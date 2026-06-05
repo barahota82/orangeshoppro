@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/sales_return_analytics.php';
+require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_admin_api();
 
 $pdo = db();
@@ -90,4 +91,9 @@ json_response([
             'line_discount' => (float) ($row['line_discount'] ?? 0),
         ];
     }, $items),
+    'extra_lines' => orange_invoice_ancillary_extra_lines_for_doc(
+        $pdo,
+        orange_invoice_ancillary_doc_kind_sales_return(),
+        $returnId
+    ),
 ]);

@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/catalog_multicountry_runtime.php';
+require_once __DIR__ . '/../../includes/invoice_ancillary_lines.php';
 
 $pdo = orange_admin_page_pdo();
 orange_catalog_backfill_products_country_id($pdo);
@@ -23,6 +24,11 @@ $srDefaultCurrency = orange_admin_context_currency_code($pdo);
 $srCurrencyUnit = orange_currency_display_unit($srDefaultCurrency);
 $sr2CustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $srCountryId);
 $sr2PickRows = orange_sales_doc_product_pick_rows($pdo, $srCountryId);
+
+$sr2SalesLineKinds = [];
+foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kindMeta) {
+    $sr2SalesLineKinds[] = ['key' => $kindKey, 'label_ar' => (string) ($kindMeta['label_ar'] ?? $kindKey)];
+}
 
 $sr2CustomerPickRows = [];
 if (orange_table_exists($pdo, 'customers')) {
@@ -231,6 +237,28 @@ $sr2DocSerialPreview = $sr2NavReady
         </div>
     </div>
 
+    <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:16px 0 10px;">بنود إضافية</h4>
+    <div class="admin-doc-frame">
+        <div class="table-wrap">
+            <table class="admin-table admin-doc-lines-table sr2-extra-lines-table">
+                <thead>
+                    <tr>
+                        <th class="pur-col-idx" style="width:2.5rem;">#</th>
+                        <th style="min-width:12rem;">الحساب / البند</th>
+                        <th style="width:7rem;">المبلغ</th>
+                        <th style="width:6rem;">يظهر بالطباعة</th>
+                        <th style="min-width:8rem;">تسمية طباعة</th>
+                        <th class="admin-doc-col-actions jv-print-hide" aria-label="حذف" style="width:3rem;"></th>
+                    </tr>
+                </thead>
+                <tbody id="sr2_extra_lines_body"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="actions jv-print-hide" style="margin-top:10px;">
+        <button type="button" class="btn-secondary" id="sr2_btn_add_extra">إضافة بند</button>
+    </div>
+
     <div style="margin-top:14px;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
         <span style="color:#64748b;">صافي المردود:</span>
         <strong id="sr2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#dc2626;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
@@ -250,6 +278,31 @@ $sr2DocSerialPreview = $sr2NavReady
             <button type="button" class="btn-secondary" id="sr2_btn_print" title="طباعة المردود المعروض" disabled>طباعة</button>
             <button type="button" class="btn-secondary" id="sr2_btn_new" title="مردود جديد">مردود جديد</button>
             <button type="button" id="sr2_btn_save" data-orange-perm="edit" data-orange-page="sales_returns">حفظ</button>
+        </div>
+    </div>
+</div>
+
+<div class="gl-pick-modal" id="sr2_extra_pick_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="sr2_extra_pick_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="sr2_extra_pick_title">
+        <h3 id="sr2_extra_pick_title" class="gl-pick-modal__title">اختيار حساب — بند إضافي</h3>
+        <div class="sr2-extra-source-tabs" role="tablist">
+            <button type="button" class="btn-secondary is-active" id="sr2_extra_tab_presets" data-source="presets">القائمة المحفوظة</button>
+            <button type="button" class="btn-secondary" id="sr2_extra_tab_coa" data-source="coa">الدليل المحاسبي</button>
+        </div>
+        <div id="sr2_extra_line_kind_wrap" hidden style="margin:10px 0;">
+            <label for="sr2_extra_line_kind">نوع البند</label>
+            <select id="sr2_extra_line_kind" class="admin-inp">
+                <?php foreach ($sr2SalesLineKinds as $lk): ?>
+                <option value="<?php echo htmlspecialchars((string) $lk['key'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $lk['label_ar'], ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <input type="search" id="sr2_extra_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث…" autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="sr2_extra_pick_list"></ul>
+        <div class="actions" style="margin-top:10px;flex-wrap:wrap;gap:8px;">
+            <button type="button" class="btn-secondary" id="sr2_extra_add_to_presets" hidden>أضف إلى القائمة</button>
+            <button type="button" class="btn-secondary" id="sr2_extra_pick_close">إغلاق</button>
         </div>
     </div>
 </div>
@@ -812,6 +865,7 @@ $sr2DocSerialPreview = $sr2NavReady
             }
             syncTrailing();
         }
+        sr2LoadExtraLines(res.extra_lines || []);
         recalcAll();
         sr2SetViewMode(true);
         if (sr2EditLockCtl) sr2EditLockCtl.refresh();
@@ -898,6 +952,220 @@ $sr2DocSerialPreview = $sr2NavReady
         location.reload();
     }
 
+    var SR2_SALES_LINE_KINDS = <?php echo json_encode($sr2SalesLineKinds, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+    var sr2ExtraPickSource = 'presets';
+    var sr2ExtraPickSelected = null;
+
+    function sr2ExtraLineKindLabel(key) {
+        key = String(key || '');
+        for (var i = 0; i < SR2_SALES_LINE_KINDS.length; i++) {
+            if (SR2_SALES_LINE_KINDS[i].key === key) return SR2_SALES_LINE_KINDS[i].label_ar || key;
+        }
+        return key;
+    }
+
+    function sr2ExtraAccountLabel(row) {
+        var code = String(row.account_code || '').trim();
+        var name = String(row.account_name || row.label_ar || '').trim();
+        if (code && name) return code + ' — ' + name;
+        return name || code || ('#' + (row.account_id || ''));
+    }
+
+    function sr2ExtraLineRowHtml() {
+        return '<td class="pur-col-idx"></td>'
+            + '<td><span class="sr2-extra-account-label"></span>'
+            + '<input type="hidden" class="sr2-extra-account-id" value="">'
+            + '<input type="hidden" class="sr2-extra-line-kind" value="">'
+            + '<input type="hidden" class="sr2-extra-preset-id" value="0"></td>'
+            + '<td><input type="number" class="sr2-extra-amount admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>'
+            + '<td style="text-align:center;"><input type="checkbox" class="sr2-extra-print" title="يظهر في المردود المطبوع"></td>'
+            + '<td><input type="text" class="sr2-extra-label admin-inp" placeholder="اختياري" dir="auto"></td>'
+            + '<td class="jv-print-hide"><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
+    }
+
+    function sr2RenumberExtraRows() {
+        var tb = document.getElementById('sr2_extra_lines_body');
+        if (!tb) return;
+        tb.querySelectorAll('tr.sr2-extra-line').forEach(function (tr, i) {
+            var c = tr.querySelector('.pur-col-idx');
+            if (c) c.textContent = String(i + 1);
+        });
+    }
+
+    function sr2FillExtraLineRow(tr, row) {
+        if (!tr || !row) return;
+        tr.querySelector('.sr2-extra-account-id').value = String(parseInt(String(row.account_id || '0'), 10) || 0);
+        tr.querySelector('.sr2-extra-line-kind').value = String(row.line_kind || '');
+        tr.querySelector('.sr2-extra-preset-id').value = String(parseInt(String(row.preset_id || '0'), 10) || 0);
+        var lbl = tr.querySelector('.sr2-extra-account-label');
+        if (lbl) lbl.textContent = sr2ExtraAccountLabel(row);
+        var amt = tr.querySelector('.sr2-extra-amount');
+        if (amt) amt.value = fmt3(row.amount || 0);
+        var pr = tr.querySelector('.sr2-extra-print');
+        if (pr) pr.checked = !!row.show_on_print;
+        var la = tr.querySelector('.sr2-extra-label');
+        if (la) la.value = row.label_ar || '';
+    }
+
+    function sr2AddExtraLine(row) {
+        var tb = document.getElementById('sr2_extra_lines_body');
+        if (!tb) return;
+        var tr = document.createElement('tr');
+        tr.className = 'sr2-extra-line';
+        tr.innerHTML = sr2ExtraLineRowHtml();
+        tb.appendChild(tr);
+        if (row) sr2FillExtraLineRow(tr, row);
+        var rm = tr.querySelector('.admin-doc-line-remove');
+        if (rm) rm.addEventListener('click', function () { tr.remove(); sr2RenumberExtraRows(); });
+        sr2RenumberExtraRows();
+    }
+
+    function sr2ClearExtraLines() {
+        var tb = document.getElementById('sr2_extra_lines_body');
+        if (tb) tb.innerHTML = '';
+    }
+
+    function sr2LoadExtraLines(lines) {
+        sr2ClearExtraLines();
+        (lines || []).forEach(function (row) { sr2AddExtraLine(row); });
+    }
+
+    function sr2CollectExtraLines() {
+        var out = [];
+        var tb = document.getElementById('sr2_extra_lines_body');
+        if (!tb) return out;
+        tb.querySelectorAll('tr.sr2-extra-line').forEach(function (tr) {
+            var accountId = parseInt(tr.querySelector('.sr2-extra-account-id').value, 10) || 0;
+            var lineKind = (tr.querySelector('.sr2-extra-line-kind').value || '').trim();
+            var amount = parseFloat(tr.querySelector('.sr2-extra-amount').value) || 0;
+            if (accountId <= 0 || !lineKind || amount <= 0) return;
+            out.push({
+                account_id: accountId,
+                line_kind: lineKind,
+                amount: amount,
+                label_ar: (tr.querySelector('.sr2-extra-label').value || '').trim(),
+                show_on_print: tr.querySelector('.sr2-extra-print').checked ? 1 : 0,
+                preset_id: parseInt(tr.querySelector('.sr2-extra-preset-id').value, 10) || 0
+            });
+        });
+        return out;
+    }
+
+    function sr2ExtraPickSetSource(source) {
+        sr2ExtraPickSource = source === 'coa' ? 'coa' : 'presets';
+        sr2ExtraPickSelected = null;
+        document.getElementById('sr2_extra_tab_presets').classList.toggle('is-active', sr2ExtraPickSource === 'presets');
+        document.getElementById('sr2_extra_tab_coa').classList.toggle('is-active', sr2ExtraPickSource === 'coa');
+        document.getElementById('sr2_extra_line_kind_wrap').hidden = sr2ExtraPickSource !== 'coa';
+        document.getElementById('sr2_extra_add_to_presets').hidden = sr2ExtraPickSource !== 'coa';
+        sr2ExtraPickRender(document.getElementById('sr2_extra_pick_q').value || '');
+    }
+
+    function sr2ExtraPickOpen() {
+        if (sr2ViewMode) { alert('وضع العرض — استخدم «مردود جديد»'); return; }
+        sr2ExtraPickSetSource('presets');
+        var modal = document.getElementById('sr2_extra_pick_modal');
+        modal.hidden = false;
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('gl-pick-open');
+        document.getElementById('sr2_extra_pick_q').value = '';
+        sr2ExtraPickRender('');
+        document.getElementById('sr2_extra_pick_q').focus();
+    }
+
+    function sr2ExtraPickClose() {
+        var modal = document.getElementById('sr2_extra_pick_modal');
+        if (!modal) return;
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('gl-pick-open');
+        sr2ExtraPickSelected = null;
+    }
+
+    function sr2ExtraPickConfirm(row) {
+        if (!row) return;
+        if (sr2ExtraPickSource === 'coa') {
+            var lineKind = (document.getElementById('sr2_extra_line_kind').value || '').trim();
+            if (!lineKind) { alert('اختر نوع البند.'); return; }
+            sr2AddExtraLine({
+                account_id: row.account_id || row.id,
+                account_code: row.account_code || row.code || '',
+                account_name: row.account_name || row.name || '',
+                line_kind: lineKind, amount: 0, show_on_print: false,
+                label_ar: row.name || row.account_name || '', preset_id: 0
+            });
+        } else {
+            sr2AddExtraLine({
+                account_id: row.account_id, account_code: row.account_code, account_name: row.account_name,
+                line_kind: row.line_kind, amount: 0, show_on_print: !!row.default_show_on_print,
+                label_ar: row.label_ar || row.account_name || '', preset_id: row.id || 0
+            });
+        }
+        sr2ExtraPickClose();
+    }
+
+    function sr2ExtraPickRender(q) {
+        var listEl = document.getElementById('sr2_extra_pick_list');
+        if (!listEl) return;
+        listEl.innerHTML = '<li class="gl-pick-empty">جاري التحميل…</li>';
+        q = String(q || '').trim();
+        if (sr2ExtraPickSource === 'presets') {
+            var url = '/admin/api/invoice-ancillary/presets-list.php?invoice_context=sales' + (q ? ('&q=' + encodeURIComponent(q)) : '');
+            fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    listEl.innerHTML = '';
+                    var rows = (res && res.presets) ? res.presets : [];
+                    if (!rows.length) { listEl.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>'; return; }
+                    rows.forEach(function (row) {
+                        var li = document.createElement('li');
+                        li.className = 'gl-pick-item'; li.setAttribute('role', 'button'); li.tabIndex = 0;
+                        li.textContent = sr2ExtraAccountLabel(row) + ' — ' + sr2ExtraLineKindLabel(row.line_kind);
+                        li.addEventListener('dblclick', function () { sr2ExtraPickConfirm(row); });
+                        li.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') sr2ExtraPickConfirm(row); });
+                        listEl.appendChild(li);
+                    });
+                })
+                .catch(function (e) { listEl.innerHTML = '<li class="gl-pick-empty">' + esc(e.message || String(e)) + '</li>'; });
+            return;
+        }
+        fetch('/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(q || ''), { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                listEl.innerHTML = '';
+                var rows = (res && res.accounts) ? res.accounts : [];
+                if (!rows.length) { listEl.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>'; return; }
+                rows.forEach(function (row) {
+                    var li = document.createElement('li');
+                    li.className = 'gl-pick-item'; li.setAttribute('role', 'button'); li.tabIndex = 0;
+                    var mapped = { account_id: row.id, account_code: row.code, account_name: row.name };
+                    li.textContent = sr2ExtraAccountLabel(mapped);
+                    li.addEventListener('click', function () {
+                        sr2ExtraPickSelected = mapped;
+                        listEl.querySelectorAll('.gl-pick-item').forEach(function (n) { n.classList.remove('is-selected'); });
+                        li.classList.add('is-selected');
+                    });
+                    li.addEventListener('dblclick', function () { sr2ExtraPickConfirm(mapped); });
+                    li.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') sr2ExtraPickConfirm(mapped); });
+                    listEl.appendChild(li);
+                });
+            })
+            .catch(function (e) { listEl.innerHTML = '<li class="gl-pick-empty">' + esc(e.message || String(e)) + '</li>'; });
+    }
+
+    function sr2ExtraAddToPresets() {
+        if (sr2ExtraPickSource !== 'coa' || !sr2ExtraPickSelected) { alert('اختر حساباً من الدليل أولاً.'); return; }
+        var lineKind = (document.getElementById('sr2_extra_line_kind').value || '').trim();
+        if (!lineKind) { alert('اختر نوع البند.'); return; }
+        postJSON('/admin/api/invoice-ancillary/preset-save.php', {
+            account_id: sr2ExtraPickSelected.account_id, line_kind: lineKind,
+            invoice_context: 'sales', label_ar: sr2ExtraPickSelected.account_name || '', default_show_on_print: false
+        }).then(function (res) {
+            if (!res || !res.success) { alert((res && res.message) || 'تعذر الحفظ'); return; }
+            alert(res.message || 'تمت الإضافة');
+        }).catch(function (e) { alert(e.message || String(e)); });
+    }
+
     function save() {
         if (!SR2_CAPS.can_edit) {
             alert('لا تملك صلاحية تعديل مردود المبيعات');
@@ -952,7 +1220,8 @@ $sr2DocSerialPreview = $sr2NavReady
             customer_id: customerId,
             channel: channel,
             notes: notes,
-            items: items
+            items: items,
+            extra_lines: sr2CollectExtraLines()
         };
         if (orderId > 0) payload.order_id = orderId;
         postJSON('/admin/api/sales_returns/create.php', payload).then(function (res) {
@@ -1024,6 +1293,21 @@ $sr2DocSerialPreview = $sr2NavReady
         document.getElementById('sr2_btn_save').addEventListener('click', save);
         document.getElementById('sr2_btn_new').addEventListener('click', sr2ResetNew);
         document.getElementById('sr2_btn_retrieve').addEventListener('click', sr2RetrieveFromOrder);
+
+        var sr2AddExtraBtn = document.getElementById('sr2_btn_add_extra');
+        if (sr2AddExtraBtn) sr2AddExtraBtn.addEventListener('click', sr2ExtraPickOpen);
+        var sr2ExtraBackdrop = document.getElementById('sr2_extra_pick_backdrop');
+        if (sr2ExtraBackdrop) sr2ExtraBackdrop.addEventListener('click', sr2ExtraPickClose);
+        var sr2ExtraCloseBtn = document.getElementById('sr2_extra_pick_close');
+        if (sr2ExtraCloseBtn) sr2ExtraCloseBtn.addEventListener('click', sr2ExtraPickClose);
+        var sr2ExtraTabPresets = document.getElementById('sr2_extra_tab_presets');
+        if (sr2ExtraTabPresets) sr2ExtraTabPresets.addEventListener('click', function () { sr2ExtraPickSetSource('presets'); });
+        var sr2ExtraTabCoa = document.getElementById('sr2_extra_tab_coa');
+        if (sr2ExtraTabCoa) sr2ExtraTabCoa.addEventListener('click', function () { sr2ExtraPickSetSource('coa'); });
+        var sr2ExtraQ = document.getElementById('sr2_extra_pick_q');
+        if (sr2ExtraQ) sr2ExtraQ.addEventListener('input', function () { sr2ExtraPickRender(this.value || ''); });
+        var sr2ExtraAddPreset = document.getElementById('sr2_extra_add_to_presets');
+        if (sr2ExtraAddPreset) sr2ExtraAddPreset.addEventListener('click', sr2ExtraAddToPresets);
         var orderRefEl = document.getElementById('sr2_order_ref');
         if (orderRefEl) {
             orderRefEl.addEventListener('keydown', function (e) {

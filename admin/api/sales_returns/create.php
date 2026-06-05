@@ -16,6 +16,7 @@ require_once __DIR__ . '/../../../includes/sales_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
+require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_admin_api();
 
 try {
@@ -31,6 +32,10 @@ try {
     $orderIdOpt = (int) ($data['order_id'] ?? 0);
     $items = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
     $notes = trim((string) ($data['notes'] ?? ''));
+    $extraInput = orange_invoice_ancillary_parse_request_lines(
+        $data,
+        orange_invoice_ancillary_doc_kind_sales_return()
+    );
 
     if (!in_array($channel, ['cash', 'online', 'credit'], true) || $items === []) {
         json_response(['success' => false, 'message' => 'بيانات مردود المبيعات غير صحيحة'], 422);
@@ -189,6 +194,21 @@ try {
         }
     }
 
+    if (orange_invoice_ancillary_tables_ready($pdo)) {
+        orange_invoice_ancillary_extra_lines_replace_for_doc(
+            $pdo,
+            orange_invoice_ancillary_doc_kind_sales_return(),
+            $returnId,
+            $returnCountryId,
+            $extraInput
+        );
+    }
+    $extraRows = orange_invoice_ancillary_extra_lines_journal_rows($extraInput);
+    /* أثر البنود على المبلغ المردود للعميل: عكس اتجاه البيع (دائن−مدين). */
+    $extraTotals = orange_invoice_ancillary_extra_lines_totals($extraInput);
+    $extraDelta = round((float) $extraTotals['credit'] - (float) $extraTotals['debit'], 4);
+    $customerRefundTotal = round($revenueTotal + $extraDelta, 4);
+
     $now = date('Y-m-d H:i:s');
     $pendingRev = orange_gl_pending_source_key('sales_return', $returnId, 'sale');
     $pendingCogs = orange_gl_pending_source_key('sales_return', $returnId, 'cogs');
@@ -221,7 +241,52 @@ try {
                 'entry_type' => 'order_return_sale',
             ]);
             if ($glRev['legacy_ar_subledger']) {
-                orange_sales_return_record_ar_subledger($pdo, $returnId, $customerId, $channel, $revenueTotal);
+                orange_sales_return_record_ar_subledger($pdo, $returnId, $customerId, $channel, $customerRefundTotal);
+            }
+        }
+
+        /* بنود إضافية (VAT/شحن/خصم) — أسطر GL عكسية مقابل حساب النقد/الذمة نفسه. */
+        foreach ($extraRows as $jr) {
+            $accId = (int) ($jr['account_id'] ?? 0);
+            $memo = trim((string) ($jr['memo'] ?? 'بند مردود'));
+            if ($accId <= 0) {
+                continue;
+            }
+            if ((float) ($jr['credit'] ?? 0) > 0.0001) {
+                $exDebit = $accId;
+                $exCredit = (int) $glRev['credit'];
+                $exAmount = round((float) $jr['credit'], 4);
+            } elseif ((float) ($jr['debit'] ?? 0) > 0.0001) {
+                $exDebit = (int) $glRev['credit'];
+                $exCredit = $accId;
+                $exAmount = round((float) $jr['debit'], 4);
+            } else {
+                continue;
+            }
+            if ($exDebit === $exCredit || $exAmount <= 0.0001) {
+                continue;
+            }
+            if (orange_gl_use_pending_queue($pdo)) {
+                orange_gl_pending_enqueue_simple($pdo, [
+                    'reference' => $pendingRev . '-EX' . $accId,
+                    'source_label' => $retNum,
+                    'movement_at' => $now,
+                    'voucher_date' => $now,
+                    'account_debit' => $exDebit,
+                    'account_credit' => $exCredit,
+                    'amount' => $exAmount,
+                    'description' => 'مردود — ' . $memo,
+                    'entry_type' => 'order_return_sale',
+                ]);
+            } else {
+                orange_journal_insert_line($pdo, [
+                    'date' => $now,
+                    'account_debit' => $exDebit,
+                    'account_credit' => $exCredit,
+                    'amount' => $exAmount,
+                    'description' => 'مردود — ' . $memo,
+                    'entry_type' => 'order_return_sale',
+                ]);
             }
         }
     }

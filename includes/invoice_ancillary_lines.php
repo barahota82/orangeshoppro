@@ -18,6 +18,11 @@ function orange_invoice_ancillary_doc_kind_sales(): string
     return 'sales';
 }
 
+function orange_invoice_ancillary_doc_kind_sales_return(): string
+{
+    return 'sales_return';
+}
+
 /**
  * @return list<string>
  */
@@ -26,6 +31,7 @@ function orange_invoice_ancillary_doc_kinds(): array
     return [
         orange_invoice_ancillary_doc_kind_purchase(),
         orange_invoice_ancillary_doc_kind_sales(),
+        orange_invoice_ancillary_doc_kind_sales_return(),
     ];
 }
 
@@ -99,7 +105,12 @@ function orange_invoice_ancillary_line_kind_side(string $lineKind): ?string
 
 function orange_invoice_ancillary_context_for_doc_kind(string $docKind): string
 {
-    return $docKind === orange_invoice_ancillary_doc_kind_sales() ? 'sales' : 'purchase';
+    if ($docKind === orange_invoice_ancillary_doc_kind_sales()
+        || $docKind === orange_invoice_ancillary_doc_kind_sales_return()) {
+        return 'sales';
+    }
+
+    return 'purchase';
 }
 
 function orange_invoice_ancillary_context_matches(string $invoiceContext, string $docKind): bool
