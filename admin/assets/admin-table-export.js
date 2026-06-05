@@ -200,8 +200,11 @@
 
     function exportButtons(table, inline) {
         var name = table.getAttribute('data-export-name') || 'report';
+        /* وسم مختصر للزر عند تعدّد الجداول في نفس التقرير (مثلاً «الإيرادات»/«المصروفات»). */
+        var shortLabel = table.getAttribute('data-export-label') || '';
+        var excelLabel = shortLabel !== '' ? 'Excel - ' + shortLabel : 'Excel';
         var out = [];
-        var bx = makeBtn('Excel', function () { exportExcel(table, name); });
+        var bx = makeBtn(excelLabel, function () { exportExcel(table, name); });
         out.push(bx);
         /* CSV اختياري (مطفأ افتراضياً بقرار المالك 2026-06-06) — يُفعَّل بسمة data-export-csv. */
         if (table.hasAttribute('data-export-csv')) {

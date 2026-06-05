@@ -11,6 +11,8 @@ require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
+require_once __DIR__ . '/../../includes/company_settings.php';
+$companyNameAr = orange_company_settings_name_ar($pdo);
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $includeAging = isset($_GET['aging']) && $_GET['aging'] === '1';
@@ -178,7 +180,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 <div class="card admin-fy-card" id="partner-balances-customers">
     <h3 class="card-title">أرصدة العملاء</h3>
     <div class="table-wrap admin-fy-table-wrap">
-        <table class="admin-fy-table">
+        <table class="admin-fy-table" data-export-name="أرصدة العملاء" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
             <thead>
                 <tr>
                     <th>#</th><th>الاسم</th><th>الهاتف</th><th>الرصيد</th><th>حد ائتمان</th><th>تجاوز</th>
@@ -211,7 +213,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 <div class="card admin-fy-card" id="partner-balances-suppliers">
     <h3 class="card-title">أرصدة الموردين</h3>
     <div class="table-wrap admin-fy-table-wrap">
-        <table class="admin-fy-table">
+        <table class="admin-fy-table" data-export-name="أرصدة الموردين" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
             <thead>
                 <tr>
                     <th>#</th><th>الاسم</th><th>الهاتف</th><th>الذمة</th>

@@ -8,9 +8,11 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/sales_return_analytics.php';
 require_once __DIR__ . '/../../includes/sales_doc_channel.php';
+require_once __DIR__ . '/../../includes/company_settings.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$srrCompanyNameAr = orange_company_settings_name_ar($pdo);
 
 $repCountryId = orange_admin_context_country_id($pdo);
 $repMoney = orange_admin_currency_context($pdo);
@@ -473,7 +475,7 @@ $csvHref = $baseUrl . '&' . http_build_query($csvQ);
         <p class="muted" style="margin:0;">لا توجد مردودات في المدى المحدد.</p>
     <?php else: ?>
     <div class="table-wrap">
-        <table>
+        <table data-export-name="تفاصيل مردودات المبيعات" data-export-company="<?php echo htmlspecialchars($srrCompanyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
             <thead>
                 <tr>
                     <th>مردود</th>
