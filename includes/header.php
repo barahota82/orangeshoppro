@@ -208,6 +208,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
         window.APP_CHANNEL_ID = <?php echo (int)($channel['id'] ?? 0); ?>;
         window.APP_CHANNEL_SLUG = <?php echo json_encode($channelSlug, JSON_UNESCAPED_UNICODE); ?>;
         window.APP_COUNTRY_ID = <?php echo (int)($countryId ?? 0); ?>;
+        window.ORANGE_SF_CURRENCY_UNIT = <?php echo json_encode(orange_storefront_currency_unit(db(), (int) ($countryId ?? 0)), JSON_UNESCAPED_UNICODE); ?>;
         window.APP_COUNTRY_CODE = <?php echo json_encode($countryCode ?? '', JSON_UNESCAPED_UNICODE); ?>;
         window.APP_COUNTRY_CURRENCY = <?php echo json_encode($countryCurrency ?? '', JSON_UNESCAPED_UNICODE); ?>;
         window.ORANGE_ACCOUNT_CHANNEL = <?php echo json_encode($orangeAccountChannelForJs, JSON_UNESCAPED_UNICODE); ?>;

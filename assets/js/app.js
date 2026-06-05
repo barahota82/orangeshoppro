@@ -1,5 +1,8 @@
 function formatMoney(v) {
-    return Number(v).toFixed(2) + ' KD';
+    var unit = (typeof window !== 'undefined' && window.ORANGE_SF_CURRENCY_UNIT)
+        ? String(window.ORANGE_SF_CURRENCY_UNIT)
+        : 'KD';
+    return Number(v).toFixed(2) + ' ' + unit;
 }
 
 /**

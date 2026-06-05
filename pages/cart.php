@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
+require_once __DIR__ . '/../includes/countries.php';
 require_once __DIR__ . '/../includes/storefront_account.php';
 require_once __DIR__ . '/../includes/delivery_areas.php';
 require_once __DIR__ . '/../includes/storefront_payment_settings.php';
@@ -36,7 +37,7 @@ $orangeOrderStatusLabelsCart = [
 $orangeMyOrderUiCart = [
     'status_label' => t('order_status_label'),
     'order_total_label' => t('order_total_label'),
-    'currency' => t('currency_kd'),
+    'currency' => orange_storefront_currency_unit(db()),
     'cancel' => t('customer_cancel_order'),
     'cancel_confirm' => t('customer_cancel_confirm'),
     'cancel_ok' => t('customer_cancel_ok'),

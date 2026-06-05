@@ -85,7 +85,7 @@ $sfProductJsonLd = [
     'sku' => trim((string) ($product['item_code'] ?? '')) ?: (string) $id,
     'offers' => [
         '@type' => 'Offer',
-        'priceCurrency' => 'KWD',
+        'priceCurrency' => orange_storefront_currency_code($pdo),
         'price' => number_format((float) ($product['price'] ?? 0), 3, '.', ''),
         'availability' => 'https://schema.org/InStock',
         'url' => $ORANGE_STOREFRONT_CANONICAL_URL ?? '',
@@ -396,7 +396,7 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
 
         <div class="product-info">
             <h2 class="product-info__title"><?php echo htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'); ?></h2>
-            <div class="price-row product-info__price"><strong><?php echo number_format((float)$product['price'], 2); ?> <?php echo htmlspecialchars(t('currency_kd'), ENT_QUOTES, 'UTF-8'); ?></strong></div>
+            <div class="price-row product-info__price"><strong><?php echo number_format((float)$product['price'], 2); ?> <?php echo htmlspecialchars(orange_storefront_currency_unit($pdo), ENT_QUOTES, 'UTF-8'); ?></strong></div>
 
             <?php if ($totalStock > 0): ?>
             <div id="productStockBanner" class="stock-banner" role="status" aria-live="polite" hidden></div>

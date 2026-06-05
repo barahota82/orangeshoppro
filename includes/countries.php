@@ -389,6 +389,48 @@ function orange_storefront_current_country_code(PDO $pdo): string
     return $memo;
 }
 
+/**
+ * رمز عملة (ISO) للدولة النشطة في المتجر — countries.currency_code ثم الخريطة المرجعية.
+ */
+function orange_storefront_currency_code(PDO $pdo, ?int $countryId = null): string
+{
+    $cid = ($countryId !== null && $countryId > 0) ? $countryId : orange_storefront_current_country_id($pdo);
+    $code = 'KWD';
+    if ($cid > 0) {
+        $row = orange_country_row_by_id($pdo, $cid, false);
+        if ($row !== null) {
+            $fromDb = strtoupper(trim((string) ($row['currency_code'] ?? '')));
+            if (preg_match('/^[A-Z]{3}$/', $fromDb)) {
+                return $fromDb;
+            }
+            $fromMap = orange_countries_currency_for_code((string) ($row['code'] ?? ''));
+            if (preg_match('/^[A-Z]{3}$/', $fromMap)) {
+                return $fromMap;
+            }
+        }
+    }
+
+    return $code;
+}
+
+/**
+ * وحدة عرض العملة في واجهة المتجر حسب الدولة النشطة واللغة (عربي: رمز محلي؛ غير ذلك ISO/KD).
+ */
+function orange_storefront_currency_unit(PDO $pdo, ?int $countryId = null): string
+{
+    $code = orange_storefront_currency_code($pdo, $countryId);
+    $lang = function_exists('current_lang') ? current_lang() : 'ar';
+    $arUnits = [
+        'KWD' => 'د.ك', 'EGP' => 'ج.م', 'SAR' => 'ر.س', 'AED' => 'د.إ',
+        'QAR' => 'ر.ق', 'BHD' => 'د.ب', 'OMR' => 'ر.ع', 'JOD' => 'د.أ',
+    ];
+    if ($lang === 'ar') {
+        return $arUnits[$code] ?? $code;
+    }
+
+    return $code === 'KWD' ? 'KD' : $code;
+}
+
 function orange_storefront_current_country_id(PDO $pdo): int
 {
     static $memo = null;

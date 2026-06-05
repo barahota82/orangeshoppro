@@ -1606,13 +1606,14 @@ function orangeFinishCheckoutSuccess(result, opts) {
     if (typeof result.total === 'number' && Number.isFinite(result.total)) {
         okMsg += ' · ' + (T.cart_total_label || 'Total') + ' ' + formatMoney(result.total);
     }
+    const sfUnit = (typeof window !== 'undefined' && window.ORANGE_SF_CURRENCY_UNIT) ? String(window.ORANGE_SF_CURRENCY_UNIT) : 'KD';
     const cd = typeof result.combo_discount === 'number' ? result.combo_discount : 0;
     if (cd > 1e-6) {
-        okMsg += ' · ' + (T.cart_combo_discount_label || '') + ' −' + Number(cd).toFixed(2) + ' KD';
+        okMsg += ' · ' + (T.cart_combo_discount_label || '') + ' −' + Number(cd).toFixed(2) + ' ' + sfUnit;
     }
     const pd = typeof result.promotion_discount === 'number' ? result.promotion_discount : 0;
     if (pd > 1e-6) {
-        okMsg += ' · ' + (T.cart_promotion_discount_label || '') + ' −' + Number(pd).toFixed(2) + ' KD';
+        okMsg += ' · ' + (T.cart_promotion_discount_label || '') + ' −' + Number(pd).toFixed(2) + ' ' + sfUnit;
     }
     orangeShowToast(okMsg, Math.max(3400, okMsg.length > 72 ? 4800 : 3400));
     setTimeout(() => {

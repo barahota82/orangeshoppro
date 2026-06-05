@@ -58,6 +58,7 @@ $canUnifiedProductSql = $navUnified
     && orange_table_has_column($pdo, 'products', 'product_type_id');
 
 $sfHomeCountryId = orange_storefront_current_country_id($pdo);
+$sfHomeCurrencyUnit = orange_storefront_currency_unit($pdo, $sfHomeCountryId);
 $homeProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $sfHomeCountryId);
 $homeDeptActiveSql = orange_department_country_active_sql($pdo, 'd', $sfHomeCountryId);
 
@@ -434,8 +435,8 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                     }
                     ?>
                     <div class="price-row">
-                        <strong><?php echo number_format((float) $p['price'] - (float) $p['discount'], 2); ?> KD</strong>
-                        <span class="old-price"><?php echo number_format((float) $p['price'], 2); ?> KD</span>
+                        <strong><?php echo number_format((float) $p['price'] - (float) $p['discount'], 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                        <span class="old-price"><?php echo number_format((float) $p['price'], 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
                     </div>
                     <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]), ENT_QUOTES, 'UTF-8'); ?>">
                         <?php echo htmlspecialchars(t('view_product'), ENT_QUOTES, 'UTF-8'); ?>
@@ -475,7 +476,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                     }
                     ?>
                     <div class="price-row">
-                        <strong><?php echo number_format((float) $p['price'], 2); ?> KD</strong>
+                        <strong><?php echo number_format((float) $p['price'], 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
                     </div>
                     <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]), ENT_QUOTES, 'UTF-8'); ?>">
                         <?php echo htmlspecialchars(t('view_product'), ENT_QUOTES, 'UTF-8'); ?>
