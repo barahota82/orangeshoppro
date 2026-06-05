@@ -60,16 +60,48 @@ foreach ($variants as &$icVarRow) {
 }
 unset($icVarRow);
 
-$movements = $pdo->prepare("
-    SELECT sm.*, pv.color AS variant_color, pv.size AS variant_size
+$icValidDate = static function (string $raw): string {
+    $raw = trim($raw);
+    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw) === 1 ? $raw : '';
+};
+$icFrom = isset($_GET['from']) ? $icValidDate((string) $_GET['from']) : '';
+$icTo = isset($_GET['to']) ? $icValidDate((string) $_GET['to']) : '';
+if ($icFrom !== '' && $icTo !== '' && strcmp($icFrom, $icTo) > 0) {
+    [$icFrom, $icTo] = [$icTo, $icFrom];
+}
+$icHasRange = $icFrom !== '' || $icTo !== '';
+
+$icMvSql = "SELECT sm.*, pv.color AS variant_color, pv.size AS variant_size
     FROM stock_movements sm
     LEFT JOIN product_variants pv ON pv.id = sm.variant_id
-    WHERE sm.product_id = ?
-    ORDER BY sm.created_at DESC, sm.id DESC
-    LIMIT 80
-");
-$movements->execute([$productId]);
+    WHERE sm.product_id = ?";
+$icMvParams = [$productId];
+if ($icFrom !== '') {
+    $icMvSql .= ' AND DATE(sm.created_at) >= ?';
+    $icMvParams[] = $icFrom;
+}
+if ($icTo !== '') {
+    $icMvSql .= ' AND DATE(sm.created_at) <= ?';
+    $icMvParams[] = $icTo;
+}
+$icMvSql .= ' ORDER BY sm.created_at DESC, sm.id DESC';
+$icMvSql .= $icHasRange ? ' LIMIT 1000' : ' LIMIT 80';
+$movements = $pdo->prepare($icMvSql);
+$movements->execute($icMvParams);
 $movements = $movements->fetchAll(PDO::FETCH_ASSOC);
+
+/* ملخص الفترة: وارد/صادر/صافي من فرق الرصيد لكل حركة. */
+$icPeriodIn = 0;
+$icPeriodOut = 0;
+foreach ($movements as $icMv) {
+    $delta = (int) ($icMv['new_stock'] ?? 0) - (int) ($icMv['old_stock'] ?? 0);
+    if ($delta > 0) {
+        $icPeriodIn += $delta;
+    } elseif ($delta < 0) {
+        $icPeriodOut += -$delta;
+    }
+}
+$icPeriodNet = $icPeriodIn - $icPeriodOut;
 
 $img = storefront_product_image_href((string) ($product['main_image'] ?? ''));
 
@@ -183,8 +215,36 @@ foreach ($variants as $vSum) {
     </div>
 </div>
 
+<div class="card gl-acc-stmt-no-print">
+    <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
+        <input type="hidden" name="page" value="item_card">
+        <input type="hidden" name="product_id" value="<?php echo (int) $productId; ?>">
+        <div>
+            <label for="ic_from">من تاريخ</label>
+            <input type="date" id="ic_from" name="from" class="admin-inp" lang="en" dir="ltr" value="<?php echo htmlspecialchars($icFrom, ENT_QUOTES, 'UTF-8'); ?>">
+        </div>
+        <div>
+            <label for="ic_to">إلى تاريخ</label>
+            <input type="date" id="ic_to" name="to" class="admin-inp" lang="en" dir="ltr" value="<?php echo htmlspecialchars($icTo, ENT_QUOTES, 'UTF-8'); ?>">
+        </div>
+        <div><button type="submit">عرض الفترة</button></div>
+        <?php if ($icHasRange): ?>
+            <div><a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=item_card&product_id=' . (int) $productId), ENT_QUOTES, 'UTF-8'); ?>">كل الحركات</a></div>
+        <?php endif; ?>
+    </form>
+</div>
+
 <div class="card">
-    <h2 class="card-title">آخر حركات المخزون</h2>
+    <h2 class="card-title"><?php echo $icHasRange ? 'حركات المخزون خلال الفترة' : 'آخر حركات المخزون'; ?></h2>
+    <p class="page-subtitle" style="margin:0 0 10px;">
+        <strong>الرصيد الحالي:</strong> <?php echo (int) $icTotalStock; ?>
+        &nbsp;|&nbsp; <strong>وارد الفترة:</strong> <?php echo (int) $icPeriodIn; ?>
+        &nbsp;|&nbsp; <strong>صادر الفترة:</strong> <?php echo (int) $icPeriodOut; ?>
+        &nbsp;|&nbsp; <strong>صافي الفترة:</strong> <?php echo (int) $icPeriodNet; ?>
+        <?php if ($icHasRange): ?>
+            &nbsp;|&nbsp; <strong>رصيد أول المدة (تقديري):</strong> <?php echo (int) ($icTotalStock - $icPeriodNet); ?>
+        <?php endif; ?>
+    </p>
     <div class="table-wrap">
         <table>
             <thead>
