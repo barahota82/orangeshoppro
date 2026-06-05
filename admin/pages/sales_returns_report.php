@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/sales_return_analytics.php';
 require_once __DIR__ . '/../../includes/sales_doc_channel.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/report_export.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -25,6 +26,7 @@ $sourceFilter = isset($_GET['source']) ? trim((string) $_GET['source']) : 'all';
 $payFilter = isset($_GET['pay']) ? trim((string) $_GET['pay']) : 'all';
 $channelFilter = isset($_GET['channel_id']) ? (int) $_GET['channel_id'] : 0;
 $exportCsv = isset($_GET['export']) && (string) $_GET['export'] === 'csv';
+$exportXls = isset($_GET['export']) && (string) $_GET['export'] === 'xls';
 
 if (!in_array($sourceFilter, ['all', 'company', 'online'], true)) {
     $sourceFilter = 'all';
@@ -228,7 +230,7 @@ if (orange_table_exists($pdo, 'sales_returns') && orange_table_exists($pdo, 'sal
     $stProd->execute($whereParams);
     $byProduct = $stProd->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-    $detailLimit = $exportCsv ? 5000 : 300;
+    $detailLimit = ($exportCsv || $exportXls) ? 5000 : 300;
     $detailCols = 'sr.id, sr.total, sr.type, sr.notes';
     if ($hasCreatedAt) {
         $detailCols .= ', sr.created_at';
@@ -304,6 +306,40 @@ if ($exportCsv) {
         fclose($out);
     }
     exit;
+}
+
+if ($exportXls) {
+    $xlsRows = [];
+    foreach ($detailRows as $dr) {
+        $retRef = $hasReturnNumber && trim((string) ($dr['return_number'] ?? '')) !== ''
+            ? trim((string) $dr['return_number'])
+            : ('SR-' . (int) ($dr['id'] ?? 0));
+        $created = $hasCreatedAt ? orange_format_date_dmY((string) ($dr['created_at'] ?? '')) : '';
+        $xlsRows[] = [
+            $retRef,
+            $created,
+            (string) ($dr['invoice_reference'] ?? ''),
+            orange_sales_return_source_kind_label((string) ($dr['source_kind'] ?? '')),
+            orange_sales_return_payment_type_label((string) ($dr['type'] ?? '')),
+            (string) ($dr['channel_name'] ?? ''),
+            (string) ($dr['customer_name'] ?? ''),
+            (float) ($dr['total'] ?? 0),
+            (string) ($dr['notes'] ?? ''),
+        ];
+    }
+    $xlsSubtitle = '';
+    if ($fromRaw !== '' || $toRaw !== '') {
+        $xlsSubtitle = 'من ' . orange_format_date_dmY($fromRaw !== '' ? $fromRaw : '') . ' إلى ' . orange_format_date_dmY($toRaw !== '' ? $toRaw : '');
+    }
+    orange_report_xls_output(
+        'تفاصيل مردودات المبيعات',
+        'تفاصيل مردودات المبيعات',
+        $srrCompanyNameAr,
+        $xlsSubtitle,
+        ['مردود', 'تاريخ', 'مرجع فاتورة', 'مصدر', 'تحصيل', 'قناة تسويق', 'عميل', 'المبلغ', 'ملاحظات'],
+        $xlsRows,
+        [7]
+    );
 }
 
 $baseUrl = storefront_public_path('/admin/index.php') . '?page=sales_returns_report';
@@ -384,8 +420,13 @@ $csvQ = $_GET;
 $csvQ['page'] = 'sales_returns_report';
 $csvQ['export'] = 'csv';
 $csvHref = $baseUrl . '&' . http_build_query($csvQ);
+$xlsQ = $_GET;
+$xlsQ['page'] = 'sales_returns_report';
+$xlsQ['export'] = 'xls';
+$xlsHref = $baseUrl . '&' . http_build_query($xlsQ);
 ?>
-<p style="margin:0 0 1rem;">
+<p style="margin:0 0 1rem;display:flex;gap:8px;flex-wrap:wrap;">
+    <a class="btn btn-secondary" href="<?php echo htmlspecialchars($xlsHref, ENT_QUOTES, 'UTF-8'); ?>">تصدير Excel (كل التفاصيل)</a>
     <a class="btn btn-secondary" href="<?php echo htmlspecialchars($csvHref, ENT_QUOTES, 'UTF-8'); ?>">تصدير CSV (تفاصيل)</a>
 </p>
 
@@ -475,7 +516,7 @@ $csvHref = $baseUrl . '&' . http_build_query($csvQ);
         <p class="muted" style="margin:0;">لا توجد مردودات في المدى المحدد.</p>
     <?php else: ?>
     <div class="table-wrap">
-        <table data-export-name="تفاصيل مردودات المبيعات" data-export-company="<?php echo htmlspecialchars($srrCompanyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
+        <table>
             <thead>
                 <tr>
                     <th>مردود</th>
