@@ -56,6 +56,7 @@ function orange_admin_permission_mega_sections(): array
                 [
                     'title' => 'التقارير',
                     'pages' => [
+                        ['page' => 'accounting_reports_index', 'label' => 'فهرس التقارير المحاسبية'],
                         ['page' => 'journal_voucher_reports', 'label' => 'تقارير السندات'],
                         ['page' => 'partner_account_statement', 'label' => 'كشف حساب'],
                         ['page' => 'report_account_list', 'label' => 'قائمة الحسابات'],
@@ -296,6 +297,7 @@ function orange_admin_permission_actions_for_page(string $page): array
         'channel_analytics',
         'sales_returns_report',
         'logs',
+        'accounting_reports_index',
         'journal_voucher_reports',
         'partner_account_statement',
         'partner_reports',

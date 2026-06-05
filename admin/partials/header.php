@@ -334,7 +334,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'group' => true,
                     'title' => 'الفواتير والمردود',
                     'items' => [
-                        ['page' => 'invoice', 'href' => '/admin/index.php?page=invoice', 'label' => 'فاتورة أونلاين', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'invoice', 'href' => '/admin/index.php?page=invoice', 'label' => 'طباعة فاتورة طلب', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'online_sales_invoice', 'href' => '/admin/index.php?page=online_sales_invoice', 'label' => 'فواتير أونلاين', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'company_sales_invoice', 'href' => '/admin/index.php?page=company_sales_invoice', 'label' => 'فاتورة مبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'sales_returns', 'href' => '/admin/index.php?page=sales_returns', 'label' => 'مردود المبيعات', 'class' => '', 'sub' => false],
@@ -396,6 +396,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'group' => true,
                     'title' => 'التقارير',
                     'items' => [
+                        ['page' => 'accounting_reports_index', 'href' => '/admin/index.php?page=accounting_reports_index', 'label' => 'فهرس التقارير المحاسبية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'journal_voucher_reports', 'href' => '/admin/index.php?page=journal_voucher_reports', 'label' => 'تقارير السندات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'partner_account_statement', 'href' => '/admin/index.php?page=partner_account_statement', 'label' => 'كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'report_account_list', 'href' => '/admin/index.php?page=report_account_list', 'label' => 'قائمة الحسابات', 'class' => 'admin-nav-sub', 'sub' => true],

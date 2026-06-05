@@ -110,6 +110,7 @@ function orange_admin_page_resource(string $page): string
         'report_trial_balance' => 'accounting',
         'report_income_statement' => 'accounting',
         'report_balance_sheet' => 'accounting',
+        'accounting_reports_index' => 'accounting',
         'report_pl_monthly' => 'accounting',
         'report_pl_compare_years' => 'accounting',
         'report_cash_flow' => 'accounting',
@@ -572,7 +573,7 @@ function orange_admin_purge_obsolete_page_permissions(PDO $pdo): void
         return;
     }
     try {
-        $pdo->exec("DELETE FROM admin_permissions WHERE resource_key IN ('page:gl_posting', 'page:accounting_reports_index')");
+        $pdo->exec("DELETE FROM admin_permissions WHERE resource_key IN ('page:gl_posting')");
         $insMarker = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
         $insMarker->execute([$marker]);
     } catch (Throwable $e) {

@@ -67,6 +67,7 @@ $allowed = [
     'report_trial_balance',
     'report_income_statement',
     'report_balance_sheet',
+    'accounting_reports_index',
     'report_pl_monthly',
     'report_pl_compare_years',
     'report_cash_flow',
