@@ -80,6 +80,17 @@
         downloadBlob(safeName(name) + '.csv', 'text/csv;charset=utf-8', ['\ufeff' + lines.join('\r\n')]);
     }
 
+    function htmlEsc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function nowStamp() {
+        var d = new Date();
+        function p(n) { return (n < 10 ? '0' : '') + n; }
+        return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+
     function exportExcel(table, name) {
         var clone = table.cloneNode(true);
         var skips = clone.querySelectorAll('[data-export-skip], .gl-acc-stmt-no-print');
@@ -89,7 +100,20 @@
             }
         }
         var sheet = safeName(name).substring(0, 31);
-        var html =
+        /* رأس التقرير داخل الملف: شركة / عنوان / فترة / تاريخ الطباعة. */
+        var company = table.getAttribute('data-export-company') || '';
+        var title = table.getAttribute('data-export-title') || name;
+        var subtitle = table.getAttribute('data-export-subtitle') || '';
+        var head = '';
+        if (company !== '') {
+            head += '<div style="font-size:14pt;font-weight:bold;">' + htmlEsc(company) + '</div>';
+        }
+        head += '<div style="font-size:13pt;font-weight:bold;">' + htmlEsc(title) + '</div>';
+        if (subtitle !== '') {
+            head += '<div style="font-size:11pt;">' + htmlEsc(subtitle) + '</div>';
+        }
+        head += '<div style="font-size:9pt;color:#666666;">تاريخ الطباعة: ' + htmlEsc(nowStamp()) + '</div><br>';
+        var htmlDoc =
             '\ufeff<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
             'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
             'xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">' +
@@ -98,8 +122,8 @@
             '</x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->' +
             '<style>table{border-collapse:collapse;}td,th{border:0.5pt solid #999999;padding:2px 5px;mso-number-format:"\\@";}' +
             'th{background:#f0f0f0;font-weight:bold;}</style></head>' +
-            '<body dir="rtl">' + clone.outerHTML + '</body></html>';
-        downloadBlob(safeName(name) + '.xls', 'application/vnd.ms-excel;charset=utf-8', [html]);
+            '<body dir="rtl">' + head + clone.outerHTML + '</body></html>';
+        downloadBlob(safeName(name) + '.xls', 'application/vnd.ms-excel;charset=utf-8', [htmlDoc]);
     }
 
     function makeBtn(label, onClick) {
@@ -160,6 +184,26 @@
             }
         }
     }
+
+    /* اسم ملف PDF عند الحفظ = اسم التقرير: نضبط عنوان المستند وقت الطباعة ونعيده بعدها. */
+    function reportNameForPrint() {
+        var t = document.querySelector('table[data-export-name]');
+        return t ? (t.getAttribute('data-export-name') || '') : '';
+    }
+    var savedDocTitle = null;
+    window.addEventListener('beforeprint', function () {
+        var rn = reportNameForPrint();
+        if (rn !== '') {
+            savedDocTitle = document.title;
+            document.title = rn;
+        }
+    });
+    window.addEventListener('afterprint', function () {
+        if (savedDocTitle !== null) {
+            document.title = savedDocTitle;
+            savedDocTitle = null;
+        }
+    });
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function () { init(document); });
