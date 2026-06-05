@@ -13,6 +13,7 @@ require_once __DIR__ . '/order_fulfillment.php';
 require_once __DIR__ . '/edit_lock.php';
 require_once __DIR__ . '/journal_voucher.php';
 require_once __DIR__ . '/phone_validation.php';
+require_once __DIR__ . '/invoice_ancillary_lines.php';
 
 /**
  * @return array{sql:string,params:list<mixed>}|null
@@ -200,9 +201,19 @@ function orange_sales_invoice_online_document_payload(PDO $pdo, int $orderId): a
         'gl_posted' => orange_sales_invoice_online_gl_posted($pdo, $order),
     ];
 
+    $extraLines = [];
+    if (orange_invoice_ancillary_tables_ready($pdo)) {
+        $extraLines = orange_invoice_ancillary_extra_lines_for_doc(
+            $pdo,
+            orange_invoice_ancillary_doc_kind_sales(),
+            $orderId
+        );
+    }
+
     return [
         'order' => $orderOut,
         'items' => $items,
+        'extra_lines' => $extraLines,
         'customer' => $customerOut,
     ];
 }
@@ -338,6 +349,11 @@ function orange_sales_invoice_online_apply_update(PDO $pdo, int $orderId, array 
     $total = (float) $validated['total'];
     $validatedItems = $validated['items'];
 
+    $extraInput = orange_invoice_ancillary_parse_request_lines(
+        $data,
+        orange_invoice_ancillary_doc_kind_sales()
+    );
+
     $pdo->beginTransaction();
 
     $pdo->prepare('DELETE FROM order_items WHERE order_id = ?')->execute([$orderId]);
@@ -393,6 +409,16 @@ function orange_sales_invoice_online_apply_update(PDO $pdo, int $orderId, array 
     }
 
     orange_sales_invoice_company_insert_items($pdo, $orderId, $validatedItems);
+
+    if (orange_invoice_ancillary_tables_ready($pdo)) {
+        orange_invoice_ancillary_extra_lines_replace_for_doc(
+            $pdo,
+            orange_invoice_ancillary_doc_kind_sales(),
+            $orderId,
+            $orderCountryId,
+            $extraInput
+        );
+    }
 
     $ordSt = $pdo->prepare('SELECT * FROM orders WHERE id = ? LIMIT 1');
     $ordSt->execute([$orderId]);
