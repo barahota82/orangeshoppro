@@ -91,6 +91,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
     <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin-date-dmy.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin-money-fields.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin-variant-picker.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin-table-export.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </head>
 <body>
 <?php require __DIR__ . '/variant_picker_modal.php'; ?>

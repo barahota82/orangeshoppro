@@ -5359,3 +5359,20 @@ td.tb-col-name,
 .au-perm-page-label { padding-inline-start: 28px !important; font-size: 12.5px; text-align: right !important; }
 .au-perm-page .p-v, .au-perm-page .p-e, .au-perm-page .p-d, .au-perm-page .p-l, .au-perm-page .p-u { cursor: pointer; }
 .au-perm-na { font-size: 12px; user-select: none; }
+
+/* شريط تصدير جداول التقارير (Excel/CSV) — admin-table-export.js */
+.table-export-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 0 10px;
+}
+.table-export-bar__label {
+    font-size: 0.85rem;
+    color: var(--muted, #6b7280);
+}
+.table-export-bar__btn {
+    padding: 4px 12px;
+    font-size: 0.85rem;
+}
