@@ -6,9 +6,24 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/countries.php';
 require_once __DIR__ . '/../includes/delivery_areas.php';
+require_once __DIR__ . '/../includes/payments/payment_core.php';
 
 $pdoTrack = db();
 orange_catalog_ensure_storefront_page($pdoTrack);
+
+/* م1b — لوحة دفع بنكي (تظهر فقط عند تفعيل التحويل البنكي لهذه الدولة). */
+$trackCountryId = (int) orange_storefront_current_country_id($pdoTrack);
+$trackBankActive = false;
+$trackBankAccounts = [];
+try {
+    $trackBankActive = orange_payment_bank_method_active($pdoTrack, $trackCountryId);
+    if ($trackBankActive) {
+        $trackBankAccounts = orange_payment_bank_accounts($pdoTrack, $trackCountryId, true);
+    }
+} catch (Throwable $e) {
+    $trackBankActive = false;
+}
+$trackBankActive = $trackBankActive && $trackBankAccounts !== [];
 
 include __DIR__ . '/../includes/header.php';
 $trackDeliveryAreaGroups = orange_delivery_areas_storefront_groups($pdoTrack, $lang);
@@ -140,7 +155,79 @@ $orangeMyOrderUi = [
         </form>
         <div id="trackResult" class="cart-track-result track-page-result" style="margin-top:18px;" tabindex="-1" role="region" aria-live="polite" aria-label="<?php echo htmlspecialchars(t('track_result_region_aria'), ENT_QUOTES, 'UTF-8'); ?>"></div>
     </div>
+
+    <?php if ($trackBankActive): ?>
+    <div class="card-box track-page-card" id="track-bank-pay-section">
+        <h3 class="cart-section-title track-page-card__title">الدفع بتحويل بنكي</h3>
+        <p class="track-form-intro">حوِّل قيمة الطلب إلى أحد حساباتنا التالية، ثم ارفع إثبات التحويل (صورة أو PDF) مع رقم الطلب والهاتف لاعتماد الدفع.</p>
+        <div class="track-bank-accounts" style="display:grid;gap:10px;margin:12px 0;">
+            <?php foreach ($trackBankAccounts as $acc): ?>
+            <div class="track-bank-account" style="border:1px solid var(--border,#e2e2e2);border-radius:10px;padding:12px;">
+                <strong><?php echo htmlspecialchars((string) $acc['bank_name'], ENT_QUOTES, 'UTF-8'); ?></strong>
+                <?php if (trim((string) ($acc['account_name'] ?? '')) !== ''): ?>
+                    <div><?php echo htmlspecialchars((string) $acc['account_name'], ENT_QUOTES, 'UTF-8'); ?></div>
+                <?php endif; ?>
+                <?php if (trim((string) ($acc['iban'] ?? '')) !== ''): ?>
+                    <div dir="ltr">IBAN: <?php echo htmlspecialchars((string) $acc['iban'], ENT_QUOTES, 'UTF-8'); ?></div>
+                <?php endif; ?>
+                <?php if (trim((string) ($acc['account_number'] ?? '')) !== ''): ?>
+                    <div dir="ltr">Acc: <?php echo htmlspecialchars((string) $acc['account_number'], ENT_QUOTES, 'UTF-8'); ?></div>
+                <?php endif; ?>
+                <?php if (trim((string) ($acc['currency'] ?? '')) !== ''): ?>
+                    <div dir="ltr"><?php echo htmlspecialchars((string) $acc['currency'], ENT_QUOTES, 'UTF-8'); ?></div>
+                <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <hr class="track-form-divider" aria-hidden="true">
+        <form class="track-page-form" id="bank-proof-form" enctype="multipart/form-data" novalidate>
+            <div class="field">
+                <label for="bp_order_number"><?php echo htmlspecialchars(t('order_number'), ENT_QUOTES, 'UTF-8'); ?></label>
+                <input id="bp_order_number" name="order_number" autocomplete="off">
+            </div>
+            <div class="field">
+                <label for="bp_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
+                <input id="bp_phone" name="phone" inputmode="numeric" autocomplete="tel" dir="ltr">
+            </div>
+            <div class="field">
+                <label for="bp_reference">مرجع التحويل (اختياري)</label>
+                <input id="bp_reference" name="reference" autocomplete="off">
+            </div>
+            <div class="field">
+                <label for="bp_proof">إثبات التحويل (صورة / PDF)</label>
+                <input id="bp_proof" name="proof" type="file" accept="image/*,application/pdf">
+            </div>
+            <div class="actions-row track-page-actions">
+                <button type="submit" class="btn btn--track-submit">رفع الإثبات</button>
+            </div>
+        </form>
+        <p id="bp_msg" role="status" aria-live="polite" style="margin-top:10px;"></p>
+    </div>
+    <?php endif; ?>
 </div>
+
+<?php if ($trackBankActive): ?>
+<script>
+(function () {
+    var form = document.getElementById('bank-proof-form');
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var msg = document.getElementById('bp_msg');
+        var fileEl = document.getElementById('bp_proof');
+        if (!fileEl.files || !fileEl.files[0]) { msg.textContent = 'يرجى إرفاق ملف الإثبات.'; return; }
+        var fd = new FormData(form);
+        msg.textContent = 'جاري الرفع…';
+        fetch(<?php echo json_encode(storefront_public_path('/api/payments/bank-proof.php'), JSON_UNESCAPED_SLASHES); ?>, {
+            method: 'POST', credentials: 'same-origin', body: fd
+        }).then(function (r) { return r.json(); }).then(function (res) {
+            msg.textContent = (res && res.message) || (res && res.success ? 'تم' : 'تعذر الرفع');
+            if (res && res.success) { form.reset(); }
+        }).catch(function () { msg.textContent = 'تعذر الرفع، حاول لاحقاً.'; });
+    });
+})();
+</script>
+<?php endif; ?>
 
 <script>
 window.ORANGE_DELIVERY_AREAS = <?php echo json_encode($trackDeliveryAreas, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
