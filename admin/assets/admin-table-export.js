@@ -113,19 +113,18 @@
 
     function exportButtons(table, inline) {
         var name = table.getAttribute('data-export-name') || 'report';
+        var out = [];
         var bx = makeBtn('Excel', function () { exportExcel(table, name); });
-        var bc = makeBtn('CSV', function () { exportCsv(table, name); });
-        if (inline) {
-            bx.classList.add('table-export-inline-btn');
-            bc.classList.add('table-export-inline-btn');
+        out.push(bx);
+        /* CSV اختياري (مطفأ افتراضياً بقرار المالك 2026-06-06) — يُفعَّل بسمة data-export-csv. */
+        if (table.hasAttribute('data-export-csv')) {
+            out.push(makeBtn('CSV', function () { exportCsv(table, name); }));
         }
-        var out = [bx, bc];
         if (table.hasAttribute('data-export-print')) {
-            var bp = makeBtn('طباعة / حفظ PDF', function () { window.print(); });
-            if (inline) {
-                bp.classList.add('table-export-inline-btn');
-            }
-            out.push(bp);
+            out.push(makeBtn('طباعة / حفظ PDF', function () { window.print(); }));
+        }
+        if (inline) {
+            out.forEach(function (b) { b.classList.add('table-export-inline-btn'); });
         }
         return out;
     }
