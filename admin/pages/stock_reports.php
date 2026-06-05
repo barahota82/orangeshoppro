@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
 require_once __DIR__ . '/../../includes/stock_alerts.php';
 require_once __DIR__ . '/../../includes/order_stock.php';
+require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/cart_promo_products.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
@@ -88,6 +89,10 @@ $itemCodeExpr = $hasItemCode ? "COALESCE(NULLIF(TRIM(p.item_code), ''), CONCAT('
 $rows = [];
 $grandQty = 0;
 $grandValue = 0.0;
+$grandValuePrev = 0.0;
+$valGroups = [];
+$valShowPrev = false;
+$valPrevEnd = '';
 $reportError = '';
 
 try {
@@ -133,10 +138,45 @@ try {
             ];
         }
     } elseif ($reportKey === 'valuation') {
-        /* تقييم: ملخص لكل صنف (كمية × تكلفة) + إجمالي القيمة. */
+        /* تقييم: لكل صنف (كمية × تكلفة) مُجمّعاً حسب الفئة + مقارنة نهاية السنة المالية السابقة. */
         $wq = orange_warehouse_effective_qty_sql($pdo, $srCountryId, 'pv', 'wvs_sr');
+
+        /* نهاية السنة المالية السابقة للمقارنة (qty من حركات المخزون). */
+        $valYears = orange_fiscal_years_list($pdo);
+        $valCurStart = '';
+        foreach ($valYears as $vy) {
+            $s = (string) ($vy['start_date'] ?? '');
+            $e = (string) ($vy['end_date'] ?? '');
+            if ($s !== '' && $e !== '' && strcmp($s, $today) <= 0 && strcmp($today, $e) <= 0) {
+                $valCurStart = $s;
+                break;
+            }
+        }
+        if ($valCurStart === '' && $valYears !== []) {
+            $valCurStart = (string) ($valYears[0]['start_date'] ?? '');
+        }
+        $valPrevEnd = '';
+        foreach ($valYears as $vy) {
+            $s = (string) ($vy['start_date'] ?? '');
+            if ($valCurStart !== '' && $s !== '' && strcmp($s, $valCurStart) < 0) {
+                $e = (string) ($vy['end_date'] ?? '');
+                if ($e !== '' && strcmp($e, $valPrevEnd) > 0) {
+                    $valPrevEnd = $e;
+                }
+            }
+        }
+        $valShowPrev = $valPrevEnd !== '';
+
         $filterSql = '';
         $params = [];
+        $prevExpr = '0';
+        if ($valShowPrev) {
+            /* رصيد المتغير كما في نهاية السنة السابقة = new_stock لآخر حركة ≤ ذلك التاريخ. */
+            $prevExpr = 'COALESCE((SELECT sm_v.new_stock FROM stock_movements sm_v
+                          WHERE sm_v.variant_id = pv.id AND DATE(sm_v.created_at) <= ?
+                          ORDER BY sm_v.created_at DESC, sm_v.id DESC LIMIT 1), 0)';
+            $params[] = $valPrevEnd;
+        }
         if ($pid > 0) {
             $filterSql .= ' AND p.id = ?';
             $params[] = $pid;
@@ -148,30 +188,42 @@ try {
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, p.cost AS cost,
                        ' . $itemCodeExpr . ' AS item_code,
                        COALESCE(c.name_ar, \'\') AS category_name,
-                       COALESCE(SUM(' . $wq['expr'] . '), 0) AS total_qty
+                       COALESCE(SUM(' . $wq['expr'] . '), 0) AS total_qty,
+                       COALESCE(SUM(' . $prevExpr . '), 0) AS prev_qty
                 FROM products p
                 ' . $catJoin . '
                 INNER JOIN product_variants pv ON pv.product_id = p.id
                 ' . $wq['join'] . '
                 WHERE p.is_active = 1' . $productCountrySql . $filterSql . '
                 GROUP BY p.id, p.name, p.cost, item_code, category_name
-                ORDER BY p.name ASC, p.id ASC';
+                ORDER BY category_name ASC, p.name ASC, p.id ASC';
         $st = $pdo->prepare($sql);
         $st->execute($params);
+        $valGroups = [];
+        $grandValuePrev = 0.0;
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $qty = (int) $r['total_qty'];
             $cost = (float) $r['cost'];
             $value = $qty * $cost;
+            $prevQty = (int) $r['prev_qty'];
+            $valuePrev = $prevQty * $cost;
             $grandQty += $qty;
             $grandValue += $value;
-            $rows[] = [
+            $grandValuePrev += $valuePrev;
+            $catName = trim((string) $r['category_name']) !== '' ? (string) $r['category_name'] : '—';
+            if (!isset($valGroups[$catName])) {
+                $valGroups[$catName] = ['rows' => [], 'sub_value' => 0.0, 'sub_value_prev' => 0.0];
+            }
+            $valGroups[$catName]['rows'][] = [
                 'item_code' => (string) $r['item_code'],
                 'product_name' => (string) $r['product_name'],
-                'category_name' => (string) $r['category_name'],
                 'qty' => $qty,
                 'cost' => $cost,
                 'value' => $value,
+                'value_prev' => $valuePrev,
             ];
+            $valGroups[$catName]['sub_value'] += $value;
+            $valGroups[$catName]['sub_value_prev'] += $valuePrev;
         }
     } elseif ($reportKey === 'low') {
         $wq = orange_warehouse_effective_qty_sql($pdo, $srCountryId, 'pv', 'wvs_low');
@@ -430,22 +482,34 @@ $reportTitle = $reports[$reportKey];
                     </tbody>
                     <tfoot><tr><th colspan="4">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th class="gl-acc-stmt-col-num">—</th><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th></tr></tfoot>
                 <?php elseif ($reportKey === 'valuation'): ?>
-                    <thead><tr><th>الكود</th><th>الصنف</th><th>التصنيف</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة</th></tr></thead>
+                    <?php $valCols = $valShowPrev ? 6 : 5; ?>
+                    <thead><tr><th>الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة الحالية</th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num">نهاية <?php echo htmlspecialchars(orange_format_date_dmY($valPrevEnd), ENT_QUOTES, 'UTF-8'); ?></th><?php endif; ?></tr></thead>
                     <tbody>
-                        <?php if ($rows === []): ?>
-                            <tr><td colspan="6" class="muted">لا أصناف.</td></tr>
-                        <?php else: foreach ($rows as $r): ?>
+                        <?php if ($valGroups === []): ?>
+                            <tr><td colspan="<?php echo (int) $valCols; ?>" class="muted">لا أصناف.</td></tr>
+                        <?php else: foreach ($valGroups as $catName => $grp): ?>
+                            <tr class="ta-report-section"><td colspan="<?php echo (int) $valCols; ?>"><?php echo htmlspecialchars((string) $catName, ENT_QUOTES, 'UTF-8'); ?></td></tr>
+                            <?php foreach ($grp['rows'] as $r): ?>
                             <tr>
                                 <td dir="ltr"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo htmlspecialchars($r['category_name'] ?: '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['cost']); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['value']); ?></td>
+                                <?php if ($valShowPrev): ?><td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['value_prev']); ?></td><?php endif; ?>
+                            </tr>
+                            <?php endforeach; ?>
+                            <tr class="ta-report-subtotal">
+                                <td class="gl-acc-stmt-col-num muted">—</td>
+                                <td><strong>إجمالي <?php echo htmlspecialchars((string) $catName, ENT_QUOTES, 'UTF-8'); ?></strong></td>
+                                <td class="gl-acc-stmt-col-num">—</td>
+                                <td class="gl-acc-stmt-col-num">—</td>
+                                <td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmtMoney((float) $grp['sub_value']); ?></strong></td>
+                                <?php if ($valShowPrev): ?><td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmtMoney((float) $grp['sub_value_prev']); ?></strong></td><?php endif; ?>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
-                    <tfoot><tr><th colspan="3">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th class="gl-acc-stmt-col-num">—</th><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th></tr></tfoot>
+                    <tfoot><tr><th colspan="2">الإجمالي العام</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th class="gl-acc-stmt-col-num">—</th><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValuePrev); ?></th><?php endif; ?></tr></tfoot>
                 <?php elseif ($reportKey === 'low'): ?>
                     <thead><tr><th>#</th><th>الصنف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num">الرصيد</th><th>آخر مورد</th></tr></thead>
                     <tbody>

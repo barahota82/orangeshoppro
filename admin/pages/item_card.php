@@ -254,6 +254,7 @@ foreach ($variants as $vSum) {
                     <th>لون/مقاس</th>
                     <th>كمية</th>
                     <th>قبل → بعد</th>
+                    <th>الرصيد التراكمي (للمتغير)</th>
                     <th>مرجع الطلب</th>
                     <th>السبب</th>
                 </tr>
@@ -268,6 +269,7 @@ foreach ($variants as $vSum) {
                     <td><?php echo htmlspecialchars(trim(($m['variant_color'] ?: '') . ' / ' . ($m['variant_size'] ?: '')) ?: '—'); ?></td>
                     <td><?php echo (int)$m['qty']; ?></td>
                     <td><?php echo (int)$m['old_stock']; ?> → <?php echo (int)$m['new_stock']; ?></td>
+                    <td><strong><?php echo (int)$m['new_stock']; ?></strong></td>
                     <td dir="ltr"><code><?php echo htmlspecialchars(trim((string)($m['reference'] ?? '')) ?: '—'); ?></code></td>
                     <td><?php echo htmlspecialchars((string)($m['reason'] ?? '')); ?></td>
                 </tr>
