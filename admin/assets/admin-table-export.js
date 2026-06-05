@@ -85,10 +85,55 @@
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
     function nowStamp() {
         var d = new Date();
-        function p(n) { return (n < 10 ? '0' : '') + n; }
-        return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+        return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    }
+
+    function dateSlug() {
+        var d = new Date();
+        return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    }
+
+    /* تحويل الأرقام العربية/الهندية إلى لاتينية. */
+    function toLatinDigits(s) {
+        return String(s)
+            .replace(/[\u0660-\u0669]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); })
+            .replace(/[\u06f0-\u06f9]/g, function (d) { return String(d.charCodeAt(0) - 0x06f0); });
+    }
+
+    /* يحوّل نص مبلغ معروض إلى رقم خام (يزيل الفواصل والعملة؛ الأقواس = سالب). null إن لم يكن رقماً. */
+    function parseAmount(text) {
+        var t = toLatinDigits(text == null ? '' : text).trim();
+        if (t === '') {
+            return null;
+        }
+        var neg = /^\(.*\)$/.test(t);
+        t = t.replace(/[()]/g, '');
+        t = t.replace(/\u066b/g, '.').replace(/\u066c/g, '');
+        t = t.replace(/[,\u00a0\s]/g, '');
+        var m = t.match(/^-?\d+(\.\d+)?$/);
+        if (!m) {
+            return null;
+        }
+        var v = parseFloat(m[0]);
+        if (isNaN(v)) {
+            return null;
+        }
+        return neg && v > 0 ? -v : v;
+    }
+
+    /* خلية رقمية = مبلغ (تُحوَّل لرقم) بشرط ألا تكون كوداً/معرّفاً نصياً (dir=ltr أو data-export-text). */
+    function isAmountCell(cell) {
+        if (cell.tagName !== 'TD' || !cell.classList.contains('gl-acc-stmt-col-num')) {
+            return false;
+        }
+        if (cell.getAttribute('dir') === 'ltr' || cell.hasAttribute('data-export-text') || cell.classList.contains('tb-col-code')) {
+            return false;
+        }
+        return true;
     }
 
     function exportExcel(table, name) {
@@ -98,6 +143,20 @@
             if (skips[i].parentNode) {
                 skips[i].parentNode.removeChild(skips[i]);
             }
+        }
+        /* المبالغ → أرقام قابلة للجمع (الأكواد/المعرّفات تبقى نصاً). */
+        var amountCells = clone.querySelectorAll('td.gl-acc-stmt-col-num');
+        for (var n = 0; n < amountCells.length; n++) {
+            var ac = amountCells[n];
+            if (!isAmountCell(ac)) {
+                continue;
+            }
+            var num = parseAmount(ac.textContent);
+            if (num === null) {
+                continue;
+            }
+            ac.setAttribute('style', (ac.getAttribute('style') || '') + ';mso-number-format:"#,##0.###";');
+            ac.textContent = String(num);
         }
         var sheet = safeName(name).substring(0, 31);
         /* رأس التقرير داخل الملف: شركة / عنوان / فترة / تاريخ الطباعة. */
@@ -120,10 +179,11 @@
             '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>' +
             '<x:Name>' + sheet + '</x:Name><x:WorksheetOptions><x:DisplayRightToLeft/>' +
             '</x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->' +
-            '<style>table{border-collapse:collapse;}td,th{border:0.5pt solid #999999;padding:2px 5px;mso-number-format:"\\@";}' +
-            'th{background:#f0f0f0;font-weight:bold;}</style></head>' +
+            '<style>table{border-collapse:collapse;}' +
+            'td,th{border:0.5pt solid #999999;padding:3px 7px;mso-number-format:"\\@";white-space:nowrap;vertical-align:middle;}' +
+            'th{background:#e8eef5;font-weight:bold;text-align:center;}</style></head>' +
             '<body dir="rtl">' + head + clone.outerHTML + '</body></html>';
-        downloadBlob(safeName(name) + '.xls', 'application/vnd.ms-excel;charset=utf-8', [htmlDoc]);
+        downloadBlob(safeName(name) + '-' + dateSlug() + '.xls', 'application/vnd.ms-excel;charset=utf-8', [htmlDoc]);
     }
 
     function makeBtn(label, onClick) {
@@ -195,7 +255,7 @@
         var rn = reportNameForPrint();
         if (rn !== '') {
             savedDocTitle = document.title;
-            document.title = rn;
+            document.title = rn + ' ' + dateSlug();
         }
     });
     window.addEventListener('afterprint', function () {
