@@ -316,6 +316,10 @@
 
     /* اسم ملف PDF عند الحفظ = اسم التقرير: نضبط عنوان المستند وقت الطباعة ونعيده بعدها. */
     function reportNameForPrint() {
+        var el = document.querySelector('[data-report-name]');
+        if (el && (el.getAttribute('data-report-name') || '') !== '') {
+            return el.getAttribute('data-report-name') || '';
+        }
         var t = document.querySelector('table[data-export-name]');
         return t ? (t.getAttribute('data-export-name') || '') : '';
     }

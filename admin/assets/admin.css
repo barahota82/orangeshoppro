@@ -4813,24 +4813,33 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     align-items: center;
     gap: 12px;
     text-align: start;
+    flex: 0 1 auto;
+    min-width: 0;
 }
 .pl-month-brand-text {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    min-width: 0;
 }
 .pl-month-brand-text .gl-acc-stmt-print-company {
     margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    white-space: nowrap;
 }
 .pl-month-cr {
     margin: 0;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: #475569;
+    white-space: nowrap;
 }
 .pl-month-contact {
     text-align: end;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: #475569;
+    flex: 1 1 auto;
+    padding-inline-start: 16px;
 }
 .pl-month-contact-line {
     margin: 0 0 2px;
@@ -5438,5 +5447,19 @@ td.tb-col-name,
     .table-export-bar,
     .table-export-inline-btn {
         display: none !important;
+    }
+}
+
+/*
+ * تأمين الطباعة: إزالة رأس/تذييل المتصفّح التلقائي (عنوان الصفحة «Orange — لوحة التحكم»
+ * + رابط الأدمن + تاريخ المتصفّح أعلى الصفحة). بجعل هامش الصفحة صفراً يحذفها Chromium،
+ * ونعوّض المسافات بحشو داخلي على حاوية التقرير. يبقى «تاريخ الطباعة» الخاص بنا أسفل التقرير.
+ */
+@media print {
+    @page {
+        margin: 0;
+    }
+    .gl-acc-stmt-print {
+        padding: 12mm 10mm !important;
     }
 }
