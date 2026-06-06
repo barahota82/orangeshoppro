@@ -4801,6 +4801,13 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 }
 
 /* قائمة إيرادات ومصروفات شهرية — كتلة/طباعة لكل شهر */
+.pl-month-print-logo {
+    display: block;
+    max-height: 64px;
+    max-width: 220px;
+    margin: 0 auto 0.4rem;
+    object-fit: contain;
+}
 .pl-month-print-inner .card {
     margin-bottom: 0;
 }

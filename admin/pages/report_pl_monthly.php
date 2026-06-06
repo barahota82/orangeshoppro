@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
@@ -358,6 +359,8 @@ $todayDmY = orange_format_date_dmY(date('Y-m-d'));
 $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
+$plCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
+$companyLogo = (string) ($plCompany['logo_url'] ?? '');
 
 $reportFmt = static fn (float $v): string => orange_accounting_report_format_amount($v, $reportMoney);
 
@@ -389,6 +392,9 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
         $rr = $ms['out'] ?? [];
         preg_match('/^(\d{4})-/u', $ymMs, $ymY);
         $yearStr = $ymY[1] ?? '';
+        if ($companyLogo !== '') {
+            echo '<div><img src="' . $plE(storefront_absolute_url($companyLogo)) . '" style="height:54px;" alt=""></div>';
+        }
         if ($companyNameAr !== '') {
             echo '<div style="font-size:14pt;font-weight:bold;">' . $plE($companyNameAr) . '</div>';
         }
@@ -524,6 +530,9 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
         ?>
     <section class="card admin-fy-card pl-month-print-inner gl-acc-stmt-print pl-month-sheet<?php echo $pageCls; ?>">
         <header class="pl-month-print-banner gl-acc-stmt-print-banner">
+            <?php if ($companyLogo !== ''): ?>
+                <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($companyLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+            <?php endif; ?>
             <?php if ($companyNameAr !== ''): ?>
                 <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
             <?php endif; ?>
