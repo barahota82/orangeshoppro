@@ -184,7 +184,7 @@ $todayDmY = orange_format_date_dmY(date('Y-m-d'));
                         <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $plcCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
                     <?php endif; ?>
                     <?php if (trim((string) ($plcCompany['phones'] ?? '')) !== ''): ?>
-                        <p class="pl-month-contact-line" dir="ltr"><?php echo htmlspecialchars((string) $plcCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></p>
+                        <p class="pl-month-contact-line"><span dir="ltr"><?php echo htmlspecialchars((string) $plcCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></span></p>
                     <?php endif; ?>
                 </div>
             </div>

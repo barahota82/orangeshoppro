@@ -392,9 +392,7 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
         $rr = $ms['out'] ?? [];
         preg_match('/^(\d{4})-/u', $ymMs, $ymY);
         $yearStr = $ymY[1] ?? '';
-        if ($companyLogo !== '') {
-            echo '<div><img src="' . $plE(storefront_absolute_url($companyLogo)) . '" style="height:54px;" alt=""></div>';
-        }
+        /* الشعار لا يُدرج في Excel (روابط الصور الخارجية تظهر X) — يظهر في الشاشة/الطباعة فقط. */
         if ($companyNameAr !== '') {
             echo '<div style="font-size:14pt;font-weight:bold;">' . $plE($companyNameAr) . '</div>';
         }
@@ -558,7 +556,7 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
                         <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $plCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
                     <?php endif; ?>
                     <?php if (trim((string) ($plCompany['phones'] ?? '')) !== ''): ?>
-                        <p class="pl-month-contact-line" dir="ltr"><?php echo htmlspecialchars((string) $plCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></p>
+                        <p class="pl-month-contact-line"><span dir="ltr"><?php echo htmlspecialchars((string) $plCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></span></p>
                     <?php endif; ?>
                 </div>
             </div>
