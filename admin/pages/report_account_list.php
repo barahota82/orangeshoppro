@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
@@ -12,6 +13,8 @@ $pdo = orange_admin_page_pdo();
 $flat = orange_accounts_flat($pdo);
 $listRows = orange_accounts_report_list_rows($pdo, $flat);
 $companyNameAr = orange_company_settings_name_ar($pdo);
+$ralCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
+$ralLogo = (string) ($ralCompany['logo_url'] ?? '');
 $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
 ?>
 <div class="admin-fy-shell gl-acc-stmt-print" dir="rtl">
@@ -26,9 +29,29 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
     <div class="card admin-fy-card">
         <div class="gl-acc-stmt-print-sheet ral-print-sheet">
         <header class="gl-acc-stmt-print-banner ral-print-banner">
-            <?php if ($companyNameAr !== ''): ?>
-                <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
-            <?php endif; ?>
+            <div class="pl-month-brand-row">
+                <div class="pl-month-brand">
+                    <?php if ($ralLogo !== ''): ?>
+                        <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($ralLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+                    <?php endif; ?>
+                    <div class="pl-month-brand-text">
+                        <?php if ($companyNameAr !== ''): ?>
+                            <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                        <?php endif; ?>
+                        <?php if (trim((string) ($ralCompany['commercial_register'] ?? '')) !== ''): ?>
+                            <p class="pl-month-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars((string) $ralCompany['commercial_register'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="pl-month-contact">
+                    <?php if (trim((string) ($ralCompany['address'] ?? '')) !== ''): ?>
+                        <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $ralCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
+                    <?php endif; ?>
+                    <?php if (trim((string) ($ralCompany['phones'] ?? '')) !== ''): ?>
+                        <p class="pl-month-contact-line"><span dir="ltr"><?php echo htmlspecialchars((string) $ralCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                    <?php endif; ?>
+                </div>
+            </div>
             <h2 class="gl-acc-stmt-print-title ral-print-title">قائمة الحسابات</h2>
         </header>
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
