@@ -450,8 +450,8 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
                             title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
-                    <label class="gas-acc-stmt-field pl-monthly-show-zeros-field" style="align-items:flex-start;margin-top:0.15rem;">
-                        <input type="checkbox" name="show_zeros" value="1" <?php echo $showZeros ? 'checked' : ''; ?> style="margin-top:6px;margin-left:6px;">
+                    <label class="gas-acc-stmt-field pl-monthly-show-zeros-field" style="display:flex;align-items:center;gap:0.5rem;margin:0;padding-bottom:1px;white-space:nowrap;">
+                        <input type="checkbox" name="show_zeros" value="1" <?php echo $showZeros ? 'checked' : ''; ?> style="margin:0;flex-shrink:0;">
                         <span>عرض كل الحسابات حتى بدون حركة في ذلك الشهر</span>
                     </label>
                     <label class="gas-acc-stmt-field is-ignore-close-field" title="قيود الإقفال السنوي (YEC) تُصفّر الإيرادات والمصروفات — فعِّل هذا الخيار لاستبعادها من أرقام التقرير إذا كان المدى الزمني يشمل تاريخ الإقفال.">
