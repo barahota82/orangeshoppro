@@ -22,7 +22,7 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
 <div class="admin-fy-shell gl-acc-stmt-print" dir="rtl">
     <div class="gl-acc-stmt-no-print">
         <h1 class="admin-fy-shell__title">قائمة الحسابات</h1>
-        <p class="actions" style="margin:0 0 16px;">
+        <p class="actions" data-export-host style="margin:0 0 16px;">
             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
             <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=chart_of_accounts'), ENT_QUOTES, 'UTF-8'); ?>">الدليل المحاسبي</a>
         </p>

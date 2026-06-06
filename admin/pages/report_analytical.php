@@ -104,9 +104,9 @@ foreach ($dims as $d) {
                         </label>
                     </div>
                 </div>
-                <div class="gas-acc-stmt-actions">
+                <div class="gas-acc-stmt-actions" data-export-host>
                     <button type="submit">عرض</button>
-                    <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
+                    <button type="button" class="btn-secondary" onclick="<?php echo ($report !== null) ? 'window.print()' : "alert('اعرض التقرير أولاً ثم اضغط طباعة')"; ?>">طباعة</button>
                     <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=analytical_dimensions'), ENT_QUOTES, 'UTF-8'); ?>">الأبعاد التحليلية</a>
                 </div>
             </div>

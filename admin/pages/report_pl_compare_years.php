@@ -129,11 +129,9 @@ $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
                         </label>
                     <?php endforeach; ?>
                 </div>
-                <div class="gas-acc-stmt-actions">
+                <div class="gas-acc-stmt-actions" data-export-host>
                     <button type="submit">عرض المقارنة</button>
-                    <?php if ($useVouchers && $rowSummaries !== []): ?>
-                        <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
-                    <?php endif; ?>
+                    <button type="button" class="btn-secondary" onclick="<?php echo ($useVouchers && $rowSummaries !== []) ? 'window.print()' : "alert('اعرض التقرير أولاً ثم اضغط طباعة')"; ?>">طباعة</button>
                 </div>
             <?php endif; ?>
         </form>

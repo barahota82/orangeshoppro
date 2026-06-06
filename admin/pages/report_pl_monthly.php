@@ -469,8 +469,8 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
                             $plXlsHref = storefront_public_path('/admin/index.php') . '?' . http_build_query($plXlsQ);
                             ?>
                             <a class="btn-secondary" data-server-export href="<?php echo htmlspecialchars($plXlsHref, ENT_QUOTES, 'UTF-8'); ?>">Excel</a>
-                            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                         <?php endif; ?>
+                        <button type="button" class="btn-secondary" onclick="<?php echo ($useVouchers && $periodLabel !== '') ? 'window.print()' : "alert('اعرض التقرير أولاً ثم اضغط طباعة')"; ?>">طباعة</button>
                     </div>
                 </div>
             </div>

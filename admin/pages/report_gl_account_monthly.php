@@ -261,7 +261,7 @@ $printNameVal = $accNameDisp !== '' ? $accNameDisp : '—';
                             class="admin-inp gas-acc-stmt-acc-name-input gl-m-acc-name-inp"
                             placeholder="—" title="يُعبأ بعد اختيار الحساب" value="<?php echo htmlspecialchars($accNameDisp, ENT_QUOTES, 'UTF-8'); ?>">
                     </div>
-                    <div class="gas-acc-stmt-actions">
+                    <div class="gas-acc-stmt-actions" data-export-host>
                         <button type="submit">عرض</button>
                         <button type="button" class="btn-secondary" onclick="<?php echo $accountId > 0 ? 'window.print()' : "alert('اختر حساباً أولاً ثم اضغط طباعة')"; ?>">طباعة</button>
                     </div>

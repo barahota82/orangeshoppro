@@ -375,7 +375,7 @@ $gasHasSelection = $isCustomerMode ? ($customerId > 0) : ($accountId > 0);
                         <label for="gas_to">إلى تاريخ</label>
                         <input type="text" name="date_to" id="gas_to" class="admin-inp orange-inp-dmy" value="<?php echo htmlspecialchars($dateToRaw, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off" required>
                     </div>
-                    <div class="gas-acc-stmt-actions">
+                    <div class="gas-acc-stmt-actions" data-export-host>
                         <button type="submit">عرض</button>
                         <button type="button" class="btn-secondary" onclick="<?php echo $gasHasSelection ? 'window.print()' : "alert('اختر حساباً أو عميلاً أولاً ثم اضغط طباعة')"; ?>">طباعة</button>
                     </div>

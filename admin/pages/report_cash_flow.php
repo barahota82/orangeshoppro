@@ -85,9 +85,9 @@ $fmt = static function (float $amt) use ($reportMoney): string {
                         </label>
                     </div>
                 </div>
-                <div class="gas-acc-stmt-actions" style="margin-inline-start:auto;align-self:flex-end;">
+                <div class="gas-acc-stmt-actions" data-export-host style="margin-inline-start:auto;align-self:flex-end;">
                     <button type="submit">عرض</button>
-                    <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
+                    <button type="button" class="btn-secondary" onclick="<?php echo ($report !== null) ? 'window.print()' : "alert('اعرض التقرير أولاً ثم اضغط طباعة')"; ?>">طباعة</button>
                 </div>
             </div>
         </form>

@@ -203,11 +203,9 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
                         <input type="checkbox" name="ignore_close" value="1" id="ta_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
                         <span>تجاهل قيود الإقفال</span>
                     </label>
-                    <div class="gas-acc-stmt-actions">
+                    <div class="gas-acc-stmt-actions" data-export-host>
                         <button type="submit">عرض</button>
-                        <?php if ($useVouchers && $periodLabel !== ''): ?>
-                            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
-                        <?php endif; ?>
+                        <button type="button" class="btn-secondary" onclick="<?php echo ($useVouchers && $periodLabel !== '') ? 'window.print()' : "alert('اعرض التقرير أولاً ثم اضغط طباعة')"; ?>">طباعة</button>
                     </div>
                 </div>
             </div>

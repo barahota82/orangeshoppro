@@ -200,11 +200,9 @@ $colCount = $showCompare ? 4 : 3;
                         <input type="checkbox" name="ignore_close" value="1" id="bs_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
                         <span>تجاهل قيود الإقفال</span>
                     </label>
-                    <div class="gas-acc-stmt-actions">
+                    <div class="gas-acc-stmt-actions" data-export-host>
                         <button type="submit">عرض</button>
-                        <?php if ($useVouchers && $asOfYmd !== ''): ?>
-                            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
-                        <?php endif; ?>
+                        <button type="button" class="btn-secondary" onclick="<?php echo ($useVouchers && $asOfYmd !== '') ? 'window.print()' : "alert('اعرض التقرير أولاً ثم اضغط طباعة')"; ?>">طباعة</button>
                     </div>
                 </div>
                 <?php if ($useVouchers): ?>

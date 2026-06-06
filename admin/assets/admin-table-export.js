@@ -346,28 +346,33 @@
         return out;
     }
 
+    /*
+     * إدراج الأزرار داخل حاوية الأدوات بالترتيب الموحّد (عرض ← Excel ← طباعة):
+     * بعد زر «عرض» (submit) إن وُجد، وإلا قبل زر الطباعة، وإلا في النهاية
+     * — لا نعتمد على نص onclick للطباعة (قد يكون تنبيهاً).
+     */
+    function insertButtonsInto(target, btns) {
+        var submitBtn = target.querySelector('button[type="submit"]');
+        var printBtn = target.querySelector('button[onclick*="print"]');
+        var anchorAfter = submitBtn && submitBtn.parentNode === target ? submitBtn : null;
+        btns.forEach(function (b) {
+            b.classList.add('table-export-inline-btn');
+            if (anchorAfter) {
+                target.insertBefore(b, anchorAfter.nextSibling);
+                anchorAfter = b;
+            } else if (printBtn) {
+                target.insertBefore(b, printBtn);
+            } else {
+                target.appendChild(b);
+            }
+        });
+    }
+
     function placeButtons(table, btns) {
         var targetSel = table.getAttribute('data-export-target');
         var target = targetSel ? document.querySelector(targetSel) : null;
         if (target) {
-            /*
-             * توحيد الترتيب (عرض ← Excel ← طباعة): نُدرج Excel بعد زر «عرض» (submit) إن وُجد،
-             * وإلا قبل زر الطباعة، وإلا في النهاية — لا نعتمد على نص onclick للطباعة (قد يكون تنبيهاً).
-             */
-            var submitBtn = target.querySelector('button[type="submit"]');
-            var printBtn = target.querySelector('button[onclick*="print"]');
-            var anchorAfter = submitBtn && submitBtn.parentNode === target ? submitBtn : null;
-            btns.forEach(function (b) {
-                b.classList.add('table-export-inline-btn');
-                if (anchorAfter) {
-                    target.insertBefore(b, anchorAfter.nextSibling);
-                    anchorAfter = b;
-                } else if (printBtn) {
-                    target.insertBefore(b, printBtn);
-                } else {
-                    target.appendChild(b);
-                }
-            });
+            insertButtonsInto(target, btns);
             return;
         }
         var bar = document.createElement('div');
@@ -383,8 +388,74 @@
         }
     }
 
+    /* يجد جدول/جداول التقرير الحالي في الصفحة (مجموعة data-export-group أو جدول مفرد). */
+    function findReportTables() {
+        var grouped = document.querySelectorAll('table[data-export-group]');
+        if (grouped.length) {
+            return { group: true, tables: Array.prototype.slice.call(grouped) };
+        }
+        var single = document.querySelector('table[data-export-name]:not([data-export-group])');
+        return single ? { group: false, tables: [single] } : null;
+    }
+
+    function hostExportName(found) {
+        if (!found || !found.tables.length) {
+            return 'report';
+        }
+        return found.tables[0].getAttribute('data-export-name') || 'report';
+    }
+
+    /*
+     * زر Excel/CSV ثابت دائماً في شريط الأدوات (مثل «طباعة»):
+     * علّم الحاوية بـ data-export-host. عند الضغط يبحث عن جدول التقرير ويصدّره،
+     * وإن لم يُعرض التقرير بعد (لا يوجد جدول) يُظهر تنبيهاً — بدل إخفاء الزر.
+     */
+    function initHosts(scope) {
+        var hosts = scope.querySelectorAll('[data-export-host]');
+        for (var i = 0; i < hosts.length; i++) {
+            var host = hosts[i];
+            if (host.getAttribute('data-export-host-init') === '1') {
+                continue;
+            }
+            host.setAttribute('data-export-host-init', '1');
+            var btns = [];
+            btns.push(makeBtn('Excel', function () {
+                var found = findReportTables();
+                if (!found) {
+                    alert('اعرض التقرير أولاً لتصدير Excel.');
+                    return;
+                }
+                if (found.group) {
+                    exportExcelGroup(found.tables, hostExportName(found));
+                } else {
+                    exportExcel(found.tables[0], hostExportName(found));
+                }
+            }));
+            if (host.hasAttribute('data-export-csv')) {
+                btns.push(makeBtn('CSV', function () {
+                    var found = findReportTables();
+                    if (!found) {
+                        alert('اعرض التقرير أولاً لتصدير CSV.');
+                        return;
+                    }
+                    exportCsv(found.tables[0], hostExportName(found));
+                }));
+            }
+            insertButtonsInto(host, btns);
+        }
+    }
+
     function init(root) {
         var scope = root && root.querySelectorAll ? root : document;
+
+        /*
+         * إن وُجدت حاوية أدوات معلَّمة data-export-host في الصفحة، نعتمدها (زر ثابت دائماً)
+         * ونتخطّى الحقن المعتمد على وجود الجدول لتفادي تكرار الأزرار.
+         */
+        if (document.querySelector('[data-export-host]')) {
+            initHosts(scope);
+            return;
+        }
 
         /* أولاً: تقارير متعددة الجداول مجمّعة بـ data-export-group → زر Excel واحد لورقة واحدة. */
         var grouped = scope.querySelectorAll('table[data-export-group]');
