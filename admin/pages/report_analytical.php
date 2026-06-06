@@ -7,6 +7,8 @@ require_once __DIR__ . '/../../includes/analytical_report.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 
 $pdo = orange_admin_page_pdo();
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
@@ -38,6 +40,9 @@ if ($ready && $submitted && $fyId > 0 && $dimensionId > 0) {
 }
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
+$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$raCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
+$raLogo = (string) ($raCompany['logo_url'] ?? '');
 $fmt = static fn (float $n): string => orange_accounting_report_format_amount($n, $reportMoney);
 
 $dimLabel = '';
@@ -119,19 +124,45 @@ foreach ($dims as $d) {
     </div>
 
     <?php if ($report !== null): ?>
-        <div class="card gl-acc-stmt-body">
-            <h2 style="margin:0 0 8px;font-size:1.1rem;"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></h2>
-            <p class="card-hint" style="margin:0 0 16px;">
-                تقرير تحليلي — <?php echo htmlspecialchars($dimLabel, ENT_QUOTES, 'UTF-8'); ?>
-                — <?php echo $method === 'movement' ? 'حركة GL' : 'قائمة دخل'; ?>
-                — سنوات مالية مرحّلة فقط
-            </p>
+        <div class="card admin-fy-card gl-acc-stmt-body">
+            <div class="gl-acc-stmt-print-sheet ral-print-sheet">
+            <header class="gl-acc-stmt-print-banner ral-print-banner">
+                <div class="pl-month-brand-row">
+                    <div class="pl-month-brand">
+                        <?php if ($raLogo !== ''): ?>
+                            <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($raLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+                        <?php endif; ?>
+                        <div class="pl-month-brand-text">
+                            <?php if ($companyNameAr !== ''): ?>
+                                <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                            <?php endif; ?>
+                            <?php if (trim((string) ($raCompany['commercial_register'] ?? '')) !== ''): ?>
+                                <p class="pl-month-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars((string) $raCompany['commercial_register'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="pl-month-contact">
+                        <?php if (trim((string) ($raCompany['address'] ?? '')) !== ''): ?>
+                            <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $raCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
+                        <?php endif; ?>
+                        <?php if (trim((string) ($raCompany['phones'] ?? '')) !== ''): ?>
+                            <p class="pl-month-contact-line"><span dir="ltr"><?php echo htmlspecialchars((string) $raCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <h2 class="gl-acc-stmt-print-title ral-print-title">التقرير التحليلي</h2>
+                <p class="muted" style="margin:8px 0 0;">
+                    <?php echo htmlspecialchars($dimLabel, ENT_QUOTES, 'UTF-8'); ?>
+                    — <?php echo $method === 'movement' ? 'حركة GL' : 'قائمة دخل'; ?>
+                    — سنوات مالية مرحّلة فقط
+                </p>
+            </header>
 
             <?php if (($report['rows'] ?? []) === []): ?>
                 <p class="muted">لا بيانات لهذا البُعد في السنة المحددة (أضف قيم البُعد على أسطر السندات).</p>
             <?php else: ?>
-                <div class="table-wrap">
-                    <table class="admin-fy-table">
+                <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
+                    <table class="admin-fy-table gl-acc-stmt-table" dir="rtl" data-export-name="التقرير التحليلي" data-export-target=".actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>" data-export-subtitle="<?php echo htmlspecialchars($dimLabel . ' — ' . ($method === 'movement' ? 'حركة GL' : 'قائمة دخل'), ENT_QUOTES, 'UTF-8'); ?>">
                         <thead>
                             <tr>
                                 <th>القيمة</th>
@@ -188,6 +219,10 @@ foreach ($dims as $d) {
                     </table>
                 </div>
             <?php endif; ?>
+            <div class="gl-acc-stmt-print-footer ta-report-print-footer">
+                <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
+            </div>
+            </div>
         </div>
     <?php endif; ?>
 </div>
