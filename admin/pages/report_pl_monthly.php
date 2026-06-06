@@ -478,7 +478,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                 <div class="pl-print-dual-col">
                     <h3 class="pl-print-dual-h" lang="ar">ايرادات</h3>
                     <div class="admin-fy-table-wrap pl-print-side-table-wrap">
-                        <table class="admin-fy-table pl-month-table" data-export-name="أرباح وخسائر - الإيرادات" data-export-label="الإيرادات" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
+                        <table class="admin-fy-table pl-month-table" data-export-name="قائمة الإيرادات والمصروفات الشهرية" data-export-group="pl_month" data-export-label="الإيرادات" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                             <thead>
                                 <tr>
                                     <th class="gl-acc-stmt-col-num">الرصيد</th>
@@ -517,7 +517,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                 <div class="pl-print-dual-col">
                     <h3 class="pl-print-dual-h" lang="ar">مصروفات</h3>
                     <div class="admin-fy-table-wrap pl-print-side-table-wrap">
-                        <table class="admin-fy-table pl-month-table" data-export-name="أرباح وخسائر - المصروفات" data-export-label="المصروفات" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
+                        <table class="admin-fy-table pl-month-table" data-export-name="قائمة الإيرادات والمصروفات الشهرية" data-export-group="pl_month" data-export-label="المصروفات" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                             <thead>
                                 <tr>
                                     <th class="gl-acc-stmt-col-num">الرصيد</th>

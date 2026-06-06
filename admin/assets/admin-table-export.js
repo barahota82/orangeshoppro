@@ -139,7 +139,8 @@
         return true;
     }
 
-    function exportExcel(table, name) {
+    /* نسخة جدول جاهزة للتصدير: حذف العناصر المُستثناة + تحويل المبالغ لأرقام. */
+    function processedTableHtml(table) {
         var clone = table.cloneNode(true);
         var skips = clone.querySelectorAll('[data-export-skip], .gl-acc-stmt-no-print');
         for (var i = 0; i < skips.length; i++) {
@@ -147,7 +148,6 @@
                 skips[i].parentNode.removeChild(skips[i]);
             }
         }
-        /* المبالغ → أرقام قابلة للجمع (الأكواد/المعرّفات تبقى نصاً). */
         var amountCells = clone.querySelectorAll('td.gl-acc-stmt-col-num, td.cf-col-amount');
         for (var n = 0; n < amountCells.length; n++) {
             var ac = amountCells[n];
@@ -161,11 +161,10 @@
             ac.setAttribute('style', (ac.getAttribute('style') || '') + ';mso-number-format:"#,##0.###";');
             ac.textContent = String(num);
         }
-        var sheet = safeName(name).substring(0, 31);
-        /* رأس التقرير داخل الملف: شركة / عنوان / فترة / تاريخ الطباعة. */
-        var company = table.getAttribute('data-export-company') || '';
-        var title = table.getAttribute('data-export-title') || name;
-        var subtitle = table.getAttribute('data-export-subtitle') || '';
+        return clone.outerHTML;
+    }
+
+    function headerBlockHtml(company, title, subtitle) {
         var head = '';
         if (company !== '') {
             head += '<div style="font-size:14pt;font-weight:bold;">' + htmlEsc(company) + '</div>';
@@ -175,18 +174,46 @@
             head += '<div style="font-size:11pt;">' + htmlEsc(subtitle) + '</div>';
         }
         head += '<div style="font-size:9pt;color:#666666;">تاريخ الطباعة: ' + htmlEsc(nowStamp()) + '</div><br>';
-        var htmlDoc =
-            '\ufeff<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+        return head;
+    }
+
+    function buildXlsDoc(sheetName, bodyHtml) {
+        return '\ufeff<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
             'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
             'xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">' +
             '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>' +
-            '<x:Name>' + sheet + '</x:Name><x:WorksheetOptions><x:DisplayRightToLeft/>' +
+            '<x:Name>' + sheetName + '</x:Name><x:WorksheetOptions><x:DisplayRightToLeft/>' +
             '</x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->' +
             '<style>table{border-collapse:collapse;}' +
             'td,th{border:0.5pt solid #999999;padding:3px 7px;mso-number-format:"\\@";white-space:nowrap;vertical-align:middle;}' +
             'th{background:#e8eef5;font-weight:bold;text-align:center;}</style></head>' +
-            '<body dir="rtl">' + head + clone.outerHTML + '</body></html>';
-        downloadBlob(safeName(name) + '-' + dateSlug() + '.xls', 'application/vnd.ms-excel;charset=utf-8', [htmlDoc]);
+            '<body dir="rtl">' + bodyHtml + '</body></html>';
+    }
+
+    function exportExcel(table, name) {
+        var company = table.getAttribute('data-export-company') || '';
+        var title = table.getAttribute('data-export-title') || name;
+        var subtitle = table.getAttribute('data-export-subtitle') || '';
+        var doc = buildXlsDoc(safeName(name).substring(0, 31), headerBlockHtml(company, title, subtitle) + processedTableHtml(table));
+        downloadBlob(safeName(name) + '-' + dateSlug() + '.xls', 'application/vnd.ms-excel;charset=utf-8', [doc]);
+    }
+
+    /* تصدير عدّة جداول لتقرير واحد في ورقة Excel واحدة (زر واحد). */
+    function exportExcelGroup(tables, name) {
+        var first = tables[0];
+        var company = first.getAttribute('data-export-company') || '';
+        var title = first.getAttribute('data-export-title') || name;
+        var subtitle = first.getAttribute('data-export-subtitle') || '';
+        var body = headerBlockHtml(company, title, subtitle);
+        for (var i = 0; i < tables.length; i++) {
+            var label = tables[i].getAttribute('data-export-label') || '';
+            if (label !== '') {
+                body += '<div style="font-size:12pt;font-weight:bold;margin:10px 0 2px;">' + htmlEsc(label) + '</div>';
+            }
+            body += processedTableHtml(tables[i]) + '<br>';
+        }
+        var doc = buildXlsDoc(safeName(name).substring(0, 31), body);
+        downloadBlob(safeName(name) + '-' + dateSlug() + '.xls', 'application/vnd.ms-excel;charset=utf-8', [doc]);
     }
 
     function makeBtn(label, onClick) {
@@ -219,35 +246,62 @@
         return out;
     }
 
+    function placeButtons(table, btns) {
+        var targetSel = table.getAttribute('data-export-target');
+        var target = targetSel ? document.querySelector(targetSel) : null;
+        if (target) {
+            btns.forEach(function (b) { b.classList.add('table-export-inline-btn'); target.appendChild(b); });
+            return;
+        }
+        var bar = document.createElement('div');
+        bar.className = 'table-export-bar gl-acc-stmt-no-print';
+        var lbl = document.createElement('span');
+        lbl.className = 'table-export-bar__label';
+        lbl.textContent = 'تنزيل:';
+        bar.appendChild(lbl);
+        btns.forEach(function (b) { b.classList.add('table-export-bar__btn'); bar.appendChild(b); });
+        var anchor = table.closest('.table-wrap') || table;
+        if (anchor.parentNode) {
+            anchor.parentNode.insertBefore(bar, anchor);
+        }
+    }
+
     function init(root) {
         var scope = root && root.querySelectorAll ? root : document;
-        var tables = scope.querySelectorAll('table[data-export-name]');
+
+        /* أولاً: تقارير متعددة الجداول مجمّعة بـ data-export-group → زر Excel واحد لورقة واحدة. */
+        var grouped = scope.querySelectorAll('table[data-export-group]');
+        var groups = {};
+        var order = [];
+        for (var g = 0; g < grouped.length; g++) {
+            var gt = grouped[g];
+            if (gt.getAttribute('data-export-init') === '1') {
+                continue;
+            }
+            gt.setAttribute('data-export-init', '1');
+            var key = gt.getAttribute('data-export-group') || '';
+            if (!groups[key]) {
+                groups[key] = [];
+                order.push(key);
+            }
+            groups[key].push(gt);
+        }
+        order.forEach(function (key) {
+            var list = groups[key];
+            var first = list[0];
+            var gname = first.getAttribute('data-export-name') || 'report';
+            placeButtons(first, [makeBtn('Excel', function () { exportExcelGroup(list, gname); })]);
+        });
+
+        /* ثم: الجداول المفردة. */
+        var tables = scope.querySelectorAll('table[data-export-name]:not([data-export-group])');
         for (var i = 0; i < tables.length; i++) {
             var table = tables[i];
             if (table.getAttribute('data-export-init') === '1') {
                 continue;
             }
-            /* الأفضل: حقن الأزرار في شريط إجراءات موجود (أعلى التقرير، خارج هيكله). */
-            var targetSel = table.getAttribute('data-export-target');
-            var target = targetSel ? document.querySelector(targetSel) : null;
-            if (target) {
-                table.setAttribute('data-export-init', '1');
-                exportButtons(table, true).forEach(function (b) { target.appendChild(b); });
-                continue;
-            }
-            /* احتياطي: شريط مستقل فوق الجدول. */
             table.setAttribute('data-export-init', '1');
-            var bar = document.createElement('div');
-            bar.className = 'table-export-bar gl-acc-stmt-no-print';
-            var lbl = document.createElement('span');
-            lbl.className = 'table-export-bar__label';
-            lbl.textContent = 'تنزيل:';
-            bar.appendChild(lbl);
-            exportButtons(table, false).forEach(function (b) { b.classList.add('table-export-bar__btn'); bar.appendChild(b); });
-            var anchor = table.closest('.table-wrap') || table;
-            if (anchor.parentNode) {
-                anchor.parentNode.insertBefore(bar, anchor);
-            }
+            placeButtons(table, exportButtons(table, false));
         }
     }
 
