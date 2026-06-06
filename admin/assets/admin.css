@@ -4715,7 +4715,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         minmax(9.25rem, 10.75rem)
         minmax(14rem, 1fr)
         auto
-        minmax(11rem, 1fr);
+        auto;
 }
 
 .ta-report-toolbar.ta-report-toolbar--is-ignore-left.gas-acc-stmt-toolbar {
