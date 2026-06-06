@@ -454,11 +454,6 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
                         <input type="checkbox" name="show_zeros" value="1" <?php echo $showZeros ? 'checked' : ''; ?> style="margin-top:6px;margin-left:6px;">
                         <span>عرض كل الحسابات حتى بدون حركة في ذلك الشهر</span>
                     </label>
-                    <label class="gas-acc-stmt-field is-ignore-close-field" title="قيود الإقفال السنوي (YEC) تُصفّر الإيرادات والمصروفات — فعِّل هذا الخيار لاستبعادها من أرقام التقرير إذا كان المدى الزمني يشمل تاريخ الإقفال.">
-                        <input type="hidden" name="ignore_close" value="0">
-                        <input type="checkbox" name="ignore_close" value="1" id="pl_m_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
-                        <span>تجاهل قيود الإقفال</span>
-                    </label>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
                         <?php if ($useVouchers && $periodLabel !== ''): ?>
@@ -472,6 +467,11 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
                             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                         <?php endif; ?>
                     </div>
+                    <label class="gas-acc-stmt-field is-ignore-close-field" title="قيود الإقفال السنوي (YEC) تُصفّر الإيرادات والمصروفات — فعِّل هذا الخيار لاستبعادها من أرقام التقرير إذا كان المدى الزمني يشمل تاريخ الإقفال.">
+                        <input type="hidden" name="ignore_close" value="0">
+                        <input type="checkbox" name="ignore_close" value="1" id="pl_m_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
+                        <span>تجاهل قيود الإقفال</span>
+                    </label>
                 </div>
             </div>
         </form>
