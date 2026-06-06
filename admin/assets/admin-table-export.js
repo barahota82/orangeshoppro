@@ -250,7 +250,16 @@
         var targetSel = table.getAttribute('data-export-target');
         var target = targetSel ? document.querySelector(targetSel) : null;
         if (target) {
-            btns.forEach(function (b) { b.classList.add('table-export-inline-btn'); target.appendChild(b); });
+            /* توحيد الترتيب: Excel قبل زر الطباعة إن وُجد في نفس الشريط. */
+            var printBtn = target.querySelector('button[onclick*="print"]');
+            btns.forEach(function (b) {
+                b.classList.add('table-export-inline-btn');
+                if (printBtn) {
+                    target.insertBefore(b, printBtn);
+                } else {
+                    target.appendChild(b);
+                }
+            });
             return;
         }
         var bar = document.createElement('div');
