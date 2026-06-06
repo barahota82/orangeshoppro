@@ -4910,6 +4910,24 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .pl-month-print-page--last {
         page-break-after: auto !important;
     }
+
+    /*
+     * التقرير الشهري متعدّد الأقسام: القاعدة العامة .gl-acc-stmt-print تجعل كل قسم
+     * absolute عند top:0 فتتراكم الأشهر ويختفي رأس كل شهر. نرفع الحاوية مرة واحدة
+     * ونجعل أقسام الأشهر تتدفّق طبيعياً مع فواصل الصفحات (فيظهر رأس كل شهر).
+     */
+    .pl-month-shell {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+    }
+    .pl-month-shell .gl-acc-stmt-print.pl-month-sheet {
+        position: static !important;
+        top: auto !important;
+        left: auto !important;
+        width: auto !important;
+    }
 }
 
 /* ميزان المراجعة — 8 أعمدة */

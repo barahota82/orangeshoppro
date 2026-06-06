@@ -424,7 +424,7 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
 }
 
 ?>
-<div class="admin-fy-shell" dir="rtl">
+<div class="admin-fy-shell pl-month-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
         <h1 class="admin-fy-shell__title">قائمة إيرادات ومصروفات شهرية</h1>
     </div>
