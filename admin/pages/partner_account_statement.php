@@ -391,14 +391,6 @@ $gasHasSelection = $isCustomerMode ? ($customerId > 0) : ($accountId > 0);
                             <label class="gas-opt-chip"><input type="radio" name="filt_dc" value="credit"<?php echo $filtDc === 'credit' ? ' checked' : ''; ?>> دائن فقط</label>
                         </div>
                     </div>
-                    <div class="gas-opt-unit">
-                        <span class="gas-opt-unit-label">التصنيف</span>
-                        <div class="gas-opt-radio-group">
-                            <label class="gas-opt-chip"><input type="radio" name="filt_post" value="all"<?php echo $filtPost === 'all' ? ' checked' : ''; ?>> الكل</label>
-                            <label class="gas-opt-chip"><input type="radio" name="filt_post" value="posted"<?php echo $filtPost === 'posted' ? ' checked' : ''; ?>> مرحّل (وحدات التشغيل)</label>
-                            <label class="gas-opt-chip"><input type="radio" name="filt_post" value="unposted"<?php echo $filtPost === 'unposted' ? ' checked' : ''; ?>> غير مرحّل (يدوي)</label>
-                        </div>
-                    </div>
                     <div class="gas-opt-unit gas-opt-unit--aging">
                         <label class="gas-opt-chip gas-opt-chip--solo">
                             <input type="checkbox" name="show_aging" value="1"<?php echo $showAging ? ' checked' : ''; ?>>
@@ -836,7 +828,7 @@ $gasHasSelection = $isCustomerMode ? ($customerId > 0) : ($accountId > 0);
                         <?php if (!$showStatement): ?>
                             <tr class="gl-acc-stmt-row-placeholder gl-acc-stmt-no-print"><td colspan="7" class="muted"><?php echo $isCustomerMode ? 'اختر العميل ونطاق التواريخ ثم «استخراج الكشف» لعرض الحركات.' : 'اختر الحساب ونطاق التواريخ ثم «استخراج الكشف» لعرض الحركات.'; ?></td></tr>
                         <?php elseif ($stmtFilterNoMatch): ?>
-                            <tr><td colspan="7" class="muted">يوجد على الحساب حركات في هذه الفترة لكن لا يوجد سطر يطابق خيارات العرض (مدين/دائن أو مرحّل/غير مرحّل).</td></tr>
+                            <tr><td colspan="7" class="muted">يوجد على الحساب حركات في هذه الفترة لكن لا يوجد سطر يطابق خيار العرض (مدين/دائن).</td></tr>
                         <?php elseif ($rows === []): ?>
                             <tr><td colspan="7" class="muted">لا حركة على هذا الحساب في هذه الفترة بعد الرصيد الافتتاحي.</td></tr>
                         <?php else: ?>
