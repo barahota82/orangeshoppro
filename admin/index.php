@@ -116,6 +116,32 @@ $orangeAdminMoney = orange_admin_currency_context($pdo);
 $orangeAdminMoneyZero = orange_admin_money_zero_string((int) $orangeAdminMoney['decimals']);
 $orangeAdminMoneyStep = orange_admin_money_input_step((int) $orangeAdminMoney['decimals']);
 
+/*
+ * تصدير الملفات (Excel/CSV) قبل إخراج تخطيط الأدمن: صفحات الأدمن تُضمَّن بعد
+ * partials/header.php، فلو أرسلت الصفحة ترويسة تنزيل (Content-Disposition) بعد
+ * الهيدر فُقدت الترويسات. هنا نُضمّن صفحة التصدير مبكراً (بلا تخطيط) فتُرسل الملف
+ * وتُنهي التنفيذ (exit). إن لم تكن الصفحة من نوع تصدير لن تستدعي exit، فنتجاهل أي
+ * إخراج مؤقت ونكمل العرض الطبيعي بالتخطيط.
+ */
+if (isset($_GET['export']) && (string) $_GET['export'] !== '') {
+    $exportPageFile = __DIR__ . '/pages/' . $page . '.php';
+    if (is_readable($exportPageFile)) {
+        ob_start();
+        try {
+            include $exportPageFile;
+        } catch (Throwable $exportErr) {
+            if (function_exists('error_log')) {
+                error_log('[orange admin export ' . $page . '] ' . $exportErr->getMessage()
+                    . ' @ ' . $exportErr->getFile() . ':' . $exportErr->getLine());
+            }
+        }
+        /* لم تُنهِ الصفحة التنفيذ (ليست تصديراً فعلياً) — تجاهل المؤقّت وأكمل العرض. */
+        if (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+    }
+}
+
 include __DIR__ . '/partials/header.php';
 $pageFile = __DIR__ . '/pages/' . $page . '.php';
 if (!is_readable($pageFile)) {
