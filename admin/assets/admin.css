@@ -4735,6 +4735,19 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         auto
         auto;
 }
+/* الميزانية العمومية: تكبير عمود «السنة المالية» ليظهر النص كاملاً */
+.ta-report-toolbar.ta-report-toolbar--bs-wide-fy.gas-acc-stmt-toolbar {
+    grid-template-columns:
+        minmax(16rem, 24rem)
+        minmax(9.25rem, 10.75rem)
+        1fr
+        auto
+        auto;
+}
+.ta-report-toolbar--bs-wide-fy #bs_fy {
+    width: 100%;
+    box-sizing: border-box;
+}
 .ta-report-toolbar--is-buttons-left .is-toolbar-spacer {
     min-width: 0;
 }

@@ -163,7 +163,7 @@ $colCount = $showCompare ? 4 : 3;
         <form method="get" class="gas-acc-stmt-filter-form" id="bs_report_form">
             <input type="hidden" name="page" value="report_balance_sheet">
             <div class="gas-acc-stmt-toolbar-wrap">
-                <div class="gas-acc-stmt-toolbar ta-report-toolbar ta-report-toolbar--is-buttons-left gas-acc-stmt-toolbar--main-center">
+                <div class="gas-acc-stmt-toolbar ta-report-toolbar ta-report-toolbar--is-buttons-left ta-report-toolbar--bs-wide-fy gas-acc-stmt-toolbar--main-center">
                     <div class="gas-acc-stmt-field">
                         <label for="bs_fy">السنة المالية</label>
                         <select id="bs_fy" name="fy" class="admin-inp" onchange="this.form.submit()">
