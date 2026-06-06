@@ -69,8 +69,8 @@ if ($asOfYmd === '') {
 
 $prevAsOfYmd = $prevFyRow !== null ? trim((string) ($prevFyRow['end_date'] ?? '')) : '';
 $hasRealPrev = $prevAsOfYmd !== '';
-/* اعرض عمود السنة السابقة دائماً (بأرصدة صفر إن لم توجد سنة سابقة فعلية) لرؤية الشكل الكامل. */
-$showCompare = true;
+/* إظهار عمود السنة السابقة اختياري عبر تشيك بوكس «أظهر السنة السابقة» (افتراضي: ظاهر). */
+$showCompare = !isset($_GET['show_prev']) || (string) $_GET['show_prev'] === '1';
 
 $ignoreClosingEntries = !isset($_GET['ignore_close']) || (string) $_GET['ignore_close'] === '1';
 $bsExcludeEntryTypes = $ignoreClosingEntries ? ['year_end_close'] : [];
@@ -90,9 +90,9 @@ $bsCheck = 0.0;
 
 if ($useVouchers && $asOfYmd !== '') {
     $tbAsOf = orange_voucher_account_totals_on_or_before_date($pdo, $asOfYmd, $bsExcludeEntryTypes);
-    $tbPrev = $hasRealPrev
-        ? orange_voucher_account_totals_on_or_before_date($pdo, $prevAsOfYmd, $bsExcludeEntryTypes)
-        : [];
+    $tbPrev = $showCompare
+        ? ($hasRealPrev ? orange_voucher_account_totals_on_or_before_date($pdo, $prevAsOfYmd, $bsExcludeEntryTypes) : [])
+        : null;
     $assetLines = orange_accounts_build_bs_statement_section_lines($pdo, $accountsLeaf, $tbAsOf, 'asset', $tbPrev);
     $liabilityLines = orange_accounts_build_bs_statement_section_lines($pdo, $accountsLeaf, $tbAsOf, 'liability', $tbPrev);
     $equityLines = orange_accounts_build_bs_statement_section_lines($pdo, $accountsLeaf, $tbAsOf, 'equity', $tbPrev);
@@ -190,6 +190,11 @@ $colCount = $showCompare ? 4 : 3;
                             autocomplete="off">
                     </div>
                     <div class="gas-acc-stmt-field is-toolbar-spacer" aria-hidden="true"></div>
+                    <label class="gas-acc-stmt-field is-ignore-close-field" title="إظهار/إخفاء عمود السنة السابقة للمقارنة.">
+                        <input type="hidden" name="show_prev" value="0">
+                        <input type="checkbox" name="show_prev" value="1" id="bs_show_prev" <?php echo $showCompare ? 'checked' : ''; ?> onchange="this.form.submit()">
+                        <span>أظهر السنة السابقة</span>
+                    </label>
                     <label class="gas-acc-stmt-field is-ignore-close-field" title="استبعاد سندات الإقفال السنوي (YEC) من الأرصدة المعروضة.">
                         <input type="hidden" name="ignore_close" value="0">
                         <input type="checkbox" name="ignore_close" value="1" id="bs_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
@@ -204,10 +209,12 @@ $colCount = $showCompare ? 4 : 3;
                 </div>
                 <?php if ($useVouchers): ?>
                 <p class="muted gl-acc-stmt-no-print" style="margin:8px 0 0;font-size:12px;text-align:center;">
-                    <?php if ($hasRealPrev): ?>
+                    <?php if (! $showCompare): ?>
+                        عمود السنة السابقة مخفي — فعّل «أظهر السنة السابقة» للمقارنة.
+                    <?php elseif ($hasRealPrev): ?>
                         مقارنة تلقائية مع نهاية السنة السابقة: <strong><?php echo htmlspecialchars($prevFyLabelAr !== '' ? $prevFyLabelAr : $prevAsOfDmY, ENT_QUOTES, 'UTF-8'); ?></strong>.
                     <?php else: ?>
-                        لا توجد سنة مالية سابقة فعلية — يُعرض عمود «السنة السابقة» بأرصدة صفر (لرؤية الشكل الكامل فقط).
+                        لا توجد سنة مالية سابقة فعلية — يُعرض عمود «<?php echo htmlspecialchars($prevYearLabel, ENT_QUOTES, 'UTF-8'); ?>» بأرصدة صفر.
                     <?php endif; ?>
                 </p>
                 <?php endif; ?>
