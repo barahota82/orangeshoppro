@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
@@ -84,14 +85,18 @@ if (strcmp($periodDateFrom, $periodDateTo) <= 0) {
     $periodLabel = $periodDateFrom . ' — ' . $periodDateTo;
 }
 
+/** عند التفعيل: استبعاد سندات entry_type = year_end_close من الفترة ورصيد أولها. */
+$ignoreClosingEntries = !isset($_GET['ignore_close']) || (string) $_GET['ignore_close'] === '1';
+$tbExcludeEntryTypes = $ignoreClosingEntries ? ['year_end_close'] : [];
+
 $tbBefore = [];
 $tbPeriod = [];
 if (
     $useVouchers && $periodLabel !== ''
     && strcmp($periodDateFrom, $periodDateTo) <= 0
 ) {
-    $tbBefore = orange_voucher_account_totals_strictly_before_date($pdo, $periodDateFrom, []);
-    $tbPeriod = orange_voucher_account_totals_by_voucher_date_range($pdo, $periodDateFrom, $periodDateTo, []);
+    $tbBefore = orange_voucher_account_totals_strictly_before_date($pdo, $periodDateFrom, $tbExcludeEntryTypes);
+    $tbPeriod = orange_voucher_account_totals_by_voucher_date_range($pdo, $periodDateFrom, $periodDateTo, $tbExcludeEntryTypes);
 }
 
 $leafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
@@ -184,6 +189,8 @@ $todayDmY = orange_format_date_dmY(date('Y-m-d'));
 $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
+$tbCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
+$tbLogo = (string) ($tbCompany['logo_url'] ?? '');
 
 $reportFmt = static function (float $v) use ($reportMoney): string {
     return orange_accounting_report_format_amount($v, $reportMoney);
@@ -199,7 +206,7 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
         <form method="get" class="gas-acc-stmt-filter-form" id="tb_report_form">
             <input type="hidden" name="page" value="report_trial_balance">
             <div class="gas-acc-stmt-toolbar-wrap">
-                <div class="gas-acc-stmt-toolbar ta-report-toolbar gas-acc-stmt-toolbar--main-center">
+                <div class="gas-acc-stmt-toolbar ta-report-toolbar ta-report-toolbar--is-buttons-left gas-acc-stmt-toolbar--main-center">
                     <div class="gas-acc-stmt-field gl-m-stmt-field--month">
                         <label for="tb_m_month_from">من شهر</label>
                         <input type="month" name="m_from" id="tb_m_month_from" class="admin-inp"
@@ -220,6 +227,12 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
                             title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
+                    <div class="gas-acc-stmt-field is-toolbar-spacer" aria-hidden="true"></div>
+                    <label class="gas-acc-stmt-field is-ignore-close-field" title="قيود الإقفال السنوي (YEC) تُصفّر الإيرادات والمصروفات — فعِّل هذا الخيار لاستبعادها من أرقام التقرير إذا كان المدى الزمني يشمل تاريخ الإقفال.">
+                        <input type="hidden" name="ignore_close" value="0">
+                        <input type="checkbox" name="ignore_close" value="1" id="tb_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
+                        <span>تجاهل قيود الإقفال</span>
+                    </label>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
                         <?php if ($useVouchers && $periodLabel !== ''): ?>
@@ -249,9 +262,29 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
     <div class="card admin-fy-card gl-acc-stmt-print">
         <div class="gl-acc-stmt-print-sheet tb-report-print-sheet">
             <header class="gl-acc-stmt-print-banner">
-                <?php if ($companyNameAr !== ''): ?>
-                    <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
-                <?php endif; ?>
+                <div class="pl-month-brand-row">
+                    <div class="pl-month-brand">
+                        <?php if ($tbLogo !== ''): ?>
+                            <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($tbLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+                        <?php endif; ?>
+                        <div class="pl-month-brand-text">
+                            <?php if ($companyNameAr !== ''): ?>
+                                <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                            <?php endif; ?>
+                            <?php if (trim((string) ($tbCompany['commercial_register'] ?? '')) !== ''): ?>
+                                <p class="pl-month-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars((string) $tbCompany['commercial_register'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="pl-month-contact">
+                        <?php if (trim((string) ($tbCompany['address'] ?? '')) !== ''): ?>
+                            <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $tbCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
+                        <?php endif; ?>
+                        <?php if (trim((string) ($tbCompany['phones'] ?? '')) !== ''): ?>
+                            <p class="pl-month-contact-line"><span dir="ltr"><?php echo htmlspecialchars((string) $tbCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
                 <h2 class="gl-acc-stmt-print-title tb-report-print-title">
                     <span class="gl-acc-stmt-print-title-ar" lang="ar">تقــــــرير ميــــــــزان المراجــــــــة عن الفترة من&nbsp;<?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?> إلـى&nbsp;&nbsp;<?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
                 </h2>
