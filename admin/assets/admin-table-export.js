@@ -350,11 +350,19 @@
         var targetSel = table.getAttribute('data-export-target');
         var target = targetSel ? document.querySelector(targetSel) : null;
         if (target) {
-            /* توحيد الترتيب: Excel قبل زر الطباعة إن وُجد في نفس الشريط. */
+            /*
+             * توحيد الترتيب (عرض ← Excel ← طباعة): نُدرج Excel بعد زر «عرض» (submit) إن وُجد،
+             * وإلا قبل زر الطباعة، وإلا في النهاية — لا نعتمد على نص onclick للطباعة (قد يكون تنبيهاً).
+             */
+            var submitBtn = target.querySelector('button[type="submit"]');
             var printBtn = target.querySelector('button[onclick*="print"]');
+            var anchorAfter = submitBtn && submitBtn.parentNode === target ? submitBtn : null;
             btns.forEach(function (b) {
                 b.classList.add('table-export-inline-btn');
-                if (printBtn) {
+                if (anchorAfter) {
+                    target.insertBefore(b, anchorAfter.nextSibling);
+                    anchorAfter = b;
+                } else if (printBtn) {
                     target.insertBefore(b, printBtn);
                 } else {
                     target.appendChild(b);
