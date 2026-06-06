@@ -426,8 +426,8 @@ $xlsQ['export'] = 'xls';
 $xlsHref = $baseUrl . '&' . http_build_query($xlsQ);
 ?>
 <p style="margin:0 0 1rem;display:flex;gap:8px;flex-wrap:wrap;">
-    <a class="btn btn-secondary" data-server-export href="<?php echo htmlspecialchars($xlsHref, ENT_QUOTES, 'UTF-8'); ?>">تصدير Excel (كل التفاصيل)</a>
-    <a class="btn btn-secondary" data-server-export href="<?php echo htmlspecialchars($csvHref, ENT_QUOTES, 'UTF-8'); ?>">تصدير CSV (تفاصيل)</a>
+    <a class="btn btn-secondary" data-server-export href="<?php echo htmlspecialchars($xlsHref, ENT_QUOTES, 'UTF-8'); ?>">Excel (كل التفاصيل)</a>
+    <a class="btn btn-secondary" data-server-export href="<?php echo htmlspecialchars($csvHref, ENT_QUOTES, 'UTF-8'); ?>">CSV (تفاصيل)</a>
 </p>
 
 <div class="grid-2" style="gap:1rem; margin-bottom:1rem;">

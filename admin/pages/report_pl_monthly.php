@@ -482,7 +482,7 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
                             $plXlsQ['export'] = 'xls';
                             $plXlsHref = storefront_public_path('/admin/index.php') . '?' . http_build_query($plXlsQ);
                             ?>
-                            <a class="btn-secondary" data-server-export href="<?php echo htmlspecialchars($plXlsHref, ENT_QUOTES, 'UTF-8'); ?>">تصدير Excel</a>
+                            <a class="btn-secondary" data-server-export href="<?php echo htmlspecialchars($plXlsHref, ENT_QUOTES, 'UTF-8'); ?>">Excel</a>
                             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                         <?php endif; ?>
                     </div>
