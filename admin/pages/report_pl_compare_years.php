@@ -164,6 +164,7 @@ $todayDmY = orange_format_date_dmY(date('Y-m-d'));
     </div>
 <?php else: ?>
     <div class="card admin-fy-card gl-acc-stmt-print">
+        <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
         <header class="pl-month-print-banner gl-acc-stmt-print-banner">
             <div class="pl-month-brand-row">
                 <div class="pl-month-brand">
@@ -219,6 +220,7 @@ $todayDmY = orange_format_date_dmY(date('Y-m-d'));
         <?php if ($todayDmY !== ''): ?>
             <p class="muted" style="margin-top:10px;font-size:0.9rem;" dir="ltr">طباعة: <?php echo htmlspecialchars($todayDmY, ENT_QUOTES, 'UTF-8'); ?></p>
         <?php endif; ?>
+        </div>
     </div>
 <?php endif; ?>
 
