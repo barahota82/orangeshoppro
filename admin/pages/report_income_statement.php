@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../includes/financial_report_breakdown.php';
 require_once __DIR__ . '/../../includes/accounting_report_mapping.php';
 require_once __DIR__ . '/../../includes/accounting_pl_statement_rows.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
@@ -205,6 +206,8 @@ $todayDmY = orange_format_date_dmY(date('Y-m-d'));
 $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
+$isCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
+$isLogo = (string) ($isCompany['logo_url'] ?? '');
 
 $hasPlData = $revenueLines !== [] || $cogsLines !== [] || $expenseLines !== [];
 
@@ -222,7 +225,7 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
         <form method="get" class="gas-acc-stmt-filter-form" id="is_report_form">
             <input type="hidden" name="page" value="report_income_statement">
             <div class="gas-acc-stmt-toolbar-wrap">
-                <div class="gas-acc-stmt-toolbar ta-report-toolbar ta-report-toolbar--is-ignore-left gas-acc-stmt-toolbar--main-center">
+                <div class="gas-acc-stmt-toolbar ta-report-toolbar ta-report-toolbar--is-buttons-left gas-acc-stmt-toolbar--main-center">
                     <div class="gas-acc-stmt-field gl-m-stmt-field--month">
                         <label for="is_m_month_from">من شهر</label>
                         <input type="month" name="m_from" id="is_m_month_from" class="admin-inp"
@@ -243,17 +246,18 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
                             title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
+                    <div class="gas-acc-stmt-field is-toolbar-spacer" aria-hidden="true"></div>
+                    <label class="gas-acc-stmt-field is-ignore-close-field" title="قيود الإقفال السنوي (YEC) تُصفّر الإيرادات والمصروفات — فعِّل هذا الخيار لاستبعادها من أرقام التقرير إذا كان المدى الزمني يشمل تاريخ الإقفال.">
+                        <input type="hidden" name="ignore_close" value="0">
+                        <input type="checkbox" name="ignore_close" value="1" id="is_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
+                        <span>تجاهل قيود الإقفال</span>
+                    </label>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
                         <?php if ($useVouchers && $periodLabel !== ''): ?>
                             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                         <?php endif; ?>
                     </div>
-                    <label class="gas-acc-stmt-field is-ignore-close-field" title="قيود الإقفال السنوي (YEC) تُصفّر الإيرادات والمصروفات — فعِّل هذا الخيار لاستبعادها من أرقام التقرير إذا كان المدى الزمني يشمل تاريخ الإقفال.">
-                        <input type="hidden" name="ignore_close" value="0">
-                        <input type="checkbox" name="ignore_close" value="1" id="is_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
-                        <span>تجاهل قيود الإقفال</span>
-                    </label>
                 </div>
             </div>
         </form>
@@ -277,9 +281,29 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
     <div class="card admin-fy-card gl-acc-stmt-print">
         <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
             <header class="gl-acc-stmt-print-banner">
-                <?php if ($companyNameAr !== ''): ?>
-                    <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
-                <?php endif; ?>
+                <div class="pl-month-brand-row">
+                    <div class="pl-month-brand">
+                        <?php if ($isLogo !== ''): ?>
+                            <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($isLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+                        <?php endif; ?>
+                        <div class="pl-month-brand-text">
+                            <?php if ($companyNameAr !== ''): ?>
+                                <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                            <?php endif; ?>
+                            <?php if (trim((string) ($isCompany['commercial_register'] ?? '')) !== ''): ?>
+                                <p class="pl-month-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars((string) $isCompany['commercial_register'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="pl-month-contact">
+                        <?php if (trim((string) ($isCompany['address'] ?? '')) !== ''): ?>
+                            <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $isCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
+                        <?php endif; ?>
+                        <?php if (trim((string) ($isCompany['phones'] ?? '')) !== ''): ?>
+                            <p class="pl-month-contact-line"><span dir="ltr"><?php echo htmlspecialchars((string) $isCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
                 <h2 class="gl-acc-stmt-print-title ta-report-print-title">
                     <span class="gl-acc-stmt-print-title-ar" lang="ar">تقرير أرباح وخسائر عن الفترة من <?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?> إلـى&nbsp;<?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
                 </h2>

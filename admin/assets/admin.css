@@ -4726,6 +4726,19 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         minmax(11rem, 1fr);
 }
 
+/* قائمة الدخل: من/إلى + فاصل مرن + تجاهل الإقفال + الأزرار (الأزرار بأقصى الشاشة) */
+.ta-report-toolbar.ta-report-toolbar--is-buttons-left.gas-acc-stmt-toolbar {
+    grid-template-columns:
+        minmax(9.25rem, 10.75rem)
+        minmax(9.25rem, 10.75rem)
+        1fr
+        auto
+        auto;
+}
+.ta-report-toolbar--is-buttons-left .is-toolbar-spacer {
+    min-width: 0;
+}
+
 .ta-report-toolbar--is-ignore-left .is-ignore-close-field {
     display: flex;
     align-items: center;
