@@ -325,6 +325,24 @@
         }
     });
 
+    /* تنزيل تصدير خادمي (a[data-server-export]) عبر iframe مخفي — كي لا تذهب الصفحة لشاشة بيضاء. */
+    document.addEventListener('click', function (e) {
+        var a = e.target && e.target.closest ? e.target.closest('a[data-server-export]') : null;
+        if (!a || !a.getAttribute('href')) {
+            return;
+        }
+        e.preventDefault();
+        var ifr = document.createElement('iframe');
+        ifr.style.display = 'none';
+        ifr.src = a.getAttribute('href');
+        document.body.appendChild(ifr);
+        setTimeout(function () {
+            if (ifr.parentNode) {
+                ifr.parentNode.removeChild(ifr);
+            }
+        }, 120000);
+    });
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function () { init(document); });
     } else {
