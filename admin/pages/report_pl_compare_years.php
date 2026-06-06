@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
@@ -89,6 +90,8 @@ if ($useVouchers && $selectedFyIds !== []) {
 }
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
+$plcCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
+$plcLogo = (string) ($plcCompany['logo_url'] ?? '');
 
 $todayDmY = orange_format_date_dmY(date('Y-m-d'));
 
@@ -161,9 +164,31 @@ $todayDmY = orange_format_date_dmY(date('Y-m-d'));
     </div>
 <?php else: ?>
     <div class="card admin-fy-card gl-acc-stmt-print">
-        <?php if ($companyNameAr !== ''): ?>
-            <p class="muted" style="margin:0 0 8px;"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
-        <?php endif; ?>
+        <header class="pl-month-print-banner gl-acc-stmt-print-banner">
+            <div class="pl-month-brand-row">
+                <div class="pl-month-brand">
+                    <?php if ($plcLogo !== ''): ?>
+                        <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($plcLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+                    <?php endif; ?>
+                    <div class="pl-month-brand-text">
+                        <?php if ($companyNameAr !== ''): ?>
+                            <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                        <?php endif; ?>
+                        <?php if (trim((string) ($plcCompany['commercial_register'] ?? '')) !== ''): ?>
+                            <p class="pl-month-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars((string) $plcCompany['commercial_register'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="pl-month-contact">
+                    <?php if (trim((string) ($plcCompany['address'] ?? '')) !== ''): ?>
+                        <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $plcCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
+                    <?php endif; ?>
+                    <?php if (trim((string) ($plcCompany['phones'] ?? '')) !== ''): ?>
+                        <p class="pl-month-contact-line" dir="ltr"><?php echo htmlspecialchars((string) $plcCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></p>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </header>
         <h3 class="card-title">ملخص بحسب سنة مالية</h3>
         <div class="table-wrap admin-fy-table-wrap">
             <table class="admin-fy-table" data-export-name="مقارنة الأرباح والخسائر السنوية" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
