@@ -4856,6 +4856,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 }
 .pl-month-contact-line {
     margin: 0 0 2px;
+    white-space: nowrap;
 }
 .pl-month-print-logo {
     display: block;
@@ -5086,6 +5087,21 @@ td.tb-col-name,
     align-items: flex-end;
     gap: 8px;
     padding-bottom: 1px;
+}
+/* توحيد شكل/عرض أزرار الشريط (عرض/Excel/طباعة) سواء كانت button أو a — تطابق بين التقارير */
+.gas-acc-stmt-actions > button,
+.gas-acc-stmt-actions > a.btn-secondary,
+.gas-acc-stmt-actions > a.btn,
+.gas-acc-stmt-actions > button.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: var(--input-min-h);
+    height: var(--input-min-h);
+    padding-inline: 14px;
+    white-space: nowrap;
+    text-decoration: none;
 }
 .gas-acc-stmt-toolbar--main-center > .gas-acc-stmt-field:not(.gas-acc-stmt-actions) > label {
     text-align: center;
