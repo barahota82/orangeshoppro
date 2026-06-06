@@ -58,7 +58,7 @@ $fmt = static function (float $amt) use ($reportMoney): string {
         <form method="get" class="card admin-fy-card" style="margin-bottom:16px;">
             <input type="hidden" name="page" value="report_cash_flow">
             <input type="hidden" name="run" value="1">
-            <div class="admin-fy-form-grid" style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:end;">
+            <div class="admin-fy-form-grid" style="display:flex;flex-wrap:wrap;gap:12px;align-items:end;">
                 <div>
                     <label for="cf_fy">السنة المالية</label>
                     <select id="cf_fy" name="fy" required>
@@ -85,10 +85,9 @@ $fmt = static function (float $amt) use ($reportMoney): string {
                         </label>
                     </div>
                 </div>
-                <div class="gas-acc-stmt-actions">
+                <div class="gas-acc-stmt-actions" style="margin-inline-start:auto;">
                     <button type="submit">عرض</button>
                     <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
-                    <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=chart_of_accounts'), ENT_QUOTES, 'UTF-8'); ?>">الدليل المحاسبي</a>
                 </div>
             </div>
         </form>
