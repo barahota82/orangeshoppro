@@ -101,15 +101,12 @@ $fmt = static function (float $amt) use ($reportMoney): string {
         <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;">
             <p style="margin:0;">لا توجد حسابات ترحيل في الدليل — صنّف الحسابات (بما فيها <code>cashflow_section</code> وحسابات النقد) ثم أعد العرض.</p>
         </div>
-    <?php elseif (! $submitted): ?>
-        <div class="card">
-            <p class="card-hint" style="margin:0;">اختر السنة المالية والطريقة ثم «عرض التقرير». التجميع من قيود **مرحّلة** فقط (بدون قيود إقفال YEC في تعديلات غير المباشرة).</p>
-        </div>
-    <?php elseif ($report === null): ?>
-        <div class="card" style="border:1px solid #dc2626;background:#fef2f2;">
-            <p style="margin:0;">تعذّر بناء التقرير للسنة المحددة.</p>
-        </div>
     <?php else: ?>
+        <?php
+        /* هيكل التقرير (إطار + ترويسة + جدول) يظهر دائماً؛ البيانات تُملأ بعد «عرض». */
+        $cfFyLabel = $report !== null ? (string) $report['fy_label'] : trim((string) ($fyRow['label_ar'] ?? ''));
+        $cfPeriod = $report !== null ? (string) $report['period'] : '';
+        ?>
         <div class="card admin-fy-card">
             <div class="gl-acc-stmt-print-sheet ral-print-sheet">
             <header class="gl-acc-stmt-print-banner ral-print-banner">
@@ -138,13 +135,13 @@ $fmt = static function (float $amt) use ($reportMoney): string {
                 </div>
                 <h2 class="gl-acc-stmt-print-title ral-print-title">قائمة التدفقات النقدية</h2>
                 <p class="muted" style="margin:8px 0 0;">
-                    <?php echo htmlspecialchars((string) $report['fy_label'], ENT_QUOTES, 'UTF-8'); ?>
-                    — <?php echo htmlspecialchars((string) $report['period'], ENT_QUOTES, 'UTF-8'); ?>
+                    <?php if ($cfFyLabel !== ''): ?><?php echo htmlspecialchars($cfFyLabel, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?>
+                    <?php if ($cfPeriod !== ''): ?> — <?php echo htmlspecialchars($cfPeriod, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?>
                     — <?php echo $method === 'direct' ? 'الطريقة المباشرة' : 'الطريقة غير المباشرة'; ?>
                 </p>
             </header>
 
-            <?php if (($report['cash_account_ids'] ?? []) === []): ?>
+            <?php if ($report !== null && ($report['cash_account_ids'] ?? []) === []): ?>
                 <div class="card-hint" style="margin:12px 0;border:1px solid #fcd34d;background:#fffbeb;padding:10px;border-radius:6px;">
                     <strong>تنبيه:</strong> لم يُعرَف حساب نقد (ربط «cash» في حسابات القيود التلقائية أو سطر «النقد وما في حكمه»). أرقام النقد أول/آخر المدة قد تكون صفراً.
                 </div>
@@ -159,46 +156,54 @@ $fmt = static function (float $amt) use ($reportMoney): string {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($report['rows'] as $row): ?>
-                            <?php
-                            $kind = (string) ($row['kind'] ?? 'line');
-                            $indent = (int) ($row['indent'] ?? 0);
-                            $bold = ! empty($row['bold']);
-                            $muted = ! empty($row['muted']);
-                            $cls = 'cf-row-' . $kind;
-                            if ($bold) {
-                                $cls .= ' cf-row-bold';
-                            }
-                            if ($muted) {
-                                $cls .= ' muted';
-                            }
-                            $pad = $indent > 0 ? 'padding-right:' . (12 + $indent * 16) . 'px;' : '';
-                            ?>
-                            <tr class="<?php echo htmlspecialchars($cls, ENT_QUOTES, 'UTF-8'); ?>">
-                                <td style="<?php echo $pad; ?>"><?php echo htmlspecialchars((string) ($row['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td class="cf-col-amount" dir="ltr" lang="en">
-                                    <?php if ($row['amount'] !== null): ?>
-                                        <?php echo htmlspecialchars($fmt((float) $row['amount']), ENT_QUOTES, 'UTF-8'); ?>
-                                    <?php else: ?>
-                                        —
-                                    <?php endif; ?>
-                                </td>
+                        <?php if ($report === null): ?>
+                            <tr class="gl-acc-stmt-no-print">
+                                <td colspan="2" class="muted"><?php echo $submitted ? 'تعذّر بناء التقرير للسنة المحددة.' : 'اختر السنة المالية والطريقة ثم «عرض» لعرض التدفقات النقدية.'; ?></td>
                             </tr>
-                        <?php endforeach; ?>
+                        <?php else: ?>
+                            <?php foreach ($report['rows'] as $row): ?>
+                                <?php
+                                $kind = (string) ($row['kind'] ?? 'line');
+                                $indent = (int) ($row['indent'] ?? 0);
+                                $bold = ! empty($row['bold']);
+                                $muted = ! empty($row['muted']);
+                                $cls = 'cf-row-' . $kind;
+                                if ($bold) {
+                                    $cls .= ' cf-row-bold';
+                                }
+                                if ($muted) {
+                                    $cls .= ' muted';
+                                }
+                                $pad = $indent > 0 ? 'padding-right:' . (12 + $indent * 16) . 'px;' : '';
+                                ?>
+                                <tr class="<?php echo htmlspecialchars($cls, ENT_QUOTES, 'UTF-8'); ?>">
+                                    <td style="<?php echo $pad; ?>"><?php echo htmlspecialchars((string) ($row['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td class="cf-col-amount" dir="ltr" lang="en">
+                                        <?php if ($row['amount'] !== null): ?>
+                                            <?php echo htmlspecialchars($fmt((float) $row['amount']), ENT_QUOTES, 'UTF-8'); ?>
+                                        <?php else: ?>
+                                            —
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
 
             <?php
-            $diff = round((float) $report['net_change_computed'] - (float) $report['net_change_actual'], 4);
-            if (abs($diff) > 0.02):
-                ?>
-                <p class="card-hint muted" style="margin-top:12px;">
-                    فرق مطابقة: <?php echo htmlspecialchars($fmt($diff), ENT_QUOTES, 'UTF-8'); ?>
-                    (محسوب <?php echo htmlspecialchars($fmt((float) $report['net_change_computed']), ENT_QUOTES, 'UTF-8'); ?>
-                    مقابل تغيّر نقد فعلي <?php echo htmlspecialchars($fmt((float) $report['net_change_actual']), ENT_QUOTES, 'UTF-8'); ?>).
-                    راجع تصنيف <code>cashflow_section</code> وحسابات النقد.
-                </p>
+            if ($report !== null):
+                $diff = round((float) $report['net_change_computed'] - (float) $report['net_change_actual'], 4);
+                if (abs($diff) > 0.02):
+                    ?>
+                    <p class="card-hint muted" style="margin-top:12px;">
+                        فرق مطابقة: <?php echo htmlspecialchars($fmt($diff), ENT_QUOTES, 'UTF-8'); ?>
+                        (محسوب <?php echo htmlspecialchars($fmt((float) $report['net_change_computed']), ENT_QUOTES, 'UTF-8'); ?>
+                        مقابل تغيّر نقد فعلي <?php echo htmlspecialchars($fmt((float) $report['net_change_actual']), ENT_QUOTES, 'UTF-8'); ?>).
+                        راجع تصنيف <code>cashflow_section</code> وحسابات النقد.
+                    </p>
+                <?php endif; ?>
             <?php endif; ?>
 
             <p class="card-hint muted" style="margin-top:12px;font-size:0.85rem;">
