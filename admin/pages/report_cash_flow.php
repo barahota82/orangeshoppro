@@ -54,10 +54,6 @@ $fmt = static function (float $amt) use ($reportMoney): string {
 <div class="admin-fy-shell gl-acc-stmt-print" dir="rtl">
     <div class="gl-acc-stmt-no-print">
         <h1 class="admin-fy-shell__title">قائمة التدفقات النقدية</h1>
-        <p class="actions" style="margin:0 0 16px;">
-            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
-            <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=chart_of_accounts'), ENT_QUOTES, 'UTF-8'); ?>">الدليل المحاسبي</a>
-        </p>
 
         <form method="get" class="card admin-fy-card" style="margin-bottom:16px;">
             <input type="hidden" name="page" value="report_cash_flow">
@@ -89,8 +85,10 @@ $fmt = static function (float $amt) use ($reportMoney): string {
                         </label>
                     </div>
                 </div>
-                <div>
-                    <button type="submit">عرض التقرير</button>
+                <div class="gas-acc-stmt-actions">
+                    <button type="submit">عرض</button>
+                    <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
+                    <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=chart_of_accounts'), ENT_QUOTES, 'UTF-8'); ?>">الدليل المحاسبي</a>
                 </div>
             </div>
         </form>
@@ -154,7 +152,7 @@ $fmt = static function (float $amt) use ($reportMoney): string {
             <?php endif; ?>
 
             <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-                <table class="admin-fy-table gl-acc-stmt-table cf-report-table" dir="rtl" data-export-name="قائمة التدفق النقدي" data-export-target=".actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
+                <table class="admin-fy-table gl-acc-stmt-table cf-report-table" dir="rtl" data-export-name="قائمة التدفق النقدي" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                     <thead>
                         <tr>
                             <th>البند</th>

@@ -60,10 +60,6 @@ foreach ($dims as $d) {
 <div class="admin-fy-shell gl-acc-stmt-print" dir="rtl">
     <div class="gl-acc-stmt-no-print">
         <h1 class="admin-fy-shell__title">التقرير التحليلي</h1>
-        <p class="actions" style="margin:0 0 16px;">
-            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
-            <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=analytical_dimensions'), ENT_QUOTES, 'UTF-8'); ?>">الأبعاد التحليلية</a>
-        </p>
 
         <?php if (! $ready): ?>
             <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;">
@@ -108,8 +104,10 @@ foreach ($dims as $d) {
                         </label>
                     </div>
                 </div>
-                <div>
+                <div class="gas-acc-stmt-actions">
                     <button type="submit">عرض</button>
+                    <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
+                    <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=analytical_dimensions'), ENT_QUOTES, 'UTF-8'); ?>">الأبعاد التحليلية</a>
                 </div>
             </div>
         </form>
@@ -162,7 +160,7 @@ foreach ($dims as $d) {
                 <p class="muted">لا بيانات لهذا البُعد في السنة المحددة (أضف قيم البُعد على أسطر السندات).</p>
             <?php else: ?>
                 <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-                    <table class="admin-fy-table gl-acc-stmt-table" dir="rtl" data-export-name="التقرير التحليلي" data-export-target=".actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>" data-export-subtitle="<?php echo htmlspecialchars($dimLabel . ' — ' . ($method === 'movement' ? 'حركة GL' : 'قائمة دخل'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <table class="admin-fy-table gl-acc-stmt-table" dir="rtl" data-export-name="التقرير التحليلي" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>" data-export-subtitle="<?php echo htmlspecialchars($dimLabel . ' — ' . ($method === 'movement' ? 'حركة GL' : 'قائمة دخل'), ENT_QUOTES, 'UTF-8'); ?>">
                         <thead>
                             <tr>
                                 <th>القيمة</th>
