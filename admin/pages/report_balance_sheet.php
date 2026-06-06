@@ -213,8 +213,6 @@ $colCount = $showCompare ? 4 : 3;
                         عمود السنة السابقة مخفي — فعّل «أظهر السنة السابقة» للمقارنة.
                     <?php elseif ($hasRealPrev): ?>
                         مقارنة تلقائية مع نهاية السنة السابقة: <strong><?php echo htmlspecialchars($prevFyLabelAr !== '' ? $prevFyLabelAr : $prevAsOfDmY, ENT_QUOTES, 'UTF-8'); ?></strong>.
-                    <?php else: ?>
-                        لا توجد سنة مالية سابقة فعلية — يُعرض عمود «<?php echo htmlspecialchars($prevYearLabel, ENT_QUOTES, 'UTF-8'); ?>» بأرصدة صفر.
                     <?php endif; ?>
                 </p>
                 <?php endif; ?>
@@ -276,10 +274,10 @@ $colCount = $showCompare ? 4 : 3;
                         <tr>
                             <th class="gl-acc-stmt-col-num">كــود الحســاب</th>
                             <th>اســــــم الحســــــاب</th>
-                            <th class="gl-acc-stmt-col-num"><?php echo htmlspecialchars($curYearLabel, ENT_QUOTES, 'UTF-8'); ?></th>
                             <?php if ($showCompare): ?>
                                 <th class="gl-acc-stmt-col-num"><?php echo htmlspecialchars($prevYearLabel, ENT_QUOTES, 'UTF-8'); ?></th>
                             <?php endif; ?>
+                            <th class="gl-acc-stmt-col-num"><?php echo htmlspecialchars($curYearLabel, ENT_QUOTES, 'UTF-8'); ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -289,10 +287,10 @@ $colCount = $showCompare ? 4 : 3;
                             <tr>
                                 <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo htmlspecialchars((string) ($ln['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars((string) ($ln['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($ln['balance'] ?? 0)); ?></td>
                                 <?php if ($showCompare): ?>
                                     <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($ln['balance_prev'] ?? 0)); ?></td>
                                 <?php endif; ?>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($ln['balance'] ?? 0)); ?></td>
                             </tr>
                             <?php
                         };
@@ -301,10 +299,10 @@ $colCount = $showCompare ? 4 : 3;
                             <tr class="ta-report-subtotal">
                                 <td class="gl-acc-stmt-col-num muted">—</td>
                                 <td><strong><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></strong></td>
-                                <td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($cur); ?></strong></td>
                                 <?php if ($showCompare): ?>
                                     <td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($prev); ?></strong></td>
                                 <?php endif; ?>
+                                <td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($cur); ?></strong></td>
                             </tr>
                             <?php
                         };
@@ -328,7 +326,7 @@ $colCount = $showCompare ? 4 : 3;
                         <?php endif; ?>
                         <?php $renderSubtotal('إجمالي الأصول غير المتداولة', $totalNonCurrentAssets, $totalNonCurrentAssetsPrev); ?>
 
-                        <tr class="ta-report-grand"><td class="gl-acc-stmt-col-num muted">—</td><td><strong>إجمالي الأصول</strong></td><td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($totalAssets); ?></strong></td><?php if ($showCompare): ?><td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($totalAssetsPrev); ?></strong></td><?php endif; ?></tr>
+                        <tr class="ta-report-grand"><td class="gl-acc-stmt-col-num muted">—</td><td><strong>إجمالي الأصول</strong></td><?php if ($showCompare): ?><td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($totalAssetsPrev); ?></strong></td><?php endif; ?><td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($totalAssets); ?></strong></td></tr>
 
                         <tr class="ta-report-section"><td colspan="<?php echo $colCount; ?>">الخصوم</td></tr>
                         <?php if ($liabilityLines === []): ?>
@@ -346,7 +344,7 @@ $colCount = $showCompare ? 4 : 3;
                         <?php endif; ?>
                         <?php $renderSubtotal('إجمالي حقوق الملكية', $totalEquity, $totalEquityPrev); ?>
 
-                        <tr class="ta-report-grand"><td class="gl-acc-stmt-col-num muted">—</td><td><strong>إجمالي الخصوم وحقوق الملكية</strong></td><td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($totalLiab + $totalEquity); ?></strong></td><?php if ($showCompare): ?><td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($totalLiabPrev + $totalEquityPrev); ?></strong></td><?php endif; ?></tr>
+                        <tr class="ta-report-grand"><td class="gl-acc-stmt-col-num muted">—</td><td><strong>إجمالي الخصوم وحقوق الملكية</strong></td><?php if ($showCompare): ?><td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($totalLiabPrev + $totalEquityPrev); ?></strong></td><?php endif; ?><td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($totalLiab + $totalEquity); ?></strong></td></tr>
                     </tbody>
                 </table>
             </div>
