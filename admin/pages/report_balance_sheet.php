@@ -163,7 +163,7 @@ $colCount = $showCompare ? 4 : 3;
         <form method="get" class="gas-acc-stmt-filter-form" id="bs_report_form">
             <input type="hidden" name="page" value="report_balance_sheet">
             <div class="gas-acc-stmt-toolbar-wrap">
-                <div class="gas-acc-stmt-toolbar ta-report-toolbar gas-acc-stmt-toolbar--main-center">
+                <div class="gas-acc-stmt-toolbar ta-report-toolbar ta-report-toolbar--is-buttons-left gas-acc-stmt-toolbar--main-center">
                     <div class="gas-acc-stmt-field">
                         <label for="bs_fy">السنة المالية</label>
                         <select id="bs_fy" name="fy" class="admin-inp" onchange="this.form.submit()">
@@ -184,17 +184,18 @@ $colCount = $showCompare ? 4 : 3;
                             <?php endif; ?>
                             autocomplete="off">
                     </div>
+                    <div class="gas-acc-stmt-field is-toolbar-spacer" aria-hidden="true"></div>
+                    <label class="gas-acc-stmt-field is-ignore-close-field" title="استبعاد سندات الإقفال السنوي (YEC) من الأرصدة المعروضة.">
+                        <input type="hidden" name="ignore_close" value="0">
+                        <input type="checkbox" name="ignore_close" value="1" id="bs_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
+                        <span>تجاهل قيود الإقفال</span>
+                    </label>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
                         <?php if ($useVouchers && $asOfYmd !== ''): ?>
                             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                         <?php endif; ?>
                     </div>
-                    <label class="gas-acc-stmt-field is-ignore-close-field" title="استبعاد سندات الإقفال السنوي (YEC) من الأرصدة المعروضة.">
-                        <input type="hidden" name="ignore_close" value="0">
-                        <input type="checkbox" name="ignore_close" value="1" id="bs_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
-                        <span>تجاهل قيود الإقفال</span>
-                    </label>
                 </div>
                 <?php if ($useVouchers): ?>
                 <p class="muted gl-acc-stmt-no-print" style="margin:8px 0 0;font-size:12px;text-align:center;">
