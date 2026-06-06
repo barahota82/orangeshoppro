@@ -363,6 +363,66 @@ $reportFmt = static fn (float $v): string => orange_accounting_report_format_amo
 
 $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 1 : 0;
 
+/* تصدير Excel مخصّص: لكل شهر رأسه + الإيرادات بجانب المصروفات (يطابق الشاشة). */
+if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers && $periodLabel !== '') {
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
+    $plName = 'قائمة الإيرادات والمصروفات الشهرية-' . date('Y-m-d');
+    header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="' . $plName . '.xls"');
+    echo "\xEF\xBB\xBF";
+    $plE = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+    echo '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" '
+        . 'xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">'
+        . '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
+        . '<x:Name>إيرادات ومصروفات</x:Name><x:WorksheetOptions><x:DisplayRightToLeft/>'
+        . '</x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->'
+        . '<style>table{border-collapse:collapse;}td,th{border:0.5pt solid #999999;padding:3px 7px;white-space:nowrap;}'
+        . 'th{background:#e8eef5;font-weight:bold;text-align:center;}.num{mso-number-format:"#,##0.###";}</style></head><body dir="rtl">';
+    foreach ($monthSheetsBuilt as $ms) {
+        $ymMs = (string) $ms['ym'];
+        $dmFrom = orange_format_date_dmY((string) $ms['date_from']);
+        $dmTo = orange_format_date_dmY((string) $ms['date_to']);
+        $tot = $ms['totals'];
+        $lr = $ms['rev'] ?? [];
+        $rr = $ms['out'] ?? [];
+        preg_match('/^(\d{4})-/u', $ymMs, $ymY);
+        $yearStr = $ymY[1] ?? '';
+        if ($companyNameAr !== '') {
+            echo '<div style="font-size:14pt;font-weight:bold;">' . $plE($companyNameAr) . '</div>';
+        }
+        echo '<div style="font-size:13pt;font-weight:bold;">' . $plE($reportTitleLine($dmFrom, $dmTo)) . '</div>';
+        echo '<div style="font-size:11pt;">' . $plE($subtitleLine($dmFrom, $dmTo)) . '</div>';
+        echo '<div style="font-size:11pt;">' . $plE($monthLabelExcel($ymMs)) . ($yearStr !== '' ? ' — السنة ' . $plE($yearStr) : '')
+            . ' — ربح: ' . $plE($reportFmt((float) ($tot['rabeh'] ?? 0))) . '</div><br>';
+        echo '<table><thead><tr><th colspan="3">ايرادات</th><th colspan="3">مصروفات</th></tr>'
+            . '<tr><th>الرصيد</th><th>اسم الحساب</th><th>كود الحساب</th>'
+            . '<th>الرصيد</th><th>اسم الحساب</th><th>كود الحساب</th></tr></thead><tbody>';
+        $plRows = max(count($lr), count($rr), 1);
+        for ($i = 0; $i < $plRows; $i++) {
+            $lv = $lr[$i] ?? null;
+            $rv = $rr[$i] ?? null;
+            echo '<tr>';
+            if ($lv !== null) {
+                echo '<td class="num">' . $plE((float) $lv['cell']) . '</td><td>' . $plE((string) $lv['name']) . '</td><td>' . $plE((string) $lv['code']) . '</td>';
+            } else {
+                echo '<td></td><td></td><td></td>';
+            }
+            if ($rv !== null) {
+                echo '<td class="num">' . $plE((float) $rv['cell']) . '</td><td>' . $plE((string) $rv['name']) . '</td><td>' . $plE((string) $rv['code']) . '</td>';
+            } else {
+                echo '<td></td><td></td><td></td>';
+            }
+            echo '</tr>';
+        }
+        echo '</tbody><tfoot><tr><td class="num">' . $plE((float) ($tot['sum_rev'] ?? 0)) . '</td><th colspan="2">إجمالي الإيرادات</th>'
+            . '<td class="num">' . $plE((float) ($tot['sum_out'] ?? 0)) . '</td><th colspan="2">إجمالي المصروفات</th></tr></tfoot></table><br><br>';
+    }
+    echo '</body></html>';
+    exit;
+}
+
 ?>
 <div class="admin-fy-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
@@ -401,6 +461,13 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
                         <?php if ($useVouchers && $periodLabel !== ''): ?>
+                            <?php
+                            $plXlsQ = $_GET;
+                            $plXlsQ['page'] = 'report_pl_monthly';
+                            $plXlsQ['export'] = 'xls';
+                            $plXlsHref = storefront_public_path('/admin/index.php') . '?' . http_build_query($plXlsQ);
+                            ?>
+                            <a class="btn-secondary" href="<?php echo htmlspecialchars($plXlsHref, ENT_QUOTES, 'UTF-8'); ?>">تصدير Excel</a>
                             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                         <?php endif; ?>
                     </div>
@@ -478,7 +545,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                 <div class="pl-print-dual-col">
                     <h3 class="pl-print-dual-h" lang="ar">ايرادات</h3>
                     <div class="admin-fy-table-wrap pl-print-side-table-wrap">
-                        <table class="admin-fy-table pl-month-table" data-export-name="قائمة الإيرادات والمصروفات الشهرية" data-export-group="pl_month" data-export-label="الإيرادات" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
+                        <table class="admin-fy-table pl-month-table">
                             <thead>
                                 <tr>
                                     <th class="gl-acc-stmt-col-num">الرصيد</th>
@@ -517,7 +584,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                 <div class="pl-print-dual-col">
                     <h3 class="pl-print-dual-h" lang="ar">مصروفات</h3>
                     <div class="admin-fy-table-wrap pl-print-side-table-wrap">
-                        <table class="admin-fy-table pl-month-table" data-export-name="قائمة الإيرادات والمصروفات الشهرية" data-export-group="pl_month" data-export-label="المصروفات" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
+                        <table class="admin-fy-table pl-month-table">
                             <thead>
                                 <tr>
                                     <th class="gl-acc-stmt-col-num">الرصيد</th>
