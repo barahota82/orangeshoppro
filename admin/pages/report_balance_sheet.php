@@ -138,6 +138,9 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
 
 $asOfDmY = orange_format_date_dmY($asOfYmd);
 $prevAsOfDmY = $hasRealPrev ? orange_format_date_dmY($prevAsOfYmd) : 'السنة السابقة';
+/* عناوين أعمدة الأرصدة = رقم السنة فقط (مثل 2026 / 2025). */
+$curYearLabel = substr($asOfYmd, 0, 4);
+$prevYearLabel = $hasRealPrev ? substr($prevAsOfYmd, 0, 4) : (string) ((int) substr($asOfYmd, 0, 4) - 1);
 $todayDmY = orange_format_date_dmY(date('Y-m-d'));
 $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
@@ -266,9 +269,9 @@ $colCount = $showCompare ? 4 : 3;
                         <tr>
                             <th class="gl-acc-stmt-col-num">كــود الحســاب</th>
                             <th>اســــــم الحســــــاب</th>
-                            <th class="gl-acc-stmt-col-num"><?php echo htmlspecialchars($asOfDmY, ENT_QUOTES, 'UTF-8'); ?></th>
+                            <th class="gl-acc-stmt-col-num"><?php echo htmlspecialchars($curYearLabel, ENT_QUOTES, 'UTF-8'); ?></th>
                             <?php if ($showCompare): ?>
-                                <th class="gl-acc-stmt-col-num"><?php echo htmlspecialchars($prevAsOfDmY, ENT_QUOTES, 'UTF-8'); ?></th>
+                                <th class="gl-acc-stmt-col-num"><?php echo htmlspecialchars($prevYearLabel, ENT_QUOTES, 'UTF-8'); ?></th>
                             <?php endif; ?>
                         </tr>
                     </thead>
