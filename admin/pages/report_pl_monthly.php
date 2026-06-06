@@ -519,6 +519,7 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
         $pageCls = $isLastSheet ? ' pl-month-print-page pl-month-print-page--last' : ' pl-month-print-page';
         ?>
     <section class="card admin-fy-card pl-month-print-inner gl-acc-stmt-print pl-month-sheet<?php echo $pageCls; ?>">
+        <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
         <header class="pl-month-print-banner gl-acc-stmt-print-banner">
             <div class="pl-month-brand-row">
                 <div class="pl-month-brand">
@@ -641,6 +642,7 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
         <footer class="pl-month-print-footer muted" style="margin-top:0.75rem;font-size:0.85rem;text-align:center;">
             تاريخ الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?>
         </footer>
+        </div>
     </section>
     <?php endforeach; ?>
 <?php endif; ?>
