@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
@@ -112,6 +113,8 @@ if ($pasAcctParams !== []) {
 }
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
+$pasCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
+$pasLogo = (string) ($pasCompany['logo_url'] ?? '');
 
 $accountId = isset($_GET['account']) ? (int) $_GET['account'] : 0;
 $customerId = isset($_GET['customer']) ? (int) $_GET['customer'] : 0;
@@ -321,6 +324,7 @@ $showStatement = $err === '' && (
 );
 /** هيكل الكشف (ترويسة + جدول) يظهر دائماً؛ البيانات تُملأ بعد اختيار الحساب/العميل و«استخراج الكشف». */
 $showStatementShell = ($err === '');
+$gasHasSelection = $isCustomerMode ? ($customerId > 0) : ($accountId > 0);
 
 ?>
 <div class="admin-fy-shell" dir="rtl">
@@ -373,9 +377,7 @@ $showStatementShell = ($err === '');
                     </div>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">استخراج الكشف</button>
-                        <?php if ($showStatement): ?>
-                            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
-                        <?php endif; ?>
+                        <button type="button" class="btn-secondary" onclick="<?php echo $gasHasSelection ? 'window.print()' : "alert('اختر حساباً أو عميلاً أولاً ثم اضغط طباعة')"; ?>">طباعة</button>
                     </div>
                 </div>
             </div>
@@ -739,9 +741,29 @@ $showStatementShell = ($err === '');
     <div class="card admin-fy-card gl-acc-stmt-print">
         <div class="gl-acc-stmt-print-sheet">
             <header class="gl-acc-stmt-print-banner">
-                <?php if ($companyNameAr !== ''): ?>
-                    <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
-                <?php endif; ?>
+                <div class="pl-month-brand-row">
+                    <div class="pl-month-brand">
+                        <?php if ($pasLogo !== ''): ?>
+                            <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($pasLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+                        <?php endif; ?>
+                        <div class="pl-month-brand-text">
+                            <?php if ($companyNameAr !== ''): ?>
+                                <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                            <?php endif; ?>
+                            <?php if (trim((string) ($pasCompany['commercial_register'] ?? '')) !== ''): ?>
+                                <p class="pl-month-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars((string) $pasCompany['commercial_register'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="pl-month-contact">
+                        <?php if (trim((string) ($pasCompany['address'] ?? '')) !== ''): ?>
+                            <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $pasCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
+                        <?php endif; ?>
+                        <?php if (trim((string) ($pasCompany['phones'] ?? '')) !== ''): ?>
+                            <p class="pl-month-contact-line"><span dir="ltr"><?php echo htmlspecialchars((string) $pasCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
                 <h2 class="gl-acc-stmt-print-title">
                     <span class="gl-acc-stmt-print-title-ar" lang="ar">كــــــشـــــف&nbsp;حـــســـاب</span>
                     <span class="gl-acc-stmt-print-title-en" lang="en" dir="ltr">STATMENT OF ACCOUNT</span>
