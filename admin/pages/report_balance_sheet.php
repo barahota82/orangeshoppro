@@ -68,7 +68,9 @@ if ($asOfYmd === '') {
 }
 
 $prevAsOfYmd = $prevFyRow !== null ? trim((string) ($prevFyRow['end_date'] ?? '')) : '';
-$showCompare = $prevAsOfYmd !== '';
+$hasRealPrev = $prevAsOfYmd !== '';
+/* اعرض عمود السنة السابقة دائماً (بأرصدة صفر إن لم توجد سنة سابقة فعلية) لرؤية الشكل الكامل. */
+$showCompare = true;
 
 $ignoreClosingEntries = !isset($_GET['ignore_close']) || (string) $_GET['ignore_close'] === '1';
 $bsExcludeEntryTypes = $ignoreClosingEntries ? ['year_end_close'] : [];
@@ -88,9 +90,9 @@ $bsCheck = 0.0;
 
 if ($useVouchers && $asOfYmd !== '') {
     $tbAsOf = orange_voucher_account_totals_on_or_before_date($pdo, $asOfYmd, $bsExcludeEntryTypes);
-    $tbPrev = $showCompare
+    $tbPrev = $hasRealPrev
         ? orange_voucher_account_totals_on_or_before_date($pdo, $prevAsOfYmd, $bsExcludeEntryTypes)
-        : null;
+        : [];
     $assetLines = orange_accounts_build_bs_statement_section_lines($pdo, $accountsLeaf, $tbAsOf, 'asset', $tbPrev);
     $liabilityLines = orange_accounts_build_bs_statement_section_lines($pdo, $accountsLeaf, $tbAsOf, 'liability', $tbPrev);
     $equityLines = orange_accounts_build_bs_statement_section_lines($pdo, $accountsLeaf, $tbAsOf, 'equity', $tbPrev);
@@ -135,7 +137,7 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
 };
 
 $asOfDmY = orange_format_date_dmY($asOfYmd);
-$prevAsOfDmY = $showCompare ? orange_format_date_dmY($prevAsOfYmd) : '';
+$prevAsOfDmY = $hasRealPrev ? orange_format_date_dmY($prevAsOfYmd) : 'السنة السابقة';
 $todayDmY = orange_format_date_dmY(date('Y-m-d'));
 $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
@@ -199,10 +201,10 @@ $colCount = $showCompare ? 4 : 3;
                 </div>
                 <?php if ($useVouchers): ?>
                 <p class="muted gl-acc-stmt-no-print" style="margin:8px 0 0;font-size:12px;text-align:center;">
-                    <?php if ($showCompare): ?>
+                    <?php if ($hasRealPrev): ?>
                         مقارنة تلقائية مع نهاية السنة السابقة: <strong><?php echo htmlspecialchars($prevFyLabelAr !== '' ? $prevFyLabelAr : $prevAsOfDmY, ENT_QUOTES, 'UTF-8'); ?></strong>.
                     <?php else: ?>
-                        لا توجد سنة مالية سابقة للمقارنة — يُعرض عمود السنة الحالية فقط.
+                        لا توجد سنة مالية سابقة فعلية — يُعرض عمود «السنة السابقة» بأرصدة صفر (لرؤية الشكل الكامل فقط).
                     <?php endif; ?>
                 </p>
                 <?php endif; ?>
