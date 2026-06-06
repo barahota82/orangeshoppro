@@ -4801,11 +4801,44 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 }
 
 /* قائمة إيرادات ومصروفات شهرية — كتلة/طباعة لكل شهر */
+.pl-month-brand-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 0.5rem;
+}
+.pl-month-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: start;
+}
+.pl-month-brand-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.pl-month-brand-text .gl-acc-stmt-print-company {
+    margin: 0;
+}
+.pl-month-cr {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #475569;
+}
+.pl-month-contact {
+    text-align: end;
+    font-size: 0.85rem;
+    color: #475569;
+}
+.pl-month-contact-line {
+    margin: 0 0 2px;
+}
 .pl-month-print-logo {
     display: block;
     max-height: 64px;
-    max-width: 220px;
-    margin: 0 auto 0.4rem;
+    max-width: 200px;
     object-fit: contain;
 }
 .pl-month-print-inner .card {

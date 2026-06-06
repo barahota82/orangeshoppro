@@ -398,6 +398,15 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
         if ($companyNameAr !== '') {
             echo '<div style="font-size:14pt;font-weight:bold;">' . $plE($companyNameAr) . '</div>';
         }
+        if (trim((string) ($plCompany['commercial_register'] ?? '')) !== '') {
+            echo '<div style="font-size:9pt;color:#555555;">سجل تجاري: ' . $plE($plCompany['commercial_register']) . '</div>';
+        }
+        if (trim((string) ($plCompany['address'] ?? '')) !== '') {
+            echo '<div style="font-size:9pt;color:#555555;">' . $plE($plCompany['address']) . '</div>';
+        }
+        if (trim((string) ($plCompany['phones'] ?? '')) !== '') {
+            echo '<div style="font-size:9pt;color:#555555;">' . $plE($plCompany['phones']) . '</div>';
+        }
         echo '<div style="font-size:13pt;font-weight:bold;">' . $plE($reportTitleLine($dmFrom, $dmTo)) . '</div>';
         echo '<div style="font-size:11pt;">' . $plE($subtitleLine($dmFrom, $dmTo)) . '</div>';
         echo '<div style="font-size:11pt;">' . $plE($monthLabelExcel($ymMs)) . ($yearStr !== '' ? ' — السنة ' . $plE($yearStr) : '')
@@ -530,12 +539,29 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
         ?>
     <section class="card admin-fy-card pl-month-print-inner gl-acc-stmt-print pl-month-sheet<?php echo $pageCls; ?>">
         <header class="pl-month-print-banner gl-acc-stmt-print-banner">
-            <?php if ($companyLogo !== ''): ?>
-                <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($companyLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
-            <?php endif; ?>
-            <?php if ($companyNameAr !== ''): ?>
-                <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
-            <?php endif; ?>
+            <div class="pl-month-brand-row">
+                <div class="pl-month-brand">
+                    <?php if ($companyLogo !== ''): ?>
+                        <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($companyLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+                    <?php endif; ?>
+                    <div class="pl-month-brand-text">
+                        <?php if ($companyNameAr !== ''): ?>
+                            <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                        <?php endif; ?>
+                        <?php if (trim((string) ($plCompany['commercial_register'] ?? '')) !== ''): ?>
+                            <p class="pl-month-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars((string) $plCompany['commercial_register'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="pl-month-contact">
+                    <?php if (trim((string) ($plCompany['address'] ?? '')) !== ''): ?>
+                        <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $plCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
+                    <?php endif; ?>
+                    <?php if (trim((string) ($plCompany['phones'] ?? '')) !== ''): ?>
+                        <p class="pl-month-contact-line" dir="ltr"><?php echo htmlspecialchars((string) $plCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></p>
+                    <?php endif; ?>
+                </div>
+            </div>
             <h2 class="pl-month-print-title gl-acc-stmt-print-title">
                 <span class="gl-acc-stmt-print-title-ar"><?php echo htmlspecialchars($reportTitleLine($dmFrom, $dmTo), ENT_QUOTES, 'UTF-8'); ?></span>
             </h2>
