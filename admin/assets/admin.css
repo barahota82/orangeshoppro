@@ -4837,7 +4837,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 }
 .pl-month-brand-text .gl-acc-stmt-print-company {
     margin: 0;
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 700;
     white-space: nowrap;
 }
@@ -4849,10 +4849,10 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 }
 .pl-month-contact {
     text-align: end;
-    font-size: 0.82rem;
+    font-size: 0.72rem;
     color: #475569;
-    flex: 1 1 auto;
-    padding-inline-start: 16px;
+    flex: 0 1 auto;
+    padding-inline-start: 14px;
 }
 .pl-month-contact-line {
     margin: 0 0 2px;
