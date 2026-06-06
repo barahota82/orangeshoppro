@@ -24,6 +24,7 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
     </div>
 
     <div class="card admin-fy-card">
+        <div class="gl-acc-stmt-print-sheet ral-print-sheet">
         <header class="gl-acc-stmt-print-banner ral-print-banner">
             <?php if ($companyNameAr !== ''): ?>
                 <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
@@ -59,6 +60,7 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
             </table>
         </div>
         <p class="card-hint gl-acc-stmt-print-metafoot muted" style="margin-top:12px;">عدد الحسابات: <?php echo count($listRows); ?></p>
+        </div>
     </div>
 </div>
 <style>
