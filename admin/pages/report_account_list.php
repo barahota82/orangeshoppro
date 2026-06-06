@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
@@ -13,6 +14,7 @@ $pdo = orange_admin_page_pdo();
 $flat = orange_accounts_flat($pdo);
 $listRows = orange_accounts_report_list_rows($pdo, $flat);
 $companyNameAr = orange_company_settings_name_ar($pdo);
+$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $ralCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
 $ralLogo = (string) ($ralCompany['logo_url'] ?? '');
 $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
@@ -82,7 +84,10 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
                 </tbody>
             </table>
         </div>
-        <p class="card-hint gl-acc-stmt-print-metafoot muted" style="margin-top:12px;">عدد الحسابات: <?php echo count($listRows); ?></p>
+        <p class="card-hint muted" style="margin-top:12px;">عدد الحسابات: <?php echo count($listRows); ?></p>
+        <div class="gl-acc-stmt-print-footer ta-report-print-footer">
+            <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
+        </div>
         </div>
     </div>
 </div>
