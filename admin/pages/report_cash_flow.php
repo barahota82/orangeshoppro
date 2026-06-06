@@ -9,6 +9,8 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/cash_flow_report.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
@@ -41,6 +43,9 @@ if ($useVouchers && $fyId > 0 && $submitted) {
 }
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
+$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$cfCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
+$cfLogo = (string) ($cfCompany['logo_url'] ?? '');
 $fmt = static function (float $amt) use ($reportMoney): string {
     return orange_accounting_report_format_amount($amt, $reportMoney);
 };
@@ -109,10 +114,31 @@ $fmt = static function (float $amt) use ($reportMoney): string {
         </div>
     <?php else: ?>
         <div class="card admin-fy-card">
+            <div class="gl-acc-stmt-print-sheet ral-print-sheet">
             <header class="gl-acc-stmt-print-banner ral-print-banner">
-                <?php if ($companyNameAr !== ''): ?>
-                    <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
-                <?php endif; ?>
+                <div class="pl-month-brand-row">
+                    <div class="pl-month-brand">
+                        <?php if ($cfLogo !== ''): ?>
+                            <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($cfLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+                        <?php endif; ?>
+                        <div class="pl-month-brand-text">
+                            <?php if ($companyNameAr !== ''): ?>
+                                <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                            <?php endif; ?>
+                            <?php if (trim((string) ($cfCompany['commercial_register'] ?? '')) !== ''): ?>
+                                <p class="pl-month-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars((string) $cfCompany['commercial_register'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="pl-month-contact">
+                        <?php if (trim((string) ($cfCompany['address'] ?? '')) !== ''): ?>
+                            <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $cfCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
+                        <?php endif; ?>
+                        <?php if (trim((string) ($cfCompany['phones'] ?? '')) !== ''): ?>
+                            <p class="pl-month-contact-line"><span dir="ltr"><?php echo htmlspecialchars((string) $cfCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
                 <h2 class="gl-acc-stmt-print-title ral-print-title">قائمة التدفقات النقدية</h2>
                 <p class="muted" style="margin:8px 0 0;">
                     <?php echo htmlspecialchars((string) $report['fy_label'], ENT_QUOTES, 'UTF-8'); ?>
@@ -181,6 +207,10 @@ $fmt = static function (float $amt) use ($reportMoney): string {
             <p class="card-hint muted" style="margin-top:12px;font-size:0.85rem;">
                 مرجع: قيود مرحّلة؛ تصنيف التدفقات من <code>accounts.cashflow_section</code> (تشغيل / استثمار / تمويل) مع fallback للذمم المتداولة.
             </p>
+            <div class="gl-acc-stmt-print-footer ta-report-print-footer">
+                <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
+            </div>
+            </div>
         </div>
     <?php endif; ?>
 </div>
