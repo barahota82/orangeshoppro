@@ -640,7 +640,7 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
             </div>
         </div>
         <footer class="pl-month-print-footer muted" style="margin-top:0.75rem;font-size:0.85rem;text-align:center;">
-            تاريخ الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?>
+            تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1
         </footer>
         </div>
     </section>
