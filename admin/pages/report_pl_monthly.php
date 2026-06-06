@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
+require_once __DIR__ . '/../../includes/report_export.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
@@ -366,23 +367,11 @@ $reportFmt = static fn (float $v): string => orange_accounting_report_format_amo
 
 $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 1 : 0;
 
-/* تصدير Excel مخصّص: لكل شهر رأسه + الإيرادات بجانب المصروفات (يطابق الشاشة). */
+/* تصدير Excel (xlsx حقيقي): لكل شهر رأسه + الإيرادات بجانب المصروفات (يطابق الشاشة). */
 if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers && $periodLabel !== '') {
-    while (ob_get_level() > 0) {
-        @ob_end_clean();
-    }
-    $plName = 'قائمة الإيرادات والمصروفات الشهرية-' . date('Y-m-d');
-    header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="' . $plName . '.xls"');
-    echo "\xEF\xBB\xBF";
-    $plE = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-    echo '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" '
-        . 'xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">'
-        . '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
-        . '<x:Name>إيرادات ومصروفات</x:Name><x:WorksheetOptions><x:DisplayRightToLeft/>'
-        . '</x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->'
-        . '<style>table{border-collapse:collapse;}td,th{border:0.5pt solid #999999;padding:3px 7px;white-space:nowrap;}'
-        . 'th{background:#e8eef5;font-weight:bold;text-align:center;}.num{mso-number-format:"#,##0.###";}</style></head><body dir="rtl">';
+    $txt = static fn ($v): array => ['v' => (string) $v, 'n' => false];
+    $num = static fn ($v): array => ['v' => (float) $v, 'n' => true];
+    $xlsxRows = [];
     foreach ($monthSheetsBuilt as $ms) {
         $ymMs = (string) $ms['ym'];
         $dmFrom = orange_format_date_dmY((string) $ms['date_from']);
@@ -392,48 +381,42 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
         $rr = $ms['out'] ?? [];
         preg_match('/^(\d{4})-/u', $ymMs, $ymY);
         $yearStr = $ymY[1] ?? '';
-        /* الشعار لا يُدرج في Excel (روابط الصور الخارجية تظهر X) — يظهر في الشاشة/الطباعة فقط. */
         if ($companyNameAr !== '') {
-            echo '<div style="font-size:14pt;font-weight:bold;">' . $plE($companyNameAr) . '</div>';
+            $xlsxRows[] = [$txt($companyNameAr)];
         }
         if (trim((string) ($plCompany['commercial_register'] ?? '')) !== '') {
-            echo '<div style="font-size:9pt;color:#555555;">سجل تجاري: ' . $plE($plCompany['commercial_register']) . '</div>';
+            $xlsxRows[] = [$txt('سجل تجاري: ' . $plCompany['commercial_register'])];
         }
         if (trim((string) ($plCompany['address'] ?? '')) !== '') {
-            echo '<div style="font-size:9pt;color:#555555;">' . $plE($plCompany['address']) . '</div>';
+            $xlsxRows[] = [$txt($plCompany['address'])];
         }
         if (trim((string) ($plCompany['phones'] ?? '')) !== '') {
-            echo '<div style="font-size:9pt;color:#555555;">' . $plE($plCompany['phones']) . '</div>';
+            $xlsxRows[] = [$txt($plCompany['phones'])];
         }
-        echo '<div style="font-size:13pt;font-weight:bold;">' . $plE($reportTitleLine($dmFrom, $dmTo)) . '</div>';
-        echo '<div style="font-size:11pt;">' . $plE($subtitleLine($dmFrom, $dmTo)) . '</div>';
-        echo '<div style="font-size:11pt;">' . $plE($monthLabelExcel($ymMs)) . ($yearStr !== '' ? ' — السنة ' . $plE($yearStr) : '')
-            . ' — ربح: ' . $plE($reportFmt((float) ($tot['rabeh'] ?? 0))) . '</div><br>';
-        echo '<table><thead><tr><th colspan="3">ايرادات</th><th colspan="3">مصروفات</th></tr>'
-            . '<tr><th>الرصيد</th><th>اسم الحساب</th><th>كود الحساب</th>'
-            . '<th>الرصيد</th><th>اسم الحساب</th><th>كود الحساب</th></tr></thead><tbody>';
+        $xlsxRows[] = [$txt($reportTitleLine($dmFrom, $dmTo))];
+        $xlsxRows[] = [$txt($subtitleLine($dmFrom, $dmTo))];
+        $xlsxRows[] = [$txt($monthLabelExcel($ymMs) . ($yearStr !== '' ? ' — السنة ' . $yearStr : '') . ' — ربح: ' . $reportFmt((float) ($tot['rabeh'] ?? 0)))];
+        $xlsxRows[] = [];
+        $xlsxRows[] = [$txt('إيرادات'), $txt(''), $txt(''), $txt('مصروفات'), $txt(''), $txt('')];
+        $xlsxRows[] = [$txt('الرصيد'), $txt('اسم الحساب'), $txt('كود الحساب'), $txt('الرصيد'), $txt('اسم الحساب'), $txt('كود الحساب')];
         $plRows = max(count($lr), count($rr), 1);
         for ($i = 0; $i < $plRows; $i++) {
             $lv = $lr[$i] ?? null;
             $rv = $rr[$i] ?? null;
-            echo '<tr>';
-            if ($lv !== null) {
-                echo '<td class="num">' . $plE((float) $lv['cell']) . '</td><td>' . $plE((string) $lv['name']) . '</td><td>' . $plE((string) $lv['code']) . '</td>';
-            } else {
-                echo '<td></td><td></td><td></td>';
-            }
-            if ($rv !== null) {
-                echo '<td class="num">' . $plE((float) $rv['cell']) . '</td><td>' . $plE((string) $rv['name']) . '</td><td>' . $plE((string) $rv['code']) . '</td>';
-            } else {
-                echo '<td></td><td></td><td></td>';
-            }
-            echo '</tr>';
+            $xlsxRows[] = [
+                $lv !== null ? $num((float) $lv['cell']) : $txt(''),
+                $lv !== null ? $txt((string) $lv['name']) : $txt(''),
+                $lv !== null ? $txt((string) $lv['code']) : $txt(''),
+                $rv !== null ? $num((float) $rv['cell']) : $txt(''),
+                $rv !== null ? $txt((string) $rv['name']) : $txt(''),
+                $rv !== null ? $txt((string) $rv['code']) : $txt(''),
+            ];
         }
-        echo '</tbody><tfoot><tr><td class="num">' . $plE((float) ($tot['sum_rev'] ?? 0)) . '</td><th colspan="2">إجمالي الإيرادات</th>'
-            . '<td class="num">' . $plE((float) ($tot['sum_out'] ?? 0)) . '</td><th colspan="2">إجمالي المصروفات</th></tr></tfoot></table><br><br>';
+        $xlsxRows[] = [$num((float) ($tot['sum_rev'] ?? 0)), $txt('إجمالي الإيرادات'), $txt(''), $num((float) ($tot['sum_out'] ?? 0)), $txt('إجمالي المصروفات'), $txt('')];
+        $xlsxRows[] = [];
+        $xlsxRows[] = [];
     }
-    echo '</body></html>';
-    exit;
+    orange_report_xlsx_send('قائمة الإيرادات والمصروفات الشهرية', 'إيرادات ومصروفات', $xlsxRows);
 }
 
 ?>

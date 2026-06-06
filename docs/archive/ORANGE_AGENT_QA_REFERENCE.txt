@@ -441,7 +441,7 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
 1. **PDF = عبر الطباعة فقط** — **لا** مكتبة PDF خادمية (المشروع بلا Composer؛ سياسة الستاك). يُوحَّد زر الطباعة وتُسمّى «طباعة / حفظ PDF».
 2. **Excel = شريط تصدير موحّد من المتصفح** يغطّي كل التقارير:
    - مكوّن JS مشترك واحد (المقترح: `assets/js/admin_table_export.js`) يُحمَّل من `admin/partials/header.php`، **يضيف تلقائياً** أزرار **Excel + CSV** فوق أي جدول مُعلَّم بسمة **`data-export-name="..."`** (opt-in حتى لا تظهر على جداول التحرير/النماذج).
-   - **Excel = صيغة xls (SpreadsheetML/HTML-table بـ MIME `application/vnd.ms-excel`)** — تفتح مباشرة في Excel، تدعم **العربية + RTL** + تنسيق بسيط، بصفر اعتماديات.
+   - **Excel = xlsx حقيقي (Open XML)** — **قرار المالك 2026-06-06:** صيغة HTML-بامتداد-xls كانت تُظهر رسالة Excel «التنسيق لا يطابق الامتداد»؛ استُبدلت بـ **xlsx حقيقي يفتح دون أي تحذير**. التوليد **بصفر اعتماديات** عبر بناء ZIP خالص: خادمياً `orange_report_zip_stored()`+`orange_report_xlsx_sheet_xml()` في `includes/report_export.php` (`pack`+`crc32`، لا يعتمد على ZipArchive)؛ وفي المتصفّح مولّد ZIP/xlsx داخل `admin-table-export.js` (CRC32 + ZIP stored). RTL عبر `sheetView rightToLeft="1"`، المبالغ خلايا رقمية (`t="n"`)، النصوص `inlineStr`. امتداد الملفات `.xlsx`.
    - **CSV: ألغاه المالك (2026-06-06)** — Excel يكفي. بقي **اختيارياً** في المكوّن عبر سمة `data-export-csv` فقط (مطفأ افتراضياً). لا تضِف زر CSV ما لم يطلبه المالك.
    - تجاهل العناصر المعلَّمة `.gl-acc-stmt-no-print` / `data-export-skip` في التصدير؛ احترام نطاق الدولة/الصلاحية (التقرير مُفلتر أصلاً خادمياً).
    - **الصيغة الافتراضية المتفق عليها: Excel (xls) فقط** (CSV أُلغِي — اختياري بسمة). بدائل إن طلب المالك: xlsx حقيقي (هاندكرافت zip+XML، أثقل) / تصدير خادمي `?export=` لكل تقرير.
