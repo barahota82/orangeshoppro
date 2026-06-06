@@ -4814,6 +4814,12 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 .ta-report-table--xlsx {
     min-width: 780px;
 }
+@media print {
+    /* في الطباعة: لا تفرض عرضاً أدنى كي يتسع الجدول للصفحة بلا تمرير أفقي */
+    .ta-report-table--xlsx {
+        min-width: 0;
+    }
+}
 
 /* قائمة إيرادات ومصروفات شهرية — كتلة/طباعة لكل شهر */
 .pl-month-brand-row {
