@@ -247,9 +247,9 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
                             autocomplete="off">
                     </div>
                     <div class="gas-acc-stmt-field is-toolbar-spacer" aria-hidden="true"></div>
-                    <label class="gas-acc-stmt-field is-ignore-close-field" title="قيود الإقفال السنوي (YEC) تُصفّر الإيرادات والمصروفات — فعِّل هذا الخيار لاستبعادها من أرقام التقرير إذا كان المدى الزمني يشمل تاريخ الإقفال.">
+                    <label class="gas-acc-stmt-field is-ignore-close-field" style="align-items:flex-start;margin-top:0.15rem;" title="قيود الإقفال السنوي (YEC) تُصفّر الإيرادات والمصروفات — فعِّل هذا الخيار لاستبعادها من أرقام التقرير إذا كان المدى الزمني يشمل تاريخ الإقفال.">
                         <input type="hidden" name="ignore_close" value="0">
-                        <input type="checkbox" name="ignore_close" value="1" id="is_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
+                        <input type="checkbox" name="ignore_close" value="1" id="is_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?> style="margin-top:6px;margin-left:6px;">
                         <span>تجاهل قيود الإقفال</span>
                     </label>
                     <div class="gas-acc-stmt-actions">
