@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
@@ -204,6 +205,8 @@ $todayDmY = orange_format_date_dmY(date('Y-m-d'));
 $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
+$glmCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
+$glmLogo = (string) ($glmCompany['logo_url'] ?? '');
 
 $showMonthlyReport = $useVouchers && $accountId > 0 && $periodLabel !== '';
 /** هيكل التقرير (ترويسة + جدول) يظهر دائماً؛ البيانات تُملأ بعد اختيار الحساب و«عرض». */
@@ -260,9 +263,7 @@ $printNameVal = $accNameDisp !== '' ? $accNameDisp : '—';
                     </div>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
-                        <?php if ($showMonthlyReport): ?>
-                            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
-                        <?php endif; ?>
+                        <button type="button" class="btn-secondary" onclick="<?php echo $accountId > 0 ? 'window.print()' : "alert('اختر حساباً أولاً ثم اضغط طباعة')"; ?>">طباعة</button>
                     </div>
                 </div>
             </div>
@@ -419,9 +420,29 @@ $printNameVal = $accNameDisp !== '' ? $accNameDisp : '—';
 <div class="card admin-fy-card gl-acc-stmt-print">
     <div class="gl-acc-stmt-print-sheet gl-m-monthly-print-sheet">
         <header class="gl-acc-stmt-print-banner">
-            <?php if ($companyNameAr !== ''): ?>
-                <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
-            <?php endif; ?>
+            <div class="pl-month-brand-row">
+                <div class="pl-month-brand">
+                    <?php if ($glmLogo !== ''): ?>
+                        <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($glmLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+                    <?php endif; ?>
+                    <div class="pl-month-brand-text">
+                        <?php if ($companyNameAr !== ''): ?>
+                            <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                        <?php endif; ?>
+                        <?php if (trim((string) ($glmCompany['commercial_register'] ?? '')) !== ''): ?>
+                            <p class="pl-month-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars((string) $glmCompany['commercial_register'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="pl-month-contact">
+                    <?php if (trim((string) ($glmCompany['address'] ?? '')) !== ''): ?>
+                        <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $glmCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
+                    <?php endif; ?>
+                    <?php if (trim((string) ($glmCompany['phones'] ?? '')) !== ''): ?>
+                        <p class="pl-month-contact-line"><span dir="ltr"><?php echo htmlspecialchars((string) $glmCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                    <?php endif; ?>
+                </div>
+            </div>
             <h2 class="gl-acc-stmt-print-title gl-m-monthly-print-title">
                 <span class="gl-acc-stmt-print-title-ar" lang="ar">تقـــــــرير&nbsp;&nbsp;الحركة الشهرية لحساب عــن الفتــرة من <?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?> إلى&nbsp;&nbsp;<?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
             </h2>
