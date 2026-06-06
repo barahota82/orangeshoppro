@@ -55,10 +55,10 @@ $fmt = static function (float $amt) use ($reportMoney): string {
     <div class="gl-acc-stmt-no-print">
         <h1 class="admin-fy-shell__title">قائمة التدفقات النقدية</h1>
 
-        <form method="get" class="card admin-fy-card" style="margin-bottom:16px;">
+        <form method="get" class="card admin-fy-card gas-acc-stmt-search-card" style="margin-bottom:16px;">
             <input type="hidden" name="page" value="report_cash_flow">
             <input type="hidden" name="run" value="1">
-            <div class="admin-fy-form-grid" style="display:flex;flex-wrap:wrap;gap:12px;align-items:end;">
+            <div class="admin-fy-form-grid" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;">
                 <div>
                     <label for="cf_fy">السنة المالية</label>
                     <select id="cf_fy" name="fy" required>
@@ -85,7 +85,7 @@ $fmt = static function (float $amt) use ($reportMoney): string {
                         </label>
                     </div>
                 </div>
-                <div class="gas-acc-stmt-actions" style="margin-inline-start:auto;">
+                <div class="gas-acc-stmt-actions" style="margin-inline-start:auto;align-self:flex-end;">
                     <button type="submit">عرض</button>
                     <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                 </div>
