@@ -268,9 +268,9 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
 }
 .jvr-lines-table col.jvr-col-vno,
 .jvr-lines-table col.jvr-col-date { width: 8%; }
-.jvr-lines-table col.jvr-col-acct { width: 17%; }
+.jvr-lines-table col.jvr-col-acct { width: 18%; }
 .jvr-lines-table col.jvr-col-amt { width: 9%; }
-.jvr-lines-table col.jvr-col-memo { width: 49%; }
+.jvr-lines-table col.jvr-col-memo { width: 48%; }
 .jvr-lines-table th,
 .jvr-lines-table td { text-align: center; vertical-align: top; }
 .jvr-lines-table th:nth-child(3),
