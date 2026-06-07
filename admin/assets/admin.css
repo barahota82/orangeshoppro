@@ -4358,13 +4358,6 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
             margin-left: 8mm;
             margin-bottom: 2.5mm;
         }
-        @bottom-right {
-            content: string(report-print-datetime);
-            font-size: 8pt;
-            color: #64748b;
-            margin-right: 8mm;
-            margin-bottom: 2.5mm;
-        }
     }
 
     /*
@@ -4767,7 +4760,6 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     color: var(--muted-text, #64748b);
 }
 .ta-report-metafoot-date {
-    string-set: report-print-datetime content();
     text-align: right;
     margin: 0;
     flex: 0 1 auto;
@@ -5701,19 +5693,33 @@ td.tb-col-name,
     }
 
     /*
-     * تذييل HTML يُخفى — الطباعة تعرض نفس السطر عبر @page @bottom-left/@bottom-right
-     * (counter(page/pages) لا يعمل مع position:fixed في Chromium).
+     * تذييل الطباعة — سطر واحد:
+     * يسار: أرقام الصفحات (@page @bottom-left — تعمل في Chromium).
+     * يمين: تاريخ/وقت الطباعة (نص ثابت من PHP + position:fixed — يتكرر على كل صفحة).
      */
     .ta-report-print-footer-bar {
-        position: absolute !important;
-        width: 1px !important;
-        height: 1px !important;
-        overflow: hidden !important;
-        clip: rect(0, 0, 0, 0) !important;
-        white-space: nowrap !important;
-        border: none !important;
+        position: fixed !important;
+        bottom: 2.5mm;
+        left: 8mm;
+        right: 8mm;
+        display: flex !important;
+        justify-content: flex-end;
+        align-items: center;
         margin: 0 !important;
         padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        z-index: 1001;
+    }
+    .ta-report-metafoot-pages {
+        display: none !important;
+    }
+    .ta-report-metafoot-date {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 8pt;
+        color: #64748b;
+        background: #fff;
     }
     .ta-report-print-sheet .card-hint {
         display: none !important;
