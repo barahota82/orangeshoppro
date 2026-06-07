@@ -4346,6 +4346,14 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 
 @media print {
     /*
+     * هامش صفحة صفر — يمنع Chromium من إظهار ترويسة/تذييل المتصفح
+     * (عنوان الصفحة، الرابط، التاريخ). الهوامش الداخلية في .gl-acc-stmt-print ورأس التقرير.
+     */
+    @page {
+        margin: 0;
+    }
+
+    /*
      * لا أشرطة تمرير في الطباعة/PDF: إلغاء overflow على الحاويات وإخفاء أي scrollbar.
      * Chromium يطبع أحياناً شريط التمرير مع overflow:auto حتى داخل معاينة الطباعة.
      */
@@ -5584,15 +5592,11 @@ td.tb-col-name,
 
 /*
  * تقارير محاسبة — طباعة/PDF:
- * @page margin يُكرَّر على كل صفحة (لا يلتصق الرأس بأعلى الصفحة 2+).
- * بلا برواز في الطباعة — الإطار كان يتداخل مع المحتوى ولا يُكرَّر بشكل موثوق.
+ * @page margin:0 (أعلاه) يحذف ترويسة المتصفح؛ الهوامش عبر رأس التقرير المتكرر والحشو الجانبي.
  */
 @media print {
-    @page {
-        margin: 10mm 8mm 14mm 8mm;
-    }
     .gl-acc-stmt-print {
-        padding: 0 !important;
+        padding: 0 8mm 12mm 8mm !important;
     }
 
     .gl-acc-stmt-print .gl-acc-stmt-print-sheet {
@@ -5610,11 +5614,20 @@ td.tb-col-name,
         display: table-header-group;
     }
     tr.ta-report-banner-row td.ta-report-banner-cell {
-        padding: 0.15rem 0.2rem 0.45rem;
+        padding: 10mm 0 0.45rem;
         border: none;
         vertical-align: top;
         background: #fff;
         text-align: right;
+    }
+    /* تقارير برأس خارج الجدول (صفحة 1) — نفس الهامش العلوي */
+    .gl-acc-stmt-print .gl-acc-stmt-print-sheet > .gl-acc-stmt-print-banner,
+    .gl-acc-stmt-print .gl-acc-stmt-print-sheet > header.gl-acc-stmt-print-banner,
+    .gl-acc-stmt-print .gl-acc-stmt-print-sheet > .pl-month-print-banner,
+    .gl-acc-stmt-print .gl-m-monthly-print-sheet > .gl-acc-stmt-print-banner,
+    .gl-acc-stmt-print .tb-report-print-sheet > .gl-acc-stmt-print-banner {
+        padding-top: 10mm;
+        box-sizing: border-box;
     }
     tr.ta-report-banner-row .gl-acc-stmt-print-banner {
         margin-bottom: 0;
