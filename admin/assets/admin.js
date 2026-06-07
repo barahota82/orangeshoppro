@@ -989,16 +989,66 @@ function orangeAdminApplyPermMarkers(root) {
 }
 
 /**
+ * عنوان حفظ PDF للسند: «اسم السند» + « رقم » + رقم القيد (مثل: سند قبض رقم 1).
+ *
+ * @param {string} [titleElId] عنصر عنوان الترويسة (span)
+ * @param {string} [numberElId] حقل رقم القيد
+ * @param {string} [fallbackName]
+ */
+function orangeAdminBuildVoucherPrintDocTitle(titleElId, numberElId, fallbackName) {
+    var name = '';
+    if (titleElId) {
+        var titleEl = document.getElementById(titleElId);
+        name = titleEl ? String(titleEl.textContent || '').trim() : '';
+    }
+    if (!name) {
+        var cardTitle = document.querySelector('.jv-print-area .card-title');
+        name = cardTitle ? String(cardTitle.textContent || '').trim() : '';
+    }
+    if (!name) {
+        name = String(fallbackName || 'سند').trim();
+    }
+    var num = '';
+    if (numberElId) {
+        var numEl = document.getElementById(numberElId);
+        num = numEl ? String(numEl.value || '').trim() : '';
+    }
+    return num !== '' ? (name + ' رقم ' + num) : name;
+}
+
+/**
  * فتح نافذة طباعة المتصفح (ومنها حفظ PDF).
  * تنفيذ دائم لسندات المحاسبة — يبقى حتى بعد إرجاع وضع الضبط المؤقت (§9.2 في ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS).
+ *
+ * @param {string} [printTitle] اسم ملف PDF المقترح (document.title)
  */
-function orangeAdminOpenPrintDialog() {
-    window.setTimeout(function () {
-        if (typeof window.print === 'function') {
-            window.print();
+function orangeAdminOpenPrintDialog(printTitle) {
+    var savedDocTitle = document.title;
+    var pdfTitle = printTitle && String(printTitle).trim() !== '' ? String(printTitle).trim() : null;
+    var cleanedUp = false;
+    var cleanup = function () {
+        if (cleanedUp) {
             return;
         }
-        alert('تعذّر فتح نافذة الطباعة في هذا المتصفح.');
+        cleanedUp = true;
+        window.removeEventListener('afterprint', cleanup);
+        window.orangeAdminVoucherPrintTitle = null;
+        document.title = savedDocTitle;
+    };
+
+    if (pdfTitle) {
+        window.orangeAdminVoucherPrintTitle = pdfTitle;
+        document.title = pdfTitle;
+    }
+    window.addEventListener('afterprint', cleanup);
+
+    window.setTimeout(function () {
+        if (typeof window.print !== 'function') {
+            cleanup();
+            alert('تعذّر فتح نافذة الطباعة في هذا المتصفح.');
+            return;
+        }
+        window.print();
     }, 0);
     return false;
 }

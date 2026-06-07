@@ -487,6 +487,7 @@ sales_returns — [جزئي UI] — **ترقية pr2 parity** GAP-SALE-DOC-01 م
 8) سجل التحديث
 ================================================================================
 
+2026-06-08 — §9.3: اسم ملف PDF عند الحفظ = عنوان السند + « رقم » + رقم القيد (`orangeAdminBuildVoucherPrintDocTitle` + `orangeAdminOpenPrintDialog`).
 2026-06-07 — §9.3 V5: تذييل طباعة السند — تاريخ/وقت يمين + صفحات يسار (`orange_voucher_print_metafoot` — نمط التقارير).
 2026-06-07 — §9.3 V1: ترويسة السند في thead — تكرار أعلى كل صفحة (`jv-voucher-print-sheet` + `ta-report-print-thead`).
 2026-06-07 — §9.3 V2: رأس السند — 6 حقول على سطر واحد في الطباعة (repeat(6) في admin.css).

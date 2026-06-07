@@ -672,10 +672,19 @@
      */
     var savedDocTitle = null;
     window.addEventListener('beforeprint', function () {
+        if (window.orangeAdminVoucherPrintTitle) {
+            savedDocTitle = document.title;
+            document.title = window.orangeAdminVoucherPrintTitle;
+            return;
+        }
         savedDocTitle = document.title;
         document.title = ' ';
     });
     window.addEventListener('afterprint', function () {
+        if (window.orangeAdminVoucherPrintTitle) {
+            savedDocTitle = null;
+            return;
+        }
         if (savedDocTitle !== null) {
             document.title = savedDocTitle;
             savedDocTitle = null;

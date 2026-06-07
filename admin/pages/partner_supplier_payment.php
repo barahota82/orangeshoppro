@@ -463,7 +463,9 @@ function spayPrintVoucher() {
         alert('احفظ السند أولاً قبل الطباعة.');
         return false;
     }
-    return orangeAdminOpenPrintDialog();
+    return orangeAdminOpenPrintDialog(
+        orangeAdminBuildVoucherPrintDocTitle(null, 'spay_number_preview', 'سند')
+    );
 }
 
 (function () {

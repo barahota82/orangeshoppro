@@ -1737,7 +1737,9 @@ function jvPrintVoucher() {
         return false;
     }
     jvSyncPrintBannerTitle();
-    return orangeAdminOpenPrintDialog();
+    return orangeAdminOpenPrintDialog(
+        orangeAdminBuildVoucherPrintDocTitle('jv_voucher_print_title_ar', 'jv_number_preview', 'سند')
+    );
 }
 
 function jvNav(where) {

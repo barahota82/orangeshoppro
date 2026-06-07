@@ -452,7 +452,9 @@ function crecPrintVoucher() {
         alert('احفظ السند أولاً قبل الطباعة.');
         return false;
     }
-    return orangeAdminOpenPrintDialog();
+    return orangeAdminOpenPrintDialog(
+        orangeAdminBuildVoucherPrintDocTitle(null, 'crec_number_preview', 'سند')
+    );
 }
 
 (function () {

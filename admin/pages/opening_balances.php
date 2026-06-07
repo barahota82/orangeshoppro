@@ -314,7 +314,9 @@ var OB_CAPS = <?php echo json_encode($obCaps, JSON_UNESCAPED_UNICODE | JSON_HEX_
 var obEditLockCtl = null;
 
 function obOpenPrintDialog() {
-    return orangeAdminOpenPrintDialog();
+    return orangeAdminOpenPrintDialog(
+        orangeAdminBuildVoucherPrintDocTitle(null, 'ob_number_preview', 'سند رصيد افتتاحي')
+    );
 }
 
 (function () {
