@@ -806,25 +806,25 @@ function orange_gl_sales_return_revenue_debit_account_id(PDO $pdo, string $chann
 function orange_gl_entry_type_labels_map(): array
 {
     return [
-        'manual' => 'سند يدوي',
+        'manual' => 'سند قيد',
         'other_voucher' => 'سندات أخرى',
         'receipt_voucher' => 'سند قبض',
         'payment_voucher' => 'سند صرف',
-        'general' => 'قيد عام',
-        'opening_balance' => 'قيد رصيد افتتاحي',
-        'year_end_close' => 'إقفال سنة مالية',
-        'customer_receipt' => 'سداد فواتير مبيعات آجلة',
-        'supplier_payment' => 'سداد فواتير مشتريات آجلة',
-        'purchase' => 'شراء',
-        'purchase_receive' => 'استلام مخزون — شراء',
+        'general' => 'سند قيد',
+        'opening_balance' => 'سند رصيد افتتاحي',
+        'year_end_close' => 'قيد الإقفال السنوي',
+        'customer_receipt' => 'قبض عميل آجل',
+        'supplier_payment' => 'صرف مورد آجل',
+        'purchase' => 'فاتورة مشتريات',
+        'purchase_receive' => 'فاتورة مشتريات',
         'purchase_return' => 'مردود مشتريات',
-        'expense' => 'مصروف',
-        'expense_adjustment' => 'تعديل مصروف',
-        'expense_reversal' => 'عكس مصروف',
-        'order_delivery_sale' => 'تسليم طلب — إيراد',
-        'order_delivery_cogs' => 'تسليم طلب — تكلفة',
-        'order_return_sale' => 'إلغاء تسليم — مردود إيراد',
-        'order_return_cogs' => 'إلغاء تسليم — مردود تكلفة',
+        'expense' => 'سند صرف',
+        'expense_adjustment' => 'سند صرف',
+        'expense_reversal' => 'سند صرف',
+        'order_delivery_sale' => 'مبيعات',
+        'order_delivery_cogs' => 'تكلفة مبيعات',
+        'order_return_sale' => 'مردود مبيعات',
+        'order_return_cogs' => 'تكلفة مردود مبيعات',
         'migrated' => 'مرحّل من نظام سابق',
     ];
 }
@@ -835,9 +835,35 @@ function orange_gl_entry_type_label_ar(string $entryType): string
     if ($entryType === '') {
         return '';
     }
+    $code = orange_journal_type_code_from_entry_type($entryType);
+    if ($code !== '') {
+        $canonical = orange_journal_type_canonical_name_ar($code);
+        if ($canonical !== '' && !in_array($entryType, ['manual', 'general', 'other_voucher', 'migrated'], true)) {
+            return $canonical;
+        }
+    }
     $map = orange_gl_entry_type_labels_map();
 
     return $map[$entryType] ?? $entryType;
+}
+
+/**
+ * تسمية نوع القيد للعرض — تفضّل اسم نوع اليومية المرتبط بالسند ثم المرجع الثابت.
+ *
+ * @param array<string, mixed> $voucherRow صف journal_vouchers (يدعم journal_type_id و entry_type)
+ */
+function orange_gl_voucher_type_label_ar(PDO $pdo, array $voucherRow): string
+{
+    $jtId = (int) ($voucherRow['journal_type_id'] ?? 0);
+    if ($jtId > 0) {
+        $jtName = orange_journal_type_name_ar_by_id($pdo, $jtId);
+        if ($jtName !== '') {
+            return $jtName;
+        }
+    }
+    $entryType = trim((string) ($voucherRow['entry_type'] ?? ''));
+
+    return orange_gl_entry_type_label_ar($entryType);
 }
 
 /**

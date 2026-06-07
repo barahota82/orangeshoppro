@@ -480,6 +480,40 @@ function orange_journal_type_code_by_id(PDO $pdo, int $id): string
     return orange_journal_type_normalize_code((string) $c);
 }
 
+/**
+ * اسم عربي مرجعي من التعريف الثابت لأنواع اليوميات (بدون قاعدة البيانات).
+ */
+function orange_journal_type_canonical_name_ar(string $code): string
+{
+    $norm = orange_journal_type_normalize_code($code);
+    if ($norm === '') {
+        return '';
+    }
+    foreach (orange_journal_types_canonical_rows() as $row) {
+        if (($row[0] ?? '') === $norm) {
+            return trim((string) ($row[1] ?? ''));
+        }
+    }
+
+    return '';
+}
+
+function orange_journal_type_name_ar_by_id(PDO $pdo, int $journalTypeId): string
+{
+    if ($journalTypeId <= 0 || !orange_table_exists($pdo, 'journal_types')) {
+        return '';
+    }
+    try {
+        $st = $pdo->prepare('SELECT name_ar FROM journal_types WHERE id = ? LIMIT 1');
+        $st->execute([$journalTypeId]);
+        $name = trim((string) $st->fetchColumn());
+
+        return $name !== '' ? $name : '';
+    } catch (Throwable $e) {
+        return '';
+    }
+}
+
 function orange_journal_type_id_by_code(PDO $pdo, string $code, ?int $countryId = null): int
 {
     $norm = orange_journal_type_normalize_code($code);

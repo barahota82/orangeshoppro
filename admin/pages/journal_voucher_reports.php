@@ -6,11 +6,14 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
+require_once __DIR__ . '/../../includes/journal_types.php';
+require_once __DIR__ . '/../../includes/admin_settings_country.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+orange_journal_types_sync_canonical_defaults($pdo);
 
 $dateToRaw = trim((string) ($_GET['date_to'] ?? ''));
 $dateFromRaw = trim((string) ($_GET['date_from'] ?? ''));
@@ -30,35 +33,39 @@ if ($dateFrom > $dateTo) {
 $dateFromDisp = orange_format_date_dmY($dateFrom);
 $dateToDisp = orange_format_date_dmY($dateTo);
 
+$jvrCountryId = orange_admin_settings_effective_country_id($pdo);
+$jvrJournalTypes = orange_journal_types_list($pdo, $jvrCountryId);
+
+$journalTypeFilterId = isset($_GET['journal_type_id']) ? (int) $_GET['journal_type_id'] : 0;
 $entryTypeFilter = trim((string) ($_GET['entry_type'] ?? ''));
 if ($entryTypeFilter !== '' && !preg_match('/^[a-zA-Z0-9_\-]+$/', $entryTypeFilter)) {
     $entryTypeFilter = '';
 }
 
-$typeLabels = orange_gl_entry_type_labels_map();
-try {
-    if (orange_journal_vouchers_ready($pdo)) {
-        $jvCountryBindDist = orange_gl_voucher_country_bind($pdo, 'jv');
-        $sqlDist = 'SELECT DISTINCT jv.entry_type FROM journal_vouchers jv WHERE 1=1' . $jvCountryBindDist['sql']
-            . ' ORDER BY jv.entry_type';
-        if ($jvCountryBindDist['params'] === []) {
-            $dist = $pdo->query($sqlDist)->fetchAll(PDO::FETCH_COLUMN);
-        } else {
-            $stDist = $pdo->prepare($sqlDist);
-            $stDist->execute($jvCountryBindDist['params']);
-            $dist = $stDist->fetchAll(PDO::FETCH_COLUMN);
-        }
-        foreach ($dist ?: [] as $t) {
-            $t = (string) $t;
-            if ($t !== '' && !array_key_exists($t, $typeLabels)) {
-                $typeLabels[$t] = $t;
-            }
+/* توافق قديم: entry_type في الرابط → نوع اليومية المطابق إن وُجد. */
+if ($journalTypeFilterId <= 0 && $entryTypeFilter !== '') {
+    $mappedCode = orange_journal_type_code_from_entry_type($entryTypeFilter);
+    if ($mappedCode !== '') {
+        $mappedId = orange_journal_type_id_by_code($pdo, $mappedCode, $jvrCountryId);
+        if ($mappedId > 0) {
+            $journalTypeFilterId = $mappedId;
+            $entryTypeFilter = '';
         }
     }
-} catch (Throwable $e) {
-    /* ignore */
 }
-asort($typeLabels, SORT_STRING);
+
+$jvrJournalTypeFilterValid = false;
+if ($journalTypeFilterId > 0) {
+    foreach ($jvrJournalTypes as $jtRow) {
+        if ((int) ($jtRow['id'] ?? 0) === $journalTypeFilterId) {
+            $jvrJournalTypeFilterValid = true;
+            break;
+        }
+    }
+    if (!$jvrJournalTypeFilterValid) {
+        $journalTypeFilterId = 0;
+    }
+}
 
 $jvrPostingLeafCt = 0;
 if (orange_journal_vouchers_ready($pdo)) {
@@ -90,8 +97,31 @@ if (orange_journal_vouchers_ready($pdo)) {
     foreach ($jvCountryBind['params'] as $cp) {
         $params[] = $cp;
     }
-    if ($entryTypeFilter !== '') {
-        $sql .= ' AND entry_type = ?';
+    if ($journalTypeFilterId > 0) {
+        $mappedEntryTypes = orange_gl_entry_types_for_journal_type_id($pdo, $journalTypeFilterId);
+        $hasJtCol = orange_table_has_column($pdo, 'journal_vouchers', 'journal_type_id');
+        if ($hasJtCol) {
+            $sql .= ' AND (jv.journal_type_id = ?';
+            $params[] = $journalTypeFilterId;
+            if ($mappedEntryTypes !== []) {
+                $ph = implode(',', array_fill(0, count($mappedEntryTypes), '?'));
+                $sql .= " OR (jv.journal_type_id IS NULL AND jv.entry_type IN ($ph))";
+                foreach ($mappedEntryTypes as $etMap) {
+                    $params[] = $etMap;
+                }
+            }
+            $sql .= ')';
+        } elseif ($mappedEntryTypes !== []) {
+            $ph = implode(',', array_fill(0, count($mappedEntryTypes), '?'));
+            $sql .= " AND jv.entry_type IN ($ph)";
+            foreach ($mappedEntryTypes as $etMap) {
+                $params[] = $etMap;
+            }
+        } else {
+            $sql .= ' AND 1=0';
+        }
+    } elseif ($entryTypeFilter !== '') {
+        $sql .= ' AND jv.entry_type = ?';
         $params[] = $entryTypeFilter;
     }
     $sql .= ' ORDER BY voucher_date DESC, id DESC LIMIT 500';
@@ -186,15 +216,31 @@ $resetUrl = htmlspecialchars(storefront_public_path('/admin/index.php?page=journ
         <input type="hidden" name="page" value="journal_voucher_reports">
         <div class="jvr-filter-tools jvr-filter-tools--center orange-doc-toolbar-fields">
             <div class="jvr-filter-tools__entry">
-                <label for="jvr_entry_type">نوع القيد</label>
-                <select id="jvr_entry_type" name="entry_type" class="admin-inp">
-                    <option value=""<?php echo $entryTypeFilter === '' ? ' selected' : ''; ?>>الكل</option>
-                    <?php foreach ($typeLabels as $code => $lab): ?>
-                        <option value="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $entryTypeFilter === $code ? ' selected' : ''; ?>>
-                            <?php echo htmlspecialchars($lab . ' (' . $code . ')', ENT_QUOTES, 'UTF-8'); ?>
+                <label for="jvr_journal_type_id">نوع القيد</label>
+                <select id="jvr_journal_type_id" name="journal_type_id" class="admin-inp"<?php echo $jvrJournalTypes === [] ? ' disabled' : ''; ?>>
+                    <option value=""<?php echo $journalTypeFilterId <= 0 && $entryTypeFilter === '' ? ' selected' : ''; ?>>الكل</option>
+                    <?php foreach ($jvrJournalTypes as $jtRow):
+                        $jtId = (int) ($jtRow['id'] ?? 0);
+                        if ($jtId <= 0) {
+                            continue;
+                        }
+                        $jtName = trim((string) ($jtRow['name_ar'] ?? ''));
+                        if ($jtName === '') {
+                            $jtName = trim((string) ($jtRow['name_en'] ?? ''));
+                        }
+                        if ($jtName === '') {
+                            continue;
+                        }
+                        ?>
+                        <option value="<?php echo $jtId; ?>"<?php echo $journalTypeFilterId === $jtId ? ' selected' : ''; ?>>
+                            <?php echo htmlspecialchars($jtName, ENT_QUOTES, 'UTF-8'); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <?php if ($entryTypeFilter !== ''): ?>
+                <input type="hidden" name="entry_type" value="<?php echo htmlspecialchars($entryTypeFilter, ENT_QUOTES, 'UTF-8'); ?>">
+                <p class="muted" style="margin:6px 0 0;font-size:12px;">فلتر نوع قيد قديم: <?php echo htmlspecialchars(orange_gl_entry_type_label_ar($entryTypeFilter), ENT_QUOTES, 'UTF-8'); ?></p>
+                <?php endif; ?>
             </div>
             <div class="jvr-filter-tools__date">
                 <label for="jvr_from">من تاريخ</label>
@@ -217,7 +263,7 @@ $resetUrl = htmlspecialchars(storefront_public_path('/admin/index.php?page=journ
 <?php if (!orange_journal_vouchers_ready($pdo)): ?>
     <div class="card"><p class="page-subtitle" style="margin:0;">جداول السندات غير جاهزة بعد.</p></div>
 <?php elseif ($vouchers === []): ?>
-    <div class="card"><p class="page-subtitle" style="margin:0;">لا توجد سندات في هذه الفترة<?php echo $entryTypeFilter !== '' ? ' لنوع القيد المحدد' : ''; ?>.</p></div>
+    <div class="card"><p class="page-subtitle" style="margin:0;">لا توجد سندات في هذه الفترة<?php echo ($journalTypeFilterId > 0 || $entryTypeFilter !== '') ? ' لنوع القيد المحدد' : ''; ?>.</p></div>
 <?php else: ?>
 <div class="card">
     <h3 class="card-title">النتائج (حتى 500 سنداً)</h3>
@@ -246,7 +292,7 @@ $resetUrl = htmlspecialchars(storefront_public_path('/admin/index.php?page=journ
                             . ' م:' . $ln['debit'] . ' د:' . $ln['credit'];
                     }
                     $et = (string) ($v['entry_type'] ?? '');
-                    $etAr = orange_gl_entry_type_label_ar($et);
+                    $etAr = orange_gl_voucher_type_label_ar($pdo, $v);
                     ?>
                     <tr>
                         <td><?php echo $vid; ?></td>

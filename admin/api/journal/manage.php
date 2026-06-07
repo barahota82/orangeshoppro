@@ -877,7 +877,7 @@ try {
                 'description' => (string) ($row['description'] ?? ''),
                 'amount' => round((float) ($row['voucher_total'] ?? 0), 3),
                 'entry_type' => $etRow,
-                'entry_type_label' => orange_gl_entry_type_label_ar($etRow),
+                'entry_type_label' => orange_gl_voucher_type_label_ar($pdo, $row),
             ];
         }
         json_response(['success' => true, 'rows' => $rows, 'results' => $rows]);
