@@ -414,7 +414,7 @@ sales_returns — [جزئي UI] — **ترقية pr2 parity** GAP-SALE-DOC-01 م
 **§9.1 — تنفيذ دائم (لا يُلغى عند إرجاع §10):**
 - `admin/assets/admin.js` → **`orangeAdminOpenPrintDialog()`** — `window.print()` / حفظ PDF من المتصفح.
 - أزرار السندات: **`onclick` مباشر** (نمط زر الحفظ) — `jvPrintVoucher` / `crecPrintVoucher` / `spayPrintVoucher` / `obOpenPrintDialog`.
-- تسمية الزر: **«طباعة / حفظ PDF»** — تبقى بعد إرجاع الضبط المؤقت.
+- تسمية الزر: **«طباعة السند»** — كما في baseline؛ **لا** تغيير تسمية عند الضبط أو بعده.
 - عند إرجاع §10: **يبقى** كل ما سبق؛ يتغيّر **فقط** تعطيل الزر قبل الحفظ (§9.2).
 
 **§9.2 — الوضع الأساسي لسياسة §10 (يُستعاد بـ `orange_admin_voucher_print_tuning_mode()` = false فقط):**

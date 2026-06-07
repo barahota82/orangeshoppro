@@ -363,7 +363,7 @@ $ppvReady = $ppvCashLock !== null;
         <div class="jv-toolbar-primary-group">
             <button type="button" id="spay_btn_new" title="إدخال سند جديد">سند جديد</button>
             <button type="button" class="btn-secondary" id="spay_btn_delete" title="حذف السند المعروض" disabled>حذف السند</button>
-            <button type="button" class="btn-secondary" id="spay_btn_print" onclick="spayPrintVoucher(); return false;" title="<?php echo $ppvPrintTuningMode ? 'طباعة / حفظ PDF (ضبط شكل — معاينة بلا حفظ)' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط'; ?>"<?php echo $ppvPrintTuningMode ? '' : ' disabled'; ?>>طباعة / حفظ PDF</button>
+            <button type="button" class="btn-secondary" id="spay_btn_print" onclick="spayPrintVoucher(); return false;" title="<?php echo $ppvPrintTuningMode ? 'طباعة السند' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط'; ?>"<?php echo $ppvPrintTuningMode ? '' : ' disabled'; ?>>طباعة السند</button>
             <button type="button" id="spay_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
         </div>
     </div>
@@ -769,7 +769,7 @@ function spayPrintVoucher() {
         }
         if (ORANGE_VOUCHER_PRINT_TUNING) {
             pb.disabled = false;
-            pb.title = 'طباعة / حفظ PDF (ضبط شكل — معاينة بلا حفظ)';
+            pb.title = 'طباعة السند';
             return;
         }
         var ok = !!spayBrowseId;
