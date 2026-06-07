@@ -4506,6 +4506,41 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .card-title {
         display: none !important;
     }
+    /*
+     * §9.3 V2 — رأس السند: رقم القيد | تاريخ السند | المرجع | تاريخ المستند | مجموع المدين | مجموع الدائن
+     * سطر واحد في الطباعة (عمودي أو أفقي) — لا التفاف لثلاثة أعمدة.
+     */
+    .jv-print-area .jv-voucher-header-line {
+        display: grid !important;
+        grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+        gap: 4px 6px !important;
+        align-items: end !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .jv-print-area .jv-voucher-header-line--nav {
+        grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    }
+    .jv-print-area .jv-voucher-header-line > div > label {
+        font-size: 7pt;
+        line-height: 1.2;
+        margin-bottom: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .jv-print-area .jv-voucher-header-line input[type="text"],
+    .jv-print-area .jv-voucher-header-line input.admin-inp-readonly,
+    .jv-print-area .jv-voucher-header-line input.orange-inp-dmy {
+        font-size: 7.5pt !important;
+        padding: 2px 3px !important;
+        min-height: 0 !important;
+        height: auto !important;
+        border: 1px solid #cbd5e1 !important;
+        background: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
     .gl-acc-stmt-no-print {
         display: none !important;
     }
