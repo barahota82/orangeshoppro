@@ -206,9 +206,6 @@ $fmt = static function (float $amt) use ($reportMoney): string {
                 <?php endif; ?>
             <?php endif; ?>
 
-            <p class="card-hint muted" style="margin-top:12px;font-size:0.85rem;">
-                مرجع: قيود مرحّلة؛ تصنيف التدفقات من <code>accounts.cashflow_section</code> (تشغيل / استثمار / تمويل) مع fallback للذمم المتداولة.
-            </p>
             <div class="gl-acc-stmt-print-footer ta-report-print-footer">
                 <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
             </div>
