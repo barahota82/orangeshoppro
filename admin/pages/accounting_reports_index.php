@@ -41,7 +41,7 @@ $ariSubgroups = is_array($ariSection) ? ($ariSection['subgroups'] ?? []) : [];
 ?>
 <div class="page-title page-title--stacked">
     <div>
-        <h1>فهرس التقارير المحاسبية</h1>
+        <h1>فهرس الحسابات والتقارير</h1>
         <p class="page-subtitle">روابط سريعة لكل تقارير وأدوات الحسابات — تظهر حسب صلاحياتك.</p>
     </div>
 </div>
