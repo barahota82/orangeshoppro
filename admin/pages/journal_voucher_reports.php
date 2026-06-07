@@ -12,9 +12,11 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
+require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
+$reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 orange_catalog_ensure_schema($pdo);
 orange_journal_types_sync_canonical_defaults($pdo);
 
@@ -79,22 +81,20 @@ if (orange_journal_vouchers_ready($pdo)) {
 }
 
 $vouchers = [];
-$linesByVid = [];
-$accMap = [];
+$jvrRows = [];
+$accNameMap = [];
 $jvrVouchersReady = orange_journal_vouchers_ready($pdo);
 $jvrReportDisplayed = $submitted && $jvrTypeSelected && $jvrVouchersReady;
 
 if ($jvrReportDisplayed) {
-    $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
-    $accCols = $hasGrp ? 'a.id, a.name, a.code, a.is_group' : 'a.id, a.name, a.code';
     $accounts = orange_accounts_fetch(
         $pdo,
-        'SELECT ' . $accCols . ' FROM accounts a WHERE 1=1 ORDER BY COALESCE(a.code, \'\'), a.name',
+        'SELECT a.id, a.name, a.code FROM accounts a WHERE 1=1 ORDER BY COALESCE(a.code, \'\'), a.name',
         [],
         'a'
     );
     foreach ($accounts as $a) {
-        $accMap[(int) $a['id']] = trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' . $a['name'] : $a['name'];
+        $accNameMap[(int) $a['id']] = trim((string) ($a['name'] ?? ''));
     }
 
     $jvCountryBind = orange_gl_voucher_country_bind($pdo, 'jv');
@@ -132,7 +132,7 @@ if ($jvrReportDisplayed) {
         $sql .= ' AND jv.entry_type = ?';
         $params[] = $entryTypeFilter;
     }
-    $sql .= ' ORDER BY voucher_date DESC, id DESC LIMIT 500';
+    $sql .= ' ORDER BY jv.voucher_date ASC, jv.id ASC LIMIT 500';
     $st = $pdo->prepare($sql);
     $st->execute($params);
     $vouchers = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -141,6 +141,7 @@ if ($jvrReportDisplayed) {
         $ids = array_map(static fn ($v) => (int) $v['id'], $vouchers);
         $in = implode(',', $ids);
         if ($in !== '') {
+            $linesByVid = [];
             $jl = $pdo->query(
                 'SELECT * FROM journal_lines WHERE voucher_id IN (' . $in . ') ORDER BY voucher_id ASC, line_no ASC'
             )->fetchAll(PDO::FETCH_ASSOC);
@@ -150,6 +151,31 @@ if ($jvrReportDisplayed) {
                     $linesByVid[$vid] = [];
                 }
                 $linesByVid[$vid][] = $ln;
+            }
+            foreach ($vouchers as $v) {
+                $vid = (int) $v['id'];
+                $vRef = trim((string) ($v['reference'] ?? ''));
+                $voucherNo = $vRef !== '' ? $vRef : (string) orange_journal_voucher_display_number($v);
+                $vDateRaw = (string) ($v['voucher_date'] ?? '');
+                $vDateDisp = strlen($vDateRaw) >= 10
+                    ? orange_format_date_dmY(substr($vDateRaw, 0, 10))
+                    : '';
+                $vDesc = trim((string) ($v['description'] ?? ''));
+                foreach ($linesByVid[$vid] ?? [] as $ln) {
+                    $aid = (int) ($ln['account_id'] ?? 0);
+                    $lineMemo = trim((string) ($ln['memo'] ?? ''));
+                    if ($lineMemo === '') {
+                        $lineMemo = $vDesc;
+                    }
+                    $jvrRows[] = [
+                        'voucher_no' => $voucherNo,
+                        'voucher_date' => $vDateDisp,
+                        'account_name' => $accNameMap[$aid] ?? ('#' . $aid),
+                        'debit' => (float) ($ln['debit'] ?? 0),
+                        'credit' => (float) ($ln['credit'] ?? 0),
+                        'memo' => $lineMemo,
+                    ];
+                }
             }
         }
     }
@@ -182,6 +208,7 @@ if ($journalTypeFilterId > 0) {
 
 $jvrExportSubtitle = 'من ' . $dateFromDisp . ' إلى ' . $dateToDisp . ' — نوع القيد: ' . $jvrFilterTypeLabel;
 $jvrVoucherCount = count($vouchers);
+$jvrLineCount = count($jvrRows);
 $jvrPrintAlert = $jvrVouchersReady
     ? "alert('اختر نوع القيد ثم اضغط عرض أولاً')"
     : "alert('جداول السندات غير جاهزة بعد')";
@@ -235,6 +262,13 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
 .jvr-filter-tools--center .jvr-filter-tools__date .admin-inp {
     text-align: center;
 }
+.jvr-lines-table th,
+.jvr-lines-table td { text-align: center; }
+.jvr-lines-table th:nth-child(3),
+.jvr-lines-table td:nth-child(3),
+.jvr-lines-table th:nth-child(6),
+.jvr-lines-table td:nth-child(6) { text-align: right; }
+.jvr-lines-table .gl-acc-stmt-col-num { white-space: nowrap; }
 </style>
 
 <div class="admin-fy-shell" dir="rtl">
@@ -342,57 +376,37 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
             </div>
         </div>
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <table class="admin-fy-table gl-acc-stmt-table" dir="rtl"<?php if ($jvrReportDisplayed): ?>
+            <table class="admin-fy-table gl-acc-stmt-table jvr-lines-table" dir="rtl"<?php if ($jvrReportDisplayed): ?>
                 data-export-name="تقارير السندات"
                 data-export-target="#jvr_export_actions"
                 data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>"
                 data-export-subtitle="<?php echo htmlspecialchars($jvrExportSubtitle, ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>>
                 <thead>
                     <tr>
-                        <th>#</th>
+                        <th>رقم القيد</th>
                         <th>تاريخ السند</th>
-                        <th>تاريخ المستند</th>
-                        <th>نوع القيد</th>
-                        <th>مرجع</th>
+                        <th>اسم الحساب</th>
+                        <th class="gl-acc-stmt-col-num">مدين</th>
+                        <th class="gl-acc-stmt-col-num">دائن</th>
                         <th>البيان</th>
-                        <th>التفاصيل</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (! $jvrReportDisplayed): ?>
-                        <tr><td colspan="7" class="muted">اختر نوع القيد والفترة ثم اضغط «عرض».</td></tr>
+                        <tr><td colspan="6" class="muted">اختر نوع القيد والفترة ثم اضغط «عرض».</td></tr>
                     <?php elseif ($submitted && ! $jvrTypeSelected): ?>
-                        <tr><td colspan="7" class="muted">يجب اختيار نوع القيد قبل عرض التقرير.</td></tr>
-                    <?php elseif ($vouchers === []): ?>
-                        <tr><td colspan="7" class="muted">لا توجد سندات في هذه الفترة لنوع القيد المحدد.</td></tr>
+                        <tr><td colspan="6" class="muted">يجب اختيار نوع القيد قبل عرض التقرير.</td></tr>
+                    <?php elseif ($jvrRows === []): ?>
+                        <tr><td colspan="6" class="muted">لا توجد حركة قيود في هذه الفترة لنوع القيد المحدد.</td></tr>
                     <?php else: ?>
-                        <?php foreach ($vouchers as $v): ?>
-                            <?php
-                            $vid = (int) $v['id'];
-                            $lines = $linesByVid[$vid] ?? [];
-                            $det = [];
-                            foreach ($lines as $ln) {
-                                $aid = (int) $ln['account_id'];
-                                $det[] = htmlspecialchars($accMap[$aid] ?? ('#' . $aid), ENT_QUOTES, 'UTF-8')
-                                    . ' م:' . $ln['debit'] . ' د:' . $ln['credit'];
-                            }
-                            $et = (string) ($v['entry_type'] ?? '');
-                            $etAr = orange_gl_voucher_type_label_ar($pdo, $v);
-                            ?>
+                        <?php foreach ($jvrRows as $row): ?>
                             <tr>
-                                <td><?php echo $vid; ?></td>
-                                <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($v['voucher_date'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php
-                                    $docIn = (string) ($v['document_entered_at'] ?? '');
-                                    if ($docIn === '') {
-                                        $docIn = (string) ($v['created_at'] ?? '');
-                                    }
-                                    echo htmlspecialchars(orange_format_datetime_dmY_hi($docIn), ENT_QUOTES, 'UTF-8');
-                                    ?></td>
-                                <td title="<?php echo htmlspecialchars($et, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($etAr, ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo htmlspecialchars((string) ($v['reference'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo htmlspecialchars((string) ($v['description'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td style="font-size:12px;max-width:22rem;"><?php echo implode(' | ', $det); ?></td>
+                                <td dir="ltr" lang="en"><?php echo htmlspecialchars((string) $row['voucher_no'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr" lang="en"><?php echo htmlspecialchars((string) $row['voucher_date'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars((string) $row['account_name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount((float) $row['debit'], $reportMoney); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount((float) $row['credit'], $reportMoney); ?></td>
+                                <td><?php echo htmlspecialchars((string) $row['memo'], ENT_QUOTES, 'UTF-8'); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -400,7 +414,7 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
             </table>
         </div>
         <?php if ($jvrReportDisplayed): ?>
-        <p class="card-hint muted" style="margin-top:12px;">عدد السندات المعروضة: <?php echo $jvrVoucherCount; ?> (حد أقصى 500)</p>
+        <p class="card-hint muted" style="margin-top:12px;">عدد السندات: <?php echo $jvrVoucherCount; ?> — عدد أسطر الحركة: <?php echo $jvrLineCount; ?> (حد أقصى 500 سنداً)</p>
         <?php endif; ?>
         <div class="gl-acc-stmt-print-footer ta-report-print-footer">
             <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($jvrPrintDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
