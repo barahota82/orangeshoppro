@@ -5585,7 +5585,7 @@ td.tb-col-name,
 /*
  * تقارير محاسبة — طباعة/PDF:
  * @page margin يُكرَّر على كل صفحة (لا يلتصق الرأس بأعلى الصفحة 2+).
- * إطار ثابت (::before) يُرسم على كل صفحة داخل الهوامش.
+ * بلا برواز في الطباعة — الإطار كان يتداخل مع المحتوى ولا يُكرَّر بشكل موثوق.
  */
 @media print {
     @page {
@@ -5595,25 +5595,11 @@ td.tb-col-name,
         padding: 0 !important;
     }
 
-    /* برواز التقرير — يتكرر على كل صفحة (position:fixed في الطباعة) */
-    .gl-acc-stmt-print .gl-acc-stmt-print-sheet::before {
-        content: '';
-        position: fixed;
-        top: 10mm;
-        left: 8mm;
-        right: 8mm;
-        bottom: 14mm;
-        border: 2px solid #1e293b;
-        box-sizing: border-box;
-        pointer-events: none;
-        z-index: 9998;
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
-    }
     .gl-acc-stmt-print .gl-acc-stmt-print-sheet {
         border: none !important;
         padding: 0 !important;
         background: transparent !important;
+        box-shadow: none !important;
     }
 
     /*
@@ -5688,15 +5674,15 @@ td.tb-col-name,
         display: none !important;
     }
 
-    /* تذييل خارج الجدول — تكرار ثابت أسفل كل صفحة داخل الإطار */
+    /* تذييل خارج الجدول — تكرار ثابت أسفل كل صفحة */
     .gl-acc-stmt-print-sheet:not(.ta-report-print-sheet--tfoot) > .ta-report-print-footer,
     .gl-acc-stmt-print-sheet:not(.ta-report-print-sheet--tfoot) > .gl-acc-stmt-print-footer:not(:has(.gl-acc-stmt-print-disclaimer)),
     .ta-report-print-metafoot-repeat {
         position: fixed;
-        bottom: 14mm;
-        left: 8mm;
-        right: 8mm;
-        width: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
         margin: 0 !important;
         padding: 3mm 2mm !important;
         border-top: 1px solid #cbd5e1;
