@@ -239,7 +239,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns ob-voucher-action-btns" role="group" aria-label="إجراءات سند الرصيد الافتتاحي">
                     <button type="button" id="ob_btn_save" data-orange-perm="edit" data-orange-page="opening_balances">حفظ السند</button>
-                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_print">طباعة السند</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_print" onclick="obOpenPrintDialog(); return false;">طباعة / حفظ PDF</button>
                     <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_delete"<?php echo $obVid <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
                 </div>
             </div>
@@ -301,6 +301,13 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
 var OB_COUNTRY_ID = <?php echo (int) $ctxCountryId; ?>;
 var OB_CAPS = <?php echo json_encode($obCaps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 var obEditLockCtl = null;
+
+function obOpenPrintDialog() {
+    window.setTimeout(function () {
+        window.print();
+    }, 0);
+    return false;
+}
 
 (function () {
     var obSaveInFlight = false;

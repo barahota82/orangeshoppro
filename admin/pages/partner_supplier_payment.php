@@ -363,7 +363,7 @@ $ppvReady = $ppvCashLock !== null;
         <div class="jv-toolbar-primary-group">
             <button type="button" id="spay_btn_new" title="إدخال سند جديد">سند جديد</button>
             <button type="button" class="btn-secondary" id="spay_btn_delete" title="حذف السند المعروض" disabled>حذف السند</button>
-            <button type="button" class="btn-secondary" id="spay_btn_print" title="<?php echo $ppvPrintTuningMode ? 'طباعة السند (ضبط شكل — معاينة بلا حفظ)' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط'; ?>"<?php echo $ppvPrintTuningMode ? '' : ' disabled'; ?>>طباعة السند</button>
+            <button type="button" class="btn-secondary" id="spay_btn_print" onclick="spayPrintVoucher(); return false;" title="<?php echo $ppvPrintTuningMode ? 'طباعة / حفظ PDF (ضبط شكل — معاينة بلا حفظ)' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط'; ?>"<?php echo $ppvPrintTuningMode ? '' : ' disabled'; ?>>طباعة / حفظ PDF</button>
             <button type="button" id="spay_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
         </div>
     </div>
@@ -443,8 +443,21 @@ $ppvReady = $ppvCashLock !== null;
 </div>
 
 <script>
+var ORANGE_VOUCHER_PRINT_TUNING = <?php echo $ppvPrintTuningMode ? 'true' : 'false'; ?>;
+var spayBrowseId = null;
+
+function spayPrintVoucher() {
+    if (!ORANGE_VOUCHER_PRINT_TUNING && !spayBrowseId) {
+        alert('احفظ السند أولاً قبل الطباعة.');
+        return false;
+    }
+    window.setTimeout(function () {
+        window.print();
+    }, 0);
+    return false;
+}
+
 (function () {
-    var ORANGE_VOUCHER_PRINT_TUNING = <?php echo $ppvPrintTuningMode ? 'true' : 'false'; ?>;
     var SPAY_API = <?php echo json_encode($ppvApiUrl, JSON_UNESCAPED_UNICODE); ?>;
     var SPAY_CASH = <?php echo json_encode($ppvCashLock, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var SPAY_READY = <?php echo $ppvReady ? 'true' : 'false'; ?>;
@@ -751,7 +764,6 @@ $ppvReady = $ppvCashLock !== null;
     }
 
     // Navigation & Search — uses /admin/api/journal/manage.php like سند الصرف
-    var spayBrowseId = null;
 
     function spaySyncPrintButton() {
         var pb = document.getElementById('spay_btn_print');
@@ -760,7 +772,7 @@ $ppvReady = $ppvCashLock !== null;
         }
         if (ORANGE_VOUCHER_PRINT_TUNING) {
             pb.disabled = false;
-            pb.title = 'طباعة السند (ضبط شكل — معاينة بلا حفظ)';
+            pb.title = 'طباعة / حفظ PDF (ضبط شكل — معاينة بلا حفظ)';
             return;
         }
         var ok = !!spayBrowseId;
@@ -933,20 +945,16 @@ $ppvReady = $ppvCashLock !== null;
             });
         }
 
-        document.getElementById('spay_advance_mode').addEventListener('change', function () {
-            renderInvoices();
-            renderJournal();
-        });
+        var spayAdvanceMode = document.getElementById('spay_advance_mode');
+        if (spayAdvanceMode) {
+            spayAdvanceMode.addEventListener('change', function () {
+                renderInvoices();
+                renderJournal();
+            });
+        }
 
         document.getElementById('spay_btn_save').addEventListener('click', save);
         document.getElementById('spay_btn_new').addEventListener('click', function () { location.reload(); });
-        document.getElementById('spay_btn_print').addEventListener('click', function () {
-            if (!ORANGE_VOUCHER_PRINT_TUNING && !spayBrowseId) {
-                alert('احفظ السند أولاً قبل الطباعة.');
-                return;
-            }
-            window.print();
-        });
         document.getElementById('spay_btn_delete').addEventListener('click', spayDeleteVoucher);
 
         document.getElementById('spay_nav_first').addEventListener('click', function () { spayNav('first'); });

@@ -352,7 +352,7 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
         <div class="jv-toolbar-primary-group">
             <button type="button" id="crec_btn_new" title="إدخال سند جديد">سند جديد</button>
             <button type="button" class="btn-secondary" id="crec_btn_delete" title="حذف السند المعروض" disabled>حذف السند</button>
-            <button type="button" class="btn-secondary" id="crec_btn_print" title="<?php echo $ppvPrintTuningMode ? 'طباعة السند (ضبط شكل — معاينة بلا حفظ)' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط'; ?>"<?php echo $ppvPrintTuningMode ? '' : ' disabled'; ?>>طباعة السند</button>
+            <button type="button" class="btn-secondary" id="crec_btn_print" onclick="crecPrintVoucher(); return false;" title="<?php echo $ppvPrintTuningMode ? 'طباعة / حفظ PDF (ضبط شكل — معاينة بلا حفظ)' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط'; ?>"<?php echo $ppvPrintTuningMode ? '' : ' disabled'; ?>>طباعة / حفظ PDF</button>
             <button type="button" id="crec_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
         </div>
     </div>
@@ -432,8 +432,21 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
 </div>
 
 <script>
+var ORANGE_VOUCHER_PRINT_TUNING = <?php echo $ppvPrintTuningMode ? 'true' : 'false'; ?>;
+var crecBrowseId = null;
+
+function crecPrintVoucher() {
+    if (!ORANGE_VOUCHER_PRINT_TUNING && !crecBrowseId) {
+        alert('احفظ السند أولاً قبل الطباعة.');
+        return false;
+    }
+    window.setTimeout(function () {
+        window.print();
+    }, 0);
+    return false;
+}
+
 (function () {
-    var ORANGE_VOUCHER_PRINT_TUNING = <?php echo $ppvPrintTuningMode ? 'true' : 'false'; ?>;
     var CREC_API = <?php echo json_encode($ppvApiUrl, JSON_UNESCAPED_UNICODE); ?>;
     var CREC_CASH = <?php echo json_encode($ppvCashLock, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var CREC_READY = <?php echo $ppvReady ? 'true' : 'false'; ?>;
@@ -738,7 +751,6 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
     }
 
     // Navigation & Search — uses /admin/api/journal/manage.php like سند الصرف
-    var crecBrowseId = null;
 
     function crecSyncPrintButton() {
         var pb = document.getElementById('crec_btn_print');
@@ -747,7 +759,7 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
         }
         if (ORANGE_VOUCHER_PRINT_TUNING) {
             pb.disabled = false;
-            pb.title = 'طباعة السند (ضبط شكل — معاينة بلا حفظ)';
+            pb.title = 'طباعة / حفظ PDF (ضبط شكل — معاينة بلا حفظ)';
             return;
         }
         var ok = !!crecBrowseId;
@@ -920,20 +932,16 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
             });
         }
 
-        document.getElementById('crec_advance_mode').addEventListener('change', function () {
-            renderInvoices();
-            renderJournal();
-        });
+        var crecAdvanceMode = document.getElementById('crec_advance_mode');
+        if (crecAdvanceMode) {
+            crecAdvanceMode.addEventListener('change', function () {
+                renderInvoices();
+                renderJournal();
+            });
+        }
 
         document.getElementById('crec_btn_save').addEventListener('click', save);
         document.getElementById('crec_btn_new').addEventListener('click', function () { location.reload(); });
-        document.getElementById('crec_btn_print').addEventListener('click', function () {
-            if (!ORANGE_VOUCHER_PRINT_TUNING && !crecBrowseId) {
-                alert('احفظ السند أولاً قبل الطباعة.');
-                return;
-            }
-            window.print();
-        });
         document.getElementById('crec_btn_delete').addEventListener('click', crecDeleteVoucher);
 
         document.getElementById('crec_nav_first').addEventListener('click', function () { crecNav('first'); });
