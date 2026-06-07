@@ -4476,6 +4476,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area,
     .jv-print-area * {
         visibility: visible;
+        box-shadow: none !important;
     }
     .jv-print-area {
         position: absolute;
@@ -4484,7 +4485,10 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         width: 100%;
         max-height: none;
         border: none;
-        box-shadow: none;
+        box-shadow: none !important;
+    }
+    .jv-print-area .admin-doc-frame {
+        background: #fff !important;
     }
     .jv-print-hide {
         display: none !important;
