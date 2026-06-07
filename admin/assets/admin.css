@@ -5013,6 +5013,20 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         left: auto !important;
         width: auto !important;
     }
+
+    /* أرصدة الذمم (عرض شامل): حاوية طباعة واحدة + كروت الأرصدة تتدفّق طبيعياً */
+    .pr-balances-print-shell {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+    }
+    .pr-balances-print-shell .card.admin-fy-card {
+        position: static !important;
+        top: auto !important;
+        left: auto !important;
+        width: auto !important;
+    }
 }
 
 /* ميزان المراجعة — 8 أعمدة */

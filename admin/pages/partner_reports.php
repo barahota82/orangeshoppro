@@ -181,9 +181,10 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
     <?php endif; ?>
 </div>
 
-<div class="gl-acc-stmt-print">
+<?php $prBothBalanceCards = $showPartnerCustomers && $showPartnerSuppliers; ?>
+<?php if ($prBothBalanceCards): ?><div class="pr-balances-print-shell gl-acc-stmt-print"><?php endif; ?>
 <?php if ($showPartnerCustomers): ?>
-<div class="card admin-fy-card" id="partner-balances-customers">
+<div class="card admin-fy-card<?php echo $prBothBalanceCards ? '' : ' gl-acc-stmt-print'; ?>" id="partner-balances-customers">
     <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
     <?php $prRenderHeader('أرصدة العملاء (ذمم)'); ?>
     <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
@@ -219,7 +220,7 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
 <?php endif; ?>
 
 <?php if ($showPartnerSuppliers): ?>
-<div class="card admin-fy-card" id="partner-balances-suppliers"<?php echo $partnerView === 'all' ? ' style="break-before:page;"' : ''; ?>>
+<div class="card admin-fy-card<?php echo $prBothBalanceCards ? '' : ' gl-acc-stmt-print'; ?>" id="partner-balances-suppliers"<?php echo $partnerView === 'all' ? ' style="break-before:page;"' : ''; ?>>
     <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
     <?php $prRenderHeader('أرصدة الموردين (ذمم)'); ?>
     <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
@@ -251,8 +252,7 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
     </div>
 </div>
 <?php endif; ?>
-</div>
-<?php /* gl-acc-stmt-print wrapper end */ ?>
+<?php if ($prBothBalanceCards): ?></div><?php endif; ?>
 
 </div>
 
