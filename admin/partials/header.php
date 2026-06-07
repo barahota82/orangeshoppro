@@ -6,6 +6,22 @@ if (!isset($admin)) {
     $admin = require_admin_page();
 }
 $orangeAdminPage = isset($page) ? (string) $page : 'dashboard';
+$orangeAdminCountryPreserveGet = [];
+if (isset($_GET) && is_array($_GET)) {
+    foreach ($_GET as $orangePreserveKey => $orangePreserveVal) {
+        if ($orangePreserveKey === 'page' || $orangePreserveKey === 'admin_country') {
+            continue;
+        }
+        if (!is_scalar($orangePreserveVal)) {
+            continue;
+        }
+        $orangePreserveKey = (string) $orangePreserveKey;
+        if ($orangePreserveKey === '') {
+            continue;
+        }
+        $orangeAdminCountryPreserveGet[$orangePreserveKey] = (string) $orangePreserveVal;
+    }
+}
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
@@ -486,6 +502,9 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                 ?>
             <form method="get" action="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php'), ENT_QUOTES, 'UTF-8'); ?>" class="admin-topbar-country-mega">
                 <input type="hidden" name="page" value="<?php echo htmlspecialchars($orangeAdminPage, ENT_QUOTES, 'UTF-8'); ?>">
+                <?php foreach ($orangeAdminCountryPreserveGet as $orangePreserveKey => $orangePreserveVal): ?>
+                <input type="hidden" name="<?php echo htmlspecialchars($orangePreserveKey, ENT_QUOTES, 'UTF-8'); ?>" value="<?php echo htmlspecialchars($orangePreserveVal, ENT_QUOTES, 'UTF-8'); ?>">
+                <?php endforeach; ?>
                 <div class="admin-mega-dropdown admin-mega-dropdown--country">
                     <label for="admin_topbar_country" class="admin-topbar-country-mega__label">الدولة</label>
                     <select id="admin_topbar_country" name="admin_country" class="admin-topbar-country-select admin-mega-trigger admin-mega-trigger--country"
@@ -571,6 +590,9 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                 <div class="admin-nav-country-drawer">
                     <form method="get" action="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php'), ENT_QUOTES, 'UTF-8'); ?>" class="admin-nav-country-drawer__form">
                         <input type="hidden" name="page" value="<?php echo htmlspecialchars($orangeAdminPage, ENT_QUOTES, 'UTF-8'); ?>">
+                        <?php foreach ($orangeAdminCountryPreserveGet as $orangePreserveKey => $orangePreserveVal): ?>
+                        <input type="hidden" name="<?php echo htmlspecialchars($orangePreserveKey, ENT_QUOTES, 'UTF-8'); ?>" value="<?php echo htmlspecialchars($orangePreserveVal, ENT_QUOTES, 'UTF-8'); ?>">
+                        <?php endforeach; ?>
                         <label for="admin_drawer_country" class="admin-nav-country-drawer__label">الدولة — سياق الأدمن</label>
                         <select id="admin_drawer_country" name="admin_country" class="admin-nav-country-drawer__select"
                             <?php echo count($orangeAdminCountriesNav) <= 1 ? 'disabled' : ''; ?>

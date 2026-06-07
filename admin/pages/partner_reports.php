@@ -22,14 +22,18 @@ $prPrintDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
 $includeAging = isset($_GET['aging']) && $_GET['aging'] === '1';
 $partnerViewRaw = isset($_GET['view']) ? strtolower(trim((string) $_GET['view'])) : '';
-$partnerView = in_array($partnerViewRaw, ['customers', 'suppliers'], true) ? $partnerViewRaw : 'all';
-$showPartnerCustomers = $partnerView === 'all' || $partnerView === 'customers';
-$showPartnerSuppliers = $partnerView === 'all' || $partnerView === 'suppliers';
+if (!in_array($partnerViewRaw, ['customers', 'suppliers'], true)) {
+    $redirectQ = $_GET;
+    $redirectQ['page'] = 'partner_reports';
+    $redirectQ['view'] = 'customers';
+    header('Location: ' . storefront_public_path('/admin/index.php?' . http_build_query($redirectQ)));
+    exit;
+}
+$partnerView = $partnerViewRaw;
+$showPartnerCustomers = $partnerView === 'customers';
+$showPartnerSuppliers = $partnerView === 'suppliers';
 $partnerReportsUrl = static function (array $extra = []) use ($partnerView, $includeAging): string {
-    $q = ['page' => 'partner_reports'];
-    if ($partnerView !== 'all') {
-        $q['view'] = $partnerView;
-    }
+    $q = ['page' => 'partner_reports', 'view' => $partnerView];
     if ($includeAging) {
         $q['aging'] = '1';
     }
@@ -103,13 +107,8 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
 <div class="admin-fy-shell" dir="rtl">
     <?php if ($partnerView === 'customers'): ?>
         <h1 class="admin-fy-shell__title">أرصدة العملاء (ذمم)</h1>
-    <?php elseif ($partnerView === 'suppliers'): ?>
-        <h1 class="admin-fy-shell__title">أرصدة الموردين (ذمم)</h1>
     <?php else: ?>
-        <h1 class="admin-fy-shell__title">تقارير الذمم الشاملة</h1>
-        <p class="admin-fy-shell__lead">
-            ملخص أرصدة كل العملاء والموردين، ومطابقة أرصدة الدليل مع دفتر الذمم.
-        </p>
+        <h1 class="admin-fy-shell__title">أرصدة الموردين (ذمم)</h1>
     <?php endif; ?>
 
 <?php if (orange_journal_vouchers_ready($pdo) && $prPostingLeafCt === 0): ?>
@@ -126,9 +125,6 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
                 <?php echo $includeAging ? 'إخفاء أعمار الذمم (أسرع)' : 'إظهار أعمار الذمم (أبطأ)'; ?>
             </a>
             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
-            <?php if ($showPartnerCustomers): ?>
-            <button type="button" class="btn-secondary" onclick="backfillOrders()">ربط طلبات آجل بعملاء (هاتف)</button>
-            <?php endif; ?>
         </div>
     </div>
     <p class="card-hint muted" style="margin-top:10px;">اعتباراً من <?php echo htmlspecialchars($report['as_of'], ENT_QUOTES, 'UTF-8'); ?></p>
@@ -136,9 +132,7 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
     <?php if ($reconcile !== null): ?>
     <form method="get" class="form-grid orange-doc-header-row" style="max-width:420px;margin-top:14px;">
         <input type="hidden" name="page" value="partner_reports">
-        <?php if ($partnerView !== 'all'): ?>
-            <input type="hidden" name="view" value="<?php echo htmlspecialchars($partnerView, ENT_QUOTES, 'UTF-8'); ?>">
-        <?php endif; ?>
+        <input type="hidden" name="view" value="<?php echo htmlspecialchars($partnerView, ENT_QUOTES, 'UTF-8'); ?>">
         <?php if ($includeAging): ?><input type="hidden" name="aging" value="1"><?php endif; ?>
         <div>
             <label for="fy_sel">السنة المالية</label>
@@ -181,10 +175,8 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
     <?php endif; ?>
 </div>
 
-<?php $prBothBalanceCards = $showPartnerCustomers && $showPartnerSuppliers; ?>
-<?php if ($prBothBalanceCards): ?><div class="pr-balances-print-shell gl-acc-stmt-print"><?php endif; ?>
 <?php if ($showPartnerCustomers): ?>
-<div class="card admin-fy-card<?php echo $prBothBalanceCards ? '' : ' gl-acc-stmt-print'; ?>" id="partner-balances-customers">
+<div class="card admin-fy-card gl-acc-stmt-print" id="partner-balances-customers">
     <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
     <?php $prRenderHeader('أرصدة العملاء (ذمم)'); ?>
     <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
@@ -220,7 +212,7 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
 <?php endif; ?>
 
 <?php if ($showPartnerSuppliers): ?>
-<div class="card admin-fy-card<?php echo $prBothBalanceCards ? '' : ' gl-acc-stmt-print'; ?>" id="partner-balances-suppliers"<?php echo $partnerView === 'all' ? ' style="break-before:page;"' : ''; ?>>
+<div class="card admin-fy-card gl-acc-stmt-print" id="partner-balances-suppliers">
     <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
     <?php $prRenderHeader('أرصدة الموردين (ذمم)'); ?>
     <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
@@ -252,16 +244,5 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
     </div>
 </div>
 <?php endif; ?>
-<?php if ($prBothBalanceCards): ?></div><?php endif; ?>
 
 </div>
-
-<script>
-function backfillOrders() {
-    if (!confirm('ربط الطلبات الآجلة التي بها هاتف وبدون customer_id بجدول العملاء؟')) return;
-    postJSON('/admin/api/customers/backfill-orders.php', {}).then(function (r) {
-        alert(r.message || (r.success ? 'تم' : 'فشل'));
-        if (r.success) location.reload();
-    }).catch(function (e) { alert(e.message || String(e)); });
-}
-</script>
