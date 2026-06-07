@@ -44,7 +44,7 @@ function orange_report_xlsx_styles_xml(): string
         . '<fills count="3">'
         . '<fill><patternFill patternType="none"/></fill>'
         . '<fill><patternFill patternType="gray125"/></fill>'
-        . '<fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></fill></fill>'
+        . '<fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></patternFill></fill>'
         . '</fills>'
         . '<borders count="2">'
         . '<border><left/><right/><top/><bottom/><diagonal/></border>'
