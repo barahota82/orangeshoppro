@@ -4537,6 +4537,17 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-lines-table .ob-c {
         text-align: left !important;
     }
+    /* §9.3 — بلا خط فاصل فوق صف البيان (بين الحساب وبيانه) */
+    .jv-print-area .jv-lines-table tr.jv-line-main:has(+ tr.jv-line-memo) td {
+        border-bottom: none !important;
+    }
+    .jv-print-area .jv-lines-table tr.jv-line-main + tr.jv-line-memo td {
+        border-top: none !important;
+        padding-top: 0 !important;
+    }
+    .jv-print-area .jv-lines-table tr.jv-line-memo .jv-m {
+        border-top: none !important;
+    }
     .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
         display: table-header-group !important;
     }
