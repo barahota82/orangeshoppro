@@ -369,8 +369,8 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
 
 /* تصدير Excel (xlsx حقيقي): لكل شهر رأسه + الإيرادات بجانب المصروفات (يطابق الشاشة). */
 if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers && $periodLabel !== '') {
-    $txt = static fn ($v): array => ['v' => (string) $v, 'n' => false];
-    $num = static fn ($v): array => ['v' => (float) $v, 'n' => true];
+    $txt = static fn ($v, int $s = 0): array => ['v' => (string) $v, 'n' => false, 's' => $s];
+    $num = static fn ($v, int $s = 0): array => ['v' => (float) $v, 'n' => true, 's' => $s];
     $xlsxRows = [];
     foreach ($monthSheetsBuilt as $ms) {
         $ymMs = (string) $ms['ym'];
@@ -397,22 +397,28 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
         $xlsxRows[] = [$txt($subtitleLine($dmFrom, $dmTo))];
         $xlsxRows[] = [$txt($monthLabelExcel($ymMs) . ($yearStr !== '' ? ' — السنة ' . $yearStr : '') . ' — ربح: ' . $reportFmt((float) ($tot['rabeh'] ?? 0)))];
         $xlsxRows[] = [];
-        $xlsxRows[] = [$txt('إيرادات'), $txt(''), $txt(''), $txt('مصروفات'), $txt(''), $txt('')];
-        $xlsxRows[] = [$txt('الرصيد'), $txt('اسم الحساب'), $txt('كود الحساب'), $txt('الرصيد'), $txt('اسم الحساب'), $txt('كود الحساب')];
+        $xlsxRows[] = [$txt('إيرادات', 1), $txt('', 1), $txt('', 1), $txt('مصروفات', 1), $txt('', 1), $txt('', 1)];
+        $xlsxRows[] = [
+            $txt('الرصيد', 1), $txt('اسم الحساب', 1), $txt('كود الحساب', 1),
+            $txt('الرصيد', 1), $txt('اسم الحساب', 1), $txt('كود الحساب', 1),
+        ];
         $plRows = max(count($lr), count($rr), 1);
         for ($i = 0; $i < $plRows; $i++) {
             $lv = $lr[$i] ?? null;
             $rv = $rr[$i] ?? null;
             $xlsxRows[] = [
-                $lv !== null ? $num((float) $lv['cell']) : $txt(''),
-                $lv !== null ? $txt((string) $lv['name']) : $txt(''),
-                $lv !== null ? $txt((string) $lv['code']) : $txt(''),
-                $rv !== null ? $num((float) $rv['cell']) : $txt(''),
-                $rv !== null ? $txt((string) $rv['name']) : $txt(''),
-                $rv !== null ? $txt((string) $rv['code']) : $txt(''),
+                $lv !== null ? $num((float) $lv['cell'], 3) : $txt('', 2),
+                $lv !== null ? $txt((string) $lv['name'], 2) : $txt('', 2),
+                $lv !== null ? $txt((string) $lv['code'], 2) : $txt('', 2),
+                $rv !== null ? $num((float) $rv['cell'], 3) : $txt('', 2),
+                $rv !== null ? $txt((string) $rv['name'], 2) : $txt('', 2),
+                $rv !== null ? $txt((string) $rv['code'], 2) : $txt('', 2),
             ];
         }
-        $xlsxRows[] = [$num((float) ($tot['sum_rev'] ?? 0)), $txt('إجمالي الإيرادات'), $txt(''), $num((float) ($tot['sum_out'] ?? 0)), $txt('إجمالي المصروفات'), $txt('')];
+        $xlsxRows[] = [
+            $num((float) ($tot['sum_rev'] ?? 0), 3), $txt('إجمالي الإيرادات', 2), $txt('', 2),
+            $num((float) ($tot['sum_out'] ?? 0), 3), $txt('إجمالي المصروفات', 2), $txt('', 2),
+        ];
         $xlsxRows[] = [];
         $xlsxRows[] = [];
     }

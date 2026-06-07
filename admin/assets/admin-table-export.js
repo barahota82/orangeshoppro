@@ -181,6 +181,41 @@
         return String(s == null ? '' : s)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
+    /* أنماط xlsx: 0=ترويسة، 1=عناوين أعمدة، 2=بيانات نص، 3=بيانات رقم */
+    var XLSX_STYLES_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        + '<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.00"/></numFmts>'
+        + '<fonts count="2">'
+        + '<font><sz val="11"/><name val="Calibri"/><family val="2"/></font>'
+        + '<font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font>'
+        + '</fonts>'
+        + '<fills count="3">'
+        + '<fill><patternFill patternType="none"/></fill>'
+        + '<fill><patternFill patternType="gray125"/></fill>'
+        + '<fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></fill></fill>'
+        + '</fills>'
+        + '<borders count="2">'
+        + '<border><left/><right/><top/><bottom/><diagonal/></border>'
+        + '<border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right>'
+        + '<top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border>'
+        + '</borders>'
+        + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+        + '<cellXfs count="4">'
+        + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+        + '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">'
+        + '<alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+        + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1">'
+        + '<alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+        + '<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1">'
+        + '<alignment horizontal="center" vertical="center"/></xf>'
+        + '</cellXfs>'
+        + '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+        + '</styleSheet>';
+
+    function xlsxStyleAttr(styleId) {
+        return styleId > 0 ? ' s="' + styleId + '"' : '';
+    }
+
     function sheetXml(rows) {
         var sb = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
@@ -193,12 +228,19 @@
                 var cell = row[c];
                 if (cell == null) { continue; }
                 var ref = colLetter(c) + (r + 1);
+                var styleId = cell.s > 0 ? cell.s : 0;
+                var styled = styleId > 0;
                 if (cell.n && cell.v !== '' && cell.v != null && !isNaN(cell.v)) {
-                    sb += '<c r="' + ref + '" t="n"><v>' + (0 + cell.v) + '</v></c>';
+                    sb += '<c r="' + ref + '"' + xlsxStyleAttr(styleId) + ' t="n"><v>' + (0 + cell.v) + '</v></c>';
                 } else {
                     var v = (cell.v == null) ? '' : String(cell.v);
-                    if (v !== '') {
-                        sb += '<c r="' + ref + '" t="inlineStr"><is><t xml:space="preserve">' + xmlEsc(v) + '</t></is></c>';
+                    if (v !== '' || styled) {
+                        if (v === '') {
+                            sb += '<c r="' + ref + '"' + xlsxStyleAttr(styleId) + '/>';
+                        } else {
+                            sb += '<c r="' + ref + '"' + xlsxStyleAttr(styleId)
+                                + ' t="inlineStr"><is><t xml:space="preserve">' + xmlEsc(v) + '</t></is></c>';
+                        }
                     }
                 }
             }
@@ -245,35 +287,50 @@
     function buildXlsx(sheetName, rows) {
         var sn = safeName(sheetName).substring(0, 31) || 'Sheet1';
         var files = [
-            { name: '[Content_Types].xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>' },
+            { name: '[Content_Types].xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
             { name: '_rels/.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
             { name: 'xl/workbook.xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' + xmlEsc(sn) + '" sheetId="1" r:id="rId1"/></sheets></workbook>' },
-            { name: 'xl/_rels/workbook.xml.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>' },
+            { name: 'xl/_rels/workbook.xml.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+            { name: 'xl/styles.xml', data: XLSX_STYLES_XML },
             { name: 'xl/worksheets/sheet1.xml', data: sheetXml(rows) }
         ];
         return zipStored(files);
     }
 
-    function txtCell(v) { return { v: (v == null ? '' : String(v)), n: false }; }
+    function txtCell(v, styleId) {
+        return { v: (v == null ? '' : String(v)), n: false, s: styleId > 0 ? styleId : 0 };
+    }
 
-    /* جدول DOM → صفوف خلايا (المبالغ أرقام، الأكواد نص). */
+    /* جدول DOM → صفوف خلايا (المبالغ أرقام، الأكواد نص، برواز شبكة كاملة). */
     function tableToRows(table) {
         var rows = [];
         eachRow(table, function (tr) {
             var cells = tr.children;
             var row = [];
+            var isHeader = false;
+            for (var h = 0; h < cells.length; h++) {
+                if (cells[h].tagName === 'TH') {
+                    isHeader = true;
+                    break;
+                }
+            }
             for (var j = 0; j < cells.length; j++) {
                 var c = cells[j];
                 if (c.tagName !== 'TD' && c.tagName !== 'TH') { continue; }
                 if (isSkipped(c)) { continue; }
                 var span = parseInt(c.getAttribute('colspan') || '1', 10) || 1;
+                var styleId = isHeader ? 1 : 2;
                 if (isAmountCell(c)) {
                     var num = parseAmount(c.textContent);
-                    row.push(num !== null ? { v: num, n: true } : txtCell(cellText(c)));
+                    if (num !== null && !isHeader) {
+                        row.push({ v: num, n: true, s: 3 });
+                    } else {
+                        row.push(txtCell(cellText(c), isHeader ? 1 : 2));
+                    }
                 } else {
-                    row.push(txtCell(cellText(c)));
+                    row.push(txtCell(cellText(c), styleId));
                 }
-                for (var k = 1; k < span; k++) { row.push(txtCell('')); }
+                for (var k = 1; k < span; k++) { row.push(txtCell('', styleId)); }
             }
             rows.push(row);
         });

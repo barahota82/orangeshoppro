@@ -31,10 +31,71 @@ function orange_report_xlsx_xml_esc(string $s): string
     );
 }
 
+/** أنماط xlsx: 0=ترويسة، 1=عناوين أعمدة، 2=بيانات نص، 3=بيانات رقم */
+function orange_report_xlsx_styles_xml(): string
+{
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . '<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.00"/></numFmts>'
+        . '<fonts count="2">'
+        . '<font><sz val="11"/><name val="Calibri"/><family val="2"/></font>'
+        . '<font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font>'
+        . '</fonts>'
+        . '<fills count="3">'
+        . '<fill><patternFill patternType="none"/></fill>'
+        . '<fill><patternFill patternType="gray125"/></fill>'
+        . '<fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></fill></fill>'
+        . '</fills>'
+        . '<borders count="2">'
+        . '<border><left/><right/><top/><bottom/><diagonal/></border>'
+        . '<border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right>'
+        . '<top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border>'
+        . '</borders>'
+        . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+        . '<cellXfs count="4">'
+        . '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+        . '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">'
+        . '<alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+        . '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1">'
+        . '<alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+        . '<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1">'
+        . '<alignment horizontal="center" vertical="center"/></xf>'
+        . '</cellXfs>'
+        . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+        . '</styleSheet>';
+}
+
+/**
+ * @param array{v:mixed,n?:bool,s?:int} $cell
+ */
+function orange_report_xlsx_cell_xml(string $ref, array $cell): string
+{
+    $styleId = (int) ($cell['s'] ?? 0);
+    $styleAttr = $styleId > 0 ? ' s="' . $styleId . '"' : '';
+    $styled = $styleId > 0;
+    $isNum = !empty($cell['n']);
+    $v = $cell['v'] ?? '';
+
+    if ($isNum && is_numeric($v)) {
+        return '<c r="' . $ref . '"' . $styleAttr . ' t="n"><v>' . (0 + $v) . '</v></c>';
+    }
+
+    $text = (string) $v;
+    if ($text === '' && !$styled) {
+        return '';
+    }
+    if ($text === '') {
+        return '<c r="' . $ref . '"' . $styleAttr . '/>';
+    }
+
+    return '<c r="' . $ref . '"' . $styleAttr . ' t="inlineStr"><is><t xml:space="preserve">'
+        . orange_report_xlsx_xml_esc($text) . '</t></is></c>';
+}
+
 /**
  * بناء XML لورقة العمل.
  *
- * @param list<list<array{v:mixed,n?:bool}>> $rows
+ * @param list<list<array{v:mixed,n?:bool,s?:int}>> $rows
  */
 function orange_report_xlsx_sheet_xml(array $rows): string
 {
@@ -49,17 +110,7 @@ function orange_report_xlsx_sheet_xml(array $rows): string
         $c = 0;
         foreach ($row as $cell) {
             $ref = orange_report_xlsx_col_letter($c) . $r;
-            $isNum = !empty($cell['n']);
-            $v = $cell['v'] ?? '';
-            if ($isNum && is_numeric($v)) {
-                $sb .= '<c r="' . $ref . '" t="n"><v>' . (0 + $v) . '</v></c>';
-            } else {
-                $text = (string) $v;
-                if ($text !== '') {
-                    $sb .= '<c r="' . $ref . '" t="inlineStr"><is><t xml:space="preserve">'
-                        . orange_report_xlsx_xml_esc($text) . '</t></is></c>';
-                }
-            }
+            $sb .= orange_report_xlsx_cell_xml($ref, $cell);
             $c++;
         }
         $sb .= '</row>';
@@ -97,6 +148,7 @@ function orange_report_xlsx_send(string $filename, string $sheetName, array $row
         . '<Default Extension="xml" ContentType="application/xml"/>'
         . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
         . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        . '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
         . '</Types>';
     $rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
@@ -109,8 +161,10 @@ function orange_report_xlsx_send(string $filename, string $sheetName, array $row
     $workbookRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
         . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        . '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
         . '</Relationships>';
     $sheetXml = orange_report_xlsx_sheet_xml($rows);
+    $stylesXml = orange_report_xlsx_styles_xml();
 
     /* بناء حزمة ZIP بـ PHP خالص (stored، بلا اعتماد على ZipArchive). */
     $data = orange_report_zip_stored([
@@ -118,6 +172,7 @@ function orange_report_xlsx_send(string $filename, string $sheetName, array $row
         ['name' => '_rels/.rels', 'data' => $rels],
         ['name' => 'xl/workbook.xml', 'data' => $workbook],
         ['name' => 'xl/_rels/workbook.xml.rels', 'data' => $workbookRels],
+        ['name' => 'xl/styles.xml', 'data' => $stylesXml],
         ['name' => 'xl/worksheets/sheet1.xml', 'data' => $sheetXml],
     ]);
 
@@ -197,7 +252,7 @@ function orange_report_xls_output(
 
     $headRow = [];
     foreach ($headers as $h) {
-        $headRow[] = ['v' => $h, 'n' => false];
+        $headRow[] = ['v' => $h, 'n' => false, 's' => 1];
     }
     $cellRows[] = $headRow;
 
@@ -206,7 +261,11 @@ function orange_report_xls_output(
         $i = 0;
         foreach ($r as $val) {
             $isNum = isset($numSet[$i]) && is_numeric($val);
-            $cells[] = ['v' => $isNum ? (0 + $val) : (string) $val, 'n' => $isNum];
+            $cells[] = [
+                'v' => $isNum ? (0 + $val) : (string) $val,
+                'n' => $isNum,
+                's' => $isNum ? 3 : 2,
+            ];
             $i++;
         }
         $cellRows[] = $cells;
