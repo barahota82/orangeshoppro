@@ -132,7 +132,7 @@ if ($jvrReportDisplayed) {
         $sql .= ' AND jv.entry_type = ?';
         $params[] = $entryTypeFilter;
     }
-    $sql .= ' ORDER BY jv.voucher_date ASC, jv.id ASC LIMIT 500';
+    $sql .= ' ORDER BY jv.voucher_date ASC, jv.id ASC';
     $st = $pdo->prepare($sql);
     $st->execute($params);
     $vouchers = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -454,7 +454,7 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
             </table>
         </div>
         <?php if ($jvrReportDisplayed): ?>
-        <p class="card-hint muted" style="margin-top:12px;">عدد السندات: <?php echo $jvrVoucherCount; ?> — عدد أسطر الحركة: <?php echo $jvrLineCount; ?> (حد أقصى 500 سنداً)</p>
+        <p class="card-hint muted" style="margin-top:12px;">عدد السندات: <?php echo $jvrVoucherCount; ?> — عدد أسطر الحركة: <?php echo $jvrLineCount; ?></p>
         <?php endif; ?>
         <div class="gl-acc-stmt-print-footer ta-report-print-footer">
             <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($jvrPrintDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
