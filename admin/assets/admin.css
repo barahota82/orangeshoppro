@@ -1053,10 +1053,11 @@ a { text-decoration: none; color: inherit; }
     min-height: 36px;
     font-size: 12px;
 }
-/* سند القيد + أرصدة أول المدة — عرض أعمدة الكود / الاسم / مدين / دائن / إجراء */
+/* سند القيد + أرصدة أول المدة — عرض أعمدة الكود / الاسم / إجراء / مدين / دائن */
 .jv-lines-table {
     table-layout: fixed;
     width: 100%;
+    direction: rtl;
 }
 .jv-lines-table col.jv-col-code {
     width: 9rem;
@@ -1070,11 +1071,18 @@ a { text-decoration: none; color: inherit; }
 .jv-lines-table col.jv-col-act {
     width: 5rem;
 }
-.jv-lines-table .ob-line-main td:nth-child(3) .ob-d,
-.jv-lines-table .ob-line-main td:nth-child(4) .ob-c {
+.jv-lines-table .jv-line-main .jv-d,
+.jv-lines-table .jv-line-main .jv-c,
+.jv-lines-table .ob-line-main .ob-d,
+.jv-lines-table .ob-line-main .ob-c {
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
+    text-align: left;
+}
+.jv-lines-table thead th:nth-child(4),
+.jv-lines-table thead th:nth-child(5) {
+    text-align: left !important;
 }
 .jv-lines-table .ob-inp-code,
 .jv-lines-table .gl-inp-code.ob-inp-code {
@@ -1734,9 +1742,10 @@ label {
     line-height: var(--input-min-h);
 }
 
-/* سند قيد — رأس السند: رقم، تواريخ، مرجع، مجموع مدين/دائن */
+/* سند قيد — رأس السند: رقم، تواريخ، مرجع، مجموع مدين/دائن (يسار — محاذاة لحقل البيان) */
 .jv-voucher-header-line {
     display: grid;
+    direction: rtl;
     grid-template-columns:
         minmax(5.25rem, 7rem)
         minmax(9.5rem, 11.5rem)
@@ -1774,7 +1783,8 @@ label {
     box-sizing: border-box;
 }
 .jv-voucher-header-line .jv-tot-readonly {
-    text-align: center;
+    text-align: left;
+    direction: ltr;
     background: #f4f4f5;
     cursor: default;
 }
@@ -4499,13 +4509,17 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-hide {
         display: none !important;
     }
-    .jv-print-area .jv-lines-table thead th.admin-doc-col-actions,
-    .jv-print-area .jv-lines-table tr.jv-line-main td:last-child {
-        display: none !important;
+    .jv-print-area .jv-lines-table col.jv-col-act {
+        width: 0 !important;
     }
+    .jv-print-area .jv-lines-table thead th.admin-doc-col-actions,
+    .jv-print-area .jv-lines-table tr.jv-line-main > td:nth-child(3),
     .jv-print-area .ob-opening-table thead th.admin-doc-col-actions,
-    .jv-print-area .ob-line-main td:last-child {
+    .jv-print-area .ob-opening-table tr.ob-line-main > td:nth-child(3) {
         display: none !important;
+        width: 0 !important;
+        padding: 0 !important;
+        border: none !important;
     }
     .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
         display: table-header-group !important;
@@ -4535,14 +4549,27 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
      */
     .jv-print-area .jv-voucher-header-line {
         display: grid !important;
-        grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+        direction: rtl !important;
+        grid-template-columns:
+            minmax(4.5rem, 6rem)
+            minmax(7rem, 9rem)
+            minmax(4.5rem, 6rem)
+            minmax(7rem, 9rem)
+            minmax(6.5rem, 8rem)
+            minmax(6.5rem, 8rem) !important;
         gap: 4px 6px !important;
         align-items: end !important;
         width: 100% !important;
         box-sizing: border-box !important;
     }
     .jv-print-area .jv-voucher-header-line--nav {
-        grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+        grid-template-columns:
+            minmax(4.5rem, 6rem)
+            minmax(7rem, 9rem)
+            minmax(4.5rem, 6rem)
+            minmax(7rem, 9rem)
+            minmax(6.5rem, 8rem)
+            minmax(6.5rem, 8rem) !important;
     }
     .jv-print-area .jv-voucher-header-line > div > label {
         font-size: 7pt;
