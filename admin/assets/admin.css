@@ -4538,21 +4538,24 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         text-align: left !important;
     }
     /*
-     * §9.3 — بلا خط فاصل زائد بين سطر الحساب وصف البيان؛
-     * مستطيل حقل البيان (.jv-m) يبقى كاملاً بأربع حدود.
+     * §9.3 — مستطيلات كاملة لكود/اسم/مدين/دائن والبيان في الطباعة.
+     * الخط الفاصل الزائد بين الصفين يُدمَج بـ margin-top سالب على .jv-m
+     * (بدون حذف الحد السفلي لمستطيلات سطر الحساب).
      */
-    .jv-print-area .jv-lines-table tr.jv-line-main:has(+ tr.jv-line-memo) td {
-        border-bottom: none !important;
+    .jv-print-area .jv-lines-table tr.jv-line-main input {
+        border: 1px solid #cbd5e1 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
-    .jv-print-area .jv-lines-table tr.jv-line-main:has(+ tr.jv-line-memo) input {
-        border-bottom: none !important;
-    }
-    .jv-print-area .jv-lines-table tr.jv-line-main + tr.jv-line-memo td {
+    .jv-print-area .jv-lines-table tr.jv-line-memo td {
+        padding-top: 0 !important;
+        padding-bottom: 8px !important;
         border-top: none !important;
-        padding-top: 2px !important;
+        border-bottom: 1px solid #e4e4e7 !important;
     }
     .jv-print-area .jv-lines-table tr.jv-line-memo .jv-m {
         border: 1px solid #cbd5e1 !important;
+        margin-top: -1px !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
