@@ -4478,6 +4478,10 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         visibility: visible;
         box-shadow: none !important;
     }
+    /*
+     * §9.3 V6 — هوامش طباعة السندات = نفس التقارير (.gl-acc-stmt-print):
+     * @page مشترك أعلاه (12mm سفلي للتذييل)؛ 8mm جانبي + 12mm سفلي داخلي؛ 10mm علوي عبر ta-report-banner-row.
+     */
     .jv-print-area {
         position: absolute;
         left: 0;
@@ -4486,6 +4490,8 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         max-height: none;
         border: none;
         box-shadow: none !important;
+        box-sizing: border-box;
+        padding: 0 8mm 12mm 8mm !important;
     }
     /* §9.3 — خط رفيع بعد وصف السند (البيان) وقبل جدول الأسطر */
     .jv-print-area .form-grid > div:has(#jv_desc),
