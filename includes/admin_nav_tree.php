@@ -95,8 +95,8 @@ function orange_admin_permission_mega_sections(): array
                 [
                     'title' => 'المخزون',
                     'pages' => [
+                        ['page' => 'warehouse_purchases_index', 'label' => 'فهرس المخازن والمشتريات'],
                         ['page' => 'stock', 'label' => 'المستودع'],
-                        ['page' => 'item_card', 'label' => 'بطاقة الصنف'],
                         ['page' => 'stock_reports', 'label' => 'تقارير المخزن'],
                         ['page' => 'opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية'],
                         ['page' => 'inventory_reconciliation', 'label' => 'تسوية المخزون / الجرد'],
@@ -135,6 +135,7 @@ function orange_admin_permission_mega_sections(): array
                 [
                     'title' => 'العملاء والطلبات',
                     'pages' => [
+                        ['page' => 'sales_promotions_index', 'label' => 'فهرس المبيعات والعروض'],
                         ['page' => 'customers', 'label' => 'العملاء'],
                         ['page' => 'orders', 'label' => 'الطلبات'],
                         ['page' => 'reserved_orders', 'label' => 'طلبات محجوزة (مخزون)'],
@@ -154,10 +155,9 @@ function orange_admin_permission_mega_sections(): array
                 [
                     'title' => 'الفواتير والمردود',
                     'pages' => [
-                        ['page' => 'invoice', 'label' => 'فاتورة أونلاين'],
+                        ['page' => 'invoice', 'label' => 'طباعة فاتورة طلب'],
                         ['page' => 'online_sales_invoice', 'label' => 'فواتير أونلاين'],
                         ['page' => 'company_sales_invoice', 'label' => 'فاتورة مبيعات'],
-                        ['page' => 'invoice_edit', 'label' => 'تعديل فاتورة'],
                         ['page' => 'sales_returns', 'label' => 'مردود المبيعات'],
                     ],
                 ],
@@ -176,8 +176,8 @@ function orange_admin_permission_mega_sections(): array
                     'title' => 'تقارير المبيعات',
                     'pages' => [
                         ['page' => 'reports', 'label' => 'تقارير المبيعات'],
-                        ['page' => 'sales_returns_report', 'label' => 'تقرير مردودات المبيعات'],
                         ['page' => 'channel_analytics', 'label' => 'تحليل القنوات'],
+                        ['page' => 'sales_returns_report', 'label' => 'تقرير مردودات المبيعات'],
                     ],
                 ],
             ],
@@ -189,9 +189,17 @@ function orange_admin_permission_mega_sections(): array
                 [
                     'title' => 'الشركة',
                     'pages' => [
+                        ['page' => 'settings_index', 'label' => 'فهرس الإعدادات'],
                         ['page' => 'company_settings', 'label' => 'بيانات الشركة'],
                         ['page' => 'company_documents', 'label' => 'أرشيف المستندات'],
                         ['page' => 'logs', 'label' => 'سجل النشاط'],
+                    ],
+                ],
+                [
+                    'title' => 'الأسواق (مشرف عام)',
+                    'pages' => [
+                        ['page' => 'countries', 'label' => 'الدول'],
+                        ['page' => 'admin_users', 'label' => 'المستخدمون والصلاحيات'],
                     ],
                 ],
                 [
@@ -311,6 +319,9 @@ function orange_admin_permission_actions_for_page(string $page): array
         'sales_returns_report',
         'logs',
         'accounting_reports_index',
+        'warehouse_purchases_index',
+        'sales_promotions_index',
+        'settings_index',
         'journal_voucher_reports',
         'partner_account_statement',
         'partner_reports',

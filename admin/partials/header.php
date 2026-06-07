@@ -291,6 +291,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'group' => true,
                     'title' => 'المخزون',
                     'items' => [
+                        ['page' => 'warehouse_purchases_index', 'href' => '/admin/index.php?page=warehouse_purchases_index', 'label' => 'فهرس المخازن والمشتريات', 'class' => '', 'sub' => false],
                         ['page' => 'stock', 'href' => '/admin/index.php?page=stock', 'label' => 'المستودع', 'class' => '', 'sub' => false],
                         ['page' => 'stock_reports', 'href' => '/admin/index.php?page=stock_reports', 'label' => 'تقارير المخزن', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
@@ -330,6 +331,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'group' => true,
                     'title' => 'العملاء والطلبات',
                     'items' => [
+                        ['page' => 'sales_promotions_index', 'href' => '/admin/index.php?page=sales_promotions_index', 'label' => 'فهرس المبيعات والعروض', 'class' => '', 'sub' => false],
                         ['page' => 'customers', 'href' => '/admin/index.php?page=customers', 'label' => 'العملاء', 'class' => '', 'sub' => false],
                         ['page' => 'orders', 'href' => '/admin/index.php?page=orders', 'label' => 'الطلبات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'reserved_orders', 'href' => '/admin/index.php?page=reserved_orders', 'label' => 'طلبات محجوزة (مخزون)', 'class' => 'admin-nav-sub', 'sub' => true],
@@ -440,6 +442,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'group' => true,
                     'title' => 'الشركة',
                     'items' => [
+                        ['page' => 'settings_index', 'href' => '/admin/index.php?page=settings_index', 'label' => 'فهرس الإعدادات', 'class' => '', 'sub' => false],
                         ['page' => 'company_settings', 'href' => '/admin/index.php?page=company_settings', 'label' => 'بيانات الشركة', 'class' => '', 'sub' => false],
                         ['page' => 'company_documents', 'href' => '/admin/index.php?page=company_documents', 'label' => 'أرشيف المستندات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'logs', 'href' => '/admin/index.php?page=logs', 'label' => 'سجل النشاط', 'class' => 'admin-nav-sub', 'sub' => true],
