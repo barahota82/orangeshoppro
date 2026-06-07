@@ -16,8 +16,11 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 
 $pdo = orange_admin_page_pdo();
+
+$jvPrintTuningMode = orange_admin_voucher_print_tuning_mode();
 
 global $page;
 $jvPermPage = isset($page) ? (string) $page : 'journal_entries';
@@ -311,7 +314,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
         <div class="jv-toolbar-primary-group">
             <button type="button" id="jv_btn_new_sheet" title="إدخال سند جديد">سند جديد</button>
             <button type="button" class="btn-secondary" id="jv_btn_delete_voucher" data-orange-perm="delete" data-orange-page="<?php echo htmlspecialchars($jvPermPage, ENT_QUOTES, 'UTF-8'); ?>" title="حذف السند المعروض" disabled>حذف السند</button>
-            <button type="button" class="btn-secondary" id="jv_btn_print_voucher" title="احفظ السند أولاً — الطباعة بعد الحفظ فقط" disabled>طباعة السند</button>
+            <button type="button" class="btn-secondary" id="jv_btn_print_voucher" title="<?php echo $jvPrintTuningMode ? 'طباعة السند (ضبط شكل — معاينة بلا حفظ)' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط'; ?>"<?php echo $jvPrintTuningMode ? '' : ' disabled'; ?>>طباعة السند</button>
             <button type="button" id="jv_btn_save" data-orange-perm="edit" data-orange-page="<?php echo htmlspecialchars($jvPermPage, ENT_QUOTES, 'UTF-8'); ?>" onclick="jvSubmit()"><?php echo $jvYecMode ? 'حفظ وإقفال السنة' : 'حفظ السند'; ?></button>
         </div>
     </div>
@@ -516,6 +519,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 </style>
 
 <script>
+var ORANGE_VOUCHER_PRINT_TUNING = <?php echo $jvPrintTuningMode ? 'true' : 'false'; ?>;
 var JV_YEC_MODE = <?php echo $jvYecMode ? 'true' : 'false'; ?>;
 var JV_YEC_API = '/admin/api/year_end_close/manage.php';
 var JV_YEC_LOAD_ID = <?php echo (int) ($jvYecLoadVoucherId ?? 0); ?>;
@@ -1666,6 +1670,11 @@ function jvSyncPrintButton() {
     if (!pb) {
         return;
     }
+    if (ORANGE_VOUCHER_PRINT_TUNING) {
+        pb.disabled = false;
+        pb.title = 'طباعة السند (ضبط شكل — معاينة بلا حفظ)';
+        return;
+    }
     var ok = !!jvBrowseId;
     if (JV_YEC_MODE) {
         ok = ok && jvYecLocked;
@@ -1675,7 +1684,7 @@ function jvSyncPrintButton() {
 }
 
 function jvPrintVoucher() {
-    if (!jvBrowseId) {
+    if (!ORANGE_VOUCHER_PRINT_TUNING && !jvBrowseId) {
         alert('احفظ السند أولاً قبل الطباعة.');
         return;
     }

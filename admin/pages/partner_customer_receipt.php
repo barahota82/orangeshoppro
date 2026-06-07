@@ -10,8 +10,11 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
+require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 
 $pdo = orange_admin_page_pdo();
+
+$ppvPrintTuningMode = orange_admin_voucher_print_tuning_mode();
 
 $ppvCountryId = orange_admin_context_country_id($pdo);
 $ppvCustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $ppvCountryId);
@@ -349,7 +352,7 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
         <div class="jv-toolbar-primary-group">
             <button type="button" id="crec_btn_new" title="إدخال سند جديد">سند جديد</button>
             <button type="button" class="btn-secondary" id="crec_btn_delete" title="حذف السند المعروض" disabled>حذف السند</button>
-            <button type="button" class="btn-secondary" id="crec_btn_print" title="احفظ السند أولاً — الطباعة بعد الحفظ فقط" disabled>طباعة السند</button>
+            <button type="button" class="btn-secondary" id="crec_btn_print" title="<?php echo $ppvPrintTuningMode ? 'طباعة السند (ضبط شكل — معاينة بلا حفظ)' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط'; ?>"<?php echo $ppvPrintTuningMode ? '' : ' disabled'; ?>>طباعة السند</button>
             <button type="button" id="crec_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
         </div>
     </div>
@@ -430,6 +433,7 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
 
 <script>
 (function () {
+    var ORANGE_VOUCHER_PRINT_TUNING = <?php echo $ppvPrintTuningMode ? 'true' : 'false'; ?>;
     var CREC_API = <?php echo json_encode($ppvApiUrl, JSON_UNESCAPED_UNICODE); ?>;
     var CREC_CASH = <?php echo json_encode($ppvCashLock, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var CREC_READY = <?php echo $ppvReady ? 'true' : 'false'; ?>;
@@ -741,6 +745,11 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
         if (!pb) {
             return;
         }
+        if (ORANGE_VOUCHER_PRINT_TUNING) {
+            pb.disabled = false;
+            pb.title = 'طباعة السند (ضبط شكل — معاينة بلا حفظ)';
+            return;
+        }
         var ok = !!crecBrowseId;
         pb.disabled = !ok;
         pb.title = ok ? 'طباعة السند' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط (§10)';
@@ -919,7 +928,7 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
         document.getElementById('crec_btn_save').addEventListener('click', save);
         document.getElementById('crec_btn_new').addEventListener('click', function () { location.reload(); });
         document.getElementById('crec_btn_print').addEventListener('click', function () {
-            if (!crecBrowseId) {
+            if (!ORANGE_VOUCHER_PRINT_TUNING && !crecBrowseId) {
                 alert('احفظ السند أولاً قبل الطباعة.');
                 return;
             }

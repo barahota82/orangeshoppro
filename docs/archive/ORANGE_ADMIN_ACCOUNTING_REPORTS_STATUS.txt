@@ -406,9 +406,43 @@ sales_returns — [جزئي UI] — **ترقية pr2 parity** GAP-SALE-DOC-01 م
 - includes/gl_pending_movements.php، journal_voucher.php، accounting_report_mapping.php
 
 ================================================================================
+9) §10 — وضع ضبط طباعة السندات (قرار مالك 2026-06-07)
+================================================================================
+
+**الغرض:** تسجيل **الوضع الأساسي** لزر الطباعة قبل ضبط شكل الطباعة (CSS/ترويسة/تذييل)، ثم إرجاعه بعد الانتهاء.
+
+**الوضع الأساسي (baseline — يُستعاد عند `orange_admin_voucher_print_tuning_mode()` = false في `includes/admin_voucher_print_tuning.php`):**
+
+| القائمة | page | ملف التنفيذ | id الزر | معطّل عند | شرط JavaScript | الإجراء |
+|--------|------|-------------|---------|-----------|----------------|---------|
+| السندات والذمم | journal_entries | journal_voucher_screen.php | jv_btn_print_voucher | سند جديد (لا browseId) | `jvBrowseId` مطلوب | `window.print()` |
+| السندات والذمم | receipt_voucher | journal_voucher_screen.php | jv_btn_print_voucher | نفس أعلاه | نفس أعلاه | نفس أعلاه |
+| السندات والذمم | payment_voucher | journal_voucher_screen.php | jv_btn_print_voucher | نفس أعلاه | نفس أعلاه | نفس أعلاه |
+| السندات والذمم | other_vouchers | journal_voucher_screen.php | jv_btn_print_voucher | نفس أعلاه | نفس أعلاه | نفس أعلاه |
+| السندات والذمم | year_end_close_vouchers | journal_voucher_screen.php | jv_btn_print_voucher | سند جديد أو YEC غير مقفول | `jvBrowseId` + `jvYecLocked` (JV_YEC_MODE) | `window.print()` |
+| السندات والذمم | partner_customer_receipt | partner_customer_receipt.php | crec_btn_print | سند جديد | `crecBrowseId` مطلوب؛ `crecSyncPrintButton()` | `window.print()` |
+| السندات والذمم | partner_supplier_payment | partner_supplier_payment.php | spay_btn_print | سند جديد | `spayBrowseId` مطلوب؛ `spaySyncPrintButton()` | `window.print()` |
+| الإعداد والدليل | opening_balances | opening_balances.php | ob_btn_print | **لا** (مفعّل دائماً) | `obPrint()` — debounce `obPrintArm` فقط؛ **لا** يشترط حفظاً | `window.print()` |
+
+**ملاحظات baseline:**
+- عنوان الزر عند التعطيل: «احفظ السند أولاً — الطباعة بعد الحفظ فقط (§10)» (journal + partner).
+- HTML أولي: `disabled` على journal + partner عند سند جديد.
+- `partner_party_voucher_ui.php` (**تراثي** — غير مستخدم في القائمة الحالية): `ppv_btn_print` مفعّل دائماً → `window.print()` — **لا يُعدّل** في جولة الضبط الحالية.
+- CSS طباعة مشترك: `.jv-print-area` / `.jv-print-hide` في `admin/assets/admin.css`؛ أرصدة OB تستخدم نفس الفئات + `.ob-opening-card`.
+- **لا** تسجيل في القاعدة عند الطباعة — الطباعة تعرض محتوى الشاشة فقط.
+
+**وضع ضبط مؤقت (تنفيذ 2026-06-07):**
+- **مفتاح واحد:** `includes/admin_voucher_print_tuning.php` → `orange_admin_voucher_print_tuning_mode()` = **true**.
+- **JS:** `ORANGE_VOUCHER_PRINT_TUNING` يُمرَّر من PHP في الشاشات الثلاث النشطة (journal_voucher_screen + partner_customer_receipt + partner_supplier_payment).
+- عند **true:** الزر مفعّل على سند جديد؛ `window.print()` بدون `browseId` وبدون حفظ.
+- عند **false:** العودة لجدول baseline أعلاه (§10 الأصلي).
+- **opening_balances:** الزر كان مفعّلاً أصلاً — **لا تغيير منطق**؛ الضبط يكون على CSS/محتوى `.jv-print-area` فقط.
+
+================================================================================
 8) سجل التحديث
 ================================================================================
 
+2026-06-07 — §9: أرشفة baseline زر طباعة السندات (السندات والذمم + opening_balances)؛ وضع ضبط مؤقت عبر `includes/admin_voucher_print_tuning.php` (طباعة معاينة بلا حفظ — يُعاد false بعد ضبط الشكل).
 2026-05-20 — إنشاء الملف + canvas companion بعد مراجعة شاملة؛ partner_customer_receipt أُعيد بناؤه؛ supplier_payment + CRR/SPR preview منجز.
 2026-05-20 — تثبيت سياسة إقفال سنة مالية (YEC) في ORANGE_GL_MOVEMENTS §9: سند واحد، ترتيب أسطر، عناوين مراحل؛ fiscal_years → [جزئي]؛ GAP-ACC-04 محدّث.
 2026-05-20 — §9.8 + §10: YEC خارج gl_posting؛ checkbox «قيد مغلق»؛ طباعة كل السندات **بعد الحفظ فقط**.
