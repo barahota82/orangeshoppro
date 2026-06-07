@@ -303,10 +303,7 @@ var OB_CAPS = <?php echo json_encode($obCaps, JSON_UNESCAPED_UNICODE | JSON_HEX_
 var obEditLockCtl = null;
 
 function obOpenPrintDialog() {
-    window.setTimeout(function () {
-        window.print();
-    }, 0);
-    return false;
+    return orangeAdminOpenPrintDialog();
 }
 
 (function () {

@@ -988,6 +988,21 @@ function orangeAdminApplyPermMarkers(root) {
     });
 }
 
+/**
+ * فتح نافذة طباعة المتصفح (ومنها حفظ PDF).
+ * تنفيذ دائم لسندات المحاسبة — يبقى حتى بعد إرجاع وضع الضبط المؤقت (§9.2 في ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS).
+ */
+function orangeAdminOpenPrintDialog() {
+    window.setTimeout(function () {
+        if (typeof window.print === 'function') {
+            window.print();
+            return;
+        }
+        alert('تعذّر فتح نافذة الطباعة في هذا المتصفح.');
+    }, 0);
+    return false;
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     orangeAdminApplyPermMarkers(document);
 });

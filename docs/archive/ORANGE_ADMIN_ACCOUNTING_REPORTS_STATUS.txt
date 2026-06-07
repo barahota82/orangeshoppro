@@ -411,7 +411,13 @@ sales_returns — [جزئي UI] — **ترقية pr2 parity** GAP-SALE-DOC-01 م
 
 **الغرض:** تسجيل **الوضع الأساسي** لزر الطباعة قبل ضبط شكل الطباعة (CSS/ترويسة/تذييل)، ثم إرجاعه بعد الانتهاء.
 
-**الوضع الأساسي (baseline — يُستعاد عند `orange_admin_voucher_print_tuning_mode()` = false في `includes/admin_voucher_print_tuning.php`):**
+**§9.1 — تنفيذ دائم (لا يُلغى عند إرجاع §10):**
+- `admin/assets/admin.js` → **`orangeAdminOpenPrintDialog()`** — `window.print()` / حفظ PDF من المتصفح.
+- أزرار السندات: **`onclick` مباشر** (نمط زر الحفظ) — `jvPrintVoucher` / `crecPrintVoucher` / `spayPrintVoucher` / `obOpenPrintDialog`.
+- تسمية الزر: **«طباعة / حفظ PDF»** — تبقى بعد إرجاع الضبط المؤقت.
+- عند إرجاع §10: **يبقى** كل ما سبق؛ يتغيّر **فقط** تعطيل الزر قبل الحفظ (§9.2).
+
+**§9.2 — الوضع الأساسي لسياسة §10 (يُستعاد بـ `orange_admin_voucher_print_tuning_mode()` = false فقط):**
 
 | القائمة | page | ملف التنفيذ | id الزر | معطّل عند | شرط JavaScript | الإجراء |
 |--------|------|-------------|---------|-----------|----------------|---------|
@@ -431,17 +437,20 @@ sales_returns — [جزئي UI] — **ترقية pr2 parity** GAP-SALE-DOC-01 م
 - CSS طباعة مشترك: `.jv-print-area` / `.jv-print-hide` في `admin/assets/admin.css`؛ أرصدة OB تستخدم نفس الفئات + `.ob-opening-card`.
 - **لا** تسجيل في القاعدة عند الطباعة — الطباعة تعرض محتوى الشاشة فقط.
 
-**وضع ضبط مؤقت (تنفيذ 2026-06-07):**
+**وضع ضبط مؤقت §9.2 (تنفيذ 2026-06-07):**
 - **مفتاح واحد:** `includes/admin_voucher_print_tuning.php` → `orange_admin_voucher_print_tuning_mode()` = **true**.
 - **JS:** `ORANGE_VOUCHER_PRINT_TUNING` يُمرَّر من PHP في الشاشات الثلاث النشطة (journal_voucher_screen + partner_customer_receipt + partner_supplier_payment).
-- عند **true:** الزر مفعّل على سند جديد؛ `window.print()` بدون `browseId` وبدون حفظ.
-- عند **false:** العودة لجدول baseline أعلاه (§10 الأصلي).
-- **opening_balances:** الزر كان مفعّلاً أصلاً — **لا تغيير منطق**؛ الضبط يكون على CSS/محتوى `.jv-print-area` فقط.
+- عند **true:** الزر **مفعّل** على سند جديد؛ الطباعة **بلا** `browseId` و**بلا** حفظ في القاعدة.
+- عند **false:** **فقط** — الزر معطّل حتى الحفظ + شرط `browseId` (جدول §9.2 أعلاه). **لا** حذف `onclick` و**لا** حذف `orangeAdminOpenPrintDialog`.
+- **opening_balances:** الزر مفعّل دائماً في baseline وفي الضبط — الفرق فقط في CSS/محتوى `.jv-print-area`.
+
+**إرجاع §10 بعد ضبط الشكل (خطوة واحدة للوكيل):** غيّر `return true` → `return false` في `includes/admin_voucher_print_tuning.php` ثم `git push`. **لا** تعدّل admin.js ولا onclick ولا دوال الطباعة في صفحات السندات.
 
 ================================================================================
 8) سجل التحديث
 ================================================================================
 
+2026-06-07 — §9.1/§9.2: فصل تنفيذ الطباعة **الدائم** (`orangeAdminOpenPrintDialog` + onclick) عن الضبط **المؤقت** (`admin_voucher_print_tuning.php` = false يعيد §10 فقط — لا يلغي فتح نافذة الطباعة).
 2026-06-07 — §9: أرشفة baseline زر طباعة السندات (السندات والذمم + opening_balances)؛ وضع ضبط مؤقت عبر `includes/admin_voucher_print_tuning.php` (طباعة معاينة بلا حفظ — يُعاد false بعد ضبط الشكل).
 2026-05-20 — إنشاء الملف + canvas companion بعد مراجعة شاملة؛ partner_customer_receipt أُعيد بناؤه؛ supplier_payment + CRR/SPR preview منجز.
 2026-05-20 — تثبيت سياسة إقفال سنة مالية (YEC) في ORANGE_GL_MOVEMENTS §9: سند واحد، ترتيب أسطر، عناوين مراحل؛ fiscal_years → [جزئي]؛ GAP-ACC-04 محدّث.

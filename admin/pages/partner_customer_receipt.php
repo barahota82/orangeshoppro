@@ -440,10 +440,7 @@ function crecPrintVoucher() {
         alert('احفظ السند أولاً قبل الطباعة.');
         return false;
     }
-    window.setTimeout(function () {
-        window.print();
-    }, 0);
-    return false;
+    return orangeAdminOpenPrintDialog();
 }
 
 (function () {
