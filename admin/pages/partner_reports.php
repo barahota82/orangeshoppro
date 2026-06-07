@@ -149,8 +149,14 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
         </p>
     <?php endif; ?>
 
+<?php if (orange_journal_vouchers_ready($pdo) && $prPostingLeafCt === 0): ?>
+<div class="card admin-fy-card gl-acc-stmt-no-print" style="border:1px solid #fcd34d;background:#fffbeb;">
+    <p class="card-hint" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ مطابقة الدليل مع دفتر الذمم وسطور التقرير تعتمد على دليل GL مكتملاً. أكمل الدليل من «الدليل المحاسبي» واربط حسابات الذمم (عملاء آجل، موردون، ...) قبل الاعتماد على الأرقام.</p>
+</div>
+<?php endif; ?>
+
 <div class="card admin-fy-card gl-acc-stmt-no-print">
-    <h3 class="card-title">خيارات العرض</h3>
+    <h3 class="card-title">خيارات العرض ومطابقة الدليل مع دفتر الذمم</h3>
     <div class="actions gas-acc-stmt-actions" data-export-host style="flex-wrap:wrap; gap:8px;">
         <a class="btn-secondary" href="<?php echo htmlspecialchars($partnerReportsUrl(['aging' => $includeAging ? null : '1']), ENT_QUOTES, 'UTF-8'); ?>">
             <?php echo $includeAging ? 'إخفاء أعمار الذمم (أسرع)' : 'إظهار أعمار الذمم (أبطأ)'; ?>
@@ -162,18 +168,9 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
         <?php endif; ?>
     </div>
     <p class="card-hint muted" style="margin-top:10px;">اعتباراً من <?php echo htmlspecialchars($report['as_of'], ENT_QUOTES, 'UTF-8'); ?></p>
-</div>
 
-<?php if (orange_journal_vouchers_ready($pdo) && $prPostingLeafCt === 0): ?>
-<div class="card admin-fy-card gl-acc-stmt-no-print" style="border:1px solid #fcd34d;background:#fffbeb;">
-    <p class="card-hint" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ مطابقة الدليل مع دفتر الذمم وسطور التقرير تعتمد على دليل GL مكتملاً. أكمل الدليل من «الدليل المحاسبي» واربط حسابات الذمم (عملاء آجل، موردون، ...) قبل الاعتماد على الأرقام.</p>
-</div>
-<?php endif; ?>
-
-<?php if ($reconcile !== null): ?>
-<div class="card admin-fy-card gl-acc-stmt-no-print">
-    <h3 class="card-title">مطابقة الدليل مع دفتر الذمم</h3>
-    <form method="get" class="form-grid orange-doc-header-row" style="max-width:420px;">
+    <?php if ($reconcile !== null): ?>
+    <form method="get" class="form-grid orange-doc-header-row" style="max-width:420px;margin-top:14px;">
         <input type="hidden" name="page" value="partner_reports">
         <?php if ($partnerView !== 'all'): ?>
             <input type="hidden" name="view" value="<?php echo htmlspecialchars($partnerView, ENT_QUOTES, 'UTF-8'); ?>">
@@ -215,12 +212,10 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
             </tbody>
         </table>
     </div>
+    <?php else: ?>
+    <p class="muted" style="margin-top:14px;">لا توجد سنة مالية أو السندات غير مفعّلة — عرّف سنة من «السنوات المالية».</p>
+    <?php endif; ?>
 </div>
-<?php else: ?>
-<div class="card admin-fy-card gl-acc-stmt-no-print">
-    <p class="muted">لا توجد سنة مالية أو السندات غير مفعّلة — عرّف سنة من «السنوات المالية».</p>
-</div>
-<?php endif; ?>
 
 <div class="gl-acc-stmt-print">
 <?php if ($showPartnerCustomers): ?>
