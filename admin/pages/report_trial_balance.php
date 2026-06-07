@@ -364,9 +364,7 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
                     — يجب أن يقترب من الصفر مع اكتمال القيود.
                 </p>
             <?php endif; ?>
-            <div class="gl-acc-stmt-print-footer">
-                <?php echo orange_accounting_report_print_metafoot_markup($printDatetime, 'تاريخ الطباعة'); ?>
-            </div>
+            <?php echo orange_accounting_report_print_metafoot_markup($printDatetime, 'تاريخ الطباعة'); ?>
         </div>
     </div>
 <?php endif; ?>

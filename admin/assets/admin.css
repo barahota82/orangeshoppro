@@ -4350,7 +4350,21 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
      * (عنوان الصفحة، الرابط، التاريخ). الهوامش الداخلية في .gl-acc-stmt-print ورأس التقرير.
      */
     @page {
-        margin: 0;
+        margin: 0 0 12mm 0;
+        @bottom-left {
+            content: "صفحة " counter(page) " من " counter(pages);
+            font-size: 8pt;
+            color: #64748b;
+            margin-left: 8mm;
+            margin-bottom: 2.5mm;
+        }
+        @bottom-right {
+            content: string(report-print-datetime);
+            font-size: 8pt;
+            color: #64748b;
+            margin-right: 8mm;
+            margin-bottom: 2.5mm;
+        }
     }
 
     /*
@@ -4737,6 +4751,39 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     margin: 0;
     font-size: 0.78rem;
     color: var(--muted-text, #64748b);
+}
+
+/* تذييل التقارير — شاشة: تاريخ يمين؛ أرقام الصفحات تظهر عند الطباعة فقط */
+.ta-report-print-footer-bar {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid #cbd5e1;
+    font-size: 0.78rem;
+    color: var(--muted-text, #64748b);
+}
+.ta-report-metafoot-date {
+    string-set: report-print-datetime content();
+    text-align: right;
+    margin: 0;
+    flex: 0 1 auto;
+}
+.ta-report-metafoot-pages {
+    text-align: left;
+    margin: 0;
+    flex: 0 1 auto;
+}
+@media screen {
+    .ta-report-metafoot-pages {
+        display: none;
+    }
+    .ta-report-print-footer-bar {
+        justify-content: flex-end;
+    }
 }
 
 .gl-acc-stmt-foot-total-title {
@@ -5654,35 +5701,19 @@ td.tb-col-name,
     }
 
     /*
-     * تذييل التقرير — position:fixed يتكرر أسفل كل صفحة.
-     * أرقام الصفحات عبر counter(page/pages) في ::after (لا تعمل داخل tfoot — كانت 0 من 0).
-     * ترويسة المتصفح تُحذف بـ @page margin:0 وعنوان فارغ — منفصلة عن أرقام الصفحات هنا.
+     * تذييل HTML يُخفى — الطباعة تعرض نفس السطر عبر @page @bottom-left/@bottom-right
+     * (counter(page/pages) لا يعمل مع position:fixed في Chromium).
      */
-    .gl-acc-stmt-print .ta-report-metafoot--with-pages,
-    .gl-acc-stmt-print .ta-report-print-metafoot-repeat.ta-report-metafoot--with-pages {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        width: 100%;
+    .ta-report-print-footer-bar {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: none !important;
         margin: 0 !important;
-        padding: 3mm 8mm !important;
-        border-top: 1px solid #cbd5e1;
-        background: #fff;
-        box-sizing: border-box;
-        text-align: center;
-        z-index: 1000;
-    }
-    .gl-acc-stmt-print .ta-report-metafoot--with-pages::after {
-        content: " — صفحة " counter(page) " من " counter(pages);
-    }
-    .gl-acc-stmt-print-sheet > .ta-report-print-footer,
-    .gl-acc-stmt-print-sheet > .gl-acc-stmt-print-footer:not(:has(.gl-acc-stmt-print-disclaimer)) {
-        display: block;
-    }
-    .gl-acc-stmt-print-sheet > .ta-report-print-footer .ta-report-metafoot--with-pages,
-    .gl-acc-stmt-print-sheet > .gl-acc-stmt-print-footer .ta-report-metafoot--with-pages {
-        position: fixed;
+        padding: 0 !important;
     }
     .ta-report-print-sheet .card-hint {
         display: none !important;

@@ -216,9 +216,7 @@ $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
                 </tbody>
             </table>
         </div>
-            <div class="gl-acc-stmt-print-footer ta-report-print-footer">
-                <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
-            </div>
+            <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
         </div>
     </div>
 <?php endif; ?>

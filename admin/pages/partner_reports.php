@@ -98,9 +98,7 @@ $prRenderHeader = static function (string $title) use ($companyNameAr, $prCompan
 };
 $prRenderFooter = static function () use ($prPrintDatetime): void {
     ?>
-    <div class="gl-acc-stmt-print-footer ta-report-print-footer">
-        <?php echo orange_accounting_report_print_metafoot_markup($prPrintDatetime); ?>
-    </div>
+    <?php echo orange_accounting_report_print_metafoot_markup($prPrintDatetime); ?>
     <?php
 };
 ?>

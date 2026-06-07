@@ -639,9 +639,7 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
                 </div>
             </div>
         </div>
-        <footer class="pl-month-print-footer ta-report-print-footer muted" style="margin-top:0.75rem;font-size:0.85rem;text-align:center;">
-            <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
-        </footer>
+        <?php echo orange_accounting_report_print_metafoot_markup($printDatetime, 'تاريخ ووقت الطباعة', 'pl-month-print-footer'); ?>
         </div>
     </section>
     <?php endforeach; ?>

@@ -464,9 +464,7 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
         <?php if ($jvrReportDisplayed): ?>
         <p class="card-hint muted" style="margin-top:12px;">عدد السندات: <?php echo $jvrVoucherCount; ?> — عدد أسطر الحركة: <?php echo $jvrLineCount; ?></p>
         <?php endif; ?>
-        <div class="gl-acc-stmt-print-footer ta-report-print-footer">
-            <?php echo orange_accounting_report_print_metafoot_markup($jvrPrintDatetime); ?>
-        </div>
+        <?php echo orange_accounting_report_print_metafoot_markup($jvrPrintDatetime); ?>
     </div>
 </div>
 <?php endif; ?>

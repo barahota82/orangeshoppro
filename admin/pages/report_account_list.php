@@ -90,9 +90,7 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
             </table>
         </div>
         <p class="card-hint muted" style="margin-top:12px;">عدد الحسابات: <?php echo count($listRows); ?></p>
-        <div class="gl-acc-stmt-print-footer ta-report-print-footer">
-            <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
-        </div>
+        <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
         </div>
     </div>
 </div>

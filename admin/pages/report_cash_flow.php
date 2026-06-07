@@ -206,9 +206,7 @@ $fmt = static function (float $amt) use ($reportMoney): string {
                 <?php endif; ?>
             <?php endif; ?>
 
-            <div class="gl-acc-stmt-print-footer ta-report-print-footer">
-                <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
-            </div>
+            <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
             </div>
         </div>
     <?php endif; ?>

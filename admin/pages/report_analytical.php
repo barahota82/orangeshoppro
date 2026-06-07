@@ -226,9 +226,7 @@ foreach ($dims as $d) {
                     <?php endif; ?>
                 </table>
             </div>
-            <div class="gl-acc-stmt-print-footer ta-report-print-footer">
-                <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
-            </div>
+            <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
             </div>
         </div>
     <?php endif; ?>

@@ -908,7 +908,7 @@ $gasHasSelection = $isCustomerMode ? ($customerId > 0) : ($accountId > 0);
                     <div class="gl-acc-stmt-print-sig"><span>المدير المالى</span><span class="gl-acc-stmt-print-sig-line">...................................</span></div>
                     <div class="gl-acc-stmt-print-sig"><span>اسم المستلم</span><span class="gl-acc-stmt-print-sig-line">...................................</span></div>
                 </div>
-                <?php echo orange_accounting_report_print_metafoot_markup($printDatetime, 'تاريخ ووقت الطباعة', 'ta-report-print-metafoot-repeat'); ?>
+                <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
             </div>
         </div>
     </div>

@@ -506,9 +506,7 @@ $printNameVal = $accNameDisp !== '' ? $accNameDisp : '—';
                 </tfoot>
             </table>
         </div>
-        <div class="gl-acc-stmt-print-footer gl-m-monthly-print-footer">
-            <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
-        </div>
+        <?php echo orange_accounting_report_print_metafoot_markup($printDatetime, 'تاريخ ووقت الطباعة', 'gl-m-monthly-print-footer'); ?>
     </div>
 </div>
 <?php endif; ?>

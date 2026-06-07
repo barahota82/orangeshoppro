@@ -357,9 +357,7 @@ endforeach;
                 <p class="card-hint ta-report-empty-msg" style="margin-top:10px;margin-bottom:0;">لا توجد حركة إيرادات أو تكلفة مبيعات على حسابات فرعية ضمن قطاع المتاجرة في المدى (بحسب تاريخ السند).</p>
             <?php endif; ?>
 
-            <div class="gl-acc-stmt-print-footer ta-report-print-footer">
-                <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
-            </div>
+            <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
         </div>
     </div>
 <?php endif; ?>

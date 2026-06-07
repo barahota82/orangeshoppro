@@ -581,9 +581,7 @@ $reportTitle = $reports[$reportKey];
         <?php if ($companyFooter !== ''): ?>
             <p class="bs-report-legal-footer"><?php echo htmlspecialchars($companyFooter, ENT_QUOTES, 'UTF-8'); ?></p>
         <?php endif; ?>
-        <div class="gl-acc-stmt-print-footer ta-report-print-footer">
-            <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
-        </div>
+        <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
     </div>
 </div>
 
