@@ -322,7 +322,6 @@ function obOpenPrintDialog() {
 (function () {
     var obSaveInFlight = false;
     var obDeleteInFlight = false;
-    var obPrintArm = true;
 
     function obResolveFyIdFromIso(iso) {
         if (!iso || !OB_FY_RANGES || !OB_FY_RANGES.length) {
@@ -795,16 +794,6 @@ function obOpenPrintDialog() {
             });
     };
 
-    function obPrint() {
-        if (!obPrintArm) {
-            return;
-        }
-        obPrintArm = false;
-        window.print();
-        window.setTimeout(function () {
-            obPrintArm = true;
-        }, 1500);
-    }
     function obDelete() {
         if (obDeleteInFlight) {
             return;
@@ -856,10 +845,6 @@ function obOpenPrintDialog() {
         var obDel = document.getElementById('ob_btn_delete');
         if (obDel) {
             obDel.addEventListener('click', obDelete);
-        }
-        var obPr = document.getElementById('ob_btn_print');
-        if (obPr) {
-            obPr.addEventListener('click', obPrint);
         }
         if (pickQ) {
             pickQ.addEventListener('input', function () {

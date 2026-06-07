@@ -428,7 +428,7 @@ sales_returns — [جزئي UI] — **ترقية pr2 parity** GAP-SALE-DOC-01 م
 | السندات والذمم | year_end_close_vouchers | journal_voucher_screen.php | jv_btn_print_voucher | سند جديد أو YEC غير مقفول | `jvBrowseId` + `jvYecLocked` (JV_YEC_MODE) | `window.print()` |
 | السندات والذمم | partner_customer_receipt | partner_customer_receipt.php | crec_btn_print | سند جديد | `crecBrowseId` مطلوب؛ `crecSyncPrintButton()` | `window.print()` |
 | السندات والذمم | partner_supplier_payment | partner_supplier_payment.php | spay_btn_print | سند جديد | `spayBrowseId` مطلوب؛ `spaySyncPrintButton()` | `window.print()` |
-| الإعداد والدليل | opening_balances | opening_balances.php | ob_btn_print | **لا** (مفعّل دائماً) | `obPrint()` — debounce `obPrintArm` فقط؛ **لا** يشترط حفظاً | `window.print()` |
+| الإعداد والدليل | opening_balances | opening_balances.php | ob_btn_print | **لا** (مفعّل دائماً) | `obOpenPrintDialog()` → `orangeAdminOpenPrintDialog`؛ **لا** يشترط حفظاً؛ **لا** مستمع `click` مكرر | `window.print()` |
 
 **ملاحظات baseline:**
 - عنوان الزر عند التعطيل: «احفظ السند أولاً — الطباعة بعد الحفظ فقط (§10)» (journal + partner).
@@ -492,6 +492,7 @@ sales_returns — [جزئي UI] — **ترقية pr2 parity** GAP-SALE-DOC-01 م
 8) سجل التحديث
 ================================================================================
 
+2026-06-08 — opening_balances: إصلاح طباعة مزدوجة — إزالة `obPrint`/`addEventListener` المكرر؛ `onclick` → `obOpenPrintDialog` فقط.
 2026-06-08 — §9.3 V6: هوامش طباعة السندات = التقارير (`jv-print-area` padding 8mm/12mm؛ `@page` مشترك).
 2026-06-08 — §9.3 V7 **[مغلق]:** ضبط طباعة موحّد لكل شاشات §9.3 عبر `voucher_print_banner.php` + `admin.css` `.jv-print-area` — لا تعديل منفصل لكل شاشة.
 2026-06-08 — §9.3 V8: لا إظهار «قيد مغلق» في طباعة YEC — `jv-print-hide` على خانة YEC في `journal_voucher_screen.php`.
