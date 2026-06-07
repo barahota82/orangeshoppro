@@ -5532,4 +5532,54 @@ td.tb-col-name,
     .gl-acc-stmt-print {
         padding: 12mm 10mm !important;
     }
+
+    /*
+     * تكرار رأس التقرير (ترويسة الشركة + العنوان + ملخص الفترة) أعلى كل صفحة طباعة/PDF.
+     * display:table-header-group على أبناء .gl-acc-stmt-print-sheet يدعمه Chromium عند التصدير PDF.
+     */
+    .gl-acc-stmt-print-sheet {
+        display: table !important;
+        width: 100% !important;
+        border-collapse: collapse;
+    }
+    .gl-acc-stmt-print-sheet > .gl-acc-stmt-print-banner,
+    .gl-acc-stmt-print-sheet > header.gl-acc-stmt-print-banner,
+    .gl-acc-stmt-print-sheet > .pl-month-print-banner {
+        display: table-header-group !important;
+        background: #fff !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+    .gl-acc-stmt-print-sheet > .gl-acc-stmt-print-grid {
+        display: table-header-group !important;
+        background: #fff !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+    .gl-acc-stmt-print-sheet > .gl-acc-stmt-table-wrap,
+    .gl-acc-stmt-print-sheet > .table-wrap,
+    .gl-acc-stmt-print-sheet > .pl-month-single-table-wrap {
+        display: table-row-group !important;
+    }
+    .gl-acc-stmt-print-sheet > p.card-hint {
+        display: table-row-group !important;
+    }
+    .gl-acc-stmt-print-sheet > .gl-acc-stmt-print-footer,
+    .gl-acc-stmt-print-sheet > footer.pl-month-print-footer,
+    .gl-acc-stmt-print-sheet > .ta-report-print-footer {
+        display: table-footer-group !important;
+        background: #fff !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+    .gl-acc-stmt-table thead {
+        display: table-header-group;
+    }
+    .gl-acc-stmt-table {
+        page-break-inside: auto;
+    }
+    .gl-acc-stmt-table tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
 }
