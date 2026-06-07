@@ -30,7 +30,7 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
     </div>
 
     <div class="card admin-fy-card gl-acc-stmt-print">
-        <div class="gl-acc-stmt-print-sheet ta-report-print-sheet ta-report-print-sheet--tfoot">
+        <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
             <table class="admin-fy-table gl-acc-stmt-table ral-account-list-table ta-report-print-table" dir="rtl" data-export-name="قائمة الحسابات" data-export-target=".actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                 <thead class="ta-report-print-thead">
@@ -87,10 +87,12 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
-                <?php echo orange_accounting_report_print_tfoot_html(5, $printDatetime); ?>
             </table>
         </div>
         <p class="card-hint muted" style="margin-top:12px;">عدد الحسابات: <?php echo count($listRows); ?></p>
+        <div class="gl-acc-stmt-print-footer ta-report-print-footer">
+            <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
+        </div>
         </div>
     </div>
 </div>

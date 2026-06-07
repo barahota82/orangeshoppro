@@ -42,7 +42,7 @@ function orange_accounting_report_format_money(PDO $pdo, float $amount, ?array $
     return orange_format_money_for_context($ctx, $amount);
 }
 
-/** سطر تذييل الطباعة — تاريخ/وقت فقط (أرقام الصفحات من المتصفح إن لزم). */
+/** سطر تذييل الطباعة — تاريخ/وقت + أرقام صفحات (counter في CSS، position:fixed). */
 function orange_accounting_report_print_metafoot_markup(
     string $printDatetime,
     string $dateLabel = 'تاريخ ووقت الطباعة',
@@ -50,7 +50,7 @@ function orange_accounting_report_print_metafoot_markup(
 ): string {
     $dt = htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8');
     $label = htmlspecialchars($dateLabel, ENT_QUOTES, 'UTF-8');
-    $class = 'gl-acc-stmt-print-metafoot ta-report-metafoot';
+    $class = 'gl-acc-stmt-print-metafoot ta-report-metafoot ta-report-metafoot--with-pages';
     if ($extraClass !== '') {
         $class .= ' ' . $extraClass;
     }

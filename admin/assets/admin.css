@@ -5653,46 +5653,36 @@ td.tb-col-name,
         page-break-after: auto;
     }
 
-    /* تذييل داخل tfoot — يتكرر أسفل كل صفحة مع الجدول */
-    .ta-report-print-table tfoot.ta-report-print-tfoot {
-        display: table-footer-group;
-    }
-    tr.ta-report-footer-row td.ta-report-footer-cell {
-        padding: 0.45rem 0 0;
-        border: none;
-        border-top: 1px solid #cbd5e1;
-        vertical-align: bottom;
-        background: #fff;
-        text-align: center;
-    }
-    tr.ta-report-footer-row .gl-acc-stmt-print-metafoot {
-        margin: 0;
-    }
-    .ta-report-print-sheet--tfoot > .gl-acc-stmt-print-footer,
-    .ta-report-print-sheet--tfoot > .ta-report-print-footer {
-        display: none !important;
-    }
-
-    /* تذييل خارج الجدول — تكرار ثابت أسفل كل صفحة */
-    .gl-acc-stmt-print-sheet:not(.ta-report-print-sheet--tfoot) > .ta-report-print-footer,
-    .gl-acc-stmt-print-sheet:not(.ta-report-print-sheet--tfoot) > .gl-acc-stmt-print-footer:not(:has(.gl-acc-stmt-print-disclaimer)),
-    .ta-report-print-metafoot-repeat {
+    /*
+     * تذييل التقرير — position:fixed يتكرر أسفل كل صفحة.
+     * أرقام الصفحات عبر counter(page/pages) في ::after (لا تعمل داخل tfoot — كانت 0 من 0).
+     * ترويسة المتصفح تُحذف بـ @page margin:0 وعنوان فارغ — منفصلة عن أرقام الصفحات هنا.
+     */
+    .gl-acc-stmt-print .ta-report-metafoot--with-pages,
+    .gl-acc-stmt-print .ta-report-print-metafoot-repeat.ta-report-metafoot--with-pages {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
         width: 100%;
         margin: 0 !important;
-        padding: 3mm 2mm !important;
+        padding: 3mm 8mm !important;
         border-top: 1px solid #cbd5e1;
         background: #fff;
         box-sizing: border-box;
         text-align: center;
         z-index: 1000;
     }
-    .gl-acc-stmt-print-sheet > .ta-report-print-footer .gl-acc-stmt-print-metafoot,
-    .gl-acc-stmt-print-sheet > .gl-acc-stmt-print-footer:not(:has(.gl-acc-stmt-print-disclaimer)) .gl-acc-stmt-print-metafoot {
-        margin: 0;
+    .gl-acc-stmt-print .ta-report-metafoot--with-pages::after {
+        content: " — صفحة " counter(page) " من " counter(pages);
+    }
+    .gl-acc-stmt-print-sheet > .ta-report-print-footer,
+    .gl-acc-stmt-print-sheet > .gl-acc-stmt-print-footer:not(:has(.gl-acc-stmt-print-disclaimer)) {
+        display: block;
+    }
+    .gl-acc-stmt-print-sheet > .ta-report-print-footer .ta-report-metafoot--with-pages,
+    .gl-acc-stmt-print-sheet > .gl-acc-stmt-print-footer .ta-report-metafoot--with-pages {
+        position: fixed;
     }
     .ta-report-print-sheet .card-hint {
         display: none !important;

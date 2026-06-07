@@ -367,7 +367,7 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
     <div class="card admin-fy-card gl-acc-stmt-no-print"><p class="muted" style="margin:0;">جداول السندات غير جاهزة بعد.</p></div>
 <?php else: ?>
 <div class="card admin-fy-card gl-acc-stmt-print">
-    <div class="gl-acc-stmt-print-sheet ta-report-print-sheet ta-report-print-sheet--tfoot">
+    <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
             <table class="admin-fy-table gl-acc-stmt-table jvr-lines-table ta-report-print-table" dir="rtl"<?php if ($jvrReportDisplayed): ?>
                 data-export-name="تقارير السندات"
@@ -459,12 +459,14 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
-                <?php echo orange_accounting_report_print_tfoot_html(6, $jvrPrintDatetime); ?>
             </table>
         </div>
         <?php if ($jvrReportDisplayed): ?>
         <p class="card-hint muted" style="margin-top:12px;">عدد السندات: <?php echo $jvrVoucherCount; ?> — عدد أسطر الحركة: <?php echo $jvrLineCount; ?></p>
         <?php endif; ?>
+        <div class="gl-acc-stmt-print-footer ta-report-print-footer">
+            <?php echo orange_accounting_report_print_metafoot_markup($jvrPrintDatetime); ?>
+        </div>
     </div>
 </div>
 <?php endif; ?>
