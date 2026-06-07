@@ -4345,6 +4345,57 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 }
 
 @media print {
+    /*
+     * لا أشرطة تمرير في الطباعة/PDF: إلغاء overflow على الحاويات وإخفاء أي scrollbar.
+     * Chromium يطبع أحياناً شريط التمرير مع overflow:auto حتى داخل معاينة الطباعة.
+     */
+    html,
+    body {
+        overflow: visible !important;
+        height: auto !important;
+    }
+    *,
+    *::before,
+    *::after {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+    }
+    *::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        background: transparent !important;
+    }
+    .table-wrap,
+    .admin-fy-table-wrap,
+    .gl-acc-stmt-table-wrap,
+    .ta-report-table-scroll,
+    .fy-years-table-wrap,
+    .gl-settings-table-wrap,
+    .ob-opening-table-wrap,
+    .pl-month-single-table-wrap,
+    .pl-print-side-table-wrap,
+    .admin-fy-shell,
+    .gl-acc-stmt-print,
+    .gl-acc-stmt-print-sheet,
+    .card,
+    .admin-main,
+    .admin-layout,
+    .admin-nav-drawer-inner {
+        overflow: visible !important;
+        overflow-x: visible !important;
+        overflow-y: visible !important;
+        max-height: none !important;
+    }
+    .gl-acc-stmt-table,
+    .admin-fy-table,
+    .ta-report-print-table,
+    .gl-acc-stmt-table.tb-report-table,
+    .ta-report-table--xlsx {
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+
     body * {
         visibility: hidden;
     }
