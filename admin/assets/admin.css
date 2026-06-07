@@ -4479,8 +4479,10 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         box-shadow: none !important;
     }
     /*
-     * §9.3 V6 — هوامش طباعة السندات = نفس التقارير (.gl-acc-stmt-print):
-     * @page مشترك أعلاه (12mm سفلي للتذييل)؛ 8mm جانبي + 12mm سفلي داخلي؛ 10mm علوي عبر ta-report-banner-row.
+     * §9.3 V6 — هوامش طباعة السندات (.jv-print-area فقط — التقارير .gl-acc-stmt-print لا تُلمس):
+     * جانبي 8mm؛ سفلي داخلي 18mm (تجربة V3 — تقليل انفصال الحساب/البيان عند كثرة الأسطر).
+     * @page سفلي 18mm للسندات فقط عبر orange_voucher_print_metafoot()؛ التقارير تبقى 12mm في @page أعلاه.
+     * علوي 10mm عبر ta-report-banner-row.
      */
     .jv-print-area {
         position: absolute;
@@ -4491,7 +4493,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         border: none;
         box-shadow: none !important;
         box-sizing: border-box;
-        padding: 0 8mm 12mm 8mm !important;
+        padding: 0 8mm 18mm 8mm !important;
     }
     /* §9.3 — خط رفيع بعد وصف السند (البيان) وقبل جدول الأسطر */
     .jv-print-area .form-grid > div:has(#jv_desc),
