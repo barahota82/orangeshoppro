@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
@@ -29,37 +30,41 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
     </div>
 
     <div class="card admin-fy-card gl-acc-stmt-print">
-        <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
-        <header class="gl-acc-stmt-print-banner ral-print-banner">
-            <div class="pl-month-brand-row">
-                <div class="pl-month-brand">
-                    <?php if ($ralLogo !== ''): ?>
-                        <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($ralLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
-                    <?php endif; ?>
-                    <div class="pl-month-brand-text">
-                        <?php if ($companyNameAr !== ''): ?>
-                            <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
-                        <?php endif; ?>
-                        <?php if (trim((string) ($ralCompany['commercial_register'] ?? '')) !== ''): ?>
-                            <p class="pl-month-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars((string) $ralCompany['commercial_register'], ENT_QUOTES, 'UTF-8'); ?></span></p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-                <div class="pl-month-contact">
-                    <?php if (trim((string) ($ralCompany['address'] ?? '')) !== ''): ?>
-                        <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $ralCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
-                    <?php endif; ?>
-                    <?php if (trim((string) ($ralCompany['phones'] ?? '')) !== ''): ?>
-                        <p class="pl-month-contact-line"><span dir="ltr"><?php echo htmlspecialchars((string) $ralCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></span></p>
-                    <?php endif; ?>
-                </div>
-            </div>
-            <h2 class="gl-acc-stmt-print-title ta-report-print-title"><span class="gl-acc-stmt-print-title-ar" lang="ar">قائمة الحسابات</span></h2>
-        </header>
+        <div class="gl-acc-stmt-print-sheet ta-report-print-sheet ta-report-print-sheet--tfoot">
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <table class="admin-fy-table gl-acc-stmt-table ral-account-list-table" dir="rtl" data-export-name="قائمة الحسابات" data-export-target=".actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
-                <thead>
-                    <tr>
+            <table class="admin-fy-table gl-acc-stmt-table ral-account-list-table ta-report-print-table" dir="rtl" data-export-name="قائمة الحسابات" data-export-target=".actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
+                <thead class="ta-report-print-thead">
+                    <tr class="ta-report-banner-row">
+                        <td colspan="5" class="ta-report-banner-cell">
+                            <header class="gl-acc-stmt-print-banner ral-print-banner">
+                                <div class="pl-month-brand-row">
+                                    <div class="pl-month-brand">
+                                        <?php if ($ralLogo !== ''): ?>
+                                            <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($ralLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+                                        <?php endif; ?>
+                                        <div class="pl-month-brand-text">
+                                            <?php if ($companyNameAr !== ''): ?>
+                                                <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                                            <?php endif; ?>
+                                            <?php if (trim((string) ($ralCompany['commercial_register'] ?? '')) !== ''): ?>
+                                                <p class="pl-month-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars((string) $ralCompany['commercial_register'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                    <div class="pl-month-contact">
+                                        <?php if (trim((string) ($ralCompany['address'] ?? '')) !== ''): ?>
+                                            <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $ralCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
+                                        <?php endif; ?>
+                                        <?php if (trim((string) ($ralCompany['phones'] ?? '')) !== ''): ?>
+                                            <p class="pl-month-contact-line"><span dir="ltr"><?php echo htmlspecialchars((string) $ralCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <h2 class="gl-acc-stmt-print-title ta-report-print-title"><span class="gl-acc-stmt-print-title-ar" lang="ar">قائمة الحسابات</span></h2>
+                            </header>
+                        </td>
+                    </tr>
+                    <tr class="ta-report-cols-row">
                         <th class="gl-acc-stmt-col-num ral-col-code">كــود الحســاب</th>
                         <th>اســــــم الحســــــاب</th>
                         <th>مستوى الحساب</th>
@@ -82,12 +87,10 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
+                <?php echo orange_accounting_report_print_tfoot_html(5, $printDatetime); ?>
             </table>
         </div>
         <p class="card-hint muted" style="margin-top:12px;">عدد الحسابات: <?php echo count($listRows); ?></p>
-        <div class="gl-acc-stmt-print-footer ta-report-print-footer">
-            <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
-        </div>
         </div>
     </div>
 </div>

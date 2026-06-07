@@ -367,48 +367,9 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
     <div class="card admin-fy-card gl-acc-stmt-no-print"><p class="muted" style="margin:0;">جداول السندات غير جاهزة بعد.</p></div>
 <?php else: ?>
 <div class="card admin-fy-card gl-acc-stmt-print">
-    <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
-        <header class="gl-acc-stmt-print-banner">
-            <div class="pl-month-brand-row">
-                <div class="pl-month-brand">
-                    <?php if ($jvrLogo !== ''): ?>
-                        <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($jvrLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
-                    <?php endif; ?>
-                    <div class="pl-month-brand-text">
-                        <?php if ($companyNameAr !== ''): ?>
-                            <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
-                        <?php endif; ?>
-                        <?php if (trim((string) ($jvrCompany['commercial_register'] ?? '')) !== ''): ?>
-                            <p class="pl-month-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars((string) $jvrCompany['commercial_register'], ENT_QUOTES, 'UTF-8'); ?></span></p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-                <div class="pl-month-contact">
-                    <?php if (trim((string) ($jvrCompany['address'] ?? '')) !== ''): ?>
-                        <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $jvrCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
-                    <?php endif; ?>
-                    <?php if (trim((string) ($jvrCompany['phones'] ?? '')) !== ''): ?>
-                        <p class="pl-month-contact-line"><span dir="ltr"><?php echo htmlspecialchars((string) $jvrCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></span></p>
-                    <?php endif; ?>
-                </div>
-            </div>
-            <h2 class="gl-acc-stmt-print-title ta-report-print-title">
-                <span class="gl-acc-stmt-print-title-ar" lang="ar">تقرير السندات عن الفترة من&nbsp;<?php echo htmlspecialchars($dateFromDisp, ENT_QUOTES, 'UTF-8'); ?>&nbsp;إلى&nbsp;<?php echo htmlspecialchars($dateToDisp, ENT_QUOTES, 'UTF-8'); ?></span>
-            </h2>
-            <p class="muted" style="margin:8px 0 0;text-align:center;">نوع القيد: <?php echo htmlspecialchars($jvrFilterTypeLabel, ENT_QUOTES, 'UTF-8'); ?></p>
-        </header>
-        <div class="gl-acc-stmt-print-grid">
-            <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--dates">
-                <span class="gl-acc-stmt-print-k">من تاريخ</span>
-                <span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($dateFromDisp, ENT_QUOTES, 'UTF-8'); ?></span>
-                <span class="gl-acc-stmt-print-k">إلى تاريخ</span>
-                <span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($dateToDisp, ENT_QUOTES, 'UTF-8'); ?></span>
-                <span class="gl-acc-stmt-print-k">نوع القيد</span>
-                <span class="gl-acc-stmt-print-v"><?php echo htmlspecialchars($jvrFilterTypeLabel, ENT_QUOTES, 'UTF-8'); ?></span>
-            </div>
-        </div>
+    <div class="gl-acc-stmt-print-sheet ta-report-print-sheet ta-report-print-sheet--tfoot">
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <table class="admin-fy-table gl-acc-stmt-table jvr-lines-table" dir="rtl"<?php if ($jvrReportDisplayed): ?>
+            <table class="admin-fy-table gl-acc-stmt-table jvr-lines-table ta-report-print-table" dir="rtl"<?php if ($jvrReportDisplayed): ?>
                 data-export-name="تقارير السندات"
                 data-export-target="#jvr_export_actions"
                 data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>"
@@ -421,8 +382,55 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
                     <col class="jvr-col-amt">
                     <col class="jvr-col-memo">
                 </colgroup>
-                <thead>
-                    <tr>
+                <thead class="ta-report-print-thead">
+                    <tr class="ta-report-banner-row">
+                        <td colspan="6" class="ta-report-banner-cell">
+                            <header class="gl-acc-stmt-print-banner">
+                                <div class="pl-month-brand-row">
+                                    <div class="pl-month-brand">
+                                        <?php if ($jvrLogo !== ''): ?>
+                                            <img class="pl-month-print-logo" src="<?php echo htmlspecialchars($jvrLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+                                        <?php endif; ?>
+                                        <div class="pl-month-brand-text">
+                                            <?php if ($companyNameAr !== ''): ?>
+                                                <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                                            <?php endif; ?>
+                                            <?php if (trim((string) ($jvrCompany['commercial_register'] ?? '')) !== ''): ?>
+                                                <p class="pl-month-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars((string) $jvrCompany['commercial_register'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                    <div class="pl-month-contact">
+                                        <?php if (trim((string) ($jvrCompany['address'] ?? '')) !== ''): ?>
+                                            <p class="pl-month-contact-line"><?php echo htmlspecialchars((string) $jvrCompany['address'], ENT_QUOTES, 'UTF-8'); ?></p>
+                                        <?php endif; ?>
+                                        <?php if (trim((string) ($jvrCompany['phones'] ?? '')) !== ''): ?>
+                                            <p class="pl-month-contact-line"><span dir="ltr"><?php echo htmlspecialchars((string) $jvrCompany['phones'], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <h2 class="gl-acc-stmt-print-title ta-report-print-title">
+                                    <span class="gl-acc-stmt-print-title-ar" lang="ar">تقرير السندات عن الفترة من&nbsp;<?php echo htmlspecialchars($dateFromDisp, ENT_QUOTES, 'UTF-8'); ?>&nbsp;إلى&nbsp;<?php echo htmlspecialchars($dateToDisp, ENT_QUOTES, 'UTF-8'); ?></span>
+                                </h2>
+                                <p class="muted" style="margin:8px 0 0;text-align:center;">نوع القيد: <?php echo htmlspecialchars($jvrFilterTypeLabel, ENT_QUOTES, 'UTF-8'); ?></p>
+                            </header>
+                        </td>
+                    </tr>
+                    <tr class="ta-report-grid-row">
+                        <td colspan="6" class="ta-report-grid-cell">
+                            <div class="gl-acc-stmt-print-grid">
+                                <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--dates">
+                                    <span class="gl-acc-stmt-print-k">من تاريخ</span>
+                                    <span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($dateFromDisp, ENT_QUOTES, 'UTF-8'); ?></span>
+                                    <span class="gl-acc-stmt-print-k">إلى تاريخ</span>
+                                    <span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($dateToDisp, ENT_QUOTES, 'UTF-8'); ?></span>
+                                    <span class="gl-acc-stmt-print-k">نوع القيد</span>
+                                    <span class="gl-acc-stmt-print-v"><?php echo htmlspecialchars($jvrFilterTypeLabel, ENT_QUOTES, 'UTF-8'); ?></span>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="ta-report-cols-row">
                         <th>رقم القيد</th>
                         <th>تاريخ السند</th>
                         <th>اسم الحساب</th>
@@ -451,14 +459,12 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
+                <?php echo orange_accounting_report_print_tfoot_html(6, $jvrPrintDatetime); ?>
             </table>
         </div>
         <?php if ($jvrReportDisplayed): ?>
         <p class="card-hint muted" style="margin-top:12px;">عدد السندات: <?php echo $jvrVoucherCount; ?> — عدد أسطر الحركة: <?php echo $jvrLineCount; ?></p>
         <?php endif; ?>
-        <div class="gl-acc-stmt-print-footer ta-report-print-footer">
-            <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($jvrPrintDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
-        </div>
     </div>
 </div>
 <?php endif; ?>

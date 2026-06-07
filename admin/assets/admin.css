@@ -4790,6 +4790,22 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     line-height: 1.5;
 }
 
+@media screen {
+    .ta-report-page-suffix {
+        display: none;
+    }
+}
+
+/* ترويسة التقرير داخل thead — شاشة وطباعة */
+.ta-report-print-table tr.ta-report-banner-row td,
+.ta-report-print-table tr.ta-report-grid-row td {
+    border: none;
+    background: transparent;
+}
+.ta-report-print-table tr.ta-report-banner-row .gl-acc-stmt-print-banner {
+    margin-bottom: 0.65rem;
+}
+
 .ta-report-print-title .gl-acc-stmt-print-title-ar {
     line-height: 1.45;
     padding: 0 0.35rem;
@@ -5534,41 +5550,31 @@ td.tb-col-name,
     }
 
     /*
-     * تكرار رأس التقرير (ترويسة الشركة + العنوان + ملخص الفترة) أعلى كل صفحة طباعة/PDF.
-     * display:table-header-group على أبناء .gl-acc-stmt-print-sheet يدعمه Chromium عند التصدير PDF.
+     * تكرار رأس التقرير أعلى كل صفحة طباعة/PDF:
+     * الترويسة داخل thead (صف ta-report-banner-row) + thead { table-header-group } — يعمل في Chromium.
      */
-    .gl-acc-stmt-print-sheet {
-        display: table !important;
-        width: 100% !important;
-        border-collapse: collapse;
+    .ta-report-print-table thead.ta-report-print-thead {
+        display: table-header-group;
     }
-    .gl-acc-stmt-print-sheet > .gl-acc-stmt-print-banner,
-    .gl-acc-stmt-print-sheet > header.gl-acc-stmt-print-banner,
-    .gl-acc-stmt-print-sheet > .pl-month-print-banner {
-        display: table-header-group !important;
-        background: #fff !important;
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
+    tr.ta-report-banner-row td.ta-report-banner-cell {
+        padding: 0 0 0.45rem;
+        border: none;
+        vertical-align: top;
+        background: #fff;
+        text-align: right;
     }
-    .gl-acc-stmt-print-sheet > .gl-acc-stmt-print-grid {
-        display: table-header-group !important;
-        background: #fff !important;
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
+    tr.ta-report-banner-row .gl-acc-stmt-print-banner {
+        margin-bottom: 0;
+        padding-bottom: 0.45rem;
+        border-bottom: 2px solid #334155;
     }
-    .gl-acc-stmt-print-sheet > .gl-acc-stmt-table-wrap,
-    .gl-acc-stmt-print-sheet > .table-wrap,
-    .gl-acc-stmt-print-sheet > .pl-month-single-table-wrap {
-        display: table-row-group !important;
+    tr.ta-report-grid-row td.ta-report-grid-cell {
+        padding: 0 0 0.35rem;
+        border: none;
+        vertical-align: top;
+        background: #fff;
     }
-    .gl-acc-stmt-print-sheet > p.card-hint {
-        display: table-row-group !important;
-    }
-    .gl-acc-stmt-print-sheet > .gl-acc-stmt-print-footer,
-    .gl-acc-stmt-print-sheet > footer.pl-month-print-footer,
-    .gl-acc-stmt-print-sheet > .ta-report-print-footer {
-        display: table-footer-group !important;
-        background: #fff !important;
+    tr.ta-report-cols-row th {
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
     }
@@ -5578,8 +5584,68 @@ td.tb-col-name,
     .gl-acc-stmt-table {
         page-break-inside: auto;
     }
-    .gl-acc-stmt-table tr {
+    .gl-acc-stmt-table tbody tr {
         page-break-inside: avoid;
         page-break-after: auto;
+    }
+    .ta-report-print-table tbody tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+
+    /* أرقام الصفحات — Chromium / PDF */
+    .ta-report-page-num::after {
+        content: counter(page);
+    }
+    .ta-report-page-total::after {
+        content: counter(pages);
+    }
+
+    /* تذييل داخل tfoot — يتكرر أسفل كل صفحة مع الجدول */
+    .ta-report-print-table tfoot.ta-report-print-tfoot {
+        display: table-footer-group;
+    }
+    tr.ta-report-footer-row td.ta-report-footer-cell {
+        padding: 0.45rem 0 0;
+        border: none;
+        border-top: 1px solid #cbd5e1;
+        vertical-align: bottom;
+        background: #fff;
+        text-align: center;
+    }
+    tr.ta-report-footer-row .gl-acc-stmt-print-metafoot {
+        margin: 0;
+    }
+    .ta-report-print-sheet--tfoot > .gl-acc-stmt-print-footer,
+    .ta-report-print-sheet--tfoot > .ta-report-print-footer {
+        display: none !important;
+    }
+
+    /* تذييل خارج الجدول — تكرار ثابت أسفل كل صفحة */
+    .gl-acc-stmt-print-sheet:not(.ta-report-print-sheet--tfoot) > .ta-report-print-footer,
+    .gl-acc-stmt-print-sheet:not(.ta-report-print-sheet--tfoot) > .gl-acc-stmt-print-footer:not(:has(.gl-acc-stmt-print-disclaimer)),
+    .ta-report-print-metafoot-repeat {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        margin: 0 !important;
+        padding: 3mm 10mm !important;
+        border-top: 1px solid #cbd5e1;
+        background: #fff;
+        box-sizing: border-box;
+        text-align: center;
+        z-index: 1000;
+    }
+    .gl-acc-stmt-print-sheet > .ta-report-print-footer .gl-acc-stmt-print-metafoot,
+    .gl-acc-stmt-print-sheet > .gl-acc-stmt-print-footer:not(:has(.gl-acc-stmt-print-disclaimer)) .gl-acc-stmt-print-metafoot {
+        margin: 0;
+    }
+    .gl-acc-stmt-print {
+        padding-bottom: 14mm !important;
+    }
+    .ta-report-print-sheet .card-hint {
+        display: none !important;
     }
 }

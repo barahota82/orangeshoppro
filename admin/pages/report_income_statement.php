@@ -475,7 +475,7 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
             <?php endif; ?>
 
             <div class="gl-acc-stmt-print-footer ta-report-print-footer">
-                <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
+                <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
             </div>
         </div>
     </div>
