@@ -4487,8 +4487,14 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         border: none;
         box-shadow: none !important;
     }
-    .jv-print-area .admin-doc-frame {
+    /* إطار جدول الأسطر — بلا برواز خارجي في الطباعة (§9.3) */
+    .jv-print-area .admin-doc-frame,
+    .jv-print-area .admin-doc-frame > .table-wrap {
+        border: none !important;
+        border-radius: 0 !important;
         background: #fff !important;
+        overflow: visible !important;
+        margin-top: 0 !important;
     }
     .jv-print-hide {
         display: none !important;
