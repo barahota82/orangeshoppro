@@ -17,6 +17,7 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
+require_once __DIR__ . '/../../includes/voucher_print_banner.php';
 
 $pdo = orange_admin_page_pdo();
 
@@ -191,6 +192,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 <?php endif; ?>
 
 <div class="card jv-print-area">
+    <?php orange_voucher_print_banner($pdo, $jvScreenCountryId, ['title_ar' => (string) $jvPageCardTitle]); ?>
     <h3 class="card-title"><?php echo htmlspecialchars($jvPageCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
     <?php if (!$jvYecMode): orange_edit_lock_ui_toolbar(['prefix' => 'jv', 'doc_kind' => 'journal_voucher', 'country_id' => $jvScreenCountryId]); endif; ?>
     <?php if ($jvYecMode): ?>

@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
+require_once __DIR__ . '/../../includes/voucher_print_banner.php';
 
 $pdo = orange_admin_page_pdo();
 
@@ -245,6 +246,7 @@ $ppvReady = $ppvCashLock !== null;
 <?php endif; ?>
 
 <div class="card jv-print-area">
+    <?php orange_voucher_print_banner($pdo, $ppvCountryId, ['title_ar' => $ppvTitle]); ?>
     <h3 class="card-title"><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
 
     <!-- ١ — المورد + خيار الدفعة المقدمة -->

@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../includes/voucher_print_banner.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -198,6 +199,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 
 <?php if ($fyId > 0 && $years !== []): ?>
 <div class="card jv-print-area ob-opening-card">
+    <?php orange_voucher_print_banner($pdo, $ctxCountryId, ['title_ar' => 'سند رصيد افتتاحي']); ?>
     <h3 class="card-title">سند رصيد افتتاحي</h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'ob', 'doc_kind' => 'opening_balance', 'country_id' => $ctxCountryId]); ?>
     <div class="form-grid">
