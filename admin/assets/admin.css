@@ -4520,7 +4520,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     }
     .jv-print-area .jv-lines-table thead th:nth-child(3),
     .jv-print-area .jv-lines-table thead th:nth-child(4) {
-        text-align: left !important;
+        text-align: center !important;
     }
     .jv-print-area .jv-lines-table .jv-d,
     .jv-print-area .jv-lines-table .jv-c,
