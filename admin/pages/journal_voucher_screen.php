@@ -434,6 +434,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 .gl-pick-modal#jv_pick_modal {
     z-index: 12100;
 }
+.jv-lines-table tr.jv-line-memo td { padding-top: 6px; padding-bottom: 12px; border-bottom: 1px solid #e4e4e7; }
 .jv-lines-table tr.jv-line-memo .jv-m { width: 100%; box-sizing: border-box; }
 .jv-search-modal {
     position: fixed;
