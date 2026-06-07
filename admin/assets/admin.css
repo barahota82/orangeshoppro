@@ -4260,9 +4260,19 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     margin: 0;
 }
 
-/* §9.3 V1 — ترويسة طباعة السندات (نمط التقارير؛ تظهر في معاينة الطباعة فقط) */
-.jv-voucher-print-banner {
+/* §9.3 V1 — ترويسة السند داخل thead (مخفية على الشاشة؛ تتكرر أعلى كل صفحة في الطباعة) */
+.jv-voucher-print-sheet {
+    width: 100%;
+    border-collapse: collapse;
+    border: none;
+}
+.jv-voucher-print-sheet > thead.jv-voucher-print-thead {
     display: none;
+}
+.jv-voucher-print-body-cell {
+    padding: 0;
+    border: none;
+    vertical-align: top;
 }
 
 /* GAP-SALE-DOC-01 — ترويسة طباعة موحّدة (INV-C / INV-O / مردود) */
@@ -4487,13 +4497,16 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .ob-line-main td:last-child {
         display: none !important;
     }
-    .jv-print-area .jv-voucher-print-banner,
-    .jv-print-area .jv-voucher-print-banner * {
+    .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
+        display: table-header-group !important;
+    }
+    .jv-print-area .jv-voucher-print-sheet,
+    .jv-print-area .jv-voucher-print-sheet * {
         visibility: visible;
     }
-    .jv-print-area .jv-voucher-print-banner {
-        display: block !important;
-        margin-bottom: 1rem;
+    .jv-print-area .jv-voucher-print-body-cell {
+        padding: 0 !important;
+        border: none !important;
     }
     .jv-print-area .sd-print-banner,
     .jv-print-area .sd-print-banner * {

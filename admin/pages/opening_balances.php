@@ -199,9 +199,13 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 
 <?php if ($fyId > 0 && $years !== []): ?>
 <div class="card jv-print-area ob-opening-card">
-    <?php orange_voucher_print_banner($pdo, $ctxCountryId, ['title_ar' => 'سند رصيد افتتاحي']); ?>
     <h3 class="card-title">سند رصيد افتتاحي</h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'ob', 'doc_kind' => 'opening_balance', 'country_id' => $ctxCountryId]); ?>
+    <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
+        <?php orange_voucher_print_banner_thead($pdo, $ctxCountryId, ['title_ar' => 'سند رصيد افتتاحي']); ?>
+        <tbody>
+            <tr>
+                <td class="jv-voucher-print-body-cell">
     <div class="form-grid">
         <div class="jv-voucher-header-line jv-voucher-header-line--nav" style="grid-column:1/-1;">
             <div>
@@ -277,6 +281,10 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
     <div class="actions admin-doc-lines-toolbar ob-opening-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:10px;">
         <button type="button" class="btn-secondary" id="ob_btn_add">+ سطر يدوي</button>
     </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
 </div>
 
 <div class="gl-pick-modal" id="ob_pick_modal" hidden aria-hidden="true">

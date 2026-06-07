@@ -6,11 +6,11 @@ require_once __DIR__ . '/company_settings.php';
 require_once __DIR__ . '/sales_doc_print.php';
 
 /**
- * ترويسة طباعة السند — نمط التقارير (§9.3 V1).
+ * محتوى ترويسة طباعة السند (داخل header) — §9.3 V1.
  *
  * @param array{title_ar:string,title_en?:string,title_span_id?:string} $ctx
  */
-function orange_voucher_print_banner(PDO $pdo, int $countryId, array $ctx): void
+function orange_voucher_print_banner_markup(PDO $pdo, int $countryId, array $ctx): void
 {
     $titleAr = trim((string) ($ctx['title_ar'] ?? 'سند'));
     $titleSpanId = trim((string) ($ctx['title_span_id'] ?? ''));
@@ -29,7 +29,7 @@ function orange_voucher_print_banner(PDO $pdo, int $countryId, array $ctx): void
     $address = trim((string) ($company['address'] ?? ''));
     $phones = trim((string) ($company['phones'] ?? ''));
     ?>
-<header class="jv-voucher-print-banner gl-acc-stmt-print-banner" aria-hidden="true">
+<header class="gl-acc-stmt-print-banner">
     <div class="pl-month-brand-row">
         <div class="pl-month-brand">
             <?php if ($logoUrl !== ''): ?>
@@ -61,4 +61,31 @@ function orange_voucher_print_banner(PDO $pdo, int $countryId, array $ctx): void
     </h2>
 </header>
     <?php
+}
+
+/**
+ * thead ترويسة — تتكرر أعلى كل صفحة طباعة (نمط ta-report-print-table).
+ *
+ * @param array{title_ar:string,title_en?:string,title_span_id?:string} $ctx
+ */
+function orange_voucher_print_banner_thead(PDO $pdo, int $countryId, array $ctx): void
+{
+    ?>
+<thead class="ta-report-print-thead jv-voucher-print-thead">
+    <tr class="ta-report-banner-row">
+        <td class="ta-report-banner-cell">
+            <?php orange_voucher_print_banner_markup($pdo, $countryId, $ctx); ?>
+        </td>
+    </tr>
+</thead>
+    <?php
+}
+
+/**
+ * @deprecated استخدم orange_voucher_print_banner_thead داخل jv-voucher-print-sheet
+ * @param array{title_ar:string,title_en?:string,title_span_id?:string} $ctx
+ */
+function orange_voucher_print_banner(PDO $pdo, int $countryId, array $ctx): void
+{
+    orange_voucher_print_banner_markup($pdo, $countryId, $ctx);
 }

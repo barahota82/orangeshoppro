@@ -192,10 +192,6 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 <?php endif; ?>
 
 <div class="card jv-print-area">
-    <?php orange_voucher_print_banner($pdo, $jvScreenCountryId, [
-        'title_ar' => (string) $jvPageCardTitle,
-        'title_span_id' => 'jv_voucher_print_title_ar',
-    ]); ?>
     <h3 class="card-title"><?php echo htmlspecialchars($jvPageCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
     <?php if (!$jvYecMode): orange_edit_lock_ui_toolbar(['prefix' => 'jv', 'doc_kind' => 'journal_voucher', 'country_id' => $jvScreenCountryId]); endif; ?>
     <?php if ($jvYecMode): ?>
@@ -208,6 +204,14 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
     <?php if ((($jvPageEntryType ?? '') === 'receipt_voucher' || ($jvPageEntryType ?? '') === 'payment_voucher') && $jvCashLock === null): ?>
     <p class="card-hint jv-print-hide" style="margin:0 0 12px;">اربط حساب <strong>الخزينة / النقدية</strong> من <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a> (بند النقدية) لاستخدام سند القبض أو سند الصرف بسطر خزينة ثابت.</p>
     <?php endif; ?>
+    <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
+        <?php orange_voucher_print_banner_thead($pdo, $jvScreenCountryId, [
+            'title_ar' => (string) $jvPageCardTitle,
+            'title_span_id' => 'jv_voucher_print_title_ar',
+        ]); ?>
+        <tbody>
+            <tr>
+                <td class="jv-voucher-print-body-cell">
     <div class="form-grid">
         <?php if ($jvPageEt === 'other_voucher'): ?>
         <div class="jv-other-voucher-filter-row jv-print-hide" style="grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:6px;">
@@ -314,6 +318,10 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
             </table>
         </div>
     </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide">
         <button type="button" class="btn-secondary" id="jv_btn_add_line" onclick="jvAddRow()">+ سطر يدوي</button>
         <div class="jv-toolbar-primary-group">

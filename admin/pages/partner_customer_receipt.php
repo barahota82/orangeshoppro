@@ -235,8 +235,12 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
 <?php endif; ?>
 
 <div class="card jv-print-area">
-    <?php orange_voucher_print_banner($pdo, $ppvCountryId, ['title_ar' => $ppvTitle]); ?>
     <h3 class="card-title"><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+    <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
+        <?php orange_voucher_print_banner_thead($pdo, $ppvCountryId, ['title_ar' => $ppvTitle]); ?>
+        <tbody>
+            <tr>
+                <td class="jv-voucher-print-body-cell">
 
     <!-- ١ — العميل + خيار الدفعة المقدمة -->
     <div class="form-grid" style="margin-bottom:16px;">
@@ -347,6 +351,11 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
             </div>
         </div>
     </div>
+
+                </td>
+            </tr>
+        </tbody>
+    </table>
 
     <!-- ٤ — أزرار -->
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
