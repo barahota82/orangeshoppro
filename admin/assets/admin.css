@@ -4357,6 +4357,15 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
             color: #64748b;
             margin-left: 8mm;
             margin-bottom: 2.5mm;
+            vertical-align: top;
+        }
+        @bottom-right {
+            font-size: 8pt;
+            color: #64748b;
+            margin-right: 8mm;
+            margin-bottom: 2.5mm;
+            text-align: right;
+            vertical-align: top;
         }
     }
 
@@ -5693,33 +5702,12 @@ td.tb-col-name,
     }
 
     /*
-     * تذييل الطباعة — سطر واحد:
-     * يسار: أرقام الصفحات (@page @bottom-left — تعمل في Chromium).
-     * يمين: تاريخ/وقت الطباعة (نص ثابت من PHP + position:fixed — يتكرر على كل صفحة).
+     * تذييل الطباعة — سطر واحد في هامش @page (ليس داخل المحتوى):
+     * يسار: أرقام الصفحات (@bottom-left)
+     * يمين: تاريخ/وقت الطباعة (@bottom-right — content من PHP inline style)
      */
     .ta-report-print-footer-bar {
-        position: fixed !important;
-        bottom: 2.5mm;
-        left: 8mm;
-        right: 8mm;
-        display: flex !important;
-        justify-content: flex-end;
-        align-items: center;
-        margin: 0 !important;
-        padding: 0 !important;
-        border: none !important;
-        background: transparent !important;
-        z-index: 1001;
-    }
-    .ta-report-metafoot-pages {
         display: none !important;
-    }
-    .ta-report-metafoot-date {
-        margin: 0 !important;
-        padding: 0 !important;
-        font-size: 8pt;
-        color: #64748b;
-        background: #fff;
     }
     .ta-report-print-sheet .card-hint {
         display: none !important;

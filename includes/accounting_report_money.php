@@ -42,7 +42,21 @@ function orange_accounting_report_format_money(PDO $pdo, float $amount, ?array $
     return orange_format_money_for_context($ctx, $amount);
 }
 
-/** تذييل الطباعة — سطر واحد: أرقام الصفحات يساراً، التاريخ/الوقت يميناً (يُعرَض عبر @page margin في الطباعة). */
+/** تهريب نص لخاصية content في CSS (@page margin). */
+function orange_accounting_report_print_css_content(string $text): string
+{
+    return str_replace(
+        ['\\', '"', "\n", "\r", "\f"],
+        ['\\\\', '\\"', ' ', ' ', ' '],
+        $text
+    );
+}
+
+/**
+ * تذييل الطباعة — سطر واحد في هامش الصفحة:
+ * يسار: أرقام الصفحات (@page @bottom-left في admin.css)
+ * يمين: تاريخ/وقت الطباعة (@page @bottom-right — نص ثابت من PHP)
+ */
 function orange_accounting_report_print_metafoot_markup(
     string $printDatetime,
     string $dateLabel = 'تاريخ ووقت الطباعة',
@@ -55,8 +69,14 @@ function orange_accounting_report_print_metafoot_markup(
         $barClass .= ' ' . $extraClass;
     }
 
-    return '<div class="' . $barClass . '">'
-        . '<span class="ta-report-metafoot-pages" dir="ltr">صفحة '
+    $cssDate = orange_accounting_report_print_css_content($dateLabel . ': ' . $printDatetime);
+    $printMarginStyle = '<style>@media print{@page{@bottom-right{content:"'
+        . $cssDate
+        . '";}}}</style>';
+
+    return $printMarginStyle
+        . '<div class="' . $barClass . '">'
+        . '<span class="ta-report-metafoot-pages" dir="ltr" aria-hidden="true">صفحة '
         . '<span class="ta-report-page-num"></span> من <span class="ta-report-page-total"></span></span>'
         . '<span class="ta-report-metafoot-date gl-acc-stmt-print-metafoot ta-report-metafoot" dir="ltr">'
         . $label . ': ' . $dt . '</span>'
