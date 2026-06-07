@@ -4537,40 +4537,6 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-lines-table .ob-c {
         text-align: left !important;
     }
-    /*
-     * §9.3 — سطر الحساب ثم البيان: صفر مسافة عمودية بينهما في الطباعة.
-     * مصدر الفراغ كان padding خلايا .admin-doc-lines-table (10px) + padding-top لصف البيان.
-     * حدود كاملة على كل حقل؛ الفاصل الوحيد أسفل صف البيان (بين مجموعات الحساب).
-     */
-    .jv-print-area .admin-doc-lines-table.jv-lines-table tbody td {
-        padding: 0 6px !important;
-        background: #fff !important;
-        vertical-align: top !important;
-    }
-    .jv-print-area .jv-lines-table tr.jv-line-main td {
-        padding-bottom: 0 !important;
-    }
-    .jv-print-area .jv-lines-table tr.jv-line-memo td {
-        padding-top: 0 !important;
-        padding-bottom: 8px !important;
-        border-top: none !important;
-        border-bottom: 1px solid #e4e4e7 !important;
-    }
-    .jv-print-area .jv-lines-table tr.jv-line-memo .jv-memo-flex {
-        margin: 0 !important;
-        padding: 0 !important;
-        gap: 4px !important;
-        align-items: stretch !important;
-    }
-    .jv-print-area .jv-lines-table tr.jv-line-main input,
-    .jv-print-area .jv-lines-table tr.jv-line-memo .jv-m,
-    .jv-print-area .jv-lines-table tr.jv-line-memo .jv-dim {
-        border: 1px solid #cbd5e1 !important;
-        margin: 0 !important;
-        box-sizing: border-box !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
     .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
         display: table-header-group !important;
     }
