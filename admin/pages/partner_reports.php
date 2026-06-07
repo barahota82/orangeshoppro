@@ -60,43 +60,6 @@ try {
     $prPostingLeafCt = 0;
 }
 
-if (isset($_GET['export']) && $_GET['export'] === 'csv') {
-    header('Content-Type: text/csv; charset=UTF-8');
-    $csvSuffix = $partnerView === 'all' ? 'all' : $partnerView;
-    header('Content-Disposition: attachment; filename="partner-balances-' . $csvSuffix . '-' . $report['as_of'] . '.csv"');
-    echo "\xEF\xBB\xBF";
-    $out = fopen('php://output', 'w');
-    fputcsv($out, ['نوع', 'المعرّف', 'الاسم', 'الهاتف', 'الرصيد', 'حد ائتمان', 'تجاوز حد']);
-    if ($showPartnerCustomers) {
-        foreach ($report['customers'] as $c) {
-            fputcsv($out, [
-                'عميل',
-                $c['id'],
-                $c['name_ar'],
-                $c['phone'],
-                orange_accounting_report_format_amount((float) $c['balance'], $reportMoney),
-                $c['credit_limit'] !== null ? orange_accounting_report_format_amount((float) $c['credit_limit'], $reportMoney) : '',
-                !empty($c['over_limit']) ? 'نعم' : '',
-            ]);
-        }
-    }
-    if ($showPartnerSuppliers) {
-        foreach ($report['suppliers'] as $s) {
-            fputcsv($out, [
-                'مورد',
-                $s['id'],
-                $s['name'],
-                $s['phone'],
-                orange_accounting_report_format_amount((float) $s['balance'], $reportMoney),
-                '',
-                '',
-            ]);
-        }
-    }
-    fclose($out);
-    exit;
-}
-
 /* رأس موحّد (شعار + شركة + سجل + عنوان + أرقام) مثل باقي التقارير. */
 $prRenderHeader = static function (string $title) use ($companyNameAr, $prCompany, $prLogo, $report): void {
     ?>
@@ -145,7 +108,7 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
     <?php else: ?>
         <h1 class="admin-fy-shell__title">تقارير الذمم الشاملة</h1>
         <p class="admin-fy-shell__lead">
-            ملخص أرصدة كل العملاء والموردين، مطابقة أرصدة الدليل مع دفتر الذمم، وتصدير CSV.
+            ملخص أرصدة كل العملاء والموردين، ومطابقة أرصدة الدليل مع دفتر الذمم.
         </p>
     <?php endif; ?>
 
@@ -161,7 +124,6 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
         <a class="btn-secondary" href="<?php echo htmlspecialchars($partnerReportsUrl(['aging' => $includeAging ? null : '1']), ENT_QUOTES, 'UTF-8'); ?>">
             <?php echo $includeAging ? 'إخفاء أعمار الذمم (أسرع)' : 'إظهار أعمار الذمم (أبطأ)'; ?>
         </a>
-        <a class="btn-secondary" href="<?php echo htmlspecialchars($partnerReportsUrl(['export' => 'csv']), ENT_QUOTES, 'UTF-8'); ?>">تنزيل CSV</a>
         <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
         <?php if ($showPartnerCustomers): ?>
         <button type="button" class="btn-secondary" onclick="backfillOrders()">ربط طلبات آجل بعملاء (هاتف)</button>
