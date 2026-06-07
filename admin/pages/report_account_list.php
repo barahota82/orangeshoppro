@@ -19,7 +19,7 @@ $ralCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orang
 $ralLogo = (string) ($ralCompany['logo_url'] ?? '');
 $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
 ?>
-<div class="admin-fy-shell gl-acc-stmt-print" dir="rtl">
+<div class="admin-fy-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
         <h1 class="admin-fy-shell__title">قائمة الحسابات</h1>
         <p class="actions" data-export-host style="margin:0 0 16px;">
@@ -28,8 +28,8 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
         </p>
     </div>
 
-    <div class="card admin-fy-card">
-        <div class="gl-acc-stmt-print-sheet ral-print-sheet">
+    <div class="card admin-fy-card gl-acc-stmt-print">
+        <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
         <header class="gl-acc-stmt-print-banner ral-print-banner">
             <div class="pl-month-brand-row">
                 <div class="pl-month-brand">
@@ -54,7 +54,7 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
                     <?php endif; ?>
                 </div>
             </div>
-            <h2 class="gl-acc-stmt-print-title ral-print-title">قائمة الحسابات</h2>
+            <h2 class="gl-acc-stmt-print-title ta-report-print-title"><span class="gl-acc-stmt-print-title-ar" lang="ar">قائمة الحسابات</span></h2>
         </header>
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
             <table class="admin-fy-table gl-acc-stmt-table ral-account-list-table" dir="rtl" data-export-name="قائمة الحسابات" data-export-target=".actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">

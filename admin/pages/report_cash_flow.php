@@ -51,7 +51,7 @@ $fmt = static function (float $amt) use ($reportMoney): string {
 };
 
 ?>
-<div class="admin-fy-shell gl-acc-stmt-print" dir="rtl">
+<div class="admin-fy-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
         <h1 class="admin-fy-shell__title">قائمة التدفقات النقدية</h1>
 
@@ -107,8 +107,8 @@ $fmt = static function (float $amt) use ($reportMoney): string {
         $cfFyLabel = $report !== null ? (string) $report['fy_label'] : trim((string) ($fyRow['label_ar'] ?? ''));
         $cfPeriod = $report !== null ? (string) $report['period'] : '';
         ?>
-        <div class="card admin-fy-card">
-            <div class="gl-acc-stmt-print-sheet ral-print-sheet">
+        <div class="card admin-fy-card gl-acc-stmt-print">
+            <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
             <header class="gl-acc-stmt-print-banner ral-print-banner">
                 <div class="pl-month-brand-row">
                     <div class="pl-month-brand">
@@ -133,7 +133,7 @@ $fmt = static function (float $amt) use ($reportMoney): string {
                         <?php endif; ?>
                     </div>
                 </div>
-                <h2 class="gl-acc-stmt-print-title ral-print-title">قائمة التدفقات النقدية</h2>
+                <h2 class="gl-acc-stmt-print-title ta-report-print-title"><span class="gl-acc-stmt-print-title-ar" lang="ar">قائمة التدفقات النقدية</span></h2>
                 <p class="muted" style="margin:8px 0 0;">
                     <?php if ($cfFyLabel !== ''): ?><?php echo htmlspecialchars($cfFyLabel, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?>
                     <?php if ($cfPeriod !== ''): ?> — <?php echo htmlspecialchars($cfPeriod, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?>

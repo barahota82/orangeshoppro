@@ -57,7 +57,7 @@ foreach ($dims as $d) {
 }
 
 ?>
-<div class="admin-fy-shell gl-acc-stmt-print" dir="rtl">
+<div class="admin-fy-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
         <h1 class="admin-fy-shell__title">التقرير التحليلي</h1>
 
@@ -122,8 +122,8 @@ foreach ($dims as $d) {
     </div>
 
     <?php if ($ready): ?>
-        <div class="card admin-fy-card gl-acc-stmt-body">
-            <div class="gl-acc-stmt-print-sheet ral-print-sheet">
+        <div class="card admin-fy-card gl-acc-stmt-body gl-acc-stmt-print">
+            <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
             <header class="gl-acc-stmt-print-banner ral-print-banner">
                 <div class="pl-month-brand-row">
                     <div class="pl-month-brand">
@@ -148,7 +148,7 @@ foreach ($dims as $d) {
                         <?php endif; ?>
                     </div>
                 </div>
-                <h2 class="gl-acc-stmt-print-title ral-print-title">التقرير التحليلي</h2>
+                <h2 class="gl-acc-stmt-print-title ta-report-print-title"><span class="gl-acc-stmt-print-title-ar" lang="ar">التقرير التحليلي</span></h2>
                 <p class="muted" style="margin:8px 0 0;">
                     <?php echo htmlspecialchars($dimLabel, ENT_QUOTES, 'UTF-8'); ?>
                     — <?php echo $method === 'movement' ? 'حركة GL' : 'قائمة دخل'; ?>
