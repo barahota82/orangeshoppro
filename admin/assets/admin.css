@@ -1090,6 +1090,32 @@ a { text-decoration: none; color: inherit; }
     min-width: 0;
     box-sizing: border-box;
 }
+/* سند القيد — البيان ملاصق لسطر الحساب؛ الفاصل بين الحسابات فقط (§9.3) */
+.jv-lines-table tr.jv-line-main:has(+ tr.jv-line-memo) td {
+    border-bottom: none;
+    background: #fff !important;
+}
+.jv-lines-table tr.jv-line-main + tr.jv-line-memo td {
+    border-top: none;
+    padding-top: 0;
+    background: #fff !important;
+}
+.jv-lines-table tr.jv-line-main + tr.jv-line-memo .jv-m {
+    border-top: none;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+.jv-lines-table tr.jv-line-memo td {
+    padding-top: 0;
+    padding-bottom: 10px;
+    border-top: none;
+    border-bottom: 1px solid #e4e4e7;
+    background: #fff !important;
+}
+.jv-lines-table tr.jv-line-main:not(:has(+ tr.jv-line-memo)) td {
+    border-bottom: 1px solid #e4e4e7;
+    padding-bottom: 10px;
+}
 .admin-doc-frame + .admin-doc-lines-toolbar,
 .admin-doc-lines-toolbar {
     margin-top: 12px;
@@ -4496,6 +4522,14 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-lines-table thead th.admin-doc-col-actions,
     .jv-print-area .jv-lines-table tr.jv-line-main td:last-child {
         display: none !important;
+    }
+    .jv-print-area .jv-lines-table tr.jv-line-main:has(+ tr.jv-line-memo) td,
+    .jv-print-area .jv-lines-table tr.jv-line-main + tr.jv-line-memo td {
+        border-top: none !important;
+        padding-top: 0 !important;
+    }
+    .jv-print-area .jv-lines-table tr.jv-line-main + tr.jv-line-memo .jv-m {
+        border-top: none !important;
     }
     .jv-print-area .ob-opening-table thead th.admin-doc-col-actions,
     .jv-print-area .ob-line-main td:last-child {
