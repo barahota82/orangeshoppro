@@ -262,13 +262,41 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
 .jvr-filter-tools--center .jvr-filter-tools__date .admin-inp {
     text-align: center;
 }
+.jvr-lines-table {
+    table-layout: fixed;
+    width: 100%;
+}
+.jvr-lines-table col.jvr-col-vno { width: 8%; }
+.jvr-lines-table col.jvr-col-date { width: 6%; }
+.jvr-lines-table col.jvr-col-acct { width: 17%; }
+.jvr-lines-table col.jvr-col-amt { width: 9%; }
+.jvr-lines-table col.jvr-col-memo { width: 51%; }
 .jvr-lines-table th,
-.jvr-lines-table td { text-align: center; }
+.jvr-lines-table td { text-align: center; vertical-align: top; }
 .jvr-lines-table th:nth-child(3),
 .jvr-lines-table td:nth-child(3),
 .jvr-lines-table th:nth-child(6),
 .jvr-lines-table td:nth-child(6) { text-align: right; }
+.jvr-lines-table th:nth-child(1),
+.jvr-lines-table td:nth-child(1),
+.jvr-lines-table th:nth-child(2),
+.jvr-lines-table td:nth-child(2) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 0;
+}
+.jvr-lines-table td:nth-child(6) {
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+}
 .jvr-lines-table .gl-acc-stmt-col-num { white-space: nowrap; }
+@media print {
+    .jvr-lines-table col.jvr-col-vno { width: 7%; }
+    .jvr-lines-table col.jvr-col-date { width: 5%; }
+    .jvr-lines-table col.jvr-col-memo { width: 48%; }
+}
 </style>
 
 <div class="admin-fy-shell" dir="rtl">
@@ -381,6 +409,14 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
                 data-export-target="#jvr_export_actions"
                 data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>"
                 data-export-subtitle="<?php echo htmlspecialchars($jvrExportSubtitle, ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>>
+                <colgroup>
+                    <col class="jvr-col-vno">
+                    <col class="jvr-col-date">
+                    <col class="jvr-col-acct">
+                    <col class="jvr-col-amt">
+                    <col class="jvr-col-amt">
+                    <col class="jvr-col-memo">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>رقم القيد</th>
