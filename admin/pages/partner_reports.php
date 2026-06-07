@@ -119,15 +119,17 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
 <?php endif; ?>
 
 <div class="card admin-fy-card gl-acc-stmt-no-print">
-    <h3 class="card-title">خيارات العرض ومطابقة الدليل مع دفتر الذمم</h3>
-    <div class="actions gas-acc-stmt-actions" data-export-host style="flex-wrap:wrap; gap:8px;">
-        <a class="btn-secondary" href="<?php echo htmlspecialchars($partnerReportsUrl(['aging' => $includeAging ? null : '1']), ENT_QUOTES, 'UTF-8'); ?>">
-            <?php echo $includeAging ? 'إخفاء أعمار الذمم (أسرع)' : 'إظهار أعمار الذمم (أبطأ)'; ?>
-        </a>
-        <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
-        <?php if ($showPartnerCustomers): ?>
-        <button type="button" class="btn-secondary" onclick="backfillOrders()">ربط طلبات آجل بعملاء (هاتف)</button>
-        <?php endif; ?>
+    <div class="pr-reconcile-toolbar-head" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;">
+        <h3 class="card-title" style="margin:0;">خيارات العرض ومطابقة الدليل مع دفتر الذمم</h3>
+        <div class="actions gas-acc-stmt-actions" data-export-host style="display:flex;flex-wrap:wrap;gap:8px;margin-inline-start:auto;">
+            <a class="btn-secondary" href="<?php echo htmlspecialchars($partnerReportsUrl(['aging' => $includeAging ? null : '1']), ENT_QUOTES, 'UTF-8'); ?>">
+                <?php echo $includeAging ? 'إخفاء أعمار الذمم (أسرع)' : 'إظهار أعمار الذمم (أبطأ)'; ?>
+            </a>
+            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
+            <?php if ($showPartnerCustomers): ?>
+            <button type="button" class="btn-secondary" onclick="backfillOrders()">ربط طلبات آجل بعملاء (هاتف)</button>
+            <?php endif; ?>
+        </div>
     </div>
     <p class="card-hint muted" style="margin-top:10px;">اعتباراً من <?php echo htmlspecialchars($report['as_of'], ENT_QUOTES, 'UTF-8'); ?></p>
 
