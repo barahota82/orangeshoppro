@@ -369,6 +369,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'group' => true,
                     'title' => 'الإعداد والدليل',
                     'items' => [
+                        ['page' => 'accounting_reports_index', 'href' => '/admin/index.php?page=accounting_reports_index', 'label' => 'فهرس الحسابات والتقارير', 'class' => '', 'sub' => false],
                         ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'الدليل المحاسبي', 'class' => '', 'sub' => false],
                         ['page' => 'gl_account_settings', 'href' => '/admin/index.php?page=gl_account_settings', 'label' => 'حسابات القيود التلقائية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'invoice_line_presets', 'href' => '/admin/index.php?page=invoice_line_presets', 'label' => 'قائمة بنود الفاتورة', 'class' => 'admin-nav-sub', 'sub' => true],
@@ -399,7 +400,6 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'group' => true,
                     'title' => 'التقارير',
                     'items' => [
-                        ['page' => 'accounting_reports_index', 'href' => '/admin/index.php?page=accounting_reports_index', 'label' => 'فهرس الحسابات والتقارير', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'journal_voucher_reports', 'href' => '/admin/index.php?page=journal_voucher_reports', 'label' => 'تقارير السندات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'partner_account_statement', 'href' => '/admin/index.php?page=partner_account_statement', 'label' => 'كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'report_gl_account_monthly', 'href' => '/admin/index.php?page=report_gl_account_monthly', 'label' => 'الحركة الشهرية لحساب', 'class' => 'admin-nav-sub', 'sub' => true],
