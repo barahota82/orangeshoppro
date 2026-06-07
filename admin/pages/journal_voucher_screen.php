@@ -322,6 +322,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
             </tr>
         </tbody>
     </table>
+    <?php orange_voucher_print_metafoot(); ?>
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide">
         <button type="button" class="btn-secondary" id="jv_btn_add_line" onclick="jvAddRow()">+ سطر يدوي</button>
         <div class="jv-toolbar-primary-group">

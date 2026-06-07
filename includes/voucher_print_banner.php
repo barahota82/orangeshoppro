@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/company_settings.php';
 require_once __DIR__ . '/sales_doc_print.php';
+require_once __DIR__ . '/date_format.php';
+require_once __DIR__ . '/accounting_report_money.php';
 
 /**
  * محتوى ترويسة طباعة السند (داخل header) — §9.3 V1.
@@ -88,4 +90,13 @@ function orange_voucher_print_banner_thead(PDO $pdo, int $countryId, array $ctx)
 function orange_voucher_print_banner(PDO $pdo, int $countryId, array $ctx): void
 {
     orange_voucher_print_banner_markup($pdo, $countryId, $ctx);
+}
+
+/**
+ * تذييل طباعة السند — تاريخ/وقت يمين + أرقام صفحات يسار (نمط التقارير §9.3 V5).
+ */
+function orange_voucher_print_metafoot(): void
+{
+    $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+    echo orange_accounting_report_print_metafoot_markup($printDatetime);
 }
