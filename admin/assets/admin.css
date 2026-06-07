@@ -4487,6 +4487,15 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         border: none;
         box-shadow: none !important;
     }
+    /* §9.3 — خط رفيع بعد وصف السند (البيان) وقبل جدول الأسطر */
+    .jv-print-area .form-grid > div:has(#jv_desc),
+    .jv-print-area .form-grid > div:has(#ob_statement),
+    .jv-print-area div:has(#crec_desc),
+    .jv-print-area div:has(#spay_desc) {
+        border-bottom: 1px solid #cbd5e1 !important;
+        padding-bottom: 6px !important;
+        margin-bottom: 8px !important;
+    }
     /* إطار جدول الأسطر — بلا برواز خارجي في الطباعة (§9.3) */
     .jv-print-area .admin-doc-frame,
     .jv-print-area .admin-doc-frame > .table-wrap {
