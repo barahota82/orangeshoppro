@@ -192,7 +192,10 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 <?php endif; ?>
 
 <div class="card jv-print-area">
-    <?php orange_voucher_print_banner($pdo, $jvScreenCountryId, ['title_ar' => (string) $jvPageCardTitle]); ?>
+    <?php orange_voucher_print_banner($pdo, $jvScreenCountryId, [
+        'title_ar' => (string) $jvPageCardTitle,
+        'title_span_id' => 'jv_voucher_print_title_ar',
+    ]); ?>
     <h3 class="card-title"><?php echo htmlspecialchars($jvPageCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
     <?php if (!$jvYecMode): orange_edit_lock_ui_toolbar(['prefix' => 'jv', 'doc_kind' => 'journal_voucher', 'country_id' => $jvScreenCountryId]); endif; ?>
     <?php if ($jvYecMode): ?>
@@ -717,6 +720,39 @@ function jvEditLockKind() {
     return 'manual';
 }
 
+function jvOtherVoucherPrintTitleFromJournalType() {
+    if (!JV_OTHER_VOUCHER_BROWSE) {
+        return null;
+    }
+    var sel = document.getElementById('jv_journal_type_filter');
+    if (!sel || sel.selectedIndex < 0) {
+        return 'سندات أخرى';
+    }
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) {
+        return 'سندات أخرى';
+    }
+    var name = (opt.textContent || '').trim();
+    if (name === '' || name.indexOf('اختر') >= 0 || name.indexOf('—') === 0) {
+        return 'سندات أخرى';
+    }
+    if (name.indexOf('سند ') === 0 || name.indexOf('سند\u00a0') === 0) {
+        return name;
+    }
+    return 'سند ' + name;
+}
+
+function jvSyncPrintBannerTitle() {
+    if (!JV_OTHER_VOUCHER_BROWSE) {
+        return;
+    }
+    var el = document.getElementById('jv_voucher_print_title_ar');
+    if (!el) {
+        return;
+    }
+    el.textContent = jvOtherVoucherPrintTitleFromJournalType();
+}
+
 function jvJournalTypeFilterId() {
     var s = document.getElementById('jv_journal_type_filter');
     if (!s) {
@@ -1113,6 +1149,7 @@ jvSearchModalBind();
         sel.addEventListener('change', function () {
             jvApplyOtherVoucherBrowseGateUi();
             jvSyncRefPreview();
+            jvSyncPrintBannerTitle();
         });
     }
     var jvDateEl = document.getElementById('jv_date');
@@ -1690,6 +1727,7 @@ function jvPrintVoucher() {
         alert('احفظ السند أولاً قبل الطباعة.');
         return false;
     }
+    jvSyncPrintBannerTitle();
     return orangeAdminOpenPrintDialog();
 }
 
@@ -1978,6 +2016,9 @@ if (JV_YEC_MODE && JV_YEC_LOAD_ID > 0) {
         sel.value = String(JV_DEEP_LOAD_JT);
         jvApplyOtherVoucherBrowseGateUi();
         jvSyncRefPreview();
+        jvSyncPrintBannerTitle();
+    } else {
+        jvSyncPrintBannerTitle();
     }
     if (JV_DEEP_LOAD_ID > 0) {
         jvLoadVoucherFromApi(JV_DEEP_LOAD_ID);

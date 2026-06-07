@@ -8,11 +8,12 @@ require_once __DIR__ . '/sales_doc_print.php';
 /**
  * ترويسة طباعة السند — نمط التقارير (§9.3 V1).
  *
- * @param array{title_ar:string,title_en?:string} $ctx
+ * @param array{title_ar:string,title_en?:string,title_span_id?:string} $ctx
  */
 function orange_voucher_print_banner(PDO $pdo, int $countryId, array $ctx): void
 {
     $titleAr = trim((string) ($ctx['title_ar'] ?? 'سند'));
+    $titleSpanId = trim((string) ($ctx['title_span_id'] ?? ''));
     if ($titleAr === '') {
         $titleAr = 'سند';
     }
@@ -53,7 +54,7 @@ function orange_voucher_print_banner(PDO $pdo, int $countryId, array $ctx): void
         </div>
     </div>
     <h2 class="gl-acc-stmt-print-title ta-report-print-title">
-        <span class="gl-acc-stmt-print-title-ar" lang="ar"><?php echo htmlspecialchars($titleAr, ENT_QUOTES, 'UTF-8'); ?></span>
+        <span class="gl-acc-stmt-print-title-ar" lang="ar"<?php echo $titleSpanId !== '' ? ' id="' . htmlspecialchars($titleSpanId, ENT_QUOTES, 'UTF-8') . '"' : ''; ?>><?php echo htmlspecialchars($titleAr, ENT_QUOTES, 'UTF-8'); ?></span>
         <?php if ($titleEn !== ''): ?>
             <span class="gl-acc-stmt-print-title-en" lang="en" dir="ltr"><?php echo htmlspecialchars($titleEn, ENT_QUOTES, 'UTF-8'); ?></span>
         <?php endif; ?>
