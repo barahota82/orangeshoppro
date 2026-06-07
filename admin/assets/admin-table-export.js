@@ -493,22 +493,14 @@
         }
     }
 
-    /* اسم ملف PDF عند الحفظ = اسم التقرير: نضبط عنوان المستند وقت الطباعة ونعيده بعدها. */
-    function reportNameForPrint() {
-        var el = document.querySelector('[data-report-name]');
-        if (el && (el.getAttribute('data-report-name') || '') !== '') {
-            return el.getAttribute('data-report-name') || '';
-        }
-        var t = document.querySelector('table[data-export-name]');
-        return t ? (t.getAttribute('data-export-name') || '') : '';
-    }
+    /*
+     * طباعة التقارير: عنوان مستند فارغ يقلّل ترويسة/تذييل المتصفح (اسم الصفحة، الرابط).
+     * مع @page{margin:0} في admin.css — لا نضيف «صفحة X من Y» في التذييل (عداد CSS لا يعمل في PDF).
+     */
     var savedDocTitle = null;
     window.addEventListener('beforeprint', function () {
-        var rn = reportNameForPrint();
-        if (rn !== '') {
-            savedDocTitle = document.title;
-            document.title = rn + ' ' + dateSlug();
-        }
+        savedDocTitle = document.title;
+        document.title = ' ';
     });
     window.addEventListener('afterprint', function () {
         if (savedDocTitle !== null) {

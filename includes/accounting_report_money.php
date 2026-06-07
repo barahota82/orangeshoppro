@@ -42,7 +42,7 @@ function orange_accounting_report_format_money(PDO $pdo, float $amount, ?array $
     return orange_format_money_for_context($ctx, $amount);
 }
 
-/** سطر تذييل الطباعة مع أرقام صفحات ديناميكية (counter(page/pages) في CSS). */
+/** سطر تذييل الطباعة — تاريخ/وقت فقط (أرقام الصفحات من المتصفح إن لزم). */
 function orange_accounting_report_print_metafoot_markup(
     string $printDatetime,
     string $dateLabel = 'تاريخ ووقت الطباعة',
@@ -55,14 +55,7 @@ function orange_accounting_report_print_metafoot_markup(
         $class .= ' ' . $extraClass;
     }
 
-    return '<p class="' . $class . '" dir="ltr">'
-        . $label . ': ' . $dt
-        . ' <span class="ta-report-page-suffix">— '
-        . '<span class="ta-report-page-label">صفحة </span>'
-        . '<span class="ta-report-page-num"></span>'
-        . '<span class="ta-report-page-of"> من </span>'
-        . '<span class="ta-report-page-total"></span>'
-        . '</span></p>';
+    return '<p class="' . $class . '" dir="ltr">' . $label . ': ' . $dt . '</p>';
 }
 
 /** تذييل داخل tfoot لجدول ta-report-print-table — يتكرر أسفل كل صفحة طباعة. */

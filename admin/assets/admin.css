@@ -4849,12 +4849,6 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     line-height: 1.5;
 }
 
-@media screen {
-    .ta-report-page-suffix {
-        display: none;
-    }
-}
-
 /* ترويسة التقرير داخل thead — شاشة وطباعة */
 .ta-report-print-table tr.ta-report-banner-row td,
 .ta-report-print-table tr.ta-report-grid-row td {
@@ -5657,14 +5651,6 @@ td.tb-col-name,
     .ta-report-print-table tbody tr {
         page-break-inside: avoid;
         page-break-after: auto;
-    }
-
-    /* أرقام الصفحات — Chromium / PDF */
-    .ta-report-page-num::after {
-        content: counter(page);
-    }
-    .ta-report-page-total::after {
-        content: counter(pages);
     }
 
     /* تذييل داخل tfoot — يتكرر أسفل كل صفحة مع الجدول */
