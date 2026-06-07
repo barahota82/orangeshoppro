@@ -261,17 +261,17 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
                 <colgroup>
                     <col class="jv-col-code">
                     <col class="jv-col-name">
+                    <col class="jv-col-amt">
+                    <col class="jv-col-amt">
                     <col class="jv-col-act">
-                    <col class="jv-col-amt">
-                    <col class="jv-col-amt">
                 </colgroup>
                 <thead>
                     <tr>
                         <th class="ob-th-code">كود الحساب</th>
                         <th class="ob-th-name">اسم الحساب</th>
-                        <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
                         <th>مدين</th>
                         <th>دائن</th>
+                        <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
                     </tr>
                 </thead>
                 <tbody id="ob_body"></tbody>
@@ -642,9 +642,9 @@ function obOpenPrintDialog() {
         tr.innerHTML =
             '<td><input type="text" class="gl-inp-code ob-inp-code admin-inp" dir="ltr" autocomplete="off" value="" aria-label="كود الحساب" placeholder="نقرتان للاختيار" title="نقرتان للاختيار"></td>' +
             '<td><input type="text" class="gl-inp-name ob-inp-name admin-inp" readonly tabindex="-1" value="" aria-label="اسم الحساب" placeholder="—" title="يُعبأ تلقائياً"></td>' +
-            '<td><button type="button" class="btn-secondary admin-doc-line-remove ob-row-del">حذف</button></td>' +
             '<td><input type="number" class="ob-d admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="مدين" placeholder="0.000"></td>' +
-            '<td><input type="number" class="ob-c admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="دائن" placeholder="0.000"></td>';
+            '<td><input type="number" class="ob-c admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="دائن" placeholder="0.000"></td>' +
+            '<td><button type="button" class="btn-secondary admin-doc-line-remove ob-row-del">حذف</button></td>';
         tb.appendChild(tr);
         tr.querySelector('.ob-row-del').addEventListener('click', function () {
             tr.remove();

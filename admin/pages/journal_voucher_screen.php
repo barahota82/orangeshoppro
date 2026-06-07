@@ -154,8 +154,8 @@ $jvEchoJvCashLine = static function (array $lock) use (&$jvInitLinePairSeq, $jvM
         '<td class="jv-acc-code-cell"><input type="hidden" class="jv-acc-id" value="', (string) $id, '">',
         '<input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="', $code, '" readonly tabindex="-1" title="حساب الخزينة — ثابت"></td>',
         '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="', $name, '" readonly tabindex="-1" title="حساب الخزينة — ثابت"></td>',
-        '<td><span class="muted" style="display:inline-block;padding:8px 0;" aria-hidden="true">—</span></td>',
         $amtCells,
+        '<td><span class="muted" style="display:inline-block;padding:8px 0;" aria-hidden="true">—</span></td>',
         '</tr>';
     $jvEchoMemoRow($pair, 'بيان سطر الخزينة', null);
 };
@@ -173,8 +173,8 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
         '<td class="jv-acc-code-cell"><input type="hidden" class="jv-acc-id" value="">',
         '<input type="text" class="jv-acc-code admin-inp" value="" placeholder="نقرتان للاختيار" autocomplete="off"></td>',
         '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="" readonly tabindex="-1"></td>',
-        '<td><button type="button" class="btn-secondary admin-doc-line-remove" onclick="jvRemoveRow(this)">حذف</button></td>',
         $amtCells,
+        '<td><button type="button" class="btn-secondary admin-doc-line-remove" onclick="jvRemoveRow(this)">حذف</button></td>',
         '</tr>';
     $jvEchoMemoRow($pair, 'البيان', null);
 };
@@ -287,17 +287,17 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
                 <colgroup>
                     <col class="jv-col-code">
                     <col class="jv-col-name">
+                    <col class="jv-col-amt">
+                    <col class="jv-col-amt">
                     <col class="jv-col-act">
-                    <col class="jv-col-amt">
-                    <col class="jv-col-amt">
                 </colgroup>
                 <thead>
                     <tr>
                         <th>كود الحساب</th>
                         <th>اسم الحساب</th>
-                        <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
                         <th>مدين</th>
                         <th>دائن</th>
+                        <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
                     </tr>
                 </thead>
                 <tbody id="jv_lines_body">
@@ -421,6 +421,12 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 .jv-lines-table .jv-acc-name {
     background: #f4f4f5;
     cursor: default;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+.jv-lines-table .jv-line-main td:nth-child(3) .jv-d,
+.jv-lines-table .jv-line-main td:nth-child(4) .jv-c {
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
@@ -1247,8 +1253,8 @@ function jvAddCashLockedRow() {
         '<input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + jvEscapeHtml(JV_CASH_LOCK.code || '') + '" readonly tabindex="-1" autocomplete="off" title="حساب الخزينة — ثابت">' +
         '</td>' +
         '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + jvEscapeHtml(JV_CASH_LOCK.name || '') + '" readonly tabindex="-1" title="حساب الخزينة — ثابت"></td>' +
-        '<td><span class="muted" style="display:inline-block;padding:8px 0;" aria-hidden="true">—</span></td>' +
-        amtCells;
+        amtCells +
+        '<td><span class="muted" style="display:inline-block;padding:8px 0;" aria-hidden="true">—</span></td>';
     var trMemo = document.createElement('tr');
     trMemo.className = 'jv-line-memo';
     trMemo.setAttribute('data-jv-pair', pair);
@@ -1275,9 +1281,9 @@ function jvAddRow() {
         '<input type="text" class="jv-acc-code admin-inp" value="" placeholder="نقرتان للاختيار" readonly autocomplete="off" title="نقرتان للاختيار">' +
         '</td>' +
         '<td><input type="text" class="jv-acc-name admin-inp" value="" readonly tabindex="-1" placeholder="—" title="يُعبأ تلقائياً"></td>' +
-        '<td><button type="button" class="btn-secondary admin-doc-line-remove" onclick="jvRemoveRow(this)">حذف</button></td>' +
         '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>' +
-        '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>';
+        '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>' +
+        '<td><button type="button" class="btn-secondary admin-doc-line-remove" onclick="jvRemoveRow(this)">حذف</button></td>';
     var trMemo = document.createElement('tr');
     trMemo.className = 'jv-line-memo';
     trMemo.setAttribute('data-jv-pair', pair);

@@ -351,17 +351,17 @@ if (orange_journal_vouchers_ready($pdo)) {
                 <colgroup>
                     <col class="jv-col-code">
                     <col class="jv-col-name">
+                    <col class="jv-col-amt">
+                    <col class="jv-col-amt">
                     <col class="jv-col-act">
-                    <col class="jv-col-amt">
-                    <col class="jv-col-amt">
                 </colgroup>
                 <thead>
                     <tr>
                         <th>كود الحساب</th>
                         <th>اسم الحساب</th>
-                        <th class="admin-doc-col-actions" aria-label=""></th>
                         <th>مدين</th>
                         <th>دائن</th>
+                        <th class="admin-doc-col-actions" aria-label=""></th>
                     </tr>
                 </thead>
                 <tbody id="ppv_lines_body"></tbody>
@@ -722,8 +722,8 @@ function ppvBuildLines() {
             '<input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + ppvEscapeHtml(PPV_CASH.code || '') + '" readonly tabindex="-1">' +
             '</td>' +
             '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + ppvEscapeHtml(PPV_CASH.name || '') + '" readonly tabindex="-1"></td>' +
-            '<td><span class="muted" style="display:inline-block;padding:8px 0;">—</span></td>' +
-            amtCells;
+            amtCells +
+            '<td><span class="muted" style="display:inline-block;padding:8px 0;">—</span></td>';
         var trMemo = document.createElement('tr');
         trMemo.className = 'jv-line-memo';
         trMemo.setAttribute('data-jv-pair', pair);
@@ -759,8 +759,8 @@ function ppvBuildLines() {
             '<input type="text" class="jv-acc-code admin-inp" value="' + ppvEscapeHtml(pcode) + '" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار" style="cursor:pointer;">' +
             '</td>' +
             '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + ppvEscapeHtml(pname) + '" readonly tabindex="-1"></td>' +
-            '<td><span class="muted" style="display:inline-block;padding:8px 0;">—</span></td>' +
-            amtCells;
+            amtCells +
+            '<td><span class="muted" style="display:inline-block;padding:8px 0;">—</span></td>';
         var trMemo = document.createElement('tr');
         trMemo.className = 'jv-line-memo';
         trMemo.setAttribute('data-jv-pair', pair);
