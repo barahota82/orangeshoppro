@@ -70,6 +70,9 @@ if ($journalTypeFilterId > 0) {
     }
 }
 
+$submitted = isset($_GET['run']) && (string) $_GET['run'] === '1';
+$jvrTypeSelected = $journalTypeFilterId > 0 || $entryTypeFilter !== '';
+
 $jvrPostingLeafCt = 0;
 if (orange_journal_vouchers_ready($pdo)) {
     $jvrPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
@@ -78,8 +81,10 @@ if (orange_journal_vouchers_ready($pdo)) {
 $vouchers = [];
 $linesByVid = [];
 $accMap = [];
+$jvrVouchersReady = orange_journal_vouchers_ready($pdo);
+$jvrReportDisplayed = $submitted && $jvrTypeSelected && $jvrVouchersReady;
 
-if (orange_journal_vouchers_ready($pdo)) {
+if ($jvrReportDisplayed) {
     $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
     $accCols = $hasGrp ? 'a.id, a.name, a.code, a.is_group' : 'a.id, a.name, a.code';
     $accounts = orange_accounts_fetch(
@@ -157,7 +162,7 @@ $jvrPrintDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $jvrCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
 $jvrLogo = (string) ($jvrCompany['logo_url'] ?? '');
 
-$jvrFilterTypeLabel = 'جميع الأنواع';
+$jvrFilterTypeLabel = '—';
 if ($journalTypeFilterId > 0) {
     foreach ($jvrJournalTypes as $jtRow) {
         if ((int) ($jtRow['id'] ?? 0) === $journalTypeFilterId) {
@@ -177,7 +182,10 @@ if ($journalTypeFilterId > 0) {
 
 $jvrExportSubtitle = 'من ' . $dateFromDisp . ' إلى ' . $dateToDisp . ' — نوع القيد: ' . $jvrFilterTypeLabel;
 $jvrVoucherCount = count($vouchers);
-$jvrVouchersReady = orange_journal_vouchers_ready($pdo);
+$jvrPrintAlert = $jvrVouchersReady
+    ? "alert('اختر نوع القيد ثم اضغط عرض أولاً')"
+    : "alert('جداول السندات غير جاهزة بعد')";
+$jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
 ?>
 <style>
 /*
@@ -241,11 +249,12 @@ $jvrVouchersReady = orange_journal_vouchers_ready($pdo);
 <div class="card admin-fy-card gl-acc-stmt-no-print gas-acc-stmt-search-card">
     <form method="get" action="" class="orange-doc-header-row">
         <input type="hidden" name="page" value="journal_voucher_reports">
+        <input type="hidden" name="run" value="1">
         <div class="jvr-filter-tools jvr-filter-tools--center orange-doc-toolbar-fields">
             <div class="jvr-filter-tools__entry">
                 <label for="jvr_journal_type_id">نوع القيد</label>
-                <select id="jvr_journal_type_id" name="journal_type_id" class="admin-inp"<?php echo $jvrJournalTypes === [] ? ' disabled' : ''; ?>>
-                    <option value=""<?php echo $journalTypeFilterId <= 0 && $entryTypeFilter === '' ? ' selected' : ''; ?>>الكل</option>
+                <select id="jvr_journal_type_id" name="journal_type_id" class="admin-inp" required<?php echo $jvrJournalTypes === [] ? ' disabled' : ''; ?>>
+                    <option value="" disabled<?php echo $journalTypeFilterId <= 0 && $entryTypeFilter === '' ? ' selected' : ''; ?>>— اختر نوع قيد —</option>
                     <?php foreach ($jvrJournalTypes as $jtRow):
                         $jtId = (int) ($jtRow['id'] ?? 0);
                         if ($jtId <= 0) {
@@ -281,7 +290,7 @@ $jvrVouchersReady = orange_journal_vouchers_ready($pdo);
             </div>
             <div class="jvr-filter-tools__actions gas-acc-stmt-actions" id="jvr_export_actions" data-export-host>
                 <button type="submit">عرض</button>
-                <button type="button" class="btn-secondary" onclick="<?php echo $jvrVouchersReady ? 'window.print()' : "alert('جداول السندات غير جاهزة بعد')"; ?>">طباعة</button>
+                <button type="button" class="btn-secondary" onclick="<?php echo $jvrPrintOnclick; ?>">طباعة</button>
                 <a class="btn-secondary" href="<?php echo $resetUrl; ?>">إعادة ضبط</a>
             </div>
         </div>
@@ -333,11 +342,11 @@ $jvrVouchersReady = orange_journal_vouchers_ready($pdo);
             </div>
         </div>
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <table class="admin-fy-table gl-acc-stmt-table" dir="rtl"
+            <table class="admin-fy-table gl-acc-stmt-table" dir="rtl"<?php if ($jvrReportDisplayed): ?>
                 data-export-name="تقارير السندات"
                 data-export-target="#jvr_export_actions"
                 data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>"
-                data-export-subtitle="<?php echo htmlspecialchars($jvrExportSubtitle, ENT_QUOTES, 'UTF-8'); ?>">
+                data-export-subtitle="<?php echo htmlspecialchars($jvrExportSubtitle, ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>>
                 <thead>
                     <tr>
                         <th>#</th>
@@ -350,8 +359,12 @@ $jvrVouchersReady = orange_journal_vouchers_ready($pdo);
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if ($vouchers === []): ?>
-                        <tr><td colspan="7" class="muted">لا توجد سندات في هذه الفترة<?php echo ($journalTypeFilterId > 0 || $entryTypeFilter !== '') ? ' لنوع القيد المحدد' : ''; ?>.</td></tr>
+                    <?php if (! $jvrReportDisplayed): ?>
+                        <tr><td colspan="7" class="muted">اختر نوع القيد والفترة ثم اضغط «عرض».</td></tr>
+                    <?php elseif ($submitted && ! $jvrTypeSelected): ?>
+                        <tr><td colspan="7" class="muted">يجب اختيار نوع القيد قبل عرض التقرير.</td></tr>
+                    <?php elseif ($vouchers === []): ?>
+                        <tr><td colspan="7" class="muted">لا توجد سندات في هذه الفترة لنوع القيد المحدد.</td></tr>
                     <?php else: ?>
                         <?php foreach ($vouchers as $v): ?>
                             <?php
@@ -386,7 +399,9 @@ $jvrVouchersReady = orange_journal_vouchers_ready($pdo);
                 </tbody>
             </table>
         </div>
+        <?php if ($jvrReportDisplayed): ?>
         <p class="card-hint muted" style="margin-top:12px;">عدد السندات المعروضة: <?php echo $jvrVoucherCount; ?> (حد أقصى 500)</p>
+        <?php endif; ?>
         <div class="gl-acc-stmt-print-footer ta-report-print-footer">
             <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($jvrPrintDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
         </div>
