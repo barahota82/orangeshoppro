@@ -266,21 +266,25 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
     table-layout: fixed;
     width: 100%;
 }
-.jvr-lines-table col.jvr-col-vno { width: 8%; }
-.jvr-lines-table col.jvr-col-date { width: 6%; }
+.jvr-lines-table col.jvr-col-vno,
+.jvr-lines-table col.jvr-col-date { width: 8%; }
 .jvr-lines-table col.jvr-col-acct { width: 17%; }
 .jvr-lines-table col.jvr-col-amt { width: 9%; }
-.jvr-lines-table col.jvr-col-memo { width: 51%; }
+.jvr-lines-table col.jvr-col-memo { width: 49%; }
 .jvr-lines-table th,
 .jvr-lines-table td { text-align: center; vertical-align: top; }
 .jvr-lines-table th:nth-child(3),
 .jvr-lines-table td:nth-child(3),
 .jvr-lines-table th:nth-child(6),
 .jvr-lines-table td:nth-child(6) { text-align: right; }
-.jvr-lines-table th:nth-child(1),
-.jvr-lines-table td:nth-child(1),
-.jvr-lines-table th:nth-child(2),
-.jvr-lines-table td:nth-child(2) {
+.jvr-lines-table thead th:nth-child(1),
+.jvr-lines-table thead th:nth-child(2) {
+    white-space: normal;
+    line-height: 1.3;
+    padding-inline: 4px;
+}
+.jvr-lines-table tbody td:nth-child(1),
+.jvr-lines-table tbody td:nth-child(2) {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -293,9 +297,9 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
 }
 .jvr-lines-table .gl-acc-stmt-col-num { white-space: nowrap; }
 @media print {
-    .jvr-lines-table col.jvr-col-vno { width: 7%; }
-    .jvr-lines-table col.jvr-col-date { width: 5%; }
-    .jvr-lines-table col.jvr-col-memo { width: 48%; }
+    .jvr-lines-table col.jvr-col-vno,
+    .jvr-lines-table col.jvr-col-date { width: 7%; }
+    .jvr-lines-table col.jvr-col-memo { width: 46%; }
 }
 </style>
 
