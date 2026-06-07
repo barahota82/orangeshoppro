@@ -30,13 +30,14 @@ function orange_admin_permission_mega_sections(): array
                 [
                     'title' => 'الإعداد والدليل',
                     'pages' => [
+                        ['page' => 'accounting_reports_index', 'label' => 'فهرس الحسابات والتقارير'],
                         ['page' => 'chart_of_accounts', 'label' => 'الدليل المحاسبي'],
-                        ['page' => 'gl_account_settings', 'label' => 'حسابات القيود التلقائية'],
-                        ['page' => 'invoice_line_presets', 'label' => 'قائمة بنود الفاتورة'],
-                        ['page' => 'analytical_dimensions', 'label' => 'الأبعاد التحليلية'],
                         ['page' => 'journal_types', 'label' => 'أنواع اليوميات'],
+                        ['page' => 'gl_account_settings', 'label' => 'حسابات القيود التلقائية'],
                         ['page' => 'fiscal_years', 'label' => 'السنوات المالية'],
                         ['page' => 'edit_lock', 'label' => 'إقفال التعديلات'],
+                        ['page' => 'invoice_line_presets', 'label' => 'قائمة بنود الفاتورة'],
+                        ['page' => 'analytical_dimensions', 'label' => 'الأبعاد التحليلية'],
                         ['page' => 'opening_balances', 'label' => 'أرصدة أول المدة المالية'],
                     ],
                 ],
@@ -58,7 +59,6 @@ function orange_admin_permission_mega_sections(): array
                 [
                     'title' => 'التقارير',
                     'pages' => [
-                        ['page' => 'accounting_reports_index', 'label' => 'فهرس التقارير المحاسبية'],
                         ['page' => 'journal_voucher_reports', 'label' => 'تقارير السندات'],
                         ['page' => 'partner_account_statement', 'label' => 'كشف حساب'],
                         ['page' => 'report_account_list', 'label' => 'قائمة الحسابات'],
