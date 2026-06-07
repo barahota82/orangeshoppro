@@ -121,7 +121,7 @@ foreach ($dims as $d) {
         <?php endif; ?>
     </div>
 
-    <?php if ($report !== null): ?>
+    <?php if ($ready): ?>
         <div class="card admin-fy-card gl-acc-stmt-body">
             <div class="gl-acc-stmt-print-sheet ral-print-sheet">
             <header class="gl-acc-stmt-print-banner ral-print-banner">
@@ -156,29 +156,36 @@ foreach ($dims as $d) {
                 </p>
             </header>
 
-            <?php if (($report['rows'] ?? []) === []): ?>
-                <p class="muted">لا بيانات لهذا البُعد في السنة المحددة (أضف قيم البُعد على أسطر السندات).</p>
-            <?php else: ?>
-                <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-                    <table class="admin-fy-table gl-acc-stmt-table" dir="rtl" data-export-name="التقرير التحليلي" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>" data-export-subtitle="<?php echo htmlspecialchars($dimLabel . ' — ' . ($method === 'movement' ? 'حركة GL' : 'قائمة دخل'), ENT_QUOTES, 'UTF-8'); ?>">
-                        <thead>
-                            <tr>
-                                <th>القيمة</th>
-                                <th>كود</th>
-                                <?php if ($method === 'pl'): ?>
-                                    <th>إيراد</th>
-                                    <th>تكلفة مبيعات</th>
-                                    <th>مجمل</th>
-                                    <th>مصروف</th>
-                                    <th>صافي</th>
-                                <?php else: ?>
-                                    <th>مدين</th>
-                                    <th>دائن</th>
-                                    <th>صافي حركة</th>
-                                <?php endif; ?>
+            <?php $raColspan = $method === 'pl' ? 7 : 5; ?>
+            <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
+                <table class="admin-fy-table gl-acc-stmt-table" dir="rtl" data-export-name="التقرير التحليلي" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>" data-export-subtitle="<?php echo htmlspecialchars($dimLabel . ' — ' . ($method === 'movement' ? 'حركة GL' : 'قائمة دخل'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <thead>
+                        <tr>
+                            <th>القيمة</th>
+                            <th>كود</th>
+                            <?php if ($method === 'pl'): ?>
+                                <th>إيراد</th>
+                                <th>تكلفة مبيعات</th>
+                                <th>مجمل</th>
+                                <th>مصروف</th>
+                                <th>صافي</th>
+                            <?php else: ?>
+                                <th>مدين</th>
+                                <th>دائن</th>
+                                <th>صافي حركة</th>
+                            <?php endif; ?>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($report === null): ?>
+                            <tr class="gl-acc-stmt-no-print">
+                                <td colspan="<?php echo $raColspan; ?>" class="muted">اختر السنة المالية والبُعد ثم «عرض» لعرض التقرير التحليلي.</td>
                             </tr>
-                        </thead>
-                        <tbody>
+                        <?php elseif (($report['rows'] ?? []) === []): ?>
+                            <tr>
+                                <td colspan="<?php echo $raColspan; ?>" class="muted">لا بيانات لهذا البُعد في السنة المحددة (أضف قيم البُعد على أسطر السندات).</td>
+                            </tr>
+                        <?php else: ?>
                             <?php foreach ($report['rows'] as $row): ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars((string) ($row['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -196,7 +203,9 @@ foreach ($dims as $d) {
                                     <?php endif; ?>
                                 </tr>
                             <?php endforeach; ?>
-                        </tbody>
+                        <?php endif; ?>
+                    </tbody>
+                    <?php if ($report !== null && ($report['rows'] ?? []) !== []): ?>
                         <?php $tot = $report['totals'] ?? []; ?>
                         <tfoot>
                             <tr style="font-weight:600;background:#f8fafc;">
@@ -214,9 +223,9 @@ foreach ($dims as $d) {
                                 <?php endif; ?>
                             </tr>
                         </tfoot>
-                    </table>
-                </div>
-            <?php endif; ?>
+                    <?php endif; ?>
+                </table>
+            </div>
             <div class="gl-acc-stmt-print-footer ta-report-print-footer">
                 <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
             </div>
