@@ -1053,6 +1053,150 @@ function orangeAdminOpenPrintDialog(printTitle) {
     return false;
 }
 
+/*
+ * §9.3 — طباعة السند بجدول واحد مسطّح يُبنى وقت الطباعة فقط:
+ *   رأس الجدول (بانر الشركة + رأس السند + عناوين الأعمدة) يتكرّر أعلى كل صفحة،
+ *   والبنود تتدفّق طبيعياً وتملأ الصفحة الأولى ثم تكمل. يُحلّ بذلك:
+ *     (أ) عدم ظهور البنود على الصفحة الأولى عند تعدّد الصفحات (بنية الجداول المتداخلة).
+ *     (ب) عدم تكرار رأس السند على كل الصفحات.
+ *   الشاشة لا تتغيّر إطلاقاً: الجدول المسطّح مخفي على الشاشة، ويُزال بعد الطباعة.
+ */
+var orangeVoucherFlatPrintEl = null;
+
+function orangeVoucherFlatSyncFields(srcRoot, cloneRoot) {
+    var src = srcRoot.querySelectorAll('input, select, textarea');
+    var clone = cloneRoot.querySelectorAll('input, select, textarea');
+    var n = Math.min(src.length, clone.length);
+    for (var i = 0; i < n; i++) {
+        try {
+            clone[i].value = src[i].value;
+            if (clone[i].tagName !== 'SELECT') {
+                clone[i].setAttribute('value', src[i].value);
+            }
+            if (typeof src[i].checked === 'boolean') {
+                clone[i].checked = src[i].checked;
+            }
+        } catch (e) {}
+    }
+}
+
+function orangeVoucherFlatStripIds(root) {
+    var ided = root.querySelectorAll('[id]');
+    for (var i = 0; i < ided.length; i++) {
+        ided[i].removeAttribute('id');
+    }
+    if (root.id) {
+        root.removeAttribute('id');
+    }
+    var labels = root.querySelectorAll('label[for]');
+    for (var j = 0; j < labels.length; j++) {
+        labels[j].removeAttribute('for');
+    }
+}
+
+function orangeVoucherFlatPrintCleanup() {
+    var actives = document.querySelectorAll('.jv-print-area.jv-flat-print-active');
+    for (var i = 0; i < actives.length; i++) {
+        actives[i].classList.remove('jv-flat-print-active');
+    }
+    var flats = document.querySelectorAll('.jv-flat-print-table');
+    for (var j = 0; j < flats.length; j++) {
+        if (flats[j].parentNode) {
+            flats[j].parentNode.removeChild(flats[j]);
+        }
+    }
+    orangeVoucherFlatPrintEl = null;
+}
+
+function orangeVoucherFlatPrintBuild() {
+    orangeVoucherFlatPrintCleanup();
+    var printArea = document.querySelector('.jv-print-area');
+    if (!printArea) {
+        return;
+    }
+    var sheet = printArea.querySelector('.jv-voucher-print-sheet');
+    if (!sheet) {
+        return;
+    }
+    var linesTable = sheet.querySelector('.jv-lines-table');
+    if (!linesTable) {
+        return;
+    }
+
+    var colgroup = linesTable.querySelector('colgroup');
+    var colCount = colgroup ? colgroup.querySelectorAll('col').length : 0;
+    var headerRow = linesTable.querySelector('thead > tr');
+    if (!colCount && headerRow) {
+        colCount = headerRow.children.length;
+    }
+    if (!colCount) {
+        colCount = 5;
+    }
+
+    var flat = document.createElement('table');
+    flat.className = 'jv-flat-print-table ta-report-print-table ' + linesTable.className;
+    flat.setAttribute('dir', 'rtl');
+
+    if (colgroup) {
+        flat.appendChild(colgroup.cloneNode(true));
+    }
+
+    var thead = document.createElement('thead');
+    thead.className = 'jv-flat-print-thead';
+
+    var banner = sheet.querySelector('.gl-acc-stmt-print-banner');
+    if (banner) {
+        var trB = document.createElement('tr');
+        trB.className = 'ta-report-banner-row jv-flat-print-banner-row';
+        var tdB = document.createElement('td');
+        tdB.colSpan = colCount;
+        tdB.className = 'ta-report-banner-cell jv-flat-print-banner-cell';
+        tdB.appendChild(banner.cloneNode(true));
+        trB.appendChild(tdB);
+        thead.appendChild(trB);
+    }
+
+    var formGrid = sheet.querySelector('.form-grid');
+    if (formGrid) {
+        var headClone = formGrid.cloneNode(true);
+        orangeVoucherFlatSyncFields(formGrid, headClone);
+        orangeVoucherFlatStripIds(headClone);
+        var trH = document.createElement('tr');
+        trH.className = 'jv-flat-print-head-row';
+        var tdH = document.createElement('td');
+        tdH.colSpan = colCount;
+        tdH.className = 'jv-flat-print-head-cell';
+        tdH.appendChild(headClone);
+        trH.appendChild(tdH);
+        thead.appendChild(trH);
+    }
+
+    if (headerRow) {
+        thead.appendChild(headerRow.cloneNode(true));
+    }
+    flat.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    var srcBody = linesTable.querySelector('tbody');
+    if (srcBody) {
+        var rows = srcBody.children;
+        for (var r = 0; r < rows.length; r++) {
+            var rowClone = rows[r].cloneNode(true);
+            orangeVoucherFlatSyncFields(rows[r], rowClone);
+            orangeVoucherFlatStripIds(rowClone);
+            tbody.appendChild(rowClone);
+        }
+    }
+    flat.appendChild(tbody);
+
+    printArea.appendChild(flat);
+    printArea.classList.add('jv-flat-print-active');
+    orangeVoucherFlatPrintEl = flat;
+}
+
+window.addEventListener('beforeprint', orangeVoucherFlatPrintBuild);
+window.addEventListener('afterprint', orangeVoucherFlatPrintCleanup);
+
 document.addEventListener('DOMContentLoaded', function () {
     orangeAdminApplyPermMarkers(document);
 });
