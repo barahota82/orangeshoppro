@@ -249,7 +249,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
                     title="يُولَّد تلقائياً: كود نوع اليومية-رمز الدولة-رقم القيد" dir="ltr" lang="en" autocomplete="off">
             </div>
             <div>
-                <label for="jv_document_entered">تاريخ المستند</label>
+                <label for="jv_document_entered">تاريخ الإدخال</label>
                 <input type="text" id="jv_document_entered" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;"
                     value="<?php echo htmlspecialchars($jvFormDocumentEnteredDisplay, ENT_QUOTES, 'UTF-8'); ?>"
                     title="وقت تسجيل إدخال القيد في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح" dir="ltr" lang="en">

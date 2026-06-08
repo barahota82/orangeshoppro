@@ -313,7 +313,7 @@ $ppvReady = $ppvCashLock !== null;
                 <input type="text" id="spay_ref" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;" value="<?php echo htmlspecialchars($spayRefPreview, ENT_QUOTES, 'UTF-8'); ?>" title="يُولَّد تلقائياً: SPR-رمز الدولة-رقم القيد" dir="ltr" lang="en" autocomplete="off">
             </div>
             <div>
-                <label for="spay_document_entered">تاريخ المستند</label>
+                <label for="spay_document_entered">تاريخ الإدخال</label>
                 <input type="text" id="spay_document_entered" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;" value="<?php echo htmlspecialchars($ppvFormDocumentEnteredDisplay, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
             </div>
             <div>

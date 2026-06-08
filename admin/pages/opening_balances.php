@@ -227,7 +227,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
                     title="يُولَّد تلقائياً: OBV-رمز الدولة-رقم القيد (مثل OBV-KW-1)" dir="ltr" lang="en" autocomplete="off">
             </div>
             <div>
-                <label for="ob_document_entered">تاريخ المستند</label>
+                <label for="ob_document_entered">تاريخ الإدخال</label>
                 <input type="text" id="ob_document_entered" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;"
                     value="<?php echo htmlspecialchars($obDocEnteredDisp, ENT_QUOTES, 'UTF-8'); ?>"
                     title="يُحدَّث من السند المحفوظ؛ عند أول حفظ يُثبت تلقائياً" dir="ltr" lang="en">
