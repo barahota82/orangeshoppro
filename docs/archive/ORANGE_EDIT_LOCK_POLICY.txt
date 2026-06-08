@@ -132,7 +132,7 @@ ARABIC
 - **تنفيذ:**
   - `includes/edit_lock.php` — `orange_edit_lock_force_lock()` (يضبط `is_locked=1` بعد التسجيل، بلا اشتراط `can_lock`).
   - `admin/api/opening_balances/save.php` — بعد `orange_edit_lock_register_opening_balance(...)` يستدعي `orange_edit_lock_force_lock(... 'opening_balance', $fyId ...)` + `audit_log('edit_lock_lock', ...)`.
-  - `admin/pages/opening_balances.php` — تلميح «قيد مغلق — يُفعَّل تلقائياً بعد الحفظ الناجح» (`#ob_autolock_hint`) + `onLockedChange: obApplyLockUi` يجعل الحقول/الأسطر/الأزرار للقراءة عند القفل (مثل `jvApplyViewModeUi` في YEC).
+  - `admin/pages/opening_balances.php` — خانة اختيار معطّلة «قيد مغلق — يُفعَّل تلقائياً بعد الحفظ الناجح» (`#ob_locked`، نفس عنصر `#jv_yec_locked` في YEC) + `onLockedChange: obApplyLockUi` يزامن الخانة ويجعل الحقول/الأسطر/الأزرار للقراءة عند القفل (مثل `jvApplyViewModeUi` في YEC).
 
 ENGLISH
 - Owner decision (2026-06-08): OBV opening-balance voucher auto-locks after successful save (like YEC), an explicit exception to §0/§3 "no auto-lock on save" (which still applies to daily docs). Unlock requires `can_unlock`; re-saving re-locks automatically.

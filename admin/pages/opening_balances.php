@@ -201,7 +201,10 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 <div class="card jv-print-area ob-opening-card">
     <h3 class="card-title">سند رصيد افتتاحي</h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'ob', 'doc_kind' => 'opening_balance', 'country_id' => $ctxCountryId]); ?>
-    <p class="card-hint jv-print-hide" id="ob_autolock_hint" style="margin:0 0 12px;line-height:1.55;"><strong>قيد مغلق</strong> — يُفعَّل تلقائياً بعد الحفظ الناجح (مثل قيد الإقفال السنوي)؛ للتعديل استخدم «فك القفل» أعلاه بصلاحية فك القفل.</p>
+    <label class="jv-print-hide" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;cursor:default;">
+        <input type="checkbox" id="ob_locked" disabled>
+        <span><strong>قيد مغلق</strong> — يُفعَّل تلقائياً بعد الحفظ الناجح</span>
+    </label>
     <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
         <?php orange_voucher_print_banner_thead($pdo, $ctxCountryId, ['title_ar' => 'سند رصيد افتتاحي']); ?>
         <tbody>
@@ -327,6 +330,10 @@ function obOpenPrintDialog() {
 
     function obApplyLockUi(locked) {
         obLocked = !!locked;
+        var lockChk = document.getElementById('ob_locked');
+        if (lockChk) {
+            lockChk.checked = obLocked;
+        }
         ['ob_date', 'ob_statement'].forEach(function (id) {
             var el = document.getElementById(id);
             if (el) {
