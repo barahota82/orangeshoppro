@@ -202,7 +202,10 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
     <h3 class="card-title">سند رصيد افتتاحي</h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'ob', 'doc_kind' => 'opening_balance', 'country_id' => $ctxCountryId]); ?>
     <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
-        <?php orange_voucher_print_banner_thead($pdo, $ctxCountryId, ['title_ar' => 'سند رصيد افتتاحي']); ?>
+        <?php orange_voucher_print_banner_thead($pdo, $ctxCountryId, [
+            'title_ar' => 'سند رصيد افتتاحي',
+            'serial_input_id' => 'ob_number_preview',
+        ]); ?>
         <tbody>
             <tr>
                 <td class="jv-voucher-print-body-cell">
