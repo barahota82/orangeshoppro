@@ -347,6 +347,7 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
                         </tr>
                     </thead>
                     <tbody id="crec_jv_body"></tbody>
+                    <?php orange_voucher_print_lines_tfoot_spacer(4); ?>
                 </table>
             </div>
         </div>

@@ -315,6 +315,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
                 }
                 ?>
                 </tbody>
+                <?php orange_voucher_print_lines_tfoot_spacer(5); ?>
             </table>
         </div>
     </div>

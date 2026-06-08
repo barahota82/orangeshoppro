@@ -275,6 +275,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
                     </tr>
                 </thead>
                 <tbody id="ob_body"></tbody>
+                <?php orange_voucher_print_lines_tfoot_spacer(5); ?>
             </table>
         </div>
     </div>

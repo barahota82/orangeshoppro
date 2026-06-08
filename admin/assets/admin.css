@@ -4269,6 +4269,9 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
     display: none;
 }
+.jv-lines-table > tfoot.jv-voucher-print-spacer-foot {
+    display: none;
+}
 .jv-voucher-print-body-cell {
     padding: 0;
     border: none;
@@ -4479,10 +4482,9 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         box-shadow: none !important;
     }
     /*
-     * §9.3 V6 — هوامش طباعة السندات (.jv-print-area فقط — التقارير .gl-acc-stmt-print لا تُلمس):
-     * جانبي 8mm؛ سفلي داخلي 18mm (تجربة V3 — تقليل انفصال الحساب/البيان عند كثرة الأسطر).
-     * @page سفلي 18mm للسندات فقط عبر orange_voucher_print_metafoot()؛ التقارير تبقى 12mm في @page أعلاه.
-     * علوي 10mm عبر ta-report-banner-row.
+     * §9.3 V6 — هوامش طباعة السندات موحّدة لكل الصفحات (.jv-print-area فقط):
+     * علوي 10mm (ta-report-banner-row)؛ جانبي 8mm؛ سفلي @page 18mm (orange_voucher_print_metafoot).
+     * بلا padding-bottom على الحاوية — tfoot داخل jv-lines-table يثبّت أسفل كل صفحة.
      */
     .jv-print-area {
         position: absolute;
@@ -4493,7 +4495,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         border: none;
         box-shadow: none !important;
         box-sizing: border-box;
-        padding: 0 8mm 18mm 8mm !important;
+        padding: 0 8mm 0 8mm !important;
     }
     /* §9.3 — خط رفيع بعد وصف السند (البيان) وقبل جدول الأسطر */
     .jv-print-area .form-grid > div:has(#jv_desc),
@@ -4547,6 +4549,19 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     }
     .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
         display: table-header-group !important;
+    }
+    .jv-print-area .jv-lines-table > tfoot.jv-voucher-print-spacer-foot {
+        display: table-footer-group !important;
+    }
+    .jv-print-area .jv-voucher-print-spacer-foot td.jv-voucher-print-spacer-cell {
+        height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        background: #fff !important;
+        vertical-align: top;
+        line-height: 0;
+        font-size: 0;
     }
     .jv-print-area .jv-voucher-print-sheet,
     .jv-print-area .jv-voucher-print-sheet * {
