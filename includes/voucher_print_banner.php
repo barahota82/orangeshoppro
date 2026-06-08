@@ -68,9 +68,13 @@ function orange_voucher_print_banner_markup(PDO $pdo, int $countryId, array $ctx
 /**
  * thead ترويسة — تتكرر أعلى كل صفحة طباعة (نمط ta-report-print-table).
  *
+ * §9.3 — إن مُرِّر $headHtml (رأس السند: رقم القيد..البيان) يُضاف كصفّ ثانٍ داخل
+ * نفس الـ thead ليتكرّر أعلى كل صفحة طباعة. البانر مخفي على الشاشة (CSS)؛ صفّ الرأس
+ * يظهر على الشاشة وفي الطباعة معاً — فيبقى شكل الشاشة مطابقاً.
+ *
  * @param array{title_ar:string,title_en?:string,title_span_id?:string} $ctx
  */
-function orange_voucher_print_banner_thead(PDO $pdo, int $countryId, array $ctx): void
+function orange_voucher_print_banner_thead(PDO $pdo, int $countryId, array $ctx, ?string $headHtml = null): void
 {
     ?>
 <thead class="ta-report-print-thead jv-voucher-print-thead">
@@ -79,6 +83,11 @@ function orange_voucher_print_banner_thead(PDO $pdo, int $countryId, array $ctx)
             <?php orange_voucher_print_banner_markup($pdo, $countryId, $ctx); ?>
         </td>
     </tr>
+    <?php if ($headHtml !== null && trim($headHtml) !== ''): ?>
+    <tr class="jv-voucher-head-row">
+        <td class="jv-voucher-print-body-cell jv-voucher-print-head-cell"><?php echo $headHtml; ?></td>
+    </tr>
+    <?php endif; ?>
 </thead>
     <?php
 }
