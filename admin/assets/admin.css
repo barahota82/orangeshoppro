@@ -4547,11 +4547,29 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-lines-table .ob-c {
         text-align: left !important;
     }
+    /*
+     * §9.3 V6 — عناوين أعمدة الأسطر مرة واحدة فقط (table-row-group).
+     * الافتراضي table-header-group يكرّرها من صفحة ٢ — يأكل مساحة ويكبّر الفراغ السفلي الأبيض.
+     */
+    .jv-print-area .jv-lines-table thead {
+        display: table-row-group !important;
+    }
+    /*
+     * §9.3 V6 — صف body الوحيد في jv-voucher-print-sheet يجب أن يُقسَّم داخلياً (تجاوز avoid العام لـ ta-report-print-table).
+     */
+    .jv-print-area .jv-voucher-print-sheet > tbody > tr {
+        page-break-inside: auto !important;
+    }
     .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
         display: table-header-group !important;
     }
     .jv-print-area .jv-lines-table > tfoot.jv-voucher-print-spacer-foot {
         display: table-footer-group !important;
+    }
+    .jv-print-area .jv-lines-table tr.jv-line-memo td,
+    .jv-print-area .jv-lines-table tr.ob-line-memo td {
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
     }
     .jv-print-area .jv-voucher-print-spacer-foot td.jv-voucher-print-spacer-cell {
         height: 0 !important;
