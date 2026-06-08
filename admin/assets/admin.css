@@ -4545,6 +4545,29 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-lines-table .ob-c {
         text-align: left !important;
     }
+    /*
+     * §9.3 — منع انفصال صف الحساب عن صف البيان بين صفحتين:
+     * الكسر يُسمح به بين البنود فقط، لا داخل البند (الحساب + بيانه معاً).
+     */
+    .jv-print-area .jv-lines-table tr.jv-line-main,
+    .jv-print-area .ob-opening-table tr.ob-line-main {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+    }
+    .jv-print-area .jv-lines-table tr.jv-line-memo,
+    .jv-print-area .ob-opening-table tr.ob-line-memo {
+        page-break-before: avoid !important;
+        break-before: avoid !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+    .jv-print-area .jv-lines-table tr.jv-line-main,
+    .jv-print-area .jv-lines-table tr.jv-line-memo,
+    .jv-print-area .ob-opening-table tr.ob-line-main,
+    .jv-print-area .ob-opening-table tr.ob-line-memo {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
     .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
         display: table-header-group !important;
     }
