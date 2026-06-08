@@ -93,29 +93,10 @@ function orange_voucher_print_banner(PDO $pdo, int $countryId, array $ctx): void
 }
 
 /**
- * §9.3 V6 — tfoot فارغ داخل jv-lines-table (الجدول الذي يُقسَّم عبر الصفحات) لتوحيد الهامش السفلي.
- *
- * @param int $colspan عدد أعمدة جدول الأسطر (٤ سند شريك، ٥ قيد/رصيد افتتاحي)
- */
-function orange_voucher_print_lines_tfoot_spacer(int $colspan = 5): void
-{
-    $colspan = max(1, $colspan);
-    ?>
-<tfoot class="jv-voucher-print-spacer-foot">
-    <tr>
-        <td colspan="<?php echo $colspan; ?>" class="jv-voucher-print-spacer-cell" aria-hidden="true"></td>
-    </tr>
-</tfoot>
-    <?php
-}
-
-/**
- * تذييل طباعة السند — تاريخ/وقت يمين + أرقام صفحات يسار (نمط التقارير §9.3 V5).
+ * تذييل طباعة السند — نفس التقارير: @page 12mm عام + تاريخ/وقت في @bottom-right.
  */
 function orange_voucher_print_metafoot(): void
 {
     $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
-    /* §9.3 V6 — هامش سفلي موحّد لكل صفحات السند: @page 18mm فقط (بلا padding-bottom على .jv-print-area). */
-    echo '<style>@media print{@page{margin:0 0 18mm 0;}}</style>';
     echo orange_accounting_report_print_metafoot_markup($printDatetime);
 }

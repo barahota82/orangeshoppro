@@ -358,7 +358,6 @@ $ppvReady = $ppvCashLock !== null;
                         </tr>
                     </thead>
                     <tbody id="spay_jv_body"></tbody>
-                    <?php orange_voucher_print_lines_tfoot_spacer(4); ?>
                 </table>
             </div>
         </div>
