@@ -4571,6 +4571,17 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
         display: table-header-group !important;
     }
+    /* §9.3 — رقم القيد في البانر المتكرر (أعلى كل صفحة طباعة) */
+    .jv-print-area .jv-print-banner-serial-line {
+        margin: 2px 0 0 !important;
+        font-size: 8.5pt !important;
+        font-weight: 600 !important;
+        color: #0f172a !important;
+        text-align: center !important;
+    }
+    .jv-print-area .jv-print-banner-serial {
+        font-weight: 700 !important;
+    }
     .jv-print-area .jv-voucher-print-sheet,
     .jv-print-area .jv-voucher-print-sheet * {
         visibility: visible;

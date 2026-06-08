@@ -1013,7 +1013,24 @@ function orangeAdminBuildVoucherPrintDocTitle(titleElId, numberElId, fallbackNam
         var numEl = document.getElementById(numberElId);
         num = numEl ? String(numEl.value || '').trim() : '';
     }
+    orangeVoucherSyncPrintBannerSerial(num);
     return num !== '' ? (name + ' رقم ' + num) : name;
+}
+
+/**
+ * §9.3 — مزامنة «رقم القيد» في البانر المتكرر للطباعة (أعلى كل صفحة).
+ * البانر print-only؛ يُملأ وقت فتح الطباعة. مخفي إن لا يوجد رقم.
+ */
+function orangeVoucherSyncPrintBannerSerial(num) {
+    var serial = String(num == null ? '' : num).trim();
+    var serialEls = document.querySelectorAll('.jv-print-banner-serial');
+    for (var i = 0; i < serialEls.length; i++) {
+        serialEls[i].textContent = serial;
+    }
+    var lineEls = document.querySelectorAll('.jv-print-banner-serial-line');
+    for (var j = 0; j < lineEls.length; j++) {
+        lineEls[j].style.display = serial !== '' ? '' : 'none';
+    }
 }
 
 /**
