@@ -4275,6 +4275,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     vertical-align: top;
 }
 /* §9.3 — جدول الطباعة المسطّح يُبنى وقت الطباعة فقط؛ مخفي تماماً على الشاشة */
+.jv-flat-print-sheet,
 .jv-flat-print-table {
     display: none;
 }
@@ -4590,6 +4591,9 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
      */
     .jv-print-area.jv-flat-print-active .jv-voucher-print-sheet {
         display: none !important;
+    }
+    .jv-print-area.jv-flat-print-active .jv-flat-print-sheet {
+        display: block !important;
     }
     .jv-print-area.jv-flat-print-active .jv-flat-print-table {
         display: table !important;

@@ -1099,10 +1099,10 @@ function orangeVoucherFlatPrintCleanup() {
     for (var i = 0; i < actives.length; i++) {
         actives[i].classList.remove('jv-flat-print-active');
     }
-    var flats = document.querySelectorAll('.jv-flat-print-table');
-    for (var j = 0; j < flats.length; j++) {
-        if (flats[j].parentNode) {
-            flats[j].parentNode.removeChild(flats[j]);
+    var sheets = document.querySelectorAll('.jv-flat-print-sheet');
+    for (var j = 0; j < sheets.length; j++) {
+        if (sheets[j].parentNode) {
+            sheets[j].parentNode.removeChild(sheets[j]);
         }
     }
     orangeVoucherFlatPrintEl = null;
@@ -1189,7 +1189,14 @@ function orangeVoucherFlatPrintBuild() {
     }
     flat.appendChild(tbody);
 
-    printArea.appendChild(flat);
+    /*
+     * يُلفّ الجدول داخل div (نمط أوراق التقارير) — جدول كطفل مباشر لعنصر
+     * position:absolute لا يكرّر الـ thead في كروم؛ اللفّ داخل بلوك عادي يُصلح ذلك.
+     */
+    var sheetWrap = document.createElement('div');
+    sheetWrap.className = 'jv-flat-print-sheet';
+    sheetWrap.appendChild(flat);
+    printArea.appendChild(sheetWrap);
     printArea.classList.add('jv-flat-print-active');
     orangeVoucherFlatPrintEl = flat;
 }
