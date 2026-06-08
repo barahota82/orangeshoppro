@@ -248,10 +248,7 @@ $ppvReady = $ppvCashLock !== null;
 <div class="card jv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
     <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
-        <?php orange_voucher_print_banner_thead($pdo, $ppvCountryId, [
-            'title_ar' => $ppvTitle,
-            'serial_input_id' => 'spay_number_preview',
-        ]); ?>
+        <?php orange_voucher_print_banner_thead($pdo, $ppvCountryId, ['title_ar' => $ppvTitle]); ?>
         <tbody>
             <tr>
                 <td class="jv-voucher-print-body-cell">

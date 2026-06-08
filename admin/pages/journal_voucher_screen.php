@@ -208,7 +208,6 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
         <?php orange_voucher_print_banner_thead($pdo, $jvScreenCountryId, [
             'title_ar' => (string) $jvPageCardTitle,
             'title_span_id' => 'jv_voucher_print_title_ar',
-            'serial_input_id' => 'jv_number_preview',
         ]); ?>
         <tbody>
             <tr>

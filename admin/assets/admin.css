@@ -4571,17 +4571,11 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
      * §9.3 V2 — رأس السند: رقم القيد | تاريخ السند | المرجع | تاريخ المستند | مجموع المدين | مجموع الدائن
      * سطر واحد في الطباعة (عمودي أو أفقي) — لا التفاف لثلاثة أعمدة.
      */
-    /*
-     * §9.3 V3 — الصفحة ١: السطر الكامل في tbody (٥ حقول بعد إخفاء رقم القيد لتفادي التكرار مع thead).
-     * الصفحات ٢+: thead يكرّر رقم القيد فقط (ليس السطر الكامل).
-     */
-    .jv-print-area .jv-voucher-header-line > div:first-child {
-        display: none !important;
-    }
     .jv-print-area .jv-voucher-header-line {
         display: grid !important;
         direction: rtl !important;
         grid-template-columns:
+            minmax(4.5rem, 6rem)
             minmax(7rem, 9rem)
             minmax(4.5rem, 6rem)
             minmax(7rem, 9rem)
@@ -4594,45 +4588,12 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     }
     .jv-print-area .jv-voucher-header-line--nav {
         grid-template-columns:
+            minmax(4.5rem, 6rem)
             minmax(7rem, 9rem)
             minmax(4.5rem, 6rem)
             minmax(7rem, 9rem)
             minmax(6.5rem, 8rem)
             minmax(6.5rem, 8rem) !important;
-    }
-    .jv-print-area tr.jv-voucher-print-serial-row td.jv-voucher-print-serial-cell {
-        padding: 0 0 0.35rem !important;
-        border: none !important;
-        background: #fff !important;
-        text-align: right !important;
-    }
-    .jv-print-area tr.ta-report-banner-row + tr.jv-voucher-print-serial-row td {
-        padding-top: 0 !important;
-    }
-    .jv-print-area .jv-voucher-print-serial-only {
-        display: flex !important;
-        flex-direction: row;
-        align-items: center;
-        gap: 6px;
-        justify-content: flex-start;
-        font-size: 8pt;
-    }
-    .jv-print-area .jv-voucher-print-serial-label {
-        font-weight: 600;
-        white-space: nowrap;
-    }
-    .jv-print-area .jv-voucher-print-serial-repeat {
-        border: 1px solid #cbd5e1 !important;
-        min-width: 3.5rem !important;
-        max-width: 6rem;
-        text-align: center !important;
-        padding: 2px 6px !important;
-        font-size: 8pt !important;
-        height: auto !important;
-        min-height: 0 !important;
-        background: #fff !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
     }
     .jv-print-area .jv-voucher-header-line .jv-tot-readonly {
         text-align: left !important;

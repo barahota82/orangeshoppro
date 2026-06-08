@@ -68,12 +68,10 @@ function orange_voucher_print_banner_markup(PDO $pdo, int $countryId, array $ctx
 /**
  * thead ترويسة — تتكرر أعلى كل صفحة طباعة (نمط ta-report-print-table).
  *
- * @param array{title_ar:string,title_en?:string,title_span_id?:string,serial_input_id?:string} $ctx
- *   serial_input_id — id حقل رقم القيد في الشاشة (مثل jv_number_preview) لتكرار الرقم فقط في الصفحات ٢+
+ * @param array{title_ar:string,title_en?:string,title_span_id?:string} $ctx
  */
 function orange_voucher_print_banner_thead(PDO $pdo, int $countryId, array $ctx): void
 {
-    $serialInputId = trim((string) ($ctx['serial_input_id'] ?? ''));
     ?>
 <thead class="ta-report-print-thead jv-voucher-print-thead">
     <tr class="ta-report-banner-row">
@@ -81,18 +79,6 @@ function orange_voucher_print_banner_thead(PDO $pdo, int $countryId, array $ctx)
             <?php orange_voucher_print_banner_markup($pdo, $countryId, $ctx); ?>
         </td>
     </tr>
-    <?php if ($serialInputId !== ''): ?>
-    <tr class="jv-voucher-print-serial-row ta-report-banner-row">
-        <td class="ta-report-banner-cell jv-voucher-print-serial-cell">
-            <div class="jv-voucher-print-serial-only" dir="rtl">
-                <span class="jv-voucher-print-serial-label">رقم القيد</span>
-                <input type="text" class="jv-voucher-print-serial-repeat admin-inp-readonly" readonly tabindex="-1"
-                    data-jv-serial-source="<?php echo htmlspecialchars($serialInputId, ENT_QUOTES, 'UTF-8'); ?>"
-                    dir="ltr" lang="en" autocomplete="off" value="">
-            </div>
-        </td>
-    </tr>
-    <?php endif; ?>
 </thead>
     <?php
 }

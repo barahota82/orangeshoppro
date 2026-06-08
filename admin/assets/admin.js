@@ -1022,18 +1022,6 @@ function orangeAdminBuildVoucherPrintDocTitle(titleElId, numberElId, fallbackNam
  *
  * @param {string} [printTitle] اسم ملف PDF المقترح (document.title)
  */
-/** §9.3 — نسخ رقم القيد إلى صف thead المتكرر قبل الطباعة */
-function orangeVoucherPrintSyncSerialRepeat() {
-    document.querySelectorAll('.jv-voucher-print-serial-repeat[data-jv-serial-source]').forEach(function (inp) {
-        var srcId = inp.getAttribute('data-jv-serial-source');
-        if (!srcId) {
-            return;
-        }
-        var src = document.getElementById(srcId);
-        inp.value = src ? String(src.value || '').trim() : '';
-    });
-}
-
 function orangeAdminOpenPrintDialog(printTitle) {
     var savedDocTitle = document.title;
     var pdfTitle = printTitle && String(printTitle).trim() !== '' ? String(printTitle).trim() : null;
@@ -1060,13 +1048,10 @@ function orangeAdminOpenPrintDialog(printTitle) {
             alert('تعذّر فتح نافذة الطباعة في هذا المتصفح.');
             return;
         }
-        orangeVoucherPrintSyncSerialRepeat();
         window.print();
     }, 0);
     return false;
 }
-
-window.addEventListener('beforeprint', orangeVoucherPrintSyncSerialRepeat);
 
 document.addEventListener('DOMContentLoaded', function () {
     orangeAdminApplyPermMarkers(document);
