@@ -204,14 +204,23 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
     <?php if ((($jvPageEntryType ?? '') === 'receipt_voucher' || ($jvPageEntryType ?? '') === 'payment_voucher') && $jvCashLock === null): ?>
     <p class="card-hint jv-print-hide" style="margin:0 0 12px;">اربط حساب <strong>الخزينة / النقدية</strong> من <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a> (بند النقدية) لاستخدام سند القبض أو سند الصرف بسطر خزينة ثابت.</p>
     <?php endif; ?>
-    <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
+    <table class="jv-voucher-print-sheet ta-report-print-table admin-table admin-doc-lines-table jv-lines-table" dir="rtl">
+        <colgroup>
+            <col class="jv-col-code">
+            <col class="jv-col-name">
+            <col class="jv-col-amt">
+            <col class="jv-col-amt">
+            <col class="jv-col-act">
+        </colgroup>
         <?php orange_voucher_print_banner_thead($pdo, $jvScreenCountryId, [
             'title_ar' => (string) $jvPageCardTitle,
             'title_span_id' => 'jv_voucher_print_title_ar',
+            'cols_colspan' => 5,
+            'with_actions_col' => true,
         ]); ?>
-        <tbody>
-            <tr>
-                <td class="jv-voucher-print-body-cell">
+        <tbody class="jv-voucher-meta-body">
+            <tr class="jv-voucher-meta-row">
+                <td colspan="5" class="jv-voucher-print-meta-cell">
     <div class="form-grid">
         <?php if ($jvPageEt === 'other_voucher'): ?>
         <div class="jv-other-voucher-filter-row jv-print-hide" style="grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:6px;">
@@ -281,45 +290,24 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
             <input type="text" id="jv_desc" placeholder="وصف السند">
         </div>
     </div>
-    <div class="admin-doc-frame">
-        <div class="table-wrap">
-            <table class="admin-table admin-doc-lines-table jv-lines-table">
-                <colgroup>
-                    <col class="jv-col-code">
-                    <col class="jv-col-name">
-                    <col class="jv-col-amt">
-                    <col class="jv-col-amt">
-                    <col class="jv-col-act">
-                </colgroup>
-                <thead>
-                    <tr>
-                        <th>كود الحساب</th>
-                        <th>اسم الحساب</th>
-                        <th>مدين</th>
-                        <th>دائن</th>
-                        <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
-                    </tr>
-                </thead>
-                <tbody id="jv_lines_body">
-                <?php
-                if ($jvCashLock !== null) {
-                    if (($jvCashLock['placement'] ?? '') === 'first') {
-                        ($jvEchoJvCashLine)($jvCashLock);
-                    }
-                    ($jvEchoJvManualLine)();
-                    if (($jvCashLock['placement'] ?? '') === 'last') {
-                        ($jvEchoJvCashLine)($jvCashLock);
-                    }
-                } elseif ($jvPageEt === 'receipt_voucher' || $jvPageEt === 'payment_voucher') {
-                    ($jvEchoJvManualLine)();
-                }
-                ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
                 </td>
             </tr>
+        </tbody>
+        <?php orange_voucher_print_lines_cols_screen_tbody(true); ?>
+        <tbody id="jv_lines_body">
+        <?php
+        if ($jvCashLock !== null) {
+            if (($jvCashLock['placement'] ?? '') === 'first') {
+                ($jvEchoJvCashLine)($jvCashLock);
+            }
+            ($jvEchoJvManualLine)();
+            if (($jvCashLock['placement'] ?? '') === 'last') {
+                ($jvEchoJvCashLine)($jvCashLock);
+            }
+        } elseif ($jvPageEt === 'receipt_voucher' || $jvPageEt === 'payment_voucher') {
+            ($jvEchoJvManualLine)();
+        }
+        ?>
         </tbody>
     </table>
     <?php orange_voucher_print_metafoot(); ?>

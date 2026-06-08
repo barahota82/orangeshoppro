@@ -66,20 +66,54 @@ function orange_voucher_print_banner_markup(PDO $pdo, int $countryId, array $ctx
 }
 
 /**
- * thead ترويسة — تتكرر أعلى كل صفحة طباعة (نمط ta-report-print-table).
+ * thead ترويسة + عناوين أعمدة الأسطر — تتكرر أعلى كل صفحة طباعة (نمط ta-report-print-table).
  *
- * @param array{title_ar:string,title_en?:string,title_span_id?:string} $ctx
+ * @param array{title_ar:string,title_en?:string,title_span_id?:string,cols_colspan?:int,with_actions_col?:bool} $ctx
  */
 function orange_voucher_print_banner_thead(PDO $pdo, int $countryId, array $ctx): void
 {
+    $colsColspan = (int) ($ctx['cols_colspan'] ?? 5);
+    if ($colsColspan < 4) {
+        $colsColspan = 4;
+    }
+    $withActionsCol = (bool) ($ctx['with_actions_col'] ?? true);
     ?>
 <thead class="ta-report-print-thead jv-voucher-print-thead">
     <tr class="ta-report-banner-row">
-        <td class="ta-report-banner-cell">
+        <td colspan="<?php echo $colsColspan; ?>" class="ta-report-banner-cell">
             <?php orange_voucher_print_banner_markup($pdo, $countryId, $ctx); ?>
         </td>
     </tr>
+    <tr class="ta-report-cols-row jv-voucher-cols-row">
+        <th>كود الحساب</th>
+        <th>اسم الحساب</th>
+        <th>مدين</th>
+        <th>دائن</th>
+        <?php if ($withActionsCol): ?>
+        <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
+        <?php endif; ?>
+    </tr>
 </thead>
+    <?php
+}
+
+/**
+ * عناوين أعمدة الأسطر على الشاشة فقط — في الطباعة تُكرَّر من thead (jv-voucher-cols-row).
+ */
+function orange_voucher_print_lines_cols_screen_tbody(bool $withActionsCol = true): void
+{
+    ?>
+<tbody class="jv-voucher-cols-screen-body jv-print-hide">
+    <tr class="jv-voucher-cols-screen-row">
+        <th>كود الحساب</th>
+        <th>اسم الحساب</th>
+        <th>مدين</th>
+        <th>دائن</th>
+        <?php if ($withActionsCol): ?>
+        <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
+        <?php endif; ?>
+    </tr>
+</tbody>
     <?php
 }
 

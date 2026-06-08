@@ -247,11 +247,21 @@ $ppvReady = $ppvCashLock !== null;
 
 <div class="card jv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
-    <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
-        <?php orange_voucher_print_banner_thead($pdo, $ppvCountryId, ['title_ar' => $ppvTitle]); ?>
-        <tbody>
-            <tr>
-                <td class="jv-voucher-print-body-cell">
+    <table class="jv-voucher-print-sheet ta-report-print-table admin-table admin-doc-lines-table jv-lines-table" dir="rtl">
+        <colgroup>
+            <col class="jv-col-code">
+            <col class="jv-col-name">
+            <col class="jv-col-amt">
+            <col class="jv-col-amt">
+        </colgroup>
+        <?php orange_voucher_print_banner_thead($pdo, $ppvCountryId, [
+            'title_ar' => $ppvTitle,
+            'cols_colspan' => 4,
+            'with_actions_col' => false,
+        ]); ?>
+        <tbody class="jv-voucher-meta-body">
+            <tr class="jv-voucher-meta-row">
+                <td colspan="4" class="jv-voucher-print-meta-cell">
 
     <!-- ١ — المورد + خيار الدفعة المقدمة -->
     <div class="form-grid" style="margin-bottom:16px;">
@@ -339,33 +349,13 @@ $ppvReady = $ppvCashLock !== null;
             <label for="spay_desc">البيان</label>
             <input type="text" id="spay_desc" placeholder="بيان السداد" value=""<?php echo !$ppvReady ? ' disabled' : ''; ?>>
         </div>
-
-        <div class="admin-doc-frame">
-            <div class="table-wrap">
-                <table class="admin-table admin-doc-lines-table jv-lines-table">
-                    <colgroup>
-                        <col class="jv-col-code">
-                        <col class="jv-col-name">
-                        <col class="jv-col-amt">
-                        <col class="jv-col-amt">
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th>كود الحساب</th>
-                            <th>اسم الحساب</th>
-                            <th>مدين</th>
-                            <th>دائن</th>
-                        </tr>
-                    </thead>
-                    <tbody id="spay_jv_body"></tbody>
-                </table>
-            </div>
-        </div>
     </div>
 
                 </td>
             </tr>
         </tbody>
+        <?php orange_voucher_print_lines_cols_screen_tbody(false); ?>
+        <tbody id="spay_jv_body"></tbody>
     </table>
     <?php orange_voucher_print_metafoot(); ?>
 
