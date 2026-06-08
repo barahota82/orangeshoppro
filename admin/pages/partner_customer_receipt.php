@@ -234,7 +234,7 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
 </div>
 <?php endif; ?>
 
-<div class="card jv-print-area" data-jv-serial-source="crec_number_preview">
+<div class="card jv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
     <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
         <?php orange_voucher_print_banner_thead($pdo, $ppvCountryId, ['title_ar' => $ppvTitle]); ?>
@@ -329,7 +329,6 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
             <input type="text" id="crec_desc" placeholder="بيان القبض" value=""<?php echo !$ppvReady ? ' disabled' : ''; ?>>
         </div>
 
-        <?php orange_voucher_print_lines_continuation_open(); ?>
         <div class="admin-doc-frame">
             <div class="table-wrap">
                 <table class="admin-table admin-doc-lines-table jv-lines-table">
@@ -351,7 +350,6 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
                 </table>
             </div>
         </div>
-        <?php orange_voucher_print_lines_continuation_close(); ?>
     </div>
 
                 </td>

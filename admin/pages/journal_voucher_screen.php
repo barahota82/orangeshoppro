@@ -191,7 +191,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 </div>
 <?php endif; ?>
 
-<div class="card jv-print-area" data-jv-serial-source="jv_number_preview">
+<div class="card jv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($jvPageCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
     <?php if (!$jvYecMode): orange_edit_lock_ui_toolbar(['prefix' => 'jv', 'doc_kind' => 'journal_voucher', 'country_id' => $jvScreenCountryId]); endif; ?>
     <?php if ($jvYecMode): ?>
@@ -281,7 +281,6 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
             <input type="text" id="jv_desc" placeholder="وصف السند">
         </div>
     </div>
-    <?php orange_voucher_print_lines_continuation_open(); ?>
     <div class="admin-doc-frame">
         <div class="table-wrap">
             <table class="admin-table admin-doc-lines-table jv-lines-table">
@@ -319,7 +318,6 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
             </table>
         </div>
     </div>
-    <?php orange_voucher_print_lines_continuation_close(); ?>
                 </td>
             </tr>
         </tbody>

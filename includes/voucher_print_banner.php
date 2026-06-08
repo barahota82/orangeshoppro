@@ -84,46 +84,6 @@ function orange_voucher_print_banner_thead(PDO $pdo, int $countryId, array $ctx)
 }
 
 /**
- * §9.3 V3 — خانة رقم القيد للصفحات ٢+ (تسمية + خانة + رقم).
- */
-function orange_voucher_print_serial_field_markup(): void
-{
-    ?>
-<div class="jv-voucher-print-serial-field">
-    <label class="jv-voucher-print-serial-label">رقم القيد</label>
-    <input type="text" class="jv-voucher-print-serial-repeat admin-inp-readonly" readonly tabindex="-1" dir="ltr" lang="en" autocomplete="off" value="">
-</div>
-    <?php
-}
-
-/**
- * §9.3 V3 — غلاف جدول الأسطر: thead يكرّر رقم القيد من الصفحة ٢ فقط (مع فاصل صفحة عند تعدد الصفحات).
- */
-function orange_voucher_print_lines_continuation_open(): void
-{
-    ?>
-<div class="jv-voucher-lines-print-start">
-<table class="jv-voucher-lines-continuation-sheet ta-report-print-table" dir="rtl">
-<thead class="jv-voucher-lines-continuation-thead">
-<tr class="jv-voucher-print-serial-row">
-<td class="jv-voucher-print-serial-cell">
-<?php orange_voucher_print_serial_field_markup(); ?>
-</td>
-</tr>
-</thead>
-<tbody><tr><td class="jv-voucher-lines-continuation-body">
-    <?php
-}
-
-function orange_voucher_print_lines_continuation_close(): void
-{
-    ?>
-</td></tr></tbody></table>
-</div>
-    <?php
-}
-
-/**
  * @deprecated استخدم orange_voucher_print_banner_thead داخل jv-voucher-print-sheet
  * @param array{title_ar:string,title_en?:string,title_span_id?:string} $ctx
  */
