@@ -201,22 +201,11 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 <div class="card jv-print-area ob-opening-card">
     <h3 class="card-title">سند رصيد افتتاحي</h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'ob', 'doc_kind' => 'opening_balance', 'country_id' => $ctxCountryId]); ?>
-    <table class="jv-voucher-print-sheet ta-report-print-table admin-table admin-doc-lines-table ob-opening-table jv-lines-table" dir="rtl">
-        <colgroup>
-            <col class="jv-col-code">
-            <col class="jv-col-name">
-            <col class="jv-col-amt">
-            <col class="jv-col-amt">
-            <col class="jv-col-act">
-        </colgroup>
-        <?php orange_voucher_print_banner_thead($pdo, $ctxCountryId, [
-            'title_ar' => 'سند رصيد افتتاحي',
-            'cols_colspan' => 5,
-            'with_actions_col' => true,
-        ]); ?>
-        <tbody class="jv-voucher-meta-body">
-            <tr class="jv-voucher-meta-row">
-                <td colspan="5" class="jv-voucher-print-meta-cell">
+    <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
+        <?php orange_voucher_print_banner_thead($pdo, $ctxCountryId, ['title_ar' => 'سند رصيد افتتاحي']); ?>
+        <tbody>
+            <tr>
+                <td class="jv-voucher-print-body-cell">
     <div class="form-grid">
         <div class="jv-voucher-header-line jv-voucher-header-line--nav" style="grid-column:1/-1;">
             <div>
@@ -266,15 +255,36 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
             <input type="text" id="ob_statement" class="admin-inp" dir="rtl" autocomplete="off" value="<?php echo htmlspecialchars($obStatement, ENT_QUOTES, 'UTF-8'); ?>" aria-required="true" placeholder="وصف السند">
         </div>
     </div>
-                </td>
-            </tr>
-        </tbody>
-        <?php orange_voucher_print_lines_cols_screen_tbody(true); ?>
-        <tbody id="ob_body"></tbody>
-    </table>
+    <div class="admin-doc-frame">
+        <div class="table-wrap ob-opening-table-wrap">
+            <table class="admin-table admin-doc-lines-table ob-opening-table jv-lines-table">
+                <colgroup>
+                    <col class="jv-col-code">
+                    <col class="jv-col-name">
+                    <col class="jv-col-amt">
+                    <col class="jv-col-amt">
+                    <col class="jv-col-act">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th class="ob-th-code">كود الحساب</th>
+                        <th class="ob-th-name">اسم الحساب</th>
+                        <th>مدين</th>
+                        <th>دائن</th>
+                        <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
+                    </tr>
+                </thead>
+                <tbody id="ob_body"></tbody>
+            </table>
+        </div>
+    </div>
     <div class="actions admin-doc-lines-toolbar ob-opening-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:10px;">
         <button type="button" class="btn-secondary" id="ob_btn_add">+ سطر يدوي</button>
     </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
     <?php orange_voucher_print_metafoot(); ?>
 </div>
 

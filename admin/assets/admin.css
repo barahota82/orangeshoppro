@@ -4266,27 +4266,10 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     border-collapse: collapse;
     border: none;
 }
-/*
- * §9.3 V7 — هيكل مسطّح مثل التقارير: thead = بانر (مخفي على الشاشة) + عناوين أعمدة؛
- * tbody منفصل للرأس/البيان ثم أسطر القيد مباشرة (لا جدول متداخل).
- */
 .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
-    display: table-header-group;
-}
-.jv-voucher-print-sheet > thead.jv-voucher-print-thead tr.ta-report-banner-row,
-.jv-voucher-print-sheet > thead.jv-voucher-print-thead tr.jv-voucher-cols-row {
     display: none;
 }
-.jv-voucher-cols-screen-body th {
-    text-align: center;
-    font-weight: 600;
-    font-size: 0.85rem;
-    padding: 8px 6px;
-    border-bottom: 2px solid #e2e8f0;
-    background: #f9fafb;
-}
-.jv-voucher-print-body-cell,
-.jv-voucher-print-meta-cell {
+.jv-voucher-print-body-cell {
     padding: 0;
     border: none;
     vertical-align: top;
@@ -4560,26 +4543,20 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-lines-table .ob-c {
         text-align: left !important;
     }
-    /* §9.3 V7 — ترويسة الشركة + عناوين الأعمدة تتكرران (نمط التقارير — جدول مسطّح) */
+    /* §9.3 — ترويسة الشركة تتكرر (نمط التقارير) */
     .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
         display: table-header-group !important;
     }
-    .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead tr.ta-report-banner-row,
-    .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead tr.jv-voucher-cols-row {
-        display: table-row !important;
+    /*
+     * جدول الأسطر متداخل داخل خلية واحدة — تكرار thead (table-header-group) من صفحة ٢
+     * يضيف صف عناوين فوق الأسطر ويترك فراغاً أبيض كبيراً فوق تذييل الطباعة (صفحة ١ لا تتأثر بنفس الشكل).
+     * عناوين الأعمدة تظهر مرة واحدة قبل الأسطر فقط (table-row-group).
+     */
+    .jv-print-area .jv-lines-table thead {
+        display: table-row-group !important;
     }
-    .jv-print-area .jv-voucher-print-sheet {
-        page-break-inside: auto;
-    }
-    .jv-print-area .jv-voucher-print-sheet tbody tr.jv-line-main,
-    .jv-print-area .jv-voucher-print-sheet tbody tr.jv-line-memo,
-    .jv-print-area .jv-voucher-print-sheet tbody tr.ob-line-main,
-    .jv-print-area .jv-voucher-print-sheet tbody tr.ob-line-memo {
-        page-break-inside: avoid;
-        page-break-after: auto;
-    }
-    .jv-print-area .jv-voucher-meta-row {
-        page-break-inside: avoid;
+    .jv-print-area .jv-voucher-print-sheet > tbody > tr {
+        page-break-inside: auto !important;
     }
     .jv-print-area .jv-lines-table tr.jv-line-memo td,
     .jv-print-area .jv-lines-table tr.ob-line-memo td {
@@ -4590,8 +4567,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-voucher-print-sheet * {
         visibility: visible;
     }
-    .jv-print-area .jv-voucher-print-body-cell,
-    .jv-print-area .jv-voucher-print-meta-cell {
+    .jv-print-area .jv-voucher-print-body-cell {
         padding: 0 !important;
         border: none !important;
     }
