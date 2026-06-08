@@ -1013,57 +1013,7 @@ function orangeAdminBuildVoucherPrintDocTitle(titleElId, numberElId, fallbackNam
         var numEl = document.getElementById(numberElId);
         num = numEl ? String(numEl.value || '').trim() : '';
     }
-    orangeVoucherSyncPrintBannerMeta(num, orangeVoucherResolveBannerDesc());
     return num !== '' ? (name + ' رقم ' + num) : name;
-}
-
-/**
- * §9.3 — قراءة قيمة «البيان» للسند من معرّفات الشاشات المعروفة (دون لمس HTML الشاشة).
- * تُحمَّل شاشة واحدة فقط في كل مرة، فيوجد معرّف واحد فعّال.
- */
-function orangeVoucherResolveBannerDesc() {
-    var ids = ['jv_desc', 'crec_desc', 'spay_desc', 'ob_statement', 'ppv_desc'];
-    for (var i = 0; i < ids.length; i++) {
-        var el = document.getElementById(ids[i]);
-        if (el) {
-            return String(el.value || '').trim();
-        }
-    }
-    return '';
-}
-
-/**
- * §9.3 — مزامنة «رقم القيد» و«البيان» في البانر المتكرر للطباعة (أعلى كل صفحة).
- * البانر print-only؛ يُملأ وقت فتح الطباعة. يُخفى كل سطر إن كانت قيمته فارغة،
- * ويُخفى الصندوق كله إن لم تتوفر أي قيمة.
- */
-function orangeVoucherSyncPrintBannerMeta(num, desc) {
-    var serial = String(num == null ? '' : num).trim();
-    var statement = String(desc == null ? '' : desc).trim();
-    orangeVoucherSetBannerField('.jv-print-banner-serial', '.jv-print-banner-serial-line', serial);
-    orangeVoucherSetBannerField('.jv-print-banner-desc', '.jv-print-banner-desc-line', statement);
-    var metaEls = document.querySelectorAll('.jv-print-banner-meta');
-    var hasAny = serial !== '' || statement !== '';
-    for (var i = 0; i < metaEls.length; i++) {
-        metaEls[i].style.display = hasAny ? '' : 'none';
-    }
-}
-
-/** §9.3 — تعبئة قيمة حقل في البانر + إظهار/إخفاء سطره. */
-function orangeVoucherSetBannerField(valueSelector, lineSelector, value) {
-    var valueEls = document.querySelectorAll(valueSelector);
-    for (var i = 0; i < valueEls.length; i++) {
-        valueEls[i].textContent = value;
-    }
-    var lineEls = document.querySelectorAll(lineSelector);
-    for (var j = 0; j < lineEls.length; j++) {
-        lineEls[j].style.display = value !== '' ? '' : 'none';
-    }
-}
-
-/** @deprecated §9.3 — استخدم orangeVoucherSyncPrintBannerMeta. */
-function orangeVoucherSyncPrintBannerSerial(num) {
-    orangeVoucherSyncPrintBannerMeta(num, orangeVoucherResolveBannerDesc());
 }
 
 /**
