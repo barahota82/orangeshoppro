@@ -61,8 +61,11 @@ function orange_voucher_print_banner_markup(PDO $pdo, int $countryId, array $ctx
             <span class="gl-acc-stmt-print-title-en" lang="en" dir="ltr"><?php echo htmlspecialchars($titleEn, ENT_QUOTES, 'UTF-8'); ?></span>
         <?php endif; ?>
     </h2>
-    <?php /* §9.3 — رقم القيد يتكرر أعلى كل صفحة طباعة (يُملأ عبر JS وقت الطباعة؛ مخفي إن فارغ). البانر print-only. */ ?>
-    <p class="jv-print-banner-serial-line" style="display:none;"><span class="jv-print-banner-serial-label">رقم القيد:</span> <span class="jv-print-banner-serial" dir="ltr"></span></p>
+    <?php /* §9.3 — رقم القيد + البيان يتكرران أعلى كل صفحة طباعة (يُملآن عبر JS وقت الطباعة؛ مخفي إن فارغ). البانر print-only. */ ?>
+    <div class="jv-print-banner-meta" style="display:none;">
+        <p class="jv-print-banner-serial-line"><span class="jv-print-banner-serial-label">رقم القيد:</span> <span class="jv-print-banner-serial" dir="ltr"></span></p>
+        <p class="jv-print-banner-desc-line"><span class="jv-print-banner-desc-label">البيان:</span> <span class="jv-print-banner-desc"></span></p>
+    </div>
 </header>
     <?php
 }
