@@ -5089,7 +5089,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 /* قائمة إيرادات ومصروفات شهرية — كتلة/طباعة لكل شهر */
 .pl-month-brand-row {
     display: grid;
-    grid-template-columns: auto max-content minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
     grid-template-rows: auto auto;
     align-items: center;
     column-gap: 12px;
@@ -5100,17 +5100,11 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     display: contents;
 }
 .pl-month-brand-text {
-    grid-column: 2;
-    grid-row: 1 / 3;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    align-self: center;
-    gap: 0.12rem;
-    min-width: 0;
-    text-align: start;
+    display: contents;
 }
 .pl-month-brand-text .gl-acc-stmt-print-company {
+    grid-column: 2;
+    grid-row: 1;
     margin: 0;
     font-size: 1rem;
     font-weight: 700;
@@ -5118,12 +5112,13 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     text-align: start;
     line-height: 1.25;
 }
-.pl-month-brand-text .pl-month-cr {
+.pl-month-cr {
+    grid-column: 2;
+    grid-row: 2;
     margin: 0;
     font-size: 0.82rem;
     color: #475569;
     white-space: nowrap;
-    text-align: start;
     line-height: 1.25;
 }
 .pl-month-contact {
@@ -5136,7 +5131,6 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     white-space: nowrap;
     text-align: end;
     line-height: 1.25;
-    justify-self: end;
 }
 .pl-month-contact-line:only-child {
     grid-column: 3;
