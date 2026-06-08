@@ -207,7 +207,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
             <tr>
                 <td class="jv-voucher-print-body-cell">
     <div class="form-grid">
-        <div class="jv-voucher-header-line jv-voucher-header-line--nav" style="grid-column:1/-1;">
+        <div class="jv-voucher-header-line" style="grid-column:1/-1;">
             <div>
                 <label for="ob_number_preview">رقم القيد</label>
                 <input type="text" id="ob_number_preview" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;text-align:center;"
@@ -242,13 +242,6 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
                 <input type="text" id="ob_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>"
                     title="إجمالي الدائن من أسطر السند" dir="ltr" lang="en" inputmode="decimal">
             </div>
-            <div class="jv-voucher-nav-cell jv-print-hide">
-                <div class="jv-voucher-nav-btns ob-voucher-action-btns" role="group" aria-label="إجراءات سند الرصيد الافتتاحي">
-                    <button type="button" id="ob_btn_save" data-orange-perm="edit" data-orange-page="opening_balances">حفظ السند</button>
-                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_print" onclick="obOpenPrintDialog(); return false;">طباعة السند</button>
-                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_delete"<?php echo $obVid <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
-                </div>
-            </div>
         </div>
         <div style="grid-column:1/-1;">
             <label for="ob_statement">البيان</label>
@@ -280,6 +273,11 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
     </div>
     <div class="actions admin-doc-lines-toolbar ob-opening-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:10px;">
         <button type="button" class="btn-secondary" id="ob_btn_add">+ سطر يدوي</button>
+        <div class="jv-toolbar-primary-group">
+            <button type="button" class="btn-secondary" id="ob_btn_delete"<?php echo $obVid <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
+            <button type="button" class="btn-secondary" id="ob_btn_print" onclick="obOpenPrintDialog(); return false;">طباعة السند</button>
+            <button type="button" id="ob_btn_save" data-orange-perm="edit" data-orange-page="opening_balances">حفظ السند</button>
+        </div>
     </div>
                 </td>
             </tr>
