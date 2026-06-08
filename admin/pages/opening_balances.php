@@ -201,6 +201,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 <div class="card jv-print-area ob-opening-card">
     <h3 class="card-title">سند رصيد افتتاحي</h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'ob', 'doc_kind' => 'opening_balance', 'country_id' => $ctxCountryId]); ?>
+    <p class="card-hint jv-print-hide" id="ob_autolock_hint" style="margin:0 0 12px;line-height:1.55;"><strong>قيد مغلق</strong> — يُفعَّل تلقائياً بعد الحفظ الناجح (مثل قيد الإقفال السنوي)؛ للتعديل استخدم «فك القفل» أعلاه بصلاحية فك القفل.</p>
     <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
         <?php orange_voucher_print_banner_thead($pdo, $ctxCountryId, ['title_ar' => 'سند رصيد افتتاحي']); ?>
         <tbody>
@@ -322,6 +323,34 @@ function obOpenPrintDialog() {
 (function () {
     var obSaveInFlight = false;
     var obDeleteInFlight = false;
+    var obLocked = false;
+
+    function obApplyLockUi(locked) {
+        obLocked = !!locked;
+        ['ob_date', 'ob_statement'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) {
+                el.readOnly = obLocked;
+            }
+        });
+        ['ob_btn_save', 'ob_btn_add'].forEach(function (id) {
+            var b = document.getElementById(id);
+            if (b) {
+                b.disabled = obLocked;
+            }
+        });
+        var del = document.getElementById('ob_btn_delete');
+        if (del) {
+            del.disabled = obLocked || OB_SAVED_VOUCHER_ID <= 0;
+        }
+        document.querySelectorAll('#ob_body input').forEach(function (inp) {
+            inp.readOnly = obLocked;
+        });
+        document.querySelectorAll('#ob_body .ob-row-del').forEach(function (bt) {
+            bt.disabled = obLocked;
+            bt.style.visibility = obLocked ? 'hidden' : '';
+        });
+    }
 
     function obResolveFyIdFromIso(iso) {
         if (!iso || !OB_FY_RANGES || !OB_FY_RANGES.length) {
@@ -872,7 +901,8 @@ function obOpenPrintDialog() {
                 countryId: OB_COUNTRY_ID,
                 getEntityId: function () {
                     return (OB_PAGE_FY > 0 && OB_SAVED_VOUCHER_ID > 0) ? OB_PAGE_FY : 0;
-                }
+                },
+                onLockedChange: obApplyLockUi
             });
         }
         obWireDateReload();

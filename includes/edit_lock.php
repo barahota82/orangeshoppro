@@ -171,6 +171,40 @@ function orange_edit_lock_is_locked(PDO $pdo, string $kind, int $entityId, ?int 
     return $v !== false && (int) $v === 1;
 }
 
+/**
+ * قفل تلقائي على مستند مسجَّل (مثل قيد الإقفال YEC) — يُستدعى بعد الحفظ الناجح.
+ * لا يتطلب صلاحية can_lock لأنه قفل تلقائي تابع لطبيعة المستند، لا إجراء مسؤول يدوي.
+ */
+function orange_edit_lock_force_lock(PDO $pdo, string $kind, int $entityId, ?int $countryId = null, ?int $adminId = null): void
+{
+    orange_catalog_ensure_schema($pdo);
+    orange_catalog_ensure_edit_lock_schema($pdo);
+    if (!orange_table_exists($pdo, 'orange_edit_lock_registry')) {
+        return;
+    }
+    $kind = trim($kind);
+    if ($kind === '' || $entityId <= 0) {
+        return;
+    }
+    $aid = ($adminId !== null && $adminId > 0) ? $adminId : null;
+    $cid = ($countryId !== null && $countryId > 0) ? $countryId : null;
+    if ($cid === null) {
+        $st = $pdo->prepare(
+            'UPDATE orange_edit_lock_registry
+             SET is_locked = 1, locked_at = NOW(), locked_by_admin_id = ?
+             WHERE doc_kind = ? AND entity_id = ? AND (country_id IS NULL OR country_id = 0)'
+        );
+        $st->execute([$aid, $kind, $entityId]);
+    } else {
+        $st = $pdo->prepare(
+            'UPDATE orange_edit_lock_registry
+             SET is_locked = 1, locked_at = NOW(), locked_by_admin_id = ?
+             WHERE doc_kind = ? AND entity_id = ? AND country_id = ?'
+        );
+        $st->execute([$aid, $kind, $entityId, $cid]);
+    }
+}
+
 function orange_edit_lock_registry_row(PDO $pdo, string $kind, int $entityId, ?int $countryId = null): ?array
 {
     orange_catalog_ensure_schema($pdo);

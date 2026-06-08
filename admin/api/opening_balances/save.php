@@ -151,6 +151,13 @@ try {
         $dateIso . ' 10:00:00'
     );
     orange_edit_lock_log_mutation($pdo, 'opening_balance', $fyId, 'edit');
+    orange_edit_lock_force_lock($pdo, 'opening_balance', $fyId, $ctxCountryId, (int) ($admin['id'] ?? 0));
+    audit_log(
+        'edit_lock_lock',
+        'قفل تلقائي بعد الحفظ — رصيد افتتاحي للسنة ' . $fyId,
+        'journal_vouchers',
+        $fyId
+    );
 
     audit_log('opening_balance_save', 'تم حفظ أرصدة افتتاحية للسنة ' . $fyId, 'journal_vouchers', $fyId);
     $msg = isset($useQueue) && $useQueue
