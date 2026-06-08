@@ -1016,6 +1016,40 @@ function orangeAdminBuildVoucherPrintDocTitle(titleElId, numberElId, fallbackNam
     return num !== '' ? (name + ' رقم ' + num) : name;
 }
 
+/** §9.3 V3 — نسخ رقم القيد إلى خانة التكرار (تسمية + خانة + رقم) */
+function orangeVoucherPrintSyncSerialRepeat() {
+    var area = document.querySelector('.jv-print-area');
+    var srcId = area ? area.getAttribute('data-jv-serial-source') : '';
+    var val = '';
+    if (srcId) {
+        var src = document.getElementById(srcId);
+        val = src ? String(src.value || '').trim() : '';
+    }
+    document.querySelectorAll('.jv-voucher-print-serial-repeat').forEach(function (inp) {
+        inp.value = val;
+    });
+}
+
+/** §9.3 V3 — صفحة واحدة: لا تكرار؛ تعدد صفحات: فاصل قبل الأسطر + thead رقم القيد */
+function orangeVoucherPrintPrepare() {
+    orangeVoucherPrintSyncSerialRepeat();
+    document.querySelectorAll('.jv-print-area').forEach(function (area) {
+        area.classList.remove('jv-print-multipage', 'jv-print-one-page');
+        var sheet = area.querySelector('.jv-voucher-print-sheet');
+        if (!sheet) {
+            return;
+        }
+        var multipage = sheet.scrollHeight > 820;
+        area.classList.add(multipage ? 'jv-print-multipage' : 'jv-print-one-page');
+    });
+}
+
+function orangeVoucherPrintPrepareCleanup() {
+    document.querySelectorAll('.jv-print-area').forEach(function (area) {
+        area.classList.remove('jv-print-multipage', 'jv-print-one-page');
+    });
+}
+
 /**
  * فتح نافذة طباعة المتصفح (ومنها حفظ PDF).
  * تنفيذ دائم لسندات المحاسبة — يبقى حتى بعد إرجاع وضع الضبط المؤقت (§9.2 في ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS).
@@ -1032,6 +1066,7 @@ function orangeAdminOpenPrintDialog(printTitle) {
         }
         cleanedUp = true;
         window.removeEventListener('afterprint', cleanup);
+        orangeVoucherPrintPrepareCleanup();
         window.orangeAdminVoucherPrintTitle = null;
         document.title = savedDocTitle;
     };
@@ -1048,10 +1083,16 @@ function orangeAdminOpenPrintDialog(printTitle) {
             alert('تعذّر فتح نافذة الطباعة في هذا المتصفح.');
             return;
         }
+        orangeVoucherPrintPrepare();
         window.print();
     }, 0);
     return false;
 }
+
+window.addEventListener('beforeprint', function () {
+    orangeVoucherPrintPrepare();
+});
+window.addEventListener('afterprint', orangeVoucherPrintPrepareCleanup);
 
 document.addEventListener('DOMContentLoaded', function () {
     orangeAdminApplyPermMarkers(document);
