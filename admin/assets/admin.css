@@ -4479,8 +4479,10 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         box-shadow: none !important;
     }
     /*
-     * §9.3 V6 — هوامش طباعة السندات = التقارير (.gl-acc-stmt-print):
-     * padding 8mm جانبي + 12mm سفلي؛ @page 12mm؛ علوي 10mm عبر ta-report-banner-row (قسم التقارير).
+     * §9.3 V6 — هوامش طباعة السندات (.jv-print-area فقط — التقارير .gl-acc-stmt-print لا تُلمس):
+     * جانبي 8mm؛ سفلي داخلي 18mm (تجربة V3 — تقليل انفصال الحساب/البيان عند كثرة الأسطر).
+     * @page سفلي 18mm للسندات فقط عبر orange_voucher_print_metafoot()؛ التقارير تبقى 12mm في @page أعلاه.
+     * علوي 10mm عبر ta-report-banner-row.
      */
     .jv-print-area {
         position: absolute;
@@ -4491,7 +4493,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         border: none;
         box-shadow: none !important;
         box-sizing: border-box;
-        padding: 0 8mm 12mm 8mm !important;
+        padding: 0 8mm 18mm 8mm !important;
     }
     /* §9.3 — خط رفيع بعد وصف السند (البيان) وقبل جدول الأسطر */
     .jv-print-area .form-grid > div:has(#jv_desc),
@@ -4543,25 +4545,8 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-lines-table .ob-c {
         text-align: left !important;
     }
-    /* §9.3 — ترويسة الشركة تتكرر (نمط التقارير) */
     .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
         display: table-header-group !important;
-    }
-    /*
-     * جدول الأسطر متداخل داخل خلية واحدة — تكرار thead (table-header-group) من صفحة ٢
-     * يضيف صف عناوين فوق الأسطر ويترك فراغاً أبيض كبيراً فوق تذييل الطباعة (صفحة ١ لا تتأثر بنفس الشكل).
-     * عناوين الأعمدة تظهر مرة واحدة قبل الأسطر فقط (table-row-group).
-     */
-    .jv-print-area .jv-lines-table thead {
-        display: table-row-group !important;
-    }
-    .jv-print-area .jv-voucher-print-sheet > tbody > tr {
-        page-break-inside: auto !important;
-    }
-    .jv-print-area .jv-lines-table tr.jv-line-memo td,
-    .jv-print-area .jv-lines-table tr.ob-line-memo td {
-        padding-top: 4px !important;
-        padding-bottom: 4px !important;
     }
     .jv-print-area .jv-voucher-print-sheet,
     .jv-print-area .jv-voucher-print-sheet * {

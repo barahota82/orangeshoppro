@@ -93,10 +93,15 @@ function orange_voucher_print_banner(PDO $pdo, int $countryId, array $ctx): void
 }
 
 /**
- * تذييل طباعة السند — نفس التقارير: @page 12mm عام + تاريخ/وقت في @bottom-right.
+ * تذييل طباعة السند — تاريخ/وقت يمين + أرقام صفحات يسار (نمط التقارير §9.3 V5).
  */
 function orange_voucher_print_metafoot(): void
 {
     $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+    /*
+     * §9.3 — هامش سفلي أكبر للسندات فقط (لا التقارير): @page في admin.css = 12mm عاماً؛
+     * شاشات السندات/الذمم/OB تستدعي هذه الدالة فقط — تجربة تقليل انفصال سطر الحساب عن البيان.
+     */
+    echo '<style>@media print{@page{margin:0 0 18mm 0;}}</style>';
     echo orange_accounting_report_print_metafoot_markup($printDatetime);
 }
