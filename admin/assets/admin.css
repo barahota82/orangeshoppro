@@ -4597,7 +4597,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
             minmax(6rem, 7.5rem) !important;
     }
     .jv-print-area .jv-voucher-header-line .jv-tot-readonly {
-        text-align: left !important;
+        text-align: center !important;
         direction: ltr;
     }
     .jv-print-area .jv-voucher-header-line > div > label {
@@ -4612,6 +4612,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-voucher-header-line input.admin-inp-readonly,
     .jv-print-area .jv-voucher-header-line input.orange-inp-dmy {
         font-size: 7.5pt !important;
+        text-align: center !important;
         padding: 2px 3px !important;
         min-height: 0 !important;
         height: auto !important;
