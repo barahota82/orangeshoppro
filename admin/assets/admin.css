@@ -4274,11 +4274,6 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     border: none;
     vertical-align: top;
 }
-/* §9.3 — جدول الطباعة المسطّح يُبنى وقت الطباعة فقط؛ مخفي تماماً على الشاشة */
-.jv-flat-print-sheet,
-.jv-flat-print-table {
-    display: none;
-}
 
 /* GAP-SALE-DOC-01 — ترويسة طباعة موحّدة (INV-C / INV-O / مردود) */
 .sd-print-banner {
@@ -4550,29 +4545,6 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-lines-table .ob-c {
         text-align: left !important;
     }
-    /*
-     * §9.3 — منع انفصال صف الحساب عن صف البيان بين صفحتين:
-     * الكسر يُسمح به بين البنود فقط، لا داخل البند (الحساب + بيانه معاً).
-     */
-    .jv-print-area .jv-lines-table tr.jv-line-main,
-    .jv-print-area .ob-opening-table tr.ob-line-main {
-        page-break-after: avoid !important;
-        break-after: avoid !important;
-    }
-    .jv-print-area .jv-lines-table tr.jv-line-memo,
-    .jv-print-area .ob-opening-table tr.ob-line-memo {
-        page-break-before: avoid !important;
-        break-before: avoid !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-    }
-    .jv-print-area .jv-lines-table tr.jv-line-main,
-    .jv-print-area .jv-lines-table tr.jv-line-memo,
-    .jv-print-area .ob-opening-table tr.ob-line-main,
-    .jv-print-area .ob-opening-table tr.ob-line-memo {
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-    }
     .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
         display: table-header-group !important;
     }
@@ -4583,34 +4555,6 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-voucher-print-body-cell {
         padding: 0 !important;
         border: none !important;
-    }
-    /*
-     * §9.3 — وضع الطباعة المسطّح: عند بناء الجدول المسطّح وقت الطباعة، تُخفى البنية
-     * المتداخلة الأصلية ويظهر الجدول الواحد. رأسه (بانر + رأس السند + عناوين الأعمدة)
-     * يتكرّر أعلى كل صفحة، والبنود تتدفّق من الصفحة الأولى.
-     */
-    .jv-print-area.jv-flat-print-active .jv-voucher-print-sheet {
-        display: none !important;
-    }
-    .jv-print-area.jv-flat-print-active .jv-flat-print-sheet {
-        display: block !important;
-    }
-    .jv-print-area.jv-flat-print-active .jv-flat-print-table {
-        display: table !important;
-        width: 100% !important;
-        border-collapse: collapse !important;
-    }
-    .jv-print-area .jv-flat-print-table > thead.jv-flat-print-thead {
-        display: table-header-group !important;
-    }
-    /* صفّ البانر يحتفظ بهامشه العلوي وحدّه السفلي من ta-report-banner-cell */
-    /* رأس السند: خانة بعرض الصفحة + خط فاصل أسفله (تحت البيان) على كل صفحة */
-    .jv-print-area .jv-flat-print-head-cell {
-        padding: 4px 0 6px !important;
-        border: none !important;
-        border-bottom: 1px solid #cbd5e1 !important;
-        text-align: right !important;
-        vertical-align: top !important;
     }
     .jv-print-area .sd-print-banner,
     .jv-print-area .sd-print-banner * {
