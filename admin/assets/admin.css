@@ -4266,18 +4266,10 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     border-collapse: collapse;
     border: none;
 }
-/*
- * §9.3 — صفّ الرأس (رقم القيد..البيان) يظهر على الشاشة وفي الطباعة (يتكرّر أعلى كل صفحة)؛
- * صفّ البانر (الشركة/الشعار/العنوان) يبقى مخفياً على الشاشة ويظهر في الطباعة فقط.
- */
 .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
-    display: table-header-group;
-}
-.jv-voucher-print-sheet > thead.jv-voucher-print-thead > tr.ta-report-banner-row {
     display: none;
 }
-.jv-voucher-print-body-cell,
-.jv-voucher-print-head-cell {
+.jv-voucher-print-body-cell {
     padding: 0;
     border: none;
     vertical-align: top;
@@ -4579,16 +4571,11 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead {
         display: table-header-group !important;
     }
-    /* §9.3 — في الطباعة يظهر صفّ البانر أيضاً (مخفي على الشاشة فقط) */
-    .jv-print-area .jv-voucher-print-sheet > thead.jv-voucher-print-thead > tr.ta-report-banner-row {
-        display: table-row !important;
-    }
     .jv-print-area .jv-voucher-print-sheet,
     .jv-print-area .jv-voucher-print-sheet * {
         visibility: visible;
     }
-    .jv-print-area .jv-voucher-print-body-cell,
-    .jv-print-area .jv-voucher-print-head-cell {
+    .jv-print-area .jv-voucher-print-body-cell {
         padding: 0 !important;
         border: none !important;
     }
