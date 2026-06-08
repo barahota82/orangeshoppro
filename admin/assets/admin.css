@@ -4574,12 +4574,12 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-voucher-header-line {
         display: grid !important;
         direction: rtl !important;
-        /* رقم القيد | تاريخ السند | المرجع (أوسع) | تاريخ المستند | مدين | دائن */
+        /* رقم القيد (أوسع) | تاريخ السند (أصغر) | المرجع | تاريخ المستند (أصغر) | مدين | دائن */
         grid-template-columns:
-            minmax(3.5rem, 5rem)
-            minmax(5.5rem, 6.5rem)
+            minmax(5.5rem, 7.5rem)
+            minmax(4.5rem, 5.5rem)
             minmax(7.5rem, 10rem)
-            minmax(6rem, 7.5rem)
+            minmax(5rem, 6rem)
             minmax(6rem, 7.5rem)
             minmax(6rem, 7.5rem) !important;
         gap: 4px 6px !important;
@@ -4589,10 +4589,10 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     }
     .jv-print-area .jv-voucher-header-line--nav {
         grid-template-columns:
-            minmax(3.5rem, 5rem)
-            minmax(5.5rem, 6.5rem)
+            minmax(5.5rem, 7.5rem)
+            minmax(4.5rem, 5.5rem)
             minmax(7.5rem, 10rem)
-            minmax(6rem, 7.5rem)
+            minmax(5rem, 6rem)
             minmax(6rem, 7.5rem)
             minmax(6rem, 7.5rem) !important;
     }
