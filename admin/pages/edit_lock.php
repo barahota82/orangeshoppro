@@ -38,54 +38,63 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
         #el_lock_tbody tr[data-id] input { cursor: default; }
         .el-badge-open { color: #15803d; font-weight: 600; }
         .el-badge-locked { color: #b45309; font-weight: 600; }
+        /* كارت الفلاتر أعلى الشاشة — فصل أدوات الفلترة عن العمود حتى يحاذي عنوان «المستندات المحفوظة» عنوانَ «معاينة أسطر القيد» */
+        .el-filters-card { margin: 0 1rem 0.75rem; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; }
+        .el-filters-card .gl-posting-pane__toolbar { border: none; background: transparent; padding: 0; }
+        .el-filters-card .gl-posting-pane__toolbar--filters { flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 20px; }
+        .el-filters-card .gl-posting-dates { margin-top: 0; }
+        .el-filters-card .gl-posting-pane__toolbar--actions { flex: 0 0 auto; }
     </style>
+
+    <div class="card el-filters-card">
+        <div class="gl-posting-pane__toolbar gl-posting-pane__toolbar--filters">
+            <div class="gl-posting-field">
+                <span class="gl-posting-field__label" id="el_movement_type_label">نوع الحركة :</span>
+                <div class="gl-posting-field__row gl-posting-field__row--movement">
+                    <select id="el_movement_type" class="gl-posting-select gl-posting-select--movement-type" aria-labelledby="el_movement_type_label"<?php echo $elJournalTypes === [] ? ' disabled' : ''; ?>>
+                        <option value="">— اختر نوع اليومية —</option>
+                        <?php if ($elJournalTypes !== []): ?>
+                        <option value="all">الكل</option>
+                        <?php endif; ?>
+                        <?php foreach ($elJournalTypes as $jt):
+                            $jid = (int) ($jt['id'] ?? 0);
+                            $jname = trim((string) ($jt['name_ar'] ?? ''));
+                            ?>
+                        <option value="<?php echo $jid; ?>"><?php echo htmlspecialchars($jname, ENT_QUOTES, 'UTF-8'); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label class="gl-posting-check-label">
+                        <input type="checkbox" id="el_all_movements" class="gl-posting-chk">
+                        جميع الحركات
+                    </label>
+                </div>
+            </div>
+            <div class="gl-posting-field">
+                <label class="gl-posting-field__label" for="el_lock_filter">حالة القفل</label>
+                <select id="el_lock_filter" class="gl-posting-select">
+                    <option value="all">الكل</option>
+                    <option value="open">مفتوح للتعديل</option>
+                    <option value="locked">مقفول</option>
+                </select>
+            </div>
+            <div class="gl-posting-dates">
+                <div class="gl-posting-field">
+                    <label class="gl-posting-field__label" for="el_date_from">من تاريخ</label>
+                    <input type="text" id="el_date_from" class="gl-posting-inp-datetime orange-inp-dmyhi" value="<?php echo htmlspecialchars($elDateFromDisp, ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
+                </div>
+                <div class="gl-posting-field">
+                    <label class="gl-posting-field__label" for="el_date_to">إلى تاريخ</label>
+                    <input type="text" id="el_date_to" class="gl-posting-inp-datetime orange-inp-dmyhi" value="<?php echo htmlspecialchars($elDateToDisp, ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
+                </div>
+            </div>
+        </div>
+        <div class="gl-posting-pane__toolbar gl-posting-pane__toolbar--actions">
+            <button type="button" class="btn-secondary" id="el_btn_reload">تحديث القائمة</button>
+        </div>
+    </div>
 
     <div class="gl-posting-workbench">
         <section class="gl-posting-pane gl-posting-pane--source" aria-labelledby="el_lock_table_title">
-            <div class="gl-posting-pane__toolbar gl-posting-pane__toolbar--filters">
-                <div class="gl-posting-field">
-                    <span class="gl-posting-field__label" id="el_movement_type_label">نوع الحركة :</span>
-                    <div class="gl-posting-field__row gl-posting-field__row--movement">
-                        <select id="el_movement_type" class="gl-posting-select gl-posting-select--movement-type" aria-labelledby="el_movement_type_label"<?php echo $elJournalTypes === [] ? ' disabled' : ''; ?>>
-                            <option value="">— اختر نوع اليومية —</option>
-                            <?php if ($elJournalTypes !== []): ?>
-                            <option value="all">الكل</option>
-                            <?php endif; ?>
-                            <?php foreach ($elJournalTypes as $jt):
-                                $jid = (int) ($jt['id'] ?? 0);
-                                $jname = trim((string) ($jt['name_ar'] ?? ''));
-                                ?>
-                            <option value="<?php echo $jid; ?>"><?php echo htmlspecialchars($jname, ENT_QUOTES, 'UTF-8'); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <label class="gl-posting-check-label">
-                            <input type="checkbox" id="el_all_movements" class="gl-posting-chk">
-                            جميع الحركات
-                        </label>
-                    </div>
-                </div>
-                <div class="gl-posting-field">
-                    <label class="gl-posting-field__label" for="el_lock_filter">حالة القفل</label>
-                    <select id="el_lock_filter" class="gl-posting-select">
-                        <option value="all">الكل</option>
-                        <option value="open">مفتوح للتعديل</option>
-                        <option value="locked">مقفول</option>
-                    </select>
-                </div>
-                <div class="gl-posting-dates">
-                    <div class="gl-posting-field">
-                        <label class="gl-posting-field__label" for="el_date_from">من تاريخ</label>
-                        <input type="text" id="el_date_from" class="gl-posting-inp-datetime orange-inp-dmyhi" value="<?php echo htmlspecialchars($elDateFromDisp, ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
-                    </div>
-                    <div class="gl-posting-field">
-                        <label class="gl-posting-field__label" for="el_date_to">إلى تاريخ</label>
-                        <input type="text" id="el_date_to" class="gl-posting-inp-datetime orange-inp-dmyhi" value="<?php echo htmlspecialchars($elDateToDisp, ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
-                    </div>
-                </div>
-            </div>
-            <div class="gl-posting-pane__toolbar gl-posting-pane__toolbar--actions">
-                <button type="button" class="btn-secondary" id="el_btn_reload">تحديث القائمة</button>
-            </div>
             <h2 id="el_lock_table_title" class="gl-posting-subcap">المستندات المحفوظة</h2>
             <div class="gl-posting-table-frame gl-posting-table-frame--scroll">
                 <table class="gl-posting-gridtable">
