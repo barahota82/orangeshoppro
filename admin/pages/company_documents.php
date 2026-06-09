@@ -15,11 +15,6 @@ $pdo = orange_admin_page_pdo();
     <h1>أرشيف المستندات والدورة المستندية</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle" style="max-width:920px;line-height:1.6;">
-    مستودع مركزي لملفات الشركة (عقود، فواتير أصلية، مراسلات، مستندات مشتريات، …) مع <strong>بيانات وصفية</strong> و<strong>ربط اختياري</strong> بطلب أو شراء أو قيد.
-    التنزيل يتم عبر النظام بعد تسجيل الدخول — لا تشارك روابط الملفات مباشرة مع العامة.
-    يُسجَّل رفع وحذف المستندات في <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=logs'), ENT_QUOTES, 'UTF-8'); ?>">سجل النشاط</a>.
-</p>
 
 <div class="card">
     <h3 class="card-title">رفع مستند</h3>
