@@ -189,6 +189,10 @@ $sr2DocSerialPreview = $sr2NavReady
             <label for="sr2_document_date">تاريخ المردود</label>
             <input type="date" id="sr2_document_date" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>">
         </div>
+        <div>
+            <label for="sr2_entry_date">تاريخ الإدخال</label>
+            <input type="text" id="sr2_entry_date" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" placeholder="يُحدَّد عند الحفظ" title="تاريخ إدخال المستند في النظام (تلقائي — للأرشفة فقط)">
+        </div>
         <input type="hidden" id="sr2_customer_id" value="0">
     </div>
 
@@ -845,6 +849,8 @@ $sr2DocSerialPreview = $sr2NavReady
         if (notesEl) notesEl.value = p.notes || '';
         var docDateEl = document.getElementById('sr2_document_date');
         if (docDateEl) docDateEl.value = (p.document_date ? String(p.document_date).substr(0, 10) : '');
+        var entryDateEl = document.getElementById('sr2_entry_date');
+        if (entryDateEl) entryDateEl.value = (p.created_at ? String(p.created_at).substr(0, 10) : '');
         var oid = parseInt(String(p.order_id || '0'), 10) || 0;
         var hid = document.getElementById('sr2_order_id');
         if (hid) hid.value = oid > 0 ? String(oid) : '0';

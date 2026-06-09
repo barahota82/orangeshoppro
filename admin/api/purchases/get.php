@@ -38,6 +38,9 @@ if ($hasSubtotal) {
 if ($hasDocumentDate) {
     $purCols .= ', document_date';
 }
+if (orange_table_has_column($pdo, 'purchases', 'created_at')) {
+    $purCols .= ', created_at';
+}
 $st = $pdo->prepare("SELECT $purCols FROM purchases WHERE id = ? LIMIT 1");
 $st->execute([$purchaseId]);
 $purchase = $st->fetch(PDO::FETCH_ASSOC);
@@ -159,6 +162,7 @@ json_response([
         'invoice_discount_raw' => $hasInvDiscount ? trim((string) ($purchase['invoice_discount_raw'] ?? '')) : '',
         'invoice_discount_amount' => $hasInvDiscount ? (float) ($purchase['invoice_discount_amount'] ?? 0) : 0.0,
         'document_date' => $hasDocumentDate ? (string) ($purchase['document_date'] ?? '') : '',
+        'created_at' => (string) ($purchase['created_at'] ?? ''),
     ],
     'items' => $items,
     'extra_lines' => $extraOut,

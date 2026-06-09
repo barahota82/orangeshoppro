@@ -257,6 +257,10 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             <label for="sv2_document_date">تاريخ الفاتورة</label>
             <input type="date" id="sv2_document_date" dir="ltr" lang="en" title="تاريخ الفاتورة = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>">
         </div>
+        <div>
+            <label for="sv2_entry_date">تاريخ الإدخال</label>
+            <input type="text" id="sv2_entry_date" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" placeholder="يُحدَّد عند الحفظ" title="تاريخ إدخال المستند في النظام (تلقائي — للأرشفة فقط)">
+        </div>
         <input type="hidden" id="sv2_customer_id" value="0">
     </div>
 
@@ -1226,6 +1230,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         if (notesEl) notesEl.value = inv.notes || '';
         var docDateEl = document.getElementById('sv2_document_date');
         if (docDateEl) docDateEl.value = (inv.document_date ? String(inv.document_date).substr(0, 10) : '');
+        var entryDateEl = document.getElementById('sv2_entry_date');
+        if (entryDateEl) entryDateEl.value = (inv.created_at ? String(inv.created_at).substr(0, 10) : '');
     }
 
     function sv2ApplyInvoicePayload(res) {

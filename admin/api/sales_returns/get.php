@@ -82,6 +82,7 @@ json_response([
         'total' => (float) ($header['total'] ?? 0),
         'return_number' => (string) ($header['return_number'] ?? ''),
         'document_date' => (string) ($header['document_date'] ?? ''),
+        'created_at' => (string) ($header['created_at'] ?? ''),
     ],
     'items' => array_map(static function (array $row): array {
         return [

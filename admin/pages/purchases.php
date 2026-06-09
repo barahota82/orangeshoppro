@@ -269,6 +269,10 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
             <label for="pv2_document_date">تاريخ الفاتورة</label>
             <input type="date" id="pv2_document_date" dir="ltr" lang="en" title="تاريخ الفاتورة = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>
         </div>
+        <div>
+            <label for="pv2_entry_date">تاريخ الإدخال</label>
+            <input type="text" id="pv2_entry_date" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" placeholder="يُحدَّد عند الحفظ" title="تاريخ إدخال المستند في النظام (تلقائي — للأرشفة فقط)">
+        </div>
         <input type="hidden" id="pv2_supplier_id" value="0">
     </div>
 
@@ -1206,6 +1210,8 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         if (invEl) invEl.value = p.supplier_invoice_number || '';
         var docDateEl = document.getElementById('pv2_document_date');
         if (docDateEl) docDateEl.value = (p.document_date ? String(p.document_date).substr(0, 10) : '');
+        var entryDateEl = document.getElementById('pv2_entry_date');
+        if (entryDateEl) entryDateEl.value = (p.created_at ? String(p.created_at).substr(0, 10) : '');
         var invDiscEl = document.getElementById('pv2_invoice_discount');
         if (invDiscEl) invDiscEl.value = p.invoice_discount_raw || '';
 
