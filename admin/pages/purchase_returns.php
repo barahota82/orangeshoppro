@@ -319,7 +319,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                 <button type="button" class="btn-secondary jv-nav-search" id="pr2_btn_search" title="بحث عن مردود">بحث</button>
             </div>
             <button type="button" class="btn-secondary" id="pr2_btn_print" title="طباعة المردود المعروض" disabled>طباعة</button>
-            <button type="button" class="btn-secondary" id="pr2_btn_new" title="مردود جديد">مردود جديد</button>
+            <button type="button" class="btn-secondary" id="pr2_btn_new" title="مردود جديد" onclick="if (confirm('بدء مردود جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { location.reload(); } return false;">مردود جديد</button>
             <button type="button" id="pr2_btn_save" data-orange-perm="edit" data-orange-page="purchase_returns"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>حفظ</button>
         </div>
     </div>
@@ -1171,7 +1171,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         }
 
         document.getElementById('pr2_btn_save').addEventListener('click', save);
-        document.getElementById('pr2_btn_new').addEventListener('click', pr2ResetNew);
+        // زر «مردود جديد» مربوط عبر onclick مباشر حتى يعمل حتى لو فشل ربط addEventListener.
         document.getElementById('pr2_btn_retrieve').addEventListener('click', pr2RetrieveFromPurchase);
         document.getElementById('pr2_invoice_discount').addEventListener('input', function () { recalcAll(); });
         document.getElementById('pr2_btn_print').addEventListener('click', function () {

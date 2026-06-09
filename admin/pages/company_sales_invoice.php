@@ -367,7 +367,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 <button type="button" class="btn-secondary jv-nav-search" id="sv2_btn_search" title="بحث عن فاتورة">بحث</button>
             </div>
             <button type="button" class="btn-secondary" id="sv2_btn_print" title="طباعة الفاتورة المعروضة" disabled>طباعة</button>
-            <button type="button" class="btn-secondary" id="sv2_btn_new" title="فاتورة جديدة" data-orange-perm="edit" data-orange-page="company_sales_invoice">فاتورة جديدة</button>
+            <button type="button" class="btn-secondary" id="sv2_btn_new" title="فاتورة جديدة" data-orange-perm="edit" data-orange-page="company_sales_invoice" onclick="if (confirm('بدء فاتورة جديدة؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { location.href = (typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '') : '') + '/admin/index.php?page=company_sales_invoice'; } return false;">فاتورة جديدة</button>
             <button type="button" id="sv2_btn_save" data-orange-perm="edit" data-orange-page="company_sales_invoice">حفظ</button>
         </div>
     </div>
@@ -1471,7 +1471,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         }
 
         document.getElementById('sv2_btn_save').addEventListener('click', save);
-        document.getElementById('sv2_btn_new').addEventListener('click', sv2ResetNew);
+        // زر «فاتورة جديدة» مربوط عبر onclick مباشر حتى يعمل حتى لو فشل ربط addEventListener.
         document.getElementById('sv2_btn_add_extra').addEventListener('click', sv2ExtraPickOpen);
         document.getElementById('sv2_extra_pick_backdrop').addEventListener('click', sv2ExtraPickClose);
         document.getElementById('sv2_extra_pick_close').addEventListener('click', sv2ExtraPickClose);

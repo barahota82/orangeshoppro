@@ -273,7 +273,7 @@ $sr2DocSerialPreview = $sr2NavReady
                 <button type="button" class="btn-secondary jv-nav-search" id="sr2_btn_search" title="بحث عن مردود">بحث</button>
             </div>
             <button type="button" class="btn-secondary" id="sr2_btn_print" title="طباعة المردود المعروض" disabled>طباعة</button>
-            <button type="button" class="btn-secondary" id="sr2_btn_new" title="مردود جديد">مردود جديد</button>
+            <button type="button" class="btn-secondary" id="sr2_btn_new" title="مردود جديد" onclick="if (confirm('بدء مردود جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { location.reload(); } return false;">مردود جديد</button>
             <button type="button" id="sr2_btn_save" data-orange-perm="edit" data-orange-page="sales_returns">حفظ</button>
         </div>
     </div>
@@ -1292,7 +1292,7 @@ $sr2DocSerialPreview = $sr2NavReady
 
         document.getElementById('sr2_channel').addEventListener('change', sr2OnChannelChange);
         document.getElementById('sr2_btn_save').addEventListener('click', save);
-        document.getElementById('sr2_btn_new').addEventListener('click', sr2ResetNew);
+        // زر «مردود جديد» مربوط عبر onclick مباشر حتى يعمل حتى لو فشل ربط addEventListener.
         document.getElementById('sr2_btn_retrieve').addEventListener('click', sr2RetrieveFromOrder);
 
         var sr2AddExtraBtn = document.getElementById('sr2_btn_add_extra');

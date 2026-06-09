@@ -357,7 +357,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
                 <button type="button" class="btn-secondary jv-nav-search" id="pv2_btn_search" title="بحث عن فاتورة">بحث</button>
             </div>
             <button type="button" class="btn-secondary" id="pv2_btn_print" title="طباعة الفاتورة المعروضة" disabled>طباعة</button>
-            <button type="button" class="btn-secondary" id="pv2_btn_new" title="فاتورة جديدة" data-orange-perm="edit" data-orange-page="purchases">فاتورة جديدة</button>
+            <button type="button" class="btn-secondary" id="pv2_btn_new" title="فاتورة جديدة" data-orange-perm="edit" data-orange-page="purchases" onclick="if (confirm('بدء فاتورة جديدة؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { location.reload(); } return false;">فاتورة جديدة</button>
             <button type="button" id="pv2_btn_save" data-orange-perm="edit" data-orange-page="purchases"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>حفظ</button>
         </div>
     </div>
@@ -1433,7 +1433,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         document.getElementById('pv2_invoice_discount').addEventListener('input', function () { recalcAll(); });
 
         document.getElementById('pv2_btn_save').addEventListener('click', save);
-        document.getElementById('pv2_btn_new').addEventListener('click', pv2ResetNew);
+        // زر «فاتورة جديدة» مربوط عبر onclick مباشر حتى يعمل حتى لو فشل ربط addEventListener.
         var addExtraBtn = document.getElementById('pv2_btn_add_extra');
         if (addExtraBtn) addExtraBtn.addEventListener('click', pv2ExtraPickOpen);
         document.getElementById('pv2_extra_pick_backdrop').addEventListener('click', pv2ExtraPickClose);
