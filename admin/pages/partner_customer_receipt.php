@@ -366,7 +366,7 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
         <span></span>
         <div class="jv-toolbar-primary-group">
-            <button type="button" id="crec_btn_new" title="إدخال سند جديد">سند جديد</button>
+            <button type="button" id="crec_btn_new" title="إدخال سند جديد" onclick="return crecNewSheet();">سند جديد</button>
             <button type="button" class="btn-secondary" id="crec_btn_delete" title="حذف السند المعروض" disabled>حذف السند</button>
             <button type="button" class="btn-secondary" id="crec_btn_print" onclick="crecPrintVoucher(); return false;" title="<?php echo $ppvPrintTuningMode ? 'طباعة السند' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط'; ?>"<?php echo $ppvPrintTuningMode ? '' : ' disabled'; ?>>طباعة السند</button>
             <button type="button" id="crec_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
@@ -461,6 +461,12 @@ function crecPrintVoucher() {
     return orangeAdminOpenPrintDialog(
         orangeAdminBuildVoucherPrintDocTitle(null, 'crec_number_preview', 'سند')
     );
+}
+
+function crecNewSheet() {
+    if (!confirm('بدء سند جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { return false; }
+    location.reload();
+    return false;
 }
 
 (function () {
@@ -969,10 +975,7 @@ function crecPrintVoucher() {
         }
 
         document.getElementById('crec_btn_save').addEventListener('click', save);
-        document.getElementById('crec_btn_new').addEventListener('click', function () {
-            if (!confirm('بدء سند جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { return; }
-            location.reload();
-        });
+        // زر «سند جديد» مربوط عبر onclick مباشر (crecNewSheet) حتى يعمل حتى لو فشل ربط addEventListener.
         document.getElementById('crec_btn_delete').addEventListener('click', crecDeleteVoucher);
 
         if (window.OrangeEditLock) {

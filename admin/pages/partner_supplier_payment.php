@@ -377,7 +377,7 @@ $ppvReady = $ppvCashLock !== null;
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
         <span></span>
         <div class="jv-toolbar-primary-group">
-            <button type="button" id="spay_btn_new" title="إدخال سند جديد">سند جديد</button>
+            <button type="button" id="spay_btn_new" title="إدخال سند جديد" onclick="return spayNewSheet();">سند جديد</button>
             <button type="button" class="btn-secondary" id="spay_btn_delete" title="حذف السند المعروض" disabled>حذف السند</button>
             <button type="button" class="btn-secondary" id="spay_btn_print" onclick="spayPrintVoucher(); return false;" title="<?php echo $ppvPrintTuningMode ? 'طباعة السند' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط'; ?>"<?php echo $ppvPrintTuningMode ? '' : ' disabled'; ?>>طباعة السند</button>
             <button type="button" id="spay_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
@@ -472,6 +472,12 @@ function spayPrintVoucher() {
     return orangeAdminOpenPrintDialog(
         orangeAdminBuildVoucherPrintDocTitle(null, 'spay_number_preview', 'سند')
     );
+}
+
+function spayNewSheet() {
+    if (!confirm('بدء سند جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { return false; }
+    location.reload();
+    return false;
 }
 
 (function () {
@@ -982,10 +988,7 @@ function spayPrintVoucher() {
         }
 
         document.getElementById('spay_btn_save').addEventListener('click', save);
-        document.getElementById('spay_btn_new').addEventListener('click', function () {
-            if (!confirm('بدء سند جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { return; }
-            location.reload();
-        });
+        // زر «سند جديد» مربوط عبر onclick مباشر (spayNewSheet) حتى يعمل حتى لو فشل ربط addEventListener.
         document.getElementById('spay_btn_delete').addEventListener('click', spayDeleteVoucher);
 
         if (window.OrangeEditLock) {

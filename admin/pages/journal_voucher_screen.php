@@ -325,7 +325,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide">
         <button type="button" class="btn-secondary" id="jv_btn_add_line" onclick="jvAddRow()">+ سطر يدوي</button>
         <div class="jv-toolbar-primary-group">
-            <button type="button" id="jv_btn_new_sheet" title="إدخال سند جديد">سند جديد</button>
+            <button type="button" id="jv_btn_new_sheet" title="إدخال سند جديد" onclick="return jvNewSheet();">سند جديد</button>
             <button type="button" class="btn-secondary" id="jv_btn_delete_voucher" data-orange-perm="delete" data-orange-page="<?php echo htmlspecialchars($jvPermPage, ENT_QUOTES, 'UTF-8'); ?>" title="حذف السند المعروض" disabled>حذف السند</button>
             <button type="button" class="btn-secondary" id="jv_btn_print_voucher" onclick="jvPrintVoucher(); return false;" title="<?php echo $jvPrintTuningMode ? 'طباعة السند' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط'; ?>"<?php echo $jvPrintTuningMode ? '' : ' disabled'; ?>>طباعة السند</button>
             <button type="button" id="jv_btn_save" data-orange-perm="edit" data-orange-page="<?php echo htmlspecialchars($jvPermPage, ENT_QUOTES, 'UTF-8'); ?>" onclick="jvSubmit()"><?php echo $jvYecMode ? 'حفظ وإقفال السنة' : 'حفظ السند'; ?></button>
@@ -1730,6 +1730,12 @@ function jvSyncPrintButton() {
     pb.title = ok ? 'طباعة السند' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط (§10)';
 }
 
+function jvNewSheet() {
+    if (!confirm('بدء سند جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { return false; }
+    location.reload();
+    return false;
+}
+
 function jvPrintVoucher() {
     if (!ORANGE_VOUCHER_PRINT_TUNING && !jvBrowseId) {
         alert('احفظ السند أولاً قبل الطباعة.');
@@ -2000,13 +2006,6 @@ jvSyncTrailingRows();
             b.addEventListener('click', function () { jvNav(pair[1]); });
         }
     });
-    var nb = document.getElementById('jv_btn_new_sheet');
-    if (nb) {
-        nb.addEventListener('click', function () {
-            if (!confirm('بدء سند جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { return; }
-            location.reload();
-        });
-    }
     var db = document.getElementById('jv_btn_delete_voucher');
     if (db) {
         db.addEventListener('click', jvDeleteVoucher);
