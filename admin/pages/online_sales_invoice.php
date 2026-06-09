@@ -151,7 +151,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     ]);
     ?>
     <h3 class="card-title">فاتورة أونلاين <span id="ov2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
-    <?php orange_edit_lock_ui_toolbar(['prefix' => 'ov2', 'doc_kind' => 'online_sales_invoice', 'country_id' => $adminCountryId]); ?>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'ov2', 'doc_kind' => 'online_sales_invoice', 'country_id' => $adminCountryId, 'show_status_badge' => false]); ?>
 
     <div class="form-grid ov2-header-row1 orange-doc-header-row" style="margin-bottom:12px;">
         <div>

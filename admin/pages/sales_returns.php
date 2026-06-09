@@ -164,7 +164,7 @@ $sr2DocSerialPreview = $sr2NavReady
     ]);
     ?>
     <h3 class="card-title">مردود مبيعات <span id="sr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
-    <?php orange_edit_lock_ui_toolbar(['prefix' => 'sr2', 'doc_kind' => 'sales_return', 'country_id' => $srCountryId]); ?>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'sr2', 'doc_kind' => 'sales_return', 'country_id' => $srCountryId, 'show_status_badge' => false]); ?>
 
     <div class="form-grid sr2-customer-row orange-doc-header-row" style="margin-bottom:12px;">
         <div>

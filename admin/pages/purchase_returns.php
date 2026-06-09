@@ -228,7 +228,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
 <div class="card jv-print-area">
     <h3 class="card-title">مردود مشتريات <span id="pr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
-    <?php orange_edit_lock_ui_toolbar(['prefix' => 'pr2', 'doc_kind' => 'purchase_return', 'country_id' => $prCountryId]); ?>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'pr2', 'doc_kind' => 'purchase_return', 'country_id' => $prCountryId, 'show_status_badge' => false]); ?>
 
     <!-- ١ — مسلسل الفاتورة + المورد -->
     <div class="form-grid pr2-supplier-row orange-doc-header-row" style="margin-bottom:12px;">

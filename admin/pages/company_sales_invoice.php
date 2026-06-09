@@ -232,7 +232,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     ]);
     ?>
     <h3 class="card-title">فاتورة مبيعات <span id="sv2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
-    <?php orange_edit_lock_ui_toolbar(['prefix' => 'sv2', 'doc_kind' => 'company_sales_invoice', 'country_id' => $adminCountryId]); ?>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'sv2', 'doc_kind' => 'company_sales_invoice', 'country_id' => $adminCountryId, 'show_status_badge' => false]); ?>
 
     <div class="form-grid sv2-header-row1 orange-doc-header-row" style="margin-bottom:12px;">
         <div>

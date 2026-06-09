@@ -247,7 +247,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
 
 <div class="card jv-print-area">
     <h3 class="card-title">فاتورة شراء <span id="pv2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
-    <?php orange_edit_lock_ui_toolbar(['prefix' => 'pv2', 'doc_kind' => 'purchase', 'country_id' => $adminCountryId]); ?>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'pv2', 'doc_kind' => 'purchase', 'country_id' => $adminCountryId, 'show_status_badge' => false]); ?>
 
     <!-- ١ — مسلسل الفاتورة + المورد -->
     <div class="form-grid pv2-supplier-row orange-doc-header-row" style="margin-bottom:12px;">
