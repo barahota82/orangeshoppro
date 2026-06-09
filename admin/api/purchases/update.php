@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
@@ -222,21 +223,48 @@ try {
         }
     }
 
+    // تاريخ الفاتورة/المستند = تاريخ ترحيل القيد المحاسبي (يُحفظ عند التعديل، ويُحترم في السنة المالية).
+    $documentDate = '';
+    if (array_key_exists('document_date', $data)) {
+        $documentDate = trim((string)($data['document_date'] ?? ''));
+    }
+    if ($documentDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $documentDate)) {
+        $existingDocDate = trim((string)($purchase['document_date'] ?? ''));
+        $documentDate = ($existingDocDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}/', $existingDocDate))
+            ? substr($existingDocDate, 0, 10)
+            : date('Y-m-d');
+    }
+    orange_fiscal_require_open_for_posting($pdo, $documentDate, $purchaseCountryId);
+    $postingAt = $documentDate . ' ' . date('H:i:s');
+    $hasDocumentDateCol = orange_table_has_column($pdo, 'purchases', 'document_date');
+
     $newTotal = apply_purchase_items($pdo, $purchaseId, $items, $purchaseCountryId);
+    $docDateSetSql = $hasDocumentDateCol ? ', document_date = ?' : '';
     if ($hasSupplierInvoiceCol) {
-        $pdo->prepare(
-            'UPDATE purchases SET supplier_id = ?, supplier_invoice_number = ?, total = ?, type = ?, notes = ?, updated_at = NOW() WHERE id = ?'
-        )->execute([
+        $params = [
             $supplierId > 0 ? $supplierId : null,
             $supplierInvoiceNumber !== '' ? $supplierInvoiceNumber : null,
             $newTotal,
             $type,
             $notes,
-            $purchaseId,
-        ]);
+        ];
+        if ($hasDocumentDateCol) {
+            $params[] = $documentDate;
+        }
+        $params[] = $purchaseId;
+        $pdo->prepare(
+            'UPDATE purchases SET supplier_id = ?, supplier_invoice_number = ?, total = ?, type = ?, notes = ?'
+            . $docDateSetSql . ', updated_at = NOW() WHERE id = ?'
+        )->execute($params);
     } else {
-        $pdo->prepare('UPDATE purchases SET supplier_id = ?, total = ?, type = ?, notes = ?, updated_at = NOW() WHERE id = ?')
-            ->execute([$supplierId > 0 ? $supplierId : null, $newTotal, $type, $notes, $purchaseId]);
+        $params = [$supplierId > 0 ? $supplierId : null, $newTotal, $type, $notes];
+        if ($hasDocumentDateCol) {
+            $params[] = $documentDate;
+        }
+        $params[] = $purchaseId;
+        $pdo->prepare('UPDATE purchases SET supplier_id = ?, total = ?, type = ?, notes = ?'
+            . $docDateSetSql . ', updated_at = NOW() WHERE id = ?')
+            ->execute($params);
     }
 
     $extraInput = orange_invoice_ancillary_parse_request_lines(
@@ -291,8 +319,8 @@ try {
                 $glB['lines'],
                 $pendingKey,
                 $srcLabel,
-                $now,
-                $now,
+                $postingAt,
+                $postingAt,
                 $glB['voucher_description'],
                 'purchase',
                 $afterJson
@@ -301,8 +329,8 @@ try {
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingKey,
                 'source_label' => $srcLabel,
-                'movement_at' => $now,
-                'voucher_date' => $now,
+                'movement_at' => $postingAt,
+                'voucher_date' => $postingAt,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
                 'amount' => $payableTotal,
@@ -314,7 +342,7 @@ try {
     } else {
         if ($glB['is_multi']) {
             $vid = orange_voucher_post($pdo, [
-                'voucher_date' => $now,
+                'voucher_date' => $postingAt,
                 'document_entered_at' => $now,
                 'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase',
@@ -323,7 +351,7 @@ try {
             orange_gl_apply_voucher_after_post_hooks($pdo, $vid, $afterJson);
         } else {
             orange_journal_insert_line($pdo, [
-                'date' => $now,
+                'date' => $postingAt,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
                 'amount' => $payableTotal,

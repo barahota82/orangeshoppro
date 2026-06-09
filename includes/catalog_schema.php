@@ -3072,6 +3072,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_product_offers_sort_order_v81($pdo);
     orange_catalog_migrate_cart_promo_pause_log_v82($pdo);
     orange_catalog_migrate_cart_promo_stock_check_v83($pdo);
+    orange_catalog_migrate_document_business_date_v84($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -5203,6 +5204,45 @@ function orange_catalog_migrate_document_currency_v56(PDO $pdo): void
             'UPDATE ' . $tbl . ' SET currency_code = ' . $pdo->quote($kwCur)
             . ' WHERE currency_code IS NULL OR currency_code = \'\''
         );
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v84 — تاريخ المستند (الفاتورة) القابل للضبط على المستندات التجارية اليدوية.
+ * منفصل عن created_at (تاريخ الإدخال للتدقيق، يبقى تلقائياً). يُستخدم كتاريخ ترحيل
+ * القيد المحاسبي وحركة المخزون على: المشتريات، فاتورة المبيعات (orders)، مردود
+ * المبيعات، مردود المشتريات. فاتورة الأونلاين تبقى مشتقّة وتُرحَّل عند «إنشاء القيود».
+ */
+function orange_catalog_migrate_document_business_date_v84(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_document_business_date_v84';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $tables = ['orders', 'purchases', 'sales_returns', 'purchase_returns'];
+    foreach ($tables as $tbl) {
+        if (!orange_table_exists($pdo, $tbl)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $tbl, 'document_date')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE ' . $tbl . ' ADD COLUMN document_date DATE NULL DEFAULT NULL'
+            );
+            orange_schema_invalidate_column_check($tbl, 'document_date');
+        }
+        if (orange_table_has_column($pdo, $tbl, 'document_date')
+            && orange_table_has_column($pdo, $tbl, 'created_at')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE ' . $tbl . ' SET document_date = DATE(created_at)'
+                . ' WHERE document_date IS NULL AND created_at IS NOT NULL'
+            );
+        }
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

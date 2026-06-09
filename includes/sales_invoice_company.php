@@ -279,6 +279,9 @@ function orange_sales_invoice_company_document_payload(PDO $pdo, int $orderId): 
         'status' => (string) ($order['status'] ?? ''),
         'total' => (float) ($order['total'] ?? 0),
         'subtotal' => $subtotal,
+        'document_date' => orange_table_has_column($pdo, 'orders', 'document_date')
+            ? (string) ($order['document_date'] ?? '')
+            : '',
         'created_at' => (string) ($order['created_at'] ?? ''),
         'created_at_dmy' => !empty($order['created_at'])
             ? orange_format_date_dmY((string) $order['created_at'])

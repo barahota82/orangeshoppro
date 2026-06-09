@@ -253,6 +253,10 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             <label for="sv2_customer_balance">رصيد الذمم</label>
             <input type="text" id="sv2_customer_balance" class="admin-inp-readonly admin-money-display" readonly disabled tabindex="-1" dir="ltr" lang="en" placeholder="—">
         </div>
+        <div>
+            <label for="sv2_document_date">تاريخ الفاتورة</label>
+            <input type="date" id="sv2_document_date" dir="ltr" lang="en" title="تاريخ الفاتورة = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>">
+        </div>
         <input type="hidden" id="sv2_customer_id" value="0">
     </div>
 
@@ -1220,6 +1224,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         if (paidEl) paidEl.value = fmt3(inv.amount_paid || 0);
         var notesEl = document.getElementById('sv2_notes');
         if (notesEl) notesEl.value = inv.notes || '';
+        var docDateEl = document.getElementById('sv2_document_date');
+        if (docDateEl) docDateEl.value = (inv.document_date ? String(inv.document_date).substr(0, 10) : '');
     }
 
     function sv2ApplyInvoicePayload(res) {
@@ -1391,6 +1397,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             channel_id: channel,
             payment_terms: document.getElementById('sv2_payment_terms').value || 'cash',
             amount_paid: paid,
+            document_date: (document.getElementById('sv2_document_date') ? (document.getElementById('sv2_document_date').value || '') : ''),
             items: items,
             extra_lines: sv2CollectExtraLines()
         };

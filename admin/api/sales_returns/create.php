@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
@@ -93,6 +94,14 @@ try {
         }
     }
 
+    // تاريخ المستند (مردود المبيعات) = تاريخ ترحيل القيد المحاسبي (منفصل عن created_at).
+    $documentDate = trim((string)($data['document_date'] ?? ''));
+    if ($documentDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $documentDate)) {
+        $documentDate = date('Y-m-d');
+    }
+    orange_fiscal_require_open_for_posting($pdo, $documentDate, $returnCountryId);
+    $postingAt = $documentDate . ' ' . date('H:i:s');
+
     $revenueTotal = 0.0;
     $cogsTotal = 0.0;
     $normalizedItems = [];
@@ -163,6 +172,9 @@ try {
     if (orange_table_has_column($pdo, 'sales_returns', 'country_id') && $returnCountryId > 0) {
         $pdo->prepare('UPDATE sales_returns SET country_id = ? WHERE id = ?')->execute([$returnCountryId, $returnId]);
     }
+    if (orange_table_has_column($pdo, 'sales_returns', 'document_date')) {
+        $pdo->prepare('UPDATE sales_returns SET document_date = ? WHERE id = ?')->execute([$documentDate, $returnId]);
+    }
     orange_sales_return_sync_analytics_for_return($pdo, $returnId, $orderIdOpt, $returnCountryId);
 
     $hasVariant = orange_table_has_column($pdo, 'sales_return_items', 'variant_id');
@@ -229,8 +241,8 @@ try {
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingRev,
                 'source_label' => $retNum,
-                'movement_at' => $now,
-                'voucher_date' => $now,
+                'movement_at' => $postingAt,
+                'voucher_date' => $postingAt,
                 'account_debit' => $glRev['debit'],
                 'account_credit' => $glRev['credit'],
                 'amount' => $revenueTotal,
@@ -240,7 +252,7 @@ try {
             ]);
         } else {
             orange_journal_insert_line($pdo, [
-                'date' => $now,
+                'date' => $postingAt,
                 'account_debit' => $glRev['debit'],
                 'account_credit' => $glRev['credit'],
                 'amount' => $revenueTotal,
@@ -277,8 +289,8 @@ try {
                 orange_gl_pending_enqueue_simple($pdo, [
                     'reference' => $pendingRev . '-EX' . $accId,
                     'source_label' => $retNum,
-                    'movement_at' => $now,
-                    'voucher_date' => $now,
+                    'movement_at' => $postingAt,
+                    'voucher_date' => $postingAt,
                     'account_debit' => $exDebit,
                     'account_credit' => $exCredit,
                     'amount' => $exAmount,
@@ -287,7 +299,7 @@ try {
                 ]);
             } else {
                 orange_journal_insert_line($pdo, [
-                    'date' => $now,
+                    'date' => $postingAt,
                     'account_debit' => $exDebit,
                     'account_credit' => $exCredit,
                     'amount' => $exAmount,
@@ -305,8 +317,8 @@ try {
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingCogs,
                 'source_label' => $retNum,
-                'movement_at' => $now,
-                'voucher_date' => $now,
+                'movement_at' => $postingAt,
+                'voucher_date' => $postingAt,
                 'account_debit' => $glCogs['debit'],
                 'account_credit' => $glCogs['credit'],
                 'amount' => $cogsTotal,
@@ -315,7 +327,7 @@ try {
             ]);
         } else {
             orange_journal_insert_line($pdo, [
-                'date' => $now,
+                'date' => $postingAt,
                 'account_debit' => $glCogs['debit'],
                 'account_credit' => $glCogs['credit'],
                 'amount' => $cogsTotal,

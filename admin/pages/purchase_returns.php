@@ -246,6 +246,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             <label for="pr2_supplier_name">اسم المورد</label>
             <input type="text" id="pr2_supplier_name" class="admin-inp-readonly" readonly disabled tabindex="-1" placeholder="يُعبأ تلقائياً">
         </div>
+        <div>
+            <label for="pr2_document_date">تاريخ المردود</label>
+            <input type="date" id="pr2_document_date" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
+        </div>
         <input type="hidden" id="pr2_supplier_id" value="0">
     </div>
 
@@ -940,6 +944,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (typeEl) typeEl.value = p.type || 'cash';
         var notesEl = document.getElementById('pr2_notes');
         if (notesEl) notesEl.value = p.notes || '';
+        var docDateEl = document.getElementById('pr2_document_date');
+        if (docDateEl) docDateEl.value = (p.document_date ? String(p.document_date).substr(0, 10) : '');
         var purEl = document.getElementById('pr2_purchase_ref');
         if (purEl) {
             var pid = parseInt(String(p.purchase_id || '0'), 10) || 0;
@@ -1098,6 +1104,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             supplier_id: supplierId,
             type: retType,
             notes: notes,
+            document_date: (document.getElementById('pr2_document_date') ? (document.getElementById('pr2_document_date').value || '') : ''),
             purchase_id: purchaseId > 0 ? purchaseId : 0,
             items: items,
             invoice_discount_raw: invDiscRaw,

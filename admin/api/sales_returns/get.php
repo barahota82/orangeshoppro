@@ -81,6 +81,7 @@ json_response([
         'notes' => (string) ($header['notes'] ?? ''),
         'total' => (float) ($header['total'] ?? 0),
         'return_number' => (string) ($header['return_number'] ?? ''),
+        'document_date' => (string) ($header['document_date'] ?? ''),
     ],
     'items' => array_map(static function (array $row): array {
         return [

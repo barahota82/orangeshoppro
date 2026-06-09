@@ -185,6 +185,10 @@ $sr2DocSerialPreview = $sr2NavReady
             <label for="sr2_customer_balance">رصيد الذمم</label>
             <input type="text" id="sr2_customer_balance" class="admin-inp-readonly admin-money-display" readonly disabled tabindex="-1" dir="ltr" lang="en" placeholder="—">
         </div>
+        <div>
+            <label for="sr2_document_date">تاريخ المردود</label>
+            <input type="date" id="sr2_document_date" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>">
+        </div>
         <input type="hidden" id="sr2_customer_id" value="0">
     </div>
 
@@ -839,6 +843,8 @@ $sr2DocSerialPreview = $sr2NavReady
         sr2OnChannelChange();
         var notesEl = document.getElementById('sr2_notes');
         if (notesEl) notesEl.value = p.notes || '';
+        var docDateEl = document.getElementById('sr2_document_date');
+        if (docDateEl) docDateEl.value = (p.document_date ? String(p.document_date).substr(0, 10) : '');
         var oid = parseInt(String(p.order_id || '0'), 10) || 0;
         var hid = document.getElementById('sr2_order_id');
         if (hid) hid.value = oid > 0 ? String(oid) : '0';
@@ -1217,6 +1223,7 @@ $sr2DocSerialPreview = $sr2NavReady
             customer_id: customerId,
             channel: channel,
             notes: notes,
+            document_date: (document.getElementById('sr2_document_date') ? (document.getElementById('sr2_document_date').value || '') : ''),
             items: items,
             extra_lines: sr2CollectExtraLines()
         };

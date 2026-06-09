@@ -2,7 +2,39 @@ ORANGE — أرشيف منهج التصنيف المحاسبي والتقاري�
 ================================================================================
 المسار: docs/archive/ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt
 تاريخ حفظ الأرشيف: 2026-04-19
-آخر تحديث: 2026-04-19 (إنشاء أرشيفي — ربط بسياسة v2 و report_line_master وقواعد الاستمرارية)
+آخر تحديث: 2026-06-09 (تاريخ الفاتورة/المستند القابل للضبط = تاريخ ترحيل القيد — انظر القسم أدناه)
+
+================================================================================
+قرار مالك نهائي (2026-06-09): تاريخ الفاتورة/المستند = تاريخ ترحيل القيد المحاسبي
+================================================================================
+السياسة المتفَّق عليها مع المالك:
+- يوجد على المستندات التجارية اليدوية حقل **«تاريخ الفاتورة/المستند»** قابل للضبط من الواجهة،
+  **منفصل** عن **`created_at`** (تاريخ الإدخال للتدقيق — يبقى تلقائياً وغير قابل للتعديل).
+- **تاريخ المستند = تاريخ ترحيل القيد المحاسبي (`voucher_date`) = تاريخ حركة GL (`movement_at`)**.
+  يُتحقَّق أنه داخل **سنة مالية مفتوحة** عبر `orange_fiscal_require_open_for_posting()` قبل الترحيل.
+- **النطاق (يدوي، قابل للضبط):** المشتريات، فاتورة مبيعات الشركة (INV-C / جدول `orders`)،
+  مردود المبيعات، مردود المشتريات.
+- **فاتورة الأونلاين (INV-O): مشتقّة** — لا حقل يدوي؛ يُرحَّل قيدها بتاريخ **«إنشاء القيود»**
+  (التسليم/الإتمام، وقت التشغيل) كما كان — وتاريخ طلب العميل للعرض/المعلومة فقط.
+
+تنفيذ:
+- مخطط: `includes/catalog_schema.php` ترحيل **v84**
+  (`orange_catalog_migrate_document_business_date_v84`) — عمود `document_date DATE NULL` على
+  `orders` و`purchases` و`sales_returns` و`purchase_returns` + تعبئة رجعية من `DATE(created_at)`.
+- مشتريات: `admin/api/purchases/create.php` و`update.php` (تخزين + `voucher_date/movement_at` =
+  `document_date`؛ `document_entered_at` يبقى `now`)، `get.php` يعيد `document_date`،
+  واجهة `admin/pages/purchases.php` (`pv2_document_date`).
+- فاتورة المبيعات INV-C: تأريخ الترحيل في `includes/order_fulfillment.php` عبر
+  `orange_order_delivery_posting_datetime($order,$isOnline)` — **يُطبَّق فقط حين `!$isOnline`**
+  (الأونلاين يبقى `now`)؛ `admin/api/orders/create-manual.php` و`admin/api/sales-invoices/update.php`
+  (تخزين + تحقق سنة مالية)، `includes/sales_invoice_company.php` (payload يعيد `document_date`)،
+  واجهة `admin/pages/company_sales_invoice.php` (`sv2_document_date`).
+- مردود المبيعات: `admin/api/sales_returns/create.php` + `get.php` + `admin/pages/sales_returns.php`
+  (`sr2_document_date`).
+- مردود المشتريات: `admin/api/purchase_returns/create.php` + `get.php` +
+  `admin/pages/purchase_returns.php` (`pr2_document_date`).
+- ملاحظة: دالة عكس قيد التسليم (`orange_reverse_order_delivery_accounting`) — للإلغاء/المردود
+  التشغيلي للطلب — تبقى على `now` (ليست مسار تعديل فاتورة الشركة الذي يحذف ويعيد الترحيل).
 
 الغرض
 -------

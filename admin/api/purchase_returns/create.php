@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
@@ -120,6 +121,14 @@ try {
         }
     }
 
+    // تاريخ المستند (مردود المشتريات) = تاريخ ترحيل القيد المحاسبي (منفصل عن created_at).
+    $documentDate = trim((string)($data['document_date'] ?? ''));
+    if ($documentDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $documentDate)) {
+        $documentDate = date('Y-m-d');
+    }
+    orange_fiscal_require_open_for_posting($pdo, $documentDate, $returnCountryId);
+    $postingAt = $documentDate . ' ' . date('H:i:s');
+
     $tmpNum = 'PR-TMP-' . bin2hex(random_bytes(6));
     $insertCols = 'return_number, purchase_id, supplier_id, type, total, notes';
     $insertPlaceholders = '?,?,?,?,?,?';
@@ -131,6 +140,11 @@ try {
         $netTotal,
         $notes !== '' ? $notes : null,
     ];
+    if (orange_table_has_column($pdo, 'purchase_returns', 'document_date')) {
+        $insertCols .= ', document_date';
+        $insertPlaceholders .= ', ?';
+        $insertValues[] = $documentDate;
+    }
     if ($hasRetSubtotal) {
         $insertCols .= ', subtotal';
         $insertPlaceholders .= ', ?';
@@ -227,8 +241,8 @@ try {
                 $glB['lines'],
                 $pendingKey,
                 $retRef,
-                $now,
-                $now,
+                $postingAt,
+                $postingAt,
                 $glB['voucher_description'],
                 'purchase_return',
                 $afterJson
@@ -237,8 +251,8 @@ try {
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingKey,
                 'source_label' => $retRef,
-                'movement_at' => $now,
-                'voucher_date' => $now,
+                'movement_at' => $postingAt,
+                'voucher_date' => $postingAt,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
                 'amount' => $netTotal,
@@ -250,7 +264,7 @@ try {
     } else {
         if ($glB['is_multi']) {
             $vid = orange_voucher_post($pdo, [
-                'voucher_date' => $now,
+                'voucher_date' => $postingAt,
                 'document_entered_at' => $now,
                 'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase_return',
@@ -259,7 +273,7 @@ try {
             orange_gl_apply_voucher_after_post_hooks($pdo, $vid, $afterJson);
         } else {
             orange_journal_insert_line($pdo, [
-                'date' => $now,
+                'date' => $postingAt,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
                 'amount' => $netTotal,

@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/order_helpers.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
+require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/document_sequences.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
@@ -105,6 +106,13 @@ try {
 
     $orderCountryId = orange_sales_order_country_id_for_channel($pdo, $channelId);
     $orderWarehouseId = orange_warehouse_default_id_for_country($pdo, $orderCountryId);
+
+    // تاريخ الفاتورة/المستند القابل للضبط = تاريخ ترحيل القيد المحاسبي (منفصل عن created_at).
+    $documentDate = trim((string)($data['document_date'] ?? ''));
+    if ($documentDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $documentDate)) {
+        $documentDate = date('Y-m-d');
+    }
+    orange_fiscal_require_open_for_posting($pdo, $documentDate, $orderCountryId);
 
     $pdo->beginTransaction();
 
@@ -228,6 +236,11 @@ try {
         $cols .= ', warehouse_id';
         $ph .= ', ?';
         $params[] = $orderWarehouseId;
+    }
+    if (orange_table_has_column($pdo, 'orders', 'document_date')) {
+        $cols .= ', document_date';
+        $ph .= ', ?';
+        $params[] = $documentDate;
     }
     orange_sql_append_document_currency_code(
         $pdo,

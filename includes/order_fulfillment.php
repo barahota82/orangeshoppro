@@ -15,6 +15,25 @@ require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/invoice_ancillary_lines.php';
 
 /**
+ * تاريخ ترحيل قيد تسليم الطلب.
+ * - الأونلاين (INV-O): يُرحَّل بتاريخ «إنشاء القيود» (وقت التشغيل) — سلوك غير متغيّر.
+ * - فاتورة الشركة (INV-C نقدي/آجل): يُرحَّل بتاريخ المستند document_date المُدخَل.
+ */
+function orange_order_delivery_posting_datetime(array $order, bool $isOnline): string
+{
+    $now = date('Y-m-d H:i:s');
+    if ($isOnline) {
+        return $now;
+    }
+    $docDateRaw = trim((string) ($order['document_date'] ?? ''));
+    if ($docDateRaw !== '' && preg_match('/^\d{4}-\d{2}-\d{2}/', $docDateRaw)) {
+        return substr($docDateRaw, 0, 10) . ' ' . substr($now, 11);
+    }
+
+    return $now;
+}
+
+/**
  * @param list<array<string, mixed>> $extraLines
  */
 function orange_order_post_delivery_sale_gl_amount(
@@ -38,6 +57,7 @@ function orange_order_post_delivery_sale_gl_amount(
     }
 
     $now = date('Y-m-d H:i:s');
+    $postingAt = orange_order_delivery_posting_datetime($order, $isOnline);
     $orderId = (int) ($order['id'] ?? 0);
     $salePendingKey = orange_gl_pending_source_key('order', $orderId, 'sale-' . $salePendingSuffix);
     $srcLabel = 'ORDER-' . (string) ($order['order_number'] ?? '');
@@ -120,8 +140,8 @@ function orange_order_post_delivery_sale_gl_amount(
                 $glB['lines'],
                 $salePendingKey,
                 $srcLabel,
-                $now,
-                $now,
+                $postingAt,
+                $postingAt,
                 $glB['voucher_description'],
                 'order_delivery_sale',
                 $afterJson
@@ -130,7 +150,7 @@ function orange_order_post_delivery_sale_gl_amount(
             return;
         }
         $vCashSale = orange_voucher_post($pdo, [
-            'voucher_date' => $now,
+            'voucher_date' => $postingAt,
             'document_entered_at' => $now,
             'description' => $glB['voucher_description'],
             'entry_type' => 'order_delivery_sale',
@@ -202,8 +222,8 @@ function orange_order_post_delivery_sale_gl_amount(
                 $glB['lines'],
                 $salePendingKey,
                 $srcLabel,
-                $now,
-                $now,
+                $postingAt,
+                $postingAt,
                 $glB['voucher_description'],
                 'order_delivery_sale',
                 $afterJson
@@ -212,8 +232,8 @@ function orange_order_post_delivery_sale_gl_amount(
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $salePendingKey,
                 'source_label' => $srcLabel,
-                'movement_at' => $now,
-                'voucher_date' => $now,
+                'movement_at' => $postingAt,
+                'voucher_date' => $postingAt,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
                 'amount' => $receivableTotal,
@@ -228,7 +248,7 @@ function orange_order_post_delivery_sale_gl_amount(
 
     if ($glB['is_multi']) {
         $vSale = orange_voucher_post($pdo, [
-            'voucher_date' => $now,
+            'voucher_date' => $postingAt,
             'document_entered_at' => $now,
             'description' => $glB['voucher_description'],
             'entry_type' => 'order_delivery_sale',
@@ -241,7 +261,7 @@ function orange_order_post_delivery_sale_gl_amount(
     }
 
     $vSale = orange_voucher_post($pdo, [
-        'voucher_date' => $now,
+        'voucher_date' => $postingAt,
         'document_entered_at' => $now,
         'description' => $glB['voucher_description'],
         'entry_type' => 'order_delivery_sale',
@@ -535,6 +555,7 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
         $costAmount = $variant ? round((float) $item['cost'] * (int) $item['qty'], 4) : 0.0;
 
         $now = date('Y-m-d H:i:s');
+        $postingAt = orange_order_delivery_posting_datetime($order, $isOnline);
         $lineKey = isset($item['id']) ? (string) (int) $item['id'] : (string) $idx;
         $salePendingKey = orange_gl_pending_source_key('order', (int) $order['id'], 'sale-' . $lineKey);
         $cogsPendingKey = orange_gl_pending_source_key('order', (int) $order['id'], 'cogs-' . $lineKey);
@@ -617,15 +638,15 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
                         $saleFour['lines'],
                         $salePendingKey,
                         $srcLabel,
-                        $now,
-                        $now,
+                        $postingAt,
+                        $postingAt,
                         $saleDesc,
                         'order_delivery_sale',
                         $cashAfterJson
                     );
                 } else {
                     $vCashSale = orange_voucher_post($pdo, [
-                        'voucher_date' => $now,
+                        'voucher_date' => $postingAt,
                         'document_entered_at' => $now,
                         'description' => $saleDesc,
                         'entry_type' => 'order_delivery_sale',
@@ -681,8 +702,8 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
                 orange_gl_pending_enqueue_simple($pdo, [
                     'reference' => $salePendingKey,
                     'source_label' => $srcLabel,
-                    'movement_at' => $now,
-                    'voucher_date' => $now,
+                    'movement_at' => $postingAt,
+                    'voucher_date' => $postingAt,
                     'account_debit' => $debitReceivable,
                     'account_credit' => $salesId,
                     'amount' => $salesAmount,
@@ -692,7 +713,7 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
                 ]);
             } else {
                 $vSale = orange_voucher_post($pdo, [
-                    'voucher_date' => $now,
+                    'voucher_date' => $postingAt,
                     'document_entered_at' => $now,
                     'description' => $saleDesc,
                     'entry_type' => 'order_delivery_sale',
@@ -723,8 +744,8 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
                 orange_gl_pending_enqueue_simple($pdo, [
                     'reference' => $cogsPendingKey,
                     'source_label' => $srcLabel,
-                    'movement_at' => $now,
-                    'voucher_date' => $now,
+                    'movement_at' => $postingAt,
+                    'voucher_date' => $postingAt,
                     'account_debit' => $cogsDebitId,
                     'account_credit' => $cogsCreditId,
                     'amount' => $costAmount,
@@ -734,7 +755,7 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
                 ]);
             } else {
                 orange_voucher_post($pdo, [
-                    'voucher_date' => $now,
+                    'voucher_date' => $postingAt,
                     'document_entered_at' => $now,
                     'description' => $cogsDesc,
                     'entry_type' => 'order_delivery_cogs',

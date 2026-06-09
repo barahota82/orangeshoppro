@@ -27,12 +27,16 @@ if ($hasSupplierInvoiceCol) {
 }
 $hasInvDiscount = orange_table_has_column($pdo, 'purchases', 'invoice_discount_raw');
 $hasSubtotal = orange_table_has_column($pdo, 'purchases', 'subtotal');
+$hasDocumentDate = orange_table_has_column($pdo, 'purchases', 'document_date');
 $hasPiDiscount = orange_table_has_column($pdo, 'purchase_items', 'discount_raw');
 if ($hasInvDiscount) {
     $purCols .= ', invoice_discount_raw, invoice_discount_amount';
 }
 if ($hasSubtotal) {
     $purCols .= ', subtotal';
+}
+if ($hasDocumentDate) {
+    $purCols .= ', document_date';
 }
 $st = $pdo->prepare("SELECT $purCols FROM purchases WHERE id = ? LIMIT 1");
 $st->execute([$purchaseId]);
@@ -154,6 +158,7 @@ json_response([
         'subtotal' => $hasSubtotal ? (float) ($purchase['subtotal'] ?? 0) : (float) $purchase['total'],
         'invoice_discount_raw' => $hasInvDiscount ? trim((string) ($purchase['invoice_discount_raw'] ?? '')) : '',
         'invoice_discount_amount' => $hasInvDiscount ? (float) ($purchase['invoice_discount_amount'] ?? 0) : 0.0,
+        'document_date' => $hasDocumentDate ? (string) ($purchase['document_date'] ?? '') : '',
     ],
     'items' => $items,
     'extra_lines' => $extraOut,

@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/order_helpers.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
+require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
@@ -166,6 +167,19 @@ try {
         : 0.0;
     $amountPaid = min($amountPaid, $total);
 
+    // تاريخ الفاتورة/المستند = تاريخ ترحيل القيد المحاسبي (يُحترم عند إعادة الترحيل بعد التعديل).
+    $documentDate = '';
+    if (array_key_exists('document_date', $data)) {
+        $documentDate = trim((string)($data['document_date'] ?? ''));
+    }
+    if ($documentDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $documentDate)) {
+        $existingDocDate = trim((string)($order['document_date'] ?? ''));
+        $documentDate = ($existingDocDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}/', $existingDocDate))
+            ? substr($existingDocDate, 0, 10)
+            : date('Y-m-d');
+    }
+    orange_fiscal_require_open_for_posting($pdo, $documentDate, $orderCountryId);
+
     orange_sales_invoice_company_remove_forward_accounting($pdo, array_merge($order, ['id' => $orderId]), $orderCountryId);
     $pdo->prepare('DELETE FROM order_items WHERE order_id = ?')->execute([$orderId]);
 
@@ -179,6 +193,10 @@ try {
         'total = ?',
     ];
     $params = [$customerName, $phoneNorm, $area, $address, $notes, $channelId > 0 ? $channelId : null, $total];
+    if (orange_table_has_column($pdo, 'orders', 'document_date')) {
+        $sets[] = 'document_date = ?';
+        $params[] = $documentDate;
+    }
 
     if (orange_table_has_column($pdo, 'orders', 'payment_terms')) {
         $sets[] = 'payment_terms = ?';
