@@ -136,6 +136,8 @@ ARABIC
 
 **تحديث واجهة الإقفال (2026-06-09):** شريط الإقفال المشترك `includes/edit_lock_ui.php` صار **خانة اختيار «قيد مغلق» تفاعلية** بدل زرّي «قفل/فك» — **القفل/الفك يدوي** (لا قفل تلقائي بعد الحفظ لباقي السندات؛ §0/§3 كما هي) مع **رسالة تأكيد OK/Cancel** قبل التنفيذ وإرجاع الخانة لحالتها عند الإلغاء؛ تحترم `can_lock`/`can_unlock`. الرصيد الافتتاحي يحتفظ بـ **القفل التلقائي الخلفي** (force_lock في save.php) وتظهر خانته مؤشَّرة بعد الحفظ مع إمكانية الفك اليدوي. YEC بخانته المعطّلة المنفصلة كما هي.
 
+**تحديث (2026-06-09 — قرار مالك): الخانة تظهر دائماً.** خانة «قيد مغلق» تُعرَض **دائماً** على شاشة المستند (حتى قبل الحفظ)، لكنها **معطّلة** قبل وجود مستند محفوظ (`entity_id<=0`) مع شارة **«يُتاح بعد الحفظ»**؛ بعد الحفظ تُفعَّل حسب الصلاحيات. (`paint()` في `edit_lock_ui.php` لم يعد يُخفي الشريط عند `!hasEntity`، بل يُظهره معطّلاً.)
+
 ENGLISH
 - Owner decision (2026-06-08): OBV opening-balance voucher auto-locks after successful save (like YEC), an explicit exception to §0/§3 "no auto-lock on save" (which still applies to daily docs). Unlock requires `can_unlock`; re-saving re-locks automatically.
 

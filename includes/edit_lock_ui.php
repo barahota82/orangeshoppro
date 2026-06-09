@@ -61,11 +61,20 @@ function orange_edit_lock_ui_script_once(): void
                 wrap.style.display = show ? '' : 'none';
             }
             function paint(locked, hasEntity) {
+                /* الخانة تظهر دائماً؛ تُعطَّل قبل الحفظ (لا مستند بعد) */
+                setVisible(true);
                 if (!hasEntity) {
-                    setVisible(false);
+                    if (chk) {
+                        chk.checked = false;
+                        chk.disabled = true;
+                    }
+                    if (badge) {
+                        badge.textContent = 'يُتاح بعد الحفظ';
+                        badge.className = 'edit-lock-badge edit-lock-badge--pending';
+                    }
+                    if (onChange) onChange(false);
                     return;
                 }
-                setVisible(true);
                 if (chk) {
                     chk.checked = !!locked;
                     /* لقفل مستند مفتوح يلزم can_lock؛ لفك مستند مقفول يلزم can_unlock */
@@ -155,6 +164,7 @@ function orange_edit_lock_ui_script_once(): void
 .edit-lock-badge { font-size:0.85rem; font-weight:600; }
 .edit-lock-badge--locked { color:#b45309; }
 .edit-lock-badge--open { color:#047857; }
+.edit-lock-badge--pending { color:#6b7280; }
 </style>
     <?php
 }
