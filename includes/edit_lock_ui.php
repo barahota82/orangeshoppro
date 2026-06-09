@@ -159,6 +159,7 @@ function orange_edit_lock_ui_script_once(): void
 </script>
 <style>
 .edit-lock-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin:0 0 12px; }
+.edit-lock-toolbar[hidden] { display:none !important; }
 .edit-lock-check { display:flex; align-items:center; gap:8px; cursor:pointer; }
 .edit-lock-check input[type="checkbox"]:disabled { cursor:default; }
 .edit-lock-badge { font-size:0.85rem; font-weight:600; }
@@ -195,7 +196,7 @@ function orange_edit_lock_ui_toolbar(array $opts): void
      data-doc-kind="<?php echo htmlspecialchars($docKind, ENT_QUOTES, 'UTF-8'); ?>"
      hidden>
     <label class="edit-lock-check">
-        <input type="checkbox" id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_chk">
+        <input type="checkbox" id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_chk" disabled>
         <span><strong>قيد مغلق</strong><?php echo $note !== '' ? ' — ' . htmlspecialchars($note, ENT_QUOTES, 'UTF-8') : ''; ?></span>
     </label>
     <span id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_badge" class="edit-lock-badge"></span>

@@ -2034,6 +2034,9 @@ if (JV_YEC_MODE && JV_YEC_LOAD_ID > 0) {
     if (JV_DEEP_LOAD_ID > 0) {
         jvLoadVoucherFromApi(JV_DEEP_LOAD_ID);
     }
+})();
+/* ربط شريط قفل القيد لكل أنواع شاشة السند (قيد/قبض/صرف/أخرى) — خارج jvDeepLoadFromQuery حتى لا يُتخطّى عند غياب وضع «سندات أخرى». */
+(function jvBindEditLock() {
     if (!JV_YEC_MODE && window.OrangeEditLock) {
         jvEditLockCtl = OrangeEditLock.bind({
             prefix: 'jv',
