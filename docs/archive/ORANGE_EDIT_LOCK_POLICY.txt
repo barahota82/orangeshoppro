@@ -207,3 +207,5 @@ Changelog
 2026-05-20 — **تنفيذ:** rev 67؛ `includes/edit_lock.php`؛ `admin/pages/edit_lock.php`؛ APIs `admin/api/edit-lock/*`؛ `can_lock`/`can_unlock`؛ طابور GL افتراضي off (`ORANGE_GL_USE_PENDING_QUEUE` opt-in)؛ `gl_posting` → redirect.
 2026-06-08 — **§6b (قرار مالك):** الرصيد الافتتاحي (OBV) **يُقفَل تلقائياً بعد الحفظ** مثل YEC (استثناء §0/§3)؛ `orange_edit_lock_force_lock()`؛ قفل في `opening_balances/save.php`؛ تلميح + تعطيل النموذج عند القفل في `opening_balances.php`.
 2026-06-09 — **واجهة الإقفال:** شريط `edit_lock_ui.php` صار **خانة اختيار تفاعلية** بدل الأزرار — قفل/فك **يدوي** + **تأكيد OK/Cancel** (مثل الحذف) + احترام الصلاحيات؛ شاشة `edit_lock.php` المركزية: تأكيد قبل قفل/فك المحدد. OB: إزالة الخانة المكرّرة والاكتفاء بخانة الشريط مع `note`.
+2026-06-09 — الخانة **تظهر دائماً** ومعطّلة قبل الحفظ (شارة «يُتاح بعد الحفظ»).
+2026-06-09 — **إضافة خانة الإقفال لشاشتي الشركاء** `partner_customer_receipt.php` (doc_kind=customer_receipt) و`partner_supplier_payment.php` (doc_kind=supplier_payment) — كانتا بلا شريط إقفال (الخلفية كانت تسجّل/تتحقق أصلاً عبر `register_voucher` + `manage.php`)؛ الربط على `crecBrowseId`/`spayBrowseId` مع refresh بعد تحميل السند.

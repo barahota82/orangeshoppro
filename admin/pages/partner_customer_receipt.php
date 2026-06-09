@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 require_once __DIR__ . '/../../includes/voucher_print_banner.php';
+require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 
 $pdo = orange_admin_page_pdo();
 
@@ -236,6 +237,7 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
 
 <div class="card jv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'crec', 'doc_kind' => 'customer_receipt', 'country_id' => $ppvCountryId]); ?>
     <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
         <?php orange_voucher_print_banner_thead($pdo, $ppvCountryId, ['title_ar' => $ppvTitle]); ?>
         <tbody>
@@ -446,6 +448,8 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
 <script>
 var ORANGE_VOUCHER_PRINT_TUNING = <?php echo $ppvPrintTuningMode ? 'true' : 'false'; ?>;
 var crecBrowseId = null;
+var crecEditLockCtl = null;
+var CREC_COUNTRY_ID = <?php echo (int) $ppvCountryId; ?>;
 
 function crecPrintVoucher() {
     if (!ORANGE_VOUCHER_PRINT_TUNING && !crecBrowseId) {
@@ -821,6 +825,9 @@ function crecPrintVoucher() {
         }
         document.getElementById('crec_btn_delete').disabled = false;
         crecSyncPrintButton();
+        if (crecEditLockCtl && crecEditLockCtl.refresh) {
+            crecEditLockCtl.refresh();
+        }
 
         // Load customer from subledger
         if (r.party_customer_id) {
@@ -954,6 +961,16 @@ function crecPrintVoucher() {
         document.getElementById('crec_btn_save').addEventListener('click', save);
         document.getElementById('crec_btn_new').addEventListener('click', function () { location.reload(); });
         document.getElementById('crec_btn_delete').addEventListener('click', crecDeleteVoucher);
+
+        if (window.OrangeEditLock) {
+            crecEditLockCtl = OrangeEditLock.bind({
+                prefix: 'crec',
+                docKind: 'customer_receipt',
+                page: 'partner_customer_receipt',
+                countryId: CREC_COUNTRY_ID,
+                getEntityId: function () { return crecBrowseId || 0; }
+            });
+        }
 
         document.getElementById('crec_nav_first').addEventListener('click', function () { crecNav('first'); });
         document.getElementById('crec_nav_prev').addEventListener('click', function () { crecNav('prev'); });

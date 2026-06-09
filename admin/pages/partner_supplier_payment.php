@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 require_once __DIR__ . '/../../includes/voucher_print_banner.php';
+require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 
 $pdo = orange_admin_page_pdo();
 
@@ -247,6 +248,7 @@ $ppvReady = $ppvCashLock !== null;
 
 <div class="card jv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'spay', 'doc_kind' => 'supplier_payment', 'country_id' => $ppvCountryId]); ?>
     <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
         <?php orange_voucher_print_banner_thead($pdo, $ppvCountryId, ['title_ar' => $ppvTitle]); ?>
         <tbody>
@@ -457,6 +459,8 @@ $ppvReady = $ppvCashLock !== null;
 <script>
 var ORANGE_VOUCHER_PRINT_TUNING = <?php echo $ppvPrintTuningMode ? 'true' : 'false'; ?>;
 var spayBrowseId = null;
+var spayEditLockCtl = null;
+var SPAY_COUNTRY_ID = <?php echo (int) $ppvCountryId; ?>;
 
 function spayPrintVoucher() {
     if (!ORANGE_VOUCHER_PRINT_TUNING && !spayBrowseId) {
@@ -834,6 +838,9 @@ function spayPrintVoucher() {
         }
         document.getElementById('spay_btn_delete').disabled = false;
         spaySyncPrintButton();
+        if (spayEditLockCtl && spayEditLockCtl.refresh) {
+            spayEditLockCtl.refresh();
+        }
 
         // Load supplier from subledger
         if (r.party_supplier_id) {
@@ -967,6 +974,16 @@ function spayPrintVoucher() {
         document.getElementById('spay_btn_save').addEventListener('click', save);
         document.getElementById('spay_btn_new').addEventListener('click', function () { location.reload(); });
         document.getElementById('spay_btn_delete').addEventListener('click', spayDeleteVoucher);
+
+        if (window.OrangeEditLock) {
+            spayEditLockCtl = OrangeEditLock.bind({
+                prefix: 'spay',
+                docKind: 'supplier_payment',
+                page: 'partner_supplier_payment',
+                countryId: SPAY_COUNTRY_ID,
+                getEntityId: function () { return spayBrowseId || 0; }
+            });
+        }
 
         document.getElementById('spay_nav_first').addEventListener('click', function () { spayNav('first'); });
         document.getElementById('spay_nav_prev').addEventListener('click', function () { spayNav('prev'); });
