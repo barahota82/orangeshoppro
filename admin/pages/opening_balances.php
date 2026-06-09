@@ -243,7 +243,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns ob-voucher-action-btns" role="group" aria-label="إجراءات سند الرصيد الافتتاحي">
                     <button type="button" id="ob_btn_save" data-orange-perm="edit" data-orange-page="opening_balances">حفظ السند</button>
-                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_print" onclick="obOpenPrintDialog(); return false;">طباعة السند</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_print" onclick="obOpenPrintDialog(); return false;" title="<?php echo $obVid > 0 ? 'طباعة السند' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط'; ?>"<?php echo $obVid <= 0 ? ' disabled' : ''; ?>>طباعة السند</button>
                     <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_delete"<?php echo $obVid <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
                 </div>
             </div>
@@ -312,6 +312,10 @@ var OB_CAPS = <?php echo json_encode($obCaps, JSON_UNESCAPED_UNICODE | JSON_HEX_
 var obEditLockCtl = null;
 
 function obOpenPrintDialog() {
+    if (OB_SAVED_VOUCHER_ID <= 0) {
+        alert('احفظ السند أولاً قبل الطباعة.');
+        return false;
+    }
     return orangeAdminOpenPrintDialog(
         orangeAdminBuildVoucherPrintDocTitle(null, 'ob_number_preview', 'سند رصيد افتتاحي')
     );
@@ -339,6 +343,11 @@ function obOpenPrintDialog() {
         var del = document.getElementById('ob_btn_delete');
         if (del) {
             del.disabled = obLocked || OB_SAVED_VOUCHER_ID <= 0;
+        }
+        var prt = document.getElementById('ob_btn_print');
+        if (prt) {
+            prt.disabled = OB_SAVED_VOUCHER_ID <= 0;
+            prt.title = OB_SAVED_VOUCHER_ID > 0 ? 'طباعة السند' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط';
         }
         document.querySelectorAll('#ob_body input').forEach(function (inp) {
             inp.readOnly = obLocked;
