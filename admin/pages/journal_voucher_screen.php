@@ -193,12 +193,12 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 
 <div class="card jv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($jvPageCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
-    <?php if (!$jvYecMode): orange_edit_lock_ui_toolbar(['prefix' => 'jv', 'doc_kind' => 'journal_voucher', 'country_id' => $jvScreenCountryId]); endif; ?>
+    <?php if (!$jvYecMode): orange_edit_lock_ui_toolbar(['prefix' => 'jv', 'doc_kind' => 'journal_voucher', 'country_id' => $jvScreenCountryId, 'show_status_badge' => false]); endif; ?>
     <?php if ($jvYecMode): ?>
     <p class="card-hint jv-print-hide" style="margin:0 0 12px;line-height:1.55;">استخدم أزرار <strong>التنقل</strong> أو <strong>بحث</strong> للانتقال بين سندات الإقفال السنوية — «تنفيذ البحث» بدون فلاتر يعرض كل السندات (حتى 300).</p>
     <label class="jv-print-hide" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;cursor:default;">
         <input type="checkbox" id="jv_yec_locked" disabled>
-        <span><strong>قيد مغلق</strong> — يُفعَّل تلقائياً بعد الحفظ الناجح</span>
+        <span><strong>قيد مغلق</strong></span>
     </label>
     <?php endif; ?>
     <?php if ((($jvPageEntryType ?? '') === 'receipt_voucher' || ($jvPageEntryType ?? '') === 'payment_voucher') && $jvCashLock === null): ?>

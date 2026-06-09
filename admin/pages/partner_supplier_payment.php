@@ -301,7 +301,7 @@ $ppvReady = $ppvCashLock !== null;
     <!-- ٣ — القيد المحاسبي -->
     <div style="margin-top:20px;padding-top:14px;border-top:2px solid #e2e8f0;">
         <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:0 0 10px;">القيد المحاسبي</h4>
-        <?php orange_edit_lock_ui_toolbar(['prefix' => 'spay', 'doc_kind' => 'supplier_payment', 'country_id' => $ppvCountryId]); ?>
+        <?php orange_edit_lock_ui_toolbar(['prefix' => 'spay', 'doc_kind' => 'supplier_payment', 'country_id' => $ppvCountryId, 'show_status_badge' => false]); ?>
 
         <div class="jv-voucher-header-line jv-voucher-header-line--nav" style="margin-bottom:12px;">
             <div>

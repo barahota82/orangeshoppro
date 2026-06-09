@@ -250,7 +250,7 @@ if (orange_journal_vouchers_ready($pdo)) {
 
 <div class="card ppv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($ppvCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
-    <?php orange_edit_lock_ui_toolbar(['prefix' => 'ppv', 'doc_kind' => $ppvKind, 'country_id' => $ppvCountryId]); ?>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'ppv', 'doc_kind' => $ppvKind, 'country_id' => $ppvCountryId, 'show_status_badge' => false]); ?>
     <?php if ($ppvCashLock === null): ?>
     <p class="card-hint ppv-print-hide" style="margin:0 0 12px;">اربط حساب <strong>الخزينة / النقدية</strong> من <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>.</p>
     <?php endif; ?>
