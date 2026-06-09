@@ -191,15 +191,15 @@ function orange_edit_lock_ui_toolbar(array $opts): void
     $note = trim((string) ($opts['note'] ?? ''));
     orange_edit_lock_ui_script_once();
     ?>
+<?php /* يُعرض دائماً (الخانة معطّلة افتراضياً في HTML فلا تُستخدم قبل الربط/الحفظ)؛ JS يُفعّلها بعد الحفظ. بلا hidden حتى تظهر حتى لو تأخّر/فشل الربط. */ ?>
 <div id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_wrap"
      class="<?php echo htmlspecialchars($class, ENT_QUOTES, 'UTF-8'); ?>"
-     data-doc-kind="<?php echo htmlspecialchars($docKind, ENT_QUOTES, 'UTF-8'); ?>"
-     hidden>
+     data-doc-kind="<?php echo htmlspecialchars($docKind, ENT_QUOTES, 'UTF-8'); ?>">
     <label class="edit-lock-check">
         <input type="checkbox" id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_chk" disabled>
         <span><strong>قيد مغلق</strong><?php echo $note !== '' ? ' — ' . htmlspecialchars($note, ENT_QUOTES, 'UTF-8') : ''; ?></span>
     </label>
-    <span id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_badge" class="edit-lock-badge"></span>
+    <span id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_badge" class="edit-lock-badge edit-lock-badge--pending">يُتاح بعد الحفظ</span>
 </div>
     <?php
 }
