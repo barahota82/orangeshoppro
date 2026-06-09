@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/order_stock.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
@@ -120,21 +121,24 @@ foreach ($variants as $vSum) {
     $icTotalStock += (int) ($vSum['stock_quantity'] ?? 0);
 }
 ?>
-<div class="page-title page-title--stacked gl-acc-stmt-no-print">
-    <div>
-        <h1>كارت الصنف</h1>
-        <p class="page-subtitle">
-            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock#balances'), ENT_QUOTES, 'UTF-8'); ?>">← المستودع</a>
-            &nbsp;·&nbsp;
-            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a>
-            &nbsp;·&nbsp;
-            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock_reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير المخزن</a>
-        </p>
-    </div>
-    <div class="ic-print-actions">
-        <button type="button" class="btn-secondary" onclick="window.print()">طباعة كارت الصنف</button>
+<div class="page-title gl-acc-stmt-no-print">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <h1>كارت الصنف</h1>
+            <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
+        </div>
+        <div class="ic-print-actions">
+            <button type="button" class="btn-secondary" onclick="window.print()">طباعة كارت الصنف</button>
+        </div>
     </div>
 </div>
+<p class="page-subtitle">
+    <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock#balances'), ENT_QUOTES, 'UTF-8'); ?>">← المستودع</a>
+    &nbsp;·&nbsp;
+    <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a>
+    &nbsp;·&nbsp;
+    <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock_reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير المخزن</a>
+</p>
 
 <div class="ic-print-area">
 <div class="card item-card-print-sheet">

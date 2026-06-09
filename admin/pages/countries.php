@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/country_provision.php';
 require_once __DIR__ . '/../../includes/admin_password_policy.php';
@@ -22,10 +23,11 @@ foreach ($countries as $c) {
     }
 }
 ?>
-<div class="page-title page-title--stacked">
+<div class="page-title">
     <h1>الدول</h1>
-    <p class="page-subtitle">المشرف العام يضيف دولة ويُفعّلها — يُنشأ تلقائياً: مخزن، قنوات (مثل الكويت)، كتالوج، دليل حسابات، إعدادات GL، ومحافظة توصيل افتراضية. ثم أضف مستخدم فريق الدولة ليعمل داخل نطاقها.</p>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<p class="page-subtitle">المشرف العام يضيف دولة ويُفعّلها — يُنشأ تلقائياً: مخزن، قنوات (مثل الكويت)، كتالوج، دليل حسابات، إعدادات GL، ومحافظة توصيل افتراضية. ثم أضف مستخدم فريق الدولة ليعمل داخل نطاقها.</p>
 
 <?php if (!$hasTable): ?>
 <div class="card">

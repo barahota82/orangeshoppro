@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -12,6 +13,7 @@ $orange_uc = orange_admin_uc_branch_bootstrap($pdo);
 ?>
 <div class="page-title">
     <h1>فروع شجرة المنتجات</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <?php if (!$orange_uc['has_unified_tables']): ?>

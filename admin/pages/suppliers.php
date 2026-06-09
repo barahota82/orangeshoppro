@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
@@ -388,10 +389,9 @@ if (is_array($supplierCtxCountryRow)) {
 }
 $supplierKwCountryId = orange_countries_default_id($pdo);
 ?>
-<div class="page-title page-title--stacked">
-    <div>
-        <h1>الموردين</h1>
-    </div>
+<div class="page-title">
+    <h1>الموردين</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <?php if ($supplierBootstrapError !== ''): ?>

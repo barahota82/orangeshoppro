@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/cart_promo_products.php';
 
 $pdo = db();
@@ -10,10 +11,11 @@ $hasTable = orange_table_exists($pdo, 'cart_combo_promotions');
 $ccpPickRows = orange_cart_promo_admin_product_rows($pdo);
 $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS);
 ?>
-<div class="page-title page-title--stacked">
+<div class="page-title">
     <h1>عروض الكومبو</h1>
-    <p class="page-subtitle">منتجان (أو أكثر) بأي لون أو مقاس — عند توفّر الكميات في العربة يُطبَّق <strong>سعر الحزمة</strong>. <strong>نقرتان</strong> على «إضافة منتج» لاختيار من المخزن.</p>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<p class="page-subtitle">منتجان (أو أكثر) بأي لون أو مقاس — عند توفّر الكميات في العربة يُطبَّق <strong>سعر الحزمة</strong>. <strong>نقرتان</strong> على «إضافة منتج» لاختيار من المخزن.</p>
 
 <?php if (!$hasTable): ?>
 <div class="card">

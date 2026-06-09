@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/order_stock.php';
 require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
@@ -43,8 +44,11 @@ function orange_reserved_orders_payment_badge(array $o): string
 
 ?>
 <div class="admin-fy-shell" dir="rtl">
-    <h1 class="admin-fy-shell__title">طلبات محجوزة (مخزون)</h1>
-    <p class="admin-fy-shell__lead">
+    <div class="page-title">
+        <h1>طلبات محجوزة (مخزون)</h1>
+        <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
+    </div>
+    <p class="page-subtitle">
         طلبات ما زال لها <strong>حجز مخزون نشط</strong> (حركات <code>pending_order</code>) حتى التسليم أو رفض/إلغاء يُطلق المخزون.
         لتحرير الحجز يدوياً: حدّث حالة الطلب من
         <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">شاشة الطلبات</a>

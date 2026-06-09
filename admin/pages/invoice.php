@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/document_sequences.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
@@ -209,8 +210,11 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
 };
 ?>
 <div class="admin-fy-shell invoice-admin-shell" dir="rtl">
-    <h1 class="admin-fy-shell__title">فاتورة أونلاين</h1>
-    <p class="admin-fy-shell__lead">مستند تشغيلي للعميل من <strong>طلب محفوظ</strong> — للطباعة عند التسليم (manifest / مندوب). <strong>الفاتورة الرسمية أونلاين (<code>INV-O-</code>)</strong> تُخصَّص عند «إنشاء القيود» فقط؛ <strong>فاتورة شركة (<code>INV-C-</code>)</strong> عند حفظ «فاتورة مبيعات». بعد التحميل: <strong>طباعة / PDF</strong> من الشريط أعلاه أو <kbd class="admin-kbd">Ctrl</kbd>+<kbd class="admin-kbd">P</kbd>.</p>
+    <div class="page-title">
+        <h1>فاتورة أونلاين</h1>
+        <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
+    </div>
+    <p class="page-subtitle">مستند تشغيلي للعميل من <strong>طلب محفوظ</strong> — للطباعة عند التسليم (manifest / مندوب). <strong>الفاتورة الرسمية أونلاين (<code>INV-O-</code>)</strong> تُخصَّص عند «إنشاء القيود» فقط؛ <strong>فاتورة شركة (<code>INV-C-</code>)</strong> عند حفظ «فاتورة مبيعات». بعد التحميل: <strong>طباعة / PDF</strong> من الشريط أعلاه أو <kbd class="admin-kbd">Ctrl</kbd>+<kbd class="admin-kbd">P</kbd>.</p>
 
 <style>
     .invoice-doc {

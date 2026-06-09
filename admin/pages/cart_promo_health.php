@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/stock_alerts.php';
 require_once __DIR__ . '/../../includes/cart_promo_monitor.php';
 require_once __DIR__ . '/../../includes/cart_promotion_country.php';
@@ -45,10 +46,11 @@ $statusClass = static function (string $status): string {
 .ocp-health--na{background:#f3f4f6;color:#4b5563;border:1px solid #e5e7eb}
 </style>
 
-<div class="page-title page-title--stacked">
+<div class="page-title">
     <h1>صحة عروض السلة والمنتجات</h1>
-    <p class="page-subtitle">مراقبة آخر فحص مخزون لكل قاعدة (الخمسة أنواع). التحذير البرتقالي = مخزون ≤ <?php echo (int) $lowTh; ?> قبل الإيقاف. <strong>مرحلة 10:</strong> بعد إيقاف مخزون فقط — إذا رجع المخزون والفترة سارية و«نشط» يُعاد التفعيل تلقائياً عند الفحص؛ انتهاء الفترة أو إيقاف الأدمن يدوياً = تفعيل يدوي فقط.</p>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<p class="page-subtitle">مراقبة آخر فحص مخزون لكل قاعدة (الخمسة أنواع). التحذير البرتقالي = مخزون ≤ <?php echo (int) $lowTh; ?> قبل الإيقاف. <strong>مرحلة 10:</strong> بعد إيقاف مخزون فقط — إذا رجع المخزون والفترة سارية و«نشط» يُعاد التفعيل تلقائياً عند الفحص؛ انتهاء الفترة أو إيقاف الأدمن يدوياً = تفعيل يدوي فقط.</p>
 
 <?php if (!$tablesReady): ?>
 <div class="card">

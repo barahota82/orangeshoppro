@@ -130,13 +130,11 @@ $sr2DocSerialPreview = $sr2NavReady
 }
 </style>
 
-<div class="page-title page-title--stacked">
-    <div>
-        <h1>مردود مبيعات</h1>
-        <p class="page-subtitle">تسجيل إرجاع بضاعة من العميل؛ <strong>يُزاد المخزون فور الحفظ</strong> ويُولَّد قيد إيراد/تكلفة حسب قناة التحصيل.</p>
-        <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة — المبالغ بعملة <strong><?php echo htmlspecialchars($srDefaultCurrency, ENT_QUOTES, 'UTF-8'); ?></strong>.</p>
-    </div>
+<div class="page-title">
+    <h1>مردود مبيعات</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<p class="page-subtitle">تسجيل إرجاع بضاعة من العميل؛ <strong>يُزاد المخزون فور الحفظ</strong> ويُولَّد قيد إيراد/تكلفة حسب قناة التحصيل.</p>
 
 <?php if ($sr2WarnNoProducts): ?>
 <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">

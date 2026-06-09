@@ -234,10 +234,9 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
 }
 </style>
 
-<div class="page-title page-title--stacked">
-    <div>
-        <h1>فاتورة شراء</h1>
-    </div>
+<div class="page-title">
+    <h1>فاتورة شراء</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <?php if (!$pv2Ready): ?>

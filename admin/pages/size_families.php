@@ -5,6 +5,7 @@ declare(strict_types=1);
 $pdo = db();
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $sizingDictForFamilyForm = orange_table_exists($pdo, 'commercial_kind_dictionary')
     && orange_table_exists($pdo, 'sizing_category_dictionary');
@@ -70,6 +71,7 @@ $tablesReady = $hasFamilies && $hasSizes;
 ?>
 <div class="page-title">
     <h1>عائلات المقاسات</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <?php if (!$tablesReady): ?>

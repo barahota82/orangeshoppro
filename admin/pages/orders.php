@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
@@ -157,8 +158,11 @@ function orange_admin_orders_action_buttons(array $o): void
 }
 ?>
 <div class="admin-fy-shell" dir="rtl">
-    <h1 class="admin-fy-shell__title">الطلبات</h1>
-    <p class="admin-fy-shell__lead">المخزن <strong>موحّد للشركة</strong> — الطلب من أي قناة يخصم نفس المخزون لتفادي البيع رغم النفاد. عمود «قناة العملاء» لتتبّع المصدر وتجميع العملاء (تيك توك، واتساب، …) وليس لمخزون منفصل.
+    <div class="page-title">
+        <h1>الطلبات</h1>
+        <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
+    </div>
+    <p class="page-subtitle">المخزن <strong>موحّد للشركة</strong> — الطلب من أي قناة يخصم نفس المخزون لتفادي البيع رغم النفاد. عمود «قناة العملاء» لتتبّع المصدر وتجميع العملاء (تيك توك، واتساب، …) وليس لمخزون منفصل.
         <?php
         if (orange_admin_may($admin, $pdo, 'sales', 'view')) {
             echo ' — <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=reserved_orders'), ENT_QUOTES, 'UTF-8') . '">طلبات محجوزة (مخزون)</a>';

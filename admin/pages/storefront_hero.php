@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/admin_settings_country.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/storefront_hero.php';
@@ -75,13 +76,11 @@ if ($editId > 0 && $hasTable) {
 $heroEditActive = $heroEdit ? (int) ($heroEdit['is_active'] ?? 1) : 1;
 $headerEditActive = $headerEdit ? (int) ($headerEdit['is_active'] ?? 1) : 1;
 ?>
-<div class="page-title page-title--stacked">
+<div class="page-title">
     <h1>بانر الصفحة الرئيسية</h1>
-    <p class="page-subtitle">أضف جمل الـ hero والتناوب تحت الشعار في الهيدر: جدول في الأسفل، تعديل، حذف، وإخفاء/تفعيل. <strong>ترتيب العرض</strong> يُضبط تلقائياً عند الإضافة؛ لإعادة الترتيب استخدم «أعلى / أسفل» في الجدول. جمل <strong>الـ hero</strong> تظهر للزائر حسب <strong>لغة واجهته</strong>؛ جمل <strong>الهيدر</strong> تتناوب للجميع بترتيب اللغات في كل صف: عربي ثم إنجليزي ثم فلبيني ثم هندي (الحقول الفارغة تُستبعد من الدورة).</p>
-    <?php if ($copyScoped && $ctxCountryId > 0): ?>
-    <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة: <strong><?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> — الجمل المعروضة والمحفوظة لهذه الدولة فقط.</p>
-    <?php endif; ?>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<p class="page-subtitle">أضف جمل الـ hero والتناوب تحت الشعار في الهيدر: جدول في الأسفل، تعديل، حذف، وإخفاء/تفعيل. <strong>ترتيب العرض</strong> يُضبط تلقائياً عند الإضافة؛ لإعادة الترتيب استخدم «أعلى / أسفل» في الجدول. جمل <strong>الـ hero</strong> تظهر للزائر حسب <strong>لغة واجهته</strong>؛ جمل <strong>الهيدر</strong> تتناوب للجميع بترتيب اللغات في كل صف: عربي ثم إنجليزي ثم فلبيني ثم هندي (الحقول الفارغة تُستبعد من الدورة).</p>
 
 <?php if (!$hasTable): ?>
 <div class="card">

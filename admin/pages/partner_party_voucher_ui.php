@@ -237,10 +237,9 @@ if (orange_journal_vouchers_ready($pdo)) {
     }
 }
 </style>
-<div class="page-title page-title--stacked ppv-print-hide">
-    <div>
-        <h1><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
-    </div>
+<div class="page-title ppv-print-hide">
+    <h1><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <?php if (orange_journal_vouchers_ready($pdo) && $ppvPostingLeafCt === 0): ?>

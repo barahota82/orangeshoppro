@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/admin_settings_country.php';
 require_once __DIR__ . '/../../includes/countries.php';
@@ -43,25 +44,25 @@ foreach (['company_name_ar', 'company_name_en', 'commercial_register', 'phones',
 }
 $csUpdatedAt = trim((string) ($csRow['updated_at'] ?? ''));
 ?>
-<div class="page-title page-title--stacked">
+<div class="page-title">
     <h1>بيانات الشركة</h1>
-    <p class="page-subtitle">سجل واحد لكل دولة — يُستخدم في طباعة الفواتير والمستندات والمتجر، وليس في عنوان لوحة التحكم.</p>
-    <?php if ($csScoped && $csCountryId > 0): ?>
-    <p class="card-hint" style="margin:0.35rem 0 0;line-height:1.55;">
-        الدولة الحالية: <strong><?php echo htmlspecialchars($csCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong>
-        — ما تحفظه هنا يبقى لهذه الدولة. لتعديل بيانات دولة أخرى غيّر الدولة من الشريط العلوي ثم عد إلى هذه الصفحة.
-    </p>
-    <?php if ($csHasSaved): ?>
-    <p class="card-hint" style="margin:0.25rem 0 0;color:#166534;line-height:1.55;">
-        بيانات محفوظة<?php if ($csUpdatedAt !== ''): ?> — آخر تحديث: <?php echo htmlspecialchars($csUpdatedAt, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?>.
-    </p>
-    <?php endif; ?>
-    <?php elseif (!$csScoped): ?>
-    <p class="card-hint" style="margin:0;color:#92400e;">
-        تنبيه: عمود <code dir="ltr">country_id</code> غير مفعّل بعد على جدول بيانات الشركة.
-    </p>
-    <?php endif; ?>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<p class="page-subtitle">سجل واحد لكل دولة — يُستخدم في طباعة الفواتير والمستندات والمتجر، وليس في عنوان لوحة التحكم.</p>
+<?php if ($csScoped && $csCountryId > 0): ?>
+<p class="card-hint" style="margin:0.35rem 0 0;line-height:1.55;">
+    ما تحفظه هنا يبقى لهذه الدولة. لتعديل بيانات دولة أخرى غيّر الدولة من الشريط العلوي ثم عد إلى هذه الصفحة.
+</p>
+<?php if ($csHasSaved): ?>
+<p class="card-hint" style="margin:0.25rem 0 0;color:#166534;line-height:1.55;">
+    بيانات محفوظة<?php if ($csUpdatedAt !== ''): ?> — آخر تحديث: <?php echo htmlspecialchars($csUpdatedAt, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?>.
+</p>
+<?php endif; ?>
+<?php elseif (!$csScoped): ?>
+<p class="card-hint" style="margin:0;color:#92400e;">
+    تنبيه: عمود <code dir="ltr">country_id</code> غير مفعّل بعد على جدول بيانات الشركة.
+</p>
+<?php endif; ?>
 
 <?php if (!$hasTable): ?>
 <div class="card">

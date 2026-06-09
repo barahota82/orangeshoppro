@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
@@ -249,13 +250,14 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
 ?>
 <div class="page-title">
     <h1>تحليل القنوات</h1>
-    <p class="card-hint" style="margin:0.35rem 0 0;max-width:900px;line-height:1.55;">
-        القنوات عندكم تمثّل <strong>واجهات البيع</strong> (مثل تيك توك / واتساب / …) وتوزيع العملاء — بحسب مذكرة النظام: مسارات منفصلة و<code>channel_id</code> على الطلب، مع <strong>مخزون ومبيعات شركة واحدة</strong>.
-        هذا التقرير يقيّس «شغل» كل قناة: <strong>مبيعات مكتملة</strong>، <strong>مردودات</strong> (حسب تاريخ المردود)، <strong>الصافي</strong>، وأكثر منتج حركةً.
-        مبيعات شركة مباشرة (قناة «<?php echo htmlspecialchars(orange_sales_company_direct_channel_label(), ENT_QUOTES, 'UTF-8'); ?>») تظهر كصف مستقل.
-        توجيه الزائر من دومين الشركة إلى القناة التي فتحها يُنفَّذ في الواجهة العامة؛ هنا نعرض نتائج الطلبات المحفوظة فقط.
-    </p>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<p class="page-subtitle" style="max-width:900px;line-height:1.55;">
+    القنوات عندكم تمثّل <strong>واجهات البيع</strong> (مثل تيك توك / واتساب / …) وتوزيع العملاء — بحسب مذكرة النظام: مسارات منفصلة و<code>channel_id</code> على الطلب، مع <strong>مخزون ومبيعات شركة واحدة</strong>.
+    هذا التقرير يقيّس «شغل» كل قناة: <strong>مبيعات مكتملة</strong>، <strong>مردودات</strong> (حسب تاريخ المردود)، <strong>الصافي</strong>، وأكثر منتج حركةً.
+    مبيعات شركة مباشرة (قناة «<?php echo htmlspecialchars(orange_sales_company_direct_channel_label(), ENT_QUOTES, 'UTF-8'); ?>») تظهر كصف مستقل.
+    توجيه الزائر من دومين الشركة إلى القناة التي فتحها يُنفَّذ في الواجهة العامة؛ هنا نعرض نتائج الطلبات المحفوظة فقط.
+</p>
 
 <div class="card">
     <h3 class="card-title">فلترة بالتاريخ</h3>

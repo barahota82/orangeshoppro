@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/department_countries.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
@@ -59,6 +60,7 @@ if ($hasDepartmentsTable) {
 ?>
 <div class="page-title">
     <h1>الأقسام الرئيسية</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <?php if (!$hasDepartmentsTable): ?>

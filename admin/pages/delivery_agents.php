@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/delivery_agents.php';
 require_once __DIR__ . '/../../includes/countries.php';
 
@@ -17,8 +18,9 @@ $nextSort = $hasTable && $adminCountryId > 0 ? orange_delivery_agents_next_sort_
 ?>
 <div class="page-title">
     <h1>مناديب التوصيل</h1>
-    <p class="page-subtitle">بيانات المناديب لكل دولة — التوزيع والتقارير وشاشة القيود (§13.11).</p>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<p class="page-subtitle">بيانات المناديب لكل دولة — التوزيع والتقارير وشاشة القيود (§13.11).</p>
 
 <?php if (!$hasTable): ?>
 <div class="card"><div class="alert-error">جدول <code>delivery_agents</code> غير جاهز.</div></div>

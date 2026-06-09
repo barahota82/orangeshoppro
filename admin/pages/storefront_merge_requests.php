@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 require_once __DIR__ . '/../../includes/admin_settings_country.php';
@@ -64,12 +65,12 @@ if ($hasTable && $ctxCountryId > 0) {
 }
 ?>
 <div class="admin-fy-shell" dir="rtl">
-    <h1 class="admin-fy-shell__title">دمج هاتف التسجيل (س15)</h1>
-    <p class="admin-fy-shell__lead">
+    <div class="page-title">
+        <h1>دمج هاتف التسجيل (س15)</h1>
+        <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
+    </div>
+    <p class="page-subtitle">
         عندما يحاول عميل التسجيل ببريد جديد لكن هاتفه مرتبط بحساب <strong>مفعّل</strong> مسبقاً، يُنشأ طلب دمج.
-        <?php if ($ctxCountryId > 0 && $ctxCountryLabel !== ''): ?>
-        <strong>سياق الدولة الحالي:</strong> <?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?> — تظهر طلبات هذه الدولة فقط.
-        <?php endif; ?>
         بعد استلام رسالة واتساب من <strong>نفس رقم العميل</strong> وتطابق النص مع الطلب، اضغط «تأكيد واتساب»؛
         ثم يكمل العميل من صفحة التسجيل بزر «تطبيق تحديث بيانات الملف».
         البريد المؤكَّد للدخول <strong>لا يتغيّر</strong> — يُحدَّث الاسم والمنطقة والعنوان فقط على الحساب القائم.

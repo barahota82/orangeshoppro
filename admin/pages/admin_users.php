@@ -3,22 +3,23 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_password_policy.php';
 
 $dbAu = db();
+$pdo = $dbAu;
 orange_catalog_ensure_schema($dbAu);
 $auPermTree = orange_admin_permission_mega_sections();
 $auPageActions = orange_admin_permission_page_actions_map();
 $auCountries = orange_countries_admin_list($dbAu);
 ?>
-<div class="page-title page-title--stacked">
-    <div>
-        <h1>المستخدمون والصلاحيات</h1>
-        <p class="page-subtitle">المشرف العام فقط يدير الحسابات. اختر صلاحيات كل شاشة (عرض / تعديل / حذف / قفل / فك) — صف المجموعة اختصار لكل الشاشات داخلها؛ وسّع ▼ للضبط الدقيق.</p>
-    </div>
+<div class="page-title">
+    <h1>المستخدمون والصلاحيات</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<p class="page-subtitle">المشرف العام فقط يدير الحسابات. اختر صلاحيات كل شاشة (عرض / تعديل / حذف / قفل / فك) — صف المجموعة اختصار لكل الشاشات داخلها؛ وسّع ▼ للضبط الدقيق.</p>
 
 <div class="grid-2">
     <div class="card">

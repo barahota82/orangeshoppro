@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/order_intake_queue.php';
@@ -142,19 +143,22 @@ $statusLabel = [
     'completed' => 'مكتمل',
 ];
 ?>
-<div class="page-title page-title--stacked">
-    <div>
-        <h1>طابور طلبات الموقع</h1>
-        <p class="page-subtitle">
-            طلبات الواجهة تُسجَّل هنا ثم تُعالَج بالتسلسل (FIFO). الصفوف <strong>الفاشلة</strong> يمكن إعادتها للطابور؛
-            الصفوف <strong>المكتملة</strong> أو الفاشلة القديمة تُنظَّف حسب العمر (يتطلب صلاحية حذف).
-        </p>
-    </div>
-    <div class="actions">
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/api/order_intake/export-csv.php?status=' . rawurlencode($statusFilter)), ENT_QUOTES, 'UTF-8'); ?>">تصدير CSV</a>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
+<div class="page-title">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <h1>طابور طلبات الموقع</h1>
+            <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
+        </div>
+        <div class="actions">
+            <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/api/order_intake/export-csv.php?status=' . rawurlencode($statusFilter)), ENT_QUOTES, 'UTF-8'); ?>">تصدير CSV</a>
+            <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
+        </div>
     </div>
 </div>
+<p class="page-subtitle">
+    طلبات الواجهة تُسجَّل هنا ثم تُعالَج بالتسلسل (FIFO). الصفوف <strong>الفاشلة</strong> يمكن إعادتها للطابور؛
+    الصفوف <strong>المكتملة</strong> أو الفاشلة القديمة تُنظَّف حسب العمر (يتطلب صلاحية حذف).
+</p>
 
 <div class="party-registry-stats" style="margin-bottom:16px;">
     <div class="party-registry-stat">

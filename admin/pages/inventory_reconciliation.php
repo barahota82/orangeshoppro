@@ -85,7 +85,10 @@ if ($initialJson === false) {
 
 ?>
 <div class="admin-fy-shell" dir="rtl" id="inv_recon_app">
-    <h1 class="admin-fy-shell__title">تسوية المخزون / الجرد</h1>
+    <div class="page-title">
+        <h1>تسوية المخزون / الجرد</h1>
+        <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
+    </div>
 
     <?php if (! $ready || ! $useVouchers): ?>
         <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;">

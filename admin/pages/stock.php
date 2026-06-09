@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/stock_alerts.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
@@ -71,10 +72,9 @@ foreach ($rows as &$stockRow) {
 }
 unset($stockRow);
 ?>
-<div class="page-title page-title--stacked">
-    <div>
-        <h1>المستودع</h1>
-    </div>
+<div class="page-title">
+    <h1>المستودع</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <div class="card" id="low-stock-variants" style="border:1px solid #f59e0b; background:#fffbeb;">

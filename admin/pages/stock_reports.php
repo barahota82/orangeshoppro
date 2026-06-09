@@ -354,17 +354,20 @@ $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $reportTitle = $reports[$reportKey];
 
 ?>
-<div class="page-title page-title--stacked gl-acc-stmt-no-print">
-    <div>
-        <h1>تقارير المخزن</h1>
-        <p class="page-subtitle">
-            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">← المستودع</a>
-        </p>
-    </div>
-    <div class="sr-print-actions">
-        <button type="button" class="btn-secondary" onclick="window.print()">طباعة التقرير</button>
+<div class="page-title gl-acc-stmt-no-print">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <h1>تقارير المخزن</h1>
+            <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
+        </div>
+        <div class="sr-print-actions">
+            <button type="button" class="btn-secondary" onclick="window.print()">طباعة التقرير</button>
+        </div>
     </div>
 </div>
+<p class="page-subtitle">
+    <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">← المستودع</a>
+</p>
 
 <div class="card gl-acc-stmt-no-print">
     <div class="sr-tabs">
