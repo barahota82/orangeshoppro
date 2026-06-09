@@ -13,5 +13,5 @@ declare(strict_types=1);
  */
 function orange_admin_voucher_print_tuning_mode(): bool
 {
-    return true;
+    return false;
 }

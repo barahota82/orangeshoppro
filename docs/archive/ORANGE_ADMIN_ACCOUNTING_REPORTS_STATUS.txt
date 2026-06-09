@@ -492,6 +492,7 @@ sales_returns — [جزئي UI] — **ترقية pr2 parity** GAP-SALE-DOC-01 م
 8) سجل التحديث
 ================================================================================
 
+2026-06-09 — §9.3 منتهٍ + §10 مُعاد: انتهى ضبط شكل الطباعة (قرار المالك) → `orange_admin_voucher_print_tuning_mode()` = **false**؛ عاد زر الطباعة معطّلاً حتى الحفظ (journal + CRR + SPR) كما في baseline §9.2 — opening_balances مفعّل دائماً وpartner_party_voucher_ui (تراثي) دون تغيير؛ لم يُلمس admin.js ولا onclick ولا دوال الطباعة.
 2026-06-08 — §9.3 V3 (تجربة): هامش سفلي 18mm للسندات فقط (`.jv-print-area` + `orange_voucher_print_metafoot`) — التقارير 12mm دون تغيير.
 2026-06-08 — opening_balances: إصلاح طباعة مزدوجة — إزالة `obPrint`/`addEventListener` المكرر؛ `onclick` → `obOpenPrintDialog` فقط.
 2026-06-08 — §9.3 V6: هوامش طباعة السندات = التقارير (`jv-print-area` padding 8mm/12mm؛ `@page` مشترك).
