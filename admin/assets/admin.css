@@ -1740,9 +1740,9 @@ label {
     /* مطابقة نِسَب الطباعة: رقم القيد | تاريخ السند (مع زر التقويم — يظهر كاملاً) | المرجع (أوسع) | تاريخ الإدخال (يظهر كاملاً) | مدين | دائن */
     grid-template-columns:
         minmax(5.25rem, 7rem)
-        minmax(8.4rem, 10.9rem)
+        minmax(8.3rem, 10.8rem)
         minmax(9rem, 11.5rem)
-        minmax(8.4rem, 10.9rem)
+        minmax(8.3rem, 10.8rem)
         minmax(7rem, 9rem)
         minmax(7rem, 9rem);
     gap: 12px 14px;
@@ -1751,9 +1751,9 @@ label {
 .jv-voucher-header-line--nav {
     grid-template-columns:
         minmax(5.25rem, 7rem)
-        minmax(8.4rem, 10.9rem)
+        minmax(8.3rem, 10.8rem)
         minmax(9rem, 11.5rem)
-        minmax(8.4rem, 10.9rem)
+        minmax(8.3rem, 10.8rem)
         minmax(7rem, 9rem)
         minmax(7rem, 9rem)
         minmax(10rem, 15rem);
