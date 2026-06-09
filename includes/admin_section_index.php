@@ -29,9 +29,6 @@ function orange_admin_render_mega_section_index(
         }
     }
     $subgroups = is_array($section) ? ($section['subgroups'] ?? []) : [];
-    if ($pageSubtitle === '') {
-        $pageSubtitle = 'روابط سريعة — بنفس ترتيب القائمة المنسدلة.';
-    }
     $countryLabel = orange_admin_page_country_label($pdo);
     ?>
 <div class="page-title">

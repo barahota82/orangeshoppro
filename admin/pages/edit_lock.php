@@ -32,10 +32,6 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
         <h1>إقفال التعديلات</h1>
         <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($elCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
     </div>
-    <p class="gl-posting-intro" style="margin:0 1rem 0.75rem;font-size:0.95rem;color:#444;line-height:1.55;">
-        رقابة على إدخالات الموظفين: <strong>قفل</strong> يمنع التعديل والحذف؛ <strong>فك القفل</strong> (بصلاحية) للتصحيح من شاشة المستند.
-        الحفظ يؤثر فوراً في التقارير — هذه الشاشة <strong>لا</strong> تؤجل الترحيل المحاسبي.
-    </p>
     <style>
         #el_lock_tbody tr.el-row-selected { outline: 2px solid #2563eb; outline-offset: -2px; background: #eff6ff; }
         #el_lock_tbody tr[data-id] { cursor: pointer; }

@@ -71,7 +71,6 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
     <h1>قائمة بنود الفاتورة المحفوظة</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($ilpCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle muted" style="margin:0 0 0.75rem;">اختصارات حسابات لبنود إضافية على فواتير المشتريات والمبيعات — تظهر في منتقي «إضافة بند».</p>
 
 <?php if (!$ilpReady): ?>
 <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;">

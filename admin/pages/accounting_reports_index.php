@@ -15,7 +15,7 @@ orange_admin_render_mega_section_index(
     'accounting',
     'accounting_reports_index',
     'فهرس الحسابات والتقارير',
-    'روابط سريعة لكل تقارير وأدوات الحسابات — بنفس ترتيب القائمة المنسدلة.',
+    '',
     [
         'chart_of_accounts' => 'شجرة الدليل المحاسبي وإدارته.',
         'journal_types' => 'أنواع اليوميات وربطها بأنواع القيود.',

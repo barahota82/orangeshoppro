@@ -59,8 +59,6 @@ if ($valuesJson === false) {
         </div>
     <?php else: ?>
 
-    <p class="card-hint">v1: <strong>فرع</strong> + <strong>قناة</strong> فقط (بذور تلقائية). أضف قيم كل بُعد ثم اخترها اختيارياً على أسطر السندات.</p>
-
     <div style="display:grid;gap:16px;grid-template-columns:minmax(220px,280px) 1fr;">
         <div class="card">
             <h3 class="card-title">الأبعاد</h3>
