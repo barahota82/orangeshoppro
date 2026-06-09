@@ -5127,6 +5127,8 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     color: #475569;
     white-space: nowrap;
     line-height: 1.25;
+    /* محاذاة صريحة كاسم الشركة — وإلا داخل خلية جدول تقارير السندات يرث وسط فينزاح عن السطر أعلاه */
+    text-align: start;
 }
 .pl-month-contact {
     display: contents;
