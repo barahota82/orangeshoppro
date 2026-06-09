@@ -7,19 +7,13 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/report_line_master.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $ctxCountryId = orange_admin_context_country_id($pdo);
-$ctxCountryLabel = '';
-if ($ctxCountryId > 0) {
-    $ctxRow = orange_country_row_by_id($pdo, $ctxCountryId, false);
-    $ctxCountryLabel = trim((string) ($ctxRow['name_ar'] ?? ''));
-    if ($ctxCountryLabel === '' && $ctxRow !== null) {
-        $ctxCountryLabel = trim((string) ($ctxRow['name_en'] ?? ''));
-    }
-}
+$ctxCountryLabel = orange_admin_page_country_label($pdo);
 
 $flat = orange_accounts_flat($pdo);
 $tree = orange_accounts_build_tree($flat);
@@ -36,17 +30,11 @@ $fyDefault = $fyList !== [] ? (int) $fyList[0]['id'] : 0;
 
 $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
 ?>
+<div class="page-title">
+    <h1>الدليل المحاسبي</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
+</div>
 <div class="coa-shell" dir="rtl" data-fy-default="<?php echo (int) $fyDefault; ?>" data-admin-country-id="<?php echo (int) $ctxCountryId; ?>">
-    <?php if ($ctxCountryId > 0 && $ctxCountryLabel !== ''): ?>
-    <p class="admin-fy-shell__lead" style="margin:0 0 12px;">
-        <strong>سياق الدولة الحالي:</strong> <?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?>
-        (معرّف <?php echo (int) $ctxCountryId; ?>)
-        — يُعرض دليل هذه الدولة فقط (حسابات <?php echo (int) count($flat); ?>).
-        <?php if ($flat !== []): ?>
-        <span class="muted" style="font-size:0.85rem;"> — أول حساب #<?php echo (int) ($flat[0]['id'] ?? 0); ?></span>
-        <?php endif; ?>
-    </p>
-    <?php endif; ?>
     <div class="coa-shell__body" dir="ltr">
         <aside class="coa-shell__tree card coa-tree-card">
             <h3 class="card-title coa-tree-card__title">شجرة الحسابات</h3>

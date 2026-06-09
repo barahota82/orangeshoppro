@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/admin_nav_tree.php';
 require_once __DIR__ . '/upload_paths.php';
+require_once __DIR__ . '/admin_page_bootstrap.php';
 
 /**
  * عرض صفحة فهرس لقسم mega (كروت بنفس ترتيب القائمة المنسدلة).
@@ -31,13 +32,15 @@ function orange_admin_render_mega_section_index(
     if ($pageSubtitle === '') {
         $pageSubtitle = 'روابط سريعة — بنفس ترتيب القائمة المنسدلة.';
     }
+    $countryLabel = orange_admin_page_country_label($pdo);
     ?>
-<div class="page-title page-title--stacked">
-    <div>
-        <h1><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
-        <p class="page-subtitle"><?php echo htmlspecialchars($pageSubtitle, ENT_QUOTES, 'UTF-8'); ?></p>
-    </div>
+<div class="page-title">
+    <h1><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($countryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<?php if ($pageSubtitle !== ''): ?>
+<p class="page-subtitle" style="margin:0 0 0.75rem;"><?php echo htmlspecialchars($pageSubtitle, ENT_QUOTES, 'UTF-8'); ?></p>
+<?php endif; ?>
 
 <?php foreach ($subgroups as $sg): ?>
     <?php
