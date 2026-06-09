@@ -114,6 +114,12 @@ function orange_edit_lock_ui_script_once(): void
                 }
                 var eid = parseInt(String(getEntityId() || '0'), 10) || 0;
                 if (eid <= 0) return;
+                var confirmMsg = lock
+                    ? 'تأكيد قفل هذا المستند؟ سيُمنع التعديل والحذف حتى فك القفل.'
+                    : 'تأكيد فك قفل هذا المستند؟ سيصبح قابلاً للتعديل.';
+                if (!window.confirm(confirmMsg)) {
+                    return;
+                }
                 postJson('/admin/api/edit-lock/toggle.php', {
                     doc_kind: getDocKind(),
                     entity_id: eid,
