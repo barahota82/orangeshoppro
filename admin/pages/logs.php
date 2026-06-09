@@ -34,9 +34,6 @@ if (orange_table_exists($pdo, 'orange_admin_audit_log')) {
     <h1>سجل النشاط</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle muted">
-    آخر العمليات التي سجّلها النظام من لوحة الإدارة (حفظ، حذف، قيود، …). يُحدَّث تلقائياً عند استدعاء <code>audit_log</code> من الـ API.
-</p>
 
 <div class="card">
     <h3 class="card-title">آخر السجلات (حتى 500)</h3>

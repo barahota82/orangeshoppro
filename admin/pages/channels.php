@@ -45,17 +45,10 @@ $hasCountryDefaultCol = orange_channels_has_country_default_column($pdo);
     <h1>الواجهات (قنوات العملاء)</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle">كل قناة تمثّل واجهة أو مصدراً لتجميع <strong>العملاء وطلباتهم</strong>. المخزون والمبيعات المحاسبية <strong>للشركة موحّدة</strong> — الطلب من أي قناة يسحب من نفس المخزن الرئيسي.</p>
 <p style="margin:0.6rem 0 0;"><a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=channel_analytics'), ENT_QUOTES, 'UTF-8'); ?>">تحليل أداء القنوات (مبيعات، أكثر منتج، ترتيب النشاط)</a></p>
-<p class="page-subtitle" style="margin:0.75rem 0 0;">روابط <strong>معاينة الواجهة</strong> تمرّ بصفحة أدمن ثم تفتح المتجر <strong>بدون إظهار سر في عنوان المتجر</strong> (جلسة معاينة ~15 دقيقة). اختياري: <code dir="ltr">ORANGE_STOREFRONT_PREVIEW_TOKEN</code> في <code dir="ltr">.env.php</code> لروابط قديمة بـ <code dir="ltr">?sf_preview=</code>.</p>
 
 <div class="card">
     <h3><?php echo $editRow ? 'تعديل واجهة' : 'إضافة واجهة'; ?></h3>
-    <p class="card-hint" style="margin:0 0 0.75rem;">اختصار الرابط يظهر في عنوان الموقع مثل <code>/tiktok</code> — عند <strong>تغييره</strong> يُحدَّث تلقائياً الـ <strong>slug الداخلي</strong> (لـ <code>?channel=</code> والكوكي). اسم الواجهة فقط لا يغيّر الـ slug.</p>
-    <p class="card-hint" style="margin:0 0 0.75rem;"><strong>حالة الظهور:</strong> الواجهة <strong>غير النشطة</strong> لا يعمل لها مسار الاختصار العام ولا تُقبل في كوكي/خرائط المتجر للزوار. رابط <strong>معاينة الواجهة</strong> من الجدول يفتحها للمراجعة (بعد تسجيل دخول الأدمن) حتى وهي متوقفة.</p>
-    <?php if ($hasCountryDefaultCol): ?>
-    <p class="card-hint" style="margin:0 0 0.75rem;"><strong>القناة الرئيسية للدولة:</strong> يُحوَّل الزائر الذي يفتح جذر الموقع (<code dir="ltr">/</code>) من دولة نشطة تلقائياً إلى هذه القناة (حسب موقعه الجغرافي). قناة رئيسية واحدة لكل دولة.</p>
-    <?php endif; ?>
     <input type="hidden" id="channel_id" value="<?php echo $editRow ? (int) $editRow['id'] : ''; ?>">
     <div class="form-grid">
         <div>

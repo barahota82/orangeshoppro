@@ -27,7 +27,6 @@ foreach ($countries as $c) {
     <h1>الدول</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle">المشرف العام يضيف دولة ويُفعّلها — يُنشأ تلقائياً: مخزن، قنوات (مثل الكويت)، كتالوج، دليل حسابات، إعدادات GL، ومحافظة توصيل افتراضية. ثم أضف مستخدم فريق الدولة ليعمل داخل نطاقها.</p>
 
 <?php if (!$hasTable): ?>
 <div class="card">
