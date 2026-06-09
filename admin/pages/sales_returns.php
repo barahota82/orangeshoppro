@@ -1223,11 +1223,15 @@ $sr2DocSerialPreview = $sr2NavReady
         if (orderId > 0) payload.order_id = orderId;
         postJSON('/admin/api/sales_returns/create.php', payload).then(function (res) {
             if (res.success) {
+                var sr2SavedId = (res && res.sales_return_id) ? (parseInt(String(res.sales_return_id), 10) || 0) : (browseReturnId || 0);
+                var sr2AfterSave = function () {
+                    if (sr2SavedId > 0) { sr2LoadReturn(sr2SavedId); } else { location.reload(); }
+                };
                 if (typeof orangeAdminOfferOpenGlVoucherAfterSave === 'function') {
-                    orangeAdminOfferOpenGlVoucherAfterSave(res, function () { location.reload(); });
+                    orangeAdminOfferOpenGlVoucherAfterSave(res, sr2AfterSave);
                 } else {
                     alert(res.message || 'تم حفظ مردود المبيعات');
-                    location.reload();
+                    sr2AfterSave();
                 }
                 return;
             }

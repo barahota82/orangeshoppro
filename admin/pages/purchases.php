@@ -1366,13 +1366,15 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
 
         postJSON(apiUrl, payload).then(function (res) {
             if (res.success) {
+                var pv2SavedId = (res && res.purchase_id) ? (parseInt(String(res.purchase_id), 10) || 0) : (browsePurchaseId || 0);
+                var pv2AfterSave = function () {
+                    if (pv2SavedId > 0) { pv2LoadPurchase(pv2SavedId); } else { location.reload(); }
+                };
                 if (typeof orangeAdminOfferOpenGlVoucherAfterSave === 'function') {
-                    orangeAdminOfferOpenGlVoucherAfterSave(res, function () {
-                        location.reload();
-                    });
+                    orangeAdminOfferOpenGlVoucherAfterSave(res, pv2AfterSave);
                 } else {
                     alert(res.message || 'تم حفظ فاتورة الشراء');
-                    location.reload();
+                    pv2AfterSave();
                 }
                 return;
             }

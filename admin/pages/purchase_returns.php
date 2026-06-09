@@ -1106,13 +1106,15 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
         postJSON('/admin/api/purchase_returns/create.php', payload).then(function (res) {
             if (res.success) {
+                var pr2SavedId = (res && res.purchase_return_id) ? (parseInt(String(res.purchase_return_id), 10) || 0) : (browseReturnId || 0);
+                var pr2AfterSave = function () {
+                    if (pr2SavedId > 0) { pr2LoadReturn(pr2SavedId); } else { location.reload(); }
+                };
                 if (typeof orangeAdminOfferOpenGlVoucherAfterSave === 'function') {
-                    orangeAdminOfferOpenGlVoucherAfterSave(res, function () {
-                        location.reload();
-                    });
+                    orangeAdminOfferOpenGlVoucherAfterSave(res, pr2AfterSave);
                 } else {
                     alert(res.message || 'تم حفظ مردود المشتريات');
-                    location.reload();
+                    pr2AfterSave();
                 }
                 return;
             }
