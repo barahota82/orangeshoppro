@@ -116,7 +116,16 @@
                 el.setAttribute('step', step);
             }
             if (isZeroishMoneyText(el.value)) {
-                el.value = z;
+                /* الحقول القابلة للكتابة (مدين/دائن، مبالغ القبض/الدفع): الصفر استرشادي (placeholder)
+                   لا قيمة ثابتة، حتى يكتب المستخدم مباشرة دون الحاجة لمسح الأصفار.
+                   الحقول للقراءة فقط (مجاميع/أسطر محسوبة/data-money-allow-zero) تبقى تعرض 0.000. */
+                var keepZeroValue =
+                    el.readOnly ||
+                    el.disabled ||
+                    el.hasAttribute('data-money-allow-zero') ||
+                    el.classList.contains('jv-tot-readonly') ||
+                    el.classList.contains('mo-line-net');
+                el.value = keepZeroValue ? z : '';
             }
         });
         root.querySelectorAll('.admin-money-display, [data-orange-money-display]').forEach(function (el) {

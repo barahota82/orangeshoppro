@@ -1737,12 +1737,12 @@ label {
 /* سند قيد — رأس السند: رقم، تواريخ، مرجع، مجموع مدين/دائن */
 .jv-voucher-header-line {
     display: grid;
-    /* مطابقة نِسَب الطباعة: رقم القيد | تاريخ السند (يظهر كاملاً) | المرجع (أوسع) | تاريخ الإدخال (يظهر كاملاً) | مدين | دائن */
+    /* مطابقة نِسَب الطباعة: رقم القيد | تاريخ السند (مع زر التقويم — يظهر كاملاً) | المرجع (أوسع) | تاريخ الإدخال (يظهر كاملاً) | مدين | دائن */
     grid-template-columns:
         minmax(5.25rem, 7rem)
-        minmax(7rem, 8.75rem)
+        minmax(8.5rem, 11rem)
         minmax(9rem, 11.5rem)
-        minmax(7rem, 8.75rem)
+        minmax(8.5rem, 11rem)
         minmax(7rem, 9rem)
         minmax(7rem, 9rem);
     gap: 12px 14px;
@@ -1751,9 +1751,9 @@ label {
 .jv-voucher-header-line--nav {
     grid-template-columns:
         minmax(5.25rem, 7rem)
-        minmax(7rem, 8.75rem)
+        minmax(8.5rem, 11rem)
         minmax(9rem, 11.5rem)
-        minmax(7rem, 8.75rem)
+        minmax(8.5rem, 11rem)
         minmax(7rem, 9rem)
         minmax(7rem, 9rem)
         minmax(10rem, 15rem);
@@ -1822,7 +1822,8 @@ label {
     width: 100%;
     min-width: 0;
 }
-.admin-inp-dmy-with-picker .orange-inp-dmy {
+.admin-inp-dmy-with-picker .orange-inp-dmy,
+.admin-inp-dmy-with-picker .orange-inp-dmyhi {
     flex: 1;
     min-width: 0;
 }
@@ -3978,8 +3979,8 @@ body.coa-modal-open {
 .gl-posting-select--movement-type {
     flex: 0 1 auto;
     width: auto;
-    min-width: 7.5rem;
-    max-width: 11rem;
+    min-width: 12rem;
+    max-width: 22rem;
 }
 .gl-posting-dates {
     display: flex;
@@ -4527,10 +4528,13 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-lines-table col.jv-col-act {
         width: 0 !important;
     }
+    /* إخفاء عمود الإجراء (زر الحذف) في الطباعة فقط — نستهدف الخلية الحاوية لزر الحذف
+       تحديداً وليس آخر عمود؛ شاشات الشركاء (صرف مورد/قبض عميل) لا تملك عمود إجراء،
+       فكان td:last-child يخفي عمود «دائن» بالخطأ. */
     .jv-print-area .jv-lines-table thead th.admin-doc-col-actions,
-    .jv-print-area .jv-lines-table tr.jv-line-main td:last-child,
+    .jv-print-area .jv-lines-table tr.jv-line-main td:has(.admin-doc-line-remove),
     .jv-print-area .ob-opening-table thead th.admin-doc-col-actions,
-    .jv-print-area .ob-opening-table tr.ob-line-main td:last-child {
+    .jv-print-area .ob-opening-table tr.ob-line-main td:has(.admin-doc-line-remove) {
         display: none !important;
         width: 0 !important;
         padding: 0 !important;
@@ -4575,12 +4579,12 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-voucher-header-line {
         display: grid !important;
         direction: rtl !important;
-        /* رقم القيد (أوسع) | تاريخ السند (أصغر) | المرجع | تاريخ الإدخال (أصغر) | مدين | دائن */
+        /* رقم القيد | تاريخ السند (يظهر كاملاً) | المرجع | تاريخ الإدخال (يظهر كاملاً) | مدين | دائن */
         grid-template-columns:
             minmax(5.5rem, 7.5rem)
-            minmax(4.5rem, 5.5rem)
-            minmax(7.5rem, 10rem)
-            minmax(5rem, 6rem)
+            minmax(5rem, 6.25rem)
+            minmax(7rem, 9rem)
+            minmax(5rem, 6.25rem)
             minmax(6rem, 7.5rem)
             minmax(6rem, 7.5rem) !important;
         gap: 4px 6px !important;
@@ -4591,9 +4595,9 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .jv-voucher-header-line--nav {
         grid-template-columns:
             minmax(5.5rem, 7.5rem)
-            minmax(4.5rem, 5.5rem)
-            minmax(7.5rem, 10rem)
-            minmax(5rem, 6rem)
+            minmax(5rem, 6.25rem)
+            minmax(7rem, 9rem)
+            minmax(5rem, 6.25rem)
             minmax(6rem, 7.5rem)
             minmax(6rem, 7.5rem) !important;
     }

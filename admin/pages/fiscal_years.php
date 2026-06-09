@@ -99,13 +99,13 @@ $fyGlRetainedBrief = $fyAccountBrief($pdo, $fyGlRetainedId);
                     <tr data-fy-row data-id="<?php echo $id; ?>">
                         <td class="fy-col-num"><span class="fy-serial"><?php echo $serial; ?></span></td>
                         <td class="fy-col-year">
-                            <input type="number" class="fy-inp-year" min="1900" max="2100" step="1" value="<?php echo $yr !== '' ? $yr : ''; ?>" aria-label="السنة">
+                            <input type="text" inputmode="numeric" class="fy-inp-year" maxlength="4" value="<?php echo $yr !== '' ? $yr : ''; ?>" aria-label="السنة">
                         </td>
                         <td class="fy-col-date">
-                            <input type="text" class="fy-inp-start fy-inp-dmy" dir="ltr" autocomplete="off" placeholder="يوم/شهر/سنة" maxlength="10" value="<?php echo htmlspecialchars($sdDisp, ENT_QUOTES, 'UTF-8'); ?>">
+                            <input type="text" class="fy-inp-start fy-inp-dmy orange-inp-dmy" dir="ltr" autocomplete="off" placeholder="يوم/شهر/سنة" maxlength="10" value="<?php echo htmlspecialchars($sdDisp, ENT_QUOTES, 'UTF-8'); ?>">
                         </td>
                         <td class="fy-col-date">
-                            <input type="text" class="fy-inp-end fy-inp-dmy" dir="ltr" autocomplete="off" placeholder="يوم/شهر/سنة" maxlength="10" value="<?php echo htmlspecialchars($edDisp, ENT_QUOTES, 'UTF-8'); ?>">
+                            <input type="text" class="fy-inp-end fy-inp-dmy orange-inp-dmy" dir="ltr" autocomplete="off" placeholder="يوم/شهر/سنة" maxlength="10" value="<?php echo htmlspecialchars($edDisp, ENT_QUOTES, 'UTF-8'); ?>">
                         </td>
                         <td class="fy-col-closed fy-col-center">
                             <input type="checkbox" class="fy-chk-closed"<?php echo $closed ? ' checked disabled title="سنة مغلقة — لفتحها استخدم فك الإقفال"' : ''; ?>>
@@ -477,13 +477,16 @@ $fyGlRetainedBrief = $fyAccountBrief($pdo, $fyGlRetainedId);
             var dEnd = fyIsoToDisplay(y + '-12-31');
             tr.innerHTML =
                 '<td class="fy-col-num"><span class="fy-serial"></span></td>' +
-                '<td class="fy-col-year"><input type="number" class="fy-inp-year" min="1900" max="2100" step="1" value="' + y + '" aria-label="السنة"></td>' +
-                '<td class="fy-col-date"><input type="text" class="fy-inp-start fy-inp-dmy" dir="ltr" autocomplete="off" placeholder="يوم/شهر/سنة" maxlength="10" value="' + dStart + '"></td>' +
-                '<td class="fy-col-date"><input type="text" class="fy-inp-end fy-inp-dmy" dir="ltr" autocomplete="off" placeholder="يوم/شهر/سنة" maxlength="10" value="' + dEnd + '"></td>' +
+                '<td class="fy-col-year"><input type="text" inputmode="numeric" class="fy-inp-year" maxlength="4" value="' + y + '" aria-label="السنة"></td>' +
+                '<td class="fy-col-date"><input type="text" class="fy-inp-start fy-inp-dmy orange-inp-dmy" dir="ltr" autocomplete="off" placeholder="يوم/شهر/سنة" maxlength="10" value="' + dStart + '"></td>' +
+                '<td class="fy-col-date"><input type="text" class="fy-inp-end fy-inp-dmy orange-inp-dmy" dir="ltr" autocomplete="off" placeholder="يوم/شهر/سنة" maxlength="10" value="' + dEnd + '"></td>' +
                 '<td class="fy-col-closed fy-col-center"><input type="checkbox" class="fy-chk-closed"></td>' +
                 '<td class="fy-col-acct-close fy-col-center"><button type="button" class="fy-btn-acct-close btn-secondary" title="إغلاق السنة مع خيارات الإقفال">إقفال…</button></td>' +
                 '<td class="fy-col-del fy-col-center"><button type="button" class="fy-btn-del btn-secondary" title="حذف">حذف</button></td>';
             tbody.appendChild(tr);
+            if (typeof window.orangeInitDmyInputs === 'function') {
+                window.orangeInitDmyInputs(tr);
+            }
             renumberRows();
         });
 
@@ -496,6 +499,14 @@ $fyGlRetainedBrief = $fyAccountBrief($pdo, $fyGlRetainedId);
             for (var i = 0; i < rows.length; i++) {
                 if (!rows[i].start_date || !rows[i].end_date) {
                     alert('أكمل التواريخ بصيغة يوم/شهر/سنة (مثال: 31/12/2026) في الصف ' + (i + 1));
+                    return;
+                }
+                if (!/-01-01$/.test(rows[i].start_date)) {
+                    alert('بداية السنة المالية يجب أن تكون 1/1 (أول يناير) في الصف ' + (i + 1));
+                    return;
+                }
+                if (!/-12-31$/.test(rows[i].end_date)) {
+                    alert('نهاية السنة المالية يجب أن تكون 31/12 (آخر ديسمبر) في الصف ' + (i + 1));
                     return;
                 }
             }

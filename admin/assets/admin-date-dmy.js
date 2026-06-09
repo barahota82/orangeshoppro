@@ -172,8 +172,25 @@
 
         textEl.setAttribute('data-orange-dmy-native-picker', '1');
 
+        var isHi = textEl.classList.contains('orange-inp-dmyhi');
+
+        function hiIsoDateFromText() {
+            var m = String(textEl.value || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (!m) {
+                return '';
+            }
+            return m[3] + '-' + orangePad2(parseInt(m[2], 10)) + '-' + orangePad2(parseInt(m[1], 10));
+        }
+        function hiTimeFromText() {
+            var m = String(textEl.value || '').match(/(\d{1,2}):(\d{2})\s*$/);
+            if (!m) {
+                return '00:00';
+            }
+            return orangePad2(parseInt(m[1], 10)) + ':' + m[2];
+        }
+
         function syncNativeFromText() {
-            var iso = orangeGetDmyValueAsIso(textEl);
+            var iso = isHi ? hiIsoDateFromText() : orangeGetDmyValueAsIso(textEl);
             pick.value = iso || '';
         }
 
@@ -181,8 +198,16 @@
             if (!pick.value) {
                 return;
             }
-            textEl.value = orangeIsoDateToDmy(pick.value);
-            orangeNormalizeDmyInput(textEl);
+            if (isHi) {
+                textEl.value = orangeIsoDateToDmy(pick.value) + ' ' + hiTimeFromText();
+                var sql = orangeDmyHiToSqlDatetime(textEl.value);
+                if (sql) {
+                    textEl.value = orangeIsoDatetimeToDmyHi(sql);
+                }
+            } else {
+                textEl.value = orangeIsoDateToDmy(pick.value);
+                orangeNormalizeDmyInput(textEl);
+            }
             syncNativeFromText();
             textEl.dispatchEvent(new Event('input', { bubbles: true }));
             textEl.dispatchEvent(new Event('change', { bubbles: true }));
@@ -224,12 +249,19 @@
             });
         });
         scope.querySelectorAll('.orange-inp-dmyhi').forEach(function (el) {
+            orangeWrapDmyWithNativePicker(el);
+        });
+        scope.querySelectorAll('.orange-inp-dmyhi').forEach(function (el) {
             if (!el.getAttribute('placeholder')) {
                 el.setAttribute('placeholder', 'يوم/شهر/سنة ساعة:دقيقة');
             }
             el.setAttribute('autocomplete', 'off');
             el.setAttribute('maxlength', '16');
             el.setAttribute('dir', 'ltr');
+            if (el.getAttribute('data-orange-dmyhi-blur') === '1') {
+                return;
+            }
+            el.setAttribute('data-orange-dmyhi-blur', '1');
             el.addEventListener('blur', function () {
                 var sql = orangeDmyHiToSqlDatetime(el.value);
                 if (sql) {
