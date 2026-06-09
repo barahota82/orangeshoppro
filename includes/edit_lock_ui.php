@@ -60,6 +60,9 @@ function orange_edit_lock_ui_script_once(): void
                 wrap.hidden = !show;
                 wrap.style.display = show ? '' : 'none';
             }
+            function showStatusBadge() {
+                return wrap && wrap.getAttribute('data-show-status-badge') !== '0';
+            }
             function paint(locked, hasEntity) {
                 /* الخانة تظهر دائماً؛ تُعطَّل قبل الحفظ (لا مستند بعد) */
                 setVisible(true);
@@ -68,7 +71,7 @@ function orange_edit_lock_ui_script_once(): void
                         chk.checked = false;
                         chk.disabled = true;
                     }
-                    if (badge) {
+                    if (badge && showStatusBadge()) {
                         badge.textContent = 'يُتاح بعد الحفظ';
                         badge.className = 'edit-lock-badge edit-lock-badge--pending';
                     }
@@ -80,7 +83,7 @@ function orange_edit_lock_ui_script_once(): void
                     /* لقفل مستند مفتوح يلزم can_lock؛ لفك مستند مقفول يلزم can_unlock */
                     chk.disabled = locked ? !permCaps.can_unlock : !permCaps.can_lock;
                 }
-                if (badge) {
+                if (badge && showStatusBadge()) {
                     badge.textContent = locked ? 'مقفول — التعديل محظور' : 'مفتوح للتعديل';
                     badge.className = locked ? 'edit-lock-badge edit-lock-badge--locked' : 'edit-lock-badge edit-lock-badge--open';
                 }
@@ -189,17 +192,21 @@ function orange_edit_lock_ui_toolbar(array $opts): void
     $docKind = trim((string) ($opts['doc_kind'] ?? ''));
     $class = trim((string) ($opts['class'] ?? 'edit-lock-toolbar jv-print-hide'));
     $note = trim((string) ($opts['note'] ?? ''));
+    $showStatusBadge = !array_key_exists('show_status_badge', $opts) || (bool) $opts['show_status_badge'];
     orange_edit_lock_ui_script_once();
     ?>
 <?php /* يُعرض دائماً (الخانة معطّلة افتراضياً في HTML فلا تُستخدم قبل الربط/الحفظ)؛ JS يُفعّلها بعد الحفظ. بلا hidden حتى تظهر حتى لو تأخّر/فشل الربط. */ ?>
 <div id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_wrap"
      class="<?php echo htmlspecialchars($class, ENT_QUOTES, 'UTF-8'); ?>"
-     data-doc-kind="<?php echo htmlspecialchars($docKind, ENT_QUOTES, 'UTF-8'); ?>">
+     data-doc-kind="<?php echo htmlspecialchars($docKind, ENT_QUOTES, 'UTF-8'); ?>"
+     data-show-status-badge="<?php echo $showStatusBadge ? '1' : '0'; ?>">
     <label class="edit-lock-check">
         <input type="checkbox" id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_chk" disabled>
         <span><strong>قيد مغلق</strong><?php echo $note !== '' ? ' — ' . htmlspecialchars($note, ENT_QUOTES, 'UTF-8') : ''; ?></span>
     </label>
+    <?php if ($showStatusBadge): ?>
     <span id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_badge" class="edit-lock-badge edit-lock-badge--pending">يُتاح بعد الحفظ</span>
+    <?php endif; ?>
 </div>
     <?php
 }
