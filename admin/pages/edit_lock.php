@@ -288,6 +288,7 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
     document.getElementById('el_btn_lock_sel').addEventListener('click', async function () {
         var ids = pickedIds();
         if (!ids.length) { window.alert('حدد مستنداً واحداً على الأقل'); return; }
+        if (!window.confirm('تأكيد قفل المستندات المحددة؟ سيُمنع التعديل والحذف حتى فك القفل.')) return;
         var r = await postJSON('/admin/api/edit-lock/lock.php', { ids: ids });
         window.alert(r.message || (r.success ? 'تم' : 'فشل'));
         if (r.success) loadList();
@@ -295,6 +296,7 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
     document.getElementById('el_btn_unlock_sel').addEventListener('click', async function () {
         var ids = pickedIds();
         if (!ids.length) { window.alert('حدد مستنداً واحداً على الأقل'); return; }
+        if (!window.confirm('تأكيد فك قفل المستندات المحددة؟ ستصبح قابلة للتعديل.')) return;
         var r = await postJSON('/admin/api/edit-lock/unlock.php', { ids: ids });
         window.alert(r.message || (r.success ? 'تم' : 'فشل'));
         if (r.success) loadList();
