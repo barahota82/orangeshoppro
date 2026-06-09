@@ -33,6 +33,7 @@ if ($jvYecMode) {
 }
 
 $jvScreenCountryId = orange_admin_context_country_id($pdo);
+$jvCountryLabel = orange_admin_page_country_label($pdo);
 
 $jvPageEt = (string) ($jvPageEntryType ?? '');
 $jvCashLock = orange_journal_voucher_cash_lock_for_screen(
@@ -179,10 +180,9 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
     $jvEchoMemoRow($pair, 'البيان', null);
 };
 ?>
-<div class="page-title page-title--stacked jv-print-hide">
-    <div>
-        <h1><?php echo htmlspecialchars($jvPageTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
-    </div>
+<div class="page-title jv-print-hide">
+    <h1><?php echo htmlspecialchars($jvPageTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($jvCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <?php if ($jvNavReady && $jvPostingLeafCt === 0): ?>

@@ -16,6 +16,7 @@ require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
+$plmCountryLabel = orange_admin_page_country_label($pdo);
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $normalizeYm = static function (string $raw): ?string {
@@ -428,7 +429,10 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
 ?>
 <div class="admin-fy-shell pl-month-shell" dir="rtl" data-report-name="قائمة إيرادات ومصروفات شهرية">
     <div class="gl-acc-stmt-no-print">
-        <h1 class="admin-fy-shell__title">قائمة إيرادات ومصروفات شهرية</h1>
+        <div class="page-title">
+            <h1>قائمة إيرادات ومصروفات شهرية</h1>
+            <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($plmCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
+        </div>
     </div>
 
     <div class="card admin-fy-card gl-acc-stmt-no-print gas-acc-stmt-search-card">

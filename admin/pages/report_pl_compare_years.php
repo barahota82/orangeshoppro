@@ -16,6 +16,7 @@ require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
+$pcyCountryLabel = orange_admin_page_country_label($pdo);
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $years = orange_fiscal_years_list($pdo);
@@ -99,7 +100,10 @@ $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 ?>
 <div class="admin-fy-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
-        <h1 class="admin-fy-shell__title">مقارنة أرباح وخسائر بين السنوات المالية</h1>
+        <div class="page-title">
+            <h1>مقارنة أرباح وخسائر بين السنوات المالية</h1>
+            <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($pcyCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
+        </div>
     </div>
 
     <div class="card admin-fy-card gl-acc-stmt-no-print">

@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
+$cfCountryLabel = orange_admin_page_country_label($pdo);
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $years = orange_fiscal_years_list($pdo);
@@ -53,7 +54,10 @@ $fmt = static function (float $amt) use ($reportMoney): string {
 ?>
 <div class="admin-fy-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
-        <h1 class="admin-fy-shell__title">قائمة التدفقات النقدية</h1>
+        <div class="page-title">
+            <h1>قائمة التدفقات النقدية</h1>
+            <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($cfCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
+        </div>
 
         <form method="get" class="card admin-fy-card gas-acc-stmt-search-card" style="margin-bottom:16px;">
             <input type="hidden" name="page" value="report_cash_flow">

@@ -178,11 +178,9 @@ $obAdminIndexUrl = storefront_public_path('/admin/index.php');
 $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 
 ?>
-<div class="page-title page-title--stacked jv-print-hide">
-    <div>
-        <h1>أرصدة أول المدة المالية</h1>
-        <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?> — الأرصدة والسند لهذه الدولة فقط.</p>
-    </div>
+<div class="page-title jv-print-hide">
+    <h1>أرصدة أول المدة المالية</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <?php if ($years === []): ?>

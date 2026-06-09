@@ -48,10 +48,10 @@ if ($valuesJson === false) {
 
 ?>
 <div class="admin-fy-shell" dir="rtl" id="ad_app">
-    <h1 class="admin-fy-shell__title">الأبعاد التحليلية</h1>
-    <?php if ($ctxCountryLabel !== ''): ?>
-    <p class="card-hint" style="margin:0 0 0.75rem;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?> — الأبعاد وقيمها لهذه الدولة فقط.</p>
-    <?php endif; ?>
+    <div class="page-title">
+        <h1>الأبعاد التحليلية</h1>
+        <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($ctxCountryLabel !== '' ? $ctxCountryLabel : orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
+    </div>
 
     <?php if (! $ready): ?>
         <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;">

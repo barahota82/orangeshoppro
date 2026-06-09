@@ -19,6 +19,7 @@ $pdo = orange_admin_page_pdo();
 $ppvPrintTuningMode = orange_admin_voucher_print_tuning_mode();
 
 $ppvCountryId = orange_admin_context_country_id($pdo);
+$ppvCountryLabel = orange_admin_page_country_label($pdo);
 $ppvCustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $ppvCountryId);
 
 $ppvTitle = 'سداد فواتير مبيعات آجلة';
@@ -220,8 +221,9 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
 .jv-search-results-table tbody tr { cursor: pointer; }
 .jv-search-results-table tbody tr:hover { background: #f4f4f5; }
 </style>
-<div class="page-title page-title--stacked jv-print-hide">
-    <div><h1><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h1></div>
+<div class="page-title jv-print-hide">
+    <h1><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($ppvCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <?php if ($ppvCashLock === null): ?>

@@ -6,16 +6,17 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/payments/payment_core.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = db();
 orange_payments_ensure_schema($pdo);
+$prCountryLabel = orange_admin_page_country_label($pdo);
 ?>
-<div class="page-title page-title--stacked">
-    <div>
-        <h1>مراجعة الدفعات (تحويل بنكي)</h1>
-        <p class="page-subtitle">تأكيد التحويلات البنكية: ابحث عن الطلب، ارفع الإثبات إن لزم، ثم «تأكيد الدفع». الحسابات البنكية من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=bank_accounts'), ENT_QUOTES, 'UTF-8'); ?>">الحسابات البنكية</a>.</p>
-    </div>
+<div class="page-title">
+    <h1>مراجعة الدفعات (تحويل بنكي)</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($prCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<p class="page-subtitle" style="margin:0 0 0.75rem;">تأكيد التحويلات البنكية: ابحث عن الطلب، ارفع الإثبات إن لزم، ثم «تأكيد الدفع». الحسابات البنكية من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=bank_accounts'), ENT_QUOTES, 'UTF-8'); ?>">الحسابات البنكية</a>.</p>
 
 <div class="card">
     <div class="form-grid">

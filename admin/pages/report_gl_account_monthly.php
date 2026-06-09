@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
+$gamCountryLabel = orange_admin_page_country_label($pdo);
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $accountId = isset($_GET['account']) ? (int) $_GET['account'] : 0;
@@ -218,7 +219,10 @@ $printNameVal = $accNameDisp !== '' ? $accNameDisp : '—';
 ?>
 <div class="admin-fy-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
-        <h1 class="admin-fy-shell__title">الحركة الشهرية لحساب</h1>
+        <div class="page-title">
+            <h1>الحركة الشهرية لحساب</h1>
+            <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($gamCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
+        </div>
     </div>
 
     <div class="card admin-fy-card gl-acc-stmt-no-print gas-acc-stmt-search-card">

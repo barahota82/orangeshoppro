@@ -16,6 +16,7 @@ require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
+$jvrCountryLabel = orange_admin_page_country_label($pdo);
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 orange_catalog_ensure_schema($pdo);
 orange_journal_types_sync_canonical_defaults($pdo);
@@ -304,7 +305,10 @@ $jvrPrintOnclick = $jvrReportDisplayed ? 'window.print()' : $jvrPrintAlert;
 </style>
 
 <div class="admin-fy-shell" dir="rtl">
-    <h1 class="admin-fy-shell__title gl-acc-stmt-no-print">تقارير السندات</h1>
+    <div class="page-title gl-acc-stmt-no-print">
+        <h1>تقارير السندات</h1>
+        <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($jvrCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
+    </div>
 
 <?php if ($jvrVouchersReady && $jvrPostingLeafCt === 0): ?>
 <div class="card admin-fy-card gl-acc-stmt-no-print" style="border:1px solid #fcd34d;background:#fffbeb;">

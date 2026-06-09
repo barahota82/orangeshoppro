@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
+$prCountryLabel = orange_admin_page_country_label($pdo);
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/date_format.php';
@@ -103,11 +104,14 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
 };
 ?>
 <div class="admin-fy-shell" dir="rtl">
-    <?php if ($partnerView === 'customers'): ?>
-        <h1 class="admin-fy-shell__title">أرصدة العملاء (ذمم)</h1>
-    <?php else: ?>
-        <h1 class="admin-fy-shell__title">أرصدة الموردين (ذمم)</h1>
-    <?php endif; ?>
+    <div class="page-title">
+        <?php if ($partnerView === 'customers'): ?>
+        <h1>أرصدة العملاء (ذمم)</h1>
+        <?php else: ?>
+        <h1>أرصدة الموردين (ذمم)</h1>
+        <?php endif; ?>
+        <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($prCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
+    </div>
 
 <?php if (orange_journal_vouchers_ready($pdo) && $prPostingLeafCt === 0): ?>
 <div class="card admin-fy-card gl-acc-stmt-no-print" style="border:1px solid #fcd34d;background:#fffbeb;">

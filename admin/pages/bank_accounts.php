@@ -7,10 +7,12 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/payments/payment_core.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = db();
 orange_payments_ensure_schema($pdo);
 $baCountryId = orange_admin_context_country_id($pdo);
+$baCountryLabel = orange_admin_page_country_label($pdo);
 $baCurrency = orange_country_functional_currency_code($pdo, $baCountryId);
 $baMethodActive = orange_payment_bank_method_active($pdo, $baCountryId);
 $baAccounts = orange_payment_bank_accounts($pdo, $baCountryId, false);
@@ -19,12 +21,11 @@ $baGwProvider = orange_payment_gateway_default_provider();
 $baGwActive = orange_payment_gateway_method_active($pdo, $baCountryId);
 $baGwConfigured = orange_payment_gateway_is_configured($baGwProvider, orange_payment_gateway_config($baGwProvider));
 ?>
-<div class="page-title page-title--stacked">
-    <div>
-        <h1>الحسابات البنكية والدفع المباشر</h1>
-        <p class="page-subtitle">حسابات بنك الشركة لهذه الدولة + تفعيل «التحويل البنكي» كطريقة دفع. تأكيد الدفعات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=payment_review'), ENT_QUOTES, 'UTF-8'); ?>">مراجعة الدفعات</a>.</p>
-    </div>
+<div class="page-title">
+    <h1>الحسابات البنكية والدفع المباشر</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($baCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<p class="page-subtitle" style="margin:0 0 0.75rem;">حسابات بنك الشركة لهذه الدولة + تفعيل «التحويل البنكي» كطريقة دفع. تأكيد الدفعات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=payment_review'), ENT_QUOTES, 'UTF-8'); ?>">مراجعة الدفعات</a>.</p>
 
 <div class="card">
     <label style="display:flex;align-items:center;gap:10px;cursor:pointer;max-width:40rem;">

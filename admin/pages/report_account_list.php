@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
+$ralCountryLabel = orange_admin_page_country_label($pdo);
 
 $flat = orange_accounts_flat($pdo);
 $listRows = orange_accounts_report_list_rows($pdo, $flat);
@@ -22,7 +23,10 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
 ?>
 <div class="admin-fy-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
-        <h1 class="admin-fy-shell__title">قائمة الحسابات</h1>
+        <div class="page-title">
+            <h1>قائمة الحسابات</h1>
+            <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($ralCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
+        </div>
         <p class="actions" data-export-host style="margin:0 0 16px;">
             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
             <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=chart_of_accounts'), ENT_QUOTES, 'UTF-8'); ?>">الدليل المحاسبي</a>

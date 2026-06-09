@@ -58,11 +58,10 @@ $fyGlIncomeBrief = $fyAccountBrief($pdo, $fyGlIncomeId);
 $fyGlRetainedBrief = $fyAccountBrief($pdo, $fyGlRetainedId);
 ?>
 <div class="admin-fy-shell fy-years-page" dir="rtl">
-    <h1 class="fy-years-page__title">السنوات المالية</h1>
-    <p class="card-hint" style="margin:0 0 0.75rem;">
-        <strong>سياق الدولة:</strong> <?php echo htmlspecialchars($fyCountryLabel, ENT_QUOTES, 'UTF-8'); ?>
-        — السنوات والإقفال لهذه الدولة فقط.
-    </p>
+    <div class="page-title">
+        <h1 class="fy-years-page__title">السنوات المالية</h1>
+        <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($fyCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
+    </div>
     <?php if (!$fyScoped): ?>
     <p class="card-hint" style="margin:0.35rem 0 0.75rem;color:#92400e;">
         تنبيه: عمود <code dir="ltr">country_id</code> غير مفعّل بعد على جدول السنوات المالية.

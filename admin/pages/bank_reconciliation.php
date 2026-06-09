@@ -15,6 +15,7 @@ require_once __DIR__ . '/../../includes/date_format.php';
 $pdo = orange_admin_page_pdo();
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+$brCountryLabel = orange_admin_page_country_label($pdo);
 
 $ready = orange_bank_reconciliation_ready($pdo);
 $useVouchers = orange_journal_vouchers_ready($pdo);
@@ -81,7 +82,10 @@ if ($initialJson === false) {
 
 ?>
 <div class="admin-fy-shell" dir="rtl" id="bank_recon_app">
-    <h1 class="admin-fy-shell__title">تسوية البنك</h1>
+    <div class="page-title">
+        <h1>تسوية البنك</h1>
+        <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($brCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
+    </div>
 
     <?php if (! $ready || ! $useVouchers): ?>
         <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;">
