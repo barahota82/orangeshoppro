@@ -80,7 +80,6 @@ $headerEditActive = $headerEdit ? (int) ($headerEdit['is_active'] ?? 1) : 1;
     <h1>بانر الصفحة الرئيسية</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle">أضف جمل الـ hero والتناوب تحت الشعار في الهيدر: جدول في الأسفل، تعديل، حذف، وإخفاء/تفعيل. <strong>ترتيب العرض</strong> يُضبط تلقائياً عند الإضافة؛ لإعادة الترتيب استخدم «أعلى / أسفل» في الجدول. جمل <strong>الـ hero</strong> تظهر للزائر حسب <strong>لغة واجهته</strong>؛ جمل <strong>الهيدر</strong> تتناوب للجميع بترتيب اللغات في كل صف: عربي ثم إنجليزي ثم فلبيني ثم هندي (الحقول الفارغة تُستبعد من الدورة).</p>
 
 <?php if (!$hasTable): ?>
 <div class="card">
@@ -90,7 +89,6 @@ $headerEditActive = $headerEdit ? (int) ($headerEdit['is_active'] ?? 1) : 1;
 
 <div class="card">
     <h3>شعار الهيدر — جمل التناوب تحت الشعار</h3>
-    <p class="card-hint" style="margin:0 0 0.75rem;">يظهر في شريط الهيدر تحت اسم المتجر. التناوب يمرّ بالصفوف النشطة ثم بكل لغة غير فارغة في الصف بالترتيب: عربي → English → Filipino → Hindi. إن لم تُضف جمل نشطة يُستعاد من الجدول القديم <code>storefront_home_hero</code> إن وُجد.</p>
     <input type="hidden" id="header_line_id" value="<?php echo $headerEdit ? (int) $headerEdit['id'] : ''; ?>">
     <div class="form-grid" style="margin-top:1rem;">
         <div>
@@ -166,7 +164,6 @@ $headerEditActive = $headerEdit ? (int) ($headerEdit['is_active'] ?? 1) : 1;
 
 <div class="card">
     <h3>جمل الـ hero — الصفحة الرئيسية</h3>
-    <p class="card-hint" style="margin:0 0 0.75rem;">الجمل تتناوب في بانر الرئيسية حسب لغة الزائر. يُفضّل وجود جملتين على الأقل للتناوب السلس.</p>
     <input type="hidden" id="hero_line_id" value="<?php echo $heroEdit ? (int) $heroEdit['id'] : ''; ?>">
     <div class="form-grid" style="margin-top:1rem;">
         <div>

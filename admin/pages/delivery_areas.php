@@ -28,7 +28,6 @@ $daNextSortOrder = $hasGovTable
     <h1>محافظات ومناطق التوصيل</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle">لكل <strong>دولة</strong>: محافظات ثم مناطق تابعة لها. عند تفعيل <strong>منطقة توصيل</strong> و<strong>محافظة نشطة</strong> تظهر في العربة والتسجيل والتتبع.</p>
 <?php if ($activeAreasCount === 0 && $hasAreasTable): ?>
 <p class="card-hint" style="margin-top:0.5rem;color:#b45309;">لا توجد مناطق توصيل نشطة لهذه الدولة — العملاء لن يكملوا الطلب حتى تُفعَّل محافظة ومنطقة على الأقل.</p>
 <?php endif; ?>

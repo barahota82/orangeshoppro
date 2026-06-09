@@ -464,7 +464,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                         ['page' => 'channels', 'href' => '/admin/index.php?page=channels', 'label' => 'قنوات العملاء', 'class' => '', 'sub' => false],
                         ['page' => 'delivery_areas', 'href' => '/admin/index.php?page=delivery_areas', 'label' => 'محافظات ومناطق التوصيل', 'class' => '', 'sub' => false],
                         ['page' => 'storefront_hero', 'href' => '/admin/index.php?page=storefront_hero', 'label' => 'بانر الصفحة الرئيسية', 'class' => '', 'sub' => false],
-                        ['page' => 'storefront_merge_requests', 'href' => '/admin/index.php?page=storefront_merge_requests', 'label' => 'دمج هاتف التسجيل (س15)', 'class' => '', 'sub' => false],
+                        ['page' => 'storefront_merge_requests', 'href' => '/admin/index.php?page=storefront_merge_requests', 'label' => 'دمج هاتف التسجيل', 'class' => '', 'sub' => false],
                     ],
                 ],
             ];

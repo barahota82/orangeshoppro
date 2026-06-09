@@ -208,7 +208,7 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'channels', 'label' => 'قنوات العملاء'],
                         ['page' => 'delivery_areas', 'label' => 'محافظات ومناطق التوصيل'],
                         ['page' => 'storefront_hero', 'label' => 'بانر الصفحة الرئيسية'],
-                        ['page' => 'storefront_merge_requests', 'label' => 'دمج هاتف التسجيل (س15)'],
+                        ['page' => 'storefront_merge_requests', 'label' => 'دمج هاتف التسجيل'],
                     ],
                 ],
             ],
