@@ -1737,12 +1737,12 @@ label {
 /* سند قيد — رأس السند: رقم، تواريخ، مرجع، مجموع مدين/دائن */
 .jv-voucher-header-line {
     display: grid;
-    /* مطابقة نِسَب الطباعة: رقم القيد | تاريخ السند (مساوٍ للإدخال) | المرجع (أوسع) | تاريخ الإدخال | مدين | دائن */
+    /* مطابقة نِسَب الطباعة: رقم القيد | تاريخ السند | المرجع (أوسع) | تاريخ الإدخال (أوسع قليلاً ليظهر كاملاً) | مدين | دائن */
     grid-template-columns:
         minmax(5.25rem, 7rem)
         minmax(6.5rem, 8rem)
-        minmax(10rem, 13rem)
-        minmax(6.5rem, 8rem)
+        minmax(9.5rem, 12.25rem)
+        minmax(7rem, 8.75rem)
         minmax(7rem, 9rem)
         minmax(7rem, 9rem);
     gap: 12px 14px;
@@ -1752,8 +1752,8 @@ label {
     grid-template-columns:
         minmax(5.25rem, 7rem)
         minmax(6.5rem, 8rem)
-        minmax(10rem, 13rem)
-        minmax(6.5rem, 8rem)
+        minmax(9.5rem, 12.25rem)
+        minmax(7rem, 8.75rem)
         minmax(7rem, 9rem)
         minmax(7rem, 9rem)
         minmax(10rem, 15rem);
