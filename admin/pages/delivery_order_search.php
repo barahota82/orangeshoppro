@@ -52,9 +52,6 @@ $multiResults = count($results) > 1;
         <h1>بحث التسليم</h1>
         <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
     </div>
-    <p class="page-subtitle">
-        بحث عن طلب قبل إغلاق دفعة المندوب — <strong>مرتجع كامل</strong> → إلغاء؛ <strong>جزئي</strong> → تعديل الفاتورة.
-    </p>
 
 <div class="card admin-fy-card">
     <form method="get" action="<?php echo htmlspecialchars($indexBase, ENT_QUOTES, 'UTF-8'); ?>" class="admin-toolbar" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">

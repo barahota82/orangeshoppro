@@ -57,10 +57,6 @@ $topProducts = $pdo->query("
     <h1>التقارير</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle">لتحليل <strong>كل قناة على حدة</strong> (طلبات، إيراد، أكثر منتج، ترتيب النشاط) استخدم
-    <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=channel_analytics'), ENT_QUOTES, 'UTF-8'); ?>">تحليل القنوات</a>.
-    لتفصيل <strong>مردودات المبيعات</strong> (مصدر الفاتورة، التحصيل، قناة التسويق، المنتجات) استخدم
-    <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sales_returns_report'), ENT_QUOTES, 'UTF-8'); ?>">تقرير مردودات المبيعات</a>.</p>
 
 <div class="grid-4">
     <div class="card stat-card"><h3>إجمالي الطلبات</h3><div class="value"><?php echo $totalOrders; ?></div></div>

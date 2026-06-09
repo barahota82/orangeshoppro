@@ -69,10 +69,6 @@ foreach ($candidates as $o) {
         <h1>إنشاء قيود التسليم</h1>
         <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
     </div>
-    <p class="page-subtitle">
-        طلبات <strong>الموقع</strong> (<code>completed</code>) بانتظار القيود المحاسبية — حدّد ثم «إنشاء القيود».
-        «بالطريق» و«تم التوصيل» من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>.
-    </p>
 
 <div class="card admin-fy-card">
     <div class="admin-toolbar" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:12px;">

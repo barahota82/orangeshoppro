@@ -15,7 +15,7 @@ orange_admin_render_mega_section_index(
     'warehouse',
     'warehouse_purchases_index',
     'فهرس المخازن والمشتريات',
-    'روابط سريعة للمخزون والمشتريات وكتالوج المنتجات — بنفس ترتيب القائمة المنسدلة.',
+    '',
     [
         'stock' => 'عرض وحركة أرصدة المستودع.',
         'stock_reports' => 'تقارير المخزون والأصناف.',

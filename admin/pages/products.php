@@ -398,12 +398,6 @@ $orangeAdminSfProductUrlPartsForJs = [
 </div>
 <?php endif; ?>
 
-<?php if ($catalogNavUnified): ?>
-<div class="card" style="margin-bottom:12px;">
-    <p style="margin:0;color:#334155;font-size:14px;line-height:1.55;"><strong>التصنيف الموحّد:</strong> مسار المتجر للمنتج = <strong>نوع المنتج</strong> (ورقة الشجرة) في النموذج — وليس فئة/فرعاً يدوياً على المنتج. هرَم المقاس التجاري (1–2) يُضبط على الورقة فيقترح النموذج عائلات المقاسات (3–4) المتوافقة. الألوان والأنماط تُدار من القواميس وتُربَط بالمتغيرات عند «توليد المتغيرات».</p>
-</div>
-<?php endif; ?>
-
 <div class="card">
     <h3 id="productFormTitle">إضافة / تعديل منتج</h3>
     <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">المخزون</a>.</p>

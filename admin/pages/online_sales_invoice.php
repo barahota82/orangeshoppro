@@ -124,15 +124,6 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     <h1>فاتورة أونلاين</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle" style="line-height:1.55;">
-    مستند بيع أونلاين (<strong dir="ltr">INV-O</strong>) — المبالغ بعملة
-    <strong><?php echo htmlspecialchars($adminDefaultCurrency, ENT_QUOTES, 'UTF-8'); ?></strong>
-    — كود الهاتف الافتراضي
-    <strong dir="ltr">+<?php echo htmlspecialchars($adminDefaultPhoneDial, ENT_QUOTES, 'UTF-8'); ?></strong>.
-    افتح فاتورة محفوظة من <strong>بحث</strong> أو أزرار التنقل — القناة وبيانات العميل تُحمَّل من الطلب ولا تُختار يدوياً.
-    لإنشاء رقم الفاتورة والقيود المحاسبية استخدم
-    <a href="<?php echo htmlspecialchars($finalPostingUrl, ENT_QUOTES, 'UTF-8'); ?>">طلبات أونلاين — إنشاء القيود</a>.
-</p>
 
 <?php if ($ov2WarnNoProducts): ?>
 <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">

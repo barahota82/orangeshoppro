@@ -15,7 +15,6 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
     <h1>عروض الكومبو</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle">منتجان (أو أكثر) بأي لون أو مقاس — عند توفّر الكميات في العربة يُطبَّق <strong>سعر الحزمة</strong>. <strong>نقرتان</strong> على «إضافة منتج» لاختيار من المخزن.</p>
 
 <?php if (!$hasTable): ?>
 <div class="card">

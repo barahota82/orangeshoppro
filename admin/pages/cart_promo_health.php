@@ -50,7 +50,6 @@ $statusClass = static function (string $status): string {
     <h1>صحة عروض السلة والمنتجات</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle">مراقبة آخر فحص مخزون لكل قاعدة (الخمسة أنواع). التحذير البرتقالي = مخزون ≤ <?php echo (int) $lowTh; ?> قبل الإيقاف. <strong>مرحلة 10:</strong> بعد إيقاف مخزون فقط — إذا رجع المخزون والفترة سارية و«نشط» يُعاد التفعيل تلقائياً عند الفحص؛ انتهاء الفترة أو إيقاف الأدمن يدوياً = تفعيل يدوي فقط.</p>
 
 <?php if (!$tablesReady): ?>
 <div class="card">

@@ -63,10 +63,6 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
     <h1>عروض BOGO (منتج / فئة / حزمة شراء)</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle"><strong>س4:</strong> (1) <em>نفس المنتج</em> — أي لون أو مقاس؛ مجموع الكمية على المنتج يبلغ الحد الأدنى.
-    (2) <em>نفس الفئة</em> — منتجات مختلفة ضمن الفئة.
-    (3) <em>حزمة شراء</em> — منتجان مختلفان على الأقل بكميات محددة.
-    الهدية: منتج ثابت أو اختيار من قائمة منتجات — <strong>نقرتان</strong> على «إضافة منتج».</p>
 
 <?php if (!$hasTable): ?>
 <div class="card">

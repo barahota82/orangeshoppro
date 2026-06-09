@@ -339,7 +339,6 @@ $count = count($customerRows);
     <h1>العملاء</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle">كود الهاتف الافتراضي <strong dir="ltr">+<?php echo htmlspecialchars($adminDefaultPhoneDial, ENT_QUOTES, 'UTF-8'); ?></strong> عند «عميل جديد».</p>
 
 <?php if ($customerSchemaBootstrapError !== ''): ?>
 <div class="card" style="border:1px solid #fbbf24; background:#fffbeb; color:#92400e;">

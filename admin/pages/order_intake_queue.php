@@ -155,10 +155,6 @@ $statusLabel = [
         </div>
     </div>
 </div>
-<p class="page-subtitle">
-    طلبات الواجهة تُسجَّل هنا ثم تُعالَج بالتسلسل (FIFO). الصفوف <strong>الفاشلة</strong> يمكن إعادتها للطابور؛
-    الصفوف <strong>المكتملة</strong> أو الفاشلة القديمة تُنظَّف حسب العمر (يتطلب صلاحية حذف).
-</p>
 
 <div class="party-registry-stats" style="margin-bottom:16px;">
     <div class="party-registry-stat">

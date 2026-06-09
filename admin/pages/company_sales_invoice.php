@@ -197,12 +197,6 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     <h1>فاتورة مبيعات</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle" style="line-height:1.55;">
-    مستند بيع شركة (<strong dir="ltr">INV-C</strong>) — المبالغ بعملة
-    <strong><?php echo htmlspecialchars($adminDefaultCurrency, ENT_QUOTES, 'UTF-8'); ?></strong>
-    — كود الهاتف الافتراضي
-    <strong dir="ltr">+<?php echo htmlspecialchars($adminDefaultPhoneDial, ENT_QUOTES, 'UTF-8'); ?></strong>.
-</p>
 
 <?php if ($sv2WarnNoProducts || $sv2WarnNoChannels): ?>
 <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">

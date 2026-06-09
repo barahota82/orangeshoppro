@@ -15,7 +15,7 @@ orange_admin_render_mega_section_index(
     'settings',
     'settings_index',
     'فهرس الإعدادات',
-    'روابط سريعة لإعدادات الشركة والسوق — بنفس ترتيب القائمة المنسدلة.',
+    '',
     [
         'company_settings' => 'بيانات الشركة والشعار للطباعة.',
         'company_documents' => 'أرشيف مستندات الشركة.',

@@ -100,9 +100,6 @@ $today = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')) ?: date('Y-m-d');
             <h1>ورقة المندوب (manifest)</h1>
             <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
         </div>
-        <p class="page-subtitle">
-            طباعة مجمّعة للطلبات المحدّدة — افتح من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=delivery_agent_handover'), ENT_QUOTES, 'UTF-8'); ?>">تسليم المندوب</a>.
-        </p>
         <?php if ($orders !== []): ?>
         <button type="button" class="btn" onclick="window.print()">طباعة / PDF</button>
         <?php endif; ?>

@@ -162,21 +162,6 @@ function orange_admin_orders_action_buttons(array $o): void
         <h1>الطلبات</h1>
         <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
     </div>
-    <p class="page-subtitle">المخزن <strong>موحّد للشركة</strong> — الطلب من أي قناة يخصم نفس المخزون لتفادي البيع رغم النفاد. عمود «قناة العملاء» لتتبّع المصدر وتجميع العملاء (تيك توك، واتساب، …) وليس لمخزون منفصل.
-        <?php
-        if (orange_admin_may($admin, $pdo, 'sales', 'view')) {
-            echo ' — <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=reserved_orders'), ENT_QUOTES, 'UTF-8') . '">طلبات محجوزة (مخزون)</a>';
-        }
-        if (orange_admin_may($admin, $pdo, 'sales', 'view') && orange_table_exists($pdo, 'order_intake_queue')) {
-            echo ' — <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=order_intake_queue'), ENT_QUOTES, 'UTF-8') . '">طابور طلبات الموقع (قبل إنشاء الطلب)</a>';
-        }
-        if (orange_admin_may($admin, $pdo, 'sales', 'view')) {
-            echo ' — <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=online_orders_final_posting'), ENT_QUOTES, 'UTF-8') . '">طلبات أونلاين — إنشاء القيود</a>';
-            echo ' — <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=delivery_agent_handover'), ENT_QUOTES, 'UTF-8') . '">تسليم المندوب</a>';
-            echo ' — <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=delivery_order_search'), ENT_QUOTES, 'UTF-8') . '">بحث التسليم</a>';
-        }
-        ?>
-    </p>
 
 <div class="card admin-fy-card">
     <h3 class="card-title">قائمة الطلبات</h3>

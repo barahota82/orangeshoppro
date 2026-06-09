@@ -48,11 +48,7 @@ $csUpdatedAt = trim((string) ($csRow['updated_at'] ?? ''));
     <h1>بيانات الشركة</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle">سجل واحد لكل دولة — يُستخدم في طباعة الفواتير والمستندات والمتجر، وليس في عنوان لوحة التحكم.</p>
 <?php if ($csScoped && $csCountryId > 0): ?>
-<p class="card-hint" style="margin:0.35rem 0 0;line-height:1.55;">
-    ما تحفظه هنا يبقى لهذه الدولة. لتعديل بيانات دولة أخرى غيّر الدولة من الشريط العلوي ثم عد إلى هذه الصفحة.
-</p>
 <?php if ($csHasSaved): ?>
 <p class="card-hint" style="margin:0.25rem 0 0;color:#166534;line-height:1.55;">
     بيانات محفوظة<?php if ($csUpdatedAt !== ''): ?> — آخر تحديث: <?php echo htmlspecialchars($csUpdatedAt, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?>.

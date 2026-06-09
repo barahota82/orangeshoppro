@@ -34,8 +34,6 @@ $offers = $pdo->query(
     <h1>عروض المنتجات</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle">العرض <strong>الخامس</strong> للمستهلك (س4): خصم من <code dir="ltr">products.price</code> — تبويب «العروض» بالرئيسية.
-    منتج: <strong>نقرتان</strong> من المخزن · <strong>بداية ونهاية العرض إلزاميان</strong> · <strong>الترتيب</strong> (الأصغر يظهر أولاً).</p>
 
 <?php if (!$hasScheduleCols): ?>
 <div class="card" style="border:1px solid #dc2626;background:#fef2f2;margin-bottom:16px;">

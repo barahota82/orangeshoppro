@@ -349,12 +349,6 @@ $baseUrl = storefront_public_path('/admin/index.php') . '?page=sales_returns_rep
     <h1>تقرير مردودات المبيعات</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle">
-    تحليل مفصّل للمردودات حسب المصدر (شركة / أونلاين)، قناة التحصيل، قناة التسويق، والمنتج.
-    <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sales_returns'), ENT_QUOTES, 'UTF-8'); ?>">مردود المبيعات</a>
-    ·
-    <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير المبيعات</a>
-</p>
 
 <?php if (!$hasAnalytics): ?>
 <div class="card">

@@ -15,8 +15,6 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
     <h1>عروض الهدايا (مجموعة اختيار / هدية ثابتة)</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle">تكميل <strong>س4</strong>: عند تحقق حد أدنى لمجموع السلة (يمكن أن يكون 0) يُضاف بند هدية — العميل يختار اللون/المقاس عند الدفع.
-    <strong>منتج كامل</strong> في الأدمن: <strong>نقرتان</strong> على «إضافة منتج» أو «اختيار منتج».</p>
 
 <?php if (!$hasTable): ?>
 <div class="card">
