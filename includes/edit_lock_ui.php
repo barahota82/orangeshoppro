@@ -53,8 +53,7 @@ function orange_edit_lock_ui_script_once(): void
             var onChange = typeof cfg.onLockedChange === 'function' ? cfg.onLockedChange : null;
             var permCaps = capsForCfg(cfg);
             var wrap = document.getElementById(prefix + '_edit_lock_wrap');
-            var btnLock = document.getElementById(prefix + '_edit_lock_btn_lock');
-            var btnUnlock = document.getElementById(prefix + '_edit_lock_btn_unlock');
+            var chk = document.getElementById(prefix + '_edit_lock_chk');
             var badge = document.getElementById(prefix + '_edit_lock_badge');
             if (!wrap || !docKind) return { refresh: function () {} };
             function setVisible(show) {
@@ -67,17 +66,14 @@ function orange_edit_lock_ui_script_once(): void
                     return;
                 }
                 setVisible(true);
+                if (chk) {
+                    chk.checked = !!locked;
+                    /* لقفل مستند مفتوح يلزم can_lock؛ لفك مستند مقفول يلزم can_unlock */
+                    chk.disabled = locked ? !permCaps.can_unlock : !permCaps.can_lock;
+                }
                 if (badge) {
                     badge.textContent = locked ? 'مقفول — التعديل محظور' : 'مفتوح للتعديل';
                     badge.className = locked ? 'edit-lock-badge edit-lock-badge--locked' : 'edit-lock-badge edit-lock-badge--open';
-                }
-                if (btnLock) {
-                    btnLock.hidden = locked || !permCaps.can_lock;
-                    btnLock.disabled = !permCaps.can_lock;
-                }
-                if (btnUnlock) {
-                    btnUnlock.hidden = !locked || !permCaps.can_unlock;
-                    btnUnlock.disabled = !permCaps.can_unlock;
                 }
                 if (onChange) onChange(locked);
             }
@@ -103,23 +99,9 @@ function orange_edit_lock_ui_script_once(): void
                     })
                     .catch(function () { paint(false, true); });
             }
-            function toggle(lock) {
-                if (lock && !permCaps.can_lock) {
-                    alert('لا تملك صلاحية قفل');
-                    return;
-                }
-                if (!lock && !permCaps.can_unlock) {
-                    alert('لا تملك صلاحية فك القفل');
-                    return;
-                }
+            function applyToggle(lock) {
                 var eid = parseInt(String(getEntityId() || '0'), 10) || 0;
-                if (eid <= 0) return;
-                var confirmMsg = lock
-                    ? 'تأكيد قفل هذا المستند؟ سيُمنع التعديل والحذف حتى فك القفل.'
-                    : 'تأكيد فك قفل هذا المستند؟ سيصبح قابلاً للتعديل.';
-                if (!window.confirm(confirmMsg)) {
-                    return;
-                }
+                if (eid <= 0) { refresh(); return; }
                 postJson('/admin/api/edit-lock/toggle.php', {
                     doc_kind: getDocKind(),
                     entity_id: eid,
@@ -128,18 +110,35 @@ function orange_edit_lock_ui_script_once(): void
                 }).then(function (res) {
                     if (!res || !res.success) {
                         alert((res && res.message) || 'تعذر تغيير حالة القفل');
+                        refresh();
                         return;
                     }
                     refresh();
-                }).catch(function (e) { alert(e.message || String(e)); });
+                }).catch(function (e) { alert(e.message || String(e)); refresh(); });
             }
-            if (btnLock && !btnLock._elBound) {
-                btnLock._elBound = true;
-                btnLock.addEventListener('click', function () { toggle(true); });
-            }
-            if (btnUnlock && !btnUnlock._elBound) {
-                btnUnlock._elBound = true;
-                btnUnlock.addEventListener('click', function () { toggle(false); });
+            if (chk && !chk._elBound) {
+                chk._elBound = true;
+                chk.addEventListener('change', function () {
+                    var wantLock = chk.checked;
+                    if (wantLock && !permCaps.can_lock) {
+                        alert('لا تملك صلاحية قفل');
+                        chk.checked = false;
+                        return;
+                    }
+                    if (!wantLock && !permCaps.can_unlock) {
+                        alert('لا تملك صلاحية فك القفل');
+                        chk.checked = true;
+                        return;
+                    }
+                    var confirmMsg = wantLock
+                        ? 'تأكيد قفل هذا المستند؟ سيُمنع التعديل والحذف حتى فك القفل.'
+                        : 'تأكيد فك قفل هذا المستند؟ سيصبح قابلاً للتعديل.';
+                    if (!window.confirm(confirmMsg)) {
+                        chk.checked = !wantLock;
+                        return;
+                    }
+                    applyToggle(wantLock);
+                });
             }
             var api = { refresh: refresh };
             window.OrangeEditLock.instances[prefix] = api;
@@ -151,6 +150,8 @@ function orange_edit_lock_ui_script_once(): void
 </script>
 <style>
 .edit-lock-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin:0 0 12px; }
+.edit-lock-check { display:flex; align-items:center; gap:8px; cursor:pointer; }
+.edit-lock-check input[type="checkbox"]:disabled { cursor:default; }
 .edit-lock-badge { font-size:0.85rem; font-weight:600; }
 .edit-lock-badge--locked { color:#b45309; }
 .edit-lock-badge--open { color:#047857; }
@@ -176,14 +177,17 @@ function orange_edit_lock_ui_toolbar(array $opts): void
     $prefix = preg_replace('/[^a-z0-9_]/i', '', (string) ($opts['prefix'] ?? 'el')) ?: 'el';
     $docKind = trim((string) ($opts['doc_kind'] ?? ''));
     $class = trim((string) ($opts['class'] ?? 'edit-lock-toolbar jv-print-hide'));
+    $note = trim((string) ($opts['note'] ?? ''));
     orange_edit_lock_ui_script_once();
     ?>
 <div id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_wrap"
      class="<?php echo htmlspecialchars($class, ENT_QUOTES, 'UTF-8'); ?>"
      data-doc-kind="<?php echo htmlspecialchars($docKind, ENT_QUOTES, 'UTF-8'); ?>"
      hidden>
-    <button type="button" class="btn-secondary" id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_btn_lock">قفل التعديل</button>
-    <button type="button" class="btn-secondary" id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_btn_unlock" hidden>فك القفل</button>
+    <label class="edit-lock-check">
+        <input type="checkbox" id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_chk">
+        <span><strong>قيد مغلق</strong><?php echo $note !== '' ? ' — ' . htmlspecialchars($note, ENT_QUOTES, 'UTF-8') : ''; ?></span>
+    </label>
     <span id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_badge" class="edit-lock-badge"></span>
 </div>
     <?php

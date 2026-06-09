@@ -132,7 +132,9 @@ ARABIC
 - **تنفيذ:**
   - `includes/edit_lock.php` — `orange_edit_lock_force_lock()` (يضبط `is_locked=1` بعد التسجيل، بلا اشتراط `can_lock`).
   - `admin/api/opening_balances/save.php` — بعد `orange_edit_lock_register_opening_balance(...)` يستدعي `orange_edit_lock_force_lock(... 'opening_balance', $fyId ...)` + `audit_log('edit_lock_lock', ...)`.
-  - `admin/pages/opening_balances.php` — خانة اختيار معطّلة «قيد مغلق — يُفعَّل تلقائياً بعد الحفظ الناجح» (`#ob_locked`، نفس عنصر `#jv_yec_locked` في YEC) + `onLockedChange: obApplyLockUi` يزامن الخانة ويجعل الحقول/الأسطر/الأزرار للقراءة عند القفل (مثل `jvApplyViewModeUi` في YEC).
+  - `admin/pages/opening_balances.php` — يمرّر `note => 'يُفعَّل تلقائياً بعد الحفظ الناجح'` إلى شريط الإقفال المشترك (خانة الاختيار تعرضه)؛ `onLockedChange: obApplyLockUi` يجعل الحقول/الأسطر/الأزرار للقراءة عند القفل (مثل `jvApplyViewModeUi` في YEC).
+
+**تحديث واجهة الإقفال (2026-06-09):** شريط الإقفال المشترك `includes/edit_lock_ui.php` صار **خانة اختيار «قيد مغلق» تفاعلية** بدل زرّي «قفل/فك» — **القفل/الفك يدوي** (لا قفل تلقائي بعد الحفظ لباقي السندات؛ §0/§3 كما هي) مع **رسالة تأكيد OK/Cancel** قبل التنفيذ وإرجاع الخانة لحالتها عند الإلغاء؛ تحترم `can_lock`/`can_unlock`. الرصيد الافتتاحي يحتفظ بـ **القفل التلقائي الخلفي** (force_lock في save.php) وتظهر خانته مؤشَّرة بعد الحفظ مع إمكانية الفك اليدوي. YEC بخانته المعطّلة المنفصلة كما هي.
 
 ENGLISH
 - Owner decision (2026-06-08): OBV opening-balance voucher auto-locks after successful save (like YEC), an explicit exception to §0/§3 "no auto-lock on save" (which still applies to daily docs). Unlock requires `can_unlock`; re-saving re-locks automatically.
@@ -202,3 +204,4 @@ Changelog
 2026-05-20 — **§8 مغلق:** 8.1 مفتوح بعد فك+تعديل؛ 8.2 محددة+فلتر تاريخ؛ 8.3 الكل+فلتر نوع؛ 8.4 audit إلزامي.
 2026-05-20 — **تنفيذ:** rev 67؛ `includes/edit_lock.php`؛ `admin/pages/edit_lock.php`؛ APIs `admin/api/edit-lock/*`؛ `can_lock`/`can_unlock`؛ طابور GL افتراضي off (`ORANGE_GL_USE_PENDING_QUEUE` opt-in)؛ `gl_posting` → redirect.
 2026-06-08 — **§6b (قرار مالك):** الرصيد الافتتاحي (OBV) **يُقفَل تلقائياً بعد الحفظ** مثل YEC (استثناء §0/§3)؛ `orange_edit_lock_force_lock()`؛ قفل في `opening_balances/save.php`؛ تلميح + تعطيل النموذج عند القفل في `opening_balances.php`.
+2026-06-09 — **واجهة الإقفال:** شريط `edit_lock_ui.php` صار **خانة اختيار تفاعلية** بدل الأزرار — قفل/فك **يدوي** + **تأكيد OK/Cancel** (مثل الحذف) + احترام الصلاحيات؛ شاشة `edit_lock.php` المركزية: تأكيد قبل قفل/فك المحدد. OB: إزالة الخانة المكرّرة والاكتفاء بخانة الشريط مع `note`.
