@@ -248,7 +248,6 @@ $ppvReady = $ppvCashLock !== null;
 
 <div class="card jv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
-    <?php orange_edit_lock_ui_toolbar(['prefix' => 'spay', 'doc_kind' => 'supplier_payment', 'country_id' => $ppvCountryId]); ?>
     <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
         <?php orange_voucher_print_banner_thead($pdo, $ppvCountryId, ['title_ar' => $ppvTitle]); ?>
         <tbody>
@@ -300,6 +299,7 @@ $ppvReady = $ppvCashLock !== null;
     <!-- ٣ — القيد المحاسبي -->
     <div style="margin-top:20px;padding-top:14px;border-top:2px solid #e2e8f0;">
         <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:0 0 10px;">القيد المحاسبي</h4>
+        <?php orange_edit_lock_ui_toolbar(['prefix' => 'spay', 'doc_kind' => 'supplier_payment', 'country_id' => $ppvCountryId]); ?>
 
         <div class="jv-voucher-header-line jv-voucher-header-line--nav" style="margin-bottom:12px;">
             <div>
@@ -854,11 +854,15 @@ function spayPrintVoucher() {
             r.lines.forEach(function (l) {
                 var tr = document.createElement('tr');
                 tr.className = 'jv-line-main';
-                var accId = parseInt(String(l.account_id || '0'), 10) || 0;
-                var accCode = '', accName = '';
-                if (r.accounts_by_id && r.accounts_by_id[String(accId)]) {
-                    accCode = r.accounts_by_id[String(accId)].code || '';
-                    accName = r.accounts_by_id[String(accId)].name || '';
+                var accCode = l.code || '';
+                var accName = l.name || '';
+                if ((!accCode || !accName) && r.accounts_by_id) {
+                    var accId = parseInt(String(l.account_id || '0'), 10) || 0;
+                    var byId = r.accounts_by_id[String(accId)];
+                    if (byId) {
+                        accCode = accCode || byId.code || '';
+                        accName = accName || byId.name || '';
+                    }
                 }
                 var d = parseFloat(String(l.debit || '0')) || 0;
                 var c = parseFloat(String(l.credit || '0')) || 0;
