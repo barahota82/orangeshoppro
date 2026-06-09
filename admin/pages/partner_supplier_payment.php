@@ -773,7 +773,11 @@ function spayPrintVoucher() {
         postJSON(SPAY_API, payload).then(function (r) {
             if (r.success) {
                 alert(r.message || 'تم');
-                location.reload();
+                if (r.voucher_id) {
+                    spayLoadVoucher(r.voucher_id);
+                } else {
+                    location.reload();
+                }
             } else {
                 alert(r.message || 'فشل');
             }
@@ -978,7 +982,10 @@ function spayPrintVoucher() {
         }
 
         document.getElementById('spay_btn_save').addEventListener('click', save);
-        document.getElementById('spay_btn_new').addEventListener('click', function () { location.reload(); });
+        document.getElementById('spay_btn_new').addEventListener('click', function () {
+            if (!confirm('بدء سند جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { return; }
+            location.reload();
+        });
         document.getElementById('spay_btn_delete').addEventListener('click', spayDeleteVoucher);
 
         if (window.OrangeEditLock) {

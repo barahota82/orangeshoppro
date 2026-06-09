@@ -1954,6 +1954,8 @@ function jvSubmit() {
             alert(r.message || 'تم');
             if (savePayload.action === 'update' && jvBrowseId) {
                 jvLoadVoucherFromApi(jvBrowseId);
+            } else if (r.id) {
+                jvLoadVoucherFromApi(r.id);
             } else {
                 location.reload();
             }
@@ -2000,7 +2002,10 @@ jvSyncTrailingRows();
     });
     var nb = document.getElementById('jv_btn_new_sheet');
     if (nb) {
-        nb.addEventListener('click', function () { location.reload(); });
+        nb.addEventListener('click', function () {
+            if (!confirm('بدء سند جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { return; }
+            location.reload();
+        });
     }
     var db = document.getElementById('jv_btn_delete_voucher');
     if (db) {

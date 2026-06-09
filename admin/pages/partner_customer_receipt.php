@@ -760,7 +760,11 @@ function crecPrintVoucher() {
         postJSON(CREC_API, payload).then(function (r) {
             if (r.success) {
                 alert(r.message || 'تم');
-                location.reload();
+                if (r.voucher_id) {
+                    crecLoadVoucher(r.voucher_id);
+                } else {
+                    location.reload();
+                }
             } else {
                 alert(r.message || 'فشل');
             }
@@ -965,7 +969,10 @@ function crecPrintVoucher() {
         }
 
         document.getElementById('crec_btn_save').addEventListener('click', save);
-        document.getElementById('crec_btn_new').addEventListener('click', function () { location.reload(); });
+        document.getElementById('crec_btn_new').addEventListener('click', function () {
+            if (!confirm('بدء سند جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { return; }
+            location.reload();
+        });
         document.getElementById('crec_btn_delete').addEventListener('click', crecDeleteVoucher);
 
         if (window.OrangeEditLock) {
