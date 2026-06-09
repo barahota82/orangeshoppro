@@ -1813,6 +1813,26 @@ label {
     flex-wrap: wrap;
     justify-content: center;
 }
+/* شاشة أرصدة أول المدة فقط: أزرار (حفظ/طباعة/حذف) في سطر واحد —
+   توسيع عمود الأزرار وتقليص عمودَي التاريخ قليلاً، بنطاق .ob-opening-card فقط
+   حتى لا تتأثر بقية الشاشات. */
+.ob-opening-card .jv-voucher-header-line--nav {
+    grid-template-columns:
+        minmax(5rem, 6.5rem)
+        minmax(7.5rem, 9rem)
+        minmax(7rem, 9rem)
+        minmax(7.5rem, 9rem)
+        minmax(6rem, 7.5rem)
+        minmax(6rem, 7.5rem)
+        minmax(13rem, 17rem);
+}
+.ob-opening-card .jv-voucher-nav-btns.ob-voucher-action-btns {
+    flex-wrap: nowrap;
+}
+.ob-opening-card .jv-voucher-nav-btns.ob-voucher-action-btns > button {
+    white-space: nowrap;
+    padding: 6px 10px;
+}
 
 /* تاريخ نصي يوم/شهر/سنة + زر تقويم (حقل date شفاف فوق الزر — لا يُعرض ترتيب الشهر/اليوم للمتصفح) */
 .admin-inp-dmy-with-picker {
