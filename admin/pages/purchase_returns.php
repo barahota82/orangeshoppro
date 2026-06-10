@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/purchase_doc_product_pick.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 
 $pdo = orange_admin_page_pdo();
 $pr2Caps = orange_admin_caps_for_page($admin, $pdo, 'purchase_returns');
@@ -330,7 +331,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                 <button type="button" class="btn-secondary jv-nav-btn" id="pr2_nav_last" title="آخر مردود" aria-label="آخر مردود">&gt;&gt;</button>
                 <button type="button" class="btn-secondary jv-nav-search" id="pr2_btn_search" title="بحث عن مردود">بحث</button>
             </div>
-            <button type="button" class="btn-secondary" id="pr2_btn_print" title="طباعة المردود المعروض" disabled>طباعة</button>
+            <button type="button" class="btn-secondary" id="pr2_btn_print" title="طباعة المردود المعروض"<?php echo orange_admin_invoice_print_tuning_mode() ? '' : ' disabled'; ?>>طباعة</button>
             <button type="button" class="btn-secondary" id="pr2_btn_new" title="مردود جديد" onclick="if (confirm('بدء مردود جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { location.reload(); } return false;">مردود جديد</button>
             <button type="button" id="pr2_btn_save" data-orange-perm="edit" data-orange-page="purchase_returns"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>حفظ</button>
         </div>
@@ -451,6 +452,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     var PR2_SUPPLIER_PAYABLE = <?php echo json_encode($supplierPayableMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var PR2_PREFILL_SUPPLIER = <?php echo (int) $prefillSupplierId; ?>;
     var PR2_READY = <?php echo $pr2Ready ? 'true' : 'false'; ?>;
+    var PR2_PRINT_TUNING = <?php echo orange_admin_invoice_print_tuning_mode() ? 'true' : 'false'; ?>;
     var PR2_NAV_READY = <?php echo $pr2NavReady ? 'true' : 'false'; ?>;
     var PR2_COUNTRY_ID = <?php echo (int) $prCountryId; ?>;
     var PR2_CAPS = <?php echo json_encode($pr2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
@@ -848,8 +850,13 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     function pr2SyncToolbar() {
         var pb = document.getElementById('pr2_btn_print');
         if (pb) {
-            pb.disabled = browseReturnId <= 0;
-            pb.title = browseReturnId > 0 ? 'طباعة المردود المعروض' : 'افتح مردوداً محفوظاً للطباعة';
+            if (PR2_PRINT_TUNING) {
+                pb.disabled = false;
+                pb.title = 'طباعة (وضع ضبط التنسيق — مؤقت)';
+            } else {
+                pb.disabled = browseReturnId <= 0;
+                pb.title = browseReturnId > 0 ? 'طباعة المردود المعروض' : 'افتح مردوداً محفوظاً للطباعة';
+            }
         }
         var sb = document.getElementById('pr2_btn_save');
         if (sb) {
@@ -1201,7 +1208,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         document.getElementById('pr2_btn_retrieve').addEventListener('click', pr2RetrieveFromPurchase);
         document.getElementById('pr2_invoice_discount').addEventListener('input', function () { recalcAll(); });
         document.getElementById('pr2_btn_print').addEventListener('click', function () {
-            if (browseReturnId <= 0) {
+            if (!PR2_PRINT_TUNING && browseReturnId <= 0) {
                 alert('افتح مردوداً محفوظاً للطباعة.');
                 return;
             }

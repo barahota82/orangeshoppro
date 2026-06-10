@@ -16,6 +16,7 @@ require_once __DIR__ . '/../../includes/sales_doc_channel.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/document_sequences.php';
 require_once __DIR__ . '/../../includes/catalog_multicountry_runtime.php';
+require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 
 $pdo = orange_admin_page_pdo();
 orange_catalog_backfill_products_country_id($pdo);
@@ -370,7 +371,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 <button type="button" class="btn-secondary jv-nav-btn" id="sv2_nav_last" title="آخر فاتورة" aria-label="آخر فاتورة">&gt;&gt;</button>
                 <button type="button" class="btn-secondary jv-nav-search" id="sv2_btn_search" title="بحث عن فاتورة">بحث</button>
             </div>
-            <button type="button" class="btn-secondary" id="sv2_btn_print" title="طباعة الفاتورة المعروضة" disabled>طباعة</button>
+            <button type="button" class="btn-secondary" id="sv2_btn_print" title="طباعة الفاتورة المعروضة"<?php echo orange_admin_invoice_print_tuning_mode() ? '' : ' disabled'; ?>>طباعة</button>
             <button type="button" class="btn-secondary" id="sv2_btn_new" title="فاتورة جديدة" data-orange-perm="edit" data-orange-page="company_sales_invoice" onclick="if (confirm('بدء فاتورة جديدة؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { location.href = (typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '') : '') + '/admin/index.php?page=company_sales_invoice'; } return false;">فاتورة جديدة</button>
             <button type="button" id="sv2_btn_save" data-orange-perm="edit" data-orange-page="company_sales_invoice">حفظ</button>
         </div>
@@ -535,6 +536,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     var SV2_CUSTOMER_PICK_ROWS = <?php echo json_encode($sv2CustomerPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var SV2_PREFILL_ORDER_ID = <?php echo (int) $prefillOrderId; ?>;
     var SV2_READY = <?php echo $sv2Ready ? 'true' : 'false'; ?>;
+    var SV2_PRINT_TUNING = <?php echo orange_admin_invoice_print_tuning_mode() ? 'true' : 'false'; ?>;
     var SV2_NAV_READY = <?php echo $sv2NavReady ? 'true' : 'false'; ?>;
     var SV2_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
     var SV2_DOC_SERIAL_PREVIEW = <?php echo json_encode($sv2DocSerialPreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
@@ -1163,8 +1165,13 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     function sv2SyncToolbar() {
         var pb = document.getElementById('sv2_btn_print');
         if (pb) {
-            pb.disabled = browseOrderId <= 0;
-            pb.title = browseOrderId > 0 ? 'طباعة الفاتورة المعروضة' : 'احفظ الفاتورة أولاً';
+            if (SV2_PRINT_TUNING) {
+                pb.disabled = false;
+                pb.title = 'طباعة (وضع ضبط التنسيق — مؤقت)';
+            } else {
+                pb.disabled = browseOrderId <= 0;
+                pb.title = browseOrderId > 0 ? 'طباعة الفاتورة المعروضة' : 'احفظ الفاتورة أولاً';
+            }
         }
         var sb = document.getElementById('sv2_btn_save');
         if (sb) {
@@ -1529,13 +1536,13 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 prefix: 'sv2',
                 serialElId: 'sv2_doc_serial',
                 beforePrint: function () {
-                    if (browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }
+                    if (!SV2_PRINT_TUNING && browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }
                     return true;
                 }
             });
         } else {
             document.getElementById('sv2_btn_print').addEventListener('click', function () {
-                if (browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return; }
+                if (!SV2_PRINT_TUNING && browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return; }
                 window.print();
             });
         }

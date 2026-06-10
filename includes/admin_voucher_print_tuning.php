@@ -15,3 +15,16 @@ function orange_admin_voucher_print_tuning_mode(): bool
 {
     return false;
 }
+
+/**
+ * وضع ضبط شكل طباعة الفواتير/المردودات (شراء/بيع شركة/مردود شراء/مردود بيع) — **مؤقت فقط**.
+ *
+ * عند true: زر الطباعة مفعّل قبل الحفظ (معاينة بلا تسجيل) لضبط CSS/HTML.
+ * عند false: السلوك الأصلي — الزر معطّل حتى يُحمَّل/يُحفظ المستند.
+ *
+ * **يُعاد إلى false** بعد اكتمال تنسيق طباعة الفواتير (خطوة واحدة: غيّر return true → false ثم push).
+ */
+function orange_admin_invoice_print_tuning_mode(): bool
+{
+    return true;
+}

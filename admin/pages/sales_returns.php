@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/catalog_multicountry_runtime.php';
 require_once __DIR__ . '/../../includes/invoice_ancillary_lines.php';
+require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 
 $pdo = orange_admin_page_pdo();
 orange_catalog_backfill_products_country_id($pdo);
@@ -274,7 +275,7 @@ $sr2DocSerialPreview = $sr2NavReady
                 <button type="button" class="btn-secondary jv-nav-btn" id="sr2_nav_last" title="آخر مردود">&gt;&gt;</button>
                 <button type="button" class="btn-secondary jv-nav-search" id="sr2_btn_search" title="بحث عن مردود">بحث</button>
             </div>
-            <button type="button" class="btn-secondary" id="sr2_btn_print" title="طباعة المردود المعروض" disabled>طباعة</button>
+            <button type="button" class="btn-secondary" id="sr2_btn_print" title="طباعة المردود المعروض"<?php echo orange_admin_invoice_print_tuning_mode() ? '' : ' disabled'; ?>>طباعة</button>
             <button type="button" class="btn-secondary" id="sr2_btn_new" title="مردود جديد" onclick="if (confirm('بدء مردود جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { location.reload(); } return false;">مردود جديد</button>
             <button type="button" id="sr2_btn_save" data-orange-perm="edit" data-orange-page="sales_returns">حفظ</button>
         </div>
@@ -425,6 +426,7 @@ $sr2DocSerialPreview = $sr2NavReady
     var SR2_PREFILL_CUSTOMER = <?php echo (int) $prefillCustomerId; ?>;
     var SR2_PREFILL_ORDER = <?php echo (int) $prefillOrderId; ?>;
     var SR2_READY = <?php echo $sr2Ready ? 'true' : 'false'; ?>;
+    var SR2_PRINT_TUNING = <?php echo orange_admin_invoice_print_tuning_mode() ? 'true' : 'false'; ?>;
     var SR2_NAV_READY = <?php echo $sr2NavReady ? 'true' : 'false'; ?>;
     var SR2_COUNTRY_ID = <?php echo (int) $srCountryId; ?>;
     var SR2_CAPS = <?php echo json_encode($sr2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
@@ -725,8 +727,13 @@ $sr2DocSerialPreview = $sr2NavReady
     function sr2SyncToolbar() {
         var pb = document.getElementById('sr2_btn_print');
         if (pb) {
-            pb.disabled = browseReturnId <= 0;
-            pb.title = browseReturnId > 0 ? 'طباعة المردود المعروض' : 'افتح مردوداً محفوظاً للطباعة';
+            if (SR2_PRINT_TUNING) {
+                pb.disabled = false;
+                pb.title = 'طباعة (وضع ضبط التنسيق — مؤقت)';
+            } else {
+                pb.disabled = browseReturnId <= 0;
+                pb.title = browseReturnId > 0 ? 'طباعة المردود المعروض' : 'افتح مردوداً محفوظاً للطباعة';
+            }
         }
         var sb = document.getElementById('sr2_btn_save');
         if (sb) {
@@ -1342,13 +1349,13 @@ $sr2DocSerialPreview = $sr2NavReady
                 prefix: 'sr2',
                 serialElId: 'sr2_doc_serial',
                 beforePrint: function () {
-                    if (browseReturnId <= 0) { alert('افتح مردوداً محفوظاً للطباعة.'); return false; }
+                    if (!SR2_PRINT_TUNING && browseReturnId <= 0) { alert('افتح مردوداً محفوظاً للطباعة.'); return false; }
                     return true;
                 }
             });
         } else {
             document.getElementById('sr2_btn_print').addEventListener('click', function () {
-                if (browseReturnId <= 0) { alert('افتح مردوداً محفوظاً للطباعة.'); return; }
+                if (!SR2_PRINT_TUNING && browseReturnId <= 0) { alert('افتح مردوداً محفوظاً للطباعة.'); return; }
                 window.print();
             });
         }

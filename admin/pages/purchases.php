@@ -16,6 +16,7 @@ require_once __DIR__ . '/../../includes/purchase_doc_product_pick.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 
 $pdo = orange_admin_page_pdo();
 $pv2Caps = orange_admin_caps_for_page($admin, $pdo, 'purchases');
@@ -367,7 +368,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
                 <button type="button" class="btn-secondary jv-nav-btn" id="pv2_nav_last" title="آخر فاتورة" aria-label="آخر فاتورة">&gt;&gt;</button>
                 <button type="button" class="btn-secondary jv-nav-search" id="pv2_btn_search" title="بحث عن فاتورة">بحث</button>
             </div>
-            <button type="button" class="btn-secondary" id="pv2_btn_print" title="طباعة الفاتورة المعروضة" disabled>طباعة</button>
+            <button type="button" class="btn-secondary" id="pv2_btn_print" title="طباعة الفاتورة المعروضة"<?php echo orange_admin_invoice_print_tuning_mode() ? '' : ' disabled'; ?>>طباعة</button>
             <button type="button" class="btn-secondary" id="pv2_btn_new" title="فاتورة جديدة" data-orange-perm="edit" data-orange-page="purchases" onclick="if (confirm('بدء فاتورة جديدة؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { location.reload(); } return false;">فاتورة جديدة</button>
             <button type="button" id="pv2_btn_save" data-orange-perm="edit" data-orange-page="purchases"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>حفظ</button>
         </div>
@@ -513,6 +514,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
     var PV2_SUPPLIER_PAYABLE = <?php echo json_encode($supplierPayableMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var PV2_PREFILL_SUPPLIER = <?php echo (int) $prefillSupplierId; ?>;
     var PV2_READY = <?php echo $pv2Ready ? 'true' : 'false'; ?>;
+    var PV2_PRINT_TUNING = <?php echo orange_admin_invoice_print_tuning_mode() ? 'true' : 'false'; ?>;
     var PV2_NAV_READY = <?php echo $pv2NavReady ? 'true' : 'false'; ?>;
     var PV2_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
     var PV2_CAPS = <?php echo json_encode($pv2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
@@ -1162,8 +1164,13 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
     function pv2SyncToolbar() {
         var pb = document.getElementById('pv2_btn_print');
         if (pb) {
-            pb.disabled = browsePurchaseId <= 0;
-            pb.title = browsePurchaseId > 0 ? 'طباعة الفاتورة المعروضة' : 'افتح فاتورة محفوظة للطباعة';
+            if (PV2_PRINT_TUNING) {
+                pb.disabled = false;
+                pb.title = 'طباعة (وضع ضبط التنسيق — مؤقت)';
+            } else {
+                pb.disabled = browsePurchaseId <= 0;
+                pb.title = browsePurchaseId > 0 ? 'طباعة الفاتورة المعروضة' : 'افتح فاتورة محفوظة للطباعة';
+            }
         }
         var sb = document.getElementById('pv2_btn_save');
         if (sb) {
@@ -1495,7 +1502,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
             }
         });
         document.getElementById('pv2_btn_print').addEventListener('click', function () {
-            if (browsePurchaseId <= 0) {
+            if (!PV2_PRINT_TUNING && browsePurchaseId <= 0) {
                 alert('افتح فاتورة محفوظة للطباعة.');
                 return;
             }
