@@ -4589,6 +4589,15 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     padding-top: 0.5rem;
     border-top: 1px dashed #cbd5e1;
 }
+.sd-print-legal {
+    display: none;
+}
+.sd-print-legal__note {
+    text-align: center;
+    font-size: 0.78rem;
+    color: #64748b;
+    margin: 0;
+}
 
 @media print {
     /*
@@ -4830,6 +4839,25 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         margin-top: auto;
         padding-top: 0.6rem;
         border-top: 2px solid #ea580c;
+    }
+    /*
+     * النص القانوني (سياسة الإرجاع) — يتكرر أسفل كل صفحة عبر position:fixed.
+     * يلزم حجز مساحة سفلية عبر @page{margin-bottom} في صفحة الفاتورة (company/online sales)
+     * كي لا يتداخل مع البنود؛ الشكر/التوقيع يبقيان في الصفحة الأخيرة فقط (sd-print-footer).
+     */
+    .jv-print-area:has(.sd-print-legal) .sd-print-legal {
+        display: block !important;
+        position: fixed;
+        left: 8mm;
+        right: 8mm;
+        bottom: 6mm;
+        text-align: center;
+        font-size: 6.8pt;
+        line-height: 1.3;
+        color: #475569;
+        padding-top: 1.2mm;
+        border-top: 1px solid #ea580c;
+        background: #ffffff;
     }
     .jv-print-area .card-title {
         display: none !important;

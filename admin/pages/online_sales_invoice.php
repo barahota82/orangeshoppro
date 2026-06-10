@@ -127,6 +127,10 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     background: #eff6ff;
     outline: 1px solid #2563eb;
 }
+@media print {
+    /* حجز مساحة سفلية لشريط النص القانوني المتكرر أسفل كل صفحة (sd-print-legal). */
+    @page { margin-bottom: 26mm; }
+}
 </style>
 
 <div class="page-title">

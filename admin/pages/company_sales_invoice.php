@@ -204,6 +204,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     .jv-print-area .sv2-extra-lines-table tr.sv2-extra-line td:last-child {
         display: none !important;
     }
+    /* حجز مساحة سفلية لشريط النص القانوني المتكرر أسفل كل صفحة (sd-print-legal). */
+    @page { margin-bottom: 26mm; }
 }
 </style>
 

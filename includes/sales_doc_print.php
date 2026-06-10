@@ -279,9 +279,12 @@ function orange_sales_doc_print_footer(array $ctx): void
             <span class="sd-print-footer__sign-label">الختم / Stamp</span>
         </div>
     </div>
-    <?php if ($footerNote !== ''): ?>
-    <p class="sd-print-footer__note"><?php echo htmlspecialchars($footerNote, ENT_QUOTES, 'UTF-8'); ?></p>
-    <?php endif; ?>
 </div>
+<?php if ($footerNote !== ''): ?>
+<?php /* النص القانوني منفصل عن كتلة الشكر/التوقيع: يتكرر أسفل كل صفحة عبر position:fixed في الطباعة (CSS). */ ?>
+<div class="sd-print-legal" aria-hidden="true">
+    <p class="sd-print-legal__note"><?php echo htmlspecialchars($footerNote, ENT_QUOTES, 'UTF-8'); ?></p>
+</div>
+<?php endif; ?>
     <?php
 }
