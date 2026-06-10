@@ -4766,9 +4766,19 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .sd-print-footer * {
         visibility: visible;
     }
+    /*
+     * تثبيت تذييل العميل (شكر/توقيع/سياسة) أسفل الصفحة دائماً:
+     * منطقة الطباعة عمود مرن بطول صفحة كامل، والتذييل يُدفَع لأسفل بـ margin-top:auto.
+     * مقصور على المستندات التي تحوي تذييلاً (فواتير/مردود مبيعات) فلا تتأثر المشتريات.
+     */
+    .jv-print-area:has(.sd-print-footer) {
+        display: flex !important;
+        flex-direction: column;
+        min-height: 100vh;
+    }
     .jv-print-area .sd-print-footer {
         display: block !important;
-        margin-top: 1.4rem;
+        margin-top: auto;
         padding-top: 0.6rem;
         border-top: 2px solid #ea580c;
     }

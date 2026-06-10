@@ -315,7 +315,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     <!-- ٤ — ملاحظات -->
     <div class="form-grid sv2-header-row3 orange-doc-header-row" style="margin-bottom:16px;">
         <div>
-            <label for="sv2_notes">ملاحظات</label>
+            <label for="sv2_notes" class="jv-print-hide">ملاحظات</label>
             <input type="text" id="sv2_notes" placeholder="ملاحظات…">
         </div>
     </div>
