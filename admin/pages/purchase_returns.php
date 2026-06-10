@@ -244,10 +244,15 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         'show_print_date' => false,
         'show_qr' => true,
         'show_party' => true,
-        'party_title' => 'المورد / Supplier',
+        'party_title' => 'رقم الفاتورة المرتجع / Returned Invoice No.',
+        'party_title_value_id' => 'ref_invoice',
         'party_rows' => [
-            ['المورد / Supplier', 'party_name', ''],
+            ['اسم المورد / Name', 'party_name', ''],
+            ['كود المورد / Code', 'party_code', 'ltr'],
+            ['رقم فاتورة المورد / Supplier Inv. No.', 'party_inv', 'ltr'],
+            ['نوع الشراء / Type', 'party_type', ''],
         ],
+        'show_notes' => true,
         'totals_rows' => [
             ['إجمالي المردود / Total', 'total'],
             ['قيمة الخصم / Discount', 'disc'],
@@ -275,6 +280,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             <input type="text" id="pr2_supplier_name" class="admin-inp-readonly" readonly disabled tabindex="-1" placeholder="يُعبأ تلقائياً">
         </div>
         <input type="hidden" id="pr2_supplier_id" value="0">
+        <input type="hidden" id="pr2_supplier_invoice_ref" value="">
     </div>
 
     <!-- ٢ — فاتورة الشراء المرجعية، استرجاع، تاريخ المردود، نوع المردود، تاريخ الإدخال، ملاحظات -->
@@ -933,6 +939,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         selectSupplier(parseInt(String(p.supplier_id || '0'), 10) || 0);
         var typeEl = document.getElementById('pr2_type');
         if (typeEl) typeEl.value = p.type || 'cash';
+        var invRefEl = document.getElementById('pr2_supplier_invoice_ref');
+        if (invRefEl) invRefEl.value = p.supplier_invoice_number || '';
         var invDiscEl = document.getElementById('pr2_invoice_discount');
         if (invDiscEl) invDiscEl.value = p.invoice_discount_raw || '';
         var tb = document.getElementById('pr2_lines_body');
@@ -1002,8 +1010,22 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         var dm = docDateVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
         setTxt('pr2_sd_print_docdate', dm ? (dm[3] + '/' + dm[2] + '/' + dm[1]) : docDateVal);
 
+        var refEl = document.getElementById('pr2_purchase_ref');
+        setTxt('pr2_sd_print_ref_invoice', refEl ? refEl.value : '');
+
         var supEl = document.getElementById('pr2_supplier_name');
         setTxt('pr2_sd_print_party_name', supEl ? supEl.value : '');
+        var codeEl = document.getElementById('pr2_supplier_code');
+        setTxt('pr2_sd_print_party_code', codeEl ? codeEl.value : '');
+        var invRefEl = document.getElementById('pr2_supplier_invoice_ref');
+        setTxt('pr2_sd_print_party_inv', invRefEl ? invRefEl.value : '');
+        var typeSel = document.getElementById('pr2_type');
+        var typeTxt = (typeSel && typeSel.selectedIndex >= 0) ? typeSel.options[typeSel.selectedIndex].text : '';
+        setTxt('pr2_sd_print_party_type', typeTxt);
+
+        var notesEl = document.getElementById('pr2_notes');
+        var notesBox = document.getElementById('pr2_sd_print_notes');
+        if (notesBox) notesBox.textContent = notesEl ? String(notesEl.value || '').trim() : '';
 
         var getTot = function (id) {
             var el = document.getElementById(id);
