@@ -210,11 +210,11 @@ function orange_sales_doc_print_banner(array $ctx): void
                 ?>
                 <?php endforeach; ?>
             </div>
-        </div>
-        <?php endif; ?>
-        <?php if ($showNotes): ?>
-        <div class="sd-print-banner__notes">
-            <span id="<?php echo $pfx; ?>_sd_print_notes" class="sd-print-banner__notes-val"></span>
+            <?php if ($showNotes): ?>
+            <div class="sd-print-banner__notes">
+                <span id="<?php echo $pfx; ?>_sd_print_notes" class="sd-print-banner__notes-val"></span>
+            </div>
+            <?php endif; ?>
         </div>
         <?php endif; ?>
     </div>
