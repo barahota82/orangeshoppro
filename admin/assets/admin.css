@@ -4362,7 +4362,8 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     font-size: 0.9rem;
     color: #ea580c;
     font-weight: 600;
-    white-space: nowrap;
+    text-align: justify;
+    text-align-last: justify;
 }
 .sd-print-banner__company-meta {
     margin: 0;
