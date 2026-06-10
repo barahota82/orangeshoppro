@@ -270,8 +270,8 @@ $sr2DocSerialPreview = $sr2NavReady
     </div>
 
     <div style="margin-top:14px;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
-        <span style="color:#64748b;">إجمالي البنود:</span> <strong id="sr2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-        <span style="color:#64748b;">إجمالي الخصم:</span> <strong id="sr2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+        <span style="color:#64748b;">إجمالي المردود:</span> <strong id="sr2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+        <span style="color:#64748b;">قيمة الخصم:</span> <strong id="sr2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
         <span style="color:#64748b;">صافي المردود:</span>
         <strong id="sr2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#dc2626;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
         <?php echo htmlspecialchars($srCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?>

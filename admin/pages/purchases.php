@@ -371,9 +371,9 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
             <input type="text" id="pv2_invoice_discount" placeholder="0 أو 5%" dir="ltr" lang="en" style="width:8rem;" autocomplete="off"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>
         </div>
         <div style="flex:1 1 auto;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
-            <span style="color:#64748b;">إجمالي البنود:</span> <strong id="pv2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#64748b;">إجمالي الخصم:</span> <strong id="pv2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#64748b;">صافي الفاتورة:</span> <strong id="pv2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
+            <span style="color:#64748b;">إجمالي الفاتورة:</span> <strong id="pv2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">قيمة الخصم:</span> <strong id="pv2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">مبلغ الفاتورة:</span> <strong id="pv2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
         </div>
     </div>
 

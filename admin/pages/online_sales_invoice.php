@@ -267,9 +267,9 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
 
     <div style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
         <div style="flex:1 1 auto;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
-            <span style="color:#64748b;">إجمالي البنود:</span> <strong id="ov2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#64748b;">إجمالي الخصم:</span> <strong id="ov2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#64748b;">صافي الفاتورة:</span> <strong id="ov2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
+            <span style="color:#64748b;">إجمالي الفاتورة:</span> <strong id="ov2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">قيمة الخصم:</span> <strong id="ov2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">مبلغ الفاتورة:</span> <strong id="ov2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
             <span class="muted" style="font-size:0.85rem;"> <?php echo htmlspecialchars($adminCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
         </div>
     </div>
@@ -286,7 +286,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                 <button type="button" class="btn-secondary jv-nav-btn" id="ov2_nav_last" title="آخر فاتورة" aria-label="آخر فاتورة">&gt;&gt;</button>
                 <button type="button" class="btn-secondary jv-nav-search" id="ov2_btn_search" title="بحث عن فاتورة">بحث</button>
             </div>
-            <button type="button" class="btn-secondary" id="ov2_btn_print" title="طباعة الفاتورة المعروضة" disabled>طباعة</button>
+            <button type="button" class="btn-secondary" id="ov2_btn_print" title="طباعة الفاتورة المعروضة"<?php echo orange_admin_invoice_print_tuning_mode() ? '' : ' disabled'; ?>>طباعة</button>
             <button type="button" id="ov2_btn_save" data-orange-perm="edit" data-orange-page="online_sales_invoice" disabled>حفظ</button>
         </div>
     </div>
@@ -448,6 +448,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     var OV2_NAV_READY = <?php echo $ov2NavReady ? 'true' : 'false'; ?>;
     var OV2_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
     var OV2_CAPS = <?php echo json_encode($ov2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
+    var OV2_PRINT_TUNING = <?php echo orange_admin_invoice_print_tuning_mode() ? 'true' : 'false'; ?>;
 
     var ov2EditLockCtl = null;
     var browseOrderId = 0;
@@ -731,8 +732,8 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     function ov2SyncToolbar() {
         var pb = document.getElementById('ov2_btn_print');
         if (pb) {
-            pb.disabled = browseOrderId <= 0;
-            pb.title = browseOrderId > 0 ? 'طباعة الفاتورة المعروضة' : 'افتح فاتورة محفوظة للطباعة';
+            pb.disabled = !OV2_PRINT_TUNING && browseOrderId <= 0;
+            pb.title = browseOrderId > 0 ? 'طباعة الفاتورة المعروضة' : (OV2_PRINT_TUNING ? 'معاينة طباعة (وضع ضبط)' : 'افتح فاتورة محفوظة للطباعة');
         }
         var sb = document.getElementById('ov2_btn_save');
         if (sb) {
@@ -1291,14 +1292,14 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                 prefix: 'ov2',
                 serialElId: 'ov2_doc_serial',
                 beforePrint: function () {
-                    if (browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }
+                    if (!OV2_PRINT_TUNING && browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }
                     ov2SyncPrintExtras();
                     return true;
                 }
             });
         } else {
             document.getElementById('ov2_btn_print').addEventListener('click', function () {
-                if (browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return; }
+                if (!OV2_PRINT_TUNING && browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return; }
                 ov2SyncPrintExtras();
                 window.print();
             });

@@ -4739,6 +4739,19 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .sd-print-banner {
         display: block !important;
         margin-bottom: 1rem;
+        /* هامش علوي بسيط يمنع تلاصق الشعار بحافة الورقة (الهامش العلوي للصفحة = 0) */
+        padding-top: 6mm;
+    }
+    /*
+     * تنظيف طباعة الفواتير/المردودات: إخفاء عناوين الأقسام («أسطر الأصناف» / «بنود إضافية»)
+     * وكتلة «بنود إضافية» بالكامل (أعمدة إدارية: يظهر بالطباعة / تسمية طباعة / الحساب / المبلغ).
+     * مقصور على مستندات الفواتير (التي تحوي .sd-print-banner) فلا تتأثر السندات.
+     */
+    .jv-print-area:has(.sd-print-banner) > h4 {
+        display: none !important;
+    }
+    .jv-print-area .admin-doc-frame:has(table[class*="-extra-lines-table"]) {
+        display: none !important;
     }
     .jv-print-area .sd-print-footer,
     .jv-print-area .sd-print-footer * {
