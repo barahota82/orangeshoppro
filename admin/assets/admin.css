@@ -4436,12 +4436,20 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     line-height: 1.5;
 }
 .sd-print-banner__party-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
     margin: 0 0 0.4rem;
     font-weight: 800;
     color: #ea580c;
     font-size: 0.95rem;
     border-bottom: 1px solid #fed7aa;
     padding-bottom: 0.3rem;
+}
+.sd-print-banner__party-title-en {
+    font-weight: 600;
+    color: #94a3b8;
+    font-size: 0.85rem;
 }
 .sd-print-banner__party-row {
     margin: 0 0 0.16rem;

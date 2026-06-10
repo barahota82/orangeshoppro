@@ -176,7 +176,15 @@ function orange_sales_doc_print_banner(array $ctx): void
         </div>
         <?php if ($showParty): ?>
         <div class="sd-print-banner__party">
-            <p class="sd-print-banner__party-title"><?php echo htmlspecialchars($partyTitle, ENT_QUOTES, 'UTF-8'); ?></p>
+            <?php
+            $ptParts = explode(' / ', $partyTitle, 2);
+            $ptAr = trim($ptParts[0] ?? $partyTitle);
+            $ptEn = trim($ptParts[1] ?? '');
+            ?>
+            <p class="sd-print-banner__party-title">
+                <span class="sd-print-banner__party-title-ar"><?php echo htmlspecialchars($ptAr, ENT_QUOTES, 'UTF-8'); ?></span>
+                <?php if ($ptEn !== ''): ?><span class="sd-print-banner__party-title-en" dir="ltr" lang="en"><?php echo htmlspecialchars($ptEn, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
+            </p>
             <?php echo orange_sales_doc_print_kv('الاسم / Name', '<span id="' . $pfx . '_sd_print_party_name" class="sd-print-banner__party-val">—</span>'); ?>
             <?php echo orange_sales_doc_print_kv('الكود / Code', '<span id="' . $pfx . '_sd_print_party_code" class="sd-print-banner__party-val" dir="ltr" lang="en">—</span>'); ?>
             <?php echo orange_sales_doc_print_kv('الهاتف / Phone', '<span id="' . $pfx . '_sd_print_party_phone" class="sd-print-banner__party-val" dir="ltr" lang="en">—</span>'); ?>
