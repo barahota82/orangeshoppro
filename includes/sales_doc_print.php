@@ -51,6 +51,24 @@ function orange_sales_doc_print_company(PDO $pdo, int $countryId): array
 }
 
 /**
+ * صف ثلاثي للطباعة: تسمية عربية (يمين) | القيمة (وسط) | تسمية إنجليزية (يسار).
+ * @param string $label تسمية بصيغة «عربي / English» (تُقسَّم على ' / ').
+ * @param string $valueHtml HTML القيمة (قد يحوي span بمعرّف للتعبئة عبر JS).
+ */
+function orange_sales_doc_print_kv(string $label, string $valueHtml): string
+{
+    $parts = explode(' / ', $label, 2);
+    $ar = trim($parts[0] ?? $label);
+    $en = trim($parts[1] ?? '');
+    $h = '<p class="sd-kv">';
+    $h .= '<span class="sd-kv__ar">' . htmlspecialchars($ar, ENT_QUOTES, 'UTF-8') . '</span>';
+    $h .= '<span class="sd-kv__val">' . $valueHtml . '</span>';
+    $h .= '<span class="sd-kv__en" dir="ltr" lang="en">' . htmlspecialchars($en, ENT_QUOTES, 'UTF-8') . '</span>';
+    $h .= '</p>';
+    return $h;
+}
+
+/**
  * GAP-SALE-DOC-01 مرحلة 4 — ترويسة طباعة موحّدة (INV-C / INV-O / مردود / شراء / مردود شراء).
  * إعادة تصميم احترافي (هوية برتقالية، 3 أعمدة، تسميات ثنائية اللغة):
  *   - عمود الشركة (يمين) + صندوق المستند (وسط) + بلوك الطرف «فاتورة إلى/المورد» (يسار، اختياري).
@@ -136,27 +154,15 @@ function orange_sales_doc_print_banner(array $ctx): void
             <?php endif; ?>
             <div class="sd-print-banner__meta-body">
                 <div class="sd-print-banner__meta-lines">
-                    <p class="sd-print-banner__serial-row">
-                        <span class="sd-print-banner__label">المسلسل / Serial:</span>
-                        <strong id="<?php echo $pfx; ?>_sd_print_serial" class="sd-print-banner__serial" dir="ltr" lang="en">—</strong>
-                    </p>
+                    <?php echo orange_sales_doc_print_kv('المسلسل / Serial', '<strong id="' . $pfx . '_sd_print_serial" class="sd-print-banner__serial" dir="ltr" lang="en">—</strong>'); ?>
                     <?php if ($showDocDate): ?>
-                    <p class="sd-print-banner__docdate-row">
-                        <span class="sd-print-banner__label"><?php echo htmlspecialchars($docDateLabel, ENT_QUOTES, 'UTF-8'); ?>:</span>
-                        <span id="<?php echo $pfx; ?>_sd_print_docdate" class="sd-print-banner__docdate" dir="ltr" lang="en">—</span>
-                    </p>
+                    <?php echo orange_sales_doc_print_kv($docDateLabel, '<span id="' . $pfx . '_sd_print_docdate" class="sd-print-banner__docdate" dir="ltr" lang="en">—</span>'); ?>
                     <?php endif; ?>
                     <?php if ($showPrintDate): ?>
-                    <p class="sd-print-banner__date-row">
-                        <span class="sd-print-banner__label">تاريخ الطباعة / Printed:</span>
-                        <span id="<?php echo $pfx; ?>_sd_print_date" class="sd-print-banner__date" dir="ltr" lang="en">—</span>
-                    </p>
+                    <?php echo orange_sales_doc_print_kv('تاريخ الطباعة / Printed', '<span id="' . $pfx . '_sd_print_date" class="sd-print-banner__date" dir="ltr" lang="en">—</span>'); ?>
                     <?php endif; ?>
                     <?php if ($currencyCode !== ''): ?>
-                    <p class="sd-print-banner__currency-row">
-                        <span class="sd-print-banner__label">العملة / Currency:</span>
-                        <span dir="ltr" lang="en"><?php echo htmlspecialchars($currencyCode, ENT_QUOTES, 'UTF-8'); ?></span>
-                    </p>
+                    <?php echo orange_sales_doc_print_kv('العملة / Currency', '<span dir="ltr" lang="en">' . htmlspecialchars($currencyCode, ENT_QUOTES, 'UTF-8') . '</span>'); ?>
                     <?php endif; ?>
                 </div>
                 <?php if ($showQr): ?>
@@ -170,11 +176,11 @@ function orange_sales_doc_print_banner(array $ctx): void
         <?php if ($showParty): ?>
         <div class="sd-print-banner__party">
             <p class="sd-print-banner__party-title"><?php echo htmlspecialchars($partyTitle, ENT_QUOTES, 'UTF-8'); ?></p>
-            <p class="sd-print-banner__party-row"><span class="sd-print-banner__label">الاسم / Name:</span> <span id="<?php echo $pfx; ?>_sd_print_party_name" class="sd-print-banner__party-val">—</span></p>
-            <p class="sd-print-banner__party-row"><span class="sd-print-banner__label">الكود / Code:</span> <span id="<?php echo $pfx; ?>_sd_print_party_code" class="sd-print-banner__party-val" dir="ltr" lang="en">—</span></p>
-            <p class="sd-print-banner__party-row"><span class="sd-print-banner__label">الهاتف / Phone:</span> <span id="<?php echo $pfx; ?>_sd_print_party_phone" class="sd-print-banner__party-val" dir="ltr" lang="en">—</span></p>
-            <p class="sd-print-banner__party-row"><span class="sd-print-banner__label">المنطقة / Area:</span> <span id="<?php echo $pfx; ?>_sd_print_party_area" class="sd-print-banner__party-val">—</span></p>
-            <p class="sd-print-banner__party-row"><span class="sd-print-banner__label">العنوان / Address:</span> <span id="<?php echo $pfx; ?>_sd_print_party_address" class="sd-print-banner__party-val">—</span></p>
+            <?php echo orange_sales_doc_print_kv('الاسم / Name', '<span id="' . $pfx . '_sd_print_party_name" class="sd-print-banner__party-val">—</span>'); ?>
+            <?php echo orange_sales_doc_print_kv('الكود / Code', '<span id="' . $pfx . '_sd_print_party_code" class="sd-print-banner__party-val" dir="ltr" lang="en">—</span>'); ?>
+            <?php echo orange_sales_doc_print_kv('الهاتف / Phone', '<span id="' . $pfx . '_sd_print_party_phone" class="sd-print-banner__party-val" dir="ltr" lang="en">—</span>'); ?>
+            <?php echo orange_sales_doc_print_kv('المنطقة / Area', '<span id="' . $pfx . '_sd_print_party_area" class="sd-print-banner__party-val">—</span>'); ?>
+            <?php echo orange_sales_doc_print_kv('العنوان / Address', '<span id="' . $pfx . '_sd_print_party_address" class="sd-print-banner__party-val">—</span>'); ?>
         </div>
         <?php endif; ?>
     </div>
