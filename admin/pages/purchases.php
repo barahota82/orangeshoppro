@@ -196,13 +196,9 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
 .jv-search-results-table { margin: 0; font-size: 0.9rem; }
 .jv-search-results-table tbody tr { cursor: pointer; }
 .jv-search-results-table tbody tr:hover { background: #f4f4f5; }
-/* صف 2 — رقم فاتورة المورد · تاريخ الفاتورة · نوع الشراء · تاريخ الإدخال */
+/* صف 2 — رقم فاتورة المورد · تاريخ الفاتورة · نوع الشراء · تاريخ الإدخال · ملاحظات */
 .form-grid.pv2-header-row2 {
-    grid-template-columns: minmax(0, 1.4fr) minmax(7rem, 0.8fr) minmax(6rem, 0.7fr) minmax(7rem, 0.8fr);
-}
-/* صف 3 — ملاحظات بعرض كامل */
-.form-grid.pv2-notes-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(7rem, 0.85fr) minmax(7rem, 0.8fr) minmax(5.5rem, 0.65fr) minmax(7rem, 0.8fr) minmax(0, 1.6fr);
 }
 .form-grid.pv2-supplier-row {
     grid-template-columns: minmax(7rem, 0.75fr) minmax(0, 1fr) minmax(0, 2fr);
@@ -272,8 +268,8 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         <input type="hidden" id="pv2_supplier_id" value="0">
     </div>
 
-    <!-- ٢ — رقم فاتورة المورد، تاريخ الفاتورة، نوع الشراء، تاريخ الإدخال -->
-    <div class="form-grid pv2-header-row2 orange-doc-header-row" style="margin-bottom:12px;">
+    <!-- ٢ — رقم فاتورة المورد، تاريخ الفاتورة، نوع الشراء، تاريخ الإدخال، ملاحظات -->
+    <div class="form-grid pv2-header-row2 orange-doc-header-row" style="margin-bottom:16px;">
         <div>
             <label for="pv2_supplier_invoice">رقم فاتورة المورد</label>
             <input type="text" id="pv2_supplier_invoice" placeholder="رقم فاتورة المورد" dir="ltr" lang="en" autocomplete="off" maxlength="64"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>
@@ -293,10 +289,6 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
             <label for="pv2_entry_date">تاريخ الإدخال</label>
             <input type="text" id="pv2_entry_date" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" placeholder="يُحدَّد عند الحفظ" title="تاريخ إدخال المستند في النظام (تلقائي — للأرشفة فقط)">
         </div>
-    </div>
-
-    <!-- ٣ — ملاحظات -->
-    <div class="form-grid pv2-notes-row orange-doc-header-row" style="margin-bottom:16px;">
         <div>
             <label for="pv2_notes">ملاحظات</label>
             <input type="text" id="pv2_notes" placeholder="شروط، ملاحظات إضافية، …"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>
