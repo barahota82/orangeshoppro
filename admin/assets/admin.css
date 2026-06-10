@@ -4282,82 +4282,178 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     display: none;
 }
 .sd-print-banner__head {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
     gap: 1rem;
-    justify-content: space-between;
-    align-items: flex-start;
+    align-items: stretch;
     padding-bottom: 0.75rem;
     margin-bottom: 0.85rem;
-    border-bottom: 2px solid #334155;
+    border-bottom: 2px solid #ea580c;
+}
+.sd-print-banner__head--with-party {
+    grid-template-columns: 1fr 1.15fr 1fr;
 }
 .sd-print-banner__brand {
     display: flex;
     gap: 0.85rem;
     align-items: flex-start;
-    max-width: 62%;
 }
 .sd-print-banner__logo {
-    width: 64px;
-    height: 64px;
+    width: 76px;
+    height: 76px;
     object-fit: contain;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
+    border: 1px solid #fed7aa;
+    border-radius: 8px;
     background: #fff;
+    padding: 3px;
 }
 .sd-print-banner__name-ar {
-    margin: 0 0 0.2rem;
-    font-size: 1.15rem;
-    font-weight: 700;
+    margin: 0 0 0.15rem;
+    font-size: 1.25rem;
+    font-weight: 800;
     color: #0f172a;
 }
 .sd-print-banner__name-en {
+    margin: 0 0 0.4rem;
+    font-size: 0.9rem;
+    color: #ea580c;
+    font-weight: 600;
+}
+.sd-print-banner__company-meta {
     margin: 0;
-    font-size: 0.88rem;
-    color: #64748b;
-    text-align: left;
+}
+.sd-print-banner__company-meta p {
+    margin: 0 0 0.12rem;
+    font-size: 0.78rem;
+    color: #475569;
+    line-height: 1.5;
 }
 .sd-print-banner__meta {
-    min-width: 200px;
-    padding: 0.65rem 0.85rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid #fed7aa;
+    border-radius: 8px;
+    background: #fff7ed;
     font-size: 0.86rem;
-    line-height: 1.5;
-    background: #f8fafc;
+    line-height: 1.55;
 }
 .sd-print-banner__doc-title {
     margin: 0 0 0.35rem;
-    font-size: 1rem;
-    font-weight: 700;
+    font-size: 1.05rem;
+    font-weight: 800;
     color: #0f172a;
+}
+.sd-print-banner__doc-title-en {
+    font-weight: 600;
+    color: #64748b;
+    font-size: 0.92rem;
 }
 .sd-print-banner__badge {
     display: inline-block;
-    margin-bottom: 0.35rem;
-    padding: 0.12rem 0.45rem;
-    border-radius: 4px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    background: #eff6ff;
-    color: #1d4ed8;
+    margin-bottom: 0.5rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 5px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    background: #ea580c;
+    color: #fff;
+    letter-spacing: 0.3px;
+}
+.sd-print-banner__meta-body {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+.sd-print-banner__meta-lines {
+    flex: 1 1 auto;
+}
+.sd-print-banner__meta-lines p {
+    margin: 0 0 0.18rem;
 }
 .sd-print-banner__label {
     color: #64748b;
+    font-size: 0.8rem;
 }
 .sd-print-banner__serial {
     color: #0f172a;
+    font-weight: 700;
 }
-.sd-print-banner__company-meta,
-.sd-print-banner__footer-hint {
-    margin: 0 0 0.5rem;
-    font-size: 0.8rem;
+.sd-print-banner__qr {
+    flex: 0 0 auto;
+    text-align: center;
+}
+.sd-print-banner__qr-box {
+    display: block;
+    width: 64px;
+    height: 64px;
+    border: 1px dashed #fdba74;
+    border-radius: 6px;
+    background: #fff;
+}
+.sd-print-banner__qr-cap {
+    font-size: 0.65rem;
+    color: #94a3b8;
+}
+.sd-print-banner__party {
+    padding: 0.7rem 0.85rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+    font-size: 0.84rem;
+    line-height: 1.5;
+}
+.sd-print-banner__party-title {
+    margin: 0 0 0.4rem;
+    font-weight: 800;
+    color: #ea580c;
+    font-size: 0.95rem;
+    border-bottom: 1px solid #fed7aa;
+    padding-bottom: 0.3rem;
+}
+.sd-print-banner__party-row {
+    margin: 0 0 0.16rem;
+}
+.sd-print-banner__party-val {
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.sd-print-footer {
+    display: none;
+}
+.sd-print-footer__thanks {
+    text-align: center;
+    font-weight: 700;
+    color: #ea580c;
+    font-size: 1rem;
+    margin: 0 0 1.2rem;
+}
+.sd-print-footer__signatures {
+    display: flex;
+    justify-content: space-between;
+    gap: 2rem;
+    margin-bottom: 0.8rem;
+}
+.sd-print-footer__sign {
+    flex: 1 1 0;
+    text-align: center;
+}
+.sd-print-footer__sign-line {
+    display: block;
+    border-top: 1px solid #94a3b8;
+    margin-bottom: 0.3rem;
+    height: 1.6rem;
+}
+.sd-print-footer__sign-label {
+    font-size: 0.82rem;
     color: #475569;
-    line-height: 1.55;
 }
-.sd-print-banner__footer-hint {
-    margin-top: 0.65rem;
-    padding-top: 0.55rem;
+.sd-print-footer__note {
+    text-align: center;
+    font-size: 0.78rem;
+    color: #64748b;
+    margin: 0.6rem 0 0;
+    padding-top: 0.5rem;
     border-top: 1px dashed #cbd5e1;
 }
 
@@ -4568,6 +4664,16 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .sd-print-banner {
         display: block !important;
         margin-bottom: 1rem;
+    }
+    .jv-print-area .sd-print-footer,
+    .jv-print-area .sd-print-footer * {
+        visibility: visible;
+    }
+    .jv-print-area .sd-print-footer {
+        display: block !important;
+        margin-top: 1.4rem;
+        padding-top: 0.6rem;
+        border-top: 2px solid #ea580c;
     }
     .jv-print-area .card-title {
         display: none !important;

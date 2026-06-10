@@ -216,9 +216,15 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     orange_sales_doc_print_banner([
         'prefix' => 'sv2',
         'doc_title' => 'فاتورة مبيعات',
+        'doc_title_en' => 'Sales Invoice',
         'doc_badge' => 'INV-C',
         'country_id' => $adminCountryId,
         'currency_code' => $adminDefaultCurrency,
+        'show_party' => true,
+        'party_title' => 'فاتورة إلى / Bill To',
+        'show_doc_date' => true,
+        'show_print_date' => false,
+        'show_qr' => true,
     ]);
     ?>
     <h3 class="card-title">فاتورة مبيعات <span id="sv2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
@@ -360,6 +366,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             <span class="muted" style="font-size:0.85rem;"> <?php echo htmlspecialchars($adminCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
         </div>
     </div>
+
+    <?php orange_sales_doc_print_footer(['country_id' => $adminCountryId]); ?>
 
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
         <span></span>
@@ -1219,6 +1227,30 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         return s;
     }
 
+    function sv2SyncPrintExtras() {
+        var setTxt = function (id, val) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            var v = String(val || '').trim();
+            el.textContent = v !== '' ? v : '—';
+        };
+        var docDateEl = document.getElementById('sv2_document_date');
+        var docDateVal = docDateEl ? String(docDateEl.value || '').trim() : '';
+        var dm = docDateVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        setTxt('sv2_sd_print_docdate', dm ? (dm[3] + '/' + dm[2] + '/' + dm[1]) : docDateVal);
+
+        var nameEl = document.getElementById('sv2_customer_name');
+        var codeEl = document.getElementById('sv2_customer_code');
+        var phoneEl = document.getElementById('sv2_phone');
+        var areaEl = document.getElementById('sv2_area');
+        var addrEl = document.getElementById('sv2_address');
+        setTxt('sv2_sd_print_party_name', nameEl ? nameEl.value : '');
+        setTxt('sv2_sd_print_party_code', codeEl ? codeEl.value : '');
+        setTxt('sv2_sd_print_party_phone', phoneEl ? phoneEl.value : '');
+        setTxt('sv2_sd_print_party_area', areaEl ? areaEl.value : '');
+        setTxt('sv2_sd_print_party_address', addrEl ? addrEl.value : '');
+    }
+
     function sv2ApplyHeaderFromInvoice(inv, cust) {
         sv2SetDocSerial(inv.reference || ('INV-C-' + (inv.id || browseOrderId)));
         applyCustomerFromApi(cust, inv);
@@ -1537,12 +1569,14 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 serialElId: 'sv2_doc_serial',
                 beforePrint: function () {
                     if (!SV2_PRINT_TUNING && browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }
+                    sv2SyncPrintExtras();
                     return true;
                 }
             });
         } else {
             document.getElementById('sv2_btn_print').addEventListener('click', function () {
                 if (!SV2_PRINT_TUNING && browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return; }
+                sv2SyncPrintExtras();
                 window.print();
             });
         }

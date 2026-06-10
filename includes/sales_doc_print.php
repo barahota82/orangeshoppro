@@ -51,26 +51,45 @@ function orange_sales_doc_print_company(PDO $pdo, int $countryId): array
 }
 
 /**
- * GAP-SALE-DOC-01 مرحلة 4 — ترويسة طباعة موحّدة (INV-C / INV-O / مردود).
+ * GAP-SALE-DOC-01 مرحلة 4 — ترويسة طباعة موحّدة (INV-C / INV-O / مردود / شراء / مردود شراء).
+ * إعادة تصميم احترافي (هوية برتقالية، 3 أعمدة، تسميات ثنائية اللغة):
+ *   - عمود الشركة (يمين) + صندوق المستند (وسط) + بلوك الطرف «فاتورة إلى/المورد» (يسار، اختياري).
  *
- * @param array{prefix:string,doc_title:string,doc_badge:string,country_id:int,currency_code?:string} $ctx
+ * @param array{
+ *   prefix:string, doc_title:string, doc_title_en?:string, doc_badge:string,
+ *   country_id:int, currency_code?:string,
+ *   show_party?:bool, party_title?:string,
+ *   show_doc_date?:bool, doc_date_label?:string,
+ *   show_print_date?:bool, show_qr?:bool
+ * } $ctx
  */
 function orange_sales_doc_print_banner(array $ctx): void
 {
     $prefix = preg_replace('/[^a-z0-9_]/i', '', (string) ($ctx['prefix'] ?? 'sd')) ?: 'sd';
+    $pfx = htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8');
     $docTitle = trim((string) ($ctx['doc_title'] ?? 'مستند مبيعات'));
+    $docTitleEn = trim((string) ($ctx['doc_title_en'] ?? ''));
     $docBadge = trim((string) ($ctx['doc_badge'] ?? ''));
     $countryId = (int) ($ctx['country_id'] ?? 0);
     $currencyCode = trim((string) ($ctx['currency_code'] ?? ''));
+
+    $showParty = !empty($ctx['show_party']);
+    $partyTitle = trim((string) ($ctx['party_title'] ?? 'فاتورة إلى / Bill To'));
+    $showDocDate = !empty($ctx['show_doc_date']);
+    $docDateLabel = trim((string) ($ctx['doc_date_label'] ?? 'تاريخ الفاتورة / Invoice Date'));
+    $showPrintDate = array_key_exists('show_print_date', $ctx) ? !empty($ctx['show_print_date']) : true;
+    $showQr = !empty($ctx['show_qr']);
 
     $company = orange_sales_doc_print_company(db(), $countryId);
 
     $nameAr = $company['company_name_ar'];
     $nameEn = $company['company_name_en'];
     $logoUrl = $company['logo_url'];
+
+    $headClass = 'sd-print-banner__head' . ($showParty ? ' sd-print-banner__head--with-party' : '');
     ?>
 <div class="sd-print-banner" aria-hidden="true">
-    <div class="sd-print-banner__head">
+    <div class="<?php echo $headClass; ?>">
         <div class="sd-print-banner__brand">
             <?php if ($logoUrl !== ''): ?>
             <img class="sd-print-banner__logo" src="<?php echo htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="">
@@ -82,48 +101,111 @@ function orange_sales_doc_print_banner(array $ctx): void
                 <?php if ($nameEn !== ''): ?>
                 <p class="sd-print-banner__name-en" dir="ltr" lang="en"><?php echo htmlspecialchars($nameEn, ENT_QUOTES, 'UTF-8'); ?></p>
                 <?php endif; ?>
+                <?php
+                $metaRows = [];
+                if ($company['commercial_register'] !== '') {
+                    $metaRows[] = ['س.ت / C.R.', $company['commercial_register']];
+                }
+                if ($company['vat_number'] !== '') {
+                    $metaRows[] = ['ض.ق.م / VAT', $company['vat_number']];
+                }
+                if ($company['phones'] !== '') {
+                    $metaRows[] = ['هاتف / Tel', $company['phones']];
+                }
+                if ($company['address'] !== '') {
+                    $metaRows[] = ['العنوان / Address', $company['address']];
+                }
+                if ($metaRows !== []): ?>
+                <div class="sd-print-banner__company-meta">
+                    <?php foreach ($metaRows as $row): ?>
+                    <p><span class="sd-print-banner__label"><?php echo htmlspecialchars($row[0], ENT_QUOTES, 'UTF-8'); ?>:</span> <span><?php echo htmlspecialchars($row[1], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
         <div class="sd-print-banner__meta">
-            <p class="sd-print-banner__doc-title"><?php echo htmlspecialchars($docTitle, ENT_QUOTES, 'UTF-8'); ?></p>
+            <p class="sd-print-banner__doc-title">
+                <?php echo htmlspecialchars($docTitle, ENT_QUOTES, 'UTF-8'); ?>
+                <?php if ($docTitleEn !== ''): ?><span class="sd-print-banner__doc-title-en" dir="ltr" lang="en"> / <?php echo htmlspecialchars($docTitleEn, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
+            </p>
             <?php if ($docBadge !== ''): ?>
             <span class="sd-print-banner__badge" dir="ltr" lang="en"><?php echo htmlspecialchars($docBadge, ENT_QUOTES, 'UTF-8'); ?></span>
             <?php endif; ?>
-            <p class="sd-print-banner__serial-row">
-                <span class="sd-print-banner__label">المسلسل:</span>
-                <strong id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_sd_print_serial" class="sd-print-banner__serial" dir="ltr" lang="en">—</strong>
-            </p>
-            <p class="sd-print-banner__date-row">
-                <span class="sd-print-banner__label">تاريخ الطباعة:</span>
-                <span id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_sd_print_date" class="sd-print-banner__date" dir="ltr" lang="en">—</span>
-            </p>
-            <?php if ($currencyCode !== ''): ?>
-            <p class="sd-print-banner__currency-row">
-                <span class="sd-print-banner__label">العملة:</span>
-                <span dir="ltr" lang="en"><?php echo htmlspecialchars($currencyCode, ENT_QUOTES, 'UTF-8'); ?></span>
-            </p>
-            <?php endif; ?>
+            <div class="sd-print-banner__meta-body">
+                <div class="sd-print-banner__meta-lines">
+                    <p class="sd-print-banner__serial-row">
+                        <span class="sd-print-banner__label">المسلسل / Serial:</span>
+                        <strong id="<?php echo $pfx; ?>_sd_print_serial" class="sd-print-banner__serial" dir="ltr" lang="en">—</strong>
+                    </p>
+                    <?php if ($showDocDate): ?>
+                    <p class="sd-print-banner__docdate-row">
+                        <span class="sd-print-banner__label"><?php echo htmlspecialchars($docDateLabel, ENT_QUOTES, 'UTF-8'); ?>:</span>
+                        <span id="<?php echo $pfx; ?>_sd_print_docdate" class="sd-print-banner__docdate" dir="ltr" lang="en">—</span>
+                    </p>
+                    <?php endif; ?>
+                    <?php if ($showPrintDate): ?>
+                    <p class="sd-print-banner__date-row">
+                        <span class="sd-print-banner__label">تاريخ الطباعة / Printed:</span>
+                        <span id="<?php echo $pfx; ?>_sd_print_date" class="sd-print-banner__date" dir="ltr" lang="en">—</span>
+                    </p>
+                    <?php endif; ?>
+                    <?php if ($currencyCode !== ''): ?>
+                    <p class="sd-print-banner__currency-row">
+                        <span class="sd-print-banner__label">العملة / Currency:</span>
+                        <span dir="ltr" lang="en"><?php echo htmlspecialchars($currencyCode, ENT_QUOTES, 'UTF-8'); ?></span>
+                    </p>
+                    <?php endif; ?>
+                </div>
+                <?php if ($showQr): ?>
+                <div class="sd-print-banner__qr" aria-hidden="true">
+                    <span class="sd-print-banner__qr-box" id="<?php echo $pfx; ?>_sd_print_qr"></span>
+                    <span class="sd-print-banner__qr-cap">QR</span>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php if ($showParty): ?>
+        <div class="sd-print-banner__party">
+            <p class="sd-print-banner__party-title"><?php echo htmlspecialchars($partyTitle, ENT_QUOTES, 'UTF-8'); ?></p>
+            <p class="sd-print-banner__party-row"><span class="sd-print-banner__label">الاسم / Name:</span> <span id="<?php echo $pfx; ?>_sd_print_party_name" class="sd-print-banner__party-val">—</span></p>
+            <p class="sd-print-banner__party-row"><span class="sd-print-banner__label">الكود / Code:</span> <span id="<?php echo $pfx; ?>_sd_print_party_code" class="sd-print-banner__party-val" dir="ltr" lang="en">—</span></p>
+            <p class="sd-print-banner__party-row"><span class="sd-print-banner__label">الهاتف / Phone:</span> <span id="<?php echo $pfx; ?>_sd_print_party_phone" class="sd-print-banner__party-val" dir="ltr" lang="en">—</span></p>
+            <p class="sd-print-banner__party-row"><span class="sd-print-banner__label">المنطقة / Area:</span> <span id="<?php echo $pfx; ?>_sd_print_party_area" class="sd-print-banner__party-val">—</span></p>
+            <p class="sd-print-banner__party-row"><span class="sd-print-banner__label">العنوان / Address:</span> <span id="<?php echo $pfx; ?>_sd_print_party_address" class="sd-print-banner__party-val">—</span></p>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+    <?php
+}
+
+/**
+ * تذييل طباعة لفاتورة العميل (شكر + توقيع/ختم + invoice_footer).
+ * يُوضع في نهاية منطقة الطباعة `.jv-print-area` للمستندات التي يستلمها العميل (المبيعات).
+ *
+ * @param array{country_id:int} $ctx
+ */
+function orange_sales_doc_print_footer(array $ctx): void
+{
+    $countryId = (int) ($ctx['country_id'] ?? 0);
+    $company = orange_sales_doc_print_company(db(), $countryId);
+    $footerNote = $company['invoice_footer'];
+    ?>
+<div class="sd-print-footer" aria-hidden="true">
+    <p class="sd-print-footer__thanks">شكراً لتعاملكم / Thank you for your business</p>
+    <div class="sd-print-footer__signatures">
+        <div class="sd-print-footer__sign">
+            <span class="sd-print-footer__sign-line"></span>
+            <span class="sd-print-footer__sign-label">التوقيع / Signature</span>
+        </div>
+        <div class="sd-print-footer__sign">
+            <span class="sd-print-footer__sign-line"></span>
+            <span class="sd-print-footer__sign-label">الختم / Stamp</span>
         </div>
     </div>
-    <?php
-    $metaBits = [];
-    if ($company['commercial_register'] !== '') {
-        $metaBits[] = 'س.ت: ' . $company['commercial_register'];
-    }
-    if ($company['vat_number'] !== '') {
-        $metaBits[] = 'ض.ق.م: ' . $company['vat_number'];
-    }
-    if ($company['phones'] !== '') {
-        $metaBits[] = 'هاتف: ' . $company['phones'];
-    }
-    if ($company['address'] !== '') {
-        $metaBits[] = $company['address'];
-    }
-    if ($metaBits !== []): ?>
-    <p class="sd-print-banner__company-meta"><?php echo htmlspecialchars(implode(' — ', $metaBits), ENT_QUOTES, 'UTF-8'); ?></p>
-    <?php endif; ?>
-    <?php if ($company['invoice_footer'] !== ''): ?>
-    <p class="sd-print-banner__footer-hint"><?php echo htmlspecialchars($company['invoice_footer'], ENT_QUOTES, 'UTF-8'); ?></p>
+    <?php if ($footerNote !== ''): ?>
+    <p class="sd-print-footer__note"><?php echo htmlspecialchars($footerNote, ENT_QUOTES, 'UTF-8'); ?></p>
     <?php endif; ?>
 </div>
     <?php
