@@ -147,6 +147,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         'show_qr' => true,
         'show_party' => true,
         'party_title' => 'فاتورة إلى / Bill To',
+        'show_notes' => true,
         'totals_rows' => [
             ['إجمالي الفاتورة / Total', 'total'],
             ['قيمة الخصم / Discount', 'disc'],
@@ -1284,6 +1285,10 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             setTxt('ov2_sd_print_total', getTot('ov2_subtotal'));
             setTxt('ov2_sd_print_disc', getTot('ov2_discount_total'));
             setTxt('ov2_sd_print_net', getTot('ov2_net_total'));
+
+            var notesEl = document.getElementById('ov2_notes');
+            var notesBox = document.getElementById('ov2_sd_print_notes');
+            if (notesBox) notesBox.textContent = notesEl ? String(notesEl.value || '').trim() : '';
         };
 
         var ov2AddExtraBtn = document.getElementById('ov2_btn_add_extra');
