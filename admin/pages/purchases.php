@@ -196,9 +196,10 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
 .jv-search-results-table { margin: 0; font-size: 0.9rem; }
 .jv-search-results-table tbody tr { cursor: pointer; }
 .jv-search-results-table tbody tr:hover { background: #f4f4f5; }
-/* صف 2 — رقم فاتورة المورد · تاريخ الفاتورة · نوع الشراء · تاريخ الإدخال · ملاحظات */
+/* صف 2 — رقم فاتورة المورد · تاريخ الفاتورة · نوع الشراء · تاريخ الإدخال · ملاحظات
+   (تاريخ الفاتورة = تاريخ الإدخال = نوع الشراء عرضاً؛ الفائض لملاحظات) */
 .form-grid.pv2-header-row2 {
-    grid-template-columns: minmax(7rem, 0.85fr) minmax(7rem, 0.8fr) minmax(5.5rem, 0.65fr) minmax(7rem, 0.8fr) minmax(0, 1.6fr);
+    grid-template-columns: minmax(7rem, 0.85fr) minmax(5.5rem, 0.65fr) minmax(5.5rem, 0.65fr) minmax(5.5rem, 0.65fr) minmax(0, 1.9fr);
 }
 .form-grid.pv2-supplier-row {
     grid-template-columns: minmax(7rem, 0.75fr) minmax(0, 1fr) minmax(0, 2fr);
