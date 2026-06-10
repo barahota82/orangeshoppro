@@ -4469,6 +4469,11 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     color: #94a3b8;
     font-size: 0.85rem;
 }
+.sd-print-banner__party-title-num {
+    font-weight: 800;
+    color: #0f172a;
+    font-size: 0.95rem;
+}
 .sd-print-banner__party-row {
     margin: 0 0 0.16rem;
 }

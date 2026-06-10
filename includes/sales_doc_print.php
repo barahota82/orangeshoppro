@@ -93,6 +93,7 @@ function orange_sales_doc_print_banner(array $ctx): void
 
     $showParty = !empty($ctx['show_party']);
     $partyTitle = trim((string) ($ctx['party_title'] ?? 'فاتورة إلى / Bill To'));
+    $partyTitleValueId = preg_replace('/[^a-z0-9_]/i', '', (string) ($ctx['party_title_value_id'] ?? ''));
     $partyRows = (isset($ctx['party_rows']) && is_array($ctx['party_rows'])) ? $ctx['party_rows'] : [
         ['الاسم / Name', 'party_name', ''],
         ['الهاتف / Phone', 'party_phone', 'ltr'],
@@ -198,7 +199,11 @@ function orange_sales_doc_print_banner(array $ctx): void
             ?>
             <p class="sd-print-banner__party-title">
                 <span class="sd-print-banner__party-title-ar"><?php echo htmlspecialchars($ptAr, ENT_QUOTES, 'UTF-8'); ?></span>
-                <?php if ($ptEn !== ''): ?><span class="sd-print-banner__party-title-en" dir="ltr" lang="en"><?php echo htmlspecialchars($ptEn, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
+                <?php if ($partyTitleValueId !== ''): ?>
+                <span class="sd-print-banner__party-title-num" id="<?php echo $pfx . '_sd_print_' . $partyTitleValueId; ?>" dir="ltr" lang="en">—</span>
+                <?php elseif ($ptEn !== ''): ?>
+                <span class="sd-print-banner__party-title-en" dir="ltr" lang="en"><?php echo htmlspecialchars($ptEn, ENT_QUOTES, 'UTF-8'); ?></span>
+                <?php endif; ?>
             </p>
             <div class="sd-kv-grid">
                 <?php foreach ($partyRows as $pr): ?>
