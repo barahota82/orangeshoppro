@@ -162,9 +162,6 @@ function orange_sales_doc_print_banner(array $ctx): void
                     <?php if ($showPrintDate): ?>
                     <?php echo orange_sales_doc_print_kv('تاريخ الطباعة / Printed', '<span id="' . $pfx . '_sd_print_date" class="sd-print-banner__date" dir="ltr" lang="en">—</span>'); ?>
                     <?php endif; ?>
-                    <?php if ($currencyCode !== ''): ?>
-                    <?php echo orange_sales_doc_print_kv('العملة / Currency', '<span dir="ltr" lang="en">' . htmlspecialchars($currencyCode, ENT_QUOTES, 'UTF-8') . '</span>'); ?>
-                    <?php endif; ?>
                 </div>
                 <?php if ($showQr): ?>
                 <div class="sd-print-banner__qr" aria-hidden="true">
