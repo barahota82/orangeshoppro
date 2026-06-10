@@ -4327,6 +4327,22 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     grid-column: 2;
     grid-row: 2;
 }
+.sd-print-banner__head--with-party .sd-print-banner__notes {
+    grid-column: 1;
+    grid-row: 3;
+}
+.sd-print-banner__notes {
+    margin-top: 0.4rem;
+    padding: 0.55rem 0.85rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    min-height: 2.6rem;
+    font-size: 0.84rem;
+    line-height: 1.5;
+    color: #0f172a;
+    overflow-wrap: anywhere;
+}
 .sd-print-banner__logo {
     width: 76px;
     height: 76px;

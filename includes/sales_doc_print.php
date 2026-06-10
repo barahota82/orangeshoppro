@@ -105,6 +105,7 @@ function orange_sales_doc_print_banner(array $ctx): void
     $showPrintDate = array_key_exists('show_print_date', $ctx) ? !empty($ctx['show_print_date']) : true;
     $showQr = !empty($ctx['show_qr']);
     $totalsRows = (isset($ctx['totals_rows']) && is_array($ctx['totals_rows'])) ? $ctx['totals_rows'] : [];
+    $showNotes = !empty($ctx['show_notes']);
 
     $company = orange_sales_doc_print_company(db(), $countryId);
 
@@ -209,6 +210,11 @@ function orange_sales_doc_print_banner(array $ctx): void
                 ?>
                 <?php endforeach; ?>
             </div>
+        </div>
+        <?php endif; ?>
+        <?php if ($showNotes): ?>
+        <div class="sd-print-banner__notes">
+            <span id="<?php echo $pfx; ?>_sd_print_notes" class="sd-print-banner__notes-val"></span>
         </div>
         <?php endif; ?>
     </div>

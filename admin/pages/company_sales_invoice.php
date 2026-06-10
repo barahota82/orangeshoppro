@@ -225,6 +225,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         'show_doc_date' => true,
         'show_print_date' => false,
         'show_qr' => true,
+        'show_notes' => true,
         'totals_rows' => [
             ['إجمالي الفاتورة / Total', 'total'],
             ['قيمة الخصم / Discount', 'disc'],
@@ -313,9 +314,9 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     </div>
 
     <!-- ٤ — ملاحظات -->
-    <div class="form-grid sv2-header-row3 orange-doc-header-row" style="margin-bottom:16px;">
+    <div class="form-grid sv2-header-row3 orange-doc-header-row jv-print-hide" style="margin-bottom:16px;">
         <div>
-            <label for="sv2_notes" class="jv-print-hide">ملاحظات</label>
+            <label for="sv2_notes">ملاحظات</label>
             <input type="text" id="sv2_notes" placeholder="ملاحظات…">
         </div>
     </div>
@@ -1267,6 +1268,10 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         setTxt('sv2_sd_print_total', getTot('sv2_subtotal'));
         setTxt('sv2_sd_print_disc', getTot('sv2_discount_total'));
         setTxt('sv2_sd_print_net', getTot('sv2_net_total'));
+
+        var notesEl = document.getElementById('sv2_notes');
+        var notesBox = document.getElementById('sv2_sd_print_notes');
+        if (notesBox) notesBox.textContent = notesEl ? String(notesEl.value || '').trim() : '';
     }
 
     function sv2ApplyHeaderFromInvoice(inv, cust) {
