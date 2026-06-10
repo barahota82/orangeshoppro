@@ -34,8 +34,15 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
 $sr2CustomerPickRows = [];
 if (orange_table_exists($pdo, 'customers')) {
     $codeCol = orange_table_has_column($pdo, 'customers', 'code') ? 'code' : 'id';
+    $sr2CustPickCols = 'id, name_ar, phone, ' . $codeCol . ' AS customer_code';
+    if (orange_table_has_column($pdo, 'customers', 'area')) {
+        $sr2CustPickCols .= ', area';
+    }
+    if (orange_table_has_column($pdo, 'customers', 'address')) {
+        $sr2CustPickCols .= ', address';
+    }
     $customers = $pdo->query(
-        'SELECT id, name_ar, phone, ' . $codeCol . ' AS customer_code FROM customers WHERE 1=1'
+        'SELECT ' . $sr2CustPickCols . ' FROM customers WHERE 1=1'
         . $sr2CustomersCountrySql . ' ORDER BY name_ar ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
     $custBal = [];
@@ -56,6 +63,8 @@ if (orange_table_exists($pdo, 'customers')) {
             'code' => $customerCode,
             'name' => trim((string) ($c['name_ar'] ?? '')),
             'phone' => trim((string) ($c['phone'] ?? '')),
+            'area' => trim((string) ($c['area'] ?? '')),
+            'address' => trim((string) ($c['address'] ?? '')),
             'balance' => round((float) ($custBal[$cid] ?? 0.0), 3),
         ];
     }
@@ -161,8 +170,12 @@ $sr2DocSerialPreview = $sr2NavReady
         'show_party' => true,
         'party_title' => 'العميل / Customer',
         'party_rows' => [
-            ['العميل / Customer', 'party_name', ''],
+            ['الاسم / Name', 'party_name', ''],
+            ['الهاتف / Phone', 'party_phone', 'ltr'],
+            ['المنطقة / Area', 'party_area', ''],
+            ['العنوان / Address', 'party_address', ''],
         ],
+        'show_notes' => true,
         'totals_rows' => [
             ['إجمالي المردود / Total', 'total'],
             ['قيمة الخصم / Discount', 'disc'],
@@ -879,6 +892,14 @@ $sr2DocSerialPreview = $sr2NavReady
         setTxt('sr2_sd_print_docdate', dm ? (dm[3] + '/' + dm[2] + '/' + dm[1]) : docDateVal);
         var nameEl = document.getElementById('sr2_customer_name');
         setTxt('sr2_sd_print_party_name', nameEl ? nameEl.value : '');
+        var cust = customerById(currentCustomerId);
+        setTxt('sr2_sd_print_party_phone', cust ? cust.phone : '');
+        setTxt('sr2_sd_print_party_area', cust ? cust.area : '');
+        setTxt('sr2_sd_print_party_address', cust ? cust.address : '');
+
+        var notesEl = document.getElementById('sr2_notes');
+        var notesBox = document.getElementById('sr2_sd_print_notes');
+        if (notesBox) notesBox.textContent = notesEl ? String(notesEl.value || '').trim() : '';
 
         var getTot = function (id) {
             var el = document.getElementById(id);
