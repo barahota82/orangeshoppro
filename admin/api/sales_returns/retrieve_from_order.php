@@ -50,6 +50,10 @@ if (orange_table_has_column($pdo, 'orders', 'invoice_number')) {
 if (orange_table_has_column($pdo, 'orders', 'order_number')) {
     $orderCols .= ', order_number';
 }
+$hasOrderChannelId = orange_table_has_column($pdo, 'orders', 'channel_id');
+if ($hasOrderChannelId) {
+    $orderCols .= ', channel_id';
+}
 
 $st = $pdo->prepare("SELECT $orderCols FROM orders WHERE id = ? LIMIT 1");
 $st->execute([$orderId]);
@@ -141,6 +145,7 @@ json_response([
         'reference' => $orderRef,
         'customer_id' => $order['customer_id'] !== null ? (int) $order['customer_id'] : 0,
         'channel' => orange_sales_return_channel_from_order($order),
+        'channel_id' => $hasOrderChannelId ? (int) ($order['channel_id'] ?? 0) : 0,
         'notes' => (string) ($order['notes'] ?? ''),
         'order_number' => (string) ($order['order_number'] ?? ''),
     ],

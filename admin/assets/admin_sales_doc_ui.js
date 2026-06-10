@@ -67,6 +67,18 @@
         }
     }
 
+    function contactPhone(companyPhone, channelWaMap, channelId) {
+        var parts = [];
+        var comp = String(companyPhone || '').trim();
+        if (comp !== '') parts.push(comp);
+        var cid = parseInt(String(channelId || '0'), 10) || 0;
+        if (cid > 0 && channelWaMap) {
+            var wa = String(channelWaMap[cid] || channelWaMap[String(cid)] || '').trim();
+            if (wa !== '') parts.push(wa);
+        }
+        return parts.join(' - ');
+    }
+
     function bindPrintButton(btnId, opts) {
         var btn = document.getElementById(btnId);
         if (!btn) return;
@@ -79,10 +91,12 @@
         });
     }
 
+    global.orangeSalesDocContactPhone = contactPhone;
     global.orangeSalesDocUi = {
         rememberChannel: rememberChannel,
         applyDefaultChannel: applyDefaultChannel,
         syncPrintBanner: syncPrintBanner,
-        bindPrintButton: bindPrintButton
+        bindPrintButton: bindPrintButton,
+        contactPhone: contactPhone
     };
 }(typeof window !== 'undefined' ? window : this));

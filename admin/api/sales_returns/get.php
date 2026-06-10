@@ -50,7 +50,9 @@ $orderReference = '';
 if (orange_table_has_column($pdo, 'sales_returns', 'invoice_reference')) {
     $orderReference = trim((string) ($header['invoice_reference'] ?? ''));
 }
-if ($orderReference === '' && $srOrderId > 0 && orange_table_exists($pdo, 'orders')) {
+$srOrderChannelId = 0;
+if ($srOrderId > 0 && orange_table_exists($pdo, 'orders')) {
+    $hasOrderChannelId = orange_table_has_column($pdo, 'orders', 'channel_id');
     $oCols = 'id, order_source';
     if (orange_table_has_column($pdo, 'orders', 'invoice_number')) {
         $oCols .= ', invoice_number';
@@ -58,11 +60,17 @@ if ($orderReference === '' && $srOrderId > 0 && orange_table_exists($pdo, 'order
     if (orange_table_has_column($pdo, 'orders', 'order_number')) {
         $oCols .= ', order_number';
     }
+    if ($hasOrderChannelId) {
+        $oCols .= ', channel_id';
+    }
     $ost = $pdo->prepare("SELECT $oCols FROM orders WHERE id = ? LIMIT 1");
     $ost->execute([$srOrderId]);
     $orow = $ost->fetch(PDO::FETCH_ASSOC);
     if (is_array($orow)) {
-        $orderReference = orange_sales_return_invoice_reference_from_order($orow, $srOrderId);
+        if ($orderReference === '') {
+            $orderReference = orange_sales_return_invoice_reference_from_order($orow, $srOrderId);
+        }
+        $srOrderChannelId = $hasOrderChannelId ? (int) ($orow['channel_id'] ?? 0) : 0;
     }
 }
 
@@ -75,6 +83,7 @@ json_response([
             ? (int) $header['order_id']
             : 0,
         'order_reference' => $orderReference,
+        'channel_id' => $srOrderChannelId,
         'source_kind' => (string) ($header['source_kind'] ?? ''),
         'type' => (string) ($header['type'] ?? 'cash'),
         'channel' => (string) ($header['type'] ?? 'cash'),

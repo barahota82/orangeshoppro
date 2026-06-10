@@ -114,13 +114,14 @@ function orange_sales_doc_print_banner(array $ctx): void
     $nameEn = $company['company_name_en'];
     $logoUrl = $company['logo_url'];
 
+    $phoneByChannel = !empty($ctx['phone_by_channel']);
     $crValue = $company['commercial_register'];
     $metaRows = [];
     if ($company['address'] !== '') {
         $metaRows[] = ['', $company['address']];
     }
-    if ($company['phones'] !== '') {
-        $metaRows[] = ['Tel', $company['phones']];
+    if ($phoneByChannel || $company['phones'] !== '') {
+        $metaRows[] = ['Tel', $company['phones'], $pfx . '_sd_print_phone'];
     }
     if ($company['vat_number'] !== '') {
         $metaRows[] = ['ض.ق.م / VAT', $company['vat_number']];
@@ -150,7 +151,7 @@ function orange_sales_doc_print_banner(array $ctx): void
             <?php if ($metaRows !== []): ?>
             <div class="sd-print-banner__company-meta">
                 <?php foreach ($metaRows as $row): ?>
-                <p><?php if ($row[0] !== ''): ?><span class="sd-print-banner__label"><?php echo htmlspecialchars($row[0], ENT_QUOTES, 'UTF-8'); ?>:</span> <?php endif; ?><span><?php echo htmlspecialchars($row[1], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                <p><?php if ($row[0] !== ''): ?><span class="sd-print-banner__label"><?php echo htmlspecialchars($row[0], ENT_QUOTES, 'UTF-8'); ?>:</span> <?php endif; ?><span<?php echo isset($row[2]) && $row[2] !== '' ? ' id="' . htmlspecialchars($row[2], ENT_QUOTES, 'UTF-8') . '"' : ''; ?>><?php echo htmlspecialchars($row[1], ENT_QUOTES, 'UTF-8'); ?></span></p>
                 <?php endforeach; ?>
             </div>
             <?php endif; ?>

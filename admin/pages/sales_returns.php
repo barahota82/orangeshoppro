@@ -26,6 +26,21 @@ $srCurrencyUnit = orange_currency_display_unit($srDefaultCurrency);
 $sr2CustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $srCountryId);
 $sr2PickRows = orange_sales_doc_product_pick_rows($pdo, $srCountryId);
 
+$sr2ChannelsCountrySql = orange_channels_has_country_column($pdo)
+    ? orange_sql_country_and_fragment($pdo, 'channels', 'channels', $srCountryId)
+    : '';
+$sr2HasChannelWa = orange_table_has_column($pdo, 'channels', 'whatsapp_number');
+$sr2ChannelWaMap = [];
+if ($sr2HasChannelWa) {
+    $sr2ChannelRows = $pdo->query(
+        'SELECT id, whatsapp_number FROM channels WHERE is_active = 1' . $sr2ChannelsCountrySql . ' ORDER BY id ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($sr2ChannelRows as $sr2Ch) {
+        $sr2ChannelWaMap[(int) $sr2Ch['id']] = trim((string) ($sr2Ch['whatsapp_number'] ?? ''));
+    }
+}
+$sr2CompanyPhone = orange_sales_doc_print_company($pdo, $srCountryId)['phones'];
+
 $sr2SalesLineKinds = [];
 foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kindMeta) {
     $sr2SalesLineKinds[] = ['key' => $kindKey, 'label_ar' => (string) ($kindMeta['label_ar'] ?? $kindKey)];
@@ -162,6 +177,7 @@ $sr2DocSerialPreview = $sr2NavReady
         'doc_title_en' => 'Sales Return',
         'country_id' => $srCountryId,
         'currency_code' => $srDefaultCurrency,
+        'phone_by_channel' => true,
         'serial_label' => 'رقم المردود / Return No.',
         'doc_date_label' => 'تاريخ المردود / Return Date',
         'show_doc_date' => true,
@@ -462,6 +478,9 @@ $sr2DocSerialPreview = $sr2NavReady
     var SR2_PRINT_TUNING = <?php echo orange_admin_invoice_print_tuning_mode() ? 'true' : 'false'; ?>;
     var SR2_NAV_READY = <?php echo $sr2NavReady ? 'true' : 'false'; ?>;
     var SR2_COUNTRY_ID = <?php echo (int) $srCountryId; ?>;
+    var SR2_COMPANY_PHONE = <?php echo json_encode($sr2CompanyPhone, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+    var SR2_CHANNEL_WA = <?php echo json_encode((object) $sr2ChannelWaMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+    var sr2MarketChannelId = 0;
     var SR2_CAPS = <?php echo json_encode($sr2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
     var SR2_DOC_SERIAL_PREVIEW = <?php echo json_encode($sr2DocSerialPreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var sr2EditLockCtl = null;
@@ -758,6 +777,7 @@ $sr2DocSerialPreview = $sr2NavReady
     function sr2ClearOrderLink() {
         var hid = document.getElementById('sr2_order_id');
         if (hid) hid.value = '0';
+        sr2MarketChannelId = 0;
     }
 
     function sr2SetDocSerial(value) {
@@ -829,6 +849,7 @@ $sr2DocSerialPreview = $sr2NavReady
         }
         var chEl = document.getElementById('sr2_channel');
         if (chEl) chEl.value = o.channel || 'cash';
+        sr2MarketChannelId = parseInt(String(o.channel_id || '0'), 10) || 0;
         sr2OnChannelChange();
         var tb = document.getElementById('sr2_lines_body');
         if (tb) {
@@ -911,6 +932,8 @@ $sr2DocSerialPreview = $sr2NavReady
         setTxt('sr2_sd_print_total', getTot('sr2_subtotal'));
         setTxt('sr2_sd_print_disc', getTot('sr2_discount_total'));
         setTxt('sr2_sd_print_net', getTot('sr2_net_total'));
+
+        setTxt('sr2_sd_print_phone', orangeSalesDocContactPhone(SR2_COMPANY_PHONE, SR2_CHANNEL_WA, sr2MarketChannelId));
     }
 
     function sr2ApplyReturnPayload(res) {
@@ -920,6 +943,7 @@ $sr2DocSerialPreview = $sr2NavReady
         }
         var p = res.sales_return;
         browseReturnId = parseInt(String(p.id || '0'), 10) || 0;
+        sr2MarketChannelId = parseInt(String(p.channel_id || '0'), 10) || 0;
         sr2SetDocSerial(p.return_number || ('SR-' + browseReturnId));
         selectCustomer(parseInt(String(p.customer_id || '0'), 10) || 0);
         var chEl = document.getElementById('sr2_channel');

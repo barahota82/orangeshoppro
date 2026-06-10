@@ -34,10 +34,17 @@ $sv2ChannelsCountrySql = orange_channels_has_country_column($pdo)
 
 $sv2PickRows = orange_sales_doc_product_pick_rows($pdo, $adminCountryId);
 
+$sv2HasChannelWa = orange_table_has_column($pdo, 'channels', 'whatsapp_number');
 $channels = $pdo->query(
-    'SELECT id, name FROM channels WHERE is_active = 1' . $sv2ChannelsCountrySql . ' ORDER BY id ASC'
+    'SELECT id, name' . ($sv2HasChannelWa ? ', whatsapp_number' : '') . ' FROM channels WHERE is_active = 1' . $sv2ChannelsCountrySql . ' ORDER BY id ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
 $sv2DefaultChannelId = orange_sales_company_direct_channel_id();
+
+$sv2ChannelWaMap = [];
+foreach ($channels as $sv2Ch) {
+    $sv2ChannelWaMap[(int) $sv2Ch['id']] = trim((string) ($sv2Ch['whatsapp_number'] ?? ''));
+}
+$sv2CompanyPhone = orange_sales_doc_print_company($pdo, $adminCountryId)['phones'];
 
 $sv2CustomerPickRows = [];
 if (orange_table_exists($pdo, 'customers')) {
@@ -219,6 +226,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         'doc_title_en' => 'Sales Invoice',
         'country_id' => $adminCountryId,
         'currency_code' => $adminDefaultCurrency,
+        'phone_by_channel' => true,
         'serial_label' => 'رقم الفاتورة / Invoice No.',
         'show_party' => true,
         'party_title' => 'فاتورة إلى / Bill To',
@@ -556,6 +564,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     var SV2_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
     var SV2_DOC_SERIAL_PREVIEW = <?php echo json_encode($sv2DocSerialPreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var SV2_DEFAULT_CHANNEL_ID = <?php echo (int) $sv2DefaultChannelId; ?>;
+    var SV2_COMPANY_PHONE = <?php echo json_encode($sv2CompanyPhone, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+    var SV2_CHANNEL_WA = <?php echo json_encode((object) $sv2ChannelWaMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var SV2_CAPS = <?php echo json_encode($sv2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
     var SV2_SALES_LINE_KINDS = <?php echo json_encode($sv2SalesLineKinds, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
 
@@ -1268,6 +1278,10 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         setTxt('sv2_sd_print_total', getTot('sv2_subtotal'));
         setTxt('sv2_sd_print_disc', getTot('sv2_discount_total'));
         setTxt('sv2_sd_print_net', getTot('sv2_net_total'));
+
+        var chSel = document.getElementById('sv2_channel');
+        var chId = chSel ? (parseInt(chSel.value, 10) || 0) : 0;
+        setTxt('sv2_sd_print_phone', orangeSalesDocContactPhone(SV2_COMPANY_PHONE, SV2_CHANNEL_WA, chId));
 
         var notesEl = document.getElementById('sv2_notes');
         var notesBox = document.getElementById('sv2_sd_print_notes');

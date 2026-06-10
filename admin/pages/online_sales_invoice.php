@@ -33,9 +33,16 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     $ov2SalesLineKinds[] = ['key' => $kindKey, 'label_ar' => (string) ($kindMeta['label_ar'] ?? $kindKey)];
 }
 
+$ov2HasChannelWa = orange_table_has_column($pdo, 'channels', 'whatsapp_number');
 $channels = $pdo->query(
-    'SELECT id, name FROM channels WHERE is_active = 1' . $ov2ChannelsCountrySql . ' ORDER BY id ASC'
+    'SELECT id, name' . ($ov2HasChannelWa ? ', whatsapp_number' : '') . ' FROM channels WHERE is_active = 1' . $ov2ChannelsCountrySql . ' ORDER BY id ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
+
+$ov2ChannelWaMap = [];
+foreach ($channels as $ov2Ch) {
+    $ov2ChannelWaMap[(int) $ov2Ch['id']] = trim((string) ($ov2Ch['whatsapp_number'] ?? ''));
+}
+$ov2CompanyPhone = orange_sales_doc_print_company($pdo, $adminCountryId)['phones'];
 $prefillOrderId = (int) ($_GET['order_id'] ?? 0);
 /** الشاشة نشطة دائماً — فاتورة أونلاين تُفتح من بحث/تنقل؛ القناة والعميل من الطلب */
 $ov2Ready = true;
@@ -141,6 +148,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         'doc_title_en' => 'Online Invoice',
         'country_id' => $adminCountryId,
         'currency_code' => $adminDefaultCurrency,
+        'phone_by_channel' => true,
         'serial_label' => 'رقم الفاتورة / Invoice No.',
         'show_doc_date' => true,
         'show_print_date' => false,
@@ -454,6 +462,8 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     var OV2_WARN_NO_PRODUCTS = <?php echo $ov2WarnNoProducts ? 'true' : 'false'; ?>;
     var OV2_NAV_READY = <?php echo $ov2NavReady ? 'true' : 'false'; ?>;
     var OV2_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
+    var OV2_COMPANY_PHONE = <?php echo json_encode($ov2CompanyPhone, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+    var OV2_CHANNEL_WA = <?php echo json_encode((object) $ov2ChannelWaMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var OV2_CAPS = <?php echo json_encode($ov2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
     var OV2_PRINT_TUNING = <?php echo orange_admin_invoice_print_tuning_mode() ? 'true' : 'false'; ?>;
 
@@ -1285,6 +1295,10 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             setTxt('ov2_sd_print_total', getTot('ov2_subtotal'));
             setTxt('ov2_sd_print_disc', getTot('ov2_discount_total'));
             setTxt('ov2_sd_print_net', getTot('ov2_net_total'));
+
+            var ov2ChIdEl = document.getElementById('ov2_channel_id');
+            var ov2ChId = ov2ChIdEl ? (parseInt(ov2ChIdEl.value, 10) || 0) : 0;
+            setTxt('ov2_sd_print_phone', orangeSalesDocContactPhone(OV2_COMPANY_PHONE, OV2_CHANNEL_WA, ov2ChId));
 
             var notesEl = document.getElementById('ov2_notes');
             var notesBox = document.getElementById('ov2_sd_print_notes');
