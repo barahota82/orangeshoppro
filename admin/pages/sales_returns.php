@@ -168,7 +168,7 @@ $sr2DocSerialPreview = $sr2NavReady
         'show_print_date' => false,
         'show_qr' => true,
         'show_party' => true,
-        'party_title' => 'فاتورة المبيعات المرجعية / Reference Invoice',
+        'party_title' => 'رقم الفاتورة المرتجع / Returned Invoice No.',
         'party_title_value_id' => 'ref_invoice',
         'party_rows' => [
             ['الاسم / Name', 'party_name', ''],
