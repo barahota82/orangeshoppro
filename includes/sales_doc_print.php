@@ -147,8 +147,8 @@ function orange_sales_doc_print_banner(array $ctx): void
         </div>
         <div class="sd-print-banner__meta">
             <p class="sd-print-banner__doc-title">
-                <?php echo htmlspecialchars($docTitle, ENT_QUOTES, 'UTF-8'); ?>
-                <?php if ($docTitleEn !== ''): ?><span class="sd-print-banner__doc-title-en" dir="ltr" lang="en"> / <?php echo htmlspecialchars($docTitleEn, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
+                <span class="sd-print-banner__doc-title-ar"><?php echo htmlspecialchars($docTitle, ENT_QUOTES, 'UTF-8'); ?></span>
+                <?php if ($docTitleEn !== ''): ?><span class="sd-print-banner__doc-title-en" dir="ltr" lang="en"><?php echo htmlspecialchars($docTitleEn, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
             </p>
             <?php if ($docBadge !== ''): ?>
             <span class="sd-print-banner__badge" dir="ltr" lang="en"><?php echo htmlspecialchars($docBadge, ENT_QUOTES, 'UTF-8'); ?></span>
