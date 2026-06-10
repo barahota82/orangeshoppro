@@ -1240,12 +1240,10 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         setTxt('sv2_sd_print_docdate', dm ? (dm[3] + '/' + dm[2] + '/' + dm[1]) : docDateVal);
 
         var nameEl = document.getElementById('sv2_customer_name');
-        var codeEl = document.getElementById('sv2_customer_code');
         var phoneEl = document.getElementById('sv2_phone');
         var areaEl = document.getElementById('sv2_area');
         var addrEl = document.getElementById('sv2_address');
         setTxt('sv2_sd_print_party_name', nameEl ? nameEl.value : '');
-        setTxt('sv2_sd_print_party_code', codeEl ? codeEl.value : '');
         setTxt('sv2_sd_print_party_phone', phoneEl ? phoneEl.value : '');
         setTxt('sv2_sd_print_party_area', areaEl ? areaEl.value : '');
         setTxt('sv2_sd_print_party_address', addrEl ? addrEl.value : '');
