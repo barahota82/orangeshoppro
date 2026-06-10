@@ -219,6 +219,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         'doc_title_en' => 'Sales Invoice',
         'country_id' => $adminCountryId,
         'currency_code' => $adminDefaultCurrency,
+        'serial_label' => 'رقم الفاتورة / Invoice No.',
         'show_party' => true,
         'party_title' => 'فاتورة إلى / Bill To',
         'show_doc_date' => true,

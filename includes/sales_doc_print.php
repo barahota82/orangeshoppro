@@ -75,7 +75,7 @@ function orange_sales_doc_print_kv(string $label, string $valueHtml): string
  *
  * @param array{
  *   prefix:string, doc_title:string, doc_title_en?:string, doc_badge:string,
- *   country_id:int, currency_code?:string,
+ *   country_id:int, currency_code?:string, serial_label?:string,
  *   show_party?:bool, party_title?:string,
  *   show_doc_date?:bool, doc_date_label?:string,
  *   show_print_date?:bool, show_qr?:bool
@@ -93,6 +93,7 @@ function orange_sales_doc_print_banner(array $ctx): void
 
     $showParty = !empty($ctx['show_party']);
     $partyTitle = trim((string) ($ctx['party_title'] ?? 'فاتورة إلى / Bill To'));
+    $serialLabel = trim((string) ($ctx['serial_label'] ?? 'المسلسل / Serial'));
     $showDocDate = !empty($ctx['show_doc_date']);
     $docDateLabel = trim((string) ($ctx['doc_date_label'] ?? 'تاريخ الفاتورة / Invoice Date'));
     $showPrintDate = array_key_exists('show_print_date', $ctx) ? !empty($ctx['show_print_date']) : true;
@@ -154,7 +155,7 @@ function orange_sales_doc_print_banner(array $ctx): void
             <?php endif; ?>
             <div class="sd-print-banner__meta-body">
                 <div class="sd-print-banner__meta-lines">
-                    <?php echo orange_sales_doc_print_kv('المسلسل / Serial', '<strong id="' . $pfx . '_sd_print_serial" class="sd-print-banner__serial" dir="ltr" lang="en">—</strong>'); ?>
+                    <?php echo orange_sales_doc_print_kv($serialLabel, '<strong id="' . $pfx . '_sd_print_serial" class="sd-print-banner__serial" dir="ltr" lang="en">—</strong>'); ?>
                     <?php if ($showDocDate): ?>
                     <?php echo orange_sales_doc_print_kv($docDateLabel, '<span id="' . $pfx . '_sd_print_docdate" class="sd-print-banner__docdate" dir="ltr" lang="en">—</span>'); ?>
                     <?php endif; ?>
