@@ -125,14 +125,6 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
-<?php if ($ov2WarnNoProducts): ?>
-<div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
-    <p class="card-hint" style="margin:0;line-height:1.55;">
-        لا توجد منتجات نشطة في سياق الدولة — إضافة/تعديل أصناف في البنود قد يفشل حتى تُضاف منتجات من «المنتجات».
-    </p>
-</div>
-<?php endif; ?>
-
 <div id="ov2_gl_banner" class="card jv-print-hide" style="display:none;border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
     <p class="card-hint" style="margin:0;line-height:1.55;">
         <strong>تنبيه محاسبي:</strong> هذه الفاتورة مرتبطة بقيود مرحّلة. تعديل البنود أو الترويسة

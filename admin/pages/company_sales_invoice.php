@@ -203,22 +203,6 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
-<?php if ($sv2WarnNoProducts || $sv2WarnNoChannels): ?>
-<div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
-    <p class="card-hint" style="margin:0;line-height:1.55;">
-        <strong>تنبيه</strong> (الشاشة نشطة — مثل المشتريات):
-        دولة الأدمن <strong dir="ltr"><?php echo htmlspecialchars(strtoupper($sv2DiagCountryCode), ENT_QUOTES, 'UTF-8'); ?></strong>.
-        <?php if ($sv2WarnNoProducts): ?>
-            لا أصناف في قائمة الاختيار (منتجات نشطة في النظام: <?php echo (int) $sv2DiagActiveProductsAll; ?>) —
-            ابحث بالكود لترى «لا نتائج»، أو أضف/فعّل منتجات من «المنتجات».
-        <?php endif; ?>
-        <?php if ($sv2WarnNoChannels): ?>
-            لا قنوات نشطة لهذه الدولة (في النظام: <?php echo (int) $sv2DiagActiveChannelsAll; ?>) —
-            أضف قناة من «القنوات» قبل الحفظ.
-        <?php endif; ?>
-    </p>
-</div>
-<?php endif; ?>
 <div id="sv2_view_mode_banner" class="card" style="display:none;border:1px solid #93c5fd;background:#eff6ff;margin-bottom:12px;" role="status">
     <p class="card-hint" style="margin:0;line-height:1.55;">
         <strong>وضع العرض:</strong> الفاتورة المعروضة للقراءة. للتعديل اضغط <strong>«فك القفل»</strong> إن وُجد، أو

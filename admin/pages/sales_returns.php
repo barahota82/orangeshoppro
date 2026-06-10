@@ -137,17 +137,6 @@ $sr2DocSerialPreview = $sr2NavReady
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
-<?php if ($sr2WarnNoProducts): ?>
-<div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
-    <p class="card-hint" style="margin:0;line-height:1.55;">
-        <strong>تنبيه</strong> (الشاشة نشطة — مثل مردود المشتريات):
-        لا أصناف في قائمة الاختيار لدولة
-        <strong dir="ltr"><?php echo htmlspecialchars(strtoupper($sr2DiagCountryCode), ENT_QUOTES, 'UTF-8'); ?></strong>
-        (منتجات نشطة في النظام: <?php echo (int) $sr2DiagActiveProductsAll; ?>) —
-        ابحث بالكود في السطر لترى «لا نتائج»، أو أضف منتجات من «المنتجات».
-    </p>
-</div>
-<?php endif; ?>
 <div id="sr2_view_mode_banner" class="card" style="display:none;border:1px solid #93c5fd;background:#eff6ff;margin-bottom:12px;" role="status">
     <p class="card-hint" style="margin:0;line-height:1.55;">
         <strong>وضع العرض:</strong> تعرض مردوداً محفوظاً (للقراءة والطباعة). لتسجيل مردود جديد اضغط
