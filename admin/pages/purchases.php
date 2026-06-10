@@ -263,8 +263,12 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         'show_party' => true,
         'party_title' => 'المورد / Supplier',
         'party_rows' => [
-            ['المورد / Supplier', 'party_name', ''],
+            ['اسم المورد / Name', 'party_name', ''],
+            ['كود المورد / Code', 'party_code', 'ltr'],
+            ['رقم فاتورة المورد / Supplier Inv. No.', 'party_inv', 'ltr'],
+            ['نوع الشراء / Type', 'party_type', ''],
         ],
+        'show_notes' => true,
         'totals_rows' => [
             ['إجمالي الفاتورة / Total', 'total'],
             ['قيمة الخصم / Discount', 'disc'],
@@ -1209,6 +1213,17 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
 
         var supEl = document.getElementById('pv2_supplier_name');
         setTxt('pv2_sd_print_party_name', supEl ? supEl.value : '');
+        var codeEl = document.getElementById('pv2_supplier_code');
+        setTxt('pv2_sd_print_party_code', codeEl ? codeEl.value : '');
+        var invEl = document.getElementById('pv2_supplier_invoice');
+        setTxt('pv2_sd_print_party_inv', invEl ? invEl.value : '');
+        var typeSel = document.getElementById('pv2_type');
+        var typeTxt = (typeSel && typeSel.selectedIndex >= 0) ? typeSel.options[typeSel.selectedIndex].text : '';
+        setTxt('pv2_sd_print_party_type', typeTxt);
+
+        var notesEl = document.getElementById('pv2_notes');
+        var notesBox = document.getElementById('pv2_sd_print_notes');
+        if (notesBox) notesBox.textContent = notesEl ? String(notesEl.value || '').trim() : '';
 
         var getTot = function (id) {
             var el = document.getElementById(id);
