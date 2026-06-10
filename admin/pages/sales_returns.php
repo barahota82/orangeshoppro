@@ -122,8 +122,10 @@ $sr2DocSerialPreview = $sr2NavReady
 .jv-search-results-table { margin: 0; font-size: 0.9rem; }
 .jv-search-results-table tbody tr { cursor: pointer; }
 .jv-search-results-table tbody tr:hover { background: #f4f4f5; }
+/* صف 2 — فاتورة المبيعات المرجعية · استرجاع · تاريخ المردود · قناة التحصيل · تاريخ الإدخال · ملاحظات
+   (نفس ترتيب مردود المشتريات؛ فرق زر الاسترجاع مأخوذ من عرض ملاحظات) */
 .form-grid.sr2-header-row2 {
-    grid-template-columns: minmax(6.5rem, 0.65fr) auto minmax(0, 1.5fr) minmax(5.5rem, 0.65fr);
+    grid-template-columns: minmax(7rem, 0.85fr) auto minmax(5.5rem, 0.65fr) minmax(5.5rem, 0.65fr) minmax(5.5rem, 0.65fr) minmax(0, 1.4fr);
 }
 .form-grid.sr2-customer-row {
     grid-template-columns: minmax(7rem, 0.75fr) minmax(0, 1fr) minmax(0, 2fr) minmax(5rem, 0.55fr);
@@ -185,19 +187,10 @@ $sr2DocSerialPreview = $sr2NavReady
             <label for="sr2_customer_balance">رصيد الذمم</label>
             <input type="text" id="sr2_customer_balance" class="admin-inp-readonly admin-money-display" readonly disabled tabindex="-1" dir="ltr" lang="en" placeholder="—">
         </div>
-        <div>
-            <label for="sr2_document_date">تاريخ المردود</label>
-            <input type="date" id="sr2_document_date" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>">
-        </div>
-        <div>
-            <label for="sr2_entry_date">تاريخ الإدخال</label>
-            <input type="text" id="sr2_entry_date" class="admin-inp-readonly" readonly tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
-                value="<?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?>"
-                title="وقت تسجيل إدخال المستند في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح">
-        </div>
         <input type="hidden" id="sr2_customer_id" value="0">
     </div>
 
+    <!-- ٢ — فاتورة المبيعات المرجعية، استرجاع، تاريخ المردود، قناة التحصيل، تاريخ الإدخال، ملاحظات -->
     <div class="form-grid sr2-header-row2 orange-doc-header-row" style="margin-bottom:16px;">
         <div>
             <label for="sr2_order_ref">فاتورة المبيعات المرجعية</label>
@@ -209,8 +202,8 @@ $sr2DocSerialPreview = $sr2NavReady
             <button type="button" class="btn-secondary" id="sr2_btn_retrieve">استرجاع</button>
         </div>
         <div>
-            <label for="sr2_notes">ملاحظات</label>
-            <input type="text" id="sr2_notes" placeholder="رقم إذن الإرجاع، …">
+            <label for="sr2_document_date">تاريخ المردود</label>
+            <input type="date" id="sr2_document_date" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>">
         </div>
         <div>
             <label for="sr2_channel">قناة التحصيل</label>
@@ -219,6 +212,16 @@ $sr2DocSerialPreview = $sr2NavReady
                 <option value="online">أونلاين</option>
                 <option value="credit">آجل</option>
             </select>
+        </div>
+        <div>
+            <label for="sr2_entry_date">تاريخ الإدخال</label>
+            <input type="text" id="sr2_entry_date" class="admin-inp-readonly" readonly tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
+                value="<?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?>"
+                title="وقت تسجيل إدخال المستند في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح">
+        </div>
+        <div>
+            <label for="sr2_notes">ملاحظات</label>
+            <input type="text" id="sr2_notes" placeholder="رقم إذن الإرجاع، …">
         </div>
     </div>
 
