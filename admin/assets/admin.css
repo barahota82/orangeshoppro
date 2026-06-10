@@ -4366,9 +4366,16 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     text-align-last: justify;
 }
 .sd-print-banner__company-meta {
-    margin: 0.35rem 0 0;
-    text-align: right;
+    margin: 0;
+    text-align: left;
     align-self: flex-start;
+}
+.sd-print-banner__cr {
+    margin: 0.15rem 0 0;
+    text-align: right;
+    font-size: 0.82rem;
+    color: #475569;
+    line-height: 1.5;
 }
 .sd-print-banner__company-meta p {
     margin: 0 0 0.12rem;
