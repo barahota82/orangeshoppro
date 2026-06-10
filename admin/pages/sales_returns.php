@@ -168,8 +168,9 @@ $sr2DocSerialPreview = $sr2NavReady
         'show_print_date' => false,
         'show_qr' => true,
         'show_party' => true,
-        'party_title' => 'العميل / Customer',
+        'party_title' => 'فاتورة المبيعات المرجعية / Reference Invoice',
         'party_rows' => [
+            ['رقم الفاتورة / Invoice No.', 'ref_invoice', 'ltr'],
             ['الاسم / Name', 'party_name', ''],
             ['الهاتف / Phone', 'party_phone', 'ltr'],
             ['المنطقة / Area', 'party_area', ''],
@@ -890,6 +891,8 @@ $sr2DocSerialPreview = $sr2NavReady
         var docDateVal = docDateEl ? String(docDateEl.value || '').trim() : '';
         var dm = docDateVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
         setTxt('sr2_sd_print_docdate', dm ? (dm[3] + '/' + dm[2] + '/' + dm[1]) : docDateVal);
+        var refEl = document.getElementById('sr2_order_ref');
+        setTxt('sr2_sd_print_ref_invoice', refEl ? refEl.value : '');
         var nameEl = document.getElementById('sr2_customer_name');
         setTxt('sr2_sd_print_party_name', nameEl ? nameEl.value : '');
         var cust = customerById(currentCustomerId);
