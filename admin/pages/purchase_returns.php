@@ -252,7 +252,9 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         </div>
         <div>
             <label for="pr2_entry_date">تاريخ الإدخال</label>
-            <input type="text" id="pr2_entry_date" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" placeholder="يُحدَّد عند الحفظ" title="تاريخ إدخال المستند في النظام (تلقائي — للأرشفة فقط)">
+            <input type="text" id="pr2_entry_date" class="admin-inp-readonly" readonly tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
+                value="<?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?>"
+                title="وقت تسجيل إدخال المستند في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح">
         </div>
         <input type="hidden" id="pr2_supplier_id" value="0">
     </div>
@@ -935,6 +937,15 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         });
     }
 
+    function pr2FormatEnteredDisplay(raw) {
+        var s = String(raw || '').trim();
+        var m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+        if (m) return m[3] + '/' + m[2] + '/' + m[1] + ' ' + m[4] + ':' + m[5];
+        var d = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (d) return d[3] + '/' + d[2] + '/' + d[1];
+        return s;
+    }
+
     function pr2ApplyReturnPayload(res) {
         if (!res || !res.success || !res.purchase_return) {
             alert((res && res.message) || 'تعذر تحميل المردود');
@@ -951,7 +962,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         var docDateEl = document.getElementById('pr2_document_date');
         if (docDateEl) docDateEl.value = (p.document_date ? String(p.document_date).substr(0, 10) : '');
         var entryDateEl = document.getElementById('pr2_entry_date');
-        if (entryDateEl) entryDateEl.value = (p.created_at ? String(p.created_at).substr(0, 10) : '');
+        if (entryDateEl && p.created_at) entryDateEl.value = pr2FormatEnteredDisplay(p.created_at);
         var purEl = document.getElementById('pr2_purchase_ref');
         if (purEl) {
             var pid = parseInt(String(p.purchase_id || '0'), 10) || 0;

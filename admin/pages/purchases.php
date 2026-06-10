@@ -288,7 +288,9 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         </div>
         <div>
             <label for="pv2_entry_date">تاريخ الإدخال</label>
-            <input type="text" id="pv2_entry_date" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" placeholder="يُحدَّد عند الحفظ" title="تاريخ إدخال المستند في النظام (تلقائي — للأرشفة فقط)">
+            <input type="text" id="pv2_entry_date" class="admin-inp-readonly" readonly tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
+                value="<?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?>"
+                title="وقت تسجيل إدخال المستند في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح">
         </div>
         <div>
             <label for="pv2_notes">ملاحظات</label>
@@ -1148,6 +1150,15 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         if (el) el.value = String(value || '');
     }
 
+    function pv2FormatEnteredDisplay(raw) {
+        var s = String(raw || '').trim();
+        var m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+        if (m) return m[3] + '/' + m[2] + '/' + m[1] + ' ' + m[4] + ':' + m[5];
+        var d = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (d) return d[3] + '/' + d[2] + '/' + d[1];
+        return s;
+    }
+
     function pv2SyncToolbar() {
         var pb = document.getElementById('pv2_btn_print');
         if (pb) {
@@ -1212,7 +1223,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         var docDateEl = document.getElementById('pv2_document_date');
         if (docDateEl) docDateEl.value = (p.document_date ? String(p.document_date).substr(0, 10) : '');
         var entryDateEl = document.getElementById('pv2_entry_date');
-        if (entryDateEl) entryDateEl.value = (p.created_at ? String(p.created_at).substr(0, 10) : '');
+        if (entryDateEl && p.created_at) entryDateEl.value = pv2FormatEnteredDisplay(p.created_at);
         var invDiscEl = document.getElementById('pv2_invoice_discount');
         if (invDiscEl) invDiscEl.value = p.invoice_discount_raw || '';
 

@@ -191,7 +191,9 @@ $sr2DocSerialPreview = $sr2NavReady
         </div>
         <div>
             <label for="sr2_entry_date">تاريخ الإدخال</label>
-            <input type="text" id="sr2_entry_date" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" placeholder="يُحدَّد عند الحفظ" title="تاريخ إدخال المستند في النظام (تلقائي — للأرشفة فقط)">
+            <input type="text" id="sr2_entry_date" class="admin-inp-readonly" readonly tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
+                value="<?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?>"
+                title="وقت تسجيل إدخال المستند في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح">
         </div>
         <input type="hidden" id="sr2_customer_id" value="0">
     </div>
@@ -829,6 +831,15 @@ $sr2DocSerialPreview = $sr2NavReady
         });
     }
 
+    function sr2FormatEnteredDisplay(raw) {
+        var s = String(raw || '').trim();
+        var m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+        if (m) return m[3] + '/' + m[2] + '/' + m[1] + ' ' + m[4] + ':' + m[5];
+        var d = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (d) return d[3] + '/' + d[2] + '/' + d[1];
+        return s;
+    }
+
     function sr2ApplyReturnPayload(res) {
         if (!res || !res.success || !res.sales_return) {
             alert((res && res.message) || 'تعذر تحميل المردود');
@@ -850,7 +861,7 @@ $sr2DocSerialPreview = $sr2NavReady
         var docDateEl = document.getElementById('sr2_document_date');
         if (docDateEl) docDateEl.value = (p.document_date ? String(p.document_date).substr(0, 10) : '');
         var entryDateEl = document.getElementById('sr2_entry_date');
-        if (entryDateEl) entryDateEl.value = (p.created_at ? String(p.created_at).substr(0, 10) : '');
+        if (entryDateEl && p.created_at) entryDateEl.value = sr2FormatEnteredDisplay(p.created_at);
         var oid = parseInt(String(p.order_id || '0'), 10) || 0;
         var hid = document.getElementById('sr2_order_id');
         if (hid) hid.value = oid > 0 ? String(oid) : '0';
