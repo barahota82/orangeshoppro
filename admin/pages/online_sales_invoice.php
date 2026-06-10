@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/invoice_ancillary_lines.php';
+require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 
 $pdo = orange_admin_page_pdo();
 $ov2Caps = orange_admin_caps_for_page($admin, $pdo, 'online_sales_invoice');
