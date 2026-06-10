@@ -235,7 +235,6 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     orange_sales_doc_print_banner([
         'prefix' => 'pr2',
         'doc_title' => 'مردود مشتريات',
-        'doc_badge' => 'PRET',
         'country_id' => $prCountryId,
         'currency_code' => $prDefaultCurrency,
     ]);

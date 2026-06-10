@@ -137,7 +137,6 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     orange_sales_doc_print_banner([
         'prefix' => 'ov2',
         'doc_title' => 'فاتورة أونلاين',
-        'doc_badge' => 'INV-O',
         'country_id' => $adminCountryId,
         'currency_code' => $adminDefaultCurrency,
     ]);

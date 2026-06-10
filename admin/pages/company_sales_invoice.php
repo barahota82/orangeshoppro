@@ -217,7 +217,6 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         'prefix' => 'sv2',
         'doc_title' => 'فاتورة مبيعات',
         'doc_title_en' => 'Sales Invoice',
-        'doc_badge' => 'INV-C',
         'country_id' => $adminCountryId,
         'currency_code' => $adminDefaultCurrency,
         'show_party' => true,

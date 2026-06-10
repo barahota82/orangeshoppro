@@ -150,7 +150,6 @@ $sr2DocSerialPreview = $sr2NavReady
     orange_sales_doc_print_banner([
         'prefix' => 'sr2',
         'doc_title' => 'مردود مبيعات',
-        'doc_badge' => 'SR',
         'country_id' => $srCountryId,
         'currency_code' => $srDefaultCurrency,
     ]);

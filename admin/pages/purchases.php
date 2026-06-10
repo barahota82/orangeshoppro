@@ -253,7 +253,6 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
     orange_sales_doc_print_banner([
         'prefix' => 'pv2',
         'doc_title' => 'فاتورة شراء',
-        'doc_badge' => 'PUR',
         'country_id' => $adminCountryId,
         'currency_code' => $adminDefaultCurrency,
     ]);
