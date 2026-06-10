@@ -667,9 +667,26 @@
     }
 
     /*
-     * طباعة التقارير: عنوان مستند فارغ يقلّل ترويسة/تذييل المتصفح (اسم الصفحة، الرابط).
-     * مع @page{margin:0} في admin.css — لا نضيف «صفحة X من Y» في التذييل (عداد CSS لا يعمل في PDF).
+     * طباعة التقارير: اسم المستند هو ما يُحفَظ به ملف PDF.
+     * - السندات/القيود: window.orangeAdminVoucherPrintTitle (يُضبط عبر orangeAdminOpenPrintDialog) — له الأولوية.
+     * - التقارير: نبني الاسم من اسم التقرير (data-export-name) + الفترة (data-export-subtitle)
+     *   حتى يأخذ الحفظ «اسم التقرير + التاريخ» (قرار المالك). إن لم يوجد جدول تصدير نُبقي العنوان
+     *   فارغاً لتقليل ترويسة/تذييل المتصفح. مع @page{margin:0} في admin.css.
      */
+    function orangeBuildReportPrintTitle() {
+        var el = document.querySelector('[data-export-name]');
+        if (!el) {
+            return '';
+        }
+        var name = (el.getAttribute('data-export-name') || '').trim();
+        if (name === '') {
+            return '';
+        }
+        var subtitle = (el.getAttribute('data-export-subtitle') || '').trim();
+        var title = subtitle !== '' ? (name + ' - ' + subtitle) : name;
+        /* محارف غير صالحة في أسماء الملفات → شرطة، ثم تنظيف الفراغات. */
+        return title.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
+    }
     var savedDocTitle = null;
     window.addEventListener('beforeprint', function () {
         if (window.orangeAdminVoucherPrintTitle) {
@@ -678,7 +695,8 @@
             return;
         }
         savedDocTitle = document.title;
-        document.title = ' ';
+        var reportTitle = orangeBuildReportPrintTitle();
+        document.title = reportTitle !== '' ? reportTitle : ' ';
     });
     window.addEventListener('afterprint', function () {
         if (window.orangeAdminVoucherPrintTitle) {
