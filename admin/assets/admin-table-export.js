@@ -674,15 +674,20 @@
      *   فارغاً لتقليل ترويسة/تذييل المتصفح. مع @page{margin:0} في admin.css.
      */
     function orangeBuildReportPrintTitle() {
-        var el = document.querySelector('[data-export-name]');
-        if (!el) {
-            return '';
+        /* الاسم: عنوان التقرير الظاهر (H1) أولاً — هو ما يراه المالك (مثل «الحركة الشهرية لحساب»)؛
+         * ثم data-export-name كبديل (اسم ملف Excel). */
+        var h1 = document.querySelector('.page-title h1');
+        var dataEl = document.querySelector('[data-export-name]');
+        var name = h1 ? (h1.textContent || '').trim() : '';
+        if (name === '' && dataEl) {
+            name = (dataEl.getAttribute('data-export-name') || '').trim();
         }
-        var name = (el.getAttribute('data-export-name') || '').trim();
         if (name === '') {
             return '';
         }
-        var subtitle = (el.getAttribute('data-export-subtitle') || '').trim();
+        /* التفصيل: اسم الحساب/الفترة من data-export-subtitle (أينما وُجد). */
+        var subEl = document.querySelector('[data-export-subtitle]');
+        var subtitle = subEl ? (subEl.getAttribute('data-export-subtitle') || '').trim() : '';
         var title = subtitle !== '' ? (name + ' - ' + subtitle) : name;
         /* محارف غير صالحة في أسماء الملفات → شرطة، ثم تنظيف الفراغات. */
         return title.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();

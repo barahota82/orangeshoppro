@@ -807,7 +807,7 @@ $gasHasSelection = $isCustomerMode ? ($customerId > 0) : ($accountId > 0);
                 ?> — عمود الرصيد يُحسب من الرصيد الافتتاحي ثم الأسطر الظاهرة فقط.</p>
             <?php endif; ?>
             <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-                <table class="admin-fy-table gl-acc-stmt-table" data-export-name="كشف حساب" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
+                <table class="admin-fy-table gl-acc-stmt-table" data-export-name="كشف حساب" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>" data-export-subtitle="<?php echo htmlspecialchars($printNameVal . ' — من ' . $dateFromRaw . ' إلى ' . $dateToRaw, ENT_QUOTES, 'UTF-8'); ?>">
                     <thead>
                         <tr>
                             <th>التاريخ</th>

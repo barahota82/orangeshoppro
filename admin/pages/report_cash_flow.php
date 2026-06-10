@@ -152,7 +152,7 @@ $fmt = static function (float $amt) use ($reportMoney): string {
             <?php endif; ?>
 
             <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-                <table class="admin-fy-table gl-acc-stmt-table cf-report-table" dir="rtl" data-export-name="قائمة التدفق النقدي" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
+                <table class="admin-fy-table gl-acc-stmt-table cf-report-table" dir="rtl" data-export-name="قائمة التدفق النقدي" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>" data-export-subtitle="<?php echo htmlspecialchars(trim($cfFyLabel . ($cfPeriod !== '' ? ' — ' . $cfPeriod : '')), ENT_QUOTES, 'UTF-8'); ?>">
                     <thead>
                         <tr>
                             <th>البند</th>

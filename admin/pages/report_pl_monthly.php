@@ -429,7 +429,7 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $useVouchers
 ?>
 <div class="admin-fy-shell pl-month-shell" dir="rtl" data-report-name="قائمة إيرادات ومصروفات شهرية">
     <div class="gl-acc-stmt-no-print">
-        <div class="page-title">
+        <div class="page-title"<?php echo ($periodLabel !== '') ? ' data-export-subtitle="' . htmlspecialchars('عن الفترة من ' . orange_format_date_dmY($periodDateFrom) . ' إلى ' . orange_format_date_dmY($periodDateTo), ENT_QUOTES, 'UTF-8') . '"' : ''; ?>>
             <h1>قائمة إيرادات ومصروفات شهرية</h1>
             <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($plmCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
         </div>
