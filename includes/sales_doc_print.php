@@ -104,6 +104,7 @@ function orange_sales_doc_print_banner(array $ctx): void
     $docDateLabel = trim((string) ($ctx['doc_date_label'] ?? 'تاريخ الفاتورة / Invoice Date'));
     $showPrintDate = array_key_exists('show_print_date', $ctx) ? !empty($ctx['show_print_date']) : true;
     $showQr = !empty($ctx['show_qr']);
+    $totalsRows = (isset($ctx['totals_rows']) && is_array($ctx['totals_rows'])) ? $ctx['totals_rows'] : [];
 
     $company = orange_sales_doc_print_company(db(), $countryId);
 
@@ -167,6 +168,16 @@ function orange_sales_doc_print_banner(array $ctx): void
                     <?php endif; ?>
                     <?php if ($showPrintDate): ?>
                     <?php echo orange_sales_doc_print_kv('تاريخ الطباعة / Printed', '<span id="' . $pfx . '_sd_print_date" class="sd-print-banner__date" dir="ltr" lang="en">—</span>'); ?>
+                    <?php endif; ?>
+                    <?php if ($totalsRows !== []): ?>
+                    <span class="sd-print-banner__meta-sep" aria-hidden="true"></span>
+                    <?php foreach ($totalsRows as $tr): ?>
+                    <?php
+                    $trLabel = (string) ($tr[0] ?? '');
+                    $trSuffix = preg_replace('/[^a-z0-9_]/i', '', (string) ($tr[1] ?? '')) ?: 'total_field';
+                    echo orange_sales_doc_print_kv($trLabel, '<strong id="' . $pfx . '_sd_print_' . $trSuffix . '" class="sd-print-banner__total" dir="ltr" lang="en">—</strong>');
+                    ?>
+                    <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
                 <?php if ($showQr): ?>

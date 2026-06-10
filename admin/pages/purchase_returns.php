@@ -248,6 +248,11 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         'party_rows' => [
             ['المورد / Supplier', 'party_name', ''],
         ],
+        'totals_rows' => [
+            ['إجمالي المردود / Total', 'total'],
+            ['قيمة الخصم / Discount', 'disc'],
+            ['صافي المردود / Net', 'net'],
+        ],
     ]);
     ?>
     <h3 class="card-title">مردود مشتريات <span id="pr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
@@ -329,7 +334,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     </div>
 
     <!-- ٣ — خصم الفاتورة + المجاميع -->
-    <div style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
+    <div class="jv-print-hide" style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
         <div style="flex:0 0 auto;" class="jv-print-hide">
             <label for="pr2_invoice_discount" style="font-size:0.82rem;font-weight:600;">خصم الفاتورة</label>
             <input type="text" id="pr2_invoice_discount" placeholder="0 أو 5%" dir="ltr" lang="en" style="width:8rem;" autocomplete="off"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
@@ -999,6 +1004,14 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
         var supEl = document.getElementById('pr2_supplier_name');
         setTxt('pr2_sd_print_party_name', supEl ? supEl.value : '');
+
+        var getTot = function (id) {
+            var el = document.getElementById(id);
+            return el ? String(el.textContent || '').trim() : '';
+        };
+        setTxt('pr2_sd_print_total', getTot('pr2_subtotal'));
+        setTxt('pr2_sd_print_disc', getTot('pr2_discount_total'));
+        setTxt('pr2_sd_print_net', getTot('pr2_net_total'));
     }
 
     function pr2ApplyReturnPayload(res) {

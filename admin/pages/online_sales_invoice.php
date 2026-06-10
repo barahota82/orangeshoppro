@@ -147,6 +147,11 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         'show_qr' => true,
         'show_party' => true,
         'party_title' => 'فاتورة إلى / Bill To',
+        'totals_rows' => [
+            ['إجمالي الفاتورة / Total', 'total'],
+            ['قيمة الخصم / Discount', 'disc'],
+            ['مبلغ الفاتورة / Net', 'net'],
+        ],
     ]);
     ?>
     <h3 class="card-title">فاتورة أونلاين <span id="ov2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
@@ -266,7 +271,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         <button type="button" class="btn-secondary" id="ov2_btn_add_extra">إضافة بند</button>
     </div>
 
-    <div style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
+    <div class="jv-print-hide" style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
         <div style="flex:1 1 auto;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
             <span style="color:#64748b;">إجمالي الفاتورة:</span> <strong id="ov2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
             <span style="color:#64748b;">قيمة الخصم:</span> <strong id="ov2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
@@ -1271,6 +1276,14 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             setTxt('ov2_sd_print_party_phone', phoneEl ? phoneEl.value : '');
             setTxt('ov2_sd_print_party_area', areaEl ? areaEl.value : '');
             setTxt('ov2_sd_print_party_address', addrEl ? addrEl.value : '');
+
+            var getTot = function (id) {
+                var el = document.getElementById(id);
+                return el ? String(el.textContent || '').trim() : '';
+            };
+            setTxt('ov2_sd_print_total', getTot('ov2_subtotal'));
+            setTxt('ov2_sd_print_disc', getTot('ov2_discount_total'));
+            setTxt('ov2_sd_print_net', getTot('ov2_net_total'));
         };
 
         var ov2AddExtraBtn = document.getElementById('ov2_btn_add_extra');

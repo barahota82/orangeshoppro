@@ -4492,6 +4492,15 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     font-weight: 600;
     overflow-wrap: anywhere;
 }
+.sd-print-banner__meta-sep {
+    grid-column: 1 / -1;
+    border-top: 1px solid #fed7aa;
+    margin: 0.25rem 0;
+}
+.sd-print-banner__total {
+    color: #ea580c;
+    font-weight: 800;
+}
 
 .sd-print-footer {
     display: none;

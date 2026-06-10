@@ -265,6 +265,11 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         'party_rows' => [
             ['المورد / Supplier', 'party_name', ''],
         ],
+        'totals_rows' => [
+            ['إجمالي الفاتورة / Total', 'total'],
+            ['قيمة الخصم / Discount', 'disc'],
+            ['مبلغ الفاتورة / Net', 'net'],
+        ],
     ]);
     ?>
     <h3 class="card-title">فاتورة شراء <span id="pv2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
@@ -365,7 +370,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
     </div>
 
     <!-- ٣ — خصم الفاتورة + المجاميع -->
-    <div style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
+    <div class="jv-print-hide" style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
         <div style="flex:0 0 auto;" class="jv-print-hide">
             <label for="pv2_invoice_discount" style="font-size:0.82rem;font-weight:600;">خصم الفاتورة</label>
             <input type="text" id="pv2_invoice_discount" placeholder="0 أو 5%" dir="ltr" lang="en" style="width:8rem;" autocomplete="off"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>
@@ -1204,6 +1209,14 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
 
         var supEl = document.getElementById('pv2_supplier_name');
         setTxt('pv2_sd_print_party_name', supEl ? supEl.value : '');
+
+        var getTot = function (id) {
+            var el = document.getElementById(id);
+            return el ? String(el.textContent || '').trim() : '';
+        };
+        setTxt('pv2_sd_print_total', getTot('pv2_subtotal'));
+        setTxt('pv2_sd_print_disc', getTot('pv2_discount_total'));
+        setTxt('pv2_sd_print_net', getTot('pv2_net_total'));
     }
 
     function pv2SyncToolbar() {

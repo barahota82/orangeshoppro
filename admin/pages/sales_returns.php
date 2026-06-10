@@ -163,6 +163,11 @@ $sr2DocSerialPreview = $sr2NavReady
         'party_rows' => [
             ['العميل / Customer', 'party_name', ''],
         ],
+        'totals_rows' => [
+            ['إجمالي المردود / Total', 'total'],
+            ['قيمة الخصم / Discount', 'disc'],
+            ['صافي المردود / Net', 'net'],
+        ],
     ]);
     ?>
     <h3 class="card-title">مردود مبيعات <span id="sr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
@@ -269,7 +274,7 @@ $sr2DocSerialPreview = $sr2NavReady
         <button type="button" class="btn-secondary" id="sr2_btn_add_extra">إضافة بند</button>
     </div>
 
-    <div style="margin-top:14px;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
+    <div class="jv-print-hide" style="margin-top:14px;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
         <span style="color:#64748b;">إجمالي المردود:</span> <strong id="sr2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
         <span style="color:#64748b;">قيمة الخصم:</span> <strong id="sr2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
         <span style="color:#64748b;">صافي المردود:</span>
@@ -874,6 +879,14 @@ $sr2DocSerialPreview = $sr2NavReady
         setTxt('sr2_sd_print_docdate', dm ? (dm[3] + '/' + dm[2] + '/' + dm[1]) : docDateVal);
         var nameEl = document.getElementById('sr2_customer_name');
         setTxt('sr2_sd_print_party_name', nameEl ? nameEl.value : '');
+
+        var getTot = function (id) {
+            var el = document.getElementById(id);
+            return el ? String(el.textContent || '').trim() : '';
+        };
+        setTxt('sr2_sd_print_total', getTot('sr2_subtotal'));
+        setTxt('sr2_sd_print_disc', getTot('sr2_discount_total'));
+        setTxt('sr2_sd_print_net', getTot('sr2_net_total'));
     }
 
     function sr2ApplyReturnPayload(res) {
