@@ -303,3 +303,64 @@ function orange_sales_doc_print_footer(array $ctx): void
 <?php endif; ?>
     <?php
 }
+
+/**
+ * تذييل صفحة الطباعة للنص القانوني عبر صناديق هامش @page (يتكرر أسفل كل صفحة، ويحجز مساحته):
+ *   @bottom-right  = النص العربي (يمين)
+ *   @bottom-center = رقم الصفحة «صفحة س من ص»
+ *   @bottom-left   = النص الإنجليزي (يسار)
+ * يُطبع في صفحات فواتير المبيعات (شركة/أونلاين). يُرجع '' إذا لا يوجد نص قانوني.
+ */
+function orange_sales_doc_print_legal_pagecss(int $countryId): string
+{
+    $company = orange_sales_doc_print_company(db(), $countryId);
+    $ar = $company['invoice_footer_ar'];
+    $en = $company['invoice_footer_en'];
+    if ($ar === '' && $en === '' && $company['invoice_footer'] !== '') {
+        $ar = $company['invoice_footer'];
+    }
+    if ($ar === '' && $en === '') {
+        return '';
+    }
+    $esc = static function (string $s): string {
+        $s = trim((string) preg_replace('/\s+/u', ' ', $s));
+        $s = str_replace('\\', '\\\\', $s);
+        return str_replace('"', '\\"', $s);
+    };
+    $arCss = $esc($ar);
+    $enCss = $esc($en);
+    ob_start();
+    ?>
+<style>
+@media print {
+    @page {
+        margin-bottom: 26mm;
+        @bottom-left {
+            content: "<?php echo $enCss; ?>";
+            font-size: 6.5pt;
+            color: #475569;
+            direction: ltr;
+            vertical-align: top;
+            margin: 2mm 6mm 0;
+        }
+        @bottom-center {
+            content: "صفحة " counter(page) " من " counter(pages);
+            font-size: 8pt;
+            color: #64748b;
+            vertical-align: top;
+            margin-top: 2mm;
+        }
+        @bottom-right {
+            content: "<?php echo $arCss; ?>";
+            font-size: 6.5pt;
+            color: #475569;
+            direction: rtl;
+            vertical-align: top;
+            margin: 2mm 6mm 0;
+        }
+    }
+}
+</style>
+    <?php
+    return (string) ob_get_clean();
+}
