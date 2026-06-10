@@ -1297,7 +1297,14 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                 return;
             }
             pr2SyncPrintBanner();
-            window.print();
+            var pr2SerEl = document.getElementById('pr2_doc_serial');
+            var pr2Ser = pr2SerEl ? String(pr2SerEl.value || '').trim() : '';
+            var pr2Title = pr2Ser !== '' ? ('مردود مشتريات رقم ' + pr2Ser) : 'مردود مشتريات';
+            if (typeof window.orangeAdminOpenPrintDialog === 'function') {
+                window.orangeAdminOpenPrintDialog(pr2Title);
+            } else {
+                window.print();
+            }
         });
 
         document.getElementById('pr2_nav_first').addEventListener('click', function () { pr2Nav('first'); });

@@ -1583,7 +1583,14 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
                 return;
             }
             pv2SyncPrintBanner();
-            window.print();
+            var pv2SerEl = document.getElementById('pv2_doc_serial');
+            var pv2Ser = pv2SerEl ? String(pv2SerEl.value || '').trim() : '';
+            var pv2Title = pv2Ser !== '' ? ('فاتورة مشتريات رقم ' + pv2Ser) : 'فاتورة مشتريات';
+            if (typeof window.orangeAdminOpenPrintDialog === 'function') {
+                window.orangeAdminOpenPrintDialog(pv2Title);
+            } else {
+                window.print();
+            }
         });
 
         document.getElementById('pv2_nav_first').addEventListener('click', function () { pv2Nav('first'); });
