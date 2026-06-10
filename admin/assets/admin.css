@@ -4462,13 +4462,17 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     color: #0f172a;
     font-weight: 600;
 }
-.sd-kv {
+.sd-kv-grid,
+.sd-print-banner__meta-lines {
     display: grid;
     direction: rtl;
     grid-template-columns: auto 1fr auto;
     align-items: baseline;
     column-gap: 0.5rem;
-    margin: 0 0 0.2rem;
+    row-gap: 0.2rem;
+}
+.sd-kv {
+    display: contents;
 }
 .sd-kv__ar {
     text-align: right;

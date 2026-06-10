@@ -185,10 +185,12 @@ function orange_sales_doc_print_banner(array $ctx): void
                 <span class="sd-print-banner__party-title-ar"><?php echo htmlspecialchars($ptAr, ENT_QUOTES, 'UTF-8'); ?></span>
                 <?php if ($ptEn !== ''): ?><span class="sd-print-banner__party-title-en" dir="ltr" lang="en"><?php echo htmlspecialchars($ptEn, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
             </p>
-            <?php echo orange_sales_doc_print_kv('الاسم / Name', '<span id="' . $pfx . '_sd_print_party_name" class="sd-print-banner__party-val">—</span>'); ?>
-            <?php echo orange_sales_doc_print_kv('الهاتف / Phone', '<span id="' . $pfx . '_sd_print_party_phone" class="sd-print-banner__party-val" dir="ltr" lang="en">—</span>'); ?>
-            <?php echo orange_sales_doc_print_kv('المنطقة / Area', '<span id="' . $pfx . '_sd_print_party_area" class="sd-print-banner__party-val">—</span>'); ?>
-            <?php echo orange_sales_doc_print_kv('العنوان / Address', '<span id="' . $pfx . '_sd_print_party_address" class="sd-print-banner__party-val">—</span>'); ?>
+            <div class="sd-kv-grid">
+                <?php echo orange_sales_doc_print_kv('الاسم / Name', '<span id="' . $pfx . '_sd_print_party_name" class="sd-print-banner__party-val">—</span>'); ?>
+                <?php echo orange_sales_doc_print_kv('الهاتف / Phone', '<span id="' . $pfx . '_sd_print_party_phone" class="sd-print-banner__party-val" dir="ltr" lang="en">—</span>'); ?>
+                <?php echo orange_sales_doc_print_kv('المنطقة / Area', '<span id="' . $pfx . '_sd_print_party_area" class="sd-print-banner__party-val">—</span>'); ?>
+                <?php echo orange_sales_doc_print_kv('العنوان / Address', '<span id="' . $pfx . '_sd_print_party_address" class="sd-print-banner__party-val">—</span>'); ?>
+            </div>
         </div>
         <?php endif; ?>
     </div>
