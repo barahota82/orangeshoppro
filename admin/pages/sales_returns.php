@@ -30,13 +30,14 @@ $sr2ChannelsCountrySql = orange_channels_has_country_column($pdo)
     ? orange_sql_country_and_fragment($pdo, 'channels', 'channels', $srCountryId)
     : '';
 $sr2HasChannelWa = orange_table_has_column($pdo, 'channels', 'whatsapp_number');
+$sr2PhoneDial = orange_admin_context_phone_dial($pdo);
 $sr2ChannelWaMap = [];
 if ($sr2HasChannelWa) {
     $sr2ChannelRows = $pdo->query(
         'SELECT id, whatsapp_number FROM channels WHERE is_active = 1' . $sr2ChannelsCountrySql . ' ORDER BY id ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
     foreach ($sr2ChannelRows as $sr2Ch) {
-        $sr2ChannelWaMap[(int) $sr2Ch['id']] = trim((string) ($sr2Ch['whatsapp_number'] ?? ''));
+        $sr2ChannelWaMap[(int) $sr2Ch['id']] = orange_phone_strip_dial((string) ($sr2Ch['whatsapp_number'] ?? ''), $sr2PhoneDial);
     }
 }
 $sr2CompanyPhone = orange_sales_doc_print_company($pdo, $srCountryId)['phones'];
@@ -933,7 +934,7 @@ $sr2DocSerialPreview = $sr2NavReady
         setTxt('sr2_sd_print_disc', getTot('sr2_discount_total'));
         setTxt('sr2_sd_print_net', getTot('sr2_net_total'));
 
-        setTxt('sr2_sd_print_phone', orangeSalesDocContactPhone(SR2_COMPANY_PHONE, SR2_CHANNEL_WA, sr2MarketChannelId));
+        orangeSalesDocSetPhoneCells('sr2_sd_print_phone', SR2_COMPANY_PHONE, SR2_CHANNEL_WA, sr2MarketChannelId);
     }
 
     function sr2ApplyReturnPayload(res) {

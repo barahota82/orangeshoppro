@@ -67,16 +67,36 @@
         }
     }
 
-    function contactPhone(companyPhone, channelWaMap, channelId) {
-        var parts = [];
-        var comp = String(companyPhone || '').trim();
-        if (comp !== '') parts.push(comp);
+    function contactPhoneTokens(companyPhone, channelWaMap, channelId) {
+        var tokens = [];
+        String(companyPhone || '').split('-').forEach(function (t) {
+            t = t.trim();
+            if (t !== '') tokens.push(t);
+        });
         var cid = parseInt(String(channelId || '0'), 10) || 0;
         if (cid > 0 && channelWaMap) {
             var wa = String(channelWaMap[cid] || channelWaMap[String(cid)] || '').trim();
-            if (wa !== '') parts.push(wa);
+            if (wa !== '') tokens.push(wa);
         }
-        return parts.join(' - ');
+        return tokens;
+    }
+
+    function setPhoneCells(containerId, companyPhone, channelWaMap, channelId) {
+        var box = document.getElementById(containerId);
+        if (!box) return;
+        var tokens = contactPhoneTokens(companyPhone, channelWaMap, channelId);
+        box.textContent = '';
+        if (!tokens.length) {
+            box.textContent = '—';
+            return;
+        }
+        tokens.forEach(function (t) {
+            var span = document.createElement('span');
+            span.className = 'sd-print-banner__num';
+            span.setAttribute('dir', 'ltr');
+            span.textContent = t;
+            box.appendChild(span);
+        });
     }
 
     function bindPrintButton(btnId, opts) {
@@ -91,12 +111,12 @@
         });
     }
 
-    global.orangeSalesDocContactPhone = contactPhone;
+    global.orangeSalesDocSetPhoneCells = setPhoneCells;
     global.orangeSalesDocUi = {
         rememberChannel: rememberChannel,
         applyDefaultChannel: applyDefaultChannel,
         syncPrintBanner: syncPrintBanner,
         bindPrintButton: bindPrintButton,
-        contactPhone: contactPhone
+        setPhoneCells: setPhoneCells
     };
 }(typeof window !== 'undefined' ? window : this));

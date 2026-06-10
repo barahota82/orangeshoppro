@@ -51,6 +51,24 @@ function orange_sales_doc_print_company(PDO $pdo, int $countryId): array
 }
 
 /**
+ * يقسّم سلسلة أرقام مفصولة بشرطة إلى خلايا <span> للطباعة (محاذاة أعمدة).
+ */
+function orange_sales_doc_phone_cells(string $phones): string
+{
+    $parts = preg_split('/\s*-\s*/', trim($phones)) ?: [];
+    $html = '';
+    foreach ($parts as $part) {
+        $part = trim((string) $part);
+        if ($part === '') {
+            continue;
+        }
+        $html .= '<span class="sd-print-banner__num" dir="ltr">'
+            . htmlspecialchars($part, ENT_QUOTES, 'UTF-8') . '</span>';
+    }
+    return $html;
+}
+
+/**
  * صف ثلاثي للطباعة: تسمية عربية (يمين) | القيمة (وسط) | تسمية إنجليزية (يسار).
  * @param string $label تسمية بصيغة «عربي / English» (تُقسَّم على ' / ').
  * @param string $valueHtml HTML القيمة (قد يحوي span بمعرّف للتعبئة عبر JS).
@@ -121,7 +139,7 @@ function orange_sales_doc_print_banner(array $ctx): void
         $metaRows[] = ['', $company['address']];
     }
     if ($phoneByChannel || $company['phones'] !== '') {
-        $metaRows[] = ['Tel', $company['phones'], $pfx . '_sd_print_phone'];
+        $metaRows[] = ['Tel', $company['phones'], $pfx . '_sd_print_phone', 'phone'];
     }
     if ($company['vat_number'] !== '') {
         $metaRows[] = ['ض.ق.م / VAT', $company['vat_number']];
@@ -151,7 +169,11 @@ function orange_sales_doc_print_banner(array $ctx): void
             <?php if ($metaRows !== []): ?>
             <div class="sd-print-banner__company-meta">
                 <?php foreach ($metaRows as $row): ?>
+                <?php if (isset($row[3]) && $row[3] === 'phone'): ?>
+                <p class="sd-print-banner__phone-row"><?php if ($row[0] !== ''): ?><span class="sd-print-banner__label"><?php echo htmlspecialchars($row[0], ENT_QUOTES, 'UTF-8'); ?>:</span> <?php endif; ?><span class="sd-print-banner__nums" id="<?php echo htmlspecialchars($row[2], ENT_QUOTES, 'UTF-8'); ?>"><?php echo orange_sales_doc_phone_cells((string) $row[1]); ?></span></p>
+                <?php else: ?>
                 <p><?php if ($row[0] !== ''): ?><span class="sd-print-banner__label"><?php echo htmlspecialchars($row[0], ENT_QUOTES, 'UTF-8'); ?>:</span> <?php endif; ?><span<?php echo isset($row[2]) && $row[2] !== '' ? ' id="' . htmlspecialchars($row[2], ENT_QUOTES, 'UTF-8') . '"' : ''; ?>><?php echo htmlspecialchars($row[1], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                <?php endif; ?>
                 <?php endforeach; ?>
             </div>
             <?php endif; ?>

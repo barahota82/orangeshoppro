@@ -38,9 +38,10 @@ $channels = $pdo->query(
     'SELECT id, name' . ($ov2HasChannelWa ? ', whatsapp_number' : '') . ' FROM channels WHERE is_active = 1' . $ov2ChannelsCountrySql . ' ORDER BY id ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
 
+$ov2PhoneDial = orange_admin_context_phone_dial($pdo);
 $ov2ChannelWaMap = [];
 foreach ($channels as $ov2Ch) {
-    $ov2ChannelWaMap[(int) $ov2Ch['id']] = trim((string) ($ov2Ch['whatsapp_number'] ?? ''));
+    $ov2ChannelWaMap[(int) $ov2Ch['id']] = orange_phone_strip_dial((string) ($ov2Ch['whatsapp_number'] ?? ''), $ov2PhoneDial);
 }
 $ov2CompanyPhone = orange_sales_doc_print_company($pdo, $adminCountryId)['phones'];
 $prefillOrderId = (int) ($_GET['order_id'] ?? 0);
@@ -1298,7 +1299,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
 
             var ov2ChIdEl = document.getElementById('ov2_channel_id');
             var ov2ChId = ov2ChIdEl ? (parseInt(ov2ChIdEl.value, 10) || 0) : 0;
-            setTxt('ov2_sd_print_phone', orangeSalesDocContactPhone(OV2_COMPANY_PHONE, OV2_CHANNEL_WA, ov2ChId));
+            orangeSalesDocSetPhoneCells('ov2_sd_print_phone', OV2_COMPANY_PHONE, OV2_CHANNEL_WA, ov2ChId);
 
             var notesEl = document.getElementById('ov2_notes');
             var notesBox = document.getElementById('ov2_sd_print_notes');

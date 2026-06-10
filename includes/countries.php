@@ -168,6 +168,39 @@ function orange_admin_context_phone_dial(PDO $pdo): string
     return $dial !== '' ? $dial : '965';
 }
 
+/**
+ * يزيل كود الاتصال الدولي من رقم هاتف للعرض (مثل واتساب القناة) مع الإبقاء على الرقم المحلي.
+ * يدعم البادئات: +، 00، ثم كود الدولة. لا يضيف صفراً محلياً.
+ */
+function orange_phone_strip_dial(string $number, string $dial): string
+{
+    $num = trim($number);
+    if ($num === '') {
+        return '';
+    }
+    $dial = preg_replace('/\D+/', '', $dial);
+
+    $compact = preg_replace('/[\s\-().]/', '', $num);
+    if (!is_string($compact) || $compact === '') {
+        return $num;
+    }
+
+    if (strncmp($compact, '+', 1) === 0) {
+        $compact = substr($compact, 1);
+    } elseif (strncmp($compact, '00', 2) === 0) {
+        $compact = substr($compact, 2);
+    }
+
+    if ($dial !== '' && $compact !== '' && strncmp($compact, $dial, strlen($dial)) === 0) {
+        $rest = substr($compact, strlen($dial));
+        if ($rest !== '') {
+            return $rest;
+        }
+    }
+
+    return $compact;
+}
+
 /** عملة السوق من مبدّل دولة الأدmin (جدول countries ثم الخريطة المرجعية). */
 function orange_admin_context_currency_code(PDO $pdo): string
 {

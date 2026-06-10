@@ -40,9 +40,10 @@ $channels = $pdo->query(
 )->fetchAll(PDO::FETCH_ASSOC);
 $sv2DefaultChannelId = orange_sales_company_direct_channel_id();
 
+$sv2PhoneDial = orange_admin_context_phone_dial($pdo);
 $sv2ChannelWaMap = [];
 foreach ($channels as $sv2Ch) {
-    $sv2ChannelWaMap[(int) $sv2Ch['id']] = trim((string) ($sv2Ch['whatsapp_number'] ?? ''));
+    $sv2ChannelWaMap[(int) $sv2Ch['id']] = orange_phone_strip_dial((string) ($sv2Ch['whatsapp_number'] ?? ''), $sv2PhoneDial);
 }
 $sv2CompanyPhone = orange_sales_doc_print_company($pdo, $adminCountryId)['phones'];
 
@@ -1281,7 +1282,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
 
         var chSel = document.getElementById('sv2_channel');
         var chId = chSel ? (parseInt(chSel.value, 10) || 0) : 0;
-        setTxt('sv2_sd_print_phone', orangeSalesDocContactPhone(SV2_COMPANY_PHONE, SV2_CHANNEL_WA, chId));
+        orangeSalesDocSetPhoneCells('sv2_sd_print_phone', SV2_COMPANY_PHONE, SV2_CHANNEL_WA, chId);
 
         var notesEl = document.getElementById('sv2_notes');
         var notesBox = document.getElementById('sv2_sd_print_notes');

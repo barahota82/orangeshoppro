@@ -4383,6 +4383,21 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     color: #475569;
     line-height: 1.5;
 }
+.sd-print-banner__phone-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.3rem;
+    direction: ltr;
+}
+.sd-print-banner__nums {
+    display: grid;
+    grid-template-columns: repeat(4, max-content);
+    gap: 0 0.55rem;
+    direction: ltr;
+}
+.sd-print-banner__num {
+    white-space: nowrap;
+}
 .sd-print-banner__meta {
     padding: 0.7rem 0.85rem;
     border: 1px solid #fed7aa;
