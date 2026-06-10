@@ -134,15 +134,16 @@ function orange_sales_doc_print_banner(array $ctx): void
 
     $phoneByChannel = !empty($ctx['phone_by_channel']);
     $crValue = $company['commercial_register'];
+    // الأعمدة محاذاة صفاً بصف مع عمود اسم الشركة (الأساس): عنوان=صف1، أرقام تواصل=صف2، ض.ق.م=صف3.
     $metaRows = [];
     if ($company['address'] !== '') {
-        $metaRows[] = ['', $company['address']];
+        $metaRows[] = ['label' => '', 'value' => $company['address'], 'row' => 1];
     }
     if ($phoneByChannel || $company['phones'] !== '') {
-        $metaRows[] = ['Tel', $company['phones'], $pfx . '_sd_print_phone', 'phone'];
+        $metaRows[] = ['label' => 'Tel', 'value' => $company['phones'], 'id' => $pfx . '_sd_print_phone', 'kind' => 'phone', 'row' => 2];
     }
     if ($company['vat_number'] !== '') {
-        $metaRows[] = ['ض.ق.م / VAT', $company['vat_number']];
+        $metaRows[] = ['label' => 'ض.ق.م / VAT', 'value' => $company['vat_number'], 'row' => 3];
     }
 
     $headClass = 'sd-print-banner__head' . ($showParty ? ' sd-print-banner__head--with-party' : '');
@@ -150,29 +151,28 @@ function orange_sales_doc_print_banner(array $ctx): void
 <div class="sd-print-banner" aria-hidden="true">
     <div class="<?php echo $headClass; ?>">
         <div class="sd-print-banner__brand">
-            <div class="sd-print-banner__brand-id">
-                <?php if ($logoUrl !== ''): ?>
-                <img class="sd-print-banner__logo" src="<?php echo htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+            <?php if ($logoUrl !== ''): ?>
+            <img class="sd-print-banner__logo" src="<?php echo htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+            <?php endif; ?>
+            <div class="sd-print-banner__titles">
+                <?php if ($nameAr !== ''): ?>
+                <p class="sd-print-banner__name-ar"><?php echo htmlspecialchars($nameAr, ENT_QUOTES, 'UTF-8'); ?></p>
                 <?php endif; ?>
-                <div class="sd-print-banner__titles">
-                    <?php if ($nameAr !== ''): ?>
-                    <p class="sd-print-banner__name-ar"><?php echo htmlspecialchars($nameAr, ENT_QUOTES, 'UTF-8'); ?></p>
-                    <?php endif; ?>
-                    <?php if ($nameEn !== ''): ?>
-                    <p class="sd-print-banner__name-en" dir="ltr" lang="en"><?php echo htmlspecialchars($nameEn, ENT_QUOTES, 'UTF-8'); ?></p>
-                    <?php endif; ?>
-                    <?php if ($crValue !== ''): ?>
-                    <p class="sd-print-banner__cr"><span class="sd-print-banner__label">سجل تجاري ( R.C.)</span> : <span dir="ltr" lang="en"><?php echo htmlspecialchars($crValue, ENT_QUOTES, 'UTF-8'); ?></span></p>
-                    <?php endif; ?>
-                </div>
+                <?php if ($nameEn !== ''): ?>
+                <p class="sd-print-banner__name-en" dir="ltr" lang="en"><?php echo htmlspecialchars($nameEn, ENT_QUOTES, 'UTF-8'); ?></p>
+                <?php endif; ?>
+                <?php if ($crValue !== ''): ?>
+                <p class="sd-print-banner__cr"><span class="sd-print-banner__label">سجل تجاري ( R.C.)</span> : <span dir="ltr" lang="en"><?php echo htmlspecialchars($crValue, ENT_QUOTES, 'UTF-8'); ?></span></p>
+                <?php endif; ?>
             </div>
             <?php if ($metaRows !== []): ?>
             <div class="sd-print-banner__company-meta">
                 <?php foreach ($metaRows as $row): ?>
-                <?php if (isset($row[3]) && $row[3] === 'phone'): ?>
-                <p class="sd-print-banner__phone-row"><?php if ($row[0] !== ''): ?><span class="sd-print-banner__label"><?php echo htmlspecialchars($row[0], ENT_QUOTES, 'UTF-8'); ?>:</span> <?php endif; ?><span class="sd-print-banner__nums" id="<?php echo htmlspecialchars($row[2], ENT_QUOTES, 'UTF-8'); ?>"><?php echo orange_sales_doc_phone_cells((string) $row[1]); ?></span></p>
+                <?php $rowStyle = isset($row['row']) ? ' style="grid-row:' . (int) $row['row'] . '"' : ''; ?>
+                <?php if (($row['kind'] ?? '') === 'phone'): ?>
+                <p class="sd-print-banner__phone-row"<?php echo $rowStyle; ?>><?php if ($row['label'] !== ''): ?><span class="sd-print-banner__label"><?php echo htmlspecialchars($row['label'], ENT_QUOTES, 'UTF-8'); ?>:</span> <?php endif; ?><span class="sd-print-banner__nums" id="<?php echo htmlspecialchars((string) $row['id'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo orange_sales_doc_phone_cells((string) $row['value']); ?></span></p>
                 <?php else: ?>
-                <p><?php if ($row[0] !== ''): ?><span class="sd-print-banner__label"><?php echo htmlspecialchars($row[0], ENT_QUOTES, 'UTF-8'); ?>:</span> <?php endif; ?><span<?php echo isset($row[2]) && $row[2] !== '' ? ' id="' . htmlspecialchars($row[2], ENT_QUOTES, 'UTF-8') . '"' : ''; ?>><?php echo htmlspecialchars($row[1], ENT_QUOTES, 'UTF-8'); ?></span></p>
+                <p<?php echo $rowStyle; ?>><?php if ($row['label'] !== ''): ?><span class="sd-print-banner__label"><?php echo htmlspecialchars($row['label'], ENT_QUOTES, 'UTF-8'); ?>:</span> <?php endif; ?><span><?php echo htmlspecialchars((string) $row['value'], ENT_QUOTES, 'UTF-8'); ?></span></p>
                 <?php endif; ?>
                 <?php endforeach; ?>
             </div>
