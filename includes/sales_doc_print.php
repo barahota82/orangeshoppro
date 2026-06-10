@@ -231,13 +231,16 @@ function orange_sales_doc_print_banner(array $ctx): void
  * تذييل طباعة لفاتورة العميل (شكر + توقيع/ختم + invoice_footer).
  * يُوضع في نهاية منطقة الطباعة `.jv-print-area` للمستندات التي يستلمها العميل (المبيعات).
  *
- * @param array{country_id:int} $ctx
+ * @param array{country_id:int, show_note?:bool} $ctx
+ *   show_note: إظهار النص القانوني (invoice_footer). افتراضياً true.
+ *   يُمرَّر false للمستندات التي لا يناسبها النص القانوني للفاتورة (مثل مردود المبيعات).
  */
 function orange_sales_doc_print_footer(array $ctx): void
 {
     $countryId = (int) ($ctx['country_id'] ?? 0);
+    $showNote = !array_key_exists('show_note', $ctx) || !empty($ctx['show_note']);
     $company = orange_sales_doc_print_company(db(), $countryId);
-    $footerNote = $company['invoice_footer'];
+    $footerNote = $showNote ? $company['invoice_footer'] : '';
     ?>
 <div class="sd-print-footer" aria-hidden="true">
     <p class="sd-print-footer__thanks">شكراً لتعاملكم / Thank you for your business</p>

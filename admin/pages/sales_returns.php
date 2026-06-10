@@ -296,7 +296,7 @@ $sr2DocSerialPreview = $sr2NavReady
         <?php echo htmlspecialchars($srCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?>
     </div>
 
-    <?php orange_sales_doc_print_footer(['country_id' => $srCountryId]); ?>
+    <?php orange_sales_doc_print_footer(['country_id' => $srCountryId, 'show_note' => false]); ?>
 
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
         <span></span>
