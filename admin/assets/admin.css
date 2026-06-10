@@ -4596,7 +4596,10 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     text-align: center;
     font-size: 0.78rem;
     color: #64748b;
-    margin: 0;
+    margin: 0 0 0.5mm;
+}
+.sd-print-legal__note:last-child {
+    margin-bottom: 0;
 }
 
 @media print {

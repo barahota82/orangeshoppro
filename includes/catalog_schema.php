@@ -2970,6 +2970,12 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'invoice_footer')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE company_settings ADD COLUMN invoice_footer TEXT NULL');
     }
+    if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'invoice_footer_ar')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE company_settings ADD COLUMN invoice_footer_ar TEXT NULL');
+    }
+    if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'invoice_footer_en')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE company_settings ADD COLUMN invoice_footer_en TEXT NULL');
+    }
 
     if (!orange_table_exists($pdo, 'storefront_home_hero')) {
         orange_catalog_safe_exec(

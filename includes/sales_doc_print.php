@@ -6,7 +6,7 @@ require_once __DIR__ . '/company_settings.php';
 require_once __DIR__ . '/upload_paths.php';
 
 /**
- * @return array{company_name_ar:string,company_name_en:string,logo_url:string,commercial_register:string,phones:string,address:string,vat_number:string,invoice_footer:string}
+ * @return array{company_name_ar:string,company_name_en:string,logo_url:string,commercial_register:string,phones:string,address:string,vat_number:string,invoice_footer:string,invoice_footer_ar:string,invoice_footer_en:string}
  */
 function orange_sales_doc_print_company(PDO $pdo, int $countryId): array
 {
@@ -19,6 +19,8 @@ function orange_sales_doc_print_company(PDO $pdo, int $countryId): array
         'address' => '',
         'vat_number' => '',
         'invoice_footer' => '',
+        'invoice_footer_ar' => '',
+        'invoice_footer_en' => '',
     ];
     $row = orange_company_settings_row($pdo, $countryId > 0 ? $countryId : null, false);
     if (!is_array($row)) {
@@ -47,6 +49,8 @@ function orange_sales_doc_print_company(PDO $pdo, int $countryId): array
         'address' => trim((string) ($row['address'] ?? '')),
         'vat_number' => trim((string) ($row['vat_number'] ?? '')),
         'invoice_footer' => trim((string) ($row['invoice_footer'] ?? '')),
+        'invoice_footer_ar' => trim((string) ($row['invoice_footer_ar'] ?? '')),
+        'invoice_footer_en' => trim((string) ($row['invoice_footer_en'] ?? '')),
     ];
 }
 
@@ -265,7 +269,9 @@ function orange_sales_doc_print_footer(array $ctx): void
     $countryId = (int) ($ctx['country_id'] ?? 0);
     $showNote = !array_key_exists('show_note', $ctx) || !empty($ctx['show_note']);
     $company = orange_sales_doc_print_company(db(), $countryId);
-    $footerNote = $showNote ? $company['invoice_footer'] : '';
+    $footerAr = $showNote ? $company['invoice_footer_ar'] : '';
+    $footerEn = $showNote ? $company['invoice_footer_en'] : '';
+    $footerLegacy = $showNote ? $company['invoice_footer'] : '';
     ?>
 <div class="sd-print-footer" aria-hidden="true">
     <p class="sd-print-footer__thanks">شكراً لتعاملكم / Thank you for your business</p>
@@ -280,10 +286,19 @@ function orange_sales_doc_print_footer(array $ctx): void
         </div>
     </div>
 </div>
-<?php if ($footerNote !== ''): ?>
-<?php /* النص القانوني منفصل عن كتلة الشكر/التوقيع: يتكرر أسفل كل صفحة عبر position:fixed في الطباعة (CSS). */ ?>
+<?php /* النص القانوني (عربي/إنجليزي منفصلان) أسفل كل صفحة عبر position:fixed في الطباعة (CSS). تحت بعض حالياً. */ ?>
+<?php if ($footerAr !== '' || $footerEn !== ''): ?>
 <div class="sd-print-legal" aria-hidden="true">
-    <p class="sd-print-legal__note"><?php echo htmlspecialchars($footerNote, ENT_QUOTES, 'UTF-8'); ?></p>
+    <?php if ($footerAr !== ''): ?>
+    <p class="sd-print-legal__note sd-print-legal__note--ar" dir="rtl" lang="ar"><?php echo htmlspecialchars($footerAr, ENT_QUOTES, 'UTF-8'); ?></p>
+    <?php endif; ?>
+    <?php if ($footerEn !== ''): ?>
+    <p class="sd-print-legal__note sd-print-legal__note--en" dir="ltr" lang="en"><?php echo htmlspecialchars($footerEn, ENT_QUOTES, 'UTF-8'); ?></p>
+    <?php endif; ?>
+</div>
+<?php elseif ($footerLegacy !== ''): ?>
+<div class="sd-print-legal" aria-hidden="true">
+    <p class="sd-print-legal__note"><?php echo htmlspecialchars($footerLegacy, ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 <?php endif; ?>
     <?php

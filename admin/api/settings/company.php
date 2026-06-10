@@ -106,6 +106,23 @@ try {
             }
         }
 
+        if (orange_table_has_column($pdo, 'company_settings', 'invoice_footer_ar')) {
+            $footerAr = trim((string) ($data['invoice_footer_ar'] ?? ''));
+            $footerEn = trim((string) ($data['invoice_footer_en'] ?? ''));
+            $footerArDb = $footerAr === '' ? null : $footerAr;
+            $footerEnDb = $footerEn === '' ? null : $footerEn;
+            if (orange_company_settings_has_country_column($pdo)) {
+                $pdo->prepare('UPDATE company_settings SET invoice_footer_ar = ?, invoice_footer_en = ? WHERE country_id = ?')
+                    ->execute([$footerArDb, $footerEnDb, $ctxCountryId]);
+            } else {
+                $rowF = $pdo->query('SELECT id FROM company_settings ORDER BY id ASC LIMIT 1')->fetch();
+                if ($rowF) {
+                    $pdo->prepare('UPDATE company_settings SET invoice_footer_ar = ?, invoice_footer_en = ? WHERE id = ?')
+                        ->execute([$footerArDb, $footerEnDb, (int) $rowF['id']]);
+                }
+            }
+        }
+
         json_response(['success' => true, 'message' => 'تم حفظ بيانات الشركة']);
     }
 

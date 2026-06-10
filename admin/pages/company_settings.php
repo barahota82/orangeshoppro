@@ -84,7 +84,15 @@ $csUpdatedAt = trim((string) ($csRow['updated_at'] ?? ''));
         </div>
         <div><label>الرقم الضريبي (للفواتير)</label><input type="text" id="vat_number" placeholder="إن وُجد" value="<?php echo $csField($csRow, 'vat_number'); ?>"></div>
         <div><label>نسبة ضريبة القيمة المضافة % (تلقائي على الفواتير — الكويت 0)</label><input type="number" id="vat_rate" min="0" max="99.999" step="0.001" lang="en" dir="ltr" placeholder="0" value="<?php echo htmlspecialchars((string) ($csRow['vat_rate'] ?? '0'), ENT_QUOTES, 'UTF-8'); ?>"></div>
-        <div style="grid-column:1/-1;"><label>نص قانوني أسفل الفاتورة (اختياري)</label><textarea id="invoice_footer" rows="2" placeholder="مثال: سداد خلال ٣٠ يوم — البضاعة تُسلّم بحالة جيدة"><?php echo $csField($csRow, 'invoice_footer'); ?></textarea></div>
+        <?php
+        $csFooterAr = trim((string) ($csRow['invoice_footer_ar'] ?? ''));
+        if ($csFooterAr === '') {
+            $csFooterAr = trim((string) ($csRow['invoice_footer'] ?? ''));
+        }
+        $csFooterEn = trim((string) ($csRow['invoice_footer_en'] ?? ''));
+        ?>
+        <div style="grid-column:1/-1;"><label>نص قانوني أسفل الفاتورة — عربي (اختياري)</label><textarea id="invoice_footer_ar" rows="2" dir="rtl" placeholder="مثال: سياسة الاستبدال والاسترجاع — خلال ١٤ يوماً ..."><?php echo htmlspecialchars($csFooterAr, ENT_QUOTES, 'UTF-8'); ?></textarea></div>
+        <div style="grid-column:1/-1;"><label>نص قانوني أسفل الفاتورة — إنجليزي (اختياري)</label><textarea id="invoice_footer_en" rows="2" dir="ltr" lang="en" placeholder="e.g., Return &amp; Exchange Policy: within 14 days ..."><?php echo htmlspecialchars($csFooterEn, ENT_QUOTES, 'UTF-8'); ?></textarea></div>
     </div>
     <div class="admin-form-actions">
         <button type="button" onclick="saveCompanySettings()">حفظ</button>
@@ -123,7 +131,10 @@ async function loadCompanySettings() {
     document.getElementById('vat_number').value = d.vat_number || '';
     var vrEl = document.getElementById('vat_rate');
     if (vrEl) vrEl.value = (d.vat_rate !== undefined && d.vat_rate !== null) ? d.vat_rate : '0';
-    document.getElementById('invoice_footer').value = d.invoice_footer || '';
+    var fAr = document.getElementById('invoice_footer_ar');
+    var fEn = document.getElementById('invoice_footer_en');
+    if (fAr) fAr.value = d.invoice_footer_ar || d.invoice_footer || '';
+    if (fEn) fEn.value = d.invoice_footer_en || '';
     const payEl = document.getElementById('payment_online_enabled');
     if (payEl) {
         payEl.checked = parseInt(String(d.payment_online_enabled || '0'), 10) === 1;
@@ -141,7 +152,8 @@ async function saveCompanySettings() {
         address: document.getElementById('address').value.trim(),
         vat_number: document.getElementById('vat_number').value.trim(),
         vat_rate: (document.getElementById('vat_rate') ? parseFloat(document.getElementById('vat_rate').value) : 0) || 0,
-        invoice_footer: document.getElementById('invoice_footer').value.trim(),
+        invoice_footer_ar: (document.getElementById('invoice_footer_ar') ? document.getElementById('invoice_footer_ar').value.trim() : ''),
+        invoice_footer_en: (document.getElementById('invoice_footer_en') ? document.getElementById('invoice_footer_en').value.trim() : ''),
         payment_online_enabled: document.getElementById('payment_online_enabled') && document.getElementById('payment_online_enabled').checked ? 1 : 0
     });
     if (res.success) {
