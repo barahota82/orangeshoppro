@@ -4284,8 +4284,8 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 .sd-print-banner__head {
     display: grid;
     direction: rtl;
-    grid-template-columns: 1fr minmax(200px, 32%);
-    gap: 0.75rem 1rem;
+    grid-template-columns: 1fr minmax(185px, 27%);
+    gap: 0.75rem 0.75rem;
     align-items: start;
     padding-bottom: 0.75rem;
     margin-bottom: 0.85rem;
@@ -4298,7 +4298,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     direction: rtl;
     grid-template-columns: auto auto 1fr auto;
     grid-template-rows: auto auto auto;
-    column-gap: 0.85rem;
+    column-gap: 0.5rem;
     align-items: start;
     width: 100%;
 }
@@ -4369,8 +4369,8 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     overflow-wrap: anywhere;
 }
 .sd-print-banner__logo {
-    width: 76px;
-    height: 76px;
+    width: 64px;
+    height: 64px;
     object-fit: contain;
     border: 1px solid #fed7aa;
     border-radius: 8px;
@@ -5426,7 +5426,8 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 }
 .pl-month-contact-line {
     margin: 0;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
     text-align: end;
     line-height: 1.25;
 }
