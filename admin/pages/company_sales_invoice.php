@@ -167,8 +167,13 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
 .form-grid.sv2-header-row2 {
     grid-template-columns: minmax(8rem, 0.85fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr);
 }
+/* صف 2 — تاريخ الفاتورة · قناة العملاء · نوع البيع · تاريخ الإدخال · مدفوع الآن */
+.form-grid.sv2-header-rowdoc {
+    grid-template-columns: minmax(7rem, 0.7fr) minmax(0, 1.4fr) minmax(6rem, 0.65fr) minmax(7rem, 0.7fr) minmax(6rem, 0.65fr);
+}
+/* صف 4 — ملاحظات بعرض كامل */
 .form-grid.sv2-header-row3 {
-    grid-template-columns: minmax(0, 1.2fr) minmax(8rem, 0.75fr) minmax(7rem, 0.65fr) minmax(0, 1.4fr);
+    grid-template-columns: 1fr;
 }
 .sv2-extra-source-tabs {
     display: flex;
@@ -253,9 +258,31 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             <label for="sv2_customer_balance">رصيد الذمم</label>
             <input type="text" id="sv2_customer_balance" class="admin-inp-readonly admin-money-display" readonly disabled tabindex="-1" dir="ltr" lang="en" placeholder="—">
         </div>
+        <input type="hidden" id="sv2_customer_id" value="0">
+    </div>
+
+    <!-- ٢ — تاريخ الفاتورة، قناة العملاء، نوع البيع، تاريخ الإدخال، مدفوع الآن -->
+    <div class="form-grid sv2-header-rowdoc orange-doc-header-row" style="margin-bottom:12px;">
         <div>
             <label for="sv2_document_date">تاريخ الفاتورة</label>
             <input type="date" id="sv2_document_date" dir="ltr" lang="en" title="تاريخ الفاتورة = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>">
+        </div>
+        <div>
+            <label for="sv2_channel">قناة العملاء</label>
+            <select id="sv2_channel" required>
+                <option value="0"<?php echo $sv2DefaultChannelId === 0 ? ' selected' : ''; ?>><?php echo htmlspecialchars(orange_sales_company_direct_channel_label(), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php foreach ($channels as $ch): ?>
+                <option value="<?php echo (int) $ch['id']; ?>"<?php echo (int) $ch['id'] === $sv2DefaultChannelId ? ' selected' : ''; ?>><?php echo htmlspecialchars((string) $ch['name'], ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label for="sv2_payment_terms">نوع البيع</label>
+            <select id="sv2_payment_terms">
+                <option value="cash">نقدي</option>
+                <option value="credit">آجل</option>
+                <option value="online">أونلاين</option>
+            </select>
         </div>
         <div>
             <label for="sv2_entry_date">تاريخ الإدخال</label>
@@ -263,7 +290,10 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 value="<?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?>"
                 title="وقت تسجيل إدخال المستند في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح">
         </div>
-        <input type="hidden" id="sv2_customer_id" value="0">
+        <div>
+            <label for="sv2_amount_paid">مدفوع الآن</label>
+            <input type="number" id="sv2_amount_paid" class="admin-inp-money" step="any" min="0" value="0" dir="ltr" lang="en">
+        </div>
     </div>
 
     <div class="form-grid sv2-header-row2 orange-doc-header-row" style="margin-bottom:12px;">
@@ -286,28 +316,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         </div>
     </div>
 
+    <!-- ٤ — ملاحظات -->
     <div class="form-grid sv2-header-row3 orange-doc-header-row" style="margin-bottom:16px;">
-        <div>
-            <label for="sv2_channel">قناة العملاء</label>
-            <select id="sv2_channel" required>
-                <option value="0"<?php echo $sv2DefaultChannelId === 0 ? ' selected' : ''; ?>><?php echo htmlspecialchars(orange_sales_company_direct_channel_label(), ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php foreach ($channels as $ch): ?>
-                <option value="<?php echo (int) $ch['id']; ?>"<?php echo (int) $ch['id'] === $sv2DefaultChannelId ? ' selected' : ''; ?>><?php echo htmlspecialchars((string) $ch['name'], ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div>
-            <label for="sv2_payment_terms">نوع البيع</label>
-            <select id="sv2_payment_terms">
-                <option value="cash">نقدي</option>
-                <option value="credit">آجل</option>
-                <option value="online">أونلاين</option>
-            </select>
-        </div>
-        <div>
-            <label for="sv2_amount_paid">مدفوع الآن</label>
-            <input type="number" id="sv2_amount_paid" class="admin-inp-money" step="any" min="0" value="0" dir="ltr" lang="en">
-        </div>
         <div>
             <label for="sv2_notes">ملاحظات</label>
             <input type="text" id="sv2_notes" placeholder="ملاحظات…">
