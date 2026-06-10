@@ -150,14 +150,25 @@ $sr2DocSerialPreview = $sr2NavReady
     orange_sales_doc_print_banner([
         'prefix' => 'sr2',
         'doc_title' => 'مردود مبيعات',
+        'doc_title_en' => 'Sales Return',
         'country_id' => $srCountryId,
         'currency_code' => $srDefaultCurrency,
+        'serial_label' => 'رقم المردود / Return No.',
+        'doc_date_label' => 'تاريخ المردود / Return Date',
+        'show_doc_date' => true,
+        'show_print_date' => false,
+        'show_qr' => true,
+        'show_party' => true,
+        'party_title' => 'العميل / Customer',
+        'party_rows' => [
+            ['العميل / Customer', 'party_name', ''],
+        ],
     ]);
     ?>
     <h3 class="card-title">مردود مبيعات <span id="sr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'sr2', 'doc_kind' => 'sales_return', 'country_id' => $srCountryId, 'show_status_badge' => false]); ?>
 
-    <div class="form-grid sr2-customer-row orange-doc-header-row" style="margin-bottom:12px;">
+    <div class="form-grid sr2-customer-row orange-doc-header-row jv-print-hide" style="margin-bottom:12px;">
         <div>
             <label for="sr2_doc_serial">مسلسل المردود</label>
             <input type="text" id="sr2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
@@ -180,7 +191,7 @@ $sr2DocSerialPreview = $sr2NavReady
     </div>
 
     <!-- ٢ — فاتورة المبيعات المرجعية، استرجاع، تاريخ المردود، قناة التحصيل، تاريخ الإدخال، ملاحظات -->
-    <div class="form-grid sr2-header-row2 orange-doc-header-row" style="margin-bottom:16px;">
+    <div class="form-grid sr2-header-row2 orange-doc-header-row jv-print-hide" style="margin-bottom:16px;">
         <div>
             <label for="sr2_order_ref">فاتورة المبيعات المرجعية</label>
             <input type="text" id="sr2_order_ref" placeholder="INV-C- أو رقم" dir="ltr" lang="en" autocomplete="off">
@@ -259,10 +270,14 @@ $sr2DocSerialPreview = $sr2NavReady
     </div>
 
     <div style="margin-top:14px;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
+        <span style="color:#64748b;">إجمالي البنود:</span> <strong id="sr2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+        <span style="color:#64748b;">إجمالي الخصم:</span> <strong id="sr2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
         <span style="color:#64748b;">صافي المردود:</span>
         <strong id="sr2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#dc2626;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
         <?php echo htmlspecialchars($srCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?>
     </div>
+
+    <?php orange_sales_doc_print_footer(['country_id' => $srCountryId]); ?>
 
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
         <span></span>
@@ -680,6 +695,7 @@ $sr2DocSerialPreview = $sr2NavReady
         var tb = document.getElementById('sr2_lines_body');
         if (!tb) return;
         var netTotal = 0;
+        var grossSubtotal = 0;
         var rows = tb.querySelectorAll('tr.sr2-line');
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
@@ -687,12 +703,19 @@ $sr2DocSerialPreview = $sr2NavReady
             var price = parseFloat(r.querySelector('.sr2-price').value) || 0;
             var disc = parseFloat(r.querySelector('.sr2-line-disc').value) || 0;
             var lineGross = q * price;
+            if (disc > lineGross) disc = lineGross;
             var lineNet = Math.max(0, lineGross - disc);
             var ltEl = r.querySelector('.sr2-line-total');
             if (ltEl) ltEl.value = fmt3(lineNet);
+            grossSubtotal += lineGross;
             netTotal += lineNet;
         }
+        var totalDiscount = Math.max(0, grossSubtotal - netTotal);
+        var stEl = document.getElementById('sr2_subtotal');
+        var dtEl = document.getElementById('sr2_discount_total');
         var ntEl = document.getElementById('sr2_net_total');
+        if (stEl) stEl.textContent = fmt3(grossSubtotal);
+        if (dtEl) dtEl.textContent = fmt3(totalDiscount);
         if (ntEl) ntEl.textContent = fmt3(netTotal);
     }
 
@@ -836,6 +859,21 @@ $sr2DocSerialPreview = $sr2NavReady
         var d = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
         if (d) return d[3] + '/' + d[2] + '/' + d[1];
         return s;
+    }
+
+    function sr2SyncPrintExtras() {
+        var setTxt = function (id, val) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            var v = String(val || '').trim();
+            el.textContent = v !== '' ? v : '—';
+        };
+        var docDateEl = document.getElementById('sr2_document_date');
+        var docDateVal = docDateEl ? String(docDateEl.value || '').trim() : '';
+        var dm = docDateVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        setTxt('sr2_sd_print_docdate', dm ? (dm[3] + '/' + dm[2] + '/' + dm[1]) : docDateVal);
+        var nameEl = document.getElementById('sr2_customer_name');
+        setTxt('sr2_sd_print_party_name', nameEl ? nameEl.value : '');
     }
 
     function sr2ApplyReturnPayload(res) {
@@ -1349,12 +1387,14 @@ $sr2DocSerialPreview = $sr2NavReady
                 serialElId: 'sr2_doc_serial',
                 beforePrint: function () {
                     if (!SR2_PRINT_TUNING && browseReturnId <= 0) { alert('افتح مردوداً محفوظاً للطباعة.'); return false; }
+                    sr2SyncPrintExtras();
                     return true;
                 }
             });
         } else {
             document.getElementById('sr2_btn_print').addEventListener('click', function () {
                 if (!SR2_PRINT_TUNING && browseReturnId <= 0) { alert('افتح مردوداً محفوظاً للطباعة.'); return; }
+                sr2SyncPrintExtras();
                 window.print();
             });
         }

@@ -137,14 +137,21 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     orange_sales_doc_print_banner([
         'prefix' => 'ov2',
         'doc_title' => 'فاتورة أونلاين',
+        'doc_title_en' => 'Online Invoice',
         'country_id' => $adminCountryId,
         'currency_code' => $adminDefaultCurrency,
+        'serial_label' => 'رقم الفاتورة / Invoice No.',
+        'show_doc_date' => true,
+        'show_print_date' => false,
+        'show_qr' => true,
+        'show_party' => true,
+        'party_title' => 'فاتورة إلى / Bill To',
     ]);
     ?>
     <h3 class="card-title">فاتورة أونلاين <span id="ov2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'ov2', 'doc_kind' => 'online_sales_invoice', 'country_id' => $adminCountryId, 'show_status_badge' => false]); ?>
 
-    <div class="form-grid ov2-header-row1 orange-doc-header-row" style="margin-bottom:12px;">
+    <div class="form-grid ov2-header-row1 orange-doc-header-row jv-print-hide" style="margin-bottom:12px;">
         <div>
             <label for="ov2_doc_serial">مسلسل الفاتورة</label>
             <input type="text" id="ov2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en"
@@ -166,7 +173,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         </div>
     </div>
 
-    <div class="form-grid ov2-header-row2 orange-doc-header-row" style="margin-bottom:12px;">
+    <div class="form-grid ov2-header-row2 orange-doc-header-row jv-print-hide" style="margin-bottom:12px;">
         <div>
             <label for="ov2_customer_code">كود العميل</label>
             <input type="text" id="ov2_customer_code" class="admin-inp-readonly" autocomplete="off" dir="ltr" lang="en" readonly disabled tabindex="-1" placeholder="—" title="من الطلب — يُعبَّأ عند فتح الفاتورة">
@@ -182,7 +189,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         <input type="hidden" id="ov2_customer_id" value="0">
     </div>
 
-    <div class="form-grid ov2-header-row3 orange-doc-header-row" style="margin-bottom:12px;">
+    <div class="form-grid ov2-header-row3 orange-doc-header-row jv-print-hide" style="margin-bottom:12px;">
         <div>
             <label for="ov2_phone_country">كود الدولة</label>
             <input type="search" id="ov2_phone_country" list="ov2_phone_country_list" autocomplete="off" dir="ltr" lang="en" placeholder="+965" required>
@@ -202,7 +209,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         </div>
     </div>
 
-    <div class="form-grid ov2-header-row4 orange-doc-header-row" style="margin-bottom:16px;">
+    <div class="form-grid ov2-header-row4 orange-doc-header-row jv-print-hide" style="margin-bottom:16px;">
         <div>
             <label for="ov2_channel_name">قناة البيع</label>
             <input type="text" id="ov2_channel_name" class="admin-inp-readonly" readonly disabled tabindex="-1" value="—" title="من الطلب — لا يُغيَّر يدوياً">
@@ -261,10 +268,13 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     <div style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
         <div style="flex:1 1 auto;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
             <span style="color:#64748b;">إجمالي البنود:</span> <strong id="ov2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">إجمالي الخصم:</span> <strong id="ov2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
             <span style="color:#64748b;">صافي الفاتورة:</span> <strong id="ov2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
             <span class="muted" style="font-size:0.85rem;"> <?php echo htmlspecialchars($adminCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
         </div>
     </div>
+
+    <?php orange_sales_doc_print_footer(['country_id' => $adminCountryId]); ?>
 
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
         <span></span>
@@ -687,6 +697,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         var tb = document.getElementById('ov2_lines_body');
         if (!tb) return;
         var subtotal = 0;
+        var grossSubtotal = 0;
         tb.querySelectorAll('tr.ov2-line').forEach(function (r) {
             var q = parseInt(r.querySelector('.ov2-qty').value, 10) || 0;
             var p = parseFloat(r.querySelector('.ov2-price').value) || 0;
@@ -695,11 +706,15 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             var lineNet = Math.max(0, lineGross - discAmt);
             var ltEl = r.querySelector('.ov2-line-total');
             if (ltEl) ltEl.value = fmt3(lineNet);
+            grossSubtotal += lineGross;
             subtotal += lineNet;
         });
+        var totalDiscount = Math.max(0, grossSubtotal - subtotal);
         var stEl = document.getElementById('ov2_subtotal');
+        var dtEl = document.getElementById('ov2_discount_total');
         var ntEl = document.getElementById('ov2_net_total');
-        if (stEl) stEl.textContent = fmt3(subtotal);
+        if (stEl) stEl.textContent = fmt3(grossSubtotal);
+        if (dtEl) dtEl.textContent = fmt3(totalDiscount);
         if (ntEl) ntEl.textContent = fmt3(subtotal);
     }
 
@@ -1237,6 +1252,25 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
 
         document.getElementById('ov2_btn_save').addEventListener('click', save);
 
+        window.ov2SyncPrintExtras = function () {
+            var setTxt = function (id, val) {
+                var el = document.getElementById(id);
+                if (!el) return;
+                var v = String(val || '').trim();
+                el.textContent = v !== '' ? v : '—';
+            };
+            var compEl = document.getElementById('ov2_completed_at');
+            setTxt('ov2_sd_print_docdate', compEl ? compEl.value : '');
+            var nameEl = document.getElementById('ov2_customer_name');
+            var phoneEl = document.getElementById('ov2_phone');
+            var areaEl = document.getElementById('ov2_area');
+            var addrEl = document.getElementById('ov2_address');
+            setTxt('ov2_sd_print_party_name', nameEl ? nameEl.value : '');
+            setTxt('ov2_sd_print_party_phone', phoneEl ? phoneEl.value : '');
+            setTxt('ov2_sd_print_party_area', areaEl ? areaEl.value : '');
+            setTxt('ov2_sd_print_party_address', addrEl ? addrEl.value : '');
+        };
+
         var ov2AddExtraBtn = document.getElementById('ov2_btn_add_extra');
         if (ov2AddExtraBtn) ov2AddExtraBtn.addEventListener('click', ov2ExtraPickOpen);
         var ov2ExtraBackdrop = document.getElementById('ov2_extra_pick_backdrop');
@@ -1258,12 +1292,14 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                 serialElId: 'ov2_doc_serial',
                 beforePrint: function () {
                     if (browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }
+                    ov2SyncPrintExtras();
                     return true;
                 }
             });
         } else {
             document.getElementById('ov2_btn_print').addEventListener('click', function () {
                 if (browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return; }
+                ov2SyncPrintExtras();
                 window.print();
             });
         }

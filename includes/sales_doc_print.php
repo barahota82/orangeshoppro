@@ -76,7 +76,7 @@ function orange_sales_doc_print_kv(string $label, string $valueHtml): string
  * @param array{
  *   prefix:string, doc_title:string, doc_title_en?:string, doc_badge:string,
  *   country_id:int, currency_code?:string, serial_label?:string,
- *   show_party?:bool, party_title?:string,
+ *   show_party?:bool, party_title?:string, party_rows?:array<array{0:string,1:string,2?:string}>,
  *   show_doc_date?:bool, doc_date_label?:string,
  *   show_print_date?:bool, show_qr?:bool
  * } $ctx
@@ -93,6 +93,12 @@ function orange_sales_doc_print_banner(array $ctx): void
 
     $showParty = !empty($ctx['show_party']);
     $partyTitle = trim((string) ($ctx['party_title'] ?? 'فاتورة إلى / Bill To'));
+    $partyRows = (isset($ctx['party_rows']) && is_array($ctx['party_rows'])) ? $ctx['party_rows'] : [
+        ['الاسم / Name', 'party_name', ''],
+        ['الهاتف / Phone', 'party_phone', 'ltr'],
+        ['المنطقة / Area', 'party_area', ''],
+        ['العنوان / Address', 'party_address', ''],
+    ];
     $serialLabel = trim((string) ($ctx['serial_label'] ?? 'المسلسل / Serial'));
     $showDocDate = !empty($ctx['show_doc_date']);
     $docDateLabel = trim((string) ($ctx['doc_date_label'] ?? 'تاريخ الفاتورة / Invoice Date'));
@@ -183,10 +189,14 @@ function orange_sales_doc_print_banner(array $ctx): void
                 <?php if ($ptEn !== ''): ?><span class="sd-print-banner__party-title-en" dir="ltr" lang="en"><?php echo htmlspecialchars($ptEn, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
             </p>
             <div class="sd-kv-grid">
-                <?php echo orange_sales_doc_print_kv('الاسم / Name', '<span id="' . $pfx . '_sd_print_party_name" class="sd-print-banner__party-val">—</span>'); ?>
-                <?php echo orange_sales_doc_print_kv('الهاتف / Phone', '<span id="' . $pfx . '_sd_print_party_phone" class="sd-print-banner__party-val" dir="ltr" lang="en">—</span>'); ?>
-                <?php echo orange_sales_doc_print_kv('المنطقة / Area', '<span id="' . $pfx . '_sd_print_party_area" class="sd-print-banner__party-val">—</span>'); ?>
-                <?php echo orange_sales_doc_print_kv('العنوان / Address', '<span id="' . $pfx . '_sd_print_party_address" class="sd-print-banner__party-val">—</span>'); ?>
+                <?php foreach ($partyRows as $pr): ?>
+                <?php
+                $prLabel = (string) ($pr[0] ?? '');
+                $prSuffix = preg_replace('/[^a-z0-9_]/i', '', (string) ($pr[1] ?? '')) ?: 'party_field';
+                $prDir = ((string) ($pr[2] ?? '')) === 'ltr' ? ' dir="ltr" lang="en"' : '';
+                echo orange_sales_doc_print_kv($prLabel, '<span id="' . $pfx . '_sd_print_' . $prSuffix . '" class="sd-print-banner__party-val"' . $prDir . '>—</span>');
+                ?>
+                <?php endforeach; ?>
             </div>
         </div>
         <?php endif; ?>

@@ -235,15 +235,26 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     orange_sales_doc_print_banner([
         'prefix' => 'pr2',
         'doc_title' => 'مردود مشتريات',
+        'doc_title_en' => 'Purchase Return',
         'country_id' => $prCountryId,
         'currency_code' => $prDefaultCurrency,
+        'serial_label' => 'رقم المردود / Return No.',
+        'doc_date_label' => 'تاريخ المردود / Return Date',
+        'show_doc_date' => true,
+        'show_print_date' => false,
+        'show_qr' => true,
+        'show_party' => true,
+        'party_title' => 'المورد / Supplier',
+        'party_rows' => [
+            ['المورد / Supplier', 'party_name', ''],
+        ],
     ]);
     ?>
     <h3 class="card-title">مردود مشتريات <span id="pr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'pr2', 'doc_kind' => 'purchase_return', 'country_id' => $prCountryId, 'show_status_badge' => false]); ?>
 
     <!-- ١ — مسلسل الفاتورة + المورد -->
-    <div class="form-grid pr2-supplier-row orange-doc-header-row" style="margin-bottom:12px;">
+    <div class="form-grid pr2-supplier-row orange-doc-header-row jv-print-hide" style="margin-bottom:12px;">
         <div>
             <label for="pr2_doc_serial">مسلسل الفاتورة</label>
             <input type="text" id="pr2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
@@ -262,7 +273,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     </div>
 
     <!-- ٢ — فاتورة الشراء المرجعية، استرجاع، تاريخ المردود، نوع المردود، تاريخ الإدخال، ملاحظات -->
-    <div class="form-grid pr2-header-row2 orange-doc-header-row" style="margin-bottom:16px;">
+    <div class="form-grid pr2-header-row2 orange-doc-header-row jv-print-hide" style="margin-bottom:16px;">
         <div>
             <label for="pr2_purchase_ref">فاتورة الشراء المرجعية</label>
             <input type="text" id="pr2_purchase_ref" placeholder="PUR- أو رقم" dir="ltr" lang="en" autocomplete="off"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
@@ -319,12 +330,13 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
     <!-- ٣ — خصم الفاتورة + المجاميع -->
     <div style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
-        <div style="flex:0 0 auto;">
+        <div style="flex:0 0 auto;" class="jv-print-hide">
             <label for="pr2_invoice_discount" style="font-size:0.82rem;font-weight:600;">خصم الفاتورة</label>
             <input type="text" id="pr2_invoice_discount" placeholder="0 أو 5%" dir="ltr" lang="en" style="width:8rem;" autocomplete="off"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
         </div>
         <div style="flex:1 1 auto;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
             <span style="color:#64748b;">إجمالي البنود:</span> <strong id="pr2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">إجمالي الخصم:</span> <strong id="pr2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
             <span style="color:#64748b;">صافي المردود:</span> <strong id="pr2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#dc2626;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
         </div>
     </div>
@@ -819,6 +831,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         var tb = document.getElementById('pr2_lines_body');
         if (!tb) return;
         var rows = tb.querySelectorAll('tr.pr2-line');
+        var grossSubtotal = 0;
         var subtotal = 0;
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
@@ -827,17 +840,22 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             var lineGross = q * c;
             var discRaw = (r.querySelector('.pr2-discount') && r.querySelector('.pr2-discount').value || '').trim();
             var discAmt = parseDiscount(discRaw, lineGross);
+            if (discAmt > lineGross) discAmt = lineGross;
             var lineNet = Math.max(0, lineGross - discAmt);
             var ltEl = r.querySelector('.pr2-line-total');
             if (ltEl) ltEl.value = fmt3(lineNet);
+            grossSubtotal += lineGross;
             subtotal += lineNet;
         }
         var invDiscRaw = (document.getElementById('pr2_invoice_discount').value || '').trim();
         var invDiscAmt = parseDiscount(invDiscRaw, subtotal);
         var netTotal = Math.max(0, subtotal - invDiscAmt);
+        var totalDiscount = Math.max(0, grossSubtotal - netTotal);
         var stEl = document.getElementById('pr2_subtotal');
+        var dtEl = document.getElementById('pr2_discount_total');
         var ntEl = document.getElementById('pr2_net_total');
-        if (stEl) stEl.textContent = fmt3(subtotal);
+        if (stEl) stEl.textContent = fmt3(grossSubtotal);
+        if (dtEl) dtEl.textContent = fmt3(totalDiscount);
         if (ntEl) ntEl.textContent = fmt3(netTotal);
     }
 
@@ -965,19 +983,22 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     }
 
     function pr2SyncPrintBanner() {
-        var pad2 = function (n) { return (n < 10 ? '0' : '') + n; };
+        var setTxt = function (id, val) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            var v = String(val || '').trim();
+            el.textContent = v !== '' ? v : '—';
+        };
         var serEl = document.getElementById('pr2_doc_serial');
-        var psEl = document.getElementById('pr2_sd_print_serial');
-        if (psEl) {
-            var ser = serEl ? String(serEl.value || '').trim() : '';
-            psEl.textContent = ser !== '' ? ser : '—';
-        }
-        var pdEl = document.getElementById('pr2_sd_print_date');
-        if (pdEl) {
-            var d = new Date();
-            pdEl.textContent = pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear()
-                + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
-        }
+        setTxt('pr2_sd_print_serial', serEl ? serEl.value : '');
+
+        var docDateEl = document.getElementById('pr2_document_date');
+        var docDateVal = docDateEl ? String(docDateEl.value || '').trim() : '';
+        var dm = docDateVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        setTxt('pr2_sd_print_docdate', dm ? (dm[3] + '/' + dm[2] + '/' + dm[1]) : docDateVal);
+
+        var supEl = document.getElementById('pr2_supplier_name');
+        setTxt('pr2_sd_print_party_name', supEl ? supEl.value : '');
     }
 
     function pr2ApplyReturnPayload(res) {
@@ -1148,7 +1169,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         }
 
         var invDiscRaw = (document.getElementById('pr2_invoice_discount').value || '').trim();
-        var subtotal = parseFloat(document.getElementById('pr2_subtotal').textContent) || 0;
+        var subtotal = 0;
+        for (var si = 0; si < items.length; si++) {
+            subtotal += Math.max(0, (items[si].qty * items[si].cost) - items[si].discount_amount);
+        }
         var invDiscAmt = parseDiscount(invDiscRaw, subtotal);
 
         var payload = {
