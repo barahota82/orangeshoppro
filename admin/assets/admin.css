@@ -4322,12 +4322,16 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     grid-column: 1;
     grid-row: 2;
     box-sizing: border-box;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
 }
 .sd-print-banner__head--with-party .sd-print-banner__meta {
     grid-column: 2;
     grid-row: 2;
 }
 .sd-print-banner__notes {
+    flex: 1 1 auto;
     margin-top: 0.5rem;
     padding-top: 0.45rem;
     border-top: 1px dashed #cbd5e1;
