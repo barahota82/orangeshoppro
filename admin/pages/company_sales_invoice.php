@@ -229,7 +229,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     <h3 class="card-title">فاتورة مبيعات <span id="sv2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'sv2', 'doc_kind' => 'company_sales_invoice', 'country_id' => $adminCountryId, 'show_status_badge' => false]); ?>
 
-    <div class="form-grid sv2-header-row1 orange-doc-header-row" style="margin-bottom:12px;">
+    <div class="form-grid sv2-header-row1 orange-doc-header-row jv-print-hide" style="margin-bottom:12px;">
         <div>
             <label for="sv2_doc_serial">مسلسل الفاتورة</label>
             <input type="text" id="sv2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
@@ -252,7 +252,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     </div>
 
     <!-- ٢ — تاريخ الفاتورة، قناة العملاء، نوع البيع، تاريخ الإدخال، مدفوع الآن -->
-    <div class="form-grid sv2-header-rowdoc orange-doc-header-row" style="margin-bottom:12px;">
+    <div class="form-grid sv2-header-rowdoc orange-doc-header-row jv-print-hide" style="margin-bottom:12px;">
         <div>
             <label for="sv2_document_date">تاريخ الفاتورة</label>
             <input type="date" id="sv2_document_date" dir="ltr" lang="en" title="تاريخ الفاتورة = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>">
@@ -286,7 +286,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         </div>
     </div>
 
-    <div class="form-grid sv2-header-row2 orange-doc-header-row" style="margin-bottom:12px;">
+    <div class="form-grid sv2-header-row2 orange-doc-header-row jv-print-hide" style="margin-bottom:12px;">
         <div>
             <label for="sv2_phone_country">كود الدولة</label>
             <input type="search" id="sv2_phone_country" list="sv2_phone_country_list" autocomplete="off" dir="ltr" lang="en" placeholder="+965" required>
