@@ -120,7 +120,7 @@ function orange_sales_doc_print_banner(array $ctx): void
         $metaRows[] = ['', $company['address']];
     }
     if ($company['phones'] !== '') {
-        $metaRows[] = ['', $company['phones']];
+        $metaRows[] = ['Tel', $company['phones']];
     }
     if ($company['vat_number'] !== '') {
         $metaRows[] = ['ض.ق.م / VAT', $company['vat_number']];
