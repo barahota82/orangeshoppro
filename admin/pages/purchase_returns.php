@@ -207,8 +207,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 .jv-search-results-table { margin: 0; font-size: 0.9rem; }
 .jv-search-results-table tbody tr { cursor: pointer; }
 .jv-search-results-table tbody tr:hover { background: #f4f4f5; }
+/* صف 2 — فاتورة الشراء المرجعية · استرجاع · تاريخ المردود · نوع المردود · تاريخ الإدخال · ملاحظات
+   (التواريخ والنوع بنفس عرض فاتورة الشراء؛ فرق زر الاسترجاع مأخوذ من عرض ملاحظات) */
 .form-grid.pr2-header-row2 {
-    grid-template-columns: minmax(6.5rem, 0.65fr) auto minmax(0, 1.5fr) minmax(5.5rem, 0.65fr);
+    grid-template-columns: minmax(7rem, 0.85fr) auto minmax(5.5rem, 0.65fr) minmax(5.5rem, 0.65fr) minmax(5.5rem, 0.65fr) minmax(0, 1.4fr);
 }
 .form-grid.pr2-supplier-row {
     grid-template-columns: minmax(7rem, 0.75fr) minmax(0, 1fr) minmax(0, 2fr);
@@ -246,20 +248,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             <label for="pr2_supplier_name">اسم المورد</label>
             <input type="text" id="pr2_supplier_name" class="admin-inp-readonly" readonly disabled tabindex="-1" placeholder="يُعبأ تلقائياً">
         </div>
-        <div>
-            <label for="pr2_document_date">تاريخ المردود</label>
-            <input type="date" id="pr2_document_date" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
-        </div>
-        <div>
-            <label for="pr2_entry_date">تاريخ الإدخال</label>
-            <input type="text" id="pr2_entry_date" class="admin-inp-readonly" readonly tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
-                value="<?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?>"
-                title="وقت تسجيل إدخال المستند في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح">
-        </div>
         <input type="hidden" id="pr2_supplier_id" value="0">
     </div>
 
-    <!-- ٢ — فاتورة الشراء المرجعية، استرجاع، ملاحظات، نوع المردود -->
+    <!-- ٢ — فاتورة الشراء المرجعية، استرجاع، تاريخ المردود، نوع المردود، تاريخ الإدخال، ملاحظات -->
     <div class="form-grid pr2-header-row2 orange-doc-header-row" style="margin-bottom:16px;">
         <div>
             <label for="pr2_purchase_ref">فاتورة الشراء المرجعية</label>
@@ -270,8 +262,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             <button type="button" class="btn-secondary" id="pr2_btn_retrieve"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>استرجاع</button>
         </div>
         <div>
-            <label for="pr2_notes">ملاحظات</label>
-            <input type="text" id="pr2_notes" placeholder="رقم إذن الإرجاع، شروط، …"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
+            <label for="pr2_document_date">تاريخ المردود</label>
+            <input type="date" id="pr2_document_date" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
         </div>
         <div>
             <label for="pr2_type">نوع المردود</label>
@@ -279,6 +271,16 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                 <option value="cash">نقدي</option>
                 <option value="credit">آجل</option>
             </select>
+        </div>
+        <div>
+            <label for="pr2_entry_date">تاريخ الإدخال</label>
+            <input type="text" id="pr2_entry_date" class="admin-inp-readonly" readonly tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
+                value="<?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?>"
+                title="وقت تسجيل إدخال المستند في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح">
+        </div>
+        <div>
+            <label for="pr2_notes">ملاحظات</label>
+            <input type="text" id="pr2_notes" placeholder="رقم إذن الإرجاع، شروط، …"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
         </div>
     </div>
 
