@@ -99,6 +99,17 @@
         });
     }
 
+    function buildPdfTitle(opts) {
+        var label = String(opts.docLabel || '').trim();
+        var serial = '';
+        if (opts.serialElId) {
+            var el = document.getElementById(opts.serialElId);
+            if (el) serial = String(el.value || el.textContent || '').trim();
+        }
+        if (serial === '') return label;
+        return label !== '' ? (label + ' رقم ' + serial) : serial;
+    }
+
     function bindPrintButton(btnId, opts) {
         var btn = document.getElementById(btnId);
         if (!btn) return;
@@ -107,7 +118,12 @@
             if (typeof opts.beforePrint === 'function') {
                 if (opts.beforePrint() === false) return;
             }
-            global.print();
+            var pdfTitle = buildPdfTitle(opts);
+            if (typeof global.orangeAdminOpenPrintDialog === 'function') {
+                global.orangeAdminOpenPrintDialog(pdfTitle);
+            } else {
+                global.print();
+            }
         });
     }
 

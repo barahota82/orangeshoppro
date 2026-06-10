@@ -1605,6 +1605,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             window.orangeSalesDocUi.bindPrintButton('sv2_btn_print', {
                 prefix: 'sv2',
                 serialElId: 'sv2_doc_serial',
+                docLabel: 'فاتورة مبيعات',
                 beforePrint: function () {
                     if (!SV2_PRINT_TUNING && browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }
                     sv2SyncPrintExtras();

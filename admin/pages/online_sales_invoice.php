@@ -1325,6 +1325,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             window.orangeSalesDocUi.bindPrintButton('ov2_btn_print', {
                 prefix: 'ov2',
                 serialElId: 'ov2_doc_serial',
+                docLabel: 'فاتورة أونلاين',
                 beforePrint: function () {
                     if (!OV2_PRINT_TUNING && browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }
                     ov2SyncPrintExtras();

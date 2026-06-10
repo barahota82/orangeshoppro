@@ -1447,6 +1447,7 @@ $sr2DocSerialPreview = $sr2NavReady
             window.orangeSalesDocUi.bindPrintButton('sr2_btn_print', {
                 prefix: 'sr2',
                 serialElId: 'sr2_doc_serial',
+                docLabel: 'مردود مبيعات',
                 beforePrint: function () {
                     if (!SR2_PRINT_TUNING && browseReturnId <= 0) { alert('افتح مردوداً محفوظاً للطباعة.'); return false; }
                     sr2SyncPrintExtras();
