@@ -17,6 +17,7 @@ require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
 
 $pdo = orange_admin_page_pdo();
 $pv2Caps = orange_admin_caps_for_page($admin, $pdo, 'purchases');
@@ -248,6 +249,15 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
 <?php endif; ?>
 
 <div class="card jv-print-area">
+    <?php
+    orange_sales_doc_print_banner([
+        'prefix' => 'pv2',
+        'doc_title' => 'فاتورة شراء',
+        'doc_badge' => 'PUR',
+        'country_id' => $adminCountryId,
+        'currency_code' => $adminDefaultCurrency,
+    ]);
+    ?>
     <h3 class="card-title">فاتورة شراء <span id="pv2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'pv2', 'doc_kind' => 'purchase', 'country_id' => $adminCountryId, 'show_status_badge' => false]); ?>
 
@@ -1161,6 +1171,22 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         return s;
     }
 
+    function pv2SyncPrintBanner() {
+        var pad2 = function (n) { return (n < 10 ? '0' : '') + n; };
+        var serEl = document.getElementById('pv2_doc_serial');
+        var psEl = document.getElementById('pv2_sd_print_serial');
+        if (psEl) {
+            var ser = serEl ? String(serEl.value || '').trim() : '';
+            psEl.textContent = ser !== '' ? ser : '—';
+        }
+        var pdEl = document.getElementById('pv2_sd_print_date');
+        if (pdEl) {
+            var d = new Date();
+            pdEl.textContent = pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear()
+                + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+        }
+    }
+
     function pv2SyncToolbar() {
         var pb = document.getElementById('pv2_btn_print');
         if (pb) {
@@ -1506,6 +1532,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
                 alert('افتح فاتورة محفوظة للطباعة.');
                 return;
             }
+            pv2SyncPrintBanner();
             window.print();
         });
 

@@ -15,6 +15,7 @@ require_once __DIR__ . '/../../includes/purchase_doc_product_pick.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
 
 $pdo = orange_admin_page_pdo();
 $pr2Caps = orange_admin_caps_for_page($admin, $pdo, 'purchase_returns');
@@ -230,6 +231,15 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 <?php endif; ?>
 
 <div class="card jv-print-area">
+    <?php
+    orange_sales_doc_print_banner([
+        'prefix' => 'pr2',
+        'doc_title' => 'مردود مشتريات',
+        'doc_badge' => 'PRET',
+        'country_id' => $prCountryId,
+        'currency_code' => $prDefaultCurrency,
+    ]);
+    ?>
     <h3 class="card-title">مردود مشتريات <span id="pr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'pr2', 'doc_kind' => 'purchase_return', 'country_id' => $prCountryId, 'show_status_badge' => false]); ?>
 
@@ -955,6 +965,22 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         return s;
     }
 
+    function pr2SyncPrintBanner() {
+        var pad2 = function (n) { return (n < 10 ? '0' : '') + n; };
+        var serEl = document.getElementById('pr2_doc_serial');
+        var psEl = document.getElementById('pr2_sd_print_serial');
+        if (psEl) {
+            var ser = serEl ? String(serEl.value || '').trim() : '';
+            psEl.textContent = ser !== '' ? ser : '—';
+        }
+        var pdEl = document.getElementById('pr2_sd_print_date');
+        if (pdEl) {
+            var d = new Date();
+            pdEl.textContent = pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear()
+                + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+        }
+    }
+
     function pr2ApplyReturnPayload(res) {
         if (!res || !res.success || !res.purchase_return) {
             alert((res && res.message) || 'تعذر تحميل المردود');
@@ -1212,6 +1238,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                 alert('افتح مردوداً محفوظاً للطباعة.');
                 return;
             }
+            pr2SyncPrintBanner();
             window.print();
         });
 
