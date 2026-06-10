@@ -4295,6 +4295,13 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     grid-column: 1;
     grid-row: 1;
     display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    width: 100%;
+}
+.sd-print-banner__brand-id {
+    display: flex;
     gap: 0.85rem;
     align-items: flex-start;
 }
@@ -4345,6 +4352,8 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 }
 .sd-print-banner__company-meta {
     margin: 0;
+    text-align: left;
+    align-self: flex-start;
 }
 .sd-print-banner__company-meta p {
     margin: 0 0 0.12rem;
