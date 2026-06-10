@@ -4283,7 +4283,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 }
 .sd-print-banner__head {
     display: grid;
-    grid-template-columns: 1fr 1.15fr;
+    grid-template-columns: 1.3fr 1fr;
     gap: 1rem;
     align-items: stretch;
     padding-bottom: 0.75rem;
@@ -4291,7 +4291,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     border-bottom: 2px solid #ea580c;
 }
 .sd-print-banner__head--with-party {
-    grid-template-columns: 1fr 1.15fr 1fr;
+    grid-template-columns: 1.4fr 1.1fr 1fr;
 }
 .sd-print-banner__brand {
     display: flex;
@@ -4312,12 +4312,14 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     font-size: 1.25rem;
     font-weight: 800;
     color: #0f172a;
+    white-space: nowrap;
 }
 .sd-print-banner__name-en {
     margin: 0 0 0.4rem;
     font-size: 0.9rem;
     color: #ea580c;
     font-weight: 600;
+    white-space: nowrap;
 }
 .sd-print-banner__company-meta {
     margin: 0;
