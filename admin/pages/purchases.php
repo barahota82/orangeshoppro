@@ -254,7 +254,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
     <div class="form-grid pv2-supplier-row orange-doc-header-row" style="margin-bottom:12px;">
         <div>
             <label for="pv2_doc_serial">مسلسل الفاتورة</label>
-            <input type="text" id="pv2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en"
+            <input type="text" id="pv2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
                 value="<?php echo htmlspecialchars($pv2DocSerialPreview, ENT_QUOTES, 'UTF-8'); ?>"
                 title="يُخصَّص تلقائياً من النظام عند الحفظ">
         </div>

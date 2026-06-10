@@ -169,7 +169,7 @@ $sr2DocSerialPreview = $sr2NavReady
     <div class="form-grid sr2-customer-row orange-doc-header-row" style="margin-bottom:12px;">
         <div>
             <label for="sr2_doc_serial">مسلسل المردود</label>
-            <input type="text" id="sr2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en"
+            <input type="text" id="sr2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
                 value="<?php echo htmlspecialchars($sr2DocSerialPreview, ENT_QUOTES, 'UTF-8'); ?>"
                 title="يُخصَّص تلقائياً عند الحفظ">
         </div>
