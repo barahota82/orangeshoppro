@@ -4303,11 +4303,22 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     grid-row: 1;
     align-self: start;
 }
-.sd-print-banner__head--with-party .sd-print-banner__party {
+/* مع بلوك الطرف: بيانات الشركة ترويسة بعرض كامل بالأعلى، ثم المربعان (المستند + العميل) جنباً إلى جنب */
+.sd-print-banner__head--with-party {
+    grid-template-columns: 1fr 1fr;
+}
+.sd-print-banner__head--with-party .sd-print-banner__brand {
     grid-column: 1 / -1;
+    grid-row: 1;
+}
+.sd-print-banner__head--with-party .sd-print-banner__party {
+    grid-column: 1;
     grid-row: 2;
-    width: 100%;
     box-sizing: border-box;
+}
+.sd-print-banner__head--with-party .sd-print-banner__meta {
+    grid-column: 2;
+    grid-row: 2;
 }
 .sd-print-banner__logo {
     width: 76px;
