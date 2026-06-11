@@ -663,7 +663,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
             '<td><input type="text" class="pv2-var-label admin-inp-readonly" readonly disabled tabindex="-1" placeholder="—"></td>' +
             '<td><input type="number" class="pv2-qty admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
             '<td><input type="number" class="pv2-cost admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>' +
-            '<td><input type="text" class="pv2-discount admin-inp admin-inp-discount" placeholder="0" dir="ltr" lang="en" autocomplete="off" style="width:100%;"></td>' +
+            '<td><input type="text" class="pv2-discount admin-inp admin-inp-discount" value="' + fmtZero() + '" placeholder="0" dir="ltr" lang="en" autocomplete="off" style="width:100%;"></td>' +
             '<td><input type="text" class="pv2-line-total admin-inp-money" value="' + fmtZero() + '" readonly data-money-allow-zero tabindex="0" dir="ltr" lang="en"></td>' +
             '<td><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
     }
@@ -869,7 +869,10 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         var cEl = tr.querySelector('.pv2-cost');
         if (cEl) cEl.value = fmt3(item.cost || 0);
         var dEl = tr.querySelector('.pv2-discount');
-        if (dEl) dEl.value = item.discount_raw || '';
+        if (dEl) {
+            var pvRaw = String(item.discount_raw || '').trim();
+            dEl.value = (pvRaw.charAt(pvRaw.length - 1) === '%') ? pvRaw : fmt3(parseFloat(pvRaw) || 0);
+        }
     }
     function recalcAll() {
         var tb = document.getElementById('pv2_lines_body');

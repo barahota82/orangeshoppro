@@ -403,13 +403,13 @@
         }
         var raw = String(el.value || '').trim().replace(',', '.');
         if (raw === '' || raw === '-' || raw === '.' || raw === '-.') {
-            el.value = '';
+            el.value = zeroMoneyAmount();
             return;
         }
         if (raw.charAt(raw.length - 1) === '%') {
             var pct = parseFloat(raw.slice(0, -1));
             if (isNaN(pct) || pct <= 0) {
-                el.value = '';
+                el.value = zeroMoneyAmount();
                 return;
             }
             el.value = String(parseFloat(pct.toFixed(4))) + '%';
@@ -417,7 +417,7 @@
         }
         var n = parseFloat(raw);
         if (isNaN(n) || n <= 0) {
-            el.value = '';
+            el.value = zeroMoneyAmount();
             return;
         }
         el.value = formatMoneyAmount(n);
