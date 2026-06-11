@@ -159,6 +159,9 @@ $sr2DocSerialPreview = $sr2NavReady
 @media print {
     /* مردود المبيعات بلا نص قانوني — نقلّل الفراغ أسفل التوقيع/الختم أكثر من فواتير المبيعات. */
     .jv-print-area { padding-bottom: 3mm !important; }
+    /* رفع التوقيع/الختم بعد البنود مباشرة (إلغاء دفعه لأسفل) فيُزال الفراغ الأبيض فوقهما
+       ويبقى أسفلهما مساحة مناسبة للتوقيع والختم. */
+    .jv-print-area:has(.sd-print-footer) { min-height: 0 !important; }
 }
 </style>
 
