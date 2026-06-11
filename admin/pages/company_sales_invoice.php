@@ -1401,6 +1401,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         }
         var inv = res.invoice;
         browseOrderId = parseInt(String(inv.id || '0'), 10) || 0;
+        if (window.orangeSalesDocUi && window.orangeSalesDocUi.setDocQr) window.orangeSalesDocUi.setDocQr('sv2', 'inv_c', browseOrderId);
         sv2ApplyHeaderFromInvoice(inv, res.customer);
         var tb = document.getElementById('sv2_lines_body');
         if (tb) {

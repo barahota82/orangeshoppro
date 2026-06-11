@@ -1297,6 +1297,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         }
         var p = res.purchase;
         browsePurchaseId = parseInt(String(p.id || '0'), 10) || 0;
+        if (window.orangeSalesDocUi && window.orangeSalesDocUi.setDocQr) window.orangeSalesDocUi.setDocQr('pv2', 'purchase', browsePurchaseId);
         pv2SetDocSerial(p.reference || ('PUR-' + browsePurchaseId));
         selectSupplier(parseInt(String(p.supplier_id || '0'), 10) || 0);
         var typeEl = document.getElementById('pv2_type');

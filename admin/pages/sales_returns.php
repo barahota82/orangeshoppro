@@ -949,6 +949,7 @@ $sr2DocSerialPreview = $sr2NavReady
         }
         var p = res.sales_return;
         browseReturnId = parseInt(String(p.id || '0'), 10) || 0;
+        if (window.orangeSalesDocUi && window.orangeSalesDocUi.setDocQr) window.orangeSalesDocUi.setDocQr('sr2', 'sales_return', browseReturnId);
         sr2MarketChannelId = parseInt(String(p.channel_id || '0'), 10) || 0;
         sr2SetDocSerial(p.return_number || ('SR-' + browseReturnId));
         selectCustomer(parseInt(String(p.customer_id || '0'), 10) || 0);

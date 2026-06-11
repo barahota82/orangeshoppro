@@ -107,11 +107,10 @@
         done = typeof done === 'function' ? done : function () {};
         var box = document.getElementById(String(prefix || 'sd') + '_sd_print_qr');
         if (!box) { done(); return; }
-        box.innerHTML = '';
         var id = parseInt(String(docId || '0'), 10) || 0;
-        var wrap = box.closest ? box.closest('.sd-print-banner__qr') : null;
+        // صندوق الباركود يبقى ظاهراً دائماً؛ يُملأ فقط للمستند المحفوظ.
         if (!docKind || id <= 0 || typeof global.qrcode !== 'function') {
-            if (wrap) wrap.style.display = 'none';
+            box.innerHTML = '';
             done();
             return;
         }
@@ -127,19 +126,11 @@
                         box.innerHTML = qr.createImgTag(3, 0);
                         var img = box.querySelector('img');
                         if (img) { img.style.width = '100%'; img.style.height = 'auto'; img.style.display = 'block'; }
-                        if (wrap) wrap.style.display = '';
-                    } catch (e) {
-                        if (wrap) wrap.style.display = 'none';
-                    }
-                } else if (wrap) {
-                    wrap.style.display = 'none';
+                    } catch (e) { /* اترك الصندوق فارغاً عند الفشل */ }
                 }
                 done();
             })
-            .catch(function () {
-                if (wrap) wrap.style.display = 'none';
-                done();
-            });
+            .catch(function () { done(); });
     }
 
     function buildPdfTitle(opts) {

@@ -1048,6 +1048,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         }
         var p = res.purchase_return;
         browseReturnId = parseInt(String(p.id || '0'), 10) || 0;
+        if (window.orangeSalesDocUi && window.orangeSalesDocUi.setDocQr) window.orangeSalesDocUi.setDocQr('pr2', 'purchase_return', browseReturnId);
         pr2SetDocSerial(p.return_number || ('PR-' + browseReturnId));
         selectSupplier(parseInt(String(p.supplier_id || '0'), 10) || 0);
         var typeEl = document.getElementById('pr2_type');

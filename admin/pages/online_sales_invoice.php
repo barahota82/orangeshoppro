@@ -828,6 +828,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         }
         var inv = res.invoice;
         browseOrderId = parseInt(String(inv.id || '0'), 10) || 0;
+        if (window.orangeSalesDocUi && window.orangeSalesDocUi.setDocQr) window.orangeSalesDocUi.setDocQr('ov2', 'inv_o', browseOrderId);
         ov2ApplyHeaderFromInvoice(inv, res.customer);
         var tb = document.getElementById('ov2_lines_body');
         if (tb) {
