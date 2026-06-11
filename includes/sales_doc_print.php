@@ -340,13 +340,15 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
             font-size: 6.5pt;
             color: #475569;
             direction: ltr;
+            text-align: justify;
             vertical-align: top;
             margin: 1mm 6mm 0;
         }
         @bottom-center {
-            content: "صفحة " counter(page) " من " counter(pages);
+            content: "صفحة\00a0" counter(page) "\00a0من\00a0" counter(pages);
             font-size: 8pt;
             color: #64748b;
+            white-space: nowrap;
             vertical-align: top;
             margin-top: 1mm;
         }
