@@ -340,7 +340,7 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
 <style>
 @media print {
     @page {
-        margin-bottom: 20mm;
+        margin-bottom: 16mm;
         @bottom-left {
             content: "<?php echo $enCss; ?>";
             width: 41%;
@@ -349,8 +349,8 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
             color: #475569;
             direction: ltr;
             text-align: left;
-            vertical-align: bottom;
-            padding: 0 3mm 2mm 0;
+            vertical-align: top;
+            padding: 1.5mm 3mm 0 0;
         }
         @bottom-center {
             content: "صفحة\00a0" counter(page) "\00a0من\00a0" counter(pages);
@@ -358,8 +358,8 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
             font-size: 7.5pt;
             color: #64748b;
             white-space: nowrap;
-            vertical-align: bottom;
-            padding-bottom: 2mm;
+            vertical-align: top;
+            padding-top: 1.5mm;
         }
         @bottom-right {
             content: "<?php echo $arCss; ?>";
@@ -369,8 +369,8 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
             color: #475569;
             direction: rtl;
             text-align: right;
-            vertical-align: bottom;
-            padding: 0 0 2mm 3mm;
+            vertical-align: top;
+            padding: 1.5mm 0 0 3mm;
         }
     }
 }
