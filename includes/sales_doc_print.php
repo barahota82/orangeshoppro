@@ -334,21 +334,21 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
 <style>
 @media print {
     @page {
-        margin-bottom: 26mm;
+        margin-bottom: 14mm;
         @bottom-left {
             content: "<?php echo $enCss; ?>";
             font-size: 6.5pt;
             color: #475569;
             direction: ltr;
             vertical-align: top;
-            margin: 2mm 6mm 0;
+            margin: 1mm 6mm 0;
         }
         @bottom-center {
             content: "صفحة " counter(page) " من " counter(pages);
             font-size: 8pt;
             color: #64748b;
             vertical-align: top;
-            margin-top: 2mm;
+            margin-top: 1mm;
         }
         @bottom-right {
             content: "<?php echo $arCss; ?>";
@@ -356,7 +356,7 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
             color: #475569;
             direction: rtl;
             vertical-align: top;
-            margin: 2mm 6mm 0;
+            margin: 1mm 6mm 0;
         }
     }
 }
