@@ -663,7 +663,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
             '<td><input type="text" class="pv2-var-label admin-inp-readonly" readonly disabled tabindex="-1" placeholder="—"></td>' +
             '<td><input type="number" class="pv2-qty admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
             '<td><input type="number" class="pv2-cost admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>' +
-            '<td><input type="text" class="pv2-discount admin-inp" placeholder="0" dir="ltr" lang="en" autocomplete="off" style="width:100%;"></td>' +
+            '<td><input type="text" class="pv2-discount admin-inp admin-inp-discount" placeholder="0" dir="ltr" lang="en" autocomplete="off" style="width:100%;"></td>' +
             '<td><input type="text" class="pv2-line-total admin-inp-money" value="' + fmtZero() + '" readonly data-money-allow-zero tabindex="0" dir="ltr" lang="en"></td>' +
             '<td><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
     }

@@ -392,6 +392,58 @@
         });
     }
 
+    /**
+     * حقل الخصم في أسطر الفواتير: يقبل مبلغاً أو نسبة (٪).
+     * عند blur: المبلغ يُنسَّق كمبلغ (0.000) مثل بقية المبالغ؛ النسبة تبقى «N%».
+     * فارغ/صفر/غير صالح → تفريغ.
+     */
+    function formatDiscountInput(el) {
+        if (!el) {
+            return;
+        }
+        var raw = String(el.value || '').trim().replace(',', '.');
+        if (raw === '' || raw === '-' || raw === '.' || raw === '-.') {
+            el.value = '';
+            return;
+        }
+        if (raw.charAt(raw.length - 1) === '%') {
+            var pct = parseFloat(raw.slice(0, -1));
+            if (isNaN(pct) || pct <= 0) {
+                el.value = '';
+                return;
+            }
+            el.value = String(parseFloat(pct.toFixed(4))) + '%';
+            return;
+        }
+        var n = parseFloat(raw);
+        if (isNaN(n) || n <= 0) {
+            el.value = '';
+            return;
+        }
+        el.value = formatMoneyAmount(n);
+    }
+
+    function attachDiscount(el) {
+        if (el.getAttribute('data-orange-disc-wired')) {
+            return;
+        }
+        el.addEventListener('blur', function () {
+            formatDiscountInput(el);
+        });
+        el.setAttribute('data-orange-disc-wired', '1');
+    }
+
+    function wireNewDiscountInputs(root) {
+        if (!root || !root.querySelectorAll) {
+            return;
+        }
+        root.querySelectorAll('input.admin-inp-discount').forEach(function (el) {
+            if (!el.getAttribute('data-orange-disc-wired')) {
+                attachDiscount(el);
+            }
+        });
+    }
+
     function bootstrap(root) {
         root = root || document;
         normalizeMoneyUi(root);
@@ -406,6 +458,7 @@
                 attachQty(el);
             }
         });
+        wireNewDiscountInputs(root);
     }
 
     function observe() {
@@ -427,6 +480,7 @@
                         n.querySelectorAll('tr').forEach(tryWireTr);
                         wireNewMoneyInputs(n);
                         wireNewQtyInputs(n);
+                        wireNewDiscountInputs(n);
                         normalizeMoneyUi(n);
                     }
                 });
@@ -504,6 +558,8 @@
         companionZero: companionZero,
         wireDebitCredit: wireDebitCredit,
         attachSingle: attachSingle,
+        formatDiscountInput: formatDiscountInput,
+        attachDiscount: attachDiscount,
         bootstrap: bootstrap
     };
 
