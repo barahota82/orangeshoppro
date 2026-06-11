@@ -235,7 +235,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         color: #ffffff !important;
         font-weight: 700 !important;
         text-align: center !important;
-        border-color: #ea580c !important;
+        border-color: #ffffff !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
