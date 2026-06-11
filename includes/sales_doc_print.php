@@ -328,8 +328,15 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
     ?>
 <style>
 @media print {
+    /*
+     * هذا التنسيق يُحقن inline على صفحتَي فاتورة المبيعات فقط (شركة/أونلاين)، لذا تعطيل
+     * عدّاد @bottom-left/@bottom-right العام (admin.css) هنا يمنع التكرار دون المساس
+     * بالتقارير/السندات. رقم الصفحة يبقى وحده في الوسط @bottom-center (سطر واحد).
+     */
     @page {
         margin-bottom: 18mm;
+        @bottom-left { content: ""; }
+        @bottom-right { content: ""; }
         @bottom-center {
             content: "صفحة\00a0" counter(page) "\00a0من\00a0" counter(pages);
             font-size: 8pt;
