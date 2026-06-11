@@ -225,6 +225,16 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         word-break: break-word;
         vertical-align: middle !important;
     }
+    /* صف العناوين بلون العلامة المميز (برتقالي + نص أبيض) */
+    .jv-print-area .pur-lines-table thead th {
+        background: #ea580c !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        text-align: center !important;
+        border-color: #ea580c !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
     /* الحقول تظهر كنص عادي: بلا حدود/خلفية/عرض ثابت، فتُعرض القيمة كاملة */
     .jv-print-area .pur-lines-table input {
         border: none !important;
