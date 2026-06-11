@@ -11,15 +11,16 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 
-/** أنواع المستندات المسموح بها (الشاشات الخمس). */
+/**
+ * أنواع المستندات المسموح بها لرابط QR العام.
+ * قرار المالك 2026-06-12: المبيعات ومردودها فقط — أُلغيت المشتريات ومردودها.
+ */
 function orange_doc_public_token_kinds(): array
 {
     return [
-        'inv_c',           // فاتورة مبيعات الشركة (orders)
-        'inv_o',           // فاتورة مبيعات أونلاين (orders)
-        'sales_return',    // مردود مبيعات (sales_returns)
-        'purchase',        // فاتورة مشتريات (purchases)
-        'purchase_return', // مردود مشتريات (purchase_returns)
+        'inv_c',        // فاتورة مبيعات الشركة (orders)
+        'inv_o',        // فاتورة مبيعات أونلاين (orders)
+        'sales_return', // مردود مبيعات (sales_returns)
     ];
 }
 

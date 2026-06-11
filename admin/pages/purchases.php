@@ -259,7 +259,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         'serial_label' => 'مسلسل الشراء / Purchase No.',
         'show_doc_date' => true,
         'show_print_date' => false,
-        'show_qr' => true,
+        'show_qr' => false,
         'show_party' => true,
         'party_title' => 'المورد / Supplier',
         'party_rows' => [
@@ -536,8 +536,6 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
 </div>
 
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_purchase_doc_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
-<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/vendor/qrcode.min.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
-<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/admin_sales_doc_ui.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 (function () {
     var PV2_PICK_ROWS = <?php echo json_encode($pv2PickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
@@ -1297,7 +1295,6 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         }
         var p = res.purchase;
         browsePurchaseId = parseInt(String(p.id || '0'), 10) || 0;
-        if (window.orangeSalesDocUi && window.orangeSalesDocUi.setDocQr) window.orangeSalesDocUi.setDocQr('pv2', 'purchase', browsePurchaseId);
         pv2SetDocSerial(p.reference || ('PUR-' + browsePurchaseId));
         selectSupplier(parseInt(String(p.supplier_id || '0'), 10) || 0);
         var typeEl = document.getElementById('pv2_type');
@@ -1592,17 +1589,10 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
             var pv2SerEl = document.getElementById('pv2_doc_serial');
             var pv2Ser = pv2SerEl ? String(pv2SerEl.value || '').trim() : '';
             var pv2Title = pv2Ser !== '' ? ('فاتورة مشتريات رقم ' + pv2Ser) : 'فاتورة مشتريات';
-            var pv2OpenPrint = function () {
-                if (typeof window.orangeAdminOpenPrintDialog === 'function') {
-                    window.orangeAdminOpenPrintDialog(pv2Title);
-                } else {
-                    window.print();
-                }
-            };
-            if (window.orangeSalesDocUi && typeof window.orangeSalesDocUi.setDocQr === 'function') {
-                window.orangeSalesDocUi.setDocQr('pv2', 'purchase', browsePurchaseId, pv2OpenPrint);
+            if (typeof window.orangeAdminOpenPrintDialog === 'function') {
+                window.orangeAdminOpenPrintDialog(pv2Title);
             } else {
-                pv2OpenPrint();
+                window.print();
             }
         });
 
