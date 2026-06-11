@@ -459,6 +459,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/country-codes.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin-phone-country.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_purchase_doc_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/vendor/qrcode.min.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/admin_sales_doc_ui.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 (function () {
@@ -1331,6 +1332,8 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                 prefix: 'ov2',
                 serialElId: 'ov2_doc_serial',
                 docLabel: 'فاتورة أونلاين',
+                docKind: 'inv_o',
+                docId: function () { return browseOrderId; },
                 beforePrint: function () {
                     if (!OV2_PRINT_TUNING && browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }
                     ov2SyncPrintExtras();

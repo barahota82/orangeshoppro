@@ -630,6 +630,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/country-codes.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin-phone-country.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_purchase_doc_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/vendor/qrcode.min.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/admin_sales_doc_ui.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 (function () {
@@ -1683,6 +1684,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 prefix: 'sv2',
                 serialElId: 'sv2_doc_serial',
                 docLabel: 'فاتورة مبيعات',
+                docKind: 'inv_c',
+                docId: function () { return browseOrderId; },
                 beforePrint: function () {
                     if (!SV2_PRINT_TUNING && browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }
                     sv2SyncPrintExtras();

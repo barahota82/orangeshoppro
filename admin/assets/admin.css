@@ -4467,9 +4467,14 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     display: block;
     width: 64px;
     height: 64px;
-    border: 1px dashed #fdba74;
     border-radius: 6px;
     background: #fff;
+    overflow: hidden;
+}
+.sd-print-banner__qr-box img {
+    display: block;
+    width: 64px;
+    height: 64px;
 }
 .sd-print-banner__qr-cap {
     font-size: 0.65rem;

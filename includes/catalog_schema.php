@@ -1059,6 +1059,23 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
 
+    /* رابط مستند الفاتورة/المردود العام عبر QR (س27 — استثناء معتمد 2026-06-12).
+       جدول مركزي: توكن واحد لكل (doc_kind, doc_id) لكل المستندات الخمسة. */
+    orange_catalog_safe_exec($pdo,
+        'CREATE TABLE IF NOT EXISTS document_public_tokens (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            token CHAR(40) NOT NULL,
+            doc_kind VARCHAR(32) NOT NULL,
+            doc_id INT NOT NULL,
+            country_id INT NULL,
+            revoked TINYINT(1) NOT NULL DEFAULT 0,
+            expires_at TIMESTAMP NULL DEFAULT NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_doc_public_token (token),
+            UNIQUE KEY uq_doc_public_doc (doc_kind, doc_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+
     orange_catalog_safe_exec($pdo,
         'CREATE TABLE IF NOT EXISTS size_families (
             id INT AUTO_INCREMENT PRIMARY KEY,

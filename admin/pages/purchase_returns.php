@@ -477,6 +477,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 </div>
 
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_purchase_doc_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/vendor/qrcode.min.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/admin_sales_doc_ui.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 (function () {
     var PR2_PICK_ROWS = <?php echo json_encode($pr2PickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
@@ -1303,10 +1305,17 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             var pr2SerEl = document.getElementById('pr2_doc_serial');
             var pr2Ser = pr2SerEl ? String(pr2SerEl.value || '').trim() : '';
             var pr2Title = pr2Ser !== '' ? ('مردود مشتريات رقم ' + pr2Ser) : 'مردود مشتريات';
-            if (typeof window.orangeAdminOpenPrintDialog === 'function') {
-                window.orangeAdminOpenPrintDialog(pr2Title);
+            var pr2OpenPrint = function () {
+                if (typeof window.orangeAdminOpenPrintDialog === 'function') {
+                    window.orangeAdminOpenPrintDialog(pr2Title);
+                } else {
+                    window.print();
+                }
+            };
+            if (window.orangeSalesDocUi && typeof window.orangeSalesDocUi.setDocQr === 'function') {
+                window.orangeSalesDocUi.setDocQr('pr2', 'purchase_return', browseReturnId, pr2OpenPrint);
             } else {
-                window.print();
+                pr2OpenPrint();
             }
         });
 

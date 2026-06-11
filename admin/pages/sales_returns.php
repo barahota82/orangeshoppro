@@ -472,6 +472,7 @@ $sr2DocSerialPreview = $sr2NavReady
 </div>
 
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_purchase_doc_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/vendor/qrcode.min.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/admin_sales_doc_ui.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 (function () {
@@ -1452,6 +1453,8 @@ $sr2DocSerialPreview = $sr2NavReady
                 prefix: 'sr2',
                 serialElId: 'sr2_doc_serial',
                 docLabel: 'مردود مبيعات',
+                docKind: 'sales_return',
+                docId: function () { return browseReturnId; },
                 beforePrint: function () {
                     if (!SR2_PRINT_TUNING && browseReturnId <= 0) { alert('افتح مردوداً محفوظاً للطباعة.'); return false; }
                     sr2SyncPrintExtras();

@@ -99,6 +99,49 @@
         });
     }
 
+    /**
+     * يضمن توكن المستند ويرسم QR في صندوق الطباعة، ثم ينادي done() (دائماً).
+     * docKind: inv_c|inv_o|sales_return|purchase|purchase_return ؛ docId: رقم المستند المحفوظ.
+     */
+    function setDocQr(prefix, docKind, docId, done) {
+        done = typeof done === 'function' ? done : function () {};
+        var box = document.getElementById(String(prefix || 'sd') + '_sd_print_qr');
+        if (!box) { done(); return; }
+        box.innerHTML = '';
+        var id = parseInt(String(docId || '0'), 10) || 0;
+        var wrap = box.closest ? box.closest('.sd-print-banner__qr') : null;
+        if (!docKind || id <= 0 || typeof global.qrcode !== 'function') {
+            if (wrap) wrap.style.display = 'none';
+            done();
+            return;
+        }
+        var url = '/admin/api/doc-token/ensure.php?doc_kind=' + encodeURIComponent(docKind) + '&doc_id=' + id;
+        fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (res && res.success && res.url) {
+                    try {
+                        var qr = global.qrcode(0, 'M');
+                        qr.addData(String(res.url));
+                        qr.make();
+                        box.innerHTML = qr.createImgTag(3, 0);
+                        var img = box.querySelector('img');
+                        if (img) { img.style.width = '100%'; img.style.height = 'auto'; img.style.display = 'block'; }
+                        if (wrap) wrap.style.display = '';
+                    } catch (e) {
+                        if (wrap) wrap.style.display = 'none';
+                    }
+                } else if (wrap) {
+                    wrap.style.display = 'none';
+                }
+                done();
+            })
+            .catch(function () {
+                if (wrap) wrap.style.display = 'none';
+                done();
+            });
+    }
+
     function buildPdfTitle(opts) {
         var label = String(opts.docLabel || '').trim();
         var serial = '';
@@ -119,10 +162,18 @@
                 if (opts.beforePrint() === false) return;
             }
             var pdfTitle = buildPdfTitle(opts);
-            if (typeof global.orangeAdminOpenPrintDialog === 'function') {
-                global.orangeAdminOpenPrintDialog(pdfTitle);
+            var openDialog = function () {
+                if (typeof global.orangeAdminOpenPrintDialog === 'function') {
+                    global.orangeAdminOpenPrintDialog(pdfTitle);
+                } else {
+                    global.print();
+                }
+            };
+            var docId = typeof opts.docId === 'function' ? opts.docId() : 0;
+            if (opts.docKind && (parseInt(String(docId || '0'), 10) || 0) > 0) {
+                setDocQr(opts.prefix, opts.docKind, docId, openDialog);
             } else {
-                global.print();
+                setDocQr(opts.prefix, opts.docKind, 0, openDialog);
             }
         });
     }
@@ -133,6 +184,7 @@
         applyDefaultChannel: applyDefaultChannel,
         syncPrintBanner: syncPrintBanner,
         bindPrintButton: bindPrintButton,
-        setPhoneCells: setPhoneCells
+        setPhoneCells: setPhoneCells,
+        setDocQr: setDocQr
     };
 }(typeof window !== 'undefined' ? window : this));
