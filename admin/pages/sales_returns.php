@@ -156,6 +156,10 @@ $sr2DocSerialPreview = $sr2NavReady
 .form-grid.sr2-customer-row {
     grid-template-columns: minmax(7rem, 0.75fr) minmax(0, 1fr) minmax(0, 2fr) minmax(5rem, 0.55fr);
 }
+@media print {
+    /* مردود المبيعات بلا نص قانوني — نقلّل الفراغ أسفل التوقيع/الختم أكثر من فواتير المبيعات. */
+    .jv-print-area { padding-bottom: 3mm !important; }
+}
 </style>
 
 <div class="page-title">
