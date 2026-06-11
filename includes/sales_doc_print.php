@@ -343,7 +343,7 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
         margin-bottom: 20mm;
         @bottom-left {
             content: "<?php echo $enCss; ?>";
-            width: 41%;
+            width: 40%;
             font-size: 6.3pt;
             line-height: 1.25;
             color: #475569;
@@ -354,7 +354,7 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
         }
         @bottom-center {
             content: "صفحة\00a0" counter(page) "\00a0من\00a0" counter(pages);
-            width: 16%;
+            width: 17%;
             font-size: 7.5pt;
             color: #64748b;
             white-space: nowrap;
