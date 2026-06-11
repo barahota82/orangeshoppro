@@ -215,6 +215,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     .jv-print-area .pur-lines-table {
         table-layout: fixed !important;
         width: 100% !important;
+        border-collapse: collapse !important;
+        border: 1px solid #cbd5e1 !important;
     }
     .jv-print-area .pur-lines-table thead th,
     .jv-print-area .pur-lines-table tbody td {
@@ -224,6 +226,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         overflow: visible !important;
         word-break: break-word;
         vertical-align: middle !important;
+        /* فواصل الشبكة: حدود رأسية وأفقية لكل خلية */
+        border: 1px solid #cbd5e1 !important;
     }
     /* صف العناوين بلون العلامة المميز (برتقالي + نص أبيض) */
     .jv-print-area .pur-lines-table thead th {
