@@ -262,8 +262,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     }
     /* نِسَب الأعمدة (بعد إخفاء عمود الحذف): #، كود، اسم، لون/مقاس، كمية، سعر، خصم، إجمالي */
     .jv-print-area .pur-lines-table thead th:nth-child(1) { width: 4% !important; }
-    .jv-print-area .pur-lines-table thead th:nth-child(2) { width: 16% !important; }
-    .jv-print-area .pur-lines-table thead th:nth-child(3) { width: 24% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(2) { width: 12% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(3) { width: 28% !important; }
     .jv-print-area .pur-lines-table thead th:nth-child(4) { width: 16% !important; }
     .jv-print-area .pur-lines-table thead th:nth-child(5) { width: 8% !important; }
     .jv-print-area .pur-lines-table thead th:nth-child(6) { width: 11% !important; }
