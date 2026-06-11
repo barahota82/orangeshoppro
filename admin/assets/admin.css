@@ -4592,15 +4592,6 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 .sd-print-legal {
     display: none;
 }
-.sd-print-legal__note {
-    text-align: center;
-    font-size: 0.78rem;
-    color: #64748b;
-    margin: 0 0 0.5mm;
-}
-.sd-print-legal__note:last-child {
-    margin-bottom: 0;
-}
 
 @media print {
     /*
@@ -4844,12 +4835,38 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         border-top: 2px solid #ea580c;
     }
     /*
-     * النص القانوني (سياسة الإرجاع) يُعرض الآن في صناديق هامش @page (تذييل الطباعة):
-     * العربي @bottom-right / رقم الصفحة @bottom-center / الإنجليزي @bottom-left —
-     * يُحقَن لكل فاتورة عبر orange_sales_doc_print_legal_pagecss(). لذا نخفي عنصر HTML هنا.
+     * النص القانوني (سياسة الإرجاع): شريط مثبّت أسفل كل صفحة (position:fixed يتكرر في طباعة Chrome).
+     * الإنجليزي يسار + العربي يمين، كلاهما justify (نهايات الأسطر بحذاء واحد). رقم الصفحة
+     * يُحقن وسطاً عبر @page @bottom-center في orange_sales_doc_print_legal_pagecss().
+     * الهامش السفلي المحجوز (@page margin-bottom) يمنع تداخل البنود مع هذا الشريط.
      */
     .jv-print-area .sd-print-legal {
-        display: none !important;
+        display: flex !important;
+        visibility: visible !important;
+        position: fixed;
+        left: 8mm;
+        right: 8mm;
+        bottom: 6mm;
+        gap: 10mm;
+        align-items: flex-start;
+        padding-top: 1.2mm;
+        border-top: 1px solid #ea580c;
+        background: #ffffff;
+    }
+    .jv-print-area .sd-print-legal__cell {
+        flex: 1 1 0;
+        min-width: 0;
+        font-size: 6.5pt;
+        line-height: 1.3;
+        color: #475569;
+        text-align: justify;
+        text-justify: inter-word;
+    }
+    .jv-print-area .sd-print-legal__cell--ar {
+        direction: rtl;
+    }
+    .jv-print-area .sd-print-legal__cell--en {
+        direction: ltr;
     }
     .jv-print-area .card-title {
         display: none !important;

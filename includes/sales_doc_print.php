@@ -286,29 +286,31 @@ function orange_sales_doc_print_footer(array $ctx): void
         </div>
     </div>
 </div>
-<?php /* النص القانوني (عربي/إنجليزي منفصلان) أسفل كل صفحة عبر position:fixed في الطباعة (CSS). تحت بعض حالياً. */ ?>
-<?php if ($footerAr !== '' || $footerEn !== ''): ?>
+<?php
+    /*
+     * النص القانوني: شريط HTML مثبّت (position:fixed) أسفل كل صفحة في الطباعة — العربي يمين،
+     * الإنجليزي يسار، كلاهما justify (نهايات الأسطر بحذاء واحد). رقم الصفحة وسطاً عبر @page
+     * @bottom-center (دالة orange_sales_doc_print_legal_pagecss). الحقل القديم يقع كعربي.
+     */
+    $legalAr = $footerAr;
+    $legalEn = $footerEn;
+    if ($legalAr === '' && $legalEn === '' && $footerLegacy !== '') {
+        $legalAr = $footerLegacy;
+    }
+    ?>
+<?php if ($legalAr !== '' || $legalEn !== ''): ?>
 <div class="sd-print-legal" aria-hidden="true">
-    <?php if ($footerAr !== ''): ?>
-    <p class="sd-print-legal__note sd-print-legal__note--ar" dir="rtl" lang="ar"><?php echo htmlspecialchars($footerAr, ENT_QUOTES, 'UTF-8'); ?></p>
-    <?php endif; ?>
-    <?php if ($footerEn !== ''): ?>
-    <p class="sd-print-legal__note sd-print-legal__note--en" dir="ltr" lang="en"><?php echo htmlspecialchars($footerEn, ENT_QUOTES, 'UTF-8'); ?></p>
-    <?php endif; ?>
-</div>
-<?php elseif ($footerLegacy !== ''): ?>
-<div class="sd-print-legal" aria-hidden="true">
-    <p class="sd-print-legal__note"><?php echo htmlspecialchars($footerLegacy, ENT_QUOTES, 'UTF-8'); ?></p>
+    <span class="sd-print-legal__cell sd-print-legal__cell--en" dir="ltr" lang="en"><?php echo htmlspecialchars($legalEn, ENT_QUOTES, 'UTF-8'); ?></span>
+    <span class="sd-print-legal__cell sd-print-legal__cell--ar" dir="rtl" lang="ar"><?php echo htmlspecialchars($legalAr, ENT_QUOTES, 'UTF-8'); ?></span>
 </div>
 <?php endif; ?>
     <?php
 }
 
 /**
- * تذييل صفحة الطباعة للنص القانوني عبر صناديق هامش @page (يتكرر أسفل كل صفحة، ويحجز مساحته):
- *   @bottom-right  = النص العربي (يمين)
- *   @bottom-center = رقم الصفحة «صفحة س من ص»
- *   @bottom-left   = النص الإنجليزي (يسار)
+ * يحجز هامشاً سفلياً لشريط النص القانوني المثبّت (sd-print-legal)، ويضع رقم الصفحة
+ * «صفحة س من ص» في @bottom-center فقط — وحده في الوسط دون يسار/يمين كي لا يُضغط
+ * فيلتف لسطرين. النص القانوني نفسه يُعرض كشريط HTML مثبّت (justify كامل).
  * يُطبع في صفحات فواتير المبيعات (شركة/أونلاين). يُرجع '' إذا لا يوجد نص قانوني.
  */
 function orange_sales_doc_print_legal_pagecss(int $countryId): string
@@ -322,43 +324,19 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
     if ($ar === '' && $en === '') {
         return '';
     }
-    $esc = static function (string $s): string {
-        $s = trim((string) preg_replace('/\s+/u', ' ', $s));
-        $s = str_replace('\\', '\\\\', $s);
-        return str_replace('"', '\\"', $s);
-    };
-    $arCss = $esc($ar);
-    $enCss = $esc($en);
     ob_start();
     ?>
 <style>
 @media print {
     @page {
-        margin-bottom: 14mm;
-        @bottom-left {
-            content: "<?php echo $enCss; ?>";
-            font-size: 6.5pt;
-            color: #475569;
-            direction: ltr;
-            text-align: justify;
-            vertical-align: top;
-            margin: 1mm 6mm 0;
-        }
+        margin-bottom: 18mm;
         @bottom-center {
             content: "صفحة\00a0" counter(page) "\00a0من\00a0" counter(pages);
             font-size: 8pt;
             color: #64748b;
             white-space: nowrap;
-            vertical-align: top;
-            margin-top: 1mm;
-        }
-        @bottom-right {
-            content: "<?php echo $arCss; ?>";
-            font-size: 6.5pt;
-            color: #475569;
-            direction: rtl;
-            vertical-align: top;
-            margin: 1mm 6mm 0;
+            vertical-align: bottom;
+            margin-bottom: 2mm;
         }
     }
 }
