@@ -130,9 +130,6 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
 @media print {
     /* تقليل الفراغ الأبيض أسفل التوقيع/الختم — النص القانوني يشغل هامش @page (16mm) أسفله. */
     .jv-print-area { padding-bottom: 5mm !important; }
-    /* رفع التوقيع/الختم بعد البنود مباشرة (إلغاء دفعه لأسفل) فيُزال الفراغ الأبيض فوقهما
-       ويبقى أسفلهما مساحة مناسبة للتوقيع والختم. */
-    .jv-print-area:has(.sd-print-footer) { min-height: 0 !important; }
 }
 </style>
 

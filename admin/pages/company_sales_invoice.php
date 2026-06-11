@@ -206,9 +206,6 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     }
     /* تقليل الفراغ الأبيض أسفل التوقيع/الختم — النص القانوني يشغل هامش @page (16mm) أسفله. */
     .jv-print-area { padding-bottom: 5mm !important; }
-    /* رفع التوقيع/الختم بعد البنود مباشرة (إلغاء دفعه لأسفل) فيُزال الفراغ الأبيض فوقهما
-       ويبقى أسفلهما مساحة مناسبة للتوقيع والختم. */
-    .jv-print-area:has(.sd-print-footer) { min-height: 0 !important; }
 }
 </style>
 
