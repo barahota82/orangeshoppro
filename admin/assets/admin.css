@@ -4846,7 +4846,12 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         position: fixed;
         left: 8mm;
         right: 8mm;
-        bottom: 2.5mm;
+        /*
+         * الشريط مثبّت نسبةً لمنطقة المحتوى (تنتهي عند بداية الهامش السفلي @page margin-bottom:14mm)،
+         * بينما رقم الصفحة في صندوق @page عند ~2.5mm من حافة الورقة. لإنزال النص القانوني إلى
+         * نفس مستوى رقم الصفحة ندفع الشريط للأسفل داخل شريط الهامش: bottom = -(14mm - 2.5mm).
+         */
+        bottom: -11.5mm;
         /* direction:ltr يضمن أن العنصر الأول (الإنجليزي) يسار والثاني (العربي) يمين
            رغم أن واجهة الأدمن rtl. align-items:flex-end يُنزل أسطر النص لمستوى رقم الصفحة. */
         direction: ltr;
