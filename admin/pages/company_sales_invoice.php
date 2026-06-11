@@ -212,6 +212,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     .jv-print-area .pur-lines-table tbody td:last-child {
         display: none !important;
     }
+    .sd-print-hide { display: none !important; }
     .jv-print-area .pur-lines-table {
         table-layout: fixed !important;
         width: 100% !important;
@@ -412,7 +413,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 <thead>
                     <tr>
                         <th class="pur-col-idx" style="width:2.5rem;">#</th>
-                        <th style="min-width:8rem;">كود / باركود</th>
+                        <th style="min-width:8rem;">كود<span class="sd-print-hide"> / باركود</span></th>
                         <th style="min-width:10rem;">اسم الصنف</th>
                         <th style="min-width:8rem;">اللون / المقاس</th>
                         <th style="width:5rem;">الكمية</th>
