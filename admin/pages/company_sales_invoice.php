@@ -219,7 +219,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     </p>
 </div>
 
-<div class="card jv-print-area sd-sales-inv-print">
+<div class="card jv-print-area">
     <?php
     orange_sales_doc_print_banner([
         'prefix' => 'sv2',

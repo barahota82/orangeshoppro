@@ -333,41 +333,31 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
     ?>
 <style>
 @media print {
-    /*
-     * صفحة مُسماة لعزل تذييل فواتير المبيعات عن @page العام في admin.css
-     * (الذي يضع رقم الصفحة في @bottom-left ويسبب تكراراً/التفافاً).
-     */
-    @page sd-sales-inv {
-        margin-bottom: 10mm;
+    @page {
+        margin-bottom: 26mm;
         @bottom-left {
             content: "<?php echo $enCss; ?>";
             font-size: 6.5pt;
             color: #475569;
             direction: ltr;
-            text-align: right;
-            vertical-align: bottom;
-            margin: 0 4mm 0.5mm 6mm;
+            vertical-align: top;
+            margin: 2mm 6mm 0;
         }
         @bottom-center {
-            content: "صفحة\00a0" counter(page) "\00a0من\00a0" counter(pages);
-            font-size: 7pt;
+            content: "صفحة " counter(page) " من " counter(pages);
+            font-size: 8pt;
             color: #64748b;
-            white-space: nowrap;
-            vertical-align: bottom;
-            margin-bottom: 0.5mm;
+            vertical-align: top;
+            margin-top: 2mm;
         }
         @bottom-right {
             content: "<?php echo $arCss; ?>";
             font-size: 6.5pt;
             color: #475569;
             direction: rtl;
-            text-align: left;
-            vertical-align: bottom;
-            margin: 0 6mm 0.5mm 4mm;
+            vertical-align: top;
+            margin: 2mm 6mm 0;
         }
-    }
-    .jv-print-area.sd-sales-inv-print {
-        page: sd-sales-inv;
     }
 }
 </style>

@@ -141,7 +141,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     </p>
 </div>
 
-<div class="card jv-print-area sd-sales-inv-print">
+<div class="card jv-print-area">
     <?php
     orange_sales_doc_print_banner([
         'prefix' => 'ov2',
