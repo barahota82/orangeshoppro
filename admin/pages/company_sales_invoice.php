@@ -206,6 +206,65 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     }
     /* مسافة أسفل التوقيع/الختم — النص القانوني يشغل هامش @page (16mm) أسفله. */
     .jv-print-area { padding-bottom: 10mm !important; }
+
+    /* ===== طباعة جدول البنود: إخفاء عمود الحذف + عرض القيم كنص كامل بلا قصّ ===== */
+    .jv-print-area .pur-lines-table thead th.admin-doc-col-actions,
+    .jv-print-area .pur-lines-table tbody td:last-child {
+        display: none !important;
+    }
+    .jv-print-area .pur-lines-table {
+        table-layout: fixed !important;
+        width: 100% !important;
+    }
+    .jv-print-area .pur-lines-table thead th,
+    .jv-print-area .pur-lines-table tbody td {
+        padding: 4px 5px !important;
+        font-size: 8.5pt !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        word-break: break-word;
+        vertical-align: middle !important;
+    }
+    /* الحقول تظهر كنص عادي: بلا حدود/خلفية/عرض ثابت، فتُعرض القيمة كاملة */
+    .jv-print-area .pur-lines-table input {
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        outline: none !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        font-size: 8.5pt !important;
+        line-height: 1.3 !important;
+        color: #0f172a !important;
+        -webkit-text-fill-color: #0f172a !important;
+        opacity: 1 !important;
+        text-overflow: clip !important;
+    }
+    /* نِسَب الأعمدة (بعد إخفاء عمود الحذف): #، كود، اسم، لون/مقاس، كمية، سعر، خصم، إجمالي */
+    .jv-print-area .pur-lines-table thead th:nth-child(1) { width: 4% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(2) { width: 16% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(3) { width: 24% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(4) { width: 16% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(5) { width: 8% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(6) { width: 11% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(7) { width: 9% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(8) { width: 12% !important; }
+    /* محاذاة: الكود يسار، الاسم/اللون يمين، الأرقام وسط */
+    .jv-print-area .pur-lines-table tbody td:nth-child(2) input { text-align: left !important; }
+    .jv-print-area .pur-lines-table tbody td:nth-child(3) input,
+    .jv-print-area .pur-lines-table tbody td:nth-child(4) input { text-align: right !important; }
+    .jv-print-area .pur-lines-table tbody td:nth-child(5) input,
+    .jv-print-area .pur-lines-table tbody td:nth-child(6) input,
+    .jv-print-area .pur-lines-table tbody td:nth-child(7) input,
+    .jv-print-area .pur-lines-table tbody td:nth-child(8) input {
+        text-align: center !important;
+    }
 }
 </style>
 
