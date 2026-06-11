@@ -205,7 +205,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         display: none !important;
     }
     /* مسافة أسفل التوقيع/الختم — النص القانوني يشغل هامش @page (16mm) أسفله. */
-    .jv-print-area { padding-bottom: 8mm !important; }
+    .jv-print-area { padding-bottom: 10mm !important; }
 }
 </style>
 

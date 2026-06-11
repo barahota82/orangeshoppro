@@ -129,7 +129,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
 }
 @media print {
     /* مسافة أسفل التوقيع/الختم — النص القانوني يشغل هامش @page (16mm) أسفله. */
-    .jv-print-area { padding-bottom: 8mm !important; }
+    .jv-print-area { padding-bottom: 10mm !important; }
 }
 </style>
 
