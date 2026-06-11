@@ -4835,47 +4835,13 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         border-top: 2px solid #ea580c;
     }
     /*
-     * النص القانوني (سياسة الإرجاع): شريط مثبّت أسفل كل صفحة (position:fixed يتكرر في طباعة Chrome).
-     * الإنجليزي يسار + العربي يمين، كلاهما justify (نهايات الأسطر بحذاء واحد). رقم الصفحة
-     * يُحقن وسطاً عبر @page @bottom-center في orange_sales_doc_print_legal_pagecss().
-     * الهامش السفلي المحجوز (@page margin-bottom) يمنع تداخل البنود مع هذا الشريط.
+     * النص القانوني (سياسة الإرجاع) يُعرض في صناديق هامش @page الحقيقية (تذييل الطباعة):
+     * الإنجليزي @bottom-left / رقم الصفحة @bottom-center / العربي @bottom-right —
+     * يُحقن لكل فاتورة عبر orange_sales_doc_print_legal_pagecss() فيتكرر بكل صفحة بثبات.
+     * لذا نخفي عنصر HTML البديل (sd-print-legal) في الطباعة والشاشة.
      */
     .jv-print-area .sd-print-legal {
-        display: flex !important;
-        visibility: visible !important;
-        position: fixed;
-        left: 8mm;
-        right: 8mm;
-        /*
-         * الشريط مثبّت نسبةً لمنطقة المحتوى (تنتهي عند بداية الهامش السفلي @page margin-bottom:14mm)،
-         * بينما رقم الصفحة في صندوق @page عند ~2.5mm من حافة الورقة. لإنزال النص القانوني إلى
-         * نفس مستوى رقم الصفحة ندفع الشريط للأسفل داخل شريط الهامش: bottom = -(14mm - 2.5mm).
-         */
-        bottom: -11.5mm;
-        /* direction:ltr يضمن أن العنصر الأول (الإنجليزي) يسار والثاني (العربي) يمين
-           رغم أن واجهة الأدمن rtl. align-items:flex-end يُنزل أسطر النص لمستوى رقم الصفحة. */
-        direction: ltr;
-        justify-content: space-between;
-        align-items: flex-end;
-        gap: 30mm;
-        padding-top: 1.2mm;
-        border-top: 1px solid #ea580c;
-        background: #ffffff;
-    }
-    .jv-print-area .sd-print-legal__cell {
-        flex: 1 1 0;
-        min-width: 0;
-        font-size: 6.5pt;
-        line-height: 1.25;
-        color: #475569;
-        text-align: justify;
-        text-justify: inter-word;
-    }
-    .jv-print-area .sd-print-legal__cell--ar {
-        direction: rtl;
-    }
-    .jv-print-area .sd-print-legal__cell--en {
-        direction: ltr;
+        display: none !important;
     }
     .jv-print-area .card-title {
         display: none !important;

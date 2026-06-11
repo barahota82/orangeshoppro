@@ -308,10 +308,14 @@ function orange_sales_doc_print_footer(array $ctx): void
 }
 
 /**
- * يحجز هامشاً سفلياً لشريط النص القانوني المثبّت (sd-print-legal)، ويضع رقم الصفحة
- * «صفحة س من ص» في @bottom-center فقط — وحده في الوسط دون يسار/يمين كي لا يُضغط
- * فيلتف لسطرين. النص القانوني نفسه يُعرض كشريط HTML مثبّت (justify كامل).
- * يُطبع في صفحات فواتير المبيعات (شركة/أونلاين). يُرجع '' إذا لا يوجد نص قانوني.
+ * النص القانوني في تذييل الطباعة الحقيقي عبر صناديق هامش @page (يتكرر أسفل كل صفحة بثبات
+ * ويحجز مساحته دون إنشاء صفحة وهمية):
+ *   @bottom-left   = الإنجليزي (يسار)
+ *   @bottom-center = رقم الصفحة «صفحة س من ص» (سطر واحد، نصيب وسطي محجوز كي لا يُضغط)
+ *   @bottom-right  = العربي (يمين)
+ * يُحقن inline على صفحتَي فاتورة المبيعات فقط (شركة/أونلاين)، فيُلغى تأثير عدّاد admin.css
+ * العام دون المساس بالتقارير/السندات. يُرجع '' إذا لا يوجد نص قانوني.
+ * ملاحظة: صناديق @page لا تدعم justify كاملاً (قيد المتصفح) — مقابل ثبات التكرار.
  */
 function orange_sales_doc_print_legal_pagecss(int $countryId): string
 {
@@ -324,26 +328,49 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
     if ($ar === '' && $en === '') {
         return '';
     }
+    $esc = static function (string $s): string {
+        $s = trim((string) preg_replace('/\s+/u', ' ', $s));
+        $s = str_replace('\\', '\\\\', $s);
+        return str_replace('"', '\\"', $s);
+    };
+    $enCss = $esc($en);
+    $arCss = $esc($ar);
     ob_start();
     ?>
 <style>
 @media print {
-    /*
-     * هذا التنسيق يُحقن inline على صفحتَي فاتورة المبيعات فقط (شركة/أونلاين)، لذا تعطيل
-     * عدّاد @bottom-left/@bottom-right العام (admin.css) هنا يمنع التكرار دون المساس
-     * بالتقارير/السندات. رقم الصفحة يبقى وحده في الوسط @bottom-center (سطر واحد).
-     */
     @page {
-        margin-bottom: 14mm;
-        @bottom-left { content: ""; }
-        @bottom-right { content: ""; }
+        margin-bottom: 20mm;
+        @bottom-left {
+            content: "<?php echo $enCss; ?>";
+            width: 41%;
+            font-size: 6.3pt;
+            line-height: 1.25;
+            color: #475569;
+            direction: ltr;
+            text-align: left;
+            vertical-align: bottom;
+            padding: 0 3mm 2mm 0;
+        }
         @bottom-center {
             content: "صفحة\00a0" counter(page) "\00a0من\00a0" counter(pages);
+            width: 16%;
             font-size: 7.5pt;
             color: #64748b;
             white-space: nowrap;
             vertical-align: bottom;
-            margin-bottom: 2.5mm;
+            padding-bottom: 2mm;
+        }
+        @bottom-right {
+            content: "<?php echo $arCss; ?>";
+            width: 41%;
+            font-size: 6.3pt;
+            line-height: 1.25;
+            color: #475569;
+            direction: rtl;
+            text-align: right;
+            vertical-align: bottom;
+            padding: 0 0 2mm 3mm;
         }
     }
 }
