@@ -128,8 +128,8 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     outline: 1px solid #2563eb;
 }
 @media print {
-    /* تقليل الفراغ الأبيض أسفل التوقيع/الختم — النص القانوني يشغل هامش @page (16mm) أسفله. */
-    .jv-print-area { padding-bottom: 5mm !important; }
+    /* مسافة أسفل التوقيع/الختم — النص القانوني يشغل هامش @page (16mm) أسفله. */
+    .jv-print-area { padding-bottom: 8mm !important; }
 }
 </style>
 

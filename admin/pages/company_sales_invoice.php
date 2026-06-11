@@ -204,8 +204,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     .jv-print-area .sv2-extra-lines-table tr.sv2-extra-line td:last-child {
         display: none !important;
     }
-    /* تقليل الفراغ الأبيض أسفل التوقيع/الختم — النص القانوني يشغل هامش @page (16mm) أسفله. */
-    .jv-print-area { padding-bottom: 5mm !important; }
+    /* مسافة أسفل التوقيع/الختم — النص القانوني يشغل هامش @page (16mm) أسفله. */
+    .jv-print-area { padding-bottom: 8mm !important; }
 }
 </style>
 
