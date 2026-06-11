@@ -343,7 +343,7 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
         margin-bottom: 20mm;
         @bottom-left {
             content: "<?php echo $enCss; ?>";
-            width: 40%;
+            width: 41%;
             font-size: 6.3pt;
             line-height: 1.25;
             color: #475569;
