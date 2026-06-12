@@ -234,6 +234,75 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
     .jv-print-area .pv2-extra-lines-table tr.pv2-extra-line td:last-child {
         display: none !important;
     }
+
+    /* ===== شبكة جدول البنود (مطابقة فاتورة مبيعات الشركة) ===== */
+    .jv-print-area .pur-lines-table thead th.admin-doc-col-actions,
+    .jv-print-area .pur-lines-table tbody td:last-child {
+        display: none !important;
+    }
+    .sd-print-hide { display: none !important; }
+    .jv-print-area .pur-lines-table {
+        table-layout: fixed !important;
+        width: 100% !important;
+        border-collapse: collapse !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    .jv-print-area .pur-lines-table thead th,
+    .jv-print-area .pur-lines-table tbody td {
+        padding: 4px 5px !important;
+        font-size: 8.5pt !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        word-break: break-word;
+        vertical-align: middle !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    .jv-print-area .pur-lines-table thead th {
+        background: #ea580c !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        text-align: center !important;
+        border-color: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .jv-print-area .pur-lines-table input {
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        outline: none !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        font-size: 8.5pt !important;
+        line-height: 1.3 !important;
+        color: #0f172a !important;
+        -webkit-text-fill-color: #0f172a !important;
+        opacity: 1 !important;
+        text-overflow: clip !important;
+    }
+    .jv-print-area .pur-lines-table thead th:nth-child(1) { width: 4% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(2) { width: 12% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(3) { width: 28% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(4) { width: 16% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(5) { width: 8% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(6) { width: 11% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(7) { width: 9% !important; }
+    .jv-print-area .pur-lines-table thead th:nth-child(8) { width: 12% !important; }
+    .jv-print-area .pur-lines-table tbody td:nth-child(2) input { text-align: left !important; }
+    .jv-print-area .pur-lines-table tbody td:nth-child(3) input,
+    .jv-print-area .pur-lines-table tbody td:nth-child(4) input { text-align: right !important; }
+    .jv-print-area .pur-lines-table tbody td:nth-child(5) input,
+    .jv-print-area .pur-lines-table tbody td:nth-child(6) input,
+    .jv-print-area .pur-lines-table tbody td:nth-child(7) input,
+    .jv-print-area .pur-lines-table tbody td:nth-child(8) input {
+        text-align: center !important;
+    }
 }
 </style>
 
@@ -335,7 +404,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
                 <thead>
                     <tr>
                         <th class="pur-col-idx" style="width:2.5rem;">#</th>
-                        <th style="min-width:8rem;">كود / باركود</th>
+                        <th style="min-width:8rem;">كود<span class="sd-print-hide"> / باركود</span></th>
                         <th style="min-width:10rem;">اسم الصنف</th>
                         <th style="min-width:8rem;">اللون / المقاس</th>
                         <th style="width:5rem;">الكمية</th>
