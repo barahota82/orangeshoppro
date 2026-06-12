@@ -219,7 +219,7 @@ header('X-Robots-Tag: noindex, nofollow', true);
         .inv-brand__id-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
         .inv-brand__logo { max-width: 70px; max-height: 60px; object-fit: contain; flex: 0 0 auto; }
         .inv-brand__name-ar { font-size: 0.98rem; font-weight: 800; color: #ea580c; display: inline-block; white-space: nowrap; }
-        .inv-brand__name-en { font-size: 0.8rem; font-weight: 700; color: #c2410c; display: inline-block; white-space: nowrap; transform-origin: <?php echo $isRtl ? 'right' : 'left'; ?> center; }
+        .inv-brand__name-en { font-size: 0.8rem; font-weight: 700; color: #c2410c; display: inline-block; white-space: nowrap; }
         .inv-brand .lbl { color: #94a3b8; }
         .num { direction: ltr; unicode-bidi: isolate; }
 
@@ -425,9 +425,12 @@ header('X-Robots-Tag: noindex, nofollow', true);
     var ar = document.getElementById('invNameAr'), en = document.getElementById('invNameEn');
     if (!ar || !en) { return; }
     function fit() {
-        en.style.transform = '';
+        en.style.fontSize = '';
         var aw = ar.offsetWidth, ew = en.offsetWidth;
-        if (aw > 4 && ew > 4 && ew > aw) { en.style.transform = 'scaleX(' + (aw / ew) + ')'; }
+        if (aw > 4 && ew > 4 && ew > aw) {
+            var fs = parseFloat(getComputedStyle(en).fontSize) || 13;
+            en.style.fontSize = (fs * aw / ew) + 'px';
+        }
     }
     fit();
     window.addEventListener('resize', fit);
