@@ -159,9 +159,12 @@ $esc = static fn ($v): string => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-
         .doc-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 22px; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
         .doc-brand { font-size: 1.5rem; font-weight: 800; color: #ea580c; letter-spacing: .5px; }
         .doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-bottom: 2px solid #ea580c; padding-bottom: 12px; margin-bottom: 14px; flex-wrap: nowrap; }
-        .doc-head > .doc-head-brand { min-width: 0; flex: 1 1 auto; }
+        .doc-head > .doc-head-brand { flex: 0 0 190px; min-width: 0; }
         .doc-type { font-size: 1.15rem; font-weight: 700; }
-        .doc-meta { font-size: 0.9rem; color: #475569; line-height: 1.8; flex: 0 0 auto; text-align: <?php echo $isRtl ? 'left' : 'right'; ?>; }
+        .doc-meta { font-size: 0.9rem; color: #475569; line-height: 1.8; flex: 1 1 auto; min-width: 0; text-align: <?php echo $isRtl ? 'right' : 'left'; ?>; }
+        @media (max-width: 560px) {
+            .doc-head > .doc-head-brand { flex-basis: 130px; }
+        }
         .doc-meta b { color: #0f172a; }
         .doc-lines-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         table.doc-lines { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.88rem; table-layout: fixed; }
