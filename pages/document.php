@@ -219,7 +219,7 @@ header('X-Robots-Tag: noindex, nofollow', true);
         .inv-brand__id-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
         .inv-brand__logo { max-width: 70px; max-height: 60px; object-fit: contain; flex: 0 0 auto; }
         .inv-brand__name-ar { font-size: 1.3rem; font-weight: 800; color: #ea580c; display: inline-block; white-space: nowrap; }
-        .inv-brand__name-en { font-size: 0.8rem; font-weight: 700; color: #c2410c; display: inline-block; white-space: nowrap; }
+        .inv-brand__name-en { font-size: 0.92rem; font-weight: 700; color: #c2410c; display: inline-block; white-space: nowrap; }
         .inv-brand .lbl { color: #94a3b8; }
         .num { direction: ltr; unicode-bidi: isolate; }
 
