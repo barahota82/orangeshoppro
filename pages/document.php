@@ -9,6 +9,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/upload_paths.php';
 require_once __DIR__ . '/../includes/countries.php';
 require_once __DIR__ . '/../includes/document_public_token.php';
 require_once __DIR__ . '/../includes/public_document_view.php';
