@@ -218,7 +218,7 @@ header('X-Robots-Tag: noindex, nofollow', true);
         .inv-brand__id { display: flex; flex-direction: row; align-items: center; gap: 8px; min-width: 0; }
         .inv-brand__id-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
         .inv-brand__logo { max-width: 70px; max-height: 60px; object-fit: contain; flex: 0 0 auto; }
-        .inv-brand__name-ar { font-size: 0.98rem; font-weight: 800; color: #ea580c; display: inline-block; white-space: nowrap; }
+        .inv-brand__name-ar { font-size: 1.3rem; font-weight: 800; color: #ea580c; display: inline-block; white-space: nowrap; }
         .inv-brand__name-en { font-size: 0.8rem; font-weight: 700; color: #c2410c; display: inline-block; white-space: nowrap; }
         .inv-brand .lbl { color: #94a3b8; }
         .num { direction: ltr; unicode-bidi: isolate; }
@@ -420,22 +420,5 @@ header('X-Robots-Tag: noindex, nofollow', true);
         </div>
     <?php endif; ?>
 </div>
-<script>
-(function () {
-    var ar = document.getElementById('invNameAr'), en = document.getElementById('invNameEn');
-    if (!ar || !en) { return; }
-    function fit() {
-        ar.style.fontSize = '';
-        var aw = ar.getBoundingClientRect().width, ew = en.getBoundingClientRect().width;
-        if (aw > 4 && ew > 4) {
-            var fs = parseFloat(getComputedStyle(ar).fontSize) || 16;
-            ar.style.fontSize = (fs * ew / aw) + 'px';
-        }
-    }
-    fit();
-    window.addEventListener('resize', fit);
-    if (document.fonts && document.fonts.ready) { document.fonts.ready.then(fit); }
-})();
-</script>
 </body>
 </html>
