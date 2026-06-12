@@ -202,6 +202,7 @@ header('X-Robots-Tag: noindex, nofollow', true);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
+    <meta name="format-detection" content="telephone=no">
     <title><?php echo $esc($doc !== null ? ($tt($doc['doc_kind']) . ' — ' . $doc['serial']) : $tt('not_found')); ?></title>
     <style>
         * { box-sizing: border-box; }
@@ -214,10 +215,11 @@ header('X-Robots-Tag: noindex, nofollow', true);
 
         /* الترويسة: 3 أعمدة كالطباعة (شركة | مستند | طرف). */
         .inv-head { display: grid; grid-template-columns: 1.25fr 1fr 1.2fr; gap: 12px; border-bottom: 3px solid #ea580c; padding-bottom: 12px; margin-bottom: 14px; }
-        .inv-brand__id { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-        .inv-brand__logo { max-width: 130px; max-height: 64px; object-fit: contain; }
-        .inv-brand__name-ar { font-size: 1.15rem; font-weight: 800; color: #ea580c; }
-        .inv-brand__name-en { font-size: 0.95rem; font-weight: 700; color: #c2410c; }
+        .inv-brand__id { display: flex; flex-direction: row; align-items: center; gap: 8px; min-width: 0; }
+        .inv-brand__id-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .inv-brand__logo { max-width: 70px; max-height: 60px; object-fit: contain; flex: 0 0 auto; }
+        .inv-brand__name-ar { font-size: 0.98rem; font-weight: 800; color: #ea580c; }
+        .inv-brand__name-en { font-size: 0.8rem; font-weight: 700; color: #c2410c; }
         .inv-brand .lbl { color: #94a3b8; }
         .num { direction: ltr; unicode-bidi: isolate; }
 
@@ -257,7 +259,8 @@ header('X-Robots-Tag: noindex, nofollow', true);
         .inv-footer__thanks { text-align: center; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
         .inv-footer__legal { font-size: 0.72rem; color: #475569; line-height: 1.5; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; text-align: justify; margin-bottom: 12px; }
         .inv-contact { text-align: center; color: #475569; font-size: 0.82rem; line-height: 1.7; border-top: 1px solid #f1f5f9; padding-top: 10px; }
-        .inv-contact__phones { direction: ltr; unicode-bidi: isolate; font-weight: 600; color: #334155; }
+        .inv-contact__phones { direction: ltr; unicode-bidi: isolate; font-weight: 600; }
+        .inv-contact__phones a { color: #ea580c; text-decoration: none; }
 
         .doc-empty { text-align: center; padding: 60px 20px; color: #64748b; }
 
@@ -294,20 +297,22 @@ header('X-Robots-Tag: noindex, nofollow', true);
                         <?php if ($company['logo_url'] !== ''): ?>
                             <img class="inv-brand__logo" src="<?php echo $esc($company['logo_url']); ?>" alt="">
                         <?php endif; ?>
-                        <?php if ($company['company_name_ar'] !== ''): ?>
-                            <div class="inv-brand__name-ar"><?php echo $esc($company['company_name_ar']); ?></div>
-                        <?php elseif ($company['company_name_en'] === ''): ?>
-                            <div class="inv-brand__name-ar">ORANGE</div>
-                        <?php endif; ?>
-                        <?php if ($company['company_name_en'] !== ''): ?>
-                            <div class="inv-brand__name-en" dir="ltr" lang="en"><?php echo $esc($company['company_name_en']); ?></div>
-                        <?php endif; ?>
-                        <?php if ($company['commercial_register'] !== ''): ?>
-                            <div style="font-size:0.78rem;color:#475569;"><span class="lbl"><?php echo $esc($tt('rc')); ?>:</span> <span class="num"><?php echo $esc($company['commercial_register']); ?></span></div>
-                        <?php endif; ?>
-                        <?php if ($company['vat_number'] !== ''): ?>
-                            <div style="font-size:0.78rem;color:#475569;"><span class="lbl"><?php echo $esc($tt('vat')); ?>:</span> <span class="num"><?php echo $esc($company['vat_number']); ?></span></div>
-                        <?php endif; ?>
+                        <div class="inv-brand__id-text">
+                            <?php if ($company['company_name_ar'] !== ''): ?>
+                                <div class="inv-brand__name-ar"><?php echo $esc($company['company_name_ar']); ?></div>
+                            <?php elseif ($company['company_name_en'] === ''): ?>
+                                <div class="inv-brand__name-ar">ORANGE</div>
+                            <?php endif; ?>
+                            <?php if ($company['company_name_en'] !== ''): ?>
+                                <div class="inv-brand__name-en" dir="ltr" lang="en"><?php echo $esc($company['company_name_en']); ?></div>
+                            <?php endif; ?>
+                            <?php if ($company['commercial_register'] !== ''): ?>
+                                <div style="font-size:0.78rem;color:#475569;"><span class="lbl"><?php echo $esc($tt('rc')); ?>:</span> <span class="num"><?php echo $esc($company['commercial_register']); ?></span></div>
+                            <?php endif; ?>
+                            <?php if ($company['vat_number'] !== ''): ?>
+                                <div style="font-size:0.78rem;color:#475569;"><span class="lbl"><?php echo $esc($tt('vat')); ?>:</span> <span class="num"><?php echo $esc($company['vat_number']); ?></span></div>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 </div>
 
@@ -400,7 +405,14 @@ header('X-Robots-Tag: noindex, nofollow', true);
                         <div><?php echo $esc($company['address']); ?></div>
                     <?php endif; ?>
                     <?php if ($phoneCells !== []): ?>
-                        <div class="inv-contact__phones"><?php echo $esc(implode(' - ', $phoneCells)); ?></div>
+                        <div class="inv-contact__phones"><?php
+                        $phoneHtml = [];
+                        foreach ($phoneCells as $pc) {
+                            $tel = preg_replace('/[^0-9+]/', '', $pc);
+                            $phoneHtml[] = '<a href="tel:' . $esc($tel) . '">' . $esc($pc) . '</a>';
+                        }
+                        echo implode(' - ', $phoneHtml);
+                        ?></div>
                     <?php endif; ?>
                 </div>
                 <?php endif; ?>
