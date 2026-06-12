@@ -426,8 +426,8 @@ header('X-Robots-Tag: noindex, nofollow', true);
     if (!ar || !en) { return; }
     function fit() {
         en.style.fontSize = '';
-        var aw = ar.offsetWidth, ew = en.offsetWidth;
-        if (aw > 4 && ew > 4 && ew > aw) {
+        var aw = ar.getBoundingClientRect().width, ew = en.getBoundingClientRect().width;
+        if (aw > 4 && ew > 4) {
             var fs = parseFloat(getComputedStyle(en).fontSize) || 13;
             en.style.fontSize = (fs * aw / ew) + 'px';
         }
