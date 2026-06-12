@@ -213,13 +213,16 @@ header('X-Robots-Tag: noindex, nofollow', true);
         .doc-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
 
         /* الترويسة: 3 أعمدة كالطباعة (شركة | مستند | طرف). */
-        .inv-head { display: grid; grid-template-columns: 1.25fr 1fr 1.2fr; gap: 12px; border-bottom: 3px solid #ea580c; padding-bottom: 12px; margin-bottom: 14px; }
-        .inv-brand { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .inv-head { display: grid; grid-template-columns: 1.7fr 1fr 1.15fr; gap: 12px; border-bottom: 3px solid #ea580c; padding-bottom: 12px; margin-bottom: 14px; }
+        /* عمود الشركة: الهوية (شعار/اسم) في جهة، بيانات التواصل (عنوان/أرقام) في الجهة المقابلة. */
+        .inv-brand { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; min-width: 0; }
+        .inv-brand__id { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
         .inv-brand__logo { max-width: 130px; max-height: 64px; object-fit: contain; }
         .inv-brand__name-ar { font-size: 1.15rem; font-weight: 800; color: #ea580c; }
         .inv-brand__name-en { font-size: 0.95rem; font-weight: 700; color: #c2410c; }
-        .inv-brand__meta { font-size: 0.78rem; color: #475569; line-height: 1.6; margin-top: 2px; }
+        .inv-brand__meta { font-size: 0.78rem; color: #475569; line-height: 1.6; min-width: 0; text-align: <?php echo $isRtl ? 'left' : 'right'; ?>; }
         .inv-brand__meta .lbl { color: #94a3b8; }
+        .inv-brand .lbl { color: #94a3b8; }
         .num { direction: ltr; unicode-bidi: isolate; }
 
         .inv-doc { text-align: center; }
@@ -293,21 +296,23 @@ header('X-Robots-Tag: noindex, nofollow', true);
         <div class="doc-card">
             <div class="inv-head">
                 <div class="inv-brand">
-                    <?php if ($company['logo_url'] !== ''): ?>
-                        <img class="inv-brand__logo" src="<?php echo $esc($company['logo_url']); ?>" alt="">
-                    <?php endif; ?>
-                    <?php if ($company['company_name_ar'] !== ''): ?>
-                        <div class="inv-brand__name-ar"><?php echo $esc($company['company_name_ar']); ?></div>
-                    <?php elseif ($company['company_name_en'] === ''): ?>
-                        <div class="inv-brand__name-ar">ORANGE</div>
-                    <?php endif; ?>
-                    <?php if ($company['company_name_en'] !== ''): ?>
-                        <div class="inv-brand__name-en" dir="ltr" lang="en"><?php echo $esc($company['company_name_en']); ?></div>
-                    <?php endif; ?>
-                    <div class="inv-brand__meta">
-                        <?php if ($company['commercial_register'] !== ''): ?>
-                            <div><span class="lbl"><?php echo $esc($tt('rc')); ?>:</span> <span class="num"><?php echo $esc($company['commercial_register']); ?></span></div>
+                    <div class="inv-brand__id">
+                        <?php if ($company['logo_url'] !== ''): ?>
+                            <img class="inv-brand__logo" src="<?php echo $esc($company['logo_url']); ?>" alt="">
                         <?php endif; ?>
+                        <?php if ($company['company_name_ar'] !== ''): ?>
+                            <div class="inv-brand__name-ar"><?php echo $esc($company['company_name_ar']); ?></div>
+                        <?php elseif ($company['company_name_en'] === ''): ?>
+                            <div class="inv-brand__name-ar">ORANGE</div>
+                        <?php endif; ?>
+                        <?php if ($company['company_name_en'] !== ''): ?>
+                            <div class="inv-brand__name-en" dir="ltr" lang="en"><?php echo $esc($company['company_name_en']); ?></div>
+                        <?php endif; ?>
+                        <?php if ($company['commercial_register'] !== ''): ?>
+                            <div style="font-size:0.78rem;color:#475569;"><span class="lbl"><?php echo $esc($tt('rc')); ?>:</span> <span class="num"><?php echo $esc($company['commercial_register']); ?></span></div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="inv-brand__meta">
                         <?php if ($company['address'] !== ''): ?>
                             <div><?php echo $esc($company['address']); ?></div>
                         <?php endif; ?>
