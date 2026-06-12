@@ -28,39 +28,47 @@ $dir = $isRtl ? 'rtl' : 'ltr';
 /* ترجمة محلية لتسميات الصفحة (مستقلة عن مصفوفات config). */
 $L = [
     'ar' => [
-        'inv_c' => 'فاتورة مبيعات', 'inv_o' => 'فاتورة مبيعات أونلاين',
+        'inv_c' => 'فاتورة مبيعات', 'inv_o' => 'فاتورة مبيعات',
         'sales_return' => 'مردود مبيعات', 'purchase' => 'فاتورة مشتريات', 'purchase_return' => 'مردود مشتريات',
         'date' => 'التاريخ', 'customer' => 'العميل', 'supplier' => 'المورد', 'phone' => 'الهاتف',
         'col_item' => 'الصنف', 'col_variant' => 'اللون / المقاس', 'col_qty' => 'الكمية',
         'col_price' => 'سعر الوحدة', 'col_discount' => 'خصم', 'col_total' => 'الإجمالي',
-        'subtotal' => 'إجمالي البنود', 'discount_total' => 'قيمة الخصم', 'net_total' => 'صافي الإجمالي',
+        'discount_total' => 'قيمة الخصم',
+        'subtotal_inv' => 'إجمالي الفاتورة', 'net_inv' => 'مبلغ الفاتورة',
+        'subtotal_ret' => 'إجمالي المردود', 'net_ret' => 'صافي المردود',
         'not_found' => 'المستند غير موجود أو انتهت صلاحية الرابط.', 'language' => 'اللغة', 'serial' => 'رقم المستند',
     ],
     'en' => [
-        'inv_c' => 'Sales Invoice', 'inv_o' => 'Online Sales Invoice',
+        'inv_c' => 'Sales Invoice', 'inv_o' => 'Sales Invoice',
         'sales_return' => 'Sales Return', 'purchase' => 'Purchase Invoice', 'purchase_return' => 'Purchase Return',
         'date' => 'Date', 'customer' => 'Customer', 'supplier' => 'Supplier', 'phone' => 'Phone',
         'col_item' => 'Item', 'col_variant' => 'Color / Size', 'col_qty' => 'Qty',
         'col_price' => 'Unit Price', 'col_discount' => 'Discount', 'col_total' => 'Total',
-        'subtotal' => 'Subtotal', 'discount_total' => 'Discount', 'net_total' => 'Net Total',
+        'discount_total' => 'Discount',
+        'subtotal_inv' => 'Invoice Total', 'net_inv' => 'Amount Due',
+        'subtotal_ret' => 'Return Total', 'net_ret' => 'Net Return',
         'not_found' => 'Document not found or the link has expired.', 'language' => 'Language', 'serial' => 'Document No.',
     ],
     'fil' => [
-        'inv_c' => 'Sales Invoice', 'inv_o' => 'Online Sales Invoice',
+        'inv_c' => 'Sales Invoice', 'inv_o' => 'Sales Invoice',
         'sales_return' => 'Sales Return', 'purchase' => 'Purchase Invoice', 'purchase_return' => 'Purchase Return',
         'date' => 'Petsa', 'customer' => 'Customer', 'supplier' => 'Supplier', 'phone' => 'Telepono',
         'col_item' => 'Item', 'col_variant' => 'Kulay / Sukat', 'col_qty' => 'Dami',
         'col_price' => 'Presyo', 'col_discount' => 'Diskwento', 'col_total' => 'Kabuuan',
-        'subtotal' => 'Subtotal', 'discount_total' => 'Diskwento', 'net_total' => 'Net na Kabuuan',
+        'discount_total' => 'Diskwento',
+        'subtotal_inv' => 'Kabuuang Invoice', 'net_inv' => 'Halagang Babayaran',
+        'subtotal_ret' => 'Kabuuang Return', 'net_ret' => 'Net na Return',
         'not_found' => 'Hindi mahanap ang dokumento o nag-expire na ang link.', 'language' => 'Wika', 'serial' => 'Dokumento No.',
     ],
     'hi' => [
-        'inv_c' => 'बिक्री चालान', 'inv_o' => 'ऑनलाइन बिक्री चालान',
+        'inv_c' => 'बिक्री चालान', 'inv_o' => 'बिक्री चालान',
         'sales_return' => 'बिक्री वापसी', 'purchase' => 'खरीद चालान', 'purchase_return' => 'खरीद वापसी',
         'date' => 'तारीख', 'customer' => 'ग्राहक', 'supplier' => 'आपूर्तिकर्ता', 'phone' => 'फ़ोन',
         'col_item' => 'वस्तु', 'col_variant' => 'रंग / माप', 'col_qty' => 'मात्रा',
         'col_price' => 'इकाई मूल्य', 'col_discount' => 'छूट', 'col_total' => 'कुल',
-        'subtotal' => 'उप-योग', 'discount_total' => 'छूट', 'net_total' => 'शुद्ध कुल',
+        'discount_total' => 'छूट',
+        'subtotal_inv' => 'चालान कुल', 'net_inv' => 'देय राशि',
+        'subtotal_ret' => 'वापसी कुल', 'net_ret' => 'शुद्ध वापसी',
         'not_found' => 'दस्तावेज़ नहीं मिला या लिंक की अवधि समाप्त हो गई।', 'language' => 'भाषा', 'serial' => 'दस्तावेज़ सं.',
     ],
 ];
@@ -150,9 +158,10 @@ $esc = static fn ($v): string => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-
         .doc-langbar a.is-active { background: #ea580c; color: #fff; border-color: #ea580c; font-weight: 700; }
         .doc-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 22px; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
         .doc-brand { font-size: 1.5rem; font-weight: 800; color: #ea580c; letter-spacing: .5px; }
-        .doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-bottom: 2px solid #ea580c; padding-bottom: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+        .doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-bottom: 2px solid #ea580c; padding-bottom: 12px; margin-bottom: 14px; flex-wrap: nowrap; }
+        .doc-head > .doc-head-brand { min-width: 0; flex: 1 1 auto; }
         .doc-type { font-size: 1.15rem; font-weight: 700; }
-        .doc-meta { font-size: 0.9rem; color: #475569; line-height: 1.8; }
+        .doc-meta { font-size: 0.9rem; color: #475569; line-height: 1.8; flex: 0 0 auto; text-align: <?php echo $isRtl ? 'left' : 'right'; ?>; }
         .doc-meta b { color: #0f172a; }
         .doc-lines-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         table.doc-lines { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.88rem; table-layout: fixed; }
@@ -194,7 +203,7 @@ $esc = static fn ($v): string => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-
     <?php else: ?>
         <div class="doc-card">
             <div class="doc-head">
-                <div>
+                <div class="doc-head-brand">
                     <div class="doc-brand">ORANGE</div>
                     <div class="doc-type"><?php echo $esc($tt($doc['doc_kind'])); ?></div>
                 </div>
@@ -241,10 +250,11 @@ $esc = static fn ($v): string => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-
             </table>
             </div>
 
+            <?php $isReturnDoc = in_array($doc['doc_kind'], ['sales_return', 'purchase_return'], true); ?>
             <div class="doc-totals">
-                <div><span><?php echo $esc($tt('subtotal')); ?></span><span class="num"><?php echo $esc($fmtMoney($doc['subtotal'])); ?></span></div>
+                <div><span><?php echo $esc($tt($isReturnDoc ? 'subtotal_ret' : 'subtotal_inv')); ?></span><span class="num"><?php echo $esc($fmtMoney($doc['subtotal'])); ?></span></div>
                 <div><span><?php echo $esc($tt('discount_total')); ?></span><span class="num"><?php echo $esc($fmtMoney($doc['discount_total'])); ?></span></div>
-                <div class="doc-net"><span><?php echo $esc($tt('net_total')); ?></span><span class="num"><?php echo $esc($fmtMoney($doc['net_total'])); ?></span></div>
+                <div class="doc-net"><span><?php echo $esc($tt($isReturnDoc ? 'net_ret' : 'net_inv')); ?></span><span class="num"><?php echo $esc($fmtMoney($doc['net_total'])); ?></span></div>
             </div>
         </div>
     <?php endif; ?>
