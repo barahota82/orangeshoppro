@@ -425,11 +425,11 @@ header('X-Robots-Tag: noindex, nofollow', true);
     var ar = document.getElementById('invNameAr'), en = document.getElementById('invNameEn');
     if (!ar || !en) { return; }
     function fit() {
-        en.style.fontSize = '';
+        ar.style.fontSize = '';
         var aw = ar.getBoundingClientRect().width, ew = en.getBoundingClientRect().width;
         if (aw > 4 && ew > 4) {
-            var fs = parseFloat(getComputedStyle(en).fontSize) || 13;
-            en.style.fontSize = (fs * aw / ew) + 'px';
+            var fs = parseFloat(getComputedStyle(ar).fontSize) || 16;
+            ar.style.fontSize = (fs * ew / aw) + 'px';
         }
     }
     fit();
