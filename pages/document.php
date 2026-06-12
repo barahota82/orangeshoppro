@@ -213,15 +213,11 @@ header('X-Robots-Tag: noindex, nofollow', true);
         .doc-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
 
         /* الترويسة: 3 أعمدة كالطباعة (شركة | مستند | طرف). */
-        .inv-head { display: grid; grid-template-columns: 1.7fr 1fr 1.15fr; gap: 12px; border-bottom: 3px solid #ea580c; padding-bottom: 12px; margin-bottom: 14px; }
-        /* عمود الشركة: الهوية (شعار/اسم) في جهة، بيانات التواصل (عنوان/أرقام) في الجهة المقابلة. */
-        .inv-brand { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; min-width: 0; }
+        .inv-head { display: grid; grid-template-columns: 1.25fr 1fr 1.2fr; gap: 12px; border-bottom: 3px solid #ea580c; padding-bottom: 12px; margin-bottom: 14px; }
         .inv-brand__id { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
         .inv-brand__logo { max-width: 130px; max-height: 64px; object-fit: contain; }
         .inv-brand__name-ar { font-size: 1.15rem; font-weight: 800; color: #ea580c; }
         .inv-brand__name-en { font-size: 0.95rem; font-weight: 700; color: #c2410c; }
-        .inv-brand__meta { font-size: 0.78rem; color: #475569; line-height: 1.6; min-width: 0; text-align: <?php echo $isRtl ? 'left' : 'right'; ?>; }
-        .inv-brand__meta .lbl { color: #94a3b8; }
         .inv-brand .lbl { color: #94a3b8; }
         .num { direction: ltr; unicode-bidi: isolate; }
 
@@ -256,14 +252,12 @@ header('X-Robots-Tag: noindex, nofollow', true);
         .doc-totals div + div { border-top: 1px solid #f1f5f9; }
         .doc-totals .doc-net { background: #ea580c; color: #fff; font-weight: 800; font-size: 1.02rem; border-top: 0; }
 
-        /* تذييل: شكر + توقيع/ختم + نص قانوني. */
+        /* تذييل: شكر + نص قانوني + بيانات تواصل بالوسط أسفل الصفحة. */
         .inv-footer { margin-top: 20px; border-top: 1px dashed #cbd5e1; padding-top: 12px; }
-        .inv-footer__thanks { text-align: center; font-weight: 700; color: #0f172a; margin-bottom: 14px; }
-        .inv-footer__signs { display: flex; justify-content: space-around; gap: 20px; margin-bottom: 14px; }
-        .inv-footer__sign { text-align: center; flex: 1; }
-        .inv-footer__sign-line { display: block; border-top: 1px solid #94a3b8; margin: 28px 8px 4px; }
-        .inv-footer__sign-label { font-size: 0.82rem; color: #475569; }
-        .inv-footer__legal { font-size: 0.72rem; color: #475569; line-height: 1.5; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; text-align: justify; }
+        .inv-footer__thanks { text-align: center; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+        .inv-footer__legal { font-size: 0.72rem; color: #475569; line-height: 1.5; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; text-align: justify; margin-bottom: 12px; }
+        .inv-contact { text-align: center; color: #475569; font-size: 0.82rem; line-height: 1.7; border-top: 1px solid #f1f5f9; padding-top: 10px; }
+        .inv-contact__phones { direction: ltr; unicode-bidi: isolate; font-weight: 600; color: #334155; }
 
         .doc-empty { text-align: center; padding: 60px 20px; color: #64748b; }
 
@@ -311,16 +305,8 @@ header('X-Robots-Tag: noindex, nofollow', true);
                         <?php if ($company['commercial_register'] !== ''): ?>
                             <div style="font-size:0.78rem;color:#475569;"><span class="lbl"><?php echo $esc($tt('rc')); ?>:</span> <span class="num"><?php echo $esc($company['commercial_register']); ?></span></div>
                         <?php endif; ?>
-                    </div>
-                    <div class="inv-brand__meta">
-                        <?php if ($company['address'] !== ''): ?>
-                            <div><?php echo $esc($company['address']); ?></div>
-                        <?php endif; ?>
-                        <?php if ($phoneCells !== []): ?>
-                            <div><span class="lbl"><?php echo $esc($tt('tel')); ?>:</span> <span class="num"><?php echo $esc(implode('  ·  ', $phoneCells)); ?></span></div>
-                        <?php endif; ?>
                         <?php if ($company['vat_number'] !== ''): ?>
-                            <div><span class="lbl"><?php echo $esc($tt('vat')); ?>:</span> <span class="num"><?php echo $esc($company['vat_number']); ?></span></div>
+                            <div style="font-size:0.78rem;color:#475569;"><span class="lbl"><?php echo $esc($tt('vat')); ?>:</span> <span class="num"><?php echo $esc($company['vat_number']); ?></span></div>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -401,24 +387,24 @@ header('X-Robots-Tag: noindex, nofollow', true);
                 <div class="doc-net"><span><?php echo $esc($tt($isReturnDoc ? 'net_ret' : 'net_inv')); ?></span><span class="num"><?php echo $esc($fmtMoney($doc['net_total'])); ?></span></div>
             </div>
 
-            <?php if (! $isSupplierDoc): ?>
             <div class="inv-footer">
-                <div class="inv-footer__thanks"><?php echo $esc($tt('thanks')); ?></div>
-                <div class="inv-footer__signs">
-                    <div class="inv-footer__sign">
-                        <span class="inv-footer__sign-line"></span>
-                        <span class="inv-footer__sign-label"><?php echo $esc($tt('signature')); ?></span>
-                    </div>
-                    <div class="inv-footer__sign">
-                        <span class="inv-footer__sign-line"></span>
-                        <span class="inv-footer__sign-label"><?php echo $esc($tt('stamp')); ?></span>
-                    </div>
+                <?php if (! $isSupplierDoc): ?>
+                    <div class="inv-footer__thanks"><?php echo $esc($tt('thanks')); ?></div>
+                    <?php if ($legalNote !== ''): ?>
+                        <div class="inv-footer__legal" dir="<?php echo $lang === 'ar' ? 'rtl' : 'ltr'; ?>"><?php echo $esc($legalNote); ?></div>
+                    <?php endif; ?>
+                <?php endif; ?>
+                <?php if ($company['address'] !== '' || $phoneCells !== []): ?>
+                <div class="inv-contact">
+                    <?php if ($company['address'] !== ''): ?>
+                        <div><?php echo $esc($company['address']); ?></div>
+                    <?php endif; ?>
+                    <?php if ($phoneCells !== []): ?>
+                        <div class="inv-contact__phones"><?php echo $esc(implode(' - ', $phoneCells)); ?></div>
+                    <?php endif; ?>
                 </div>
-                <?php if ($legalNote !== ''): ?>
-                    <div class="inv-footer__legal" dir="<?php echo $lang === 'ar' ? 'rtl' : 'ltr'; ?>"><?php echo $esc($legalNote); ?></div>
                 <?php endif; ?>
             </div>
-            <?php endif; ?>
         </div>
     <?php endif; ?>
 </div>
