@@ -75,13 +75,18 @@ $preview = isset($_GET['preview']) && (string) $_GET['preview'] !== '0' && (stri
 $doc = null;
 $currencyUnit = '';
 if ($preview) {
+    $previewKind = strtolower(trim((string) ($_GET['kind'] ?? 'inv_c')));
+    if (! in_array($previewKind, ['inv_c', 'inv_o', 'sales_return'], true)) {
+        $previewKind = 'inv_c';
+    }
+    $previewSerial = ['inv_c' => 'INV-C-KW-1', 'inv_o' => 'INV-O-KW-1', 'sales_return' => 'SR-KW-1'][$previewKind];
     $currencyUnit = 'KD';
     $sampleName = ['ar' => 'منتج تجريبي', 'en' => 'Sample Product', 'fil' => 'Halimbawang Produkto', 'hi' => 'नमूना उत्पाद'][$lang] ?? 'Sample Product';
     $sampleVar = ['ar' => 'أحمر / M', 'en' => 'Red / M', 'fil' => 'Pula / M', 'hi' => 'लाल / M'][$lang] ?? 'Red / M';
     $sampleCust = ['ar' => 'عميل تجريبي', 'en' => 'Sample Customer', 'fil' => 'Halimbawang Customer', 'hi' => 'नमूना ग्राहक'][$lang] ?? 'Sample Customer';
     $doc = [
-        'doc_kind' => 'inv_c',
-        'serial' => 'INV-C-KW-1',
+        'doc_kind' => $previewKind,
+        'serial' => $previewSerial,
         'date' => date('Y-m-d'),
         'party_kind' => 'customer',
         'party_name' => $sampleCust,
@@ -121,7 +126,7 @@ $fmtMoney = static function ($n) use ($currencyUnit): string {
 $langLinks = [];
 foreach ($allowedLang as $lc) {
     $langLinks[$lc] = $preview
-        ? (storefront_public_path('/pages/document.php') . '?' . http_build_query(['preview' => 1, 'lang' => $lc]))
+        ? (storefront_public_path('/pages/document.php') . '?' . http_build_query(['preview' => 1, 'kind' => $doc['doc_kind'] ?? 'inv_c', 'lang' => $lc]))
         : orange_doc_public_relative_url($token, $lc);
 }
 $langLabels = ['ar' => 'العربية', 'en' => 'English', 'fil' => 'Filipino', 'hi' => 'हिन्दी'];
@@ -149,10 +154,23 @@ $esc = static fn ($v): string => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-
         .doc-type { font-size: 1.15rem; font-weight: 700; }
         .doc-meta { font-size: 0.9rem; color: #475569; line-height: 1.8; }
         .doc-meta b { color: #0f172a; }
-        table.doc-lines { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.88rem; }
+        .doc-lines-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table.doc-lines { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.88rem; table-layout: fixed; }
         table.doc-lines th { background: #ea580c; color: #fff; padding: 8px 6px; text-align: center; border: 1px solid #fff; font-weight: 700; }
         table.doc-lines td { padding: 7px 6px; border: 1px solid #e2e8f0; text-align: center; }
+        table.doc-lines th, table.doc-lines td { word-break: break-word; overflow-wrap: anywhere; }
         table.doc-lines td.doc-name { text-align: <?php echo $isRtl ? 'right' : 'left'; ?>; }
+        table.doc-lines col.c-item { width: 30%; }
+        table.doc-lines col.c-variant { width: 18%; }
+        table.doc-lines col.c-qty { width: 10%; }
+        table.doc-lines col.c-price { width: 14%; }
+        table.doc-lines col.c-discount { width: 14%; }
+        table.doc-lines col.c-total { width: 14%; }
+        @media (max-width: 560px) {
+            .doc-card { padding: 14px; }
+            table.doc-lines { font-size: 0.78rem; }
+            table.doc-lines th, table.doc-lines td { padding: 5px 3px; }
+        }
         .doc-totals { margin-top: 14px; margin-<?php echo $isRtl ? 'left' : 'right'; ?>: 0; margin-<?php echo $isRtl ? 'right' : 'left'; ?>: auto; max-width: 320px; font-size: 0.92rem; }
         .doc-totals div { display: flex; justify-content: space-between; padding: 4px 0; }
         .doc-totals .doc-net { border-top: 2px solid #0f172a; margin-top: 4px; padding-top: 8px; font-weight: 800; font-size: 1.05rem; }
@@ -192,7 +210,12 @@ $esc = static fn ($v): string => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-
                 </div>
             </div>
 
+            <div class="doc-lines-wrap">
             <table class="doc-lines">
+                <colgroup>
+                    <col class="c-item"><col class="c-variant"><col class="c-qty">
+                    <col class="c-price"><col class="c-discount"><col class="c-total">
+                </colgroup>
                 <thead>
                     <tr>
                         <th><?php echo $esc($tt('col_item')); ?></th>
@@ -216,6 +239,7 @@ $esc = static fn ($v): string => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            </div>
 
             <div class="doc-totals">
                 <div><span><?php echo $esc($tt('subtotal')); ?></span><span class="num"><?php echo $esc($fmtMoney($doc['subtotal'])); ?></span></div>

@@ -111,8 +111,10 @@
         // مؤقّت (وضع معاينة): اعرض QR يشير لصفحة المعاينة دائماً حتى قبل الحفظ ليُمسح بالكاميرا.
         if (typeof global.qrcode === 'function') {
             try {
+                var pkind = String(docKind || '').trim();
+                var purl = global.location.origin + '/pages/document.php?preview=1' + (pkind ? '&kind=' + encodeURIComponent(pkind) : '');
                 var pqr = global.qrcode(0, 'M');
-                pqr.addData(global.location.origin + '/pages/document.php?preview=1');
+                pqr.addData(purl);
                 pqr.make();
                 box.innerHTML = pqr.createImgTag(3, 0);
                 var pimg = box.querySelector('img');
