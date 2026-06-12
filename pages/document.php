@@ -67,20 +67,47 @@ $tt = static function (string $key) use ($L, $lang): string {
     return $L[$lang][$key] ?? ($L['en'][$key] ?? $key);
 };
 
+/* وضع معاينة مؤقت (?preview=1) — بيانات تجريبية فقط لاستعراض شكل الصفحة بلا توكن.
+   مؤقّت: يُزال لاحقاً ويبقى التوليد عبر التوكن بعد الحفظ. */
+$preview = isset($_GET['preview']) && (string) $_GET['preview'] !== '0' && (string) $_GET['preview'] !== '';
+
 $doc = null;
 $currencyUnit = '';
-try {
-    $pdo = db();
-    $found = $token !== '' ? orange_doc_public_token_lookup($pdo, $token) : null;
-    if ($found !== null) {
-        $doc = orange_public_document_load($pdo, $found['doc_kind'], $found['doc_id'], (int) ($found['country_id'] ?? 0));
-        if ($doc !== null) {
-            $cid = (int) ($doc['country_id'] ?? 0);
-            $currencyUnit = orange_storefront_currency_unit($pdo, $cid > 0 ? $cid : null);
+if ($preview) {
+    $currencyUnit = 'KD';
+    $sampleName = ['ar' => 'منتج تجريبي', 'en' => 'Sample Product', 'fil' => 'Halimbawang Produkto', 'hi' => 'नमूना उत्पाद'][$lang] ?? 'Sample Product';
+    $sampleVar = ['ar' => 'أحمر / M', 'en' => 'Red / M', 'fil' => 'Pula / M', 'hi' => 'लाल / M'][$lang] ?? 'Red / M';
+    $sampleCust = ['ar' => 'عميل تجريبي', 'en' => 'Sample Customer', 'fil' => 'Halimbawang Customer', 'hi' => 'नमूना ग्राहक'][$lang] ?? 'Sample Customer';
+    $doc = [
+        'doc_kind' => 'inv_c',
+        'serial' => 'INV-C-KW-1',
+        'date' => date('Y-m-d'),
+        'party_kind' => 'customer',
+        'party_name' => $sampleCust,
+        'party_phone' => '5000 0000',
+        'lines' => [
+            ['name' => $sampleName . ' 1', 'variant' => $sampleVar, 'qty' => 2, 'price' => 3.5, 'discount' => 0.5, 'total' => 6.5],
+            ['name' => $sampleName . ' 2', 'variant' => '', 'qty' => 1, 'price' => 12.25, 'discount' => 0, 'total' => 12.25],
+            ['name' => $sampleName . ' 3', 'variant' => $sampleVar, 'qty' => 3, 'price' => 1.0, 'discount' => 0, 'total' => 3.0],
+        ],
+        'subtotal' => 22.25,
+        'discount_total' => 0.5,
+        'net_total' => 21.75,
+    ];
+} else {
+    try {
+        $pdo = db();
+        $found = $token !== '' ? orange_doc_public_token_lookup($pdo, $token) : null;
+        if ($found !== null) {
+            $doc = orange_public_document_load($pdo, $found['doc_kind'], $found['doc_id'], (int) ($found['country_id'] ?? 0));
+            if ($doc !== null) {
+                $cid = (int) ($doc['country_id'] ?? 0);
+                $currencyUnit = orange_storefront_currency_unit($pdo, $cid > 0 ? $cid : null);
+            }
         }
+    } catch (Throwable $e) {
+        $doc = null;
     }
-} catch (Throwable $e) {
-    $doc = null;
 }
 
 $fmtMoney = static function ($n) use ($currencyUnit): string {
@@ -92,7 +119,9 @@ $fmtMoney = static function ($n) use ($currencyUnit): string {
 /* روابط مبدّل اللغة (نفس التوكن، lang مختلف). */
 $langLinks = [];
 foreach ($allowedLang as $lc) {
-    $langLinks[$lc] = orange_doc_public_relative_url($token, $lc);
+    $langLinks[$lc] = $preview
+        ? (storefront_public_path('/pages/document.php') . '?' . http_build_query(['preview' => 1, 'lang' => $lc]))
+        : orange_doc_public_relative_url($token, $lc);
 }
 $langLabels = ['ar' => 'العربية', 'en' => 'English', 'fil' => 'Filipino', 'hi' => 'हिन्दी'];
 
