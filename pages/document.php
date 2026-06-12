@@ -218,8 +218,8 @@ header('X-Robots-Tag: noindex, nofollow', true);
         .inv-brand__id { display: flex; flex-direction: row; align-items: center; gap: 8px; min-width: 0; }
         .inv-brand__id-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
         .inv-brand__logo { max-width: 70px; max-height: 60px; object-fit: contain; flex: 0 0 auto; }
-        .inv-brand__name-ar { font-size: 0.98rem; font-weight: 800; color: #ea580c; text-align: justify; text-align-last: justify; -moz-text-align-last: justify; text-justify: inter-character; }
-        .inv-brand__name-en { font-size: 0.8rem; font-weight: 700; color: #c2410c; }
+        .inv-brand__name-ar { font-size: 0.98rem; font-weight: 800; color: #ea580c; display: inline-block; white-space: nowrap; transform-origin: <?php echo $isRtl ? 'right' : 'left'; ?> center; }
+        .inv-brand__name-en { font-size: 0.8rem; font-weight: 700; color: #c2410c; display: inline-block; white-space: nowrap; }
         .inv-brand .lbl { color: #94a3b8; }
         .num { direction: ltr; unicode-bidi: isolate; }
 
@@ -299,12 +299,12 @@ header('X-Robots-Tag: noindex, nofollow', true);
                         <?php endif; ?>
                         <div class="inv-brand__id-text">
                             <?php if ($company['company_name_ar'] !== ''): ?>
-                                <div class="inv-brand__name-ar"><?php echo $esc($company['company_name_ar']); ?></div>
+                                <div class="inv-brand__name-ar" id="invNameAr"><?php echo $esc($company['company_name_ar']); ?></div>
                             <?php elseif ($company['company_name_en'] === ''): ?>
                                 <div class="inv-brand__name-ar">ORANGE</div>
                             <?php endif; ?>
                             <?php if ($company['company_name_en'] !== ''): ?>
-                                <div class="inv-brand__name-en" dir="ltr" lang="en"><?php echo $esc($company['company_name_en']); ?></div>
+                                <div class="inv-brand__name-en" id="invNameEn" dir="ltr" lang="en"><?php echo $esc($company['company_name_en']); ?></div>
                             <?php endif; ?>
                             <?php if ($company['commercial_register'] !== ''): ?>
                                 <div style="font-size:0.78rem;color:#475569;"><span class="lbl"><?php echo $esc($tt('rc')); ?>:</span> <span class="num"><?php echo $esc($company['commercial_register']); ?></span></div>
@@ -420,5 +420,19 @@ header('X-Robots-Tag: noindex, nofollow', true);
         </div>
     <?php endif; ?>
 </div>
+<script>
+(function () {
+    var ar = document.getElementById('invNameAr'), en = document.getElementById('invNameEn');
+    if (!ar || !en) { return; }
+    function fit() {
+        ar.style.transform = '';
+        var aw = ar.offsetWidth, ew = en.offsetWidth;
+        if (aw > 4 && ew > 4) { ar.style.transform = 'scaleX(' + (ew / aw) + ')'; }
+    }
+    fit();
+    window.addEventListener('resize', fit);
+    if (document.fonts && document.fonts.ready) { document.fonts.ready.then(fit); }
+})();
+</script>
 </body>
 </html>
