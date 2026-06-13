@@ -331,9 +331,9 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         ],
         'show_notes' => true,
         'totals_rows' => [
-            ['الإجمالي / Total', 'gross'],
-            ['الخصم / Discount', 'disc'],
-            ['الصافي / Net', 'net'],
+            ['إجمالي الفاتورة / Total', 'gross'],
+            ['قيمة الخصم / Discount', 'disc'],
+            ['مبلغ الفاتورة / Net', 'net'],
         ],
     ]);
     ?>
