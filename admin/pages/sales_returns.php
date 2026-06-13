@@ -388,6 +388,7 @@ $sr2DocSerialPreview = $sr2NavReady
         <span style="color:#0f172a;font-weight:700;border-top:2px solid #ea580c;display:inline-block;padding-top:4px;margin-top:2px;"><span id="sr2_grand_label">إجمالي المردود:</span> <strong id="sr2_grand_total" class="admin-money-display" dir="ltr" lang="en" style="color:#ea580c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
         <span class="muted" style="font-size:0.85rem;"> <?php echo htmlspecialchars($srCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span></span>
     </div>
+    <div id="sr2_line_disc_error" class="jv-print-hide" style="display:none;color:#dc2626;font-size:0.85rem;margin-top:6px;font-weight:600;"></div>
 
     <?php orange_sales_doc_print_footer(['country_id' => $srCountryId, 'show_note' => false]); ?>
 
@@ -825,13 +826,19 @@ $sr2DocSerialPreview = $sr2NavReady
         if (!tb) return;
         var netTotal = 0;
         var grossSubtotal = 0;
+        var firstDiscError = '';
         var rows = tb.querySelectorAll('tr.sr2-line');
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             var q = parseInt(r.querySelector('.sr2-qty').value, 10) || 0;
             var price = parseFloat(r.querySelector('.sr2-price').value) || 0;
             var lineGross = q * price;
-            var disc = parseDiscount((r.querySelector('.sr2-line-disc').value || '').trim(), lineGross);
+            var discEl = r.querySelector('.sr2-line-disc');
+            var disc = parseDiscount((discEl && discEl.value || '').trim(), lineGross);
+            // المردود: الخصم يمكن أن يساوي إجمالي الصنف (الصافي صفر) لكن لا يتجاوزه.
+            var invalid = (disc > 0) && (disc > lineGross + 0.0005);
+            if (discEl) discEl.style.border = invalid ? '1px solid #dc2626' : '';
+            if (invalid && !firstDiscError) firstDiscError = 'خصم الصنف في السطر ' + (i + 1) + ' أكبر من إجمالي الصنف — يمكن أن يساويه فقط.';
             if (disc > lineGross) disc = lineGross;
             var lineNet = Math.max(0, lineGross - disc);
             var ltEl = r.querySelector('.sr2-line-total');
@@ -839,6 +846,8 @@ $sr2DocSerialPreview = $sr2NavReady
             grossSubtotal += lineGross;
             netTotal += lineNet;
         }
+        var errEl = document.getElementById('sr2_line_disc_error');
+        if (errEl) { errEl.innerHTML = firstDiscError; errEl.style.display = firstDiscError ? '' : 'none'; }
         var totalDiscount = Math.max(0, grossSubtotal - netTotal);
         var stEl = document.getElementById('sr2_subtotal');
         var dtEl = document.getElementById('sr2_discount_total');

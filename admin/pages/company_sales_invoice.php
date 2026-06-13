@@ -462,6 +462,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             <span class="muted" style="font-size:0.85rem;"> <?php echo htmlspecialchars($adminCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span></span>
         </div>
     </div>
+    <div id="sv2_line_disc_error" class="jv-print-hide" style="display:none;color:#dc2626;font-size:0.85rem;margin-top:6px;font-weight:600;"></div>
 
     <?php orange_sales_doc_print_footer(['country_id' => $adminCountryId]); ?>
     <?php echo orange_sales_doc_print_legal_pagecss((int) $adminCountryId); ?>
@@ -1017,11 +1018,18 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         if (!tb) return;
         var grossSubtotal = 0;
         var totalDiscount = 0;
-        tb.querySelectorAll('tr.sv2-line').forEach(function (r) {
+        var firstDiscError = '';
+        var rows = tb.querySelectorAll('tr.sv2-line');
+        rows.forEach(function (r, i) {
             var q = parseInt(r.querySelector('.sv2-qty').value, 10) || 0;
             var p = parseFloat(r.querySelector('.sv2-price').value) || 0;
             var lineGross = q * p;
-            var discAmt = parseDiscount((r.querySelector('.sv2-discount').value || '').trim(), lineGross);
+            var discEl = r.querySelector('.sv2-discount');
+            var discAmt = parseDiscount((discEl && discEl.value || '').trim(), lineGross);
+            // المبيعات: الخصم يمكن أن يساوي إجمالي الصنف (الصافي صفر) لكن لا يتجاوزه.
+            var invalid = (discAmt > 0) && (discAmt > lineGross + 0.0005);
+            if (discEl) discEl.style.border = invalid ? '1px solid #dc2626' : '';
+            if (invalid && !firstDiscError) firstDiscError = 'خصم الصنف في السطر ' + (i + 1) + ' أكبر من إجمالي الصنف — يمكن أن يساويه فقط.';
             if (discAmt > lineGross) discAmt = lineGross;
             var lineNet = Math.max(0, lineGross - discAmt);
             var ltEl = r.querySelector('.sv2-line-total');
@@ -1029,6 +1037,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             grossSubtotal += lineGross;
             totalDiscount += discAmt;
         });
+        var errEl = document.getElementById('sv2_line_disc_error');
+        if (errEl) { errEl.innerHTML = firstDiscError; errEl.style.display = firstDiscError ? '' : 'none'; }
         var netTotal = Math.max(0, grossSubtotal - totalDiscount);
         var stEl = document.getElementById('sv2_subtotal');
         var dtEl = document.getElementById('sv2_discount_total');

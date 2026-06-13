@@ -366,6 +366,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             <span class="muted" style="font-size:0.85rem;"> <?php echo htmlspecialchars($adminCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span></span>
         </div>
     </div>
+    <div id="ov2_line_disc_error" class="jv-print-hide" style="display:none;color:#dc2626;font-size:0.85rem;margin-top:6px;font-weight:600;"></div>
 
     <?php orange_sales_doc_print_footer(['country_id' => $adminCountryId]); ?>
     <?php echo orange_sales_doc_print_legal_pagecss((int) $adminCountryId); ?>
@@ -796,17 +797,26 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         if (!tb) return;
         var subtotal = 0;
         var grossSubtotal = 0;
-        tb.querySelectorAll('tr.ov2-line').forEach(function (r) {
+        var firstDiscError = '';
+        tb.querySelectorAll('tr.ov2-line').forEach(function (r, i) {
             var q = parseInt(r.querySelector('.ov2-qty').value, 10) || 0;
             var p = parseFloat(r.querySelector('.ov2-price').value) || 0;
             var lineGross = q * p;
-            var discAmt = parseDiscount((r.querySelector('.ov2-discount').value || '').trim(), lineGross);
+            var discEl = r.querySelector('.ov2-discount');
+            var discAmt = parseDiscount((discEl && discEl.value || '').trim(), lineGross);
+            // المبيعات: الخصم يمكن أن يساوي إجمالي الصنف (الصافي صفر) لكن لا يتجاوزه.
+            var invalid = (discAmt > 0) && (discAmt > lineGross + 0.0005);
+            if (discEl) discEl.style.border = invalid ? '1px solid #dc2626' : '';
+            if (invalid && !firstDiscError) firstDiscError = 'خصم الصنف في السطر ' + (i + 1) + ' أكبر من إجمالي الصنف — يمكن أن يساويه فقط.';
+            if (discAmt > lineGross) discAmt = lineGross;
             var lineNet = Math.max(0, lineGross - discAmt);
             var ltEl = r.querySelector('.ov2-line-total');
             if (ltEl) ltEl.value = fmt3(lineNet);
             grossSubtotal += lineGross;
             subtotal += lineNet;
         });
+        var errEl = document.getElementById('ov2_line_disc_error');
+        if (errEl) { errEl.innerHTML = firstDiscError; errEl.style.display = firstDiscError ? '' : 'none'; }
         var totalDiscount = Math.max(0, grossSubtotal - subtotal);
         var stEl = document.getElementById('ov2_subtotal');
         var dtEl = document.getElementById('ov2_discount_total');
