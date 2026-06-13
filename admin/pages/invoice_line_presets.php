@@ -107,13 +107,6 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
             <label for="ilp_line_kind">نوع البند (MD/CR)</label>
             <select id="ilp_line_kind" class="admin-inp"<?php echo !$ilpReady ? ' disabled' : ''; ?>></select>
         </div>
-        <div>
-            <label for="ilp_show_print">افتراضي — يظهر بالطباعة</label>
-            <select id="ilp_show_print" class="admin-inp"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
-                <option value="0">لا</option>
-                <option value="1">نعم</option>
-            </select>
-        </div>
         <div class="ilp-account-row">
             <div>
                 <label for="ilp_account_code">كود الحساب</label>
@@ -158,7 +151,6 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
                     <th>الحساب</th>
                     <th>السياق</th>
                     <th>نوع البند</th>
-                    <th>طباعة</th>
                     <th>نشط</th>
                     <th>ترتيب</th>
                     <th>إجراءات</th>
@@ -228,7 +220,6 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         document.getElementById('ilp_sort').value = String(ILP_NEXT_SORT);
         document.getElementById('ilp_active').value = '1';
         document.getElementById('ilp_context').value = 'sales';
-        document.getElementById('ilp_show_print').value = '0';
         document.getElementById('ilp_account_code').value = '';
         document.getElementById('ilp_account_name').value = '';
         document.getElementById('ilp_account_hint').textContent = '';
@@ -244,7 +235,6 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         document.getElementById('ilp_active').value = row.is_active ? '1' : '0';
         document.getElementById('ilp_context').value = row.invoice_context || 'both';
         ilpRefreshLineKindOptions(row.line_kind || '');
-        document.getElementById('ilp_show_print').value = row.default_show_on_print ? '1' : '0';
         document.getElementById('ilp_account_code').value = row.account_code || '';
         document.getElementById('ilp_account_name').value = row.account_name || '';
         document.getElementById('ilp_account_hint').textContent = '';
@@ -268,7 +258,6 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
                 + '<td dir="ltr">' + esc((row.account_code || '') + (row.account_name ? ' — ' + row.account_name : '')) + '</td>'
                 + '<td>' + esc(row.invoice_context_label || row.invoice_context || '') + '</td>'
                 + '<td style="font-size:0.85rem;">' + esc(row.line_kind_label || row.line_kind || '') + '</td>'
-                + '<td>' + (row.default_show_on_print ? 'نعم' : 'لا') + '</td>'
                 + '<td>' + (row.is_active ? 'نعم' : 'لا') + '</td>'
                 + '<td dir="ltr">' + esc(String(row.sort_order || 0)) + '</td>'
                 + '<td><div class="ilp-row-ops">'
@@ -321,7 +310,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
             invoice_context: ilpContextValue(),
             label_ar: (document.getElementById('ilp_label_ar').value || '').trim(),
             label_en: (document.getElementById('ilp_label_en').value || '').trim(),
-            default_show_on_print: document.getElementById('ilp_show_print').value === '1',
+            default_show_on_print: true,
             is_active: document.getElementById('ilp_active').value === '1',
             sort_order: parseInt(document.getElementById('ilp_sort').value, 10) || 0
         };
