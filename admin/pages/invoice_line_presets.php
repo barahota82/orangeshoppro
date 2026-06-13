@@ -171,6 +171,19 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
     </div>
 </div>
 
+<!-- منتقي حساب من الدليل (دبل كليك على خانة الكود) -->
+<div class="gl-pick-modal" id="ilp_acc_pick_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="ilp_acc_pick_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="ilp_acc_pick_title">
+        <h3 id="ilp_acc_pick_title" class="gl-pick-modal__title">اختيار حساب من الدليل</h3>
+        <input type="search" id="ilp_acc_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="ilp_acc_pick_list"></ul>
+        <div class="actions" style="margin-top:10px;">
+            <button type="button" class="btn-secondary" id="ilp_acc_pick_close">إغلاق</button>
+        </div>
+    </div>
+</div>
+
 <script>
 (function () {
     var ILP_LINE_KINDS = <?php echo json_encode($ilpLineKinds, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
@@ -380,6 +393,69 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
             .catch(function (e) { hint.textContent = e.message || String(e); });
     }
 
+    function ilpAccPickFill(acc) {
+        document.getElementById('ilp_account_id').value = String(acc.id || 0);
+        document.getElementById('ilp_account_code').value = acc.code || '';
+        document.getElementById('ilp_account_name').value = acc.name || '';
+        document.getElementById('ilp_account_hint').textContent = '';
+        if (!(document.getElementById('ilp_label_ar').value || '').trim()) {
+            document.getElementById('ilp_label_ar').value = acc.name || '';
+        }
+    }
+
+    function ilpAccPickRender(q) {
+        var listEl = document.getElementById('ilp_acc_pick_list');
+        if (!listEl) return;
+        listEl.innerHTML = '<li class="gl-pick-empty">جاري التحميل…</li>';
+        fetch('/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(String(q || '').trim()), {
+            credentials: 'same-origin',
+            headers: orangeAdminCountryHeaders({ Accept: 'application/json' }),
+            cache: 'no-store'
+        }).then(function (r) { return r.json(); })
+            .then(function (res) {
+                listEl.innerHTML = '';
+                var rows = (res && res.accounts) ? res.accounts : [];
+                if (!rows.length) {
+                    listEl.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>';
+                    return;
+                }
+                rows.forEach(function (acc) {
+                    var li = document.createElement('li');
+                    li.className = 'gl-pick-item';
+                    li.setAttribute('role', 'button');
+                    li.tabIndex = 0;
+                    li.textContent = (acc.code || '') + ' — ' + (acc.name || '');
+                    li.addEventListener('click', function () { ilpAccPickFill(acc); ilpAccPickClose(); });
+                    li.addEventListener('dblclick', function () { ilpAccPickFill(acc); ilpAccPickClose(); });
+                    li.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ilpAccPickFill(acc); ilpAccPickClose(); } });
+                    listEl.appendChild(li);
+                });
+            })
+            .catch(function (e) {
+                listEl.innerHTML = '<li class="gl-pick-empty">' + esc(e.message || String(e)) + '</li>';
+            });
+    }
+
+    function ilpAccPickOpen() {
+        var modal = document.getElementById('ilp_acc_pick_modal');
+        var qEl = document.getElementById('ilp_acc_pick_q');
+        if (!modal || !qEl) return;
+        modal.hidden = false;
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('gl-pick-open');
+        qEl.value = (document.getElementById('ilp_account_code').value || '').trim();
+        ilpAccPickRender(qEl.value);
+        qEl.focus();
+    }
+
+    function ilpAccPickClose() {
+        var modal = document.getElementById('ilp_acc_pick_modal');
+        if (!modal) return;
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('gl-pick-open');
+    }
+
     function ilpTranslate() {
         var ar = (document.getElementById('ilp_label_ar').value || '').trim();
         if (!ar) {
@@ -411,6 +487,21 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         if (ilpAccountTimer) clearTimeout(ilpAccountTimer);
         var code = this.value || '';
         ilpAccountTimer = setTimeout(function () { ilpLookupAccountByCode(code); }, 280);
+    });
+    document.getElementById('ilp_account_code').addEventListener('dblclick', ilpAccPickOpen);
+    document.getElementById('ilp_acc_pick_backdrop').addEventListener('click', ilpAccPickClose);
+    document.getElementById('ilp_acc_pick_close').addEventListener('click', ilpAccPickClose);
+    var ilpAccPickTimer = null;
+    document.getElementById('ilp_acc_pick_q').addEventListener('input', function () {
+        if (ilpAccPickTimer) clearTimeout(ilpAccPickTimer);
+        var q = this.value || '';
+        ilpAccPickTimer = setTimeout(function () { ilpAccPickRender(q); }, 220);
+    });
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') {
+            var modal = document.getElementById('ilp_acc_pick_modal');
+            if (modal && !modal.hidden) ilpAccPickClose();
+        }
     });
 
     ilpResetForm();
