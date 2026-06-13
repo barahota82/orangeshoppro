@@ -11,6 +11,7 @@ require_once __DIR__ . '/journal_voucher.php';
 require_once __DIR__ . '/gl_settings.php';
 require_once __DIR__ . '/gl_pending_movements.php';
 require_once __DIR__ . '/admin_settings_country.php';
+require_once __DIR__ . '/inventory_cost_layers.php';
 
 function orange_inventory_reconciliation_ready(PDO $pdo): bool
 {
@@ -109,10 +110,17 @@ function orange_inventory_reconciliation_variant_qty_system(PDO $pdo, int $wareh
     return max(0, (int) ($st->fetchColumn() ?: 0));
 }
 
-function orange_inventory_reconciliation_variant_unit_cost(PDO $pdo, int $variantId): float
+function orange_inventory_reconciliation_variant_unit_cost(PDO $pdo, int $variantId, int $warehouseId = 0): float
 {
     if ($variantId <= 0) {
         return 0.0;
+    }
+    // FIFO م4: تكلفة الوحدة من الطبقات المتبقية (مصدر الحقيقة) عند توفّر المخزن؛ ثم احتياطي تراثي.
+    if ($warehouseId > 0) {
+        $layerUnit = orange_inventory_cost_layers_current_unit_cost($pdo, $warehouseId, $variantId);
+        if ($layerUnit > 0) {
+            return round($layerUnit, 4);
+        }
     }
     if (orange_table_exists($pdo, 'purchase_items') && orange_table_exists($pdo, 'purchases')) {
         $st = $pdo->prepare(
@@ -198,7 +206,7 @@ function orange_inventory_reconciliation_stock_lines_for_warehouse(PDO $pdo, int
  *   lines_with_variance:int
  * }
  */
-function orange_inventory_reconciliation_enrich_lines(PDO $pdo, array $rawLines): array
+function orange_inventory_reconciliation_enrich_lines(PDO $pdo, array $rawLines, int $warehouseId = 0): array
 {
     $lines = [];
     $totalQtyVar = 0;
@@ -209,7 +217,7 @@ function orange_inventory_reconciliation_enrich_lines(PDO $pdo, array $rawLines)
         $qtySystem = (int) ($ln['qty_system'] ?? 0);
         $qtyCounted = (int) ($ln['qty_counted'] ?? 0);
         $qtyVariance = (int) ($ln['qty_variance'] ?? ($qtyCounted - $qtySystem));
-        $unitCost = orange_inventory_reconciliation_variant_unit_cost($pdo, $variantId);
+        $unitCost = orange_inventory_reconciliation_variant_unit_cost($pdo, $variantId, $warehouseId);
         $lineValue = round($qtyVariance * $unitCost, 4);
         if ($qtyVariance !== 0) {
             ++$withVar;
@@ -272,7 +280,7 @@ function orange_inventory_reconciliation_get(PDO $pdo, int $id, ?int $countryId 
     );
     $stL->execute([$id]);
     $rawLines = $stL->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    $enriched = orange_inventory_reconciliation_enrich_lines($pdo, $rawLines);
+    $enriched = orange_inventory_reconciliation_enrich_lines($pdo, $rawLines, $warehouseId);
 
     $whLabel = '';
     if ($warehouseId > 0) {
@@ -523,6 +531,10 @@ function orange_inventory_reconciliation_approve(
         require_once __DIR__ . '/warehouses.php';
 
         $ref = 'INV-RCN-' . $id;
+        // FIFO م4: قيمة GL تُشتق من حركة الطبقات الفعلية (نقص→استهلاك FIFO، زيادة→طبقة جديدة)
+        // لضمان بقاء رصيد حساب المخزون GL مساوياً لقيمة الطبقات.
+        $layerTotalValue = 0.0;
+        $reconAt = ($countedAt !== '' ? $countedAt : date('Y-m-d')) . ' 17:00:00';
         foreach ($lines as $ln) {
             $variantId = (int) ($ln['variant_id'] ?? 0);
             $qtyVariance = (int) ($ln['qty_variance'] ?? 0);
@@ -547,7 +559,45 @@ function orange_inventory_reconciliation_approve(
                 'country_id' => $countryId > 0 ? $countryId : null,
                 'warehouse_id' => $warehouseId,
             ]);
+
+            $fallbackUnit = orange_inventory_reconciliation_variant_unit_cost($pdo, $variantId, $warehouseId);
+            if ($qtyVariance > 0) {
+                $unitCost = orange_inventory_cost_layers_current_unit_cost($pdo, $warehouseId, $variantId);
+                if ($unitCost <= 0) {
+                    $unitCost = $fallbackUnit;
+                }
+                orange_inventory_cost_layer_add(
+                    $pdo,
+                    $warehouseId,
+                    $variantId,
+                    $qtyVariance,
+                    round($unitCost, 5),
+                    'adjust',
+                    $id,
+                    $countryId > 0 ? $countryId : null,
+                    $reconAt,
+                    'تسوية جرد #' . $id
+                );
+                $layerTotalValue += $qtyVariance * round($unitCost, 5);
+            } else {
+                $consume = orange_inventory_cost_layers_consume_fifo(
+                    $pdo,
+                    $warehouseId,
+                    $variantId,
+                    -$qtyVariance,
+                    'inv_recon',
+                    $id,
+                    $reconAt
+                );
+                $lineCost = (float) $consume['cost'];
+                $short = (int) ($consume['shortfall'] ?? 0);
+                if ($short > 0) {
+                    $lineCost += $short * $fallbackUnit;
+                }
+                $layerTotalValue -= round($lineCost, 5);
+            }
         }
+        $totalValue = round($layerTotalValue, 4);
 
         if (abs($totalValue) >= 0.0001) {
             if ($adjustmentAccountId <= 0 || ! orange_accounts_account_is_posting_leaf($pdo, $adjustmentAccountId)) {

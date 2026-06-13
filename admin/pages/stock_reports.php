@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
+require_once __DIR__ . '/../../includes/inventory_cost_layers.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
@@ -201,12 +202,35 @@ try {
                 ORDER BY category_name ASC, p.name ASC, p.id ASC';
         $st = $pdo->prepare($sql);
         $st->execute($params);
+        /* FIFO م4: قيمة التقييم لكل منتج = Σ(qty_remaining × unit_cost) من طبقات التكلفة
+           لمخزن الدولة الافتراضي (مصدر الحقيقة)، مع احتياطي qty × products.cost عند غياب طبقات. */
+        $valWarehouseId = orange_warehouse_default_id_for_country($pdo, $srCountryId);
+        $fifoValueByProduct = [];
+        if ($valWarehouseId > 0 && orange_inventory_cost_layers_table_exists($pdo)) {
+            $stFifo = $pdo->prepare(
+                'SELECT pv.product_id AS pid,
+                        COALESCE(SUM(icl.qty_remaining * icl.unit_cost), 0) AS val
+                 FROM inventory_cost_layers icl
+                 INNER JOIN product_variants pv ON pv.id = icl.variant_id
+                 WHERE icl.qty_remaining > 0 AND icl.warehouse_id = ?
+                 GROUP BY pv.product_id'
+            );
+            $stFifo->execute([$valWarehouseId]);
+            foreach ($stFifo->fetchAll(PDO::FETCH_ASSOC) as $fr) {
+                $fifoValueByProduct[(int) $fr['pid']] = round((float) $fr['val'], 4);
+            }
+        }
+        $valGlCheck = orange_inventory_cost_layers_gl_balance_check($pdo, $srCountryId);
         $valGroups = [];
         $grandValuePrev = 0.0;
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $qty = (int) $r['total_qty'];
-            $cost = (float) $r['cost'];
-            $value = $qty * $cost;
+            $cardCost = (float) $r['cost'];
+            $pidRow = (int) $r['product_id'];
+            $value = array_key_exists($pidRow, $fifoValueByProduct)
+                ? $fifoValueByProduct[$pidRow]
+                : round($qty * $cardCost, 4);
+            $cost = $qty > 0 ? round($value / $qty, 4) : $cardCost;
             $prevQty = (int) $r['prev_qty'];
             $valuePrev = $prevQty * $cost;
             $grandQty += $qty;
@@ -464,6 +488,22 @@ $reportTitle = $reports[$reportKey];
 
         <?php if ($reportError !== ''): ?>
             <p class="card-hint" style="color:#b91c1c;">تعذّر توليد التقرير: <?php echo htmlspecialchars($reportError, ENT_QUOTES, 'UTF-8'); ?></p>
+        <?php endif; ?>
+
+        <?php if ($reportKey === 'valuation' && isset($valGlCheck) && is_array($valGlCheck)): ?>
+            <?php $valGlDiff = (float) ($valGlCheck['diff'] ?? 0); $valGlOk = abs($valGlDiff) < 0.01; ?>
+            <style>@media print{.sr-print-hide{display:none !important;}}</style>
+            <div class="sr-print-hide" style="margin:8px 0;padding:10px 14px;border-radius:8px;border:1px solid <?php echo $valGlOk ? '#bbf7d0' : '#fecaca'; ?>;background:<?php echo $valGlOk ? '#f0fdf4' : '#fef2f2'; ?>;font-size:13px;">
+                <strong>اختبار اتزان قيمة المخزون مقابل حساب المخزون (GL):</strong>
+                قيمة الطبقات (FIFO): <span dir="ltr"><?php echo $reportFmtMoney((float) ($valGlCheck['layers_value'] ?? 0)); ?></span>
+                &nbsp;•&nbsp; رصيد حساب المخزون GL: <span dir="ltr"><?php echo $reportFmtMoney((float) ($valGlCheck['gl_balance'] ?? 0)); ?></span>
+                &nbsp;•&nbsp; الفرق: <span dir="ltr"><?php echo $reportFmtMoney($valGlDiff); ?></span>
+                <?php if ($valGlOk): ?>
+                    <span style="color:#15803d;font-weight:700;">— متّزن ✓</span>
+                <?php else: ?>
+                    <span style="color:#b91c1c;font-weight:700;">— يوجد فرق (راجع القيود المعلّقة/الافتتاحي)</span>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
 
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">

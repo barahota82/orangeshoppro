@@ -495,3 +495,73 @@ if (!function_exists('orange_inventory_cost_layers_value')) {
         return round((float) ($st->fetchColumn() ?: 0), 5);
     }
 }
+
+if (!function_exists('orange_inventory_cost_layers_current_unit_cost')) {
+    /**
+     * تكلفة الوحدة الحالية من الطبقات المتبقية لـ(مخزن، variant) = متوسط مرجّح للطبقات المتبقية
+     * (قيمة ÷ كمية). تُستعمل لتقدير تكلفة بنود الزيادة في الجرد. تُعيد 0.0 عند غياب طبقات.
+     */
+    function orange_inventory_cost_layers_current_unit_cost(
+        PDO $pdo,
+        int $warehouseId,
+        int $variantId
+    ): float {
+        if (!orange_inventory_cost_layers_table_exists($pdo) || $warehouseId <= 0 || $variantId <= 0) {
+            return 0.0;
+        }
+        $st = $pdo->prepare(
+            'SELECT COALESCE(SUM(qty_remaining), 0) AS q, COALESCE(SUM(qty_remaining * unit_cost), 0) AS v
+             FROM inventory_cost_layers
+             WHERE qty_remaining > 0 AND warehouse_id = ? AND variant_id = ?'
+        );
+        $st->execute([$warehouseId, $variantId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+        $q = (int) ($row['q'] ?? 0);
+        $v = (float) ($row['v'] ?? 0);
+
+        return $q > 0 ? round($v / $q, 5) : 0.0;
+    }
+}
+
+if (!function_exists('orange_inventory_cost_layers_gl_balance_check')) {
+    /**
+     * اختبار اتزان: قيمة طبقات المخزون مقابل رصيد حساب المخزون GL لدولة معيّنة.
+     *
+     * @return array{layers_value: float, gl_balance: float, diff: float, inventory_account_id: int}
+     */
+    function orange_inventory_cost_layers_gl_balance_check(PDO $pdo, ?int $countryId = null): array
+    {
+        require_once __DIR__ . '/gl_settings.php';
+        require_once __DIR__ . '/warehouses.php';
+        require_once __DIR__ . '/countries.php';
+        require_once __DIR__ . '/journal_voucher.php';
+
+        if ($countryId === null || $countryId <= 0) {
+            $countryId = orange_countries_default_id($pdo);
+        }
+
+        $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
+        $layersValue = orange_inventory_cost_layers_value($pdo, $warehouseId > 0 ? $warehouseId : null);
+
+        $inventoryAccountId = (int) (orange_gl_account_id_optional($pdo, 'inventory', $countryId) ?? 0);
+        $glBalance = 0.0;
+        if ($inventoryAccountId > 0 && orange_journal_vouchers_ready($pdo)) {
+            $countryBind = orange_gl_voucher_country_bind($pdo, 'jv', $countryId);
+            $sql = 'SELECT COALESCE(SUM(jl.debit), 0) - COALESCE(SUM(jl.credit), 0)
+                    FROM journal_lines jl
+                    INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
+                    WHERE jl.account_id = ?' . $countryBind['sql'];
+            $params = array_merge([$inventoryAccountId], $countryBind['params']);
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+            $glBalance = round((float) ($st->fetchColumn() ?: 0), 5);
+        }
+
+        return [
+            'layers_value' => round($layersValue, 5),
+            'gl_balance' => $glBalance,
+            'diff' => round($layersValue - $glBalance, 5),
+            'inventory_account_id' => $inventoryAccountId,
+        ];
+    }
+}
