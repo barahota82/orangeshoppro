@@ -4615,6 +4615,11 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     font-size: 0.95rem;
 }
 
+/* بنود الإجماليات داخل جدول الأصناف (مبيعات/مردود) — طباعة فقط، مخفية على الشاشة */
+.sd-intable-totals .sd-intable-tot {
+    display: none;
+}
+
 .sd-print-footer {
     display: none;
 }
@@ -4887,6 +4892,49 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         display: block !important;
         break-inside: avoid;
         page-break-inside: avoid;
+    }
+    /* أسطر الإجماليات/البنود الإضافية داخل جدول الأصناف (مبيعات/مردود) — تظهر في الطباعة */
+    .jv-print-area .sd-intable-totals .sd-intable-tot {
+        display: table-row !important;
+        visibility: visible;
+    }
+    .jv-print-area .sd-intable-tot > td {
+        visibility: visible;
+        padding: 0.2rem 0.5rem;
+        vertical-align: middle;
+    }
+    .jv-print-area .sd-intable-tot__lbl {
+        text-align: right;
+        font-weight: 600;
+        color: #475569;
+        white-space: nowrap;
+    }
+    .jv-print-area .sd-intable-tot__val {
+        text-align: center;
+        font-weight: 600;
+        color: #0f172a;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+    .jv-print-area .sd-intable-tot--net > td {
+        border-top: 1px solid #cbd5e1;
+        font-weight: 700;
+    }
+    .jv-print-area .sd-intable-tot--net .sd-intable-tot__lbl {
+        color: #0f172a;
+    }
+    .jv-print-area .sd-intable-tot--sep > td {
+        border-top: 1px solid #cbd5e1;
+    }
+    .jv-print-area .sd-intable-tot--final > td {
+        border-top: 2px solid #ea580c;
+        border-bottom: 2px solid #ea580c;
+    }
+    .jv-print-area .sd-intable-tot--final .sd-intable-tot__lbl,
+    .jv-print-area .sd-intable-tot--final .sd-intable-tot__val {
+        color: #ea580c;
+        font-weight: 800;
+        font-size: 0.95rem;
     }
     .jv-print-area .sd-print-footer,
     .jv-print-area .sd-print-footer * {

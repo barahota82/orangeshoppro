@@ -278,6 +278,26 @@
             body.innerHTML = html;
         }
 
+        // أسطر داخل جدول الأصناف (للطباعة/الـ QR فقط) — بديل الصندوق السفلي المنفصل.
+        if (opts.intableId) {
+            var intbl = document.getElementById(String(opts.intableId));
+            if (intbl) {
+                var cspan = Math.max(1, parseInt(opts.intableColspan, 10) || 7);
+                var ihtml = '';
+                rows.forEach(function (r) {
+                    var cls2 = 'sd-intable-tot sd-intable-tot--' + r.kind + (r.sep ? ' sd-intable-tot--sep' : '');
+                    var lab2 = (r.label && r.label.ar) ? r.label.ar : '';
+                    var signTxt2 = r.sign > 0 ? '+\u00a0' : (r.sign < 0 ? '\u2212\u00a0' : '');
+                    var unitTxt2 = r.unit ? (' ' + escapeHtml(r.unit)) : '';
+                    ihtml += '<tr class="' + cls2 + '">'
+                        + '<td colspan="' + cspan + '" class="sd-intable-tot__lbl">' + escapeHtml(lab2) + '</td>'
+                        + '<td class="sd-intable-tot__val" dir="ltr" lang="en">'
+                        + signTxt2 + money3(r.val) + unitTxt2 + '</td></tr>';
+                });
+                intbl.innerHTML = ihtml;
+            }
+        }
+
         var headEl = document.getElementById(prefix + '_sd_print_total');
         if (headEl) headEl.textContent = money3(grand);
 

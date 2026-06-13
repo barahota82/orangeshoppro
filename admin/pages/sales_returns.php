@@ -352,11 +352,11 @@ $sr2DocSerialPreview = $sr2NavReady
                     </tr>
                 </thead>
                 <tbody id="sr2_lines_body"></tbody>
+                <tfoot id="sr2_sd_intable_totals" class="sd-intable-totals"></tfoot>
             </table>
         </div>
     </div>
 
-    <?php orange_sales_doc_print_totals_box('sr2'); ?>
 
     <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:16px 0 10px;">بنود إضافية</h4>
     <div class="admin-doc-frame">
@@ -857,6 +857,7 @@ $sr2DocSerialPreview = $sr2NavReady
             collectExtra: (typeof sr2CollectExtraLines === 'function') ? sr2CollectExtraLines : function () { return []; },
             unit: <?php echo json_encode($srCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
             screenExtraId: 'sr2_screen_extra', grandOutId: 'sr2_grand_total', grandLabelId: 'sr2_grand_label',
+            intableId: 'sr2_sd_intable_totals', intableColspan: 7,
             foldTotalId: 'sr2_sd_print_gross', foldDiscountId: 'sr2_sd_print_disc', foldNetId: 'sr2_sd_print_net',
             labels: {
                 items: { ar: 'إجمالي الأصناف', en: 'Items Total' },

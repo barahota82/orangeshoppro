@@ -424,11 +424,11 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                     </tr>
                 </thead>
                 <tbody id="sv2_lines_body"></tbody>
+                <tfoot id="sv2_sd_intable_totals" class="sd-intable-totals"></tfoot>
             </table>
         </div>
     </div>
 
-    <?php orange_sales_doc_print_totals_box('sv2'); ?>
 
     <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:18px 0 10px;">بنود إضافية</h4>
     <div class="admin-doc-frame">
@@ -1049,6 +1049,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             collectExtra: sv2CollectExtraLines,
             unit: <?php echo json_encode($adminCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
             screenExtraId: 'sv2_screen_extra', grandOutId: 'sv2_grand_total', grandLabelId: 'sv2_grand_label',
+            intableId: 'sv2_sd_intable_totals', intableColspan: 7,
             foldTotalId: 'sv2_sd_print_gross', foldDiscountId: 'sv2_sd_print_disc', foldNetId: 'sv2_sd_print_net',
             labels: {
                 items: { ar: 'إجمالي الأصناف', en: 'Items Total' },

@@ -328,11 +328,11 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                     </tr>
                 </thead>
                 <tbody id="ov2_lines_body"></tbody>
+                <tfoot id="ov2_sd_intable_totals" class="sd-intable-totals"></tfoot>
             </table>
         </div>
     </div>
 
-    <?php orange_sales_doc_print_totals_box('ov2'); ?>
 
     <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:16px 0 10px;">بنود إضافية</h4>
     <div class="admin-doc-frame">
@@ -825,6 +825,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             collectExtra: ov2CollectExtraLines,
             unit: <?php echo json_encode($adminCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
             screenExtraId: 'ov2_screen_extra', grandOutId: 'ov2_grand_total', grandLabelId: 'ov2_grand_label',
+            intableId: 'ov2_sd_intable_totals', intableColspan: 7,
             foldTotalId: 'ov2_sd_print_gross', foldDiscountId: 'ov2_sd_print_disc', foldNetId: 'ov2_sd_print_net',
             labels: {
                 items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
