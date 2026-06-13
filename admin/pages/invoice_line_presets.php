@@ -107,7 +107,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
             <label for="ilp_active">نشط</label>
             <select id="ilp_active" class="admin-inp"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
                 <option value="1">نعم</option>
-                <option value="0">لا (مخفي من المنتقي)</option>
+                <option value="0">لا</option>
             </select>
         </div>
         <div>
