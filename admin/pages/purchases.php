@@ -955,7 +955,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         setTxt('pv2_inv_disc', invDiscAmt);
         setTxt('pv2_grand_total', netTotal);
         var invDiscValEl = document.getElementById('pv2_inv_disc_print_val');
-        if (invDiscValEl) invDiscValEl.textContent = fmt3(invDiscAmt);
+        if (invDiscValEl) invDiscValEl.textContent = (invDiscAmt > 0.0005 ? '- ' : '') + fmt3(invDiscAmt);
         var invDiscRow = document.getElementById('pv2_inv_disc_print_row');
         if (invDiscRow) invDiscRow.classList.toggle('pur-inv-disc-active', invDiscAmt > 0.0005);
         var errMsgs = [];
