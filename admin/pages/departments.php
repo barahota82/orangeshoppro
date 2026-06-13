@@ -74,6 +74,7 @@ if ($hasDepartmentsTable) {
 <?php endif; ?>
 
 <?php if ($depCanManageGlobal): ?>
+<div class="card">
     <h3>إضافة / تعديل قسم</h3>
     <input type="hidden" id="dept_record_id" value="0">
     <div class="form-grid dep-form-grid">
