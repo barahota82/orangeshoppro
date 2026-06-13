@@ -108,22 +108,6 @@
         var box = document.getElementById(String(prefix || 'sd') + '_sd_print_qr');
         if (!box) { done(); return; }
         var id = parseInt(String(docId || '0'), 10) || 0;
-        // مؤقّت (وضع معاينة): اعرض QR يشير لصفحة المعاينة داخل المربع دائماً حتى قبل الحفظ ليُمسح بالكاميرا.
-        if (typeof global.qrcode === 'function') {
-            try {
-                var pkind = String(docKind || '').trim();
-                var purl = global.location.origin + '/pages/document.php?preview=1' + (pkind ? '&kind=' + encodeURIComponent(pkind) : '');
-                var pqr = global.qrcode(0, 'M');
-                pqr.addData(purl);
-                pqr.make();
-                box.innerHTML = pqr.createImgTag(3, 0);
-                var pimg = box.querySelector('img');
-                if (pimg) { pimg.style.width = '100%'; pimg.style.height = 'auto'; pimg.style.display = 'block'; }
-            } catch (e) { box.innerHTML = ''; }
-        }
-        done();
-        return;
-        /* eslint-disable no-unreachable */
         // صندوق الباركود يبقى ظاهراً دائماً؛ يُملأ فقط للمستند المحفوظ (التوكن يُولَّد بعد الحفظ).
         if (!docKind || id <= 0 || typeof global.qrcode !== 'function') {
             box.innerHTML = '';

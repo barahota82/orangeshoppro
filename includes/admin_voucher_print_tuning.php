@@ -26,5 +26,5 @@ function orange_admin_voucher_print_tuning_mode(): bool
  */
 function orange_admin_invoice_print_tuning_mode(): bool
 {
-    return true;
+    return false;
 }
