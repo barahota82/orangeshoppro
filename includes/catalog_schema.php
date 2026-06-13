@@ -3082,6 +3082,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_cart_promo_pause_log_v82($pdo);
     orange_catalog_migrate_cart_promo_stock_check_v83($pdo);
     orange_catalog_migrate_document_business_date_v84($pdo);
+    orange_catalog_migrate_inventory_cost_layers_v89($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -6222,6 +6223,101 @@ function orange_catalog_migrate_cart_promo_stock_check_v83(PDO $pdo): void
                 KEY idx_promo_stock_check_status (status, checked_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v89 — تقييم المخزون بـ FIFO (المرحلة م1): جداول طبقات التكلفة + بذر الرصيد الافتتاحي.
+ *
+ * آمن لإعادة التشغيل: marker + IF NOT EXISTS + NOT EXISTS عند البذر.
+ * لا يربط COGS بعد (تشغيل ظلّي) — الربط يبدأ في م2/م3.
+ * القرار + الخطة: docs/archive/ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt (FIFO 2026-06-13).
+ */
+function orange_catalog_migrate_inventory_cost_layers_v89(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_inventory_cost_layers_v89';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'inventory_cost_layers')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS inventory_cost_layers (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                country_id INT UNSIGNED NULL DEFAULT NULL,
+                warehouse_id INT UNSIGNED NOT NULL,
+                variant_id INT NOT NULL,
+                source_type VARCHAR(24) NOT NULL,
+                source_id BIGINT UNSIGNED NULL DEFAULT NULL,
+                layer_date DATETIME NOT NULL,
+                qty_in INT NOT NULL DEFAULT 0,
+                qty_remaining INT NOT NULL DEFAULT 0,
+                unit_cost DECIMAL(15,5) NOT NULL DEFAULT 0,
+                note VARCHAR(191) NOT NULL DEFAULT \'\',
+                created_at DATETIME NOT NULL,
+                KEY idx_icl_consume (warehouse_id, variant_id, qty_remaining, layer_date, id),
+                KEY idx_icl_source (source_type, source_id),
+                KEY idx_icl_variant (variant_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (!orange_table_exists($pdo, 'inventory_cost_consumptions')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS inventory_cost_consumptions (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                layer_id BIGINT UNSIGNED NOT NULL,
+                warehouse_id INT UNSIGNED NOT NULL,
+                variant_id INT NOT NULL,
+                consumed_qty INT NOT NULL DEFAULT 0,
+                unit_cost DECIMAL(15,5) NOT NULL DEFAULT 0,
+                sale_source_type VARCHAR(24) NOT NULL,
+                sale_source_id BIGINT UNSIGNED NULL DEFAULT NULL,
+                consumed_at DATETIME NOT NULL,
+                KEY idx_icc_layer (layer_id),
+                KEY idx_icc_source (sale_source_type, sale_source_id),
+                KEY idx_icc_variant (warehouse_id, variant_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    // بذر الرصيد الافتتاحي: طبقة واحدة لكل (مخزن، variant) لها كمية>0 ولا طبقة لها بعد.
+    // تكلفة الوحدة = products.cost الحالية (أفضل تقدير متاح لحظة التحويل) — إرشادية افتتاحية فقط.
+    if (
+        orange_table_exists($pdo, 'inventory_cost_layers')
+        && orange_table_exists($pdo, 'warehouse_variant_stock')
+        && orange_table_exists($pdo, 'warehouses')
+        && orange_table_exists($pdo, 'product_variants')
+        && orange_table_exists($pdo, 'products')
+    ) {
+        $now = date('Y-m-d H:i:s');
+        $seed = $pdo->prepare(
+            'INSERT INTO inventory_cost_layers
+                (country_id, warehouse_id, variant_id, source_type, source_id, layer_date,
+                 qty_in, qty_remaining, unit_cost, note, created_at)
+             SELECT w.country_id, wvs.warehouse_id, wvs.variant_id, \'opening\', NULL, ?,
+                    wvs.quantity, wvs.quantity, COALESCE(p.cost, 0), \'رصيد افتتاحي\', ?
+             FROM warehouse_variant_stock wvs
+             INNER JOIN warehouses w ON w.id = wvs.warehouse_id
+             INNER JOIN product_variants pv ON pv.id = wvs.variant_id
+             INNER JOIN products p ON p.id = pv.product_id
+             WHERE wvs.quantity > 0
+               AND NOT EXISTS (
+                   SELECT 1 FROM inventory_cost_layers icl
+                   WHERE icl.warehouse_id = wvs.warehouse_id AND icl.variant_id = wvs.variant_id
+               )'
+        );
+        try {
+            $seed->execute([$now, $now]);
+        } catch (Throwable $e) {
+            // البذر تيسيري للمرحلة م1؛ لا نُفشل ضمان المخطط لو تعذّر (يُعاد لاحقاً).
+        }
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);
