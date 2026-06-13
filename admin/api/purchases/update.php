@@ -267,30 +267,14 @@ try {
             ->execute($params);
     }
 
-    $extraInput = orange_invoice_ancillary_parse_request_lines(
-        $data,
-        orange_invoice_ancillary_doc_kind_purchase()
-    );
-    $extraInput = orange_invoice_ancillary_merge_auto_vat(
-        $pdo,
-        orange_invoice_ancillary_doc_kind_purchase(),
-        $purchaseCountryId,
-        (float) $newTotal,
-        $extraInput
-    );
-    orange_invoice_ancillary_extra_lines_replace_for_doc(
-        $pdo,
-        orange_invoice_ancillary_doc_kind_purchase(),
-        $purchaseId,
-        $purchaseCountryId,
-        $extraInput
-    );
-    $savedExtra = orange_invoice_ancillary_extra_lines_for_doc(
+    // قرار المالك (2026-06): أُلغيت «البنود الإضافية» على المشتريات. نحذف أي بنود قديمة
+    // محفوظة لهذه الفاتورة حتى لا يبقى أثر لا يقابله ترحيل، والقيد يصبح بسيطاً على صافي الأصناف.
+    orange_invoice_ancillary_extra_lines_delete_for_doc(
         $pdo,
         orange_invoice_ancillary_doc_kind_purchase(),
         $purchaseId
     );
-    $payableTotal = orange_invoice_ancillary_purchase_payable_total($newTotal, $savedExtra);
+    $payableTotal = (float) $newTotal;
 
     orange_purchase_remove_receive_accounting($pdo, $purchaseId);
     orange_purchase_remove_accounting($pdo, $purchaseId, $purchaseCountryId > 0 ? $purchaseCountryId : null);
@@ -304,7 +288,6 @@ try {
         $newTotal,
         $purchaseCountryId
     );
-    $glB = orange_gl_posting_bundle_apply_invoice_ancillary($glB, $savedExtra, $newTotal);
     $pendingKey = orange_gl_pending_source_key('purchase', $purchaseId);
     $srcLabel = 'PIN-' . $purchaseId;
     $now = date('Y-m-d H:i:s');

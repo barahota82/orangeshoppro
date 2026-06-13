@@ -13,7 +13,6 @@ require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
-require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_admin_api();
@@ -241,30 +240,9 @@ try {
         }
     }
 
-    $extraInput = orange_invoice_ancillary_parse_request_lines(
-        $data,
-        orange_invoice_ancillary_doc_kind_purchase()
-    );
-    $extraInput = orange_invoice_ancillary_merge_auto_vat(
-        $pdo,
-        orange_invoice_ancillary_doc_kind_purchase(),
-        $purchaseCountryId,
-        (float) $netTotal,
-        $extraInput
-    );
-    orange_invoice_ancillary_extra_lines_replace_for_doc(
-        $pdo,
-        orange_invoice_ancillary_doc_kind_purchase(),
-        $purchaseId,
-        $purchaseCountryId,
-        $extraInput
-    );
-    $savedExtra = orange_invoice_ancillary_extra_lines_for_doc(
-        $pdo,
-        orange_invoice_ancillary_doc_kind_purchase(),
-        $purchaseId
-    );
-    $payableTotal = orange_invoice_ancillary_purchase_payable_total($netTotal, $savedExtra);
+    // قرار المالك (2026-06): أُلغيت «البنود الإضافية» على المشتريات؛ مصاريف التوريد/الشحن
+    // والخصم المكتسب تُسجَّل بقيد يدوي من المحاسبة. القيد هنا بسيط على صافي الأصناف.
+    $payableTotal = (float) $netTotal;
 
     $glB = orange_gl_purchase_invoice_posting_bundle(
         $pdo,
@@ -274,7 +252,6 @@ try {
         $netTotal,
         $purchaseCountryId
     );
-    $glB = orange_gl_posting_bundle_apply_invoice_ancillary($glB, $savedExtra, $netTotal);
 
     $pendingKey = orange_gl_pending_source_key('purchase', $purchaseId);
     $srcLabel = 'PIN-' . $purchaseId;
