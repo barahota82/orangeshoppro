@@ -28,6 +28,72 @@ function orange_schema_migrations_ensure_table(PDO $pdo): void
 }
 
 /**
+ * تتبّع الترحيلات الفاشلة لمنع إعادة محاولتها على كل طلب ويب (كان يستنزف اتصالات DB
+ * ويغرق السجلّ بآلاف «migration failed» ثم يسبب HTTP 500 «Too many connections»).
+ */
+function orange_schema_migration_failures_ensure_table(PDO $pdo): void
+{
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS orange_schema_migration_failures (
+            filename VARCHAR(191) NOT NULL,
+            attempts INT UNSIGNED NOT NULL DEFAULT 0,
+            last_error TEXT NULL,
+            last_attempt_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (filename)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+}
+
+/**
+ * أسماء الملفات التي فشلت خلال فترة التهدئة (لا نعيد محاولتها كل طلب).
+ *
+ * @return array<string,true>
+ */
+function orange_schema_migration_recent_failures(PDO $pdo, int $cooldownSeconds = 1800): array
+{
+    $cooldownSeconds = max(60, $cooldownSeconds);
+    try {
+        $st = $pdo->query(
+            'SELECT filename FROM orange_schema_migration_failures
+             WHERE last_attempt_at > (NOW() - INTERVAL ' . $cooldownSeconds . ' SECOND)'
+        );
+        $out = [];
+        foreach (($st ? $st->fetchAll(PDO::FETCH_COLUMN) : []) as $fn) {
+            $out[(string) $fn] = true;
+        }
+
+        return $out;
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+function orange_schema_migration_failure_record(PDO $pdo, string $filename, string $error): void
+{
+    try {
+        $st = $pdo->prepare(
+            'INSERT INTO orange_schema_migration_failures (filename, attempts, last_error, last_attempt_at)
+             VALUES (?, 1, ?, NOW())
+             ON DUPLICATE KEY UPDATE attempts = attempts + 1, last_error = VALUES(last_error), last_attempt_at = NOW()'
+        );
+        $st->execute([$filename, mb_substr($error, 0, 2000)]);
+    } catch (Throwable $e) {
+        // تتبّع الفشل ثانوي — لا نُسقط الطلب إن تعذّر التسجيل.
+    }
+}
+
+function orange_schema_migration_failure_clear(PDO $pdo, string $filename): void
+{
+    try {
+        $st = $pdo->prepare('DELETE FROM orange_schema_migration_failures WHERE filename = ?');
+        $st->execute([$filename]);
+    } catch (Throwable $e) {
+        // تجاهل
+    }
+}
+
+/**
  * يقسّم ملف SQL إلى جمل منفصلة (سطر ينتهي بـ ؛ يغلق الجملة). لا تضع فاصلة منقوطة داخل نصوص نصية في الترحيلات.
  *
  * @return list<string>
@@ -71,12 +137,25 @@ function orange_schema_migration_already_applied(PDO $pdo, string $filename): bo
 
 function orange_schema_run_pending_migrations(PDO $pdo): void
 {
+    // يُستدعى من عدة مسارات في النواة/المسار السريع/البوابة؛ مرّة واحدة لكل طلب تكفي.
+    static $ranThisRequest = false;
+    if ($ranThisRequest) {
+        return;
+    }
+    $ranThisRequest = true;
+
     $dir = orange_schema_migrations_dir();
     if (!is_dir($dir)) {
         return;
     }
 
     orange_schema_migrations_ensure_table($pdo);
+    orange_schema_migration_failures_ensure_table($pdo);
+
+    // على الويب: لا نعيد محاولة ملف فشل خلال فترة التهدئة (يمنع لوب الفشل واستنزاف الاتصالات).
+    // على CLI (php scripts/run_migrations.php): نتجاهل التهدئة لإتاحة تشغيل يدوي فوري بعد الإصلاح.
+    $isCli = PHP_SAPI === 'cli';
+    $recentFailures = $isCli ? [] : orange_schema_migration_recent_failures($pdo);
 
     $filesUnderscore = glob($dir . DIRECTORY_SEPARATOR . '[0-9][0-9][0-9]_*.sql') ?: [];
     $filesPlain = glob($dir . DIRECTORY_SEPARATOR . '[0-9][0-9][0-9].sql') ?: [];
@@ -91,12 +170,17 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
         if (orange_schema_migration_already_applied($pdo, $base)) {
             continue;
         }
+        if (isset($recentFailures[$base])) {
+            // فشل مؤخراً — مؤجَّل حتى انقضاء التهدئة (لا تكرار كل طلب).
+            continue;
+        }
 
         $raw = @file_get_contents($fullPath);
         if ($raw === false) {
             if (function_exists('error_log')) {
                 error_log('[orange] migration read failed: ' . $base);
             }
+            orange_schema_migration_failure_record($pdo, $base, 'read failed');
 
             continue;
         }
@@ -106,6 +190,7 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
             try {
                 $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
                 $ins->execute([$base]);
+                orange_schema_migration_failure_clear($pdo, $base);
             } catch (Throwable $e) {
                 if (function_exists('error_log')) {
                     error_log('[orange] migration record empty: ' . $base . ' — ' . $e->getMessage());
@@ -123,6 +208,7 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
             $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
             $ins->execute([$base]);
             $pdo->commit();
+            orange_schema_migration_failure_clear($pdo, $base);
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -130,6 +216,7 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
             if (function_exists('error_log')) {
                 error_log('[orange] migration failed ' . $base . ': ' . $e->getMessage());
             }
+            orange_schema_migration_failure_record($pdo, $base, $e->getMessage());
         }
     }
 }
