@@ -418,10 +418,13 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             <input type="text" id="pr2_invoice_discount" placeholder="0 أو 5%" dir="ltr" lang="en" style="width:8rem;" autocomplete="off"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
         </div>
         <div style="flex:1 1 auto;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
-            <span style="color:#64748b;">إجمالي المردود:</span> <strong id="pr2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#64748b;">قيمة الخصم:</span> <strong id="pr2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#64748b;">صافي المردود:</span> <strong id="pr2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#dc2626;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
+            <span style="color:#64748b;">إجمالي الأصناف:</span> <strong id="pr2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">خصم الأصناف:</span> <strong id="pr2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">صافي الأصناف:</span> <strong id="pr2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">خصم الفاتورة:</span> <strong id="pr2_inv_disc" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#0f172a;font-weight:700;border-top:2px solid #ea580c;display:inline-block;padding-top:4px;margin-top:2px;">مبلغ المردود: <strong id="pr2_grand_total" class="admin-money-display" dir="ltr" lang="en" style="color:#ea580c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong></span>
         </div>
+        <div id="pr2_line_disc_error" style="flex:1 1 100%;color:#dc2626;font-size:0.85rem;font-weight:600;display:none;"></div>
     </div>
 
     <!-- ٤ — أزرار -->
@@ -924,30 +927,40 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         var rows = tb.querySelectorAll('tr.pr2-line');
         var grossSubtotal = 0;
         var subtotal = 0;
+        var lineDiscTotal = 0;
+        var firstDiscError = '';
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             var q = parseInt(r.querySelector('.pr2-qty').value, 10) || 0;
             var c = parseFloat(r.querySelector('.pr2-cost').value) || 0;
             var lineGross = q * c;
-            var discRaw = (r.querySelector('.pr2-discount') && r.querySelector('.pr2-discount').value || '').trim();
+            var discEl = r.querySelector('.pr2-discount');
+            var discRaw = (discEl && discEl.value || '').trim();
             var discAmt = parseDiscount(discRaw, lineGross);
+            var invalid = (discAmt > 0) && ((lineGross - discAmt) < 0.0005);
+            if (discEl) discEl.style.border = invalid ? '1px solid #dc2626' : '';
+            if (invalid && !firstDiscError) firstDiscError = 'خصم الصنف في السطر ' + (i + 1) + ' يساوي أو يتجاوز إجمالي الصنف — يجب أن تبقى للصنف قيمة.';
             if (discAmt > lineGross) discAmt = lineGross;
             var lineNet = Math.max(0, lineGross - discAmt);
             var ltEl = r.querySelector('.pr2-line-total');
             if (ltEl) ltEl.value = fmt3(lineNet);
             grossSubtotal += lineGross;
             subtotal += lineNet;
+            lineDiscTotal += (lineGross - lineNet);
         }
         var invDiscRaw = (document.getElementById('pr2_invoice_discount').value || '').trim();
         var invDiscAmt = parseDiscount(invDiscRaw, subtotal);
+        if (invDiscAmt > subtotal) invDiscAmt = subtotal;
         var netTotal = Math.max(0, subtotal - invDiscAmt);
         var totalDiscount = Math.max(0, grossSubtotal - netTotal);
-        var stEl = document.getElementById('pr2_subtotal');
-        var dtEl = document.getElementById('pr2_discount_total');
-        var ntEl = document.getElementById('pr2_net_total');
-        if (stEl) stEl.textContent = fmt3(grossSubtotal);
-        if (dtEl) dtEl.textContent = fmt3(totalDiscount);
-        if (ntEl) ntEl.textContent = fmt3(netTotal);
+        var setTxt = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = fmt3(v); };
+        setTxt('pr2_subtotal', grossSubtotal);
+        setTxt('pr2_discount_total', lineDiscTotal);
+        setTxt('pr2_net_total', subtotal);
+        setTxt('pr2_inv_disc', invDiscAmt);
+        setTxt('pr2_grand_total', netTotal);
+        var errEl = document.getElementById('pr2_line_disc_error');
+        if (errEl) { errEl.textContent = firstDiscError; errEl.style.display = firstDiscError ? '' : 'none'; }
         pr2FillBannerTotals(grossSubtotal, totalDiscount, netTotal);
     }
 
@@ -1122,9 +1135,11 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             var el = document.getElementById(id);
             return el ? String(el.textContent || '').trim() : '';
         };
-        setTxt('pr2_sd_print_gross', getTot('pr2_subtotal'));
-        setTxt('pr2_sd_print_disc', getTot('pr2_discount_total'));
-        setTxt('pr2_sd_print_net', getTot('pr2_net_total'));
+        var grossN = parseFloat(getTot('pr2_subtotal').replace(',', '.')) || 0;
+        var netN = parseFloat(getTot('pr2_grand_total').replace(',', '.')) || 0;
+        setTxt('pr2_sd_print_gross', fmt3(grossN));
+        setTxt('pr2_sd_print_disc', fmt3(Math.max(0, grossN - netN)));
+        setTxt('pr2_sd_print_net', fmt3(netN));
     }
 
     function pr2ApplyReturnPayload(res) {
@@ -1287,8 +1302,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             if (!pid || q < 1) continue;
             var lineGross = q * c;
             var discAmt = parseDiscount(discRaw, lineGross);
-            if (discAmt > lineGross + 0.0001) {
-                alert('خصم الصنف في السطر ' + (i + 1) + ' أكبر من إجمالي الصنف. صحّح الخصم قبل الحفظ.');
+            if (discAmt > 0 && (lineGross - discAmt) < 0.0005) {
+                alert('خصم الصنف في السطر ' + (i + 1) + ' يساوي أو يتجاوز إجمالي الصنف — يجب أن تبقى للصنف قيمة. صحّح الخصم قبل الحفظ.');
                 return;
             }
             items.push({ product_id: pid, variant_id: vid, qty: q, cost: c, discount_raw: discRaw, discount_amount: discAmt });
@@ -1304,8 +1319,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             subtotal += Math.max(0, (items[si].qty * items[si].cost) - items[si].discount_amount);
         }
         var invDiscAmt = parseDiscount(invDiscRaw, subtotal);
-        if (invDiscAmt > subtotal + 0.0001) {
-            alert('خصم الفاتورة أكبر من إجمالي الفاتورة. صحّح الخصم قبل الحفظ.');
+        if (invDiscAmt > 0 && (subtotal - invDiscAmt) < 0.0005) {
+            alert('خصم الفاتورة يجعل مبلغ المردود صفراً — يجب أن يكون للمردود إجمالي. صحّح الخصم قبل الحفظ.');
             return;
         }
 
