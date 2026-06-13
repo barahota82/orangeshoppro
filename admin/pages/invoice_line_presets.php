@@ -20,7 +20,9 @@ if ($ilpCountryLabel === '') {
 }
 $ilpReady = orange_invoice_ancillary_tables_ready($pdo);
 $ilpNextSort = $ilpReady ? orange_invoice_ancillary_preset_next_sort($pdo, $ilpCountryId) : 1;
-$ilpContextLabels = orange_invoice_ancillary_invoice_context_labels();
+// قرار المالك (2026-06): البنود الإضافية للمبيعات فقط (أُلغيت للمشتريات) — القائمة المحفوظة سياقها مبيعات فقط.
+$ilpAllContextLabels = orange_invoice_ancillary_invoice_context_labels();
+$ilpContextLabels = ['sales' => $ilpAllContextLabels['sales'] ?? 'مبيعات'];
 $ilpLineKinds = [];
 foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) {
     $ilpLineKinds[] = [
@@ -151,7 +153,6 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         <div class="orange-doc-toolbar-fields" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
             <label for="ilp_filter_context" class="muted" style="font-size:0.85rem;">فلتر:</label>
             <select id="ilp_filter_context" class="admin-inp" style="min-width:8rem;">
-                <option value="">الكل</option>
                 <?php foreach ($ilpContextLabels as $ctxKey => $ctxLabel): ?>
                 <option value="<?php echo htmlspecialchars($ctxKey, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($ctxLabel, ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php endforeach; ?>
@@ -222,7 +223,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         document.getElementById('ilp_account_id').value = '0';
         document.getElementById('ilp_sort').value = String(ILP_NEXT_SORT);
         document.getElementById('ilp_active').value = '1';
-        document.getElementById('ilp_context').value = 'purchase';
+        document.getElementById('ilp_context').value = 'sales';
         document.getElementById('ilp_show_print').value = '0';
         document.getElementById('ilp_account_q').value = '';
         document.getElementById('ilp_account_code').value = '';
