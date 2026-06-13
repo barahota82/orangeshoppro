@@ -160,10 +160,10 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
             <thead>
                 <tr>
                     <th style="width:2.5rem;white-space:nowrap;">#</th>
-                    <th style="width:10rem;white-space:nowrap;">نوع البند</th>
+                    <th style="width:34%;">نوع البند</th>
                     <th style="width:3.5rem;white-space:nowrap;text-align:center;">نشط</th>
-                    <th style="width:38%;">الحساب</th>
-                    <th style="width:30%;">التسمية</th>
+                    <th style="width:25%;">الحساب</th>
+                    <th style="width:25%;">التسمية</th>
                     <th style="width:4rem;white-space:nowrap;text-align:center;">الترتيب</th>
                     <th style="width:5rem;white-space:nowrap;" title="إعادة الترتيب">إعادة الترتيب</th>
                 </tr>
@@ -268,7 +268,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
             tr.style.cursor = 'pointer';
             tr.title = 'اضغط للتعديل';
             tr.innerHTML = '<td style="white-space:nowrap;">' + esc(String(row.id)) + '</td>'
-                + '<td style="font-size:0.85rem;white-space:nowrap;">' + esc(row.line_kind_label || row.line_kind || '') + '</td>'
+                + '<td style="font-size:0.85rem;">' + esc(row.line_kind_label || row.line_kind || '') + '</td>'
                 + '<td style="white-space:nowrap;text-align:center;">' + (row.is_active ? 'نعم' : 'لا') + '</td>'
                 + '<td dir="ltr">' + esc((row.account_code || '') + (row.account_name ? ' — ' + row.account_name : '')) + '</td>'
                 + '<td>' + esc(row.label_ar || '') + '</td>'
