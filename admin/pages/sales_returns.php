@@ -671,7 +671,7 @@ $sr2DocSerialPreview = $sr2NavReady
             '<td><input type="text" class="sr2-var-label admin-inp-readonly" readonly disabled tabindex="-1" placeholder="—"></td>' +
             '<td><input type="number" class="sr2-qty admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
             '<td><input type="number" class="sr2-price admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>' +
-            '<td><input type="number" class="sr2-line-disc admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>' +
+            '<td><input type="text" class="sr2-line-disc admin-inp admin-inp-discount" value="" placeholder="' + fmtZero() + '" dir="ltr" lang="en" autocomplete="off" style="width:100%;"></td>' +
             '<td><input type="text" class="sr2-line-total admin-inp-money" value="' + fmtZero() + '" readonly data-money-allow-zero tabindex="0" dir="ltr" lang="en"></td>' +
             '<td><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
     }
@@ -696,7 +696,7 @@ $sr2DocSerialPreview = $sr2NavReady
             qEl.removeAttribute('title');
         }
         var discEl = tr.querySelector('.sr2-line-disc');
-        if (discEl) discEl.value = fmtZero();
+        if (discEl) discEl.value = '';
         var costEl = tr.querySelector('.sr2-cost');
         if (costEl) costEl.value = '';
     }
@@ -804,7 +804,20 @@ $sr2DocSerialPreview = $sr2NavReady
             }
         }
         var dEl = tr.querySelector('.sr2-line-disc');
-        if (dEl) dEl.value = fmt3(item.line_discount || 0);
+        if (dEl) {
+            var ld = parseFloat(item.line_discount || 0) || 0;
+            dEl.value = ld > 0 ? fmt3(ld) : '';
+        }
+    }
+
+    function parseDiscount(raw, lineAmount) {
+        raw = String(raw || '').trim();
+        if (!raw || raw === '0') return 0;
+        if (raw.endsWith('%')) {
+            var pct = parseFloat(raw.slice(0, -1)) || 0;
+            return Math.round(lineAmount * pct / 100 * 10000) / 10000;
+        }
+        return parseFloat(raw) || 0;
     }
 
     function recalcAll() {
@@ -817,8 +830,8 @@ $sr2DocSerialPreview = $sr2NavReady
             var r = rows[i];
             var q = parseInt(r.querySelector('.sr2-qty').value, 10) || 0;
             var price = parseFloat(r.querySelector('.sr2-price').value) || 0;
-            var disc = parseFloat(r.querySelector('.sr2-line-disc').value) || 0;
             var lineGross = q * price;
+            var disc = parseDiscount((r.querySelector('.sr2-line-disc').value || '').trim(), lineGross);
             if (disc > lineGross) disc = lineGross;
             var lineNet = Math.max(0, lineGross - disc);
             var ltEl = r.querySelector('.sr2-line-total');
@@ -1411,7 +1424,6 @@ $sr2DocSerialPreview = $sr2NavReady
             var vid = parseInt(r.querySelector('.sr2-variant-id').value, 10) || 0;
             var q = parseInt(r.querySelector('.sr2-qty').value, 10) || 0;
             var price = parseFloat(r.querySelector('.sr2-price').value) || 0;
-            var disc = parseFloat(r.querySelector('.sr2-line-disc').value) || 0;
             var maxQ = parseInt(r.querySelector('.sr2-qty').getAttribute('data-max-qty') || '0', 10) || 0;
             if (maxQ > 0 && q > maxQ) {
                 alert('الكمية في السطر ' + (i + 1) + ' تتجاوز المتاح (' + maxQ + ').');
@@ -1419,8 +1431,9 @@ $sr2DocSerialPreview = $sr2NavReady
             }
             if (!pid || q < 1) continue;
             var lineGross = q * price;
+            var disc = parseDiscount((r.querySelector('.sr2-line-disc').value || '').trim(), lineGross);
             if (disc > lineGross + 0.0001) {
-                alert('خصم السطر ' + (i + 1) + ' يتجاوز إجمالي السطر.');
+                alert('خصم الصنف في السطر ' + (i + 1) + ' أكبر من إجمالي الصنف. صحّح الخصم قبل الحفظ.');
                 return;
             }
             var row = { product_id: pid, variant_id: vid, qty: q, price: price, line_discount: disc };
