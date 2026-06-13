@@ -394,7 +394,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                         ['page' => 'gl_account_settings', 'href' => '/admin/index.php?page=gl_account_settings', 'label' => 'حسابات القيود التلقائية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'fiscal_years', 'href' => '/admin/index.php?page=fiscal_years', 'label' => 'السنوات المالية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'edit_lock', 'href' => '/admin/index.php?page=edit_lock', 'label' => 'إقفال التعديلات', 'class' => 'admin-nav-sub', 'sub' => true],
-                        ['page' => 'invoice_line_presets', 'href' => '/admin/index.php?page=invoice_line_presets', 'label' => 'قائمة بنود الفاتورة', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'invoice_line_presets', 'href' => '/admin/index.php?page=invoice_line_presets', 'label' => 'قائمة بنود الفاتورة الإضافية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'analytical_dimensions', 'href' => '/admin/index.php?page=analytical_dimensions', 'label' => 'الأبعاد التحليلية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'opening_balances', 'href' => '/admin/index.php?page=opening_balances', 'label' => 'أرصدة أول المدة المالية', 'class' => 'admin-nav-sub', 'sub' => true],
                     ],

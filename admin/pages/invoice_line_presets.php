@@ -83,7 +83,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
 </style>
 
 <div class="page-title">
-    <h1>قائمة بنود الفاتورة المحفوظة</h1>
+    <h1>قائمة بنود الفاتورة الإضافية</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($ilpCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
@@ -94,7 +94,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
 <?php endif; ?>
 
 <div class="card">
-    <h3 class="card-title">إضافة / تعديل بند محفوظ</h3>
+    <h3 class="card-title">إضافة / تعديل بند إضافي</h3>
     <input type="hidden" id="ilp_id" value="0">
     <input type="hidden" id="ilp_account_id" value="0">
     <div class="form-grid ilp-form-grid orange-doc-header-row">
@@ -149,7 +149,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
 
 <div class="card">
     <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;">
-        <h3 class="card-title" style="margin:0;">البنود المحفوظة</h3>
+        <h3 class="card-title" style="margin:0;">البنود الإضافية المحفوظة</h3>
         <div class="orange-doc-toolbar-fields" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
             <button type="button" class="btn-secondary" id="ilp_btn_reload">تحديث</button>
             <button type="button" class="btn-secondary" id="ilp_btn_save_order"<?php echo !$ilpReady ? ' disabled' : ''; ?>>حفظ الترتيب</button>
@@ -160,17 +160,15 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
             <thead>
                 <tr>
                     <th style="width:3rem;">#</th>
-                    <th>التسمية</th>
-                    <th>الحساب</th>
-                    <th>السياق</th>
                     <th>نوع البند</th>
                     <th>نشط</th>
-                    <th>ترتيب</th>
-                    <th>إجراءات</th>
+                    <th>الحساب</th>
+                    <th>التسمية</th>
+                    <th>الترتيب</th>
                 </tr>
             </thead>
             <tbody id="ilp_list_body">
-                <tr><td colspan="9" class="muted">جاري التحميل…</td></tr>
+                <tr><td colspan="6" class="muted">جاري التحميل…</td></tr>
             </tbody>
         </table>
     </div>
@@ -260,33 +258,21 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         if (!tb) return;
         tb.innerHTML = '';
         if (!rows || !rows.length) {
-            tb.innerHTML = '<tr><td colspan="9" class="muted">لا توجد بنود محفوظة</td></tr>';
+            tb.innerHTML = '<tr><td colspan="6" class="muted">لا توجد بنود محفوظة</td></tr>';
             return;
         }
         rows.forEach(function (row, idx) {
             var tr = document.createElement('tr');
             tr.dataset.id = String(row.id || 0);
+            tr.style.cursor = 'pointer';
+            tr.title = 'اضغط للتعديل';
             tr.innerHTML = '<td>' + esc(String(row.id)) + '</td>'
-                + '<td>' + esc(row.label_ar || '') + '</td>'
-                + '<td dir="ltr">' + esc((row.account_code || '') + (row.account_name ? ' — ' + row.account_name : '')) + '</td>'
-                + '<td>' + esc(row.invoice_context_label || row.invoice_context || '') + '</td>'
                 + '<td style="font-size:0.85rem;">' + esc(row.line_kind_label || row.line_kind || '') + '</td>'
                 + '<td>' + (row.is_active ? 'نعم' : 'لا') + '</td>'
-                + '<td dir="ltr">' + esc(String(row.sort_order || 0)) + '</td>'
-                + '<td><div class="ilp-row-ops">'
-                + '<button type="button" class="btn-secondary ilp-move-up" title="أعلى">↑</button>'
-                + '<button type="button" class="btn-secondary ilp-move-down" title="أسفل">↓</button>'
-                + '<button type="button" class="btn-secondary ilp-edit">تعديل</button>'
-                + '</div></td>';
-            tr.querySelector('.ilp-edit').addEventListener('click', function () { ilpFillForm(row); });
-            tr.querySelector('.ilp-move-up').addEventListener('click', function () {
-                var prev = tr.previousElementSibling;
-                if (prev) tb.insertBefore(tr, prev);
-            });
-            tr.querySelector('.ilp-move-down').addEventListener('click', function () {
-                var next = tr.nextElementSibling;
-                if (next) tb.insertBefore(next, tr);
-            });
+                + '<td dir="ltr">' + esc((row.account_code || '') + (row.account_name ? ' — ' + row.account_name : '')) + '</td>'
+                + '<td>' + esc(row.label_ar || '') + '</td>'
+                + '<td dir="ltr">' + esc(String(row.sort_order || 0)) + '</td>';
+            tr.addEventListener('click', function () { ilpFillForm(row); });
             tb.appendChild(tr);
         });
     }
