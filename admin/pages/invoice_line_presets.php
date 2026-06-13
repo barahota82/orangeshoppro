@@ -35,7 +35,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
 <style>
 .ilp-form-grid {
     display: grid;
-    grid-template-columns: minmax(5rem, 0.5fr) minmax(4rem, 0.38fr) minmax(5.5rem, 0.45fr) minmax(0, 1.3fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
+    grid-template-columns: minmax(4rem, 0.32fr) minmax(4rem, 0.38fr) minmax(5.5rem, 0.45fr) minmax(0, 1.55fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
     gap: 10px 12px;
     align-items: end;
 }
@@ -100,7 +100,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
     <div class="form-grid ilp-form-grid orange-doc-header-row">
         <div>
             <label for="ilp_sort">الترتيب</label>
-            <input type="number" id="ilp_sort" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en"
+            <input type="number" id="ilp_sort" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;text-align:center;"
                 value="<?php echo (int) $ilpNextSort; ?>">
         </div>
         <div>
@@ -112,7 +112,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         </div>
         <div>
             <label for="ilp_context_display">سياق الفاتورة</label>
-            <input type="text" id="ilp_context_display" class="admin-inp-readonly" readonly disabled tabindex="-1"
+            <input type="text" id="ilp_context_display" class="admin-inp-readonly" readonly disabled tabindex="-1" style="background:#f4f4f5;cursor:default;text-align:center;"
                 value="<?php echo htmlspecialchars($ilpContextLabels['sales'] ?? 'مبيعات', ENT_QUOTES, 'UTF-8'); ?>">
             <input type="hidden" id="ilp_context" value="sales">
         </div>
