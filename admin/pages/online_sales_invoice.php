@@ -382,7 +382,11 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             </div>
             <button type="button" class="btn-secondary" id="ov2_btn_print" title="طباعة الفاتورة المعروضة"<?php echo orange_admin_invoice_print_tuning_mode() ? '' : ' disabled'; ?>>طباعة</button>
             <button type="button" id="ov2_btn_save" data-orange-perm="edit" data-orange-page="online_sales_invoice" disabled>حفظ</button>
+            <!-- مؤقت: معاينة QR لاختبار شكل صفحة العميل — يُزال لاحقاً -->
+            <button type="button" class="btn-secondary" id="ov2_btn_qr_preview" title="معاينة QR (مؤقت للاختبار)">معاينة QR</button>
         </div>
+        <!-- مؤقت: صندوق معاينة QR — يُزال لاحقاً -->
+        <div id="ov2_sd_qr_preview_box" style="margin:8px 0;text-align:center"></div>
     </div>
 </div>
 
@@ -1432,6 +1436,12 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         var ov2ExtraAddPreset = document.getElementById('ov2_extra_add_to_presets');
         if (ov2ExtraAddPreset) ov2ExtraAddPreset.addEventListener('click', ov2ExtraAddToPresets);
 
+        var ov2QrPreviewBtn = document.getElementById('ov2_btn_qr_preview');
+        if (ov2QrPreviewBtn && window.orangeSalesDocUi && window.orangeSalesDocUi.setDocQrPreview) {
+            ov2QrPreviewBtn.addEventListener('click', function () {
+                window.orangeSalesDocUi.setDocQrPreview('ov2', 'inv_o', browseOrderId);
+            });
+        }
         if (window.orangeSalesDocUi) {
             window.orangeSalesDocUi.bindPrintButton('ov2_btn_print', {
                 prefix: 'ov2',

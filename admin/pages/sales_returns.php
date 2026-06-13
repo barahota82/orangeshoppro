@@ -404,7 +404,11 @@ $sr2DocSerialPreview = $sr2NavReady
             <button type="button" class="btn-secondary" id="sr2_btn_print" title="طباعة المردود المعروض"<?php echo orange_admin_invoice_print_tuning_mode() ? '' : ' disabled'; ?>>طباعة</button>
             <button type="button" class="btn-secondary" id="sr2_btn_new" title="مردود جديد" onclick="if (confirm('بدء مردود جديد؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { location.reload(); } return false;">مردود جديد</button>
             <button type="button" id="sr2_btn_save" data-orange-perm="edit" data-orange-page="sales_returns">حفظ</button>
+            <!-- مؤقت: معاينة QR لاختبار شكل صفحة العميل — يُزال لاحقاً -->
+            <button type="button" class="btn-secondary" id="sr2_btn_qr_preview" title="معاينة QR (مؤقت للاختبار)">معاينة QR</button>
         </div>
+        <!-- مؤقت: صندوق معاينة QR — يُزال لاحقاً -->
+        <div id="sr2_sd_qr_preview_box" style="margin:8px 0;text-align:center"></div>
     </div>
 </div>
 
@@ -1554,6 +1558,12 @@ $sr2DocSerialPreview = $sr2NavReady
             });
             orderRefEl.addEventListener('input', function () {
                 sr2ClearOrderLink();
+            });
+        }
+        var sr2QrPreviewBtn = document.getElementById('sr2_btn_qr_preview');
+        if (sr2QrPreviewBtn && window.orangeSalesDocUi && window.orangeSalesDocUi.setDocQrPreview) {
+            sr2QrPreviewBtn.addEventListener('click', function () {
+                window.orangeSalesDocUi.setDocQrPreview('sr2', 'sales_return', browseReturnId);
             });
         }
         if (window.orangeSalesDocUi) {

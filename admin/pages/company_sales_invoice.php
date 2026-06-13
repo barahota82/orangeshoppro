@@ -479,7 +479,11 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             <button type="button" class="btn-secondary" id="sv2_btn_print" title="طباعة الفاتورة المعروضة"<?php echo orange_admin_invoice_print_tuning_mode() ? '' : ' disabled'; ?>>طباعة</button>
             <button type="button" class="btn-secondary" id="sv2_btn_new" title="فاتورة جديدة" data-orange-perm="edit" data-orange-page="company_sales_invoice" onclick="if (confirm('بدء فاتورة جديدة؟ سيتم مسح أي بيانات غير محفوظة على الشاشة.')) { location.href = (typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '') : '') + '/admin/index.php?page=company_sales_invoice'; } return false;">فاتورة جديدة</button>
             <button type="button" id="sv2_btn_save" data-orange-perm="edit" data-orange-page="company_sales_invoice">حفظ</button>
+            <!-- مؤقت: معاينة QR لاختبار شكل صفحة العميل — يُزال لاحقاً -->
+            <button type="button" class="btn-secondary" id="sv2_btn_qr_preview" title="معاينة QR (مؤقت للاختبار)">معاينة QR</button>
         </div>
+        <!-- مؤقت: صندوق معاينة QR — يُزال لاحقاً -->
+        <div id="sv2_sd_qr_preview_box" style="margin:8px 0;text-align:center"></div>
     </div>
 </div>
 
@@ -1722,6 +1726,12 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 sv2ExtraPickClose();
             }
         });
+        var sv2QrPreviewBtn = document.getElementById('sv2_btn_qr_preview');
+        if (sv2QrPreviewBtn && window.orangeSalesDocUi && window.orangeSalesDocUi.setDocQrPreview) {
+            sv2QrPreviewBtn.addEventListener('click', function () {
+                window.orangeSalesDocUi.setDocQrPreview('sv2', 'inv_c', browseOrderId);
+            });
+        }
         if (window.orangeSalesDocUi) {
             window.orangeSalesDocUi.bindPrintButton('sv2_btn_print', {
                 prefix: 'sv2',

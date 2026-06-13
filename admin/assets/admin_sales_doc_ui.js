@@ -133,6 +133,38 @@
             .catch(function () { done(); });
     }
 
+    /* === مؤقت: معاينة QR على الشاشة لاختبار شكل صفحة الـ QR — يُزال لاحقاً === */
+    function setDocQrPreview(prefix, docKind, docId) {
+        var box = document.getElementById(String(prefix || 'sd') + '_sd_qr_preview_box');
+        if (!box) { return; }
+        var id = parseInt(String(docId || '0'), 10) || 0;
+        if (!docKind || id <= 0 || typeof global.qrcode !== 'function') {
+            box.innerHTML = '<span style="color:#a33;font-size:12px">احفظ المستند أولاً ثم افتحه، ثم اضغط «معاينة QR».</span>';
+            return;
+        }
+        box.innerHTML = '<span style="color:#888;font-size:12px">…جارٍ التوليد</span>';
+        var url = '/admin/api/doc-token/ensure.php?doc_kind=' + encodeURIComponent(docKind) + '&doc_id=' + id;
+        fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (res && res.success && res.url) {
+                    try {
+                        var qr = global.qrcode(0, 'M');
+                        qr.addData(String(res.url));
+                        qr.make();
+                        box.innerHTML = qr.createImgTag(4, 6)
+                            + '<div style="font-size:11px;direction:ltr;word-break:break-all;margin-top:6px;color:#444">'
+                            + String(res.url) + '</div>';
+                        var img = box.querySelector('img');
+                        if (img) { img.style.width = '170px'; img.style.height = '170px'; img.style.display = 'block'; }
+                    } catch (e) { box.innerHTML = '<span style="color:#a33">تعذر توليد QR</span>'; }
+                } else {
+                    box.innerHTML = '<span style="color:#a33;font-size:12px">' + ((res && res.message) || 'تعذر توليد QR') + '</span>';
+                }
+            })
+            .catch(function () { box.innerHTML = '<span style="color:#a33;font-size:12px">تعذر الاتصال بالخادم</span>'; });
+    }
+
     function buildPdfTitle(opts) {
         var label = String(opts.docLabel || '').trim();
         var serial = '';
@@ -374,6 +406,7 @@
         bindPrintButton: bindPrintButton,
         setPhoneCells: setPhoneCells,
         setDocQr: setDocQr,
+        setDocQrPreview: setDocQrPreview,
         renderDocTotals: renderDocTotals,
         ancillaryDisplaySign: ancillaryDisplaySign
     };
