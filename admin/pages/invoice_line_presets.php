@@ -165,10 +165,11 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
                     <th>الحساب</th>
                     <th>التسمية</th>
                     <th>الترتيب</th>
+                    <th style="width:5rem;" title="ترتيب يدوي">ترتيب يدوي</th>
                 </tr>
             </thead>
             <tbody id="ilp_list_body">
-                <tr><td colspan="6" class="muted">جاري التحميل…</td></tr>
+                <tr><td colspan="7" class="muted">جاري التحميل…</td></tr>
             </tbody>
         </table>
     </div>
@@ -258,7 +259,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         if (!tb) return;
         tb.innerHTML = '';
         if (!rows || !rows.length) {
-            tb.innerHTML = '<tr><td colspan="6" class="muted">لا توجد بنود محفوظة</td></tr>';
+            tb.innerHTML = '<tr><td colspan="7" class="muted">لا توجد بنود محفوظة</td></tr>';
             return;
         }
         rows.forEach(function (row, idx) {
@@ -271,8 +272,24 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
                 + '<td>' + (row.is_active ? 'نعم' : 'لا') + '</td>'
                 + '<td dir="ltr">' + esc((row.account_code || '') + (row.account_name ? ' — ' + row.account_name : '')) + '</td>'
                 + '<td>' + esc(row.label_ar || '') + '</td>'
-                + '<td dir="ltr">' + esc(String(row.sort_order || 0)) + '</td>';
+                + '<td dir="ltr">' + esc(String(row.sort_order || 0)) + '</td>'
+                + '<td><div class="ilp-row-ops">'
+                + '<button type="button" class="btn-secondary ilp-move-up" title="أعلى">↑</button>'
+                + '<button type="button" class="btn-secondary ilp-move-down" title="أسفل">↓</button>'
+                + '</div></td>';
             tr.addEventListener('click', function () { ilpFillForm(row); });
+            var upBtn = tr.querySelector('.ilp-move-up');
+            var dnBtn = tr.querySelector('.ilp-move-down');
+            if (upBtn) upBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var prev = tr.previousElementSibling;
+                if (prev) tb.insertBefore(tr, prev);
+            });
+            if (dnBtn) dnBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var next = tr.nextElementSibling;
+                if (next) tb.insertBefore(next, tr);
+            });
             tb.appendChild(tr);
         });
     }
