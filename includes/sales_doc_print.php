@@ -257,6 +257,25 @@ function orange_sales_doc_print_banner(array $ctx): void
 }
 
 /**
+ * GAP-ACC-07-DISP — صندوق إجماليات سفلي للطباعة (يظهر أسفل جدول الأصناف فقط في الطباعة).
+ * يُملأ عبر JS (orangeSalesDocUi.renderDocTotals) بالتسلسل المتفق عليه:
+ *   إجمالي الأصناف / − خصم الأصناف / صافي الأصناف / (± بنود إضافية ظاهرة) / + ضريبة (إن وُجدت) / = الإجمالي.
+ *
+ * @param string $prefix بادئة الصفحة (sv2/ov2/sr2/pv2/pr2) لمطابقة معرّفات JS.
+ */
+function orange_sales_doc_print_totals_box(string $prefix): void
+{
+    $pfx = preg_replace('/[^a-z0-9_]/i', '', $prefix) ?: 'sd';
+    ?>
+<div class="sd-print-totals" aria-hidden="true">
+    <table class="sd-print-totals__tbl">
+        <tbody id="<?php echo htmlspecialchars($pfx, ENT_QUOTES, 'UTF-8'); ?>_sd_print_totals_body"></tbody>
+    </table>
+</div>
+    <?php
+}
+
+/**
  * تذييل طباعة لفاتورة العميل (شكر + توقيع/ختم + invoice_footer).
  * يُوضع في نهاية منطقة الطباعة `.jv-print-area` للمستندات التي يستلمها العميل (المبيعات).
  *

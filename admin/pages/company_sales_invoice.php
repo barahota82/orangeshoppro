@@ -312,9 +312,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         'show_qr' => true,
         'show_notes' => true,
         'totals_rows' => [
-            ['إجمالي الفاتورة / Total', 'total'],
-            ['قيمة الخصم / Discount', 'disc'],
-            ['مبلغ الفاتورة / Net', 'net'],
+            ['الإجمالي / Total', 'total'],
         ],
     ]);
     ?>
@@ -427,6 +425,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             </table>
         </div>
     </div>
+
+    <?php orange_sales_doc_print_totals_box('sv2'); ?>
 
     <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:18px 0 10px;">بنود إضافية</h4>
     <div class="admin-doc-frame">
@@ -1354,9 +1354,25 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             var el = document.getElementById(id);
             return el ? String(el.textContent || '').trim() : '';
         };
-        setTxt('sv2_sd_print_total', getTot('sv2_subtotal'));
-        setTxt('sv2_sd_print_disc', getTot('sv2_discount_total'));
-        setTxt('sv2_sd_print_net', getTot('sv2_net_total'));
+        var sv2PtEl = document.getElementById('sv2_payment_terms');
+        var sv2IsCash = !sv2PtEl || String(sv2PtEl.value || 'cash') !== 'credit';
+        if (window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals) {
+            window.orangeSalesDocUi.renderDocTotals({
+                prefix: 'sv2', context: 'sales',
+                subtotalId: 'sv2_subtotal', discountId: 'sv2_discount_total', netId: 'sv2_net_total',
+                collectExtra: sv2CollectExtraLines,
+                unit: <?php echo json_encode($adminCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
+                labels: {
+                    items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
+                    items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
+                    net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
+                    vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
+                },
+                finalLabel: sv2IsCash
+                    ? { ar: 'المبلغ المحصّل', en: 'Amount Collected' }
+                    : { ar: 'الإجمالي المستحق', en: 'Amount Due' }
+            });
+        }
 
         var chSel = document.getElementById('sv2_channel');
         var chId = chSel ? (parseInt(chSel.value, 10) || 0) : 0;

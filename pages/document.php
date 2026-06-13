@@ -40,6 +40,9 @@ $L = [
         'discount_total' => 'قيمة الخصم',
         'subtotal_inv' => 'إجمالي الفاتورة', 'net_inv' => 'مبلغ الفاتورة',
         'subtotal_ret' => 'إجمالي المردود', 'net_ret' => 'صافي المردود',
+        'items_total' => 'إجمالي الأصناف', 'items_disc' => 'خصم الأصناف', 'net_items' => 'صافي الأصناف',
+        'vat_line' => 'ضريبة القيمة المضافة',
+        'amount_collected' => 'المبلغ المحصّل', 'amount_due' => 'الإجمالي المستحق', 'total_refund' => 'إجمالي المردود',
         'thanks' => 'شكراً لتعاملكم', 'signature' => 'التوقيع', 'stamp' => 'الختم',
         'not_found' => 'المستند غير موجود أو انتهت صلاحية الرابط.', 'language' => 'اللغة', 'serial' => 'رقم المستند',
     ],
@@ -55,6 +58,9 @@ $L = [
         'discount_total' => 'Discount',
         'subtotal_inv' => 'Invoice Total', 'net_inv' => 'Amount Due',
         'subtotal_ret' => 'Return Total', 'net_ret' => 'Net Return',
+        'items_total' => 'Items Total', 'items_disc' => 'Items Discount', 'net_items' => 'Net Items',
+        'vat_line' => 'VAT',
+        'amount_collected' => 'Amount Collected', 'amount_due' => 'Amount Due', 'total_refund' => 'Total Refund',
         'thanks' => 'Thank you for your business', 'signature' => 'Signature', 'stamp' => 'Stamp',
         'not_found' => 'Document not found or the link has expired.', 'language' => 'Language', 'serial' => 'Document No.',
     ],
@@ -70,6 +76,9 @@ $L = [
         'discount_total' => 'Diskwento',
         'subtotal_inv' => 'Kabuuang Invoice', 'net_inv' => 'Halagang Babayaran',
         'subtotal_ret' => 'Kabuuang Return', 'net_ret' => 'Net na Return',
+        'items_total' => 'Kabuuang Items', 'items_disc' => 'Diskwento sa Items', 'net_items' => 'Net na Items',
+        'vat_line' => 'VAT',
+        'amount_collected' => 'Halagang Nakolekta', 'amount_due' => 'Halagang Babayaran', 'total_refund' => 'Kabuuang Refund',
         'thanks' => 'Salamat sa inyong pakikipagkalakalan', 'signature' => 'Lagda', 'stamp' => 'Selyo',
         'not_found' => 'Hindi mahanap ang dokumento o nag-expire na ang link.', 'language' => 'Wika', 'serial' => 'Dokumento No.',
     ],
@@ -85,6 +94,9 @@ $L = [
         'discount_total' => 'छूट',
         'subtotal_inv' => 'चालान कुल', 'net_inv' => 'देय राशि',
         'subtotal_ret' => 'वापसी कुल', 'net_ret' => 'शुद्ध वापसी',
+        'items_total' => 'वस्तुओं का कुल', 'items_disc' => 'वस्तु छूट', 'net_items' => 'शुद्ध वस्तुएँ',
+        'vat_line' => 'वैट',
+        'amount_collected' => 'वसूली गई राशि', 'amount_due' => 'देय राशि', 'total_refund' => 'कुल वापसी',
         'thanks' => 'आपके व्यवसाय के लिए धन्यवाद', 'signature' => 'हस्ताक्षर', 'stamp' => 'मुहर',
         'not_found' => 'दस्तावेज़ नहीं मिला या लिंक की अवधि समाप्त हो गई।', 'language' => 'भाषा', 'serial' => 'दस्तावेज़ सं.',
     ],
@@ -127,6 +139,13 @@ if ($preview) {
         'subtotal' => 22.25,
         'discount_total' => 0.5,
         'net_total' => 21.75,
+        'paid' => ($previewKind !== 'inv_o'),
+        'extra_lines' => ($previewKind === 'sales_return') ? [] : [
+            ['label' => ['ar' => 'مصاريف توصيل', 'en' => 'Delivery Fee', 'fil' => 'Bayad sa Delivery', 'hi' => 'डिलीवरी शुल्क'][$lang] ?? 'Delivery Fee', 'amount' => 1.0, 'sign' => 1, 'is_vat' => false],
+            ['label' => ['ar' => 'رسوم خدمة', 'en' => 'Service Fee', 'fil' => 'Service Fee', 'hi' => 'सेवा शुल्क'][$lang] ?? 'Service Fee', 'amount' => 0.5, 'sign' => 1, 'is_vat' => false],
+            ['label' => ['ar' => 'خصم مسموح', 'en' => 'Allowed Discount', 'fil' => 'Pinapayagang Diskwento', 'hi' => 'अनुमत छूट'][$lang] ?? 'Allowed Discount', 'amount' => 0.25, 'sign' => -1, 'is_vat' => false],
+        ],
+        'grand_total' => ($previewKind === 'sales_return') ? 21.75 : 23.0,
     ];
 } else {
     try {
@@ -249,10 +268,16 @@ header('X-Robots-Tag: noindex, nofollow', true);
         table.doc-lines col.c-discount { width: 13%; }
         table.doc-lines col.c-total { width: 14%; }
 
-        .doc-totals { margin-top: 12px; margin-<?php echo $isRtl ? 'left' : 'right'; ?>: 0; margin-<?php echo $isRtl ? 'right' : 'left'; ?>: auto; max-width: 320px; font-size: 0.9rem; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
-        .doc-totals div { display: flex; justify-content: space-between; padding: 6px 12px; }
+        .doc-totals { margin-top: 12px; margin-<?php echo $isRtl ? 'left' : 'right'; ?>: 0; margin-<?php echo $isRtl ? 'right' : 'left'; ?>: auto; max-width: 340px; font-size: 0.9rem; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+        .doc-totals div { display: flex; justify-content: space-between; gap: 10px; padding: 6px 12px; }
         .doc-totals div + div { border-top: 1px solid #f1f5f9; }
-        .doc-totals .doc-net { background: #ea580c; color: #fff; font-weight: 800; font-size: 1.02rem; border-top: 0; }
+        .doc-totals .doc-row-lbl { color: #475569; }
+        .doc-totals .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .doc-totals .doc-net-items { background: #f8fafc; font-weight: 700; color: #0f172a; }
+        .doc-totals .doc-net-items .doc-row-lbl { color: #0f172a; }
+        .doc-totals .doc-extra-minus .num { color: #b91c1c; }
+        .doc-totals .doc-net { background: #ea580c; color: #fff; font-weight: 800; font-size: 1.02rem; }
+        .doc-totals .doc-net .doc-row-lbl { color: #fff; }
 
         /* تذييل: شكر + نص قانوني + بيانات تواصل بالوسط أسفل الصفحة. */
         .inv-footer { margin-top: 20px; border-top: 1px dashed #cbd5e1; padding-top: 12px; }
@@ -386,10 +411,29 @@ header('X-Robots-Tag: noindex, nofollow', true);
             </table>
             </div>
 
+            <?php
+            $extraLines = isset($doc['extra_lines']) && is_array($doc['extra_lines']) ? $doc['extra_lines'] : [];
+            $itemsDisc = (float) ($doc['discount_total'] ?? 0);
+            $netItems = (float) ($doc['net_total'] ?? 0);
+            $grandTotal = isset($doc['grand_total']) ? (float) $doc['grand_total'] : $netItems;
+            $finalKey = $isReturnDoc ? 'total_refund' : (!empty($doc['paid']) ? 'amount_collected' : 'amount_due');
+            $minus = "\u{2212}\u{00a0}"; // − + مسافة غير قابلة للكسر
+            $plus = "+\u{00a0}";
+            ?>
             <div class="doc-totals">
-                <div><span><?php echo $esc($tt($isReturnDoc ? 'subtotal_ret' : 'subtotal_inv')); ?></span><span class="num"><?php echo $esc($fmtMoney($doc['subtotal'])); ?></span></div>
-                <div><span><?php echo $esc($tt('discount_total')); ?></span><span class="num"><?php echo $esc($fmtMoney($doc['discount_total'])); ?></span></div>
-                <div class="doc-net"><span><?php echo $esc($tt($isReturnDoc ? 'net_ret' : 'net_inv')); ?></span><span class="num"><?php echo $esc($fmtMoney($doc['net_total'])); ?></span></div>
+                <div><span class="doc-row-lbl"><?php echo $esc($tt('items_total')); ?></span><span class="num"><?php echo $esc($fmtMoney($doc['subtotal'])); ?></span></div>
+                <?php if ($itemsDisc > 0): ?>
+                <div class="doc-extra-minus"><span class="doc-row-lbl"><?php echo $esc($tt('items_disc')); ?></span><span class="num"><?php echo $minus . $esc($fmtMoney($itemsDisc)); ?></span></div>
+                <?php endif; ?>
+                <div class="doc-net-items"><span class="doc-row-lbl"><?php echo $esc($tt('net_items')); ?></span><span class="num"><?php echo $esc($fmtMoney($netItems)); ?></span></div>
+                <?php foreach ($extraLines as $xl): ?>
+                <?php
+                $xlSign = (int) ($xl['sign'] ?? 1);
+                $xlLabel = !empty($xl['is_vat']) ? $tt('vat_line') : (string) ($xl['label'] ?? '');
+                ?>
+                <div class="<?php echo $xlSign < 0 ? 'doc-extra-minus' : ''; ?>"><span class="doc-row-lbl"><?php echo $esc($xlLabel); ?></span><span class="num"><?php echo ($xlSign < 0 ? $minus : $plus) . $esc($fmtMoney($xl['amount'] ?? 0)); ?></span></div>
+                <?php endforeach; ?>
+                <div class="doc-net"><span class="doc-row-lbl"><?php echo $esc($tt($finalKey)); ?></span><span class="num"><?php echo $esc($fmtMoney($grandTotal)); ?></span></div>
             </div>
 
             <div class="inv-footer">

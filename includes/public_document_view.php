@@ -9,6 +9,58 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/invoice_ancillary_lines.php';
+
+/**
+ * GAP-ACC-07-DISP — يرفق البنود الإضافية الظاهرة (show_on_print=1) ويحسب الإجمالي النهائي.
+ * مبيعات: دائن (+) / مدين (−). يُملأ في $doc:
+ *   extra_lines = [{label, amount, sign(+1/-1), is_vat}], grand_total.
+ *
+ * @param array<string,mixed> $doc
+ */
+function orange_public_doc_attach_ancillary(PDO $pdo, array &$doc, string $ancillaryDocKind, int $docId): void
+{
+    $doc['extra_lines'] = [];
+    $net = (float) ($doc['net_total'] ?? 0);
+    $doc['grand_total'] = round($net, 3);
+
+    try {
+        $rows = orange_invoice_ancillary_extra_lines_for_doc($pdo, $ancillaryDocKind, $docId);
+    } catch (Throwable $e) {
+        return;
+    }
+
+    $grand = $net;
+    foreach ($rows as $r) {
+        if ((int) ($r['show_on_print'] ?? 0) !== 1) {
+            continue;
+        }
+        $amount = (float) ($r['amount'] ?? 0);
+        if ($amount <= 0) {
+            continue;
+        }
+        $lineKind = (string) ($r['line_kind'] ?? '');
+        $side = orange_invoice_ancillary_line_kind_side($lineKind);
+        // سياق المبيعات: دائن يضيف (+) ومدين يخصم (−).
+        $sign = ($side === 'credit') ? 1 : -1;
+        $isVat = ($lineKind === 'sales_credit_liability' || $lineKind === 'purchase_debit_vat_input');
+        $label = trim((string) ($r['label_ar'] ?? ''));
+        if ($label === '' && $isVat) {
+            $label = 'ضريبة القيمة المضافة';
+        }
+        if ($label === '') {
+            $label = trim((string) ($r['account_name'] ?? ''));
+        }
+        $grand += $sign * $amount;
+        $doc['extra_lines'][] = [
+            'label' => $label,
+            'amount' => round($amount, 3),
+            'sign' => $sign,
+            'is_vat' => $isVat,
+        ];
+    }
+    $doc['grand_total'] = round($grand, 3);
+}
 
 /** أسماء المنتجات مُترجَمة حسب اللغة الحالية. [product_id => name] */
 function orange_public_doc_localized_names(PDO $pdo, array $productIds): array
@@ -137,7 +189,7 @@ function orange_public_doc_load_order(PDO $pdo, string $docKind, int $orderId): 
         $discTotal += $disc;
     }
 
-    return [
+    $doc = [
         'doc_kind' => $docKind,
         'serial' => (string) ($o['invoice_number'] ?? ''),
         'date' => orange_public_doc_fmt_date($o['document_date'] ?? ($o['created_at'] ?? null)),
@@ -153,6 +205,11 @@ function orange_public_doc_load_order(PDO $pdo, string $docKind, int $orderId): 
         'discount_total' => round($discTotal, 3),
         'net_total' => round((float) ($o['total'] ?? ($subtotal - $discTotal)), 3),
     ];
+    orange_public_doc_attach_ancillary($pdo, $doc, orange_invoice_ancillary_doc_kind_sales(), $orderId);
+    $grandForPaid = (float) ($doc['grand_total'] ?? $doc['net_total']);
+    $doc['paid'] = ((float) ($o['amount_paid'] ?? 0)) + 0.0005 >= $grandForPaid;
+
+    return $doc;
 }
 
 function orange_public_doc_load_sales_return(PDO $pdo, int $returnId): ?array
@@ -206,7 +263,7 @@ function orange_public_doc_load_sales_return(PDO $pdo, int $returnId): ?array
         }
     }
 
-    return [
+    $doc = [
         'doc_kind' => 'sales_return',
         'serial' => (string) ($h['return_number'] ?? ''),
         'date' => orange_public_doc_fmt_date($h['document_date'] ?? ($h['created_at'] ?? null)),
@@ -222,6 +279,9 @@ function orange_public_doc_load_sales_return(PDO $pdo, int $returnId): ?array
         'discount_total' => round($discTotal, 3),
         'net_total' => round((float) ($h['total'] ?? ($subtotal - $discTotal)), 3),
     ];
+    orange_public_doc_attach_ancillary($pdo, $doc, orange_invoice_ancillary_doc_kind_sales_return(), $returnId);
+
+    return $doc;
 }
 
 function orange_public_doc_load_purchase(PDO $pdo, int $purchaseId, int $countryId): ?array

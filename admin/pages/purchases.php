@@ -339,9 +339,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         ],
         'show_notes' => true,
         'totals_rows' => [
-            ['إجمالي الفاتورة / Total', 'total'],
-            ['قيمة الخصم / Discount', 'disc'],
-            ['مبلغ الفاتورة / Net', 'net'],
+            ['الإجمالي / Total', 'total'],
         ],
     ]);
     ?>
@@ -418,6 +416,8 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
             </table>
         </div>
     </div>
+
+    <?php orange_sales_doc_print_totals_box('pv2'); ?>
 
     <!-- بنود إضافية (GL مركّب) -->
     <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:18px 0 10px;">بنود إضافية</h4>
@@ -1301,9 +1301,21 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
             var el = document.getElementById(id);
             return el ? String(el.textContent || '').trim() : '';
         };
-        setTxt('pv2_sd_print_total', getTot('pv2_subtotal'));
-        setTxt('pv2_sd_print_disc', getTot('pv2_discount_total'));
-        setTxt('pv2_sd_print_net', getTot('pv2_net_total'));
+        if (window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals) {
+            window.orangeSalesDocUi.renderDocTotals({
+                prefix: 'pv2', context: 'purchase',
+                subtotalId: 'pv2_subtotal', discountId: 'pv2_discount_total', netId: 'pv2_net_total',
+                collectExtra: (typeof pv2CollectExtraLines === 'function') ? pv2CollectExtraLines : function () { return []; },
+                unit: <?php echo json_encode($adminCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
+                labels: {
+                    items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
+                    items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
+                    net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
+                    vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
+                },
+                finalLabel: { ar: 'الإجمالي', en: 'Total' }
+            });
+        }
     }
 
     function pv2SyncToolbar() {

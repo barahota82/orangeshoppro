@@ -269,8 +269,6 @@ $sr2DocSerialPreview = $sr2NavReady
         'show_notes' => true,
         'totals_rows' => [
             ['إجمالي المردود / Total', 'total'],
-            ['قيمة الخصم / Discount', 'disc'],
-            ['صافي المردود / Net', 'net'],
         ],
     ]);
     ?>
@@ -355,6 +353,8 @@ $sr2DocSerialPreview = $sr2NavReady
             </table>
         </div>
     </div>
+
+    <?php orange_sales_doc_print_totals_box('sr2'); ?>
 
     <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:16px 0 10px;">بنود إضافية</h4>
     <div class="admin-doc-frame">
@@ -1004,9 +1004,21 @@ $sr2DocSerialPreview = $sr2NavReady
             var el = document.getElementById(id);
             return el ? String(el.textContent || '').trim() : '';
         };
-        setTxt('sr2_sd_print_total', getTot('sr2_subtotal'));
-        setTxt('sr2_sd_print_disc', getTot('sr2_discount_total'));
-        setTxt('sr2_sd_print_net', getTot('sr2_net_total'));
+        if (window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals) {
+            window.orangeSalesDocUi.renderDocTotals({
+                prefix: 'sr2', context: 'sales',
+                subtotalId: 'sr2_subtotal', discountId: 'sr2_discount_total', netId: 'sr2_net_total',
+                collectExtra: (typeof sr2CollectExtraLines === 'function') ? sr2CollectExtraLines : function () { return []; },
+                unit: <?php echo json_encode($srCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
+                labels: {
+                    items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
+                    items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
+                    net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
+                    vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
+                },
+                finalLabel: { ar: 'إجمالي المردود', en: 'Total Refund' }
+            });
+        }
 
         orangeSalesDocSetPhoneCells('sr2_sd_print_phone', SR2_COMPANY_PHONE, SR2_CHANNEL_WA, sr2MarketChannelId);
     }

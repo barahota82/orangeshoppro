@@ -4557,6 +4557,64 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     font-weight: 800;
 }
 
+/* GAP-ACC-07-DISP — صندوق إجماليات سفلي (يظهر في الطباعة فقط، أسفل جدول الأصناف) */
+.sd-print-totals {
+    display: none;
+}
+.sd-print-totals__tbl {
+    width: 46%;
+    min-width: 16rem;
+    margin: 0.7rem 0 0 auto;
+    border-collapse: collapse;
+    direction: rtl;
+    font-size: 0.84rem;
+}
+.sd-print-totals__row > td {
+    padding: 0.18rem 0.35rem;
+    vertical-align: middle;
+}
+.sd-print-totals__lbl {
+    color: #475569;
+    text-align: right;
+    white-space: nowrap;
+}
+.sd-print-totals__lbl-en {
+    color: #94a3b8;
+    font-size: 0.72rem;
+    margin-inline-start: 0.4rem;
+}
+.sd-print-totals__val {
+    text-align: left;
+    font-weight: 600;
+    color: #0f172a;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.sd-print-totals__unit {
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 400;
+}
+.sd-print-totals__row--net > td {
+    border-top: 1px solid #cbd5e1;
+    font-weight: 700;
+}
+.sd-print-totals__row--net .sd-print-totals__lbl {
+    color: #0f172a;
+}
+.sd-print-totals__row--final > td {
+    border-top: 2px solid #ea580c;
+    border-bottom: 2px solid #ea580c;
+    padding-top: 0.32rem;
+    padding-bottom: 0.32rem;
+}
+.sd-print-totals__row--final .sd-print-totals__lbl,
+.sd-print-totals__row--final .sd-print-totals__val {
+    color: #ea580c;
+    font-weight: 800;
+    font-size: 0.95rem;
+}
+
 .sd-print-footer {
     display: none;
 }
@@ -4819,6 +4877,16 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     }
     .jv-print-area .admin-doc-frame:has(table[class*="-extra-lines-table"]) {
         display: none !important;
+    }
+    /* صندوق الإجماليات السفلي: يظهر في الطباعة (تفصيل البنود + الإجمالي النهائي) */
+    .jv-print-area .sd-print-totals,
+    .jv-print-area .sd-print-totals * {
+        visibility: visible;
+    }
+    .jv-print-area .sd-print-totals {
+        display: block !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
     }
     .jv-print-area .sd-print-footer,
     .jv-print-area .sd-print-footer * {

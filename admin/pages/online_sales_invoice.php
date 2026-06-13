@@ -231,9 +231,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         'party_title' => 'فاتورة إلى / Bill To',
         'show_notes' => true,
         'totals_rows' => [
-            ['إجمالي الفاتورة / Total', 'total'],
-            ['قيمة الخصم / Discount', 'disc'],
-            ['مبلغ الفاتورة / Net', 'net'],
+            ['الإجمالي / Total', 'total'],
         ],
     ]);
     ?>
@@ -331,6 +329,8 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             </table>
         </div>
     </div>
+
+    <?php orange_sales_doc_print_totals_box('ov2'); ?>
 
     <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:16px 0 10px;">بنود إضافية</h4>
     <div class="admin-doc-frame">
@@ -1369,9 +1369,21 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                 var el = document.getElementById(id);
                 return el ? String(el.textContent || '').trim() : '';
             };
-            setTxt('ov2_sd_print_total', getTot('ov2_subtotal'));
-            setTxt('ov2_sd_print_disc', getTot('ov2_discount_total'));
-            setTxt('ov2_sd_print_net', getTot('ov2_net_total'));
+            if (window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals) {
+                window.orangeSalesDocUi.renderDocTotals({
+                    prefix: 'ov2', context: 'sales',
+                    subtotalId: 'ov2_subtotal', discountId: 'ov2_discount_total', netId: 'ov2_net_total',
+                    collectExtra: ov2CollectExtraLines,
+                    unit: <?php echo json_encode($adminCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
+                    labels: {
+                        items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
+                        items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
+                        net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
+                        vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
+                    },
+                    finalLabel: { ar: 'الإجمالي', en: 'Total' }
+                });
+            }
 
             var ov2ChIdEl = document.getElementById('ov2_channel_id');
             var ov2ChId = ov2ChIdEl ? (parseInt(ov2ChIdEl.value, 10) || 0) : 0;

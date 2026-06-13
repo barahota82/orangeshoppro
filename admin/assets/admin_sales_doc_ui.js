@@ -185,6 +185,132 @@
         });
     }
 
+    /* ===== GAP-ACC-07-DISP: صندوق إجماليات سفلي موحّد (طباعة) ===== */
+
+    // اتجاه كل line_kind محاسبياً (ثابت — مطابق orange_invoice_ancillary_line_kind_catalog).
+    var ANCILLARY_SIDE_BY_KIND = {
+        sales_credit_revenue: 'credit',
+        sales_debit_contra: 'debit',
+        sales_credit_liability: 'credit',
+        purchase_debit_asset: 'debit',
+        purchase_debit_landed: 'debit',
+        purchase_debit_vat_input: 'debit',
+        purchase_credit_contra: 'credit'
+    };
+    var ANCILLARY_VAT_KINDS = { sales_credit_liability: 1, purchase_debit_vat_input: 1 };
+
+    function parseMoney(txt) {
+        var s = String(txt == null ? '' : txt).replace(/[^0-9.\-]/g, '');
+        var v = parseFloat(s);
+        return isFinite(v) ? v : 0;
+    }
+
+    function money3(v) {
+        var n = Number(v) || 0;
+        return n.toFixed(3);
+    }
+
+    /**
+     * الإشارة المعروضة للعميل/المورد لبند إضافي:
+     *   مبيعات: دائن (+) / مدين (−).   مشتريات: مدين (+) / دائن (−).
+     * @returns {number} +1 أو -1
+     */
+    function ancillaryDisplaySign(context, lineKind) {
+        var side = ANCILLARY_SIDE_BY_KIND[String(lineKind || '')] || '';
+        if (String(context) === 'purchase') {
+            return side === 'debit' ? 1 : -1;
+        }
+        return side === 'credit' ? 1 : -1;
+    }
+
+    /**
+     * يبني صفوف صندوق الإجماليات السفلي ويملأ الإجمالي النهائي أعلى الفاتورة.
+     * opts: {
+     *   prefix, context:'sales'|'purchase',
+     *   subtotalId, discountId, netId,          // معرّفات إجماليات الشاشة
+     *   collectExtra: function -> [{line_kind, amount, label_ar, show_on_print}],
+     *   unit,                                    // وحدة العملة (نص)
+     *   labels: { items, items_disc, net_items, vat },  // {ar,en}
+     *   finalLabel: {ar,en}
+     * }
+     * @returns {number} الإجمالي النهائي
+     */
+    function renderDocTotals(opts) {
+        opts = opts || {};
+        var prefix = String(opts.prefix || 'sd');
+        var context = String(opts.context || 'sales');
+        var unit = String(opts.unit || '');
+        var L = opts.labels || {};
+        var subtotal = parseMoney(getText(opts.subtotalId));
+        var itemsDisc = parseMoney(getText(opts.discountId));
+        var netItems = parseMoney(getText(opts.netId));
+        if (!isFinite(netItems) || (opts.netId == null)) netItems = subtotal - itemsDisc;
+
+        var lines = (typeof opts.collectExtra === 'function') ? (opts.collectExtra() || []) : [];
+        var rows = [];
+        rows.push({ kind: 'sub', label: L.items, val: subtotal, sign: 0 });
+        if (itemsDisc > 0) {
+            rows.push({ kind: 'disc', label: L.items_disc, val: itemsDisc, sign: -1 });
+        }
+        rows.push({ kind: 'net', label: L.net_items, val: netItems, sign: 0, sep: true });
+
+        var grand = netItems;
+        lines.forEach(function (ln) {
+            if (!ln || !ln.show_on_print) return;
+            var amt = Number(ln.amount) || 0;
+            if (amt <= 0) return;
+            var sign = ancillaryDisplaySign(context, ln.line_kind);
+            grand += sign * amt;
+            var lbl = String(ln.label_ar || '').trim();
+            if (lbl === '' && ANCILLARY_VAT_KINDS[String(ln.line_kind || '')]) {
+                lbl = (L.vat && L.vat.ar) ? L.vat.ar : 'ضريبة القيمة المضافة';
+            }
+            if (lbl === '') lbl = (sign > 0 ? 'بند إضافي' : 'خصم');
+            rows.push({ kind: 'extra', label: { ar: lbl, en: '' }, val: amt, sign: sign });
+        });
+
+        var fl = opts.finalLabel || { ar: 'الإجمالي', en: 'Total' };
+        rows.push({ kind: 'final', label: fl, val: grand, sign: 0, unit: unit });
+
+        var body = document.getElementById(prefix + '_sd_print_totals_body');
+        if (body) {
+            var html = '';
+            rows.forEach(function (r) {
+                var cls = 'sd-print-totals__row sd-print-totals__row--' + r.kind + (r.sep ? ' sd-print-totals__row--sep' : '');
+                var lab = r.label || {};
+                var labHtml = '<span class="sd-print-totals__lbl-ar">'
+                    + escapeHtml(String(lab.ar || '')) + '</span>';
+                if (lab.en) {
+                    labHtml += '<span class="sd-print-totals__lbl-en" dir="ltr" lang="en">'
+                        + escapeHtml(String(lab.en)) + '</span>';
+                }
+                var signTxt = r.sign > 0 ? '+\u00a0' : (r.sign < 0 ? '\u2212\u00a0' : '');
+                var unitTxt = r.unit ? (' <span class="sd-print-totals__unit">' + escapeHtml(r.unit) + '</span>') : '';
+                html += '<tr class="' + cls + '">'
+                    + '<td class="sd-print-totals__lbl">' + labHtml + '</td>'
+                    + '<td class="sd-print-totals__val" dir="ltr" lang="en">'
+                    + signTxt + money3(r.val) + unitTxt + '</td></tr>';
+            });
+            body.innerHTML = html;
+        }
+
+        var headEl = document.getElementById(prefix + '_sd_print_total');
+        if (headEl) headEl.textContent = money3(grand);
+        return grand;
+    }
+
+    function getText(id) {
+        if (!id) return '';
+        var el = document.getElementById(String(id));
+        return el ? String(el.textContent || '').trim() : '';
+    }
+
+    function escapeHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     global.orangeSalesDocSetPhoneCells = setPhoneCells;
     global.orangeSalesDocUi = {
         rememberChannel: rememberChannel,
@@ -192,6 +318,8 @@
         syncPrintBanner: syncPrintBanner,
         bindPrintButton: bindPrintButton,
         setPhoneCells: setPhoneCells,
-        setDocQr: setDocQr
+        setDocQr: setDocQr,
+        renderDocTotals: renderDocTotals,
+        ancillaryDisplaySign: ancillaryDisplaySign
     };
 }(typeof window !== 'undefined' ? window : this));

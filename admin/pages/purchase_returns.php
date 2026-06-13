@@ -325,8 +325,6 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         'show_notes' => true,
         'totals_rows' => [
             ['إجمالي المردود / Total', 'total'],
-            ['قيمة الخصم / Discount', 'disc'],
-            ['صافي المردود / Net', 'net'],
         ],
     ]);
     ?>
@@ -408,6 +406,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             </table>
         </div>
     </div>
+
+    <?php orange_sales_doc_print_totals_box('pr2'); ?>
 
     <!-- ٣ — خصم الفاتورة + المجاميع -->
     <div class="jv-print-hide" style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
@@ -1104,9 +1104,21 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             var el = document.getElementById(id);
             return el ? String(el.textContent || '').trim() : '';
         };
-        setTxt('pr2_sd_print_total', getTot('pr2_subtotal'));
-        setTxt('pr2_sd_print_disc', getTot('pr2_discount_total'));
-        setTxt('pr2_sd_print_net', getTot('pr2_net_total'));
+        if (window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals) {
+            window.orangeSalesDocUi.renderDocTotals({
+                prefix: 'pr2', context: 'purchase',
+                subtotalId: 'pr2_subtotal', discountId: 'pr2_discount_total', netId: 'pr2_net_total',
+                collectExtra: (typeof pr2CollectExtraLines === 'function') ? pr2CollectExtraLines : function () { return []; },
+                unit: '',
+                labels: {
+                    items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
+                    items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
+                    net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
+                    vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
+                },
+                finalLabel: { ar: 'إجمالي المردود', en: 'Total Refund' }
+            });
+        }
     }
 
     function pr2ApplyReturnPayload(res) {
