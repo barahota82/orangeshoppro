@@ -43,7 +43,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
 .ilp-form-grid .ilp-account-row {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: minmax(8rem, 0.55fr) minmax(0, 1fr) minmax(0, 1.2fr);
+    grid-template-columns: minmax(8rem, 0.5fr) minmax(0, 1fr);
     gap: 10px 12px;
     align-items: end;
 }
@@ -116,18 +116,14 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         </div>
         <div class="ilp-account-row">
             <div>
-                <label for="ilp_account_q">بحث حساب (دليل)</label>
-                <input type="search" id="ilp_account_q" class="admin-inp" placeholder="كود أو اسم…" autocomplete="off" dir="rtl"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
-            </div>
-            <div>
                 <label for="ilp_account_code">كود الحساب</label>
-                <input type="text" id="ilp_account_code" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en">
+                <input type="text" id="ilp_account_code" class="admin-inp" placeholder="اكتب كود الحساب" autocomplete="off" dir="ltr" lang="en"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
             </div>
             <div>
                 <label for="ilp_account_name">اسم الحساب</label>
                 <input type="text" id="ilp_account_name" class="admin-inp-readonly" readonly disabled tabindex="-1">
+                <span id="ilp_account_hint" class="muted" style="display:block;font-size:0.78rem;margin-top:2px;"></span>
             </div>
-            <ul class="ilp-pick-results ilp-span-full" id="ilp_account_results" hidden></ul>
         </div>
         <div>
             <label for="ilp_label_ar">التسمية (عربي)</label>
@@ -149,12 +145,6 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
     <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;">
         <h3 class="card-title" style="margin:0;">البنود المحفوظة</h3>
         <div class="orange-doc-toolbar-fields" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-            <label for="ilp_filter_context" class="muted" style="font-size:0.85rem;">فلتر:</label>
-            <select id="ilp_filter_context" class="admin-inp" style="min-width:8rem;">
-                <?php foreach ($ilpContextLabels as $ctxKey => $ctxLabel): ?>
-                <option value="<?php echo htmlspecialchars($ctxKey, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($ctxLabel, ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
             <button type="button" class="btn-secondary" id="ilp_btn_reload">تحديث</button>
             <button type="button" class="btn-secondary" id="ilp_btn_save_order"<?php echo !$ilpReady ? ' disabled' : ''; ?>>حفظ الترتيب</button>
         </div>
@@ -226,12 +216,11 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         document.getElementById('ilp_active').value = '1';
         document.getElementById('ilp_context').value = 'sales';
         document.getElementById('ilp_show_print').value = '0';
-        document.getElementById('ilp_account_q').value = '';
         document.getElementById('ilp_account_code').value = '';
         document.getElementById('ilp_account_name').value = '';
+        document.getElementById('ilp_account_hint').textContent = '';
         document.getElementById('ilp_label_ar').value = '';
         document.getElementById('ilp_label_en').value = '';
-        document.getElementById('ilp_account_results').hidden = true;
         ilpRefreshLineKindOptions('');
     }
 
@@ -245,9 +234,9 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         document.getElementById('ilp_show_print').value = row.default_show_on_print ? '1' : '0';
         document.getElementById('ilp_account_code').value = row.account_code || '';
         document.getElementById('ilp_account_name').value = row.account_name || '';
+        document.getElementById('ilp_account_hint').textContent = '';
         document.getElementById('ilp_label_ar').value = row.label_ar || '';
         document.getElementById('ilp_label_en').value = row.label_en || '';
-        document.getElementById('ilp_account_results').hidden = true;
     }
 
     function ilpRenderList(rows) {
@@ -288,9 +277,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
     }
 
     function ilpLoadList() {
-        var ctx = (document.getElementById('ilp_filter_context').value || '').trim();
-        var url = '/admin/api/invoice-ancillary/presets-admin-list.php';
-        if (ctx) url += '?invoice_context=' + encodeURIComponent(ctx);
+        var url = '/admin/api/invoice-ancillary/presets-admin-list.php?invoice_context=sales';
         fetch(url, { credentials: 'same-origin', headers: orangeAdminCountryHeaders({ 'Accept': 'application/json' }), cache: 'no-store' })
             .then(function (r) { return r.json(); })
             .then(function (res) {
@@ -357,44 +344,40 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         }).catch(function (e) { alert(e.message || String(e)); });
     }
 
-    function ilpSearchAccounts(q) {
-        var list = document.getElementById('ilp_account_results');
-        if (!list) return;
-        q = String(q || '').trim();
-        if (q.length < 1) {
-            list.hidden = true;
-            list.innerHTML = '';
+    function ilpLookupAccountByCode(code) {
+        var hint = document.getElementById('ilp_account_hint');
+        var nameEl = document.getElementById('ilp_account_name');
+        code = String(code || '').trim();
+        document.getElementById('ilp_account_id').value = '0';
+        nameEl.value = '';
+        if (code === '') {
+            hint.textContent = '';
             return;
         }
-        fetch('/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(q), {
+        hint.textContent = 'جاري البحث…';
+        fetch('/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(code), {
             credentials: 'same-origin',
             headers: orangeAdminCountryHeaders({ Accept: 'application/json' }),
             cache: 'no-store'
         }).then(function (r) { return r.json(); })
             .then(function (res) {
-                list.innerHTML = '';
                 var rows = (res && res.accounts) ? res.accounts : [];
-                if (!rows.length) {
-                    list.innerHTML = '<li class="muted">لا نتائج</li>';
-                    list.hidden = false;
+                var match = null;
+                for (var i = 0; i < rows.length; i++) {
+                    if (String(rows[i].code || '').trim() === code) { match = rows[i]; break; }
+                }
+                if (!match) {
+                    hint.textContent = 'لا يوجد حساب قابل للترحيل بهذا الكود';
                     return;
                 }
-                rows.forEach(function (acc) {
-                    var li = document.createElement('li');
-                    li.textContent = (acc.code || '') + ' — ' + (acc.name || '');
-                    li.addEventListener('click', function () {
-                        document.getElementById('ilp_account_id').value = String(acc.id || 0);
-                        document.getElementById('ilp_account_code').value = acc.code || '';
-                        document.getElementById('ilp_account_name').value = acc.name || '';
-                        if (!(document.getElementById('ilp_label_ar').value || '').trim()) {
-                            document.getElementById('ilp_label_ar').value = acc.name || '';
-                        }
-                        list.hidden = true;
-                    });
-                    list.appendChild(li);
-                });
-                list.hidden = false;
-            });
+                document.getElementById('ilp_account_id').value = String(match.id || 0);
+                nameEl.value = match.name || '';
+                hint.textContent = '';
+                if (!(document.getElementById('ilp_label_ar').value || '').trim()) {
+                    document.getElementById('ilp_label_ar').value = match.name || '';
+                }
+            })
+            .catch(function (e) { hint.textContent = e.message || String(e); });
     }
 
     function ilpTranslate() {
@@ -423,12 +406,11 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
     document.getElementById('ilp_btn_new').addEventListener('click', ilpResetForm);
     document.getElementById('ilp_btn_reload').addEventListener('click', ilpLoadList);
     document.getElementById('ilp_btn_save_order').addEventListener('click', ilpSaveOrder);
-    document.getElementById('ilp_filter_context').addEventListener('change', ilpLoadList);
     document.getElementById('ilp_btn_translate').addEventListener('click', ilpTranslate);
-    document.getElementById('ilp_account_q').addEventListener('input', function () {
+    document.getElementById('ilp_account_code').addEventListener('input', function () {
         if (ilpAccountTimer) clearTimeout(ilpAccountTimer);
-        var q = this.value || '';
-        ilpAccountTimer = setTimeout(function () { ilpSearchAccounts(q); }, 220);
+        var code = this.value || '';
+        ilpAccountTimer = setTimeout(function () { ilpLookupAccountByCode(code); }, 280);
     });
 
     ilpResetForm();
