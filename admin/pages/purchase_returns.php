@@ -1075,7 +1075,18 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         var invRefEl = document.getElementById('pr2_supplier_invoice_ref');
         if (invRefEl) invRefEl.value = p.supplier_invoice_number || '';
         var invDiscEl = document.getElementById('pr2_invoice_discount');
-        if (invDiscEl) invDiscEl.value = p.invoice_discount_raw || '';
+        if (invDiscEl) {
+            // عكس خصم الفاتورة المكتسب بالتناسب: نملأ الخانة بنسبة خصم الفاتورة الأصلية (%)
+            // حتى يُحسب على صافي الأصناف المردودة (يصحّ مع المردود الجزئي تلقائياً).
+            var origSub = parseFloat(String(p.subtotal || '0')) || 0;
+            var origAmt = parseFloat(String(p.invoice_discount_amount || '0')) || 0;
+            if (origSub > 0 && origAmt > 0.0005) {
+                var rate = (origAmt / origSub) * 100;
+                invDiscEl.value = (Math.round(rate * 10000) / 10000) + '%';
+            } else {
+                invDiscEl.value = '';
+            }
+        }
         var tb = document.getElementById('pr2_lines_body');
         if (tb) {
             tb.innerHTML = '';

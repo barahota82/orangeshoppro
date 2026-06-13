@@ -466,3 +466,78 @@ function orange_gl_purchase_return_posting_bundle(
         'legacy_ap_subledger' => false,
     ];
 }
+
+/**
+ * خصم الفاتورة على المشتريات (قرار مالك 2026-06-13): لا يمسّ تكلفة المخزن.
+ *
+ * المخزون يُسجَّل بإجمالي صافي الأصناف (subtotal بعد خصم الأصناف فقط)، أما خصم الفاتورة
+ * فيُثبَّت في «خصم مكتسب على المشتريات» (purchase_discount)، والتمويل (ذمة/نقد) يبقى على
+ * الصافي. عند المردود يُعكَس الخصم المكتسب بحصة المردود (الخصم المُدخَل على المردود).
+ *
+ * يُستدعى بعد بناء الحزمة الأساسية بمبلغ **الصافي** (كما اليوم). يضيف زوجاً متوازناً:
+ *   - شراء : مدين مخزون / دائن خصم مكتسب   (يرفع المخزون إلى الإجمالي ويثبت الخصم).
+ *   - مردود: مدين خصم مكتسب / دائن مخزون   (يعكس حصة المردود من الخصم).
+ * ويحوّل الحزمة إلى سند متعدد الأسطر عند الحاجة ليُرحَّل القيد المركّب في سند واحد.
+ *
+ * @param array<string,mixed> $glB
+ * @return array<string,mixed>
+ * @throws RuntimeException
+ */
+function orange_gl_purchase_apply_invoice_discount_lines(
+    PDO $pdo,
+    array $glB,
+    float $netAmount,
+    float $discountAmt,
+    ?int $countryId,
+    bool $isReturn
+): array {
+    $discountAmt = round($discountAmt, 4);
+    if ($discountAmt <= 0.0005) {
+        return $glB;
+    }
+    $netAmount = round($netAmount, 4);
+    $glCountryId = orange_purchase_gl_country_id($pdo, $countryId);
+    $inventoryId = orange_gl_account_id_optional($pdo, 'inventory', $glCountryId);
+    $discId = orange_gl_account_id_optional($pdo, 'purchase_discount', $glCountryId);
+    if ($discId === null || $discId <= 0) {
+        throw new RuntimeException(
+            'لتسجيل خصم فاتورة المشتريات اربط «حساب خصم مكتسب على المشتريات» في «حسابات القيود التلقائية».'
+        );
+    }
+    if ($inventoryId === null || $inventoryId <= 0) {
+        throw new RuntimeException('حساب المخزون غير مربوط في «حسابات القيود التلقائية».');
+    }
+
+    if ($isReturn) {
+        $discPair = [
+            ['account_id' => $discId, 'debit' => $discountAmt, 'credit' => 0.0, 'memo' => 'عكس خصم مكتسب على المشتريات (حصة المردود)'],
+            ['account_id' => $inventoryId, 'debit' => 0.0, 'credit' => $discountAmt, 'memo' => 'مردود — تكلفة الأصناف بالصافي (لا تتأثر بخصم الفاتورة)'],
+        ];
+    } else {
+        $discPair = [
+            ['account_id' => $inventoryId, 'debit' => $discountAmt, 'credit' => 0.0, 'memo' => 'تكلفة الأصناف بالصافي (لا تتأثر بخصم الفاتورة)'],
+            ['account_id' => $discId, 'debit' => 0.0, 'credit' => $discountAmt, 'memo' => 'إثبات خصم مكتسب على المشتريات'],
+        ];
+    }
+
+    if (empty($glB['is_multi'])) {
+        $debitAcct = (int) ($glB['debit'] ?? 0);
+        $creditAcct = (int) ($glB['credit'] ?? 0);
+        if ($debitAcct <= 0 || $creditAcct <= 0) {
+            throw new RuntimeException('تعذر بناء قيد مركّب لخصم فاتورة المشتريات — حسابات الترحيل الأساسية غير مكتملة.');
+        }
+        $desc = (string) ($glB['voucher_description'] ?? '');
+        $base = [
+            ['account_id' => $debitAcct, 'debit' => $netAmount, 'credit' => 0.0, 'memo' => $desc],
+            ['account_id' => $creditAcct, 'debit' => 0.0, 'credit' => $netAmount, 'memo' => $desc],
+        ];
+        $glB['is_multi'] = true;
+        $glB['lines'] = array_merge($base, $discPair);
+        $glB['debit'] = 0;
+        $glB['credit'] = 0;
+    } else {
+        $glB['lines'] = array_merge((array) $glB['lines'], $discPair);
+    }
+
+    return $glB;
+}

@@ -51,11 +51,16 @@ function reverse_purchase_stock(PDO $pdo, int $purchaseId, int $countryId): void
     }
 }
 
+/**
+ * يُعيد إدراج أصناف الشراء (مع خصم السطر إن وُجد العمود) ويرجع **إجمالي صافي الأصناف**
+ * (subtotal = مجموع الكمية×التكلفة − خصم السطر) — متسق مع create.php.
+ */
 function apply_purchase_items(PDO $pdo, int $purchaseId, array $items, int $countryId): float
 {
     $hasV = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
     $hasRecv = orange_table_has_column($pdo, 'purchase_items', 'qty_received');
-    $total = 0.0;
+    $hasDiscount = orange_table_has_column($pdo, 'purchase_items', 'discount_raw');
+    $subtotal = 0.0;
     foreach ($items as $item) {
         $productId = (int)($item['product_id'] ?? 0);
         $qty = (int)($item['qty'] ?? 0);
@@ -63,32 +68,53 @@ function apply_purchase_items(PDO $pdo, int $purchaseId, array $items, int $coun
         if ($productId <= 0 || $qty <= 0 || $cost < 0) {
             throw new RuntimeException('عنصر شراء غير صحيح');
         }
-        $total += $qty * $cost;
+        $lineGross = $qty * $cost;
+        $discountRaw = trim((string)($item['discount_raw'] ?? ''));
+        $discountAmt = 0.0;
+        if ($discountRaw !== '') {
+            if (str_ends_with($discountRaw, '%')) {
+                $pct = (float) rtrim($discountRaw, '%');
+                $discountAmt = round($lineGross * $pct / 100, 4);
+            } else {
+                $discountAmt = round((float) $discountRaw, 4);
+            }
+            if ($discountAmt < 0) {
+                $discountAmt = 0.0;
+            }
+            if ($discountAmt > $lineGross) {
+                $discountAmt = $lineGross;
+            }
+        }
+        $subtotal += ($lineGross - $discountAmt);
         $variantId = orange_purchase_resolve_variant_id(
             $pdo,
             $productId,
             (int)($item['variant_id'] ?? 0)
         );
-        if ($hasV && $hasRecv) {
-            $pdo->prepare(
-                'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, ?, ?)'
-            )->execute([$purchaseId, $productId, $variantId, $qty, $qty, $cost]);
-        } elseif ($hasV) {
-            $pdo->prepare(
-                'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, cost) VALUES (?, ?, ?, ?, ?)'
-            )->execute([$purchaseId, $productId, $variantId, $qty, $cost]);
-        } elseif ($hasRecv) {
-            $pdo->prepare(
-                'INSERT INTO purchase_items (purchase_id, product_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, ?)'
-            )->execute([$purchaseId, $productId, $qty, $qty, $cost]);
-        } else {
-            $pdo->prepare("INSERT INTO purchase_items (purchase_id, product_id, qty, cost) VALUES (?, ?, ?, ?)")
-                ->execute([$purchaseId, $productId, $qty, $cost]);
+        $cols = ['purchase_id', 'product_id', 'qty', 'cost'];
+        $vals = [$purchaseId, $productId, $qty, $cost];
+        if ($hasV) {
+            array_splice($cols, 2, 0, ['variant_id']);
+            array_splice($vals, 2, 0, [$variantId]);
         }
+        if ($hasRecv) {
+            $cols[] = 'qty_received';
+            $vals[] = $qty;
+        }
+        if ($hasDiscount) {
+            $cols[] = 'discount_raw';
+            $cols[] = 'discount_amount';
+            $vals[] = $discountRaw;
+            $vals[] = $discountAmt;
+        }
+        $pdo->prepare(
+            'INSERT INTO purchase_items (' . implode(', ', $cols) . ') VALUES ('
+            . implode(', ', array_fill(0, count($vals), '?')) . ')'
+        )->execute($vals);
         orange_purchase_apply_variant_stock_increase($pdo, $variantId, $qty, $countryId);
     }
 
-    return $total;
+    return $subtotal;
 }
 
 try {
@@ -238,34 +264,63 @@ try {
     $postingAt = $documentDate . ' ' . date('H:i:s');
     $hasDocumentDateCol = orange_table_has_column($pdo, 'purchases', 'document_date');
 
-    $newTotal = apply_purchase_items($pdo, $purchaseId, $items, $purchaseCountryId);
-    $docDateSetSql = $hasDocumentDateCol ? ', document_date = ?' : '';
-    if ($hasSupplierInvoiceCol) {
-        $params = [
-            $supplierId > 0 ? $supplierId : null,
-            $supplierInvoiceNumber !== '' ? $supplierInvoiceNumber : null,
-            $newTotal,
-            $type,
-            $notes,
-        ];
-        if ($hasDocumentDateCol) {
-            $params[] = $documentDate;
-        }
-        $params[] = $purchaseId;
-        $pdo->prepare(
-            'UPDATE purchases SET supplier_id = ?, supplier_invoice_number = ?, total = ?, type = ?, notes = ?'
-            . $docDateSetSql . ', updated_at = NOW() WHERE id = ?'
-        )->execute($params);
+    $subtotal = apply_purchase_items($pdo, $purchaseId, $items, $purchaseCountryId);
+
+    // خصم الفاتورة (يُعالَج كـ «خصم مكتسب» محاسبياً — لا يمسّ تكلفة المخزن).
+    $hasInvDiscount = orange_table_has_column($pdo, 'purchases', 'invoice_discount_raw');
+    $hasSubtotalCol = orange_table_has_column($pdo, 'purchases', 'subtotal');
+    if (array_key_exists('invoice_discount_raw', $data)) {
+        $invoiceDiscountRaw = trim((string)($data['invoice_discount_raw'] ?? ''));
     } else {
-        $params = [$supplierId > 0 ? $supplierId : null, $newTotal, $type, $notes];
-        if ($hasDocumentDateCol) {
-            $params[] = $documentDate;
-        }
-        $params[] = $purchaseId;
-        $pdo->prepare('UPDATE purchases SET supplier_id = ?, total = ?, type = ?, notes = ?'
-            . $docDateSetSql . ', updated_at = NOW() WHERE id = ?')
-            ->execute($params);
+        $invoiceDiscountRaw = trim((string)($purchase['invoice_discount_raw'] ?? ''));
     }
+    $invoiceDiscountAmt = 0.0;
+    if ($invoiceDiscountRaw !== '') {
+        if (str_ends_with($invoiceDiscountRaw, '%')) {
+            $pct = (float) rtrim($invoiceDiscountRaw, '%');
+            $invoiceDiscountAmt = round($subtotal * $pct / 100, 4);
+        } else {
+            $invoiceDiscountAmt = round((float) $invoiceDiscountRaw, 4);
+        }
+        if ($invoiceDiscountAmt < 0) {
+            $invoiceDiscountAmt = 0.0;
+        }
+        if ($invoiceDiscountAmt > $subtotal) {
+            $invoiceDiscountAmt = $subtotal;
+        }
+    }
+    $newTotal = round($subtotal - $invoiceDiscountAmt, 4);
+
+    $setCols = ['supplier_id = ?'];
+    $params = [$supplierId > 0 ? $supplierId : null];
+    if ($hasSupplierInvoiceCol) {
+        $setCols[] = 'supplier_invoice_number = ?';
+        $params[] = $supplierInvoiceNumber !== '' ? $supplierInvoiceNumber : null;
+    }
+    $setCols[] = 'total = ?';
+    $params[] = $newTotal;
+    $setCols[] = 'type = ?';
+    $params[] = $type;
+    $setCols[] = 'notes = ?';
+    $params[] = $notes;
+    if ($hasSubtotalCol) {
+        $setCols[] = 'subtotal = ?';
+        $params[] = round($subtotal, 4);
+    }
+    if ($hasInvDiscount) {
+        $setCols[] = 'invoice_discount_raw = ?';
+        $params[] = $invoiceDiscountRaw;
+        $setCols[] = 'invoice_discount_amount = ?';
+        $params[] = $invoiceDiscountAmt;
+    }
+    if ($hasDocumentDateCol) {
+        $setCols[] = 'document_date = ?';
+        $params[] = $documentDate;
+    }
+    $setCols[] = 'updated_at = NOW()';
+    $params[] = $purchaseId;
+    $pdo->prepare('UPDATE purchases SET ' . implode(', ', $setCols) . ' WHERE id = ?')
+        ->execute($params);
 
     // قرار المالك (2026-06): أُلغيت «البنود الإضافية» على المشتريات. نحذف أي بنود قديمة
     // محفوظة لهذه الفاتورة حتى لا يبقى أثر لا يقابله ترحيل، والقيد يصبح بسيطاً على صافي الأصناف.
@@ -287,6 +342,15 @@ try {
         $purchaseId,
         $newTotal,
         $purchaseCountryId
+    );
+    // خصم الفاتورة → «خصم مكتسب على المشتريات» (قيد مركّب) دون مسّ تكلفة المخزن.
+    $glB = orange_gl_purchase_apply_invoice_discount_lines(
+        $pdo,
+        $glB,
+        $newTotal,
+        $invoiceDiscountAmt,
+        $purchaseCountryId,
+        false
     );
     $pendingKey = orange_gl_pending_source_key('purchase', $purchaseId);
     $srcLabel = 'PIN-' . $purchaseId;

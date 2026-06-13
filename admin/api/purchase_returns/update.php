@@ -41,12 +41,14 @@ function reverse_purchase_return_stock(PDO $pdo, int $returnId): void
 }
 
 /**
- * @return float الإجمالي المحسوب
+ * يُعيد إدراج أصناف المردود (مع خصم السطر إن وُجد العمود) ويرجع **إجمالي صافي الأصناف**
+ * (subtotal = مجموع الكمية×التكلفة − خصم السطر) — متسق مع create.php.
  */
 function apply_purchase_return_items(PDO $pdo, int $returnId, array $items): float
 {
     $hasV = orange_table_has_column($pdo, 'purchase_return_items', 'variant_id');
-    $total = 0.0;
+    $hasDiscount = orange_table_has_column($pdo, 'purchase_return_items', 'discount_raw');
+    $subtotal = 0.0;
     foreach ($items as $item) {
         $productId = (int) ($item['product_id'] ?? 0);
         $qty = (int) ($item['qty'] ?? 0);
@@ -54,27 +56,35 @@ function apply_purchase_return_items(PDO $pdo, int $returnId, array $items): flo
         if ($productId <= 0 || $qty <= 0 || $cost < 0) {
             throw new RuntimeException('عنصر مردود غير صحيح');
         }
-        $total += $qty * $cost;
+        $lineGross = $qty * $cost;
+        $discountRaw = trim((string) ($item['discount_raw'] ?? ''));
+        $discountAmt = orange_purchase_return_parse_discount_amount($discountRaw, $lineGross);
+        $subtotal += ($lineGross - $discountAmt);
         $variantId = orange_purchase_resolve_variant_id(
             $pdo,
             $productId,
             (int) ($item['variant_id'] ?? 0)
         );
         orange_purchase_return_apply_line_stock($pdo, $productId, $variantId, $qty);
+        $cols = ['purchase_return_id', 'product_id', 'qty', 'cost'];
+        $vals = [$returnId, $productId, $qty, $cost];
         if ($hasV) {
-            $pdo->prepare(
-                'INSERT INTO purchase_return_items (purchase_return_id, product_id, variant_id, qty, cost)
-                 VALUES (?,?,?,?,?)'
-            )->execute([$returnId, $productId, $variantId, $qty, $cost]);
-        } else {
-            $pdo->prepare(
-                'INSERT INTO purchase_return_items (purchase_return_id, product_id, qty, cost)
-                 VALUES (?,?,?,?)'
-            )->execute([$returnId, $productId, $qty, $cost]);
+            array_splice($cols, 2, 0, ['variant_id']);
+            array_splice($vals, 2, 0, [$variantId]);
         }
+        if ($hasDiscount) {
+            $cols[] = 'discount_raw';
+            $cols[] = 'discount_amount';
+            $vals[] = $discountRaw;
+            $vals[] = $discountAmt;
+        }
+        $pdo->prepare(
+            'INSERT INTO purchase_return_items (' . implode(', ', $cols) . ') VALUES ('
+            . implode(', ', array_fill(0, count($vals), '?')) . ')'
+        )->execute($vals);
     }
 
-    return round($total, 4);
+    return round($subtotal, 4);
 }
 
 try {
@@ -203,17 +213,40 @@ try {
         json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
-    $newTotal = apply_purchase_return_items($pdo, $returnId, $items);
-    $pdo->prepare(
-        'UPDATE purchase_returns SET purchase_id = ?, supplier_id = ?, type = ?, total = ?, notes = ? WHERE id = ?'
-    )->execute([
+    $subtotal = apply_purchase_return_items($pdo, $returnId, $items);
+
+    // خصم الفاتورة على المردود (يُعكَس كـ «خصم مكتسب» محاسبياً — لا يمسّ تكلفة المخزن).
+    $hasRetInvDiscount = orange_table_has_column($pdo, 'purchase_returns', 'invoice_discount_raw');
+    $hasRetSubtotal = orange_table_has_column($pdo, 'purchase_returns', 'subtotal');
+    if (array_key_exists('invoice_discount_raw', $data)) {
+        $invoiceDiscountRaw = trim((string) ($data['invoice_discount_raw'] ?? ''));
+    } else {
+        $invoiceDiscountRaw = trim((string) ($row['invoice_discount_raw'] ?? ''));
+    }
+    $invoiceDiscountAmt = orange_purchase_return_parse_discount_amount($invoiceDiscountRaw, $subtotal);
+    $newTotal = round($subtotal - $invoiceDiscountAmt, 4);
+
+    $setCols = ['purchase_id = ?', 'supplier_id = ?', 'type = ?', 'total = ?', 'notes = ?'];
+    $params = [
         $purchaseIdOpt > 0 ? $purchaseIdOpt : null,
         $supplierId > 0 ? $supplierId : null,
         $type,
         $newTotal,
         $notes !== '' ? $notes : null,
-        $returnId,
-    ]);
+    ];
+    if ($hasRetSubtotal) {
+        $setCols[] = 'subtotal = ?';
+        $params[] = round($subtotal, 4);
+    }
+    if ($hasRetInvDiscount) {
+        $setCols[] = 'invoice_discount_raw = ?';
+        $params[] = $invoiceDiscountRaw;
+        $setCols[] = 'invoice_discount_amount = ?';
+        $params[] = $invoiceDiscountAmt;
+    }
+    $params[] = $returnId;
+    $pdo->prepare('UPDATE purchase_returns SET ' . implode(', ', $setCols) . ' WHERE id = ?')
+        ->execute($params);
 
     orange_purchase_return_remove_accounting($pdo, $returnId);
     orange_gl_pending_remove_by_reference($pdo, orange_gl_pending_source_key('purchase_return', $returnId));
@@ -231,6 +264,15 @@ try {
     }
 
     $glB = orange_gl_purchase_return_posting_bundle($pdo, $type, $supplierId, $returnId, $newTotal, $returnCountryId);
+    // عكس خصم الفاتورة المكتسب بحصة المردود (قيد مركّب) — دون مسّ تكلفة المخزن.
+    $glB = orange_gl_purchase_apply_invoice_discount_lines(
+        $pdo,
+        $glB,
+        $newTotal,
+        $invoiceDiscountAmt,
+        $returnCountryId,
+        true
+    );
     $pendingKey = orange_gl_pending_source_key('purchase_return', $returnId);
     $srcLabel = trim((string) ($row['return_number'] ?? ('PR-' . $returnId)));
     $now = date('Y-m-d H:i:s');

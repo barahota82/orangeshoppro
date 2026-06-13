@@ -228,6 +228,15 @@ try {
     }
 
     $glB = orange_gl_purchase_return_posting_bundle($pdo, $type, $supplierId, $returnId, $netTotal, $returnCountryId);
+    // عكس خصم الفاتورة المكتسب بحصة المردود (قيد مركّب) — دون مسّ تكلفة المخزن.
+    $glB = orange_gl_purchase_apply_invoice_discount_lines(
+        $pdo,
+        $glB,
+        $netTotal,
+        $invoiceDiscountAmt,
+        $returnCountryId,
+        true
+    );
     $pendingKey = orange_gl_pending_source_key('purchase_return', $returnId);
     $now = date('Y-m-d H:i:s');
     $afterJson = $glB['after_post'] !== null

@@ -252,6 +252,15 @@ try {
         $netTotal,
         $purchaseCountryId
     );
+    // خصم الفاتورة → «خصم مكتسب على المشتريات» (قيد مركّب) دون مسّ تكلفة المخزن.
+    $glB = orange_gl_purchase_apply_invoice_discount_lines(
+        $pdo,
+        $glB,
+        $netTotal,
+        $invoiceDiscountAmt,
+        $purchaseCountryId,
+        false
+    );
 
     $pendingKey = orange_gl_pending_source_key('purchase', $purchaseId);
     $srcLabel = 'PIN-' . $purchaseId;
