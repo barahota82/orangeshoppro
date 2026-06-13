@@ -35,9 +35,22 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
 <style>
 .ilp-form-grid {
     display: grid;
-    grid-template-columns: minmax(5rem, 0.5fr) minmax(5rem, 0.55fr) minmax(7rem, 0.65fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(5rem, 0.5fr) minmax(5rem, 0.55fr) minmax(7rem, 0.65fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr);
     gap: 10px 12px;
     align-items: end;
+}
+.ilp-form-grid-2 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 10px 12px;
+    align-items: end;
+    margin-top: 12px;
+}
+.ilp-form-grid-2 .ilp-actions-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-end;
 }
 .ilp-form-grid .ilp-span-full { grid-column: 1 / -1; }
 .ilp-form-grid .ilp-account-row {
@@ -107,30 +120,30 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
             <label for="ilp_line_kind">نوع البند (MD/CR)</label>
             <select id="ilp_line_kind" class="admin-inp"<?php echo !$ilpReady ? ' disabled' : ''; ?>></select>
         </div>
-        <div class="ilp-account-row">
-            <div>
-                <label for="ilp_account_code">كود الحساب</label>
-                <input type="text" id="ilp_account_code" class="admin-inp" placeholder="اكتب كود الحساب" autocomplete="off" dir="ltr" lang="en"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
-            </div>
-            <div>
-                <label for="ilp_account_name">اسم الحساب</label>
-                <input type="text" id="ilp_account_name" class="admin-inp-readonly" readonly disabled tabindex="-1">
-                <span id="ilp_account_hint" class="muted" style="display:block;font-size:0.78rem;margin-top:2px;"></span>
-            </div>
-            <div>
-                <label for="ilp_label_ar">التسمية (عربي)</label>
-                <input type="text" id="ilp_label_ar" class="admin-inp" dir="auto"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
-            </div>
-            <div>
-                <label for="ilp_label_en">English</label>
-                <input type="text" id="ilp_label_en" class="admin-inp" dir="ltr" lang="en"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
-            </div>
+        <div>
+            <label for="ilp_account_code">كود الحساب</label>
+            <input type="text" id="ilp_account_code" class="admin-inp" placeholder="اكتب كود الحساب" autocomplete="off" dir="ltr" lang="en"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
+        </div>
+        <div>
+            <label for="ilp_account_name">اسم الحساب</label>
+            <input type="text" id="ilp_account_name" class="admin-inp-readonly" readonly disabled tabindex="-1">
+            <span id="ilp_account_hint" class="muted" style="display:block;font-size:0.78rem;margin-top:2px;"></span>
         </div>
     </div>
-    <div class="actions" style="margin-top:14px;">
-        <button type="button" id="ilp_btn_save"<?php echo !$ilpReady ? ' disabled' : ''; ?>>حفظ</button>
-        <button type="button" class="btn-secondary" id="ilp_btn_translate"<?php echo !$ilpReady ? ' disabled' : ''; ?>>ترجمة من العربي</button>
-        <button type="button" class="btn-secondary" id="ilp_btn_new"<?php echo !$ilpReady ? ' disabled' : ''; ?>>جديد</button>
+    <div class="ilp-form-grid-2 orange-doc-header-row">
+        <div>
+            <label for="ilp_label_ar">التسمية (عربي)</label>
+            <input type="text" id="ilp_label_ar" class="admin-inp" dir="auto"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
+        </div>
+        <div>
+            <label for="ilp_label_en">English</label>
+            <input type="text" id="ilp_label_en" class="admin-inp" dir="ltr" lang="en"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
+        </div>
+        <div class="ilp-actions-cell">
+            <button type="button" id="ilp_btn_save"<?php echo !$ilpReady ? ' disabled' : ''; ?>>حفظ</button>
+            <button type="button" class="btn-secondary" id="ilp_btn_translate"<?php echo !$ilpReady ? ' disabled' : ''; ?>>ترجمة من العربي</button>
+            <button type="button" class="btn-secondary" id="ilp_btn_new"<?php echo !$ilpReady ? ' disabled' : ''; ?>>جديد</button>
+        </div>
     </div>
 </div>
 
