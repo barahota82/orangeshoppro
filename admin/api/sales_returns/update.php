@@ -15,6 +15,8 @@ require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/sales_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
+require_once __DIR__ . '/../../../includes/warehouses.php';
+require_once __DIR__ . '/../../../includes/inventory_cost_layers.php';
 require_admin_api();
 
 function reverse_sales_return_stock(PDO $pdo, int $returnId): void
@@ -44,8 +46,14 @@ function reverse_sales_return_stock(PDO $pdo, int $returnId): void
 /**
  * @return array{revenue: float, cogs: float}
  */
-function apply_sales_return_items(PDO $pdo, int $returnId, array $items): array
-{
+function apply_sales_return_items(
+    PDO $pdo,
+    int $returnId,
+    array $items,
+    int $warehouseId = 0,
+    ?int $returnCountryId = null,
+    string $postingAt = ''
+): array {
     $hasV = orange_table_has_column($pdo, 'sales_return_items', 'variant_id');
     $revenueTotal = 0.0;
     $cogsTotal = 0.0;
@@ -77,6 +85,21 @@ function apply_sales_return_items(PDO $pdo, int $returnId, array $items): array
         $revenueTotal += $net;
         $cogsTotal += $lineCost;
         orange_sales_return_add_line_stock($pdo, $productId, $variantId, $qty);
+        // FIFO م3: إعادة طبقة تكلفة بنفس تكلفة الوحدة المُرحَّلة (تساوي مدين المخزون).
+        if ($warehouseId > 0) {
+            orange_inventory_cost_layer_add(
+                $pdo,
+                $warehouseId,
+                $variantId,
+                $qty,
+                round($unitCost, 5),
+                'sale_return',
+                $returnId,
+                $returnCountryId,
+                $postingAt !== '' ? $postingAt : date('Y-m-d H:i:s'),
+                'SR-' . $returnId
+            );
+        }
         if ($hasV) {
             $pdo->prepare(
                 'INSERT INTO sales_return_items (sales_return_id, product_id, variant_id, qty, price, line_discount)
@@ -150,6 +173,8 @@ try {
 
     $pdo->beginTransaction();
     reverse_sales_return_stock($pdo, $returnId);
+    // FIFO م3: حذف طبقات هذا المردود (تُعاد بناءً على البنود الجديدة، أو تبقى محذوفة عند الحذف).
+    orange_inventory_cost_layers_delete_for_source($pdo, 'sale_return', $returnId);
     $pdo->prepare('DELETE FROM sales_return_items WHERE sales_return_id = ?')->execute([$returnId]);
 
     if ($action === 'delete') {
@@ -214,7 +239,16 @@ try {
         json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
-    $totals = apply_sales_return_items($pdo, $returnId, $items);
+    $updCountryForLayers = $returnCountryLock > 0 ? $returnCountryLock : orange_admin_context_country_id($pdo);
+    $srWarehouseId = orange_warehouse_default_id_for_country($pdo, $updCountryForLayers);
+    $srPostingAt = date('Y-m-d H:i:s');
+    if (orange_table_has_column($pdo, 'sales_returns', 'document_date')) {
+        $docDateRow = trim((string) ($row['document_date'] ?? ''));
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $docDateRow)) {
+            $srPostingAt = $docDateRow . ' ' . date('H:i:s');
+        }
+    }
+    $totals = apply_sales_return_items($pdo, $returnId, $items, $srWarehouseId, $updCountryForLayers, $srPostingAt);
     $revenueTotal = $totals['revenue'];
     $cogsTotal = $totals['cogs'];
 

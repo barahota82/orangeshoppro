@@ -13,6 +13,7 @@ require_once __DIR__ . '/party_subledger.php';
 require_once __DIR__ . '/party_allocations.php';
 require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/invoice_ancillary_lines.php';
+require_once __DIR__ . '/inventory_cost_layers.php';
 
 /**
  * تاريخ ترحيل قيد تسليم الطلب.
@@ -409,6 +410,28 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                 'warehouse_id' => $stockCtx['warehouse_id'],
             ]);
         }
+
+        // FIFO م3: استهلاك طبقات التكلفة عند التسليم (سواء حُجز المخزون مسبقاً أو صُرف الآن —
+        // الطبقات لا تُمسّ عند الحجز). idempotent: نستهلك فقط الكمية غير المستهلَكة لسطر الطلب.
+        if ($variant) {
+            $itemIdFifo = isset($item['id']) ? (int) $item['id'] : 0;
+            $qtyFifo = (int) ($item['qty'] ?? 0);
+            if ($itemIdFifo > 0 && $qtyFifo > 0) {
+                $alreadyFifo = orange_inventory_cost_layers_consumption_cost($pdo, 'order', $itemIdFifo);
+                $needFifo = $qtyFifo - (int) $alreadyFifo['qty'];
+                if ($needFifo > 0) {
+                    orange_inventory_cost_layers_consume_fifo(
+                        $pdo,
+                        (int) $stockCtx['warehouse_id'],
+                        (int) $variant['id'],
+                        $needFifo,
+                        'order',
+                        $itemIdFifo,
+                        date('Y-m-d H:i:s')
+                    );
+                }
+            }
+        }
     }
 
     if ($stockAlreadyReserved) {
@@ -552,7 +575,21 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
     foreach ($items as $idx => $item) {
         $variant = orange_order_resolve_variant_from_item($pdo, $item);
         $salesAmount = orange_order_item_line_net($item);
-        $costAmount = $variant ? round((float) $item['cost'] * (int) $item['qty'], 4) : 0.0;
+        // FIFO م3: تكلفة المبيعات = تكلفة الطبقات المستهلَكة عند التسليم (تُقرأ من سجل الاستهلاك).
+        // احتياطي عند غياب طبقات/سجل (طلبات قبل م3 أو نقص طبقات): تكلفة بطاقة الصنف للكمية الناقصة.
+        if ($variant) {
+            $itemIdCogs = isset($item['id']) ? (int) $item['id'] : 0;
+            $lineQtyCogs = (int) ($item['qty'] ?? 0);
+            $consCogs = orange_inventory_cost_layers_consumption_cost($pdo, 'order', $itemIdCogs);
+            $costAmount = (float) $consCogs['cost'];
+            $shortCogs = $lineQtyCogs - (int) $consCogs['qty'];
+            if ($shortCogs > 0) {
+                $costAmount += (float) $item['cost'] * $shortCogs;
+            }
+            $costAmount = round($costAmount, 4);
+        } else {
+            $costAmount = 0.0;
+        }
 
         $now = date('Y-m-d H:i:s');
         $postingAt = orange_order_delivery_posting_datetime($order, $isOnline);
@@ -1016,7 +1053,19 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
         }
 
         $salesAmount = orange_order_item_line_net($item);
-        $costAmount = $variant ? round((float) $item['cost'] * $qty, 4) : 0.0;
+        // FIFO م3: عكس التسليم يُعيد الكميات إلى طبقاتها ويستعمل التكلفة المُعادة لقيد مردود التكلفة.
+        if ($variant) {
+            $itemIdRev = isset($item['id']) ? (int) $item['id'] : 0;
+            $restoreRev = orange_inventory_cost_layers_restore_consumption($pdo, 'order', $itemIdRev);
+            $costAmount = (float) $restoreRev['cost'];
+            $shortRev = $qty - (int) $restoreRev['qty'];
+            if ($shortRev > 0) {
+                $costAmount += (float) $item['cost'] * $shortRev;
+            }
+            $costAmount = round($costAmount, 4);
+        } else {
+            $costAmount = 0.0;
+        }
         $lineKey = isset($item['id']) ? (string) (int) $item['id'] : (string) $idx;
         $saleRetRef = 'ORDER-' . $orderNumber . '-RS-' . $lineKey;
         $cogsRetRef = 'ORDER-' . $orderNumber . '-RC-' . $lineKey;

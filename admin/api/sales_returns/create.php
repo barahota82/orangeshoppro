@@ -18,6 +18,8 @@ require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
+require_once __DIR__ . '/../../../includes/warehouses.php';
+require_once __DIR__ . '/../../../includes/inventory_cost_layers.php';
 require_admin_api();
 
 try {
@@ -178,8 +180,24 @@ try {
     orange_sales_return_sync_analytics_for_return($pdo, $returnId, $orderIdOpt, $returnCountryId);
 
     $hasVariant = orange_table_has_column($pdo, 'sales_return_items', 'variant_id');
+    // FIFO م3: مردود المبيعات يُعيد البضاعة للمخزون → نُنشئ طبقة تكلفة بنفس تكلفة الوحدة المُرحَّلة
+    // (تساوي مدين المخزون في القيد) ليُستهلَك FIFO في مبيعات لاحقة.
+    $srWarehouseId = orange_warehouse_default_id_for_country($pdo, $returnCountryId);
     foreach ($normalizedItems as $line) {
         orange_sales_return_add_line_stock($pdo, $line['product_id'], $line['variant_id'], $line['qty']);
+        $srUnitCost = (int) $line['qty'] > 0 ? round((float) $line['line_cogs'] / (int) $line['qty'], 5) : 0.0;
+        orange_inventory_cost_layer_add(
+            $pdo,
+            $srWarehouseId,
+            (int) $line['variant_id'],
+            (int) $line['qty'],
+            $srUnitCost,
+            'sale_return',
+            $returnId,
+            $returnCountryId,
+            $postingAt,
+            $retNum
+        );
         if ($hasVariant) {
             $pdo->prepare(
                 'INSERT INTO sales_return_items (sales_return_id, product_id, variant_id, qty, price, line_discount)

@@ -375,6 +375,96 @@ if (!function_exists('orange_inventory_cost_layers_delete_for_source')) {
     }
 }
 
+if (!function_exists('orange_inventory_cost_layers_consumption_cost')) {
+    /**
+     * قراءة (دون تعديل) إجمالي تكلفة وكمية الاستهلاك المسجّل لمصدر بيع معيّن (مثل سطر طلب).
+     * تُستعمل في ترحيل قيد تكلفة المبيعات لقراءة تكلفة الطبقات المستهلَكة عند التسليم.
+     *
+     * @return array{cost: float, qty: int}
+     */
+    function orange_inventory_cost_layers_consumption_cost(
+        PDO $pdo,
+        string $saleSourceType,
+        int $saleSourceId
+    ): array {
+        $res = ['cost' => 0.0, 'qty' => 0];
+        if (!orange_inventory_cost_layers_consumptions_table_exists($pdo) || $saleSourceId <= 0) {
+            return $res;
+        }
+        $st = $pdo->prepare(
+            'SELECT COALESCE(SUM(consumed_qty), 0) AS q, COALESCE(SUM(consumed_qty * unit_cost), 0) AS c
+             FROM inventory_cost_consumptions
+             WHERE sale_source_type = ? AND sale_source_id = ?'
+        );
+        $st->execute([$saleSourceType, $saleSourceId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+        $res['qty'] = (int) ($row['q'] ?? 0);
+        $res['cost'] = round((float) ($row['c'] ?? 0), 5);
+
+        return $res;
+    }
+}
+
+if (!function_exists('orange_inventory_cost_layers_restore_consumption')) {
+    /**
+     * عكس استهلاك مصدر بيع (مثل إلغاء تسليم/مردود): يُعيد الكميات إلى طبقاتها الأصلية (بحدّ qty_in)،
+     * ويحسب التكلفة المُعادة، ثم يحذف سجلات الاستهلاك. يجب استدعاؤه داخل معاملة.
+     *
+     * @return array{cost: float, qty: int}
+     */
+    function orange_inventory_cost_layers_restore_consumption(
+        PDO $pdo,
+        string $saleSourceType,
+        int $saleSourceId
+    ): array {
+        $res = ['cost' => 0.0, 'qty' => 0];
+        if (
+            !orange_inventory_cost_layers_consumptions_table_exists($pdo)
+            || !orange_inventory_cost_layers_table_exists($pdo)
+            || $saleSourceId <= 0
+        ) {
+            return $res;
+        }
+        $sel = $pdo->prepare(
+            'SELECT id, layer_id, consumed_qty, unit_cost
+             FROM inventory_cost_consumptions
+             WHERE sale_source_type = ? AND sale_source_id = ?
+             FOR UPDATE'
+        );
+        $sel->execute([$saleSourceType, $saleSourceId]);
+        $rows = $sel->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $updLayer = $pdo->prepare(
+            'UPDATE inventory_cost_layers SET qty_remaining = LEAST(qty_in, qty_remaining + ?) WHERE id = ?'
+        );
+        $delCons = $pdo->prepare('DELETE FROM inventory_cost_consumptions WHERE id = ?');
+
+        $totalCost = 0.0;
+        $totalQty = 0;
+        foreach ($rows as $r) {
+            $consId = (int) ($r['id'] ?? 0);
+            $layerId = (int) ($r['layer_id'] ?? 0);
+            $cq = (int) ($r['consumed_qty'] ?? 0);
+            $uc = round((float) ($r['unit_cost'] ?? 0), 5);
+            if ($cq > 0) {
+                if ($layerId > 0) {
+                    $updLayer->execute([$cq, $layerId]);
+                }
+                $totalCost += $cq * $uc;
+                $totalQty += $cq;
+            }
+            if ($consId > 0) {
+                $delCons->execute([$consId]);
+            }
+        }
+
+        $res['cost'] = round($totalCost, 5);
+        $res['qty'] = $totalQty;
+
+        return $res;
+    }
+}
+
 if (!function_exists('orange_inventory_cost_layers_value')) {
     /**
      * قيمة المخزون من الطبقات المتبقية = Σ(qty_remaining × unit_cost).
