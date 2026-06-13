@@ -400,7 +400,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                         <th style="width:5rem;">الكمية</th>
                         <th style="width:6rem;">تكلفة الوحدة</th>
                         <th style="width:6rem;">خصم</th>
-                        <th style="width:7rem;">إجمالي السطر</th>
+                        <th style="width:7rem;">إجمالي الصنف</th>
                         <th class="admin-doc-col-actions" aria-label="حذف السطر" style="width:3rem;"></th>
                     </tr>
                 </thead>
@@ -684,7 +684,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             '<td><input type="text" class="pr2-var-label admin-inp-readonly" readonly disabled tabindex="-1" placeholder="—"></td>' +
             '<td><input type="number" class="pr2-qty admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
             '<td><input type="number" class="pr2-cost admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>' +
-            '<td><input type="text" class="pr2-discount admin-inp admin-inp-discount" value="' + fmtZero() + '" placeholder="0" dir="ltr" lang="en" autocomplete="off" style="width:100%;"></td>' +
+            '<td><input type="text" class="pr2-discount admin-inp admin-inp-discount" value="" placeholder="' + fmtZero() + '" dir="ltr" lang="en" autocomplete="off" style="width:100%;"></td>' +
             '<td><input type="text" class="pr2-line-total admin-inp-money" value="' + fmtZero() + '" readonly data-money-allow-zero tabindex="0" dir="ltr" lang="en"></td>' +
             '<td><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
     }
@@ -908,7 +908,12 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         var dEl = tr.querySelector('.pr2-discount');
         if (dEl) {
             var prRaw = String(item.discount_raw || '').trim();
-            dEl.value = (prRaw.charAt(prRaw.length - 1) === '%') ? prRaw : fmt3(parseFloat(prRaw) || 0);
+            if (prRaw.charAt(prRaw.length - 1) === '%') {
+                dEl.value = prRaw;
+            } else {
+                var prAmt = parseFloat(prRaw) || 0;
+                dEl.value = prAmt > 0 ? fmt3(prAmt) : '';
+            }
         }
     }
 

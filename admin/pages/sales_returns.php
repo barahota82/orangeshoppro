@@ -347,7 +347,7 @@ $sr2DocSerialPreview = $sr2NavReady
                         <th style="width:5rem;">الكمية</th>
                         <th style="width:6rem;">سعر الوحدة</th>
                         <th style="width:6rem;">خصم السطر</th>
-                        <th style="width:7rem;">إجمالي السطر</th>
+                        <th style="width:7rem;">إجمالي الصنف</th>
                         <th class="admin-doc-col-actions" aria-label="حذف السطر" style="width:3rem;"></th>
                     </tr>
                 </thead>
