@@ -50,17 +50,17 @@ function orange_invoice_ancillary_line_kind_catalog(): array
 {
     return [
         'sales_credit_revenue' => [
-            'label_ar' => 'مبيعات — دائن (إيراد/شحن/رسوم)',
+            'label_ar' => 'دائن — إيراد للشركة (شحن/رسوم خدمة)',
             'side' => 'credit',
             'contexts' => ['sales', 'both'],
         ],
         'sales_debit_contra' => [
-            'label_ar' => 'مبيعات — مدين (خصم مسموح)',
+            'label_ar' => 'مدين — خصم مسموح للعميل (يُخصم من الفاتورة)',
             'side' => 'debit',
             'contexts' => ['sales', 'both'],
         ],
         'sales_credit_liability' => [
-            'label_ar' => 'مبيعات — دائن (VAT مستحق)',
+            'label_ar' => 'دائن — ضريبة مستحقة للدولة (VAT)',
             'side' => 'credit',
             'contexts' => ['sales', 'both'],
         ],
