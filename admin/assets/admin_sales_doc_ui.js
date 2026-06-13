@@ -280,6 +280,32 @@
 
         var headEl = document.getElementById(prefix + '_sd_print_total');
         if (headEl) headEl.textContent = money3(grand);
+
+        // إخراج على الشاشة (اختياري): ملخّص البنود الإضافية الظاهرة + الإجمالي النهائي.
+        if (opts.screenExtraId) {
+            var sc = document.getElementById(String(opts.screenExtraId));
+            if (sc) {
+                var sh = '';
+                rows.forEach(function (r) {
+                    if (r.kind !== 'extra') return;
+                    var sgn = r.sign < 0 ? '\u2212\u00a0' : '+\u00a0';
+                    var col = r.sign < 0 ? '#b91c1c' : '#0f172a';
+                    var lab = (r.label && r.label.ar) ? r.label.ar : '';
+                    sh += '<span style="color:#64748b;">' + escapeHtml(lab) + ':</span> '
+                        + '<strong class="admin-money-display" dir="ltr" lang="en" style="color:' + col + ';">'
+                        + sgn + money3(r.val) + '</strong><br>';
+                });
+                sc.innerHTML = sh;
+            }
+        }
+        if (opts.grandOutId) {
+            var gEl = document.getElementById(String(opts.grandOutId));
+            if (gEl) gEl.textContent = money3(grand);
+        }
+        if (opts.grandLabelId && opts.finalLabel) {
+            var glEl = document.getElementById(String(opts.grandLabelId));
+            if (glEl) glEl.textContent = (opts.finalLabel.ar || '') + ':';
+        }
         return grand;
     }
 

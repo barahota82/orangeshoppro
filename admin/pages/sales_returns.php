@@ -379,11 +379,12 @@ $sr2DocSerialPreview = $sr2NavReady
     </div>
 
     <div class="jv-print-hide" style="margin-top:14px;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
-        <span style="color:#64748b;">إجمالي المردود:</span> <strong id="sr2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-        <span style="color:#64748b;">قيمة الخصم:</span> <strong id="sr2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-        <span style="color:#64748b;">صافي المردود:</span>
-        <strong id="sr2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#dc2626;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
-        <?php echo htmlspecialchars($srCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?>
+        <span style="color:#64748b;">إجمالي الأصناف:</span> <strong id="sr2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+        <span style="color:#64748b;">خصم الأصناف:</span> <strong id="sr2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+        <span style="color:#64748b;">صافي الأصناف:</span> <strong id="sr2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#dc2626;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+        <span id="sr2_screen_extra"></span>
+        <span style="color:#0f172a;font-weight:700;border-top:2px solid #ea580c;display:inline-block;padding-top:4px;margin-top:2px;"><span id="sr2_grand_label">إجمالي المردود:</span> <strong id="sr2_grand_total" class="admin-money-display" dir="ltr" lang="en" style="color:#ea580c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
+        <span class="muted" style="font-size:0.85rem;"> <?php echo htmlspecialchars($srCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span></span>
     </div>
 
     <?php orange_sales_doc_print_footer(['country_id' => $srCountryId, 'show_note' => false]); ?>
@@ -830,6 +831,25 @@ $sr2DocSerialPreview = $sr2NavReady
         if (stEl) stEl.textContent = fmt3(grossSubtotal);
         if (dtEl) dtEl.textContent = fmt3(totalDiscount);
         if (ntEl) ntEl.textContent = fmt3(netTotal);
+        sr2RenderTotals();
+    }
+
+    function sr2RenderTotals() {
+        if (!(window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals)) return;
+        window.orangeSalesDocUi.renderDocTotals({
+            prefix: 'sr2', context: 'sales',
+            subtotalId: 'sr2_subtotal', discountId: 'sr2_discount_total', netId: 'sr2_net_total',
+            collectExtra: (typeof sr2CollectExtraLines === 'function') ? sr2CollectExtraLines : function () { return []; },
+            unit: <?php echo json_encode($srCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
+            screenExtraId: 'sr2_screen_extra', grandOutId: 'sr2_grand_total', grandLabelId: 'sr2_grand_label',
+            labels: {
+                items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
+                items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
+                net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
+                vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
+            },
+            finalLabel: { ar: 'إجمالي المردود', en: 'Total Refund' }
+        });
     }
 
     function parseOrderRef(raw) {
@@ -1000,25 +1020,7 @@ $sr2DocSerialPreview = $sr2NavReady
         var notesBox = document.getElementById('sr2_sd_print_notes');
         if (notesBox) notesBox.textContent = notesEl ? String(notesEl.value || '').trim() : '';
 
-        var getTot = function (id) {
-            var el = document.getElementById(id);
-            return el ? String(el.textContent || '').trim() : '';
-        };
-        if (window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals) {
-            window.orangeSalesDocUi.renderDocTotals({
-                prefix: 'sr2', context: 'sales',
-                subtotalId: 'sr2_subtotal', discountId: 'sr2_discount_total', netId: 'sr2_net_total',
-                collectExtra: (typeof sr2CollectExtraLines === 'function') ? sr2CollectExtraLines : function () { return []; },
-                unit: <?php echo json_encode($srCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
-                labels: {
-                    items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
-                    items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
-                    net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
-                    vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
-                },
-                finalLabel: { ar: 'إجمالي المردود', en: 'Total Refund' }
-            });
-        }
+        sr2RenderTotals();
 
         orangeSalesDocSetPhoneCells('sr2_sd_print_phone', SR2_COMPANY_PHONE, SR2_CHANNEL_WA, sr2MarketChannelId);
     }
@@ -1221,8 +1223,15 @@ $sr2DocSerialPreview = $sr2NavReady
         tb.appendChild(tr);
         if (row) sr2FillExtraLineRow(tr, row);
         var rm = tr.querySelector('.admin-doc-line-remove');
-        if (rm) rm.addEventListener('click', function () { tr.remove(); sr2RenumberExtraRows(); });
+        if (rm) rm.addEventListener('click', function () { tr.remove(); sr2RenumberExtraRows(); sr2RenderTotals(); });
+        var pr = tr.querySelector('.sr2-extra-print');
+        if (pr) pr.addEventListener('change', function () { sr2RenderTotals(); });
+        var am = tr.querySelector('.sr2-extra-amount');
+        if (am) am.addEventListener('input', function () { sr2RenderTotals(); });
+        var la = tr.querySelector('.sr2-extra-label');
+        if (la) la.addEventListener('input', function () { sr2RenderTotals(); });
         sr2RenumberExtraRows();
+        sr2RenderTotals();
     }
 
     function sr2ClearExtraLines() {

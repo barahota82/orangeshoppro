@@ -452,10 +452,12 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
 
     <div class="jv-print-hide" style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
         <div style="flex:1 1 auto;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
-            <span style="color:#64748b;">إجمالي الفاتورة:</span> <strong id="sv2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#64748b;">قيمة الخصم:</span> <strong id="sv2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#64748b;">مبلغ الفاتورة:</span> <strong id="sv2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
-            <span class="muted" style="font-size:0.85rem;"> <?php echo htmlspecialchars($adminCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
+            <span style="color:#64748b;">إجمالي الأصناف:</span> <strong id="sv2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">خصم الأصناف:</span> <strong id="sv2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">صافي الأصناف:</span> <strong id="sv2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span id="sv2_screen_extra"></span>
+            <span style="color:#0f172a;font-weight:700;border-top:2px solid #ea580c;display:inline-block;padding-top:4px;margin-top:2px;"><span id="sv2_grand_label">المبلغ المحصّل:</span> <strong id="sv2_grand_total" class="admin-money-display" dir="ltr" lang="en" style="color:#ea580c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
+            <span class="muted" style="font-size:0.85rem;"> <?php echo htmlspecialchars($adminCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span></span>
         </div>
     </div>
 
@@ -1032,6 +1034,29 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         if (stEl) stEl.textContent = fmt3(grossSubtotal);
         if (dtEl) dtEl.textContent = fmt3(totalDiscount);
         if (ntEl) ntEl.textContent = fmt3(netTotal);
+        sv2RenderTotals();
+    }
+
+    function sv2RenderTotals() {
+        if (!(window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals)) return;
+        var ptEl = document.getElementById('sv2_payment_terms');
+        var isCash = !ptEl || String(ptEl.value || 'cash') !== 'credit';
+        window.orangeSalesDocUi.renderDocTotals({
+            prefix: 'sv2', context: 'sales',
+            subtotalId: 'sv2_subtotal', discountId: 'sv2_discount_total', netId: 'sv2_net_total',
+            collectExtra: sv2CollectExtraLines,
+            unit: <?php echo json_encode($adminCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
+            screenExtraId: 'sv2_screen_extra', grandOutId: 'sv2_grand_total', grandLabelId: 'sv2_grand_label',
+            labels: {
+                items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
+                items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
+                net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
+                vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
+            },
+            finalLabel: isCash
+                ? { ar: 'المبلغ المحصّل', en: 'Amount Collected' }
+                : { ar: 'الإجمالي المستحق', en: 'Amount Due' }
+        });
     }
 
     function sv2ExtraLineKindLabel(key) {
@@ -1101,6 +1126,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         tb.appendChild(tr);
         if (row) sv2FillExtraLineRow(tr, row);
         sv2RenumberExtraRows();
+        if (typeof sv2RenderTotals === 'function') sv2RenderTotals();
     }
 
     function sv2ClearExtraLines() {
@@ -1354,25 +1380,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             var el = document.getElementById(id);
             return el ? String(el.textContent || '').trim() : '';
         };
-        var sv2PtEl = document.getElementById('sv2_payment_terms');
-        var sv2IsCash = !sv2PtEl || String(sv2PtEl.value || 'cash') !== 'credit';
-        if (window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals) {
-            window.orangeSalesDocUi.renderDocTotals({
-                prefix: 'sv2', context: 'sales',
-                subtotalId: 'sv2_subtotal', discountId: 'sv2_discount_total', netId: 'sv2_net_total',
-                collectExtra: sv2CollectExtraLines,
-                unit: <?php echo json_encode($adminCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
-                labels: {
-                    items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
-                    items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
-                    net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
-                    vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
-                },
-                finalLabel: sv2IsCash
-                    ? { ar: 'المبلغ المحصّل', en: 'Amount Collected' }
-                    : { ar: 'الإجمالي المستحق', en: 'Amount Due' }
-            });
-        }
+        sv2RenderTotals();
 
         var chSel = document.getElementById('sv2_channel');
         var chId = chSel ? (parseInt(chSel.value, 10) || 0) : 0;
@@ -1682,11 +1690,18 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 if (e.target && e.target.classList.contains('admin-doc-line-remove')) {
                     e.target.closest('tr').remove();
                     sv2RenumberExtraRows();
+                    sv2RenderTotals();
                 }
             });
             extraTb.addEventListener('change', function (e) {
                 if (e.target && e.target.classList.contains('sv2-extra-print')) {
                     sv2SyncExtraPrintClass(e.target.closest('tr'));
+                }
+                sv2RenderTotals();
+            });
+            extraTb.addEventListener('input', function (e) {
+                if (e.target && (e.target.classList.contains('sv2-extra-amount') || e.target.classList.contains('sv2-extra-label'))) {
+                    sv2RenderTotals();
                 }
             });
         }

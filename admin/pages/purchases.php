@@ -449,9 +449,12 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
             <input type="text" id="pv2_invoice_discount" placeholder="0 أو 5%" dir="ltr" lang="en" style="width:8rem;" autocomplete="off"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>
         </div>
         <div style="flex:1 1 auto;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
-            <span style="color:#64748b;">إجمالي الفاتورة:</span> <strong id="pv2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#64748b;">قيمة الخصم:</span> <strong id="pv2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#64748b;">مبلغ الفاتورة:</span> <strong id="pv2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
+            <span style="color:#64748b;">إجمالي الأصناف:</span> <strong id="pv2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">خصم الأصناف:</span> <strong id="pv2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">صافي الأصناف:</span> <strong id="pv2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span id="pv2_screen_extra"></span>
+            <span style="color:#0f172a;font-weight:700;border-top:2px solid #ea580c;display:inline-block;padding-top:4px;margin-top:2px;"><span id="pv2_grand_label">الإجمالي:</span> <strong id="pv2_grand_total" class="admin-money-display" dir="ltr" lang="en" style="color:#ea580c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
+            <span class="muted" style="font-size:0.85rem;"> <?php echo htmlspecialchars($adminCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span></span>
         </div>
     </div>
 
@@ -973,6 +976,25 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         if (stEl) stEl.textContent = fmt3(grossSubtotal);
         if (dtEl) dtEl.textContent = fmt3(totalDiscount);
         if (ntEl) ntEl.textContent = fmt3(netTotal);
+        pv2RenderTotals();
+    }
+
+    function pv2RenderTotals() {
+        if (!(window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals)) return;
+        window.orangeSalesDocUi.renderDocTotals({
+            prefix: 'pv2', context: 'purchase',
+            subtotalId: 'pv2_subtotal', discountId: 'pv2_discount_total', netId: 'pv2_net_total',
+            collectExtra: (typeof pv2CollectExtraLines === 'function') ? pv2CollectExtraLines : function () { return []; },
+            unit: <?php echo json_encode($adminCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
+            screenExtraId: 'pv2_screen_extra', grandOutId: 'pv2_grand_total', grandLabelId: 'pv2_grand_label',
+            labels: {
+                items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
+                items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
+                net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
+                vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
+            },
+            finalLabel: { ar: 'الإجمالي', en: 'Total' }
+        });
     }
 
     /* ── Extra invoice lines ─────────────────────────────────────── */
@@ -1049,6 +1071,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         tb.appendChild(tr);
         if (row) pv2FillExtraLineRow(tr, row);
         pv2RenumberExtraRows();
+        if (typeof pv2RenderTotals === 'function') pv2RenderTotals();
     }
 
     function pv2ClearExtraLines() {
@@ -1301,21 +1324,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
             var el = document.getElementById(id);
             return el ? String(el.textContent || '').trim() : '';
         };
-        if (window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals) {
-            window.orangeSalesDocUi.renderDocTotals({
-                prefix: 'pv2', context: 'purchase',
-                subtotalId: 'pv2_subtotal', discountId: 'pv2_discount_total', netId: 'pv2_net_total',
-                collectExtra: (typeof pv2CollectExtraLines === 'function') ? pv2CollectExtraLines : function () { return []; },
-                unit: <?php echo json_encode($adminCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
-                labels: {
-                    items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
-                    items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
-                    net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
-                    vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
-                },
-                finalLabel: { ar: 'الإجمالي', en: 'Total' }
-            });
-        }
+        pv2RenderTotals();
     }
 
     function pv2SyncToolbar() {
@@ -1648,11 +1657,18 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
                     var tr = e.target.closest('tr');
                     if (tr) tr.remove();
                     pv2RenumberExtraRows();
+                    pv2RenderTotals();
                 }
             });
             extraTb.addEventListener('change', function (e) {
                 if (e.target && e.target.classList.contains('pv2-extra-print')) {
                     pv2SyncExtraPrintClass(e.target.closest('tr'));
+                }
+                pv2RenderTotals();
+            });
+            extraTb.addEventListener('input', function (e) {
+                if (e.target && (e.target.classList.contains('pv2-extra-amount') || e.target.classList.contains('pv2-extra-label'))) {
+                    pv2RenderTotals();
                 }
             });
         }

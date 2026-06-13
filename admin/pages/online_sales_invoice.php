@@ -356,10 +356,12 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
 
     <div class="jv-print-hide" style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
         <div style="flex:1 1 auto;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
-            <span style="color:#64748b;">إجمالي الفاتورة:</span> <strong id="ov2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#64748b;">قيمة الخصم:</span> <strong id="ov2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#64748b;">مبلغ الفاتورة:</span> <strong id="ov2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
-            <span class="muted" style="font-size:0.85rem;"> <?php echo htmlspecialchars($adminCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
+            <span style="color:#64748b;">إجمالي الأصناف:</span> <strong id="ov2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">خصم الأصناف:</span> <strong id="ov2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">صافي الأصناف:</span> <strong id="ov2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span id="ov2_screen_extra"></span>
+            <span style="color:#0f172a;font-weight:700;border-top:2px solid #ea580c;display:inline-block;padding-top:4px;margin-top:2px;"><span id="ov2_grand_label">الإجمالي:</span> <strong id="ov2_grand_total" class="admin-money-display" dir="ltr" lang="en" style="color:#ea580c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
+            <span class="muted" style="font-size:0.85rem;"> <?php echo htmlspecialchars($adminCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span></span>
         </div>
     </div>
 
@@ -810,6 +812,25 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         if (stEl) stEl.textContent = fmt3(grossSubtotal);
         if (dtEl) dtEl.textContent = fmt3(totalDiscount);
         if (ntEl) ntEl.textContent = fmt3(subtotal);
+        ov2RenderTotals();
+    }
+
+    function ov2RenderTotals() {
+        if (!(window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals)) return;
+        window.orangeSalesDocUi.renderDocTotals({
+            prefix: 'ov2', context: 'sales',
+            subtotalId: 'ov2_subtotal', discountId: 'ov2_discount_total', netId: 'ov2_net_total',
+            collectExtra: ov2CollectExtraLines,
+            unit: <?php echo json_encode($adminCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
+            screenExtraId: 'ov2_screen_extra', grandOutId: 'ov2_grand_total', grandLabelId: 'ov2_grand_label',
+            labels: {
+                items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
+                items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
+                net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
+                vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
+            },
+            finalLabel: { ar: 'الإجمالي', en: 'Total' }
+        });
     }
 
     function ov2SetDocSerial(value) {
@@ -1075,10 +1096,15 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         tb.appendChild(tr);
         if (row) ov2FillExtraLineRow(tr, row);
         var rm = tr.querySelector('.admin-doc-line-remove');
-        if (rm) rm.addEventListener('click', function () { tr.remove(); ov2RenumberExtraRows(); });
+        if (rm) rm.addEventListener('click', function () { tr.remove(); ov2RenumberExtraRows(); ov2RenderTotals(); });
         var pr = tr.querySelector('.ov2-extra-print');
-        if (pr) pr.addEventListener('change', function () { ov2SyncExtraPrintClass(tr); });
+        if (pr) pr.addEventListener('change', function () { ov2SyncExtraPrintClass(tr); ov2RenderTotals(); });
+        var am = tr.querySelector('.ov2-extra-amount');
+        if (am) am.addEventListener('input', function () { ov2RenderTotals(); });
+        var la = tr.querySelector('.ov2-extra-label');
+        if (la) la.addEventListener('input', function () { ov2RenderTotals(); });
         ov2RenumberExtraRows();
+        ov2RenderTotals();
     }
 
     function ov2ClearExtraLines() {
@@ -1369,21 +1395,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                 var el = document.getElementById(id);
                 return el ? String(el.textContent || '').trim() : '';
             };
-            if (window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals) {
-                window.orangeSalesDocUi.renderDocTotals({
-                    prefix: 'ov2', context: 'sales',
-                    subtotalId: 'ov2_subtotal', discountId: 'ov2_discount_total', netId: 'ov2_net_total',
-                    collectExtra: ov2CollectExtraLines,
-                    unit: <?php echo json_encode($adminCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
-                    labels: {
-                        items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
-                        items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
-                        net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
-                        vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
-                    },
-                    finalLabel: { ar: 'الإجمالي', en: 'Total' }
-                });
-            }
+            ov2RenderTotals();
 
             var ov2ChIdEl = document.getElementById('ov2_channel_id');
             var ov2ChId = ov2ChIdEl ? (parseInt(ov2ChIdEl.value, 10) || 0) : 0;
