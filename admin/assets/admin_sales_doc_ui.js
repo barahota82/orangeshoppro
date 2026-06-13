@@ -306,6 +306,31 @@
             var glEl = document.getElementById(String(opts.grandLabelId));
             if (glEl) glEl.textContent = (opts.finalLabel.ar || '') + ':';
         }
+
+        // عرض مطوي (3 أسطر): الرسوم الإضافية الظاهرة (+) تُضاف لخانة «الإجمالي»،
+        // والخصومات الإضافية الظاهرة (−) تُضاف لخانة «الخصم»، والصافي = الإجمالي − الخصم (= grand).
+        if (opts.foldTotalId || opts.foldDiscountId || opts.foldNetId) {
+            var foldChargeSum = 0;
+            var foldDiscExtra = 0;
+            lines.forEach(function (ln) {
+                if (!ln || !ln.show_on_print) return;
+                var amt2 = Number(ln.amount) || 0;
+                if (amt2 <= 0) return;
+                if (ancillaryDisplaySign(context, ln.line_kind) > 0) foldChargeSum += amt2;
+                else foldDiscExtra += amt2;
+            });
+            var foldTotal = subtotal + foldChargeSum;
+            var foldDiscount = itemsDisc + foldDiscExtra;
+            var foldNet = foldTotal - foldDiscount;
+            var setFold = function (id, v) {
+                if (!id) return;
+                var el = document.getElementById(String(id));
+                if (el) el.textContent = money3(v);
+            };
+            setFold(opts.foldTotalId, foldTotal);
+            setFold(opts.foldDiscountId, foldDiscount);
+            setFold(opts.foldNetId, foldNet);
+        }
         return grand;
     }
 
