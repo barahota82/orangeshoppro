@@ -200,7 +200,9 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
     function ilpLineKindMatchesContext(kind, ctx) {
         if (!kind || !kind.contexts) return false;
         if (ctx === 'both') return true;
-        return kind.contexts.indexOf(ctx) !== -1 || kind.contexts.indexOf('both') !== -1;
+        // مطابقة السياق الفعلي فقط: لا نعتمد على وجود 'both' في قائمة النوع،
+        // وإلا ظهرت أنواع المشتريات (سياقها ['purchase','both']) ضمن سياق المبيعات.
+        return kind.contexts.indexOf(ctx) !== -1;
     }
 
     function ilpRefreshLineKindOptions(selected) {
