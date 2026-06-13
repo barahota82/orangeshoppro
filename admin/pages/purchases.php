@@ -1210,6 +1210,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             if (!pid || q < 1) continue;
             var lineGross = q * c;
             var discAmt = parseDiscount(discRaw, lineGross);
+            if (discAmt > lineGross + 0.0001) {
+                alert('خصم الصنف في السطر ' + (i + 1) + ' أكبر من إجمالي الصنف. صحّح الخصم قبل الحفظ.');
+                return;
+            }
             items.push({ product_id: pid, variant_id: vid, qty: q, cost: c, discount_raw: discRaw, discount_amount: discAmt });
         }
         if (!items.length) {
@@ -1223,6 +1227,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             subtotal += Math.max(0, (items[si].qty * items[si].cost) - items[si].discount_amount);
         }
         var invDiscAmt = parseDiscount(invDiscRaw, subtotal);
+        if (invDiscAmt > subtotal + 0.0001) {
+            alert('خصم الفاتورة أكبر من إجمالي الفاتورة. صحّح الخصم قبل الحفظ.');
+            return;
+        }
 
         var payload = {
             supplier_id: supplierId,

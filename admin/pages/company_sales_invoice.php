@@ -1563,18 +1563,25 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         var tb = document.getElementById('sv2_lines_body');
         if (!tb) { alert('لا توجد أصناف'); return; }
         var items = [];
-        tb.querySelectorAll('tr.sv2-line').forEach(function (r) {
+        var sv2DiscError = '';
+        tb.querySelectorAll('tr.sv2-line').forEach(function (r, idx) {
             var pid = parseInt(r.querySelector('.sv2-product-id').value, 10) || 0;
             var vid = parseInt(r.querySelector('.sv2-variant-id').value, 10) || 0;
             var q = parseInt(r.querySelector('.sv2-qty').value, 10) || 0;
             var p = parseFloat(r.querySelector('.sv2-price').value) || 0;
             var discRaw = (r.querySelector('.sv2-discount').value || '').trim();
             if (!pid || q < 1) return;
-            var discAmt = parseDiscount(discRaw, q * p);
+            var lineGross = q * p;
+            var discAmt = parseDiscount(discRaw, lineGross);
+            if (discAmt > lineGross + 0.0001) {
+                if (!sv2DiscError) sv2DiscError = 'خصم الصنف في السطر ' + (idx + 1) + ' أكبر من إجمالي الصنف. صحّح الخصم قبل الحفظ.';
+                return;
+            }
             var o = { product_id: pid, qty: q, line_discount: discAmt };
             if (vid) o.variant_id = vid;
             items.push(o);
         });
+        if (sv2DiscError) { alert(sv2DiscError); return; }
         if (!items.length) { alert('أضف سطرًا واحدًا على الأقل بصنف وكمية صحيحة'); return; }
 
         var paid = parseFloat(document.getElementById('sv2_amount_paid').value) || 0;
