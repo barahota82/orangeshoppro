@@ -217,8 +217,21 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 .form-grid.pr2-supplier-row {
     grid-template-columns: minmax(7rem, 0.75fr) minmax(0, 1fr) minmax(0, 2fr);
 }
+.pur-inv-disc-row { display: none; }
 @media print {
     /* ===== شبكة جدول البنود (مطابقة فاتورة مبيعات الشركة) ===== */
+    .jv-print-area .pur-lines-table tfoot tr.pur-inv-disc-row.pur-inv-disc-active {
+        display: table-row !important;
+    }
+    .jv-print-area .pur-lines-table tfoot td {
+        padding: 4px 5px !important;
+        font-size: 8.5pt !important;
+        border: 1px solid #cbd5e1 !important;
+        vertical-align: middle !important;
+        background: #fff7ed !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
     .jv-print-area .pur-lines-table thead th.admin-doc-col-actions,
     .jv-print-area .pur-lines-table tbody td:last-child {
         display: none !important;
@@ -405,6 +418,12 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                     </tr>
                 </thead>
                 <tbody id="pr2_lines_body"></tbody>
+                <tfoot>
+                    <tr id="pr2_inv_disc_print_row" class="pur-inv-disc-row">
+                        <td colspan="7" style="text-align:right;font-weight:700;">خصم الفاتورة</td>
+                        <td id="pr2_inv_disc_print_val" style="text-align:center;font-weight:700;">—</td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </div>
@@ -959,6 +978,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         setTxt('pr2_net_total', subtotal);
         setTxt('pr2_inv_disc', invDiscAmt);
         setTxt('pr2_grand_total', netTotal);
+        var invDiscValEl = document.getElementById('pr2_inv_disc_print_val');
+        if (invDiscValEl) invDiscValEl.textContent = fmt3(invDiscAmt);
+        var invDiscRow = document.getElementById('pr2_inv_disc_print_row');
+        if (invDiscRow) invDiscRow.classList.toggle('pur-inv-disc-active', invDiscAmt > 0.0005);
         var errEl = document.getElementById('pr2_line_disc_error');
         if (errEl) { errEl.textContent = firstDiscError; errEl.style.display = firstDiscError ? '' : 'none'; }
         pr2FillBannerTotals(grossSubtotal, totalDiscount, netTotal);

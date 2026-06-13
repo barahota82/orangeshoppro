@@ -218,9 +218,22 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     background: #eff6ff;
     outline: 1px solid #2563eb;
 }
+.pur-inv-disc-row { display: none; }
 @media print {
     .pv2-extra-skip-print {
         display: none !important;
+    }
+    .jv-print-area .pur-lines-table tfoot tr.pur-inv-disc-row.pur-inv-disc-active {
+        display: table-row !important;
+    }
+    .jv-print-area .pur-lines-table tfoot td {
+        padding: 4px 5px !important;
+        font-size: 8.5pt !important;
+        border: 1px solid #cbd5e1 !important;
+        vertical-align: middle !important;
+        background: #fff7ed !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
     .jv-print-area .pv2-extra-lines-table thead th.admin-doc-col-actions,
     .jv-print-area .pv2-extra-lines-table tr.pv2-extra-line td:last-child {
@@ -407,6 +420,12 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                     </tr>
                 </thead>
                 <tbody id="pv2_lines_body"></tbody>
+                <tfoot>
+                    <tr id="pv2_inv_disc_print_row" class="pur-inv-disc-row">
+                        <td colspan="7" style="text-align:right;font-weight:700;">خصم الفاتورة</td>
+                        <td id="pv2_inv_disc_print_val" style="text-align:center;font-weight:700;">—</td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </div>
@@ -932,6 +951,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         setTxt('pv2_net_total', subtotal);
         setTxt('pv2_inv_disc', invDiscAmt);
         setTxt('pv2_grand_total', netTotal);
+        var invDiscValEl = document.getElementById('pv2_inv_disc_print_val');
+        if (invDiscValEl) invDiscValEl.textContent = fmt3(invDiscAmt);
+        var invDiscRow = document.getElementById('pv2_inv_disc_print_row');
+        if (invDiscRow) invDiscRow.classList.toggle('pur-inv-disc-active', invDiscAmt > 0.0005);
         var errEl = document.getElementById('pv2_line_disc_error');
         if (errEl) { errEl.textContent = firstDiscError; errEl.style.display = firstDiscError ? '' : 'none'; }
         pv2FillBannerTotals(grossSubtotal, totalDiscount, netTotal);
