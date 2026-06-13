@@ -98,12 +98,10 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
             </select>
         </div>
         <div>
-            <label for="ilp_context">سياق الفاتورة</label>
-            <select id="ilp_context" class="admin-inp"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
-                <?php foreach ($ilpContextLabels as $ctxKey => $ctxLabel): ?>
-                <option value="<?php echo htmlspecialchars($ctxKey, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($ctxLabel, ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
+            <label for="ilp_context_display">سياق الفاتورة</label>
+            <input type="text" id="ilp_context_display" class="admin-inp-readonly" readonly disabled tabindex="-1"
+                value="<?php echo htmlspecialchars($ilpContextLabels['sales'] ?? 'مبيعات', ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="hidden" id="ilp_context" value="sales">
         </div>
         <div>
             <label for="ilp_line_kind">نوع البند (MD/CR)</label>
@@ -194,7 +192,8 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
     }
 
     function ilpContextValue() {
-        return (document.getElementById('ilp_context').value || 'both').trim();
+        // الشاشة للمبيعات فقط (أُلغيت بنود المشتريات) — السياق ثابت.
+        return 'sales';
     }
 
     function ilpLineKindMatchesContext(kind, ctx) {
