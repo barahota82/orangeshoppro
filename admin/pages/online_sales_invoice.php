@@ -343,7 +343,6 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                         <th class="pur-col-idx" style="width:2.5rem;">#</th>
                         <th style="min-width:12rem;">الحساب / البند</th>
                         <th style="width:7rem;">المبلغ</th>
-                        <th style="width:6rem;">يظهر بالطباعة</th>
                         <th style="min-width:8rem;">تسمية طباعة</th>
                         <th class="admin-doc-col-actions jv-print-hide" aria-label="حذف" style="width:3rem;"></th>
                     </tr>
@@ -1065,7 +1064,6 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             + '<input type="hidden" class="ov2-extra-line-kind" value="">'
             + '<input type="hidden" class="ov2-extra-preset-id" value="0"></td>'
             + '<td><input type="number" class="ov2-extra-amount admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>'
-            + '<td style="text-align:center;"><input type="checkbox" class="ov2-extra-print" title="يظهر في الفاتورة المطبوعة"></td>'
             + '<td><input type="text" class="ov2-extra-label admin-inp" placeholder="اختياري" dir="auto"></td>'
             + '<td class="jv-print-hide"><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
     }
@@ -1079,12 +1077,6 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         });
     }
 
-    function ov2SyncExtraPrintClass(tr) {
-        if (!tr) return;
-        var show = tr.querySelector('.ov2-extra-print');
-        tr.classList.toggle('ov2-extra-skip-print', !(show && show.checked));
-    }
-
     function ov2FillExtraLineRow(tr, row) {
         if (!tr || !row) return;
         tr.querySelector('.ov2-extra-account-id').value = String(parseInt(String(row.account_id || '0'), 10) || 0);
@@ -1094,25 +1086,20 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         if (lbl) lbl.textContent = ov2ExtraAccountLabel(row);
         var amt = tr.querySelector('.ov2-extra-amount');
         if (amt) amt.value = fmt3(row.amount || 0);
-        var pr = tr.querySelector('.ov2-extra-print');
-        if (pr) pr.checked = !!row.show_on_print;
         var la = tr.querySelector('.ov2-extra-label');
         if (la) la.value = row.label_ar || '';
-        ov2SyncExtraPrintClass(tr);
     }
 
     function ov2AddExtraLine(row) {
         var tb = document.getElementById('ov2_extra_lines_body');
         if (!tb) return;
         var tr = document.createElement('tr');
-        tr.className = 'ov2-extra-line ov2-extra-skip-print';
+        tr.className = 'ov2-extra-line';
         tr.innerHTML = ov2ExtraLineRowHtml();
         tb.appendChild(tr);
         if (row) ov2FillExtraLineRow(tr, row);
         var rm = tr.querySelector('.admin-doc-line-remove');
         if (rm) rm.addEventListener('click', function () { tr.remove(); ov2RenumberExtraRows(); ov2RenderTotals(); });
-        var pr = tr.querySelector('.ov2-extra-print');
-        if (pr) pr.addEventListener('change', function () { ov2SyncExtraPrintClass(tr); ov2RenderTotals(); });
         var am = tr.querySelector('.ov2-extra-amount');
         if (am) am.addEventListener('input', function () { ov2RenderTotals(); });
         var la = tr.querySelector('.ov2-extra-label');
@@ -1145,7 +1132,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                 line_kind: lineKind,
                 amount: amount,
                 label_ar: (tr.querySelector('.ov2-extra-label').value || '').trim(),
-                show_on_print: tr.querySelector('.ov2-extra-print').checked ? 1 : 0,
+                show_on_print: 1,
                 preset_id: parseInt(tr.querySelector('.ov2-extra-preset-id').value, 10) || 0
             });
         });

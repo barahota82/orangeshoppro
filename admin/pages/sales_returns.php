@@ -367,7 +367,6 @@ $sr2DocSerialPreview = $sr2NavReady
                         <th class="pur-col-idx" style="width:2.5rem;">#</th>
                         <th style="min-width:12rem;">الحساب / البند</th>
                         <th style="width:7rem;">المبلغ</th>
-                        <th style="width:6rem;">يظهر بالطباعة</th>
                         <th style="min-width:8rem;">تسمية طباعة</th>
                         <th class="admin-doc-col-actions jv-print-hide" aria-label="حذف" style="width:3rem;"></th>
                     </tr>
@@ -1211,7 +1210,6 @@ $sr2DocSerialPreview = $sr2NavReady
             + '<input type="hidden" class="sr2-extra-line-kind" value="">'
             + '<input type="hidden" class="sr2-extra-preset-id" value="0"></td>'
             + '<td><input type="number" class="sr2-extra-amount admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>'
-            + '<td style="text-align:center;"><input type="checkbox" class="sr2-extra-print" title="يظهر في المردود المطبوع"></td>'
             + '<td><input type="text" class="sr2-extra-label admin-inp" placeholder="اختياري" dir="auto"></td>'
             + '<td class="jv-print-hide"><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
     }
@@ -1234,8 +1232,6 @@ $sr2DocSerialPreview = $sr2NavReady
         if (lbl) lbl.textContent = sr2ExtraAccountLabel(row);
         var amt = tr.querySelector('.sr2-extra-amount');
         if (amt) amt.value = fmt3(row.amount || 0);
-        var pr = tr.querySelector('.sr2-extra-print');
-        if (pr) pr.checked = !!row.show_on_print;
         var la = tr.querySelector('.sr2-extra-label');
         if (la) la.value = row.label_ar || '';
     }
@@ -1250,8 +1246,6 @@ $sr2DocSerialPreview = $sr2NavReady
         if (row) sr2FillExtraLineRow(tr, row);
         var rm = tr.querySelector('.admin-doc-line-remove');
         if (rm) rm.addEventListener('click', function () { tr.remove(); sr2RenumberExtraRows(); sr2RenderTotals(); });
-        var pr = tr.querySelector('.sr2-extra-print');
-        if (pr) pr.addEventListener('change', function () { sr2RenderTotals(); });
         var am = tr.querySelector('.sr2-extra-amount');
         if (am) am.addEventListener('input', function () { sr2RenderTotals(); });
         var la = tr.querySelector('.sr2-extra-label');
@@ -1284,7 +1278,7 @@ $sr2DocSerialPreview = $sr2NavReady
                 line_kind: lineKind,
                 amount: amount,
                 label_ar: (tr.querySelector('.sr2-extra-label').value || '').trim(),
-                show_on_print: tr.querySelector('.sr2-extra-print').checked ? 1 : 0,
+                show_on_print: 1,
                 preset_id: parseInt(tr.querySelector('.sr2-extra-preset-id').value, 10) || 0
             });
         });
