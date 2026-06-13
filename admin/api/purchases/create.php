@@ -15,6 +15,8 @@ require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
+require_once __DIR__ . '/../../../includes/warehouses.php';
+require_once __DIR__ . '/../../../includes/inventory_cost_layers.php';
 require_admin_api();
 
 try {
@@ -176,6 +178,13 @@ try {
     $hasPiVariant = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
     $hasPiQtyReceived = orange_table_has_column($pdo, 'purchase_items', 'qty_received');
 
+    // FIFO م2: طبقة تكلفة لكل سطر (صافي بعد خصم السطر) + تحديث «آخر تكلفة شراء» الإرشادية في البطاقة.
+    $purchaseWarehouseId = orange_warehouse_default_id_for_country($pdo, $purchaseCountryId);
+    $hasProductsCost = orange_table_has_column($pdo, 'products', 'cost');
+    $updProductCost = $hasProductsCost
+        ? $pdo->prepare('UPDATE products SET cost = ? WHERE id = ?')
+        : null;
+
     foreach ($items as $item) {
         $productId = (int)($item['product_id'] ?? 0);
         $qty = (int)($item['qty'] ?? 0);
@@ -192,6 +201,7 @@ try {
 
         $lineDiscRaw = (string)($item['_discount_raw'] ?? '');
         $lineDiscAmt = (float)($item['_discount_amount'] ?? 0);
+        $lineNetUnit = $qty > 0 ? round((($qty * $cost) - $lineDiscAmt) / $qty, 5) : round($cost, 5);
 
         if ($hasPiVariant && $hasPiQtyReceived) {
             $sql = 'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, qty_received, cost';
@@ -237,6 +247,24 @@ try {
             $sql .= ') VALUES (' . implode(',', array_fill(0, count($vals), '?')) . ')';
             $pdo->prepare($sql)->execute($vals);
             orange_purchase_apply_variant_stock_increase($pdo, $variantId, $qty, $purchaseCountryId);
+        }
+
+        // FIFO: طبقة واردة بصافي تكلفة الوحدة (خصم الفاتورة لا يدخل — يبقى «خصم مكتسب»).
+        orange_inventory_cost_layer_add(
+            $pdo,
+            $purchaseWarehouseId,
+            $variantId,
+            $qty,
+            $lineNetUnit,
+            'purchase',
+            $purchaseId,
+            $purchaseCountryId,
+            $postingAt,
+            'PIN-' . $purchaseId
+        );
+        // بطاقة الصنف: «آخر تكلفة شراء» إرشادية فقط (لا أثر تقييمي بعد م3).
+        if ($updProductCost !== null) {
+            $updProductCost->execute([$lineNetUnit, $productId]);
         }
     }
 

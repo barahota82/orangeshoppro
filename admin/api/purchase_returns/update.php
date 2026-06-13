@@ -14,9 +14,11 @@ require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
+require_once __DIR__ . '/../../../includes/warehouses.php';
+require_once __DIR__ . '/../../../includes/inventory_cost_layers.php';
 require_admin_api();
 
-function reverse_purchase_return_stock(PDO $pdo, int $returnId): void
+function reverse_purchase_return_stock(PDO $pdo, int $returnId, int $refPurchaseId = 0, int $warehouseId = 0): void
 {
     $hasV = orange_table_has_column($pdo, 'purchase_return_items', 'variant_id');
     $cols = 'product_id, qty';
@@ -37,6 +39,17 @@ function reverse_purchase_return_stock(PDO $pdo, int $returnId): void
             $vid = orange_purchase_resolve_variant_id($pdo, $pid, 0);
         }
         orange_purchase_return_restore_line_stock($pdo, $pid, $vid, $qty);
+        // FIFO م2: استرجاع الكمية إلى طبقات فاتورة الشراء المرجعية (عكس تخفيض المردود).
+        if ($refPurchaseId > 0 && $warehouseId > 0) {
+            orange_inventory_cost_layers_restore_for_source(
+                $pdo,
+                'purchase',
+                $refPurchaseId,
+                $vid,
+                $warehouseId,
+                $qty
+            );
+        }
     }
 }
 
@@ -44,8 +57,13 @@ function reverse_purchase_return_stock(PDO $pdo, int $returnId): void
  * يُعيد إدراج أصناف المردود (مع خصم السطر إن وُجد العمود) ويرجع **إجمالي صافي الأصناف**
  * (subtotal = مجموع الكمية×التكلفة − خصم السطر) — متسق مع create.php.
  */
-function apply_purchase_return_items(PDO $pdo, int $returnId, array $items): float
-{
+function apply_purchase_return_items(
+    PDO $pdo,
+    int $returnId,
+    array $items,
+    int $refPurchaseId = 0,
+    int $warehouseId = 0
+): float {
     $hasV = orange_table_has_column($pdo, 'purchase_return_items', 'variant_id');
     $hasDiscount = orange_table_has_column($pdo, 'purchase_return_items', 'discount_raw');
     $subtotal = 0.0;
@@ -66,6 +84,17 @@ function apply_purchase_return_items(PDO $pdo, int $returnId, array $items): flo
             (int) ($item['variant_id'] ?? 0)
         );
         orange_purchase_return_apply_line_stock($pdo, $productId, $variantId, $qty);
+        // FIFO م2: نخفّض طبقات فاتورة الشراء المرجعية فقط (قابل للعكس).
+        if ($refPurchaseId > 0 && $warehouseId > 0) {
+            orange_inventory_cost_layers_reduce_for_source(
+                $pdo,
+                'purchase',
+                $refPurchaseId,
+                $variantId,
+                $warehouseId,
+                $qty
+            );
+        }
         $cols = ['purchase_return_id', 'product_id', 'qty', 'cost'];
         $vals = [$returnId, $productId, $qty, $cost];
         if ($hasV) {
@@ -140,7 +169,16 @@ try {
     }
 
     $pdo->beginTransaction();
-    reverse_purchase_return_stock($pdo, $returnId);
+    // FIFO م2: مخزن/مرجع الشراء للمردود القائم (لاسترجاع الطبقات عند العكس).
+    $existingRefPurchaseId = (int) ($row['purchase_id'] ?? 0);
+    $reverseCountryId = orange_admin_context_country_id($pdo);
+    if ($existingRefPurchaseId > 0 && orange_table_has_country_id($pdo, 'purchases')) {
+        $rc = $pdo->prepare('SELECT country_id FROM purchases WHERE id = ? LIMIT 1');
+        $rc->execute([$existingRefPurchaseId]);
+        $reverseCountryId = (int) ($rc->fetchColumn() ?: $reverseCountryId);
+    }
+    $reverseWarehouseId = orange_warehouse_default_id_for_country($pdo, $reverseCountryId);
+    reverse_purchase_return_stock($pdo, $returnId, $existingRefPurchaseId, $reverseWarehouseId);
     $pdo->prepare('DELETE FROM purchase_return_items WHERE purchase_return_id = ?')->execute([$returnId]);
 
     if ($action === 'delete') {
@@ -213,7 +251,15 @@ try {
         json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
-    $subtotal = apply_purchase_return_items($pdo, $returnId, $items);
+    // FIFO م2: مخزن المردود الجديد (لتخفيض طبقات فاتورة الشراء المرجعية الجديدة).
+    $applyCountryId = orange_admin_context_country_id($pdo);
+    if ($purchaseIdOpt > 0 && orange_table_has_country_id($pdo, 'purchases')) {
+        $ac = $pdo->prepare('SELECT country_id FROM purchases WHERE id = ? LIMIT 1');
+        $ac->execute([$purchaseIdOpt]);
+        $applyCountryId = (int) ($ac->fetchColumn() ?: $applyCountryId);
+    }
+    $applyWarehouseId = orange_warehouse_default_id_for_country($pdo, $applyCountryId);
+    $subtotal = apply_purchase_return_items($pdo, $returnId, $items, $purchaseIdOpt, $applyWarehouseId);
 
     // خصم الفاتورة على المردود (يُعكَس كـ «خصم مكتسب» محاسبياً — لا يمسّ تكلفة المخزن).
     $hasRetInvDiscount = orange_table_has_column($pdo, 'purchase_returns', 'invoice_discount_raw');

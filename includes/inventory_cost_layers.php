@@ -236,6 +236,145 @@ if (!function_exists('orange_inventory_cost_layers_reduce_for_source')) {
     }
 }
 
+if (!function_exists('orange_inventory_cost_layers_restore_for_source')) {
+    /**
+     * استرجاع كمية إلى طبقات مصدر معيّن (عكس reduce_for_source) — يُستعمل عند تعديل/حذف مردود
+     * مشتريات لإعادة الكمية إلى طبقات فاتورة الشراء الأصلية. لا يتجاوز qty_in الأصلي لكل طبقة.
+     *
+     * @return int الكمية التي استُرجعت فعلياً
+     */
+    function orange_inventory_cost_layers_restore_for_source(
+        PDO $pdo,
+        string $sourceType,
+        int $sourceId,
+        int $variantId,
+        int $warehouseId,
+        int $qty
+    ): int {
+        if (!orange_inventory_cost_layers_table_exists($pdo)) {
+            return 0;
+        }
+        if ($sourceId <= 0 || $variantId <= 0 || $warehouseId <= 0 || $qty <= 0) {
+            return 0;
+        }
+
+        $sel = $pdo->prepare(
+            'SELECT id, qty_in, qty_remaining
+             FROM inventory_cost_layers
+             WHERE source_type = ? AND source_id = ? AND variant_id = ? AND warehouse_id = ?
+             ORDER BY layer_date ASC, id ASC
+             FOR UPDATE'
+        );
+        $sel->execute([$sourceType, $sourceId, $variantId, $warehouseId]);
+        $layers = $sel->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $upd = $pdo->prepare(
+            'UPDATE inventory_cost_layers SET qty_remaining = qty_remaining + ? WHERE id = ?'
+        );
+
+        $remaining = $qty;
+        foreach ($layers as $layer) {
+            if ($remaining <= 0) {
+                break;
+            }
+            $layerId = (int) ($layer['id'] ?? 0);
+            $qtyIn = (int) ($layer['qty_in'] ?? 0);
+            $qtyRem = (int) ($layer['qty_remaining'] ?? 0);
+            $room = $qtyIn - $qtyRem;
+            if ($layerId <= 0 || $room <= 0) {
+                continue;
+            }
+            $give = min($room, $remaining);
+            $upd->execute([$give, $layerId]);
+            $remaining -= $give;
+        }
+
+        return $qty - $remaining;
+    }
+}
+
+if (!function_exists('orange_inventory_cost_layers_reduce_newest')) {
+    /**
+     * تخفيض الكمية المتبقية من **أحدث** الطبقات (عكس FIFO) بغضّ النظر عن المصدر —
+     * احتياطي لمردود المشتريات عند تعذّر مطابقة طبقة المصدر الأصلية.
+     *
+     * @return int الكمية التي خُفّضت فعلياً
+     */
+    function orange_inventory_cost_layers_reduce_newest(
+        PDO $pdo,
+        int $warehouseId,
+        int $variantId,
+        int $qty
+    ): int {
+        if (!orange_inventory_cost_layers_table_exists($pdo)) {
+            return 0;
+        }
+        if ($warehouseId <= 0 || $variantId <= 0 || $qty <= 0) {
+            return 0;
+        }
+
+        $sel = $pdo->prepare(
+            'SELECT id, qty_remaining
+             FROM inventory_cost_layers
+             WHERE warehouse_id = ? AND variant_id = ? AND qty_remaining > 0
+             ORDER BY layer_date DESC, id DESC
+             FOR UPDATE'
+        );
+        $sel->execute([$warehouseId, $variantId]);
+        $layers = $sel->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $upd = $pdo->prepare(
+            'UPDATE inventory_cost_layers SET qty_remaining = qty_remaining - ? WHERE id = ?'
+        );
+
+        $remaining = $qty;
+        foreach ($layers as $layer) {
+            if ($remaining <= 0) {
+                break;
+            }
+            $layerId = (int) ($layer['id'] ?? 0);
+            $avail = (int) ($layer['qty_remaining'] ?? 0);
+            if ($layerId <= 0 || $avail <= 0) {
+                continue;
+            }
+            $take = min($avail, $remaining);
+            $upd->execute([$take, $layerId]);
+            $remaining -= $take;
+        }
+
+        return $qty - $remaining;
+    }
+}
+
+if (!function_exists('orange_inventory_cost_layers_delete_for_source')) {
+    /**
+     * حذف كل طبقات مصدر معيّن (يُستعمل عند تعديل/حذف فاتورة الشراء قبل إعادة بنائها).
+     *
+     * ملاحظة: آمن في المرحلة م2 لأن الطبقات لا تُستهلَك بعد (الاستهلاك يبدأ في م3). بعد م3 يجب
+     * استدعاؤه فقط حين لا يوجد استهلاك على طبقات المصدر، وإلا تُعالَج سلامة التعديل بمنطق أدق.
+     *
+     * @return int عدد الصفوف المحذوفة
+     */
+    function orange_inventory_cost_layers_delete_for_source(
+        PDO $pdo,
+        string $sourceType,
+        int $sourceId
+    ): int {
+        if (!orange_inventory_cost_layers_table_exists($pdo)) {
+            return 0;
+        }
+        if ($sourceId <= 0 || $sourceType === '') {
+            return 0;
+        }
+        $st = $pdo->prepare(
+            'DELETE FROM inventory_cost_layers WHERE source_type = ? AND source_id = ?'
+        );
+        $st->execute([$sourceType, $sourceId]);
+
+        return (int) $st->rowCount();
+    }
+}
+
 if (!function_exists('orange_inventory_cost_layers_value')) {
     /**
      * قيمة المخزون من الطبقات المتبقية = Σ(qty_remaining × unit_cost).

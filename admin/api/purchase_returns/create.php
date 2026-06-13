@@ -16,6 +16,8 @@ require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
+require_once __DIR__ . '/../../../includes/warehouses.php';
+require_once __DIR__ . '/../../../includes/inventory_cost_layers.php';
 require_admin_api();
 
 try {
@@ -167,6 +169,8 @@ try {
     $pdo->prepare('UPDATE purchase_returns SET return_number = ? WHERE id = ?')->execute([$retRef, $returnId]);
 
     $hasVariant = orange_table_has_column($pdo, 'purchase_return_items', 'variant_id');
+    // FIFO م2: مردود المشتريات يخفّض طبقات المخزون (طبقة الشراء الأصلية أولاً ثم الأحدث).
+    $returnWarehouseId = orange_warehouse_default_id_for_country($pdo, $returnCountryId);
 
     foreach ($items as $item) {
         $productId = (int) ($item['product_id'] ?? 0);
@@ -186,6 +190,19 @@ try {
             (int) ($item['variant_id'] ?? 0)
         );
         orange_purchase_return_apply_line_stock($pdo, $productId, $variantId, $qty);
+
+        // FIFO: نخفّض طبقات فاتورة الشراء المرجعية فقط (قابل للعكس عند التعديل/الحذف).
+        // مردود بلا مرجع شراء لا يمسّ الطبقات في م2 (يُطابَق في م4).
+        if ($purchaseIdOpt > 0) {
+            orange_inventory_cost_layers_reduce_for_source(
+                $pdo,
+                'purchase',
+                $purchaseIdOpt,
+                $variantId,
+                $returnWarehouseId,
+                $qty
+            );
+        }
 
         if ($hasVariant) {
             if ($hasPriDiscount) {

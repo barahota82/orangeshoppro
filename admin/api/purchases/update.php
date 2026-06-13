@@ -15,6 +15,8 @@ require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
+require_once __DIR__ . '/../../../includes/warehouses.php';
+require_once __DIR__ . '/../../../includes/inventory_cost_layers.php';
 require_admin_api();
 
 function reverse_purchase_stock(PDO $pdo, int $purchaseId, int $countryId): void
@@ -55,11 +57,17 @@ function reverse_purchase_stock(PDO $pdo, int $purchaseId, int $countryId): void
  * يُعيد إدراج أصناف الشراء (مع خصم السطر إن وُجد العمود) ويرجع **إجمالي صافي الأصناف**
  * (subtotal = مجموع الكمية×التكلفة − خصم السطر) — متسق مع create.php.
  */
-function apply_purchase_items(PDO $pdo, int $purchaseId, array $items, int $countryId): float
+function apply_purchase_items(PDO $pdo, int $purchaseId, array $items, int $countryId, string $postingAt): float
 {
     $hasV = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
     $hasRecv = orange_table_has_column($pdo, 'purchase_items', 'qty_received');
     $hasDiscount = orange_table_has_column($pdo, 'purchase_items', 'discount_raw');
+    // FIFO م2: إعادة بناء طبقات التكلفة + تحديث «آخر تكلفة شراء» الإرشادية.
+    $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
+    $hasProductsCost = orange_table_has_column($pdo, 'products', 'cost');
+    $updProductCost = $hasProductsCost
+        ? $pdo->prepare('UPDATE products SET cost = ? WHERE id = ?')
+        : null;
     $subtotal = 0.0;
     foreach ($items as $item) {
         $productId = (int)($item['product_id'] ?? 0);
@@ -112,6 +120,23 @@ function apply_purchase_items(PDO $pdo, int $purchaseId, array $items, int $coun
             . implode(', ', array_fill(0, count($vals), '?')) . ')'
         )->execute($vals);
         orange_purchase_apply_variant_stock_increase($pdo, $variantId, $qty, $countryId);
+
+        $lineNetUnit = $qty > 0 ? round((($qty * $cost) - $discountAmt) / $qty, 5) : round($cost, 5);
+        orange_inventory_cost_layer_add(
+            $pdo,
+            $warehouseId,
+            $variantId,
+            $qty,
+            $lineNetUnit,
+            'purchase',
+            $purchaseId,
+            $countryId,
+            $postingAt,
+            'PIN-' . $purchaseId
+        );
+        if ($updProductCost !== null) {
+            $updProductCost->execute([$lineNetUnit, $productId]);
+        }
     }
 
     return $subtotal;
@@ -174,6 +199,8 @@ try {
     $pdo->beginTransaction();
     reverse_purchase_stock($pdo, $purchaseId, $purchaseCountryId);
     $pdo->prepare("DELETE FROM purchase_items WHERE purchase_id = ?")->execute([$purchaseId]);
+    // FIFO م2: نحذف طبقات هذه الفاتورة قبل إعادة بنائها (آمن — لا استهلاك قبل م3).
+    orange_inventory_cost_layers_delete_for_source($pdo, 'purchase', $purchaseId);
 
     if ($action === 'delete') {
         orange_purchase_remove_receive_accounting($pdo, $purchaseId);
@@ -264,7 +291,7 @@ try {
     $postingAt = $documentDate . ' ' . date('H:i:s');
     $hasDocumentDateCol = orange_table_has_column($pdo, 'purchases', 'document_date');
 
-    $subtotal = apply_purchase_items($pdo, $purchaseId, $items, $purchaseCountryId);
+    $subtotal = apply_purchase_items($pdo, $purchaseId, $items, $purchaseCountryId, $postingAt);
 
     // خصم الفاتورة (يُعالَج كـ «خصم مكتسب» محاسبياً — لا يمسّ تكلفة المخزن).
     $hasInvDiscount = orange_table_has_column($pdo, 'purchases', 'invoice_discount_raw');
