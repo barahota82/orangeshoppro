@@ -332,7 +332,7 @@ header('X-Robots-Tag: noindex, nofollow', true);
                     $partyRows[] = [$tt('lbl_name'), $doc['party_name'], false];
                 }
                 if (trim((string) ($doc['party_phone'] ?? '')) !== '') {
-                    $partyRows[] = [$tt('phone'), $doc['party_phone'], true];
+                    $partyRows[] = [$tt('phone'), preg_replace('/\s+/', '', (string) $doc['party_phone']), true];
                 }
                 if (trim((string) ($doc['party_area'] ?? '')) !== '') {
                     $partyRows[] = [$tt('lbl_area'), $doc['party_area'], false];
