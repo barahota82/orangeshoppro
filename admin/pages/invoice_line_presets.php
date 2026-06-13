@@ -100,7 +100,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
     <div class="form-grid ilp-form-grid orange-doc-header-row">
         <div>
             <label for="ilp_sort">الترتيب</label>
-            <input type="number" id="ilp_sort" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;text-align:center;"
+            <input type="text" id="ilp_sort" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en" inputmode="numeric" style="background:#f4f4f5;cursor:default;text-align:center;"
                 value="<?php echo (int) $ilpNextSort; ?>">
         </div>
         <div>
