@@ -967,8 +967,11 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             subtotal += lineNet;
             lineDiscTotal += (lineGross - lineNet);
         }
-        var invDiscRaw = (document.getElementById('pr2_invoice_discount').value || '').trim();
+        var invDiscEl = document.getElementById('pr2_invoice_discount');
+        var invDiscRaw = (invDiscEl && invDiscEl.value || '').trim();
         var invDiscAmt = parseDiscount(invDiscRaw, subtotal);
+        var invInvalid = (invDiscAmt > 0) && ((subtotal - invDiscAmt) < 0.0005);
+        if (invDiscEl) invDiscEl.style.border = invInvalid ? '1px solid #dc2626' : '';
         if (invDiscAmt > subtotal) invDiscAmt = subtotal;
         var netTotal = Math.max(0, subtotal - invDiscAmt);
         var totalDiscount = Math.max(0, grossSubtotal - netTotal);
@@ -982,8 +985,11 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (invDiscValEl) invDiscValEl.textContent = fmt3(invDiscAmt);
         var invDiscRow = document.getElementById('pr2_inv_disc_print_row');
         if (invDiscRow) invDiscRow.classList.toggle('pur-inv-disc-active', invDiscAmt > 0.0005);
+        var errMsgs = [];
+        if (firstDiscError) errMsgs.push(firstDiscError);
+        if (invInvalid) errMsgs.push('خصم الفاتورة يجعل مبلغ المردود صفراً — يجب أن يكون للمردود إجمالي.');
         var errEl = document.getElementById('pr2_line_disc_error');
-        if (errEl) { errEl.textContent = firstDiscError; errEl.style.display = firstDiscError ? '' : 'none'; }
+        if (errEl) { errEl.innerHTML = errMsgs.join('<br>'); errEl.style.display = errMsgs.length ? '' : 'none'; }
         pr2FillBannerTotals(grossSubtotal, totalDiscount, netTotal);
     }
 
