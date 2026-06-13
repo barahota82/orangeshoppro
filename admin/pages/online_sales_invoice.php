@@ -231,7 +231,9 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         'party_title' => 'فاتورة إلى / Bill To',
         'show_notes' => true,
         'totals_rows' => [
-            ['الإجمالي / Total', 'total'],
+            ['إجمالي الفاتورة / Total', 'gross'],
+            ['قيمة الخصم / Discount', 'disc'],
+            ['مبلغ الفاتورة / Net', 'net'],
         ],
     ]);
     ?>
@@ -356,14 +358,11 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
 
     <div class="jv-print-hide" style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
         <div style="flex:1 1 auto;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
-            <span hidden aria-hidden="true">
-                <span id="ov2_subtotal"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></span>
-                <span id="ov2_discount_total"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></span>
-                <span id="ov2_net_total"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></span>
-            </span>
-            <span style="color:#64748b;">إجمالي الفاتورة:</span> <strong id="ov2_fold_total" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#64748b;">قيمة الخصم:</span> <strong id="ov2_fold_discount" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
-            <span style="color:#0f172a;font-weight:700;border-top:2px solid #ea580c;display:inline-block;padding-top:4px;margin-top:2px;">مبلغ الفاتورة: <strong id="ov2_fold_net" class="admin-money-display" dir="ltr" lang="en" style="color:#ea580c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
+            <span style="color:#64748b;">إجمالي الأصناف:</span> <strong id="ov2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">خصم الأصناف:</span> <strong id="ov2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">صافي الأصناف:</span> <strong id="ov2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span id="ov2_screen_extra"></span>
+            <span style="color:#0f172a;font-weight:700;border-top:2px solid #ea580c;display:inline-block;padding-top:4px;margin-top:2px;"><span id="ov2_grand_label">الإجمالي:</span> <strong id="ov2_grand_total" class="admin-money-display" dir="ltr" lang="en" style="color:#ea580c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
             <span class="muted" style="font-size:0.85rem;"> <?php echo htmlspecialchars($adminCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span></span>
         </div>
     </div>
@@ -825,7 +824,8 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             subtotalId: 'ov2_subtotal', discountId: 'ov2_discount_total', netId: 'ov2_net_total',
             collectExtra: ov2CollectExtraLines,
             unit: <?php echo json_encode($adminCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
-            foldTotalId: 'ov2_fold_total', foldDiscountId: 'ov2_fold_discount', foldNetId: 'ov2_fold_net',
+            screenExtraId: 'ov2_screen_extra', grandOutId: 'ov2_grand_total', grandLabelId: 'ov2_grand_label',
+            foldTotalId: 'ov2_sd_print_gross', foldDiscountId: 'ov2_sd_print_disc', foldNetId: 'ov2_sd_print_net',
             labels: {
                 items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
                 items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
