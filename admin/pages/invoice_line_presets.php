@@ -43,7 +43,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
 .ilp-form-grid .ilp-account-row {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: minmax(8rem, 0.5fr) minmax(0, 1fr);
+    grid-template-columns: minmax(7rem, 0.5fr) minmax(7rem, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
     gap: 10px 12px;
     align-items: end;
 }
@@ -65,7 +65,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
 .ilp-pick-results li:hover { background: #f8fafc; }
 @media (max-width: 900px) {
     .ilp-form-grid { grid-template-columns: 1fr 1fr; }
-    .ilp-form-grid .ilp-account-row { grid-template-columns: 1fr; }
+    .ilp-form-grid .ilp-account-row { grid-template-columns: 1fr 1fr; }
 }
 </style>
 
@@ -124,14 +124,14 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
                 <input type="text" id="ilp_account_name" class="admin-inp-readonly" readonly disabled tabindex="-1">
                 <span id="ilp_account_hint" class="muted" style="display:block;font-size:0.78rem;margin-top:2px;"></span>
             </div>
-        </div>
-        <div>
-            <label for="ilp_label_ar">التسمية (عربي)</label>
-            <input type="text" id="ilp_label_ar" class="admin-inp" dir="auto"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
-        </div>
-        <div>
-            <label for="ilp_label_en">English</label>
-            <input type="text" id="ilp_label_en" class="admin-inp" dir="ltr" lang="en"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
+            <div>
+                <label for="ilp_label_ar">التسمية (عربي)</label>
+                <input type="text" id="ilp_label_ar" class="admin-inp" dir="auto"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
+            </div>
+            <div>
+                <label for="ilp_label_en">English</label>
+                <input type="text" id="ilp_label_en" class="admin-inp" dir="ltr" lang="en"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
+            </div>
         </div>
     </div>
     <div class="actions" style="margin-top:14px;">
@@ -471,7 +471,8 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
                 alert((res && res.message) || 'تعذر الترجمة');
                 return;
             }
-            if (res.name_en) document.getElementById('ilp_label_en').value = res.name_en;
+            var en = (res.translations && res.translations.name_en) ? res.translations.name_en : (res.name_en || '');
+            if (en) document.getElementById('ilp_label_en').value = en;
         }).catch(function (e) { alert(e.message || String(e)); });
     }
 

@@ -331,7 +331,9 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         ],
         'show_notes' => true,
         'totals_rows' => [
-            ['الإجمالي / Total', 'total'],
+            ['الإجمالي / Total', 'gross'],
+            ['الخصم / Discount', 'disc'],
+            ['الصافي / Net', 'net'],
         ],
     ]);
     ?>
@@ -409,7 +411,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         </div>
     </div>
 
-    <?php orange_sales_doc_print_totals_box('pv2'); ?>
+    <?php /* المشتريات بلا بنود إضافية (قرار 2026-06): الإجماليات تظهر في كارت الترويسة (إجمالي/خصم/صافي) — لا صندوق سفلي مكرّر. */ ?>
 
     <!-- ٣ — خصم الفاتورة + المجاميع -->
     <div class="jv-print-hide" style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
@@ -916,7 +918,18 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (stEl) stEl.textContent = fmt3(grossSubtotal);
         if (dtEl) dtEl.textContent = fmt3(totalDiscount);
         if (ntEl) ntEl.textContent = fmt3(netTotal);
+        pv2FillBannerTotals(grossSubtotal, totalDiscount, netTotal);
         pv2RenderTotals();
+    }
+
+    function pv2FillBannerTotals(gross, disc, net) {
+        var set = function (id, val) {
+            var el = document.getElementById(id);
+            if (el) el.textContent = fmt3(val);
+        };
+        set('pv2_sd_print_gross', gross);
+        set('pv2_sd_print_disc', disc);
+        set('pv2_sd_print_net', net);
     }
 
     function pv2RenderTotals() {
@@ -984,6 +997,9 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             var el = document.getElementById(id);
             return el ? String(el.textContent || '').trim() : '';
         };
+        setTxt('pv2_sd_print_gross', getTot('pv2_subtotal'));
+        setTxt('pv2_sd_print_disc', getTot('pv2_discount_total'));
+        setTxt('pv2_sd_print_net', getTot('pv2_net_total'));
         pv2RenderTotals();
     }
 

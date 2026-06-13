@@ -324,7 +324,9 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         ],
         'show_notes' => true,
         'totals_rows' => [
-            ['إجمالي المردود / Total', 'total'],
+            ['إجمالي المردود / Total', 'gross'],
+            ['الخصم / Discount', 'disc'],
+            ['صافي المردود / Net', 'net'],
         ],
     ]);
     ?>
@@ -407,7 +409,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         </div>
     </div>
 
-    <?php orange_sales_doc_print_totals_box('pr2'); ?>
+    <?php /* مردود المشتريات بلا بنود إضافية (قرار 2026-06): الإجماليات تظهر في كارت الترويسة (إجمالي/خصم/صافي) — لا صندوق سفلي مكرّر. */ ?>
 
     <!-- ٣ — خصم الفاتورة + المجاميع -->
     <div class="jv-print-hide" style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
@@ -941,6 +943,17 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (stEl) stEl.textContent = fmt3(grossSubtotal);
         if (dtEl) dtEl.textContent = fmt3(totalDiscount);
         if (ntEl) ntEl.textContent = fmt3(netTotal);
+        pr2FillBannerTotals(grossSubtotal, totalDiscount, netTotal);
+    }
+
+    function pr2FillBannerTotals(gross, disc, net) {
+        var set = function (id, val) {
+            var el = document.getElementById(id);
+            if (el) el.textContent = fmt3(val);
+        };
+        set('pr2_sd_print_gross', gross);
+        set('pr2_sd_print_disc', disc);
+        set('pr2_sd_print_net', net);
     }
 
 
@@ -1104,21 +1117,9 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             var el = document.getElementById(id);
             return el ? String(el.textContent || '').trim() : '';
         };
-        if (window.orangeSalesDocUi && window.orangeSalesDocUi.renderDocTotals) {
-            window.orangeSalesDocUi.renderDocTotals({
-                prefix: 'pr2', context: 'purchase',
-                subtotalId: 'pr2_subtotal', discountId: 'pr2_discount_total', netId: 'pr2_net_total',
-                collectExtra: (typeof pr2CollectExtraLines === 'function') ? pr2CollectExtraLines : function () { return []; },
-                unit: '',
-                labels: {
-                    items: { ar: 'إجمالي الأصناف', en: 'Items Total' },
-                    items_disc: { ar: 'خصم الأصناف', en: 'Items Discount' },
-                    net_items: { ar: 'صافي الأصناف', en: 'Net Items' },
-                    vat: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }
-                },
-                finalLabel: { ar: 'إجمالي المردود', en: 'Total Refund' }
-            });
-        }
+        setTxt('pr2_sd_print_gross', getTot('pr2_subtotal'));
+        setTxt('pr2_sd_print_disc', getTot('pr2_discount_total'));
+        setTxt('pr2_sd_print_net', getTot('pr2_net_total'));
     }
 
     function pr2ApplyReturnPayload(res) {
