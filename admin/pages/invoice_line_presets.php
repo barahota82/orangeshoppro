@@ -159,13 +159,13 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         <table class="admin-table">
             <thead>
                 <tr>
-                    <th style="width:3rem;">#</th>
-                    <th>نوع البند</th>
-                    <th>نشط</th>
-                    <th>الحساب</th>
-                    <th>التسمية</th>
-                    <th>الترتيب</th>
-                    <th style="width:5rem;" title="إعادة الترتيب">إعادة الترتيب</th>
+                    <th style="width:2.5rem;white-space:nowrap;">#</th>
+                    <th style="width:10rem;white-space:nowrap;">نوع البند</th>
+                    <th style="width:3.5rem;white-space:nowrap;text-align:center;">نشط</th>
+                    <th style="width:38%;">الحساب</th>
+                    <th style="width:30%;">التسمية</th>
+                    <th style="width:4rem;white-space:nowrap;text-align:center;">الترتيب</th>
+                    <th style="width:5rem;white-space:nowrap;" title="إعادة الترتيب">إعادة الترتيب</th>
                 </tr>
             </thead>
             <tbody id="ilp_list_body">
@@ -267,12 +267,12 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
             tr.dataset.id = String(row.id || 0);
             tr.style.cursor = 'pointer';
             tr.title = 'اضغط للتعديل';
-            tr.innerHTML = '<td>' + esc(String(row.id)) + '</td>'
-                + '<td style="font-size:0.85rem;">' + esc(row.line_kind_label || row.line_kind || '') + '</td>'
-                + '<td>' + (row.is_active ? 'نعم' : 'لا') + '</td>'
+            tr.innerHTML = '<td style="white-space:nowrap;">' + esc(String(row.id)) + '</td>'
+                + '<td style="font-size:0.85rem;white-space:nowrap;">' + esc(row.line_kind_label || row.line_kind || '') + '</td>'
+                + '<td style="white-space:nowrap;text-align:center;">' + (row.is_active ? 'نعم' : 'لا') + '</td>'
                 + '<td dir="ltr">' + esc((row.account_code || '') + (row.account_name ? ' — ' + row.account_name : '')) + '</td>'
                 + '<td>' + esc(row.label_ar || '') + '</td>'
-                + '<td dir="ltr">' + esc(String(row.sort_order || 0)) + '</td>'
+                + '<td dir="ltr" style="white-space:nowrap;text-align:center;">' + esc(String(row.sort_order || 0)) + '</td>'
                 + '<td><div class="ilp-row-ops">'
                 + '<button type="button" class="btn-secondary ilp-move-up" title="أعلى">↑</button>'
                 + '<button type="button" class="btn-secondary ilp-move-down" title="أسفل">↓</button>'
