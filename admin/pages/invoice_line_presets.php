@@ -165,7 +165,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
                     <th>الحساب</th>
                     <th>التسمية</th>
                     <th>الترتيب</th>
-                    <th style="width:5rem;" title="ترتيب يدوي">ترتيب يدوي</th>
+                    <th style="width:5rem;" title="إعادة الترتيب">إعادة الترتيب</th>
                 </tr>
             </thead>
             <tbody id="ilp_list_body">
