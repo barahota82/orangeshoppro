@@ -35,7 +35,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
 <style>
 .ilp-form-grid {
     display: grid;
-    grid-template-columns: minmax(5rem, 0.5fr) minmax(5rem, 0.55fr) minmax(7rem, 0.65fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr);
+    grid-template-columns: minmax(5rem, 0.5fr) minmax(4rem, 0.38fr) minmax(5.5rem, 0.45fr) minmax(0, 1.3fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
     gap: 10px 12px;
     align-items: end;
 }
