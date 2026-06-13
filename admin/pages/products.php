@@ -519,8 +519,9 @@ $orangeAdminSfProductUrlPartsForJs = [
                         <input type="number" id="price" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
                     </div>
                     <div>
-                        <label>التكلفة</label>
+                        <label>آخر تكلفة شراء (إرشادي)</label>
                         <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
+                        <small class="card-hint" style="display:block;margin-top:4px;color:#6b7280;">قيمة إرشادية تُحدَّث آلياً بصافي آخر شراء — لا تؤثر على تقييم المخزون أو تكلفة المبيعات (تُحسب بـ FIFO من طبقات التكلفة).</small>
                     </div>
                     <div class="product-basic-class-cell">
                         <label for="product_is_active">حالة العرض</label>
@@ -819,7 +820,7 @@ $orangeAdminSfProductUrlPartsForJs = [
                     <?php endif; ?>
                     <th>دليل استرشادي</th>
                     <th>السعر</th>
-                    <th>التكلفة</th>
+                    <th>آخر تكلفة شراء</th>
                     <th>الحالة</th>
                     <th class="prod-ops-col">إجراءات</th>
                 </tr>
