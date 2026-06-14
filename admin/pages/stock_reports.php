@@ -384,9 +384,6 @@ $reportTitle = $reports[$reportKey];
             <h1>تقارير المخزن</h1>
             <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
         </div>
-        <div class="sr-print-actions">
-            <button type="button" class="btn-secondary" onclick="window.print()">طباعة التقرير</button>
-        </div>
     </div>
 </div>
 <p class="page-subtitle">
@@ -454,6 +451,9 @@ $reportTitle = $reports[$reportKey];
             </div>
         <?php endif; ?>
         <div><button type="submit">عرض</button></div>
+        <div class="sr-print-actions" style="display:flex;gap:8px;align-items:center;margin-inline-start:auto;">
+            <button type="button" class="btn-secondary" onclick="window.print()">طباعة التقرير</button>
+        </div>
     </form>
 </div>
 
