@@ -149,7 +149,7 @@ if ($icTo !== '') {
     $icMvSql .= ' AND DATE(sm.created_at) <= ?';
     $icMvParams[] = $icTo;
 }
-$icMvSql .= ' ORDER BY sm.created_at ASC, sm.id ASC LIMIT 2000';
+$icMvSql .= ' ORDER BY sm.created_at ASC, sm.id ASC';
 $icMvSt = $pdo->prepare($icMvSql);
 $icMvSt->execute($icMvParams);
 $icSaleTypes = ['delivered_order', 'pending_order_fulfilled'];

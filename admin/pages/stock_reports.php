@@ -329,7 +329,7 @@ try {
             $sql .= ' AND sm.product_id = ?';
             $params[] = $pid;
         }
-        $sql .= ' ORDER BY sm.created_at DESC, sm.id DESC LIMIT 1000';
+        $sql .= ' ORDER BY sm.created_at DESC, sm.id DESC';
         $st = $pdo->prepare($sql);
         $st->execute($params);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
