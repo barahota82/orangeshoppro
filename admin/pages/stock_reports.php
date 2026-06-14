@@ -24,9 +24,9 @@ $companyNameAr = orange_company_settings_name_ar($pdo);
 $reports = [
     'balances'    => 'الجرد (أرصدة المخزون)',
     'valuation'   => 'تقييم المخزون',
-    'low'         => 'النواقص (تحت الحد)',
     'movements'   => 'حركة المخزون',
     'move_summary'=> 'ملخص الحركة (وارد/صادر)',
+    'low'         => 'النواقص (تحت الحد)',
     'stagnant'    => 'الأصناف الراكدة',
 ];
 $reportKey = isset($_GET['r']) ? (string) $_GET['r'] : 'balances';
@@ -409,13 +409,13 @@ $reportTitle = $reports[$reportKey];
                 <div style="display:flex;gap:6px;align-items:center;">
                     <input type="hidden" id="sr_pid" name="pid" value="<?php echo (int) $pid; ?>">
                     <input type="text" id="sr_pid_code" class="admin-inp" readonly
-                        title="دبل كليك لاختيار صنف"
-                        style="cursor:pointer;width:8rem;" dir="ltr"
+                        title="يُملأ تلقائياً عند اختيار الصنف"
+                        style="width:11rem;background:#f4f4f5;" dir="ltr"
                         placeholder="الكود"
                         value="<?php echo htmlspecialchars($pidCode, ENT_QUOTES, 'UTF-8'); ?>">
                     <input type="text" id="sr_pid_name" class="admin-inp" readonly
                         title="دبل كليك لاختيار صنف"
-                        style="cursor:pointer;min-width:14rem;"
+                        style="cursor:pointer;min-width:20rem;"
                         placeholder="كل الأصناف — دبل كليك للاختيار"
                         value="<?php echo htmlspecialchars($pidLabel, ENT_QUOTES, 'UTF-8'); ?>">
                     <?php if ($pid > 0): ?>
@@ -453,9 +453,9 @@ $reportTitle = $reports[$reportKey];
                 <input type="number" id="sr_days" name="days" class="admin-inp" min="7" max="3650" step="1" lang="en" dir="ltr" value="<?php echo (int) $stagnantDays; ?>">
             </div>
         <?php endif; ?>
-        <div><button type="submit">عرض</button></div>
         <div class="sr-print-actions" style="display:flex;gap:8px;align-items:center;margin-inline-start:auto;">
-            <button type="button" class="btn-secondary" onclick="window.print()">طباعة التقرير</button>
+            <button type="submit">عرض</button>
+            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
         </div>
     </form>
 </div>
@@ -669,9 +669,6 @@ $reportTitle = $reports[$reportKey];
         });
     }
 
-    if (pidCode) {
-        pidCode.addEventListener('dblclick', openPicker);
-    }
     if (pidName) {
         pidName.addEventListener('dblclick', openPicker);
     }
