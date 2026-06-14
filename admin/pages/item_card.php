@@ -65,6 +65,11 @@ foreach ($variants as &$icVarRow) {
 }
 unset($icVarRow);
 
+$icTotalStock = 0;
+foreach ($variants as $vSum) {
+    $icTotalStock += (int) ($vSum['stock_quantity'] ?? 0);
+}
+
 $icValidDate = static function (string $raw): string {
     $raw = trim($raw);
     return preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw) === 1 ? $raw : '';
@@ -75,8 +80,63 @@ if ($icFrom !== '' && $icTo !== '' && strcmp($icFrom, $icTo) > 0) {
     [$icFrom, $icTo] = [$icTo, $icFrom];
 }
 $icHasRange = $icFrom !== '' || $icTo !== '';
+$icToday = date('Y-m-d');
 
-$icMvSql = "SELECT sm.*, pv.color AS variant_color, pv.size AS variant_size
+/*
+ * المخزون يتأثر بمصدرين لا يكتبان سطراً في stock_movements:
+ *   الشراء (+) ومردود الشراء (−) — يحدّثان كمية المخزن وطبقات التكلفة فقط.
+ * لذلك نجمع الحركات من كل المصادر، ونحسب الرصيد الافتتاحي عكسياً:
+ *   الافتتاحي = الرصيد الحالي − صافي كل الحركات التي تاريخها ≥ «من».
+ * فيطابق الرصيد الختامي المخزون الفعلي عندما يكون «إلى» = اليوم (أو بلا مدى).
+ */
+$hasPurCreatedAt = orange_table_has_column($pdo, 'purchases', 'created_at');
+$hasPurReturns = orange_table_exists($pdo, 'purchase_returns') && orange_table_exists($pdo, 'purchase_return_items');
+$hasPriVariant = $hasPurReturns && orange_table_has_column($pdo, 'purchase_return_items', 'variant_id');
+/* الكمية التي تدخل المخزن فعلاً = qty_received عند وجوده (عكس التخفيض يعتمده أيضاً)، وإلا qty. */
+$icPuQtyExpr = orange_table_has_column($pdo, 'purchase_items', 'qty_received') ? 'pi.qty_received' : 'pi.qty';
+
+$icDeltaSince = 0;
+$smSinceSql = 'SELECT COALESCE(SUM(new_stock - old_stock), 0) FROM stock_movements WHERE product_id = ?';
+$smSinceParams = [$productId];
+if ($icFrom !== '') {
+    $smSinceSql .= ' AND DATE(created_at) >= ?';
+    $smSinceParams[] = $icFrom;
+}
+$icSt = $pdo->prepare($smSinceSql);
+$icSt->execute($smSinceParams);
+$icDeltaSince += (int) $icSt->fetchColumn();
+
+if ($hasPurCreatedAt) {
+    $puSinceSql = 'SELECT COALESCE(SUM(' . $icPuQtyExpr . '), 0) FROM purchase_items pi
+        INNER JOIN purchases pu ON pu.id = pi.purchase_id WHERE pi.product_id = ?';
+    $puSinceParams = [$productId];
+    if ($icFrom !== '') {
+        $puSinceSql .= ' AND DATE(pu.created_at) >= ?';
+        $puSinceParams[] = $icFrom;
+    }
+    $icSt = $pdo->prepare($puSinceSql);
+    $icSt->execute($puSinceParams);
+    $icDeltaSince += (int) $icSt->fetchColumn();
+}
+if ($hasPurReturns) {
+    $prSinceSql = 'SELECT COALESCE(SUM(pri.qty), 0) FROM purchase_return_items pri
+        INNER JOIN purchase_returns pr ON pr.id = pri.purchase_return_id WHERE pri.product_id = ?';
+    $prSinceParams = [$productId];
+    if ($icFrom !== '') {
+        $prSinceSql .= ' AND DATE(pr.created_at) >= ?';
+        $prSinceParams[] = $icFrom;
+    }
+    $icSt = $pdo->prepare($prSinceSql);
+    $icSt->execute($prSinceParams);
+    $icDeltaSince -= (int) $icSt->fetchColumn();
+}
+$icOpening = $icTotalStock - $icDeltaSince;
+
+/* حركات المدى من كل المصادر، مصنّفة. */
+$icEvents = [];
+
+$icMvSql = "SELECT sm.created_at, sm.type, sm.old_stock, sm.new_stock, sm.reference, sm.reason,
+        pv.color AS variant_color, pv.size AS variant_size
     FROM stock_movements sm
     LEFT JOIN product_variants pv ON pv.id = sm.variant_id
     WHERE sm.product_id = ?";
@@ -89,24 +149,124 @@ if ($icTo !== '') {
     $icMvSql .= ' AND DATE(sm.created_at) <= ?';
     $icMvParams[] = $icTo;
 }
-$icMvSql .= ' ORDER BY sm.created_at DESC, sm.id DESC';
-$icMvSql .= $icHasRange ? ' LIMIT 1000' : ' LIMIT 80';
-$movements = $pdo->prepare($icMvSql);
-$movements->execute($icMvParams);
-$movements = $movements->fetchAll(PDO::FETCH_ASSOC);
+$icMvSql .= ' ORDER BY sm.created_at ASC, sm.id ASC LIMIT 2000';
+$icMvSt = $pdo->prepare($icMvSql);
+$icMvSt->execute($icMvParams);
+$icSaleTypes = ['delivered_order', 'pending_order_fulfilled'];
+$icSaleReturnTypes = ['order_return', 'delivered_order_void', 'order_amend_release'];
+$icReserveTypes = ['pending_order', 'order_release', 'pending_order_void'];
+$icAdjustTypes = ['manual_adjustment', 'inventory_count', 'opening_balance'];
+foreach ($icMvSt->fetchAll(PDO::FETCH_ASSOC) as $m) {
+    $type = (string) $m['type'];
+    $delta = (int) $m['new_stock'] - (int) $m['old_stock'];
+    if (in_array($type, $icSaleTypes, true)) {
+        $cat = 'sale';
+    } elseif (in_array($type, $icSaleReturnTypes, true)) {
+        $cat = 'sale_return';
+    } elseif (in_array($type, $icReserveTypes, true)) {
+        $cat = 'reserve';
+    } elseif (in_array($type, $icAdjustTypes, true)) {
+        $cat = 'adjust';
+    } else {
+        $cat = 'other';
+    }
+    $icEvents[] = [
+        'at' => (string) $m['created_at'],
+        'cat' => $cat,
+        'delta' => $delta,
+        'label' => orange_stock_movement_type_label_ar($type),
+        'reference' => (string) ($m['reference'] ?? ''),
+        'reason' => (string) ($m['reason'] ?? ''),
+        'variant' => trim(((string) ($m['variant_color'] ?? '')) . ' / ' . ((string) ($m['variant_size'] ?? ''))),
+    ];
+}
 
-/* ملخص الفترة: وارد/صادر/صافي من فرق الرصيد لكل حركة. */
-$icPeriodIn = 0;
-$icPeriodOut = 0;
-foreach ($movements as $icMv) {
-    $delta = (int) ($icMv['new_stock'] ?? 0) - (int) ($icMv['old_stock'] ?? 0);
-    if ($delta > 0) {
-        $icPeriodIn += $delta;
-    } elseif ($delta < 0) {
-        $icPeriodOut += -$delta;
+if ($hasPurCreatedAt) {
+    $puDetSql = 'SELECT pu.id AS doc_id, pu.created_at, ' . $icPuQtyExpr . ' AS qty, pv.color, pv.size
+        FROM purchase_items pi
+        INNER JOIN purchases pu ON pu.id = pi.purchase_id
+        LEFT JOIN product_variants pv ON pv.id = pi.variant_id
+        WHERE pi.product_id = ?';
+    $puDetParams = [$productId];
+    if ($icFrom !== '') {
+        $puDetSql .= ' AND DATE(pu.created_at) >= ?';
+        $puDetParams[] = $icFrom;
+    }
+    if ($icTo !== '') {
+        $puDetSql .= ' AND DATE(pu.created_at) <= ?';
+        $puDetParams[] = $icTo;
+    }
+    $icSt = $pdo->prepare($puDetSql);
+    $icSt->execute($puDetParams);
+    foreach ($icSt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $icEvents[] = [
+            'at' => (string) $r['created_at'],
+            'cat' => 'purchase',
+            'delta' => (int) $r['qty'],
+            'label' => 'فاتورة شراء',
+            'reference' => 'PUR-' . (int) $r['doc_id'],
+            'reason' => '',
+            'variant' => trim(((string) ($r['color'] ?? '')) . ' / ' . ((string) ($r['size'] ?? ''))),
+        ];
     }
 }
+if ($hasPurReturns) {
+    $prDetSql = 'SELECT pr.id AS doc_id, pr.created_at, pri.qty, '
+        . ($hasPriVariant ? 'pv.color, pv.size' : 'NULL AS color, NULL AS size') . '
+        FROM purchase_return_items pri
+        INNER JOIN purchase_returns pr ON pr.id = pri.purchase_return_id
+        ' . ($hasPriVariant ? 'LEFT JOIN product_variants pv ON pv.id = pri.variant_id' : '') . '
+        WHERE pri.product_id = ?';
+    $prDetParams = [$productId];
+    if ($icFrom !== '') {
+        $prDetSql .= ' AND DATE(pr.created_at) >= ?';
+        $prDetParams[] = $icFrom;
+    }
+    if ($icTo !== '') {
+        $prDetSql .= ' AND DATE(pr.created_at) <= ?';
+        $prDetParams[] = $icTo;
+    }
+    $icSt = $pdo->prepare($prDetSql);
+    $icSt->execute($prDetParams);
+    foreach ($icSt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $icEvents[] = [
+            'at' => (string) $r['created_at'],
+            'cat' => 'purchase_return',
+            'delta' => -((int) $r['qty']),
+            'label' => 'مردود مشتريات',
+            'reference' => 'PRET-' . (int) $r['doc_id'],
+            'reason' => '',
+            'variant' => trim(((string) ($r['color'] ?? '')) . ' / ' . ((string) ($r['size'] ?? ''))),
+        ];
+    }
+}
+
+usort($icEvents, static function (array $a, array $b): int {
+    return strcmp((string) $a['at'], (string) $b['at']);
+});
+
+$icSummary = [
+    'purchase' => 0, 'purchase_return' => 0, 'sale' => 0,
+    'sale_return' => 0, 'adjust' => 0, 'reserve' => 0, 'other' => 0,
+];
+$icPeriodIn = 0;
+$icPeriodOut = 0;
+$icRunning = $icOpening;
+foreach ($icEvents as $idx => $ev) {
+    $d = (int) $ev['delta'];
+    $icRunning += $d;
+    $icSummary[$ev['cat']] += $d;
+    if ($d > 0) {
+        $icPeriodIn += $d;
+    } elseif ($d < 0) {
+        $icPeriodOut += -$d;
+    }
+    $icEvents[$idx]['balance'] = $icRunning;
+}
 $icPeriodNet = $icPeriodIn - $icPeriodOut;
+$icClosing = $icRunning;
+$icCloseIsNow = ($icTo === '' || $icTo === $icToday);
+$icReconcileDiff = $icClosing - $icTotalStock;
 
 $img = storefront_product_image_href((string) ($product['main_image'] ?? ''));
 
@@ -116,10 +276,6 @@ $icCompanyLogo = $icCompany['logo_url'];
 $icCompanyCr = $icCompany['commercial_register'];
 $icCompanyFooter = $icCompany['invoice_footer'];
 $icPrintDate = orange_format_date_dmY(date('Y-m-d'));
-$icTotalStock = 0;
-foreach ($variants as $vSum) {
-    $icTotalStock += (int) ($vSum['stock_quantity'] ?? 0);
-}
 ?>
 <div class="page-title gl-acc-stmt-no-print">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
@@ -242,15 +398,51 @@ foreach ($variants as $vSum) {
     </form>
 </div>
 
+<style>
+.ic-summary { display:flex; flex-wrap:wrap; gap:10px; margin:4px 0 12px; }
+.ic-box { min-width:8rem; flex:1 1 8rem; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; padding:9px 12px; display:flex; flex-direction:column; gap:3px; }
+.ic-box-label { font-size:0.8rem; color:#64748b; }
+.ic-box-val { font-size:1.18rem; font-weight:700; color:#0f172a; }
+.ic-box-open { background:#eff6ff; border-color:#bfdbfe; }
+.ic-box-close { background:#f0fdf4; border-color:#bbf7d0; }
+.ic-box-val.ic-pos { color:#15803d; }
+.ic-box-val.ic-neg { color:#b91c1c; }
+</style>
 <div class="card">
-    <h2 class="card-title"><?php echo $icHasRange ? 'حركات المخزون خلال الفترة' : 'آخر حركات المخزون'; ?></h2>
-    <p class="page-subtitle" style="margin:0 0 10px;">
-        <strong>الرصيد الحالي:</strong> <?php echo (int) $icTotalStock; ?>
-        &nbsp;|&nbsp; <strong>وارد الفترة:</strong> <?php echo (int) $icPeriodIn; ?>
-        &nbsp;|&nbsp; <strong>صادر الفترة:</strong> <?php echo (int) $icPeriodOut; ?>
-        &nbsp;|&nbsp; <strong>صافي الفترة:</strong> <?php echo (int) $icPeriodNet; ?>
-        <?php if ($icHasRange): ?>
-            &nbsp;|&nbsp; <strong>رصيد أول المدة (تقديري):</strong> <?php echo (int) ($icTotalStock - $icPeriodNet); ?>
+    <h2 class="card-title"><?php echo $icHasRange ? 'كرت حركة الصنف خلال الفترة' : 'كرت حركة الصنف (كل الحركات)'; ?></h2>
+    <div class="ic-summary">
+        <div class="ic-box ic-box-open">
+            <span class="ic-box-label">الرصيد الافتتاحي<?php echo $icFrom !== '' ? ' (' . htmlspecialchars(orange_format_date_dmY($icFrom), ENT_QUOTES, 'UTF-8') . ')' : ''; ?></span>
+            <span class="ic-box-val" dir="ltr"><?php echo (int) $icOpening; ?></span>
+        </div>
+        <div class="ic-box"><span class="ic-box-label">مشتريات (+)</span><span class="ic-box-val ic-pos" dir="ltr"><?php echo (int) $icSummary['purchase']; ?></span></div>
+        <div class="ic-box"><span class="ic-box-label">مردود مشتريات (−)</span><span class="ic-box-val ic-neg" dir="ltr"><?php echo (int) $icSummary['purchase_return']; ?></span></div>
+        <div class="ic-box"><span class="ic-box-label">مبيعات (−)</span><span class="ic-box-val ic-neg" dir="ltr"><?php echo (int) $icSummary['sale']; ?></span></div>
+        <div class="ic-box"><span class="ic-box-label">مردود مبيعات (+)</span><span class="ic-box-val ic-pos" dir="ltr"><?php echo (int) $icSummary['sale_return']; ?></span></div>
+        <?php if ((int) $icSummary['adjust'] !== 0): ?>
+            <div class="ic-box"><span class="ic-box-label">تعديل/تسوية (±)</span><span class="ic-box-val" dir="ltr"><?php echo (int) $icSummary['adjust']; ?></span></div>
+        <?php endif; ?>
+        <?php if ((int) $icSummary['reserve'] !== 0): ?>
+            <div class="ic-box"><span class="ic-box-label">حجز/إفراج (±)</span><span class="ic-box-val" dir="ltr"><?php echo (int) $icSummary['reserve']; ?></span></div>
+        <?php endif; ?>
+        <?php if ((int) $icSummary['other'] !== 0): ?>
+            <div class="ic-box"><span class="ic-box-label">حركات أخرى (±)</span><span class="ic-box-val" dir="ltr"><?php echo (int) $icSummary['other']; ?></span></div>
+        <?php endif; ?>
+        <div class="ic-box ic-box-close">
+            <span class="ic-box-label">الرصيد الختامي<?php echo $icTo !== '' ? ' (' . htmlspecialchars(orange_format_date_dmY($icTo), ENT_QUOTES, 'UTF-8') . ')' : ''; ?></span>
+            <span class="ic-box-val" dir="ltr"><?php echo (int) $icClosing; ?></span>
+        </div>
+    </div>
+    <p class="page-subtitle gl-acc-stmt-no-print" style="margin:0 0 10px;">
+        الرصيد الفعلي بالمخزن الآن: <strong dir="ltr"><?php echo (int) $icTotalStock; ?></strong>
+        <?php if ($icCloseIsNow): ?>
+            <?php if ($icReconcileDiff === 0): ?>
+                <span style="color:#15803d;font-weight:700;">— مطابق للرصيد الختامي ✓</span>
+            <?php else: ?>
+                <span style="color:#b91c1c;font-weight:700;">— فرق <span dir="ltr"><?php echo (int) $icReconcileDiff; ?></span></span>
+            <?php endif; ?>
+        <?php else: ?>
+            <span class="muted">(الرصيد الختامي محسوب حتى نهاية المدى المحدد)</span>
         <?php endif; ?>
     </p>
     <div class="table-wrap">
@@ -258,35 +450,46 @@ foreach ($variants as $vSum) {
             <thead>
                 <tr>
                     <th>التاريخ</th>
-                    <th>النوع</th>
+                    <th>الحركة</th>
                     <th>لون/مقاس</th>
-                    <th>كمية</th>
-                    <th>قبل → بعد</th>
-                    <th>الرصيد التراكمي (للمتغير)</th>
-                    <th>مرجع الطلب</th>
+                    <th>وارد</th>
+                    <th>صادر</th>
+                    <th>الرصيد</th>
+                    <th>مرجع</th>
                     <th>السبب</th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($movements as $m): ?>
+                <tr style="background:#eff6ff;font-weight:700;">
+                    <td colspan="5">رصيد بداية المدة<?php echo $icFrom !== '' ? ' (' . htmlspecialchars(orange_format_date_dmY($icFrom), ENT_QUOTES, 'UTF-8') . ')' : ''; ?></td>
+                    <td dir="ltr"><?php echo (int) $icOpening; ?></td>
+                    <td>—</td>
+                    <td>—</td>
+                </tr>
+                <?php foreach ($icEvents as $ev): ?>
+                <?php $d = (int) $ev['delta']; $vlbl = trim((string) $ev['variant']); ?>
                 <tr>
-                    <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) $m['created_at'])); ?></td>
-                    <td>
-                        <code title="<?php echo htmlspecialchars((string) $m['type'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(orange_stock_movement_type_label_ar((string) ($m['type'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></code>
-                    </td>
-                    <td><?php echo htmlspecialchars(trim(($m['variant_color'] ?: '') . ' / ' . ($m['variant_size'] ?: '')) ?: '—'); ?></td>
-                    <td><?php echo (int)$m['qty']; ?></td>
-                    <td><?php echo (int)$m['old_stock']; ?> → <?php echo (int)$m['new_stock']; ?></td>
-                    <td><strong><?php echo (int)$m['new_stock']; ?></strong></td>
-                    <td dir="ltr"><code><?php echo htmlspecialchars(trim((string)($m['reference'] ?? '')) ?: '—'); ?></code></td>
-                    <td><?php echo htmlspecialchars((string)($m['reason'] ?? '')); ?></td>
+                    <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) $ev['at'])); ?></td>
+                    <td><?php echo htmlspecialchars((string) $ev['label'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars(($vlbl !== '' && $vlbl !== '/') ? $vlbl : '—'); ?></td>
+                    <td dir="ltr"><?php echo $d > 0 ? (int) $d : ''; ?></td>
+                    <td dir="ltr"><?php echo $d < 0 ? (int) (-$d) : ''; ?></td>
+                    <td dir="ltr"><strong><?php echo (int) $ev['balance']; ?></strong></td>
+                    <td dir="ltr"><code><?php echo htmlspecialchars((string) $ev['reference'] !== '' ? (string) $ev['reference'] : '—'); ?></code></td>
+                    <td><?php echo htmlspecialchars((string) $ev['reason']); ?></td>
                 </tr>
                 <?php endforeach; ?>
+                <tr style="background:#f0fdf4;font-weight:700;">
+                    <td colspan="5">رصيد نهاية المدة<?php echo $icTo !== '' ? ' (' . htmlspecialchars(orange_format_date_dmY($icTo), ENT_QUOTES, 'UTF-8') . ')' : ''; ?></td>
+                    <td dir="ltr"><?php echo (int) $icClosing; ?></td>
+                    <td>—</td>
+                    <td>—</td>
+                </tr>
             </tbody>
         </table>
     </div>
-    <?php if (!$movements): ?>
-        <p class="muted">لا توجد حركات مسجلة لهذا الصنف.</p>
+    <?php if ($icEvents === []): ?>
+        <p class="muted">لا توجد حركات على الصنف في المدى المحدد.</p>
     <?php endif; ?>
 </div>
 

@@ -28,4 +28,17 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
    - Edit load + fiscal lock check: admin/api/purchases/get.php; POST update/delete: admin/api/purchases/update.php (reverses stock using qty_received only before replacing lines).
    - UI: admin/pages/purchases.php — استلام كامل / استلام جزئي / تعديل / حذف.
 
+7) كارت الصنف (item_card) — تقرير حركة صنف موحّد (قرار المالك 2026-06-14)
+   - الصفحة: admin/pages/item_card.php (تُفتح لكل صنف من شاشة المستودع admin/pages/stock.php «فتح الكارت»، ومُحال إليها من تقارير المخزن).
+   - المشكلة المُعالَجة: stock_movements لا يسجّل **الشراء ولا مردود الشراء** (يحدّثان كمية المخزن وطبقات FIFO فقط عبر orange_warehouse_apply_variant_delta). فكان «رصيد أول المدة (تقديري)» القديم خاطئاً والمشتريات غائبة عن الكرت.
+   - الحل: الكرت يجمع الحركات من كل المصادر:
+       * مشتريات (+): purchase_items + purchases.created_at
+       * مردود مشتريات (−): purchase_return_items + purchase_returns.created_at
+       * مبيعات (−): stock_movements types delivered_order / pending_order_fulfilled
+       * مردود مبيعات (+): stock_movements types order_return / delivered_order_void / order_amend_release
+       * تعديل/تسوية (±): stock_movements types manual_adjustment / inventory_count / opening_balance
+       * حجز/إفراج وأخرى (±): بقية أنواع stock_movements (لإبقاء الرصيد متّزناً)
+   - الرصيد الافتتاحي يُحسب عكسياً: الافتتاحي = الرصيد الفعلي الحالي − صافي كل الحركات (من كل المصادر) التي تاريخها ≥ «من». فيطابق الرصيد الختامي المخزون الفعلي عندما «إلى» = اليوم (أو بلا مدى) — تُعرض مطابقة صريحة.
+   - قرار المالك: تُعرض التعديلات/تسويات الجرد كصف مستقل ضمن الكرت حتى يطابق الرصيد الختامي المخزون الفعلي تماماً (وليس الاكتفاء بالشراء/البيع ومردودهما).
+
 Agreed with project owner for Orange implementation.
