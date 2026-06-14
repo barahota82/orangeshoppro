@@ -36,10 +36,17 @@ if (!isset($reports[$reportKey])) {
 
 $pid = isset($_GET['pid']) ? max(0, (int) $_GET['pid']) : 0;
 $pidLabel = '';
+$pidCode = '';
 if ($pid > 0) {
-    $pl = $pdo->prepare('SELECT name FROM products WHERE id = ? LIMIT 1');
+    $pidHasItemCode = orange_table_has_column($pdo, 'products', 'item_code');
+    $pidCodeExpr = $pidHasItemCode
+        ? "COALESCE(NULLIF(TRIM(item_code), ''), CONCAT('P', id))"
+        : "CONCAT('P', id)";
+    $pl = $pdo->prepare("SELECT name, {$pidCodeExpr} AS code FROM products WHERE id = ? LIMIT 1");
     $pl->execute([$pid]);
-    $pidLabel = (string) ($pl->fetchColumn() ?: '');
+    $plRow = $pl->fetch(PDO::FETCH_ASSOC);
+    $pidLabel = (string) ($plRow['name'] ?? '');
+    $pidCode = (string) ($plRow['code'] ?? '');
     if ($pidLabel === '') {
         $pid = 0;
     }
@@ -398,15 +405,19 @@ $reportTitle = $reports[$reportKey];
         <input type="hidden" name="r" value="<?php echo htmlspecialchars($reportKey, ENT_QUOTES, 'UTF-8'); ?>">
         <?php if (in_array($reportKey, ['balances', 'valuation', 'movements', 'move_summary'], true)): ?>
             <div>
-                <label for="sr_pid_label">الصنف (دبل كليك للاختيار)</label>
+                <label for="sr_pid_code">الصنف (دبل كليك للاختيار)</label>
                 <div style="display:flex;gap:6px;align-items:center;">
                     <input type="hidden" id="sr_pid" name="pid" value="<?php echo (int) $pid; ?>">
-                    <input type="text" id="sr_pid_label" class="admin-inp" readonly
+                    <input type="text" id="sr_pid_code" class="admin-inp" readonly
                         title="دبل كليك لاختيار صنف"
-                        style="cursor:pointer;min-width:16rem;"
+                        style="cursor:pointer;width:8rem;" dir="ltr"
+                        placeholder="الكود"
+                        value="<?php echo htmlspecialchars($pidCode, ENT_QUOTES, 'UTF-8'); ?>">
+                    <input type="text" id="sr_pid_name" class="admin-inp" readonly
+                        title="دبل كليك لاختيار صنف"
+                        style="cursor:pointer;min-width:14rem;"
                         placeholder="كل الأصناف — دبل كليك للاختيار"
                         value="<?php echo htmlspecialchars($pidLabel, ENT_QUOTES, 'UTF-8'); ?>">
-                    <button type="button" class="btn-secondary" id="sr_pick_btn">اختيار صنف</button>
                     <?php if ($pid > 0): ?>
                         <button type="button" class="btn-secondary" id="sr_pick_clear">الكل</button>
                     <?php endif; ?>
@@ -632,8 +643,8 @@ $reportTitle = $reports[$reportKey];
 (function () {
     var SR_PICK_ROWS = <?php echo $srPickJson !== false ? $srPickJson : '[]'; ?>;
     var pidInput = document.getElementById('sr_pid');
-    var pidLabel = document.getElementById('sr_pid_label');
-    var pickBtn = document.getElementById('sr_pick_btn');
+    var pidCode = document.getElementById('sr_pid_code');
+    var pidName = document.getElementById('sr_pid_name');
     var clearBtn = document.getElementById('sr_pick_clear');
     var form = document.getElementById('bs_report_form') || (pidInput ? pidInput.closest('form') : null);
 
@@ -646,8 +657,11 @@ $reportTitle = $reports[$reportKey];
                 return;
             }
             pidInput.value = parseInt(row.product_id, 10) || 0;
-            if (pidLabel) {
-                pidLabel.value = (row.code ? row.code + ' — ' : '') + row.name;
+            if (pidCode) {
+                pidCode.value = row.code || '';
+            }
+            if (pidName) {
+                pidName.value = row.name || '';
             }
             if (form) {
                 form.submit();
@@ -655,19 +669,22 @@ $reportTitle = $reports[$reportKey];
         });
     }
 
-    if (pickBtn) {
-        pickBtn.addEventListener('click', openPicker);
+    if (pidCode) {
+        pidCode.addEventListener('dblclick', openPicker);
     }
-    if (pidLabel) {
-        pidLabel.addEventListener('dblclick', openPicker);
+    if (pidName) {
+        pidName.addEventListener('dblclick', openPicker);
     }
     if (clearBtn) {
         clearBtn.addEventListener('click', function () {
             if (pidInput) {
                 pidInput.value = '0';
             }
-            if (pidLabel) {
-                pidLabel.value = '';
+            if (pidCode) {
+                pidCode.value = '';
+            }
+            if (pidName) {
+                pidName.value = '';
             }
             if (form) {
                 form.submit();
