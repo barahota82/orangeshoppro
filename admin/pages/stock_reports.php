@@ -379,16 +379,9 @@ $reportTitle = $reports[$reportKey];
 
 ?>
 <div class="page-title gl-acc-stmt-no-print">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
-        <div>
-            <h1>تقارير المخزن</h1>
-            <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
-        </div>
-    </div>
+    <h1>تقارير المخزن</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p class="page-subtitle">
-    <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">← المستودع</a>
-</p>
 
 <div class="card gl-acc-stmt-no-print">
     <div class="sr-tabs">
@@ -398,7 +391,6 @@ $reportTitle = $reports[$reportKey];
                 <?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?>
             </a>
         <?php endforeach; ?>
-        <a class="sr-tab" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">كارت الصنف (من المستودع)</a>
     </div>
 
     <form method="get" class="sr-filter-form" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
