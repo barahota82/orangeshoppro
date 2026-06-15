@@ -4262,6 +4262,21 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     margin: 0;
 }
 
+/*
+ * قرار المالك (2026-06-16): لا أسهم زيادة/نقصان (spinner) على أي حقل رقمي في الأدمن —
+ * المستخدم يكتب الرقم مباشرة دون إجبار على الضغط بالماوس. قاعدة عامة تشمل كل
+ * input[type=number] الحالية والمستقبلية، فلا حاجة لإضافة صنف لكل حقل.
+ */
+input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
 /* §9.3 V1 — ترويسة السند داخل thead (مخفية على الشاشة؛ تتكرر أعلى كل صفحة في الطباعة) */
 .jv-voucher-print-sheet {
     width: 100%;
