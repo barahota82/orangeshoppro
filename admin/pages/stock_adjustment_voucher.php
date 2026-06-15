@@ -184,7 +184,6 @@ if ($editSv !== null) {
 
     <div class="stk-treat-card">
         <h4 class="stk-treat-title">المعالجة المحاسبية (قيد التسوية)</h4>
-        <p class="stk-treat-info" id="stk_treat_info">—</p>
         <div class="admin-doc-frame">
             <div class="table-wrap">
                 <table class="admin-table admin-doc-lines-table jv-lines-table stk-treat-table" id="stk_treat_table">
@@ -304,7 +303,6 @@ if ($editSv !== null) {
 .stk-val-pos { color: #15803d; font-weight: 700; }
 .stk-treat-card { margin-top: 16px; border-top: 2px solid #e4e4e7; padding-top: 12px; }
 .stk-treat-title { margin: 0 0 6px; font-size: 1rem; }
-.stk-treat-info { margin: 0 0 10px; font-size: 0.9rem; color: #334155; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; }
 .stk-treat-table { table-layout: fixed; width: 100%; }
 .stk-treat-table col.stk-tcol-code { width: 12rem; }
 .stk-treat-table col.stk-tcol-name { width: auto; }
@@ -545,13 +543,6 @@ if ($editSv !== null) {
         // الإجماليات تشمل سطر المخزون التلقائي ليبدو القيد كاملاً مثل سند القيد.
         var totalDebit = round4(mv.inc + sums.debit);
         var totalCredit = round4(mv.dec + sums.credit);
-        var info = el('stk_treat_info');
-        if (info) {
-            var dirTxt = mv.net > 0 ? ('مدين حساب المخزون بصافي ' + fmt(mv.net))
-                : (mv.net < 0 ? ('دائن حساب المخزون بصافي ' + fmt(-mv.net)) : 'لا صافي قيمة');
-            info.innerHTML = 'حركة المخزون التلقائية: <strong>' + esc(dirTxt) + '</strong>'
-                + '<br>أكمل الطرف المقابل (أرباح/خسائر أو ذمة موظف) حتى يتوازن القيد (مجموع المدين = مجموع الدائن).';
-        }
         var de = el('stk_treat_debit'); if (de) { de.textContent = fmt(totalDebit); }
         var ce = el('stk_treat_credit'); if (ce) { ce.textContent = fmt(totalCredit); }
         var be = el('stk_treat_balance');
@@ -585,7 +576,7 @@ if ($editSv !== null) {
         el('stk_desc').value = state.notes || '';
         el('stk_status_badge').textContent = state.id > 0
             ? ('سند #' + state.id + ' — ' + (isApproved() ? ('معتمد' + (state.journal_voucher_id ? ' (قيد #' + state.journal_voucher_id + ')' : '')) : 'مسودة'))
-            : 'سند جديد (غير محفوظ)';
+            : '';
         bindRows();
         applyMode();
         recompute();
