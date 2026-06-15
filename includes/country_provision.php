@@ -761,8 +761,8 @@ function orange_country_copy_company_settings_from_source(PDO $pdo, int $targetC
         return $out;
     }
     $ins = $pdo->prepare(
-        'INSERT INTO company_settings (country_id, company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number, invoice_footer)
-         VALUES (?,?,?,?,?,?,?,?,?)'
+        'INSERT INTO company_settings (country_id, company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number, invoice_footer_ar, invoice_footer_en)
+         VALUES (?,?,?,?,?,?,?,?,?,?)'
     );
     try {
         $ins->execute([
@@ -774,7 +774,8 @@ function orange_country_copy_company_settings_from_source(PDO $pdo, int $targetC
             (string) ($row['phones'] ?? ''),
             (string) ($row['address'] ?? ''),
             (string) ($row['vat_number'] ?? ''),
-            $row['invoice_footer'] ?? null,
+            $row['invoice_footer_ar'] ?? null,
+            $row['invoice_footer_en'] ?? null,
         ]);
         $out['copied'] = 1;
     } catch (Throwable $e) {

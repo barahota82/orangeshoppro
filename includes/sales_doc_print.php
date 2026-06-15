@@ -6,7 +6,7 @@ require_once __DIR__ . '/company_settings.php';
 require_once __DIR__ . '/upload_paths.php';
 
 /**
- * @return array{company_name_ar:string,company_name_en:string,logo_url:string,commercial_register:string,phones:string,address:string,vat_number:string,invoice_footer:string,invoice_footer_ar:string,invoice_footer_en:string}
+ * @return array{company_name_ar:string,company_name_en:string,logo_url:string,commercial_register:string,phones:string,address:string,vat_number:string,invoice_footer_ar:string,invoice_footer_en:string}
  */
 function orange_sales_doc_print_company(PDO $pdo, int $countryId): array
 {
@@ -18,7 +18,6 @@ function orange_sales_doc_print_company(PDO $pdo, int $countryId): array
         'phones' => '',
         'address' => '',
         'vat_number' => '',
-        'invoice_footer' => '',
         'invoice_footer_ar' => '',
         'invoice_footer_en' => '',
     ];
@@ -48,7 +47,6 @@ function orange_sales_doc_print_company(PDO $pdo, int $countryId): array
         'phones' => trim((string) ($row['phones'] ?? '')),
         'address' => trim((string) ($row['address'] ?? '')),
         'vat_number' => trim((string) ($row['vat_number'] ?? '')),
-        'invoice_footer' => trim((string) ($row['invoice_footer'] ?? '')),
         'invoice_footer_ar' => trim((string) ($row['invoice_footer_ar'] ?? '')),
         'invoice_footer_en' => trim((string) ($row['invoice_footer_en'] ?? '')),
     ];
@@ -276,11 +274,11 @@ function orange_sales_doc_print_totals_box(string $prefix): void
 }
 
 /**
- * تذييل طباعة لفاتورة العميل (شكر + توقيع/ختم + invoice_footer).
+ * تذييل طباعة لفاتورة العميل (شكر + توقيع/ختم + النص القانوني).
  * يُوضع في نهاية منطقة الطباعة `.jv-print-area` للمستندات التي يستلمها العميل (المبيعات).
  *
  * @param array{country_id:int, show_note?:bool} $ctx
- *   show_note: إظهار النص القانوني (invoice_footer). افتراضياً true.
+ *   show_note: إظهار النص القانوني (عربي/إنجليزي). افتراضياً true.
  *   يُمرَّر false للمستندات التي لا يناسبها النص القانوني للفاتورة (مثل مردود المبيعات).
  */
 function orange_sales_doc_print_footer(array $ctx): void
@@ -290,7 +288,6 @@ function orange_sales_doc_print_footer(array $ctx): void
     $company = orange_sales_doc_print_company(db(), $countryId);
     $footerAr = $showNote ? $company['invoice_footer_ar'] : '';
     $footerEn = $showNote ? $company['invoice_footer_en'] : '';
-    $footerLegacy = $showNote ? $company['invoice_footer'] : '';
     ?>
 <div class="sd-print-footer" aria-hidden="true">
     <p class="sd-print-footer__thanks">شكراً لتعاملكم / Thank you for your business</p>
@@ -309,13 +306,10 @@ function orange_sales_doc_print_footer(array $ctx): void
     /*
      * النص القانوني: شريط HTML مثبّت (position:fixed) أسفل كل صفحة في الطباعة — العربي يمين،
      * الإنجليزي يسار، كلاهما justify (نهايات الأسطر بحذاء واحد). رقم الصفحة وسطاً عبر @page
-     * @bottom-center (دالة orange_sales_doc_print_legal_pagecss). الحقل القديم يقع كعربي.
+     * @bottom-center (دالة orange_sales_doc_print_legal_pagecss).
      */
     $legalAr = $footerAr;
     $legalEn = $footerEn;
-    if ($legalAr === '' && $legalEn === '' && $footerLegacy !== '') {
-        $legalAr = $footerLegacy;
-    }
     ?>
 <?php if ($legalAr !== '' || $legalEn !== ''): ?>
 <div class="sd-print-legal" aria-hidden="true">
@@ -341,9 +335,6 @@ function orange_sales_doc_print_legal_pagecss(int $countryId): string
     $company = orange_sales_doc_print_company(db(), $countryId);
     $ar = $company['invoice_footer_ar'];
     $en = $company['invoice_footer_en'];
-    if ($ar === '' && $en === '' && $company['invoice_footer'] !== '') {
-        $ar = $company['invoice_footer'];
-    }
     if ($ar === '' && $en === '') {
         return '';
     }

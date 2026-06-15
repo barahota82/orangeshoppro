@@ -36,7 +36,7 @@ $csField = static function (array $row, string $key): string {
     return htmlspecialchars(trim((string) ($row[$key] ?? '')), ENT_QUOTES, 'UTF-8');
 };
 $csHasSaved = false;
-foreach (['company_name_ar', 'company_name_en', 'commercial_register', 'phones', 'address', 'vat_number', 'invoice_footer'] as $csKey) {
+foreach (['company_name_ar', 'company_name_en', 'commercial_register', 'phones', 'address', 'vat_number', 'invoice_footer_ar', 'invoice_footer_en'] as $csKey) {
     if (trim((string) ($csRow[$csKey] ?? '')) !== '') {
         $csHasSaved = true;
         break;
@@ -88,9 +88,6 @@ $csUpdatedAt = trim((string) ($csRow['updated_at'] ?? ''));
         <div><label>حد إظهار «كمية محدودة» للعميل (واجهة المتجر — يظهر عند الرصيد ≤ هذا الرقم)</label><input type="number" id="customer_low_stock_threshold" min="1" max="100000" step="1" lang="en" dir="ltr" placeholder="5" value="<?php echo htmlspecialchars((string) ($csRow['customer_low_stock_threshold'] ?? '5'), ENT_QUOTES, 'UTF-8'); ?>"></div>
         <?php
         $csFooterAr = trim((string) ($csRow['invoice_footer_ar'] ?? ''));
-        if ($csFooterAr === '') {
-            $csFooterAr = trim((string) ($csRow['invoice_footer'] ?? ''));
-        }
         $csFooterEn = trim((string) ($csRow['invoice_footer_en'] ?? ''));
         ?>
         <div style="grid-column:1/-1;"><label>نص قانوني أسفل الفاتورة — عربي (اختياري)</label><textarea id="invoice_footer_ar" rows="2" dir="rtl" placeholder="مثال: سياسة الاستبدال والاسترجاع — خلال ١٤ يوماً ..."><?php echo htmlspecialchars($csFooterAr, ENT_QUOTES, 'UTF-8'); ?></textarea></div>
@@ -139,7 +136,7 @@ async function loadCompanySettings() {
     if (clsEl) clsEl.value = (d.customer_low_stock_threshold !== undefined && d.customer_low_stock_threshold !== null && d.customer_low_stock_threshold !== '') ? d.customer_low_stock_threshold : '5';
     var fAr = document.getElementById('invoice_footer_ar');
     var fEn = document.getElementById('invoice_footer_en');
-    if (fAr) fAr.value = d.invoice_footer_ar || d.invoice_footer || '';
+    if (fAr) fAr.value = d.invoice_footer_ar || '';
     if (fEn) fEn.value = d.invoice_footer_en || '';
     const payEl = document.getElementById('payment_online_enabled');
     if (payEl) {

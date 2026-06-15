@@ -125,7 +125,7 @@ try {
 $company = [
     'company_name_ar' => '', 'company_name_en' => '', 'logo_url' => '',
     'commercial_register' => '', 'phones' => '', 'address' => '', 'vat_number' => '',
-    'invoice_footer_ar' => '', 'invoice_footer_en' => '', 'invoice_footer' => '',
+    'invoice_footer_ar' => '', 'invoice_footer_en' => '',
 ];
 if ($doc !== null) {
     try {
@@ -156,8 +156,8 @@ $showLegal = ($doc !== null) && in_array($doc['doc_kind'], ['inv_c', 'inv_o'], t
 $legalNote = '';
 if ($showLegal) {
     $legalNote = $lang === 'ar'
-        ? ($company['invoice_footer_ar'] ?: ($company['invoice_footer'] ?: $company['invoice_footer_en']))
-        : ($company['invoice_footer_en'] ?: ($company['invoice_footer'] ?: $company['invoice_footer_ar']));
+        ? ($company['invoice_footer_ar'] ?: $company['invoice_footer_en'])
+        : ($company['invoice_footer_en'] ?: $company['invoice_footer_ar']);
 }
 
 /* خلايا الهواتف. */

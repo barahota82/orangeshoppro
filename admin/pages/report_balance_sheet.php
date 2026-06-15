@@ -149,7 +149,6 @@ $company = orange_sales_doc_print_company($pdo, $bsCountryId);
 $companyNameAr = $company['company_name_ar'];
 $companyLogo = $company['logo_url'];
 $companyCr = $company['commercial_register'];
-$companyFooter = $company['invoice_footer'];
 
 $fyLabelAr = $fyRow !== null ? (string) ($fyRow['label_ar'] ?? '') : '';
 $prevFyLabelAr = $prevFyRow !== null ? (string) ($prevFyRow['label_ar'] ?? '') : '';
@@ -355,10 +354,6 @@ $colCount = $showCompare ? 4 : 3;
                 <p class="card-hint ta-report-empty-msg" style="margin-top:10px;margin-bottom:0;">
                     <strong>فرق محاسبي:</strong> <?php echo $reportFmt($bsCheck); ?> (أصول − خصوم − حقوق) — راجع التصنيف أو القيود.
                 </p>
-            <?php endif; ?>
-
-            <?php if ($companyFooter !== ''): ?>
-                <p class="bs-report-legal-footer"><?php echo htmlspecialchars($companyFooter, ENT_QUOTES, 'UTF-8'); ?></p>
             <?php endif; ?>
 
             <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>

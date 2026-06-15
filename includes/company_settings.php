@@ -55,8 +55,8 @@ function orange_company_settings_ensure_row(PDO $pdo, int $countryId): array
         $st->execute([$countryId]);
         if (!$st->fetchColumn()) {
             $ins = $pdo->prepare(
-                'INSERT INTO company_settings (country_id, company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number, invoice_footer)
-                 VALUES (?, \'\', \'\', \'\', \'\', \'\', \'\', \'\', NULL)'
+                'INSERT INTO company_settings (country_id, company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number)
+                 VALUES (?, \'\', \'\', \'\', \'\', \'\', \'\', \'\')'
             );
             $ins->execute([$countryId]);
         }

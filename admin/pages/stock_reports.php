@@ -676,7 +676,6 @@ try {
 $companyName = $company['company_name_ar'];
 $companyLogo = $company['logo_url'];
 $companyCr = $company['commercial_register'];
-$companyFooter = $company['invoice_footer'];
 $todayDmY = orange_format_date_dmY($today);
 $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $reportTitle = $reports[$reportKey];
@@ -954,9 +953,6 @@ $reportTitle = $reports[$reportKey];
             </table>
         </div>
 
-        <?php if ($companyFooter !== ''): ?>
-            <p class="bs-report-legal-footer"><?php echo htmlspecialchars($companyFooter, ENT_QUOTES, 'UTF-8'); ?></p>
-        <?php endif; ?>
         <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
     </div>
 </div>

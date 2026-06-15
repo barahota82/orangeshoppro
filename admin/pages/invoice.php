@@ -68,7 +68,8 @@ function orange_invoice_load_company(PDO $pdo, ?int $countryId = null): array
         'phones' => '',
         'address' => '',
         'vat_number' => '',
-        'invoice_footer' => '',
+        'invoice_footer_ar' => '',
+        'invoice_footer_en' => '',
     ];
     try {
         orange_catalog_ensure_schema($pdo);
@@ -514,7 +515,10 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
     $phones = trim((string)($companyProfile['phones'] ?? ''));
     $addr = trim((string)($companyProfile['address'] ?? ''));
     $vat = trim((string)($companyProfile['vat_number'] ?? ''));
-    $footerLegal = trim((string)($companyProfile['invoice_footer'] ?? ''));
+    $footerLegal = trim((string)($companyProfile['invoice_footer_ar'] ?? ''));
+    if ($footerLegal === '') {
+        $footerLegal = trim((string)($companyProfile['invoice_footer_en'] ?? ''));
+    }
     $formalInv = trim((string)($order['invoice_number'] ?? ''));
     $orderSrc = (string)($order['order_source'] ?? 'website');
     $orderSrcAr = $orderSrc === 'company'

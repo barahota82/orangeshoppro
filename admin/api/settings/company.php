@@ -25,7 +25,6 @@ try {
         phones VARCHAR(500) NOT NULL DEFAULT '',
         address TEXT NULL,
         vat_number VARCHAR(191) NOT NULL DEFAULT '',
-        invoice_footer TEXT NULL,
         updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
@@ -49,8 +48,6 @@ try {
         $phones = trim((string)($data['phones'] ?? ''));
         $address = trim((string)($data['address'] ?? ''));
         $vatNumber = trim((string)($data['vat_number'] ?? ''));
-        $invoiceFooter = trim((string)($data['invoice_footer'] ?? ''));
-        $invoiceFooterDb = $invoiceFooter === '' ? null : $invoiceFooter;
         $paymentOnlineEnabled = (int)($data['payment_online_enabled'] ?? 0) === 1 ? 1 : 0;
         $hasPayOnlineCol = orange_company_settings_has_payment_online_column($pdo);
 
@@ -58,32 +55,32 @@ try {
         if (orange_company_settings_has_country_column($pdo)) {
             if ($hasPayOnlineCol) {
                 $stmt = $pdo->prepare(
-                    "UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, invoice_footer=?, payment_online_enabled=? WHERE country_id=?"
+                    "UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, payment_online_enabled=? WHERE country_id=?"
                 );
-                $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, $paymentOnlineEnabled, $ctxCountryId]);
+                $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $paymentOnlineEnabled, $ctxCountryId]);
             } else {
                 $stmt = $pdo->prepare(
-                    "UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, invoice_footer=? WHERE country_id=?"
+                    "UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=? WHERE country_id=?"
                 );
-                $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, $ctxCountryId]);
+                $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $ctxCountryId]);
             }
         } else {
             $row = $pdo->query("SELECT id FROM company_settings ORDER BY id ASC LIMIT 1")->fetch();
             if ($row) {
                 if ($hasPayOnlineCol) {
-                    $stmt = $pdo->prepare("UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, invoice_footer=?, payment_online_enabled=? WHERE id=?");
-                    $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, $paymentOnlineEnabled, (int)$row['id']]);
+                    $stmt = $pdo->prepare("UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, payment_online_enabled=? WHERE id=?");
+                    $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $paymentOnlineEnabled, (int)$row['id']]);
                 } else {
-                    $stmt = $pdo->prepare("UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, invoice_footer=? WHERE id=?");
-                    $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, (int)$row['id']]);
+                    $stmt = $pdo->prepare("UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=? WHERE id=?");
+                    $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, (int)$row['id']]);
                 }
             } else {
                 if ($hasPayOnlineCol) {
-                    $stmt = $pdo->prepare("INSERT INTO company_settings (company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number, invoice_footer, payment_online_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, $paymentOnlineEnabled]);
+                    $stmt = $pdo->prepare("INSERT INTO company_settings (company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number, payment_online_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $paymentOnlineEnabled]);
                 } else {
-                    $stmt = $pdo->prepare("INSERT INTO company_settings (company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number, invoice_footer) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb]);
+                    $stmt = $pdo->prepare("INSERT INTO company_settings (company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber]);
                 }
             }
         }
