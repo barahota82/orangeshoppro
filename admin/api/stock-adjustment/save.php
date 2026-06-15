@@ -32,10 +32,13 @@ try {
     $linesIn = isset($data['lines']) && is_array($data['lines']) ? $data['lines'] : [];
     $lines = orange_stock_adjustment_voucher_normalize_lines($pdo, $warehouseId, $linesIn);
 
+    $glLinesIn = isset($data['gl_lines']) && is_array($data['gl_lines']) ? $data['gl_lines'] : [];
+
     $id = orange_stock_adjustment_voucher_save($pdo, [
         'id' => (int) ($data['id'] ?? 0),
         'document_date' => trim((string) ($data['document_date'] ?? '')),
         'notes' => trim((string) ($data['notes'] ?? '')),
+        'gl_lines' => $glLinesIn,
     ], $lines, $ctxCountryId);
 
     audit_log('stock_adjustment_voucher_save', 'حفظ سند تعديل رصيد #' . $id, 'stock_adjustment_voucher', $id);

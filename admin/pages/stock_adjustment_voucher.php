@@ -27,6 +27,7 @@ $initial = [
     'status' => 'draft',
     'journal_voucher_id' => 0,
     'lines' => [],
+    'gl_lines' => [],
     'total_value' => 0,
 ];
 if ($editSv !== null) {
@@ -38,6 +39,7 @@ if ($editSv !== null) {
         'status' => (string) ($h['status'] ?? 'draft'),
         'journal_voucher_id' => (int) ($h['journal_voucher_id'] ?? 0),
         'lines' => $editSv['lines'],
+        'gl_lines' => $editSv['gl_lines'] ?? [],
         'total_value' => (float) ($editSv['total_value'] ?? 0),
     ];
 }
@@ -70,8 +72,9 @@ if ($editSv !== null) {
 
 <p class="card-hint jv-print-hide" style="margin:0 0 12px;">
     سند بنمط القيد لكن للكميات: لكل سطر اختر <strong>الصنف</strong> (نقرتان على خانة الكود)، وسجّل كمية في
-    <strong>إضافة (+)</strong> أو <strong>خصم (−)</strong>؛ تُحتسب قيمة الفرق من تكلفة الصنف، واختر لكل سطر
-    <strong>حساب المعالجة</strong> (نقرتان): أرباح/خسائر أو ذمة موظف من شجرة الحسابات.
+    <strong>إضافة (+)</strong> أو <strong>خصم (−)</strong>؛ تُحتسب قيمة الفرق من تكلفة الصنف. المعالجة المحاسبية
+    تُسجَّل في <strong>كارت «المعالجة المحاسبية»</strong> بالأسفل بصيغة مدين/دائن مرنة (سطر واحد أو أكثر) — حساب
+    المخزون يُضاف تلقائياً عند الاعتماد.
 </p>
 
 <div class="card jv-print-area" id="stk_adj_app">
@@ -146,7 +149,6 @@ if ($editSv !== null) {
                     <col class="stk-col-deduct">
                     <col class="stk-col-cost">
                     <col class="stk-col-val">
-                    <col class="stk-col-acc">
                     <col class="stk-col-act">
                 </colgroup>
                 <thead>
@@ -159,7 +161,6 @@ if ($editSv !== null) {
                         <th>خصم (−)</th>
                         <th>تكلفة الوحدة</th>
                         <th>قيمة الفرق</th>
-                        <th>حساب المعالجة</th>
                         <th class="admin-doc-col-actions" aria-label="حذف"></th>
                     </tr>
                 </thead>
@@ -168,6 +169,46 @@ if ($editSv !== null) {
         </div>
     </div>
     <p id="stk_lines_empty" class="card-hint jv-print-hide">لا أصناف — اضغط «+ سطر يدوي» ثم انقر نقرتين على خانة الكود لاختيار الصنف.</p>
+
+    <div class="stk-treat-card">
+        <h4 class="stk-treat-title">المعالجة المحاسبية (قيد التسوية)</h4>
+        <p class="stk-treat-info" id="stk_treat_info">—</p>
+        <div class="admin-doc-frame">
+            <div class="table-wrap">
+                <table class="admin-table admin-doc-lines-table jv-lines-table stk-treat-table" id="stk_treat_table">
+                    <colgroup>
+                        <col class="stk-tcol-acc">
+                        <col class="stk-tcol-debit">
+                        <col class="stk-tcol-credit">
+                        <col class="stk-tcol-memo">
+                        <col class="stk-tcol-act">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>الحساب (أرباح/خسائر أو ذمة موظف)</th>
+                            <th>مدين</th>
+                            <th>دائن</th>
+                            <th>بيان السطر</th>
+                            <th class="admin-doc-col-actions" aria-label="حذف"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="stk_treat_body"></tbody>
+                    <tfoot>
+                        <tr class="stk-treat-foot">
+                            <th>الإجمالي</th>
+                            <th><span id="stk_treat_debit">0.00</span></th>
+                            <th><span id="stk_treat_credit">0.00</span></th>
+                            <th colspan="2"><span id="stk_treat_balance" class="stk-balance"></span></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="actions jv-print-hide" style="margin-top:8px;gap:8px;">
+            <button type="button" class="btn-secondary" id="stk_treat_add">+ سطر معالجة</button>
+            <button type="button" class="btn-secondary" id="stk_treat_balance_btn" title="ضبط سطر معالجة واحد ليوازن قيمة المخزون">موازنة تلقائية</button>
+        </div>
+    </div>
 
                 </td>
             </tr>
@@ -250,6 +291,22 @@ if ($editSv !== null) {
 .stk-lines-table .stk-add, .stk-lines-table .stk-deduct { width: 100%; }
 .stk-val-neg { color: #b91c1c; font-weight: 700; }
 .stk-val-pos { color: #15803d; font-weight: 700; }
+.stk-treat-card { margin-top: 16px; border-top: 2px solid #e4e4e7; padding-top: 12px; }
+.stk-treat-title { margin: 0 0 6px; font-size: 1rem; }
+.stk-treat-info { margin: 0 0 10px; font-size: 0.9rem; color: #334155; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; }
+.stk-treat-table { table-layout: fixed; width: 100%; }
+.stk-treat-table col.stk-tcol-acc { width: auto; }
+.stk-treat-table col.stk-tcol-debit { width: 8rem; }
+.stk-treat-table col.stk-tcol-credit { width: 8rem; }
+.stk-treat-table col.stk-tcol-memo { width: 14rem; }
+.stk-treat-table col.stk-tcol-act { width: 5rem; }
+.stk-treat-table input { box-sizing: border-box; width: 100%; }
+.stk-treat-table .stk-tacc { cursor: pointer; background: #f4f4f5; }
+.stk-treat-table .stk-tdebit, .stk-treat-table .stk-tcredit { text-align: center; }
+.stk-treat-foot th { text-align: center; background: #f8fafc; }
+.stk-balance { font-weight: 700; }
+.stk-balance.ok { color: #15803d; }
+.stk-balance.bad { color: #b91c1c; }
 .jv-voucher-header-line .stk-tot-int {
     text-align: center;
     background: #f4f4f5;
@@ -281,7 +338,9 @@ if ($editSv !== null) {
     var NEXT_NO = <?php echo (int) $nextNo; ?>;
     var state = <?php echo $initialJson; ?>;
     if (!state.lines) { state.lines = []; }
+    if (!state.gl_lines) { state.gl_lines = []; }
     var browseId = state.id > 0 ? state.id : 0;
+    function round4(n) { return Math.round((Number(n) || 0) * 10000) / 10000; }
 
     function el(id) { return document.getElementById(id); }
     function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -316,7 +375,6 @@ if ($editSv !== null) {
             + '<td><input type="number" class="admin-inp-qty stk-deduct" min="0" step="1" inputmode="numeric" lang="en" dir="ltr" value="' + (ln.qty_deduct || 0) + '"' + dis + '></td>'
             + '<td><input type="text" class="admin-inp stk-cost admin-inp-readonly" value="' + fmt(ln.unit_cost) + '" readonly tabindex="-1"></td>'
             + '<td><input type="text" class="admin-inp stk-val admin-inp-readonly ' + vCls + '" value="' + fmt(v) + '" readonly tabindex="-1"></td>'
-            + '<td><input type="text" class="admin-inp stk-acc" value="' + esc(ln.treatment_account_label || '') + '" placeholder="نقرتان للاختيار" readonly title="نقرتان للاختيار"></td>'
             + '<td>' + (isApproved() ? '' : '<button type="button" class="btn-secondary stk-remove">حذف</button>') + '</td>'
             + '</tr>';
     }
@@ -327,6 +385,152 @@ if ($editSv !== null) {
         state.total_value = total;
         el('stk_tot_lines').value = String(state.lines.length);
         el('stk_tot_value').value = fmt(total);
+        updateTreatBalance();
+    }
+
+    // ===== المعالجة المحاسبية (الكارت السفلي) =====
+    function invMovement() {
+        var inc = 0, dec = 0;
+        state.lines.forEach(function (ln) {
+            var v = lineValue(ln);
+            if (v > 0) { inc += v; } else if (v < 0) { dec += -v; }
+        });
+        inc = round4(inc); dec = round4(dec);
+        return { inc: inc, dec: dec, net: round4(inc - dec) };
+    }
+
+    function treatSums() {
+        var d = 0, c = 0;
+        state.gl_lines.forEach(function (g) { d += parseFloat(g.debit) || 0; c += parseFloat(g.credit) || 0; });
+        return { debit: round4(d), credit: round4(c), net: round4(c - d) };
+    }
+
+    function treatRowHtml(g, idx) {
+        var dis = isApproved() ? ' disabled' : '';
+        var roCls = isApproved() ? ' admin-inp-readonly' : '';
+        return '<tr data-tidx="' + idx + '">'
+            + '<td><input type="text" class="admin-inp stk-tacc" value="' + esc(g.account_label || '') + '" placeholder="نقرتان للاختيار" readonly title="نقرتان لاختيار الحساب"></td>'
+            + '<td><input type="number" class="admin-inp stk-tdebit' + roCls + '" min="0" step="0.0001" inputmode="decimal" lang="en" dir="ltr" value="' + (g.debit ? g.debit : '') + '"' + dis + '></td>'
+            + '<td><input type="number" class="admin-inp stk-tcredit' + roCls + '" min="0" step="0.0001" inputmode="decimal" lang="en" dir="ltr" value="' + (g.credit ? g.credit : '') + '"' + dis + '></td>'
+            + '<td><input type="text" class="admin-inp stk-tmemo" value="' + esc(g.memo || '') + '"' + dis + '></td>'
+            + '<td>' + (isApproved() ? '' : '<button type="button" class="btn-secondary stk-tremove">حذف</button>') + '</td>'
+            + '</tr>';
+    }
+
+    function renderTreat() {
+        var tb = el('stk_treat_body');
+        if (!tb) { return; }
+        tb.innerHTML = state.gl_lines.map(treatRowHtml).join('');
+        bindTreatRows();
+    }
+
+    function syncTreatFromInputs() {
+        var tb = el('stk_treat_body');
+        if (!tb) { return; }
+        Array.prototype.forEach.call(tb.querySelectorAll('tr'), function (tr) {
+            var idx = parseInt(tr.getAttribute('data-tidx'), 10);
+            if (isNaN(idx) || !state.gl_lines[idx]) { return; }
+            var d = tr.querySelector('.stk-tdebit');
+            var c = tr.querySelector('.stk-tcredit');
+            var m = tr.querySelector('.stk-tmemo');
+            state.gl_lines[idx].debit = d ? (parseFloat(d.value) || 0) : 0;
+            state.gl_lines[idx].credit = c ? (parseFloat(c.value) || 0) : 0;
+            state.gl_lines[idx].memo = m ? m.value : '';
+        });
+    }
+
+    function bindTreatRows() {
+        var tb = el('stk_treat_body');
+        if (!tb) { return; }
+        Array.prototype.forEach.call(tb.querySelectorAll('tr'), function (tr) {
+            var idx = parseInt(tr.getAttribute('data-tidx'), 10);
+            if (!isApproved()) {
+                var accInp = tr.querySelector('.stk-tacc');
+                if (accInp) { accInp.addEventListener('dblclick', function (e) { e.preventDefault(); openAccPicker(idx); }); }
+            }
+            var rm = tr.querySelector('.stk-tremove');
+            if (rm) { rm.addEventListener('click', function () { syncTreatFromInputs(); state.gl_lines.splice(idx, 1); renderTreat(); updateTreatBalance(); }); }
+            var d = tr.querySelector('.stk-tdebit');
+            var c = tr.querySelector('.stk-tcredit');
+            function onAmt(which) {
+                return function () {
+                    state.gl_lines[idx].debit = d ? (parseFloat(d.value) || 0) : 0;
+                    state.gl_lines[idx].credit = c ? (parseFloat(c.value) || 0) : 0;
+                    // مدين ودائن متعارضان — عند الكتابة في أحدهما يُفرَّغ الآخر.
+                    if (which === 'd' && state.gl_lines[idx].debit > 0 && c) { c.value = ''; state.gl_lines[idx].credit = 0; }
+                    if (which === 'c' && state.gl_lines[idx].credit > 0 && d) { d.value = ''; state.gl_lines[idx].debit = 0; }
+                    updateTreatBalance();
+                };
+            }
+            if (d) { d.addEventListener('input', onAmt('d')); }
+            if (c) { c.addEventListener('input', onAmt('c')); }
+            var m = tr.querySelector('.stk-tmemo');
+            if (m) { m.addEventListener('input', function () { state.gl_lines[idx].memo = m.value; }); }
+        });
+    }
+
+    function addTreatRow() {
+        if (isApproved()) { return; }
+        syncTreatFromInputs();
+        state.gl_lines.push({ account_id: 0, account_label: '', debit: 0, credit: 0, memo: '' });
+        renderTreat();
+        updateTreatBalance();
+    }
+
+    function autoBalance() {
+        if (isApproved()) { return; }
+        syncTreatFromInputs();
+        var mv = invMovement();
+        var sums = treatSums();
+        // الفرق المطلوب سدّه في صافي المعالجة (دائن − مدين) = mv.net
+        var diff = round4(mv.net - sums.net); // المتبقي
+        if (Math.abs(diff) < 0.0001) { updateTreatBalance(); return; }
+        // أضف/اضبط سطراً واحداً يحمل الفرق على الجهة الصحيحة.
+        var target = null;
+        for (var i = 0; i < state.gl_lines.length; i++) {
+            var g = state.gl_lines[i];
+            if ((parseFloat(g.debit) || 0) === 0 && (parseFloat(g.credit) || 0) === 0) { target = g; break; }
+        }
+        if (!target) { target = { account_id: 0, account_label: '', debit: 0, credit: 0, memo: '' }; state.gl_lines.push(target); }
+        if (diff > 0) { target.credit = round4((parseFloat(target.credit) || 0) + diff); target.debit = 0; }
+        else { target.debit = round4((parseFloat(target.debit) || 0) - diff); target.credit = 0; }
+        renderTreat();
+        updateTreatBalance();
+    }
+
+    function updateTreatBalance() {
+        var mv = invMovement();
+        var sums = treatSums();
+        var info = el('stk_treat_info');
+        if (info) {
+            var parts = [];
+            if (mv.inc > 0) { parts.push('زيادة مخزون (مدين المخزون): ' + fmt(mv.inc)); }
+            if (mv.dec > 0) { parts.push('نقص مخزون (دائن المخزون): ' + fmt(mv.dec)); }
+            var dirTxt = mv.net > 0 ? ('مدين حساب المخزون بصافي ' + fmt(mv.net))
+                : (mv.net < 0 ? ('دائن حساب المخزون بصافي ' + fmt(-mv.net)) : 'لا صافي قيمة');
+            info.innerHTML = 'حركة المخزون التلقائية: <strong>' + esc(dirTxt) + '</strong>'
+                + (parts.length ? ' — ' + esc(parts.join(' / ')) : '')
+                + '<br>صافي المعالجة المطلوب (دائن − مدين) = <strong>' + fmt(mv.net) + '</strong>';
+        }
+        var de = el('stk_treat_debit'); if (de) { de.textContent = fmt(sums.debit); }
+        var ce = el('stk_treat_credit'); if (ce) { ce.textContent = fmt(sums.credit); }
+        var be = el('stk_treat_balance');
+        if (be) {
+            var missingAcc = state.gl_lines.some(function (g) {
+                var has = (parseFloat(g.debit) || 0) > 0 || (parseFloat(g.credit) || 0) > 0;
+                return has && !((parseInt(g.account_id, 10) || 0) > 0);
+            });
+            var ok = Math.abs(round4(sums.net - mv.net)) < 0.005 && !missingAcc && Math.abs(mv.net) >= 0.0001;
+            if (Math.abs(mv.net) < 0.0001 && Math.abs(sums.net) < 0.0001) {
+                be.textContent = ''; be.className = 'stk-balance';
+            } else if (missingAcc) {
+                be.textContent = 'سطر معالجة بلا حساب'; be.className = 'stk-balance bad';
+            } else if (ok) {
+                be.textContent = '✔ متوازن مع قيمة المخزون'; be.className = 'stk-balance ok';
+            } else {
+                be.textContent = '✖ غير متوازن (الفرق ' + fmt(round4(mv.net - sums.net)) + ')'; be.className = 'stk-balance bad';
+            }
+        }
     }
 
     function render() {
@@ -342,6 +546,7 @@ if ($editSv !== null) {
             ? ('سند #' + state.id + ' — ' + (isApproved() ? ('معتمد' + (state.journal_voucher_id ? ' (قيد #' + state.journal_voucher_id + ')' : '')) : 'مسودة'))
             : 'سند جديد (غير محفوظ)';
         bindRows();
+        renderTreat();
         applyMode();
         recompute();
     }
@@ -357,6 +562,8 @@ if ($editSv !== null) {
         pb.title = isApproved() ? 'طباعة' : 'اعتمد السند أولاً — الطباعة بعد الاعتماد';
         el('stk_document_date').readOnly = ro;
         el('stk_desc').readOnly = ro;
+        var ta = el('stk_treat_add'); if (ta) { ta.disabled = ro; }
+        var tb = el('stk_treat_balance_btn'); if (tb) { tb.disabled = ro; }
     }
 
     function syncFromInputs() {
@@ -382,10 +589,6 @@ if ($editSv !== null) {
                 var codeInp = tr.querySelector('.stk-code');
                 if (codeInp) {
                     codeInp.addEventListener('dblclick', function (e) { e.preventDefault(); OrangeProductPicker.open(function (vv) { onPickProduct(idx, vv); }); });
-                }
-                var accInp = tr.querySelector('.stk-acc');
-                if (accInp) {
-                    accInp.addEventListener('dblclick', function (e) { e.preventDefault(); openAccPicker(idx); });
                 }
             }
             var rm = tr.querySelector('.stk-remove');
@@ -475,12 +678,14 @@ if ($editSv !== null) {
                     li.tabIndex = 0;
                     li.textContent = label;
                     function choose() {
-                        if (accIdx >= 0 && state.lines[accIdx]) {
-                            state.lines[accIdx].treatment_account_id = a.id;
-                            state.lines[accIdx].treatment_account_label = label;
+                        syncTreatFromInputs();
+                        if (accIdx >= 0 && state.gl_lines[accIdx]) {
+                            state.gl_lines[accIdx].account_id = a.id;
+                            state.gl_lines[accIdx].account_label = label;
                         }
                         closeAccPicker();
-                        render();
+                        renderTreat();
+                        updateTreatBalance();
                     }
                     li.addEventListener('click', choose);
                     li.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); choose(); } });
@@ -500,6 +705,7 @@ if ($editSv !== null) {
     // ===== الحفظ / الاعتماد / الحذف =====
     function payload() {
         syncFromInputs();
+        syncTreatFromInputs();
         return {
             id: state.id || 0,
             document_date: (typeof orangeGetDmyValueAsIso === 'function') ? orangeGetDmyValueAsIso(el('stk_document_date')) : '',
@@ -508,8 +714,17 @@ if ($editSv !== null) {
                 return {
                     variant_id: parseInt(ln.variant_id, 10) || 0,
                     qty_add: parseInt(ln.qty_add, 10) || 0,
-                    qty_deduct: parseInt(ln.qty_deduct, 10) || 0,
-                    treatment_account_id: parseInt(ln.treatment_account_id, 10) || 0
+                    qty_deduct: parseInt(ln.qty_deduct, 10) || 0
+                };
+            }),
+            gl_lines: state.gl_lines.filter(function (g) {
+                return (parseInt(g.account_id, 10) || 0) > 0 || (parseFloat(g.debit) || 0) > 0 || (parseFloat(g.credit) || 0) > 0;
+            }).map(function (g) {
+                return {
+                    account_id: parseInt(g.account_id, 10) || 0,
+                    debit: parseFloat(g.debit) || 0,
+                    credit: parseFloat(g.credit) || 0,
+                    memo: g.memo || ''
                 };
             })
         };
@@ -524,6 +739,7 @@ if ($editSv !== null) {
         state.status = h.status || 'draft';
         state.journal_voucher_id = parseInt(h.journal_voucher_id, 10) || 0;
         state.lines = sv.lines || [];
+        state.gl_lines = sv.gl_lines || [];
         state.total_value = parseFloat(sv.total_value) || 0;
         browseId = state.id;
         if (typeof orangeIsoDateToDmy === 'function') { el('stk_document_date').value = state.document_date ? orangeIsoDateToDmy(state.document_date) : ''; }
@@ -545,12 +761,27 @@ if ($editSv !== null) {
 
     function doApprove() {
         if (state.id <= 0) { showErr('احفظ المسودة أولاً'); return; }
-        if (!confirm('اعتماد السند وتطبيق التعديل على المخزون وترحيل القيد؟ لا يمكن التراجع.')) { return; }
-        postJson(API.approve, { id: state.id }).then(function (d) {
-            if (!d.success) { showErr(d.message || 'فشل الاعتماد'); return; }
-            showOk(d.message || 'تم الاعتماد');
-            applyVoucher(d.voucher);
-        }).catch(function (e) { showErr(e.message || String(e)); });
+        syncTreatFromInputs();
+        var mv = invMovement();
+        var sums = treatSums();
+        if (!state.gl_lines.length) { showErr('أضف أسطر المعالجة المحاسبية (مدين/دائن) في الكارت السفلي'); return; }
+        if (state.gl_lines.some(function (g) {
+            var has = (parseFloat(g.debit) || 0) > 0 || (parseFloat(g.credit) || 0) > 0;
+            return has && !((parseInt(g.account_id, 10) || 0) > 0);
+        })) { showErr('سطر معالجة بلا حساب — انقر نقرتين لاختياره'); return; }
+        if (Math.abs(round4(sums.net - mv.net)) > 0.005) {
+            showErr('أسطر المعالجة غير متوازنة مع قيمة المخزون — استخدم «موازنة تلقائية» أو عدّل المبالغ'); return;
+        }
+        if (!confirm('اعتماد السند وتطبيق التعديل على المخزون وترحيل قيد التسوية؟ لا يمكن التراجع.')) { return; }
+        // احفظ آخر التعديلات أولاً ثم اعتمد (يضمن مطابقة أسطر المعالجة المخزّنة لما يراه المستخدم).
+        doSave(function () {
+            if (state.id <= 0) { return; }
+            postJson(API.approve, { id: state.id }).then(function (d) {
+                if (!d.success) { showErr(d.message || 'فشل الاعتماد'); return; }
+                showOk(d.message || 'تم الاعتماد');
+                applyVoucher(d.voucher);
+            }).catch(function (e) { showErr(e.message || String(e)); });
+        });
     }
 
     function doDelete() {
@@ -564,7 +795,7 @@ if ($editSv !== null) {
     }
 
     function newSheet() {
-        state = { id: 0, document_date: '<?php echo $initial['document_date']; ?>', notes: '', status: 'draft', journal_voucher_id: 0, lines: [], total_value: 0 };
+        state = { id: 0, document_date: '<?php echo $initial['document_date']; ?>', notes: '', status: 'draft', journal_voucher_id: 0, lines: [], gl_lines: [], total_value: 0 };
         browseId = 0;
         if (typeof orangeIsoDateToDmy === 'function') { el('stk_document_date').value = orangeIsoDateToDmy(state.document_date); }
         showErr(''); showOk('');
@@ -622,6 +853,8 @@ if ($editSv !== null) {
     }
 
     el('stk_btn_add').addEventListener('click', addRow);
+    el('stk_treat_add').addEventListener('click', addTreatRow);
+    el('stk_treat_balance_btn').addEventListener('click', autoBalance);
     el('stk_btn_new').addEventListener('click', function () { if (confirm('بدء سند جديد؟ سيُمسح غير المحفوظ.')) { newSheet(); } });
     el('stk_delete_btn').addEventListener('click', doDelete);
     el('stk_btn_print').addEventListener('click', printVoucher);

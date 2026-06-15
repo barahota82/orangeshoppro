@@ -119,6 +119,7 @@ function orange_journal_types_canonical_rows(): array
         ['CGO', 'تكلفة مبيعات الاونلاين', 'Cost of online sales'],
         ['OSR', 'مردود مبيعات الاونلاين', 'Online sales return'],
         ['COR', 'تكلفة مردود مبيعات الاونلاين', 'Cost of online sales return'],
+        ['SAJ', 'قيد تسوية مخزون', 'Stock adjustment voucher'],
     ];
 }
 
@@ -442,6 +443,7 @@ function orange_gl_entry_types_for_journal_type_code(string $code): array
         'CSR' => ['order_return_cogs'],
         'CGR' => ['order_return_cogs'],
         'COR' => ['order_return_cogs'],
+        'SAJ' => ['stock_adjustment'],
     ];
 
     return $map[$code] ?? [];
@@ -557,6 +559,7 @@ function orange_journal_type_code_from_entry_type(string $entryType): string
         'expense' => 'PV',
         'expense_adjustment' => 'PV',
         'expense_reversal' => 'PV',
+        'stock_adjustment' => 'SAJ',
     ];
 
     return $map[$k] ?? '';
