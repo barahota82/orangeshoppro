@@ -209,7 +209,7 @@ $osvRef = $osvId > 0
     /* نِسَب مئوية: اسم الصنف يأخذ الأوسع، وباقي الأعمدة أضيق */
     .jv-print-area .osv-lines-table col.osv-col-code { width: 16% !important; }
     .jv-print-area .osv-lines-table col.osv-col-name { width: auto !important; }
-    .jv-print-area .osv-lines-table col.osv-col-vlbl { width: 18% !important; }
+    .jv-print-area .osv-lines-table col.osv-col-vlbl { width: 26% !important; }
     .jv-print-area .osv-lines-table col.osv-col-qty { width: 14% !important; }
     .jv-print-area .osv-lines-table col.osv-col-act { width: 0 !important; }
     /* إخفاء عمود الإجراء (زر حذف) رأساً وجسماً في الطباعة */
