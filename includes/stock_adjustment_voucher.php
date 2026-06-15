@@ -247,22 +247,51 @@ function orange_stock_adjustment_voucher_get_gl_lines(PDO $pdo, int $voucherId):
         return [];
     }
     $st = $pdo->prepare(
-        'SELECT id, account_id, debit, credit, memo FROM stock_adjustment_voucher_gl
-         WHERE voucher_id = ? ORDER BY line_no ASC, id ASC'
+        'SELECT g.id, g.account_id, g.debit, g.credit, g.memo,
+                COALESCE(a.code, \'\') AS account_code, COALESCE(a.name, \'\') AS account_name
+         FROM stock_adjustment_voucher_gl g
+         LEFT JOIN accounts a ON a.id = g.account_id
+         WHERE g.voucher_id = ? ORDER BY g.line_no ASC, g.id ASC'
     );
     $st->execute([$voucherId]);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     $out = [];
     foreach ($rows as $r) {
         $accId = (int) ($r['account_id'] ?? 0);
+        $code = trim((string) ($r['account_code'] ?? ''));
+        $name = trim((string) ($r['account_name'] ?? ''));
         $out[] = [
             'id' => (int) ($r['id'] ?? 0),
             'account_id' => $accId,
-            'account_label' => orange_stock_adjustment_account_label($pdo, $accId),
+            'account_code' => $code,
+            'account_name' => $name,
+            'account_label' => ($code !== '' ? $code . ' — ' : '') . $name,
             'debit' => round((float) ($r['debit'] ?? 0), 4),
             'credit' => round((float) ($r['credit'] ?? 0), 4),
             'memo' => (string) ($r['memo'] ?? ''),
         ];
+    }
+
+    return $out;
+}
+
+/**
+ * كود/اسم الحساب منفصلين (لشبكة المعالجة بنمط سند القيد).
+ *
+ * @return array{id:int,code:string,name:string}
+ */
+function orange_stock_adjustment_account_code_name(PDO $pdo, int $accountId): array
+{
+    $out = ['id' => $accountId, 'code' => '', 'name' => ''];
+    if ($accountId <= 0 || ! orange_table_exists($pdo, 'accounts')) {
+        return $out;
+    }
+    $st = $pdo->prepare('SELECT code, name FROM accounts WHERE id = ? LIMIT 1');
+    $st->execute([$accountId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if ($row) {
+        $out['code'] = trim((string) ($row['code'] ?? ''));
+        $out['name'] = trim((string) ($row['name'] ?? ''));
     }
 
     return $out;
@@ -354,6 +383,7 @@ function orange_stock_adjustment_voucher_get(PDO $pdo, int $id, ?int $countryId 
         $countryForGl = orange_admin_settings_effective_country_id($pdo);
     }
     $inventoryAccountId = orange_gl_account_id($pdo, 'inventory', $countryForGl > 0 ? $countryForGl : null);
+    $invCN = orange_stock_adjustment_account_code_name($pdo, $inventoryAccountId);
 
     return [
         'header' => $row,
@@ -364,7 +394,9 @@ function orange_stock_adjustment_voucher_get(PDO $pdo, int $id, ?int $countryId 
         'inc_value' => round($incValue, 4),
         'dec_value' => round($decValue, 4),
         'inventory_account_id' => $inventoryAccountId,
-        'inventory_account_label' => orange_stock_adjustment_account_label($pdo, $inventoryAccountId),
+        'inventory_account_code' => $invCN['code'],
+        'inventory_account_name' => $invCN['name'],
+        'inventory_account_label' => ($invCN['code'] !== '' ? $invCN['code'] . ' — ' : '') . $invCN['name'],
     ];
 }
 

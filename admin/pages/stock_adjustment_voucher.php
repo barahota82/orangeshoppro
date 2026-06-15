@@ -20,6 +20,14 @@ $editSv = ($editId > 0 && $ready) ? orange_stock_adjustment_voucher_get($pdo, $e
 $apiBase = storefront_public_path('/admin/api/stock-adjustment');
 $accountsSearchUrl = storefront_public_path('/admin/api/accounts/search-leaves.php');
 
+$invAccId = $ready ? orange_gl_account_id($pdo, 'inventory', $ctxCountryId) : 0;
+$invAccCN = orange_stock_adjustment_account_code_name($pdo, $invAccId);
+$invAccJson = json_encode([
+    'id' => (int) $invAccId,
+    'code' => (string) $invAccCN['code'],
+    'name' => (string) $invAccCN['name'],
+], JSON_UNESCAPED_UNICODE) ?: '{"id":0,"code":"","name":""}';
+
 $initial = [
     'id' => 0,
     'document_date' => date('Y-m-d'),
@@ -137,6 +145,7 @@ if ($editSv !== null) {
         </div>
     </div>
 
+    <h4 class="stk-treat-title">أصناف التعديل (الكميات)</h4>
     <div class="admin-doc-frame">
         <div class="table-wrap">
             <table class="admin-table admin-doc-lines-table jv-lines-table stk-lines-table" id="stk_lines_table">
@@ -168,7 +177,10 @@ if ($editSv !== null) {
             </table>
         </div>
     </div>
-    <p id="stk_lines_empty" class="card-hint jv-print-hide">لا أصناف — اضغط «+ سطر يدوي» ثم انقر نقرتين على خانة الكود لاختيار الصنف.</p>
+    <p id="stk_lines_empty" class="card-hint jv-print-hide">لا أصناف — اضغط «+ سطر صنف» ثم انقر نقرتين على خانة الكود لاختيار الصنف.</p>
+    <div class="actions jv-print-hide stk-qty-toolbar">
+        <button type="button" class="btn-secondary" id="stk_btn_add">+ سطر صنف</button>
+    </div>
 
     <div class="stk-treat-card">
         <h4 class="stk-treat-title">المعالجة المحاسبية (قيد التسوية)</h4>
@@ -177,28 +189,28 @@ if ($editSv !== null) {
             <div class="table-wrap">
                 <table class="admin-table admin-doc-lines-table jv-lines-table stk-treat-table" id="stk_treat_table">
                     <colgroup>
-                        <col class="stk-tcol-acc">
+                        <col class="stk-tcol-code">
+                        <col class="stk-tcol-name">
                         <col class="stk-tcol-debit">
                         <col class="stk-tcol-credit">
-                        <col class="stk-tcol-memo">
                         <col class="stk-tcol-act">
                     </colgroup>
                     <thead>
                         <tr>
-                            <th>الحساب (أرباح/خسائر أو ذمة موظف)</th>
+                            <th>كود الحساب</th>
+                            <th>اسم الحساب</th>
                             <th>مدين</th>
                             <th>دائن</th>
-                            <th>بيان السطر</th>
                             <th class="admin-doc-col-actions" aria-label="حذف"></th>
                         </tr>
                     </thead>
                     <tbody id="stk_treat_body"></tbody>
                     <tfoot>
                         <tr class="stk-treat-foot">
-                            <th>الإجمالي</th>
+                            <th colspan="2">الإجمالي</th>
                             <th><span id="stk_treat_debit">0.00</span></th>
                             <th><span id="stk_treat_credit">0.00</span></th>
-                            <th colspan="2"><span id="stk_treat_balance" class="stk-balance"></span></th>
+                            <th><span id="stk_treat_balance" class="stk-balance"></span></th>
                         </tr>
                     </tfoot>
                 </table>
@@ -217,7 +229,6 @@ if ($editSv !== null) {
     <?php orange_voucher_print_metafoot(); ?>
 
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide">
-        <button type="button" class="btn-secondary" id="stk_btn_add">+ سطر يدوي</button>
         <div class="jv-toolbar-primary-group">
             <button type="button" id="stk_btn_new">سند جديد</button>
             <button type="button" class="btn-secondary" id="stk_delete_btn" data-orange-perm="delete">حذف السند</button>
@@ -295,15 +306,18 @@ if ($editSv !== null) {
 .stk-treat-title { margin: 0 0 6px; font-size: 1rem; }
 .stk-treat-info { margin: 0 0 10px; font-size: 0.9rem; color: #334155; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; }
 .stk-treat-table { table-layout: fixed; width: 100%; }
-.stk-treat-table col.stk-tcol-acc { width: auto; }
+.stk-treat-table col.stk-tcol-code { width: 12rem; }
+.stk-treat-table col.stk-tcol-name { width: auto; }
 .stk-treat-table col.stk-tcol-debit { width: 8rem; }
 .stk-treat-table col.stk-tcol-credit { width: 8rem; }
-.stk-treat-table col.stk-tcol-memo { width: 14rem; }
 .stk-treat-table col.stk-tcol-act { width: 5rem; }
 .stk-treat-table input { box-sizing: border-box; width: 100%; }
-.stk-treat-table .stk-tacc { cursor: pointer; background: #f4f4f5; }
+.stk-treat-table .stk-tcode { cursor: pointer; }
+.stk-treat-table .stk-tname { background: #f4f4f5; }
 .stk-treat-table .stk-tdebit, .stk-treat-table .stk-tcredit { text-align: center; }
+.stk-treat-table .stk-inv-row input { background: #eef2ff; font-weight: 600; cursor: default; }
 .stk-treat-foot th { text-align: center; background: #f8fafc; }
+.stk-qty-toolbar { margin: 8px 0 0; }
 .stk-balance { font-weight: 700; }
 .stk-balance.ok { color: #15803d; }
 .stk-balance.bad { color: #b91c1c; }
@@ -336,6 +350,7 @@ if ($editSv !== null) {
         accounts: <?php echo json_encode($accountsSearchUrl, JSON_UNESCAPED_UNICODE); ?>
     };
     var NEXT_NO = <?php echo (int) $nextNo; ?>;
+    var INV_ACC = <?php echo $invAccJson; ?>;
     var state = <?php echo $initialJson; ?>;
     if (!state.lines) { state.lines = []; }
     if (!state.gl_lines) { state.gl_lines = []; }
@@ -385,7 +400,7 @@ if ($editSv !== null) {
         state.total_value = total;
         el('stk_tot_lines').value = String(state.lines.length);
         el('stk_tot_value').value = fmt(total);
-        updateTreatBalance();
+        refreshTreat();
     }
 
     // ===== المعالجة المحاسبية (الكارت السفلي) =====
@@ -405,14 +420,27 @@ if ($editSv !== null) {
         return { debit: round4(d), credit: round4(c), net: round4(c - d) };
     }
 
+    // سطر المخزون التلقائي (عرض فقط — يُولَّد من الكميات، ولا يُحفظ ضمن سطور المعالجة).
+    function invRowHtml(debit, credit) {
+        var codeTxt = INV_ACC.code || '';
+        var nameTxt = INV_ACC.name || 'المخزون';
+        return '<tr class="stk-inv-row">'
+            + '<td><input type="text" class="admin-inp" value="' + esc(codeTxt) + '" readonly tabindex="-1" title="حساب المخزون (تلقائي)"></td>'
+            + '<td><input type="text" class="admin-inp" value="' + esc(nameTxt) + '" readonly tabindex="-1"></td>'
+            + '<td><input type="text" class="admin-inp" value="' + (debit > 0 ? fmt(debit) : '') + '" readonly tabindex="-1"></td>'
+            + '<td><input type="text" class="admin-inp" value="' + (credit > 0 ? fmt(credit) : '') + '" readonly tabindex="-1"></td>'
+            + '<td></td>'
+            + '</tr>';
+    }
+
     function treatRowHtml(g, idx) {
         var dis = isApproved() ? ' disabled' : '';
         var roCls = isApproved() ? ' admin-inp-readonly' : '';
         return '<tr data-tidx="' + idx + '">'
-            + '<td><input type="text" class="admin-inp stk-tacc" value="' + esc(g.account_label || '') + '" placeholder="نقرتان للاختيار" readonly title="نقرتان لاختيار الحساب"></td>'
+            + '<td class="jv-acc-code-cell"><input type="text" class="admin-inp stk-tcode" value="' + esc(g.account_code || '') + '" placeholder="نقرتان للاختيار" readonly title="نقرتان لاختيار الحساب"></td>'
+            + '<td><input type="text" class="admin-inp stk-tname admin-inp-readonly" value="' + esc(g.account_name || '') + '" readonly tabindex="-1"></td>'
             + '<td><input type="number" class="admin-inp stk-tdebit' + roCls + '" min="0" step="0.0001" inputmode="decimal" lang="en" dir="ltr" value="' + (g.debit ? g.debit : '') + '"' + dis + '></td>'
             + '<td><input type="number" class="admin-inp stk-tcredit' + roCls + '" min="0" step="0.0001" inputmode="decimal" lang="en" dir="ltr" value="' + (g.credit ? g.credit : '') + '"' + dis + '></td>'
-            + '<td><input type="text" class="admin-inp stk-tmemo" value="' + esc(g.memo || '') + '"' + dis + '></td>'
             + '<td>' + (isApproved() ? '' : '<button type="button" class="btn-secondary stk-tremove">حذف</button>') + '</td>'
             + '</tr>';
     }
@@ -420,33 +448,44 @@ if ($editSv !== null) {
     function renderTreat() {
         var tb = el('stk_treat_body');
         if (!tb) { return; }
-        tb.innerHTML = state.gl_lines.map(treatRowHtml).join('');
+        var mv = invMovement();
+        var html = '';
+        // سطر المخزون التلقائي (مدين عند الزيادة / دائن عند النقص) — للعرض ليبدو القيد كاملاً متوازناً.
+        if (mv.inc > 0) { html += invRowHtml(mv.inc, 0); }
+        if (mv.dec > 0) { html += invRowHtml(0, mv.dec); }
+        html += state.gl_lines.map(treatRowHtml).join('');
+        tb.innerHTML = html;
         bindTreatRows();
+    }
+
+    // مزامنة + إعادة رسم (تُستدعى عند تغيّر الكميات لتحديث سطر المخزون).
+    function refreshTreat() {
+        syncTreatFromInputs();
+        renderTreat();
+        updateTreatBalance();
     }
 
     function syncTreatFromInputs() {
         var tb = el('stk_treat_body');
         if (!tb) { return; }
-        Array.prototype.forEach.call(tb.querySelectorAll('tr'), function (tr) {
+        Array.prototype.forEach.call(tb.querySelectorAll('tr[data-tidx]'), function (tr) {
             var idx = parseInt(tr.getAttribute('data-tidx'), 10);
             if (isNaN(idx) || !state.gl_lines[idx]) { return; }
             var d = tr.querySelector('.stk-tdebit');
             var c = tr.querySelector('.stk-tcredit');
-            var m = tr.querySelector('.stk-tmemo');
             state.gl_lines[idx].debit = d ? (parseFloat(d.value) || 0) : 0;
             state.gl_lines[idx].credit = c ? (parseFloat(c.value) || 0) : 0;
-            state.gl_lines[idx].memo = m ? m.value : '';
         });
     }
 
     function bindTreatRows() {
         var tb = el('stk_treat_body');
         if (!tb) { return; }
-        Array.prototype.forEach.call(tb.querySelectorAll('tr'), function (tr) {
+        Array.prototype.forEach.call(tb.querySelectorAll('tr[data-tidx]'), function (tr) {
             var idx = parseInt(tr.getAttribute('data-tidx'), 10);
             if (!isApproved()) {
-                var accInp = tr.querySelector('.stk-tacc');
-                if (accInp) { accInp.addEventListener('dblclick', function (e) { e.preventDefault(); openAccPicker(idx); }); }
+                var codeInp = tr.querySelector('.stk-tcode');
+                if (codeInp) { codeInp.addEventListener('dblclick', function (e) { e.preventDefault(); openAccPicker(idx); }); }
             }
             var rm = tr.querySelector('.stk-tremove');
             if (rm) { rm.addEventListener('click', function () { syncTreatFromInputs(); state.gl_lines.splice(idx, 1); renderTreat(); updateTreatBalance(); }); }
@@ -464,15 +503,13 @@ if ($editSv !== null) {
             }
             if (d) { d.addEventListener('input', onAmt('d')); }
             if (c) { c.addEventListener('input', onAmt('c')); }
-            var m = tr.querySelector('.stk-tmemo');
-            if (m) { m.addEventListener('input', function () { state.gl_lines[idx].memo = m.value; }); }
         });
     }
 
     function addTreatRow() {
         if (isApproved()) { return; }
         syncTreatFromInputs();
-        state.gl_lines.push({ account_id: 0, account_label: '', debit: 0, credit: 0, memo: '' });
+        state.gl_lines.push({ account_id: 0, account_code: '', account_name: '', debit: 0, credit: 0 });
         renderTreat();
         updateTreatBalance();
     }
@@ -491,7 +528,7 @@ if ($editSv !== null) {
             var g = state.gl_lines[i];
             if ((parseFloat(g.debit) || 0) === 0 && (parseFloat(g.credit) || 0) === 0) { target = g; break; }
         }
-        if (!target) { target = { account_id: 0, account_label: '', debit: 0, credit: 0, memo: '' }; state.gl_lines.push(target); }
+        if (!target) { target = { account_id: 0, account_code: '', account_name: '', debit: 0, credit: 0 }; state.gl_lines.push(target); }
         if (diff > 0) { target.credit = round4((parseFloat(target.credit) || 0) + diff); target.debit = 0; }
         else { target.debit = round4((parseFloat(target.debit) || 0) - diff); target.credit = 0; }
         renderTreat();
@@ -501,34 +538,34 @@ if ($editSv !== null) {
     function updateTreatBalance() {
         var mv = invMovement();
         var sums = treatSums();
+        // الإجماليات تشمل سطر المخزون التلقائي ليبدو القيد كاملاً مثل سند القيد.
+        var totalDebit = round4(mv.inc + sums.debit);
+        var totalCredit = round4(mv.dec + sums.credit);
         var info = el('stk_treat_info');
         if (info) {
-            var parts = [];
-            if (mv.inc > 0) { parts.push('زيادة مخزون (مدين المخزون): ' + fmt(mv.inc)); }
-            if (mv.dec > 0) { parts.push('نقص مخزون (دائن المخزون): ' + fmt(mv.dec)); }
             var dirTxt = mv.net > 0 ? ('مدين حساب المخزون بصافي ' + fmt(mv.net))
                 : (mv.net < 0 ? ('دائن حساب المخزون بصافي ' + fmt(-mv.net)) : 'لا صافي قيمة');
             info.innerHTML = 'حركة المخزون التلقائية: <strong>' + esc(dirTxt) + '</strong>'
-                + (parts.length ? ' — ' + esc(parts.join(' / ')) : '')
-                + '<br>صافي المعالجة المطلوب (دائن − مدين) = <strong>' + fmt(mv.net) + '</strong>';
+                + '<br>أكمل الطرف المقابل (أرباح/خسائر أو ذمة موظف) حتى يتوازن القيد (مجموع المدين = مجموع الدائن).';
         }
-        var de = el('stk_treat_debit'); if (de) { de.textContent = fmt(sums.debit); }
-        var ce = el('stk_treat_credit'); if (ce) { ce.textContent = fmt(sums.credit); }
+        var de = el('stk_treat_debit'); if (de) { de.textContent = fmt(totalDebit); }
+        var ce = el('stk_treat_credit'); if (ce) { ce.textContent = fmt(totalCredit); }
         var be = el('stk_treat_balance');
         if (be) {
             var missingAcc = state.gl_lines.some(function (g) {
                 var has = (parseFloat(g.debit) || 0) > 0 || (parseFloat(g.credit) || 0) > 0;
                 return has && !((parseInt(g.account_id, 10) || 0) > 0);
             });
-            var ok = Math.abs(round4(sums.net - mv.net)) < 0.005 && !missingAcc && Math.abs(mv.net) >= 0.0001;
+            var balanced = Math.abs(round4(totalDebit - totalCredit)) < 0.005;
+            var ok = balanced && !missingAcc && Math.abs(mv.net) >= 0.0001;
             if (Math.abs(mv.net) < 0.0001 && Math.abs(sums.net) < 0.0001) {
                 be.textContent = ''; be.className = 'stk-balance';
             } else if (missingAcc) {
                 be.textContent = 'سطر معالجة بلا حساب'; be.className = 'stk-balance bad';
             } else if (ok) {
-                be.textContent = '✔ متوازن مع قيمة المخزون'; be.className = 'stk-balance ok';
+                be.textContent = '✔ القيد متوازن'; be.className = 'stk-balance ok';
             } else {
-                be.textContent = '✖ غير متوازن (الفرق ' + fmt(round4(mv.net - sums.net)) + ')'; be.className = 'stk-balance bad';
+                be.textContent = '✖ غير متوازن (الفرق ' + fmt(round4(totalDebit - totalCredit)) + ')'; be.className = 'stk-balance bad';
             }
         }
     }
@@ -546,7 +583,6 @@ if ($editSv !== null) {
             ? ('سند #' + state.id + ' — ' + (isApproved() ? ('معتمد' + (state.journal_voucher_id ? ' (قيد #' + state.journal_voucher_id + ')' : '')) : 'مسودة'))
             : 'سند جديد (غير محفوظ)';
         bindRows();
-        renderTreat();
         applyMode();
         recompute();
     }
@@ -681,7 +717,8 @@ if ($editSv !== null) {
                         syncTreatFromInputs();
                         if (accIdx >= 0 && state.gl_lines[accIdx]) {
                             state.gl_lines[accIdx].account_id = a.id;
-                            state.gl_lines[accIdx].account_label = label;
+                            state.gl_lines[accIdx].account_code = a.code || '';
+                            state.gl_lines[accIdx].account_name = a.name || '';
                         }
                         closeAccPicker();
                         renderTreat();
