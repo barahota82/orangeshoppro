@@ -29,6 +29,31 @@ try {
         json_response(['success' => true, 'variant' => $info]);
     }
 
+    if ($action === 'next_no') {
+        json_response(['success' => true, 'next_no' => orange_stock_adjustment_voucher_next_no($pdo, $ctxCountryId)]);
+    }
+
+    if ($action === 'nav') {
+        $where = trim((string) ($data['where'] ?? ''));
+        $currentId = (int) ($data['current_id'] ?? 0);
+        $navId = orange_stock_adjustment_voucher_nav($pdo, $where, $currentId, $ctxCountryId);
+        if ($navId <= 0) {
+            json_response(['success' => false, 'message' => 'لا يوجد سند في هذا الاتجاه'], 404);
+        }
+        json_response(['success' => true, 'id' => $navId]);
+    }
+
+    if ($action === 'search') {
+        $rows = orange_stock_adjustment_voucher_search($pdo, [
+            'id_from' => (int) ($data['id_from'] ?? 0),
+            'id_to' => (int) ($data['id_to'] ?? 0),
+            'date_from' => trim((string) ($data['date_from'] ?? '')),
+            'date_to' => trim((string) ($data['date_to'] ?? '')),
+            'notes' => trim((string) ($data['notes'] ?? '')),
+        ], $ctxCountryId);
+        json_response(['success' => true, 'rows' => $rows]);
+    }
+
     $id = (int) ($data['id'] ?? 0);
     $sv = orange_stock_adjustment_voucher_get($pdo, $id, $ctxCountryId);
     if ($sv === null) {

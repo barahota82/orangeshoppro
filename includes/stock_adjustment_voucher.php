@@ -297,6 +297,105 @@ function orange_stock_adjustment_voucher_list(PDO $pdo, ?int $countryId = null):
     return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
+/** رقم السند المتوقَّع (MAX(id)+1) — للعرض فقط. */
+function orange_stock_adjustment_voucher_next_no(PDO $pdo, ?int $countryId = null): int
+{
+    if (! orange_stock_adjustment_voucher_ready($pdo)) {
+        return 1;
+    }
+
+    return (int) $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM stock_adjustment_voucher')->fetchColumn();
+}
+
+/** تنقّل بين السندات ضمن سياق الدولة. */
+function orange_stock_adjustment_voucher_nav(PDO $pdo, string $where, int $currentId, ?int $countryId = null): int
+{
+    if (! orange_stock_adjustment_voucher_ready($pdo)) {
+        return 0;
+    }
+    $scope = '';
+    $params = [];
+    if ($countryId !== null && $countryId > 0
+        && orange_table_has_column($pdo, 'stock_adjustment_voucher', 'country_id')) {
+        $scope = ' AND (country_id IS NULL OR country_id = ?)';
+        $params[] = $countryId;
+    }
+    switch ($where) {
+        case 'first':
+            $sql = 'SELECT MIN(id) FROM stock_adjustment_voucher WHERE 1=1' . $scope;
+            break;
+        case 'last':
+            $sql = 'SELECT MAX(id) FROM stock_adjustment_voucher WHERE 1=1' . $scope;
+            break;
+        case 'prev':
+            $sql = 'SELECT MAX(id) FROM stock_adjustment_voucher WHERE id < ?' . $scope;
+            array_unshift($params, $currentId);
+            break;
+        case 'next':
+            $sql = 'SELECT MIN(id) FROM stock_adjustment_voucher WHERE id > ?' . $scope;
+            array_unshift($params, $currentId);
+            break;
+        default:
+            return 0;
+    }
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+
+    return (int) ($st->fetchColumn() ?: 0);
+}
+
+/**
+ * بحث في السندات (نطاق رقم/تاريخ/ملاحظة) — بلا حدّ أسطر.
+ *
+ * @param array<string, mixed> $filters
+ * @return list<array<string, mixed>>
+ */
+function orange_stock_adjustment_voucher_search(PDO $pdo, array $filters, ?int $countryId = null): array
+{
+    if (! orange_stock_adjustment_voucher_ready($pdo)) {
+        return [];
+    }
+    $sql = 'SELECT sv.id, sv.document_date, sv.status, sv.notes,
+            (SELECT COUNT(*) FROM stock_adjustment_voucher_line sl WHERE sl.voucher_id = sv.id) AS line_count
+            FROM stock_adjustment_voucher sv WHERE 1=1';
+    $params = [];
+    if ($countryId !== null && $countryId > 0
+        && orange_table_has_column($pdo, 'stock_adjustment_voucher', 'country_id')) {
+        $sql .= ' AND (sv.country_id IS NULL OR sv.country_id = ?)';
+        $params[] = $countryId;
+    }
+    $idFrom = (int) ($filters['id_from'] ?? 0);
+    $idTo = (int) ($filters['id_to'] ?? 0);
+    if ($idFrom > 0) {
+        $sql .= ' AND sv.id >= ?';
+        $params[] = $idFrom;
+    }
+    if ($idTo > 0) {
+        $sql .= ' AND sv.id <= ?';
+        $params[] = $idTo;
+    }
+    $dateFrom = trim((string) ($filters['date_from'] ?? ''));
+    $dateTo = trim((string) ($filters['date_to'] ?? ''));
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
+        $sql .= ' AND sv.document_date >= ?';
+        $params[] = $dateFrom;
+    }
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+        $sql .= ' AND sv.document_date <= ?';
+        $params[] = $dateTo;
+    }
+    $notes = trim((string) ($filters['notes'] ?? ''));
+    if ($notes !== '') {
+        $sql .= ' AND sv.notes LIKE ?';
+        $params[] = '%' . $notes . '%';
+    }
+    $sql .= ' ORDER BY sv.id DESC';
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+
+    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
 /**
  * حفظ مسودة سند تعديل رصيد (لا يطبّق مخزوناً ولا يرحّل).
  *

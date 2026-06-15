@@ -289,6 +289,7 @@ function orange_admin_api_page_from_script(): ?string
         'bank-reconciliation' => 'bank_reconciliation',
         'inventory-reconciliation' => 'inventory_reconciliation',
         'stock-adjustment' => 'stock_adjustment_voucher',
+        'opening-stock-voucher' => 'opening_stock_balances',
         'analytical-dimensions' => 'analytical_dimensions',
         'accounts' => 'chart_of_accounts',
         'invoice-ancillary' => 'invoice_line_presets',
