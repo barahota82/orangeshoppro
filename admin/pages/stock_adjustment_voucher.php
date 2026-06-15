@@ -8,9 +8,12 @@ require_once __DIR__ . '/../../includes/admin_settings_country.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/voucher_print_banner.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
+require_once __DIR__ . '/../../includes/currency.php';
 
 $pdo = orange_admin_page_pdo();
 $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+$stkCurrencyCode = orange_gl_functional_currency_code($pdo, $ctxCountryId > 0 ? $ctxCountryId : null);
+$stkDecimals = orange_currency_decimals_for_code($stkCurrencyCode);
 $ready = orange_stock_adjustment_voucher_ready($pdo);
 $useVouchers = orange_journal_vouchers_ready($pdo);
 $nextNo = $ready ? orange_stock_adjustment_voucher_next_no($pdo, $ctxCountryId) : 1;
@@ -361,7 +364,8 @@ if ($editSv !== null) {
     function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function showErr(m) { var e = el('stk_err'); if (!e) return; e.textContent = m || ''; e.style.display = m ? 'block' : 'none'; if (m) { var o = el('stk_msg'); if (o) o.style.display = 'none'; } }
     function showOk(m) { var o = el('stk_msg'); if (!o) return; o.textContent = m || ''; o.style.display = m ? 'block' : 'none'; if (m) { var e = el('stk_err'); if (e) e.style.display = 'none'; } }
-    function fmt(n) { var x = Number(n) || 0; return x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    var STK_DECIMALS = <?php echo (int) $stkDecimals; ?>;
+    function fmt(n) { var x = Number(n) || 0; return x.toLocaleString('en-US', { minimumFractionDigits: STK_DECIMALS, maximumFractionDigits: STK_DECIMALS }); }
     function isApproved() { return state.status === 'approved'; }
 
     async function postJson(url, body) {
