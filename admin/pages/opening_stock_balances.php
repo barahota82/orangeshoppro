@@ -11,8 +11,10 @@ require_once __DIR__ . '/../../includes/opening_stock_voucher.php';
 require_once __DIR__ . '/../../includes/admin_settings_country.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/voucher_print_banner.php';
+require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 
 $pdo = orange_admin_page_pdo();
+$osvPrintTuning = orange_admin_voucher_print_tuning_mode();
 $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
 $ready = orange_opening_stock_voucher_ready($pdo);
 $openingStockLocked = orange_opening_stock_is_locked($pdo, $ctxCountryId);
@@ -127,7 +129,7 @@ $osvRef = $osvId > 0
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns osv-voucher-action-btns" role="group" aria-label="إجراءات سند الرصيد الافتتاحي">
                     <button type="button" id="osv_btn_save">حفظ السند</button>
-                    <button type="button" class="btn-secondary jv-nav-search" id="osv_btn_print" title="معاينة الطباعة">طباعة السند</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="osv_btn_print" title="<?php echo $osvPrintTuning ? 'معاينة الطباعة' : 'اعتمد السند أولاً — الطباعة بعد الاعتماد'; ?>"<?php echo $osvPrintTuning ? '' : ' disabled'; ?>>طباعة السند</button>
                     <button type="button" class="btn-secondary jv-nav-search" id="osv_btn_delete"<?php echo $osvId <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
                 </div>
             </div>
@@ -247,6 +249,7 @@ $osvRef = $osvId > 0
     var API = <?php echo json_encode($apiUrl, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
     var LOCK_API = <?php echo json_encode($lockApiUrl, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
     var LOCKED = <?php echo $openingStockLocked ? 'true' : 'false'; ?>;
+    var OSV_PRINT_TUNING = <?php echo $osvPrintTuning ? 'true' : 'false'; ?>;
     var NEXT_NO = <?php echo (int) $nextNo; ?>;
     var SAVED_ID = <?php echo (int) $osvId; ?>;
     var state = <?php echo $initialJson; ?>;
@@ -320,8 +323,13 @@ $osvRef = $osvId > 0
         el('osv_btn_delete').disabled = ro || state.id <= 0;
         el('osv_btn_add').disabled = ro;
         var pb = el('osv_btn_print');
-        pb.disabled = false;
-        pb.title = isApproved() ? 'طباعة السند' : 'معاينة الطباعة (متاحة قبل الحفظ لضبط التنسيق)';
+        if (OSV_PRINT_TUNING) {
+            pb.disabled = false;
+            pb.title = isApproved() ? 'طباعة السند' : 'معاينة الطباعة (متاحة قبل الحفظ لضبط التنسيق)';
+        } else {
+            pb.disabled = !isApproved();
+            pb.title = isApproved() ? 'طباعة السند' : 'اعتمد السند أولاً — الطباعة بعد الاعتماد';
+        }
         el('osv_date').readOnly = ro;
         el('osv_statement').readOnly = ro;
     }
@@ -480,6 +488,7 @@ $osvRef = $osvId > 0
     }
 
     function printVoucher() {
+        if (!OSV_PRINT_TUNING && !isApproved()) { showErr('اعتمد السند أولاً قبل الطباعة'); return; }
         if (typeof orangeAdminOpenPrintDialog === 'function') {
             orangeAdminOpenPrintDialog(orangeAdminBuildVoucherPrintDocTitle(null, 'osv_number', 'سند رصيد افتتاحي مخزني'));
         } else {

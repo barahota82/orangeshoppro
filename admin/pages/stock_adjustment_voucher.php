@@ -9,8 +9,10 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/voucher_print_banner.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/currency.php';
+require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 
 $pdo = orange_admin_page_pdo();
+$stkPrintTuning = orange_admin_voucher_print_tuning_mode();
 $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
 $stkCurrencyCode = orange_gl_functional_currency_code($pdo, $ctxCountryId > 0 ? $ctxCountryId : null);
 $stkDecimals = orange_currency_decimals_for_code($stkCurrencyCode);
@@ -234,7 +236,7 @@ if ($editSv !== null) {
         <div class="jv-toolbar-primary-group">
             <button type="button" id="stk_btn_new">سند جديد</button>
             <button type="button" class="btn-secondary" id="stk_delete_btn" data-orange-perm="delete">حذف السند</button>
-            <button type="button" class="btn-secondary" id="stk_btn_print" title="معاينة الطباعة">طباعة السند</button>
+            <button type="button" class="btn-secondary" id="stk_btn_print" title="<?php echo $stkPrintTuning ? 'معاينة الطباعة' : 'اعتمد السند أولاً — الطباعة بعد الاعتماد'; ?>"<?php echo $stkPrintTuning ? '' : ' disabled'; ?>>طباعة السند</button>
             <button type="button" id="stk_save_btn" data-orange-perm="edit">حفظ السند</button>
         </div>
     </div>
@@ -412,6 +414,7 @@ if ($editSv !== null) {
         accounts: <?php echo json_encode($accountsSearchUrl, JSON_UNESCAPED_UNICODE); ?>
     };
     var NEXT_NO = <?php echo (int) $nextNo; ?>;
+    var STK_PRINT_TUNING = <?php echo $stkPrintTuning ? 'true' : 'false'; ?>;
     var INV_ACC = <?php echo $invAccJson; ?>;
     var STK_REF_PREVIEW = <?php echo json_encode($stkRefPreview, JSON_UNESCAPED_UNICODE) ?: '""'; ?>;
     var state = <?php echo $initialJson; ?>;
@@ -698,8 +701,13 @@ if ($editSv !== null) {
         el('stk_delete_btn').disabled = ro || state.id <= 0;
         el('stk_btn_add').disabled = ro;
         var pb = el('stk_btn_print');
-        pb.disabled = false;
-        pb.title = isApproved() ? 'طباعة' : 'معاينة الطباعة (متاحة قبل الاعتماد لضبط التنسيق)';
+        if (STK_PRINT_TUNING) {
+            pb.disabled = false;
+            pb.title = isApproved() ? 'طباعة' : 'معاينة الطباعة (متاحة قبل الاعتماد لضبط التنسيق)';
+        } else {
+            pb.disabled = !isApproved();
+            pb.title = isApproved() ? 'طباعة' : 'اعتمد السند أولاً — الطباعة بعد الاعتماد';
+        }
         el('stk_document_date').readOnly = ro;
         el('stk_desc').readOnly = ro;
         var ta = el('stk_treat_add'); if (ta) { ta.disabled = ro; }
@@ -1026,6 +1034,7 @@ if ($editSv !== null) {
     }
 
     function printVoucher() {
+        if (!STK_PRINT_TUNING && !isApproved()) { showErr('اعتمد السند أولاً قبل الطباعة'); return; }
         if (typeof orangeAdminOpenPrintDialog === 'function') {
             orangeAdminOpenPrintDialog(orangeAdminBuildVoucherPrintDocTitle(null, 'stk_number', 'قيد تسوية مخزون'));
         } else {
