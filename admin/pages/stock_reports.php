@@ -133,6 +133,23 @@ $productCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $srC
 $catJoin = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', null);
 $itemCodeExpr = $hasItemCode ? "COALESCE(NULLIF(TRIM(p.item_code), ''), CONCAT('P', p.id))" : "CONCAT('P', p.id)";
 
+/* تجميع التقارير برأس «القسم ← الفئة» (يعتمد على alias c من $catJoin = catalog_categories). */
+$grpCatJoinExtra = ' LEFT JOIN catalog_sections cs_grp ON cs_grp.id = c.catalog_section_id'
+    . ' LEFT JOIN departments d_grp ON d_grp.id = cs_grp.department_id';
+$grpSelectCols = "COALESCE(d_grp.name_ar, '') AS group_dep_name, COALESCE(c.id, 0) AS group_cat_id, COALESCE(c.name_ar, '') AS group_cat_name";
+$grpOrderBy = 'd_grp.sort_order ASC, d_grp.name_ar ASC, c.sort_order ASC, c.name_ar ASC';
+$grpKey = static function (array $r): string {
+    return (string) ($r['group_dep_name'] ?? '') . '|' . (string) ($r['group_cat_id'] ?? '0') . '|' . (string) ($r['group_cat_name'] ?? '');
+};
+$grpLabel = static function (array $r): string {
+    $dep = trim((string) ($r['group_dep_name'] ?? ''));
+    $cat = trim((string) ($r['group_cat_name'] ?? ''));
+    if ($cat === '') {
+        $cat = 'بدون تصنيف';
+    }
+    return $dep !== '' ? ($dep . ' ← ' . $cat) : $cat;
+};
+
 $rows = [];
 $moveGroups = [];
 $grandQty = 0;
@@ -167,12 +184,13 @@ try {
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, p.is_active,
                        ' . $itemCodeExpr . ' AS item_code,
                        COALESCE(c.name_ar, \'\') AS category_name,
+                       ' . $grpSelectCols . ',
                        (SELECT COUNT(*) FROM product_variants pv WHERE pv.product_id = p.id) AS variant_count,
                        ' . $totalStockSub . ' AS total_stock
                 FROM products p
-                ' . $catJoin . '
+                ' . $catJoin . $grpCatJoinExtra . '
                 WHERE 1=1' . $productCountrySql . $filterSql . '
-                ORDER BY p.sort_order ASC, p.name ASC, p.id ASC';
+                ORDER BY ' . $grpOrderBy . ', p.sort_order ASC, p.name ASC, p.id ASC';
         $st = $pdo->prepare($sql);
         $st->execute($params);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
@@ -182,6 +200,9 @@ try {
                 'item_code' => (string) $r['item_code'],
                 'product_name' => (string) $r['product_name'],
                 'category_name' => (string) $r['category_name'],
+                'group_dep_name' => (string) ($r['group_dep_name'] ?? ''),
+                'group_cat_id' => (int) ($r['group_cat_id'] ?? 0),
+                'group_cat_name' => (string) ($r['group_cat_name'] ?? ''),
                 'variant_count' => (int) $r['variant_count'],
                 'total_stock' => $qty,
                 'is_active' => !empty($r['is_active']),
@@ -206,13 +227,14 @@ try {
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, p.cost AS cost,
                        ' . $itemCodeExpr . ' AS item_code,
                        COALESCE(c.name_ar, \'\') AS category_name,
+                       ' . $grpSelectCols . ',
                        pv.color, pv.size, ' . $wq['expr'] . ' AS qty
                 FROM products p
-                ' . $catJoin . '
+                ' . $catJoin . $grpCatJoinExtra . '
                 INNER JOIN product_variants pv ON pv.product_id = p.id
                 ' . $wq['join'] . '
                 WHERE p.is_active = 1' . $productCountrySql . $filterSql . '
-                ORDER BY p.name ASC, p.id ASC, pv.color ASC, pv.size ASC, pv.id ASC';
+                ORDER BY ' . $grpOrderBy . ', p.name ASC, p.id ASC, pv.color ASC, pv.size ASC, pv.id ASC';
         $st = $pdo->prepare($sql);
         $st->execute($params);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
@@ -225,6 +247,9 @@ try {
                 'item_code' => (string) $r['item_code'],
                 'product_name' => (string) $r['product_name'],
                 'category_name' => (string) $r['category_name'],
+                'group_dep_name' => (string) ($r['group_dep_name'] ?? ''),
+                'group_cat_id' => (int) ($r['group_cat_id'] ?? 0),
+                'group_cat_name' => (string) ($r['group_cat_name'] ?? ''),
                 'variant' => trim(((string) ($r['color'] ?? '')) . ' / ' . ((string) ($r['size'] ?? ''))),
                 'qty' => $qty,
                 'cost' => $cost,
@@ -355,18 +380,23 @@ try {
                     ORDER BY pu2.id DESC LIMIT 1) AS last_supplier"
             : ', NULL AS last_supplier';
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, pv.id AS variant_id,
-                       pv.color, pv.size, ' . $wq['expr'] . ' AS qty' . $lastSupplierSelect . '
+                       pv.color, pv.size, ' . $wq['expr'] . ' AS qty,
+                       ' . $grpSelectCols . $lastSupplierSelect . '
                 FROM product_variants pv
                 INNER JOIN products p ON p.id = pv.product_id
+                ' . $catJoin . $grpCatJoinExtra . '
                 ' . $wq['join'] . '
                 WHERE p.is_active = 1 AND ' . $wq['expr'] . ' <= ?' . $productCountrySql . '
-                ORDER BY ' . $wq['expr'] . ' ASC, p.name ASC, pv.id ASC';
+                ORDER BY ' . $grpOrderBy . ', ' . $wq['expr'] . ' ASC, p.name ASC, pv.id ASC';
         $st = $pdo->prepare($sql);
         $st->execute([$lowTh]);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $rows[] = [
                 'product_id' => (int) $r['product_id'],
                 'product_name' => (string) $r['product_name'],
+                'group_dep_name' => (string) ($r['group_dep_name'] ?? ''),
+                'group_cat_id' => (int) ($r['group_cat_id'] ?? 0),
+                'group_cat_name' => (string) ($r['group_cat_name'] ?? ''),
                 'variant' => trim(((string) ($r['color'] ?? '')) . ' / ' . ((string) ($r['size'] ?? ''))),
                 'qty' => (int) $r['qty'],
                 'last_supplier' => trim((string) ($r['last_supplier'] ?? '')),
@@ -866,34 +896,46 @@ $reportTitle = $reports[$reportKey];
         <?php endif; ?>
 
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <table class="admin-fy-table gl-acc-stmt-table ta-report-table" data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".sr-print-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
+            <?php $srFixedCols = in_array($reportKey, ['items', 'balances', 'low'], true); ?>
+            <table class="admin-fy-table gl-acc-stmt-table ta-report-table<?php echo $srFixedCols ? ' sr-grouped-cols' : ''; ?>" data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".sr-print-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                 <?php if ($reportKey === 'items'): ?>
-                    <thead><tr><th>الكود</th><th>الصنف</th><th>التصنيف</th><th class="gl-acc-stmt-col-num">عدد المتغيرات</th><th class="gl-acc-stmt-col-num">إجمالي الرصيد</th><th>الحالة</th></tr></thead>
+                    <colgroup><col style="width:10%"><col style="width:49%"><col style="width:13%"><col style="width:14%"><col style="width:14%"></colgroup>
+                <?php elseif ($reportKey === 'balances'): ?>
+                    <colgroup><col style="width:9%"><col style="width:36%"><col style="width:18%"><col style="width:11%"><col style="width:12%"><col style="width:14%"></colgroup>
+                <?php elseif ($reportKey === 'low'): ?>
+                    <colgroup><col style="width:7%"><col style="width:38%"><col style="width:18%"><col style="width:12%"><col style="width:25%"></colgroup>
+                <?php endif; ?>
+                <?php if ($reportKey === 'items'): ?>
+                    <thead><tr><th>الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num">عدد المتغيرات</th><th class="gl-acc-stmt-col-num">إجمالي الرصيد</th><th>الحالة</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
-                            <tr><td colspan="6" class="muted">لا أصناف.</td></tr>
-                        <?php else: foreach ($rows as $r): ?>
+                            <tr><td colspan="5" class="muted">لا أصناف.</td></tr>
+                        <?php else: $srGrp = null; foreach ($rows as $r): ?>
+                            <?php $k = $grpKey($r); if ($k !== $srGrp): $srGrp = $k; ?>
+                                <tr class="ta-report-section"><td colspan="5"><?php echo htmlspecialchars($grpLabel($r), ENT_QUOTES, 'UTF-8'); ?></td></tr>
+                            <?php endif; ?>
                             <tr>
                                 <td dir="ltr"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo htmlspecialchars($r['category_name'] ?: '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['variant_count']; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['total_stock']; ?></td>
                                 <td><?php echo $r['is_active'] ? 'نشط' : 'موقوف'; ?></td>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
-                    <tfoot><tr><th colspan="4">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th></th></tr></tfoot>
+                    <tfoot><tr><th colspan="3">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th></th></tr></tfoot>
                 <?php elseif ($reportKey === 'balances'): ?>
-                    <thead><tr><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة</th></tr></thead>
+                    <thead><tr><th>الكود</th><th>الصنف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
-                            <tr><td colspan="7" class="muted">لا أصناف.</td></tr>
-                        <?php else: foreach ($rows as $r): ?>
+                            <tr><td colspan="6" class="muted">لا أصناف.</td></tr>
+                        <?php else: $srGrp = null; foreach ($rows as $r): ?>
+                            <?php $k = $grpKey($r); if ($k !== $srGrp): $srGrp = $k; ?>
+                                <tr class="ta-report-section"><td colspan="6"><?php echo htmlspecialchars($grpLabel($r), ENT_QUOTES, 'UTF-8'); ?></td></tr>
+                            <?php endif; ?>
                             <tr>
                                 <td dir="ltr"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo htmlspecialchars($r['category_name'] ?: '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['cost']); ?></td>
@@ -901,7 +943,7 @@ $reportTitle = $reports[$reportKey];
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
-                    <tfoot><tr><th colspan="4">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th class="gl-acc-stmt-col-num">—</th><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th></tr></tfoot>
+                    <tfoot><tr><th colspan="3">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th class="gl-acc-stmt-col-num">—</th><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th></tr></tfoot>
                 <?php elseif ($reportKey === 'valuation'): ?>
                     <?php $valCols = $valShowPrev ? 6 : 5; ?>
                     <thead><tr><th>الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة الحالية</th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num">نهاية <?php echo htmlspecialchars(orange_format_date_dmY($valPrevEnd), ENT_QUOTES, 'UTF-8'); ?></th><?php endif; ?></tr></thead>
@@ -936,7 +978,10 @@ $reportTitle = $reports[$reportKey];
                     <tbody>
                         <?php if ($rows === []): ?>
                             <tr><td colspan="5" class="muted">لا نواقص ضمن الحد (<?php echo (int) $lowTh; ?>).</td></tr>
-                        <?php else: foreach ($rows as $r): ?>
+                        <?php else: $srGrp = null; foreach ($rows as $r): ?>
+                            <?php $k = $grpKey($r); if ($k !== $srGrp): $srGrp = $k; ?>
+                                <tr class="ta-report-section"><td colspan="5"><?php echo htmlspecialchars($grpLabel($r), ENT_QUOTES, 'UTF-8'); ?></td></tr>
+                            <?php endif; ?>
                             <tr>
                                 <td dir="ltr"><?php echo (int) $r['product_id']; ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>

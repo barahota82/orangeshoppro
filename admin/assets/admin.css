@@ -5263,6 +5263,26 @@ input[type='number']::-webkit-inner-spin-button {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
+/*
+ * تقارير المخزن (قائمة الأصناف/الأرصدة/النواقص): تثبيت نِسَب الأعمدة عبر colgroup
+ * حتى لا تبتلع الأعمدة الرقمية ذات الرؤوس الطويلة (white-space:nowrap) مساحةَ اسم
+ * الصنف. مع table-layout:fixed تُحترم نِسَب <col>، ويُسمح للرؤوس بالالتفاف على سطرين
+ * بدل توسيع العمود، وللنصوص الطويلة (اسم الصنف/اللون/المقاس) بالالتفاف داخل عمودها.
+ */
+.gl-acc-stmt-table.sr-grouped-cols {
+    table-layout: fixed;
+}
+.gl-acc-stmt-table.sr-grouped-cols thead th {
+    white-space: normal;
+    word-break: break-word;
+}
+.gl-acc-stmt-table.sr-grouped-cols tbody td {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+.gl-acc-stmt-table.sr-grouped-cols tbody td.gl-acc-stmt-col-num {
+    white-space: nowrap;
+}
 .gl-acc-stmt-col-ref {
     text-align: right;
     font-variant-numeric: tabular-nums;
