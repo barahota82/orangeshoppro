@@ -44,6 +44,7 @@ function orange_stock_adjustment_voucher_ensure_schema(PDO $pdo): void
                 KEY idx_stk_adj_country (country_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
+        orange_schema_invalidate_table_exists('stock_adjustment_voucher');
     }
 
     if (! orange_table_exists($pdo, 'stock_adjustment_voucher_line')) {
@@ -65,6 +66,7 @@ function orange_stock_adjustment_voucher_ensure_schema(PDO $pdo): void
                     REFERENCES stock_adjustment_voucher (id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
+        orange_schema_invalidate_table_exists('stock_adjustment_voucher_line');
     }
 
     if (orange_table_exists($pdo, 'stock_adjustment_voucher_line')
