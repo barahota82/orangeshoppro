@@ -137,6 +137,18 @@ if ($editSv !== null) {
     <div class="admin-doc-frame">
         <div class="table-wrap">
             <table class="admin-table admin-doc-lines-table jv-lines-table stk-lines-table" id="stk_lines_table">
+                <colgroup>
+                    <col class="stk-col-code">
+                    <col class="stk-col-name">
+                    <col class="stk-col-vlbl">
+                    <col class="stk-col-sys">
+                    <col class="stk-col-add">
+                    <col class="stk-col-deduct">
+                    <col class="stk-col-cost">
+                    <col class="stk-col-val">
+                    <col class="stk-col-acc">
+                    <col class="stk-col-act">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>كود الصنف</th>
@@ -148,7 +160,6 @@ if ($editSv !== null) {
                         <th>تكلفة الوحدة</th>
                         <th>قيمة الفرق</th>
                         <th>حساب المعالجة</th>
-                        <th>ملاحظة</th>
                         <th class="admin-doc-col-actions" aria-label="حذف"></th>
                     </tr>
                 </thead>
@@ -220,6 +231,17 @@ if ($editSv !== null) {
 </div>
 
 <style>
+.stk-lines-table { table-layout: fixed; width: 100%; }
+.stk-lines-table col.stk-col-code { width: 10rem; }
+.stk-lines-table col.stk-col-name { width: auto; }
+.stk-lines-table col.stk-col-vlbl { width: 9rem; }
+.stk-lines-table col.stk-col-sys { width: 6rem; }
+.stk-lines-table col.stk-col-add { width: 5.5rem; }
+.stk-lines-table col.stk-col-deduct { width: 5.5rem; }
+.stk-lines-table col.stk-col-cost { width: 7rem; }
+.stk-lines-table col.stk-col-val { width: 7rem; }
+.stk-lines-table col.stk-col-acc { width: 11rem; }
+.stk-lines-table col.stk-col-act { width: 5rem; }
 .stk-lines-table .stk-code { cursor: pointer; width: 100%; box-sizing: border-box; }
 .stk-lines-table .stk-name, .stk-lines-table .stk-vlbl, .stk-lines-table .stk-acc, .stk-lines-table .stk-sys, .stk-lines-table .stk-cost, .stk-lines-table .stk-val { background: #f4f4f5; width: 100%; box-sizing: border-box; }
 .stk-lines-table .stk-acc { cursor: pointer; }
@@ -284,19 +306,17 @@ if ($editSv !== null) {
         var v = lineValue(ln);
         var vCls = v < 0 ? 'stk-val-neg' : (v > 0 ? 'stk-val-pos' : '');
         var dis = isApproved() ? ' disabled' : '';
-        var ro = isApproved() ? ' readonly tabindex="-1"' : '';
         var code = ln.item_code || (ln.variant_id ? ('#' + ln.variant_id) : '');
         return '<tr data-idx="' + idx + '">'
-            + '<td><input type="text" class="admin-inp stk-code" value="' + esc(code) + '" placeholder="نقرتان للاختيار" readonly title="نقرتان للاختيار"></td>'
-            + '<td><input type="text" class="admin-inp stk-name" value="' + esc(ln.product_name || '') + '" readonly tabindex="-1"></td>'
-            + '<td><input type="text" class="admin-inp stk-vlbl" value="' + esc(vlbl(ln)) + '" readonly tabindex="-1"></td>'
-            + '<td><input type="text" class="admin-inp stk-sys" value="' + (ln.qty_system != null ? ln.qty_system : 0) + '" readonly tabindex="-1"></td>'
+            + '<td class="jv-acc-code-cell"><input type="text" class="admin-inp stk-code" value="' + esc(code) + '" placeholder="نقرتان للاختيار" readonly title="نقرتان للاختيار"></td>'
+            + '<td><input type="text" class="admin-inp stk-name admin-inp-readonly" value="' + esc(ln.product_name || '') + '" readonly tabindex="-1"></td>'
+            + '<td><input type="text" class="admin-inp stk-vlbl admin-inp-readonly" value="' + esc(vlbl(ln)) + '" readonly tabindex="-1"></td>'
+            + '<td><input type="text" class="admin-inp stk-sys admin-inp-readonly" value="' + (ln.qty_system != null ? ln.qty_system : 0) + '" readonly tabindex="-1"></td>'
             + '<td><input type="number" class="admin-inp-qty stk-add" min="0" step="1" inputmode="numeric" lang="en" dir="ltr" value="' + (ln.qty_add || 0) + '"' + dis + '></td>'
             + '<td><input type="number" class="admin-inp-qty stk-deduct" min="0" step="1" inputmode="numeric" lang="en" dir="ltr" value="' + (ln.qty_deduct || 0) + '"' + dis + '></td>'
-            + '<td><input type="text" class="admin-inp stk-cost" value="' + fmt(ln.unit_cost) + '" readonly tabindex="-1"></td>'
-            + '<td><input type="text" class="admin-inp stk-val ' + vCls + '" value="' + fmt(v) + '" readonly tabindex="-1"></td>'
+            + '<td><input type="text" class="admin-inp stk-cost admin-inp-readonly" value="' + fmt(ln.unit_cost) + '" readonly tabindex="-1"></td>'
+            + '<td><input type="text" class="admin-inp stk-val admin-inp-readonly ' + vCls + '" value="' + fmt(v) + '" readonly tabindex="-1"></td>'
             + '<td><input type="text" class="admin-inp stk-acc" value="' + esc(ln.treatment_account_label || '') + '" placeholder="نقرتان للاختيار" readonly title="نقرتان للاختيار"></td>'
-            + '<td><input type="text" class="admin-inp stk-note" value="' + esc(ln.note || '') + '"' + ro + '></td>'
             + '<td>' + (isApproved() ? '' : '<button type="button" class="btn-secondary stk-remove">حذف</button>') + '</td>'
             + '</tr>';
     }
@@ -348,10 +368,8 @@ if ($editSv !== null) {
             if (isNaN(idx) || !state.lines[idx]) { return; }
             var a = tr.querySelector('.stk-add');
             var d = tr.querySelector('.stk-deduct');
-            var n = tr.querySelector('.stk-note');
             state.lines[idx].qty_add = a ? (parseInt(a.value, 10) || 0) : 0;
             state.lines[idx].qty_deduct = d ? (parseInt(d.value, 10) || 0) : 0;
-            state.lines[idx].note = n ? n.value : '';
         });
     }
 
@@ -384,8 +402,6 @@ if ($editSv !== null) {
             }
             if (a) { a.addEventListener('input', onQty); }
             if (d) { d.addEventListener('input', onQty); }
-            var n = tr.querySelector('.stk-note');
-            if (n) { n.addEventListener('input', function () { state.lines[idx].note = n.value; }); }
         });
     }
 
@@ -414,7 +430,7 @@ if ($editSv !== null) {
     function addRow() {
         if (isApproved()) { return; }
         syncFromInputs();
-        state.lines.push({ variant_id: 0, product_name: '', color: '', size: '', item_code: '', qty_system: 0, unit_cost: 0, qty_add: 0, qty_deduct: 0, treatment_account_id: 0, treatment_account_label: '', note: '' });
+        state.lines.push({ variant_id: 0, product_name: '', color: '', size: '', item_code: '', qty_system: 0, unit_cost: 0, qty_add: 0, qty_deduct: 0, treatment_account_id: 0, treatment_account_label: '' });
         render();
     }
 
@@ -493,8 +509,7 @@ if ($editSv !== null) {
                     variant_id: parseInt(ln.variant_id, 10) || 0,
                     qty_add: parseInt(ln.qty_add, 10) || 0,
                     qty_deduct: parseInt(ln.qty_deduct, 10) || 0,
-                    treatment_account_id: parseInt(ln.treatment_account_id, 10) || 0,
-                    note: ln.note || ''
+                    treatment_account_id: parseInt(ln.treatment_account_id, 10) || 0
                 };
             })
         };
