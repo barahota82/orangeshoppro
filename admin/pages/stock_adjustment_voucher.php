@@ -346,11 +346,6 @@ if ($editSv !== null) {
     html, body { height: auto !important; min-height: 0 !important; }
     .admin-layout { min-height: 0 !important; }
     .admin-main { min-height: 0 !important; }
-    /* لا تطبع الأسطر الفارغة (بلا صنف/حساب) — كانت تضخّم المحتوى وتولّد صفحة زائدة */
-    .jv-print-area .stk-lines-table tbody tr.stk-row-empty,
-    .jv-print-area .stk-treat-table tbody tr.stk-trow-empty {
-        display: none !important;
-    }
     .jv-print-area .stk-lines-table,
     .jv-print-area .stk-treat-table {
         table-layout: fixed !important;
@@ -456,8 +451,7 @@ if ($editSv !== null) {
         var vCls = v < 0 ? 'stk-val-neg' : (v > 0 ? 'stk-val-pos' : '');
         var dis = isApproved() ? ' disabled' : '';
         var code = ln.item_code || (ln.variant_id ? ('#' + ln.variant_id) : '');
-        var emptyCls = (parseInt(ln.variant_id, 10) || 0) > 0 ? '' : ' stk-row-empty';
-        return '<tr data-idx="' + idx + '" class="stk-line-row' + emptyCls + '">'
+        return '<tr data-idx="' + idx + '">'
             + '<td class="jv-acc-code-cell"><input type="text" class="admin-inp stk-code" value="' + esc(code) + '" placeholder="نقرتان للاختيار" readonly title="نقرتان للاختيار"></td>'
             + '<td><input type="text" class="admin-inp stk-name admin-inp-readonly" value="' + esc(ln.product_name || '') + '" readonly tabindex="-1"></td>'
             + '<td><input type="text" class="admin-inp stk-vlbl admin-inp-readonly" value="' + esc(vlbl(ln)) + '" readonly tabindex="-1"></td>'
@@ -514,8 +508,7 @@ if ($editSv !== null) {
     function treatRowHtml(g, idx) {
         var dis = isApproved() ? ' disabled' : '';
         var roCls = isApproved() ? ' admin-inp-readonly' : '';
-        var emptyCls = (parseInt(g.account_id, 10) || 0) > 0 ? '' : ' stk-trow-empty';
-        return '<tr data-tidx="' + idx + '" class="stk-treat-row' + emptyCls + '">'
+        return '<tr data-tidx="' + idx + '">'
             + '<td class="jv-acc-code-cell"><input type="text" class="admin-inp stk-tcode" value="' + esc(g.account_code || '') + '" placeholder="نقرتان للاختيار" readonly title="نقرتان لاختيار الحساب"></td>'
             + '<td><input type="text" class="admin-inp stk-tname admin-inp-readonly" value="' + esc(g.account_name || '') + '" readonly tabindex="-1"></td>'
             + '<td><input type="number" class="admin-inp admin-inp-money stk-tdebit' + roCls + '" min="0" step="0.0001" inputmode="decimal" lang="en" dir="ltr" value="' + (g.debit ? g.debit : '') + '"' + dis + '></td>'
