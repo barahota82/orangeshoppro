@@ -162,6 +162,65 @@ function orange_opening_stock_voucher_next_no(PDO $pdo, ?int $countryId = null):
 }
 
 /**
+ * السند الوحيد لرصيد افتتاحي مخزني ضمن الدولة (مثل رصيد أول المدة المالي — سند واحد فقط).
+ *
+ * @return array<string, mixed>|null
+ */
+function orange_opening_stock_voucher_get_singleton(PDO $pdo, ?int $countryId = null): ?array
+{
+    if (! orange_opening_stock_voucher_ready($pdo)) {
+        return null;
+    }
+    $sql = 'SELECT id FROM opening_stock_voucher WHERE 1=1';
+    $params = [];
+    if ($countryId !== null && $countryId > 0
+        && orange_table_has_column($pdo, 'opening_stock_voucher', 'country_id')) {
+        $sql .= ' AND (country_id IS NULL OR country_id = ?)';
+        $params[] = $countryId;
+    }
+    $sql .= ' ORDER BY id DESC LIMIT 1';
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+    $id = (int) ($st->fetchColumn() ?: 0);
+    if ($id <= 0) {
+        return null;
+    }
+
+    return orange_opening_stock_voucher_get($pdo, $id, $countryId);
+}
+
+/** مرجع السند للعرض: OSV-رمز الدولة-رقم السند. */
+function orange_opening_stock_voucher_reference(PDO $pdo, int $voucherId, ?int $countryId = null): string
+{
+    if ($voucherId <= 0) {
+        return '';
+    }
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_admin_settings_effective_country_id($pdo);
+    }
+    $code = '';
+    if ($countryId > 0 && function_exists('orange_country_row_by_id')) {
+        $row = orange_country_row_by_id($pdo, $countryId, false);
+        if ($row !== null) {
+            $code = orange_countries_display_code((string) ($row['code'] ?? ''));
+        }
+    }
+    if ($code === '') {
+        $code = 'XX';
+    }
+
+    return 'OSV-' . $code . '-' . $voucherId;
+}
+
+/** معاينة مرجع سند جديد قبل الحفظ. */
+function orange_opening_stock_voucher_reference_preview(PDO $pdo, ?int $countryId = null): string
+{
+    $next = orange_opening_stock_voucher_next_no($pdo, $countryId);
+
+    return orange_opening_stock_voucher_reference($pdo, $next, $countryId);
+}
+
+/**
  * @return array<string, mixed>|null
  */
 function orange_opening_stock_voucher_get(PDO $pdo, int $id, ?int $countryId = null): ?array
@@ -225,6 +284,7 @@ function orange_opening_stock_voucher_get(PDO $pdo, int $id, ?int $countryId = n
         'warehouse_label' => $whLabel,
         'lines' => $lines,
         'total_qty' => $totalQty,
+        'reference' => orange_opening_stock_voucher_reference($pdo, $id, $countryId),
     ];
 }
 
@@ -371,6 +431,22 @@ function orange_opening_stock_voucher_save(PDO $pdo, array $headerIn, array $lin
     if ($countryId === null || $countryId <= 0) {
         $countryId = orange_admin_settings_effective_country_id($pdo);
     }
+
+    // سند واحد لكل دولة — لا يُنشأ سند ثانٍ.
+    if ($id <= 0) {
+        $singleton = orange_opening_stock_voucher_get_singleton($pdo, $countryId);
+        if ($singleton !== null) {
+            $singletonId = (int) ($singleton['header']['id'] ?? 0);
+            $singletonStatus = (string) ($singleton['header']['status'] ?? '');
+            if ($singletonStatus === 'approved') {
+                throw new InvalidArgumentException('يوجد سند رصيد افتتاحي معتمد — لا يُنشأ سند ثانٍ لهذه الدولة.');
+            }
+            if ($singletonId > 0) {
+                $id = $singletonId;
+            }
+        }
+    }
+
     $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
     if ($warehouseId <= 0) {
         throw new RuntimeException('لا يوجد مستودع افتراضي لهذه الدولة.');
