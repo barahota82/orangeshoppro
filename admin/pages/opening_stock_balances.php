@@ -150,14 +150,19 @@ $osvRef = $osvId > 0
     <div class="admin-doc-frame">
         <div class="table-wrap osv-opening-table-wrap">
             <table class="admin-table admin-doc-lines-table jv-lines-table osv-lines-table" id="osv_lines_table">
+                <colgroup>
+                    <col class="osv-col-code">
+                    <col class="osv-col-name">
+                    <col class="osv-col-vlbl">
+                    <col class="osv-col-qty">
+                    <col class="osv-col-act">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>كود الصنف</th>
                         <th>اسم الصنف</th>
                         <th>لون/مقاس</th>
-                        <th>الرصيد الحالي</th>
                         <th>الكمية (افتتاحي)</th>
-                        <th>ملاحظة</th>
                         <th class="admin-doc-col-actions" aria-label="حذف"></th>
                     </tr>
                 </thead>
@@ -184,6 +189,20 @@ $osvRef = $osvId > 0
 <?php require __DIR__ . '/../partials/product_pick_modal.php'; ?>
 
 <?php endif; ?>
+
+<style>
+.osv-lines-table { table-layout: fixed; width: 100%; }
+.osv-lines-table col.osv-col-code { width: 11rem; }
+.osv-lines-table col.osv-col-name { width: auto; }
+.osv-lines-table col.osv-col-vlbl { width: 11rem; }
+.osv-lines-table col.osv-col-qty { width: 8.5rem; }
+.osv-lines-table col.osv-col-act { width: 5rem; }
+.osv-lines-table .osv-code { cursor: pointer; width: 100%; box-sizing: border-box; }
+.osv-lines-table .osv-name,
+.osv-lines-table .osv-vlbl { background: #f4f4f5; cursor: default; width: 100%; box-sizing: border-box; }
+.osv-lines-table .osv-qty { width: 100%; box-sizing: border-box; }
+.osv-lines-table input { box-sizing: border-box; }
+</style>
 
 <script>
 (function () {
@@ -218,9 +237,7 @@ $osvRef = $osvId > 0
             + '<td class="jv-acc-code-cell"><input type="text" class="admin-inp osv-code" value="' + esc(code) + '" placeholder="نقرتان للاختيار" readonly title="نقرتان للاختيار"></td>'
             + '<td><input type="text" class="admin-inp osv-name admin-inp-readonly" value="' + esc(ln.product_name || '') + '" readonly tabindex="-1"></td>'
             + '<td><input type="text" class="admin-inp osv-vlbl admin-inp-readonly" value="' + esc(vlbl(ln)) + '" readonly tabindex="-1"></td>'
-            + '<td><input type="text" class="admin-inp osv-sys admin-inp-readonly" value="' + (ln.qty_system != null ? ln.qty_system : 0) + '" readonly tabindex="-1" dir="ltr"></td>'
             + '<td><input type="number" class="admin-inp-qty osv-qty" min="0" step="1" inputmode="numeric" lang="en" dir="ltr" value="' + (ln.quantity != null ? ln.quantity : 0) + '"' + ro + dis + '></td>'
-            + '<td><input type="text" class="admin-inp osv-note" value="' + esc(ln.note || '') + '"' + ro + '></td>'
             + '<td>' + (isApproved() ? '' : '<button type="button" class="btn-secondary osv-remove">حذف</button>') + '</td>'
             + '</tr>';
     }
@@ -269,9 +286,7 @@ $osvRef = $osvId > 0
             var idx = parseInt(tr.getAttribute('data-idx'), 10);
             if (isNaN(idx) || !state.lines[idx]) { return; }
             var q = tr.querySelector('.osv-qty');
-            var n = tr.querySelector('.osv-note');
             state.lines[idx].quantity = q ? (parseInt(q.value, 10) || 0) : 0;
-            state.lines[idx].note = n ? n.value : '';
         });
     }
 
@@ -312,14 +327,12 @@ $osvRef = $osvId > 0
             state.lines[idx].color = v.color || (info ? info.color : '');
             state.lines[idx].size = v.size || (info ? info.size : '');
             state.lines[idx].item_code = info ? info.item_code : '';
-            state.lines[idx].qty_system = info ? info.qty_system : (v.stock_quantity || 0);
             render();
         }).catch(function () {
             state.lines[idx].variant_id = v.variant_id;
             state.lines[idx].product_name = v.product_name || '';
             state.lines[idx].color = v.color || '';
             state.lines[idx].size = v.size || '';
-            state.lines[idx].qty_system = v.stock_quantity || 0;
             render();
         });
     }
@@ -327,14 +340,14 @@ $osvRef = $osvId > 0
     function addRow() {
         if (isApproved() || LOCKED) { return; }
         syncFromInputs();
-        state.lines.push({ variant_id: 0, product_name: '', color: '', size: '', item_code: '', quantity: 0, note: '', qty_system: 0 });
+        state.lines.push({ variant_id: 0, product_name: '', color: '', size: '', item_code: '', quantity: 0 });
         render();
     }
 
     function collectLines() {
         syncFromInputs();
         return state.lines.filter(function (l) { return (parseInt(l.variant_id, 10) || 0) > 0; })
-            .map(function (l) { return { variant_id: parseInt(l.variant_id, 10) || 0, quantity: parseInt(l.quantity, 10) || 0, note: l.note || '' }; });
+            .map(function (l) { return { variant_id: parseInt(l.variant_id, 10) || 0, quantity: parseInt(l.quantity, 10) || 0 }; });
     }
 
     function applyVoucher(v) {
