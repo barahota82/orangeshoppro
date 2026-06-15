@@ -779,7 +779,7 @@ $reportTitle = $reports[$reportKey];
             <?php endif; ?>
             <div>
                 <label for="sr_cat">الفئة</label>
-                <select id="sr_cat" name="cat" class="admin-inp">
+                <select id="sr_cat" name="cat" class="admin-inp" <?php echo ($depOptions !== [] && $depId <= 0) ? 'disabled' : ''; ?>>
                     <option value="0">كل الفئات</option>
                     <?php foreach ($catOptions as $co): ?>
                         <?php $coDep = (int) ($co['department_id'] ?? 0); ?>
@@ -1081,6 +1081,13 @@ $reportTitle = $reports[$reportKey];
     if (depSel && catSel) {
         var syncCats = function (resetIfMismatch) {
             var dep = parseInt(depSel.value, 10) || 0;
+            /* كل الأقسام: لا اختيار فئة محددة (مكرّرة) — تُقفل على «كل الفئات». */
+            if (dep === 0) {
+                catSel.value = '0';
+                catSel.disabled = true;
+                return;
+            }
+            catSel.disabled = false;
             var opts = catSel.options;
             for (var i = 0; i < opts.length; i++) {
                 var opt = opts[i];
@@ -1088,7 +1095,7 @@ $reportTitle = $reports[$reportKey];
                     continue;
                 }
                 var oDep = parseInt(opt.getAttribute('data-dep'), 10) || 0;
-                var show = (dep === 0) || (oDep === dep);
+                var show = (oDep === dep);
                 opt.hidden = !show;
                 opt.disabled = !show;
                 if (!show && resetIfMismatch && opt.selected) {
