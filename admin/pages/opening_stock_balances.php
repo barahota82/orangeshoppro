@@ -205,6 +205,10 @@ $osvRef = $osvId > 0
     html, body { height: auto !important; min-height: 0 !important; }
     .admin-layout { min-height: 0 !important; }
     .admin-main { min-height: 0 !important; }
+    /* لا تطبع الأسطر الفارغة (بلا صنف) — كانت تضخّم المحتوى وتولّد صفحة زائدة */
+    .jv-print-area .osv-lines-table tbody tr.osv-row-empty {
+        display: none !important;
+    }
     .jv-print-area .osv-lines-table {
         table-layout: fixed !important;
         width: 100% !important;
@@ -276,7 +280,8 @@ $osvRef = $osvId > 0
         var ro = isApproved() ? ' readonly tabindex="-1"' : '';
         var dis = isApproved() ? ' disabled' : '';
         var code = ln.item_code || (ln.variant_id ? ('#' + ln.variant_id) : '');
-        return '<tr data-idx="' + idx + '">'
+        var emptyCls = (parseInt(ln.variant_id, 10) || 0) > 0 ? '' : ' osv-row-empty';
+        return '<tr data-idx="' + idx + '" class="osv-line-row' + emptyCls + '">'
             + '<td class="jv-acc-code-cell"><input type="text" class="admin-inp osv-code" value="' + esc(code) + '" placeholder="نقرتان للاختيار" readonly title="نقرتان للاختيار"></td>'
             + '<td><input type="text" class="admin-inp osv-name admin-inp-readonly" value="' + esc(ln.product_name || '') + '" readonly tabindex="-1"></td>'
             + '<td><input type="text" class="admin-inp osv-vlbl admin-inp-readonly" value="' + esc(vlbl(ln)) + '" readonly tabindex="-1"></td>'
