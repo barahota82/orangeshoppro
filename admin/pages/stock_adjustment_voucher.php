@@ -230,7 +230,7 @@ if ($editSv !== null) {
     </table>
     <?php orange_voucher_print_metafoot(); ?>
 
-    <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide">
+    <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="justify-content:flex-end;">
         <div class="jv-toolbar-primary-group">
             <button type="button" id="stk_btn_new">سند جديد</button>
             <button type="button" class="btn-secondary" id="stk_delete_btn" data-orange-perm="delete">حذف السند</button>
