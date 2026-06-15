@@ -380,6 +380,8 @@ if ($editSv !== null) {
 
     function vlbl(ln) { return [ln.color, ln.size].filter(function (x) { return x; }).join(' / ') || '—'; }
 
+    function emptyLine() { return { variant_id: 0, product_name: '', color: '', size: '', item_code: '', qty_system: 0, unit_cost: 0, qty_add: 0, qty_deduct: 0, treatment_account_id: 0, treatment_account_label: '' }; }
+
     function rowHtml(ln, idx) {
         var v = lineValue(ln);
         var vCls = v < 0 ? 'stk-val-neg' : (v > 0 ? 'stk-val-pos' : '');
@@ -572,6 +574,7 @@ if ($editSv !== null) {
     function render() {
         var tb = el('stk_lines_body');
         if (!tb) { return; }
+        if (!isApproved() && state.lines.length === 0) { state.lines.push(emptyLine()); }
         tb.innerHTML = state.lines.map(rowHtml).join('');
         var emptyEl = el('stk_lines_empty');
         if (emptyEl) { emptyEl.style.display = state.lines.length ? 'none' : 'block'; }
@@ -618,29 +621,69 @@ if ($editSv !== null) {
     function bindRows() {
         var tb = el('stk_lines_body');
         if (!tb) { return; }
-        Array.prototype.forEach.call(tb.querySelectorAll('tr'), function (tr) {
-            var idx = parseInt(tr.getAttribute('data-idx'), 10);
-            if (!isApproved()) {
-                var codeInp = tr.querySelector('.stk-code');
-                if (codeInp) {
-                    codeInp.addEventListener('dblclick', function (e) { e.preventDefault(); OrangeProductPicker.open(function (vv) { onPickProduct(idx, vv); }); });
-                }
+        Array.prototype.forEach.call(tb.querySelectorAll('tr'), bindRowAt);
+    }
+
+    function bindRowAt(tr) {
+        var idx = parseInt(tr.getAttribute('data-idx'), 10);
+        if (!isApproved()) {
+            var codeInp = tr.querySelector('.stk-code');
+            if (codeInp) {
+                codeInp.addEventListener('dblclick', function (e) { e.preventDefault(); OrangeProductPicker.open(function (vv) { onPickProduct(idx, vv); }); });
             }
-            var rm = tr.querySelector('.stk-remove');
-            if (rm) { rm.addEventListener('click', function () { syncFromInputs(); state.lines.splice(idx, 1); render(); }); }
-            var a = tr.querySelector('.stk-add');
-            var d = tr.querySelector('.stk-deduct');
-            function onQty() {
-                state.lines[idx].qty_add = parseInt(a.value, 10) || 0;
-                state.lines[idx].qty_deduct = parseInt(d.value, 10) || 0;
-                var v = lineValue(state.lines[idx]);
-                var valCell = tr.querySelector('.stk-val');
-                if (valCell) { valCell.value = fmt(v); valCell.className = 'admin-inp stk-val ' + (v < 0 ? 'stk-val-neg' : (v > 0 ? 'stk-val-pos' : '')); }
-                recompute();
+        }
+        var rm = tr.querySelector('.stk-remove');
+        if (rm) { rm.addEventListener('click', function () { syncFromInputs(); state.lines.splice(idx, 1); render(); }); }
+        var a = tr.querySelector('.stk-add');
+        var d = tr.querySelector('.stk-deduct');
+        function onQty() {
+            state.lines[idx].qty_add = parseInt(a.value, 10) || 0;
+            state.lines[idx].qty_deduct = parseInt(d.value, 10) || 0;
+            var v = lineValue(state.lines[idx]);
+            var valCell = tr.querySelector('.stk-val');
+            if (valCell) { valCell.value = fmt(v); valCell.className = 'admin-inp stk-val ' + (v < 0 ? 'stk-val-neg' : (v > 0 ? 'stk-val-pos' : '')); }
+            maybeAppendRow(idx);
+            recompute();
+        }
+        function onKey(ev) {
+            if (ev.key === 'Enter') {
+                ev.preventDefault();
+                maybeAppendRow(idx);
+                focusRowQty(idx + 1);
             }
-            if (a) { a.addEventListener('input', onQty); }
-            if (d) { d.addEventListener('input', onQty); }
-        });
+        }
+        if (a) { a.addEventListener('input', onQty); a.addEventListener('keydown', onKey); }
+        if (d) { d.addEventListener('input', onQty); d.addEventListener('keydown', onKey); }
+    }
+
+    // إضافة سطر تالٍ تلقائياً عند إدخال كمية على السطر الأخير الذي يحمل صنفاً
+    function maybeAppendRow(idx) {
+        if (isApproved()) { return; }
+        if (idx !== state.lines.length - 1) { return; }
+        var ln = state.lines[idx];
+        if ((parseInt(ln.variant_id, 10) || 0) <= 0) { return; }
+        if ((parseInt(ln.qty_add, 10) || 0) <= 0 && (parseInt(ln.qty_deduct, 10) || 0) <= 0) { return; }
+        appendEmptyRow();
+    }
+
+    function appendEmptyRow() {
+        var tb = el('stk_lines_body');
+        if (!tb) { return; }
+        var idx = state.lines.length;
+        state.lines.push(emptyLine());
+        tb.insertAdjacentHTML('beforeend', rowHtml(state.lines[idx], idx));
+        var tr = tb.querySelector('tr[data-idx="' + idx + '"]');
+        if (tr) { bindRowAt(tr); }
+        var emptyEl = el('stk_lines_empty'); if (emptyEl) { emptyEl.style.display = 'none'; }
+    }
+
+    function focusRowQty(idx) {
+        var tb = el('stk_lines_body');
+        if (!tb) { return; }
+        var tr = tb.querySelector('tr[data-idx="' + idx + '"]');
+        if (!tr) { return; }
+        var add = tr.querySelector('.stk-add');
+        if (add) { add.focus(); add.select && add.select(); }
     }
 
     function onPickProduct(idx, v) {
@@ -668,7 +711,7 @@ if ($editSv !== null) {
     function addRow() {
         if (isApproved()) { return; }
         syncFromInputs();
-        state.lines.push({ variant_id: 0, product_name: '', color: '', size: '', item_code: '', qty_system: 0, unit_cost: 0, qty_add: 0, qty_deduct: 0, treatment_account_id: 0, treatment_account_label: '' });
+        state.lines.push(emptyLine());
         render();
     }
 
