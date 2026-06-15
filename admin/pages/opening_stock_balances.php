@@ -75,15 +75,12 @@ $osvRef = $osvId > 0
     </div>
 <?php else: ?>
 
-<div class="card jv-print-hide" style="margin-bottom:12px;">
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+<div class="card jv-print-area osv-opening-card" id="osv_app">
+    <h3 class="card-title">سند رصيد افتتاحي مخزني</h3>
+    <label class="jv-print-hide" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0 0 12px;">
         <input type="checkbox" id="osbLockToggle" <?php echo $openingStockLocked ? 'checked' : ''; ?>>
         <span><strong>سند مغلق</strong></span>
     </label>
-</div>
-
-<div class="card jv-print-area osv-opening-card" id="osv_app">
-    <h3 class="card-title">سند رصيد افتتاحي مخزني</h3>
 
     <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
         <?php orange_voucher_print_banner_thead($pdo, $ctxCountryId, [
