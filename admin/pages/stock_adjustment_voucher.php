@@ -348,7 +348,10 @@ if ($editSv !== null) {
     .admin-main { min-height: 0 !important; }
     /* الحشوة السفلية 18mm على صندوق الطباعة المطلق تتجاوز حافة الصفحة فتولّد صفحة فارغة؛
        هامش @page السفلي (18mm) يكفي لتذييل العدّاد — فنُلغي الحشوة الزائدة دون حذف أي سطر. */
-    .jv-print-area { padding-bottom: 2mm !important; }
+    .jv-print-area { padding-bottom: 0 !important; }
+    /* تضييق المسافات الرأسية بين الكارتين والعناوين والإطارات لتلائم صفحة واحدة */
+    .jv-print-area .stk-treat-card { margin-top: 6px !important; padding-top: 6px !important; }
+    .jv-print-area .admin-doc-frame { margin: 0 !important; }
     .jv-print-area .stk-lines-table,
     .jv-print-area .stk-treat-table {
         table-layout: fixed !important;
@@ -387,15 +390,17 @@ if ($editSv !== null) {
     .jv-print-area .stk-lines-table td,
     .jv-print-area .stk-treat-table th,
     .jv-print-area .stk-treat-table td {
-        font-size: 7.5pt !important;
-        padding: 2px 3px !important;
+        font-size: 7pt !important;
+        padding: 1px 3px !important;
+        line-height: 1.15 !important;
     }
     .jv-print-area .stk-lines-table input,
     .jv-print-area .stk-treat-table input {
-        font-size: 7.5pt !important;
-        padding: 1px 2px !important;
+        font-size: 7pt !important;
+        padding: 0 2px !important;
         height: auto !important;
         min-height: 0 !important;
+        line-height: 1.2 !important;
         border: 1px solid #cbd5e1 !important;
         background: #fff !important;
         text-align: center;
@@ -403,8 +408,8 @@ if ($editSv !== null) {
         print-color-adjust: exact;
     }
     .jv-print-area .stk-treat-title {
-        font-size: 9pt !important;
-        margin: 6px 0 3px !important;
+        font-size: 8.5pt !important;
+        margin: 3px 0 2px !important;
     }
 }
 </style>
