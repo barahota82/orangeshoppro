@@ -37,6 +37,7 @@ $initial = [
     'journal_voucher_id' => 0,
     'lines' => [],
     'gl_lines' => [],
+    'reference' => '',
     'total_value' => 0,
 ];
 if ($editSv !== null) {
@@ -50,6 +51,7 @@ if ($editSv !== null) {
         'lines' => $editSv['lines'],
         'gl_lines' => $editSv['gl_lines'] ?? [],
         'total_value' => (float) ($editSv['total_value'] ?? 0),
+        'reference' => (string) ($editSv['reference'] ?? ''),
     ];
 }
 $initialJson = json_encode($initial, JSON_UNESCAPED_UNICODE);
@@ -59,7 +61,10 @@ if ($initialJson === false) {
 $documentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $voucherDateDisplay = orange_format_date_dmY($initial['document_date']);
 $stkNumberDisplay = $initial['id'] > 0 ? (int) $initial['id'] : $nextNo;
-$stkRef = $initial['id'] > 0 ? ('STK-ADJ-' . (int) $initial['id']) : ('STK-ADJ-' . (int) $nextNo);
+$stkRefPreview = $ready
+    ? orange_stock_adjustment_voucher_reference_preview($pdo, $initial['document_date'], $ctxCountryId > 0 ? $ctxCountryId : null)
+    : '';
+$stkRef = ($initial['reference'] ?? '') !== '' ? (string) $initial['reference'] : $stkRefPreview;
 if ($editSv !== null) {
     $h = $editSv['header'];
     $docAt = trim((string) ($h['created_at'] ?? ''));
@@ -79,17 +84,9 @@ if ($editSv !== null) {
     </div>
 <?php else: ?>
 
-<p class="card-hint jv-print-hide" style="margin:0 0 12px;">
-    سند بنمط القيد لكن للكميات: لكل سطر اختر <strong>الصنف</strong> (نقرتان على خانة الكود)، وسجّل كمية في
-    <strong>إضافة (+)</strong> أو <strong>خصم (−)</strong>؛ تُحتسب قيمة الفرق من تكلفة الصنف. المعالجة المحاسبية
-    تُسجَّل في <strong>كارت «المعالجة المحاسبية»</strong> بالأسفل بصيغة مدين/دائن مرنة (سطر واحد أو أكثر) — حساب
-    المخزون يُضاف تلقائياً عند الاعتماد.
-</p>
-
-<?php orange_edit_lock_ui_toolbar(['prefix' => 'stk', 'doc_kind' => 'stock_adjustment', 'country_id' => $ctxCountryId, 'show_status_badge' => false]); ?>
-
 <div class="card jv-print-area" id="stk_adj_app">
     <h3 class="card-title">قيد تسوية مخزون</h3>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'stk', 'doc_kind' => 'stock_adjustment', 'country_id' => $ctxCountryId, 'show_status_badge' => false]); ?>
 
     <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
         <?php orange_voucher_print_banner_thead($pdo, $ctxCountryId, [
@@ -123,14 +120,14 @@ if ($editSv !== null) {
                     value="<?php echo htmlspecialchars($documentEnteredDisplay, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
             </div>
             <div>
-                <label for="stk_tot_lines">عدد الأسطر</label>
-                <input type="text" id="stk_tot_lines" readonly class="admin-inp-readonly stk-tot-int" value="0"
-                    title="عدد أسطر السند" dir="ltr" lang="en" inputmode="numeric">
+                <label for="stk_tot_debit">مدين</label>
+                <input type="text" id="stk_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.00"
+                    title="صافي الفرق مدين (زيادة مخزون)" dir="ltr" lang="en" inputmode="decimal">
             </div>
             <div>
-                <label for="stk_tot_value">صافي قيمة الفرق</label>
-                <input type="text" id="stk_tot_value" readonly class="admin-inp-readonly jv-tot-readonly" value="0.00"
-                    title="مجموع قيم الفروق" dir="ltr" lang="en" inputmode="decimal">
+                <label for="stk_tot_credit">دائن</label>
+                <input type="text" id="stk_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.00"
+                    title="صافي الفرق دائن (نقص مخزون)" dir="ltr" lang="en" inputmode="decimal">
             </div>
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين السندات">
@@ -354,6 +351,7 @@ if ($editSv !== null) {
     };
     var NEXT_NO = <?php echo (int) $nextNo; ?>;
     var INV_ACC = <?php echo $invAccJson; ?>;
+    var STK_REF_PREVIEW = <?php echo json_encode($stkRefPreview, JSON_UNESCAPED_UNICODE) ?: '""'; ?>;
     var state = <?php echo $initialJson; ?>;
     if (!state.lines) { state.lines = []; }
     if (!state.gl_lines) { state.gl_lines = []; }
@@ -402,8 +400,10 @@ if ($editSv !== null) {
         var total = 0;
         state.lines.forEach(function (ln) { total += lineValue(ln); });
         state.total_value = total;
-        el('stk_tot_lines').value = String(state.lines.length);
-        el('stk_tot_value').value = fmt(total);
+        // صافي الفرق: موجب = مدين (زيادة مخزون)، سالب = دائن (نقص مخزون).
+        var net = round4(total);
+        var de = el('stk_tot_debit'); if (de) { de.value = fmt(net > 0 ? net : 0); }
+        var ce = el('stk_tot_credit'); if (ce) { ce.value = fmt(net < 0 ? -net : 0); }
         refreshTreat();
     }
 
@@ -581,7 +581,7 @@ if ($editSv !== null) {
         var emptyEl = el('stk_lines_empty');
         if (emptyEl) { emptyEl.style.display = state.lines.length ? 'none' : 'block'; }
         el('stk_number').value = state.id > 0 ? state.id : NEXT_NO;
-        el('stk_ref').value = state.id > 0 ? ('STK-ADJ-' + state.id) : ('STK-ADJ-' + NEXT_NO);
+        el('stk_ref').value = state.reference || STK_REF_PREVIEW;
         el('stk_desc').value = state.notes || '';
         el('stk_status_badge').textContent = state.id > 0
             ? ('سند #' + state.id + ' — ' + (isApproved() ? ('معتمد' + (state.journal_voucher_id ? ' (قيد #' + state.journal_voucher_id + ')' : '')) : 'مسودة'))
@@ -779,6 +779,7 @@ if ($editSv !== null) {
         state.notes = h.notes || '';
         state.status = h.status || 'draft';
         state.journal_voucher_id = parseInt(h.journal_voucher_id, 10) || 0;
+        state.reference = sv.reference || '';
         state.lines = sv.lines || [];
         state.gl_lines = sv.gl_lines || [];
         state.total_value = parseFloat(sv.total_value) || 0;
@@ -837,7 +838,7 @@ if ($editSv !== null) {
     }
 
     function newSheet() {
-        state = { id: 0, document_date: '<?php echo $initial['document_date']; ?>', notes: '', status: 'draft', journal_voucher_id: 0, lines: [], gl_lines: [], total_value: 0 };
+        state = { id: 0, document_date: '<?php echo $initial['document_date']; ?>', notes: '', status: 'draft', journal_voucher_id: 0, reference: '', lines: [], gl_lines: [], total_value: 0 };
         browseId = 0;
         if (typeof orangeIsoDateToDmy === 'function') { el('stk_document_date').value = orangeIsoDateToDmy(state.document_date); }
         showErr(''); showOk('');

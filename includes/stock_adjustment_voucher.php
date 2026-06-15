@@ -299,6 +299,38 @@ function orange_stock_adjustment_account_code_name(PDO $pdo, int $accountId): ar
 }
 
 /**
+ * مرجع القيد بنمط نوع اليومية: {كود نوع اليومية}-{كود الدولة}-{تسلسل} (مثل SAJ-KW-12).
+ * للمسودّة يُعرَض التسلسل التالي المتوقَّع (يُخصَّص فعلياً عند الترحيل في orange_voucher_post).
+ */
+function orange_stock_adjustment_voucher_reference_preview(PDO $pdo, string $documentDate, ?int $countryId): string
+{
+    require_once __DIR__ . '/fiscal_years.php';
+    $cc = orange_voucher_country_display_code($pdo, $countryId);
+    if ($cc === '') {
+        $cc = 'XX';
+    }
+    $code = orange_voucher_journal_type_code($pdo, 'stock_adjustment', null, $countryId);
+    if ($code === '') {
+        $code = 'SAJ';
+    }
+    $date = $documentDate !== '' ? substr($documentDate, 0, 10) : date('Y-m-d');
+    $fy = orange_fiscal_find_for_date($pdo, $date, $countryId);
+    $fyId = $fy !== null ? (int) ($fy['id'] ?? 0) : 0;
+    if ($fyId > 0) {
+        try {
+            $prev = orange_voucher_auto_reference_preview($pdo, 'stock_adjustment', $fyId, $countryId);
+            if ($prev !== '') {
+                return $prev;
+            }
+        } catch (Throwable $e) {
+            // تجاهل — رجوع للصيغة المبسّطة أدناه.
+        }
+    }
+
+    return $code . '-' . $cc . '-?';
+}
+
+/**
  * @return array<string, mixed>|null
  */
 function orange_stock_adjustment_voucher_get(PDO $pdo, int $id, ?int $countryId = null): ?array
@@ -386,8 +418,25 @@ function orange_stock_adjustment_voucher_get(PDO $pdo, int $id, ?int $countryId 
     $inventoryAccountId = orange_gl_account_id($pdo, 'inventory', $countryForGl > 0 ? $countryForGl : null);
     $invCN = orange_stock_adjustment_account_code_name($pdo, $inventoryAccountId);
 
+    // المرجع بنمط نوع اليومية: المرحَّل الفعلي بعد الاعتماد، أو معاينة للتسلسل التالي للمسودة.
+    $reference = '';
+    $jvid = (int) ($row['journal_voucher_id'] ?? 0);
+    if ($jvid > 0 && orange_table_exists($pdo, 'journal_vouchers')) {
+        $stR = $pdo->prepare('SELECT reference FROM journal_vouchers WHERE id = ? LIMIT 1');
+        $stR->execute([$jvid]);
+        $reference = trim((string) ($stR->fetchColumn() ?: ''));
+    }
+    if ($reference === '') {
+        $reference = orange_stock_adjustment_voucher_reference_preview(
+            $pdo,
+            (string) ($row['document_date'] ?? ''),
+            $countryForGl > 0 ? $countryForGl : null
+        );
+    }
+
     return [
         'header' => $row,
+        'reference' => $reference,
         'warehouse_label' => $whLabel,
         'lines' => $lines,
         'gl_lines' => orange_stock_adjustment_voucher_get_gl_lines($pdo, $id),
