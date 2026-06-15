@@ -127,7 +127,7 @@ $osvRef = $osvId > 0
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns osv-voucher-action-btns" role="group" aria-label="إجراءات سند الرصيد الافتتاحي">
                     <button type="button" id="osv_btn_save">حفظ السند</button>
-                    <button type="button" class="btn-secondary jv-nav-search" id="osv_btn_print" title="<?php echo $osvId > 0 && ($initial['status'] ?? '') === 'approved' ? 'طباعة السند' : 'احفظ السند أولاً'; ?>"<?php echo ($osvId <= 0 || ($initial['status'] ?? '') !== 'approved') ? ' disabled' : ''; ?>>طباعة السند</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="osv_btn_print" title="معاينة الطباعة">طباعة السند</button>
                     <button type="button" class="btn-secondary jv-nav-search" id="osv_btn_delete"<?php echo $osvId <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
                 </div>
             </div>
@@ -278,8 +278,8 @@ $osvRef = $osvId > 0
         el('osv_btn_delete').disabled = ro || state.id <= 0;
         el('osv_btn_add').disabled = ro;
         var pb = el('osv_btn_print');
-        pb.disabled = !isApproved();
-        pb.title = isApproved() ? 'طباعة السند' : 'احفظ السند أولاً';
+        pb.disabled = false;
+        pb.title = isApproved() ? 'طباعة السند' : 'معاينة الطباعة (متاحة قبل الحفظ لضبط التنسيق)';
         el('osv_date').readOnly = ro;
         el('osv_statement').readOnly = ro;
     }
@@ -438,7 +438,6 @@ $osvRef = $osvId > 0
     }
 
     function printVoucher() {
-        if (!isApproved()) { showErr('احفظ السند أولاً قبل الطباعة'); return; }
         if (typeof orangeAdminOpenPrintDialog === 'function') {
             orangeAdminOpenPrintDialog(orangeAdminBuildVoucherPrintDocTitle(null, 'osv_number', 'سند رصيد افتتاحي مخزني'));
         } else {

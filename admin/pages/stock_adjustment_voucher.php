@@ -234,7 +234,7 @@ if ($editSv !== null) {
         <div class="jv-toolbar-primary-group">
             <button type="button" id="stk_btn_new">سند جديد</button>
             <button type="button" class="btn-secondary" id="stk_delete_btn" data-orange-perm="delete">حذف السند</button>
-            <button type="button" class="btn-secondary" id="stk_btn_print" disabled title="اعتمد السند أولاً">طباعة السند</button>
+            <button type="button" class="btn-secondary" id="stk_btn_print" title="معاينة الطباعة">طباعة السند</button>
             <button type="button" id="stk_save_btn" data-orange-perm="edit">حفظ السند</button>
         </div>
     </div>
@@ -636,8 +636,8 @@ if ($editSv !== null) {
         el('stk_delete_btn').disabled = ro || state.id <= 0;
         el('stk_btn_add').disabled = ro;
         var pb = el('stk_btn_print');
-        pb.disabled = !isApproved();
-        pb.title = isApproved() ? 'طباعة' : 'اعتمد السند أولاً — الطباعة بعد الاعتماد';
+        pb.disabled = false;
+        pb.title = isApproved() ? 'طباعة' : 'معاينة الطباعة (متاحة قبل الاعتماد لضبط التنسيق)';
         el('stk_document_date').readOnly = ro;
         el('stk_desc').readOnly = ro;
         var ta = el('stk_treat_add'); if (ta) { ta.disabled = ro; }
@@ -964,7 +964,6 @@ if ($editSv !== null) {
     }
 
     function printVoucher() {
-        if (!isApproved()) { showErr('اعتمد السند أولاً قبل الطباعة'); return; }
         if (typeof orangeAdminOpenPrintDialog === 'function') {
             orangeAdminOpenPrintDialog(orangeAdminBuildVoucherPrintDocTitle(null, 'stk_number', 'قيد تسوية مخزون'));
         } else {
