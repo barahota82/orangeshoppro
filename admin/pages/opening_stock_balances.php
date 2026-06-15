@@ -124,13 +124,13 @@ $osvRef = $osvId > 0
             </div>
             <div>
                 <label for="osv_tot_lines">عدد الأسطر</label>
-                <input type="text" id="osv_tot_lines" readonly class="admin-inp-readonly jv-tot-readonly" value="0"
-                    title="عدد أسطر السند" dir="ltr" lang="en">
+                <input type="text" id="osv_tot_lines" readonly class="admin-inp-readonly osv-tot-int" value="0"
+                    title="عدد أسطر السند" dir="ltr" lang="en" inputmode="numeric">
             </div>
             <div>
                 <label for="osv_tot_qty">إجمالي الكمية</label>
-                <input type="text" id="osv_tot_qty" readonly class="admin-inp-readonly jv-tot-readonly" value="0"
-                    title="مجموع الكميات الافتتاحية" dir="ltr" lang="en">
+                <input type="text" id="osv_tot_qty" readonly class="admin-inp-readonly osv-tot-int" value="0"
+                    title="مجموع الكميات الافتتاحية" dir="ltr" lang="en" inputmode="numeric">
             </div>
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns osv-voucher-action-btns" role="group" aria-label="إجراءات سند الرصيد الافتتاحي">
@@ -201,6 +201,11 @@ $osvRef = $osvId > 0
 .osv-lines-table .osv-vlbl { background: #f4f4f5; cursor: default; width: 100%; box-sizing: border-box; }
 .osv-lines-table .osv-qty { width: 100%; box-sizing: border-box; }
 .osv-lines-table input { box-sizing: border-box; }
+.jv-voucher-header-line .osv-tot-int {
+    text-align: center;
+    background: #f4f4f5;
+    cursor: default;
+}
 </style>
 
 <script>

@@ -110,8 +110,8 @@ if ($editSv !== null) {
             </div>
             <div>
                 <label for="stk_tot_lines">عدد الأسطر</label>
-                <input type="text" id="stk_tot_lines" readonly class="admin-inp-readonly jv-tot-readonly" value="0"
-                    title="عدد أسطر السند" dir="ltr" lang="en">
+                <input type="text" id="stk_tot_lines" readonly class="admin-inp-readonly stk-tot-int" value="0"
+                    title="عدد أسطر السند" dir="ltr" lang="en" inputmode="numeric">
             </div>
             <div>
                 <label for="stk_tot_value">صافي قيمة الفرق</label>
@@ -228,6 +228,11 @@ if ($editSv !== null) {
 .stk-lines-table .stk-add, .stk-lines-table .stk-deduct { width: 100%; }
 .stk-val-neg { color: #b91c1c; font-weight: 700; }
 .stk-val-pos { color: #15803d; font-weight: 700; }
+.jv-voucher-header-line .stk-tot-int {
+    text-align: center;
+    background: #f4f4f5;
+    cursor: default;
+}
 .gl-pick-modal#stk_acc_modal { z-index: 12100; }
 .stk-search-modal { position: fixed; inset: 0; z-index: 10060; display: none; align-items: center; justify-content: center; padding: 16px; direction: rtl; }
 .stk-search-modal__backdrop { position: absolute; inset: 0; background: rgba(15,23,42,0.45); }
