@@ -339,6 +339,67 @@ if ($editSv !== null) {
 .stk-search-fields input { width: 9rem; }
 #stk_s_results tr { cursor: pointer; }
 #stk_s_results tr:hover { background: #f4f4f5; }
+
+/* ===== الطباعة: ملاءمة الجداول لعرض الصفحة وإخفاء عمود الإجراء ===== */
+@media print {
+    .jv-print-area .stk-lines-table,
+    .jv-print-area .stk-treat-table {
+        table-layout: fixed !important;
+        width: 100% !important;
+        direction: rtl !important;
+    }
+    /* جدول الكميات (9 أعمدة) — نِسَب مئوية تجمع 100% بعد إخفاء عمود الإجراء */
+    .jv-print-area .stk-lines-table col.stk-col-code { width: 13% !important; }
+    .jv-print-area .stk-lines-table col.stk-col-name { width: auto !important; }
+    .jv-print-area .stk-lines-table col.stk-col-vlbl { width: 12% !important; }
+    .jv-print-area .stk-lines-table col.stk-col-sys { width: 9% !important; }
+    .jv-print-area .stk-lines-table col.stk-col-add { width: 9% !important; }
+    .jv-print-area .stk-lines-table col.stk-col-deduct { width: 9% !important; }
+    .jv-print-area .stk-lines-table col.stk-col-cost { width: 11% !important; }
+    .jv-print-area .stk-lines-table col.stk-col-val { width: 11% !important; }
+    .jv-print-area .stk-lines-table col.stk-col-act { width: 0 !important; }
+    /* جدول المعالجة (5 أعمدة) */
+    .jv-print-area .stk-treat-table col.stk-tcol-code { width: 24% !important; }
+    .jv-print-area .stk-treat-table col.stk-tcol-name { width: auto !important; }
+    .jv-print-area .stk-treat-table col.stk-tcol-debit { width: 20% !important; }
+    .jv-print-area .stk-treat-table col.stk-tcol-credit { width: 20% !important; }
+    .jv-print-area .stk-treat-table col.stk-tcol-act { width: 0 !important; }
+    /* إخفاء عمود الإجراء (زر حذف) رأساً وجسماً + خلية حالة الاتزان في الطباعة */
+    .jv-print-area .stk-lines-table thead th.admin-doc-col-actions,
+    .jv-print-area .stk-lines-table tbody td:last-child,
+    .jv-print-area .stk-treat-table thead th.admin-doc-col-actions,
+    .jv-print-area .stk-treat-table tbody td:last-child,
+    .jv-print-area .stk-treat-table tfoot th:last-child {
+        display: none !important;
+        width: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+    }
+    /* خطوط ومسافات أصغر لتلائم الصفحة */
+    .jv-print-area .stk-lines-table th,
+    .jv-print-area .stk-lines-table td,
+    .jv-print-area .stk-treat-table th,
+    .jv-print-area .stk-treat-table td {
+        font-size: 7.5pt !important;
+        padding: 2px 3px !important;
+    }
+    .jv-print-area .stk-lines-table input,
+    .jv-print-area .stk-treat-table input {
+        font-size: 7.5pt !important;
+        padding: 1px 2px !important;
+        height: auto !important;
+        min-height: 0 !important;
+        border: 1px solid #cbd5e1 !important;
+        background: #fff !important;
+        text-align: center;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    .jv-print-area .stk-treat-title {
+        font-size: 9pt !important;
+        margin: 6px 0 3px !important;
+    }
+}
 </style>
 
 <script>
