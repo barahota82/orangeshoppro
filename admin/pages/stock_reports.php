@@ -288,36 +288,146 @@ try {
             ];
         }
     } elseif ($reportKey === 'move_summary') {
-        /* ملخص الحركة لكل صنف في المدى: وارد (+) / صادر (−) / صافي من فرق الرصيد. */
-        $mvCountrySql = orange_sql_country_and_fragment($pdo, 'stock_movements', 'sm', $srCountryId);
-        $filterSql = '';
-        $params = [$mFrom, $mTo];
-        if ($pid > 0) {
-            $filterSql = ' AND sm.product_id = ?';
-            $params[] = $pid;
+        /*
+         * ملخص الحركة لكل صنف (ق1): رصيد أول + وارد + صادر + الرصيد الحالي — من كل المصادر.
+         * stock_movements لا يحوي الشراء/مردود الشراء؛ لذا نجمعهما من جداولهما، ونحسب «رصيد أول»
+         * بالمطابقة العكسية: الرصيد الفعلي الحالي − صافي كل الحركات منذ «من» (نفس منطق كرت الصنف
+         * في admin/pages/item_card.php، لكن مُجمَّعاً لكل صنف). الرصيد الحالي = رصيد أول + وارد − صادر،
+         * فيطابق المخزون الفعلي عند «إلى» = اليوم.
+         */
+        $msMvCountrySql = orange_sql_country_and_fragment($pdo, 'stock_movements', 'sm', $srCountryId);
+        $msHasPurCreatedAt = orange_table_has_column($pdo, 'purchases', 'created_at');
+        $msHasPurReturns = orange_table_exists($pdo, 'purchase_returns') && orange_table_exists($pdo, 'purchase_return_items');
+        $msPuQtyExpr = orange_table_has_column($pdo, 'purchase_items', 'qty_received') ? 'pi.qty_received' : 'pi.qty';
+        $msPidSm = $pid > 0 ? ' AND sm.product_id = ?' : '';
+        $msPidPi = $pid > 0 ? ' AND pi.product_id = ?' : '';
+        $msPidPri = $pid > 0 ? ' AND pri.product_id = ?' : '';
+
+        $wq = orange_warehouse_effective_qty_sql($pdo, $srCountryId, 'pv', 'wvs_ms');
+
+        /* (1) الرصيد الفعلي الحالي + اسم الصنف لكل صنف ضمن نطاق الدولة. */
+        $msCur = [];
+        $curSql = 'SELECT p.id AS pid, p.name AS pname, COALESCE(SUM(' . $wq['expr'] . '), 0) AS cur
+                   FROM products p
+                   INNER JOIN product_variants pv ON pv.product_id = p.id
+                   ' . $wq['join'] . '
+                   WHERE 1=1' . $productCountrySql . ($pid > 0 ? ' AND p.id = ?' : '') . '
+                   GROUP BY p.id, p.name';
+        $st = $pdo->prepare($curSql);
+        $st->execute($pid > 0 ? [$pid] : []);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $msCur[(int) $r['pid']] = ['name' => (string) $r['pname'], 'cur' => (int) $r['cur']];
         }
-        $sql = 'SELECT p.id AS product_id, p.name AS product_name,
+
+        /* (2) صافي كل الحركات منذ «من» لكل صنف (لاستخراج رصيد أول عكسياً). */
+        $msDeltaSince = [];
+        $msSmSince = 'SELECT sm.product_id AS pid, COALESCE(SUM(sm.new_stock - sm.old_stock), 0) AS v
+                      FROM stock_movements sm
+                      WHERE DATE(sm.created_at) >= ?' . $msMvCountrySql . $msPidSm . '
+                      GROUP BY sm.product_id';
+        $st = $pdo->prepare($msSmSince);
+        $st->execute($pid > 0 ? [$mFrom, $pid] : [$mFrom]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $msDeltaSince[(int) $r['pid']] = ($msDeltaSince[(int) $r['pid']] ?? 0) + (int) $r['v'];
+        }
+        if ($msHasPurCreatedAt) {
+            $msPuSince = 'SELECT pi.product_id AS pid, COALESCE(SUM(' . $msPuQtyExpr . '), 0) AS v
+                          FROM purchase_items pi
+                          INNER JOIN purchases pu ON pu.id = pi.purchase_id
+                          WHERE DATE(pu.created_at) >= ?' . $msPidPi . '
+                          GROUP BY pi.product_id';
+            $st = $pdo->prepare($msPuSince);
+            $st->execute($pid > 0 ? [$mFrom, $pid] : [$mFrom]);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $msDeltaSince[(int) $r['pid']] = ($msDeltaSince[(int) $r['pid']] ?? 0) + (int) $r['v'];
+            }
+        }
+        if ($msHasPurReturns) {
+            $msPrSince = 'SELECT pri.product_id AS pid, COALESCE(SUM(pri.qty), 0) AS v
+                          FROM purchase_return_items pri
+                          INNER JOIN purchase_returns pr ON pr.id = pri.purchase_return_id
+                          WHERE DATE(pr.created_at) >= ?' . $msPidPri . '
+                          GROUP BY pri.product_id';
+            $st = $pdo->prepare($msPrSince);
+            $st->execute($pid > 0 ? [$mFrom, $pid] : [$mFrom]);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $msDeltaSince[(int) $r['pid']] = ($msDeltaSince[(int) $r['pid']] ?? 0) - (int) $r['v'];
+            }
+        }
+
+        /* (3) وارد/صادر داخل الفترة [من,إلى] لكل صنف من كل المصادر. */
+        $msIn = [];
+        $msOut = [];
+        $msSmIo = 'SELECT sm.product_id AS pid,
                        SUM(CASE WHEN (sm.new_stock - sm.old_stock) > 0 THEN (sm.new_stock - sm.old_stock) ELSE 0 END) AS qin,
                        SUM(CASE WHEN (sm.new_stock - sm.old_stock) < 0 THEN (sm.old_stock - sm.new_stock) ELSE 0 END) AS qout
-                FROM stock_movements sm
-                INNER JOIN products p ON p.id = sm.product_id
-                WHERE DATE(sm.created_at) BETWEEN ? AND ?' . $mvCountrySql . $filterSql . '
-                GROUP BY p.id, p.name
-                HAVING qin <> 0 OR qout <> 0
-                ORDER BY p.name ASC, p.id ASC';
-        $st = $pdo->prepare($sql);
-        $st->execute($params);
+                   FROM stock_movements sm
+                   WHERE DATE(sm.created_at) BETWEEN ? AND ?' . $msMvCountrySql . $msPidSm . '
+                   GROUP BY sm.product_id';
+        $st = $pdo->prepare($msSmIo);
+        $st->execute($pid > 0 ? [$mFrom, $mTo, $pid] : [$mFrom, $mTo]);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $qin = (int) $r['qin'];
-            $qout = (int) $r['qout'];
+            $p = (int) $r['pid'];
+            $msIn[$p] = ($msIn[$p] ?? 0) + (int) $r['qin'];
+            $msOut[$p] = ($msOut[$p] ?? 0) + (int) $r['qout'];
+        }
+        if ($msHasPurCreatedAt) {
+            $msPuIo = 'SELECT pi.product_id AS pid, COALESCE(SUM(' . $msPuQtyExpr . '), 0) AS v
+                       FROM purchase_items pi
+                       INNER JOIN purchases pu ON pu.id = pi.purchase_id
+                       WHERE DATE(pu.created_at) BETWEEN ? AND ?' . $msPidPi . '
+                       GROUP BY pi.product_id';
+            $st = $pdo->prepare($msPuIo);
+            $st->execute($pid > 0 ? [$mFrom, $mTo, $pid] : [$mFrom, $mTo]);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $p = (int) $r['pid'];
+                $msIn[$p] = ($msIn[$p] ?? 0) + (int) $r['v'];
+            }
+        }
+        if ($msHasPurReturns) {
+            $msPrIo = 'SELECT pri.product_id AS pid, COALESCE(SUM(pri.qty), 0) AS v
+                       FROM purchase_return_items pri
+                       INNER JOIN purchase_returns pr ON pr.id = pri.purchase_return_id
+                       WHERE DATE(pr.created_at) BETWEEN ? AND ?' . $msPidPri . '
+                       GROUP BY pri.product_id';
+            $st = $pdo->prepare($msPrIo);
+            $st->execute($pid > 0 ? [$mFrom, $mTo, $pid] : [$mFrom, $mTo]);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $p = (int) $r['pid'];
+                $msOut[$p] = ($msOut[$p] ?? 0) + (int) $r['v'];
+            }
+        }
+
+        /* (4) الصفوف: الأصناف ذات الحركة في الفترة (أو الصنف المحدّد)، ضمن نطاق الدولة فقط. */
+        $msPidSet = [];
+        foreach (array_keys($msIn) as $p) {
+            $msPidSet[$p] = true;
+        }
+        foreach (array_keys($msOut) as $p) {
+            $msPidSet[$p] = true;
+        }
+        if ($pid > 0) {
+            $msPidSet[$pid] = true;
+        }
+        foreach (array_keys($msPidSet) as $p) {
+            if (!isset($msCur[$p])) {
+                continue;
+            }
+            $opening = (int) $msCur[$p]['cur'] - (int) ($msDeltaSince[$p] ?? 0);
+            $qin = (int) ($msIn[$p] ?? 0);
+            $qout = (int) ($msOut[$p] ?? 0);
             $rows[] = [
-                'product_id' => (int) $r['product_id'],
-                'product_name' => (string) $r['product_name'],
+                'product_id' => $p,
+                'product_name' => (string) $msCur[$p]['name'],
+                'opening' => $opening,
                 'qin' => $qin,
                 'qout' => $qout,
-                'net' => $qin - $qout,
+                'closing' => $opening + $qin - $qout,
             ];
         }
+        usort($rows, static function (array $a, array $b): int {
+            return strcmp((string) $a['product_name'], (string) $b['product_name']) ?: ($a['product_id'] <=> $b['product_id']);
+        });
     } elseif ($reportKey === 'movements') {
         $mvCountrySql = orange_sql_country_and_fragment($pdo, 'stock_movements', 'sm', $srCountryId);
         $sql = 'SELECT sm.created_at, sm.type, sm.qty, sm.old_stock, sm.new_stock, sm.reference, sm.reason,
@@ -576,17 +686,18 @@ $reportTitle = $reports[$reportKey];
                         <?php endforeach; endif; ?>
                     </tbody>
                 <?php elseif ($reportKey === 'move_summary'): ?>
-                    <thead><tr><th>#</th><th>الصنف</th><th class="gl-acc-stmt-col-num">وارد</th><th class="gl-acc-stmt-col-num">صادر</th><th class="gl-acc-stmt-col-num">الصافي</th></tr></thead>
+                    <thead><tr><th>#</th><th>الصنف</th><th class="gl-acc-stmt-col-num">رصيد أول</th><th class="gl-acc-stmt-col-num">وارد</th><th class="gl-acc-stmt-col-num">صادر</th><th class="gl-acc-stmt-col-num">الرصيد الحالي</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
-                            <tr><td colspan="5" class="muted">لا حركة في المدى.</td></tr>
+                            <tr><td colspan="6" class="muted">لا حركة في المدى.</td></tr>
                         <?php else: foreach ($rows as $r): ?>
                             <tr>
                                 <td dir="ltr"><?php echo (int) $r['product_id']; ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo (int) $r['opening']; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qin']; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qout']; ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo (int) $r['net']; ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo (int) $r['closing']; ?></td>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
