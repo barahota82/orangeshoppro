@@ -342,6 +342,10 @@ if ($editSv !== null) {
 
 /* ===== الطباعة: ملاءمة الجداول لعرض الصفحة وإخفاء عمود الإجراء ===== */
 @media print {
+    /* منع الصفحة البيضاء الزائدة: الهيكل المخفي يفرض min-height:100vh فيُنتج صفحة ثانية فارغة */
+    html, body { height: auto !important; min-height: 0 !important; }
+    .admin-layout { min-height: 0 !important; }
+    .admin-main { min-height: 0 !important; }
     .jv-print-area .stk-lines-table,
     .jv-print-area .stk-treat-table {
         table-layout: fixed !important;
