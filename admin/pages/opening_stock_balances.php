@@ -134,9 +134,8 @@ $osvRef = $osvId > 0
             </div>
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns osv-voucher-action-btns" role="group" aria-label="إجراءات سند الرصيد الافتتاحي">
-                    <button type="button" id="osv_btn_save">حفظ المسودة</button>
-                    <button type="button" id="osv_btn_approve">اعتماد وتطبيق</button>
-                    <button type="button" class="btn-secondary jv-nav-search" id="osv_btn_print" title="<?php echo $osvId > 0 ? 'طباعة السند' : 'احفظ السند أولاً'; ?>"<?php echo $osvId <= 0 ? ' disabled' : ''; ?>>طباعة السند</button>
+                    <button type="button" id="osv_btn_save">حفظ السند</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="osv_btn_print" title="<?php echo $osvId > 0 && ($initial['status'] ?? '') === 'approved' ? 'طباعة السند' : 'احفظ السند أولاً'; ?>"<?php echo ($osvId <= 0 || ($initial['status'] ?? '') !== 'approved') ? ' disabled' : ''; ?>>طباعة السند</button>
                     <button type="button" class="btn-secondary jv-nav-search" id="osv_btn_delete"<?php echo $osvId <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
                 </div>
             </div>
@@ -266,14 +265,14 @@ $osvRef = $osvId > 0
 
     function applyMode() {
         var ro = isApproved() || LOCKED;
-        el('osv_btn_save').disabled = ro;
-        el('osv_btn_approve').disabled = ro || state.id <= 0;
+        var saveBtn = el('osv_btn_save');
+        saveBtn.disabled = ro;
+        saveBtn.title = LOCKED && !isApproved() ? 'الرصيد الافتتاحي مقفول' : '';
         el('osv_btn_delete').disabled = ro || state.id <= 0;
         el('osv_btn_add').disabled = ro;
         var pb = el('osv_btn_print');
-        pb.disabled = state.id <= 0;
-        pb.title = state.id > 0 ? 'طباعة السند' : 'احفظ السند أولاً';
-        if (LOCKED && !isApproved()) { el('osv_btn_approve').title = 'الرصيد الافتتاحي مقفول'; }
+        pb.disabled = !isApproved();
+        pb.title = isApproved() ? 'طباعة السند' : 'احفظ السند أولاً';
         el('osv_date').readOnly = ro;
         el('osv_statement').readOnly = ro;
     }
@@ -362,27 +361,25 @@ $osvRef = $osvId > 0
         render();
     }
 
-    function save() {
+    function saveVoucher() {
         if (isApproved() || LOCKED) { return; }
+        if (LOCKED) { showErr('الرصيد الافتتاحي مقفول'); return; }
         var dIso = (typeof orangeGetDmyValueAsIso === 'function') ? orangeGetDmyValueAsIso(el('osv_date')) : '';
         if (!dIso) { showErr('التاريخ مطلوب (يوم/شهر/سنة)'); return; }
         var lines = collectLines();
         if (!lines.length) { showErr('أضف صنفاً واحداً على الأقل'); return; }
+        if (!confirm('حفظ السند وتطبيق الأرصدة الافتتاحية على المخزون؟ لا يمكن التراجع.')) { return; }
         postJson(API, { action: 'save', id: state.id || 0, document_date: dIso, notes: el('osv_statement').value.trim(), lines: lines }).then(function (r) {
             if (!r.success) { showErr(r.message || 'فشل الحفظ'); return; }
             applyVoucher(r.voucher);
-            showOk(r.message || 'تم الحفظ');
-        }).catch(function (e) { showErr(e.message || String(e)); });
-    }
-
-    function approve() {
-        if (state.id <= 0) { showErr('احفظ السند أولاً'); return; }
-        if (LOCKED) { showErr('الرصيد الافتتاحي مقفول'); return; }
-        if (!confirm('اعتماد السند وتطبيق الأرصدة الافتتاحية على المخزون؟ لا يمكن التراجع.')) { return; }
-        postJson(API, { action: 'approve', id: state.id }).then(function (r) {
-            if (!r.success) { showErr(r.message || 'فشل الاعتماد'); return; }
+            var vid = state.id;
+            if (vid <= 0) { showErr('تعذّر تحديد رقم السند بعد الحفظ'); return; }
+            return postJson(API, { action: 'approve', id: vid });
+        }).then(function (r) {
+            if (!r) { return; }
+            if (!r.success) { showErr(r.message || 'فشل اعتماد السند'); return; }
             applyVoucher(r.voucher);
-            showOk(r.message || 'تم الاعتماد');
+            showOk(r.message || 'تم حفظ السند وتطبيق الأرصدة الافتتاحية');
         }).catch(function (e) { showErr(e.message || String(e)); });
     }
 
@@ -399,7 +396,7 @@ $osvRef = $osvId > 0
     }
 
     function printVoucher() {
-        if (state.id <= 0) { showErr('احفظ السند أولاً قبل الطباعة'); return; }
+        if (!isApproved()) { showErr('احفظ السند أولاً قبل الطباعة'); return; }
         if (typeof orangeAdminOpenPrintDialog === 'function') {
             orangeAdminOpenPrintDialog(orangeAdminBuildVoucherPrintDocTitle(null, 'osv_number', 'سند رصيد افتتاحي مخزني'));
         } else {
@@ -425,8 +422,7 @@ $osvRef = $osvId > 0
     el('osv_btn_add').addEventListener('click', addRow);
     el('osv_btn_delete').addEventListener('click', removeDraft);
     el('osv_btn_print').addEventListener('click', printVoucher);
-    el('osv_btn_save').addEventListener('click', save);
-    el('osv_btn_approve').addEventListener('click', approve);
+    el('osv_btn_save').addEventListener('click', saveVoucher);
 
     render();
 })();
