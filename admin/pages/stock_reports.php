@@ -22,6 +22,7 @@ $srCountryId = function_exists('orange_admin_context_country_id') ? (int) orange
 $companyNameAr = orange_company_settings_name_ar($pdo);
 
 $reports = [
+    'items'       => 'قائمة الأصناف',
     'balances'    => 'الجرد (أرصدة المخزون)',
     'valuation'   => 'تقييم المخزون',
     'movements'   => 'حركة المخزون',
@@ -109,7 +110,47 @@ $valPrevEnd = '';
 $reportError = '';
 
 try {
-    if ($reportKey === 'balances') {
+    if ($reportKey === 'items') {
+        /* قائمة الأصناف: سطر لكل منتج (تصنيف + عدد المتغيرات + إجمالي الرصيد + الحالة). */
+        $wqi = orange_warehouse_effective_qty_sql($pdo, $srCountryId, 'pv2', 'wvs_items');
+        $totalStockSub = '(SELECT COALESCE(SUM(' . $wqi['expr'] . '), 0)
+            FROM product_variants pv2'
+            . $wqi['join']
+            . ' WHERE pv2.product_id = p.id)';
+        $filterSql = '';
+        $params = [];
+        if ($pid > 0) {
+            $filterSql .= ' AND p.id = ?';
+            $params[] = $pid;
+        }
+        if ($catId > 0) {
+            $filterSql .= ' AND c.id = ?';
+            $params[] = $catId;
+        }
+        $sql = 'SELECT p.id AS product_id, p.name AS product_name, p.is_active,
+                       ' . $itemCodeExpr . ' AS item_code,
+                       COALESCE(c.name_ar, \'\') AS category_name,
+                       (SELECT COUNT(*) FROM product_variants pv WHERE pv.product_id = p.id) AS variant_count,
+                       ' . $totalStockSub . ' AS total_stock
+                FROM products p
+                ' . $catJoin . '
+                WHERE 1=1' . $productCountrySql . $filterSql . '
+                ORDER BY p.sort_order ASC, p.name ASC, p.id ASC';
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $qty = (int) $r['total_stock'];
+            $grandQty += $qty;
+            $rows[] = [
+                'item_code' => (string) $r['item_code'],
+                'product_name' => (string) $r['product_name'],
+                'category_name' => (string) $r['category_name'],
+                'variant_count' => (int) $r['variant_count'],
+                'total_stock' => $qty,
+                'is_active' => !empty($r['is_active']),
+            ];
+        }
+    } elseif ($reportKey === 'balances') {
         /* الجرد: سطر لكل متغير (لون/مقاس) + كود + تكلفة + قيمة. */
         $wq = orange_warehouse_effective_qty_sql($pdo, $srCountryId, 'pv', 'wvs_sr');
         $filterSql = '';
@@ -659,7 +700,7 @@ $reportTitle = $reports[$reportKey];
     <form method="get" class="sr-filter-form" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
         <input type="hidden" name="page" value="stock_reports">
         <input type="hidden" name="r" value="<?php echo htmlspecialchars($reportKey, ENT_QUOTES, 'UTF-8'); ?>">
-        <?php if (in_array($reportKey, ['balances', 'valuation', 'movements', 'move_summary'], true)): ?>
+        <?php if (in_array($reportKey, ['items', 'balances', 'valuation', 'movements', 'move_summary'], true)): ?>
             <div>
                 <label for="sr_pid_code">الصنف (دبل كليك للاختيار)</label>
                 <div style="display:flex;gap:6px;align-items:center;">
@@ -680,7 +721,7 @@ $reportTitle = $reports[$reportKey];
                 </div>
             </div>
         <?php endif; ?>
-        <?php if (in_array($reportKey, ['balances', 'valuation'], true) && $catOptions !== []): ?>
+        <?php if (in_array($reportKey, ['items', 'balances', 'valuation'], true) && $catOptions !== []): ?>
             <div>
                 <label for="sr_cat">الفئة</label>
                 <select id="sr_cat" name="cat" class="admin-inp">
@@ -767,7 +808,24 @@ $reportTitle = $reports[$reportKey];
 
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
             <table class="admin-fy-table gl-acc-stmt-table ta-report-table" data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".sr-print-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
-                <?php if ($reportKey === 'balances'): ?>
+                <?php if ($reportKey === 'items'): ?>
+                    <thead><tr><th>الكود</th><th>الصنف</th><th>التصنيف</th><th class="gl-acc-stmt-col-num">عدد المتغيرات</th><th class="gl-acc-stmt-col-num">إجمالي الرصيد</th><th>الحالة</th></tr></thead>
+                    <tbody>
+                        <?php if ($rows === []): ?>
+                            <tr><td colspan="6" class="muted">لا أصناف.</td></tr>
+                        <?php else: foreach ($rows as $r): ?>
+                            <tr>
+                                <td dir="ltr"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars($r['category_name'] ?: '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo (int) $r['variant_count']; ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo (int) $r['total_stock']; ?></td>
+                                <td><?php echo $r['is_active'] ? 'نشط' : 'موقوف'; ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                    <tfoot><tr><th colspan="4">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th></th></tr></tfoot>
+                <?php elseif ($reportKey === 'balances'): ?>
                     <thead><tr><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
@@ -909,7 +967,7 @@ $reportTitle = $reports[$reportKey];
 .sr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
 </style>
 
-<?php if (in_array($reportKey, ['balances', 'valuation', 'movements', 'move_summary'], true)): ?>
+<?php if (in_array($reportKey, ['items', 'balances', 'valuation', 'movements', 'move_summary'], true)): ?>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 (function () {

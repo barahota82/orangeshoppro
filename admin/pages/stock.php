@@ -81,7 +81,7 @@ unset($stockRow);
     <h2 class="card-title">تنبيه: قارب على النفاذ (س5)</h2>
     <p class="card-hint" style="margin:0 0 10px;">
         متغيرات المنتجات <strong>النشطة</strong> التي رصيدها الحالي ≤ <strong><?php echo (int) $lowStockTh; ?></strong> قطعة.
-        عدّل الرصيد من جدول «رصيد المخزن» أدناه أو من <strong>كارت الصنف</strong>.
+        تعديل الأرصدة يتم من <strong>«أرصدة أول المدة المخزنية»</strong> أو <strong>«قيد تسوية مخزون»</strong> (بالحسابات).
     </p>
     <?php if ($lowStockRows === []): ?>
         <p class="page-subtitle" style="margin:0;">لا توجد متغيرات ضمن عتبة التنبيه حالياً.</p>
@@ -143,6 +143,7 @@ unset($stockRow);
 
 <div class="card" id="balances">
     <h2 class="card-title">رصيد المخزن (لون / مقاس)</h2>
+    <p class="card-hint" style="margin:0 0 10px;">عرض فقط. لتعديل الأرصدة استخدم «أرصدة أول المدة المخزنية» أو «قيد تسوية مخزون» (بالحسابات).</p>
     <div class="table-wrap">
         <table>
             <thead>
@@ -151,8 +152,6 @@ unset($stockRow);
                     <th>اللون</th>
                     <th>المقاس</th>
                     <th>الرصيد الحالي</th>
-                    <th>الرصيد الجديد</th>
-                    <th>التحكم</th>
                 </tr>
             </thead>
             <tbody>
@@ -161,35 +160,10 @@ unset($stockRow);
                     <td><?php echo htmlspecialchars($r['product_name']); ?></td>
                     <td><?php echo htmlspecialchars($r['color'] ?: '—'); ?></td>
                     <td><?php echo htmlspecialchars($r['size'] ?: '—'); ?></td>
-                    <td><?php echo (int)$r['stock_quantity']; ?></td>
-                    <td>
-                        <input type="number" min="0" step="1" class="input-stock admin-inp-qty" inputmode="numeric" lang="en" dir="ltr" id="stock_<?php echo (int)$r['id']; ?>" value="<?php echo (int)$r['stock_quantity']; ?>">
-                    </td>
-                    <td class="stock-actions">
-                        <button type="button" class="btn btn-secondary" onclick="adjustStock(<?php echo (int)$r['id']; ?>, 'manual_adjustment')">حفظ التعديل</button>
-                        <?php if (!$openingStockLocked): ?>
-                        <button type="button" class="btn btn-outline" onclick="adjustStock(<?php echo (int)$r['id']; ?>, 'opening_balance')">رصيد افتتاحي</button>
-                        <?php endif; ?>
-                    </td>
+                    <td><strong><?php echo (int)$r['stock_quantity']; ?></strong></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
     </div>
 </div>
-
-<script>
-async function adjustStock(variantId, movementType) {
-    const el = document.getElementById('stock_' + variantId);
-    const stock = parseInt(el.value || '0', 10);
-    const label = movementType === 'opening_balance' ? 'تسجيل الرصيد الافتتاحي؟' : 'حفظ تعديل المخزون؟';
-    if (!confirm(label)) return;
-    const res = await postJSON('/admin/api/stock/adjust.php', {
-        variant_id: variantId,
-        stock: stock,
-        movement_type: movementType
-    });
-    alert(res.message || (res.success ? 'تم' : 'فشل'));
-    if (res.success) location.reload();
-}
-</script>
