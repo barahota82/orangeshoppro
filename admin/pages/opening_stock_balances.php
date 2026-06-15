@@ -235,7 +235,7 @@ $osvRef = $osvId > 0
             + '<td class="jv-acc-code-cell"><input type="text" class="admin-inp osv-code" value="' + esc(code) + '" placeholder="نقرتان للاختيار" readonly title="نقرتان للاختيار"></td>'
             + '<td><input type="text" class="admin-inp osv-name admin-inp-readonly" value="' + esc(ln.product_name || '') + '" readonly tabindex="-1"></td>'
             + '<td><input type="text" class="admin-inp osv-vlbl admin-inp-readonly" value="' + esc(vlbl(ln)) + '" readonly tabindex="-1"></td>'
-            + '<td><input type="number" class="admin-inp-qty osv-qty" min="0" step="1" inputmode="numeric" lang="en" dir="ltr" value="' + (ln.quantity != null ? ln.quantity : 0) + '"' + ro + dis + '></td>'
+            + '<td><input type="number" class="admin-inp-qty osv-qty" min="0" step="1" inputmode="numeric" lang="en" dir="ltr" placeholder="0" value="' + ((parseInt(ln.quantity, 10) || 0) > 0 ? ln.quantity : '') + '"' + ro + dis + '></td>'
             + '<td>' + (isApproved() ? '' : '<button type="button" class="btn-secondary osv-remove">حذف</button>') + '</td>'
             + '</tr>';
     }
