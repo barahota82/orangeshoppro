@@ -45,12 +45,12 @@ function orange_admin_permission_mega_sections(): array
                     'title' => 'السندات والذمم',
                     'pages' => [
                         ['page' => 'journal_entries', 'label' => 'سند قيد'],
-                        ['page' => 'stock_adjustment_voucher', 'label' => 'قيد تسوية مخزون'],
                         ['page' => 'receipt_voucher', 'label' => 'سند قبض'],
                         ['page' => 'payment_voucher', 'label' => 'سند صرف'],
                         ['page' => 'other_vouchers', 'label' => 'سندات أخرى'],
                         ['page' => 'partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة'],
                         ['page' => 'partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة'],
+                        ['page' => 'stock_adjustment_voucher', 'label' => 'قيد تسوية مخزون'],
                         ['page' => 'bank_accounts', 'label' => 'الحسابات البنكية (دفع مباشر)'],
                         ['page' => 'payment_review', 'label' => 'مراجعة الدفعات'],
                         ['page' => 'bank_reconciliation', 'label' => 'تسوية البنك'],

@@ -403,12 +403,12 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'title' => 'السندات والذمم',
                     'items' => [
                         ['page' => 'journal_entries', 'href' => '/admin/index.php?page=journal_entries', 'label' => 'سند قيد', 'class' => '', 'sub' => false],
-                        ['page' => 'stock_adjustment_voucher', 'href' => '/admin/index.php?page=stock_adjustment_voucher', 'label' => 'قيد تسوية مخزون', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'receipt_voucher', 'href' => '/admin/index.php?page=receipt_voucher', 'label' => 'سند قبض', 'class' => '', 'sub' => false],
                         ['page' => 'payment_voucher', 'href' => '/admin/index.php?page=payment_voucher', 'label' => 'سند صرف', 'class' => '', 'sub' => false],
                         ['page' => 'other_vouchers', 'href' => '/admin/index.php?page=other_vouchers', 'label' => 'سندات أخرى', 'class' => '', 'sub' => false],
                         ['page' => 'partner_customer_receipt', 'href' => '/admin/index.php?page=partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'partner_supplier_payment', 'href' => '/admin/index.php?page=partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'stock_adjustment_voucher', 'href' => '/admin/index.php?page=stock_adjustment_voucher', 'label' => 'قيد تسوية مخزون', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'bank_accounts', 'href' => '/admin/index.php?page=bank_accounts', 'label' => 'الحسابات البنكية (دفع مباشر)', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'payment_review', 'href' => '/admin/index.php?page=payment_review', 'label' => 'مراجعة الدفعات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'bank_reconciliation', 'href' => '/admin/index.php?page=bank_reconciliation', 'label' => 'تسوية البنك', 'class' => 'admin-nav-sub', 'sub' => true],
