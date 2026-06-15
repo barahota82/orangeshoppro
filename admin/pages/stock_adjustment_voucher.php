@@ -236,7 +236,6 @@ if ($editSv !== null) {
             <button type="button" class="btn-secondary" id="stk_delete_btn" data-orange-perm="delete">حذف السند</button>
             <button type="button" class="btn-secondary" id="stk_btn_print" disabled title="اعتمد السند أولاً">طباعة السند</button>
             <button type="button" id="stk_save_btn" data-orange-perm="edit">حفظ السند</button>
-            <button type="button" id="stk_approve_btn">اعتماد وترحيل</button>
         </div>
     </div>
 
@@ -592,7 +591,6 @@ if ($editSv !== null) {
     function applyMode() {
         var ro = isApproved();
         el('stk_save_btn').disabled = ro;
-        el('stk_approve_btn').disabled = ro || state.id <= 0;
         el('stk_delete_btn').disabled = ro || state.id <= 0;
         el('stk_btn_add').disabled = ro;
         var pb = el('stk_btn_print');
@@ -834,14 +832,14 @@ if ($editSv !== null) {
         if (!p.lines.length) { showErr('أضف صنفاً واحداً على الأقل'); return; }
         postJson(API.save, p).then(function (d) {
             if (!d.success) { showErr(d.message || 'فشل الحفظ'); return; }
-            showOk(d.message || 'تم الحفظ');
             applyVoucher(d.voucher);
-            if (typeof cb === 'function') { cb(); }
+            if (typeof cb === 'function') { cb(); } else { showOk(d.message || 'تم الحفظ'); }
         }).catch(function (e) { showErr(e.message || String(e)); });
     }
 
-    function doApprove() {
-        if (state.id <= 0) { showErr('احفظ المسودة أولاً'); return; }
+    // زر واحد «حفظ السند»: يحفظ ثم يطبّق على المخزون ويرحّل قيد التسوية دفعة واحدة.
+    function doSavePost() {
+        showErr('');
         syncTreatFromInputs();
         var mv = invMovement();
         var sums = treatSums();
@@ -853,13 +851,12 @@ if ($editSv !== null) {
         if (Math.abs(round4(sums.net - mv.net)) > 0.005) {
             showErr('أسطر المعالجة غير متوازنة مع قيمة المخزون — استخدم «موازنة تلقائية» أو عدّل المبالغ'); return;
         }
-        if (!confirm('اعتماد السند وتطبيق التعديل على المخزون وترحيل قيد التسوية؟ لا يمكن التراجع.')) { return; }
-        // احفظ آخر التعديلات أولاً ثم اعتمد (يضمن مطابقة أسطر المعالجة المخزّنة لما يراه المستخدم).
+        if (!confirm('حفظ السند وتطبيق التعديل على المخزون وترحيل قيد التسوية؟ لا يمكن التراجع.')) { return; }
         doSave(function () {
             if (state.id <= 0) { return; }
             postJson(API.approve, { id: state.id }).then(function (d) {
-                if (!d.success) { showErr(d.message || 'فشل الاعتماد'); return; }
-                showOk(d.message || 'تم الاعتماد');
+                if (!d.success) { showErr(d.message || 'فشل الحفظ والترحيل'); return; }
+                showOk(d.message || 'تم حفظ السند وترحيل قيد التسوية');
                 applyVoucher(d.voucher);
             }).catch(function (e) { showErr(e.message || String(e)); });
         });
@@ -939,8 +936,7 @@ if ($editSv !== null) {
     el('stk_btn_new').addEventListener('click', function () { if (confirm('بدء سند جديد؟ سيُمسح غير المحفوظ.')) { newSheet(); } });
     el('stk_delete_btn').addEventListener('click', doDelete);
     el('stk_btn_print').addEventListener('click', printVoucher);
-    el('stk_save_btn').addEventListener('click', function () { doSave(); });
-    el('stk_approve_btn').addEventListener('click', doApprove);
+    el('stk_save_btn').addEventListener('click', doSavePost);
     el('stk_nav_first').addEventListener('click', function () { nav('first'); });
     el('stk_nav_prev').addEventListener('click', function () { nav('prev'); });
     el('stk_nav_next').addEventListener('click', function () { nav('next'); });
