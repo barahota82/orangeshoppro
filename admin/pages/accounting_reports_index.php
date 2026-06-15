@@ -31,6 +31,7 @@ orange_admin_render_mega_section_index(
         'other_vouchers' => 'سندات أخرى حسب الإعداد.',
         'partner_customer_receipt' => 'تخصيص سداد على فواتير مبيعات آجلة.',
         'partner_supplier_payment' => 'تخصيص سداد على فواتير مشتريات آجلة.',
+        'stock_adjustment_voucher' => 'تسوية محاسبية لفروق المخزون مع توجيه الطرف المقابل.',
         'bank_accounts' => 'حسابات بنكية للدفع المباشر.',
         'payment_review' => 'مراجعة وتأكيد الدفعات.',
         'bank_reconciliation' => 'مطابقة كشف البنك مع الدفاتر.',
