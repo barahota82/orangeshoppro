@@ -98,8 +98,8 @@ function orange_admin_permission_mega_sections(): array
                     'pages' => [
                         ['page' => 'warehouse_purchases_index', 'label' => 'فهرس المخازن والمشتريات'],
                         ['page' => 'stock_reports', 'label' => 'تقارير المخزن'],
-                        ['page' => 'opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية'],
                         ['page' => 'inventory_reconciliation', 'label' => 'تسوية المخزون / الجرد'],
+                        ['page' => 'opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية'],
                     ],
                 ],
                 [
