@@ -98,9 +98,9 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'warehouse_purchases_index', 'label' => 'فهرس المخازن والمشتريات'],
                         ['page' => 'stock', 'label' => 'المستودع'],
                         ['page' => 'stock_reports', 'label' => 'تقارير المخزن'],
+                        ['page' => 'stock_adjustment_voucher', 'label' => 'سند تعديل الرصيد'],
                         ['page' => 'opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية'],
                         ['page' => 'inventory_reconciliation', 'label' => 'تسوية المخزون / الجرد'],
-                        ['page' => 'stock_adjustment_voucher', 'label' => 'سند تعديل الرصيد'],
                     ],
                 ],
                 [
