@@ -10,6 +10,7 @@ require_once __DIR__ . '/../includes/advisory_sizing_guides.php';
 require_once __DIR__ . '/../includes/upload_paths.php';
 require_once __DIR__ . '/../includes/countries.php';
 require_once __DIR__ . '/../includes/warehouses.php';
+require_once __DIR__ . '/../includes/stock_alerts.php';
 
 $pdo = db();
 orange_catalog_ensure_storefront_page($pdo);
@@ -652,7 +653,7 @@ window.CURRENT_PRODUCT = {
     sizing_guide_scope: <?php echo json_encode($scope, JSON_UNESCAPED_UNICODE); ?>,
     variants: <?php echo json_encode($variants, JSON_UNESCAPED_UNICODE); ?>,
     total_stock_sum: <?php echo (int)$totalStock; ?>,
-    low_stock_threshold: 5,
+    low_stock_threshold: <?php echo (int) orange_storefront_low_stock_display_threshold($pdo, $sfProductCountryId); ?>,
     colorway_gallery: <?php echo json_encode($colorwayGalleryByChip, JSON_UNESCAPED_UNICODE); ?>,
     default_gallery_urls: <?php echo json_encode($galleryUrls, JSON_UNESCAPED_UNICODE); ?>
 };

@@ -94,7 +94,7 @@ function orange_cart_promo_rule_has_low_stock_warn(PDO $pdo, array $productIds, 
     if ($productIds === []) {
         return false;
     }
-    $th = orange_stock_low_alert_threshold();
+    $th = orange_stock_low_alert_threshold($pdo, $countryId);
     $st = $pdo->prepare('SELECT id FROM product_variants WHERE product_id = ?');
     foreach ($productIds as $pid) {
         $pid = (int) $pid;
@@ -159,7 +159,7 @@ function orange_cart_promo_compute_stock_check_status(PDO $pdo, string $table, a
         return [
             'status' => 'warn',
             'stock_reason' => null,
-            'detail' => 'قارب النفاذ (مخزون ≤ ' . orange_stock_low_alert_threshold() . ' على منتج مرتبط)',
+            'detail' => 'قارب النفاذ (مخزون ≤ ' . orange_stock_low_alert_threshold($pdo, $countryId) . ' على منتج مرتبط)',
         ];
     }
 

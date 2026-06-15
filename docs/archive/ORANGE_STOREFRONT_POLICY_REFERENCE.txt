@@ -107,8 +107,20 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 س5. عند نفاد المخزون: نمنع الإضافة للسلة، أم نسمح مع تنبيه، أم نسمح والتنفيذ لاحقاً؟
 نمنع الإضافة للسلة. وفي الأدمن شاشة تنبيه «قارب على النفاذ» حسب كمية يحددها النظام.
 **تنفيذ:** بطاقة في **المستودع** (`admin` → المستودع) + عدّاد في **الرئيسية** لمن لديه صلاحية
-المخزن؛ العتبة البرمجية `orange_stock_low_alert_threshold()` في **`includes/stock_alerts.php`**
-(افتراضياً 3 قطع للمتغيرات ضمن منتجات نشطة).
+المخزن؛ العتبة عبر `orange_stock_low_alert_threshold($pdo, $countryId)` في **`includes/stock_alerts.php`**
+(للمتغيرات ضمن منتجات نشطة).
+**قرار المالك (2026-06-16 — العتبة قابلة للضبط لكل دولة):** الحد لم يعد ثابتاً (3) في الكود؛ يُحدَّد
+من شاشة **«إعدادات الشركة»** (`admin/pages/company_settings.php` → حقل «حد تنبيه قارب على النفاذ»)
+ويُخزَّن في **`company_settings.low_stock_threshold`** (`INT NOT NULL DEFAULT 3`، عمود يُضمَن في
+`includes/catalog_schema.php`؛ حفظ في `admin/api/settings/company.php` بنمط `vat_rate`). الدالة تقرأ
+القيمة لكل دولة وتسقط على **3** عند غياب الصف/العمود/قيمة غير صالحة. المستدعون يمرّرون `$pdo` ودولة
+السياق: `stock.php`، `stock_reports.php` (تبويب النواقص)، `dashboard.php`، `admin/api/reports/stats.php`،
+ومراقبة العروض `includes/cart_promo_monitor.php`.
+**قرار المالك (2026-06-16 — خانة منفصلة للعميل):** عبارة العميل «كمية محدودة» لها **عتبة مستقلة**
+عن تنبيه الأدمن (إشارة تسويقية ≠ حد إعادة الطلب). حقل ثانٍ في «إعدادات الشركة» «حد إظهار كمية محدودة
+للعميل» يُخزَّن في **`company_settings.customer_low_stock_threshold`** (`INT NOT NULL DEFAULT 5`)؛
+تقرؤه `orange_storefront_low_stock_display_threshold($pdo, $countryId)` في `includes/stock_alerts.php`
+(افتراضي 5)، ويُمرَّر إلى `window.CURRENT_PRODUCT.low_stock_threshold` في `pages/product.php` لكل دولة.
 
 س6. هل تعدد القنوات يغيّر السعر/التوفر/المنتجات المعروضة لنفس المنتج؟
 لا. القنوات متشابهة بكل شيء وليست مخازن منفصلة بل إداع للوصول للجمهور. مخزن الشركة

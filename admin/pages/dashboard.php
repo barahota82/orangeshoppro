@@ -31,7 +31,7 @@ $salesToday = (float)$pdo->query("SELECT COALESCE(SUM(total),0) FROM orders WHER
 $pendingOrders = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending'" . $dashOrdersSql)->fetchColumn();
 $productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE 1=1" . orange_sql_country_and_fragment($pdo, 'products', 'products', $dashCountryId))->fetchColumn();
 
-$lowStockThDash = orange_stock_low_alert_threshold();
+$lowStockThDash = orange_stock_low_alert_threshold($pdo, $dashCountryId);
 $wQtyDash = orange_warehouse_effective_qty_sql($pdo, $dashCountryId, 'pv', 'wvs_dash');
 $stLowDash = $pdo->prepare(
     'SELECT COUNT(*) FROM product_variants pv

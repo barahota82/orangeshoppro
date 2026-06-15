@@ -16,7 +16,7 @@ $stockCountryId = orange_admin_context_country_id($pdo);
 $openingStockLocked = orange_opening_stock_is_locked($pdo, $stockCountryId);
 $stockProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $stockCountryId);
 
-$lowStockTh = orange_stock_low_alert_threshold();
+$lowStockTh = orange_stock_low_alert_threshold($pdo, $stockCountryId);
 $wQtyStock = orange_warehouse_effective_qty_sql($pdo, $stockCountryId, 'pv', 'wvs_low');
 $stLowList = $pdo->prepare(
     'SELECT pv.id AS variant_id, ' . $wQtyStock['expr'] . ' AS stock_quantity, pv.color, pv.size, p.id AS product_id, p.name AS product_name

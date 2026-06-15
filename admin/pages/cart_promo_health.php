@@ -25,7 +25,7 @@ $resync = isset($_GET['resync']) && (string) $_GET['resync'] === '1';
 $rows = $tablesReady ? orange_cart_promo_monitor_rows_for_admin($pdo, $healthCountryId, $resync) : [];
 $pauseLog = $tablesReady ? orange_cart_promo_recent_pause_log($pdo, $healthCountryId, 40) : [];
 $statusLabels = orange_cart_promo_monitor_status_labels_ar();
-$lowTh = orange_stock_low_alert_threshold();
+$lowTh = orange_stock_low_alert_threshold($pdo, $healthCountryId);
 
 $statusClass = static function (string $status): string {
     return match ($status) {

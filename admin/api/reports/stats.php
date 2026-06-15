@@ -9,8 +9,8 @@ require_admin_api('GET');
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
-    $lowTh = orange_stock_low_alert_threshold();
     $countryId = orange_admin_context_country_id($pdo);
+    $lowTh = orange_stock_low_alert_threshold($pdo, $countryId);
     $ordersSql = orange_sql_country_and_fragment($pdo, 'orders', 'orders', $countryId);
     $productsSql = orange_sql_country_and_fragment($pdo, 'products', 'p', $countryId);
     $offersSql = orange_sql_country_and_fragment($pdo, 'offers', 'offers', $countryId);

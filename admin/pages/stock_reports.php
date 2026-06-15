@@ -52,7 +52,7 @@ if ($pid > 0) {
         $pid = 0;
     }
 }
-$lowTh = orange_stock_low_alert_threshold();
+$lowTh = orange_stock_low_alert_threshold($pdo, $srCountryId);
 $srPickRows = orange_cart_promo_admin_product_rows($pdo);
 $srPickJson = json_encode($srPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS);
 

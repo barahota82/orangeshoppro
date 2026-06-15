@@ -106,6 +106,46 @@ try {
             }
         }
 
+        if (array_key_exists('low_stock_threshold', $data) && orange_table_has_column($pdo, 'company_settings', 'low_stock_threshold')) {
+            $lowTh = (int) $data['low_stock_threshold'];
+            if ($lowTh < 1) {
+                $lowTh = 3;
+            }
+            if ($lowTh > 100000) {
+                $lowTh = 100000;
+            }
+            if (orange_company_settings_has_country_column($pdo)) {
+                $pdo->prepare('UPDATE company_settings SET low_stock_threshold = ? WHERE country_id = ?')
+                    ->execute([$lowTh, $ctxCountryId]);
+            } else {
+                $rowLt = $pdo->query('SELECT id FROM company_settings ORDER BY id ASC LIMIT 1')->fetch();
+                if ($rowLt) {
+                    $pdo->prepare('UPDATE company_settings SET low_stock_threshold = ? WHERE id = ?')
+                        ->execute([$lowTh, (int) $rowLt['id']]);
+                }
+            }
+        }
+
+        if (array_key_exists('customer_low_stock_threshold', $data) && orange_table_has_column($pdo, 'company_settings', 'customer_low_stock_threshold')) {
+            $custLowTh = (int) $data['customer_low_stock_threshold'];
+            if ($custLowTh < 1) {
+                $custLowTh = 5;
+            }
+            if ($custLowTh > 100000) {
+                $custLowTh = 100000;
+            }
+            if (orange_company_settings_has_country_column($pdo)) {
+                $pdo->prepare('UPDATE company_settings SET customer_low_stock_threshold = ? WHERE country_id = ?')
+                    ->execute([$custLowTh, $ctxCountryId]);
+            } else {
+                $rowClt = $pdo->query('SELECT id FROM company_settings ORDER BY id ASC LIMIT 1')->fetch();
+                if ($rowClt) {
+                    $pdo->prepare('UPDATE company_settings SET customer_low_stock_threshold = ? WHERE id = ?')
+                        ->execute([$custLowTh, (int) $rowClt['id']]);
+                }
+            }
+        }
+
         if (orange_table_has_column($pdo, 'company_settings', 'invoice_footer_ar')) {
             $footerAr = trim((string) ($data['invoice_footer_ar'] ?? ''));
             $footerEn = trim((string) ($data['invoice_footer_en'] ?? ''));

@@ -84,6 +84,8 @@ $csUpdatedAt = trim((string) ($csRow['updated_at'] ?? ''));
         </div>
         <div><label>الرقم الضريبي (للفواتير)</label><input type="text" id="vat_number" placeholder="إن وُجد" value="<?php echo $csField($csRow, 'vat_number'); ?>"></div>
         <div><label>نسبة ضريبة القيمة المضافة % (تلقائي على الفواتير — الكويت 0)</label><input type="number" id="vat_rate" min="0" max="99.999" step="0.001" lang="en" dir="ltr" placeholder="0" value="<?php echo htmlspecialchars((string) ($csRow['vat_rate'] ?? '0'), ENT_QUOTES, 'UTF-8'); ?>"></div>
+        <div><label>حد تنبيه الأدمن «قارب على النفاذ» (داخلي — التنبيه عند الرصيد ≤ هذا الرقم)</label><input type="number" id="low_stock_threshold" min="1" max="100000" step="1" lang="en" dir="ltr" placeholder="3" value="<?php echo htmlspecialchars((string) ($csRow['low_stock_threshold'] ?? '3'), ENT_QUOTES, 'UTF-8'); ?>"></div>
+        <div><label>حد إظهار «كمية محدودة» للعميل (واجهة المتجر — يظهر عند الرصيد ≤ هذا الرقم)</label><input type="number" id="customer_low_stock_threshold" min="1" max="100000" step="1" lang="en" dir="ltr" placeholder="5" value="<?php echo htmlspecialchars((string) ($csRow['customer_low_stock_threshold'] ?? '5'), ENT_QUOTES, 'UTF-8'); ?>"></div>
         <?php
         $csFooterAr = trim((string) ($csRow['invoice_footer_ar'] ?? ''));
         if ($csFooterAr === '') {
@@ -131,6 +133,10 @@ async function loadCompanySettings() {
     document.getElementById('vat_number').value = d.vat_number || '';
     var vrEl = document.getElementById('vat_rate');
     if (vrEl) vrEl.value = (d.vat_rate !== undefined && d.vat_rate !== null) ? d.vat_rate : '0';
+    var lstEl = document.getElementById('low_stock_threshold');
+    if (lstEl) lstEl.value = (d.low_stock_threshold !== undefined && d.low_stock_threshold !== null && d.low_stock_threshold !== '') ? d.low_stock_threshold : '3';
+    var clsEl = document.getElementById('customer_low_stock_threshold');
+    if (clsEl) clsEl.value = (d.customer_low_stock_threshold !== undefined && d.customer_low_stock_threshold !== null && d.customer_low_stock_threshold !== '') ? d.customer_low_stock_threshold : '5';
     var fAr = document.getElementById('invoice_footer_ar');
     var fEn = document.getElementById('invoice_footer_en');
     if (fAr) fAr.value = d.invoice_footer_ar || d.invoice_footer || '';
@@ -152,6 +158,8 @@ async function saveCompanySettings() {
         address: document.getElementById('address').value.trim(),
         vat_number: document.getElementById('vat_number').value.trim(),
         vat_rate: (document.getElementById('vat_rate') ? parseFloat(document.getElementById('vat_rate').value) : 0) || 0,
+        low_stock_threshold: (document.getElementById('low_stock_threshold') ? parseInt(document.getElementById('low_stock_threshold').value, 10) : 3) || 3,
+        customer_low_stock_threshold: (document.getElementById('customer_low_stock_threshold') ? parseInt(document.getElementById('customer_low_stock_threshold').value, 10) : 5) || 5,
         invoice_footer_ar: (document.getElementById('invoice_footer_ar') ? document.getElementById('invoice_footer_ar').value.trim() : ''),
         invoice_footer_en: (document.getElementById('invoice_footer_en') ? document.getElementById('invoice_footer_en').value.trim() : ''),
         payment_online_enabled: document.getElementById('payment_online_enabled') && document.getElementById('payment_online_enabled').checked ? 1 : 0
