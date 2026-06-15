@@ -78,7 +78,7 @@ if ($initialJson === false) {
     </div>
 
     <div class="card" style="border:1px solid #bfdbfe;background:#eff6ff;margin-bottom:12px;">
-        <p style="margin:0;">هذه الشاشة <strong>تقرير عَدّ فقط</strong>: يُجرى الجرد، ويُظهر فرق الكمية وقيمته التقديرية، ثم يُقفل ويُطبع ويُرفع للإدارة بالتوقيعات. <strong>لا يُطبَّق على المخزون ولا يُنشأ قيد محاسبي هنا</strong> — بعد قرار الإدارة يُحرَّر <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock_adjustment_voucher'), ENT_QUOTES, 'UTF-8'); ?>">سند تعديل الرصيد</a> الذي يطبّق الفرق ويُرحّل القيد.</p>
+        <p style="margin:0;">هذه الشاشة <strong>تقرير عَدّ فقط</strong>: يُجرى الجرد، ويُظهر فرق الكمية وقيمته التقديرية، ثم يُقفل ويُطبع ويُرفع للإدارة بالتوقيعات. <strong>لا يُطبَّق على المخزون ولا يُنشأ قيد محاسبي هنا</strong> — بعد قرار الإدارة يُحرَّر <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock_adjustment_voucher'), ENT_QUOTES, 'UTF-8'); ?>">قيد تسوية مخزون</a> الذي يطبّق الفرق ويُرحّل القيد.</p>
     </div>
 
     <?php if (! $ready || ! $useVouchers): ?>
@@ -232,7 +232,7 @@ if ($initialJson === false) {
     (function () {
         var hint = document.querySelector('#ir_approve_panel p.card-hint');
         if (hint) {
-            hint.textContent = 'الإقفال يثبّت التقرير للطباعة ورفعه للإدارة. لا يُطبَّق على المخزون ولا يُنشأ قيد محاسبي — يتم ذلك عبر «سند تعديل الرصيد».';
+            hint.textContent = 'الإقفال يثبّت التقرير للطباعة ورفعه للإدارة. لا يُطبَّق على المخزون ولا يُنشأ قيد محاسبي — يتم ذلك عبر «قيد تسوية مخزون».';
         }
     })();
 

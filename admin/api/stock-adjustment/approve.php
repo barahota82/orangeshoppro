@@ -12,7 +12,7 @@ try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
     if (! orange_stock_adjustment_voucher_ready($pdo)) {
-        json_response(['success' => false, 'message' => 'جداول سند تعديل الرصيد غير جاهزة'], 500);
+        json_response(['success' => false, 'message' => 'جداول قيد تسوية المخزون غير جاهزة'], 500);
     }
 
     $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
@@ -21,7 +21,7 @@ try {
 
     $result = orange_stock_adjustment_voucher_approve($pdo, $id, $ctxCountryId);
 
-    audit_log('stock_adjustment_voucher_approve', 'اعتماد سند تعديل رصيد #' . $id, 'stock_adjustment_voucher', $id);
+    audit_log('stock_adjustment_voucher_approve', 'اعتماد قيد تسوية مخزون #' . $id, 'stock_adjustment_voucher', $id);
 
     $msg = 'تم اعتماد السند وتطبيق التعديل على المخزون';
     if (! empty($result['queued'])) {

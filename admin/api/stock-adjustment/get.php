@@ -12,7 +12,7 @@ try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
     if (! orange_stock_adjustment_voucher_ready($pdo)) {
-        json_response(['success' => false, 'message' => 'جداول سند تعديل الرصيد غير جاهزة'], 500);
+        json_response(['success' => false, 'message' => 'جداول قيد تسوية المخزون غير جاهزة'], 500);
     }
 
     $ctxCountryId = orange_admin_settings_effective_country_id($pdo);

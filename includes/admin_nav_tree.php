@@ -45,7 +45,7 @@ function orange_admin_permission_mega_sections(): array
                     'title' => 'السندات والذمم',
                     'pages' => [
                         ['page' => 'journal_entries', 'label' => 'سند قيد'],
-                        ['page' => 'stock_adjustment_voucher', 'label' => 'سند تعديل الرصيد'],
+                        ['page' => 'stock_adjustment_voucher', 'label' => 'قيد تسوية مخزون'],
                         ['page' => 'receipt_voucher', 'label' => 'سند قبض'],
                         ['page' => 'payment_voucher', 'label' => 'سند صرف'],
                         ['page' => 'other_vouchers', 'label' => 'سندات أخرى'],

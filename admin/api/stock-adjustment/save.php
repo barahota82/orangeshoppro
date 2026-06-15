@@ -12,7 +12,7 @@ try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
     if (! orange_stock_adjustment_voucher_ready($pdo)) {
-        json_response(['success' => false, 'message' => 'جداول سند تعديل الرصيد غير جاهزة'], 500);
+        json_response(['success' => false, 'message' => 'جداول قيد تسوية المخزون غير جاهزة'], 500);
     }
 
     $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
@@ -24,7 +24,7 @@ try {
         if (! orange_stock_adjustment_voucher_delete_draft($pdo, $id, $ctxCountryId)) {
             json_response(['success' => false, 'message' => 'تعذّر الحذف — مسودة فقط'], 422);
         }
-        audit_log('stock_adjustment_voucher_delete', 'حذف مسودة سند تعديل رصيد #' . $id, 'stock_adjustment_voucher', $id);
+        audit_log('stock_adjustment_voucher_delete', 'حذف مسودة قيد تسوية مخزون #' . $id, 'stock_adjustment_voucher', $id);
         json_response(['success' => true, 'message' => 'تم حذف المسودة']);
     }
 
@@ -41,12 +41,12 @@ try {
         'gl_lines' => $glLinesIn,
     ], $lines, $ctxCountryId);
 
-    audit_log('stock_adjustment_voucher_save', 'حفظ سند تعديل رصيد #' . $id, 'stock_adjustment_voucher', $id);
+    audit_log('stock_adjustment_voucher_save', 'حفظ قيد تسوية مخزون #' . $id, 'stock_adjustment_voucher', $id);
 
     $sv = orange_stock_adjustment_voucher_get($pdo, $id, $ctxCountryId);
     json_response([
         'success' => true,
-        'message' => 'تم حفظ مسودة سند تعديل الرصيد',
+        'message' => 'تم حفظ مسودة قيد تسوية المخزون',
         'id' => $id,
         'voucher' => $sv,
     ]);

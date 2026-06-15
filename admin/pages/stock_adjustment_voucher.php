@@ -68,13 +68,13 @@ if ($editSv !== null) {
 }
 ?>
 <div class="page-title jv-print-hide">
-    <h1>سند تعديل الرصيد</h1>
+    <h1>قيد تسوية مخزون</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <?php if (! $ready || ! $useVouchers): ?>
     <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;">
-        <p style="margin:0;">جدول السندات أو سند تعديل الرصيد غير جاهز — حدّث المخطط.</p>
+        <p style="margin:0;">جدول السندات أو قيد تسوية المخزون غير جاهز — حدّث المخطط.</p>
     </div>
 <?php else: ?>
 
@@ -86,11 +86,11 @@ if ($editSv !== null) {
 </p>
 
 <div class="card jv-print-area" id="stk_adj_app">
-    <h3 class="card-title">سند تعديل رصيد مخزون</h3>
+    <h3 class="card-title">قيد تسوية مخزون</h3>
 
     <table class="jv-voucher-print-sheet ta-report-print-table" dir="rtl">
         <?php orange_voucher_print_banner_thead($pdo, $ctxCountryId, [
-            'title_ar' => 'سند تعديل رصيد مخزون',
+            'title_ar' => 'قيد تسوية مخزون',
             'title_span_id' => 'stk_voucher_print_title_ar',
         ]); ?>
         <tbody>
@@ -246,7 +246,7 @@ if ($editSv !== null) {
     <div id="stk_search_modal" class="stk-search-modal jv-print-hide" style="display:none;" aria-hidden="true" role="dialog">
         <div class="stk-search-modal__backdrop" id="stk_search_backdrop"></div>
         <div class="stk-search-modal__panel">
-            <div class="stk-search-modal__head"><h3 class="stk-search-modal__title">بحث في سندات تعديل الرصيد</h3></div>
+            <div class="stk-search-modal__head"><h3 class="stk-search-modal__title">بحث في قيود تسوية المخزون</h3></div>
             <div class="stk-search-modal__body">
                 <div class="stk-search-fields">
                     <div><label for="stk_s_id_from">رقم — من</label><input type="number" id="stk_s_id_from" class="admin-inp" min="1" step="1" dir="ltr" lang="en"></div>
@@ -883,7 +883,7 @@ if ($editSv !== null) {
     function printVoucher() {
         if (!isApproved()) { showErr('اعتمد السند أولاً قبل الطباعة'); return; }
         if (typeof orangeAdminOpenPrintDialog === 'function') {
-            orangeAdminOpenPrintDialog(orangeAdminBuildVoucherPrintDocTitle(null, 'stk_number', 'سند تعديل رصيد مخزون'));
+            orangeAdminOpenPrintDialog(orangeAdminBuildVoucherPrintDocTitle(null, 'stk_number', 'قيد تسوية مخزون'));
         } else {
             window.print();
         }

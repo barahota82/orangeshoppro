@@ -403,7 +403,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'title' => 'السندات والذمم',
                     'items' => [
                         ['page' => 'journal_entries', 'href' => '/admin/index.php?page=journal_entries', 'label' => 'سند قيد', 'class' => '', 'sub' => false],
-                        ['page' => 'stock_adjustment_voucher', 'href' => '/admin/index.php?page=stock_adjustment_voucher', 'label' => 'سند تعديل الرصيد', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'stock_adjustment_voucher', 'href' => '/admin/index.php?page=stock_adjustment_voucher', 'label' => 'قيد تسوية مخزون', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'receipt_voucher', 'href' => '/admin/index.php?page=receipt_voucher', 'label' => 'سند قبض', 'class' => '', 'sub' => false],
                         ['page' => 'payment_voucher', 'href' => '/admin/index.php?page=payment_voucher', 'label' => 'سند صرف', 'class' => '', 'sub' => false],
                         ['page' => 'other_vouchers', 'href' => '/admin/index.php?page=other_vouchers', 'label' => 'سندات أخرى', 'class' => '', 'sub' => false],

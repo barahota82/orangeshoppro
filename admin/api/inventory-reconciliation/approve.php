@@ -24,7 +24,7 @@ try {
 
     audit_log('inventory_reconciliation_approve', 'إقفال تقرير جرد #' . $id, 'inventory_reconciliation', $id);
 
-    $msg = 'تم إقفال تقرير الجرد — لم يُطبَّق على المخزون. حرّر «سند تعديل الرصيد» لتطبيق الفرق بعد قرار الإدارة.';
+    $msg = 'تم إقفال تقرير الجرد — لم يُطبَّق على المخزون. حرّر «قيد تسوية مخزون» لتطبيق الفرق بعد قرار الإدارة.';
 
     $rec = orange_inventory_reconciliation_get($pdo, $id, $ctxCountryId);
     json_response([

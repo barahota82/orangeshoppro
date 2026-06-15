@@ -14,7 +14,7 @@ require_once __DIR__ . '/inventory_cost_layers.php';
 require_once __DIR__ . '/inventory_reconciliation.php';
 
 /**
- * سند تعديل الرصيد (Stock Adjustment Voucher).
+ * قيد تسوية مخزون (Stock Adjustment Voucher).
  *
  * فلسفته: بعد رفع تقرير الجرد للإدارة واتخاذ القرار، يحرّره المحاسب بإضافة/خصم كميات لكل صنف
  * (شبكة كميات بلا حساب)؛ تُحتسب قيمة الفرق من تكلفة FIFO. المعالجة المحاسبية تُسجَّل في **كارت سفلي
@@ -530,7 +530,7 @@ function orange_stock_adjustment_voucher_search(PDO $pdo, array $filters, ?int $
 }
 
 /**
- * حفظ مسودة سند تعديل رصيد (لا يطبّق مخزوناً ولا يرحّل).
+ * حفظ مسودة قيد تسوية مخزون (لا يطبّق مخزوناً ولا يرحّل).
  *
  * @param array<string, mixed> $headerIn
  * @param list<array<string, mixed>> $lines
@@ -538,7 +538,7 @@ function orange_stock_adjustment_voucher_search(PDO $pdo, array $filters, ?int $
 function orange_stock_adjustment_voucher_save(PDO $pdo, array $headerIn, array $lines, ?int $countryId = null): int
 {
     if (! orange_stock_adjustment_voucher_ready($pdo)) {
-        throw new RuntimeException('جداول سند تعديل الرصيد غير جاهزة.');
+        throw new RuntimeException('جداول قيد تسوية المخزون غير جاهزة.');
     }
 
     $id = (int) ($headerIn['id'] ?? 0);
@@ -773,7 +773,7 @@ function orange_stock_adjustment_voucher_approve(PDO $pdo, int $id, ?int $countr
                 'qty' => abs($delta),
                 'old_stock' => $stockChange['old'],
                 'new_stock' => $stockChange['new'],
-                'reason' => 'سند تعديل رصيد #' . $id,
+                'reason' => 'قيد تسوية مخزون #' . $id,
                 'reference' => $ref,
                 'country_id' => $countryId > 0 ? $countryId : null,
                 'warehouse_id' => $warehouseId,
@@ -796,7 +796,7 @@ function orange_stock_adjustment_voucher_approve(PDO $pdo, int $id, ?int $countr
                     $id,
                     $countryId > 0 ? $countryId : null,
                     $postingAt,
-                    'سند تعديل رصيد #' . $id
+                    'قيد تسوية مخزون #' . $id
                 );
                 $lineValue = round($delta * round($unitCost, 5), 4);
             } else {
