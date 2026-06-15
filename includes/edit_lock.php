@@ -80,6 +80,9 @@ function orange_edit_lock_page_for_kind(string $kind): string
     if ($kind === 'opening_balance') {
         return 'opening_balances';
     }
+    if ($kind === 'stock_adjustment') {
+        return 'stock_adjustment_voucher';
+    }
 
     return 'journal_entries';
 }

@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/stock_adjustment_voucher.php';
 require_once __DIR__ . '/../../includes/admin_settings_country.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/voucher_print_banner.php';
+require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 
 $pdo = orange_admin_page_pdo();
 $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
@@ -85,6 +86,8 @@ if ($editSv !== null) {
     المخزون يُضاف تلقائياً عند الاعتماد.
 </p>
 
+<?php orange_edit_lock_ui_toolbar(['prefix' => 'stk', 'doc_kind' => 'stock_adjustment', 'country_id' => $ctxCountryId, 'show_status_badge' => false]); ?>
+
 <div class="card jv-print-area" id="stk_adj_app">
     <h3 class="card-title">قيد تسوية مخزون</h3>
 
@@ -99,20 +102,20 @@ if ($editSv !== null) {
     <div class="form-grid">
         <div class="jv-voucher-header-line jv-voucher-header-line--nav" style="grid-column:1/-1;">
             <div>
-                <label for="stk_number">رقم السند</label>
+                <label for="stk_number">رقم القيد</label>
                 <input type="text" id="stk_number" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;text-align:center;"
                     value="<?php echo (int) $stkNumberDisplay; ?>" title="يُخصَّص تلقائياً عند الحفظ">
             </div>
             <div>
-                <label for="stk_document_date">تاريخ السند</label>
+                <label for="stk_document_date">تاريخ القيد</label>
                 <input type="text" id="stk_document_date" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off"
-                    value="<?php echo htmlspecialchars($voucherDateDisplay, ENT_QUOTES, 'UTF-8'); ?>" title="تاريخ السند — يوم/شهر/سنة">
+                    value="<?php echo htmlspecialchars($voucherDateDisplay, ENT_QUOTES, 'UTF-8'); ?>" title="تاريخ القيد — يوم/شهر/سنة">
             </div>
             <div>
                 <label for="stk_ref">المرجع</label>
                 <input type="text" id="stk_ref" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;" tabindex="-1"
                     value="<?php echo htmlspecialchars($stkRef, ENT_QUOTES, 'UTF-8'); ?>"
-                    title="يُولَّد تلقائياً: STK-ADJ-رقم السند" dir="ltr" lang="en" autocomplete="off">
+                    title="يُولَّد تلقائياً: STK-ADJ-رقم القيد" dir="ltr" lang="en" autocomplete="off">
             </div>
             <div>
                 <label for="stk_entered">تاريخ الإدخال</label>
@@ -355,6 +358,7 @@ if ($editSv !== null) {
     if (!state.lines) { state.lines = []; }
     if (!state.gl_lines) { state.gl_lines = []; }
     var browseId = state.id > 0 ? state.id : 0;
+    var stkEditLockCtl = null;
     function round4(n) { return Math.round((Number(n) || 0) * 10000) / 10000; }
 
     function el(id) { return document.getElementById(id); }
@@ -781,6 +785,7 @@ if ($editSv !== null) {
         browseId = state.id;
         if (typeof orangeIsoDateToDmy === 'function') { el('stk_document_date').value = state.document_date ? orangeIsoDateToDmy(state.document_date) : ''; }
         render();
+        if (stkEditLockCtl && stkEditLockCtl.refresh) { stkEditLockCtl.refresh(); }
     }
 
     function doSave(cb) {
@@ -911,6 +916,16 @@ if ($editSv !== null) {
         var sm = el('stk_search_modal');
         if (sm && sm.style.display === 'flex') { searchClose(); }
     }, true);
+
+    if (window.OrangeEditLock) {
+        stkEditLockCtl = OrangeEditLock.bind({
+            prefix: 'stk',
+            docKind: 'stock_adjustment',
+            page: 'stock_adjustment_voucher',
+            countryId: <?php echo (int) $ctxCountryId; ?>,
+            getEntityId: function () { return state.journal_voucher_id || 0; }
+        });
+    }
 
     render();
 })();

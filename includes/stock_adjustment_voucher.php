@@ -12,6 +12,7 @@ require_once __DIR__ . '/gl_pending_movements.php';
 require_once __DIR__ . '/admin_settings_country.php';
 require_once __DIR__ . '/inventory_cost_layers.php';
 require_once __DIR__ . '/inventory_reconciliation.php';
+require_once __DIR__ . '/edit_lock.php';
 
 /**
  * قيد تسوية مخزون (Stock Adjustment Voucher).
@@ -913,6 +914,24 @@ function orange_stock_adjustment_voucher_approve(PDO $pdo, int $id, ?int $countr
             $pdo->rollBack();
         }
         throw $e;
+    }
+
+    // تسجيل القيد المرحّل في سجل «إقفال التعديلات» (مثل باقي القيود) — قفل/فك يدوي من الشاشة.
+    // بعد الـ commit لتفادي DDL داخل المعاملة (إنشاء جدول السجل أول مرة).
+    if ($voucherId > 0) {
+        try {
+            orange_edit_lock_register($pdo, [
+                'doc_kind' => 'stock_adjustment',
+                'entity_id' => $voucherId,
+                'country_id' => ($countryId !== null && $countryId > 0) ? $countryId : null,
+                'reference' => $ref,
+                'label_ar' => $desc,
+                'saved_at' => $postingAt,
+                'journal_voucher_id' => $voucherId,
+            ]);
+        } catch (Throwable $e) {
+            // التسجيل في سجل الإقفال غير حرج لاعتماد السند — تجاهل بصمت.
+        }
     }
 
     return [

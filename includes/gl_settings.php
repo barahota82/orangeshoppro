@@ -825,6 +825,7 @@ function orange_gl_entry_type_labels_map(): array
         'order_delivery_cogs' => 'تكلفة مبيعات',
         'order_return_sale' => 'مردود مبيعات',
         'order_return_cogs' => 'تكلفة مردود مبيعات',
+        'stock_adjustment' => 'قيد تسوية مخزون',
         'migrated' => 'مرحّل من نظام سابق',
     ];
 }
