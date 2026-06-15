@@ -228,6 +228,8 @@ $osvRef = $osvId > 0
 
     function vlbl(ln) { return [ln.color, ln.size].filter(function (x) { return x; }).join(' / ') || '—'; }
 
+    function emptyLine() { return { variant_id: 0, product_name: '', color: '', size: '', item_code: '', quantity: 0 }; }
+
     function rowHtml(ln, idx) {
         var ro = isApproved() ? ' readonly tabindex="-1"' : '';
         var dis = isApproved() ? ' disabled' : '';
@@ -242,15 +244,18 @@ $osvRef = $osvId > 0
     }
 
     function recalc() {
-        var totalQty = 0;
-        state.lines.forEach(function (l) { totalQty += (parseInt(l.quantity, 10) || 0); });
-        el('osv_tot_lines').value = String(state.lines.length);
+        var totalQty = 0, cnt = 0;
+        state.lines.forEach(function (l) {
+            if ((parseInt(l.variant_id, 10) || 0) > 0) { cnt++; totalQty += (parseInt(l.quantity, 10) || 0); }
+        });
+        el('osv_tot_lines').value = String(cnt);
         el('osv_tot_qty').value = String(totalQty);
     }
 
     function render() {
         var tb = el('osv_lines_body');
         if (!tb) { return; }
+        if (!isApproved() && !LOCKED && state.lines.length === 0) { state.lines.push(emptyLine()); }
         tb.innerHTML = state.lines.map(rowHtml).join('');
         el('osv_number').value = state.id > 0 ? state.id : NEXT_NO;
         el('osv_statement').value = state.notes || '';
@@ -297,26 +302,61 @@ $osvRef = $osvId > 0
     function bindRows() {
         var tb = el('osv_lines_body');
         if (!tb) { return; }
-        Array.prototype.forEach.call(tb.querySelectorAll('tr'), function (tr) {
-            var idx = parseInt(tr.getAttribute('data-idx'), 10);
-            var codeInp = tr.querySelector('.osv-code');
-            if (codeInp && !isApproved() && !LOCKED) {
-                codeInp.addEventListener('dblclick', function (e) {
-                    e.preventDefault();
-                    OrangeProductPicker.open(function (v) { onPick(idx, v); });
-                });
-            }
-            var rm = tr.querySelector('.osv-remove');
-            if (rm) {
-                rm.addEventListener('click', function () {
-                    syncFromInputs();
-                    state.lines.splice(idx, 1);
-                    render();
-                });
-            }
-            var q = tr.querySelector('.osv-qty');
-            if (q) { q.addEventListener('input', function () { state.lines[idx].quantity = parseInt(q.value, 10) || 0; recalc(); }); }
-        });
+        Array.prototype.forEach.call(tb.querySelectorAll('tr'), bindRowAt);
+    }
+
+    function bindRowAt(tr) {
+        var idx = parseInt(tr.getAttribute('data-idx'), 10);
+        var codeInp = tr.querySelector('.osv-code');
+        if (codeInp && !isApproved() && !LOCKED) {
+            codeInp.addEventListener('dblclick', function (e) {
+                e.preventDefault();
+                OrangeProductPicker.open(function (v) { onPick(idx, v); });
+            });
+        }
+        var rm = tr.querySelector('.osv-remove');
+        if (rm) {
+            rm.addEventListener('click', function () {
+                syncFromInputs();
+                state.lines.splice(idx, 1);
+                render();
+            });
+        }
+        var q = tr.querySelector('.osv-qty');
+        if (q) {
+            q.addEventListener('input', function () { state.lines[idx].quantity = parseInt(q.value, 10) || 0; maybeAppendRow(idx); recalc(); });
+            q.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); maybeAppendRow(idx); focusRowQty(idx + 1); } });
+        }
+    }
+
+    // إضافة سطر تالٍ تلقائياً عند إدخال كمية على السطر الأخير الذي يحمل صنفاً
+    function maybeAppendRow(idx) {
+        if (isApproved() || LOCKED) { return; }
+        if (idx !== state.lines.length - 1) { return; }
+        var ln = state.lines[idx];
+        if ((parseInt(ln.variant_id, 10) || 0) <= 0) { return; }
+        if ((parseInt(ln.quantity, 10) || 0) <= 0) { return; }
+        appendEmptyRow();
+    }
+
+    function appendEmptyRow() {
+        var tb = el('osv_lines_body');
+        if (!tb) { return; }
+        var idx = state.lines.length;
+        state.lines.push(emptyLine());
+        tb.insertAdjacentHTML('beforeend', rowHtml(state.lines[idx], idx));
+        var tr = tb.querySelector('tr[data-idx="' + idx + '"]');
+        if (tr) { bindRowAt(tr); }
+        recalc();
+    }
+
+    function focusRowQty(idx) {
+        var tb = el('osv_lines_body');
+        if (!tb) { return; }
+        var tr = tb.querySelector('tr[data-idx="' + idx + '"]');
+        if (!tr) { return; }
+        var q = tr.querySelector('.osv-qty');
+        if (q) { q.focus(); q.select && q.select(); }
     }
 
     function onPick(idx, v) {
@@ -344,7 +384,7 @@ $osvRef = $osvId > 0
     function addRow() {
         if (isApproved() || LOCKED) { return; }
         syncFromInputs();
-        state.lines.push({ variant_id: 0, product_name: '', color: '', size: '', item_code: '', quantity: 0 });
+        state.lines.push(emptyLine());
         render();
     }
 
