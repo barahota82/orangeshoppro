@@ -144,8 +144,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
              * @param array{page:string,href:string,label:string,class:string,sub:bool} $nl
              */
             $orangeNavLinkActive = static function (array $nl) use ($orangeAdminPage): bool {
-                return ($nl['page'] === 'stock' && ($orangeAdminPage === 'stock' || $orangeAdminPage === 'item_card'))
-                    || $orangeAdminPage === $nl['page'];
+                return $orangeAdminPage === $nl['page'];
             };
 
             /** @param array<string, mixed> $nl */

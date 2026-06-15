@@ -471,195 +471,44 @@ function orange_inventory_reconciliation_save(
 }
 
 /**
+ * اعتماد الجرد = **إقفال تقرير الجرد** فقط (للطباعة ورفعه للإدارة بالتوقيعات).
+ *
+ * قرار المالك (2026-06): الجرد **تقرير عَدّ فقط** — لا يُطبَّق على المخزون ولا يُنشئ قيد GL.
+ * التطبيق الفعلي على المخزون والمعالجة المحاسبية يتمّان عبر **«سند تعديل الرصيد»**
+ * (`includes/stock_adjustment_voucher.php`) بعد قرار الإدارة. لذا لا حاجة هنا لحساب تسوية.
+ *
+ * @param int $adjustmentAccountId مُهمَل (متوافق مع التوقيع القديم) — لم يعد يُرحَّل قيد هنا.
+ *
  * @return array{voucher_id:int,total_value_variance:float,total_qty_variance:int,queued:bool}
  */
 function orange_inventory_reconciliation_approve(
     PDO $pdo,
     int $id,
-    int $adjustmentAccountId,
+    int $adjustmentAccountId = 0,
     ?int $countryId = null
 ): array {
-    if (! orange_journal_vouchers_ready($pdo)) {
-        throw new RuntimeException('جدول السندات غير جاهز.');
-    }
-
     $rec = orange_inventory_reconciliation_get($pdo, $id, $countryId);
     if ($rec === null) {
         throw new InvalidArgumentException('جلسة الجرد غير موجودة.');
     }
     $header = $rec['header'];
     if ((string) ($header['status'] ?? '') === 'approved') {
-        throw new InvalidArgumentException('الجرد معتمد مسبقاً.');
+        throw new InvalidArgumentException('الجرد مُقفل مسبقاً.');
     }
 
-    $warehouseId = (int) ($header['warehouse_id'] ?? 0);
-    $countedAt = trim((string) ($header['counted_at'] ?? ''));
-    if ($warehouseId <= 0) {
-        throw new InvalidArgumentException('المستودع غير محدد.');
-    }
-
-    if ($countryId === null || $countryId <= 0) {
-        $countryId = (int) ($header['country_id'] ?? 0);
-        if ($countryId <= 0) {
-            $countryId = orange_admin_settings_effective_country_id($pdo);
-        }
-    }
-
-    $lines = $rec['lines'];
     $totalValue = (float) ($rec['total_value_variance'] ?? 0);
     $totalQtyVar = (int) ($rec['total_qty_variance'] ?? 0);
-    $hasStockChange = false;
-    foreach ($lines as $ln) {
-        if ((int) ($ln['qty_variance'] ?? 0) !== 0) {
-            $hasStockChange = true;
-            break;
-        }
-    }
-    if (! $hasStockChange && abs($totalValue) < 0.0001) {
-        throw new InvalidArgumentException('لا فروق كمية — لا حاجة للاعتماد.');
-    }
 
-    $inventoryAccountId = orange_gl_account_id($pdo, 'inventory', $countryId);
-    if ($inventoryAccountId <= 0) {
-        throw new RuntimeException('حساب المخزون (inventory) غير مربوط في إعدادات GL.');
-    }
-
-    $voucherId = 0;
-    $queued = false;
     $pdo->beginTransaction();
     try {
-        require_once __DIR__ . '/warehouses.php';
-
-        $ref = 'INV-RCN-' . $id;
-        // FIFO م4: قيمة GL تُشتق من حركة الطبقات الفعلية (نقص→استهلاك FIFO، زيادة→طبقة جديدة)
-        // لضمان بقاء رصيد حساب المخزون GL مساوياً لقيمة الطبقات.
-        $layerTotalValue = 0.0;
-        $reconAt = ($countedAt !== '' ? $countedAt : date('Y-m-d')) . ' 17:00:00';
-        foreach ($lines as $ln) {
-            $variantId = (int) ($ln['variant_id'] ?? 0);
-            $qtyVariance = (int) ($ln['qty_variance'] ?? 0);
-            if ($variantId <= 0 || $qtyVariance === 0) {
-                continue;
-            }
-
-            $stVar = $pdo->prepare('SELECT product_id FROM product_variants WHERE id = ? LIMIT 1');
-            $stVar->execute([$variantId]);
-            $productId = (int) ($stVar->fetchColumn() ?: 0);
-
-            $stockChange = orange_warehouse_apply_variant_delta($pdo, $warehouseId, $variantId, $qtyVariance, 0);
-            orange_stock_movement_insert($pdo, [
-                'product_id' => $productId,
-                'variant_id' => $variantId,
-                'type' => 'inventory_count',
-                'qty' => abs($qtyVariance),
-                'old_stock' => $stockChange['old'],
-                'new_stock' => $stockChange['new'],
-                'reason' => 'تسوية جرد #' . $id,
-                'reference' => $ref,
-                'country_id' => $countryId > 0 ? $countryId : null,
-                'warehouse_id' => $warehouseId,
-            ]);
-
-            $fallbackUnit = orange_inventory_reconciliation_variant_unit_cost($pdo, $variantId, $warehouseId);
-            if ($qtyVariance > 0) {
-                $unitCost = orange_inventory_cost_layers_current_unit_cost($pdo, $warehouseId, $variantId);
-                if ($unitCost <= 0) {
-                    $unitCost = $fallbackUnit;
-                }
-                orange_inventory_cost_layer_add(
-                    $pdo,
-                    $warehouseId,
-                    $variantId,
-                    $qtyVariance,
-                    round($unitCost, 5),
-                    'adjust',
-                    $id,
-                    $countryId > 0 ? $countryId : null,
-                    $reconAt,
-                    'تسوية جرد #' . $id
-                );
-                $layerTotalValue += $qtyVariance * round($unitCost, 5);
-            } else {
-                $consume = orange_inventory_cost_layers_consume_fifo(
-                    $pdo,
-                    $warehouseId,
-                    $variantId,
-                    -$qtyVariance,
-                    'inv_recon',
-                    $id,
-                    $reconAt
-                );
-                $lineCost = (float) $consume['cost'];
-                $short = (int) ($consume['shortfall'] ?? 0);
-                if ($short > 0) {
-                    $lineCost += $short * $fallbackUnit;
-                }
-                $layerTotalValue -= round($lineCost, 5);
-            }
-        }
-        $totalValue = round($layerTotalValue, 4);
-
-        if (abs($totalValue) >= 0.0001) {
-            if ($adjustmentAccountId <= 0 || ! orange_accounts_account_is_posting_leaf($pdo, $adjustmentAccountId)) {
-                throw new InvalidArgumentException('حساب تسوية فرق الجرد (ورقة ترحيل) مطلوب عند وجود فرق قيمة.');
-            }
-            if ($adjustmentAccountId === $inventoryAccountId) {
-                throw new InvalidArgumentException('حساب التسوية يجب أن يختلف عن حساب المخزون.');
-            }
-
-            $memo = 'تسوية جرد #' . $id . ' — ' . ($totalValue > 0 ? 'زيادة مخزون' : 'نقص مخزون');
-            $abs = abs($totalValue);
-            if ($totalValue > 0) {
-                $glLines = [
-                    ['account_id' => $inventoryAccountId, 'debit' => $abs, 'credit' => 0.0, 'memo' => $memo],
-                    ['account_id' => $adjustmentAccountId, 'debit' => 0.0, 'credit' => $abs, 'memo' => $memo],
-                ];
-            } else {
-                $glLines = [
-                    ['account_id' => $inventoryAccountId, 'debit' => 0.0, 'credit' => $abs, 'memo' => $memo],
-                    ['account_id' => $adjustmentAccountId, 'debit' => $abs, 'credit' => 0.0, 'memo' => $memo],
-                ];
-            }
-
-            $voucherDate = ($countedAt !== '' ? $countedAt : date('Y-m-d')) . ' 17:00:00';
-            $desc = 'تسوية جرد مخزون — جلسة #' . $id;
-            if (orange_gl_use_pending_queue($pdo)) {
-                $pendingId = orange_gl_pending_enqueue_multi(
-                    $pdo,
-                    $glLines,
-                    'inv_recon_' . $id,
-                    $ref,
-                    $voucherDate,
-                    $voucherDate,
-                    $desc,
-                    'general'
-                );
-                if ($pendingId <= 0) {
-                    throw new RuntimeException('تعذّر إدراج قيد الجرد في الطابور.');
-                }
-                $queued = true;
-            } else {
-                $voucherId = orange_voucher_post($pdo, [
-                    'voucher_date' => $voucherDate,
-                    'description' => $desc,
-                    'entry_type' => 'general',
-                    'country_id' => $countryId,
-                ], $glLines);
-            }
-        }
-
         $upd = $pdo->prepare(
-            'UPDATE inventory_reconciliation SET status = \'approved\', journal_voucher_id = ?, approved_at = NOW()
+            'UPDATE inventory_reconciliation SET status = \'approved\', journal_voucher_id = NULL, approved_at = NOW()
              WHERE id = ? AND status = \'draft\''
         );
-        $upd->execute([
-            $voucherId > 0 ? $voucherId : null,
-            $id,
-        ]);
+        $upd->execute([$id]);
         if ($upd->rowCount() === 0) {
-            throw new RuntimeException('تعذّر اعتماد الجرد.');
+            throw new RuntimeException('تعذّر إقفال الجرد.');
         }
-
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
@@ -669,10 +518,10 @@ function orange_inventory_reconciliation_approve(
     }
 
     return [
-        'voucher_id' => $voucherId,
-        'total_value_variance' => $totalValue,
+        'voucher_id' => 0,
+        'total_value_variance' => round($totalValue, 4),
         'total_qty_variance' => $totalQtyVar,
-        'queued' => $queued,
+        'queued' => false,
     ];
 }
 

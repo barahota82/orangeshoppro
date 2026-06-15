@@ -22,16 +22,9 @@ try {
 
     $result = orange_inventory_reconciliation_approve($pdo, $id, $adjustmentAccountId, $ctxCountryId);
 
-    audit_log('inventory_reconciliation_approve', 'اعتماد جرد #' . $id, 'inventory_reconciliation', $id);
+    audit_log('inventory_reconciliation_approve', 'إقفال تقرير جرد #' . $id, 'inventory_reconciliation', $id);
 
-    $msg = 'تم اعتماد الجرد وتطبيق فروق الكمية';
-    if (! empty($result['queued'])) {
-        $msg .= ' — قيد القيمة في طابور الترحيل؛ أكمل من «إقفال الحركات»';
-    } elseif (($result['voucher_id'] ?? 0) > 0) {
-        $msg .= ' — سند #' . (int) $result['voucher_id'];
-    } elseif (abs((float) ($result['total_value_variance'] ?? 0)) < 0.0001) {
-        $msg .= ' — لا فرق قيمة (تكلفة صفر أو لا فروق)';
-    }
+    $msg = 'تم إقفال تقرير الجرد — لم يُطبَّق على المخزون. حرّر «سند تعديل الرصيد» لتطبيق الفرق بعد قرار الإدارة.';
 
     $rec = orange_inventory_reconciliation_get($pdo, $id, $ctxCountryId);
     json_response([

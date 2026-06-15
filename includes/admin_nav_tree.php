@@ -100,6 +100,7 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'stock_reports', 'label' => 'تقارير المخزن'],
                         ['page' => 'opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية'],
                         ['page' => 'inventory_reconciliation', 'label' => 'تسوية المخزون / الجرد'],
+                        ['page' => 'stock_adjustment_voucher', 'label' => 'سند تعديل الرصيد'],
                     ],
                 ],
                 [
@@ -335,7 +336,6 @@ function orange_admin_permission_actions_for_page(string $page): array
         'report_cash_flow',
         'report_analytical',
         'financial_report',
-        'item_card',
         'delivery_order_search',
         'delivery_handover_manifest',
     ];
@@ -369,6 +369,7 @@ function orange_admin_permission_actions_for_page(string $page): array
         'channels',
         'bank_reconciliation',
         'inventory_reconciliation',
+        'stock_adjustment_voucher',
     ];
 
     if (in_array($page, $viewOnly, true)) {
