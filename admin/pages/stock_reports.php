@@ -71,17 +71,51 @@ $mFromDisplay = orange_format_date_dmY($mFrom);
 $mToDisplay = orange_format_date_dmY($mTo);
 $stagnantDays = isset($_GET['days']) ? max(7, min(3650, (int) $_GET['days'])) : 90;
 
-/* فلتر الفئة (catalog_categories) للجرد/التقييم. */
+/* فلتر القسم (departments) ثم الفئة (catalog_categories) — الفئات مكرّرة الاسم بين الأقسام
+   لذلك يُختار القسم أولاً وتُفلتَر الفئات تبعه. */
+$depId = isset($_GET['dep']) ? max(0, (int) $_GET['dep']) : 0;
 $catId = isset($_GET['cat']) ? max(0, (int) $_GET['cat']) : 0;
+$depOptions = [];
 $catOptions = [];
 try {
-    if (orange_table_exists($pdo, 'catalog_categories')) {
+    if (orange_table_exists($pdo, 'departments')) {
+        $depOptions = $pdo->query(
+            'SELECT id, name_ar FROM departments WHERE is_active = 1 ORDER BY sort_order ASC, name_ar ASC'
+        )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+    if (orange_table_exists($pdo, 'catalog_categories') && orange_table_exists($pdo, 'catalog_sections')) {
+        /* كل فئة مع قسمها (عبر القسم الفرعي catalog_sections) لتعاقُب القائمة في الواجهة. */
         $catOptions = $pdo->query(
-            'SELECT id, name_ar FROM catalog_categories WHERE is_active = 1 ORDER BY sort_order ASC, name_ar ASC'
+            'SELECT cc.id, cc.name_ar, cs.department_id
+             FROM catalog_categories cc
+             INNER JOIN catalog_sections cs ON cs.id = cc.catalog_section_id
+             WHERE cc.is_active = 1
+             ORDER BY cc.sort_order ASC, cc.name_ar ASC'
         )->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 } catch (Throwable $e) {
+    $depOptions = [];
     $catOptions = [];
+}
+/* تأكيد اتساق: إن كانت الفئة المختارة لا تتبع القسم المختار، أهمل الفئة. */
+if ($catId > 0 && $depId > 0) {
+    $catBelongs = false;
+    foreach ($catOptions as $co) {
+        if ((int) ($co['id'] ?? 0) === $catId && (int) ($co['department_id'] ?? 0) === $depId) {
+            $catBelongs = true;
+            break;
+        }
+    }
+    if (!$catBelongs) {
+        $catId = 0;
+    }
+}
+/* جملة فلتر القسم عند عدم اختيار فئة محددة (الفئة أدق فتُقدَّم). */
+$depFilterSql = '';
+$depFilterParam = null;
+if ($catId <= 0 && $depId > 0) {
+    $depFilterSql = ' AND c.catalog_section_id IN (SELECT cs_dep.id FROM catalog_sections cs_dep WHERE cs_dep.department_id = ?)';
+    $depFilterParam = $depId;
 }
 
 $hasItemCode = orange_table_has_column($pdo, 'products', 'item_code');
@@ -126,6 +160,9 @@ try {
         if ($catId > 0) {
             $filterSql .= ' AND c.id = ?';
             $params[] = $catId;
+        } elseif ($depFilterSql !== '') {
+            $filterSql .= $depFilterSql;
+            $params[] = $depFilterParam;
         }
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, p.is_active,
                        ' . $itemCodeExpr . ' AS item_code,
@@ -162,6 +199,9 @@ try {
         if ($catId > 0) {
             $filterSql .= ' AND c.id = ?';
             $params[] = $catId;
+        } elseif ($depFilterSql !== '') {
+            $filterSql .= $depFilterSql;
+            $params[] = $depFilterParam;
         }
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, p.cost AS cost,
                        ' . $itemCodeExpr . ' AS item_code,
@@ -238,6 +278,9 @@ try {
         if ($catId > 0) {
             $filterSql .= ' AND c.id = ?';
             $params[] = $catId;
+        } elseif ($depFilterSql !== '') {
+            $filterSql .= $depFilterSql;
+            $params[] = $depFilterParam;
         }
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, p.cost AS cost,
                        ' . $itemCodeExpr . ' AS item_code,
@@ -721,12 +764,29 @@ $reportTitle = $reports[$reportKey];
             </div>
         <?php endif; ?>
         <?php if (in_array($reportKey, ['items', 'balances', 'valuation'], true) && $catOptions !== []): ?>
+            <?php if ($depOptions !== []): ?>
+            <div>
+                <label for="sr_dep">القسم</label>
+                <select id="sr_dep" name="dep" class="admin-inp">
+                    <option value="0">كل الأقسام</option>
+                    <?php foreach ($depOptions as $depo): ?>
+                        <option value="<?php echo (int) $depo['id']; ?>" <?php echo ((int) $depo['id'] === $depId) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars((string) ($depo['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
             <div>
                 <label for="sr_cat">الفئة</label>
                 <select id="sr_cat" name="cat" class="admin-inp">
                     <option value="0">كل الفئات</option>
                     <?php foreach ($catOptions as $co): ?>
-                        <option value="<?php echo (int) $co['id']; ?>" <?php echo ((int) $co['id'] === $catId) ? 'selected' : ''; ?>>
+                        <?php $coDep = (int) ($co['department_id'] ?? 0); ?>
+                        <option value="<?php echo (int) $co['id']; ?>"
+                            data-dep="<?php echo $coDep; ?>"
+                            <?php echo ((int) $co['id'] === $catId) ? 'selected' : ''; ?>
+                            <?php echo ($depId > 0 && $coDep !== $depId) ? 'hidden disabled' : ''; ?>>
                             <?php echo htmlspecialchars((string) ($co['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
                         </option>
                     <?php endforeach; ?>
@@ -1013,6 +1073,33 @@ $reportTitle = $reports[$reportKey];
                 form.submit();
             }
         });
+    }
+
+    /* تعاقُب القسم → الفئة: عند تغيير القسم تُعرض فئات ذلك القسم فقط، وتُصفّر الفئة إن لم تَعُد ضمنه. */
+    var depSel = document.getElementById('sr_dep');
+    var catSel = document.getElementById('sr_cat');
+    if (depSel && catSel) {
+        var syncCats = function (resetIfMismatch) {
+            var dep = parseInt(depSel.value, 10) || 0;
+            var opts = catSel.options;
+            for (var i = 0; i < opts.length; i++) {
+                var opt = opts[i];
+                if (!opt.value || opt.value === '0') {
+                    continue;
+                }
+                var oDep = parseInt(opt.getAttribute('data-dep'), 10) || 0;
+                var show = (dep === 0) || (oDep === dep);
+                opt.hidden = !show;
+                opt.disabled = !show;
+                if (!show && resetIfMismatch && opt.selected) {
+                    catSel.value = '0';
+                }
+            }
+        };
+        depSel.addEventListener('change', function () {
+            syncCats(true);
+        });
+        syncCats(false);
     }
 })();
 </script>
