@@ -185,7 +185,7 @@ $osvRef = $osvId > 0
 .osv-lines-table { table-layout: fixed; width: 100%; }
 .osv-lines-table col.osv-col-code { width: 12.5rem; }
 .osv-lines-table col.osv-col-name { width: auto; }
-.osv-lines-table col.osv-col-vlbl { width: 12.5rem; }
+.osv-lines-table col.osv-col-vlbl { width: 17rem; }
 .osv-lines-table col.osv-col-qty { width: 8.5rem; }
 .osv-lines-table col.osv-col-act { width: 5rem; }
 .osv-lines-table .osv-code { cursor: pointer; width: 100%; box-sizing: border-box; }
