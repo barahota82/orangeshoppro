@@ -346,8 +346,6 @@ if ($editSv !== null) {
     html, body { height: auto !important; min-height: 0 !important; }
     .admin-layout { min-height: 0 !important; }
     .admin-main { min-height: 0 !important; }
-    /* أسطر فارغة تماماً يُعلَّم عليها قبل الطباعة (beforeprint) لإزالتها مؤقتاً */
-    .jv-print-area .stk-print-skip { display: none !important; }
     .jv-print-area .stk-lines-table,
     .jv-print-area .stk-treat-table {
         table-layout: fixed !important;
@@ -1037,44 +1035,6 @@ if ($editSv !== null) {
             window.print();
         }
     }
-
-    // عند الطباعة فقط: أخفِ الأسطر الفارغة تماماً (بلا صنف/حساب وبلا كمية وبلا مبلغ)
-    // حتى لا تتضخّم الصفحة وتظهر صفحة ثانية فارغة — مع إبقاء أي سطر فيه بيان فعلي.
-    function stkTrimEmptyRowsForPrint() {
-        syncFromInputs();
-        syncTreatFromInputs();
-        var tb = el('stk_lines_body');
-        if (tb) {
-            Array.prototype.forEach.call(tb.querySelectorAll('tr[data-idx]'), function (tr) {
-                var i = parseInt(tr.getAttribute('data-idx'), 10);
-                var ln = state.lines[i];
-                if (!ln) { return; }
-                var empty = (parseInt(ln.variant_id, 10) || 0) <= 0
-                    && (parseInt(ln.qty_add, 10) || 0) <= 0
-                    && (parseInt(ln.qty_deduct, 10) || 0) <= 0;
-                if (empty) { tr.classList.add('stk-print-skip'); }
-            });
-        }
-        var tt = el('stk_treat_body');
-        if (tt) {
-            Array.prototype.forEach.call(tt.querySelectorAll('tr[data-tidx]'), function (tr) {
-                var i = parseInt(tr.getAttribute('data-tidx'), 10);
-                var g = state.gl_lines[i];
-                if (!g) { return; }
-                var empty = (parseInt(g.account_id, 10) || 0) <= 0
-                    && (parseFloat(g.debit) || 0) <= 0
-                    && (parseFloat(g.credit) || 0) <= 0;
-                if (empty) { tr.classList.add('stk-print-skip'); }
-            });
-        }
-    }
-    function stkRestoreRowsAfterPrint() {
-        Array.prototype.forEach.call(document.querySelectorAll('.stk-print-skip'), function (tr) {
-            tr.classList.remove('stk-print-skip');
-        });
-    }
-    window.addEventListener('beforeprint', stkTrimEmptyRowsForPrint);
-    window.addEventListener('afterprint', stkRestoreRowsAfterPrint);
 
     el('stk_btn_add').addEventListener('click', addRow);
     el('stk_treat_add').addEventListener('click', addTreatRow);

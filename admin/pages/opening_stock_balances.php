@@ -205,8 +205,6 @@ $osvRef = $osvId > 0
     html, body { height: auto !important; min-height: 0 !important; }
     .admin-layout { min-height: 0 !important; }
     .admin-main { min-height: 0 !important; }
-    /* أسطر فارغة تماماً يُعلَّم عليها قبل الطباعة (beforeprint) لإزالتها مؤقتاً */
-    .jv-print-area .osv-print-skip { display: none !important; }
     .jv-print-area .osv-lines-table {
         table-layout: fixed !important;
         width: 100% !important;
@@ -506,28 +504,6 @@ $osvRef = $osvId > 0
             }).catch(function (e) { alert(e.message || String(e)); self.checked = !locked; });
         });
     }
-
-    // عند الطباعة فقط: أخفِ الأسطر الفارغة تماماً (بلا صنف وبلا كمية) لمنع الصفحة الزائدة،
-    // مع إبقاء أي سطر فيه بيان فعلي.
-    function osvTrimEmptyRowsForPrint() {
-        syncFromInputs();
-        var tb = el('osv_lines_body');
-        if (!tb) { return; }
-        Array.prototype.forEach.call(tb.querySelectorAll('tr[data-idx]'), function (tr) {
-            var i = parseInt(tr.getAttribute('data-idx'), 10);
-            var ln = state.lines[i];
-            if (!ln) { return; }
-            var empty = (parseInt(ln.variant_id, 10) || 0) <= 0 && (parseInt(ln.quantity, 10) || 0) <= 0;
-            if (empty) { tr.classList.add('osv-print-skip'); }
-        });
-    }
-    function osvRestoreRowsAfterPrint() {
-        Array.prototype.forEach.call(document.querySelectorAll('.osv-print-skip'), function (tr) {
-            tr.classList.remove('osv-print-skip');
-        });
-    }
-    window.addEventListener('beforeprint', osvTrimEmptyRowsForPrint);
-    window.addEventListener('afterprint', osvRestoreRowsAfterPrint);
 
     el('osv_btn_add').addEventListener('click', addRow);
     el('osv_btn_delete').addEventListener('click', removeDraft);
