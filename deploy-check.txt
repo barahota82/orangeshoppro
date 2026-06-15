@@ -1,0 +1,20 @@
+DEPLOY PROBE — Orange
+=====================
+token: ORANGE-STOCK-ADJ-PROBE-2026-06-15
+purpose: التحقق من وصول آخر رفع تلقائي إلى السيرفر.
+
+إذا كنت ترى هذا الملف عبر المتصفح على رابط موقعك:
+  https://<your-domain>/deploy-check.txt
+فهذا يعني أن النشر التلقائي (auto-deploy) وصّل أحدث الملفات إلى السيرفر بنجاح.
+في هذه الحالة لو ظلّت شاشة «سند تعديل الرصيد» غير ظاهرة، فالسبب هو
+ذاكرة PHP (OPcache) تخدم نسخة قديمة → يلزم إعادة تشغيل PHP / مسح OPcache.
+
+إذا فتحت الرابط وظهر خطأ 404 أو محتوى قديم/مفقود:
+فالنشر التلقائي لم يَسحب آخر الملفات → المشكلة في خطوة الـ pull/الـ webhook على Plesk.
+
+الملفات المتوقع وجودها على السيرفر بعد هذا الرفع:
+  admin/pages/stock_adjustment_voucher.php
+  admin/api/stock-adjustment/save.php
+  admin/api/stock-adjustment/get.php
+  admin/api/stock-adjustment/approve.php
+  includes/stock_adjustment_voucher.php
