@@ -66,16 +66,11 @@ function orange_admin_render_mega_section_index(
                 $cardHref = $rawHref !== ''
                     ? storefront_public_path($rawHref)
                     : storefront_public_path('/admin/index.php?page=' . rawurlencode($pg));
-                $desc = trim((string) ($p['desc'] ?? ''));
-                if ($desc === '' && isset($descByPage[$pg])) {
-                    $desc = $descByPage[$pg];
-                }
+                // الجمل التوضيحية مُزالة من كل شاشات الفهرس بقرار المالك — تُعرض العناوين فقط.
+                // $descByPage و $p['desc'] يُتجاهلان عمداً (يبقى الوسيط للتوافق مع الاستدعاءات الحالية).
                 ?>
                 <a class="ari-card" href="<?php echo htmlspecialchars($cardHref, ENT_QUOTES, 'UTF-8'); ?>">
                     <span class="ari-card__title"><?php echo htmlspecialchars((string) ($p['label'] ?? $pg), ENT_QUOTES, 'UTF-8'); ?></span>
-                    <?php if ($desc !== ''): ?>
-                        <span class="ari-card__desc"><?php echo htmlspecialchars($desc, ENT_QUOTES, 'UTF-8'); ?></span>
-                    <?php endif; ?>
                 </a>
             <?php endforeach; ?>
         </div>
