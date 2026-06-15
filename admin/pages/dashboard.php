@@ -135,7 +135,7 @@ document.getElementById('dash_promo_stock_health_btn')?.addEventListener('click'
         <h3>قارب على النفاذ</h3>
         <div class="value"><?php echo $lowStockVariantsDash; ?></div>
         <p class="card-hint" style="margin:8px 0 0;font-size:0.88rem;">متغيرات ≤ <?php echo (int) $lowStockThDash; ?> — نشطة</p>
-        <p style="margin:10px 0 0;"><a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock#low-stock-variants'), ENT_QUOTES, 'UTF-8'); ?>">المستودع</a></p>
+        <p style="margin:10px 0 0;"><a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock_reports&r=low'), ENT_QUOTES, 'UTF-8'); ?>">تقارير المخزن — النواقص</a></p>
     </div>
     <?php endif; ?>
 </div>

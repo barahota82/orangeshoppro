@@ -17,7 +17,6 @@ orange_admin_render_mega_section_index(
     'فهرس المخازن والمشتريات',
     '',
     [
-        'stock' => 'عرض وحركة أرصدة المستودع.',
         'stock_reports' => 'تقارير المخزون والأصناف.',
         'opening_stock_balances' => 'أرصدة افتتاحية للمخزون.',
         'inventory_reconciliation' => 'جرد وتسوية كميات المخزون.',

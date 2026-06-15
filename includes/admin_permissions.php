@@ -88,7 +88,6 @@ function orange_admin_page_resource(string $page): string
         'suppliers' => 'partners',
         'purchases' => 'warehouse',
         'purchase_returns' => 'warehouse',
-        'stock' => 'warehouse',
         'opening_stock_balances' => 'warehouse',
         'stock_reports' => 'warehouse',
         'stock_adjustment_voucher' => 'accounting',

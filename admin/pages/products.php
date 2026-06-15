@@ -400,7 +400,7 @@ $orangeAdminSfProductUrlPartsForJs = [
 
 <div class="card">
     <h3 id="productFormTitle">إضافة / تعديل منتج</h3>
-    <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">المخزون</a>.</p>
+    <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=opening_stock_balances'), ENT_QUOTES, 'UTF-8'); ?>">أرصدة أول المدة المخزنية</a>.</p>
     <form id="productForm">
         <style id="orangeProductsTabsNoGapFix">
             #productForm > .admin-product-tab-panels {
@@ -4122,7 +4122,7 @@ function generateVariants() {
         return;
     }
 
-    let html = '<p class="admin-variants-lead"><strong>منتج بلا ألوان وبلا مقاسات:</strong> صف واحد = SKU واحد وباركود واحد بعد الحفظ. <strong>منتج بلون أو بمقاسات:</strong> كل صف يمثل نفس الصنف مع دمج لون ونمط اختياري × مقاس. عمود «صورة المرجع»: عند رفع صور لكل لون من تبويب الألوان تُعرض صورة ذلك اللون لكل صف؛ وإلا تُستخدم الصورة الرئيسية أو معرض الصور العام. <strong>الكميات:</strong> لا تُدخل من هنا — بعد الحفظ عالج المخزون من <a href="' + adminPublicPath('/admin/index.php?page=stock') + '">شاشة المخزون</a> (رصيد افتتاحي أو تعديل) أو من <a href="' + adminPublicPath('/admin/index.php?page=purchases') + '">استلام فاتورة شراء</a>.</p>';
+    let html = '<p class="admin-variants-lead"><strong>منتج بلا ألوان وبلا مقاسات:</strong> صف واحد = SKU واحد وباركود واحد بعد الحفظ. <strong>منتج بلون أو بمقاسات:</strong> كل صف يمثل نفس الصنف مع دمج لون ونمط اختياري × مقاس. عمود «صورة المرجع»: عند رفع صور لكل لون من تبويب الألوان تُعرض صورة ذلك اللون لكل صف؛ وإلا تُستخدم الصورة الرئيسية أو معرض الصور العام. <strong>الكميات:</strong> لا تُدخل من هنا — بعد الحفظ عالج المخزون من <a href="' + adminPublicPath('/admin/index.php?page=opening_stock_balances') + '">أرصدة أول المدة المخزنية</a> أو <a href="' + adminPublicPath('/admin/index.php?page=stock_adjustment_voucher') + '">قيد تسوية مخزون</a> أو من <a href="' + adminPublicPath('/admin/index.php?page=purchases') + '">استلام فاتورة شراء</a>.</p>';
     html += '<div class="table-wrap admin-table-wrap-elevated"><table class="admin-table admin-variants-matrix"><thead><tr>';
     html += '<th class="col-ref-img">صورة المرجع</th><th>اللون</th><th>المقاس</th><th class="col-vbar">باركود المتغير (بعد الحفظ)</th><th class="col-stock">المخزون الحالي (عرض)</th>';
     html += '</tr></thead><tbody>';

@@ -42,7 +42,6 @@ $allowed = [
     'suppliers',
     'purchases',
     'purchase_returns',
-    'stock',
     'stock_reports',
     'stock_adjustment_voucher',
     'chart_of_accounts',
