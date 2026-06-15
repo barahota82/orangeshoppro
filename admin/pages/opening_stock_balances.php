@@ -78,14 +78,9 @@ $osvRef = $osvId > 0
 <div class="card jv-print-hide" style="margin-bottom:12px;">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
         <input type="checkbox" id="osbLockToggle" <?php echo $openingStockLocked ? 'checked' : ''; ?>>
-        <span><strong>مقفول</strong> — منع اعتماد سند الرصيد الافتتاحي (حسب دولة الأدمن الحالية)</span>
+        <span><strong>سند مغلق</strong></span>
     </label>
 </div>
-
-<p class="card-hint jv-print-hide" style="margin:0 0 12px;">
-    سند <strong>واحد</strong> لكل دولة (مثل رصيد أول المدة المالي): اختر الصنف بنقرتين على خانة الكود،
-    وأدخل الكمية الافتتاحية. عند الاعتماد تُضبَط كميات المستودع الافتراضي (بلا قيد محاسبي).
-</p>
 
 <div class="card jv-print-area osv-opening-card" id="osv_app">
     <h3 class="card-title">سند رصيد افتتاحي مخزني</h3>
@@ -259,9 +254,14 @@ $osvRef = $osvId > 0
         tb.innerHTML = state.lines.map(rowHtml).join('');
         el('osv_number').value = state.id > 0 ? state.id : NEXT_NO;
         el('osv_statement').value = state.notes || '';
-        el('osv_status_badge').textContent = state.id > 0
+        var badgeTxt = state.id > 0
             ? ('سند #' + state.id + ' — ' + (isApproved() ? 'معتمد' : 'مسودة'))
-            : 'سند جديد (غير محفوظ)';
+            : '';
+        var badge = el('osv_status_badge');
+        if (badge) {
+            badge.textContent = badgeTxt;
+            badge.style.display = badgeTxt ? 'block' : 'none';
+        }
         SAVED_ID = state.id > 0 ? state.id : 0;
         bindRows();
         applyMode();
