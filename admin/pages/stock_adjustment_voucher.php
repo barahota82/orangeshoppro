@@ -347,8 +347,9 @@ if ($editSv !== null) {
     .admin-layout { min-height: 0 !important; }
     .admin-main { min-height: 0 !important; }
     /* الحشوة السفلية 18mm على صندوق الطباعة المطلق تتجاوز حافة الصفحة فتولّد صفحة فارغة؛
-       هامش @page السفلي (18mm) يكفي لتذييل العدّاد — فنُلغي الحشوة الزائدة دون حذف أي سطر. */
-    .jv-print-area { padding-bottom: 2mm !important; }
+       هامش @page السفلي (18mm) يكفي لتذييل العدّاد — فنُلغي الحشوة الزائدة دون حذف أي سطر
+       ودون تصغير أي خانة أو خط. */
+    .jv-print-area { padding-bottom: 0 !important; }
     .jv-print-area .stk-lines-table,
     .jv-print-area .stk-treat-table {
         table-layout: fixed !important;
