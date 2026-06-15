@@ -452,9 +452,12 @@ if ($editSv !== null) {
             + '</tr>';
     }
 
+    function emptyGlLine() { return { account_id: 0, account_code: '', account_name: '', debit: 0, credit: 0 }; }
+
     function renderTreat() {
         var tb = el('stk_treat_body');
         if (!tb) { return; }
+        if (!isApproved() && state.gl_lines.length === 0) { state.gl_lines.push(emptyGlLine()); }
         var mv = invMovement();
         var html = '';
         // سطر المخزون التلقائي (مدين عند الزيادة / دائن عند النقص) — للعرض ليبدو القيد كاملاً متوازناً.
@@ -488,35 +491,74 @@ if ($editSv !== null) {
     function bindTreatRows() {
         var tb = el('stk_treat_body');
         if (!tb) { return; }
-        Array.prototype.forEach.call(tb.querySelectorAll('tr[data-tidx]'), function (tr) {
-            var idx = parseInt(tr.getAttribute('data-tidx'), 10);
-            if (!isApproved()) {
-                var codeInp = tr.querySelector('.stk-tcode');
-                if (codeInp) { codeInp.addEventListener('dblclick', function (e) { e.preventDefault(); openAccPicker(idx); }); }
+        Array.prototype.forEach.call(tb.querySelectorAll('tr[data-tidx]'), bindTreatRowAt);
+    }
+
+    function bindTreatRowAt(tr) {
+        var idx = parseInt(tr.getAttribute('data-tidx'), 10);
+        if (!isApproved()) {
+            var codeInp = tr.querySelector('.stk-tcode');
+            if (codeInp) { codeInp.addEventListener('dblclick', function (e) { e.preventDefault(); openAccPicker(idx); }); }
+        }
+        var rm = tr.querySelector('.stk-tremove');
+        if (rm) { rm.addEventListener('click', function () { syncTreatFromInputs(); state.gl_lines.splice(idx, 1); renderTreat(); updateTreatBalance(); }); }
+        var d = tr.querySelector('.stk-tdebit');
+        var c = tr.querySelector('.stk-tcredit');
+        function onAmt(which) {
+            return function () {
+                state.gl_lines[idx].debit = d ? (parseFloat(d.value) || 0) : 0;
+                state.gl_lines[idx].credit = c ? (parseFloat(c.value) || 0) : 0;
+                // مدين ودائن متعارضان — عند الكتابة في أحدهما يُفرَّغ الآخر.
+                if (which === 'd' && state.gl_lines[idx].debit > 0 && c) { c.value = ''; state.gl_lines[idx].credit = 0; }
+                if (which === 'c' && state.gl_lines[idx].credit > 0 && d) { d.value = ''; state.gl_lines[idx].debit = 0; }
+                maybeAppendTreatRow(idx);
+                updateTreatBalance();
+            };
+        }
+        function onKey(ev) {
+            if (ev.key === 'Enter') {
+                ev.preventDefault();
+                maybeAppendTreatRow(idx);
+                focusTreatRow(idx + 1);
             }
-            var rm = tr.querySelector('.stk-tremove');
-            if (rm) { rm.addEventListener('click', function () { syncTreatFromInputs(); state.gl_lines.splice(idx, 1); renderTreat(); updateTreatBalance(); }); }
-            var d = tr.querySelector('.stk-tdebit');
-            var c = tr.querySelector('.stk-tcredit');
-            function onAmt(which) {
-                return function () {
-                    state.gl_lines[idx].debit = d ? (parseFloat(d.value) || 0) : 0;
-                    state.gl_lines[idx].credit = c ? (parseFloat(c.value) || 0) : 0;
-                    // مدين ودائن متعارضان — عند الكتابة في أحدهما يُفرَّغ الآخر.
-                    if (which === 'd' && state.gl_lines[idx].debit > 0 && c) { c.value = ''; state.gl_lines[idx].credit = 0; }
-                    if (which === 'c' && state.gl_lines[idx].credit > 0 && d) { d.value = ''; state.gl_lines[idx].debit = 0; }
-                    updateTreatBalance();
-                };
-            }
-            if (d) { d.addEventListener('input', onAmt('d')); }
-            if (c) { c.addEventListener('input', onAmt('c')); }
-        });
+        }
+        if (d) { d.addEventListener('input', onAmt('d')); d.addEventListener('keydown', onKey); }
+        if (c) { c.addEventListener('input', onAmt('c')); c.addEventListener('keydown', onKey); }
+    }
+
+    // إضافة سطر معالجة تالٍ تلقائياً عند إدخال مبلغ على السطر الأخير الذي يحمل حساباً
+    function maybeAppendTreatRow(idx) {
+        if (isApproved()) { return; }
+        if (idx !== state.gl_lines.length - 1) { return; }
+        var g = state.gl_lines[idx];
+        if ((parseInt(g.account_id, 10) || 0) <= 0) { return; }
+        if ((parseFloat(g.debit) || 0) <= 0 && (parseFloat(g.credit) || 0) <= 0) { return; }
+        appendTreatRow();
+    }
+
+    function appendTreatRow() {
+        var tb = el('stk_treat_body');
+        if (!tb) { return; }
+        var idx = state.gl_lines.length;
+        state.gl_lines.push(emptyGlLine());
+        tb.insertAdjacentHTML('beforeend', treatRowHtml(state.gl_lines[idx], idx));
+        var tr = tb.querySelector('tr[data-tidx="' + idx + '"]');
+        if (tr) { bindTreatRowAt(tr); }
+    }
+
+    function focusTreatRow(idx) {
+        var tb = el('stk_treat_body');
+        if (!tb) { return; }
+        var tr = tb.querySelector('tr[data-tidx="' + idx + '"]');
+        if (!tr) { return; }
+        var d = tr.querySelector('.stk-tdebit');
+        if (d) { d.focus(); d.select && d.select(); }
     }
 
     function addTreatRow() {
         if (isApproved()) { return; }
         syncTreatFromInputs();
-        state.gl_lines.push({ account_id: 0, account_code: '', account_name: '', debit: 0, credit: 0 });
+        state.gl_lines.push(emptyGlLine());
         renderTreat();
         updateTreatBalance();
     }
