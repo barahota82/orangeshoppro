@@ -201,14 +201,7 @@ $osvRef = $osvId > 0
 
 /* ===== الطباعة: ملاءمة الأعمدة وإخفاء عمود الإجراء ===== */
 @media print {
-    /* منع الصفحة البيضاء الزائدة: الهيكل المخفي يفرض min-height:100vh فيُنتج صفحة ثانية فارغة */
-    html, body { height: auto !important; min-height: 0 !important; }
-    .admin-layout { min-height: 0 !important; }
-    .admin-main { min-height: 0 !important; }
-    /* الحشوة السفلية 18mm على صندوق الطباعة المطلق تتجاوز حافة الصفحة فتولّد صفحة فارغة؛
-       هامش @page السفلي (18mm) يكفي لتذييل العدّاد — فنُلغي الحشوة الزائدة دون حذف أي سطر.
-       موحّدة على قيمة شاشة التسوية (0) لاتساق سلوك الطباعة بين الشاشتين. */
-    .jv-print-area { padding-bottom: 0 !important; }
+    /* إصلاح الصفحة الفارغة موحّد جذرياً في admin.css (§9.3 V7) — لا تجاوز موضعي هنا */
     .jv-print-area .osv-lines-table {
         table-layout: fixed !important;
         width: 100% !important;

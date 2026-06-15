@@ -4796,7 +4796,26 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         border: none;
         box-shadow: none !important;
         box-sizing: border-box;
-        padding: 0 8mm 18mm 8mm !important;
+        /*
+         * §9.3 V7 — إزالة الصفحة البيضاء الزائدة (إصلاح جذري موحّد لكل السندات):
+         * الحشوة السفلية 18mm كانت مكرّرة مع هامش @page السفلي (18mm عبر metafoot)،
+         * فيتجاوز صندوق الطباعة المطلق حافة الصفحة عند كثرة الأسطر فيولّد صفحة ثانية فارغة.
+         * @page السفلي وحده يكفي لمساحة عدّاد الصفحات؛ فنُصفّر الحشوة السفلية دون حذف أي سطر.
+         */
+        padding: 0 8mm 0 8mm !important;
+    }
+    /*
+     * §9.3 V7 — تحييد أرضية min-height:100vh في الطباعة: الهيكل المخفي (.admin-layout)
+     * يبقى في التدفق ويفرض ارتفاع صفحة كاملة، وعند ملامسة المحتوى للحافة يُنتج صفحة فارغة.
+     * في الطباعة لا حاجة للأرضية — المتصفح يطبع صفحة واحدة كحدّ أدنى تلقائياً.
+     */
+    html,
+    body {
+        min-height: 0 !important;
+    }
+    .admin-layout,
+    .admin-main {
+        min-height: 0 !important;
     }
     /* §9.3 — خط رفيع بعد وصف السند (البيان) وقبل جدول الأسطر */
     .jv-print-area .form-grid > div:has(#jv_desc),
