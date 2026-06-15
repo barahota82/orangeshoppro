@@ -447,8 +447,8 @@ if ($editSv !== null) {
         return '<tr data-tidx="' + idx + '">'
             + '<td class="jv-acc-code-cell"><input type="text" class="admin-inp stk-tcode" value="' + esc(g.account_code || '') + '" placeholder="نقرتان للاختيار" readonly title="نقرتان لاختيار الحساب"></td>'
             + '<td><input type="text" class="admin-inp stk-tname admin-inp-readonly" value="' + esc(g.account_name || '') + '" readonly tabindex="-1"></td>'
-            + '<td><input type="number" class="admin-inp stk-tdebit' + roCls + '" min="0" step="0.0001" inputmode="decimal" lang="en" dir="ltr" value="' + (g.debit ? g.debit : '') + '"' + dis + '></td>'
-            + '<td><input type="number" class="admin-inp stk-tcredit' + roCls + '" min="0" step="0.0001" inputmode="decimal" lang="en" dir="ltr" value="' + (g.credit ? g.credit : '') + '"' + dis + '></td>'
+            + '<td><input type="number" class="admin-inp admin-inp-money stk-tdebit' + roCls + '" min="0" step="0.0001" inputmode="decimal" lang="en" dir="ltr" value="' + (g.debit ? g.debit : '') + '"' + dis + '></td>'
+            + '<td><input type="number" class="admin-inp admin-inp-money stk-tcredit' + roCls + '" min="0" step="0.0001" inputmode="decimal" lang="en" dir="ltr" value="' + (g.credit ? g.credit : '') + '"' + dis + '></td>'
             + '<td>' + (isApproved() ? '' : '<button type="button" class="btn-secondary stk-tremove">حذف</button>') + '</td>'
             + '</tr>';
     }
