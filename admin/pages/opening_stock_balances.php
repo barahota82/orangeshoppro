@@ -198,6 +198,47 @@ $osvRef = $osvId > 0
     background: #f4f4f5;
     cursor: default;
 }
+
+/* ===== الطباعة: ملاءمة الأعمدة وإخفاء عمود الإجراء ===== */
+@media print {
+    .jv-print-area .osv-lines-table {
+        table-layout: fixed !important;
+        width: 100% !important;
+        direction: rtl !important;
+    }
+    /* نِسَب مئوية: اسم الصنف يأخذ الأوسع، وباقي الأعمدة أضيق */
+    .jv-print-area .osv-lines-table col.osv-col-code { width: 16% !important; }
+    .jv-print-area .osv-lines-table col.osv-col-name { width: auto !important; }
+    .jv-print-area .osv-lines-table col.osv-col-vlbl { width: 18% !important; }
+    .jv-print-area .osv-lines-table col.osv-col-qty { width: 14% !important; }
+    .jv-print-area .osv-lines-table col.osv-col-act { width: 0 !important; }
+    /* إخفاء عمود الإجراء (زر حذف) رأساً وجسماً في الطباعة */
+    .jv-print-area .osv-lines-table thead th.admin-doc-col-actions,
+    .jv-print-area .osv-lines-table tbody td:last-child {
+        display: none !important;
+        width: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+    }
+    .jv-print-area .osv-lines-table th,
+    .jv-print-area .osv-lines-table td {
+        font-size: 8pt !important;
+        padding: 2px 4px !important;
+    }
+    .jv-print-area .osv-lines-table input {
+        font-size: 8pt !important;
+        padding: 1px 3px !important;
+        height: auto !important;
+        min-height: 0 !important;
+        border: 1px solid #cbd5e1 !important;
+        background: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    /* اسم الصنف محاذاة لليمين (نص)، الكمية وسط */
+    .jv-print-area .osv-lines-table .osv-name { text-align: right !important; }
+    .jv-print-area .osv-lines-table .osv-qty { text-align: center !important; }
+}
 </style>
 
 <script>
