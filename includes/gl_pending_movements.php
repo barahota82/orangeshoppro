@@ -382,7 +382,7 @@ function orange_gl_pending_list(PDO $pdo, string $status, ?string $dateFrom, ?st
             $params[] = $et;
         }
     }
-    $sql .= ' ORDER BY movement_at ASC, id ASC LIMIT 500';
+    $sql .= ' ORDER BY movement_at ASC, id ASC';
     $st = $pdo->prepare($sql);
     $st->execute($params);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);

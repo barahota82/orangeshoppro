@@ -38,7 +38,7 @@ if ($q !== '') {
     $params[] = $like;
     $params[] = $like;
     $params[] = $like;
-    $sql .= ' ORDER BY o.id DESC LIMIT 50';
+    $sql .= ' ORDER BY o.id DESC';
     $st = $pdo->prepare($sql);
     $st->execute($params);
     $results = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];

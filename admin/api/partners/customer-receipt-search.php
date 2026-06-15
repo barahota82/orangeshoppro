@@ -52,7 +52,7 @@ try {
                    (SELECT SUM(jl.debit) FROM journal_lines jl WHERE jl.voucher_id = v.id) AS total
             FROM journal_vouchers v
             WHERE ' . implode(' AND ', $where) . '
-            ORDER BY v.id DESC LIMIT 100';
+            ORDER BY v.id DESC';
 
     $st = $pdo->prepare($sql);
     $st->execute($params);

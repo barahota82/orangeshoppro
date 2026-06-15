@@ -162,11 +162,11 @@ if ($initialJson === false) {
             </div>
             <div>
                 <label for="br_from">من تاريخ</label>
-                <input type="date" id="br_from">
+                <input type="text" id="br_from" class="orange-inp-dmy" dir="ltr" lang="en">
             </div>
             <div>
                 <label for="br_to">حتى تاريخ (رصيد GL)</label>
-                <input type="date" id="br_to" required>
+                <input type="text" id="br_to" class="orange-inp-dmy" dir="ltr" lang="en" required>
             </div>
             <div>
                 <label for="br_stmt">رصيد كشف البنك</label>
@@ -267,8 +267,8 @@ if ($initialJson === false) {
     function syncFormFromState() {
         el('br_account').value = String(state.account_id || '');
         el('br_fy').value = String(state.fiscal_year_id || '');
-        el('br_from').value = state.period_from || '';
-        el('br_to').value = state.period_to || '';
+        el('br_from').value = state.period_from ? orangeIsoDateToDmy(state.period_from) : '';
+        el('br_to').value = state.period_to ? orangeIsoDateToDmy(state.period_to) : '';
         el('br_stmt').value = state.statement_balance != null ? String(state.statement_balance) : '0';
         el('br_notes').value = state.notes || '';
         el('br_gl_disp').textContent = fmt(state.gl_balance_live || 0);
@@ -293,7 +293,7 @@ if ($initialJson === false) {
         (state.lines || []).forEach(function (ln, idx) {
             var tr = document.createElement('tr');
             tr.innerHTML =
-                '<td><input type="date" data-idx="' + idx + '" data-f="date" value="' + (ln.line_date || '') + '"' + (state.status === 'closed' ? ' disabled' : '') + '></td>' +
+                '<td><input type="text" class="orange-inp-dmy" dir="ltr" lang="en" data-idx="' + idx + '" data-f="date" value="' + (ln.line_date ? orangeIsoDateToDmy(ln.line_date) : '') + '"' + (state.status === 'closed' ? ' disabled' : '') + '></td>' +
                 '<td><input type="text" data-idx="' + idx + '" data-f="desc" value="' + (ln.description || '').replace(/"/g, '&quot;') + '" style="width:100%"' + (state.status === 'closed' ? ' disabled' : '') + '></td>' +
                 '<td><input type="number" step="0.001" data-idx="' + idx + '" data-f="amt" value="' + (ln.amount != null ? ln.amount : 0) + '" dir="ltr"' + (state.status === 'closed' ? ' disabled' : '') + '></td>' +
                 '<td>' + (state.status === 'closed' ? '' : '<button type="button" class="btn-secondary" data-rm="' + idx + '">×</button>') + '</td>';
@@ -302,6 +302,7 @@ if ($initialJson === false) {
         tb.querySelectorAll('input').forEach(function (inp) {
             inp.addEventListener('change', onLineEdit);
         });
+        if (typeof orangeInitDmyInputs === 'function') orangeInitDmyInputs(tb);
         tb.querySelectorAll('button[data-rm]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var i = parseInt(btn.getAttribute('data-rm'), 10);
@@ -316,7 +317,7 @@ if ($initialJson === false) {
         var i = parseInt(inp.getAttribute('data-idx'), 10);
         var f = inp.getAttribute('data-f');
         if (!state.lines[i]) return;
-        if (f === 'date') state.lines[i].line_date = inp.value || null;
+        if (f === 'date') state.lines[i].line_date = orangeGetDmyValueAsIso(inp) || null;
         if (f === 'desc') state.lines[i].description = inp.value;
         if (f === 'amt') state.lines[i].amount = parseFloat(inp.value) || 0;
     }
@@ -326,8 +327,8 @@ if ($initialJson === false) {
             id: state.id || 0,
             account_id: parseInt(el('br_account').value, 10) || 0,
             fiscal_year_id: parseInt(el('br_fy').value, 10) || 0,
-            period_from: el('br_from').value || '',
-            period_to: el('br_to').value || '',
+            period_from: orangeGetDmyValueAsIso(el('br_from')) || '',
+            period_to: orangeGetDmyValueAsIso(el('br_to')) || '',
             statement_balance: parseFloat(el('br_stmt').value) || 0,
             notes: el('br_notes').value || '',
             lines: (state.lines || []).map(function (ln) {
@@ -401,7 +402,7 @@ if ($initialJson === false) {
 
     el('br_line_add') && el('br_line_add').addEventListener('click', function () {
         state.lines = state.lines || [];
-        state.lines.push({ line_date: el('br_to').value || null, description: '', amount: 0, source: 'manual' });
+        state.lines.push({ line_date: orangeGetDmyValueAsIso(el('br_to')) || null, description: '', amount: 0, source: 'manual' });
         renderLines();
     });
 

@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/admin_settings_country.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 
 $pdo = orange_admin_page_pdo();
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
@@ -132,7 +133,7 @@ if ($initialJson === false) {
                             <tr>
                                 <td><?php echo $rid; ?></td>
                                 <td><?php echo htmlspecialchars($whName !== '' ? $whName : ('#' . (int) ($row['warehouse_id'] ?? 0)), ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td dir="ltr"><?php echo htmlspecialchars(substr((string) ($row['counted_at'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY(substr((string) ($row['counted_at'] ?? ''), 0, 10)), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo (int) ($row['line_count'] ?? 0); ?></td>
                                 <td dir="ltr"><?php echo (int) ($row['total_qty_variance'] ?? 0); ?></td>
                                 <td><?php echo $st === 'approved' ? 'معتمد' : 'مسودة'; ?></td>
@@ -161,7 +162,7 @@ if ($initialJson === false) {
             </div>
             <div>
                 <label for="ir_counted_at">تاريخ الجرد</label>
-                <input type="date" id="ir_counted_at" required>
+                <input type="text" id="ir_counted_at" class="orange-inp-dmy" dir="ltr" lang="en" required>
             </div>
         </div>
 
@@ -284,7 +285,7 @@ if ($initialJson === false) {
 
     function syncFormFromState() {
         el('ir_warehouse').value = String(state.warehouse_id || '');
-        el('ir_counted_at').value = state.counted_at || '';
+        el('ir_counted_at').value = state.counted_at ? orangeIsoDateToDmy(state.counted_at) : '';
         el('ir_notes').value = state.notes || '';
         recomputeTotals();
         var approved = state.status === 'approved';
@@ -350,7 +351,7 @@ if ($initialJson === false) {
         return {
             id: state.id || 0,
             warehouse_id: parseInt(el('ir_warehouse').value, 10) || 0,
-            counted_at: el('ir_counted_at').value || '',
+            counted_at: orangeGetDmyValueAsIso(el('ir_counted_at')) || '',
             notes: el('ir_notes').value || '',
             lines: (state.lines || []).map(function (ln) {
                 return {

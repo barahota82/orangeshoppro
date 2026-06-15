@@ -312,7 +312,7 @@ $sr2DocSerialPreview = $sr2NavReady
         </div>
         <div>
             <label for="sr2_document_date">تاريخ المردود</label>
-            <input type="date" id="sr2_document_date" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="text" id="sr2_document_date" class="orange-inp-dmy" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('d/m/Y'), ENT_QUOTES, 'UTF-8'); ?>">
         </div>
         <div>
             <label for="sr2_channel">قناة التحصيل</label>
@@ -1029,9 +1029,7 @@ $sr2DocSerialPreview = $sr2NavReady
             el.textContent = v !== '' ? v : '—';
         };
         var docDateEl = document.getElementById('sr2_document_date');
-        var docDateVal = docDateEl ? String(docDateEl.value || '').trim() : '';
-        var dm = docDateVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        setTxt('sr2_sd_print_docdate', dm ? (dm[3] + '/' + dm[2] + '/' + dm[1]) : docDateVal);
+        setTxt('sr2_sd_print_docdate', docDateEl ? String(docDateEl.value || '').trim() : '');
         var refEl = document.getElementById('sr2_order_ref');
         setTxt('sr2_sd_print_ref_invoice', refEl ? refEl.value : '');
         var nameEl = document.getElementById('sr2_customer_name');
@@ -1071,7 +1069,7 @@ $sr2DocSerialPreview = $sr2NavReady
         var notesEl = document.getElementById('sr2_notes');
         if (notesEl) notesEl.value = p.notes || '';
         var docDateEl = document.getElementById('sr2_document_date');
-        if (docDateEl) docDateEl.value = (p.document_date ? String(p.document_date).substr(0, 10) : '');
+        if (docDateEl) docDateEl.value = (p.document_date ? orangeIsoDateToDmy(String(p.document_date).substr(0, 10)) : '');
         var entryDateEl = document.getElementById('sr2_entry_date');
         if (entryDateEl && p.created_at) entryDateEl.value = sr2FormatEnteredDisplay(p.created_at);
         var oid = parseInt(String(p.order_id || '0'), 10) || 0;
@@ -1454,7 +1452,7 @@ $sr2DocSerialPreview = $sr2NavReady
             customer_id: customerId,
             channel: channel,
             notes: notes,
-            document_date: (document.getElementById('sr2_document_date') ? (document.getElementById('sr2_document_date').value || '') : ''),
+            document_date: (document.getElementById('sr2_document_date') ? (orangeGetDmyValueAsIso(document.getElementById('sr2_document_date')) || '') : ''),
             items: items,
             extra_lines: sr2CollectExtraLines()
         };

@@ -378,7 +378,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         </div>
         <div>
             <label for="pr2_document_date">تاريخ المردود</label>
-            <input type="date" id="pr2_document_date" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="pr2_document_date" class="orange-inp-dmy" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('d/m/Y'), ENT_QUOTES, 'UTF-8'); ?>"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
         </div>
         <div>
             <label for="pr2_type">نوع المردود</label>
@@ -1150,9 +1150,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         setTxt('pr2_sd_print_serial', serEl ? serEl.value : '');
 
         var docDateEl = document.getElementById('pr2_document_date');
-        var docDateVal = docDateEl ? String(docDateEl.value || '').trim() : '';
-        var dm = docDateVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        setTxt('pr2_sd_print_docdate', dm ? (dm[3] + '/' + dm[2] + '/' + dm[1]) : docDateVal);
+        setTxt('pr2_sd_print_docdate', docDateEl ? String(docDateEl.value || '').trim() : '');
 
         var refEl = document.getElementById('pr2_purchase_ref');
         setTxt('pr2_sd_print_ref_invoice', refEl ? refEl.value : '');
@@ -1196,7 +1194,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         var notesEl = document.getElementById('pr2_notes');
         if (notesEl) notesEl.value = p.notes || '';
         var docDateEl = document.getElementById('pr2_document_date');
-        if (docDateEl) docDateEl.value = (p.document_date ? String(p.document_date).substr(0, 10) : '');
+        if (docDateEl) docDateEl.value = (p.document_date ? orangeIsoDateToDmy(String(p.document_date).substr(0, 10)) : '');
         var entryDateEl = document.getElementById('pr2_entry_date');
         if (entryDateEl && p.created_at) entryDateEl.value = pr2FormatEnteredDisplay(p.created_at);
         var purEl = document.getElementById('pr2_purchase_ref');
@@ -1368,7 +1366,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             supplier_id: supplierId,
             type: retType,
             notes: notes,
-            document_date: (document.getElementById('pr2_document_date') ? (document.getElementById('pr2_document_date').value || '') : ''),
+            document_date: (document.getElementById('pr2_document_date') ? (orangeGetDmyValueAsIso(document.getElementById('pr2_document_date')) || '') : ''),
             purchase_id: purchaseId > 0 ? purchaseId : 0,
             items: items,
             invoice_discount_raw: invDiscRaw,

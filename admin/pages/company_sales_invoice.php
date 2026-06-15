@@ -347,7 +347,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     <div class="form-grid sv2-header-rowdoc orange-doc-header-row jv-print-hide" style="margin-bottom:12px;">
         <div>
             <label for="sv2_document_date">تاريخ الفاتورة</label>
-            <input type="date" id="sv2_document_date" dir="ltr" lang="en" title="تاريخ الفاتورة = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="text" id="sv2_document_date" class="orange-inp-dmy" dir="ltr" lang="en" title="تاريخ الفاتورة = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('d/m/Y'), ENT_QUOTES, 'UTF-8'); ?>">
         </div>
         <div>
             <label for="sv2_channel">قناة العملاء</label>
@@ -1366,9 +1366,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             el.textContent = v !== '' ? v : '—';
         };
         var docDateEl = document.getElementById('sv2_document_date');
-        var docDateVal = docDateEl ? String(docDateEl.value || '').trim() : '';
-        var dm = docDateVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        setTxt('sv2_sd_print_docdate', dm ? (dm[3] + '/' + dm[2] + '/' + dm[1]) : docDateVal);
+        setTxt('sv2_sd_print_docdate', docDateEl ? String(docDateEl.value || '').trim() : '');
 
         var nameEl = document.getElementById('sv2_customer_name');
         var phoneEl = document.getElementById('sv2_phone');
@@ -1416,7 +1414,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         var notesEl = document.getElementById('sv2_notes');
         if (notesEl) notesEl.value = inv.notes || '';
         var docDateEl = document.getElementById('sv2_document_date');
-        if (docDateEl) docDateEl.value = (inv.document_date ? String(inv.document_date).substr(0, 10) : '');
+        if (docDateEl) docDateEl.value = (inv.document_date ? orangeIsoDateToDmy(String(inv.document_date).substr(0, 10)) : '');
         var entryDateEl = document.getElementById('sv2_entry_date');
         if (entryDateEl && inv.created_at) entryDateEl.value = sv2FormatEnteredDisplay(inv.created_at);
     }
@@ -1598,7 +1596,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             channel_id: channel,
             payment_terms: document.getElementById('sv2_payment_terms').value || 'cash',
             amount_paid: paid,
-            document_date: (document.getElementById('sv2_document_date') ? (document.getElementById('sv2_document_date').value || '') : ''),
+            document_date: (document.getElementById('sv2_document_date') ? (orangeGetDmyValueAsIso(document.getElementById('sv2_document_date')) || '') : ''),
             items: items,
             extra_lines: sv2CollectExtraLines()
         };

@@ -71,8 +71,7 @@ foreach ($variants as $vSum) {
 }
 
 $icValidDate = static function (string $raw): string {
-    $raw = trim($raw);
-    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw) === 1 ? $raw : '';
+    return orange_parse_admin_date_to_ymd(trim($raw));
 };
 $icFrom = isset($_GET['from']) ? $icValidDate((string) $_GET['from']) : '';
 $icTo = isset($_GET['to']) ? $icValidDate((string) $_GET['to']) : '';
@@ -81,6 +80,8 @@ if ($icFrom !== '' && $icTo !== '' && strcmp($icFrom, $icTo) > 0) {
 }
 $icHasRange = $icFrom !== '' || $icTo !== '';
 $icToday = date('Y-m-d');
+$icFromDisplay = $icFrom !== '' ? orange_format_date_dmY($icFrom) : '';
+$icToDisplay = $icTo !== '' ? orange_format_date_dmY($icTo) : '';
 
 /*
  * المخزون يتأثر بمصدرين لا يكتبان سطراً في stock_movements:
@@ -385,11 +386,11 @@ $icPrintDate = orange_format_date_dmY(date('Y-m-d'));
         <input type="hidden" name="product_id" value="<?php echo (int) $productId; ?>">
         <div>
             <label for="ic_from">من تاريخ</label>
-            <input type="date" id="ic_from" name="from" class="admin-inp" lang="en" dir="ltr" value="<?php echo htmlspecialchars($icFrom, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="text" id="ic_from" name="from" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($icFromDisplay, ENT_QUOTES, 'UTF-8'); ?>">
         </div>
         <div>
             <label for="ic_to">إلى تاريخ</label>
-            <input type="date" id="ic_to" name="to" class="admin-inp" lang="en" dir="ltr" value="<?php echo htmlspecialchars($icTo, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="text" id="ic_to" name="to" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($icToDisplay, ENT_QUOTES, 'UTF-8'); ?>">
         </div>
         <div><button type="submit">عرض الفترة</button></div>
         <?php if ($icHasRange): ?>

@@ -101,6 +101,43 @@ Orange — سياق نقاش تقريري المخزن (حركة المخزون 
       الخلاصة: مطلوب تدقيق شامل لكل شاشات التقارير الحقيقية وإزالة أي حدّ أسطر، مع تمييز Top-N المقصود
       وغير التقارير. (يُنفَّذ كمهمة مستقلة بموافقة المالك.)
 
+ق3) **تجاوز قرار المالك (2026-06-15): لا استثناء لأي شاشة أدمن** — «لا يوجد استثناء لأي شاشة من شاشات
+    الأدمن، لا أريد حدوداً لعدد أسطر معيّنة؛ النظام كبير ومعرّض لأن يكون عدد الأسطر مئات الآلاف».
+    أي أن استثناء «القوائم/البحث/السجل» في ق2 **أُلغي**. نُفِّذ تدقيق شامل وأُزيلت كل حدود عرض النتائج
+    من شاشات الأدمن (pages + api + includes الخاصة بالأدمن). أبقي فقط على:
+      (1) LIMIT 1 (جلب صف واحد بحكم المنطق — ليس سقفاً للنتائج).
+      (2) ويدجِت Top-N صريحة (مقصودة كملخّص ترتيبي) — موثّقة أدناه فقط، ينتظر قرار المالك إن أراد إزالتها أيضاً.
+    الملفات التي أُزيل منها حدّ الأسطر:
+      admin/pages: stock_reports.php (سبق)، item_card.php (سبق)، sales_returns_report.php (تفاصيل 300/5000)،
+        order_intake_queue.php (250)، logs.php (500×2)، delivery_order_search.php (50)،
+        storefront_merge_requests.php (100×2)، customers.php (5000×2 توليد أكواد)، suppliers.php (5000×2 توليد أكواد).
+      admin/api: journal/manage.php (300×2)، payments/review.php (200)، online-invoices/browse.php (200)،
+        sales-invoices/browse.php (200)، sales_returns/browse.php (200)، purchase_returns/browse.php (200)،
+        purchases/browse.php (200)، customers/search.php (80)، accounts/search-leaves.php (500×2 + 80)،
+        partners/customer-receipt-search.php (100)، partners/supplier-payment-search.php (100)،
+        order_intake/export-csv.php (8000)، suppliers/save.php (5000×2)، customers/save.php (5000×2).
+      includes: gl_pending_movements.php (500 — دالة قائمة)، edit_lock.php (2000 — قائمة سجل القفل).
+    ويدجِت Top-N/الأخيرة المُبقاة (تنتظر قرار المالك إن أراد فتحها بالكامل):
+      * admin/pages/reports.php سطر 53: أعلى 10 منتجات مبيعاً (LIMIT 10) — ملخّص ترتيبي بلوحة التقارير.
+      * admin/pages/sales_returns_report.php سطر 229: أعلى 25 صنفاً بقيمة المردود (LIMIT 25) — ترتيب Top-N.
+      * admin/pages/invoice.php سطر 180: منتقي «أحدث 30 طلباً» لإنشاء فاتورة يدوية (LIMIT 30) — منتقي مساعد
+        على شاشة معاملة (وليس تقريراً)؛ أُبقي تفادياً لتحميل كامل جدول الطلبات في قائمة منسدلة.
+    ملاحظة للمالك: إن أراد إزالة هذه الثلاثة أيضاً ليصبح بلا أي LIMIT بعدد ثابت إطلاقاً — يُبلِّغ ويُنفَّذ.
+
+ق4) **سياسة تنسيق التاريخ في كل شاشات الأدمن (تذكير المالك 2026-06-15):** كل خانات التاريخ في أي شاشة
+    أدمن يجب أن تكون **يوم/شهر/سنة** مثل خانة التاريخ في السندات — لا حقول `<input type="date">`
+    الأصلية (التي تعرض بتنسيق المتصفّح). النمط الموحّد:
+      * حقل نصي class="orange-inp-dmy" dir="ltr" lang="en"، يعرض d/m/Y، ومكتبة admin/assets/admin-date-dmy.js
+        (محمّلة عالمياً في admin/partials/header.php) تضيف زر تقويم وتطبيع blur تلقائياً.
+      * PHP يحلّل القيمة الواردة عبر orange_parse_admin_date_to_ymd() (يقبل d/m/Y و Y-m-d) للاستعلامات.
+      * JS يقرأ القيمة للإرسال عبر orangeGetDmyValueAsIso()، ويملؤها من Y-m-d عبر orangeIsoDateToDmy().
+    نُفِّذ تحويل كل حقول `type="date"` المتبقية في الأدمن إلى هذا النمط:
+      stock_reports.php (sr_from/sr_to)، item_card.php (ic_from/ic_to)، report_balance_sheet.php (as_of)،
+      online_orders_final_posting.php (date_from/date_to)، inventory_reconciliation.php (ir_counted_at)،
+      bank_reconciliation.php (br_from/br_to + سطور line_date الديناميكية)، purchases.php (pv2_document_date)،
+      sales_returns.php (sr2_document_date)، purchase_returns.php (pr2_document_date)،
+      company_sales_invoice.php (sv2_document_date). لم يتبقَّ أي `type="date"` في admin/**/*.php.
+
 ---------------------------------------------------------------------
 المطلوب تنفيذه (Checklist — يُملأ بعد القرارات)
 ---------------------------------------------------------------------
@@ -110,3 +147,5 @@ Orange — سياق نقاش تقريري المخزن (حركة المخزون 
 سجل التحديثات
 ---------------------------------------------------------------------
 - 2026-06-15: إنشاء الملف وتسجيل خط الأساس (حالة التقريرين الحالية) بناءً على طلب المالك بدء توثيق سياق النقاش.
+- 2026-06-15: إضافة ق3 (إزالة شاملة لحدود الأسطر من كل شاشات الأدمن بلا استثناء — تجاوز قرار المالك)
+  وق4 (تحويل كل خانات التاريخ في الأدمن إلى نمط يوم/شهر/سنة orange-inp-dmy مثل السندات).

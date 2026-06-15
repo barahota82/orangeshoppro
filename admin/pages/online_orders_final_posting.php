@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../includes/delivery_agents.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -16,8 +17,10 @@ orange_catalog_ensure_schema($pdo);
 $adminCountryId = orange_admin_context_country_id($pdo);
 $ordersMoney = orange_admin_currency_context($pdo);
 $agentFilter = isset($_GET['agent_id']) ? (int) $_GET['agent_id'] : 0;
-$dateFrom = trim((string) ($_GET['date_from'] ?? ''));
-$dateTo = trim((string) ($_GET['date_to'] ?? ''));
+$dateFrom = orange_parse_admin_date_to_ymd(trim((string) ($_GET['date_from'] ?? '')));
+$dateTo = orange_parse_admin_date_to_ymd(trim((string) ($_GET['date_to'] ?? '')));
+$dateFromDisplay = $dateFrom !== '' ? orange_format_date_dmY($dateFrom) : '';
+$dateToDisplay = $dateTo !== '' ? orange_format_date_dmY($dateTo) : '';
 $agents = orange_table_exists($pdo, 'delivery_agents')
     ? orange_delivery_agents_admin_list($pdo, $adminCountryId > 0 ? $adminCountryId : null)
     : [];
@@ -74,11 +77,11 @@ foreach ($candidates as $o) {
     <div class="admin-toolbar" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:12px;">
         <label class="admin-toolbar__field">
             <span>من تاريخ التسليم</span>
-            <input type="date" id="ofp_date_from" value="<?php echo htmlspecialchars(strlen($dateFrom) >= 10 ? substr($dateFrom, 0, 10) : $dateFrom, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="text" id="ofp_date_from" class="orange-inp-dmy" dir="ltr" lang="en" value="<?php echo htmlspecialchars($dateFromDisplay, ENT_QUOTES, 'UTF-8'); ?>">
         </label>
         <label class="admin-toolbar__field">
             <span>إلى تاريخ التسليم</span>
-            <input type="date" id="ofp_date_to" value="<?php echo htmlspecialchars(strlen($dateTo) >= 10 ? substr($dateTo, 0, 10) : $dateTo, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="text" id="ofp_date_to" class="orange-inp-dmy" dir="ltr" lang="en" value="<?php echo htmlspecialchars($dateToDisplay, ENT_QUOTES, 'UTF-8'); ?>">
         </label>
         <button type="button" class="btn-secondary" onclick="ofpApplyFilters()">تطبيق الفلتر</button>
         <?php if ($agents !== []): ?>
@@ -154,8 +157,8 @@ function ofpApplyAgentFilter(val) {
 function ofpApplyFilters() {
     ofpNavigate({
         agent_id: document.getElementById('ofp_agent_filter') ? document.getElementById('ofp_agent_filter').value : '0',
-        date_from: (document.getElementById('ofp_date_from') || {}).value || '',
-        date_to: (document.getElementById('ofp_date_to') || {}).value || ''
+        date_from: document.getElementById('ofp_date_from') ? (orangeGetDmyValueAsIso(document.getElementById('ofp_date_from')) || '') : '',
+        date_to: document.getElementById('ofp_date_to') ? (orangeGetDmyValueAsIso(document.getElementById('ofp_date_to')) || '') : ''
     });
 }
 

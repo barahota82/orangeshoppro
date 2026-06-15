@@ -726,7 +726,7 @@ function orange_edit_lock_list(
         $sql .= ' AND country_id = ?';
         $params[] = $ctxCid;
     }
-    $sql .= ' ORDER BY saved_at DESC, id DESC LIMIT 2000';
+    $sql .= ' ORDER BY saved_at DESC, id DESC';
     $st = $pdo->prepare($sql);
     $st->execute($params);
     $rows = [];

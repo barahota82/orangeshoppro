@@ -231,7 +231,6 @@ if (orange_table_exists($pdo, 'sales_returns') && orange_table_exists($pdo, 'sal
     $stProd->execute($whereParams);
     $byProduct = $stProd->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-    $detailLimit = ($exportCsv || $exportXls) ? 5000 : 300;
     $detailCols = 'sr.id, sr.total, sr.type, sr.notes';
     if ($hasCreatedAt) {
         $detailCols .= ', sr.created_at';
@@ -255,8 +254,7 @@ if (orange_table_exists($pdo, 'sales_returns') && orange_table_exists($pdo, 'sal
     $stDet = $pdo->prepare(
         'SELECT ' . $detailCols . '
          FROM sales_returns sr' . $joinCh . $joinCust . $whereSql . '
-         ORDER BY sr.id DESC
-         LIMIT ' . (int) $detailLimit
+         ORDER BY sr.id DESC'
     );
     $stDet->execute($whereParams);
     $detailRows = $stDet->fetchAll(PDO::FETCH_ASSOC) ?: [];

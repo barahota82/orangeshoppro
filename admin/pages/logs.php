@@ -18,14 +18,12 @@ if (orange_table_exists($pdo, 'orange_admin_audit_log')) {
                 a.username AS admin_username
                 FROM orange_admin_audit_log l
                 LEFT JOIN admins a ON a.id = l.admin_id
-                ORDER BY l.id DESC
-                LIMIT 500';
+                ORDER BY l.id DESC';
     } else {
         $sql = 'SELECT id, created_at, admin_id, action, message, entity_table, entity_id,
                 NULL AS admin_username
                 FROM orange_admin_audit_log
-                ORDER BY id DESC
-                LIMIT 500';
+                ORDER BY id DESC';
     }
     $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 }

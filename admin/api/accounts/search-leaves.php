@@ -48,7 +48,7 @@ try {
             $sql .= $countryFilter['sql'];
             $params = array_merge($params, $countryFilter['params']);
         }
-        $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC LIMIT 500';
+        $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC';
         $st = $pdo->prepare($sql);
         $st->execute($params);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -89,7 +89,7 @@ try {
             $sql .= $countryFilter['sql'];
             $params = array_merge($params, $countryFilter['params']);
         }
-        $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC LIMIT 500';
+        $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC';
         $st = $pdo->prepare($sql);
         $st->execute($params);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -140,7 +140,7 @@ try {
         $sql .= $countryFilter['sql'];
         $params = array_merge($params, $countryFilter['params']);
     }
-    $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC LIMIT 80';
+    $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC';
 
     $st = $pdo->prepare($sql);
     $st->execute($params);

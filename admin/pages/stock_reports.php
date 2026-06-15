@@ -56,8 +56,8 @@ $srPickRows = orange_cart_promo_admin_product_rows($pdo);
 $srPickJson = json_encode($srPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS);
 
 $normalizeDate = static function (string $raw): ?string {
-    $raw = trim($raw);
-    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw) === 1 ? $raw : null;
+    $ymd = orange_parse_admin_date_to_ymd(trim($raw));
+    return $ymd !== '' ? $ymd : null;
 };
 $today = date('Y-m-d');
 $monthStart = date('Y-m-01');
@@ -66,6 +66,8 @@ $mTo = isset($_GET['m_to']) ? ($normalizeDate((string) $_GET['m_to']) ?? $today)
 if (strcmp($mFrom, $mTo) > 0) {
     [$mFrom, $mTo] = [$mTo, $mFrom];
 }
+$mFromDisplay = orange_format_date_dmY($mFrom);
+$mToDisplay = orange_format_date_dmY($mTo);
 $stagnantDays = isset($_GET['days']) ? max(7, min(3650, (int) $_GET['days'])) : 90;
 
 /* فلتر الفئة (catalog_categories) للجرد/التقييم. */
@@ -440,11 +442,11 @@ $reportTitle = $reports[$reportKey];
         <?php if (in_array($reportKey, ['movements', 'move_summary'], true)): ?>
             <div>
                 <label for="sr_from">من تاريخ</label>
-                <input type="date" id="sr_from" name="m_from" class="admin-inp" lang="en" dir="ltr" value="<?php echo htmlspecialchars($mFrom, ENT_QUOTES, 'UTF-8'); ?>">
+                <input type="text" id="sr_from" name="m_from" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($mFromDisplay, ENT_QUOTES, 'UTF-8'); ?>">
             </div>
             <div>
                 <label for="sr_to">إلى تاريخ</label>
-                <input type="date" id="sr_to" name="m_to" class="admin-inp" lang="en" dir="ltr" value="<?php echo htmlspecialchars($mTo, ENT_QUOTES, 'UTF-8'); ?>">
+                <input type="text" id="sr_to" name="m_to" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($mToDisplay, ENT_QUOTES, 'UTF-8'); ?>">
             </div>
         <?php endif; ?>
         <?php if ($reportKey === 'stagnant'): ?>

@@ -20,13 +20,13 @@ function orange_supplier_next_auto_code(PDO $pdo, ?int $countryId = null): ?stri
     if (orange_table_has_country_id($pdo, 'suppliers') && $countryId > 0) {
         $st = $pdo->prepare(
             'SELECT code FROM suppliers WHERE country_id = ? AND code IS NOT NULL AND TRIM(code) <> \'\'
-             ORDER BY id DESC LIMIT 5000'
+             ORDER BY id DESC'
         );
         $st->execute([$countryId]);
         $rows = $st->fetchAll(PDO::FETCH_COLUMN) ?: [];
         $chk = $pdo->prepare('SELECT id FROM suppliers WHERE code = ? AND country_id = ? LIMIT 1');
     } else {
-        $rows = $pdo->query('SELECT code FROM suppliers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC LIMIT 5000')
+        $rows = $pdo->query('SELECT code FROM suppliers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC')
             ->fetchAll(PDO::FETCH_COLUMN) ?: [];
         $chk = $pdo->prepare('SELECT id FROM suppliers WHERE code = ? LIMIT 1');
     }

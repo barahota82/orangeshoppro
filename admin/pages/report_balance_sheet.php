@@ -50,7 +50,7 @@ if ($fyRow !== null) {
 
 $useVouchers = orange_journal_vouchers_ready($pdo);
 
-$asOfYmd = isset($_GET['as_of']) ? trim((string) $_GET['as_of']) : '';
+$asOfYmd = isset($_GET['as_of']) ? orange_parse_admin_date_to_ymd(trim((string) $_GET['as_of'])) : '';
 if ($fyRow !== null) {
     $fyEnd = trim((string) ($fyRow['end_date'] ?? ''));
     $fyStart = trim((string) ($fyRow['start_date'] ?? ''));
@@ -185,12 +185,8 @@ $colCount = $showCompare ? 4 : 3;
                     </div>
                     <div class="gas-acc-stmt-field gl-m-stmt-field--month">
                         <label for="bs_as_of">حتى تاريخ</label>
-                        <input type="date" name="as_of" id="bs_as_of" class="admin-inp" lang="en" dir="ltr"
-                            value="<?php echo htmlspecialchars($asOfYmd, ENT_QUOTES, 'UTF-8'); ?>"
-                            <?php if ($fyRow !== null): ?>
-                            min="<?php echo htmlspecialchars((string) ($fyRow['start_date'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
-                            max="<?php echo htmlspecialchars((string) ($fyRow['end_date'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
-                            <?php endif; ?>
+                        <input type="text" name="as_of" id="bs_as_of" class="admin-inp orange-inp-dmy" lang="en" dir="ltr"
+                            value="<?php echo htmlspecialchars($asOfDmY, ENT_QUOTES, 'UTF-8'); ?>"
                             autocomplete="off">
                     </div>
                     <div class="gas-acc-stmt-field is-toolbar-spacer" aria-hidden="true"></div>

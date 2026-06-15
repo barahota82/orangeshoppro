@@ -138,7 +138,7 @@ try {
             $params[] = '%' . $notes . '%';
         }
 
-        $sql .= ' ORDER BY p.id DESC LIMIT 200';
+        $sql .= ' ORDER BY p.id DESC';
         $st = $pdo->prepare($sql);
         $st->execute($params);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];

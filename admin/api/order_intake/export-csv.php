@@ -47,7 +47,7 @@ try {
         $sql .= ' AND oiq.status = ?';
         $params[] = $status;
     }
-    $sql .= ' ORDER BY oiq.id DESC LIMIT 8000';
+    $sql .= ' ORDER BY oiq.id DESC';
 
     $st = $pdo->prepare($sql);
     $st->execute($params);

@@ -860,8 +860,8 @@ try {
             FROM journal_vouchers jv
             WHERE ' . implode(' AND ', $parts) . $countryBind['sql']
             . (orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
-                ? ' ORDER BY COALESCE(jv.voucher_serial, jv.id) DESC, jv.id DESC LIMIT 300'
-                : ' ORDER BY jv.id DESC LIMIT 300');
+                ? ' ORDER BY COALESCE(jv.voucher_serial, jv.id) DESC, jv.id DESC'
+                : ' ORDER BY jv.id DESC');
         $st = $pdo->prepare($sql);
         $st->execute(array_merge($params, $countryBind['params']));
         $rows = [];

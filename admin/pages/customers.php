@@ -59,13 +59,13 @@ if (orange_table_exists($pdo, 'customers') && $hasCustomerCodeCol) {
     if (orange_table_has_country_id($pdo, 'customers') && $adminCountryId > 0) {
         $codeSt = $pdo->prepare(
             'SELECT code FROM customers WHERE country_id = ? AND code IS NOT NULL AND TRIM(code) <> \'\'
-             ORDER BY id DESC LIMIT 5000'
+             ORDER BY id DESC'
         );
         $codeSt->execute([$adminCountryId]);
         $codeRows = $codeSt->fetchAll(PDO::FETCH_COLUMN) ?: [];
     } else {
         $codeRows = $pdo->query(
-            'SELECT code FROM customers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC LIMIT 5000'
+            'SELECT code FROM customers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC'
         )->fetchAll(PDO::FETCH_COLUMN) ?: [];
     }
     $maxCodeNum = 0;

@@ -129,7 +129,7 @@ if (orange_table_exists($pdo, 'order_intake_queue')) {
         $sql .= ' AND oiq.status = ?';
         $params[] = $statusFilter;
     }
-    $sql .= ' ORDER BY oiq.id DESC LIMIT 250';
+    $sql .= ' ORDER BY oiq.id DESC';
     $st = $pdo->prepare($sql);
     $st->execute($params);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];

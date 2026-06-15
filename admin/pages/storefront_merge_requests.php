@@ -42,8 +42,7 @@ if ($hasTable && $ctxCountryId > 0) {
              WHERE r.consumed_at IS NULL AND r.expires_at > NOW()"
             . $rScope['where']
             . $aScope['where']
-            . " ORDER BY r.created_at DESC
-             LIMIT 100"
+            . " ORDER BY r.created_at DESC"
         );
         $q->execute(array_merge($rScope['params'], $aScope['params']));
     } elseif ($hasCountryCol) {
@@ -52,8 +51,7 @@ if ($hasTable && $ctxCountryId > 0) {
              FROM storefront_phone_merge_requests r
              INNER JOIN storefront_accounts a ON a.id = r.storefront_account_id
              WHERE r.country_id = ? AND r.consumed_at IS NULL AND r.expires_at > NOW()
-             ORDER BY r.created_at DESC
-             LIMIT 100"
+             ORDER BY r.created_at DESC"
         );
         $q->execute([$ctxCountryId]);
     } else {

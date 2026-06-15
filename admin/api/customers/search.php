@@ -75,7 +75,7 @@ try {
         if ($whereParts !== []) {
             $sql .= ' WHERE ' . implode(' AND ', $whereParts);
         }
-        $sql .= ' ORDER BY c.id DESC LIMIT 80';
+        $sql .= ' ORDER BY c.id DESC';
         $st = $pdo->prepare($sql);
         $st->execute($params);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);

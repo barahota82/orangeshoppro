@@ -144,13 +144,13 @@ if (orange_table_exists($pdo, 'suppliers') && orange_table_has_column($pdo, 'sup
             $supCodeSql .= $supCodeCountryFilter['sql'];
             $supCodeParams = $supCodeCountryFilter['params'];
         }
-        $supCodeSql .= ' ORDER BY id DESC LIMIT 5000';
+        $supCodeSql .= ' ORDER BY id DESC';
         $supCodeSt = $pdo->prepare($supCodeSql);
         $supCodeSt->execute($supCodeParams);
         $codeRows = $supCodeSt->fetchAll(PDO::FETCH_COLUMN) ?: [];
     } else {
         $codeRows = $pdo->query(
-            'SELECT code FROM suppliers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC LIMIT 5000'
+            'SELECT code FROM suppliers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC'
         )->fetchAll(PDO::FETCH_COLUMN) ?: [];
     }
     $maxCodeNum = 0;
