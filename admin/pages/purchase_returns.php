@@ -131,6 +131,7 @@ try {
     }
 }
 
+$prefillReturnId = (int) ($_GET['purchase_return_id'] ?? 0);
 $prefillSupplierId = 0;
 $prefillStmtId = (int) ($_GET['stmt_party_id'] ?? 0);
 $prefillStmtKind = trim((string) ($_GET['stmt_party_kind'] ?? ''));
@@ -577,6 +578,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     var PR2_SUPPLIER_PICK_ROWS = <?php echo json_encode($pr2SupplierPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var PR2_SUPPLIER_PAYABLE = <?php echo json_encode($supplierPayableMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var PR2_PREFILL_SUPPLIER = <?php echo (int) $prefillSupplierId; ?>;
+    var PR2_PREFILL_RETURN_ID = <?php echo (int) $prefillReturnId; ?>;
     var PR2_READY = <?php echo $pr2Ready ? 'true' : 'false'; ?>;
     var PR2_PRINT_TUNING = <?php echo orange_admin_invoice_print_tuning_mode() ? 'true' : 'false'; ?>;
     var PR2_NAV_READY = <?php echo $pr2NavReady ? 'true' : 'false'; ?>;
@@ -1505,6 +1507,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
         if (PR2_PREFILL_SUPPLIER > 0) {
             selectSupplier(PR2_PREFILL_SUPPLIER);
+        }
+
+        if (PR2_PREFILL_RETURN_ID > 0) {
+            pr2LoadReturn(PR2_PREFILL_RETURN_ID);
         }
 
         if (window.OrangeEditLock) {

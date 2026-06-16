@@ -112,6 +112,7 @@ foreach ($suppliers as $s) {
 $inventoryAccId = orange_gl_account_id_optional($pdo, 'inventory');
 $cashAccId = orange_gl_account_id_optional($pdo, 'cash');
 
+$prefillPurchaseId = (int) ($_GET['purchase_id'] ?? 0);
 $prefillSupplierId = 0;
 $prefillStmtId = (int) ($_GET['stmt_party_id'] ?? 0);
 $prefillStmtKind = trim((string) ($_GET['stmt_party_kind'] ?? ''));
@@ -579,6 +580,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     var PV2_SUPPLIER_PICK_ROWS = <?php echo json_encode($pv2SupplierPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var PV2_SUPPLIER_PAYABLE = <?php echo json_encode($supplierPayableMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var PV2_PREFILL_SUPPLIER = <?php echo (int) $prefillSupplierId; ?>;
+    var PV2_PREFILL_PURCHASE_ID = <?php echo (int) $prefillPurchaseId; ?>;
     var PV2_READY = <?php echo $pv2Ready ? 'true' : 'false'; ?>;
     var PV2_PRINT_TUNING = <?php echo orange_admin_invoice_print_tuning_mode() ? 'true' : 'false'; ?>;
     var PV2_NAV_READY = <?php echo $pv2NavReady ? 'true' : 'false'; ?>;
@@ -1399,6 +1401,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
         if (PV2_PREFILL_SUPPLIER > 0) {
             selectSupplier(PV2_PREFILL_SUPPLIER);
+        }
+
+        if (PV2_PREFILL_PURCHASE_ID > 0) {
+            pv2LoadPurchase(PV2_PREFILL_PURCHASE_ID);
         }
 
         if (window.OrangeEditLock) {

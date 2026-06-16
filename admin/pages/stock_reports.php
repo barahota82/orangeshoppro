@@ -624,6 +624,30 @@ try {
             }
         }
 
+        /*
+         * رابط فتح المستند المصدري من مرجع الحركة (للنقر المزدوج على السطر):
+         * ORDER-<order_number> → فاتورة الطلب؛ STK-ADJ-<id> → سند تعديل الرصيد؛
+         * OPEN-STK-<id> → أرصدة أول المدة (singleton). غير ذلك = بلا رابط.
+         */
+        $mvRefLink = static function (string $reference): string {
+            $reference = trim($reference);
+            if ($reference === '') {
+                return '';
+            }
+            if (stripos($reference, 'ORDER-') === 0) {
+                $orderNumber = substr($reference, 6);
+                return $orderNumber !== '' ? 'index.php?page=invoice&order_number=' . rawurlencode($orderNumber) : '';
+            }
+            if (stripos($reference, 'STK-ADJ-') === 0) {
+                $id = (int) substr($reference, 8);
+                return $id > 0 ? 'index.php?page=stock_adjustment_voucher&id=' . $id : '';
+            }
+            if (stripos($reference, 'OPEN-STK-') === 0) {
+                return 'index.php?page=opening_stock_balances';
+            }
+            return '';
+        };
+
         /* (3) أحداث الفترة [من,إلى] لكل صنف من كل المصادر. */
         $mvEvents = [];
         $q = 'SELECT sm.product_id AS pid, sm.created_at AS at, sm.type, sm.old_stock, sm.new_stock, sm.reference, pv.color, pv.size
@@ -635,12 +659,14 @@ try {
         $st->execute($pid > 0 ? [$mFrom, $mTo, $pid] : [$mFrom, $mTo]);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $p = (int) $r['pid'];
+            $ref = (string) ($r['reference'] ?? '');
             $mvEvents[$p][] = [
                 'at' => (string) $r['at'],
                 'label' => orange_stock_movement_type_label_ar((string) $r['type']),
                 'variant' => trim(((string) ($r['color'] ?? '')) . ' / ' . ((string) ($r['size'] ?? ''))),
                 'delta' => (int) $r['new_stock'] - (int) $r['old_stock'],
-                'reference' => (string) ($r['reference'] ?? ''),
+                'reference' => $ref,
+                'link' => $mvRefLink($ref),
             ];
         }
         if ($mvHasPurCreatedAt) {
@@ -660,6 +686,7 @@ try {
                     'variant' => trim(((string) ($r['color'] ?? '')) . ' / ' . ((string) ($r['size'] ?? ''))),
                     'delta' => (int) $r['qty'],
                     'reference' => 'PUR-' . (int) $r['doc_id'],
+                    'link' => 'index.php?page=purchases&purchase_id=' . (int) $r['doc_id'],
                 ];
             }
         }
@@ -681,6 +708,7 @@ try {
                     'variant' => trim(((string) ($r['color'] ?? '')) . ' / ' . ((string) ($r['size'] ?? ''))),
                     'delta' => -((int) $r['qty']),
                     'reference' => 'PRET-' . (int) $r['doc_id'],
+                    'link' => 'index.php?page=purchase_returns&purchase_return_id=' . (int) $r['doc_id'],
                 ];
             }
         }
@@ -714,6 +742,7 @@ try {
                     'out' => $d < 0 ? -$d : 0,
                     'balance' => $running,
                     'reference' => (string) $ev['reference'],
+                    'link' => (string) ($ev['link'] ?? ''),
                 ];
             }
             $moveGroups[] = [
@@ -1048,7 +1077,7 @@ $reportTitle = $reports[$reportKey];
                                 <td class="gl-acc-stmt-col-num"><strong><?php echo (int) $g['opening']; ?></strong></td>
                             </tr>
                             <?php foreach ($g['lines'] as $ln): ?>
-                            <tr>
+                            <tr<?php echo ($ln['link'] ?? '') !== '' ? ' class="sr-move-row" data-href="' . htmlspecialchars($ln['link'], ENT_QUOTES, 'UTF-8') . '" title="نقر مزدوج لفتح المستند"' : ''; ?>>
                                 <td><?php echo htmlspecialchars(orange_format_datetime_ar_day_dmY_hi($ln['at']), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($ln['label'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td dir="ltr"><code><?php echo htmlspecialchars($ln['reference'] !== '' ? $ln['reference'] : '—', ENT_QUOTES, 'UTF-8'); ?></code></td>
@@ -1094,7 +1123,24 @@ $reportTitle = $reports[$reportKey];
 .sr-tabs { display:flex; flex-wrap:wrap; gap:8px; }
 .sr-tab { padding:7px 14px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; color:#334155; text-decoration:none; font-size:0.92rem; }
 .sr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
+.sr-move-row { cursor:pointer; }
+.sr-move-row:hover { background:#eff6ff; }
 </style>
+
+<?php if ($reportKey === 'movements'): ?>
+<script>
+(function () {
+    var table = document.querySelector('.gl-acc-stmt-table');
+    if (!table) { return; }
+    table.addEventListener('dblclick', function (e) {
+        var tr = e.target ? e.target.closest('tr.sr-move-row') : null;
+        if (!tr) { return; }
+        var href = tr.getAttribute('data-href');
+        if (href) { window.open(href, '_blank'); }
+    });
+})();
+</script>
+<?php endif; ?>
 
 <?php if (in_array($reportKey, ['items', 'balances', 'valuation', 'movements', 'move_summary'], true)): ?>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
