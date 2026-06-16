@@ -1386,9 +1386,11 @@ $reportTitle = $reports[$reportKey];
 <?php endif; ?>
 
 <?php
-$srDocTitle = $reportTitle;
-if ($reportKey === 'balances' && $agentId > 0 && $agentLabel !== '') {
-    $srDocTitle .= ' - عهدة ' . $agentLabel;
+if ($reportKey === 'balances') {
+    $srWarehouseName = ($agentId > 0 && $agentLabel !== '') ? $agentLabel : 'مخزن رئيسي';
+    $srDocTitle = 'جرد - ' . $srWarehouseName;
+} else {
+    $srDocTitle = $reportTitle;
 }
 $srDocTitle .= ' - ' . date('Y-m-d');
 ?>
