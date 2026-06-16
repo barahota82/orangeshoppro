@@ -1284,12 +1284,12 @@ $reportTitle = $reports[$reportKey];
 .sr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
 .sr-move-row { cursor:pointer; }
 .sr-move-row:hover { background:#eff6ff; }
-.sr-sign-row { display:flex; justify-content:space-between; gap:32px; margin-top:48px; padding:0 8px; }
-.sr-sign-box { flex:1; text-align:center; }
+.sr-sign-row { display:flex; justify-content:space-between; gap:32px; margin-top:48px; padding:0 8px; break-inside:avoid; page-break-inside:avoid; }
+.sr-sign-box { flex:1; text-align:center; break-inside:avoid; page-break-inside:avoid; }
 .sr-sign-title { font-weight:700; color:#0f172a; margin-bottom:6px; }
 .sr-sign-name { color:#334155; min-height:1.2em; margin-bottom:30px; }
 .sr-sign-line { border-top:1px solid #475569; width:80%; margin:0 auto; }
-@media print { .sr-sign-row { margin-top:60px; } }
+@media print { .sr-sign-row { margin-top:72px; } }
 </style>
 
 <?php if ($reportKey === 'movements'): ?>
