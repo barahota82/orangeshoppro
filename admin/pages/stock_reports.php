@@ -1034,34 +1034,32 @@ $reportTitle = $reports[$reportKey];
                         <?php endforeach; endif; ?>
                     </tbody>
                 <?php elseif ($reportKey === 'movements'): ?>
-                    <thead><tr><th>التاريخ</th><th>النوع</th><th class="sr-col-variant">لون/مقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">وارد</th><th class="gl-acc-stmt-col-num sr-col-qty">صادر</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>مرجع</th></tr></thead>
+                    <thead><tr><th>التاريخ</th><th>النوع</th><th>مرجع</th><th class="sr-col-variant">لون/مقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">وارد</th><th class="gl-acc-stmt-col-num sr-col-qty">صادر</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th></tr></thead>
                     <tbody>
                         <?php if ($moveGroups === []): ?>
                             <tr><td colspan="7" class="muted">لا حركات في المدى.</td></tr>
                         <?php else: foreach ($moveGroups as $g): ?>
                             <tr class="ta-report-section"><td colspan="7"><?php echo htmlspecialchars($g['product_name'] . ' (#' . $g['product_id'] . ')', ENT_QUOTES, 'UTF-8'); ?></td></tr>
                             <tr>
-                                <td colspan="5"><strong>رصيد أول</strong></td>
+                                <td colspan="6"><strong>رصيد أول</strong></td>
                                 <td class="gl-acc-stmt-col-num"><strong><?php echo (int) $g['opening']; ?></strong></td>
-                                <td class="muted">—</td>
                             </tr>
                             <?php foreach ($g['lines'] as $ln): ?>
                             <tr>
                                 <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi($ln['at']), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($ln['label'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr"><code><?php echo htmlspecialchars($ln['reference'] !== '' ? $ln['reference'] : '—', ENT_QUOTES, 'UTF-8'); ?></code></td>
                                 <td class="sr-col-variant"><?php echo htmlspecialchars($ln['variant'] !== '/' ? $ln['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $ln['in'] > 0 ? (int) $ln['in'] : '—'; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $ln['out'] > 0 ? (int) $ln['out'] : '—'; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $ln['balance']; ?></td>
-                                <td dir="ltr"><code><?php echo htmlspecialchars($ln['reference'] !== '' ? $ln['reference'] : '—', ENT_QUOTES, 'UTF-8'); ?></code></td>
                             </tr>
                             <?php endforeach; ?>
                             <tr class="ta-report-subtotal">
-                                <td colspan="3"><strong>رصيد ختامي — <?php echo htmlspecialchars($g['product_name'], ENT_QUOTES, 'UTF-8'); ?></strong></td>
+                                <td colspan="4"><strong>رصيد ختامي — <?php echo htmlspecialchars($g['product_name'], ENT_QUOTES, 'UTF-8'); ?></strong></td>
                                 <td class="gl-acc-stmt-col-num"><strong><?php echo (int) $g['sum_in']; ?></strong></td>
                                 <td class="gl-acc-stmt-col-num"><strong><?php echo (int) $g['sum_out']; ?></strong></td>
                                 <td class="gl-acc-stmt-col-num"><strong><?php echo (int) $g['closing']; ?></strong></td>
-                                <td class="muted">—</td>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
