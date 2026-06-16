@@ -5319,7 +5319,7 @@ input[type='number']::-webkit-inner-spin-button {
 }
 .gl-acc-stmt-table th.sr-col-dept,
 .gl-acc-stmt-table td.sr-col-dept {
-    width: 9.5rem;
+    width: 12rem;
     white-space: nowrap;
     word-break: normal;
     overflow-wrap: normal;
