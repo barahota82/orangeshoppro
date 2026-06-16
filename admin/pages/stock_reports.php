@@ -1048,7 +1048,7 @@ $reportTitle = $reports[$reportKey];
             <?php $srFixedCols = in_array($reportKey, ['items', 'balances', 'low', 'stagnant', 'valuation'], true); ?>
             <table class="admin-fy-table gl-acc-stmt-table ta-report-table<?php echo $srFixedCols ? ' sr-grouped-cols' : ''; ?>" data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".sr-print-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                 <?php if ($reportKey === 'items'): ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:15rem"><col style="width:6rem"><col style="width:6rem"></colgroup>
+                    <colgroup><col class="srw-code"><col><col class="srw-varcount"><col class="srw-qty"><col class="srw-status"></colgroup>
                 <?php elseif ($reportKey === 'balances'): ?>
                     <?php if ($agentId > 0): ?>
                     <colgroup><col class="srw-code"><col><col class="srw-variant"><col class="srw-qty"><col class="srw-actual"><col class="srw-res"><col class="srw-res"></colgroup>
@@ -1311,6 +1311,8 @@ $reportTitle = $reports[$reportKey];
 .srw-supplier { width:16rem; }
 .srw-date { width:8.5rem; }
 .srw-mtype { width:10rem; }
+.srw-varcount { width:15rem; }
+.srw-status { width:6rem; }
 @media print {
     .srw-code { width:7rem; }
     .srw-variant { width:7.5rem; }
@@ -1320,6 +1322,8 @@ $reportTitle = $reports[$reportKey];
     .srw-supplier { width:9.5rem; }
     .srw-date { width:6rem; }
     .srw-mtype { width:6.5rem; }
+    .srw-varcount { width:7.5rem; }
+    .srw-status { width:5rem; }
 }
 /* توقيع مختصر يتكرر أسفل كل صفحة مطبوعة (تثبيت المسؤولية لكل ورقة) — مخفي على الشاشة. */
 .sr-page-sign { display:none; }
