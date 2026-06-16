@@ -733,7 +733,8 @@ try {
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, pv.id AS variant_id,
                        ' . $itemCodeExpr . ' AS item_code,
                        pv.color, pv.size, ' . $wq['expr'] . ' AS qty,
-                       (SELECT MAX(sm.created_at) FROM stock_movements sm WHERE sm.variant_id = pv.id) AS last_move
+                       (SELECT MAX(sm.created_at) FROM stock_movements sm WHERE sm.variant_id = pv.id) AS last_move,
+                       (SELECT sm2.type FROM stock_movements sm2 WHERE sm2.variant_id = pv.id ORDER BY sm2.created_at DESC, sm2.id DESC LIMIT 1) AS last_move_type
                 FROM product_variants pv
                 INNER JOIN products p ON p.id = pv.product_id
                 ' . $wq['join'] . '
@@ -750,6 +751,7 @@ try {
                 'variant' => trim(((string) ($r['color'] ?? '')) . ' / ' . ((string) ($r['size'] ?? ''))),
                 'qty' => (int) $r['qty'],
                 'last_move' => (string) ($r['last_move'] ?? ''),
+                'last_move_type' => (string) ($r['last_move_type'] ?? ''),
             ];
         }
     }
@@ -1062,10 +1064,10 @@ $reportTitle = $reports[$reportKey];
                         <?php endforeach; endif; ?>
                     </tbody>
                 <?php elseif ($reportKey === 'stagnant'): ?>
-                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="sr-col-variant">اللون / المقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>آخر حركة</th></tr></thead>
+                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="sr-col-variant">اللون / المقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>آخر حركة</th><th>نوع آخر حركة</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
-                            <tr><td colspan="5" class="muted">لا أصناف راكدة منذ <?php echo (int) $stagnantDays; ?> يوم.</td></tr>
+                            <tr><td colspan="6" class="muted">لا أصناف راكدة منذ <?php echo (int) $stagnantDays; ?> يوم.</td></tr>
                         <?php else: foreach ($rows as $r): ?>
                             <tr>
                                 <td dir="ltr" class="sr-code-cell"><?php echo htmlspecialchars($r['item_code'] !== '' ? $r['item_code'] : ('P' . $r['product_id']), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -1073,6 +1075,7 @@ $reportTitle = $reports[$reportKey];
                                 <td class="sr-col-variant"><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>
                                 <td><?php echo $r['last_move'] !== '' ? htmlspecialchars(orange_format_date_dmY(substr($r['last_move'], 0, 10)), ENT_QUOTES, 'UTF-8') : 'بلا حركة'; ?></td>
+                                <td><?php echo $r['last_move_type'] !== '' ? htmlspecialchars(orange_stock_movement_type_label_ar($r['last_move_type']), ENT_QUOTES, 'UTF-8') : '—'; ?></td>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
