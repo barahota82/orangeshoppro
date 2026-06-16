@@ -1322,7 +1322,7 @@ $reportTitle = $reports[$reportKey];
     .srw-supplier { width:9.5rem; }
     .srw-date { width:6rem; }
     .srw-mtype { width:6.5rem; }
-    .srw-varcount { width:7.5rem; }
+    .srw-varcount { width:10rem; }
     .srw-status { width:5rem; }
 }
 /* توقيع مختصر يتكرر أسفل كل صفحة مطبوعة (تثبيت المسؤولية لكل ورقة) — مخفي على الشاشة. */
