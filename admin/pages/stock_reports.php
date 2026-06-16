@@ -915,14 +915,14 @@ $reportTitle = $reports[$reportKey];
             <?php $srFixedCols = in_array($reportKey, ['items', 'balances', 'low'], true); ?>
             <table class="admin-fy-table gl-acc-stmt-table ta-report-table<?php echo $srFixedCols ? ' sr-grouped-cols' : ''; ?>" data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".sr-print-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                 <?php if ($reportKey === 'items'): ?>
-                    <colgroup><col style="width:10%"><col style="width:46%"><col style="width:16%"><col style="width:14%"><col style="width:14%"></colgroup>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:9rem"><col style="width:8rem"><col style="width:6rem"></colgroup>
                 <?php elseif ($reportKey === 'balances'): ?>
-                    <colgroup><col style="width:7%"><col style="width:38%"><col style="width:18%"><col style="width:11%"><col style="width:12%"><col style="width:14%"></colgroup>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:14%"><col style="width:6rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
                 <?php elseif ($reportKey === 'low'): ?>
                     <colgroup><col style="width:7%"><col style="width:38%"><col style="width:18%"><col style="width:12%"><col style="width:25%"></colgroup>
                 <?php endif; ?>
                 <?php if ($reportKey === 'items'): ?>
-                    <thead><tr><th>الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num">عدد المتغيرات</th><th class="gl-acc-stmt-col-num">إجمالي الرصيد</th><th>الحالة</th></tr></thead>
+                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num">عدد المتغيرات</th><th class="gl-acc-stmt-col-num">إجمالي الرصيد</th><th>الحالة</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
                             <tr><td colspan="5" class="muted">لا أصناف.</td></tr>
@@ -931,7 +931,7 @@ $reportTitle = $reports[$reportKey];
                                 <tr class="ta-report-section"><td colspan="5"><?php echo htmlspecialchars($grpLabel($r), ENT_QUOTES, 'UTF-8'); ?></td></tr>
                             <?php endif; ?>
                             <tr>
-                                <td dir="ltr"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr" class="sr-code-cell"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['variant_count']; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['total_stock']; ?></td>
@@ -941,7 +941,7 @@ $reportTitle = $reports[$reportKey];
                     </tbody>
                     <tfoot><tr><th colspan="3">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th></th></tr></tfoot>
                 <?php elseif ($reportKey === 'balances'): ?>
-                    <thead><tr><th>الكود</th><th>الصنف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة</th></tr></thead>
+                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
                             <tr><td colspan="6" class="muted">لا أصناف.</td></tr>
@@ -950,7 +950,7 @@ $reportTitle = $reports[$reportKey];
                                 <tr class="ta-report-section"><td colspan="6"><?php echo htmlspecialchars($grpLabel($r), ENT_QUOTES, 'UTF-8'); ?></td></tr>
                             <?php endif; ?>
                             <tr>
-                                <td dir="ltr"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr" class="sr-code-cell"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>
