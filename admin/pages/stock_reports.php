@@ -920,7 +920,7 @@ $reportTitle = $reports[$reportKey];
         <?php endif; ?>
 
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <?php $srFixedCols = in_array($reportKey, ['items', 'balances', 'low'], true); ?>
+            <?php $srFixedCols = in_array($reportKey, ['items', 'balances', 'low', 'stagnant'], true); ?>
             <table class="admin-fy-table gl-acc-stmt-table ta-report-table<?php echo $srFixedCols ? ' sr-grouped-cols' : ''; ?>" data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".sr-print-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                 <?php if ($reportKey === 'items'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:15rem"><col style="width:6rem"><col style="width:6rem"></colgroup>
@@ -928,6 +928,8 @@ $reportTitle = $reports[$reportKey];
                     <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
                 <?php elseif ($reportKey === 'low'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:14rem"></colgroup>
+                <?php elseif ($reportKey === 'stagnant'): ?>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:7rem"><col style="width:10rem"></colgroup>
                 <?php endif; ?>
                 <?php if ($reportKey === 'items'): ?>
                     <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num">عدد المتغيرات</th><th class="gl-acc-stmt-col-num">إجمالي الرصيد</th><th>الحالة</th></tr></thead>
