@@ -919,7 +919,7 @@ $reportTitle = $reports[$reportKey];
                 <?php elseif ($reportKey === 'balances'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
                 <?php elseif ($reportKey === 'low'): ?>
-                    <colgroup><col style="width:7%"><col style="width:38%"><col style="width:18%"><col style="width:12%"><col style="width:25%"></colgroup>
+                    <colgroup><col style="width:5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:14rem"></colgroup>
                 <?php endif; ?>
                 <?php if ($reportKey === 'items'): ?>
                     <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num">عدد المتغيرات</th><th class="gl-acc-stmt-col-num">إجمالي الرصيد</th><th>الحالة</th></tr></thead>
