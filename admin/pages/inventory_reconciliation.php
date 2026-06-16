@@ -60,6 +60,28 @@ if ($initialJson === false) {
 }
 
 ?>
+<style>
+.stk-attachments-summary { display:flex; flex-direction:column; gap:6px; max-width:420px; }
+.stk-attachments-inline { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; width:100%; }
+#stk_attachments_count { max-width:none; width:100%; text-align:center; }
+#stk_attachments_manage_btn { width:100%; height:42px; }
+.stk-attachments-modal__dialog { width:min(920px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; }
+.stk-attachments-toolbar { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:10px; align-items:end; margin-bottom:10px; }
+.stk-attachments-toolbar button { height:42px; }
+.stk-attachments-list { border:1px solid #e5e7eb; border-radius:10px; background:#fff; padding:8px; min-height:54px; }
+.stk-attachment-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 6px; border-bottom:1px solid #f1f5f9; }
+.stk-attachment-row:last-child { border-bottom:0; }
+.stk-attachment-main { min-width:0; flex:1 1 auto; }
+.stk-attachment-title { font-weight:600; color:#0f172a; line-height:1.35; }
+.stk-attachment-meta { margin-top:3px; font-size:12px; color:#64748b; line-height:1.4; }
+.stk-attachment-actions { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+@media (max-width:900px) {
+    .stk-attachments-inline { grid-template-columns:1fr; }
+    .stk-attachments-toolbar { grid-template-columns:1fr; }
+    .stk-attachment-row { flex-direction:column; align-items:stretch; }
+    .stk-attachment-actions { justify-content:flex-start; }
+}
+</style>
 <div class="admin-fy-shell" dir="rtl" id="stk_arch_app">
     <div class="page-title">
         <h1>أرشيف الجرد</h1>
@@ -80,8 +102,59 @@ if ($initialJson === false) {
         <button type="button" class="btn-secondary" id="stk_btn_new">سجل جرد جديد</button>
     </p>
 
-    <div class="card" style="margin-bottom:16px;">
-        <h3 class="card-title">سجلات الأرشيف</h3>
+    <div class="card" id="stk_editor_card">
+        <h3 class="card-title" id="stk_editor_title">سجل جرد جديد</h3>
+
+        <div class="admin-fy-form-grid" style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:16px;">
+            <div>
+                <label for="stk_scope">المخزن / المندوب</label>
+                <select id="stk_scope">
+                    <option value="">— اختر —</option>
+                    <?php if ($warehouses !== []): ?>
+                        <optgroup label="المخازن">
+                            <?php foreach ($warehouses as $wh): ?>
+                                <option value="w:<?php echo (int) $wh['id']; ?>"><?php echo htmlspecialchars($wh['label'], ENT_QUOTES, 'UTF-8'); ?></option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endif; ?>
+                    <?php if ($agents !== []): ?>
+                        <optgroup label="المناديب (عهدة)">
+                            <?php foreach ($agents as $ag): ?>
+                                <option value="a:<?php echo (int) ($ag['id'] ?? 0); ?>"><?php echo htmlspecialchars(orange_delivery_agent_display_name($ag), ENT_QUOTES, 'UTF-8'); ?></option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endif; ?>
+                </select>
+            </div>
+            <div>
+                <label for="stk_counted_at">تاريخ الجرد</label>
+                <input type="text" id="stk_counted_at" class="orange-inp-dmy" dir="ltr" lang="en" required>
+            </div>
+            <div class="stk-attachments-summary">
+                <label for="stk_attachments_count">عدد المرفقات</label>
+                <div class="stk-attachments-inline">
+                    <input type="text" id="stk_attachments_count" dir="ltr" lang="en" value="0" readonly>
+                    <button type="button" class="btn-secondary" id="stk_attachments_manage_btn">إدارة المرفقات</button>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-bottom:12px;">
+            <label for="stk_notes">ملاحظة</label>
+            <input type="text" id="stk_notes" style="width:100%;max-width:640px;" placeholder="مثال: جرد ربع سنوي — تم بحضور أمين المخزن">
+        </div>
+
+        <p class="actions" style="margin-top:4px;">
+            <button type="button" id="stk_save_btn">حفظ السجل</button>
+            <button type="button" class="btn-danger" id="stk_delete_btn" style="display:none;">حذف السجل ومرفقاته</button>
+        </p>
+
+        <p id="stk_msg" class="card-hint" style="margin-top:12px;color:#166534;display:none;"></p>
+        <p id="stk_err" class="card-hint" style="margin-top:12px;color:#b91c1c;display:none;"></p>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+        <h3 class="card-title">سجلات الأرشيف (الأحدث)</h3>
         <div class="table-wrap">
             <table class="admin-fy-table">
                 <thead>
@@ -115,88 +188,70 @@ if ($initialJson === false) {
         </div>
     </div>
 
-    <div class="card" id="stk_editor_card">
-        <h3 class="card-title" id="stk_editor_title">سجل جرد جديد</h3>
-
-        <div class="admin-fy-form-grid" style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:16px;">
+    <div class="card" id="stk_retrieve_card" style="margin-top:16px;">
+        <h3 class="card-title">استرجاع الأرشيف (من تاريخ إلى تاريخ)</h3>
+        <p class="card-hint" style="margin-top:0;">اختر مدى تاريخ الجرد لعرض كل عمليات الجرد التي تمّت خلال الفترة والاطّلاع على مرفقاتها.</p>
+        <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end;max-width:760px;margin-bottom:12px;">
             <div>
-                <label for="stk_scope">المخزن / المندوب</label>
-                <select id="stk_scope">
-                    <option value="">— اختر —</option>
-                    <?php if ($warehouses !== []): ?>
-                        <optgroup label="المخازن">
-                            <?php foreach ($warehouses as $wh): ?>
-                                <option value="w:<?php echo (int) $wh['id']; ?>"><?php echo htmlspecialchars($wh['label'], ENT_QUOTES, 'UTF-8'); ?></option>
-                            <?php endforeach; ?>
-                        </optgroup>
-                    <?php endif; ?>
-                    <?php if ($agents !== []): ?>
-                        <optgroup label="المناديب (عهدة)">
-                            <?php foreach ($agents as $ag): ?>
-                                <option value="a:<?php echo (int) ($ag['id'] ?? 0); ?>"><?php echo htmlspecialchars(orange_delivery_agent_display_name($ag), ENT_QUOTES, 'UTF-8'); ?></option>
-                            <?php endforeach; ?>
-                        </optgroup>
-                    <?php endif; ?>
-                </select>
+                <label for="stk_from">من تاريخ</label>
+                <input type="text" id="stk_from" class="orange-inp-dmy" dir="ltr" lang="en">
             </div>
             <div>
-                <label for="stk_counted_at">تاريخ الجرد</label>
-                <input type="text" id="stk_counted_at" class="orange-inp-dmy" dir="ltr" lang="en" required>
+                <label for="stk_to">إلى تاريخ</label>
+                <input type="text" id="stk_to" class="orange-inp-dmy" dir="ltr" lang="en">
+            </div>
+            <div class="actions" style="margin:0;">
+                <button type="button" id="stk_search_btn">عرض</button>
             </div>
         </div>
-
-        <div style="margin-bottom:12px;">
-            <label for="stk_notes">ملاحظة</label>
-            <input type="text" id="stk_notes" style="width:100%;max-width:640px;" placeholder="مثال: جرد ربع سنوي — تم بحضور أمين المخزن">
+        <div class="table-wrap">
+            <table class="admin-fy-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>تاريخ الجرد</th>
+                        <th>المخزن / المندوب</th>
+                        <th>المرفقات</th>
+                        <th>ملاحظة</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="stk_retrieve_body">
+                    <tr><td colspan="6" class="muted">اختر المدى ثم «عرض».</td></tr>
+                </tbody>
+            </table>
         </div>
-
-        <p class="actions" style="margin-top:4px;">
-            <button type="button" id="stk_save_btn">حفظ السجل</button>
-            <button type="button" class="btn-danger" id="stk_delete_btn" style="display:none;">حذف السجل ومرفقاته</button>
-        </p>
-
-        <div id="stk_attach_section" style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
-            <h4>مرفقات الجرد</h4>
-            <p class="card-hint" id="stk_attach_hint">احفظ بيانات السجل أولاً ثم ارفع تقرير الجرد المطبوع الموقّع (PDF / صورة / Excel / Word). الحد 25 ميجابايت لكل ملف.</p>
-
-            <div id="stk_attach_uploader" style="display:none;margin-bottom:14px;">
-                <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));align-items:end;max-width:760px;">
-                    <div>
-                        <label for="stk_file">الملف</label>
-                        <input type="file" id="stk_file" accept=".pdf,image/*,.xlsx,.xls,.docx,.doc">
-                    </div>
-                    <div>
-                        <label for="stk_file_name">وصف المرفق (اختياري)</label>
-                        <input type="text" id="stk_file_name" placeholder="مثال: ورقة المخزن الرئيسي">
-                    </div>
-                    <div>
-                        <button type="button" id="stk_upload_btn">رفع المرفق</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="table-wrap">
-                <table class="admin-fy-table" id="stk_attach_table">
-                    <thead>
-                        <tr>
-                            <th>الوصف</th>
-                            <th>النوع</th>
-                            <th>الحجم</th>
-                            <th>تاريخ الرفع</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="stk_attach_body"></tbody>
-                </table>
-            </div>
-            <p id="stk_attach_empty" class="card-hint" style="display:none;">لا مرفقات بعد.</p>
-        </div>
-
-        <p id="stk_msg" class="card-hint" style="margin-top:12px;color:#166534;display:none;"></p>
-        <p id="stk_err" class="card-hint" style="margin-top:12px;color:#b91c1c;display:none;"></p>
+        <p id="stk_retrieve_count" class="card-hint" style="margin-top:8px;"></p>
     </div>
 
     <?php endif; ?>
+</div>
+
+<div class="gl-pick-modal" id="stk_attachments_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="stk_attachments_backdrop"></div>
+    <div class="gl-pick-modal__dialog stk-attachments-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="stk_attachments_title">
+        <h3 id="stk_attachments_title" class="gl-pick-modal__title">مرفقات الجرد</h3>
+        <p class="gl-pick-modal__hint muted" id="stk_attachments_hint" style="margin:0 0 10px;font-size:0.9rem;">
+            PDF / صور / Excel / Word — حتى 20 مرفقاً لكل سجل (حتى 25MB للملف).
+        </p>
+        <div class="stk-attachments-toolbar">
+            <div>
+                <label for="stk_attachment_file">اختر ملف</label>
+                <input type="file" id="stk_attachment_file" accept=".pdf,image/*,.xlsx,.xls,.docx,.doc">
+            </div>
+            <div>
+                <label for="stk_attachment_name">وصف المرفق</label>
+                <input type="text" id="stk_attachment_name" maxlength="191" autocomplete="off" placeholder="اختياري (يؤخذ من اسم الملف)">
+            </div>
+            <div class="actions" style="margin:0;">
+                <button type="button" class="btn-secondary" id="stk_attachment_upload_btn">رفع مرفق</button>
+            </div>
+        </div>
+        <div class="stk-attachments-list" id="stk_attachments_list"></div>
+        <div class="actions" style="margin-top:12px;">
+            <button type="button" class="btn-secondary" id="stk_attachments_close">إغلاق</button>
+        </div>
+    </div>
 </div>
 <script>
 (function () {
@@ -206,8 +261,10 @@ if ($initialJson === false) {
         'upload' => $apiBase . '/attachment-upload.php',
         'attDelete' => $apiBase . '/attachment-delete.php',
         'download' => $apiBase . '/attachment-download.php',
+        'list' => $apiBase . '/archive-list.php',
     ], JSON_UNESCAPED_UNICODE); ?>;
     var state = <?php echo $initialJson; ?>;
+    var MAX_ATT = 20;
 
     function el(id) { return document.getElementById(id); }
 
@@ -229,6 +286,16 @@ if ($initialJson === false) {
         return (b / (1024 * 1024)).toFixed(2) + ' MB';
     }
 
+    function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    function downloadUrl(attId, inline) {
+        return API.download + '?id=' + (state.id || 0) + '&attachment_id=' + encodeURIComponent(attId) + (inline ? '&inline=1' : '');
+    }
+
     function scopeValue() {
         var wid = parseInt(state.warehouse_id, 10) || 0;
         var aid = parseInt(state.delivery_agent_id, 10) || 0;
@@ -243,41 +310,78 @@ if ($initialJson === false) {
         el('stk_notes').value = state.notes || '';
         el('stk_editor_title').textContent = state.id ? ('سجل جرد #' + state.id) : 'سجل جرد جديد';
         el('stk_delete_btn').style.display = state.id ? 'inline-block' : 'none';
-        var hasId = !!state.id;
-        el('stk_attach_uploader').style.display = hasId ? 'block' : 'none';
-        el('stk_attach_hint').style.display = hasId ? 'none' : 'block';
         renderAttachments();
     }
 
+    function attRows() { return state.attachments || []; }
+
     function renderAttachments() {
-        var tb = el('stk_attach_body');
-        tb.innerHTML = '';
-        var list = state.attachments || [];
-        list.forEach(function (att) {
-            var tr = document.createElement('tr');
-            var dlBase = API.download + '?id=' + (state.id || 0) + '&attachment_id=' + encodeURIComponent(att.id);
-            tr.innerHTML =
-                '<td>' + escapeHtml(att.name || att.original_name || 'مرفق') + '</td>' +
-                '<td dir="ltr">' + escapeHtml(att.mime || '') + '</td>' +
-                '<td dir="ltr">' + fmtSize(att.size) + '</td>' +
-                '<td dir="ltr">' + escapeHtml((att.uploaded_at || '').substring(0, 16)) + '</td>' +
-                '<td>' +
-                    '<a href="' + dlBase + '&inline=1" target="_blank" rel="noopener">عرض</a> · ' +
-                    '<a href="' + dlBase + '">تنزيل</a> · ' +
-                    '<a href="#" class="stk-att-del" data-att="' + escapeHtml(att.id) + '" style="color:#b91c1c;">حذف</a>' +
-                '</td>';
-            tb.appendChild(tr);
-        });
-        el('stk_attach_empty').style.display = list.length === 0 ? 'block' : 'none';
-        tb.querySelectorAll('.stk-att-del').forEach(function (a) {
-            a.addEventListener('click', onAttDelete);
+        var rows = attRows();
+        var hasId = !!state.id;
+        var countEl = el('stk_attachments_count');
+        var manageBtn = el('stk_attachments_manage_btn');
+        var upBtn = el('stk_attachment_upload_btn');
+        var hint = el('stk_attachments_hint');
+        if (countEl) countEl.value = String(rows.length);
+        if (manageBtn) {
+            manageBtn.disabled = !hasId;
+            manageBtn.textContent = rows.length > 0 ? ('إدارة المرفقات (' + rows.length + ')') : 'إدارة المرفقات';
+        }
+        if (upBtn) upBtn.disabled = !hasId || rows.length >= MAX_ATT;
+        if (hint) {
+            hint.textContent = !hasId
+                ? 'احفظ السجل أولاً ثم افتح إدارة المرفقات.'
+                : ('عدد المرفقات: ' + rows.length + ' / ' + MAX_ATT + ' — PDF / صور / Excel / Word، حتى 25MB للملف.');
+        }
+        var list = el('stk_attachments_list');
+        if (!list) return;
+        if (rows.length === 0) {
+            list.innerHTML = '<div class="card-hint">لا توجد مرفقات حالياً.</div>';
+            return;
+        }
+        list.innerHTML = rows.map(function (item) {
+            var title = String(item.name || item.original_name || 'مرفق').trim();
+            var meta = [];
+            if (item.size > 0) meta.push(fmtSize(item.size));
+            if (item.mime) meta.push(String(item.mime));
+            if (item.uploaded_at) meta.push(String(item.uploaded_at).replace('T', ' ').substring(0, 16));
+            var viewable = /^image\//.test(item.mime || '') || (item.mime || '') === 'application/pdf';
+            return ''
+                + '<div class="stk-attachment-row">'
+                + '  <div class="stk-attachment-main">'
+                + '    <div class="stk-attachment-title">' + escapeHtml(title) + '</div>'
+                + '    <div class="stk-attachment-meta">' + escapeHtml(meta.join(' — ')) + '</div>'
+                + '  </div>'
+                + '  <div class="stk-attachment-actions">'
+                + (viewable ? ('<a class="btn btn-secondary" target="_blank" rel="noopener" href="' + downloadUrl(item.id, true) + '">عرض</a>') : '')
+                + '    <a class="btn btn-secondary" href="' + downloadUrl(item.id, false) + '">تحميل</a>'
+                + '    <button type="button" class="btn-danger" data-stk-att-del="' + escapeHtml(item.id) + '">حذف</button>'
+                + '  </div>'
+                + '</div>';
+        }).join('');
+        list.querySelectorAll('[data-stk-att-del]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var attId = String(btn.getAttribute('data-stk-att-del') || '').trim();
+                if (attId) attDelete(attId);
+            });
         });
     }
 
-    function escapeHtml(s) {
-        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-        });
+    function modalOpen() {
+        if (!state.id) { showErr('احفظ السجل أولاً ثم أدر المرفقات'); return; }
+        var modal = el('stk_attachments_modal');
+        if (!modal) return;
+        modal.hidden = false;
+        modal.setAttribute('aria-hidden', 'false');
+        renderAttachments();
+        var f = el('stk_attachment_file');
+        if (f) f.focus();
+    }
+    function modalClose() {
+        var modal = el('stk_attachments_modal');
+        if (!modal) return;
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
     }
 
     function payloadFromForm() {
@@ -334,45 +438,87 @@ if ($initialJson === false) {
         window.location.href = '?page=inventory_reconciliation';
     });
 
-    el('stk_upload_btn') && el('stk_upload_btn').addEventListener('click', async function () {
-        showErr('');
-        if (!state.id) { showErr('احفظ السجل أولاً'); return; }
-        var fileInp = el('stk_file');
-        if (!fileInp.files || !fileInp.files.length) { showErr('اختر ملفاً'); return; }
+    el('stk_attachments_manage_btn') && el('stk_attachments_manage_btn').addEventListener('click', modalOpen);
+    el('stk_attachments_close') && el('stk_attachments_close').addEventListener('click', modalClose);
+    el('stk_attachments_backdrop') && el('stk_attachments_backdrop').addEventListener('click', modalClose);
+
+    el('stk_attachment_upload_btn') && el('stk_attachment_upload_btn').addEventListener('click', async function () {
+        if (!state.id) { alert('احفظ السجل أولاً'); return; }
+        if (attRows().length >= MAX_ATT) { alert('بلغت الحد الأقصى للمرفقات'); return; }
+        var fileInp = el('stk_attachment_file');
+        if (!fileInp.files || !fileInp.files.length) { alert('اختر ملفاً للرفع'); return; }
         var fd = new FormData();
         fd.append('id', String(state.id));
-        fd.append('attachment_name', el('stk_file_name').value || '');
+        fd.append('attachment_name', el('stk_attachment_name').value || '');
         fd.append('file', fileInp.files[0]);
-        el('stk_upload_btn').disabled = true;
+        var btn = el('stk_attachment_upload_btn');
+        btn.disabled = true;
         try {
             var res = await fetch(API.upload, { method: 'POST', credentials: 'same-origin', body: fd });
-            var data = await res.json();
-            if (!data.success) { showErr(data.message || 'فشل الرفع'); return; }
+            var data = {};
+            try { data = await res.json(); } catch (e) { data = {}; }
+            if (!data.success) { alert(data.message || 'تعذر رفع المرفق'); return; }
             state.attachments = data.attachments || [];
             fileInp.value = '';
-            el('stk_file_name').value = '';
-            showOk('تم رفع المرفق');
-            renderAttachments();
+            el('stk_attachment_name').value = '';
+            alert(data.message || 'تم رفع المرفق');
         } catch (e) {
-            showErr('تعذر الرفع');
+            alert('تعذر الرفع');
         } finally {
-            el('stk_upload_btn').disabled = false;
+            btn.disabled = false;
+            renderAttachments();
         }
     });
 
-    async function onAttDelete(ev) {
-        ev.preventDefault();
-        var attId = ev.target.getAttribute('data-att');
-        if (!attId || !confirm('حذف هذا المرفق؟')) return;
+    async function attDelete(attId) {
+        if (!attId || !confirm('سيتم حذف المرفق نهائياً. هل تريد المتابعة؟')) return;
         var data = await postJson(API.attDelete, { id: state.id, attachment_id: attId });
-        if (!data.success) { showErr(data.message); return; }
+        if (!data || !data.success) { alert((data && data.message) || 'تعذر حذف المرفق'); return; }
         state.attachments = data.attachments || [];
-        showOk('تم حذف المرفق');
         renderAttachments();
+        alert(data.message || 'تم حذف المرفق');
     }
 
     el('stk_btn_new') && el('stk_btn_new').addEventListener('click', function () {
         window.location.href = '?page=inventory_reconciliation';
+    });
+
+    // ---- استرجاع الأرشيف (مدى تاريخ) ----
+    function retrieveRowHtml(r) {
+        var dmy = r.counted_at ? orangeIsoDateToDmy(String(r.counted_at).substring(0, 10)) : '';
+        var openUrl = '?page=inventory_reconciliation&id=' + (parseInt(r.id, 10) || 0);
+        return '<tr>'
+            + '<td>' + (parseInt(r.id, 10) || 0) + '</td>'
+            + '<td dir="ltr">' + escapeHtml(dmy) + '</td>'
+            + '<td>' + escapeHtml(r.scope_label || '') + '</td>'
+            + '<td>' + (parseInt(r.attachment_count, 10) || 0) + '</td>'
+            + '<td>' + escapeHtml(r.notes || '') + '</td>'
+            + '<td><a href="' + openUrl + '">فتح</a></td>'
+            + '</tr>';
+    }
+
+    el('stk_search_btn') && el('stk_search_btn').addEventListener('click', async function () {
+        var from = orangeGetDmyValueAsIso(el('stk_from')) || '';
+        var to = orangeGetDmyValueAsIso(el('stk_to')) || '';
+        var body = el('stk_retrieve_body');
+        var cnt = el('stk_retrieve_count');
+        body.innerHTML = '<tr><td colspan="6" class="muted">جارٍ التحميل…</td></tr>';
+        cnt.textContent = '';
+        var url = API.list + '?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
+        try {
+            var res = await fetch(url, { credentials: 'same-origin' });
+            var data = await res.json();
+            if (!data.success) { body.innerHTML = '<tr><td colspan="6" class="muted">' + escapeHtml(data.message || 'تعذر العرض') + '</td></tr>'; return; }
+            var rows = data.records || [];
+            if (rows.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" class="muted">لا عمليات جرد في هذه الفترة.</td></tr>';
+            } else {
+                body.innerHTML = rows.map(retrieveRowHtml).join('');
+            }
+            cnt.textContent = 'عدد العمليات: ' + rows.length;
+        } catch (e) {
+            body.innerHTML = '<tr><td colspan="6" class="muted">تعذر العرض</td></tr>';
+        }
     });
 
     syncFormFromState();

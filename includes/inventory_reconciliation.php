@@ -635,11 +635,18 @@ function orange_inventory_reconciliation_archive_save(PDO $pdo, array $headerIn,
  *
  * @return list<array<string,mixed>>
  */
-function orange_inventory_reconciliation_archive_list(PDO $pdo, ?int $countryId = null, int $limit = 100): array
-{
+function orange_inventory_reconciliation_archive_list(
+    PDO $pdo,
+    ?int $countryId = null,
+    int $limit = 100,
+    ?string $fromDate = null,
+    ?string $toDate = null
+): array {
     if (! orange_inventory_reconciliation_ready($pdo)) {
         return [];
     }
+    $fromDate = ($fromDate !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate)) ? $fromDate : null;
+    $toDate = ($toDate !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $toDate)) ? $toDate : null;
     $hasAttach = orange_table_has_column($pdo, 'inventory_reconciliation', 'attachments_json');
     $hasAgent = orange_table_has_column($pdo, 'inventory_reconciliation', 'delivery_agent_id');
     $hasAgentTable = orange_table_exists($pdo, 'delivery_agents');
@@ -664,6 +671,14 @@ function orange_inventory_reconciliation_archive_list(PDO $pdo, ?int $countryId 
     if ($countryId !== null && $countryId > 0 && orange_table_has_column($pdo, 'inventory_reconciliation', 'country_id')) {
         $sql .= ' AND (ir.country_id IS NULL OR ir.country_id = ?)';
         $params[] = $countryId;
+    }
+    if ($fromDate !== null) {
+        $sql .= ' AND ir.counted_at >= ?';
+        $params[] = $fromDate;
+    }
+    if ($toDate !== null) {
+        $sql .= ' AND ir.counted_at <= ?';
+        $params[] = $toDate;
     }
     $sql .= ' ORDER BY ir.counted_at DESC, ir.id DESC LIMIT ' . max(1, min(300, $limit));
 
