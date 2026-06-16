@@ -951,7 +951,7 @@ $reportTitle = $reports[$reportKey];
         <?php endif; ?>
 
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <?php $srFixedCols = in_array($reportKey, ['items', 'balances', 'low', 'stagnant'], true); ?>
+            <?php $srFixedCols = in_array($reportKey, ['items', 'balances', 'low', 'stagnant', 'valuation'], true); ?>
             <table class="admin-fy-table gl-acc-stmt-table ta-report-table<?php echo $srFixedCols ? ' sr-grouped-cols' : ''; ?>" data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".sr-print-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                 <?php if ($reportKey === 'items'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:15rem"><col style="width:6rem"><col style="width:6rem"></colgroup>
@@ -961,6 +961,8 @@ $reportTitle = $reports[$reportKey];
                     <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:16rem"></colgroup>
                 <?php elseif ($reportKey === 'stagnant'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:8.5rem"><col style="width:10rem"></colgroup>
+                <?php elseif ($reportKey === 'valuation'): ?>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:6rem"><col style="width:7rem"><col style="width:8.5rem"><?php if ($valShowPrev): ?><col style="width:8.5rem"><?php endif; ?></colgroup>
                 <?php endif; ?>
                 <?php if ($reportKey === 'items'): ?>
                     <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num">عدد المتغيرات</th><th class="gl-acc-stmt-col-num">إجمالي الرصيد</th><th>الحالة</th></tr></thead>
@@ -1003,7 +1005,7 @@ $reportTitle = $reports[$reportKey];
                     <tfoot><tr><th colspan="3">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th class="gl-acc-stmt-col-num">—</th><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th></tr></tfoot>
                 <?php elseif ($reportKey === 'valuation'): ?>
                     <?php $valCols = $valShowPrev ? 6 : 5; ?>
-                    <thead><tr><th>الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num sr-col-qty">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة الحالية</th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num">نهاية <?php echo htmlspecialchars(orange_format_date_dmY($valPrevEnd), ENT_QUOTES, 'UTF-8'); ?></th><?php endif; ?></tr></thead>
+                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num sr-col-qty">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة الحالية</th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num">نهاية <?php echo htmlspecialchars(orange_format_date_dmY($valPrevEnd), ENT_QUOTES, 'UTF-8'); ?></th><?php endif; ?></tr></thead>
                     <tbody>
                         <?php if ($valGroups === []): ?>
                             <tr><td colspan="<?php echo (int) $valCols; ?>" class="muted">لا أصناف.</td></tr>
@@ -1011,7 +1013,7 @@ $reportTitle = $reports[$reportKey];
                             <tr class="ta-report-section"><td colspan="<?php echo (int) $valCols; ?>"><?php echo htmlspecialchars((string) $catName, ENT_QUOTES, 'UTF-8'); ?></td></tr>
                             <?php foreach ($grp['rows'] as $r): ?>
                             <tr>
-                                <td dir="ltr"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr" class="sr-code-cell"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['cost']); ?></td>
