@@ -902,9 +902,9 @@ $reportTitle = $reports[$reportKey];
         <input type="hidden" name="r" value="<?php echo htmlspecialchars($reportKey, ENT_QUOTES, 'UTF-8'); ?>">
         <?php if ($reportKey === 'balances'): ?>
             <div>
-                <label for="sr_agent">المندوب (عهدة)</label>
+                <label for="sr_agent">المخزن</label>
                 <select id="sr_agent" name="agent_id" class="admin-inp" style="width:14rem;" onchange="this.form.submit()">
-                    <option value="0">المخزن (بدون المحمَّل للمناديب)</option>
+                    <option value="0">مخزن الشركة</option>
                     <?php foreach ($agentOptions as $ao): ?>
                         <option value="<?php echo (int) $ao['id']; ?>" <?php echo ((int) $ao['id'] === $agentId) ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars(orange_delivery_agent_display_name($ao), ENT_QUOTES, 'UTF-8'); ?>
