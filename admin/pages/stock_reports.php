@@ -915,7 +915,7 @@ $reportTitle = $reports[$reportKey];
             <?php $srFixedCols = in_array($reportKey, ['items', 'balances', 'low'], true); ?>
             <table class="admin-fy-table gl-acc-stmt-table ta-report-table<?php echo $srFixedCols ? ' sr-grouped-cols' : ''; ?>" data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".sr-print-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                 <?php if ($reportKey === 'items'): ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:6rem"></colgroup>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:15rem"><col style="width:6rem"><col style="width:6rem"></colgroup>
                 <?php elseif ($reportKey === 'balances'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:14%"><col style="width:6rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
                 <?php elseif ($reportKey === 'low'): ?>
