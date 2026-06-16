@@ -388,6 +388,7 @@ try {
                     ORDER BY pu2.id DESC LIMIT 1) AS last_supplier"
             : ', NULL AS last_supplier';
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, pv.id AS variant_id,
+                       ' . $itemCodeExpr . ' AS item_code,
                        pv.color, pv.size, ' . $wq['expr'] . ' AS qty,
                        ' . $grpSelectCols . $lastSupplierSelect . '
                 FROM product_variants pv
@@ -401,6 +402,7 @@ try {
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $rows[] = [
                 'product_id' => (int) $r['product_id'],
+                'item_code' => (string) $r['item_code'],
                 'product_name' => (string) $r['product_name'],
                 'group_dep_name' => (string) ($r['group_dep_name'] ?? ''),
                 'group_cat_id' => (int) ($r['group_cat_id'] ?? 0),
@@ -430,16 +432,17 @@ try {
 
         /* (1) الرصيد الفعلي الحالي + اسم الصنف لكل صنف ضمن نطاق الدولة. */
         $msCur = [];
-        $curSql = 'SELECT p.id AS pid, p.name AS pname, COALESCE(SUM(' . $wq['expr'] . '), 0) AS cur
+        $curSql = 'SELECT p.id AS pid, p.name AS pname, ' . $itemCodeExpr . ' AS item_code,
+                          COALESCE(SUM(' . $wq['expr'] . '), 0) AS cur
                    FROM products p
                    INNER JOIN product_variants pv ON pv.product_id = p.id
                    ' . $wq['join'] . '
                    WHERE 1=1' . $productCountrySql . ($pid > 0 ? ' AND p.id = ?' : '') . '
-                   GROUP BY p.id, p.name';
+                   GROUP BY p.id, p.name, item_code';
         $st = $pdo->prepare($curSql);
         $st->execute($pid > 0 ? [$pid] : []);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $msCur[(int) $r['pid']] = ['name' => (string) $r['pname'], 'cur' => (int) $r['cur']];
+            $msCur[(int) $r['pid']] = ['name' => (string) $r['pname'], 'item_code' => (string) $r['item_code'], 'cur' => (int) $r['cur']];
         }
 
         /* (2) صافي كل الحركات منذ «من» لكل صنف (لاستخراج رصيد أول عكسياً). */
@@ -541,6 +544,7 @@ try {
             $qout = (int) ($msOut[$p] ?? 0);
             $rows[] = [
                 'product_id' => $p,
+                'item_code' => (string) ($msCur[$p]['item_code'] ?? ''),
                 'product_name' => (string) $msCur[$p]['name'],
                 'opening' => $opening,
                 'qin' => $qin,
@@ -727,6 +731,7 @@ try {
         $wq = orange_warehouse_effective_qty_sql($pdo, $srCountryId, 'pv', 'wvs_stag');
         $cutoff = date('Y-m-d', strtotime('-' . $stagnantDays . ' days'));
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, pv.id AS variant_id,
+                       ' . $itemCodeExpr . ' AS item_code,
                        pv.color, pv.size, ' . $wq['expr'] . ' AS qty,
                        (SELECT MAX(sm.created_at) FROM stock_movements sm WHERE sm.variant_id = pv.id) AS last_move
                 FROM product_variants pv
@@ -740,6 +745,7 @@ try {
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $rows[] = [
                 'product_id' => (int) $r['product_id'],
+                'item_code' => (string) $r['item_code'],
                 'product_name' => (string) $r['product_name'],
                 'variant' => trim(((string) ($r['color'] ?? '')) . ' / ' . ((string) ($r['size'] ?? ''))),
                 'qty' => (int) $r['qty'],
@@ -919,7 +925,7 @@ $reportTitle = $reports[$reportKey];
                 <?php elseif ($reportKey === 'balances'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
                 <?php elseif ($reportKey === 'low'): ?>
-                    <colgroup><col style="width:5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:14rem"></colgroup>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:14rem"></colgroup>
                 <?php endif; ?>
                 <?php if ($reportKey === 'items'): ?>
                     <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num">عدد المتغيرات</th><th class="gl-acc-stmt-col-num">إجمالي الرصيد</th><th>الحالة</th></tr></thead>
@@ -990,7 +996,7 @@ $reportTitle = $reports[$reportKey];
                     </tbody>
                     <tfoot><tr><th colspan="2">الإجمالي العام</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th class="gl-acc-stmt-col-num">—</th><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValuePrev); ?></th><?php endif; ?></tr></tfoot>
                 <?php elseif ($reportKey === 'low'): ?>
-                    <thead><tr><th>#</th><th>الصنف</th><th class="sr-col-variant">اللون / المقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>آخر مورد</th></tr></thead>
+                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="sr-col-variant">اللون / المقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>آخر مورد</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
                             <tr><td colspan="5" class="muted">لا نواقص ضمن الحد (<?php echo (int) $lowTh; ?>).</td></tr>
@@ -999,7 +1005,7 @@ $reportTitle = $reports[$reportKey];
                                 <tr class="ta-report-section"><td colspan="5"><?php echo htmlspecialchars($grpLabel($r), ENT_QUOTES, 'UTF-8'); ?></td></tr>
                             <?php endif; ?>
                             <tr>
-                                <td dir="ltr"><?php echo (int) $r['product_id']; ?></td>
+                                <td dir="ltr" class="sr-code-cell"><?php echo htmlspecialchars($r['item_code'] !== '' ? $r['item_code'] : ('P' . $r['product_id']), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="sr-col-variant"><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>
@@ -1008,13 +1014,13 @@ $reportTitle = $reports[$reportKey];
                         <?php endforeach; endif; ?>
                     </tbody>
                 <?php elseif ($reportKey === 'move_summary'): ?>
-                    <thead><tr><th>#</th><th>الصنف</th><th class="gl-acc-stmt-col-num sr-col-qty">رصيد أول</th><th class="gl-acc-stmt-col-num sr-col-qty">وارد</th><th class="gl-acc-stmt-col-num sr-col-qty">صادر</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد الحالي</th></tr></thead>
+                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num sr-col-qty">رصيد أول</th><th class="gl-acc-stmt-col-num sr-col-qty">وارد</th><th class="gl-acc-stmt-col-num sr-col-qty">صادر</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد الحالي</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
                             <tr><td colspan="6" class="muted">لا حركة في المدى.</td></tr>
                         <?php else: foreach ($rows as $r): ?>
                             <tr>
-                                <td dir="ltr"><?php echo (int) $r['product_id']; ?></td>
+                                <td dir="ltr" class="sr-code-cell"><?php echo htmlspecialchars($r['item_code'] !== '' ? $r['item_code'] : ('P' . $r['product_id']), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['opening']; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qin']; ?></td>
@@ -1056,13 +1062,13 @@ $reportTitle = $reports[$reportKey];
                         <?php endforeach; endif; ?>
                     </tbody>
                 <?php elseif ($reportKey === 'stagnant'): ?>
-                    <thead><tr><th>#</th><th>الصنف</th><th class="sr-col-variant">اللون / المقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>آخر حركة</th></tr></thead>
+                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="sr-col-variant">اللون / المقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>آخر حركة</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
                             <tr><td colspan="5" class="muted">لا أصناف راكدة منذ <?php echo (int) $stagnantDays; ?> يوم.</td></tr>
                         <?php else: foreach ($rows as $r): ?>
                             <tr>
-                                <td dir="ltr"><?php echo (int) $r['product_id']; ?></td>
+                                <td dir="ltr" class="sr-code-cell"><?php echo htmlspecialchars($r['item_code'] !== '' ? $r['item_code'] : ('P' . $r['product_id']), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="sr-col-variant"><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>

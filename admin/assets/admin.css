@@ -5283,9 +5283,12 @@ input[type='number']::-webkit-inner-spin-button {
 .gl-acc-stmt-table.sr-grouped-cols tbody td.gl-acc-stmt-col-num {
     white-space: nowrap;
 }
-/* خلية الكود الرقمي (item_code، حتى 14 رقماً): لا تُكسَر على سطرين ولا تُقتطع. */
+/* خلية الكود الرقمي (item_code، حتى 14 رقماً): عرض موحّد، لا تُكسَر على سطرين ولا تُقتطع. */
+.gl-acc-stmt-table th.sr-code-cell,
+.gl-acc-stmt-table td.sr-code-cell,
 .gl-acc-stmt-table.sr-grouped-cols th.sr-code-cell,
 .gl-acc-stmt-table.sr-grouped-cols td.sr-code-cell {
+    width: 9.5rem;
     white-space: nowrap;
     word-break: normal;
     overflow-wrap: normal;
