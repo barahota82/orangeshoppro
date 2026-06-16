@@ -5299,6 +5299,21 @@ input[type='number']::-webkit-inner-spin-button {
 .gl-acc-stmt-table td.sr-col-qty {
     width: 6rem;
 }
+/*
+ * عرض موحّد لعمود «اللون / المقاس» في كل التقارير + عرض محتواه في سطر واحد (لا التفاف).
+ * السيليكتورات المضاعفة (sr-grouped-cols) لرفع الأولوية فوق قاعدة التفاف خلايا الجداول المثبّتة.
+ */
+.gl-acc-stmt-table th.sr-col-variant,
+.gl-acc-stmt-table td.sr-col-variant,
+.gl-acc-stmt-table.sr-grouped-cols th.sr-col-variant,
+.gl-acc-stmt-table.sr-grouped-cols td.sr-col-variant {
+    width: 12rem;
+    white-space: nowrap;
+    word-break: normal;
+    overflow-wrap: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .gl-acc-stmt-col-ref {
     text-align: right;
     font-variant-numeric: tabular-nums;

@@ -917,7 +917,7 @@ $reportTitle = $reports[$reportKey];
                 <?php if ($reportKey === 'items'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:15rem"><col style="width:6rem"><col style="width:6rem"></colgroup>
                 <?php elseif ($reportKey === 'balances'): ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:14%"><col style="width:6rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
                 <?php elseif ($reportKey === 'low'): ?>
                     <colgroup><col style="width:7%"><col style="width:38%"><col style="width:18%"><col style="width:12%"><col style="width:25%"></colgroup>
                 <?php endif; ?>
@@ -941,7 +941,7 @@ $reportTitle = $reports[$reportKey];
                     </tbody>
                     <tfoot><tr><th colspan="3">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th></th></tr></tfoot>
                 <?php elseif ($reportKey === 'balances'): ?>
-                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة</th></tr></thead>
+                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="sr-col-variant">اللون / المقاس</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
                             <tr><td colspan="6" class="muted">لا أصناف.</td></tr>
@@ -952,7 +952,7 @@ $reportTitle = $reports[$reportKey];
                             <tr>
                                 <td dir="ltr" class="sr-code-cell"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="sr-col-variant"><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['cost']); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['value']); ?></td>
@@ -990,7 +990,7 @@ $reportTitle = $reports[$reportKey];
                     </tbody>
                     <tfoot><tr><th colspan="2">الإجمالي العام</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th class="gl-acc-stmt-col-num">—</th><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValuePrev); ?></th><?php endif; ?></tr></tfoot>
                 <?php elseif ($reportKey === 'low'): ?>
-                    <thead><tr><th>#</th><th>الصنف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>آخر مورد</th></tr></thead>
+                    <thead><tr><th>#</th><th>الصنف</th><th class="sr-col-variant">اللون / المقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>آخر مورد</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
                             <tr><td colspan="5" class="muted">لا نواقص ضمن الحد (<?php echo (int) $lowTh; ?>).</td></tr>
@@ -1001,7 +1001,7 @@ $reportTitle = $reports[$reportKey];
                             <tr>
                                 <td dir="ltr"><?php echo (int) $r['product_id']; ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="sr-col-variant"><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>
                                 <td><?php echo htmlspecialchars(($r['last_supplier'] ?? '') !== '' ? $r['last_supplier'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                             </tr>
@@ -1024,7 +1024,7 @@ $reportTitle = $reports[$reportKey];
                         <?php endforeach; endif; ?>
                     </tbody>
                 <?php elseif ($reportKey === 'movements'): ?>
-                    <thead><tr><th>التاريخ</th><th>النوع</th><th>لون/مقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">وارد</th><th class="gl-acc-stmt-col-num sr-col-qty">صادر</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>مرجع</th></tr></thead>
+                    <thead><tr><th>التاريخ</th><th>النوع</th><th class="sr-col-variant">لون/مقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">وارد</th><th class="gl-acc-stmt-col-num sr-col-qty">صادر</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>مرجع</th></tr></thead>
                     <tbody>
                         <?php if ($moveGroups === []): ?>
                             <tr><td colspan="7" class="muted">لا حركات في المدى.</td></tr>
@@ -1039,7 +1039,7 @@ $reportTitle = $reports[$reportKey];
                             <tr>
                                 <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi($ln['at']), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($ln['label'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo htmlspecialchars($ln['variant'] !== '/' ? $ln['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="sr-col-variant"><?php echo htmlspecialchars($ln['variant'] !== '/' ? $ln['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $ln['in'] > 0 ? (int) $ln['in'] : '—'; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $ln['out'] > 0 ? (int) $ln['out'] : '—'; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $ln['balance']; ?></td>
@@ -1056,7 +1056,7 @@ $reportTitle = $reports[$reportKey];
                         <?php endforeach; endif; ?>
                     </tbody>
                 <?php elseif ($reportKey === 'stagnant'): ?>
-                    <thead><tr><th>#</th><th>الصنف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>آخر حركة</th></tr></thead>
+                    <thead><tr><th>#</th><th>الصنف</th><th class="sr-col-variant">اللون / المقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>آخر حركة</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
                             <tr><td colspan="5" class="muted">لا أصناف راكدة منذ <?php echo (int) $stagnantDays; ?> يوم.</td></tr>
@@ -1064,7 +1064,7 @@ $reportTitle = $reports[$reportKey];
                             <tr>
                                 <td dir="ltr"><?php echo (int) $r['product_id']; ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="sr-col-variant"><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>
                                 <td><?php echo $r['last_move'] !== '' ? htmlspecialchars(orange_format_date_dmY(substr($r['last_move'], 0, 10)), ENT_QUOTES, 'UTF-8') : 'بلا حركة'; ?></td>
                             </tr>
