@@ -1362,6 +1362,26 @@ $reportTitle = $reports[$reportKey];
 </script>
 <?php endif; ?>
 
+<?php
+$srDocTitle = $reportTitle;
+if ($reportKey === 'balances' && $agentId > 0 && $agentLabel !== '') {
+    $srDocTitle .= ' - عهدة ' . $agentLabel;
+}
+if ($companyNameAr !== '') {
+    $srDocTitle .= ' - ' . $companyNameAr;
+}
+$srDocTitle .= ' - ' . date('Y-m-d');
+?>
+<script>
+(function () {
+    /* عند الطباعة/الحفظ كـ PDF يُؤخذ اسم الملف من عنوان المستند؛ نضبطه مؤقتاً على اسم التقرير ثم نُعيد الأصلي. */
+    var reportTitle = <?php echo json_encode($srDocTitle, JSON_UNESCAPED_UNICODE); ?>;
+    var originalTitle = document.title;
+    window.addEventListener('beforeprint', function () { document.title = reportTitle; });
+    window.addEventListener('afterprint', function () { document.title = originalTitle; });
+})();
+</script>
+
 <?php if (in_array($reportKey, ['items', 'balances', 'valuation'], true)): ?>
 <script>
 (function () {
