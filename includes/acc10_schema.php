@@ -133,6 +133,23 @@ function orange_catalog_ensure_acc10_schema(PDO $pdo): void
         );
     }
 
+    // أرشيف الجرد (قرار المالك 2026-06-16): تخزين مرفقات تقرير الجرد الموقّع (PDF/صور/Office) كقائمة JSON.
+    if (orange_table_exists($pdo, 'inventory_reconciliation')
+        && !orange_table_has_column($pdo, 'inventory_reconciliation', 'attachments_json')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE inventory_reconciliation ADD COLUMN attachments_json TEXT NULL DEFAULT NULL'
+        );
+    }
+    // نطاق الجرد قد يكون عهدة مندوب (بجانب المخزن) — معرّف اختياري للمندوب.
+    if (orange_table_exists($pdo, 'inventory_reconciliation')
+        && !orange_table_has_column($pdo, 'inventory_reconciliation', 'delivery_agent_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE inventory_reconciliation ADD COLUMN delivery_agent_id INT UNSIGNED NULL DEFAULT NULL'
+        );
+    }
+
     if (!orange_table_exists($pdo, 'inventory_reconciliation_line')) {
         orange_catalog_safe_exec(
             $pdo,

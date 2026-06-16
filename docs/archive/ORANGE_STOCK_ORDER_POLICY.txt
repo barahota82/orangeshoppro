@@ -46,6 +46,14 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
    - الصفحة admin/pages/inventory_reconciliation.php صارت **تقرير عَدّ فقط**: يُجرى الجرد، يُظهر فرق الكمية وقيمته التقديرية، ثم يُقفل («إقفال التقرير») ليُطبع ويُرفع للإدارة بالتوقيعات.
    - **لا يطبّق على المخزون ولا يُنشئ قيد GL** بعد الآن. orange_inventory_reconciliation_approve صار يضبط الحالة approved فقط (بلا تحريك مخزون/طبقات/سند)؛ أُزيل اختيار حساب التسوية من الشاشة. (الجلسات المعتمَدة قبل هذا التاريخ كانت قد طبّقت المخزون/القيد سابقاً — لا تُمسّ.)
 
+8b) أرشيف الجرد — إعادة توظيف الشاشة (قرار المالك 2026-06-16)
+   - بعد ضبط **تقرير الجرد القابل للطباعة** (تقارير المخزن ← تبويب «الجرد/الأرصدة» مع التوقيعات وأعمدة الكمية الفعلية)، صار العَدّ الرقمي داخل الشاشة القديمة بلا فائدة (لا أثر مخزني/محاسبي). قرار المالك: **تحويل admin/pages/inventory_reconciliation.php إلى «أرشيف الجرد»** (تسمية القائمة في header.php: «أرشيف الجرد»).
+   - **الوظيفة:** أرشفة كل عملية جرد تمّت كسجل = (المخزن **أو** عهدة مندوب) + تاريخ الجرد + ملاحظة + **مرفقات** (رفع تقرير الجرد المطبوع الموقّع). **حُذف** إدخال الكميات الفعلية وحساب الفروق من الشاشة (دوال الأسطر/الاعتماد القديمة باقية في includes/inventory_reconciliation.php للتوافق لكنها غير مستعملة من الشاشة).
+   - **الأنواع المسموحة للمرفقات:** PDF + صور (عدا SVG) + Excel (xlsx/xls) + Word (docx/doc)؛ **عدة مرفقات** لكل سجل (حتى 20، حتى 25MB لكل ملف). xlsx/docx حاويات zip — يُسمح بها بالامتداد عند اكتشاف finfo نوعاً عاماً (zip/octet-stream).
+   - **التخزين:** ملفات تحت project_root/uploads/stocktake/{id}/ (غير عام — التنزيل عبر سكربت يتحقق من الجلسة) وقائمة JSON في العمود inventory_reconciliation.attachments_json (نمط مرفقات المورد). أُضيف العمودان attachments_json TEXT وdelivery_agent_id (اختياري) عبر ensure-schema في includes/acc10_schema.php. عند اختيار مندوب يُسند warehouse_id للمستودع الافتراضي للدولة (قيد NOT NULL) ويُخزَّن delivery_agent_id.
+   - **المنطق:** دوال orange_inventory_reconciliation_archive_{save,list,get,delete} في includes/inventory_reconciliation.php + مكتبة المرفقات includes/stocktake_archive.php (تخزين/تحقق/ترميز آمن بنمط supplier_attachments). **API:** admin/api/inventory-reconciliation/{archive-save,archive-delete,attachment-upload,attachment-download,attachment-delete}.php. (نقاط save/get/approve القديمة باقية بلا استعمال من الشاشة.)
+   - **التطبيق الفعلي للفروق على المخزون والمحاسبة يبقى عبر «قيد تسوية مخزون» (SAJ)** — البندان 9 و11.
+
 9) سند تعديل الرصيد (Stock Adjustment Voucher) — السند التنفيذي للتعديل (قرار المالك 2026-06-15)
    - الصفحة admin/pages/stock_adjustment_voucher.php + API admin/api/stock-adjustment/{save,get,approve}.php + المنطق includes/stock_adjustment_voucher.php (جداول stock_adjustment_voucher + stock_adjustment_voucher_line عبر ensure-schema بنمط catalog_schema).
    - يُحرَّر **بعد قرار الإدارة** الناتج عن تقرير الجرد. متعدد الأسطر؛ لكل سطر صنف (variant) + خانة **إضافة (+)** وخانة **خصم (−)** → الفرق. قيمة الفرق = الكمية × تكلفة الصنف (FIFO الحالية/الاحتياطي).

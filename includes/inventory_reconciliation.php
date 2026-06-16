@@ -12,6 +12,8 @@ require_once __DIR__ . '/gl_settings.php';
 require_once __DIR__ . '/gl_pending_movements.php';
 require_once __DIR__ . '/admin_settings_country.php';
 require_once __DIR__ . '/inventory_cost_layers.php';
+require_once __DIR__ . '/stocktake_archive.php';
+require_once __DIR__ . '/delivery_agents.php';
 
 function orange_inventory_reconciliation_ready(PDO $pdo): bool
 {
@@ -532,6 +534,245 @@ function orange_inventory_reconciliation_delete_draft(PDO $pdo, int $id, ?int $c
         return false;
     }
     $st = $pdo->prepare('DELETE FROM inventory_reconciliation WHERE id = ? AND status = \'draft\'');
+    $st->execute([$id]);
+
+    return $st->rowCount() > 0;
+}
+
+/*
+ * ============================================================================
+ * أرشيف الجرد (قرار المالك 2026-06-16)
+ * ----------------------------------------------------------------------------
+ * الشاشة صارت أرشيفاً لرفع تقرير الجرد المطبوع الموقّع: سجل = (مخزن + تاريخ + ملاحظة + مرفقات).
+ * لا عَدّ رقمي ولا أسطر ولا أثر مخزني/محاسبي — التطبيق عبر «قيد تسوية مخزون» (SAJ).
+ * يُعاد استخدام جدول inventory_reconciliation (header) + العمود attachments_json.
+ * ============================================================================
+ */
+
+/**
+ * حفظ/تحديث سجل أرشيف جرد (رأس فقط: مخزن، تاريخ، ملاحظة).
+ */
+function orange_inventory_reconciliation_archive_save(PDO $pdo, array $headerIn, ?int $countryId = null): int
+{
+    if (! orange_inventory_reconciliation_ready($pdo)) {
+        throw new RuntimeException('جداول الجرد غير جاهزة.');
+    }
+
+    $id = (int) ($headerIn['id'] ?? 0);
+    $warehouseId = (int) ($headerIn['warehouse_id'] ?? 0);
+    $agentId = (int) ($headerIn['delivery_agent_id'] ?? 0);
+    $countedAt = trim((string) ($headerIn['counted_at'] ?? ''));
+    $notes = trim((string) ($headerIn['notes'] ?? ''));
+
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_admin_settings_effective_country_id($pdo);
+    }
+
+    // نطاق الجرد: إمّا مخزن وإمّا عهدة مندوب. عند اختيار مندوب يُسند المخزن للافتراضي (لقيد warehouse_id NOT NULL).
+    if ($agentId > 0) {
+        if (orange_delivery_agent_row_by_id($pdo, $agentId) === null) {
+            throw new InvalidArgumentException('المندوب غير موجود.');
+        }
+        if ($warehouseId <= 0) {
+            $warehouseId = (int) orange_warehouse_default_id_for_country($pdo, $countryId);
+        }
+    }
+    if ($warehouseId <= 0) {
+        throw new InvalidArgumentException('اختر المخزن أو المندوب.');
+    }
+    if ($countedAt === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $countedAt)) {
+        throw new InvalidArgumentException('تاريخ الجرد مطلوب (YYYY-MM-DD).');
+    }
+
+    orange_inventory_reconciliation_assert_warehouse_country($pdo, $warehouseId, $countryId);
+
+    $hasAgentCol = orange_table_has_column($pdo, 'inventory_reconciliation', 'delivery_agent_id');
+
+    if ($id > 0) {
+        $existing = orange_inventory_reconciliation_get($pdo, $id, $countryId);
+        if ($existing === null) {
+            throw new InvalidArgumentException('سجل الجرد غير موجود.');
+        }
+        $sql = 'UPDATE inventory_reconciliation SET warehouse_id = ?, counted_at = ?, notes = ?, country_id = ?'
+            . ($hasAgentCol ? ', delivery_agent_id = ?' : '')
+            . ' WHERE id = ?';
+        $args = [
+            $warehouseId,
+            $countedAt,
+            $notes !== '' ? $notes : null,
+            $countryId > 0 ? $countryId : null,
+        ];
+        if ($hasAgentCol) {
+            $args[] = $agentId > 0 ? $agentId : null;
+        }
+        $args[] = $id;
+        $pdo->prepare($sql)->execute($args);
+
+        return $id;
+    }
+
+    $cols = 'warehouse_id, status, counted_at, notes, country_id';
+    $ph = '?, \'archived\', ?, ?, ?';
+    $args = [
+        $warehouseId,
+        $countedAt,
+        $notes !== '' ? $notes : null,
+        $countryId > 0 ? $countryId : null,
+    ];
+    if ($hasAgentCol) {
+        $cols .= ', delivery_agent_id';
+        $ph .= ', ?';
+        $args[] = $agentId > 0 ? $agentId : null;
+    }
+    $ins = $pdo->prepare('INSERT INTO inventory_reconciliation (' . $cols . ') VALUES (' . $ph . ')');
+    $ins->execute($args);
+
+    return (int) $pdo->lastInsertId();
+}
+
+/**
+ * قائمة سجلات أرشيف الجرد (مع عدد المرفقات) ضمن سياق الدولة.
+ *
+ * @return list<array<string,mixed>>
+ */
+function orange_inventory_reconciliation_archive_list(PDO $pdo, ?int $countryId = null, int $limit = 100): array
+{
+    if (! orange_inventory_reconciliation_ready($pdo)) {
+        return [];
+    }
+    $hasAttach = orange_table_has_column($pdo, 'inventory_reconciliation', 'attachments_json');
+    $hasAgent = orange_table_has_column($pdo, 'inventory_reconciliation', 'delivery_agent_id');
+    $hasAgentTable = orange_table_exists($pdo, 'delivery_agents');
+    $cols = 'ir.id, ir.warehouse_id, ir.counted_at, ir.notes, ir.created_at, ir.country_id,
+             w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en';
+    if ($hasAttach) {
+        $cols .= ', ir.attachments_json';
+    }
+    $join = ' LEFT JOIN warehouses w ON w.id = ir.warehouse_id';
+    if ($hasAgent) {
+        $cols .= ', ir.delivery_agent_id';
+        if ($hasAgentTable) {
+            $cols .= ', da.name_ar AS agent_name_ar, da.name_en AS agent_name_en';
+            $join .= ' LEFT JOIN delivery_agents da ON da.id = ir.delivery_agent_id';
+        }
+    }
+    $sql = 'SELECT ' . $cols . '
+            FROM inventory_reconciliation ir'
+            . $join
+            . ' WHERE 1=1';
+    $params = [];
+    if ($countryId !== null && $countryId > 0 && orange_table_has_column($pdo, 'inventory_reconciliation', 'country_id')) {
+        $sql .= ' AND (ir.country_id IS NULL OR ir.country_id = ?)';
+        $params[] = $countryId;
+    }
+    $sql .= ' ORDER BY ir.counted_at DESC, ir.id DESC LIMIT ' . max(1, min(300, $limit));
+
+    if ($params !== []) {
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } else {
+        $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    foreach ($rows as &$row) {
+        $count = 0;
+        if ($hasAttach) {
+            $count = count(orange_stocktake_archive_decode_list((string) ($row['attachments_json'] ?? '')));
+            unset($row['attachments_json']);
+        }
+        $row['attachment_count'] = $count;
+
+        $agentName = trim((string) ($row['agent_name_ar'] ?? ''));
+        if ($agentName === '') {
+            $agentName = trim((string) ($row['agent_name_en'] ?? ''));
+        }
+        $whName = trim((string) ($row['warehouse_name_ar'] ?? ''));
+        if ($whName === '') {
+            $whName = trim((string) ($row['warehouse_name_en'] ?? ''));
+        }
+        if ($whName === '') {
+            $whName = '#' . (int) ($row['warehouse_id'] ?? 0);
+        }
+        $row['scope_label'] = $agentName !== '' ? ('عهدة: ' . $agentName) : $whName;
+    }
+    unset($row);
+
+    return $rows;
+}
+
+/**
+ * جلب سجل أرشيف جرد مع مرفقاته.
+ *
+ * @return array<string,mixed>|null
+ */
+function orange_inventory_reconciliation_archive_get(PDO $pdo, int $id, ?int $countryId = null): ?array
+{
+    if ($id <= 0 || ! orange_inventory_reconciliation_ready($pdo)) {
+        return null;
+    }
+    $st = $pdo->prepare('SELECT * FROM inventory_reconciliation WHERE id = ? LIMIT 1');
+    $st->execute([$id]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (! $row) {
+        return null;
+    }
+    if ($countryId !== null && $countryId > 0 && isset($row['country_id']) && (int) $row['country_id'] > 0
+        && (int) $row['country_id'] !== $countryId) {
+        return null;
+    }
+
+    $warehouseId = (int) ($row['warehouse_id'] ?? 0);
+    $whLabel = '';
+    if ($warehouseId > 0) {
+        $wh = orange_warehouse_row_by_id($pdo, $warehouseId);
+        if ($wh !== null) {
+            $whLabel = trim((string) ($wh['name_ar'] ?? ''));
+            if ($whLabel === '') {
+                $whLabel = trim((string) ($wh['name_en'] ?? ''));
+            }
+        }
+    }
+
+    $agentId = (int) ($row['delivery_agent_id'] ?? 0);
+    $agentLabel = '';
+    if ($agentId > 0) {
+        $ag = orange_delivery_agent_row_by_id($pdo, $agentId);
+        if ($ag !== null) {
+            $agentLabel = orange_delivery_agent_display_name($ag);
+        }
+    }
+    $scopeLabel = $agentLabel !== '' ? ('عهدة المندوب: ' . $agentLabel) : $whLabel;
+
+    return [
+        'header' => $row,
+        'warehouse_label' => $whLabel,
+        'agent_label' => $agentLabel,
+        'scope_label' => $scopeLabel,
+        'attachments' => orange_stocktake_archive_decode_list((string) ($row['attachments_json'] ?? '')),
+    ];
+}
+
+/**
+ * حذف سجل أرشيف جرد + ملفات مرفقاته من القرص.
+ */
+function orange_inventory_reconciliation_archive_delete(PDO $pdo, int $id, ?int $countryId = null): bool
+{
+    $rec = orange_inventory_reconciliation_archive_get($pdo, $id, $countryId);
+    if ($rec === null) {
+        return false;
+    }
+    foreach (($rec['attachments'] ?? []) as $att) {
+        $abs = orange_stocktake_archive_abs_path((string) ($att['path'] ?? ''));
+        if (orange_stocktake_archive_is_within_upload_root($abs) && is_file($abs)) {
+            @unlink($abs);
+        }
+    }
+    $dir = orange_stocktake_archive_upload_root() . DIRECTORY_SEPARATOR . $id;
+    if (is_dir($dir)) {
+        @rmdir($dir);
+    }
+    $st = $pdo->prepare('DELETE FROM inventory_reconciliation WHERE id = ?');
     $st->execute([$id]);
 
     return $st->rowCount() > 0;
