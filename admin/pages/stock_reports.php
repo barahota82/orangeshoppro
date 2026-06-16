@@ -1275,6 +1275,17 @@ $reportTitle = $reports[$reportKey];
         <?php endif; ?>
 
         <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
+
+        <?php if ($reportKey === 'balances'): ?>
+            <div class="sr-page-sign" aria-hidden="true">
+                <?php if ($agentId > 0): ?>
+                    <span class="sr-page-sign__item">توقيع المندوب:<span class="sr-page-sign__line"></span></span>
+                    <span class="sr-page-sign__item">توقيع أمين المخزن:<span class="sr-page-sign__line"></span></span>
+                <?php else: ?>
+                    <span class="sr-page-sign__item">توقيع أمين المخزن:<span class="sr-page-sign__line"></span></span>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -1290,6 +1301,18 @@ $reportTitle = $reports[$reportKey];
 .sr-sign-name { color:#334155; min-height:1.2em; margin-bottom:30px; }
 .sr-sign-line { border-top:1px solid #475569; width:80%; margin:0 auto; }
 @media print { .sr-sign-row { margin-top:72px; } }
+/* توقيع مختصر يتكرر أسفل كل صفحة مطبوعة (تثبيت المسؤولية لكل ورقة) — مخفي على الشاشة. */
+.sr-page-sign { display:none; }
+@media print {
+    @page { margin-bottom:24mm; }
+    .sr-page-sign {
+        display:flex; position:fixed; left:0; right:0; bottom:7mm;
+        justify-content:flex-start; gap:30mm; padding:0 14mm;
+        font-size:8.5pt; color:#0f172a; direction:rtl;
+    }
+    .sr-page-sign__item { white-space:nowrap; }
+    .sr-page-sign__line { display:inline-block; min-width:42mm; border-bottom:1px solid #475569; margin-inline-start:5px; vertical-align:bottom; }
+}
 </style>
 
 <?php if ($reportKey === 'movements'): ?>
