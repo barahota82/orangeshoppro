@@ -915,7 +915,7 @@ $reportTitle = $reports[$reportKey];
             <?php $srFixedCols = in_array($reportKey, ['items', 'balances', 'low'], true); ?>
             <table class="admin-fy-table gl-acc-stmt-table ta-report-table<?php echo $srFixedCols ? ' sr-grouped-cols' : ''; ?>" data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".sr-print-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                 <?php if ($reportKey === 'items'): ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:8rem"><col style="width:6rem"></colgroup>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:6rem"></colgroup>
                 <?php elseif ($reportKey === 'balances'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:14%"><col style="width:6rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
                 <?php elseif ($reportKey === 'low'): ?>
@@ -962,7 +962,7 @@ $reportTitle = $reports[$reportKey];
                     <tfoot><tr><th colspan="3">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th class="gl-acc-stmt-col-num">—</th><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th></tr></tfoot>
                 <?php elseif ($reportKey === 'valuation'): ?>
                     <?php $valCols = $valShowPrev ? 6 : 5; ?>
-                    <thead><tr><th>الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة الحالية</th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num">نهاية <?php echo htmlspecialchars(orange_format_date_dmY($valPrevEnd), ENT_QUOTES, 'UTF-8'); ?></th><?php endif; ?></tr></thead>
+                    <thead><tr><th>الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num sr-col-qty">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة الحالية</th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num">نهاية <?php echo htmlspecialchars(orange_format_date_dmY($valPrevEnd), ENT_QUOTES, 'UTF-8'); ?></th><?php endif; ?></tr></thead>
                     <tbody>
                         <?php if ($valGroups === []): ?>
                             <tr><td colspan="<?php echo (int) $valCols; ?>" class="muted">لا أصناف.</td></tr>
@@ -990,7 +990,7 @@ $reportTitle = $reports[$reportKey];
                     </tbody>
                     <tfoot><tr><th colspan="2">الإجمالي العام</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th class="gl-acc-stmt-col-num">—</th><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValuePrev); ?></th><?php endif; ?></tr></tfoot>
                 <?php elseif ($reportKey === 'low'): ?>
-                    <thead><tr><th>#</th><th>الصنف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num">الرصيد</th><th>آخر مورد</th></tr></thead>
+                    <thead><tr><th>#</th><th>الصنف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>آخر مورد</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
                             <tr><td colspan="5" class="muted">لا نواقص ضمن الحد (<?php echo (int) $lowTh; ?>).</td></tr>
@@ -1008,7 +1008,7 @@ $reportTitle = $reports[$reportKey];
                         <?php endforeach; endif; ?>
                     </tbody>
                 <?php elseif ($reportKey === 'move_summary'): ?>
-                    <thead><tr><th>#</th><th>الصنف</th><th class="gl-acc-stmt-col-num">رصيد أول</th><th class="gl-acc-stmt-col-num">وارد</th><th class="gl-acc-stmt-col-num">صادر</th><th class="gl-acc-stmt-col-num">الرصيد الحالي</th></tr></thead>
+                    <thead><tr><th>#</th><th>الصنف</th><th class="gl-acc-stmt-col-num sr-col-qty">رصيد أول</th><th class="gl-acc-stmt-col-num sr-col-qty">وارد</th><th class="gl-acc-stmt-col-num sr-col-qty">صادر</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد الحالي</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
                             <tr><td colspan="6" class="muted">لا حركة في المدى.</td></tr>
@@ -1024,7 +1024,7 @@ $reportTitle = $reports[$reportKey];
                         <?php endforeach; endif; ?>
                     </tbody>
                 <?php elseif ($reportKey === 'movements'): ?>
-                    <thead><tr><th>التاريخ</th><th>النوع</th><th>لون/مقاس</th><th class="gl-acc-stmt-col-num">وارد</th><th class="gl-acc-stmt-col-num">صادر</th><th class="gl-acc-stmt-col-num">الرصيد</th><th>مرجع</th></tr></thead>
+                    <thead><tr><th>التاريخ</th><th>النوع</th><th>لون/مقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">وارد</th><th class="gl-acc-stmt-col-num sr-col-qty">صادر</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>مرجع</th></tr></thead>
                     <tbody>
                         <?php if ($moveGroups === []): ?>
                             <tr><td colspan="7" class="muted">لا حركات في المدى.</td></tr>
@@ -1056,7 +1056,7 @@ $reportTitle = $reports[$reportKey];
                         <?php endforeach; endif; ?>
                     </tbody>
                 <?php elseif ($reportKey === 'stagnant'): ?>
-                    <thead><tr><th>#</th><th>الصنف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num">الرصيد</th><th>آخر حركة</th></tr></thead>
+                    <thead><tr><th>#</th><th>الصنف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>آخر حركة</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
                             <tr><td colspan="5" class="muted">لا أصناف راكدة منذ <?php echo (int) $stagnantDays; ?> يوم.</td></tr>

@@ -5290,6 +5290,15 @@ input[type='number']::-webkit-inner-spin-button {
     word-break: normal;
     overflow-wrap: normal;
 }
+/*
+ * عرض موحّد لأعمدة الكميات في كل تقارير المخزن (نفس عرض «الكمية» في الجرد ≈ 6rem،
+ * يكفي ~9 أرقام). يُطبَّق على رؤوس الكميات في التقييم/النواقص/ملخص الحركة/الحركة/الراكد.
+ * (قائمة الأصناف والأرصدة مضبوطة عبر colgroup بنفس 6rem.)
+ */
+.gl-acc-stmt-table th.sr-col-qty,
+.gl-acc-stmt-table td.sr-col-qty {
+    width: 6rem;
+}
 .gl-acc-stmt-col-ref {
     text-align: right;
     font-variant-numeric: tabular-nums;
