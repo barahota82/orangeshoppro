@@ -805,7 +805,7 @@ $reportTitle = $reports[$reportKey];
             <?php if ($depOptions !== []): ?>
             <div>
                 <label for="sr_dep">القسم</label>
-                <select id="sr_dep" name="dep" class="admin-inp" style="width:14rem;">
+                <select id="sr_dep" name="dep" class="admin-inp" style="width:11rem;">
                     <option value="0">كل الأقسام</option>
                     <?php foreach ($depOptions as $depo): ?>
                         <option value="<?php echo (int) $depo['id']; ?>" <?php echo ((int) $depo['id'] === $depId) ? 'selected' : ''; ?>>
@@ -817,7 +817,7 @@ $reportTitle = $reports[$reportKey];
             <?php endif; ?>
             <div>
                 <label for="sr_cat">الفئة</label>
-                <select id="sr_cat" name="cat" class="admin-inp" style="width:14rem;" <?php echo ($depOptions !== [] && $depId <= 0) ? 'disabled' : ''; ?>>
+                <select id="sr_cat" name="cat" class="admin-inp" style="width:11rem;" <?php echo ($depOptions !== [] && $depId <= 0) ? 'disabled' : ''; ?>>
                     <option value="0">كل الفئات</option>
                     <?php foreach ($catOptions as $co): ?>
                         <?php $coDep = (int) ($co['department_id'] ?? 0); ?>
@@ -915,9 +915,9 @@ $reportTitle = $reports[$reportKey];
             <?php $srFixedCols = in_array($reportKey, ['items', 'balances', 'low'], true); ?>
             <table class="admin-fy-table gl-acc-stmt-table ta-report-table<?php echo $srFixedCols ? ' sr-grouped-cols' : ''; ?>" data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".sr-print-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                 <?php if ($reportKey === 'items'): ?>
-                    <colgroup><col style="width:10%"><col style="width:49%"><col style="width:13%"><col style="width:14%"><col style="width:14%"></colgroup>
+                    <colgroup><col style="width:8%"><col style="width:51%"><col style="width:13%"><col style="width:14%"><col style="width:14%"></colgroup>
                 <?php elseif ($reportKey === 'balances'): ?>
-                    <colgroup><col style="width:9%"><col style="width:36%"><col style="width:18%"><col style="width:11%"><col style="width:12%"><col style="width:14%"></colgroup>
+                    <colgroup><col style="width:7%"><col style="width:38%"><col style="width:18%"><col style="width:11%"><col style="width:12%"><col style="width:14%"></colgroup>
                 <?php elseif ($reportKey === 'low'): ?>
                     <colgroup><col style="width:7%"><col style="width:38%"><col style="width:18%"><col style="width:12%"><col style="width:25%"></colgroup>
                 <?php endif; ?>
