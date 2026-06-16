@@ -1051,14 +1051,14 @@ $reportTitle = $reports[$reportKey];
                     <colgroup><col style="width:9.5rem"><col><col style="width:15rem"><col style="width:6rem"><col style="width:6rem"></colgroup>
                 <?php elseif ($reportKey === 'balances'): ?>
                     <?php if ($agentId > 0): ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:7rem"><col style="width:8rem"><col style="width:5rem"><col style="width:5rem"></colgroup>
+                    <colgroup><col class="srw-code"><col><col class="srw-variant"><col class="srw-qty"><col class="srw-actual"><col class="srw-res"><col class="srw-res"></colgroup>
                     <?php else: ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:6rem"><col style="width:8rem"><col style="width:5rem"><col style="width:5rem"></colgroup>
+                    <colgroup><col class="srw-code"><col><col class="srw-variant"><col class="srw-qty"><col class="srw-qty"><col class="srw-actual"><col class="srw-res"><col class="srw-res"></colgroup>
                     <?php endif; ?>
                 <?php elseif ($reportKey === 'low'): ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:16rem"></colgroup>
+                    <colgroup><col class="srw-code"><col><col class="srw-variant"><col class="srw-qty"><col class="srw-supplier"></colgroup>
                 <?php elseif ($reportKey === 'stagnant'): ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:8.5rem"><col style="width:10rem"></colgroup>
+                    <colgroup><col class="srw-code"><col><col class="srw-variant"><col class="srw-qty"><col class="srw-date"><col class="srw-mtype"></colgroup>
                 <?php elseif ($reportKey === 'valuation'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:6rem"><col style="width:7rem"><col style="width:8.5rem"><?php if ($valShowPrev): ?><col style="width:8.5rem"><?php endif; ?></colgroup>
                 <?php endif; ?>
@@ -1301,6 +1301,26 @@ $reportTitle = $reports[$reportKey];
 .sr-sign-name { color:#334155; min-height:1.2em; margin-bottom:30px; }
 .sr-sign-line { border-top:1px solid #475569; width:80%; margin:0 auto; }
 @media print { .sr-sign-row { margin-top:72px; } }
+/* عرض أعمدة تقارير الجرد/النواقص/الراكدة: عرض الشاشة كما هو، ويُصغَّر عند الطباعة
+   حتى يتّسع مجموع الأعمدة داخل عرض ورقة A4 العمودية فلا ينضغط عمود «الصنف». */
+.srw-code { width:9.5rem; }
+.srw-variant { width:12rem; }
+.srw-qty { width:6rem; }
+.srw-actual { width:8rem; }
+.srw-res { width:5rem; }
+.srw-supplier { width:16rem; }
+.srw-date { width:8.5rem; }
+.srw-mtype { width:10rem; }
+@media print {
+    .srw-code { width:7rem; }
+    .srw-variant { width:7.5rem; }
+    .srw-qty { width:4.2rem; }
+    .srw-actual { width:5.5rem; }
+    .srw-res { width:3.6rem; }
+    .srw-supplier { width:9.5rem; }
+    .srw-date { width:6rem; }
+    .srw-mtype { width:6.5rem; }
+}
 /* توقيع مختصر يتكرر أسفل كل صفحة مطبوعة (تثبيت المسؤولية لكل ورقة) — مخفي على الشاشة. */
 .sr-page-sign { display:none; }
 @media print {
