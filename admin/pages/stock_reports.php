@@ -835,7 +835,7 @@ $reportTitle = $reports[$reportKey];
             <div style="display:flex;align-items:flex-end;">
                 <label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
                     <input type="checkbox" name="hz" value="1" onchange="this.form.submit()" <?php echo $hideZero ? 'checked' : ''; ?>>
-                    إخفاء الأصناف ذات الرصيد صفر
+                    إخفاء الرصيد صفر
                 </label>
             </div>
         <?php endif; ?>
