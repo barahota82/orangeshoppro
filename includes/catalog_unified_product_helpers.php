@@ -34,6 +34,7 @@ function orange_catalog_resolve_product_classification(PDO $pdo, array $data): a
 
 /**
  * جزء واحد من كود الصنف: slug لاتيني/أرقام مختصر، أو i{id} عند الفراغ.
+ * (مُبقى للتوافق؛ الكود الحالي رقمي بحت — انظر orange_catalog_generate_product_item_code_from_tree).
  */
 function orange_catalog_item_code_segment_from_slug(?string $slug, int $id): string
 {
@@ -45,6 +46,65 @@ function orange_catalog_item_code_segment_from_slug(?string $slug, int $id): str
     }
 
     return 'i' . max(0, $id);
+}
+
+/**
+ * الترتيب الرقمي (1-based) لعقدة شجرة ضمن أبيها حسب (sort_order, id).
+ * أساس الترقيم الرقمي للكود؛ مُشتق تلقائياً (قد يتغيّر عند إعادة الترتيب أو حذف عقدة أسبق).
+ * أسماء الجداول تأتي من قائمة ثابتة داخلية (ليست مدخلات مستخدم).
+ */
+function orange_catalog_node_ordinal(PDO $pdo, string $table, ?string $parentColumn, ?int $parentId, int $rowId): int
+{
+    if ($rowId <= 0) {
+        return 0;
+    }
+    try {
+        $st = $pdo->prepare("SELECT sort_order FROM {$table} WHERE id = ? LIMIT 1");
+        $st->execute([$rowId]);
+        $so = $st->fetchColumn();
+        if ($so === false) {
+            return 0;
+        }
+        $so = (int) $so;
+        $where = '(sort_order < ? OR (sort_order = ? AND id <= ?))';
+        $params = [$so, $so, $rowId];
+        if ($parentColumn !== null && $parentId !== null) {
+            $where = "{$parentColumn} = ? AND " . $where;
+            array_unshift($params, $parentId);
+        }
+        $st2 = $pdo->prepare("SELECT COUNT(*) FROM {$table} WHERE {$where}");
+        $st2->execute($params);
+
+        return (int) $st2->fetchColumn();
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
+/**
+ * تسلسل المنتج الرقمي (1-based) داخل نوع المنتج حسب (sort_order, id).
+ */
+function orange_catalog_product_ordinal_in_type(PDO $pdo, int $productTypeId, int $productId): int
+{
+    if ($productTypeId <= 0 || $productId <= 0) {
+        return 0;
+    }
+    try {
+        $st = $pdo->prepare('SELECT sort_order FROM products WHERE id = ? LIMIT 1');
+        $st->execute([$productId]);
+        $so = $st->fetchColumn();
+        $so = ($so === false) ? 0 : (int) $so;
+        $st2 = $pdo->prepare(
+            'SELECT COUNT(*) FROM products
+             WHERE product_type_id = ?
+               AND (sort_order < ? OR (sort_order = ? AND id <= ?))'
+        );
+        $st2->execute([$productTypeId, $so, $so, $productId]);
+
+        return (int) $st2->fetchColumn();
+    } catch (Throwable $e) {
+        return 0;
+    }
 }
 
 /**
@@ -103,30 +163,21 @@ function orange_catalog_generate_product_item_code_from_tree(PDO $pdo, int $prod
         return null;
     }
 
-    $p1 = orange_catalog_item_code_segment_from_slug($row['dep_slug'] ?? null, $depId);
-    $p2 = orange_catalog_item_code_segment_from_slug($row['sec_slug'] ?? null, $secId);
-    $p3 = orange_catalog_item_code_segment_from_slug($row['cat_slug'] ?? null, $catId);
-    $p4 = orange_catalog_item_code_segment_from_slug($row['sub_slug'] ?? null, $subId);
-    $p5 = orange_catalog_item_code_segment_from_slug($row['pt_slug'] ?? null, $ptId);
-    $base = implode('-', [$p1, $p2, $p3, $p4, $p5]);
-    $base = trim(preg_replace('/-+/', '-', $base), '-');
-    if ($base === '') {
-        $base = 'pt' . $productTypeId;
-    }
-    $suffix = '-P' . $productId;
-    $maxBase = 64 - strlen($suffix);
-    if ($maxBase < 4) {
-        return 'P' . $productId;
-    }
-    if (strlen($base) > $maxBase) {
-        $base = substr($base, 0, $maxBase);
-        $base = rtrim($base, '-');
-        if ($base === '') {
-            $base = 'pt' . $productTypeId;
-        }
-    }
+    /*
+     * كود رقمي بحت (قرار المالك 2026-06-16): DD SS CC UU TT NNNN
+     *   DD=القسم، SS=قسم الكتالوج، CC=الفئة، UU=تحت‑الفئة، TT=نوع المنتج (خانتان لكلٍّ، الترتيب داخل الأب)
+     *   NNNN=تسلسل المنتج داخل نوع المنتج (4 خانات). الإجمالي 14 رقماً.
+     * الترقيم مُشتق تلقائياً من (sort_order, id)؛ قد يتغيّر عند إعادة الترتيب/الحذف.
+     * لو تجاوز مستوى 99 ابناً (أو المنتجات 9999) يتمدّد عدد الخانات بدل التصادم.
+     */
+    $dd = orange_catalog_node_ordinal($pdo, 'departments', null, null, $depId);
+    $ss = orange_catalog_node_ordinal($pdo, 'catalog_sections', 'department_id', $depId, $secId);
+    $cc = orange_catalog_node_ordinal($pdo, 'catalog_categories', 'catalog_section_id', $secId, $catId);
+    $uu = orange_catalog_node_ordinal($pdo, 'catalog_subcategories', 'catalog_category_id', $catId, $subId);
+    $tt = orange_catalog_node_ordinal($pdo, 'product_types', 'catalog_subcategory_id', $subId, $ptId);
+    $seq = orange_catalog_product_ordinal_in_type($pdo, $productTypeId, $productId);
 
-    return $base . $suffix;
+    return sprintf('%02d%02d%02d%02d%02d%04d', $dd, $ss, $cc, $uu, $tt, $seq);
 }
 
 /**
