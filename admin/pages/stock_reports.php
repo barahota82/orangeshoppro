@@ -1390,9 +1390,6 @@ $srDocTitle = $reportTitle;
 if ($reportKey === 'balances' && $agentId > 0 && $agentLabel !== '') {
     $srDocTitle .= ' - عهدة ' . $agentLabel;
 }
-if ($companyNameAr !== '') {
-    $srDocTitle .= ' - ' . $companyNameAr;
-}
 $srDocTitle .= ' - ' . date('Y-m-d');
 ?>
 <script>
