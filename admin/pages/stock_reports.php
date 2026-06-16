@@ -1233,6 +1233,39 @@ $reportTitle = $reports[$reportKey];
             </table>
         </div>
 
+        <?php if ($reportKey === 'balances'): ?>
+            <div class="sr-sign-row">
+                <?php if ($agentId > 0): ?>
+                    <div class="sr-sign-box">
+                        <div class="sr-sign-title">توقيع المندوب</div>
+                        <div class="sr-sign-name"><?php echo htmlspecialchars($agentLabel, ENT_QUOTES, 'UTF-8'); ?></div>
+                        <div class="sr-sign-line"></div>
+                    </div>
+                    <div class="sr-sign-box">
+                        <div class="sr-sign-title">توقيع أمين المخزن</div>
+                        <div class="sr-sign-name">&nbsp;</div>
+                        <div class="sr-sign-line"></div>
+                    </div>
+                    <div class="sr-sign-box">
+                        <div class="sr-sign-title">اعتماد الإدارة</div>
+                        <div class="sr-sign-name">&nbsp;</div>
+                        <div class="sr-sign-line"></div>
+                    </div>
+                <?php else: ?>
+                    <div class="sr-sign-box">
+                        <div class="sr-sign-title">توقيع أمين المخزن</div>
+                        <div class="sr-sign-name">&nbsp;</div>
+                        <div class="sr-sign-line"></div>
+                    </div>
+                    <div class="sr-sign-box">
+                        <div class="sr-sign-title">اعتماد الإدارة</div>
+                        <div class="sr-sign-name">&nbsp;</div>
+                        <div class="sr-sign-line"></div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
         <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
     </div>
 </div>
@@ -1243,6 +1276,12 @@ $reportTitle = $reports[$reportKey];
 .sr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
 .sr-move-row { cursor:pointer; }
 .sr-move-row:hover { background:#eff6ff; }
+.sr-sign-row { display:flex; justify-content:space-between; gap:32px; margin-top:48px; padding:0 8px; }
+.sr-sign-box { flex:1; text-align:center; }
+.sr-sign-title { font-weight:700; color:#0f172a; margin-bottom:6px; }
+.sr-sign-name { color:#334155; min-height:1.2em; margin-bottom:30px; }
+.sr-sign-line { border-top:1px solid #475569; width:80%; margin:0 auto; }
+@media print { .sr-sign-row { margin-top:60px; } }
 </style>
 
 <?php if ($reportKey === 'movements'): ?>
