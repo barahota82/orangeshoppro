@@ -1396,10 +1396,15 @@ $srDocTitle .= ' - ' . date('Y-m-d');
 ?>
 <script>
 (function () {
-    /* عند الطباعة/الحفظ كـ PDF يُؤخذ اسم الملف من عنوان المستند؛ نضبطه مؤقتاً على اسم التقرير ثم نُعيد الأصلي. */
+    /*
+     * اسم حفظ/طباعة PDF: السكربت المشترك admin-table-export.js يبني العنوان من <h1> الصفحة
+     * (وهو «تقارير المخزن» العام لكل التبويبات) ويُحمَّل في التذييل فيدهس أي معالج beforeprint سابق.
+     * لذا نمرّر اسم التقرير عبر نقطة التجاوز ذات الأولوية القصوى لديه (orangeAdminVoucherPrintTitle)
+     * بدل تسجيل معالج خاص. نعيد العنوان الأصلي بعد الطباعة مع إبقاء المتغيّر (لطباعات متكررة).
+     */
     var reportTitle = <?php echo json_encode($srDocTitle, JSON_UNESCAPED_UNICODE); ?>;
     var originalTitle = document.title;
-    window.addEventListener('beforeprint', function () { document.title = reportTitle; });
+    window.orangeAdminVoucherPrintTitle = reportTitle;
     window.addEventListener('afterprint', function () { document.title = originalTitle; });
 })();
 </script>
