@@ -805,7 +805,7 @@ $reportTitle = $reports[$reportKey];
             <?php if ($depOptions !== []): ?>
             <div>
                 <label for="sr_dep">القسم</label>
-                <select id="sr_dep" name="dep" class="admin-inp" style="width:9.5rem;">
+                <select id="sr_dep" name="dep" class="admin-inp" style="width:10.25rem;">
                     <option value="0">كل الأقسام</option>
                     <?php foreach ($depOptions as $depo): ?>
                         <option value="<?php echo (int) $depo['id']; ?>" <?php echo ((int) $depo['id'] === $depId) ? 'selected' : ''; ?>>
