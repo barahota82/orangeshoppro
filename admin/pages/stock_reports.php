@@ -1051,16 +1051,16 @@ $reportTitle = $reports[$reportKey];
                     <colgroup><col class="srw-code"><col><col class="srw-varcount"><col class="srw-qty"><col class="srw-status"></colgroup>
                 <?php elseif ($reportKey === 'balances'): ?>
                     <?php if ($agentId > 0): ?>
-                    <colgroup><col class="srw-code"><col><col class="srw-variant"><col class="srw-qty"><col class="srw-actual"><col class="srw-res"><col class="srw-res"></colgroup>
+                    <colgroup><col class="srw-code"><col><col class="srw-bal-variant"><col class="srw-qty"><col class="srw-actual"><col class="srw-res"><col class="srw-res"></colgroup>
                     <?php else: ?>
-                    <colgroup><col class="srw-code"><col><col class="srw-variant"><col class="srw-qty"><col class="srw-qty"><col class="srw-actual"><col class="srw-res"><col class="srw-res"></colgroup>
+                    <colgroup><col class="srw-code"><col><col class="srw-bal-variant"><col class="srw-qty"><col class="srw-qty"><col class="srw-actual"><col class="srw-res"><col class="srw-res"></colgroup>
                     <?php endif; ?>
                 <?php elseif ($reportKey === 'low'): ?>
                     <colgroup><col class="srw-code"><col><col class="srw-variant"><col class="srw-qty"><col class="srw-supplier"></colgroup>
                 <?php elseif ($reportKey === 'stagnant'): ?>
                     <colgroup><col class="srw-code"><col><col class="srw-variant"><col class="srw-qty"><col class="srw-date"><col class="srw-mtype"></colgroup>
                 <?php elseif ($reportKey === 'valuation'): ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:6rem"><col style="width:7rem"><col style="width:8.5rem"><?php if ($valShowPrev): ?><col style="width:8.5rem"><?php endif; ?></colgroup>
+                    <colgroup><col class="srw-code"><col><col class="srw-qty"><col style="width:7rem"><col style="width:8.5rem"><?php if ($valShowPrev): ?><col style="width:8.5rem"><?php endif; ?></colgroup>
                 <?php endif; ?>
                 <?php if ($reportKey === 'items'): ?>
                     <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num">عدد المتغيرات</th><th class="gl-acc-stmt-col-num">إجمالي الرصيد</th><th>الحالة</th></tr></thead>
@@ -1305,6 +1305,7 @@ $reportTitle = $reports[$reportKey];
    حتى يتّسع مجموع الأعمدة داخل عرض ورقة A4 العمودية فلا ينضغط عمود «الصنف». */
 .srw-code { width:9.5rem; }
 .srw-variant { width:12rem; }
+.srw-bal-variant { width:12rem; }
 .srw-qty { width:6rem; }
 .srw-actual { width:8rem; }
 .srw-res { width:5rem; }
@@ -1314,9 +1315,11 @@ $reportTitle = $reports[$reportKey];
 .srw-varcount { width:15rem; }
 .srw-status { width:6rem; }
 @media print {
-    /* الكود يبقى 9.5rem حتى في الطباعة ليتّسع لـ 14 رقماً كاملة دون اقتطاع. */
+    /* توحيد عرض الطباعة لكل التقارير: الكود 9.5rem (يتّسع لـ14 رقماً)، الكميات 4.2rem،
+       اللون/المقاس 10rem. تقرير الجرد مستثنى (srw-bal-variant + srw-actual + srw-res). */
     .srw-code { width:9.5rem; }
-    .srw-variant { width:7.5rem; }
+    .srw-variant { width:10rem; }
+    .srw-bal-variant { width:7.5rem; }
     .srw-qty { width:4.2rem; }
     .srw-actual { width:5.5rem; }
     .srw-res { width:3.6rem; }
@@ -1325,6 +1328,13 @@ $reportTitle = $reports[$reportKey];
     .srw-mtype { width:6.5rem; }
     .srw-varcount { width:10rem; }
     .srw-status { width:5rem; }
+    /* التقارير ذات التخطيط التلقائي (الحركة/ملخص الحركة) تعتمد على فئات الخلايا العامة. */
+    .gl-acc-stmt-table th.sr-col-qty,
+    .gl-acc-stmt-table td.sr-col-qty { width:4.2rem; }
+    .gl-acc-stmt-table th.sr-col-variant,
+    .gl-acc-stmt-table td.sr-col-variant,
+    .gl-acc-stmt-table.sr-grouped-cols th.sr-col-variant,
+    .gl-acc-stmt-table.sr-grouped-cols td.sr-col-variant { width:10rem; }
 }
 /* توقيع مختصر يتكرر أسفل كل صفحة مطبوعة (تثبيت المسؤولية لكل ورقة) — مخفي على الشاشة. */
 .sr-page-sign { display:none; }
