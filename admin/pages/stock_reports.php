@@ -1314,7 +1314,8 @@ $reportTitle = $reports[$reportKey];
 .srw-varcount { width:15rem; }
 .srw-status { width:6rem; }
 @media print {
-    .srw-code { width:7rem; }
+    /* الكود يبقى 9.5rem حتى في الطباعة ليتّسع لـ 14 رقماً كاملة دون اقتطاع. */
+    .srw-code { width:9.5rem; }
     .srw-variant { width:7.5rem; }
     .srw-qty { width:4.2rem; }
     .srw-actual { width:5.5rem; }
