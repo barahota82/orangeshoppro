@@ -927,7 +927,7 @@ $reportTitle = $reports[$reportKey];
                 <?php elseif ($reportKey === 'balances'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
                 <?php elseif ($reportKey === 'low'): ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:14rem"></colgroup>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:16rem"></colgroup>
                 <?php elseif ($reportKey === 'stagnant'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:8.5rem"><col style="width:10rem"></colgroup>
                 <?php endif; ?>
