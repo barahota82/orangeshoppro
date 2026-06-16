@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
 require_once __DIR__ . '/../../includes/stock_alerts.php';
 require_once __DIR__ . '/../../includes/order_stock.php';
+require_once __DIR__ . '/../../includes/delivery_agents.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/cart_promo_products.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
@@ -77,6 +78,28 @@ $depId = isset($_GET['dep']) ? max(0, (int) $_GET['dep']) : 0;
 $catId = isset($_GET['cat']) ? max(0, (int) $_GET['cat']) : 0;
 /* إخفاء الأصناف/المتغيّرات ذات الرصيد صفر (قائمة الأصناف/الأرصدة/التقييم). */
 $hideZero = isset($_GET['hz']) && (string) $_GET['hz'] === '1';
+
+/* تقرير الجرد: فلتر المندوب (عهدة) بدل اختيار صنف واحد.
+   فارغ = جرد المخزن (الرف) مخصوماً منه المحمّل للمناديب؛ مندوب محدّد = عهدة ذلك المندوب. */
+$agentId = isset($_GET['agent_id']) ? max(0, (int) $_GET['agent_id']) : 0;
+$agentOptions = [];
+$agentLabel = '';
+if ($reportKey === 'balances' && orange_table_exists($pdo, 'delivery_agents')) {
+    $agentOptions = orange_delivery_agents_admin_list($pdo, $srCountryId > 0 ? $srCountryId : null);
+    if ($agentId > 0) {
+        $agentValid = false;
+        foreach ($agentOptions as $ao) {
+            if ((int) ($ao['id'] ?? 0) === $agentId) {
+                $agentLabel = orange_delivery_agent_display_name($ao);
+                $agentValid = true;
+                break;
+            }
+        }
+        if (!$agentValid) {
+            $agentId = 0;
+        }
+    }
+}
 $depOptions = [];
 $catOptions = [];
 try {
@@ -155,6 +178,7 @@ $grpLabel = static function (array $r): string {
 $rows = [];
 $moveGroups = [];
 $grandQty = 0;
+$grandReserved = 0;
 $grandValue = 0.0;
 $grandValuePrev = 0.0;
 $valGroups = [];
@@ -214,14 +238,56 @@ try {
             ];
         }
     } elseif ($reportKey === 'balances') {
-        /* الجرد: سطر لكل متغير (لون/مقاس) + كود + تكلفة + قيمة. */
+        /*
+         * الجرد: سطر لكل متغير (لون/مقاس). فلتر المندوب:
+         *  - فارغ → جرد الرف: الكمية على الرف = الرصيد المخزّن + المحجوز غير المُحمَّل،
+         *    مع عمود «محجوز» (طلبات لها حجز نشط ولم تخرج للمندوب بعد). المحمّل للمندوب
+         *    (طلب «بالطريق» مُسنَد لمندوب) مستثنى تلقائياً لأنه خرج من الرف فعلياً.
+         *  - مندوب محدّد → عهدته: الأصناف المحمّلة بالطريق المُسنَدة لذلك المندوب فقط.
+         */
         $wq = orange_warehouse_effective_qty_sql($pdo, $srCountryId, 'pv', 'wvs_sr');
+        $balAgentMode = ($agentId > 0);
+
+        /* تجميع الحجوزات النشطة (pending_order) لكل متغيّر، مقسّمة: محمّل لمندوب أم على الرف. */
+        $balResShelf = [];   // variant_id => كمية محجوزة على الرف (غير محمّلة)
+        $balCustody = [];    // variant_id => كمية محمّلة لدى المندوب المحدّد
+        if (orange_table_exists($pdo, 'orders')
+            && orange_table_has_column($pdo, 'orders', 'delivery_agent_id')
+            && orange_table_exists($pdo, 'stock_movements')) {
+            $resCountrySql = '';
+            $resParams = [];
+            if ($srCountryId > 0 && orange_table_has_column($pdo, 'orders', 'country_id')) {
+                $resCountrySql = ' AND o.country_id = ?';
+                $resParams[] = $srCountryId;
+            }
+            $resSql = "SELECT sm.variant_id AS vid,
+                              (o.status = 'on_the_way' AND o.delivery_agent_id IS NOT NULL) AS loaded,
+                              o.delivery_agent_id AS agent_id,
+                              COALESCE(SUM(sm.qty), 0) AS q
+                       FROM stock_movements sm
+                       INNER JOIN orders o ON sm.reference = CONCAT('ORDER-', o.order_number)
+                       WHERE sm.type = 'pending_order' AND sm.variant_id IS NOT NULL" . $resCountrySql . "
+                       GROUP BY sm.variant_id, loaded, o.delivery_agent_id";
+            $rs = $pdo->prepare($resSql);
+            $rs->execute($resParams);
+            foreach ($rs->fetchAll(PDO::FETCH_ASSOC) as $rr) {
+                $vid = (int) $rr['vid'];
+                if ($vid <= 0) {
+                    continue;
+                }
+                $q = (int) $rr['q'];
+                if ((int) $rr['loaded'] === 1) {
+                    if ($balAgentMode && (int) ($rr['agent_id'] ?? 0) === $agentId) {
+                        $balCustody[$vid] = ($balCustody[$vid] ?? 0) + $q;
+                    }
+                } else {
+                    $balResShelf[$vid] = ($balResShelf[$vid] ?? 0) + $q;
+                }
+            }
+        }
+
         $filterSql = '';
         $params = [];
-        if ($pid > 0) {
-            $filterSql .= ' AND p.id = ?';
-            $params[] = $pid;
-        }
         if ($catId > 0) {
             $filterSql .= ' AND c.id = ?';
             $params[] = $catId;
@@ -230,6 +296,7 @@ try {
             $params[] = $depFilterParam;
         }
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, p.cost AS cost,
+                       pv.id AS variant_id,
                        ' . $itemCodeExpr . ' AS item_code,
                        COALESCE(c.name_ar, \'\') AS category_name,
                        ' . $grpSelectCols . ',
@@ -243,13 +310,26 @@ try {
         $st = $pdo->prepare($sql);
         $st->execute($params);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $qty = (int) $r['qty'];
-            if ($hideZero && $qty <= 0) {
-                continue;
-            }
+            $vid = (int) $r['variant_id'];
+            $wstock = (int) $r['qty'];
             $cost = (float) $r['cost'];
+            if ($balAgentMode) {
+                $custody = (int) ($balCustody[$vid] ?? 0);
+                if ($custody <= 0) {
+                    continue;
+                }
+                $qty = $custody;
+                $reserved = 0;
+            } else {
+                $reserved = (int) ($balResShelf[$vid] ?? 0);
+                $qty = $wstock + $reserved;
+                if ($hideZero && $qty <= 0) {
+                    continue;
+                }
+            }
             $value = $qty * $cost;
             $grandQty += $qty;
+            $grandReserved += $reserved;
             $grandValue += $value;
             $rows[] = [
                 'item_code' => (string) $r['item_code'],
@@ -260,6 +340,7 @@ try {
                 'group_cat_name' => (string) ($r['group_cat_name'] ?? ''),
                 'variant' => trim(((string) ($r['color'] ?? '')) . ' / ' . ((string) ($r['size'] ?? ''))),
                 'qty' => $qty,
+                'reserved' => $reserved,
                 'cost' => $cost,
                 'value' => $value,
             ];
@@ -819,7 +900,20 @@ $reportTitle = $reports[$reportKey];
     <form method="get" class="sr-filter-form" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
         <input type="hidden" name="page" value="stock_reports">
         <input type="hidden" name="r" value="<?php echo htmlspecialchars($reportKey, ENT_QUOTES, 'UTF-8'); ?>">
-        <?php if (in_array($reportKey, ['items', 'balances', 'valuation', 'movements', 'move_summary'], true)): ?>
+        <?php if ($reportKey === 'balances'): ?>
+            <div>
+                <label for="sr_agent">المندوب (عهدة)</label>
+                <select id="sr_agent" name="agent_id" class="admin-inp" style="width:14rem;" onchange="this.form.submit()">
+                    <option value="0">المخزن (بدون المحمَّل للمناديب)</option>
+                    <?php foreach ($agentOptions as $ao): ?>
+                        <option value="<?php echo (int) $ao['id']; ?>" <?php echo ((int) $ao['id'] === $agentId) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars(orange_delivery_agent_display_name($ao), ENT_QUOTES, 'UTF-8'); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        <?php endif; ?>
+        <?php if (in_array($reportKey, ['items', 'valuation', 'movements', 'move_summary'], true)): ?>
             <div>
                 <label for="sr_pid_code">الصنف (دبل كليك للاختيار)</label>
                 <div style="display:flex;gap:6px;align-items:center;">
@@ -956,7 +1050,11 @@ $reportTitle = $reports[$reportKey];
                 <?php if ($reportKey === 'items'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:15rem"><col style="width:6rem"><col style="width:6rem"></colgroup>
                 <?php elseif ($reportKey === 'balances'): ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
+                    <?php if ($agentId > 0): ?>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:7rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
+                    <?php else: ?>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:6rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
+                    <?php endif; ?>
                 <?php elseif ($reportKey === 'low'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:16rem"></colgroup>
                 <?php elseif ($reportKey === 'stagnant'): ?>
@@ -984,25 +1082,43 @@ $reportTitle = $reports[$reportKey];
                     </tbody>
                     <tfoot><tr><th colspan="3">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th></th></tr></tfoot>
                 <?php elseif ($reportKey === 'balances'): ?>
-                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="sr-col-variant">اللون / المقاس</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة</th></tr></thead>
+                    <?php $balAgentMode = ($agentId > 0); $balCols = $balAgentMode ? 6 : 7; ?>
+                    <thead><tr>
+                        <th class="sr-code-cell">الكود</th><th>الصنف</th><th class="sr-col-variant">اللون / المقاس</th>
+                        <?php if ($balAgentMode): ?>
+                            <th class="gl-acc-stmt-col-num">بعهدة المندوب</th>
+                        <?php else: ?>
+                            <th class="gl-acc-stmt-col-num">على الرف</th><th class="gl-acc-stmt-col-num">محجوز</th>
+                        <?php endif; ?>
+                        <th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة</th>
+                    </tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
-                            <tr><td colspan="6" class="muted">لا أصناف.</td></tr>
+                            <tr><td colspan="<?php echo (int) $balCols; ?>" class="muted"><?php echo $balAgentMode ? 'لا أصناف بعهدة هذا المندوب حالياً.' : 'لا أصناف.'; ?></td></tr>
                         <?php else: $srGrp = null; foreach ($rows as $r): ?>
                             <?php $k = $grpKey($r); if ($k !== $srGrp): $srGrp = $k; ?>
-                                <tr class="ta-report-section"><td colspan="6"><?php echo htmlspecialchars($grpLabel($r), ENT_QUOTES, 'UTF-8'); ?></td></tr>
+                                <tr class="ta-report-section"><td colspan="<?php echo (int) $balCols; ?>"><?php echo htmlspecialchars($grpLabel($r), ENT_QUOTES, 'UTF-8'); ?></td></tr>
                             <?php endif; ?>
                             <tr>
                                 <td dir="ltr" class="sr-code-cell"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="sr-col-variant"><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>
+                                <?php if (!$balAgentMode): ?>
+                                    <td class="gl-acc-stmt-col-num"><?php echo ((int) ($r['reserved'] ?? 0)) > 0 ? (int) $r['reserved'] : '—'; ?></td>
+                                <?php endif; ?>
                                 <td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['cost']); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['value']); ?></td>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
-                    <tfoot><tr><th colspan="3">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th class="gl-acc-stmt-col-num">—</th><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th></tr></tfoot>
+                    <tfoot><tr>
+                        <th colspan="3">الإجمالي</th>
+                        <th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th>
+                        <?php if (!$balAgentMode): ?><th class="gl-acc-stmt-col-num"><?php echo $grandReserved > 0 ? (int) $grandReserved : '—'; ?></th><?php endif; ?>
+                        <th class="gl-acc-stmt-col-num">—</th>
+                        <th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th>
+                    </tr></tfoot>
                 <?php elseif ($reportKey === 'valuation'): ?>
                     <?php $valCols = $valShowPrev ? 6 : 5; ?>
                     <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num sr-col-qty">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة الحالية</th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num">نهاية <?php echo htmlspecialchars(orange_format_date_dmY($valPrevEnd), ENT_QUOTES, 'UTF-8'); ?></th><?php endif; ?></tr></thead>
@@ -1144,7 +1260,7 @@ $reportTitle = $reports[$reportKey];
 </script>
 <?php endif; ?>
 
-<?php if (in_array($reportKey, ['items', 'balances', 'valuation', 'movements', 'move_summary'], true)): ?>
+<?php if (in_array($reportKey, ['items', 'valuation', 'movements', 'move_summary'], true)): ?>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 (function () {
@@ -1195,40 +1311,45 @@ $reportTitle = $reports[$reportKey];
             }
         });
     }
+})();
+</script>
+<?php endif; ?>
 
+<?php if (in_array($reportKey, ['items', 'balances', 'valuation'], true)): ?>
+<script>
+(function () {
     /* تعاقُب القسم → الفئة: عند تغيير القسم تُعرض فئات ذلك القسم فقط، وتُصفّر الفئة إن لم تَعُد ضمنه. */
     var depSel = document.getElementById('sr_dep');
     var catSel = document.getElementById('sr_cat');
-    if (depSel && catSel) {
-        var syncCats = function (resetIfMismatch) {
-            var dep = parseInt(depSel.value, 10) || 0;
-            /* كل الأقسام: لا اختيار فئة محددة (مكرّرة) — تُقفل على «كل الفئات». */
-            if (dep === 0) {
+    if (!depSel || !catSel) { return; }
+    var syncCats = function (resetIfMismatch) {
+        var dep = parseInt(depSel.value, 10) || 0;
+        /* كل الأقسام: لا اختيار فئة محددة (مكرّرة) — تُقفل على «كل الفئات». */
+        if (dep === 0) {
+            catSel.value = '0';
+            catSel.disabled = true;
+            return;
+        }
+        catSel.disabled = false;
+        var opts = catSel.options;
+        for (var i = 0; i < opts.length; i++) {
+            var opt = opts[i];
+            if (!opt.value || opt.value === '0') {
+                continue;
+            }
+            var oDep = parseInt(opt.getAttribute('data-dep'), 10) || 0;
+            var show = (oDep === dep);
+            opt.hidden = !show;
+            opt.disabled = !show;
+            if (!show && resetIfMismatch && opt.selected) {
                 catSel.value = '0';
-                catSel.disabled = true;
-                return;
             }
-            catSel.disabled = false;
-            var opts = catSel.options;
-            for (var i = 0; i < opts.length; i++) {
-                var opt = opts[i];
-                if (!opt.value || opt.value === '0') {
-                    continue;
-                }
-                var oDep = parseInt(opt.getAttribute('data-dep'), 10) || 0;
-                var show = (oDep === dep);
-                opt.hidden = !show;
-                opt.disabled = !show;
-                if (!show && resetIfMismatch && opt.selected) {
-                    catSel.value = '0';
-                }
-            }
-        };
-        depSel.addEventListener('change', function () {
-            syncCats(true);
-        });
-        syncCats(false);
-    }
+        }
+    };
+    depSel.addEventListener('change', function () {
+        syncCats(true);
+    });
+    syncCats(false);
 })();
 </script>
 <?php endif; ?>
