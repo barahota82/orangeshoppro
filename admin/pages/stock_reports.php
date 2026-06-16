@@ -1051,9 +1051,9 @@ $reportTitle = $reports[$reportKey];
                     <colgroup><col style="width:9.5rem"><col><col style="width:15rem"><col style="width:6rem"><col style="width:6rem"></colgroup>
                 <?php elseif ($reportKey === 'balances'): ?>
                     <?php if ($agentId > 0): ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:7rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:7rem"><col style="width:8rem"><col style="width:8rem"></colgroup>
                     <?php else: ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:6rem"><col style="width:7rem"><col style="width:8rem"></colgroup>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:6rem"><col style="width:8rem"><col style="width:8rem"></colgroup>
                     <?php endif; ?>
                 <?php elseif ($reportKey === 'low'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:16rem"></colgroup>
@@ -1090,7 +1090,7 @@ $reportTitle = $reports[$reportKey];
                         <?php else: ?>
                             <th class="gl-acc-stmt-col-num">على الرف</th><th class="gl-acc-stmt-col-num">محجوز</th>
                         <?php endif; ?>
-                        <th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة</th>
+                        <th class="gl-acc-stmt-col-num">الكمية الفعلية</th><th class="gl-acc-stmt-col-num">ناتج الجرد</th>
                     </tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
@@ -1107,8 +1107,8 @@ $reportTitle = $reports[$reportKey];
                                 <?php if (!$balAgentMode): ?>
                                     <td class="gl-acc-stmt-col-num"><?php echo ((int) ($r['reserved'] ?? 0)) > 0 ? (int) $r['reserved'] : '—'; ?></td>
                                 <?php endif; ?>
-                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['cost']); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['value']); ?></td>
+                                <td class="gl-acc-stmt-col-num"></td>
+                                <td class="gl-acc-stmt-col-num"></td>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
@@ -1116,8 +1116,8 @@ $reportTitle = $reports[$reportKey];
                         <th colspan="3">الإجمالي</th>
                         <th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th>
                         <?php if (!$balAgentMode): ?><th class="gl-acc-stmt-col-num"><?php echo $grandReserved > 0 ? (int) $grandReserved : '—'; ?></th><?php endif; ?>
-                        <th class="gl-acc-stmt-col-num">—</th>
-                        <th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th>
+                        <th class="gl-acc-stmt-col-num"></th>
+                        <th class="gl-acc-stmt-col-num"></th>
                     </tr></tfoot>
                 <?php elseif ($reportKey === 'valuation'): ?>
                     <?php $valCols = $valShowPrev ? 6 : 5; ?>
