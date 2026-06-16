@@ -1051,9 +1051,9 @@ $reportTitle = $reports[$reportKey];
                     <colgroup><col style="width:9.5rem"><col><col style="width:15rem"><col style="width:6rem"><col style="width:6rem"></colgroup>
                 <?php elseif ($reportKey === 'balances'): ?>
                     <?php if ($agentId > 0): ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:7rem"><col style="width:8rem"><col style="width:8rem"></colgroup>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:7rem"><col style="width:8rem"><col style="width:5rem"><col style="width:5rem"></colgroup>
                     <?php else: ?>
-                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:6rem"><col style="width:8rem"><col style="width:8rem"></colgroup>
+                    <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:6rem"><col style="width:8rem"><col style="width:5rem"><col style="width:5rem"></colgroup>
                     <?php endif; ?>
                 <?php elseif ($reportKey === 'low'): ?>
                     <colgroup><col style="width:9.5rem"><col><col style="width:12rem"><col style="width:6rem"><col style="width:16rem"></colgroup>
@@ -1082,16 +1082,22 @@ $reportTitle = $reports[$reportKey];
                     </tbody>
                     <tfoot><tr><th colspan="3">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th></th></tr></tfoot>
                 <?php elseif ($reportKey === 'balances'): ?>
-                    <?php $balAgentMode = ($agentId > 0); $balCols = $balAgentMode ? 6 : 7; ?>
-                    <thead><tr>
-                        <th class="sr-code-cell">الكود</th><th>الصنف</th><th class="sr-col-variant">اللون / المقاس</th>
+                    <?php $balAgentMode = ($agentId > 0); $balCols = $balAgentMode ? 7 : 8; ?>
+                    <thead>
+                    <tr>
+                        <th class="sr-code-cell" rowspan="2">الكود</th><th rowspan="2">الصنف</th><th class="sr-col-variant" rowspan="2">اللون / المقاس</th>
                         <?php if ($balAgentMode): ?>
-                            <th class="gl-acc-stmt-col-num">بعهدة المندوب</th>
+                            <th class="gl-acc-stmt-col-num" rowspan="2">بعهدة المندوب</th>
                         <?php else: ?>
-                            <th class="gl-acc-stmt-col-num">على الرف</th><th class="gl-acc-stmt-col-num">محجوز</th>
+                            <th class="gl-acc-stmt-col-num" rowspan="2">على الرف</th><th class="gl-acc-stmt-col-num" rowspan="2">محجوز</th>
                         <?php endif; ?>
-                        <th class="gl-acc-stmt-col-num">الكمية الفعلية</th><th class="gl-acc-stmt-col-num">ناتج الجرد</th>
-                    </tr></thead>
+                        <th class="gl-acc-stmt-col-num" rowspan="2">الكمية الفعلية</th>
+                        <th class="gl-acc-stmt-col-num" colspan="2">ناتج الجرد</th>
+                    </tr>
+                    <tr>
+                        <th class="gl-acc-stmt-col-num">زائد +</th><th class="gl-acc-stmt-col-num">ناقص −</th>
+                    </tr>
+                    </thead>
                     <tbody>
                         <?php if ($rows === []): ?>
                             <tr><td colspan="<?php echo (int) $balCols; ?>" class="muted"><?php echo $balAgentMode ? 'لا أصناف بعهدة هذا المندوب حالياً.' : 'لا أصناف.'; ?></td></tr>
@@ -1109,6 +1115,7 @@ $reportTitle = $reports[$reportKey];
                                 <?php endif; ?>
                                 <td class="gl-acc-stmt-col-num"></td>
                                 <td class="gl-acc-stmt-col-num"></td>
+                                <td class="gl-acc-stmt-col-num"></td>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
@@ -1116,6 +1123,7 @@ $reportTitle = $reports[$reportKey];
                         <th colspan="3">الإجمالي</th>
                         <th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th>
                         <?php if (!$balAgentMode): ?><th class="gl-acc-stmt-col-num"><?php echo $grandReserved > 0 ? (int) $grandReserved : '—'; ?></th><?php endif; ?>
+                        <th class="gl-acc-stmt-col-num"></th>
                         <th class="gl-acc-stmt-col-num"></th>
                         <th class="gl-acc-stmt-col-num"></th>
                     </tr></tfoot>
