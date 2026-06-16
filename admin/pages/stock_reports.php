@@ -817,7 +817,7 @@ $reportTitle = $reports[$reportKey];
             <?php endif; ?>
             <div>
                 <label for="sr_cat">الفئة</label>
-                <select id="sr_cat" name="cat" class="admin-inp" style="width:11rem;" <?php echo ($depOptions !== [] && $depId <= 0) ? 'disabled' : ''; ?>>
+                <select id="sr_cat" name="cat" class="admin-inp" style="width:13.5rem;" <?php echo ($depOptions !== [] && $depId <= 0) ? 'disabled' : ''; ?>>
                     <option value="0">كل الفئات</option>
                     <?php foreach ($catOptions as $co): ?>
                         <?php $coDep = (int) ($co['department_id'] ?? 0); ?>
