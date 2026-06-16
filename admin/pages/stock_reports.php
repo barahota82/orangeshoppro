@@ -433,16 +433,17 @@ try {
         /* (1) الرصيد الفعلي الحالي + اسم الصنف لكل صنف ضمن نطاق الدولة. */
         $msCur = [];
         $curSql = 'SELECT p.id AS pid, p.name AS pname, ' . $itemCodeExpr . ' AS item_code,
+                          COALESCE(d_grp.name_ar, \'\') AS dep_name,
                           COALESCE(SUM(' . $wq['expr'] . '), 0) AS cur
                    FROM products p
                    INNER JOIN product_variants pv ON pv.product_id = p.id
-                   ' . $wq['join'] . '
+                   ' . $wq['join'] . $catJoin . $grpCatJoinExtra . '
                    WHERE 1=1' . $productCountrySql . ($pid > 0 ? ' AND p.id = ?' : '') . '
-                   GROUP BY p.id, p.name, item_code';
+                   GROUP BY p.id, p.name, item_code, dep_name';
         $st = $pdo->prepare($curSql);
         $st->execute($pid > 0 ? [$pid] : []);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $msCur[(int) $r['pid']] = ['name' => (string) $r['pname'], 'item_code' => (string) $r['item_code'], 'cur' => (int) $r['cur']];
+            $msCur[(int) $r['pid']] = ['name' => (string) $r['pname'], 'item_code' => (string) $r['item_code'], 'dep_name' => (string) $r['dep_name'], 'cur' => (int) $r['cur']];
         }
 
         /* (2) صافي كل الحركات منذ «من» لكل صنف (لاستخراج رصيد أول عكسياً). */
@@ -546,6 +547,7 @@ try {
                 'product_id' => $p,
                 'item_code' => (string) ($msCur[$p]['item_code'] ?? ''),
                 'product_name' => (string) $msCur[$p]['name'],
+                'department' => (string) ($msCur[$p]['dep_name'] ?? ''),
                 'opening' => $opening,
                 'qin' => $qin,
                 'qout' => $qout,
@@ -1018,14 +1020,15 @@ $reportTitle = $reports[$reportKey];
                         <?php endforeach; endif; ?>
                     </tbody>
                 <?php elseif ($reportKey === 'move_summary'): ?>
-                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num sr-col-qty">رصيد أول</th><th class="gl-acc-stmt-col-num sr-col-qty">وارد</th><th class="gl-acc-stmt-col-num sr-col-qty">صادر</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد الحالي</th></tr></thead>
+                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="sr-col-dept">القسم</th><th class="gl-acc-stmt-col-num sr-col-qty">رصيد أول</th><th class="gl-acc-stmt-col-num sr-col-qty">وارد</th><th class="gl-acc-stmt-col-num sr-col-qty">صادر</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد الحالي</th></tr></thead>
                     <tbody>
                         <?php if ($rows === []): ?>
-                            <tr><td colspan="6" class="muted">لا حركة في المدى.</td></tr>
+                            <tr><td colspan="7" class="muted">لا حركة في المدى.</td></tr>
                         <?php else: foreach ($rows as $r): ?>
                             <tr>
                                 <td dir="ltr" class="sr-code-cell"><?php echo htmlspecialchars($r['item_code'] !== '' ? $r['item_code'] : ('P' . $r['product_id']), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="sr-col-dept"><?php echo ($r['department'] ?? '') !== '' ? htmlspecialchars($r['department'], ENT_QUOTES, 'UTF-8') : '—'; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['opening']; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qin']; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qout']; ?></td>
