@@ -46,6 +46,28 @@ function orange_format_datetime_dmY_hi(?string $value): string
 }
 
 /**
+ * تاريخ ووقت مع اسم اليوم بالعربي: «اليوم يوم/شهر/سنة ساعة:دقيقة».
+ */
+function orange_format_datetime_ar_day_dmY_hi(?string $value): string
+{
+    if ($value === null) {
+        return '';
+    }
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+    $t = strtotime($value);
+    if ($t === false) {
+        return $value;
+    }
+    static $days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    $dayName = $days[(int) date('w', $t)] ?? '';
+
+    return ($dayName !== '' ? $dayName . ' ' : '') . date('d/m/Y H:i', $t);
+}
+
+/**
  * تحويل إدخال المستخدم (يوم/شهر/سنة أو Y-m-d) إلى Y-m-d للاستعلامات والـ API.
  *
  * @return string فارغ إذا لم يُقبل الإدخال

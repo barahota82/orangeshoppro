@@ -1049,7 +1049,7 @@ $reportTitle = $reports[$reportKey];
                             </tr>
                             <?php foreach ($g['lines'] as $ln): ?>
                             <tr>
-                                <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi($ln['at']), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars(orange_format_datetime_ar_day_dmY_hi($ln['at']), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($ln['label'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td dir="ltr"><code><?php echo htmlspecialchars($ln['reference'] !== '' ? $ln['reference'] : '—', ENT_QUOTES, 'UTF-8'); ?></code></td>
                                 <td class="sr-col-variant"><?php echo htmlspecialchars($ln['variant'] !== '/' ? $ln['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
