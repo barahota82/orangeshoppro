@@ -75,6 +75,8 @@ $stagnantDays = isset($_GET['days']) ? max(7, min(3650, (int) $_GET['days'])) : 
    لذلك يُختار القسم أولاً وتُفلتَر الفئات تبعه. */
 $depId = isset($_GET['dep']) ? max(0, (int) $_GET['dep']) : 0;
 $catId = isset($_GET['cat']) ? max(0, (int) $_GET['cat']) : 0;
+/* إخفاء الأصناف/المتغيّرات ذات الرصيد صفر (قائمة الأصناف/الأرصدة/التقييم). */
+$hideZero = isset($_GET['hz']) && (string) $_GET['hz'] === '1';
 $depOptions = [];
 $catOptions = [];
 try {
@@ -195,6 +197,9 @@ try {
         $st->execute($params);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $qty = (int) $r['total_stock'];
+            if ($hideZero && $qty <= 0) {
+                continue;
+            }
             $grandQty += $qty;
             $rows[] = [
                 'item_code' => (string) $r['item_code'],
@@ -239,6 +244,9 @@ try {
         $st->execute($params);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $qty = (int) $r['qty'];
+            if ($hideZero && $qty <= 0) {
+                continue;
+            }
             $cost = (float) $r['cost'];
             $value = $qty * $cost;
             $grandQty += $qty;
@@ -821,6 +829,14 @@ $reportTitle = $reports[$reportKey];
                         </option>
                     <?php endforeach; ?>
                 </select>
+            </div>
+        <?php endif; ?>
+        <?php if (in_array($reportKey, ['items', 'balances'], true)): ?>
+            <div style="display:flex;align-items:flex-end;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
+                    <input type="checkbox" name="hz" value="1" onchange="this.form.submit()" <?php echo $hideZero ? 'checked' : ''; ?>>
+                    إخفاء الأصناف ذات الرصيد صفر
+                </label>
             </div>
         <?php endif; ?>
         <?php if (in_array($reportKey, ['movements', 'move_summary'], true)): ?>
