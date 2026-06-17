@@ -733,6 +733,150 @@ function orange_inventory_reconciliation_archive_list(
 }
 
 /**
+ * التنقّل بين سجلات الأرشيف بترتيب المعرّف (id): أول/سابق/تالي/آخر.
+ * يعيد معرّف السجل الهدف أو 0 إن لا يوجد.
+ */
+function orange_inventory_reconciliation_archive_nav(PDO $pdo, string $dir, int $currentId, ?int $countryId = null): int
+{
+    if (! orange_inventory_reconciliation_ready($pdo)) {
+        return 0;
+    }
+    $hasCountry = orange_table_has_column($pdo, 'inventory_reconciliation', 'country_id');
+    $scopeSql = '';
+    $params = [];
+    if ($hasCountry && $countryId !== null && $countryId > 0) {
+        $scopeSql = ' AND (country_id IS NULL OR country_id = ?)';
+        $params[] = $countryId;
+    }
+
+    switch ($dir) {
+        case 'first':
+            $sql = 'SELECT id FROM inventory_reconciliation WHERE 1=1' . $scopeSql . ' ORDER BY id ASC LIMIT 1';
+            break;
+        case 'last':
+            $sql = 'SELECT id FROM inventory_reconciliation WHERE 1=1' . $scopeSql . ' ORDER BY id DESC LIMIT 1';
+            break;
+        case 'prev':
+            $sql = 'SELECT id FROM inventory_reconciliation WHERE id < ?' . $scopeSql . ' ORDER BY id DESC LIMIT 1';
+            array_unshift($params, $currentId);
+            break;
+        case 'next':
+            $sql = 'SELECT id FROM inventory_reconciliation WHERE id > ?' . $scopeSql . ' ORDER BY id ASC LIMIT 1';
+            array_unshift($params, $currentId);
+            break;
+        default:
+            return 0;
+    }
+
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+    $val = $st->fetchColumn();
+
+    return $val === false ? 0 : (int) $val;
+}
+
+/**
+ * بحث في سجلات الأرشيف بفلاتر: تاريخ من/إلى، نص الملاحظة، النطاق (مخزن/مندوب).
+ *
+ * @param array<string,mixed> $filters
+ * @return array<int,array<string,mixed>>
+ */
+function orange_inventory_reconciliation_archive_search(PDO $pdo, array $filters, ?int $countryId = null): array
+{
+    if (! orange_inventory_reconciliation_ready($pdo)) {
+        return [];
+    }
+
+    $fromDate = isset($filters['from']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $filters['from']) ? (string) $filters['from'] : null;
+    $toDate = isset($filters['to']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $filters['to']) ? (string) $filters['to'] : null;
+    $notes = isset($filters['notes']) ? trim((string) $filters['notes']) : '';
+    $warehouseId = (int) ($filters['warehouse_id'] ?? 0);
+    $agentId = (int) ($filters['delivery_agent_id'] ?? 0);
+
+    $hasAttach = orange_table_has_column($pdo, 'inventory_reconciliation', 'attachments_json');
+    $hasAgent = orange_table_has_column($pdo, 'inventory_reconciliation', 'delivery_agent_id');
+    $hasSort = orange_table_has_column($pdo, 'inventory_reconciliation', 'sort_order');
+    $hasAgentTable = orange_table_exists($pdo, 'delivery_agents');
+
+    $cols = 'ir.id, ir.warehouse_id, ir.counted_at, ir.notes, ir.created_at, ir.country_id,
+             w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en';
+    if ($hasSort) {
+        $cols .= ', ir.sort_order';
+    }
+    if ($hasAttach) {
+        $cols .= ', ir.attachments_json';
+    }
+    $join = ' LEFT JOIN warehouses w ON w.id = ir.warehouse_id';
+    if ($hasAgent) {
+        $cols .= ', ir.delivery_agent_id';
+        if ($hasAgentTable) {
+            $cols .= ', da.name_ar AS agent_name_ar, da.name_en AS agent_name_en';
+            $join .= ' LEFT JOIN delivery_agents da ON da.id = ir.delivery_agent_id';
+        }
+    }
+
+    $sql = 'SELECT ' . $cols . ' FROM inventory_reconciliation ir' . $join . ' WHERE 1=1';
+    $params = [];
+    if ($countryId !== null && $countryId > 0 && orange_table_has_column($pdo, 'inventory_reconciliation', 'country_id')) {
+        $sql .= ' AND (ir.country_id IS NULL OR ir.country_id = ?)';
+        $params[] = $countryId;
+    }
+    if ($fromDate !== null) {
+        $sql .= ' AND ir.counted_at >= ?';
+        $params[] = $fromDate;
+    }
+    if ($toDate !== null) {
+        $sql .= ' AND ir.counted_at <= ?';
+        $params[] = $toDate;
+    }
+    if ($notes !== '') {
+        $sql .= ' AND ir.notes LIKE ?';
+        $params[] = '%' . $notes . '%';
+    }
+    if ($agentId > 0 && $hasAgent) {
+        $sql .= ' AND ir.delivery_agent_id = ?';
+        $params[] = $agentId;
+    } elseif ($warehouseId > 0) {
+        $sql .= ' AND ir.warehouse_id = ?';
+        if ($hasAgent) {
+            $sql .= ' AND (ir.delivery_agent_id IS NULL OR ir.delivery_agent_id = 0)';
+        }
+        $params[] = $warehouseId;
+    }
+    $sql .= ($hasSort ? ' ORDER BY ir.sort_order ASC, ir.counted_at DESC, ir.id DESC' : ' ORDER BY ir.counted_at DESC, ir.id DESC')
+        . ' LIMIT 300';
+
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    foreach ($rows as &$row) {
+        $count = 0;
+        if ($hasAttach) {
+            $count = count(orange_stocktake_archive_decode_list((string) ($row['attachments_json'] ?? '')));
+            unset($row['attachments_json']);
+        }
+        $row['attachment_count'] = $count;
+
+        $agentName = trim((string) ($row['agent_name_ar'] ?? ''));
+        if ($agentName === '') {
+            $agentName = trim((string) ($row['agent_name_en'] ?? ''));
+        }
+        $whName = trim((string) ($row['warehouse_name_ar'] ?? ''));
+        if ($whName === '') {
+            $whName = trim((string) ($row['warehouse_name_en'] ?? ''));
+        }
+        if ($whName === '') {
+            $whName = '#' . (int) ($row['warehouse_id'] ?? 0);
+        }
+        $row['scope_label'] = $agentName !== '' ? ('عهدة: ' . $agentName) : $whName;
+    }
+    unset($row);
+
+    return $rows;
+}
+
+/**
  * جلب سجل أرشيف جرد مع مرفقاته.
  *
  * @return array<string,mixed>|null

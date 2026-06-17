@@ -61,15 +61,6 @@ if ($initialJson === false) {
     $initialJson = '{}';
 }
 
-$navIds = [];
-foreach ($list as $navRow) {
-    $navIds[] = (int) ($navRow['id'] ?? 0);
-}
-$navIdsJson = json_encode($navIds);
-if ($navIdsJson === false) {
-    $navIdsJson = '[]';
-}
-
 ?>
 <style>
 .stk-attachments-summary { display:flex; flex-direction:column; gap:6px; max-width:420px; }
@@ -156,11 +147,12 @@ if ($navIdsJson === false) {
             </div>
             <div style="flex:0 0 auto;">
                 <label>&nbsp;</label>
-                <div style="display:flex;gap:6px;align-items:center;">
-                    <button type="button" class="btn-secondary" id="stk_btn_new" title="سجل جرد جديد">＋ جديد</button>
-                    <button type="button" class="btn-secondary" id="stk_nav_search" title="بحث في الأرشيف">بحث</button>
-                    <button type="button" class="btn-secondary" id="stk_nav_prev" title="السجل السابق">›</button>
-                    <button type="button" class="btn-secondary" id="stk_nav_next" title="السجل التالي">‹</button>
+                <div style="display:flex;gap:6px;align-items:center;" role="group" aria-label="تنقل بين السجلات">
+                    <button type="button" class="btn-secondary" id="stk_nav_first" title="أول سجل" aria-label="أول سجل">&lt;&lt;</button>
+                    <button type="button" class="btn-secondary" id="stk_nav_prev" title="السجل السابق" aria-label="السجل السابق">&lt;</button>
+                    <button type="button" class="btn-secondary" id="stk_nav_next" title="السجل التالي" aria-label="السجل التالي">&gt;</button>
+                    <button type="button" class="btn-secondary" id="stk_nav_last" title="آخر سجل" aria-label="آخر سجل">&gt;&gt;</button>
+                    <button type="button" class="btn-secondary" id="stk_nav_search" title="بحث عن سجل">بحث</button>
                 </div>
             </div>
         </div>
@@ -170,13 +162,14 @@ if ($navIdsJson === false) {
             <input type="text" id="stk_notes" style="width:100%;" placeholder="مثال: جرد ربع سنوي — تم بحضور أمين المخزن">
         </div>
 
-        <div style="text-align:left;margin-top:4px;">
-            <button type="button" id="stk_save_btn">حفظ السجل</button>
-            <button type="button" class="btn-danger" id="stk_delete_btn" style="display:none;">حذف السجل ومرفقاته</button>
-        </div>
-
         <p id="stk_msg" class="card-hint" style="margin-top:12px;color:#166534;display:none;"></p>
         <p id="stk_err" class="card-hint" style="margin-top:12px;color:#b91c1c;display:none;"></p>
+
+        <div class="actions" style="display:flex;gap:8px;justify-content:flex-start;margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
+            <button type="button" class="btn-secondary" id="stk_btn_new" title="سجل جرد جديد">جديد</button>
+            <button type="button" class="btn-danger" id="stk_delete_btn" title="حذف السجل ومرفقاته" style="display:none;">حذف</button>
+            <button type="button" id="stk_save_btn">حفظ</button>
+        </div>
     </div>
 
     <div class="card" style="margin-top:16px;">
@@ -216,43 +209,6 @@ if ($navIdsJson === false) {
         </div>
     </div>
 
-    <div class="card" id="stk_retrieve_card" style="margin-top:16px;">
-        <h3 class="card-title">استرجاع الأرشيف (من تاريخ إلى تاريخ)</h3>
-        <p class="card-hint" style="margin-top:0;">اختر مدى تاريخ الجرد لعرض كل عمليات الجرد التي تمّت خلال الفترة والاطّلاع على مرفقاتها.</p>
-        <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end;max-width:760px;margin-bottom:12px;">
-            <div>
-                <label for="stk_from">من تاريخ</label>
-                <input type="text" id="stk_from" class="orange-inp-dmy" dir="ltr" lang="en">
-            </div>
-            <div>
-                <label for="stk_to">إلى تاريخ</label>
-                <input type="text" id="stk_to" class="orange-inp-dmy" dir="ltr" lang="en">
-            </div>
-            <div class="actions" style="margin:0;">
-                <button type="button" id="stk_search_btn">عرض</button>
-            </div>
-        </div>
-        <div class="table-wrap">
-            <table class="admin-fy-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>ترتيب</th>
-                        <th>تاريخ الجرد</th>
-                        <th>المخزن / المندوب</th>
-                        <th>المرفقات</th>
-                        <th>ملاحظة</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody id="stk_retrieve_body">
-                    <tr><td colspan="7" class="muted">اختر المدى ثم «عرض».</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <p id="stk_retrieve_count" class="card-hint" style="margin-top:8px;"></p>
-    </div>
-
     <?php endif; ?>
 </div>
 
@@ -282,6 +238,78 @@ if ($navIdsJson === false) {
         </div>
     </div>
 </div>
+
+<div class="gl-pick-modal" id="stk_search_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="stk_search_backdrop"></div>
+    <div class="gl-pick-modal__dialog stk-attachments-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="stk_search_title">
+        <h3 id="stk_search_title" class="gl-pick-modal__title">بحث عن سجل جرد</h3>
+        <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));align-items:end;margin-bottom:10px;">
+            <div>
+                <label for="stk_search_from">تاريخ الجرد — من</label>
+                <input type="text" id="stk_search_from" class="orange-inp-dmy admin-inp" dir="ltr" lang="en" autocomplete="off">
+            </div>
+            <div>
+                <label for="stk_search_to">تاريخ الجرد — إلى</label>
+                <input type="text" id="stk_search_to" class="orange-inp-dmy admin-inp" dir="ltr" lang="en" autocomplete="off">
+            </div>
+            <div>
+                <label for="stk_search_scope">المخزن / المندوب</label>
+                <select id="stk_search_scope" class="admin-inp" style="width:100%;">
+                    <option value="">— الكل —</option>
+                    <?php if ($warehouses !== []): ?>
+                        <optgroup label="المخازن">
+                            <?php foreach ($warehouses as $wh): ?>
+                                <?php
+                                $whName2 = trim((string) ($wh['name_ar'] ?? ''));
+                                if ($whName2 === '') {
+                                    $whName2 = trim((string) ($wh['name_en'] ?? ''));
+                                }
+                                if ($whName2 === '') {
+                                    $whName2 = '#' . (int) ($wh['id'] ?? 0);
+                                }
+                                ?>
+                                <option value="w:<?php echo (int) $wh['id']; ?>"><?php echo htmlspecialchars($whName2, ENT_QUOTES, 'UTF-8'); ?></option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endif; ?>
+                    <?php if ($agents !== []): ?>
+                        <optgroup label="المناديب (عهدة)">
+                            <?php foreach ($agents as $ag): ?>
+                                <option value="a:<?php echo (int) ($ag['id'] ?? 0); ?>"><?php echo htmlspecialchars(orange_delivery_agent_display_name($ag), ENT_QUOTES, 'UTF-8'); ?></option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endif; ?>
+                </select>
+            </div>
+            <div>
+                <label for="stk_search_notes">ملاحظة (تحتوي النص)</label>
+                <input type="text" id="stk_search_notes" class="admin-inp" autocomplete="off" dir="auto">
+            </div>
+        </div>
+        <div class="actions" style="margin:0 0 12px;">
+            <button type="button" id="stk_search_run">تنفيذ البحث</button>
+        </div>
+        <div class="table-wrap">
+            <table class="admin-fy-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>ترتيب</th>
+                        <th>تاريخ الجرد</th>
+                        <th>المخزن / المندوب</th>
+                        <th>المرفقات</th>
+                        <th>ملاحظة</th>
+                    </tr>
+                </thead>
+                <tbody id="stk_search_results"><tr><td colspan="6" class="muted">حدّد المعايير ثم «تنفيذ البحث» — انقر سجلاً لفتحه.</td></tr></tbody>
+            </table>
+        </div>
+        <p id="stk_search_count" class="card-hint" style="margin-top:8px;"></p>
+        <div class="actions" style="margin-top:12px;">
+            <button type="button" class="btn-secondary" id="stk_search_close">إغلاق</button>
+        </div>
+    </div>
+</div>
 <script>
 (function () {
     var API = <?php echo json_encode([
@@ -291,9 +319,10 @@ if ($navIdsJson === false) {
         'attDelete' => $apiBase . '/attachment-delete.php',
         'download' => $apiBase . '/attachment-download.php',
         'list' => $apiBase . '/archive-list.php',
+        'nav' => $apiBase . '/archive-nav.php',
+        'search' => $apiBase . '/archive-search.php',
     ], JSON_UNESCAPED_UNICODE); ?>;
     var state = <?php echo $initialJson; ?>;
-    var recordIds = <?php echo $navIdsJson; ?>;
     var MAX_ATT = 20;
 
     function el(id) { return document.getElementById(id); }
@@ -512,70 +541,98 @@ if ($navIdsJson === false) {
         alert(data.message || 'تم حذف المرفق');
     }
 
+    function gotoRecord(id) {
+        if (id > 0) window.location.href = '?page=inventory_reconciliation&id=' + id;
+    }
+
     el('stk_btn_new') && el('stk_btn_new').addEventListener('click', function () {
         window.location.href = '?page=inventory_reconciliation';
     });
 
-    function gotoRecord(id) {
-        if (id > 0) window.location.href = '?page=inventory_reconciliation&id=' + id;
+    // ---- التنقّل بين السجلات (أول/سابق/تالي/آخر) من الخادم ----
+    async function navTo(dir) {
+        var url = API.nav + '?dir=' + encodeURIComponent(dir) + '&current=' + (parseInt(state.id, 10) || 0);
+        try {
+            var res = await fetch(url, { credentials: 'same-origin' });
+            var data = await res.json();
+            if (!data.success) { showErr(data.message || 'تعذر التنقّل'); return; }
+            if (data.id > 0 && data.id !== (parseInt(state.id, 10) || 0)) {
+                gotoRecord(data.id);
+            }
+        } catch (e) {
+            showErr('تعذر التنقّل');
+        }
     }
-    el('stk_nav_prev') && el('stk_nav_prev').addEventListener('click', function () {
-        if (!recordIds.length) return;
-        var idx = recordIds.indexOf(parseInt(state.id, 10) || 0);
-        if (idx < 0) { gotoRecord(recordIds[0]); return; }
-        if (idx > 0) gotoRecord(recordIds[idx - 1]);
-    });
-    el('stk_nav_next') && el('stk_nav_next').addEventListener('click', function () {
-        if (!recordIds.length) return;
-        var idx = recordIds.indexOf(parseInt(state.id, 10) || 0);
-        if (idx < 0) { gotoRecord(recordIds[0]); return; }
-        if (idx < recordIds.length - 1) gotoRecord(recordIds[idx + 1]);
-    });
-    el('stk_nav_search') && el('stk_nav_search').addEventListener('click', function () {
-        var card = el('stk_retrieve_card');
-        if (!card) return;
-        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        var f = el('stk_from');
-        if (f) setTimeout(function () { f.focus(); }, 300);
-    });
+    el('stk_nav_first') && el('stk_nav_first').addEventListener('click', function () { navTo('first'); });
+    el('stk_nav_prev') && el('stk_nav_prev').addEventListener('click', function () { navTo('prev'); });
+    el('stk_nav_next') && el('stk_nav_next').addEventListener('click', function () { navTo('next'); });
+    el('stk_nav_last') && el('stk_nav_last').addEventListener('click', function () { navTo('last'); });
 
-    // ---- استرجاع الأرشيف (مدى تاريخ) ----
-    function retrieveRowHtml(r) {
+    // ---- نافذة البحث ----
+    function searchModalOpen() {
+        var m = el('stk_search_modal');
+        if (!m) return;
+        m.hidden = false;
+        m.setAttribute('aria-hidden', 'false');
+        var f = el('stk_search_from');
+        if (f) setTimeout(function () { f.focus(); }, 50);
+    }
+    function searchModalClose() {
+        var m = el('stk_search_modal');
+        if (!m) return;
+        m.hidden = true;
+        m.setAttribute('aria-hidden', 'true');
+    }
+
+    function searchRowHtml(r) {
         var dmy = r.counted_at ? orangeIsoDateToDmy(String(r.counted_at).substring(0, 10)) : '';
-        var openUrl = '?page=inventory_reconciliation&id=' + (parseInt(r.id, 10) || 0);
-        return '<tr>'
-            + '<td>' + (parseInt(r.id, 10) || 0) + '</td>'
+        var id = parseInt(r.id, 10) || 0;
+        return '<tr class="stk-search-row" data-id="' + id + '" style="cursor:pointer;">'
+            + '<td>' + id + '</td>'
             + '<td dir="ltr">' + (parseInt(r.sort_order, 10) || 0) + '</td>'
             + '<td dir="ltr">' + escapeHtml(dmy) + '</td>'
             + '<td>' + escapeHtml(r.scope_label || '') + '</td>'
             + '<td>' + (parseInt(r.attachment_count, 10) || 0) + '</td>'
             + '<td>' + escapeHtml(r.notes || '') + '</td>'
-            + '<td><a href="' + openUrl + '">فتح</a></td>'
             + '</tr>';
     }
 
-    el('stk_search_btn') && el('stk_search_btn').addEventListener('click', async function () {
-        var from = orangeGetDmyValueAsIso(el('stk_from')) || '';
-        var to = orangeGetDmyValueAsIso(el('stk_to')) || '';
-        var body = el('stk_retrieve_body');
-        var cnt = el('stk_retrieve_count');
-        body.innerHTML = '<tr><td colspan="7" class="muted">جارٍ التحميل…</td></tr>';
+    el('stk_nav_search') && el('stk_nav_search').addEventListener('click', searchModalOpen);
+    el('stk_search_close') && el('stk_search_close').addEventListener('click', searchModalClose);
+    el('stk_search_backdrop') && el('stk_search_backdrop').addEventListener('click', searchModalClose);
+
+    el('stk_search_run') && el('stk_search_run').addEventListener('click', async function () {
+        var from = orangeGetDmyValueAsIso(el('stk_search_from')) || '';
+        var to = orangeGetDmyValueAsIso(el('stk_search_to')) || '';
+        var scope = el('stk_search_scope') ? el('stk_search_scope').value : '';
+        var notes = el('stk_search_notes') ? el('stk_search_notes').value : '';
+        var body = el('stk_search_results');
+        var cnt = el('stk_search_count');
+        body.innerHTML = '<tr><td colspan="6" class="muted">جارٍ التحميل…</td></tr>';
         cnt.textContent = '';
-        var url = API.list + '?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
+        var url = API.search + '?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to)
+            + '&scope=' + encodeURIComponent(scope) + '&notes=' + encodeURIComponent(notes);
         try {
             var res = await fetch(url, { credentials: 'same-origin' });
             var data = await res.json();
-            if (!data.success) { body.innerHTML = '<tr><td colspan="7" class="muted">' + escapeHtml(data.message || 'تعذر العرض') + '</td></tr>'; return; }
+            if (!data.success) { body.innerHTML = '<tr><td colspan="6" class="muted">' + escapeHtml(data.message || 'تعذر البحث') + '</td></tr>'; return; }
             var rows = data.records || [];
             if (rows.length === 0) {
-                body.innerHTML = '<tr><td colspan="7" class="muted">لا عمليات جرد في هذه الفترة.</td></tr>';
+                body.innerHTML = '<tr><td colspan="6" class="muted">لا نتائج مطابقة.</td></tr>';
             } else {
-                body.innerHTML = rows.map(retrieveRowHtml).join('');
+                body.innerHTML = rows.map(searchRowHtml).join('');
             }
-            cnt.textContent = 'عدد العمليات: ' + rows.length;
+            cnt.textContent = 'عدد النتائج: ' + rows.length;
         } catch (e) {
-            body.innerHTML = '<tr><td colspan="7" class="muted">تعذر العرض</td></tr>';
+            body.innerHTML = '<tr><td colspan="6" class="muted">تعذر البحث</td></tr>';
         }
+    });
+
+    el('stk_search_results') && el('stk_search_results').addEventListener('click', function (ev) {
+        var tr = ev.target && ev.target.closest ? ev.target.closest('.stk-search-row') : null;
+        if (!tr) return;
+        var id = parseInt(tr.getAttribute('data-id'), 10) || 0;
+        if (id > 0) gotoRecord(id);
     });
 
     syncFormFromState();
