@@ -108,6 +108,7 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'suppliers', 'label' => 'الموردين'],
                         ['page' => 'purchases', 'label' => 'المشتريات'],
                         ['page' => 'purchase_returns', 'label' => 'مردود المشتريات'],
+                        ['page' => 'purchase_reports', 'label' => 'تقارير المشتريات'],
                     ],
                 ],
                 [
@@ -320,6 +321,7 @@ function orange_admin_permission_actions_for_page(string $page): array
         'logs',
         'accounting_reports_index',
         'warehouse_purchases_index',
+        'purchase_reports',
         'sales_promotions_index',
         'settings_index',
         'journal_voucher_reports',

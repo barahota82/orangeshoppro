@@ -43,6 +43,7 @@ $allowed = [
     'purchases',
     'purchase_returns',
     'stock_reports',
+    'purchase_reports',
     'stock_adjustment_voucher',
     'chart_of_accounts',
     'fiscal_years',

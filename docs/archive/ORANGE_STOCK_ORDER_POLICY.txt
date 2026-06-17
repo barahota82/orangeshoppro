@@ -96,4 +96,11 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
      * **عند اختيار مندوب (عهدته):** تُعرض فقط الأصناف **المحمّلة بالطريق المُسنَدة لذلك المندوب**، بعمود **«بعهدة المندوب»** = Σ حجوزاته النشطة لكل متغيّر؛ القيمة = الكمية × التكلفة.
      * التنفيذ في `admin/pages/stock_reports.php` (فرع `balances`): استعلام تجميع الحجوزات `INNER JOIN orders o ON sm.reference = CONCAT('ORDER-', o.order_number)` مع `GROUP BY variant_id, loaded, delivery_agent_id`؛ والعرض بعمودين مشروطين على وضع المندوب. فلتر القسم/الفئة وخيار إخفاء الصفر يبقيان متاحين. `require_once includes/delivery_agents.php`.
 
+13) شاشة «تقارير المشتريات» (قرار تنفيذ 2026-06-18)
+   - **أُضيفت شاشة موحّدة** `admin/pages/purchase_reports.php` بنفس أسلوب «تقارير المخزن» (تبويبات + فلاتر + طباعة + تصدير Excel/CSV من الجدول).
+   - **التبويبات:** `invoices` (فواتير المشتريات) / `returns` (مردودات المشتريات) / `suppliers` (ملخص الموردين) / `items` (تحليل الأصناف) / `monthly` (ملخص شهري).
+   - **الفلاتر:** مدى تاريخ (من/إلى) لكل التبويبات + مورد (لكل تبويب) + صنف (في تحليل الأصناف) + خيار إخفاء الصافي صفر في تحليل الأصناف.
+   - **النطاق حسب الدولة:** كل الاستعلامات scoped بسياق دولة الأدمن عبر `orange_sql_country_and_fragment()` على `purchases` و`purchase_returns`.
+   - **الربط في النظام:** إدراج الصفحة في `admin/index.php` (`$allowed`)، القائمة والشجرة (`admin/partials/header.php` + `includes/admin_nav_tree.php`)، وصلاحيات الشاشة ضمن مجموعة `warehouse` في `includes/admin_permissions.php`، وإضافتها في فهرس المخازن والمشتريات `admin/pages/warehouse_purchases_index.php`.
+
 Agreed with project owner for Orange implementation.

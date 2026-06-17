@@ -304,6 +304,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                         ['page' => 'suppliers', 'href' => '/admin/index.php?page=suppliers', 'label' => 'الموردين', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'purchases', 'href' => '/admin/index.php?page=purchases', 'label' => 'المشتريات', 'class' => '', 'sub' => false],
                         ['page' => 'purchase_returns', 'href' => '/admin/index.php?page=purchase_returns', 'label' => 'مردود المشتريات', 'class' => '', 'sub' => false],
+                        ['page' => 'purchase_reports', 'href' => '/admin/index.php?page=purchase_reports', 'label' => 'تقارير المشتريات', 'class' => '', 'sub' => false],
                     ],
                 ],
                 [
