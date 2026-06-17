@@ -706,7 +706,6 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         style="cursor:pointer;min-width:15rem;"
                         placeholder="كل الموردين — دبل كليك للاختيار"
                         value="<?php echo htmlspecialchars($selectedSupplierName, ENT_QUOTES, 'UTF-8'); ?>">
-                    <button type="button" class="btn-secondary" id="prr_supplier_clear">الكل</button>
                 </div>
             </div>
         <?php endif; ?>
@@ -726,7 +725,6 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         style="cursor:pointer;min-width:18rem;"
                         placeholder="كل الأصناف — دبل كليك للاختيار"
                         value="<?php echo htmlspecialchars($selectedProductName, ENT_QUOTES, 'UTF-8'); ?>">
-                    <button type="button" class="btn-secondary" id="prr_product_clear">الكل</button>
                 </div>
             </div>
             <div style="display:flex;align-items:flex-end;">
@@ -1016,7 +1014,6 @@ $prDocTitle = $reportTitle . ' - ' . date('Y-m-d');
     var supplierIdEl = document.getElementById('prr_supplier_id');
     var supplierCodeEl = document.getElementById('prr_supplier_code');
     var supplierNameEl = document.getElementById('prr_supplier_name');
-    var supplierClearBtn = document.getElementById('prr_supplier_clear');
     var supplierModal = document.getElementById('prr_supplier_pick_modal');
     var supplierBackdrop = document.getElementById('prr_supplier_pick_backdrop');
     var supplierCloseBtn = document.getElementById('prr_supplier_pick_close');
@@ -1026,7 +1023,6 @@ $prDocTitle = $reportTitle . ' - ' . date('Y-m-d');
     var productIdEl = document.getElementById('prr_product_id');
     var productCodeEl = document.getElementById('prr_product_code');
     var productNameEl = document.getElementById('prr_product_name');
-    var productClearBtn = document.getElementById('prr_product_clear');
     var productModal = document.getElementById('prr_product_pick_modal');
     var productBackdrop = document.getElementById('prr_product_pick_backdrop');
     var productCloseBtn = document.getElementById('prr_product_pick_close');
@@ -1218,11 +1214,6 @@ $prDocTitle = $reportTitle . ' - ' . date('Y-m-d');
                 supplierOpen();
             }
         });
-        if (supplierClearBtn) {
-            supplierClearBtn.addEventListener('click', function () {
-                supplierSet(null);
-            });
-        }
         if (supplierBackdrop) {
             supplierBackdrop.addEventListener('click', supplierClose);
         }
@@ -1251,11 +1242,6 @@ $prDocTitle = $reportTitle . ' - ' . date('Y-m-d');
                 productOpen();
             }
         });
-        if (productClearBtn) {
-            productClearBtn.addEventListener('click', function () {
-                productSet(null);
-            });
-        }
         if (productBackdrop) {
             productBackdrop.addEventListener('click', productClose);
         }
