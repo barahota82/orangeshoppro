@@ -1,6 +1,0 @@
-
-Dark UI
-Primary color: #FF6A00
-Buttons: solid orange
-Hover: gradient
-Cards: dark gray with light borders
