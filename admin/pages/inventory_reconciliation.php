@@ -100,8 +100,8 @@ if ($initialJson === false) {
         <h3 class="card-title" id="stk_editor_title">سجل جرد جديد</h3>
 
         <div class="stk-top-row" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:12px;">
-            <div style="flex:0 0 90px;">
-                <label for="stk_sort_order">ترتيب</label>
+            <div style="flex:0 0 120px;">
+                <label for="stk_sort_order">رقم المستند</label>
                 <input type="number" id="stk_sort_order" dir="ltr" lang="en" step="1" min="0" value="0" style="width:100%;">
             </div>
             <div style="flex:1 1 220px;min-width:180px;">
@@ -137,6 +137,19 @@ if ($initialJson === false) {
                 <label for="stk_counted_at">تاريخ الجرد</label>
                 <input type="text" id="stk_counted_at" class="orange-inp-dmy" dir="ltr" lang="en" required style="width:100%;">
             </div>
+            <div style="flex:0 0 auto;">
+                <label>&nbsp;</label>
+                <div style="display:flex;gap:6px;align-items:center;" role="group" aria-label="بحث وتنقل بين السجلات">
+                    <button type="button" class="btn-secondary" id="stk_nav_search" title="بحث عن سجل">بحث</button>
+                    <button type="button" class="btn-secondary" id="stk_nav_first" title="أول سجل" aria-label="أول سجل">&lt;&lt;</button>
+                    <button type="button" class="btn-secondary" id="stk_nav_prev" title="السجل السابق" aria-label="السجل السابق">&lt;</button>
+                    <button type="button" class="btn-secondary" id="stk_nav_next" title="السجل التالي" aria-label="السجل التالي">&gt;</button>
+                    <button type="button" class="btn-secondary" id="stk_nav_last" title="آخر سجل" aria-label="آخر سجل">&gt;&gt;</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="stk-top-row" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:12px;">
             <div style="flex:0 0 100px;">
                 <label for="stk_attachments_count">عدد المرفقات</label>
                 <input type="text" id="stk_attachments_count" dir="ltr" lang="en" value="0" readonly style="width:100%;text-align:center;">
@@ -145,27 +158,16 @@ if ($initialJson === false) {
                 <label>&nbsp;</label>
                 <button type="button" class="btn-secondary" id="stk_attachments_manage_btn" style="display:block;">إدارة المرفقات</button>
             </div>
-            <div style="flex:0 0 auto;">
-                <label>&nbsp;</label>
-                <div style="display:flex;gap:6px;align-items:center;" role="group" aria-label="تنقل بين السجلات">
-                    <button type="button" class="btn-secondary" id="stk_nav_first" title="أول سجل" aria-label="أول سجل">&lt;&lt;</button>
-                    <button type="button" class="btn-secondary" id="stk_nav_prev" title="السجل السابق" aria-label="السجل السابق">&lt;</button>
-                    <button type="button" class="btn-secondary" id="stk_nav_next" title="السجل التالي" aria-label="السجل التالي">&gt;</button>
-                    <button type="button" class="btn-secondary" id="stk_nav_last" title="آخر سجل" aria-label="آخر سجل">&gt;&gt;</button>
-                    <button type="button" class="btn-secondary" id="stk_nav_search" title="بحث عن سجل">بحث</button>
-                </div>
+            <div style="flex:1 1 260px;min-width:200px;">
+                <label for="stk_notes">ملاحظات</label>
+                <input type="text" id="stk_notes" style="width:100%;" placeholder="مثال: جرد ربع سنوي — تم بحضور أمين المخزن">
             </div>
-        </div>
-
-        <div style="margin-bottom:12px;">
-            <label for="stk_notes">ملاحظات</label>
-            <input type="text" id="stk_notes" style="width:100%;" placeholder="مثال: جرد ربع سنوي — تم بحضور أمين المخزن">
         </div>
 
         <p id="stk_msg" class="card-hint" style="margin-top:12px;color:#166534;display:none;"></p>
         <p id="stk_err" class="card-hint" style="margin-top:12px;color:#b91c1c;display:none;"></p>
 
-        <div class="actions" style="display:flex;gap:8px;justify-content:flex-start;margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
+        <div class="actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
             <button type="button" class="btn-secondary" id="stk_btn_new" title="سجل جرد جديد">جديد</button>
             <button type="button" class="btn-danger" id="stk_delete_btn" title="حذف السجل ومرفقاته" style="display:none;">حذف</button>
             <button type="button" id="stk_save_btn">حفظ</button>
@@ -179,7 +181,7 @@ if ($initialJson === false) {
                 <thead>
                     <tr>
                         <th>#</th>
-                        <th>ترتيب</th>
+                        <th>رقم المستند</th>
                         <th>تاريخ الجرد</th>
                         <th>المخزن / المندوب</th>
                         <th>المرفقات</th>
@@ -294,7 +296,7 @@ if ($initialJson === false) {
                 <thead>
                     <tr>
                         <th>#</th>
-                        <th>ترتيب</th>
+                        <th>رقم المستند</th>
                         <th>تاريخ الجرد</th>
                         <th>المخزن / المندوب</th>
                         <th>المرفقات</th>
