@@ -51,8 +51,13 @@ $itemCodeExpr = $hasItemCode
 
 $suppliers = [];
 $supplierMap = [];
+$supplierCodeMap = [];
 if (orange_table_exists($pdo, 'suppliers')) {
-    $supplierSql = 'SELECT s.id, COALESCE(s.name, \'\') AS supplier_name FROM suppliers s WHERE 1=1'
+    $hasSupplierCode = orange_table_has_column($pdo, 'suppliers', 'code');
+    $supplierCodeExpr = $hasSupplierCode
+        ? "COALESCE(NULLIF(TRIM(s.code), ''), CONCAT('SUP-', s.id))"
+        : "CONCAT('SUP-', s.id)";
+    $supplierSql = 'SELECT s.id, ' . $supplierCodeExpr . ' AS supplier_code, COALESCE(s.name, \'\') AS supplier_name FROM suppliers s WHERE 1=1'
         . orange_sql_country_and_fragment($pdo, 'suppliers', 's', $prCountryId)
         . ' ORDER BY s.name ASC, s.id ASC';
     $suppliers = $pdo->query($supplierSql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -62,6 +67,7 @@ if (orange_table_exists($pdo, 'suppliers')) {
             continue;
         }
         $supplierMap[$sid] = (string) ($sRow['supplier_name'] ?? '');
+        $supplierCodeMap[$sid] = (string) ($sRow['supplier_code'] ?? ('SUP-' . $sid));
     }
 }
 if ($supplierId > 0 && !isset($supplierMap[$supplierId])) {
@@ -90,6 +96,43 @@ if (orange_table_exists($pdo, 'products')) {
 if ($productId > 0 && !isset($productMap[$productId])) {
     $productId = 0;
 }
+
+$supplierPickerRows = [];
+foreach ($suppliers as $sRow) {
+    $sid = (int) ($sRow['id'] ?? 0);
+    if ($sid <= 0) {
+        continue;
+    }
+    $sName = trim((string) ($sRow['supplier_name'] ?? ''));
+    $supplierPickerRows[] = [
+        'id' => $sid,
+        'code' => (string) ($supplierCodeMap[$sid] ?? ('SUP-' . $sid)),
+        'name' => $sName,
+    ];
+}
+
+$productPickerRows = [];
+foreach ($products as $pRow) {
+    $pid = (int) ($pRow['id'] ?? 0);
+    if ($pid <= 0) {
+        continue;
+    }
+    $pCode = trim((string) ($pRow['item_code'] ?? ''));
+    if ($pCode === '') {
+        $pCode = 'P' . $pid;
+    }
+    $pName = trim((string) ($pRow['product_name'] ?? ''));
+    $productPickerRows[] = [
+        'id' => $pid,
+        'code' => $pCode,
+        'name' => $pName,
+    ];
+}
+
+$selectedSupplierCode = $supplierId > 0 ? (string) ($supplierCodeMap[$supplierId] ?? ('SUP-' . $supplierId)) : '';
+$selectedSupplierName = $supplierId > 0 ? (string) ($supplierMap[$supplierId] ?? '') : '';
+$selectedProductCode = $productId > 0 ? (string) ($productMap[$productId]['code'] ?? ('P' . $productId)) : '';
+$selectedProductName = $productId > 0 ? (string) ($productMap[$productId]['name'] ?? '') : '';
 
 $hasPurchases = orange_table_exists($pdo, 'purchases');
 $hasPurchaseItems = orange_table_exists($pdo, 'purchase_items');
@@ -650,36 +693,41 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 
         <?php if (in_array($reportKey, ['invoices', 'returns', 'suppliers', 'items', 'monthly'], true)): ?>
             <div>
-                <label for="prr_supplier_id">المورد</label>
-                <select id="prr_supplier_id" name="supplier_id" class="admin-inp" style="width:14rem;">
-                    <option value="0">كل الموردين</option>
-                    <?php foreach ($suppliers as $sRow): ?>
-                        <?php $sid = (int) ($sRow['id'] ?? 0); ?>
-                        <option value="<?php echo $sid; ?>" <?php echo $sid === $supplierId ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars((string) ($sRow['supplier_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+                <label for="prr_supplier_name">المورد (دبل كليك للاختيار)</label>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <input type="hidden" id="prr_supplier_id" name="supplier_id" value="<?php echo (int) $supplierId; ?>">
+                    <input type="text" id="prr_supplier_code" class="admin-inp" readonly
+                        title="دبل كليك لاختيار المورد"
+                        style="width:9rem;background:#f4f4f5;cursor:pointer;" dir="ltr" lang="en"
+                        placeholder="الكود"
+                        value="<?php echo htmlspecialchars($selectedSupplierCode, ENT_QUOTES, 'UTF-8'); ?>">
+                    <input type="text" id="prr_supplier_name" class="admin-inp" readonly
+                        title="دبل كليك لاختيار المورد"
+                        style="cursor:pointer;min-width:15rem;"
+                        placeholder="كل الموردين — دبل كليك للاختيار"
+                        value="<?php echo htmlspecialchars($selectedSupplierName, ENT_QUOTES, 'UTF-8'); ?>">
+                    <button type="button" class="btn-secondary" id="prr_supplier_clear">الكل</button>
+                </div>
             </div>
         <?php endif; ?>
 
         <?php if ($reportKey === 'items'): ?>
             <div>
-                <label for="prr_product_id">الصنف</label>
-                <select id="prr_product_id" name="product_id" class="admin-inp" style="width:18rem;">
-                    <option value="0">كل الأصناف</option>
-                    <?php foreach ($products as $pRow): ?>
-                        <?php
-                        $pid = (int) ($pRow['id'] ?? 0);
-                        $pCode = trim((string) ($pRow['item_code'] ?? ''));
-                        $pName = trim((string) ($pRow['product_name'] ?? ''));
-                        $label = $pCode !== '' ? ($pCode . ' — ' . $pName) : $pName;
-                        ?>
-                        <option value="<?php echo $pid; ?>" <?php echo $pid === $productId ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+                <label for="prr_product_name">الصنف (دبل كليك للاختيار)</label>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <input type="hidden" id="prr_product_id" name="product_id" value="<?php echo (int) $productId; ?>">
+                    <input type="text" id="prr_product_code" class="admin-inp" readonly
+                        title="دبل كليك لاختيار الصنف"
+                        style="width:10rem;background:#f4f4f5;cursor:pointer;" dir="ltr" lang="en"
+                        placeholder="الكود"
+                        value="<?php echo htmlspecialchars($selectedProductCode, ENT_QUOTES, 'UTF-8'); ?>">
+                    <input type="text" id="prr_product_name" class="admin-inp" readonly
+                        title="دبل كليك لاختيار الصنف"
+                        style="cursor:pointer;min-width:18rem;"
+                        placeholder="كل الأصناف — دبل كليك للاختيار"
+                        value="<?php echo htmlspecialchars($selectedProductName, ENT_QUOTES, 'UTF-8'); ?>">
+                    <button type="button" class="btn-secondary" id="prr_product_clear">الكل</button>
+                </div>
             </div>
             <div style="display:flex;align-items:flex-end;">
                 <label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
@@ -921,6 +969,28 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     </div>
 </div>
 
+<div class="gl-pick-modal" id="prr_supplier_pick_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="prr_supplier_pick_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="prr_supplier_pick_title">
+        <h3 id="prr_supplier_pick_title" class="gl-pick-modal__title">اختيار المورد</h3>
+        <p class="muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان للاختيار</p>
+        <input type="search" id="prr_supplier_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو اسم المورد..." autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="prr_supplier_pick_list"></ul>
+        <button type="button" class="btn-secondary" id="prr_supplier_pick_close">إغلاق</button>
+    </div>
+</div>
+
+<div class="gl-pick-modal" id="prr_product_pick_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="prr_product_pick_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="prr_product_pick_title">
+        <h3 id="prr_product_pick_title" class="gl-pick-modal__title">اختيار الصنف</h3>
+        <p class="muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان للاختيار</p>
+        <input type="search" id="prr_product_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو اسم الصنف..." autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="prr_product_pick_list"></ul>
+        <button type="button" class="btn-secondary" id="prr_product_pick_close">إغلاق</button>
+    </div>
+</div>
+
 <style>
 .prr-tabs { display:flex; flex-wrap:wrap; gap:8px; }
 .prr-tab {
@@ -938,6 +1008,280 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 <?php
 $prDocTitle = $reportTitle . ' - ' . date('Y-m-d');
 ?>
+<script>
+(function () {
+    var supplierRows = <?php echo json_encode($supplierPickerRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?> || [];
+    var productRows = <?php echo json_encode($productPickerRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?> || [];
+
+    var supplierIdEl = document.getElementById('prr_supplier_id');
+    var supplierCodeEl = document.getElementById('prr_supplier_code');
+    var supplierNameEl = document.getElementById('prr_supplier_name');
+    var supplierClearBtn = document.getElementById('prr_supplier_clear');
+    var supplierModal = document.getElementById('prr_supplier_pick_modal');
+    var supplierBackdrop = document.getElementById('prr_supplier_pick_backdrop');
+    var supplierCloseBtn = document.getElementById('prr_supplier_pick_close');
+    var supplierSearchEl = document.getElementById('prr_supplier_pick_q');
+    var supplierListEl = document.getElementById('prr_supplier_pick_list');
+
+    var productIdEl = document.getElementById('prr_product_id');
+    var productCodeEl = document.getElementById('prr_product_code');
+    var productNameEl = document.getElementById('prr_product_name');
+    var productClearBtn = document.getElementById('prr_product_clear');
+    var productModal = document.getElementById('prr_product_pick_modal');
+    var productBackdrop = document.getElementById('prr_product_pick_backdrop');
+    var productCloseBtn = document.getElementById('prr_product_pick_close');
+    var productSearchEl = document.getElementById('prr_product_pick_q');
+    var productListEl = document.getElementById('prr_product_pick_list');
+
+    function esc(v) {
+        return String(v == null ? '' : v)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function syncBodyLock() {
+        var anyOpen = (supplierModal && !supplierModal.hidden) || (productModal && !productModal.hidden);
+        document.body.classList.toggle('gl-pick-open', anyOpen);
+    }
+
+    function supplierSet(row) {
+        if (!supplierIdEl || !supplierCodeEl || !supplierNameEl) {
+            return;
+        }
+        if (!row) {
+            supplierIdEl.value = '0';
+            supplierCodeEl.value = '';
+            supplierNameEl.value = '';
+            return;
+        }
+        supplierIdEl.value = String(parseInt(String(row.id || '0'), 10) || 0);
+        supplierCodeEl.value = String(row.code || '');
+        supplierNameEl.value = String(row.name || '');
+    }
+
+    function supplierRender(query) {
+        if (!supplierListEl) {
+            return;
+        }
+        var q = String(query || '').trim().toLowerCase();
+        var filtered = supplierRows.filter(function (r) {
+            if (!q) {
+                return true;
+            }
+            var hay = (String(r.code || '') + ' ' + String(r.name || '')).toLowerCase();
+            return hay.indexOf(q) !== -1;
+        });
+        supplierListEl.innerHTML = '';
+        if (!filtered.length) {
+            supplierListEl.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>';
+            return;
+        }
+        filtered.forEach(function (r) {
+            var li = document.createElement('li');
+            li.className = 'gl-pick-item';
+            li.setAttribute('role', 'button');
+            li.tabIndex = 0;
+            li.innerHTML = '<span dir="ltr">' + esc(r.code || '') + '</span> — ' + esc(r.name || '');
+            li.addEventListener('dblclick', function () {
+                supplierSet(r);
+                supplierClose();
+            });
+            li.addEventListener('keydown', function (ev) {
+                if (ev.key === 'Enter') {
+                    ev.preventDefault();
+                    supplierSet(r);
+                    supplierClose();
+                }
+            });
+            supplierListEl.appendChild(li);
+        });
+    }
+
+    function supplierOpen() {
+        if (!supplierModal) {
+            return;
+        }
+        supplierModal.hidden = false;
+        supplierModal.setAttribute('aria-hidden', 'false');
+        syncBodyLock();
+        if (supplierSearchEl) {
+            supplierSearchEl.value = '';
+            supplierRender('');
+            supplierSearchEl.focus();
+        } else {
+            supplierRender('');
+        }
+    }
+
+    function supplierClose() {
+        if (!supplierModal) {
+            return;
+        }
+        supplierModal.hidden = true;
+        supplierModal.setAttribute('aria-hidden', 'true');
+        syncBodyLock();
+    }
+
+    function productSet(row) {
+        if (!productIdEl || !productCodeEl || !productNameEl) {
+            return;
+        }
+        if (!row) {
+            productIdEl.value = '0';
+            productCodeEl.value = '';
+            productNameEl.value = '';
+            return;
+        }
+        productIdEl.value = String(parseInt(String(row.id || '0'), 10) || 0);
+        productCodeEl.value = String(row.code || '');
+        productNameEl.value = String(row.name || '');
+    }
+
+    function productRender(query) {
+        if (!productListEl) {
+            return;
+        }
+        var q = String(query || '').trim().toLowerCase();
+        var filtered = productRows.filter(function (r) {
+            if (!q) {
+                return true;
+            }
+            var hay = (String(r.code || '') + ' ' + String(r.name || '')).toLowerCase();
+            return hay.indexOf(q) !== -1;
+        });
+        productListEl.innerHTML = '';
+        if (!filtered.length) {
+            productListEl.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>';
+            return;
+        }
+        filtered.forEach(function (r) {
+            var li = document.createElement('li');
+            li.className = 'gl-pick-item';
+            li.setAttribute('role', 'button');
+            li.tabIndex = 0;
+            li.innerHTML = '<span dir="ltr">' + esc(r.code || '') + '</span> — ' + esc(r.name || '');
+            li.addEventListener('dblclick', function () {
+                productSet(r);
+                productClose();
+            });
+            li.addEventListener('keydown', function (ev) {
+                if (ev.key === 'Enter') {
+                    ev.preventDefault();
+                    productSet(r);
+                    productClose();
+                }
+            });
+            productListEl.appendChild(li);
+        });
+    }
+
+    function productOpen() {
+        if (!productModal) {
+            return;
+        }
+        productModal.hidden = false;
+        productModal.setAttribute('aria-hidden', 'false');
+        syncBodyLock();
+        if (productSearchEl) {
+            productSearchEl.value = '';
+            productRender('');
+            productSearchEl.focus();
+        } else {
+            productRender('');
+        }
+    }
+
+    function productClose() {
+        if (!productModal) {
+            return;
+        }
+        productModal.hidden = true;
+        productModal.setAttribute('aria-hidden', 'true');
+        syncBodyLock();
+    }
+
+    if (supplierCodeEl && supplierNameEl) {
+        supplierCodeEl.addEventListener('dblclick', supplierOpen);
+        supplierNameEl.addEventListener('dblclick', supplierOpen);
+        supplierCodeEl.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                supplierOpen();
+            }
+        });
+        supplierNameEl.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                supplierOpen();
+            }
+        });
+        if (supplierClearBtn) {
+            supplierClearBtn.addEventListener('click', function () {
+                supplierSet(null);
+            });
+        }
+        if (supplierBackdrop) {
+            supplierBackdrop.addEventListener('click', supplierClose);
+        }
+        if (supplierCloseBtn) {
+            supplierCloseBtn.addEventListener('click', supplierClose);
+        }
+        if (supplierSearchEl) {
+            supplierSearchEl.addEventListener('input', function () {
+                supplierRender(supplierSearchEl.value || '');
+            });
+        }
+    }
+
+    if (productCodeEl && productNameEl) {
+        productCodeEl.addEventListener('dblclick', productOpen);
+        productNameEl.addEventListener('dblclick', productOpen);
+        productCodeEl.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                productOpen();
+            }
+        });
+        productNameEl.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                productOpen();
+            }
+        });
+        if (productClearBtn) {
+            productClearBtn.addEventListener('click', function () {
+                productSet(null);
+            });
+        }
+        if (productBackdrop) {
+            productBackdrop.addEventListener('click', productClose);
+        }
+        if (productCloseBtn) {
+            productCloseBtn.addEventListener('click', productClose);
+        }
+        if (productSearchEl) {
+            productSearchEl.addEventListener('input', function () {
+                productRender(productSearchEl.value || '');
+            });
+        }
+    }
+
+    window.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Escape') {
+            return;
+        }
+        if (supplierModal && !supplierModal.hidden) {
+            supplierClose();
+        }
+        if (productModal && !productModal.hidden) {
+            productClose();
+        }
+    });
+})();
+</script>
 <script>
 (function () {
     var reportTitle = <?php echo json_encode($prDocTitle, JSON_UNESCAPED_UNICODE); ?>;
