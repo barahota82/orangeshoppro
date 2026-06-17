@@ -82,8 +82,28 @@ if ($initialJson === false) {
 #stk_attachments_count { max-width:none; width:100%; text-align:center; }
 #stk_attachments_manage_btn { width:100%; box-sizing:border-box; height:var(--input-min-h, 36px); min-height:var(--input-min-h, 36px); }
 .stk-attachments-modal__dialog { width:min(1080px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; }
-.stk-attachments-toolbar { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:10px; align-items:end; margin-bottom:10px; }
-.stk-attachments-toolbar button { height:42px; }
+.stk-attachments-toolbar {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:
+        "file file"
+        "name action";
+    gap:10px;
+    align-items:end;
+    margin-bottom:10px;
+}
+.stk-attachments-field { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.stk-attachments-field--file { grid-area:file; }
+.stk-attachments-field--name { grid-area:name; }
+.stk-attachments-toolbar .actions { grid-area:action; margin:0; }
+.stk-attachments-toolbar input[type="file"],
+.stk-attachments-toolbar input[type="text"] {
+    width:100%;
+    min-width:0;
+    box-sizing:border-box;
+}
+.stk-attachments-toolbar input[type="file"] { direction:ltr; }
+.stk-attachments-toolbar button { height:42px; white-space:nowrap; }
 .stk-attachments-list { border:1px solid #e5e7eb; border-radius:10px; background:#fff; padding:8px; min-height:54px; }
 .stk-attachment-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 6px; border-bottom:1px solid #f1f5f9; }
 .stk-attachment-row:last-child { border-bottom:0; }
@@ -93,7 +113,15 @@ if ($initialJson === false) {
 .stk-attachment-actions { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
 @media (max-width:900px) {
     .stk-attachments-inline { grid-template-columns:1fr; }
-    .stk-attachments-toolbar { grid-template-columns:1fr; }
+    .stk-attachments-toolbar {
+        grid-template-columns:1fr;
+        grid-template-areas:
+            "file"
+            "name"
+            "action";
+    }
+    .stk-attachments-toolbar .actions { width:100%; }
+    .stk-attachments-toolbar .actions button { width:100%; }
     .stk-attachment-row { flex-direction:column; align-items:stretch; }
     .stk-attachment-actions { justify-content:flex-start; }
 }
@@ -256,11 +284,11 @@ if ($initialJson === false) {
             PDF / صور / Excel / Word — حتى 20 مرفقاً لكل سجل (حتى 25MB للملف).
         </p>
         <div class="stk-attachments-toolbar">
-            <div>
+            <div class="stk-attachments-field stk-attachments-field--file">
                 <label for="stk_attachment_file">اختر ملف</label>
-                <input type="file" id="stk_attachment_file" accept=".pdf,image/*,.xlsx,.xls,.docx,.doc">
+                <input type="file" id="stk_attachment_file" accept=".pdf,image/*,.xlsx,.xls,.docx,.doc" dir="ltr" lang="en">
             </div>
-            <div>
+            <div class="stk-attachments-field stk-attachments-field--name">
                 <label for="stk_attachment_name">وصف المرفق</label>
                 <input type="text" id="stk_attachment_name" maxlength="191" autocomplete="off" placeholder="اختياري (يؤخذ من اسم الملف)">
             </div>

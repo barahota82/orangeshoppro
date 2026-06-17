@@ -604,13 +604,38 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
 }
 .sup-attachments-toolbar {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "file file"
+        "name action";
     gap: 10px;
     align-items: end;
     margin-bottom: 10px;
 }
+.sup-attachments-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+.sup-attachments-field--file { grid-area: file; }
+.sup-attachments-field--name { grid-area: name; }
+.sup-attachments-toolbar .actions {
+    grid-area: action;
+    margin: 0;
+}
+.sup-attachments-toolbar input[type="file"],
+.sup-attachments-toolbar input[type="text"] {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+.sup-attachments-toolbar input[type="file"] {
+    direction: ltr;
+}
 .sup-attachments-toolbar button {
     height: 42px;
+    white-space: nowrap;
 }
 .sup-attachments-list {
     border: 1px solid #e5e7eb;
@@ -714,6 +739,16 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
     }
     .sup-attachments-toolbar {
         grid-template-columns: 1fr;
+        grid-template-areas:
+            "file"
+            "name"
+            "action";
+    }
+    .sup-attachments-toolbar .actions {
+        width: 100%;
+    }
+    .sup-attachments-toolbar .actions button {
+        width: 100%;
     }
     .sup-attachment-row {
         flex-direction: column;
@@ -956,11 +991,11 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
             PDF وصور فقط — حد أقصى 5 مرفقات لكل مورد (حتى 20MB للملف قبل الضغط).
         </p>
         <div class="sup-attachments-toolbar">
-            <div>
+            <div class="sup-attachments-field sup-attachments-field--file">
                 <label for="sup_attachment_file">اختر ملف</label>
-                <input type="file" id="sup_attachment_file" accept=".pdf,image/*">
+                <input type="file" id="sup_attachment_file" accept=".pdf,image/*" dir="ltr" lang="en">
             </div>
-            <div>
+            <div class="sup-attachments-field sup-attachments-field--name">
                 <label for="sup_attachment_name">اسم الملف</label>
                 <input type="text" id="sup_attachment_name" maxlength="191" autocomplete="off" placeholder="اختياري (يؤخذ من اسم الملف)">
             </div>
