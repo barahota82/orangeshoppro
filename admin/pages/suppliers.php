@@ -598,7 +598,7 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
     height: 42px;
 }
 .sup-attachments-modal__dialog {
-    width: min(920px, calc(100vw - 24px));
+    width: min(1080px, calc(100vw - 24px));
     max-height: calc(100vh - 24px);
     overflow: auto;
 }

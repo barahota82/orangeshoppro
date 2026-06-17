@@ -563,7 +563,7 @@ function orange_inventory_reconciliation_archive_save(PDO $pdo, array $headerIn,
     $agentId = (int) ($headerIn['delivery_agent_id'] ?? 0);
     $countedAt = trim((string) ($headerIn['counted_at'] ?? ''));
     $notes = trim((string) ($headerIn['notes'] ?? ''));
-    $sortOrder = (int) ($headerIn['sort_order'] ?? 0);
+    $sortOrder = max(1, (int) ($headerIn['sort_order'] ?? 0));
 
     if ($countryId === null || $countryId <= 0) {
         $countryId = orange_admin_settings_effective_country_id($pdo);

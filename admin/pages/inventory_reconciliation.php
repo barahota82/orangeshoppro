@@ -62,10 +62,13 @@ if ($editRec !== null) {
         'delivery_agent_id' => (int) ($h['delivery_agent_id'] ?? 0),
         'counted_at' => substr((string) ($h['counted_at'] ?? ''), 0, 10),
         'notes' => (string) ($h['notes'] ?? ''),
-        'sort_order' => (int) ($h['sort_order'] ?? 0),
+        'sort_order' => max(1, (int) ($h['sort_order'] ?? 0)),
         'attachments' => $editRec['attachments'] ?? [],
     ];
 }
+
+$initialSortOrder = max(1, (int) ($initial['sort_order'] ?? 1));
+$initial['sort_order'] = $initialSortOrder;
 
 $initialJson = json_encode($initial, JSON_UNESCAPED_UNICODE);
 if ($initialJson === false) {
@@ -78,7 +81,7 @@ if ($initialJson === false) {
 .stk-attachments-inline { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; width:100%; }
 #stk_attachments_count { max-width:none; width:100%; text-align:center; }
 #stk_attachments_manage_btn { width:100%; box-sizing:border-box; height:var(--input-min-h, 36px); min-height:var(--input-min-h, 36px); }
-.stk-attachments-modal__dialog { width:min(920px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; }
+.stk-attachments-modal__dialog { width:min(1080px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; }
 .stk-attachments-toolbar { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:10px; align-items:end; margin-bottom:10px; }
 .stk-attachments-toolbar button { height:42px; }
 .stk-attachments-list { border:1px solid #e5e7eb; border-radius:10px; background:#fff; padding:8px; min-height:54px; }
@@ -113,7 +116,7 @@ if ($initialJson === false) {
         <div class="stk-top-row" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:12px;">
             <div style="flex:0 0 120px;">
                 <label for="stk_sort_order">رقم المستند</label>
-                <input type="number" id="stk_sort_order" dir="ltr" lang="en" step="1" min="0" value="0" style="width:100%;">
+                <input type="number" id="stk_sort_order" dir="ltr" lang="en" step="1" min="1" value="<?php echo (int) $initialSortOrder; ?>" style="width:100%;">
             </div>
             <div style="flex:1 1 220px;min-width:180px;">
                 <label for="stk_scope">المخزن / المندوب</label>
@@ -144,7 +147,7 @@ if ($initialJson === false) {
                     <?php endif; ?>
                 </select>
             </div>
-            <div style="flex:0 0 150px;">
+            <div style="flex:0 0 182px;">
                 <label for="stk_counted_at">تاريخ الجرد</label>
                 <input type="text" id="stk_counted_at" class="orange-inp-dmy" dir="ltr" lang="en" required style="width:100%;">
             </div>
@@ -222,7 +225,7 @@ if ($initialJson === false) {
                             ?>
                             <tr<?php echo $rid === $editId ? ' style="background:#fff7ed;"' : ''; ?>>
                                 <td><?php echo $rid; ?></td>
-                                <td dir="ltr"><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
+                                <td dir="ltr"><?php echo max(1, (int) ($row['sort_order'] ?? 0)); ?></td>
                                 <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY(substr((string) ($row['counted_at'] ?? ''), 0, 10)), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars((string) ($row['scope_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td>
@@ -405,11 +408,16 @@ if ($initialJson === false) {
         return '';
     }
 
+    function normalizeSortOrder(value) {
+        var n = parseInt(value, 10) || 0;
+        return n > 0 ? n : 1;
+    }
+
     function syncFormFromState() {
         el('stk_scope').value = scopeValue();
         el('stk_counted_at').value = state.counted_at ? orangeIsoDateToDmy(state.counted_at) : '';
         el('stk_notes').value = state.notes || '';
-        if (el('stk_sort_order')) el('stk_sort_order').value = String(parseInt(state.sort_order, 10) || 0);
+        if (el('stk_sort_order')) el('stk_sort_order').value = String(normalizeSortOrder(state.sort_order));
         el('stk_editor_title').textContent = state.id ? ('سجل جرد #' + state.id) : 'سجل جرد جديد';
         el('stk_delete_btn').disabled = !state.id;
         renderAttachments();
@@ -496,7 +504,7 @@ if ($initialJson === false) {
             delivery_agent_id: aid,
             counted_at: orangeGetDmyValueAsIso(el('stk_counted_at')) || '',
             notes: el('stk_notes').value || '',
-            sort_order: parseInt(el('stk_sort_order') ? el('stk_sort_order').value : 0, 10) || 0
+            sort_order: normalizeSortOrder(el('stk_sort_order') ? el('stk_sort_order').value : 0)
         };
     }
 
@@ -508,7 +516,7 @@ if ($initialJson === false) {
         state.delivery_agent_id = parseInt(h.delivery_agent_id, 10) || 0;
         state.counted_at = (h.counted_at || '').substring(0, 10);
         state.notes = h.notes || '';
-        state.sort_order = parseInt(h.sort_order, 10) || 0;
+        state.sort_order = normalizeSortOrder(h.sort_order);
         state.attachments = rec.attachments || [];
         syncFormFromState();
     }
@@ -613,7 +621,7 @@ if ($initialJson === false) {
 
     // ---- طباعة ورقة مستند الجرد (لإرفاقها مع الجرد اليدوي) ----
     el('stk_print_btn') && el('stk_print_btn').addEventListener('click', function () {
-        var docNo = el('stk_sort_order') ? (el('stk_sort_order').value || '') : '';
+        var docNo = String(normalizeSortOrder(el('stk_sort_order') ? el('stk_sort_order').value : 0));
         var scopeText = '';
         var sel = el('stk_scope');
         if (sel && sel.selectedIndex >= 0 && sel.value) scopeText = sel.options[sel.selectedIndex].text || '';
@@ -639,16 +647,19 @@ if ($initialJson === false) {
             + 'th{background:#f1f1f1;width:160px;}'
             + '.sigs{display:flex;justify-content:space-between;gap:24px;margin-top:60px;}'
             + '.sig{flex:1;text-align:center;border-top:1px solid #444;padding-top:8px;font-size:13px;}'
+            + '.actions{margin-top:18px;display:flex;gap:8px;justify-content:flex-start;}'
+            + '.actions button{padding:8px 14px;font-size:13px;cursor:pointer;}'
             + '@media print{body{margin:14mm;}}'
+            + '@media print{.actions{display:none;}}'
             + '</style></head><body>'
             + '<h1>مستند جرد مخزني</h1>'
             + '<table>' + rows + '</table>'
             + '<div class="sigs">' + sigs + '</div>'
+            + '<div class="actions"><button type="button" onclick="window.print()">طباعة</button><button type="button" onclick="window.close()">إغلاق</button></div>'
             + '</body></html>';
         win.document.write(html);
         win.document.close();
         win.focus();
-        setTimeout(function () { try { win.print(); } catch (e) {} }, 350);
     });
 
     // ---- التنقّل بين السجلات (أول/سابق/تالي/آخر) من الخادم ----
@@ -691,7 +702,7 @@ if ($initialJson === false) {
         var id = parseInt(r.id, 10) || 0;
         return '<tr class="stk-search-row" data-id="' + id + '" style="cursor:pointer;">'
             + '<td>' + id + '</td>'
-            + '<td dir="ltr">' + (parseInt(r.sort_order, 10) || 0) + '</td>'
+            + '<td dir="ltr">' + normalizeSortOrder(r.sort_order) + '</td>'
             + '<td dir="ltr">' + escapeHtml(dmy) + '</td>'
             + '<td>' + escapeHtml(r.scope_label || '') + '</td>'
             + '<td>' + (parseInt(r.attachment_count, 10) || 0) + '</td>'
