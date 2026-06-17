@@ -61,6 +61,15 @@ if ($initialJson === false) {
     $initialJson = '{}';
 }
 
+$navIds = [];
+foreach ($list as $navRow) {
+    $navIds[] = (int) ($navRow['id'] ?? 0);
+}
+$navIdsJson = json_encode($navIds);
+if ($navIdsJson === false) {
+    $navIdsJson = '[]';
+}
+
 ?>
 <style>
 .stk-attachments-summary { display:flex; flex-direction:column; gap:6px; max-width:420px; }
@@ -90,27 +99,23 @@ if ($initialJson === false) {
         <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
     </div>
 
-    <div class="card" style="border:1px solid #bfdbfe;background:#eff6ff;margin-bottom:12px;">
-        <p style="margin:0;">أرشيف لرفع <strong>تقرير الجرد المطبوع الموقّع</strong> (PDF / صور / Excel / Word) لكل عملية جرد تمّت. كل سجل: المخزن أو المندوب + تاريخ الجرد + ملاحظة + المرفقات. <strong>لا يُطبَّق على المخزون ولا يُنشئ قيداً</strong> — تطبيق فروق الجرد يتم عبر <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock_adjustment_voucher'), ENT_QUOTES, 'UTF-8'); ?>">قيد تسوية مخزون</a>. تقرير الجرد القابل للطباعة من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock_reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير المخزن ← الجرد</a>.</p>
-    </div>
-
     <?php if (! $ready): ?>
         <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;">
             <p style="margin:0;">جداول الجرد غير جاهزة — حدّث المخطط (ACC-10 مرحلة 0).</p>
         </div>
     <?php else: ?>
 
-    <p class="actions" style="margin:0 0 16px;">
-        <button type="button" class="btn-secondary" id="stk_btn_new">سجل جرد جديد</button>
-    </p>
-
     <div class="card" id="stk_editor_card">
         <h3 class="card-title" id="stk_editor_title">سجل جرد جديد</h3>
 
-        <div class="admin-fy-form-grid" style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:16px;">
-            <div>
+        <div class="stk-top-row" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:12px;">
+            <div style="flex:0 0 90px;">
+                <label for="stk_sort_order">ترتيب</label>
+                <input type="number" id="stk_sort_order" dir="ltr" lang="en" step="1" min="0" value="0" style="width:100%;">
+            </div>
+            <div style="flex:1 1 220px;min-width:180px;">
                 <label for="stk_scope">المخزن / المندوب</label>
-                <select id="stk_scope">
+                <select id="stk_scope" style="width:100%;">
                     <option value="">— اختر —</option>
                     <?php if ($warehouses !== []): ?>
                         <optgroup label="المخازن">
@@ -137,32 +142,38 @@ if ($initialJson === false) {
                     <?php endif; ?>
                 </select>
             </div>
-            <div>
+            <div style="flex:0 0 150px;">
                 <label for="stk_counted_at">تاريخ الجرد</label>
-                <input type="text" id="stk_counted_at" class="orange-inp-dmy" dir="ltr" lang="en" required>
+                <input type="text" id="stk_counted_at" class="orange-inp-dmy" dir="ltr" lang="en" required style="width:100%;">
             </div>
-            <div>
-                <label for="stk_sort_order">ترتيب</label>
-                <input type="number" id="stk_sort_order" dir="ltr" lang="en" step="1" min="0" value="0" style="width:100%;">
-            </div>
-            <div class="stk-attachments-summary">
+            <div style="flex:0 0 100px;">
                 <label for="stk_attachments_count">عدد المرفقات</label>
-                <div class="stk-attachments-inline">
-                    <input type="text" id="stk_attachments_count" dir="ltr" lang="en" value="0" readonly>
-                    <button type="button" class="btn-secondary" id="stk_attachments_manage_btn">إدارة المرفقات</button>
+                <input type="text" id="stk_attachments_count" dir="ltr" lang="en" value="0" readonly style="width:100%;text-align:center;">
+            </div>
+            <div style="flex:0 0 auto;">
+                <label>&nbsp;</label>
+                <button type="button" class="btn-secondary" id="stk_attachments_manage_btn" style="display:block;">إدارة المرفقات</button>
+            </div>
+            <div style="flex:0 0 auto;">
+                <label>&nbsp;</label>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <button type="button" class="btn-secondary" id="stk_btn_new" title="سجل جرد جديد">＋ جديد</button>
+                    <button type="button" class="btn-secondary" id="stk_nav_search" title="بحث في الأرشيف">بحث</button>
+                    <button type="button" class="btn-secondary" id="stk_nav_prev" title="السجل السابق">›</button>
+                    <button type="button" class="btn-secondary" id="stk_nav_next" title="السجل التالي">‹</button>
                 </div>
             </div>
         </div>
 
         <div style="margin-bottom:12px;">
-            <label for="stk_notes">ملاحظة</label>
-            <input type="text" id="stk_notes" style="width:100%;max-width:640px;" placeholder="مثال: جرد ربع سنوي — تم بحضور أمين المخزن">
+            <label for="stk_notes">ملاحظات</label>
+            <input type="text" id="stk_notes" style="width:100%;" placeholder="مثال: جرد ربع سنوي — تم بحضور أمين المخزن">
         </div>
 
-        <p class="actions" style="margin-top:4px;">
+        <div style="text-align:left;margin-top:4px;">
             <button type="button" id="stk_save_btn">حفظ السجل</button>
             <button type="button" class="btn-danger" id="stk_delete_btn" style="display:none;">حذف السجل ومرفقاته</button>
-        </p>
+        </div>
 
         <p id="stk_msg" class="card-hint" style="margin-top:12px;color:#166534;display:none;"></p>
         <p id="stk_err" class="card-hint" style="margin-top:12px;color:#b91c1c;display:none;"></p>
@@ -282,6 +293,7 @@ if ($initialJson === false) {
         'list' => $apiBase . '/archive-list.php',
     ], JSON_UNESCAPED_UNICODE); ?>;
     var state = <?php echo $initialJson; ?>;
+    var recordIds = <?php echo $navIdsJson; ?>;
     var MAX_ATT = 20;
 
     function el(id) { return document.getElementById(id); }
@@ -502,6 +514,29 @@ if ($initialJson === false) {
 
     el('stk_btn_new') && el('stk_btn_new').addEventListener('click', function () {
         window.location.href = '?page=inventory_reconciliation';
+    });
+
+    function gotoRecord(id) {
+        if (id > 0) window.location.href = '?page=inventory_reconciliation&id=' + id;
+    }
+    el('stk_nav_prev') && el('stk_nav_prev').addEventListener('click', function () {
+        if (!recordIds.length) return;
+        var idx = recordIds.indexOf(parseInt(state.id, 10) || 0);
+        if (idx < 0) { gotoRecord(recordIds[0]); return; }
+        if (idx > 0) gotoRecord(recordIds[idx - 1]);
+    });
+    el('stk_nav_next') && el('stk_nav_next').addEventListener('click', function () {
+        if (!recordIds.length) return;
+        var idx = recordIds.indexOf(parseInt(state.id, 10) || 0);
+        if (idx < 0) { gotoRecord(recordIds[0]); return; }
+        if (idx < recordIds.length - 1) gotoRecord(recordIds[idx + 1]);
+    });
+    el('stk_nav_search') && el('stk_nav_search').addEventListener('click', function () {
+        var card = el('stk_retrieve_card');
+        if (!card) return;
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        var f = el('stk_from');
+        if (f) setTimeout(function () { f.focus(); }, 300);
     });
 
     // ---- استرجاع الأرشيف (مدى تاريخ) ----
