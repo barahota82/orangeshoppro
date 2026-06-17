@@ -151,6 +151,159 @@ function orange_stocktake_archive_safe_display_name(string $name, string $fallba
 }
 
 /**
+ * التخزين المؤقت قبل الحفظ (Draft): تُرفع المرفقات لمجلد مؤقت باسم رمز عشوائي،
+ * ثم تُنقل إلى مجلد السجل عند الحفظ. هذا يسمح بإضافة المرفقات قبل إنشاء السجل.
+ */
+function orange_stocktake_archive_is_valid_draft_token(string $token): bool
+{
+    return (bool) preg_match('/^[a-f0-9]{32}$/', $token);
+}
+
+function orange_stocktake_archive_draft_root(): string
+{
+    return orange_stocktake_archive_upload_root() . DIRECTORY_SEPARATOR . '_drafts';
+}
+
+function orange_ensure_stocktake_archive_draft_dir(string $token): ?string
+{
+    if (! orange_stocktake_archive_is_valid_draft_token($token)) {
+        return null;
+    }
+    $uploadsRoot = orange_project_root_path() . DIRECTORY_SEPARATOR . 'uploads';
+    $base = orange_stocktake_archive_upload_root();
+    $draftsRoot = orange_stocktake_archive_draft_root();
+    $dir = $draftsRoot . DIRECTORY_SEPARATOR . $token;
+    foreach ([$uploadsRoot, $base, $draftsRoot, $dir] as $path) {
+        if (is_file($path)) {
+            return null;
+        }
+        if (! is_dir($path)) {
+            if (! @mkdir($path, 0755, true) && ! is_dir($path)) {
+                @mkdir($path, 0775, true);
+            }
+        }
+        if (! is_dir($path) || ! is_writable($path)) {
+            return null;
+        }
+    }
+
+    return $dir;
+}
+
+/**
+ * ينقل المرفقات المؤقتة إلى مجلد السجل بعد إنشائه ويعيد القائمة النهائية بالمسارات الجديدة.
+ *
+ * @param list<array<string,mixed>> $stagedList
+ * @return list<array<string,mixed>>
+ */
+function orange_stocktake_archive_finalize_draft(int $reconciliationId, string $token, array $stagedList): array
+{
+    $out = [];
+    if ($reconciliationId <= 0 || ! orange_stocktake_archive_is_valid_draft_token($token)) {
+        return $out;
+    }
+    $destDir = orange_ensure_stocktake_archive_dir($reconciliationId);
+    if ($destDir === null) {
+        return $out;
+    }
+    $draftDir = orange_stocktake_archive_draft_root() . DIRECTORY_SEPARATOR . $token;
+    $expectedPrefix = 'stocktake/_drafts/' . $token . '/';
+    foreach ($stagedList as $item) {
+        if (! is_array($item)) {
+            continue;
+        }
+        $path = ltrim(str_replace('\\', '/', trim((string) ($item['path'] ?? ''))), '/');
+        if (! str_starts_with($path, $expectedPrefix) || str_contains($path, '..')) {
+            continue;
+        }
+        $base = basename($path);
+        if ($base === '') {
+            continue;
+        }
+        $srcAbs = $draftDir . DIRECTORY_SEPARATOR . $base;
+        if (! is_file($srcAbs)) {
+            continue;
+        }
+        $mime = trim((string) ($item['mime'] ?? ''));
+        $originalName = orange_stocktake_archive_safe_original_name((string) ($item['original_name'] ?? $base));
+        if (! orange_stocktake_archive_is_allowed($mime, $originalName)) {
+            @unlink($srcAbs);
+            continue;
+        }
+        $ext = orange_stocktake_archive_extension_from_mime($mime, $originalName);
+        $safe = 'st_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+        $destAbs = $destDir . DIRECTORY_SEPARATOR . $safe;
+        if (! @rename($srcAbs, $destAbs)) {
+            if (! @copy($srcAbs, $destAbs)) {
+                continue;
+            }
+            @unlink($srcAbs);
+        }
+        $out[] = [
+            'id' => bin2hex(random_bytes(8)),
+            'name' => orange_stocktake_archive_safe_display_name((string) ($item['name'] ?? ''), pathinfo($originalName, PATHINFO_FILENAME)),
+            'path' => 'stocktake/' . $reconciliationId . '/' . $safe,
+            'mime' => $mime !== '' ? $mime : 'application/octet-stream',
+            'size' => is_file($destAbs) ? (int) filesize($destAbs) : 0,
+            'uploaded_at' => date('Y-m-d H:i:s'),
+            'original_name' => $originalName,
+        ];
+    }
+    orange_stocktake_archive_cleanup_draft($token);
+
+    return $out;
+}
+
+function orange_stocktake_archive_cleanup_draft(string $token): void
+{
+    if (! orange_stocktake_archive_is_valid_draft_token($token)) {
+        return;
+    }
+    $dir = orange_stocktake_archive_draft_root() . DIRECTORY_SEPARATOR . $token;
+    if (! is_dir($dir)) {
+        return;
+    }
+    foreach ((array) @scandir($dir) as $f) {
+        if ($f === '.' || $f === '..') {
+            continue;
+        }
+        @unlink($dir . DIRECTORY_SEPARATOR . $f);
+    }
+    @rmdir($dir);
+}
+
+/**
+ * تنظيف المجلدات المؤقتة المهجورة (افتراضياً أقدم من يوم).
+ */
+function orange_stocktake_archive_cleanup_old_drafts(int $maxAgeSeconds = 86400): void
+{
+    $root = orange_stocktake_archive_draft_root();
+    if (! is_dir($root)) {
+        return;
+    }
+    $now = time();
+    foreach ((array) @scandir($root) as $f) {
+        if ($f === '.' || $f === '..') {
+            continue;
+        }
+        $dir = $root . DIRECTORY_SEPARATOR . $f;
+        if (! is_dir($dir)) {
+            continue;
+        }
+        $mt = @filemtime($dir);
+        if ($mt !== false && ($now - $mt) > $maxAgeSeconds) {
+            foreach ((array) @scandir($dir) as $g) {
+                if ($g === '.' || $g === '..') {
+                    continue;
+                }
+                @unlink($dir . DIRECTORY_SEPARATOR . $g);
+            }
+            @rmdir($dir);
+        }
+    }
+}
+
+/**
  * @return list<array{id:string,name:string,path:string,mime:string,size:int,uploaded_at:string,original_name:string}>
  */
 function orange_stocktake_archive_decode_list(?string $json): array

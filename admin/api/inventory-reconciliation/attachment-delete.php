@@ -24,7 +24,27 @@ try {
     $data = get_json_input();
     $recId = (int) ($data['id'] ?? 0);
     $attachmentId = trim((string) ($data['attachment_id'] ?? ''));
-    if ($recId <= 0 || $attachmentId === '') {
+
+    // فرع المسودة: حذف مرفق مؤقت قبل حفظ السجل (id<=0 + token + path).
+    if ($recId <= 0) {
+        $draftToken = trim((string) ($data['token'] ?? ''));
+        $path = ltrim(str_replace('\\', '/', trim((string) ($data['path'] ?? ''))), '/');
+        $expectedPrefix = 'stocktake/_drafts/' . $draftToken . '/';
+        if (! orange_stocktake_archive_is_valid_draft_token($draftToken)
+            || ! str_starts_with($path, $expectedPrefix) || str_contains($path, '..')) {
+            json_response(['success' => false, 'message' => 'بيانات الحذف غير صالحة'], 422);
+        }
+        $abs = orange_stocktake_archive_abs_path($path);
+        if (orange_stocktake_archive_is_within_upload_root($abs) && is_file($abs)) {
+            @unlink($abs);
+        }
+        json_response([
+            'success' => true,
+            'message' => 'تم حذف المرفق',
+        ]);
+    }
+
+    if ($attachmentId === '') {
         json_response(['success' => false, 'message' => 'بيانات الحذف غير مكتملة'], 422);
     }
 

@@ -19,6 +19,17 @@ $list = $ready ? orange_inventory_reconciliation_archive_list($pdo, $ctxCountryI
 
 $editId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $editRec = ($editId > 0 && $ready) ? orange_inventory_reconciliation_archive_get($pdo, $editId, $ctxCountryId) : null;
+$attOpen = isset($_GET['att']) ? (int) $_GET['att'] : 0;
+$draftToken = bin2hex(random_bytes(16));
+
+$nextDocNo = 1;
+if ($ready && orange_table_has_column($pdo, 'inventory_reconciliation', 'sort_order')) {
+    try {
+        $nextDocNo = max(1, (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM inventory_reconciliation')->fetchColumn());
+    } catch (Throwable $e) {
+        $nextDocNo = 1;
+    }
+}
 
 $apiBase = storefront_public_path('/admin/api/inventory-reconciliation');
 
@@ -39,7 +50,7 @@ $initial = [
     'delivery_agent_id' => 0,
     'counted_at' => date('Y-m-d'),
     'notes' => '',
-    'sort_order' => 0,
+    'sort_order' => $nextDocNo,
     'attachments' => [],
 ];
 
@@ -66,7 +77,7 @@ if ($initialJson === false) {
 .stk-attachments-summary { display:flex; flex-direction:column; gap:6px; max-width:420px; }
 .stk-attachments-inline { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; width:100%; }
 #stk_attachments_count { max-width:none; width:100%; text-align:center; }
-#stk_attachments_manage_btn { width:100%; height:42px; }
+#stk_attachments_manage_btn { width:100%; box-sizing:border-box; height:var(--input-min-h, 36px); min-height:var(--input-min-h, 36px); }
 .stk-attachments-modal__dialog { width:min(920px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; }
 .stk-attachments-toolbar { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:10px; align-items:end; margin-bottom:10px; }
 .stk-attachments-toolbar button { height:42px; }
@@ -169,7 +180,8 @@ if ($initialJson === false) {
 
         <div class="actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
             <button type="button" class="btn-secondary" id="stk_btn_new" title="سجل جرد جديد">جديد</button>
-            <button type="button" class="btn-danger" id="stk_delete_btn" title="حذف السجل ومرفقاته" style="display:none;">حذف</button>
+            <button type="button" class="btn-secondary" id="stk_print_btn" title="طباعة ورقة مستند الجرد لإرفاقها مع الجرد اليدوي">طباعة</button>
+            <button type="button" class="btn-danger" id="stk_delete_btn" title="حذف السجل ومرفقاته" disabled>حذف</button>
             <button type="button" id="stk_save_btn">حفظ</button>
         </div>
     </div>
@@ -177,7 +189,16 @@ if ($initialJson === false) {
     <div class="card" style="margin-top:16px;">
         <h3 class="card-title">سجلات الأرشيف (الأحدث)</h3>
         <div class="table-wrap">
-            <table class="admin-fy-table">
+            <table class="admin-fy-table" style="width:100%;">
+                <colgroup>
+                    <col style="width:46px;">
+                    <col style="width:80px;">
+                    <col style="width:104px;">
+                    <col style="width:140px;">
+                    <col style="width:96px;">
+                    <col>
+                    <col style="width:56px;">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>#</th>
@@ -194,13 +215,23 @@ if ($initialJson === false) {
                         <tr><td colspan="7" class="muted">لا سجلات بعد.</td></tr>
                     <?php else: ?>
                         <?php foreach ($list as $row): ?>
-                            <?php $rid = (int) ($row['id'] ?? 0); ?>
+                            <?php
+                            $rid = (int) ($row['id'] ?? 0);
+                            $attCount = (int) ($row['attachment_count'] ?? 0);
+                            $attUrl = storefront_public_path('/admin/index.php?page=inventory_reconciliation&id=' . $rid . '&att=1');
+                            ?>
                             <tr<?php echo $rid === $editId ? ' style="background:#fff7ed;"' : ''; ?>>
                                 <td><?php echo $rid; ?></td>
                                 <td dir="ltr"><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
                                 <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY(substr((string) ($row['counted_at'] ?? ''), 0, 10)), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars((string) ($row['scope_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo (int) ($row['attachment_count'] ?? 0); ?></td>
+                                <td>
+                                    <?php if ($attCount > 0): ?>
+                                        <a class="btn-secondary" style="display:inline-block;padding:2px 10px;font-size:12px;" href="<?php echo htmlspecialchars($attUrl, ENT_QUOTES, 'UTF-8'); ?>" title="عرض المرفقات">عرض (<?php echo $attCount; ?>)</a>
+                                    <?php else: ?>
+                                        <span class="muted">0</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td><?php echo htmlspecialchars((string) ($row['notes'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=inventory_reconciliation&id=' . $rid), ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
                             </tr>
@@ -325,6 +356,8 @@ if ($initialJson === false) {
         'search' => $apiBase . '/archive-search.php',
     ], JSON_UNESCAPED_UNICODE); ?>;
     var state = <?php echo $initialJson; ?>;
+    var ATT_OPEN_ON_LOAD = <?php echo $attOpen ? '1' : '0'; ?>;
+    var DRAFT_TOKEN = <?php echo json_encode($draftToken); ?>;
     var MAX_ATT = 20;
 
     function el(id) { return document.getElementById(id); }
@@ -353,8 +386,15 @@ if ($initialJson === false) {
         });
     }
 
-    function downloadUrl(attId, inline) {
-        return API.download + '?id=' + (state.id || 0) + '&attachment_id=' + encodeURIComponent(attId) + (inline ? '&inline=1' : '');
+    function downloadUrl(item, inline) {
+        if (state.id) {
+            return API.download + '?id=' + state.id + '&attachment_id=' + encodeURIComponent(item.id) + (inline ? '&inline=1' : '');
+        }
+        return API.download + '?id=0&token=' + encodeURIComponent(DRAFT_TOKEN)
+            + '&path=' + encodeURIComponent(item.path || '')
+            + '&mime=' + encodeURIComponent(item.mime || '')
+            + '&name=' + encodeURIComponent(item.original_name || item.name || '')
+            + (inline ? '&inline=1' : '');
     }
 
     function scopeValue() {
@@ -371,7 +411,7 @@ if ($initialJson === false) {
         el('stk_notes').value = state.notes || '';
         if (el('stk_sort_order')) el('stk_sort_order').value = String(parseInt(state.sort_order, 10) || 0);
         el('stk_editor_title').textContent = state.id ? ('سجل جرد #' + state.id) : 'سجل جرد جديد';
-        el('stk_delete_btn').style.display = state.id ? 'inline-block' : 'none';
+        el('stk_delete_btn').disabled = !state.id;
         renderAttachments();
     }
 
@@ -386,13 +426,13 @@ if ($initialJson === false) {
         var hint = el('stk_attachments_hint');
         if (countEl) countEl.value = String(rows.length);
         if (manageBtn) {
-            manageBtn.disabled = !hasId;
+            manageBtn.disabled = false;
             manageBtn.textContent = rows.length > 0 ? ('إدارة المرفقات (' + rows.length + ')') : 'إدارة المرفقات';
         }
-        if (upBtn) upBtn.disabled = !hasId || rows.length >= MAX_ATT;
+        if (upBtn) upBtn.disabled = rows.length >= MAX_ATT;
         if (hint) {
             hint.textContent = !hasId
-                ? 'احفظ السجل أولاً ثم افتح إدارة المرفقات.'
+                ? ('أضف المرفقات الآن وتُحفظ مع السجل عند الضغط على «حفظ» — ' + rows.length + ' / ' + MAX_ATT + ' (PDF / صور / Excel / Word، حتى 25MB).')
                 : ('عدد المرفقات: ' + rows.length + ' / ' + MAX_ATT + ' — PDF / صور / Excel / Word، حتى 25MB للملف.');
         }
         var list = el('stk_attachments_list');
@@ -415,8 +455,8 @@ if ($initialJson === false) {
                 + '    <div class="stk-attachment-meta">' + escapeHtml(meta.join(' — ')) + '</div>'
                 + '  </div>'
                 + '  <div class="stk-attachment-actions">'
-                + (viewable ? ('<a class="btn btn-secondary" target="_blank" rel="noopener" href="' + downloadUrl(item.id, true) + '">عرض</a>') : '')
-                + '    <a class="btn btn-secondary" href="' + downloadUrl(item.id, false) + '">تحميل</a>'
+                + (viewable ? ('<a class="btn btn-secondary" target="_blank" rel="noopener" href="' + downloadUrl(item, true) + '">عرض</a>') : '')
+                + '    <a class="btn btn-secondary" href="' + downloadUrl(item, false) + '">تحميل</a>'
                 + '    <button type="button" class="btn-danger" data-stk-att-del="' + escapeHtml(item.id) + '">حذف</button>'
                 + '  </div>'
                 + '</div>';
@@ -430,7 +470,6 @@ if ($initialJson === false) {
     }
 
     function modalOpen() {
-        if (!state.id) { showErr('احفظ السجل أولاً ثم أدر المرفقات'); return; }
         var modal = el('stk_attachments_modal');
         if (!modal) return;
         modal.hidden = false;
@@ -486,7 +525,15 @@ if ($initialJson === false) {
 
     el('stk_save_btn') && el('stk_save_btn').addEventListener('click', async function () {
         showErr('');
-        var data = await postJson(API.save, payloadFromForm());
+        var payload = payloadFromForm();
+        if (!payload.warehouse_id && !payload.delivery_agent_id) { showErr('اختر المخزن أو المندوب أولاً'); return; }
+        if (!payload.counted_at) { showErr('تاريخ الجرد مطلوب'); return; }
+        if ((state.attachments || []).length < 1) { showErr('أرفق مرفقاً واحداً على الأقل قبل الحفظ'); return; }
+        if (!state.id) {
+            payload.token = DRAFT_TOKEN;
+            payload.attachments = state.attachments || [];
+        }
+        var data = await postJson(API.save, payload);
         if (!data.success) { showErr(data.message || 'فشل الحفظ'); return; }
         showOk(data.message || 'تم الحفظ');
         applyRec(data.record);
@@ -507,12 +554,12 @@ if ($initialJson === false) {
     el('stk_attachments_backdrop') && el('stk_attachments_backdrop').addEventListener('click', modalClose);
 
     el('stk_attachment_upload_btn') && el('stk_attachment_upload_btn').addEventListener('click', async function () {
-        if (!state.id) { alert('احفظ السجل أولاً'); return; }
         if (attRows().length >= MAX_ATT) { alert('بلغت الحد الأقصى للمرفقات'); return; }
         var fileInp = el('stk_attachment_file');
         if (!fileInp.files || !fileInp.files.length) { alert('اختر ملفاً للرفع'); return; }
         var fd = new FormData();
-        fd.append('id', String(state.id));
+        fd.append('id', String(state.id || 0));
+        if (!state.id) fd.append('token', DRAFT_TOKEN);
         fd.append('attachment_name', el('stk_attachment_name').value || '');
         fd.append('file', fileInp.files[0]);
         var btn = el('stk_attachment_upload_btn');
@@ -522,7 +569,12 @@ if ($initialJson === false) {
             var data = {};
             try { data = await res.json(); } catch (e) { data = {}; }
             if (!data.success) { alert(data.message || 'تعذر رفع المرفق'); return; }
-            state.attachments = data.attachments || [];
+            if (state.id) {
+                state.attachments = data.attachments || [];
+            } else {
+                state.attachments = state.attachments || [];
+                if (data.attachment) state.attachments.push(data.attachment);
+            }
             fileInp.value = '';
             el('stk_attachment_name').value = '';
             alert(data.message || 'تم رفع المرفق');
@@ -536,11 +588,19 @@ if ($initialJson === false) {
 
     async function attDelete(attId) {
         if (!attId || !confirm('سيتم حذف المرفق نهائياً. هل تريد المتابعة؟')) return;
-        var data = await postJson(API.attDelete, { id: state.id, attachment_id: attId });
-        if (!data || !data.success) { alert((data && data.message) || 'تعذر حذف المرفق'); return; }
-        state.attachments = data.attachments || [];
+        if (state.id) {
+            var data = await postJson(API.attDelete, { id: state.id, attachment_id: attId });
+            if (!data || !data.success) { alert((data && data.message) || 'تعذر حذف المرفق'); return; }
+            state.attachments = data.attachments || [];
+        } else {
+            var item = (state.attachments || []).filter(function (x) { return String(x.id) === String(attId); })[0];
+            if (!item) return;
+            var dd = await postJson(API.attDelete, { id: 0, token: DRAFT_TOKEN, path: item.path || '' });
+            if (!dd || !dd.success) { alert((dd && dd.message) || 'تعذر حذف المرفق'); return; }
+            state.attachments = (state.attachments || []).filter(function (x) { return String(x.id) !== String(attId); });
+        }
         renderAttachments();
-        alert(data.message || 'تم حذف المرفق');
+        alert('تم حذف المرفق');
     }
 
     function gotoRecord(id) {
@@ -549,6 +609,46 @@ if ($initialJson === false) {
 
     el('stk_btn_new') && el('stk_btn_new').addEventListener('click', function () {
         window.location.href = '?page=inventory_reconciliation';
+    });
+
+    // ---- طباعة ورقة مستند الجرد (لإرفاقها مع الجرد اليدوي) ----
+    el('stk_print_btn') && el('stk_print_btn').addEventListener('click', function () {
+        var docNo = el('stk_sort_order') ? (el('stk_sort_order').value || '') : '';
+        var scopeText = '';
+        var sel = el('stk_scope');
+        if (sel && sel.selectedIndex >= 0 && sel.value) scopeText = sel.options[sel.selectedIndex].text || '';
+        var dateText = el('stk_counted_at') ? (el('stk_counted_at').value || '') : '';
+        var notes = el('stk_notes') ? (el('stk_notes').value || '') : '';
+        var isAgent = (sel && String(sel.value).indexOf('a:') === 0);
+        var win = window.open('', '_blank');
+        if (!win) { alert('يجب السماح بالنوافذ المنبثقة للطباعة'); return; }
+        var rows = ''
+            + '<tr><th>رقم المستند</th><td>' + escapeHtml(docNo) + '</td></tr>'
+            + '<tr><th>' + (isAgent ? 'المندوب (عهدة)' : 'المخزن') + '</th><td>' + escapeHtml(scopeText) + '</td></tr>'
+            + '<tr><th>تاريخ الجرد</th><td>' + escapeHtml(dateText) + '</td></tr>'
+            + '<tr><th>ملاحظات</th><td>' + escapeHtml(notes) + '</td></tr>';
+        var sigs = isAgent
+            ? '<div class="sig">المندوب</div><div class="sig">أمين المخزن</div><div class="sig">اعتماد الإدارة</div>'
+            : '<div class="sig">أمين المخزن</div><div class="sig">اعتماد الإدارة</div>';
+        var html = '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">'
+            + '<title>مستند جرد ' + escapeHtml(docNo) + '</title><style>'
+            + 'body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;color:#111;margin:28px;}'
+            + 'h1{font-size:20px;text-align:center;margin:0 0 18px;}'
+            + 'table{width:100%;border-collapse:collapse;margin-bottom:36px;}'
+            + 'th,td{border:1px solid #444;padding:9px 12px;font-size:14px;text-align:right;}'
+            + 'th{background:#f1f1f1;width:160px;}'
+            + '.sigs{display:flex;justify-content:space-between;gap:24px;margin-top:60px;}'
+            + '.sig{flex:1;text-align:center;border-top:1px solid #444;padding-top:8px;font-size:13px;}'
+            + '@media print{body{margin:14mm;}}'
+            + '</style></head><body>'
+            + '<h1>مستند جرد مخزني</h1>'
+            + '<table>' + rows + '</table>'
+            + '<div class="sigs">' + sigs + '</div>'
+            + '</body></html>';
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        setTimeout(function () { try { win.print(); } catch (e) {} }, 350);
     });
 
     // ---- التنقّل بين السجلات (أول/سابق/تالي/آخر) من الخادم ----
@@ -638,5 +738,9 @@ if ($initialJson === false) {
     });
 
     syncFormFromState();
+
+    if (ATT_OPEN_ON_LOAD && state.id) {
+        modalOpen();
+    }
 })();
 </script>

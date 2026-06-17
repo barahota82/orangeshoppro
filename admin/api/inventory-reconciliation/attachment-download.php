@@ -24,24 +24,39 @@ try {
     $recId = (int) ($_GET['id'] ?? 0);
     $attachmentId = trim((string) ($_GET['attachment_id'] ?? ''));
     $inline = (int) ($_GET['inline'] ?? 0) === 1;
-    if ($recId <= 0 || $attachmentId === '') {
-        json_response(['success' => false, 'message' => 'بيانات التنزيل غير مكتملة'], 422);
-    }
-
-    $rec = orange_inventory_reconciliation_archive_get($pdo, $recId, $ctxCountryId);
-    if ($rec === null) {
-        json_response(['success' => false, 'message' => 'سجل الجرد غير موجود'], 404);
-    }
 
     $picked = null;
-    foreach (($rec['attachments'] ?? []) as $item) {
-        if ((string) ($item['id'] ?? '') === $attachmentId) {
-            $picked = $item;
-            break;
+    if ($recId <= 0) {
+        // فرع المسودة: عرض/تنزيل مرفق مؤقت قبل الحفظ (token + path).
+        $draftToken = trim((string) ($_GET['token'] ?? ''));
+        $path = ltrim(str_replace('\\', '/', trim((string) ($_GET['path'] ?? ''))), '/');
+        $expectedPrefix = 'stocktake/_drafts/' . $draftToken . '/';
+        if (! orange_stocktake_archive_is_valid_draft_token($draftToken)
+            || ! str_starts_with($path, $expectedPrefix) || str_contains($path, '..')) {
+            json_response(['success' => false, 'message' => 'بيانات التنزيل غير صالحة'], 422);
         }
-    }
-    if ($picked === null) {
-        json_response(['success' => false, 'message' => 'المرفق غير موجود'], 404);
+        $picked = [
+            'path' => $path,
+            'mime' => trim((string) ($_GET['mime'] ?? '')),
+            'original_name' => (string) ($_GET['name'] ?? ''),
+        ];
+    } else {
+        if ($attachmentId === '') {
+            json_response(['success' => false, 'message' => 'بيانات التنزيل غير مكتملة'], 422);
+        }
+        $rec = orange_inventory_reconciliation_archive_get($pdo, $recId, $ctxCountryId);
+        if ($rec === null) {
+            json_response(['success' => false, 'message' => 'سجل الجرد غير موجود'], 404);
+        }
+        foreach (($rec['attachments'] ?? []) as $item) {
+            if ((string) ($item['id'] ?? '') === $attachmentId) {
+                $picked = $item;
+                break;
+            }
+        }
+        if ($picked === null) {
+            json_response(['success' => false, 'message' => 'المرفق غير موجود'], 404);
+        }
     }
 
     $abs = orange_stocktake_archive_abs_path((string) ($picked['path'] ?? ''));

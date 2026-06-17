@@ -25,18 +25,40 @@ try {
 
     $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
     $recId = (int) ($_POST['id'] ?? 0);
-    if ($recId <= 0) {
-        json_response(['success' => false, 'message' => 'احفظ بيانات الجرد أولاً ثم أضف المرفقات'], 422);
-    }
-    $rec = orange_inventory_reconciliation_archive_get($pdo, $recId, $ctxCountryId);
-    if ($rec === null) {
-        json_response(['success' => false, 'message' => 'سجل الجرد غير موجود'], 404);
-    }
-
-    $attachments = orange_stocktake_archive_attachments_for($pdo, $recId);
+    $draftToken = trim((string) ($_POST['token'] ?? ''));
+    $isDraft = $recId <= 0;
     $maxAttachments = 20;
-    if (count($attachments) >= $maxAttachments) {
-        json_response(['success' => false, 'message' => 'الحد الأقصى للمرفقات هو 20 ملفاً'], 422);
+
+    if ($isDraft) {
+        if (! orange_stocktake_archive_is_valid_draft_token($draftToken)) {
+            json_response(['success' => false, 'message' => 'جلسة الإضافة غير صالحة — أعد تحميل الصفحة'], 422);
+        }
+        $dir = orange_ensure_stocktake_archive_draft_dir($draftToken);
+        if ($dir === null) {
+            json_response(['success' => false, 'message' => 'تعذر تجهيز مجلد المرفقات المؤقت'], 500);
+        }
+        $existingCount = 0;
+        foreach ((array) @scandir($dir) as $f) {
+            if ($f !== '.' && $f !== '..' && is_file($dir . DIRECTORY_SEPARATOR . $f)) {
+                $existingCount++;
+            }
+        }
+        if ($existingCount >= $maxAttachments) {
+            json_response(['success' => false, 'message' => 'الحد الأقصى للمرفقات هو 20 ملفاً'], 422);
+        }
+    } else {
+        $rec = orange_inventory_reconciliation_archive_get($pdo, $recId, $ctxCountryId);
+        if ($rec === null) {
+            json_response(['success' => false, 'message' => 'سجل الجرد غير موجود'], 404);
+        }
+        $attachments = orange_stocktake_archive_attachments_for($pdo, $recId);
+        if (count($attachments) >= $maxAttachments) {
+            json_response(['success' => false, 'message' => 'الحد الأقصى للمرفقات هو 20 ملفاً'], 422);
+        }
+        $dir = orange_ensure_stocktake_archive_dir($recId);
+        if ($dir === null) {
+            json_response(['success' => false, 'message' => 'تعذر تجهيز مجلد مرفقات الجرد'], 500);
+        }
     }
 
     if (! isset($_FILES['file']) || ! is_array($_FILES['file'])) {
@@ -69,11 +91,6 @@ try {
         (string) pathinfo($originalName, PATHINFO_FILENAME)
     );
 
-    $dir = orange_ensure_stocktake_archive_dir($recId);
-    if ($dir === null) {
-        json_response(['success' => false, 'message' => 'تعذر تجهيز مجلد مرفقات الجرد'], 500);
-    }
-
     $ext = orange_stocktake_archive_extension_from_mime($mime, $originalName);
     $safe = 'st_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
     $destAbs = $dir . DIRECTORY_SEPARATOR . $safe;
@@ -82,17 +99,25 @@ try {
     }
 
     $finalSize = is_file($destAbs) ? (int) filesize($destAbs) : 0;
-    $relative = 'stocktake/' . $recId . '/' . basename($destAbs);
-    $attachments[] = [
+    $newItem = [
         'id' => bin2hex(random_bytes(8)),
         'name' => $displayName,
-        'path' => $relative,
+        'path' => ($isDraft ? ('stocktake/_drafts/' . $draftToken . '/') : ('stocktake/' . $recId . '/')) . basename($destAbs),
         'mime' => $mime,
         'size' => $finalSize,
         'uploaded_at' => date('Y-m-d H:i:s'),
         'original_name' => $originalName,
     ];
 
+    if ($isDraft) {
+        json_response([
+            'success' => true,
+            'message' => 'تم رفع المرفق',
+            'attachment' => $newItem,
+        ]);
+    }
+
+    $attachments[] = $newItem;
     orange_stocktake_archive_store_attachments($pdo, $recId, $attachments);
     audit_log('stocktake_archive_attachment_upload', 'رفع مرفق جرد #' . $recId . ' — ' . $displayName, 'inventory_reconciliation', $recId);
 
