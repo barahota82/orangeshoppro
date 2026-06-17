@@ -80,7 +80,7 @@ $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<title>بطاقة مورد #<?php echo (int) $supplierId; ?></title>
+<title>بطاقة مورد</title>
 <style>
 * { box-sizing: border-box; }
 body {
@@ -165,6 +165,12 @@ h2 { font-size: 1rem; margin: 0 0 10px; }
     background: #ffffff;
     color: #334155;
 }
+.print-footer {
+    display: none;
+}
+.print-footer__page-number::after {
+    content: counter(page);
+}
 pre {
     white-space: pre-wrap;
     font-family: inherit;
@@ -179,6 +185,9 @@ pre {
     .actions button { flex: 1 1 auto; }
 }
 @media print {
+    @page {
+        margin: 12mm 10mm 16mm;
+    }
     body {
         margin: 0;
         padding: 0;
@@ -194,6 +203,21 @@ pre {
         box-shadow: none;
     }
     .actions { display: none; }
+    .print-footer {
+        display: flex;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-top: 1px solid #9ca3af;
+        background: #ffffff;
+        color: #334155;
+        font-size: 11px;
+        padding: 4px 10mm 2px;
+        align-items: center;
+        justify-content: space-between;
+        direction: rtl;
+    }
 }
 </style>
 </head>
@@ -203,8 +227,7 @@ pre {
     <?php if ($companyName !== ''): ?>
     <p class="muted"><?php echo htmlspecialchars($companyName, ENT_QUOTES, 'UTF-8'); ?></p>
     <?php endif; ?>
-    <h1>بطاقة مورد #<?php echo (int) $supplierId; ?></h1>
-    <p class="muted">تاريخ الطباعة: <span class="ltr"><?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?></span></p>
+    <h1>بطاقة مورد</h1>
 </header>
 
 <div class="card">
@@ -271,6 +294,10 @@ pre {
 <div class="actions">
     <button type="button" onclick="window.print()">طباعة</button>
     <button type="button" onclick="window.close()">إغلاق</button>
+</div>
+<div class="print-footer" aria-hidden="true">
+    <span class="print-footer__datetime">تاريخ ووقت الطباعة: <span class="ltr"><?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?></span></span>
+    <span class="print-footer__page">صفحة <span class="print-footer__page-number"></span></span>
 </div>
 </div>
 </body>
