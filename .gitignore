@@ -21,3 +21,12 @@ ref_extract1/
 ref_extract2/
 *.local.bak
 uploads/
+
+# Generated review/audit exports — not part of the site
+docs/exports/
+*ADMIN_DB_SCHEMA_AUDIT*.md
+
+# Backup/reference snapshots accidentally committed before
+*.php.txt
+*.sql.txt
+*.sql.TXT
