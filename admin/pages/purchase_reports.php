@@ -18,8 +18,8 @@ $reports = [
     'invoices' => 'فواتير المشتريات',
     'returns' => 'مردودات المشتريات',
     'suppliers' => 'ملخص الموردين',
-    'items' => 'تحليل الأصناف',
     'monthly' => 'ملخص شهري',
+    'items' => 'تحليل الأصناف',
 ];
 $reportKey = isset($_GET['r']) ? (string) $_GET['r'] : 'invoices';
 if (!isset($reports[$reportKey])) {
@@ -697,8 +697,8 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                 <div style="display:flex;gap:6px;align-items:center;">
                     <input type="hidden" id="prr_supplier_id" name="supplier_id" value="<?php echo (int) $supplierId; ?>">
                     <input type="text" id="prr_supplier_code" class="admin-inp" readonly
-                        title="دبل كليك لاختيار المورد"
-                        style="width:9rem;background:#f4f4f5;cursor:pointer;" dir="ltr" lang="en"
+                        title="يُملأ تلقائياً عند اختيار المورد"
+                        style="width:9rem;background:#f4f4f5;" dir="ltr" lang="en"
                         placeholder="الكود"
                         value="<?php echo htmlspecialchars($selectedSupplierCode, ENT_QUOTES, 'UTF-8'); ?>">
                     <input type="text" id="prr_supplier_name" class="admin-inp" readonly
@@ -716,8 +716,8 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                 <div style="display:flex;gap:6px;align-items:center;">
                     <input type="hidden" id="prr_product_id" name="product_id" value="<?php echo (int) $productId; ?>">
                     <input type="text" id="prr_product_code" class="admin-inp" readonly
-                        title="دبل كليك لاختيار الصنف"
-                        style="width:10rem;background:#f4f4f5;cursor:pointer;" dir="ltr" lang="en"
+                        title="يُملأ تلقائياً عند اختيار الصنف"
+                        style="width:10rem;background:#f4f4f5;" dir="ltr" lang="en"
                         placeholder="الكود"
                         value="<?php echo htmlspecialchars($selectedProductCode, ENT_QUOTES, 'UTF-8'); ?>">
                     <input type="text" id="prr_product_name" class="admin-inp" readonly
@@ -1200,14 +1200,7 @@ $prDocTitle = $reportTitle . ' - ' . date('Y-m-d');
     }
 
     if (supplierCodeEl && supplierNameEl) {
-        supplierCodeEl.addEventListener('dblclick', supplierOpen);
         supplierNameEl.addEventListener('dblclick', supplierOpen);
-        supplierCodeEl.addEventListener('keydown', function (ev) {
-            if (ev.key === 'Enter' || ev.key === ' ') {
-                ev.preventDefault();
-                supplierOpen();
-            }
-        });
         supplierNameEl.addEventListener('keydown', function (ev) {
             if (ev.key === 'Enter' || ev.key === ' ') {
                 ev.preventDefault();
@@ -1228,14 +1221,7 @@ $prDocTitle = $reportTitle . ' - ' . date('Y-m-d');
     }
 
     if (productCodeEl && productNameEl) {
-        productCodeEl.addEventListener('dblclick', productOpen);
         productNameEl.addEventListener('dblclick', productOpen);
-        productCodeEl.addEventListener('keydown', function (ev) {
-            if (ev.key === 'Enter' || ev.key === ' ') {
-                ev.preventDefault();
-                productOpen();
-            }
-        });
         productNameEl.addEventListener('keydown', function (ev) {
             if (ev.key === 'Enter' || ev.key === ' ') {
                 ev.preventDefault();
