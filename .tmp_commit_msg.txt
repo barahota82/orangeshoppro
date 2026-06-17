@@ -1,7 +1,0 @@
-stocktake archive: supplier-style attachment manager + date-range retrieval
-
-- attachment count field + "إدارة المرفقات (N)" button opening a modal
-  (upload / inline-view / download / delete), matching suppliers UI
-- bottom card "استرجاع الأرشيف": from/to date filter listing stocktakes
-  in the period with open links
-- archive_list() gains optional from/to date params; new archive-list.php API

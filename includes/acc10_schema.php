@@ -149,6 +149,14 @@ function orange_catalog_ensure_acc10_schema(PDO $pdo): void
             'ALTER TABLE inventory_reconciliation ADD COLUMN delivery_agent_id INT UNSIGNED NULL DEFAULT NULL'
         );
     }
+    // ترتيب يدوي لسجلات أرشيف الجرد.
+    if (orange_table_exists($pdo, 'inventory_reconciliation')
+        && !orange_table_has_column($pdo, 'inventory_reconciliation', 'sort_order')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE inventory_reconciliation ADD COLUMN sort_order INT NOT NULL DEFAULT 0'
+        );
+    }
 
     if (!orange_table_exists($pdo, 'inventory_reconciliation_line')) {
         orange_catalog_safe_exec(

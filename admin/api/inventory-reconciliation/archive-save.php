@@ -28,6 +28,7 @@ try {
         'delivery_agent_id' => (int) ($data['delivery_agent_id'] ?? 0),
         'counted_at' => trim((string) ($data['counted_at'] ?? '')),
         'notes' => trim((string) ($data['notes'] ?? '')),
+        'sort_order' => (int) ($data['sort_order'] ?? 0),
     ], $ctxCountryId);
 
     audit_log('stocktake_archive_save', 'حفظ سجل أرشيف جرد #' . $id, 'inventory_reconciliation', $id);

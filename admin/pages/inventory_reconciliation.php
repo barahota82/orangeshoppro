@@ -39,6 +39,7 @@ $initial = [
     'delivery_agent_id' => 0,
     'counted_at' => date('Y-m-d'),
     'notes' => '',
+    'sort_order' => 0,
     'attachments' => [],
 ];
 
@@ -50,6 +51,7 @@ if ($editRec !== null) {
         'delivery_agent_id' => (int) ($h['delivery_agent_id'] ?? 0),
         'counted_at' => substr((string) ($h['counted_at'] ?? ''), 0, 10),
         'notes' => (string) ($h['notes'] ?? ''),
+        'sort_order' => (int) ($h['sort_order'] ?? 0),
         'attachments' => $editRec['attachments'] ?? [],
     ];
 }
@@ -113,7 +115,16 @@ if ($initialJson === false) {
                     <?php if ($warehouses !== []): ?>
                         <optgroup label="المخازن">
                             <?php foreach ($warehouses as $wh): ?>
-                                <option value="w:<?php echo (int) $wh['id']; ?>"><?php echo htmlspecialchars($wh['label'], ENT_QUOTES, 'UTF-8'); ?></option>
+                                <?php
+                                $whName = trim((string) ($wh['name_ar'] ?? ''));
+                                if ($whName === '') {
+                                    $whName = trim((string) ($wh['name_en'] ?? ''));
+                                }
+                                if ($whName === '') {
+                                    $whName = '#' . (int) ($wh['id'] ?? 0);
+                                }
+                                ?>
+                                <option value="w:<?php echo (int) $wh['id']; ?>"><?php echo htmlspecialchars($whName, ENT_QUOTES, 'UTF-8'); ?></option>
                             <?php endforeach; ?>
                         </optgroup>
                     <?php endif; ?>
@@ -129,6 +140,10 @@ if ($initialJson === false) {
             <div>
                 <label for="stk_counted_at">تاريخ الجرد</label>
                 <input type="text" id="stk_counted_at" class="orange-inp-dmy" dir="ltr" lang="en" required>
+            </div>
+            <div>
+                <label for="stk_sort_order">ترتيب</label>
+                <input type="number" id="stk_sort_order" dir="ltr" lang="en" step="1" min="0" value="0" style="width:100%;">
             </div>
             <div class="stk-attachments-summary">
                 <label for="stk_attachments_count">عدد المرفقات</label>
@@ -160,6 +175,7 @@ if ($initialJson === false) {
                 <thead>
                     <tr>
                         <th>#</th>
+                        <th>ترتيب</th>
                         <th>تاريخ الجرد</th>
                         <th>المخزن / المندوب</th>
                         <th>المرفقات</th>
@@ -169,12 +185,13 @@ if ($initialJson === false) {
                 </thead>
                 <tbody>
                     <?php if ($list === []): ?>
-                        <tr><td colspan="6" class="muted">لا سجلات بعد.</td></tr>
+                        <tr><td colspan="7" class="muted">لا سجلات بعد.</td></tr>
                     <?php else: ?>
                         <?php foreach ($list as $row): ?>
                             <?php $rid = (int) ($row['id'] ?? 0); ?>
                             <tr<?php echo $rid === $editId ? ' style="background:#fff7ed;"' : ''; ?>>
                                 <td><?php echo $rid; ?></td>
+                                <td dir="ltr"><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
                                 <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY(substr((string) ($row['counted_at'] ?? ''), 0, 10)), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars((string) ($row['scope_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo (int) ($row['attachment_count'] ?? 0); ?></td>
@@ -209,6 +226,7 @@ if ($initialJson === false) {
                 <thead>
                     <tr>
                         <th>#</th>
+                        <th>ترتيب</th>
                         <th>تاريخ الجرد</th>
                         <th>المخزن / المندوب</th>
                         <th>المرفقات</th>
@@ -217,7 +235,7 @@ if ($initialJson === false) {
                     </tr>
                 </thead>
                 <tbody id="stk_retrieve_body">
-                    <tr><td colspan="6" class="muted">اختر المدى ثم «عرض».</td></tr>
+                    <tr><td colspan="7" class="muted">اختر المدى ثم «عرض».</td></tr>
                 </tbody>
             </table>
         </div>
@@ -308,6 +326,7 @@ if ($initialJson === false) {
         el('stk_scope').value = scopeValue();
         el('stk_counted_at').value = state.counted_at ? orangeIsoDateToDmy(state.counted_at) : '';
         el('stk_notes').value = state.notes || '';
+        if (el('stk_sort_order')) el('stk_sort_order').value = String(parseInt(state.sort_order, 10) || 0);
         el('stk_editor_title').textContent = state.id ? ('سجل جرد #' + state.id) : 'سجل جرد جديد';
         el('stk_delete_btn').style.display = state.id ? 'inline-block' : 'none';
         renderAttachments();
@@ -394,7 +413,8 @@ if ($initialJson === false) {
             warehouse_id: wid,
             delivery_agent_id: aid,
             counted_at: orangeGetDmyValueAsIso(el('stk_counted_at')) || '',
-            notes: el('stk_notes').value || ''
+            notes: el('stk_notes').value || '',
+            sort_order: parseInt(el('stk_sort_order') ? el('stk_sort_order').value : 0, 10) || 0
         };
     }
 
@@ -406,6 +426,7 @@ if ($initialJson === false) {
         state.delivery_agent_id = parseInt(h.delivery_agent_id, 10) || 0;
         state.counted_at = (h.counted_at || '').substring(0, 10);
         state.notes = h.notes || '';
+        state.sort_order = parseInt(h.sort_order, 10) || 0;
         state.attachments = rec.attachments || [];
         syncFormFromState();
     }
@@ -489,6 +510,7 @@ if ($initialJson === false) {
         var openUrl = '?page=inventory_reconciliation&id=' + (parseInt(r.id, 10) || 0);
         return '<tr>'
             + '<td>' + (parseInt(r.id, 10) || 0) + '</td>'
+            + '<td dir="ltr">' + (parseInt(r.sort_order, 10) || 0) + '</td>'
             + '<td dir="ltr">' + escapeHtml(dmy) + '</td>'
             + '<td>' + escapeHtml(r.scope_label || '') + '</td>'
             + '<td>' + (parseInt(r.attachment_count, 10) || 0) + '</td>'
@@ -502,22 +524,22 @@ if ($initialJson === false) {
         var to = orangeGetDmyValueAsIso(el('stk_to')) || '';
         var body = el('stk_retrieve_body');
         var cnt = el('stk_retrieve_count');
-        body.innerHTML = '<tr><td colspan="6" class="muted">جارٍ التحميل…</td></tr>';
+        body.innerHTML = '<tr><td colspan="7" class="muted">جارٍ التحميل…</td></tr>';
         cnt.textContent = '';
         var url = API.list + '?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
         try {
             var res = await fetch(url, { credentials: 'same-origin' });
             var data = await res.json();
-            if (!data.success) { body.innerHTML = '<tr><td colspan="6" class="muted">' + escapeHtml(data.message || 'تعذر العرض') + '</td></tr>'; return; }
+            if (!data.success) { body.innerHTML = '<tr><td colspan="7" class="muted">' + escapeHtml(data.message || 'تعذر العرض') + '</td></tr>'; return; }
             var rows = data.records || [];
             if (rows.length === 0) {
-                body.innerHTML = '<tr><td colspan="6" class="muted">لا عمليات جرد في هذه الفترة.</td></tr>';
+                body.innerHTML = '<tr><td colspan="7" class="muted">لا عمليات جرد في هذه الفترة.</td></tr>';
             } else {
                 body.innerHTML = rows.map(retrieveRowHtml).join('');
             }
             cnt.textContent = 'عدد العمليات: ' + rows.length;
         } catch (e) {
-            body.innerHTML = '<tr><td colspan="6" class="muted">تعذر العرض</td></tr>';
+            body.innerHTML = '<tr><td colspan="7" class="muted">تعذر العرض</td></tr>';
         }
     });
 

@@ -9,3 +9,15 @@ orange_db.sql
 
 # IIS: keep real web.config (Plesk paths, httpErrors) on the server only — not in GitHub
 web.config
+
+# Local temp/extract artifacts — never commit
+.tmp_*
+.pl_extract/
+.pl_extract.zip
+.pl_tmp.zip
+ref1.zip
+ref2.zip
+ref_extract1/
+ref_extract2/
+*.local.bak
+uploads/

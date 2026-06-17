@@ -563,6 +563,7 @@ function orange_inventory_reconciliation_archive_save(PDO $pdo, array $headerIn,
     $agentId = (int) ($headerIn['delivery_agent_id'] ?? 0);
     $countedAt = trim((string) ($headerIn['counted_at'] ?? ''));
     $notes = trim((string) ($headerIn['notes'] ?? ''));
+    $sortOrder = (int) ($headerIn['sort_order'] ?? 0);
 
     if ($countryId === null || $countryId <= 0) {
         $countryId = orange_admin_settings_effective_country_id($pdo);
@@ -587,6 +588,7 @@ function orange_inventory_reconciliation_archive_save(PDO $pdo, array $headerIn,
     orange_inventory_reconciliation_assert_warehouse_country($pdo, $warehouseId, $countryId);
 
     $hasAgentCol = orange_table_has_column($pdo, 'inventory_reconciliation', 'delivery_agent_id');
+    $hasSortCol = orange_table_has_column($pdo, 'inventory_reconciliation', 'sort_order');
 
     if ($id > 0) {
         $existing = orange_inventory_reconciliation_get($pdo, $id, $countryId);
@@ -595,6 +597,7 @@ function orange_inventory_reconciliation_archive_save(PDO $pdo, array $headerIn,
         }
         $sql = 'UPDATE inventory_reconciliation SET warehouse_id = ?, counted_at = ?, notes = ?, country_id = ?'
             . ($hasAgentCol ? ', delivery_agent_id = ?' : '')
+            . ($hasSortCol ? ', sort_order = ?' : '')
             . ' WHERE id = ?';
         $args = [
             $warehouseId,
@@ -604,6 +607,9 @@ function orange_inventory_reconciliation_archive_save(PDO $pdo, array $headerIn,
         ];
         if ($hasAgentCol) {
             $args[] = $agentId > 0 ? $agentId : null;
+        }
+        if ($hasSortCol) {
+            $args[] = $sortOrder;
         }
         $args[] = $id;
         $pdo->prepare($sql)->execute($args);
@@ -623,6 +629,11 @@ function orange_inventory_reconciliation_archive_save(PDO $pdo, array $headerIn,
         $cols .= ', delivery_agent_id';
         $ph .= ', ?';
         $args[] = $agentId > 0 ? $agentId : null;
+    }
+    if ($hasSortCol) {
+        $cols .= ', sort_order';
+        $ph .= ', ?';
+        $args[] = $sortOrder;
     }
     $ins = $pdo->prepare('INSERT INTO inventory_reconciliation (' . $cols . ') VALUES (' . $ph . ')');
     $ins->execute($args);
@@ -649,9 +660,13 @@ function orange_inventory_reconciliation_archive_list(
     $toDate = ($toDate !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $toDate)) ? $toDate : null;
     $hasAttach = orange_table_has_column($pdo, 'inventory_reconciliation', 'attachments_json');
     $hasAgent = orange_table_has_column($pdo, 'inventory_reconciliation', 'delivery_agent_id');
+    $hasSort = orange_table_has_column($pdo, 'inventory_reconciliation', 'sort_order');
     $hasAgentTable = orange_table_exists($pdo, 'delivery_agents');
     $cols = 'ir.id, ir.warehouse_id, ir.counted_at, ir.notes, ir.created_at, ir.country_id,
              w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en';
+    if ($hasSort) {
+        $cols .= ', ir.sort_order';
+    }
     if ($hasAttach) {
         $cols .= ', ir.attachments_json';
     }
@@ -680,7 +695,8 @@ function orange_inventory_reconciliation_archive_list(
         $sql .= ' AND ir.counted_at <= ?';
         $params[] = $toDate;
     }
-    $sql .= ' ORDER BY ir.counted_at DESC, ir.id DESC LIMIT ' . max(1, min(300, $limit));
+    $sql .= ($hasSort ? ' ORDER BY ir.sort_order ASC, ir.counted_at DESC, ir.id DESC' : ' ORDER BY ir.counted_at DESC, ir.id DESC')
+        . ' LIMIT ' . max(1, min(300, $limit));
 
     if ($params !== []) {
         $st = $pdo->prepare($sql);
