@@ -29,6 +29,7 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 - customers, orders, reserved_orders, order_intake_queue, invoice, manual_order, sales_returns — دولة
 - offers, cart_promotions, cart_gift_promotions, cart_bogo_promotions, cart_combo_promotions — دولة
 - reports, channel_analytics — دولة
+- تنفيذ (2026-06-17): توحيد تنسيق طباعة **بطاقة العميل** و**بطاقة المورد** (`admin/api/customers/print-card.php`, `admin/api/suppliers/print-card.php`) بهيدر أوضح وكروت بيانات مرتبة للطباعة العربية + تحسين عرض الأزرار (طباعة/إغلاق) — بدون تغيير منطق البيانات.
 
 الحسابات والتقارير — إعداد/دليل
 - chart_of_accounts, gl_account_settings, journal_types, fiscal_years, gl_posting, opening_balances — دولة

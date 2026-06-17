@@ -83,25 +83,123 @@ $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 <title>بطاقة مورد #<?php echo (int) $supplierId; ?></title>
 <style>
 * { box-sizing: border-box; }
-body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; margin: 24px; color: #0f172a; }
-h1 { font-size: 1.4rem; margin: 0 0 6px; }
-h2 { font-size: 1rem; margin: 16px 0 6px; }
-.muted { color: #64748b; font-size: 0.85rem; }
-.card { border: 1px solid #cbd5e1; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
-.row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
-.row .k { color: #475569; font-size: 0.85rem; }
-.row .v { font-weight: 600; font-size: 0.95rem; }
-.row.full { grid-column: 1 / -1; }
-.ltr { direction: ltr; }
-.actions { margin-top: 14px; }
+body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    color: #0f172a;
+    background: #f4f7fb;
+}
+.print-wrap {
+    max-width: 980px;
+    margin: 0 auto;
+}
+.print-head {
+    margin-bottom: 12px;
+    padding: 14px 16px;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    background: #ffffff;
+}
+h1 { font-size: 1.35rem; margin: 0 0 4px; }
+h2 { font-size: 1rem; margin: 0 0 10px; }
+.muted { color: #64748b; font-size: 0.86rem; }
+.card {
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+    background: #ffffff;
+    page-break-inside: avoid;
+    break-inside: avoid-page;
+}
+.row {
+    display: grid;
+    grid-template-columns: minmax(160px, 0.42fr) minmax(0, 1fr);
+    gap: 8px 12px;
+    align-items: start;
+}
+.row .k {
+    color: #334155;
+    font-size: 0.86rem;
+    font-weight: 600;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+}
+.row .v {
+    font-weight: 600;
+    font-size: 0.95rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    min-height: 40px;
+    word-break: break-word;
+}
+.ltr {
+    direction: ltr;
+    unicode-bidi: plaintext;
+}
+.actions {
+    margin-top: 16px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-start;
+}
+.actions button {
+    border: 1px solid #334155;
+    background: #334155;
+    color: #ffffff;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.actions button:last-child {
+    background: #ffffff;
+    color: #334155;
+}
+pre {
+    white-space: pre-wrap;
+    font-family: inherit;
+    margin: 0;
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+@media (max-width: 760px) {
+    body { padding: 12px; }
+    .row { grid-template-columns: 1fr; }
+    .row .k, .row .v { min-height: auto; }
+    .actions button { flex: 1 1 auto; }
+}
 @media print {
-    body { margin: 12mm; }
+    body {
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+    }
+    .print-wrap {
+        max-width: none;
+        margin: 0;
+    }
+    .print-head,
+    .card {
+        border-color: #9ca3af;
+        box-shadow: none;
+    }
     .actions { display: none; }
 }
 </style>
 </head>
 <body>
-<header style="margin-bottom: 12px;">
+<div class="print-wrap">
+<header class="print-head">
     <?php if ($companyName !== ''): ?>
     <p class="muted"><?php echo htmlspecialchars($companyName, ENT_QUOTES, 'UTF-8'); ?></p>
     <?php endif; ?>
@@ -166,13 +264,14 @@ h2 { font-size: 1rem; margin: 16px 0 6px; }
 <?php if (trim((string) ($row['notes'] ?? '')) !== ''): ?>
 <div class="card">
     <h2>ملاحظات</h2>
-    <pre style="white-space:pre-wrap;font-family:inherit;margin:0;font-size:0.9rem;"><?php echo htmlspecialchars((string) $row['notes'], ENT_QUOTES, 'UTF-8'); ?></pre>
+    <pre><?php echo htmlspecialchars((string) $row['notes'], ENT_QUOTES, 'UTF-8'); ?></pre>
 </div>
 <?php endif; ?>
 
 <div class="actions">
     <button type="button" onclick="window.print()">طباعة</button>
     <button type="button" onclick="window.close()">إغلاق</button>
+</div>
 </div>
 </body>
 </html>
