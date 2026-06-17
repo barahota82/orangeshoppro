@@ -30,3 +30,6 @@ docs/exports/
 *.php.txt
 *.sql.txt
 *.sql.TXT
+
+# Local agent sync note — keep locally, do not commit
+ORANGE_LAST_SYNC_FROM_AGENT.txt
