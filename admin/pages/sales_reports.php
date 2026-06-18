@@ -51,6 +51,13 @@ if (!in_array($payFilter, ['all', 'cash', 'online', 'credit'], true)) {
 }
 $channelFilter = isset($_GET['channel_id']) ? (int) $_GET['channel_id'] : 0;
 $customerDetailed = isset($_GET['customer_detail']) && (string) $_GET['customer_detail'] === '1';
+if ($source === 'all') {
+    $channelFilter = 0;
+} elseif ($source === 'company') {
+    $channelFilter = -1;
+} elseif ($source === 'online' && $channelFilter === -1) {
+    $channelFilter = 0;
+}
 
 $customerId = isset($_GET['customer_id']) ? max(0, (int) $_GET['customer_id']) : 0;
 $productId = isset($_GET['product_id']) ? max(0, (int) $_GET['product_id']) : 0;
@@ -1142,14 +1149,20 @@ $filterSubtitle = implode(' — ', $subtitleParts);
             </div>
             <div class="srr-channel-wrap">
                 <label for="srr_channel">قناة التسويق</label>
-                <select id="srr_channel" name="channel_id" class="admin-inp">
-                    <option value="0"<?php echo $channelFilter === 0 ? ' selected' : ''; ?>>الكل</option>
-                    <option value="-1"<?php echo $channelFilter === -1 ? ' selected' : ''; ?>><?php echo htmlspecialchars($directChannelLabel, ENT_QUOTES, 'UTF-8'); ?> — مبيعات شركة مباشرة</option>
-                    <?php foreach ($channelOptions as $ch): ?>
-                        <option value="<?php echo (int) ($ch['id'] ?? 0); ?>"<?php echo $channelFilter === (int) ($ch['id'] ?? 0) ? ' selected' : ''; ?>>
-                            <?php echo htmlspecialchars((string) ($ch['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
-                        </option>
-                    <?php endforeach; ?>
+                <input type="hidden" id="srr_channel_hidden" value="0"<?php echo $source === 'all' ? ' name="channel_id"' : ''; ?>>
+                <select id="srr_channel" name="channel_id" class="admin-inp" data-current="<?php echo (int) $channelFilter; ?>"<?php echo $source === 'all' ? ' disabled' : ''; ?>>
+                    <?php if ($source === 'company'): ?>
+                        <option value="-1" selected><?php echo htmlspecialchars($directChannelLabel, ENT_QUOTES, 'UTF-8'); ?> — مبيعات شركة مباشرة</option>
+                    <?php elseif ($source === 'online'): ?>
+                        <option value="0"<?php echo $channelFilter === 0 ? ' selected' : ''; ?>>الكل</option>
+                        <?php foreach ($channelOptions as $ch): ?>
+                            <option value="<?php echo (int) ($ch['id'] ?? 0); ?>"<?php echo $channelFilter === (int) ($ch['id'] ?? 0) ? ' selected' : ''; ?>>
+                                <?php echo htmlspecialchars((string) ($ch['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <option value="0" selected>الكل</option>
+                    <?php endif; ?>
                 </select>
             </div>
             <?php if ($tab === 'customers'): ?>
@@ -1448,6 +1461,12 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     var productCloseBtn = document.getElementById('srr_product_pick_close');
     var productSearchEl = document.getElementById('srr_product_pick_q');
     var productListEl = document.getElementById('srr_product_pick_list');
+    var sourceEl = document.getElementById('srr_src');
+    var channelEl = document.getElementById('srr_channel');
+    var channelHiddenEl = document.getElementById('srr_channel_hidden');
+    var channelRows = <?php echo json_encode($channelOptions, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?> || [];
+    var directChannelLabel = <?php echo json_encode($directChannelLabel, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?> || 'الشركة';
+    var companyChannelText = String(directChannelLabel || 'الشركة') + ' — مبيعات شركة مباشرة';
 
     function esc(v) {
         return String(v == null ? '' : v)
@@ -1461,6 +1480,81 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     function syncBodyLock() {
         var anyOpen = (customerModal && !customerModal.hidden) || (productModal && !productModal.hidden);
         document.body.classList.toggle('gl-pick-open', anyOpen);
+    }
+
+    function appendSelectOption(selectEl, value, label, selected) {
+        if (!selectEl) {
+            return;
+        }
+        var opt = document.createElement('option');
+        opt.value = String(value);
+        opt.textContent = String(label || '');
+        if (selected) {
+            opt.selected = true;
+        }
+        selectEl.appendChild(opt);
+    }
+
+    function selectHasValue(selectEl, value) {
+        if (!selectEl) {
+            return false;
+        }
+        var wanted = String(value);
+        for (var i = 0; i < selectEl.options.length; i += 1) {
+            if (String(selectEl.options[i].value) === wanted) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function renderMarketingChannelBySource(sourceValue) {
+        if (!channelEl) {
+            return;
+        }
+        var src = String(sourceValue || 'all');
+        var currentValue = String(channelEl.getAttribute('data-current') || channelEl.value || '0');
+        channelEl.innerHTML = '';
+
+        if (src === 'all') {
+            appendSelectOption(channelEl, '0', 'الكل', true);
+            channelEl.disabled = true;
+            channelEl.setAttribute('data-current', '0');
+            if (channelHiddenEl) {
+                channelHiddenEl.value = '0';
+                channelHiddenEl.setAttribute('name', 'channel_id');
+            }
+            return;
+        }
+
+        channelEl.disabled = false;
+        if (channelHiddenEl) {
+            channelHiddenEl.removeAttribute('name');
+        }
+
+        if (src === 'company') {
+            appendSelectOption(channelEl, '-1', companyChannelText, true);
+            channelEl.setAttribute('data-current', '-1');
+            channelEl.value = '-1';
+            return;
+        }
+
+        appendSelectOption(channelEl, '0', 'الكل', false);
+        channelRows.forEach(function (row) {
+            var id = parseInt(String(row && row.id ? row.id : '0'), 10) || 0;
+            if (id <= 0) {
+                return;
+            }
+            appendSelectOption(channelEl, String(id), String((row && row.name) || ''), false);
+        });
+        if (currentValue === '-1') {
+            currentValue = '0';
+        }
+        if (!selectHasValue(channelEl, currentValue)) {
+            currentValue = '0';
+        }
+        channelEl.value = currentValue;
+        channelEl.setAttribute('data-current', currentValue);
     }
 
     function customerSet(row) {
@@ -1658,6 +1752,18 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     if (productSearchEl) {
         productSearchEl.addEventListener('input', function () {
             productRender(productSearchEl.value || '');
+        });
+    }
+
+    if (sourceEl) {
+        sourceEl.addEventListener('change', function () {
+            renderMarketingChannelBySource(sourceEl.value || 'all');
+        });
+        renderMarketingChannelBySource(sourceEl.value || 'all');
+    }
+    if (channelEl) {
+        channelEl.addEventListener('change', function () {
+            channelEl.setAttribute('data-current', String(channelEl.value || '0'));
         });
     }
 
