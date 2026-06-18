@@ -680,11 +680,11 @@ $filterSubtitle = implode(' — ', $subtitleParts);
         <?php endforeach; ?>
     </div>
 
-    <form method="get" class="prr-filter-form<?php echo $reportKey === 'items' ? ' is-items' : ''; ?>" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
+    <form method="get" class="prr-filter-form" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
         <input type="hidden" name="page" value="purchase_reports">
         <input type="hidden" name="r" value="<?php echo htmlspecialchars($reportKey, ENT_QUOTES, 'UTF-8'); ?>">
 
-        <div class="prr-main-row<?php echo $reportKey === 'items' ? ' is-items' : ''; ?>">
+        <div class="prr-main-row">
             <div class="prr-date-field">
                 <label for="prr_from">من تاريخ</label>
                 <input type="text" id="prr_from" name="from" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($fromDisplay, ENT_QUOTES, 'UTF-8'); ?>">
@@ -1090,10 +1090,10 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     flex: 1 1 24rem;
     min-width: 20rem;
 }
-.prr-filter-form.is-items .prr-supplier-name {
+.prr-filter-form .prr-supplier-name {
     min-width: 13rem !important;
 }
-.prr-filter-form.is-items .prr-product-name {
+.prr-filter-form .prr-product-name {
     min-width: 14rem !important;
 }
 .prr-filter-form .prr-options-row {
