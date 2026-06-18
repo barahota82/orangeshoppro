@@ -356,7 +356,7 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars($channelsUrl, ENT_QUOTES, 'UTF-8'); ?>">إدارة القنوات</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars($ordersUrl, ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars($returnsReportUrl, ENT_QUOTES, 'UTF-8'); ?>">تقرير مردودات المبيعات</a>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير المبيعات العامة</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sales_reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير المبيعات العامة</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars($companyInvoiceUrl, ENT_QUOTES, 'UTF-8'); ?>">فاتورة مبيعات الشركة</a>
     </p>
 </div>

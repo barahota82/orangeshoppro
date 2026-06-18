@@ -107,4 +107,12 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
    - **الربط في النظام:** إدراج الصفحة في `admin/index.php` (`$allowed`)، القائمة والشجرة (`admin/partials/header.php` + `includes/admin_nav_tree.php`)، وصلاحيات الشاشة ضمن مجموعة `warehouse` في `includes/admin_permissions.php`، وإضافتها في فهرس المخازن والمشتريات `admin/pages/warehouse_purchases_index.php`.
    - **توسيع الصلاحيات (2026-06-18):** إضافة عمودي **«طباعة»** و**«تنزيل»** (Excel/CSV) إلى مصفوفة صلاحيات المستخدمين، وتوحيد تطبيقها في الواجهة (`admin.js` + `admin-table-export.js`) بحيث تُحجب أزرار الطباعة/التصدير وتُمنع عمليات التصدير المباشر بدون صلاحية.
 
+14) شاشة «تقارير المبيعات» (قرار تنفيذ 2026-06-18)
+   - **أُضيفت شاشة موحّدة** `admin/pages/sales_reports.php` بنفس هيكل تقارير المخزن/المشتريات (تبويبات + شريط فلاتر + طباعة + تصدير Excel/CSV من نفس جدول التقرير).
+   - **التبويبات:** `invoices` (فواتير المبيعات) / `returns` (مردودات المبيعات) / `customers` (ملخص العملاء) / `monthly` (ملخص شهري) / `items` (تحليل الأصناف).
+   - **الفلاتر:** مدى تاريخ + مصدر (شركة/أونلاين/الكل) + عميل (لكل التبويبات) + صنف في `items` + خيار «إخفاء الصافي صفر» في `items`.
+   - **النطاق حسب الدولة:** الاستعلامات على `orders` و`sales_returns` و`products` و`customers` تعمل بسياق الدولة عبر `orange_sql_country_and_fragment()`.
+   - **الربط في النظام:** إضافة الصفحة إلى `admin/index.php`، وربط القائمة العلوية عليها من مجموعة «تحليل المبيعات» في `admin/partials/header.php`، وإضافتها إلى شجرة صلاحيات الشاشات في `includes/admin_nav_tree.php` وفهرس المبيعات والعروض `admin/pages/sales_promotions_index.php`.
+   - **التوافق مع الصلاحيات السابقة:** إضافة mapping للشاشة الجديدة ضمن مجموعة `reports` في `includes/admin_permissions.php` مع fallback تلقائي من `page:reports` إلى `page:sales_reports` حتى لا تنكسر صلاحيات المستخدمين القديمة بعد إعادة التسمية.
+
 Agreed with project owner for Orange implementation.

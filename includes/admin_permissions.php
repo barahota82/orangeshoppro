@@ -130,6 +130,7 @@ function orange_admin_page_resource(string $page): string
         'partner_supplier_payment' => 'partners',
         'partner_reports' => 'partners',
         'reports' => 'reports',
+        'sales_reports' => 'reports',
         'sales_returns_report' => 'reports',
         'channel_analytics' => 'reports',
         'logs' => 'reports',
@@ -427,6 +428,12 @@ function orange_admin_resolve_perm_row(array $matrix, string $page): ?array
     $pageKey = orange_admin_perm_storage_key($page);
     if (isset($matrix[$pageKey])) {
         return $matrix[$pageKey];
+    }
+    if ($page === 'sales_reports') {
+        $legacyKey = orange_admin_perm_storage_key('reports');
+        if (isset($matrix[$legacyKey])) {
+            return $matrix[$legacyKey];
+        }
     }
     $group = orange_admin_page_resource($page);
     if (isset($matrix[$group])) {

@@ -176,7 +176,7 @@ function orange_admin_permission_mega_sections(): array
                 [
                     'title' => 'تقارير المبيعات',
                     'pages' => [
-                        ['page' => 'reports', 'label' => 'تقارير المبيعات'],
+                        ['page' => 'sales_reports', 'label' => 'تقارير المبيعات'],
                         ['page' => 'channel_analytics', 'label' => 'تحليل القنوات'],
                         ['page' => 'sales_returns_report', 'label' => 'تقرير مردودات المبيعات'],
                     ],
@@ -336,6 +336,7 @@ function orange_admin_permission_actions_for_page(string $page): array
     ];
 
     static $viewPrintExport = [
+        'sales_reports',
         'purchase_reports',
         'stock_reports',
         'journal_voucher_reports',
