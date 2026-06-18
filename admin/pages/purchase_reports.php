@@ -182,7 +182,7 @@ $fmtMoney = static function (float $value) use ($reportMoney): string {
     return orange_accounting_report_format_amount($value, $reportMoney);
 };
 $fmtQty = static function (float $value): string {
-    return number_format($value, 1, '.', ',');
+    return number_format($value, 0, '.', ',');
 };
 $purchaseTypeLabel = static function (string $raw): string {
     $v = strtolower(trim($raw));
