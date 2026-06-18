@@ -1022,18 +1022,18 @@ $filterSubtitle = implode(' — ', $subtitleParts);
             </div>
             <?php if ($reportKey === 'items'): ?>
                 <div class="prr-items-zero-wrap">
-                    <label class="prr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
-                        <input type="checkbox" name="hz" value="1" <?php echo $hideZero ? 'checked' : ''; ?>>
-                        إخفاء الصافي صفر
-                    </label>
+                    <label for="prr_hide_zero">إخفاء الصافي صفر</label>
+                    <div class="prr-checkbox-control">
+                        <input type="checkbox" id="prr_hide_zero" name="hz" value="1" <?php echo $hideZero ? 'checked' : ''; ?>>
+                    </div>
                 </div>
             <?php endif; ?>
             <?php if ($reportKey === 'suppliers'): ?>
                 <div class="prr-suppliers-detail-wrap">
-                    <label class="prr-suppliers-detail-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
-                        <input type="checkbox" name="supplier_detail" value="1" <?php echo $supplierDetailed ? 'checked' : ''; ?>>
-                        تقرير تفصيلي
-                    </label>
+                    <label for="prr_supplier_detail">تقرير تفصيلي</label>
+                    <div class="prr-checkbox-control">
+                        <input type="checkbox" id="prr_supplier_detail" name="supplier_detail" value="1" <?php echo $supplierDetailed ? 'checked' : ''; ?>>
+                    </div>
                 </div>
             <?php endif; ?>
         </div>
@@ -1460,11 +1460,24 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 }
 .prr-filter-form .prr-items-zero-wrap {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 4px;
 }
 .prr-filter-form .prr-suppliers-detail-wrap {
     display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.prr-filter-form .prr-checkbox-control {
+    min-height: 2.1rem;
+    display: flex;
     align-items: center;
+    justify-content: center;
+}
+.prr-filter-form .prr-checkbox-control input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
 }
 .prr-filter-form .prr-print-actions {
     display: flex;
