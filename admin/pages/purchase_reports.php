@@ -1068,7 +1068,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     flex-basis: 100%;
     display: flex;
     flex-wrap: nowrap;
-    gap: 10px;
+    gap: 6px;
     align-items: flex-end;
     overflow-x: auto;
     min-width: 0;
@@ -1078,7 +1078,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     flex: 0 0 auto;
 }
 .prr-filter-form .prr-date-field-to {
-    margin-inline-start: 0.5rem;
+    margin-inline-start: 0.2rem;
 }
 .prr-filter-form #prr_from,
 .prr-filter-form #prr_to {
