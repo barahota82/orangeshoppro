@@ -1061,12 +1061,12 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     flex: 0 0 auto;
 }
 .prr-filter-form .prr-date-field-to {
-    margin-inline-start: 0.75rem;
+    margin-inline-start: 0.5rem;
 }
 .prr-filter-form #prr_from,
 .prr-filter-form #prr_to {
-    width: 7rem;
-    min-width: 7rem;
+    width: 6.6rem;
+    min-width: 6.6rem;
 }
 .prr-filter-form.is-items .prr-supplier-name {
     min-width: 13rem !important;
