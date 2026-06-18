@@ -1059,12 +1059,12 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 .prr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
 .prr-filter-form .prr-date-field {
     flex: 0 0 auto;
-    width: 8.75rem;
+    width: 7rem;
 }
 .prr-filter-form #prr_from,
 .prr-filter-form #prr_to {
-    width: 8.75rem;
-    min-width: 8.75rem;
+    width: 7rem;
+    min-width: 7rem;
 }
 .prr-filter-form.is-items .prr-supplier-name {
     min-width: 13rem !important;
