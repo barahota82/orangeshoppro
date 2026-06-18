@@ -1416,6 +1416,14 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     gap: 4px;
     min-width: 11rem;
 }
+.srr-filter-form .srr-channel-wrap {
+    flex: 0 0 16rem;
+    min-width: 16rem;
+    max-width: 16rem;
+}
+.srr-filter-form #srr_channel {
+    width: 100%;
+}
 .srr-filter-form .srr-items-zero-wrap {
     display: flex;
     align-items: center;
