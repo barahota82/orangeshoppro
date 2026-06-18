@@ -133,6 +133,37 @@ if ($productId > 0 && !isset($productMap[$productId])) {
     $productId = 0;
 }
 
+$customerPickerRows = [];
+foreach ($customers as $row) {
+    $cid = (int) ($row['id'] ?? 0);
+    if ($cid <= 0) {
+        continue;
+    }
+    $customerPickerRows[] = [
+        'id' => $cid,
+        'code' => (string) ($customerMap[$cid]['code'] ?? ('CUS-' . $cid)),
+        'name' => (string) ($customerMap[$cid]['name'] ?? ''),
+    ];
+}
+
+$productPickerRows = [];
+foreach ($products as $row) {
+    $pid = (int) ($row['id'] ?? 0);
+    if ($pid <= 0) {
+        continue;
+    }
+    $productPickerRows[] = [
+        'id' => $pid,
+        'code' => (string) ($productMap[$pid]['code'] ?? ('P' . $pid)),
+        'name' => (string) ($productMap[$pid]['name'] ?? ''),
+    ];
+}
+
+$selectedCustomerCode = $customerId > 0 ? (string) ($customerMap[$customerId]['code'] ?? ('CUS-' . $customerId)) : '';
+$selectedCustomerName = $customerId > 0 ? (string) ($customerMap[$customerId]['name'] ?? '') : '';
+$selectedProductCode = $productId > 0 ? (string) ($productMap[$productId]['code'] ?? ('P' . $productId)) : '';
+$selectedProductName = $productId > 0 ? (string) ($productMap[$productId]['name'] ?? '') : '';
+
 $hasOrdCreatedAt = $hasOrders && orange_table_has_column($pdo, 'orders', 'created_at');
 $hasOrdCompletedAt = $hasOrders && orange_table_has_column($pdo, 'orders', 'completed_at');
 $hasOrdSource = $hasOrders && orange_table_has_column($pdo, 'orders', 'order_source');
@@ -743,60 +774,75 @@ $filterSubtitle = implode(' — ', $subtitleParts);
         <?php endforeach; ?>
     </div>
 
-    <form method="get" class="srr-filter-form<?php echo $tab === 'items' ? ' is-items' : ''; ?>" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
+    <form method="get" class="srr-filter-form" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
         <input type="hidden" name="page" value="sales_reports">
         <input type="hidden" name="r" value="<?php echo htmlspecialchars($tab, ENT_QUOTES, 'UTF-8'); ?>">
-        <div>
-            <label for="srr_from">من تاريخ</label>
-            <input type="text" id="srr_from" name="from" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($fromDisplay, ENT_QUOTES, 'UTF-8'); ?>">
+        <div class="srr-main-row">
+            <div class="srr-date-field">
+                <label for="srr_from">من تاريخ</label>
+                <input type="text" id="srr_from" name="from" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($fromDisplay, ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+            <div class="srr-date-field srr-date-field-to">
+                <label for="srr_to">إلى تاريخ</label>
+                <input type="text" id="srr_to" name="to" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($toDisplay, ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+            <div class="srr-customer-field-wrap">
+                <label for="srr_customer_name">العميل (دبل كليك للاختيار)</label>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <input type="hidden" id="srr_customer_id" name="customer_id" value="<?php echo (int) $customerId; ?>">
+                    <input type="text" id="srr_customer_code" class="admin-inp" readonly
+                        title="يُملأ تلقائياً عند اختيار العميل"
+                        style="width:9rem;background:#f4f4f5;" dir="ltr" lang="en"
+                        placeholder="الكود"
+                        value="<?php echo htmlspecialchars($selectedCustomerCode, ENT_QUOTES, 'UTF-8'); ?>">
+                    <input type="text" id="srr_customer_name" class="admin-inp srr-name-input srr-customer-name" readonly
+                        title="دبل كليك لاختيار العميل"
+                        style="cursor:pointer;min-width:15rem;"
+                        placeholder="كل العملاء — دبل كليك للاختيار"
+                        value="<?php echo htmlspecialchars($selectedCustomerName, ENT_QUOTES, 'UTF-8'); ?>">
+                </div>
+            </div>
+            <?php if ($tab === 'items'): ?>
+                <div class="srr-product-field-wrap">
+                    <label for="srr_product_name">الصنف (دبل كليك للاختيار)</label>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <input type="hidden" id="srr_product_id" name="product_id" value="<?php echo (int) $productId; ?>">
+                        <input type="text" id="srr_product_code" class="admin-inp" readonly
+                            title="يُملأ تلقائياً عند اختيار الصنف"
+                            style="width:10rem;background:#f4f4f5;" dir="ltr" lang="en"
+                            placeholder="الكود"
+                            value="<?php echo htmlspecialchars($selectedProductCode, ENT_QUOTES, 'UTF-8'); ?>">
+                        <input type="text" id="srr_product_name" class="admin-inp srr-name-input srr-product-name" readonly
+                            title="دبل كليك لاختيار الصنف"
+                            style="cursor:pointer;min-width:18rem;"
+                            placeholder="كل الأصناف — دبل كليك للاختيار"
+                            value="<?php echo htmlspecialchars($selectedProductName, ENT_QUOTES, 'UTF-8'); ?>">
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
-        <div>
-            <label for="srr_to">إلى تاريخ</label>
-            <input type="text" id="srr_to" name="to" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($toDisplay, ENT_QUOTES, 'UTF-8'); ?>">
-        </div>
-        <div>
-            <label for="srr_src">المصدر</label>
-            <select id="srr_src" name="src" class="admin-inp">
-                <option value="all"<?php echo $source === 'all' ? ' selected' : ''; ?>>الكل</option>
-                <option value="company"<?php echo $source === 'company' ? ' selected' : ''; ?>>شركة</option>
-                <option value="online"<?php echo $source === 'online' ? ' selected' : ''; ?>>أونلاين</option>
-            </select>
-        </div>
-        <div>
-            <label for="srr_customer">العميل</label>
-            <select id="srr_customer" name="customer_id" class="admin-inp">
-                <option value="0">كل العملاء</option>
-                <?php foreach ($customers as $c): ?>
-                    <?php $cid = (int) ($c['id'] ?? 0); ?>
-                    <?php if ($cid <= 0) { continue; } ?>
-                    <option value="<?php echo $cid; ?>"<?php echo $customerId === $cid ? ' selected' : ''; ?>>
-                        <?php echo htmlspecialchars((string) ($c['customer_code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?> - <?php echo htmlspecialchars((string) ($c['customer_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <?php if ($tab === 'items'): ?>
-            <div>
-                <label for="srr_product">الصنف</label>
-                <select id="srr_product" name="product_id" class="admin-inp">
-                    <option value="0">كل الأصناف</option>
-                    <?php foreach ($products as $p): ?>
-                        <?php $pid = (int) ($p['id'] ?? 0); ?>
-                        <?php if ($pid <= 0) { continue; } ?>
-                        <option value="<?php echo $pid; ?>"<?php echo $productId === $pid ? ' selected' : ''; ?>>
-                            <?php echo htmlspecialchars((string) ($p['item_code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?> - <?php echo htmlspecialchars((string) ($p['product_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
-                        </option>
-                    <?php endforeach; ?>
+        <div class="srr-options-row">
+            <div class="srr-source-wrap">
+                <label for="srr_src">مصدر الفاتورة</label>
+                <select id="srr_src" name="src" class="admin-inp">
+                    <option value="all"<?php echo $source === 'all' ? ' selected' : ''; ?>>الكل</option>
+                    <option value="company"<?php echo $source === 'company' ? ' selected' : ''; ?>>شركة</option>
+                    <option value="online"<?php echo $source === 'online' ? ' selected' : ''; ?>>أونلاين</option>
                 </select>
             </div>
-            <div class="srr-items-zero-wrap" style="display:flex;align-items:flex-end;">
-                <label class="srr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
-                    <input type="checkbox" name="hz" value="1" <?php echo $hideZero ? 'checked' : ''; ?>>
-                    إخفاء الصافي صفر
-                </label>
-            </div>
-        <?php endif; ?>
-        <div class="srr-print-actions" style="display:flex;gap:8px;align-items:center;<?php echo $tab === 'items' ? 'flex-basis:100%;justify-content:flex-end;' : 'margin-inline-start:auto;'; ?>">
+            <?php if ($tab === 'items'): ?>
+                <div class="srr-items-zero-wrap">
+                    <label class="srr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
+                        <input type="checkbox" name="hz" value="1" <?php echo $hideZero ? 'checked' : ''; ?>>
+                        إخفاء الصافي صفر
+                    </label>
+                </div>
+            <?php endif; ?>
+            <?php if ($tab !== 'items'): ?>
+                <span class="srr-options-placeholder" aria-hidden="true">&nbsp;</span>
+            <?php endif; ?>
+        </div>
+        <div class="srr-print-actions">
             <button type="submit">عرض</button>
             <button type="button" class="btn-secondary" data-orange-perm="print" onclick="window.print()">طباعة</button>
         </div>
@@ -918,6 +964,28 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     </div>
 </div>
 
+<div class="gl-pick-modal" id="srr_customer_pick_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="srr_customer_pick_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="srr_customer_pick_title">
+        <h3 id="srr_customer_pick_title" class="gl-pick-modal__title">اختيار العميل</h3>
+        <p class="muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان للاختيار</p>
+        <input type="search" id="srr_customer_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو اسم العميل..." autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="srr_customer_pick_list"></ul>
+        <button type="button" class="btn-secondary" id="srr_customer_pick_close">إغلاق</button>
+    </div>
+</div>
+
+<div class="gl-pick-modal" id="srr_product_pick_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="srr_product_pick_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="srr_product_pick_title">
+        <h3 id="srr_product_pick_title" class="gl-pick-modal__title">اختيار الصنف</h3>
+        <p class="muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان للاختيار</p>
+        <input type="search" id="srr_product_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو اسم الصنف..." autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="srr_product_pick_list"></ul>
+        <button type="button" class="btn-secondary" id="srr_product_pick_close">إغلاق</button>
+    </div>
+</div>
+
 <style>
 .srr-tabs { display:flex; flex-wrap:wrap; gap:8px; }
 .srr-tab {
@@ -930,9 +998,320 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     font-size:0.92rem;
 }
 .srr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
-.srr-filter-form.is-items #srr_customer { min-width: 13rem; }
-.srr-filter-form.is-items #srr_product { min-width: 14rem; }
+.srr-filter-form .srr-main-row {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    align-items: flex-end;
+    overflow-x: auto;
+    min-width: 0;
+    padding-bottom: 2px;
+}
+.srr-filter-form .srr-date-field {
+    flex: 0 0 auto;
+}
+.srr-filter-form .srr-date-field-to {
+    margin-inline-start: 0.2rem;
+}
+.srr-filter-form #srr_from,
+.srr-filter-form #srr_to {
+    width: 6.6rem;
+    min-width: 6.6rem;
+}
+.srr-filter-form .srr-main-row .srr-customer-field-wrap,
+.srr-filter-form .srr-main-row .srr-product-field-wrap {
+    flex: 1 1 24rem;
+    min-width: 20rem;
+}
+.srr-filter-form .srr-customer-name {
+    min-width: 13rem !important;
+}
+.srr-filter-form .srr-product-name {
+    min-width: 14rem !important;
+}
+.srr-filter-form .srr-options-row {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 10px;
+    align-items: center;
+    min-height: 2.1rem;
+    overflow-x: auto;
+}
+.srr-filter-form .srr-source-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 11rem;
+}
+.srr-filter-form .srr-items-zero-wrap {
+    display: flex;
+    align-items: center;
+}
+.srr-filter-form .srr-options-placeholder {
+    display: inline-block;
+    width: 1px;
+    height: 1.6rem;
+    opacity: 0;
+}
+.srr-filter-form .srr-print-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-basis: 100%;
+    justify-content: flex-end;
+}
 </style>
+
+<script>
+(function () {
+    var customerRows = <?php echo json_encode($customerPickerRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?> || [];
+    var productRows = <?php echo json_encode($productPickerRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?> || [];
+
+    var customerIdEl = document.getElementById('srr_customer_id');
+    var customerCodeEl = document.getElementById('srr_customer_code');
+    var customerNameEl = document.getElementById('srr_customer_name');
+    var customerModal = document.getElementById('srr_customer_pick_modal');
+    var customerBackdrop = document.getElementById('srr_customer_pick_backdrop');
+    var customerCloseBtn = document.getElementById('srr_customer_pick_close');
+    var customerSearchEl = document.getElementById('srr_customer_pick_q');
+    var customerListEl = document.getElementById('srr_customer_pick_list');
+
+    var productIdEl = document.getElementById('srr_product_id');
+    var productCodeEl = document.getElementById('srr_product_code');
+    var productNameEl = document.getElementById('srr_product_name');
+    var productModal = document.getElementById('srr_product_pick_modal');
+    var productBackdrop = document.getElementById('srr_product_pick_backdrop');
+    var productCloseBtn = document.getElementById('srr_product_pick_close');
+    var productSearchEl = document.getElementById('srr_product_pick_q');
+    var productListEl = document.getElementById('srr_product_pick_list');
+
+    function esc(v) {
+        return String(v == null ? '' : v)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function syncBodyLock() {
+        var anyOpen = (customerModal && !customerModal.hidden) || (productModal && !productModal.hidden);
+        document.body.classList.toggle('gl-pick-open', anyOpen);
+    }
+
+    function customerSet(row) {
+        if (!customerIdEl || !customerCodeEl || !customerNameEl) {
+            return;
+        }
+        if (!row) {
+            customerIdEl.value = '0';
+            customerCodeEl.value = '';
+            customerNameEl.value = '';
+            return;
+        }
+        customerIdEl.value = String(parseInt(String(row.id || '0'), 10) || 0);
+        customerCodeEl.value = String(row.code || '');
+        customerNameEl.value = String(row.name || '');
+    }
+
+    function customerRender(query) {
+        if (!customerListEl) {
+            return;
+        }
+        var q = String(query || '').trim().toLowerCase();
+        var filtered = customerRows.filter(function (r) {
+            if (!q) {
+                return true;
+            }
+            var hay = (String(r.code || '') + ' ' + String(r.name || '')).toLowerCase();
+            return hay.indexOf(q) !== -1;
+        });
+        customerListEl.innerHTML = '';
+        if (!filtered.length) {
+            customerListEl.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>';
+            return;
+        }
+        filtered.forEach(function (r) {
+            var li = document.createElement('li');
+            li.className = 'gl-pick-item';
+            li.setAttribute('role', 'button');
+            li.tabIndex = 0;
+            li.innerHTML = '<span dir="ltr">' + esc(r.code || '') + '</span> — ' + esc(r.name || '');
+            li.addEventListener('dblclick', function () {
+                customerSet(r);
+                customerClose();
+            });
+            li.addEventListener('keydown', function (ev) {
+                if (ev.key === 'Enter') {
+                    ev.preventDefault();
+                    customerSet(r);
+                    customerClose();
+                }
+            });
+            customerListEl.appendChild(li);
+        });
+    }
+
+    function customerOpen() {
+        if (!customerModal) {
+            return;
+        }
+        customerModal.hidden = false;
+        customerModal.setAttribute('aria-hidden', 'false');
+        syncBodyLock();
+        if (customerSearchEl) {
+            customerSearchEl.value = '';
+            customerRender('');
+            customerSearchEl.focus();
+        } else {
+            customerRender('');
+        }
+    }
+
+    function customerClose() {
+        if (!customerModal) {
+            return;
+        }
+        customerModal.hidden = true;
+        customerModal.setAttribute('aria-hidden', 'true');
+        syncBodyLock();
+    }
+
+    function productSet(row) {
+        if (!productIdEl || !productCodeEl || !productNameEl) {
+            return;
+        }
+        if (!row) {
+            productIdEl.value = '0';
+            productCodeEl.value = '';
+            productNameEl.value = '';
+            return;
+        }
+        productIdEl.value = String(parseInt(String(row.id || '0'), 10) || 0);
+        productCodeEl.value = String(row.code || '');
+        productNameEl.value = String(row.name || '');
+    }
+
+    function productRender(query) {
+        if (!productListEl) {
+            return;
+        }
+        var q = String(query || '').trim().toLowerCase();
+        var filtered = productRows.filter(function (r) {
+            if (!q) {
+                return true;
+            }
+            var hay = (String(r.code || '') + ' ' + String(r.name || '')).toLowerCase();
+            return hay.indexOf(q) !== -1;
+        });
+        productListEl.innerHTML = '';
+        if (!filtered.length) {
+            productListEl.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>';
+            return;
+        }
+        filtered.forEach(function (r) {
+            var li = document.createElement('li');
+            li.className = 'gl-pick-item';
+            li.setAttribute('role', 'button');
+            li.tabIndex = 0;
+            li.innerHTML = '<span dir="ltr">' + esc(r.code || '') + '</span> — ' + esc(r.name || '');
+            li.addEventListener('dblclick', function () {
+                productSet(r);
+                productClose();
+            });
+            li.addEventListener('keydown', function (ev) {
+                if (ev.key === 'Enter') {
+                    ev.preventDefault();
+                    productSet(r);
+                    productClose();
+                }
+            });
+            productListEl.appendChild(li);
+        });
+    }
+
+    function productOpen() {
+        if (!productModal) {
+            return;
+        }
+        productModal.hidden = false;
+        productModal.setAttribute('aria-hidden', 'false');
+        syncBodyLock();
+        if (productSearchEl) {
+            productSearchEl.value = '';
+            productRender('');
+            productSearchEl.focus();
+        } else {
+            productRender('');
+        }
+    }
+
+    function productClose() {
+        if (!productModal) {
+            return;
+        }
+        productModal.hidden = true;
+        productModal.setAttribute('aria-hidden', 'true');
+        syncBodyLock();
+    }
+
+    if (customerNameEl) {
+        customerNameEl.addEventListener('dblclick', customerOpen);
+        customerNameEl.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                customerOpen();
+            }
+        });
+    }
+    if (customerBackdrop) {
+        customerBackdrop.addEventListener('click', customerClose);
+    }
+    if (customerCloseBtn) {
+        customerCloseBtn.addEventListener('click', customerClose);
+    }
+    if (customerSearchEl) {
+        customerSearchEl.addEventListener('input', function () {
+            customerRender(customerSearchEl.value || '');
+        });
+    }
+
+    if (productNameEl) {
+        productNameEl.addEventListener('dblclick', productOpen);
+        productNameEl.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                productOpen();
+            }
+        });
+    }
+    if (productBackdrop) {
+        productBackdrop.addEventListener('click', productClose);
+    }
+    if (productCloseBtn) {
+        productCloseBtn.addEventListener('click', productClose);
+    }
+    if (productSearchEl) {
+        productSearchEl.addEventListener('input', function () {
+            productRender(productSearchEl.value || '');
+        });
+    }
+
+    window.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Escape') {
+            return;
+        }
+        if (customerModal && !customerModal.hidden) {
+            customerClose();
+        }
+        if (productModal && !productModal.hidden) {
+            productClose();
+        }
+    });
+})();
+</script>
 
 <?php $docTitle = $reportTitle . ' - ' . date('Y-m-d'); ?>
 <script>
