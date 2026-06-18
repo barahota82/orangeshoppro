@@ -777,6 +777,10 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                 $prrTableClass = ' prr-doc-table';
             } elseif ($reportKey === 'suppliers') {
                 $prrTableClass = ' prr-suppliers-table';
+            } elseif ($reportKey === 'items') {
+                $prrTableClass = ' prr-items-table';
+            } elseif ($reportKey === 'monthly') {
+                $prrTableClass = ' prr-monthly-table';
             }
             ?>
             <table class="admin-fy-table gl-acc-stmt-table ta-report-table<?php echo $prrTableClass; ?>"
@@ -802,6 +806,27 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         <col class="prr-sup-col-count">
                         <col class="prr-sup-col-money">
                         <col class="prr-sup-col-money">
+                    </colgroup>
+                <?php elseif ($reportKey === 'items'): ?>
+                    <colgroup>
+                        <col class="prr-item-col-code">
+                        <col class="prr-item-col-name">
+                        <col class="prr-item-col-variant">
+                        <col class="prr-item-col-qty">
+                        <col class="prr-item-col-money">
+                        <col class="prr-item-col-qty">
+                        <col class="prr-item-col-money">
+                        <col class="prr-item-col-qty">
+                        <col class="prr-item-col-money">
+                    </colgroup>
+                <?php elseif ($reportKey === 'monthly'): ?>
+                    <colgroup>
+                        <col class="prr-mon-col-month">
+                        <col class="prr-mon-col-count">
+                        <col class="prr-mon-col-money">
+                        <col class="prr-mon-col-count">
+                        <col class="prr-mon-col-money">
+                        <col class="prr-mon-col-money">
                     </colgroup>
                 <?php endif; ?>
                 <?php if ($reportKey === 'invoices'): ?>
@@ -1061,6 +1086,22 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 .prr-suppliers-table .prr-sup-col-name { width: 34%; }
 .prr-suppliers-table .prr-sup-col-count { width: 10%; }
 .prr-suppliers-table .prr-sup-col-money { width: 15.333%; }
+.prr-items-table {
+    table-layout: fixed;
+    min-width: 82rem;
+}
+.prr-items-table .prr-item-col-code { width: 10%; }
+.prr-items-table .prr-item-col-name { width: 24%; }
+.prr-items-table .prr-item-col-variant { width: 16%; }
+.prr-items-table .prr-item-col-qty { width: 7%; }
+.prr-items-table .prr-item-col-money { width: 9.666%; }
+.prr-monthly-table {
+    table-layout: fixed;
+    min-width: 58rem;
+}
+.prr-monthly-table .prr-mon-col-month { width: 26%; }
+.prr-monthly-table .prr-mon-col-count { width: 10%; }
+.prr-monthly-table .prr-mon-col-money { width: 18%; }
 </style>
 
 <?php
