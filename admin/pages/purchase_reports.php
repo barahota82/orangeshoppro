@@ -1059,7 +1059,6 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 .prr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
 .prr-filter-form .prr-date-field {
     flex: 0 0 auto;
-    width: 7rem;
 }
 .prr-filter-form .prr-date-field-to {
     margin-inline-start: 0.75rem;
