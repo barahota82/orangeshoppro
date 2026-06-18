@@ -111,6 +111,7 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
    - **أُضيفت شاشة موحّدة** `admin/pages/sales_reports.php` بنفس هيكل تقارير المخزن/المشتريات (تبويبات + شريط فلاتر + طباعة + تصدير Excel/CSV من نفس جدول التقرير).
    - **التبويبات:** `invoices` (فواتير المبيعات) / `returns` (مردودات المبيعات) / `customers` (ملخص العملاء) / `monthly` (ملخص شهري) / `items` (تحليل الأصناف).
    - **الفلاتر:** مدى تاريخ + مصدر (شركة/أونلاين/الكل) + عميل (لكل التبويبات) + صنف في `items` + خيار «إخفاء الصافي صفر» في `items`.
+   - **فصل الشاشات وعدم الاستبدال (تصحيح 2026-06-18):** تبقى شاشة `reports` كـ **«تحليل المبيعات»** وتبقى شاشة `channel_analytics` كـ **«تحليل القنوات»** بدون إلغاء؛ الشاشة الجديدة `sales_reports` تُضاف كبند مستقل باسم **«تقارير المبيعات»**.
    - **النطاق حسب الدولة:** الاستعلامات على `orders` و`sales_returns` و`products` و`customers` تعمل بسياق الدولة عبر `orange_sql_country_and_fragment()`.
    - **الربط في النظام:** إضافة الصفحة إلى `admin/index.php`، وربط القائمة العلوية عليها من مجموعة «تحليل المبيعات» في `admin/partials/header.php`، وإضافتها إلى شجرة صلاحيات الشاشات في `includes/admin_nav_tree.php` وفهرس المبيعات والعروض `admin/pages/sales_promotions_index.php`.
    - **التوافق مع الصلاحيات السابقة:** إضافة mapping للشاشة الجديدة ضمن مجموعة `reports` في `includes/admin_permissions.php` مع fallback تلقائي من `page:reports` إلى `page:sales_reports` حتى لا تنكسر صلاحيات المستخدمين القديمة بعد إعادة التسمية.

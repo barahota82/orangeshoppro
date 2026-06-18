@@ -26,6 +26,7 @@ orange_admin_render_mega_section_index(
         'sales_returns' => 'مردودات المبيعات.',
         'offers' => 'عروض على منتجات محددة.',
         'cart_promotions' => 'خصومات على مجموع السلة.',
+        'reports' => 'تحليل المبيعات العام.',
         'sales_reports' => 'تقارير المبيعات والإيرادات.',
         'channel_analytics' => 'تحليل أداء قنوات البيع.',
     ]
