@@ -60,6 +60,64 @@ try {
         orange_country_functional_currency_code($pdo, $countryId)
     );
 
+    if ($action === 'get_policy') {
+        $policy = orange_delivery_country_policy_read($pdo, $countryId);
+        json_response([
+            'success' => true,
+            'data' => [
+                'default_delivery_fee' => (float) ($policy['default_delivery_fee'] ?? 0.0),
+                'delivery_fee_policy' => (string) ($policy['delivery_fee_policy'] ?? 'paid_all'),
+                'active_areas_count' => orange_delivery_areas_count_active($pdo, $countryId),
+            ],
+        ]);
+    }
+
+    if ($action === 'save_policy') {
+        if ($countryId <= 0) {
+            json_response(['success' => false, 'message' => 'الدولة غير محددة'], 422);
+        }
+        $rawPolicy = strtolower(trim((string) ($data['delivery_fee_policy'] ?? 'paid_all')));
+        if (!isset(orange_delivery_fee_policy_values()[$rawPolicy])) {
+            json_response(['success' => false, 'message' => 'اختر سياسة توصيل صحيحة'], 422);
+        }
+        $defaultFee = da_money_non_negative($data['default_delivery_fee'] ?? '', $countryMoneyDecimals);
+        if ($defaultFee === null) {
+            json_response(['success' => false, 'message' => 'قيمة التوصيل الافتراضية غير صحيحة'], 422);
+        }
+        $applyActiveAreas = !empty($data['apply_active_areas']);
+        $appliedCount = 0;
+
+        $pdo->beginTransaction();
+        try {
+            orange_delivery_country_policy_save($pdo, $countryId, (float) $defaultFee, $rawPolicy);
+            if ($applyActiveAreas) {
+                $appliedCount = orange_delivery_apply_default_fee_to_active_areas($pdo, $countryId, (float) $defaultFee);
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        $saved = orange_delivery_country_policy_read($pdo, $countryId);
+        $msg = $applyActiveAreas
+            ? ('تم حفظ السياسة وتطبيق القيمة على ' . $appliedCount . ' منطقة نشطة')
+            : 'تم حفظ سياسة قيمة التوصيل';
+
+        json_response([
+            'success' => true,
+            'message' => $msg,
+            'data' => [
+                'default_delivery_fee' => (float) ($saved['default_delivery_fee'] ?? 0.0),
+                'delivery_fee_policy' => (string) ($saved['delivery_fee_policy'] ?? 'paid_all'),
+                'active_areas_count' => orange_delivery_areas_count_active($pdo, $countryId),
+                'applied_count' => $appliedCount,
+            ],
+        ]);
+    }
+
     if ($action === 'list_governorates') {
         json_response([
             'success' => true,
@@ -113,7 +171,10 @@ try {
         $governorateId = (int) ($data['governorate_id'] ?? 0);
         $nameAr = da_str191($data['name_ar'] ?? '');
         $nameEn = da_str191($data['name_en'] ?? '');
-        $deliveryFee = da_money_non_negative($data['delivery_fee'] ?? 0, $countryMoneyDecimals);
+        $deliveryFeeRaw = trim((string) ($data['delivery_fee'] ?? ''));
+        $deliveryFee = $deliveryFeeRaw === ''
+            ? orange_delivery_country_default_fee($pdo, $countryId)
+            : da_money_non_negative($deliveryFeeRaw, $countryMoneyDecimals);
         $isActive = !empty($data['is_active']) ? 1 : 0;
 
         if ($nameAr === '') {

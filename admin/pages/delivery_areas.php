@@ -34,6 +34,14 @@ $daMoneyStep = isset($orangeAdminMoneyStep) && is_string($orangeAdminMoneyStep)
 $daMoneyZero = isset($orangeAdminMoneyZero) && is_string($orangeAdminMoneyZero)
     ? $orangeAdminMoneyZero
     : orange_admin_money_zero_string($daMoneyDecimals);
+$daPolicy = orange_delivery_country_policy_read($pdo, $adminCountryId);
+$daPolicyCode = orange_delivery_fee_policy_normalize((string) ($daPolicy['delivery_fee_policy'] ?? 'paid_all'));
+$daPolicyFeeValue = number_format(
+    max(0.0, (float) ($daPolicy['default_delivery_fee'] ?? 0)),
+    $daMoneyDecimals,
+    '.',
+    ''
+);
 ?>
 <div class="page-title">
     <h1>محافظات ومناطق التوصيل</h1>
@@ -41,6 +49,41 @@ $daMoneyZero = isset($orangeAdminMoneyZero) && is_string($orangeAdminMoneyZero)
 </div>
 <?php if ($activeAreasCount === 0 && $hasAreasTable): ?>
 <p class="card-hint" style="margin-top:0.5rem;color:#b45309;">لا توجد مناطق توصيل نشطة لهذه الدولة — العملاء لن يكملوا الطلب حتى تُفعَّل محافظة ومنطقة على الأقل.</p>
+<?php endif; ?>
+
+<?php if ($hasAreasTable): ?>
+<div class="card da-policy-card">
+    <h3>كارت سياسة قيمة التوصيل</h3>
+    <p class="card-hint" style="margin-top:0;">
+        حدّد قيمة التوصيل الافتراضية للدولة الحالية، واختر سياسة واحدة حصرية لكيفية تطبيقها في checkout.
+    </p>
+    <div class="form-grid da-policy-form-grid">
+        <div class="da-policy-fee">
+            <label for="da_policy_default_fee">القيمة الافتراضية للتوصيل</label>
+            <input type="number"
+                   id="da_policy_default_fee"
+                   min="0"
+                   step="<?php echo htmlspecialchars($daMoneyStep, ENT_QUOTES, 'UTF-8'); ?>"
+                   lang="en"
+                   dir="ltr"
+                   value="<?php echo htmlspecialchars($daPolicyFeeValue, ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="card-hint">تُستخدم تلقائيًا كقيمة مبدئية للمناطق الجديدة.</small>
+        </div>
+        <div class="da-policy-mode">
+            <label>سياسة تحصيل قيمة التوصيل</label>
+            <div class="da-policy-radios">
+                <label><input type="radio" name="da_policy_mode" value="paid_all"<?php echo $daPolicyCode === 'paid_all' ? ' checked' : ''; ?>> الكل يسدد</label>
+                <label><input type="radio" name="da_policy_mode" value="free_registered"<?php echo $daPolicyCode === 'free_registered' ? ' checked' : ''; ?>> مجاني للمسجّلين</label>
+                <label><input type="radio" name="da_policy_mode" value="free_all"<?php echo $daPolicyCode === 'free_all' ? ' checked' : ''; ?>> مجاني للكل</label>
+            </div>
+        </div>
+    </div>
+    <div class="admin-form-actions" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;align-items:center;">
+        <button type="button" onclick="saveDeliveryPolicy(false)">حفظ السياسة</button>
+        <button type="button" class="btn-secondary" onclick="saveDeliveryPolicy(true)">حفظ + تطبيق على المناطق النشطة</button>
+        <span id="da_policy_status" class="card-hint" style="margin:0;"></span>
+    </div>
+</div>
 <?php endif; ?>
 
 <?php if (!$hasAreasTable): ?>
@@ -282,6 +325,31 @@ $daMoneyZero = isset($orangeAdminMoneyZero) && is_string($orangeAdminMoneyZero)
     .da-area-fee { grid-area: fee; }
     .da-area-sort { grid-area: sort; }
     .da-area-active { grid-area: active; }
+    .da-policy-form-grid {
+        display: grid;
+        gap: 12px 16px;
+        grid-template-columns: minmax(220px, 320px) 1fr;
+        align-items: end;
+    }
+    .da-policy-radios {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        margin-top: 6px;
+    }
+    .da-policy-radios label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        margin: 0;
+    }
+    #da_policy_status.da-policy-error {
+        color: #b91c1c;
+    }
+    #da_policy_status.da-policy-ok {
+        color: #166534;
+    }
     .da-areas-list-head {
         display: flex;
         flex-wrap: wrap;
@@ -305,7 +373,8 @@ $daMoneyZero = isset($orangeAdminMoneyZero) && is_string($orangeAdminMoneyZero)
     }
     @media (max-width: 720px) {
         .da-gov-form-grid,
-        .da-area-form-grid {
+        .da-area-form-grid,
+        .da-policy-form-grid {
             grid-template-columns: 1fr;
             grid-template-areas: unset;
         }
@@ -327,6 +396,8 @@ var dgSortStep = <?php echo (int) orange_delivery_governorates_sort_order_step()
 var daSortStep = dgSortStep;
 var daMoneyDecimals = <?php echo (int) $daMoneyDecimals; ?>;
 var daMoneyZero = <?php echo json_encode($daMoneyZero, JSON_UNESCAPED_UNICODE); ?>;
+var daAreaDefaultFee = <?php echo json_encode((float) ($daPolicy['default_delivery_fee'] ?? 0), JSON_UNESCAPED_UNICODE); ?>;
+var daDeliveryPolicy = <?php echo json_encode($daPolicyCode, JSON_UNESCAPED_UNICODE); ?>;
 
 function dgComputeNextSort() {
     var max = 0;
@@ -438,6 +509,89 @@ function refreshDaSortPreview() {
 
 function daCountryId() {
     return parseInt(document.getElementById('da_country_id').value, 10) || 0;
+}
+
+function daPolicySelectedValue() {
+    var selected = document.querySelector('input[name="da_policy_mode"]:checked');
+    return selected ? String(selected.value || 'paid_all') : 'paid_all';
+}
+
+function daShowPolicyStatus(message, isError) {
+    var el = document.getElementById('da_policy_status');
+    if (!el) return;
+    el.textContent = String(message || '');
+    el.classList.remove('da-policy-ok', 'da-policy-error');
+    if (!message) return;
+    el.classList.add(isError ? 'da-policy-error' : 'da-policy-ok');
+}
+
+function daSetPolicyForm(policyData) {
+    var fee = daRoundMoney(daParseMoney(policyData && policyData.default_delivery_fee != null ? policyData.default_delivery_fee : 0));
+    var mode = String(policyData && policyData.delivery_fee_policy ? policyData.delivery_fee_policy : 'paid_all');
+    var feeInput = document.getElementById('da_policy_default_fee');
+    if (feeInput) {
+        feeInput.value = daFormatMoney(fee);
+    }
+    var modeFound = false;
+    document.querySelectorAll('input[name="da_policy_mode"]').forEach(function (radio) {
+        var match = String(radio.value) === mode;
+        radio.checked = match;
+        if (match) modeFound = true;
+    });
+    if (!modeFound) {
+        var fallback = document.querySelector('input[name="da_policy_mode"][value="paid_all"]');
+        if (fallback) fallback.checked = true;
+        mode = 'paid_all';
+    }
+    daAreaDefaultFee = fee;
+    daDeliveryPolicy = mode;
+}
+
+async function loadDeliveryPolicy() {
+    var res = await postJSON('/admin/api/delivery_areas/manage.php', {
+        action: 'get_policy',
+        country_id: daCountryId()
+    });
+    if (!res || !res.success) {
+        daShowPolicyStatus((res && res.message) ? res.message : 'تعذر تحميل سياسة التوصيل', true);
+        return;
+    }
+    daSetPolicyForm(res.data || {});
+    var areaId = parseInt(document.getElementById('da_id').value, 10) || 0;
+    if (areaId <= 0) {
+        var areaFeeEl = document.getElementById('da_delivery_fee');
+        if (areaFeeEl) {
+            areaFeeEl.value = daFormatMoney(daAreaDefaultFee);
+        }
+    }
+    daShowPolicyStatus('', false);
+}
+
+async function saveDeliveryPolicy(applyActiveAreas) {
+    var feeEl = document.getElementById('da_policy_default_fee');
+    if (!feeEl) return;
+    var feeVal = daParseMoney(feeEl.value);
+    if (!Number.isFinite(feeVal) || feeVal < 0) {
+        daShowPolicyStatus('قيمة التوصيل الافتراضية غير صحيحة', true);
+        return;
+    }
+    var payload = {
+        action: 'save_policy',
+        country_id: daCountryId(),
+        default_delivery_fee: Number(daRoundMoney(feeVal).toFixed(daMoneyDecimals)),
+        delivery_fee_policy: daPolicySelectedValue(),
+        apply_active_areas: applyActiveAreas ? 1 : 0
+    };
+    var res = await postJSON('/admin/api/delivery_areas/manage.php', payload);
+    if (!res || !res.success) {
+        daShowPolicyStatus((res && res.message) ? res.message : 'تعذر حفظ سياسة التوصيل', true);
+        return;
+    }
+    daSetPolicyForm(res.data || {});
+    daShowPolicyStatus(res.message || 'تم حفظ سياسة التوصيل', false);
+    if (applyActiveAreas) {
+        await loadDeliveryAreas();
+    }
 }
 
 function daSwitchAdminCountry(code) {
@@ -606,7 +760,7 @@ function resetDeliveryAreaForm() {
     document.getElementById('da_id').value = '0';
     document.getElementById('da_name_ar').value = '';
     document.getElementById('da_name_en').value = '';
-    document.getElementById('da_delivery_fee').value = daMoneyZero;
+    document.getElementById('da_delivery_fee').value = daFormatMoney(daAreaDefaultFee);
     document.getElementById('da_is_active').checked = true;
     const sel = document.getElementById('da_governorate_id');
     if (sel) sel.value = '';
@@ -774,6 +928,9 @@ if (daListAll) daListAll.addEventListener('change', renderDeliveryAreasTable);
         bindDeliveryAreaEditButtons();
         refreshDgSortPreview();
         refreshDaSortPreview();
+        if (document.getElementById('da_policy_default_fee')) {
+            await loadDeliveryPolicy();
+        }
         if (document.getElementById('dg_tbody') && daGovernoratesCache.length === 0) {
             await loadGovernorates();
         }

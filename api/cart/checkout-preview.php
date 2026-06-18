@@ -24,23 +24,24 @@ try {
     }
 
     [$subtotal, $validatedItems] = orange_storefront_validate_cart_items_core($pdo, $items, false);
+    $storefrontCountryId = orange_storefront_current_country_id($pdo);
 
     $acc = current_storefront_account($pdo);
     $buyerReg = $acc !== null;
-    $comboPick = orange_cart_combo_best_match($pdo, $validatedItems, $buyerReg);
+    $comboPick = orange_cart_combo_best_match($pdo, $validatedItems, $buyerReg, $storefrontCountryId);
     $comboDiscount = $comboPick !== null ? (float) $comboPick['discount'] : 0.0;
     $comboId = $comboPick !== null ? (int) $comboPick['id'] : null;
     $netAfterCombo = max(0.0, round($subtotal - $comboDiscount, 4));
-    $promo = orange_cart_promotion_resolve($pdo, $netAfterCombo, $buyerReg);
+    $promo = orange_cart_promotion_resolve($pdo, $netAfterCombo, $buyerReg, $storefrontCountryId);
     $promoDiscount = $promo !== null ? (float) $promo['discount'] : 0.0;
     $total = max(0.0, round($netAfterCombo - $promoDiscount, 4));
-    $regTeaser = orange_cart_promotion_register_incentive_teaser($pdo, $netAfterCombo, $buyerReg);
-    $giftRegUnlock = orange_cart_gift_register_unlock_teaser_applies($pdo, $subtotal, $buyerReg, $validatedItems);
-    $bogoRegUnlock = orange_cart_bogo_register_unlock_teaser_applies($pdo, $validatedItems, $buyerReg);
-    $comboRegUnlock = orange_cart_combo_register_unlock_teaser_applies($pdo, $validatedItems, $buyerReg);
+    $regTeaser = orange_cart_promotion_register_incentive_teaser($pdo, $netAfterCombo, $buyerReg, $storefrontCountryId);
+    $giftRegUnlock = orange_cart_gift_register_unlock_teaser_applies($pdo, $subtotal, $buyerReg, $validatedItems, $storefrontCountryId);
+    $bogoRegUnlock = orange_cart_bogo_register_unlock_teaser_applies($pdo, $validatedItems, $buyerReg, $storefrontCountryId);
+    $comboRegUnlock = orange_cart_combo_register_unlock_teaser_applies($pdo, $validatedItems, $buyerReg, $storefrontCountryId);
 
     $giftPayload = null;
-    $giftRule = orange_cart_gift_promotion_select_rule($pdo, $subtotal, $buyerReg);
+    $giftRule = orange_cart_gift_promotion_select_rule($pdo, $subtotal, $buyerReg, $storefrontCountryId);
     if ($giftRule !== null) {
         if ($giftRule['gift_kind'] === 'fixed') {
             $fv = (int) ($giftRule['fixed_variant_id'] ?? 0);
@@ -74,7 +75,7 @@ try {
     }
 
     $bogoPayload = null;
-    $bogoRule = orange_cart_bogo_promotion_select_rule($pdo, $validatedItems, $buyerReg);
+    $bogoRule = orange_cart_bogo_promotion_select_rule($pdo, $validatedItems, $buyerReg, $storefrontCountryId);
     $bogoCtx = $validatedItems;
     if ($bogoRule !== null) {
         $bogoCtx = $validatedItems;
@@ -140,10 +141,7 @@ try {
     $deliveryAreaId = (int) ($data['delivery_area_id'] ?? 0);
     $deliveryFee = 0.0;
     if ($deliveryAreaId > 0) {
-        $daRow = orange_delivery_area_row_active($pdo, $deliveryAreaId);
-        if ($daRow !== null) {
-            $deliveryFee = orange_delivery_area_fee_from_row($daRow);
-        }
+        $deliveryFee = orange_delivery_resolve_checkout_fee($pdo, $deliveryAreaId, $buyerReg, $storefrontCountryId);
     }
     $total = max(0.0, round($total + $thresholdGiftChargePreview + $bogoGiftChargePreview + $deliveryFee, 4));
 

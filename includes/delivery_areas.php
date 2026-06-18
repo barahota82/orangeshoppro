@@ -222,6 +222,203 @@ function orange_delivery_area_fee_from_row(array $row): float
 }
 
 /**
+ * @return array<string, bool>
+ */
+function orange_delivery_fee_policy_values(): array
+{
+    return [
+        'paid_all' => true,
+        'free_registered' => true,
+        'free_all' => true,
+    ];
+}
+
+function orange_delivery_fee_policy_normalize(?string $policy): string
+{
+    $key = strtolower(trim((string) $policy));
+
+    return isset(orange_delivery_fee_policy_values()[$key]) ? $key : 'paid_all';
+}
+
+/**
+ * @return array{default_delivery_fee:float, delivery_fee_policy:string}
+ */
+function orange_delivery_country_policy_read(PDO $pdo, ?int $countryId = null): array
+{
+    $result = [
+        'default_delivery_fee' => 0.0,
+        'delivery_fee_policy' => 'paid_all',
+    ];
+    if (!orange_table_exists($pdo, 'countries')) {
+        return $result;
+    }
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
+    if ($countryId <= 0) {
+        return $result;
+    }
+
+    $hasFee = orange_table_has_column($pdo, 'countries', 'default_delivery_fee');
+    $hasPolicy = orange_table_has_column($pdo, 'countries', 'delivery_fee_policy');
+    if (!$hasFee && !$hasPolicy) {
+        return $result;
+    }
+    $feeSel = $hasFee ? 'default_delivery_fee' : '0 AS default_delivery_fee';
+    $policySel = $hasPolicy ? "delivery_fee_policy" : "'paid_all' AS delivery_fee_policy";
+    $st = $pdo->prepare(
+        'SELECT ' . $feeSel . ', ' . $policySel . ' FROM countries WHERE id = ? LIMIT 1'
+    );
+    $st->execute([$countryId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($row)) {
+        return $result;
+    }
+    $result['default_delivery_fee'] = orange_delivery_area_fee_from_row([
+        'delivery_fee' => $row['default_delivery_fee'] ?? 0,
+    ]);
+    $result['delivery_fee_policy'] = orange_delivery_fee_policy_normalize((string) ($row['delivery_fee_policy'] ?? ''));
+
+    return $result;
+}
+
+function orange_delivery_country_default_fee(PDO $pdo, ?int $countryId = null): float
+{
+    $policy = orange_delivery_country_policy_read($pdo, $countryId);
+
+    return (float) ($policy['default_delivery_fee'] ?? 0.0);
+}
+
+function orange_delivery_country_policy_save(PDO $pdo, int $countryId, float $defaultDeliveryFee, string $policy): void
+{
+    if ($countryId <= 0 || !orange_table_exists($pdo, 'countries')) {
+        return;
+    }
+    $fee = round(max(0.0, $defaultDeliveryFee), 4);
+    $policyNorm = orange_delivery_fee_policy_normalize($policy);
+    $hasFee = orange_table_has_column($pdo, 'countries', 'default_delivery_fee');
+    $hasPolicy = orange_table_has_column($pdo, 'countries', 'delivery_fee_policy');
+    if (!$hasFee && !$hasPolicy) {
+        return;
+    }
+    $set = [];
+    $params = [];
+    if ($hasFee) {
+        $set[] = 'default_delivery_fee = ?';
+        $params[] = $fee;
+    }
+    if ($hasPolicy) {
+        $set[] = 'delivery_fee_policy = ?';
+        $params[] = $policyNorm;
+    }
+    if ($set === []) {
+        return;
+    }
+    $params[] = $countryId;
+    $sql = 'UPDATE countries SET ' . implode(', ', $set) . ' WHERE id = ? LIMIT 1';
+    $up = $pdo->prepare($sql);
+    $up->execute($params);
+}
+
+function orange_delivery_apply_default_fee_to_active_areas(PDO $pdo, int $countryId, float $defaultDeliveryFee): int
+{
+    if ($countryId <= 0 || !orange_table_exists($pdo, 'delivery_areas')) {
+        return 0;
+    }
+    if (!orange_table_has_column($pdo, 'delivery_areas', 'delivery_fee')) {
+        return 0;
+    }
+    $fee = round(max(0.0, $defaultDeliveryFee), 4);
+    $hasCountry = orange_delivery_areas_has_country_column($pdo);
+    $hasGov = orange_delivery_areas_has_governorate_column($pdo)
+        && orange_delivery_governorates_table_exists($pdo);
+    if ($hasCountry && $hasGov) {
+        $up = $pdo->prepare(
+            'UPDATE delivery_areas a
+             INNER JOIN delivery_governorates g ON g.id = a.governorate_id
+             SET a.delivery_fee = ?
+             WHERE a.is_active = 1
+               AND g.is_active = 1
+               AND (a.country_id = ? OR g.country_id = ?)'
+        );
+        $up->execute([$fee, $countryId, $countryId]);
+
+        return (int) $up->rowCount();
+    }
+    if ($hasGov) {
+        $up = $pdo->prepare(
+            'UPDATE delivery_areas a
+             INNER JOIN delivery_governorates g ON g.id = a.governorate_id
+             SET a.delivery_fee = ?
+             WHERE a.is_active = 1
+               AND g.is_active = 1
+               AND g.country_id = ?'
+        );
+        $up->execute([$fee, $countryId]);
+
+        return (int) $up->rowCount();
+    }
+    if ($hasCountry) {
+        $up = $pdo->prepare(
+            'UPDATE delivery_areas SET delivery_fee = ? WHERE is_active = 1 AND country_id = ?'
+        );
+        $up->execute([$fee, $countryId]);
+
+        return (int) $up->rowCount();
+    }
+    $up = $pdo->prepare(
+        'UPDATE delivery_areas SET delivery_fee = ? WHERE is_active = 1'
+    );
+    $up->execute([$fee]);
+
+    return (int) $up->rowCount();
+}
+
+function orange_delivery_policy_is_free_for_buyer(string $policy, bool $buyerRegistered): bool
+{
+    $policy = orange_delivery_fee_policy_normalize($policy);
+    if ($policy === 'free_all') {
+        return true;
+    }
+
+    return $policy === 'free_registered' && $buyerRegistered;
+}
+
+/**
+ * @param array<string, mixed>|null $areaRow
+ */
+function orange_delivery_resolve_checkout_fee(
+    PDO $pdo,
+    int $deliveryAreaId,
+    bool $buyerRegistered,
+    ?int $countryId = null,
+    ?array $areaRow = null
+): float {
+    if ($deliveryAreaId <= 0) {
+        return 0.0;
+    }
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
+    if ($areaRow === null) {
+        $areaRow = orange_delivery_area_row_active($pdo, $deliveryAreaId, $countryId);
+    }
+    if (!is_array($areaRow)) {
+        return 0.0;
+    }
+    $baseFee = orange_delivery_area_fee_from_row($areaRow);
+    if ($baseFee <= 0.0) {
+        return 0.0;
+    }
+    $policy = orange_delivery_country_policy_read($pdo, $countryId);
+    if (orange_delivery_policy_is_free_for_buyer((string) ($policy['delivery_fee_policy'] ?? ''), $buyerRegistered)) {
+        return 0.0;
+    }
+
+    return $baseFee;
+}
+
+/**
  * @param array<string, mixed> $data
  */
 function orange_delivery_areas_api_country_id(PDO $pdo, array $data): int
@@ -496,7 +693,14 @@ function orange_storefront_normalize_delivery_area_payload(PDO $pdo, array &$dat
     }
     $data['delivery_area_id'] = $id;
     $data['area'] = orange_delivery_area_label_from_row($row, $lang);
-    $data['delivery_fee'] = orange_delivery_area_fee_from_row($row);
+    $buyerRegistered = !empty($data['_buyer_registered']);
+    $data['delivery_fee'] = orange_delivery_resolve_checkout_fee(
+        $pdo,
+        $id,
+        $buyerRegistered,
+        $countryId,
+        $row
+    );
 }
 
 /**

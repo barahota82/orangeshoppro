@@ -248,11 +248,11 @@ function orange_storefront_verify_email_token(PDO $pdo, string $token): array
 }
 
 /**
- * يثبّط معرّف الحساب على الطلب عند الدفع فقط إذا كان الحساب مفعّلاً بالبريد والهاتف يطابق الطلب.
+ * يرجع معرّف الحساب فقط إذا كان الحساب موجوداً ومفعّلاً (email_verified_at).
  */
-function orange_storefront_resolve_order_account_link(PDO $pdo, int $claimedAccountId, string $checkoutPhoneNorm): ?int
+function orange_storefront_verified_account_id(PDO $pdo, int $accountId): ?int
 {
-    if ($claimedAccountId <= 0 || trim($checkoutPhoneNorm) === '') {
+    if ($accountId <= 0) {
         return null;
     }
     require_once __DIR__ . '/catalog_schema.php';
@@ -260,9 +260,133 @@ function orange_storefront_resolve_order_account_link(PDO $pdo, int $claimedAcco
         return null;
     }
     $st = $pdo->prepare(
-        'SELECT id, customer_phone FROM storefront_accounts WHERE id = ? AND email_verified_at IS NOT NULL LIMIT 1'
+        'SELECT id FROM storefront_accounts WHERE id = ? AND email_verified_at IS NOT NULL LIMIT 1'
     );
-    $st->execute([$claimedAccountId]);
+    $st->execute([$accountId]);
+    $id = $st->fetchColumn();
+
+    return ($id !== false && (int) $id > 0) ? (int) $id : null;
+}
+
+/**
+ * @return array{id:int,email:string,customer_phone:string}|null
+ */
+function orange_storefront_verified_account_by_phone(PDO $pdo, string $phoneNorm, ?int $countryId = null): ?array
+{
+    $phoneNorm = trim($phoneNorm);
+    if ($phoneNorm === '') {
+        return null;
+    }
+    require_once __DIR__ . '/catalog_schema.php';
+    if (!orange_table_exists($pdo, 'storefront_accounts')) {
+        return null;
+    }
+    $hasCountry = orange_table_has_column($pdo, 'storefront_accounts', 'country_id');
+    if ($countryId === null || $countryId <= 0) {
+        require_once __DIR__ . '/countries.php';
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
+    require_once __DIR__ . '/order_helpers.php';
+    if ($hasCountry && $countryId > 0) {
+        $st = $pdo->prepare(
+            'SELECT id, email, customer_phone
+             FROM storefront_accounts
+             WHERE country_id = ?
+               AND email_verified_at IS NOT NULL
+               AND customer_phone IS NOT NULL
+               AND TRIM(customer_phone) <> \'\'
+             ORDER BY id DESC'
+        );
+        $st->execute([$countryId]);
+    } else {
+        $st = $pdo->query(
+            'SELECT id, email, customer_phone
+             FROM storefront_accounts
+             WHERE email_verified_at IS NOT NULL
+               AND customer_phone IS NOT NULL
+               AND TRIM(customer_phone) <> \'\'
+             ORDER BY id DESC'
+        );
+    }
+    if (!$st) {
+        return null;
+    }
+    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        if (!is_array($row) || (int) ($row['id'] ?? 0) <= 0) {
+            continue;
+        }
+        $candidatePhone = trim((string) ($row['customer_phone'] ?? ''));
+        if ($candidatePhone === '') {
+            continue;
+        }
+        if (!orange_order_phones_match_for_lookup($phoneNorm, $candidatePhone)) {
+            continue;
+        }
+
+        return [
+            'id' => (int) $row['id'],
+            'email' => trim((string) ($row['email'] ?? '')),
+            'customer_phone' => $candidatePhone,
+        ];
+    }
+
+    return null;
+}
+
+function orange_storefront_checkout_otp_hash(int $accountId, string $phoneNorm, string $otpCode): string
+{
+    $pepper = defined('DB_PASS') ? (string) DB_PASS : '';
+
+    return hash('sha256', $accountId . '|' . trim($phoneNorm) . '|' . trim($otpCode) . '|' . $pepper);
+}
+
+function orange_storefront_checkout_otp_columns_ready(PDO $pdo): bool
+{
+    require_once __DIR__ . '/catalog_schema.php';
+    if (!orange_table_exists($pdo, 'storefront_accounts')) {
+        return false;
+    }
+
+    return orange_table_has_column($pdo, 'storefront_accounts', 'otp_hash')
+        && orange_table_has_column($pdo, 'storefront_accounts', 'otp_expires_at')
+        && orange_table_has_column($pdo, 'storefront_accounts', 'otp_sent_at')
+        && orange_table_has_column($pdo, 'storefront_accounts', 'otp_attempts')
+        && orange_table_has_column($pdo, 'storefront_accounts', 'otp_phone');
+}
+
+function orange_storefront_checkout_otp_clear(PDO $pdo, int $accountId): void
+{
+    if ($accountId <= 0 || !orange_storefront_checkout_otp_columns_ready($pdo)) {
+        return;
+    }
+    $up = $pdo->prepare(
+        'UPDATE storefront_accounts
+         SET otp_hash = NULL,
+             otp_expires_at = NULL,
+             otp_sent_at = NULL,
+             otp_attempts = 0,
+             otp_phone = NULL
+         WHERE id = ? LIMIT 1'
+    );
+    $up->execute([$accountId]);
+}
+
+/**
+ * يثبّط معرّف الحساب على الطلب عند الدفع فقط إذا كان الحساب مفعّلاً بالبريد والهاتف يطابق الطلب.
+ */
+function orange_storefront_resolve_order_account_link(PDO $pdo, int $claimedAccountId, string $checkoutPhoneNorm): ?int
+{
+    if ($claimedAccountId <= 0 || trim($checkoutPhoneNorm) === '') {
+        return null;
+    }
+    $verifiedId = orange_storefront_verified_account_id($pdo, $claimedAccountId);
+    if ($verifiedId === null) {
+        return null;
+    }
+    $st = $pdo->prepare(
+        'SELECT id, customer_phone FROM storefront_accounts WHERE id = ? LIMIT 1'
+    );
+    $st->execute([$verifiedId]);
     $row = $st->fetch(PDO::FETCH_ASSOC);
     if (!$row || empty($row['customer_phone'])) {
         return null;
@@ -272,7 +396,7 @@ function orange_storefront_resolve_order_account_link(PDO $pdo, int $claimedAcco
         return null;
     }
 
-    return (int) $row['id'];
+    return $verifiedId;
 }
 
 /**

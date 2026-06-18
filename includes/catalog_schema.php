@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 84);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 90);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3108,6 +3108,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_cart_promo_stock_check_v83($pdo);
     orange_catalog_migrate_document_business_date_v84($pdo);
     orange_catalog_migrate_inventory_cost_layers_v89($pdo);
+    orange_catalog_migrate_delivery_policy_checkout_otp_v90($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -6379,6 +6380,103 @@ function orange_catalog_migrate_inventory_cost_layers_v89(PDO $pdo): void
             $seed->execute([$now, $now]);
         } catch (Throwable $e) {
             // البذر تيسيري للمرحلة م1؛ لا نُفشل ضمان المخطط لو تعذّر (يُعاد لاحقاً).
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v90 — سياسة توصيل الدولة + OTP checkout.
+ *
+ * - countries: default_delivery_fee + delivery_fee_policy
+ * - storefront_accounts: otp_hash + otp_expires_at + otp_sent_at + otp_attempts + otp_phone
+ */
+function orange_catalog_migrate_delivery_policy_checkout_otp_v90(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_delivery_policy_checkout_otp_v90';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'countries')) {
+        if (!orange_table_has_column($pdo, 'countries', 'default_delivery_fee')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE countries ADD COLUMN default_delivery_fee DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER currency_code'
+            );
+            orange_schema_invalidate_column_check('countries', 'default_delivery_fee');
+        }
+        if (!orange_table_has_column($pdo, 'countries', 'delivery_fee_policy')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                "ALTER TABLE countries ADD COLUMN delivery_fee_policy VARCHAR(32) NOT NULL DEFAULT 'paid_all' AFTER default_delivery_fee"
+            );
+            orange_schema_invalidate_column_check('countries', 'delivery_fee_policy');
+        }
+        if (orange_table_has_column($pdo, 'countries', 'default_delivery_fee')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE countries SET default_delivery_fee = 0
+                 WHERE default_delivery_fee IS NULL OR default_delivery_fee < 0'
+            );
+        }
+        if (orange_table_has_column($pdo, 'countries', 'delivery_fee_policy')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                "UPDATE countries
+                 SET delivery_fee_policy = 'paid_all'
+                 WHERE delivery_fee_policy IS NULL
+                    OR TRIM(delivery_fee_policy) = ''
+                    OR LOWER(TRIM(delivery_fee_policy)) NOT IN ('paid_all','free_registered','free_all')"
+            );
+        }
+    }
+
+    if (orange_table_exists($pdo, 'storefront_accounts')) {
+        if (!orange_table_has_column($pdo, 'storefront_accounts', 'otp_hash')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE storefront_accounts ADD COLUMN otp_hash CHAR(64) NULL DEFAULT NULL AFTER verify_email_sent_at'
+            );
+            orange_schema_invalidate_column_check('storefront_accounts', 'otp_hash');
+        }
+        if (!orange_table_has_column($pdo, 'storefront_accounts', 'otp_expires_at')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE storefront_accounts ADD COLUMN otp_expires_at DATETIME NULL DEFAULT NULL AFTER otp_hash'
+            );
+            orange_schema_invalidate_column_check('storefront_accounts', 'otp_expires_at');
+        }
+        if (!orange_table_has_column($pdo, 'storefront_accounts', 'otp_sent_at')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE storefront_accounts ADD COLUMN otp_sent_at DATETIME NULL DEFAULT NULL AFTER otp_expires_at'
+            );
+            orange_schema_invalidate_column_check('storefront_accounts', 'otp_sent_at');
+        }
+        if (!orange_table_has_column($pdo, 'storefront_accounts', 'otp_attempts')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE storefront_accounts ADD COLUMN otp_attempts INT UNSIGNED NOT NULL DEFAULT 0 AFTER otp_sent_at'
+            );
+            orange_schema_invalidate_column_check('storefront_accounts', 'otp_attempts');
+        }
+        if (!orange_table_has_column($pdo, 'storefront_accounts', 'otp_phone')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE storefront_accounts ADD COLUMN otp_phone VARCHAR(64) NULL DEFAULT NULL AFTER otp_attempts'
+            );
+            orange_schema_invalidate_column_check('storefront_accounts', 'otp_phone');
+        }
+        if (orange_table_has_column($pdo, 'storefront_accounts', 'otp_attempts')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE storefront_accounts SET otp_attempts = 0
+                 WHERE otp_attempts IS NULL OR otp_attempts < 0'
+            );
         }
     }
 

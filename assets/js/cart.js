@@ -420,6 +420,27 @@ function orangeCheckoutApiMessage(result) {
     if (c === 'invalid_phone' && T.checkout_invalid_phone) {
         return T.checkout_invalid_phone;
     }
+    if (c === 'otp_service_unavailable' && T.checkout_otp_service_unavailable) {
+        return T.checkout_otp_service_unavailable;
+    }
+    if (c === 'otp_account_not_found' && T.checkout_otp_account_not_found) {
+        return T.checkout_otp_account_not_found;
+    }
+    if (c === 'otp_send_failed' && T.checkout_otp_send_failed) {
+        return T.checkout_otp_send_failed;
+    }
+    if (c === 'otp_not_requested' && T.checkout_otp_not_requested) {
+        return T.checkout_otp_not_requested;
+    }
+    if (c === 'otp_expired' && T.checkout_otp_expired) {
+        return T.checkout_otp_expired;
+    }
+    if ((c === 'otp_invalid' || c === 'otp_invalid_format') && T.checkout_otp_invalid) {
+        return T.checkout_otp_invalid;
+    }
+    if (c === 'otp_max_attempts' && T.checkout_otp_max_attempts) {
+        return T.checkout_otp_max_attempts;
+    }
     if (c === 'invalid_phone' && T.storefront_register_invalid_phone) {
         return T.storefront_register_invalid_phone;
     }
@@ -1145,6 +1166,368 @@ function orangeScheduleCheckoutPreview() {
         orangeRunCheckoutPreview();
     }, 400);
 }
+
+const orangeCheckoutOtpState = {
+    ignored: false,
+    requested: false,
+    verified: false,
+    sending: false,
+    verifying: false,
+    maskedEmail: '',
+    cooldownUntilMs: 0,
+    lastPhoneSignature: '',
+};
+let orangeCheckoutOtpUiTimer = null;
+
+function orangeCheckoutOtpLoggedIn() {
+    const acc = window.ORANGE_CART_SF_ACCOUNT || {};
+    return !!acc.logged_in;
+}
+
+function orangeCheckoutOtpSetLoggedIn(flag) {
+    if (!window.ORANGE_CART_SF_ACCOUNT || typeof window.ORANGE_CART_SF_ACCOUNT !== 'object') {
+        window.ORANGE_CART_SF_ACCOUNT = { logged_in: !!flag };
+    } else {
+        window.ORANGE_CART_SF_ACCOUNT.logged_in = !!flag;
+    }
+    window.ORANGE_SF_LOGGED_IN = !!flag;
+}
+
+function orangeCheckoutOtpCurrentPhoneContext() {
+    const ccEl = document.getElementById('customer_phone_country');
+    const phoneEl = document.getElementById('customer_phone');
+    const intl = !!ccEl && String(ccEl.value || '') === '__intl__';
+    const ccDigits =
+        typeof window.orangeStorefrontPhoneCountryDigits === 'function'
+            ? window.orangeStorefrontPhoneCountryDigits('customer_phone_country')
+            : null;
+    return {
+        intl: intl,
+        phoneRaw: phoneEl ? String(phoneEl.value || '').trim() : '',
+        phoneCountry: intl ? '__intl__' : ccDigits || '',
+        hasCountry:
+            ccDigits !== null &&
+            ccDigits !== undefined &&
+            (intl || String(ccDigits).trim() !== ''),
+    };
+}
+
+function orangeCheckoutOtpNormalizedPhone(ctx) {
+    if (!ctx || !ctx.phoneRaw || !ctx.hasCountry) {
+        return '';
+    }
+    if (typeof window.orangeNormalizeCustomerPhone !== 'function') {
+        return '';
+    }
+    const norm = window.orangeNormalizeCustomerPhone(
+        ctx.phoneRaw,
+        ctx.intl ? null : ctx.phoneCountry,
+        ctx.intl
+    );
+    return norm ? String(norm).trim() : '';
+}
+
+function orangeCheckoutOtpSetFeedback(message, isError) {
+    const node = document.getElementById('checkoutOtpFeedback');
+    if (!node) {
+        return;
+    }
+    const text = String(message || '').trim();
+    if (!text) {
+        node.textContent = '';
+        node.hidden = true;
+        return;
+    }
+    node.textContent = text;
+    node.style.color = isError ? '#b91c1c' : '#166534';
+    node.hidden = false;
+}
+
+function orangeCheckoutOtpSyncUi() {
+    const wrap = document.getElementById('checkoutOtpQuickLogin');
+    if (!wrap) {
+        return;
+    }
+    if (orangeCheckoutOtpUiTimer) {
+        clearTimeout(orangeCheckoutOtpUiTimer);
+        orangeCheckoutOtpUiTimer = null;
+    }
+    const hintEl = document.getElementById('checkoutOtpHint');
+    const sendBtn = document.getElementById('checkoutOtpSendBtn');
+    const resendBtn = document.getElementById('checkoutOtpResendBtn');
+    const ignoreBtn = document.getElementById('checkoutOtpIgnoreBtn');
+    const verifyWrap = document.getElementById('checkoutOtpVerifyWrap');
+    const verifyBtn = document.getElementById('checkoutOtpVerifyBtn');
+    if (orangeCheckoutOtpLoggedIn()) {
+        wrap.hidden = true;
+        return;
+    }
+    const ctx = orangeCheckoutOtpCurrentPhoneContext();
+    const signature = orangeCheckoutOtpNormalizedPhone(ctx);
+    if (!signature || orangeCheckoutOtpState.ignored) {
+        wrap.hidden = true;
+        return;
+    }
+    wrap.hidden = false;
+
+    const now = Date.now();
+    const cooldownMs = Math.max(0, orangeCheckoutOtpState.cooldownUntilMs - now);
+    const cooldownSec = Math.ceil(cooldownMs / 1000);
+    const canResend = orangeCheckoutOtpState.requested;
+    if (sendBtn) {
+        sendBtn.hidden = canResend;
+        sendBtn.disabled = orangeCheckoutOtpState.sending || cooldownSec > 0;
+    }
+    if (resendBtn) {
+        resendBtn.hidden = !canResend;
+        resendBtn.disabled = orangeCheckoutOtpState.sending || cooldownSec > 0;
+    }
+    if (ignoreBtn) {
+        ignoreBtn.hidden = false;
+        ignoreBtn.disabled = orangeCheckoutOtpState.sending || orangeCheckoutOtpState.verifying;
+    }
+    if (verifyWrap) {
+        verifyWrap.hidden = !canResend;
+    }
+    if (verifyBtn) {
+        verifyBtn.disabled = orangeCheckoutOtpState.verifying;
+    }
+    const T = window.APP_T || {};
+    let hint = String(T.checkout_otp_prompt || '').trim();
+    if (canResend && orangeCheckoutOtpState.maskedEmail) {
+        const sentTpl = String(T.checkout_otp_sent_to_email || '').trim();
+        if (sentTpl) {
+            hint = sentTpl.replace(/\{email\}/g, orangeCheckoutOtpState.maskedEmail);
+        }
+    }
+    if (cooldownSec > 0) {
+        const cTpl = String(T.checkout_otp_resend_after || '').trim();
+        const cText = cTpl ? cTpl.replace(/\{seconds\}/g, String(cooldownSec)) : '';
+        hint = hint ? hint + (cText ? ' — ' + cText : '') : cText;
+        orangeCheckoutOtpUiTimer = setTimeout(orangeCheckoutOtpSyncUi, 1000);
+    }
+    if (hintEl) {
+        hintEl.textContent = hint;
+    }
+}
+
+function orangeCheckoutOtpResetForPhone(signature) {
+    orangeCheckoutOtpState.requested = false;
+    orangeCheckoutOtpState.verified = false;
+    orangeCheckoutOtpState.sending = false;
+    orangeCheckoutOtpState.verifying = false;
+    orangeCheckoutOtpState.maskedEmail = '';
+    orangeCheckoutOtpState.cooldownUntilMs = 0;
+    orangeCheckoutOtpState.ignored = false;
+    orangeCheckoutOtpState.lastPhoneSignature = signature || '';
+    const otpEl = document.getElementById('checkoutOtpCode');
+    if (otpEl) {
+        otpEl.value = '';
+    }
+    orangeCheckoutOtpSetFeedback('', false);
+}
+
+function orangeCheckoutOtpOnPhoneEdited() {
+    if (orangeCheckoutOtpLoggedIn()) {
+        orangeCheckoutOtpSyncUi();
+        return;
+    }
+    const signature = orangeCheckoutOtpNormalizedPhone(orangeCheckoutOtpCurrentPhoneContext());
+    if (signature !== orangeCheckoutOtpState.lastPhoneSignature) {
+        orangeCheckoutOtpResetForPhone(signature);
+    }
+    orangeCheckoutOtpSyncUi();
+}
+
+async function orangeCheckoutRequestOtp(isResend) {
+    if (orangeCheckoutOtpLoggedIn()) {
+        return;
+    }
+    const T = window.APP_T || {};
+    const ctx = orangeCheckoutOtpCurrentPhoneContext();
+    if (!ctx.hasCountry) {
+        orangeCheckoutOtpSetFeedback(
+            T.phone_country_required || T.checkout_required_fields || '',
+            true
+        );
+        return;
+    }
+    const signature = orangeCheckoutOtpNormalizedPhone(ctx);
+    if (!signature) {
+        orangeCheckoutOtpSetFeedback(
+            T.checkout_invalid_phone || T.storefront_register_invalid_phone || '',
+            true
+        );
+        return;
+    }
+    if (signature !== orangeCheckoutOtpState.lastPhoneSignature) {
+        orangeCheckoutOtpResetForPhone(signature);
+    }
+    orangeCheckoutOtpState.sending = true;
+    orangeCheckoutOtpSyncUi();
+    try {
+        const response = await fetch(
+            storefrontApiUrl('/api/auth/request-checkout-email-otp.php'),
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phone: ctx.phoneRaw,
+                    phone_country: ctx.phoneCountry,
+                    lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
+                    resend: isResend ? 1 : 0,
+                }),
+            }
+        );
+        let data = null;
+        try {
+            data = await response.json();
+        } catch (eJson) {
+            data = null;
+        }
+        if (!data || typeof data !== 'object') {
+            orangeCheckoutOtpSetFeedback(T.api_request_failed || '', true);
+            return;
+        }
+        if (!response.ok || data.success !== true) {
+            orangeCheckoutOtpSetFeedback(
+                orangeCheckoutApiMessage(data) || T.checkout_otp_send_failed || '',
+                true
+            );
+            return;
+        }
+        orangeCheckoutOtpState.requested = true;
+        orangeCheckoutOtpState.maskedEmail = String(data.masked_email || '');
+        const cdSec = parseInt(String(data.cooldown_seconds || 0), 10) || 0;
+        orangeCheckoutOtpState.cooldownUntilMs = cdSec > 0 ? Date.now() + cdSec * 1000 : 0;
+        orangeCheckoutOtpSetFeedback(
+            orangeCheckoutApiMessage(data) || data.message || T.checkout_otp_sent || '',
+            false
+        );
+        orangeCheckoutOtpSyncUi();
+    } catch (eReq) {
+        orangeCheckoutOtpSetFeedback(T.api_request_failed || '', true);
+    } finally {
+        orangeCheckoutOtpState.sending = false;
+        orangeCheckoutOtpSyncUi();
+    }
+}
+
+async function orangeCheckoutVerifyOtp() {
+    if (orangeCheckoutOtpLoggedIn()) {
+        return;
+    }
+    const T = window.APP_T || {};
+    const ctx = orangeCheckoutOtpCurrentPhoneContext();
+    if (!ctx.hasCountry) {
+        orangeCheckoutOtpSetFeedback(
+            T.phone_country_required || T.checkout_required_fields || '',
+            true
+        );
+        return;
+    }
+    const signature = orangeCheckoutOtpNormalizedPhone(ctx);
+    if (!signature) {
+        orangeCheckoutOtpSetFeedback(
+            T.checkout_invalid_phone || T.storefront_register_invalid_phone || '',
+            true
+        );
+        return;
+    }
+    if (signature !== orangeCheckoutOtpState.lastPhoneSignature) {
+        orangeCheckoutOtpResetForPhone(signature);
+        orangeCheckoutOtpSetFeedback(T.checkout_otp_not_requested || '', true);
+        orangeCheckoutOtpSyncUi();
+        return;
+    }
+    const otpEl = document.getElementById('checkoutOtpCode');
+    const otpCodeRaw = otpEl ? String(otpEl.value || '').replace(/\D+/g, '') : '';
+    if (otpCodeRaw.length !== 6) {
+        orangeCheckoutOtpSetFeedback(T.checkout_otp_invalid || '', true);
+        return;
+    }
+    orangeCheckoutOtpState.verifying = true;
+    orangeCheckoutOtpSyncUi();
+    try {
+        const response = await fetch(
+            storefrontApiUrl('/api/auth/verify-checkout-email-otp.php'),
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phone: ctx.phoneRaw,
+                    phone_country: ctx.phoneCountry,
+                    otp: otpCodeRaw,
+                    lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
+                }),
+            }
+        );
+        let data = null;
+        try {
+            data = await response.json();
+        } catch (eJson) {
+            data = null;
+        }
+        if (!data || typeof data !== 'object') {
+            orangeCheckoutOtpSetFeedback(T.api_request_failed || '', true);
+            return;
+        }
+        if (!response.ok || data.success !== true) {
+            let errText = orangeCheckoutApiMessage(data) || T.checkout_otp_invalid || '';
+            if (data.attempts_left != null && Number.isFinite(Number(data.attempts_left))) {
+                const leftTpl = String(T.checkout_otp_attempts_left || '').trim();
+                if (leftTpl) {
+                    errText +=
+                        ' — ' +
+                        leftTpl.replace(/\{count\}/g, String(parseInt(String(data.attempts_left), 10) || 0));
+                }
+            }
+            orangeCheckoutOtpSetFeedback(errText, true);
+            return;
+        }
+
+        orangeCheckoutOtpState.requested = false;
+        orangeCheckoutOtpState.verified = true;
+        orangeCheckoutOtpState.cooldownUntilMs = 0;
+        orangeCheckoutOtpState.maskedEmail =
+            data.account && data.account.masked_email ? String(data.account.masked_email) : '';
+        orangeCheckoutOtpSetLoggedIn(true);
+        if (otpEl) {
+            otpEl.value = '';
+        }
+        const okMsg = orangeCheckoutApiMessage(data) || data.message || T.checkout_otp_verified || '';
+        orangeCheckoutOtpSetFeedback(okMsg, false);
+        orangeCheckoutOtpSyncUi();
+        if (typeof window.orangeShowToast === 'function' && okMsg) {
+            window.orangeShowToast(okMsg, 2800);
+        }
+        orangeScheduleCheckoutPreview();
+        if (typeof window.orangeCartRefreshAccountOrderLists === 'function') {
+            try {
+                await window.orangeCartRefreshAccountOrderLists();
+            } catch (eRef) {
+                /* ignore */
+            }
+        }
+    } catch (eVerify) {
+        orangeCheckoutOtpSetFeedback(T.api_request_failed || '', true);
+    } finally {
+        orangeCheckoutOtpState.verifying = false;
+        orangeCheckoutOtpSyncUi();
+    }
+}
+
+function orangeCheckoutIgnoreOtp() {
+    orangeCheckoutOtpState.ignored = true;
+    orangeCheckoutOtpState.requested = false;
+    orangeCheckoutOtpState.cooldownUntilMs = 0;
+    orangeCheckoutOtpSetFeedback('', false);
+    orangeCheckoutOtpSyncUi();
+}
+
+window.orangeCheckoutRequestOtp = orangeCheckoutRequestOtp;
+window.orangeCheckoutVerifyOtp = orangeCheckoutVerifyOtp;
+window.orangeCheckoutIgnoreOtp = orangeCheckoutIgnoreOtp;
 
 function orangeCheckoutSelectedDeliveryAreaId() {
     const areaEl = document.getElementById('customer_area');
@@ -3189,8 +3572,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (t.id === 'customer_area') {
             orangeScheduleCheckoutPreview();
+            return;
+        }
+        if (t.id === 'customer_phone_country') {
+            orangeCheckoutOtpOnPhoneEdited();
         }
     });
+    const otpPhoneEl = document.getElementById('customer_phone');
+    if (otpPhoneEl) {
+        otpPhoneEl.addEventListener('input', orangeCheckoutOtpOnPhoneEdited);
+    }
+    const otpCodeEl = document.getElementById('checkoutOtpCode');
+    if (otpCodeEl) {
+        otpCodeEl.addEventListener('input', () => {
+            const trimmed = String(otpCodeEl.value || '').replace(/\D+/g, '').slice(0, 6);
+            if (trimmed !== otpCodeEl.value) {
+                otpCodeEl.value = trimmed;
+            }
+        });
+        otpCodeEl.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter') {
+                ev.preventDefault();
+                orangeCheckoutVerifyOtp();
+            }
+        });
+    }
+    orangeCheckoutOtpOnPhoneEdited();
+    setTimeout(orangeCheckoutOtpOnPhoneEdited, 220);
 
     window.orangeCartRefreshAccountOrderLists = orangeCartRefreshAccountOrderLists;
 

@@ -417,13 +417,6 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $langCheckout = 'en';
     }
     orange_storefront_normalize_delivery_area_payload($pdo, $data, $langCheckout);
-    $deliveryFee = isset($data['delivery_fee']) && is_numeric($data['delivery_fee'])
-        ? (float) $data['delivery_fee']
-        : 0.0;
-    if (!is_finite($deliveryFee) || $deliveryFee < 0) {
-        $deliveryFee = 0.0;
-    }
-    $deliveryFee = round($deliveryFee, 4);
 
     require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
 
@@ -480,10 +473,18 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     $hasSfa = orange_table_has_column($pdo, 'orders', 'storefront_account_id');
     $sfaLink = null;
     if ($hasSfa && isset($data['storefront_account_id'])) {
-        $sfaLink = orange_storefront_resolve_order_account_link($pdo, (int) $data['storefront_account_id'], $data['phone']);
+        $sfaLink = orange_storefront_verified_account_id($pdo, (int) $data['storefront_account_id']);
     }
 
     $buyerRegistered = $sfaLink !== null && $sfaLink > 0;
+    $deliveryAreaId = isset($data['delivery_area_id']) ? (int) $data['delivery_area_id'] : 0;
+    $deliveryFee = $deliveryAreaId > 0
+        ? orange_delivery_resolve_checkout_fee($pdo, $deliveryAreaId, $buyerRegistered, $orderCountryId)
+        : 0.0;
+    if (!is_finite($deliveryFee) || $deliveryFee < 0) {
+        $deliveryFee = 0.0;
+    }
+    $deliveryFee = round($deliveryFee, 4);
     $comboPick = orange_cart_combo_best_match($pdo, $validatedItems, $buyerRegistered, $orderCountryId);
     $comboDiscount = $comboPick !== null ? (float) $comboPick['discount'] : 0.0;
     $comboId = $comboPick !== null ? (int) $comboPick['id'] : null;

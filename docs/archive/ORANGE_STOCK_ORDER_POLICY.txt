@@ -122,4 +122,25 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
    - **إزالة التكرار (2026-06-18):** بعد الدمج الكامل، أُزيلت الصفحة المنفصلة `admin/pages/sales_returns_report.php` من النظام، وحُذفت مداخلها من التنقل (`admin/partials/header.php` + `includes/admin_nav_tree.php`) ومن المسارات المسموح بها (`admin/index.php`) وتوجيهات الموارد (`includes/admin_permissions.php`)، وتم تحويل رابط «تقرير مردودات المبيعات» في `admin/pages/channel_analytics.php` إلى تبويب `returns` داخل `sales_reports`.
    - **ترتيب مجموعة «المبيعات والعروض» (2026-06-18):** في القائمة المنسدلة داخل مجموعة التقارير، تم جعل رأس المجموعة **«تقارير المبيعات»** مع الحفاظ على ترتيب العناصر: `تحليل المبيعات` ثم `تحليل القنوات` ثم `تقارير المبيعات` (نقل بند `sales_reports` أسفل `channel_analytics`) في كلٍّ من `admin/partials/header.php` و`includes/admin_nav_tree.php`.
 
+15) سياسة قيمة التوصيل + OTP checkout (قرار تنفيذ 2026-06-18)
+   - **سياسة قيمة التوصيل (3 خيارات حصرية):** `paid_all` (الكل يسدد) / `free_registered` (مجاني للمسجّلين) / `free_all` (مجاني للكل). السياسة تحفظ على مستوى الدولة مع قيمة افتراضية `default_delivery_fee` وتُطبّق اختيارياً على **كل المناطق النشطة** في الدولة الحالية.
+   - **المخطط والمزامنة:** ترحيل v90 في `includes/catalog_schema.php` أضاف:
+     * `countries.default_delivery_fee`, `countries.delivery_fee_policy`
+     * `storefront_accounts.otp_hash`, `otp_expires_at`, `otp_sent_at`, `otp_attempts`, `otp_phone`
+   - **Helpers مشتركة:** `includes/delivery_areas.php`:
+     * قراءة/حفظ سياسة الدولة (`orange_delivery_country_policy_read/save`)
+     * تطبيق القيمة الافتراضية جماعياً على المناطق النشطة (`orange_delivery_apply_default_fee_to_active_areas`)
+     * حسم قيمة التوصيل حسب السياسة + حالة المسجّل في الجلسة (`orange_delivery_resolve_checkout_fee`)
+   - **كارت الأدمن (delivery_areas):**
+     * واجهة الكارت أعلى الصفحة في `admin/pages/delivery_areas.php` (قيمة افتراضية + radio حصري + حفظ + حفظ مع تطبيق جماعي).
+     * API في `admin/api/delivery_areas/manage.php` عبر `get_policy` و`save_policy` داخل transaction؛ وعند إنشاء منطقة جديدة بدون قيمة صريحة تُسحب القيمة الافتراضية للدولة.
+   - **توحيد Session-only للعميل المسجّل:** المنطق لا يثق بأي `storefront_account_id` أو `_buyer_registered` من payload:
+     * `api/orders/create-order.php` ينظف القيم القادمة من العميل ويعتمد جلسة الدخول فقط.
+     * `api/cart/checkout-preview.php` و`includes/order_intake_queue.php` يستخدمان helper موحّد لحسم قيمة التوصيل بنفس قاعدة «المسجّل من الجلسة».
+     * `includes/storefront_account.php` أضاف helpers تحقق حساب موثّق (`orange_storefront_verified_account_id`) وبحث برقم الهاتف لحساب موثّق حسب الدولة (`orange_storefront_verified_account_by_phone`).
+   - **OTP checkout (إرسال يدوي على البريد):**
+     * `api/auth/request-checkout-email-otp.php` (توليد OTP، hash، cooldown، expiry، attempts، إرسال للبريد الموثّق).
+     * `api/auth/verify-checkout-email-otp.php` (تحقق OTP، حد محاولات، تسجيل دخول جلسة، مسح حالة OTP بعد النجاح).
+     * `pages/cart.php` + `assets/js/cart.js`: زر إرسال OTP يدوي، إدخال/تحقق OTP، إعادة إرسال، تجاهل تسجيل الدخول، ثم إعادة حساب `checkout-preview` فور نجاح التحقق لضمان ظهور مزايا المسجّل بنفس إجمالي التنفيذ.
+
 Agreed with project owner for Orange implementation.

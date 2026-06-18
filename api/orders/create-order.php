@@ -26,6 +26,17 @@ try {
     if (!preg_match('/^(ar|en|fil|hi)$/', $langCo)) {
         $langCo = 'en';
     }
+    // Session-only policy: ignore any storefront_account_id from client payload.
+    unset($data['storefront_account_id']);
+    unset($data['_buyer_registered']);
+    $accSf = current_storefront_account($pdo);
+    $sessionAccountId = $accSf && !empty($accSf['id']) ? (int) $accSf['id'] : 0;
+    if ($sessionAccountId > 0) {
+        $data['storefront_account_id'] = $sessionAccountId;
+        $data['_buyer_registered'] = 1;
+    } else {
+        $data['_buyer_registered'] = 0;
+    }
     try {
         orange_storefront_normalize_delivery_area_payload($pdo, $data, $langCo);
     } catch (RuntimeException $e) {
@@ -54,13 +65,6 @@ try {
     $phoneParts = orange_storefront_phone_storage_parts($phoneRawIn, $dialForNational);
     $data['phone_country_dial'] = $phoneParts['country_dial'];
     $data['phone_national'] = $phoneParts['national'];
-
-    $accSf = current_storefront_account($pdo);
-    if ($accSf && !empty($accSf['customer_phone'])) {
-        if (orange_order_phones_match_for_lookup($data['phone'], (string) $accSf['customer_phone'])) {
-            $data['storefront_account_id'] = (int) $accSf['id'];
-        }
-    }
 
     if (!is_array($data['items']) || count($data['items']) === 0) {
         json_response(['success' => false, 'code' => 'cart_items_required', 'message' => t('checkout_cart_items_required')], 422);

@@ -125,6 +125,32 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                         <input id="customer_phone" class="js-orange-phone-input" type="tel" autocomplete="tel" inputmode="numeric" maxlength="22" data-orange-national-phone="customer_phone_country" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" required>
                     </div>
                 </div>
+                <?php if (!$cartSfLoggedIn): ?>
+                <div id="checkoutOtpQuickLogin" class="field cart-otp-quick-login" hidden>
+                    <p id="checkoutOtpHint" class="cart-checkout-intro" style="margin:0 0 0.5rem;"></p>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                        <button type="button" class="btn btn-secondary" id="checkoutOtpSendBtn" onclick="orangeCheckoutRequestOtp(false)">
+                            <?php echo htmlspecialchars(t('checkout_otp_send_btn'), ENT_QUOTES, 'UTF-8'); ?>
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="checkoutOtpResendBtn" onclick="orangeCheckoutRequestOtp(true)" hidden>
+                            <?php echo htmlspecialchars(t('checkout_otp_resend_btn'), ENT_QUOTES, 'UTF-8'); ?>
+                        </button>
+                        <button type="button" class="btn btn-ghost" id="checkoutOtpIgnoreBtn" onclick="orangeCheckoutIgnoreOtp()">
+                            <?php echo htmlspecialchars(t('checkout_otp_ignore_btn'), ENT_QUOTES, 'UTF-8'); ?>
+                        </button>
+                    </div>
+                    <div id="checkoutOtpVerifyWrap" style="margin-top:0.6rem;" hidden>
+                        <label for="checkoutOtpCode"><?php echo htmlspecialchars(t('checkout_otp_code_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                            <input id="checkoutOtpCode" type="text" inputmode="numeric" maxlength="6" dir="ltr" lang="en" autocomplete="one-time-code" placeholder="<?php echo htmlspecialchars(t('checkout_otp_code_placeholder'), ENT_QUOTES, 'UTF-8'); ?>">
+                            <button type="button" class="btn btn-secondary" id="checkoutOtpVerifyBtn" onclick="orangeCheckoutVerifyOtp()">
+                                <?php echo htmlspecialchars(t('checkout_otp_verify_btn'), ENT_QUOTES, 'UTF-8'); ?>
+                            </button>
+                        </div>
+                    </div>
+                    <p id="checkoutOtpFeedback" class="cart-checkout-intro" style="margin:0.5rem 0 0;" role="status" aria-live="polite" hidden></p>
+                </div>
+                <?php endif; ?>
                 <div class="field">
                     <label for="customer_email"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?> <span class="form-optional-hint">(<?php echo htmlspecialchars(t('field_optional_short'), ENT_QUOTES, 'UTF-8'); ?>)</span></label>
                     <input id="customer_email" type="email" autocomplete="email" maxlength="255" dir="ltr" lang="en">
