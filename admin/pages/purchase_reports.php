@@ -880,26 +880,27 @@ $filterSubtitle = implode(' — ', $subtitleParts);
             <?php endif; ?>
         </div>
 
-        <?php if ($reportKey === 'items' || $reportKey === 'suppliers'): ?>
-            <div class="prr-options-row">
-                <?php if ($reportKey === 'items'): ?>
-                    <div class="prr-items-zero-wrap">
-                        <label class="prr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
-                            <input type="checkbox" name="hz" value="1" <?php echo $hideZero ? 'checked' : ''; ?>>
-                            إخفاء الصافي صفر
-                        </label>
-                    </div>
-                <?php endif; ?>
-                <?php if ($reportKey === 'suppliers'): ?>
-                    <div class="prr-suppliers-detail-wrap">
-                        <label class="prr-suppliers-detail-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
-                            <input type="checkbox" name="supplier_detail" value="1" <?php echo $supplierDetailed ? 'checked' : ''; ?>>
-                            تقرير تفصيلي
-                        </label>
-                    </div>
-                <?php endif; ?>
-            </div>
-        <?php endif; ?>
+        <div class="prr-options-row<?php echo ($reportKey !== 'items' && $reportKey !== 'suppliers') ? ' is-empty' : ''; ?>">
+            <?php if ($reportKey === 'items'): ?>
+                <div class="prr-items-zero-wrap">
+                    <label class="prr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
+                        <input type="checkbox" name="hz" value="1" <?php echo $hideZero ? 'checked' : ''; ?>>
+                        إخفاء الصافي صفر
+                    </label>
+                </div>
+            <?php endif; ?>
+            <?php if ($reportKey === 'suppliers'): ?>
+                <div class="prr-suppliers-detail-wrap">
+                    <label class="prr-suppliers-detail-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
+                        <input type="checkbox" name="supplier_detail" value="1" <?php echo $supplierDetailed ? 'checked' : ''; ?>>
+                        تقرير تفصيلي
+                    </label>
+                </div>
+            <?php endif; ?>
+            <?php if ($reportKey !== 'items' && $reportKey !== 'suppliers'): ?>
+                <span class="prr-options-placeholder" aria-hidden="true">&nbsp;</span>
+            <?php endif; ?>
+        </div>
 
         <div class="prr-print-actions">
             <button type="submit">عرض</button>
@@ -1308,19 +1309,28 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 .prr-filter-form .prr-options-row {
     flex-basis: 100%;
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 10px;
-    align-items: flex-end;
+    align-items: center;
+    min-height: 2.1rem;
+    overflow-x: auto;
+}
+.prr-filter-form .prr-options-row.is-empty {
+    pointer-events: none;
+}
+.prr-filter-form .prr-options-placeholder {
+    display: inline-block;
+    width: 1px;
+    height: 1.6rem;
+    opacity: 0;
 }
 .prr-filter-form .prr-items-zero-wrap {
     display: flex;
     align-items: center;
-    padding-bottom: 2px;
 }
 .prr-filter-form .prr-suppliers-detail-wrap {
     display: flex;
     align-items: center;
-    padding-bottom: 2px;
 }
 .prr-filter-form .prr-print-actions {
     display: flex;
