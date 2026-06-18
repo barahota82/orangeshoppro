@@ -37,13 +37,13 @@ function orange_admin_resource_screen_hints(): array
     return [
         'dashboard' => 'الرئيسية',
         'catalog' => 'الأقسام، فروع الشجرة، أنواع المنتجات، سمات الكتالوج، قاموس الألوان، أنماط الألوان، قوالب/عائلات المقاسات، دليل المقاس الاسترشادي',
-        'products' => 'المنتجات، عروض المنتجات',
+        'products' => 'المنتجات، عروض المنتجات، عروض التوصيل',
         'sales' => 'العملاء (عرض الطلبات)، الطلبات، الطلبات المحجوزة، طابور الطلبات، مناديب التوصيل، تسليم المندوب، فواتير أونلاين/مبيعات، فاتورة مبيعات، مردود المبيعات، إنشاء قيود التسليم',
         'warehouse' => 'المستودع، أرصدة أول المدة المخزنية، تسوية المخزون / الجرد، الموردين، المشتريات، مردود المشتريات، تقارير المخزن، تقارير المشتريات',
         'accounting' => 'الدليل المحاسبي، حسابات القيود، السنوات المالية، أرصدة أول المدة المالية، سندات القبض/الصرف/القيد، قيود الإقفال، إقفال التعديلات، التقارير المالية، ميزان المراجعة، أرباح وخسائر، تسوية البنك، كشف حساب…',
         'partners' => 'العملاء، الموردين، سداد فواتير آجلة، أرصدة ذمم العملاء/الموردين',
         'reports' => 'تقارير المبيعات، تحليل القنوات، سجل النشاط',
-        'settings' => 'بيانات الشركة، الدول، قنوات العملاء، مناطق التوصيل، بانر المتجر، عروض السلة والتوصيل (مجموع/توصيل/هدايا/BOGO/كومبو)، دمج هاتف التسجيل، أرشيف المستندات',
+        'settings' => 'بيانات الشركة، الدول، قنوات العملاء، مناطق التوصيل، بانر المتجر، عروض السلة (مجموع/هدايا/BOGO/كومبو)، دمج هاتف التسجيل، أرشيف المستندات',
         'admin_users' => 'المستخدمون والصلاحيات (مشرف عام فقط)',
     ];
 }
@@ -138,7 +138,7 @@ function orange_admin_page_resource(string $page): string
         'storefront_merge_requests' => 'settings',
         'delivery_areas' => 'settings',
         'cart_promotions' => 'settings',
-        'delivery_promotions' => 'settings',
+        'delivery_promotions' => 'products',
         'cart_gift_promotions' => 'settings',
         'cart_bogo_promotions' => 'settings',
         'cart_combo_promotions' => 'settings',
@@ -196,7 +196,7 @@ function orange_admin_api_folder_resource(string $folder): string
         'company_documents' => 'settings',
         'delivery_areas' => 'settings',
         'cart_promotions' => 'settings',
-        'delivery_promotions' => 'settings',
+        'delivery_promotions' => 'products',
         'cart_gift_promotions' => 'settings',
         'cart_bogo_promotions' => 'settings',
         'cart_combo_promotions' => 'settings',

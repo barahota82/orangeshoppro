@@ -165,9 +165,9 @@ function orange_admin_permission_mega_sections(): array
                 [
                     'title' => 'العروض',
                     'pages' => [
+                        ['page' => 'delivery_promotions', 'label' => 'عروض التوصيل'],
                         ['page' => 'offers', 'label' => 'عروض المنتجات'],
                         ['page' => 'cart_promotions', 'label' => 'عروض مجموع السلة'],
-                        ['page' => 'delivery_promotions', 'label' => 'عروض التوصيل'],
                         ['page' => 'cart_gift_promotions', 'label' => 'عروض الهدايا'],
                         ['page' => 'cart_bogo_promotions', 'label' => 'عروض BOGO'],
                         ['page' => 'cart_combo_promotions', 'label' => 'عروض الكومبو'],

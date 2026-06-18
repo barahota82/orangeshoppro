@@ -363,6 +363,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'group' => true,
                     'title' => 'العروض',
                     'items' => [
+                        ['page' => 'delivery_promotions', 'href' => '/admin/index.php?page=delivery_promotions', 'label' => 'عروض التوصيل', 'class' => '', 'sub' => false],
                         ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'عروض المنتجات', 'class' => '', 'sub' => false],
                         ['page' => 'cart_promotions', 'href' => '/admin/index.php?page=cart_promotions', 'label' => 'عروض مجموع السلة', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'cart_gift_promotions', 'href' => '/admin/index.php?page=cart_gift_promotions', 'label' => 'عروض الهدايا', 'class' => 'admin-nav-sub', 'sub' => true],
