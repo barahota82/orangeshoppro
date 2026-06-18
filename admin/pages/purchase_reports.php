@@ -694,7 +694,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
         </div>
 
         <?php if (in_array($reportKey, ['invoices', 'returns', 'suppliers', 'items', 'monthly'], true)): ?>
-            <div>
+            <div class="prr-supplier-field-wrap">
                 <label for="prr_supplier_name">المورد (دبل كليك للاختيار)</label>
                 <div style="display:flex;gap:6px;align-items:center;">
                     <input type="hidden" id="prr_supplier_id" name="supplier_id" value="<?php echo (int) $supplierId; ?>">
@@ -737,7 +737,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
             </div>
         <?php endif; ?>
 
-        <div class="prr-print-actions" style="display:flex;gap:8px;align-items:center;<?php echo $reportKey === 'items' ? 'flex-basis:100%;justify-content:flex-end;' : 'margin-inline-start:auto;'; ?>">
+        <div class="prr-print-actions">
             <button type="submit">عرض</button>
             <button type="button" class="btn-secondary" data-orange-perm="print" onclick="window.print()">طباعة</button>
         </div>
@@ -1066,8 +1066,15 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 .prr-filter-form.is-items .prr-items-zero-wrap {
     padding-bottom: 2px;
 }
-.prr-filter-form.is-items .prr-print-actions {
-    margin-inline-start: 0 !important;
+.prr-filter-form .prr-print-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-basis: 100%;
+    justify-content: flex-end;
+}
+.prr-filter-form:not(.is-items) .prr-supplier-field-wrap {
+    flex-basis: 100%;
 }
 .prr-doc-table {
     table-layout: fixed;
