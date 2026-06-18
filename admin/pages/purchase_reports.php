@@ -337,6 +337,7 @@ try {
             $disc = (float) ($r['discount_amount'] ?? 0);
             $net = (float) ($r['net_amount'] ?? 0);
             $rows[] = [
+                'purchase_id' => (int) ($r['id'] ?? 0),
                 'reference' => 'PUR-' . (int) ($r['id'] ?? 0),
                 'date' => (string) ($r['doc_date'] ?? ''),
                 'supplier' => (string) ($r['supplier_name'] ?? ''),
@@ -345,6 +346,7 @@ try {
                 'subtotal' => $sub,
                 'discount' => $disc,
                 'net' => $net,
+                'doc_url' => storefront_public_path('/admin/index.php?page=purchases&purchase_id=' . (int) ($r['id'] ?? 0)),
             ];
             $invoiceSummary['count']++;
             $invoiceSummary['subtotal'] += $sub;
@@ -364,7 +366,9 @@ try {
         $purchaseRefExpr = $hasRetPurchaseId
             ? "CASE WHEN pr.purchase_id IS NOT NULL AND pr.purchase_id > 0 THEN CONCAT('PUR-', pr.purchase_id) ELSE '' END"
             : "''";
-        $sql = 'SELECT ' . $returnRefExpr . ' AS return_reference, ' . $purchaseRefExpr . ' AS purchase_reference,
+        $sql = 'SELECT COALESCE(pr.id, 0) AS return_id,
+                       ' . ($hasRetPurchaseId ? 'COALESCE(pr.purchase_id, 0)' : '0') . ' AS purchase_id,
+                       ' . $returnRefExpr . ' AS return_reference, ' . $purchaseRefExpr . ' AS purchase_reference,
                        ' . $dateSql . ' AS doc_date,
                        COALESCE(s.name, \'\') AS supplier_name,
                        COALESCE(pr.type, \'\') AS return_type,
@@ -390,6 +394,7 @@ try {
             $disc = (float) ($r['discount_amount'] ?? 0);
             $net = (float) ($r['net_amount'] ?? 0);
             $rows[] = [
+                'return_id' => (int) ($r['return_id'] ?? 0),
                 'reference' => (string) ($r['return_reference'] ?? ''),
                 'purchase_reference' => (string) ($r['purchase_reference'] ?? ''),
                 'date' => (string) ($r['doc_date'] ?? ''),
@@ -398,6 +403,12 @@ try {
                 'subtotal' => $sub,
                 'discount' => $disc,
                 'net' => $net,
+                'doc_url' => (int) ($r['return_id'] ?? 0) > 0
+                    ? storefront_public_path('/admin/index.php?page=purchase_returns&purchase_return_id=' . (int) ($r['return_id'] ?? 0))
+                    : '',
+                'purchase_doc_url' => (int) ($r['purchase_id'] ?? 0) > 0
+                    ? storefront_public_path('/admin/index.php?page=purchases&purchase_id=' . (int) ($r['purchase_id'] ?? 0))
+                    : '',
             ];
             $returnSummary['count']++;
             $returnSummary['subtotal'] += $sub;
@@ -458,6 +469,8 @@ try {
                         'subtotal' => $subtotal,
                         'discount' => $discount,
                         'net' => $net,
+                        'invoice_url' => storefront_public_path('/admin/index.php?page=purchases&purchase_id=' . (int) ($r['id'] ?? 0)),
+                        'reference_url' => '',
                     ];
                     $supplierSummary['purchase_count']++;
                     $supplierSummary['purchase_net'] += $net;
@@ -478,6 +491,8 @@ try {
                 $subtotalExpr = $hasRetSubtotal ? 'COALESCE(pr.subtotal, pr.total, 0)' : 'COALESCE(pr.total, 0)';
                 $discountExpr = $hasRetDiscount ? 'COALESCE(pr.invoice_discount_amount, 0)' : '0';
                 $sql = 'SELECT COALESCE(pr.supplier_id, 0) AS sid,
+                               COALESCE(pr.id, 0) AS return_id,
+                               ' . ($hasRetPurchaseId ? 'COALESCE(pr.purchase_id, 0)' : '0') . ' AS purchase_id,
                                ' . $dateSql . ' AS doc_date,
                                ' . $returnRefExpr . ' AS return_reference,
                                ' . $purchaseRefExpr . ' AS purchase_reference,
@@ -525,6 +540,12 @@ try {
                         'subtotal' => $subtotal,
                         'discount' => $discount,
                         'net' => $net,
+                        'invoice_url' => (int) ($r['purchase_id'] ?? 0) > 0
+                            ? storefront_public_path('/admin/index.php?page=purchases&purchase_id=' . (int) ($r['purchase_id'] ?? 0))
+                            : '',
+                        'reference_url' => (int) ($r['return_id'] ?? 0) > 0
+                            ? storefront_public_path('/admin/index.php?page=purchase_returns&purchase_return_id=' . (int) ($r['return_id'] ?? 0))
+                            : '',
                     ];
                     $supplierSummary['return_count']++;
                     $supplierSummary['return_net'] += abs($net);
@@ -1161,7 +1182,13 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         <tr><td colspan="8" class="muted">لا توجد فواتير مشتريات في المدى المحدد.</td></tr>
                     <?php else: foreach ($rows as $r): ?>
                         <tr>
-                            <td dir="ltr"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr">
+                                <?php if ((string) ($r['doc_url'] ?? '') !== ''): ?>
+                                    <a href="<?php echo htmlspecialchars((string) $r['doc_url'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></a>
+                                <?php else: ?>
+                                    <?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?>
+                                <?php endif; ?>
+                            </td>
                             <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY((string) $r['date']), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) $r['supplier'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td dir="ltr"><?php echo htmlspecialchars((string) $r['supplier_invoice'], ENT_QUOTES, 'UTF-8'); ?></td>
@@ -1198,10 +1225,22 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         <tr><td colspan="8" class="muted">لا توجد مردودات مشتريات في المدى المحدد.</td></tr>
                     <?php else: foreach ($rows as $r): ?>
                         <tr>
-                            <td dir="ltr"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr">
+                                <?php if ((string) ($r['doc_url'] ?? '') !== ''): ?>
+                                    <a href="<?php echo htmlspecialchars((string) $r['doc_url'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></a>
+                                <?php else: ?>
+                                    <?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?>
+                                <?php endif; ?>
+                            </td>
                             <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY((string) $r['date']), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) $r['supplier'], ENT_QUOTES, 'UTF-8'); ?></td>
-                            <td dir="ltr"><?php echo htmlspecialchars((string) $r['purchase_reference'], ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr">
+                                <?php if ((string) ($r['purchase_doc_url'] ?? '') !== '' && (string) ($r['purchase_reference'] ?? '') !== ''): ?>
+                                    <a href="<?php echo htmlspecialchars((string) $r['purchase_doc_url'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $r['purchase_reference'], ENT_QUOTES, 'UTF-8'); ?></a>
+                                <?php else: ?>
+                                    <?php echo htmlspecialchars((string) $r['purchase_reference'], ENT_QUOTES, 'UTF-8'); ?>
+                                <?php endif; ?>
+                            </td>
                             <td><?php echo htmlspecialchars($purchaseTypeLabel((string) $r['type']), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['subtotal']); ?></td>
                             <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['discount']); ?></td>
@@ -1238,8 +1277,20 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                             <tr>
                                 <td><?php echo htmlspecialchars((string) $r['supplier'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars((string) $r['doc_type'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td dir="ltr"><?php echo htmlspecialchars((string) $r['invoice_number'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td dir="ltr"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr">
+                                    <?php if ((string) ($r['invoice_url'] ?? '') !== '' && (string) ($r['invoice_number'] ?? '') !== '—'): ?>
+                                        <a href="<?php echo htmlspecialchars((string) $r['invoice_url'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $r['invoice_number'], ENT_QUOTES, 'UTF-8'); ?></a>
+                                    <?php else: ?>
+                                        <?php echo htmlspecialchars((string) $r['invoice_number'], ENT_QUOTES, 'UTF-8'); ?>
+                                    <?php endif; ?>
+                                </td>
+                                <td dir="ltr">
+                                    <?php if ((string) ($r['reference_url'] ?? '') !== '' && (string) ($r['reference'] ?? '') !== '—'): ?>
+                                        <a href="<?php echo htmlspecialchars((string) $r['reference_url'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></a>
+                                    <?php else: ?>
+                                        <?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?>
+                                    <?php endif; ?>
+                                </td>
                                 <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY((string) $r['date']), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['subtotal']); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['discount']); ?></td>

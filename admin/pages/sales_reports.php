@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/sales_return_analytics.php';
+require_once __DIR__ . '/../../includes/report_export.php';
 
 $pdo = orange_admin_page_pdo();
 $countryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
@@ -26,6 +27,11 @@ $tab = isset($_GET['r']) ? (string) $_GET['r'] : 'invoices';
 if (!isset($tabs[$tab])) {
     $tab = 'invoices';
 }
+$exportMode = isset($_GET['export']) ? strtolower(trim((string) $_GET['export'])) : '';
+if (!in_array($exportMode, ['csv', 'xls'], true)) {
+    $exportMode = '';
+}
+$returnsServerExport = $tab === 'returns' && $exportMode !== '';
 
 $parseDate = static function (string $raw): ?string {
     $ymd = orange_parse_admin_date_to_ymd(trim($raw));
@@ -213,6 +219,7 @@ $hasSrReturnNumber = $hasSalesReturns && orange_table_has_column($pdo, 'sales_re
 $hasSrCustomerId = $hasSalesReturns && orange_table_has_column($pdo, 'sales_returns', 'customer_id');
 $hasSrType = $hasSalesReturns && orange_table_has_column($pdo, 'sales_returns', 'type');
 $hasSrChannelId = $hasSalesReturns && orange_table_has_column($pdo, 'sales_returns', 'channel_id');
+$hasSrNotes = $hasSalesReturns && orange_table_has_column($pdo, 'sales_returns', 'notes');
 
 $hasSriVariant = $hasSalesReturnItems && orange_table_has_column($pdo, 'sales_return_items', 'variant_id');
 $hasSriLineDiscount = $hasSalesReturnItems && orange_table_has_column($pdo, 'sales_return_items', 'line_discount');
@@ -413,6 +420,10 @@ $applyReturnChannelFilter = static function (string &$sql, array &$params) use (
 $rows = [];
 $invoiceSummary = ['count' => 0, 'subtotal' => 0.0, 'discount' => 0.0, 'net' => 0.0];
 $returnSummary = ['count' => 0, 'total' => 0.0];
+$returnSourceBuckets = [];
+$returnPaymentBuckets = [];
+$returnChannelBuckets = [];
+$returnTopProducts = [];
 $customerSummary = ['sales_count' => 0, 'sales_total' => 0.0, 'return_count' => 0, 'return_total' => 0.0, 'net' => 0.0];
 $customerDetailSummary = ['sales_count' => 0, 'sales_total' => 0.0, 'return_count' => 0, 'return_total' => 0.0, 'net' => 0.0];
 $itemSummary = ['sales_qty' => 0.0, 'sales_value' => 0.0, 'return_qty' => 0.0, 'return_value' => 0.0, 'net_qty' => 0.0, 'net_value' => 0.0];
@@ -438,7 +449,8 @@ try {
                 ? "COALESCE(NULLIF(TRIM(o.invoice_number),''), NULLIF(TRIM(o.order_number),''), CONCAT('ORD-', o.id))"
                 : "COALESCE(NULLIF(TRIM(o.invoice_number),''), CONCAT('ORD-', o.id))")
             : ($hasOrdOrderNumber ? "COALESCE(NULLIF(TRIM(o.order_number),''), CONCAT('ORD-', o.id))" : "CONCAT('ORD-', o.id)");
-        $sql = 'SELECT ' . $referenceExpr . ' AS reference,
+        $sql = 'SELECT o.id AS order_id,
+                       ' . $referenceExpr . ' AS reference,
                        ' . $dateSql . ' AS doc_date,
                        ' . ($hasOrdCustomerId ? 'COALESCE(o.customer_id,0)' : '0') . ' AS customer_id,
                        ' . ($hasOrdCustomerName ? "COALESCE(o.customer_name,'')" : "''") . ' AS customer_name_raw,
@@ -479,15 +491,29 @@ try {
             $sub = (float) ($r['subtotal_amount'] ?? 0);
             $net = (float) ($r['net_amount'] ?? 0);
             $disc = $sub > $net ? ($sub - $net) : 0.0;
+            $src = $resolveOrderSource($r);
+            $orderIdForLink = (int) ($r['order_id'] ?? 0);
+            $docUrl = '';
+            if ($orderIdForLink > 0) {
+                if ($src === 'company') {
+                    $docUrl = storefront_public_path('/admin/index.php?page=company_sales_invoice&order_id=' . $orderIdForLink);
+                } elseif ($src === 'online') {
+                    $docUrl = storefront_public_path('/admin/index.php?page=online_sales_invoice&order_id=' . $orderIdForLink);
+                } else {
+                    $docUrl = storefront_public_path('/admin/index.php?page=sales_invoices&order_id=' . $orderIdForLink);
+                }
+            }
             $rows[] = [
+                'order_id' => $orderIdForLink,
                 'reference' => (string) ($r['reference'] ?? ''),
                 'date' => (string) ($r['doc_date'] ?? ''),
                 'customer' => $customerName,
-                'source' => (string) ($r['source_kind'] ?? ''),
+                'source' => $src,
                 'payment' => (string) ($r['pay_type'] ?? ''),
                 'subtotal' => $sub,
                 'discount' => $disc,
                 'net' => $net,
+                'doc_url' => $docUrl,
             ];
             $invoiceSummary['count']++;
             $invoiceSummary['subtotal'] += $sub;
@@ -502,14 +528,20 @@ try {
         $referenceExpr = $hasSrReturnNumber
             ? "COALESCE(NULLIF(TRIM(sr.return_number),''), CONCAT('SR-', sr.id))"
             : "CONCAT('SR-', sr.id)";
-        $sql = 'SELECT ' . $referenceExpr . ' AS reference,
+        $joinChannel = ($hasChannels && $hasSrChannelId) ? ' LEFT JOIN channels ch ON ch.id = sr.channel_id' : '';
+        $sql = 'SELECT sr.id AS return_id,
+                       ' . $referenceExpr . ' AS reference,
                        ' . $dateSql . ' AS doc_date,
                        ' . ($hasSrCustomerId ? 'COALESCE(sr.customer_id,0)' : '0') . ' AS customer_id,
                        ' . ($hasSrInvoiceRef ? "COALESCE(sr.invoice_reference,'')" : "''") . ' AS invoice_reference,
                        ' . ($hasSrSourceKind ? "COALESCE(sr.source_kind,'')" : "''") . ' AS source_kind,
                        ' . ($hasSrType ? "COALESCE(sr.type,'cash')" : "'cash'") . ' AS pay_type,
+                       ' . ($hasSrChannelId ? 'COALESCE(sr.channel_id,0)' : '0') . ' AS channel_id,
+                       ' . ($hasChannels && $hasSrChannelId ? "COALESCE(ch.name,'')" : "''") . ' AS channel_name_db,
+                       ' . ($hasSrNotes ? "COALESCE(sr.notes,'')" : "''") . ' AS notes,
                        COALESCE(sr.total,0) AS total_amount
                 FROM sales_returns sr
+                ' . $joinChannel . '
                 WHERE 1=1'
             . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
             . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
@@ -531,18 +563,89 @@ try {
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $cid = (int) ($r['customer_id'] ?? 0);
             $customerName = $cid > 0 && isset($customerMap[$cid]) ? (string) $customerMap[$cid]['name'] : ($cid > 0 ? ('#' . $cid) : 'غير محدد');
+            $src = $resolveReturnSource($r);
+            $channelId = (int) ($r['channel_id'] ?? 0);
+            $channelNameDb = (string) ($r['channel_name_db'] ?? '');
+            $channelLabel = $marketingLabel($channelId > 0 ? $channelId : null, $channelNameDb, $src);
+            $returnIdForLink = (int) ($r['return_id'] ?? 0);
+            $docUrl = $returnIdForLink > 0
+                ? storefront_public_path('/admin/index.php?page=sales_returns&sales_return_id=' . $returnIdForLink)
+                : '';
             $rows[] = [
+                'return_id' => $returnIdForLink,
                 'reference' => (string) ($r['reference'] ?? ''),
                 'date' => (string) ($r['doc_date'] ?? ''),
                 'customer' => $customerName,
                 'invoice_reference' => (string) ($r['invoice_reference'] ?? ''),
-                'source' => $resolveReturnSource($r),
+                'source' => $src,
                 'payment' => (string) ($r['pay_type'] ?? 'cash'),
+                'channel' => $channelLabel,
+                'notes' => (string) ($r['notes'] ?? ''),
                 'total' => (float) ($r['total_amount'] ?? 0),
+                'doc_url' => $docUrl,
             ];
             $returnSummary['count']++;
             $returnSummary['total'] += (float) ($r['total_amount'] ?? 0);
+
+            $sourceBucketLabel = orange_sales_return_source_kind_label($src);
+            if (!isset($returnSourceBuckets[$sourceBucketLabel])) {
+                $returnSourceBuckets[$sourceBucketLabel] = ['label' => $sourceBucketLabel, 'count' => 0, 'total' => 0.0];
+            }
+            $returnSourceBuckets[$sourceBucketLabel]['count']++;
+            $returnSourceBuckets[$sourceBucketLabel]['total'] += (float) ($r['total_amount'] ?? 0);
+
+            $paymentBucketLabel = orange_sales_return_payment_type_label((string) ($r['pay_type'] ?? 'cash'));
+            if (!isset($returnPaymentBuckets[$paymentBucketLabel])) {
+                $returnPaymentBuckets[$paymentBucketLabel] = ['label' => $paymentBucketLabel, 'count' => 0, 'total' => 0.0];
+            }
+            $returnPaymentBuckets[$paymentBucketLabel]['count']++;
+            $returnPaymentBuckets[$paymentBucketLabel]['total'] += (float) ($r['total_amount'] ?? 0);
+
+            $channelBucketLabel = $channelLabel !== '' ? $channelLabel : '— بلا قناة —';
+            if (!isset($returnChannelBuckets[$channelBucketLabel])) {
+                $returnChannelBuckets[$channelBucketLabel] = ['label' => $channelBucketLabel, 'count' => 0, 'total' => 0.0];
+            }
+            $returnChannelBuckets[$channelBucketLabel]['count']++;
+            $returnChannelBuckets[$channelBucketLabel]['total'] += (float) ($r['total_amount'] ?? 0);
         }
+
+        if ($hasSalesReturnItems) {
+            $lineDiscountExpr = $hasSriLineDiscount ? 'COALESCE(sri.line_discount, 0)' : '0';
+            $sqlProd = 'SELECT ' . $productNameExpr . ' AS product_label,
+                               COALESCE(SUM(COALESCE(sri.qty,0)),0) AS qty_sum,
+                               COALESCE(SUM((COALESCE(sri.qty,0) * COALESCE(sri.price,0)) - ' . $lineDiscountExpr . '),0) AS line_total
+                        FROM sales_return_items sri
+                        INNER JOIN sales_returns sr ON sr.id = sri.sales_return_id
+                        LEFT JOIN products p ON p.id = sri.product_id
+                        WHERE 1=1'
+                . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
+                . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
+            $paramsProd = [$from, $to];
+            $applyReturnSourceFilter($sqlProd, $paramsProd);
+            $applyReturnPayFilter($sqlProd, $paramsProd);
+            $applyReturnChannelFilter($sqlProd, $paramsProd);
+            if ($customerId > 0 && $hasSrCustomerId) {
+                $sqlProd .= ' AND sr.customer_id = ?';
+                $paramsProd[] = $customerId;
+            }
+            if ($productId > 0) {
+                $sqlProd .= ' AND sri.product_id = ?';
+                $paramsProd[] = $productId;
+            }
+            $sqlProd .= ' GROUP BY sri.product_id, product_label
+                          ORDER BY line_total DESC
+                          LIMIT 25';
+            $stProd = $pdo->prepare($sqlProd);
+            $stProd->execute($paramsProd);
+            $returnTopProducts = $stProd->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+
+        $returnSourceBuckets = array_values($returnSourceBuckets);
+        usort($returnSourceBuckets, static fn(array $a, array $b): int => ($b['total'] <=> $a['total']) ?: ($b['count'] <=> $a['count']));
+        $returnPaymentBuckets = array_values($returnPaymentBuckets);
+        usort($returnPaymentBuckets, static fn(array $a, array $b): int => ($b['total'] <=> $a['total']) ?: ($b['count'] <=> $a['count']));
+        $returnChannelBuckets = array_values($returnChannelBuckets);
+        usort($returnChannelBuckets, static fn(array $a, array $b): int => ($b['total'] <=> $a['total']) ?: ($b['count'] <=> $a['count']));
     } elseif ($tab === 'customers') {
         if ($customerDetailed) {
             $detailRows = [];
@@ -555,7 +658,8 @@ try {
                         : "COALESCE(NULLIF(TRIM(o.invoice_number),''), CONCAT('ORD-', o.id))")
                     : ($hasOrdOrderNumber ? "COALESCE(NULLIF(TRIM(o.order_number),''), CONCAT('ORD-', o.id))" : "CONCAT('ORD-', o.id)");
                 $joinChannel = ($hasChannels && $hasOrdChannelId) ? ' LEFT JOIN channels ch ON ch.id = o.channel_id' : '';
-                $sql = 'SELECT ' . $referenceExpr . ' AS reference,
+                $sql = 'SELECT o.id AS order_id,
+                               ' . $referenceExpr . ' AS reference,
                                ' . $dateSql . ' AS doc_date,
                                ' . ($hasOrdCustomerId ? 'COALESCE(o.customer_id,0)' : '0') . ' AS customer_id,
                                ' . ($hasOrdCustomerName ? "COALESCE(o.customer_name,'')" : "''") . ' AS customer_name_raw,
@@ -596,6 +700,17 @@ try {
                     }
                     $src = $resolveOrderSource($r);
                     $amount = (float) ($r['net_amount'] ?? 0);
+                    $orderIdForLink = (int) ($r['order_id'] ?? 0);
+                    $docUrl = '';
+                    if ($orderIdForLink > 0) {
+                        if ($src === 'company') {
+                            $docUrl = storefront_public_path('/admin/index.php?page=company_sales_invoice&order_id=' . $orderIdForLink);
+                        } elseif ($src === 'online') {
+                            $docUrl = storefront_public_path('/admin/index.php?page=online_sales_invoice&order_id=' . $orderIdForLink);
+                        } else {
+                            $docUrl = storefront_public_path('/admin/index.php?page=sales_invoices&order_id=' . $orderIdForLink);
+                        }
+                    }
                     $detailRows[] = [
                         'customer' => $customerName,
                         'doc_type' => 'فاتورة مبيعات',
@@ -610,6 +725,7 @@ try {
                         ),
                         'invoice_reference' => '',
                         'amount' => $amount,
+                        'doc_url' => $docUrl,
                     ];
                     $customerDetailSummary['sales_count']++;
                     $customerDetailSummary['sales_total'] += $amount;
@@ -623,7 +739,8 @@ try {
                     ? "COALESCE(NULLIF(TRIM(sr.return_number),''), CONCAT('SR-', sr.id))"
                     : "CONCAT('SR-', sr.id)";
                 $joinChannel = ($hasChannels && $hasSrChannelId) ? ' LEFT JOIN channels ch ON ch.id = sr.channel_id' : '';
-                $sql = 'SELECT ' . $referenceExpr . ' AS reference,
+                $sql = 'SELECT sr.id AS return_id,
+                               ' . $referenceExpr . ' AS reference,
                                ' . $dateSql . ' AS doc_date,
                                ' . ($hasSrCustomerId ? 'COALESCE(sr.customer_id,0)' : '0') . ' AS customer_id,
                                ' . ($hasSrInvoiceRef ? "COALESCE(sr.invoice_reference,'')" : "''") . ' AS invoice_reference,
@@ -657,6 +774,10 @@ try {
                     $customerName = $cid > 0 && isset($customerMap[$cid]) ? (string) $customerMap[$cid]['name'] : ($cid > 0 ? ('#' . $cid) : 'غير محدد');
                     $src = $resolveReturnSource($r);
                     $retTotal = (float) ($r['total_amount'] ?? 0);
+                    $returnIdForLink = (int) ($r['return_id'] ?? 0);
+                    $docUrl = $returnIdForLink > 0
+                        ? storefront_public_path('/admin/index.php?page=sales_returns&sales_return_id=' . $returnIdForLink)
+                        : '';
                     $detailRows[] = [
                         'customer' => $customerName,
                         'doc_type' => 'مردود مبيعات',
@@ -671,6 +792,7 @@ try {
                         ),
                         'invoice_reference' => (string) ($r['invoice_reference'] ?? ''),
                         'amount' => 0 - $retTotal,
+                        'doc_url' => $docUrl,
                     ];
                     $customerDetailSummary['return_count']++;
                     $customerDetailSummary['return_total'] += $retTotal;
@@ -1067,6 +1189,73 @@ if ($tab === 'customers' && $customerDetailed) {
     $subtitleParts[] = 'الوضع: تقرير تفصيلي';
 }
 $filterSubtitle = implode(' — ', $subtitleParts);
+
+$returnCsvHref = '';
+$returnXlsHref = '';
+if ($tab === 'returns') {
+    $baseUrl = storefront_public_path('/admin/index.php');
+    $csvQ = $_GET;
+    $csvQ['page'] = 'sales_reports';
+    $csvQ['r'] = 'returns';
+    $csvQ['export'] = 'csv';
+    $returnCsvHref = $baseUrl . '?' . http_build_query($csvQ);
+    $xlsQ = $_GET;
+    $xlsQ['page'] = 'sales_reports';
+    $xlsQ['r'] = 'returns';
+    $xlsQ['export'] = 'xls';
+    $returnXlsHref = $baseUrl . '?' . http_build_query($xlsQ);
+}
+
+if ($returnsServerExport && $reportError === '') {
+    if ($exportMode === 'csv') {
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="sales_returns_report.csv"');
+        echo "\xEF\xBB\xBF";
+        $out = fopen('php://output', 'w');
+        if ($out !== false) {
+            fputcsv($out, ['مردود', 'تاريخ', 'مرجع فاتورة', 'مصدر', 'تحصيل', 'قناة تسويق', 'عميل', 'المبلغ', 'ملاحظات']);
+            foreach ($rows as $r) {
+                fputcsv($out, [
+                    (string) ($r['reference'] ?? ''),
+                    orange_format_date_dmY((string) ($r['date'] ?? '')),
+                    (string) ($r['invoice_reference'] ?? ''),
+                    orange_sales_return_source_kind_label((string) ($r['source'] ?? '')),
+                    orange_sales_return_payment_type_label((string) ($r['payment'] ?? '')),
+                    (string) ($r['channel'] ?? ''),
+                    (string) ($r['customer'] ?? ''),
+                    (string) ((float) ($r['total'] ?? 0)),
+                    (string) ($r['notes'] ?? ''),
+                ]);
+            }
+            fclose($out);
+        }
+        exit;
+    }
+
+    $xlsRows = [];
+    foreach ($rows as $r) {
+        $xlsRows[] = [
+            (string) ($r['reference'] ?? ''),
+            orange_format_date_dmY((string) ($r['date'] ?? '')),
+            (string) ($r['invoice_reference'] ?? ''),
+            orange_sales_return_source_kind_label((string) ($r['source'] ?? '')),
+            orange_sales_return_payment_type_label((string) ($r['payment'] ?? '')),
+            (string) ($r['channel'] ?? ''),
+            (string) ($r['customer'] ?? ''),
+            (float) ($r['total'] ?? 0),
+            (string) ($r['notes'] ?? ''),
+        ];
+    }
+    orange_report_xls_output(
+        'تفاصيل مردودات المبيعات',
+        'تفاصيل مردودات المبيعات',
+        $companyNameAr,
+        $filterSubtitle,
+        ['مردود', 'تاريخ', 'مرجع فاتورة', 'مصدر', 'تحصيل', 'قناة تسويق', 'عميل', 'المبلغ', 'ملاحظات'],
+        $xlsRows,
+        [7]
+    );
+}
 ?>
 <div class="page-title gl-acc-stmt-no-print">
     <h1>تقارير المبيعات</h1>
@@ -1188,6 +1377,10 @@ $filterSubtitle = implode(' — ', $subtitleParts);
         <div class="srr-print-actions">
             <button type="submit">عرض</button>
             <button type="button" class="btn-secondary" data-orange-perm="print" onclick="window.print()">طباعة</button>
+            <?php if ($tab === 'returns'): ?>
+                <a class="btn-secondary" data-server-export href="<?php echo htmlspecialchars($returnXlsHref, ENT_QUOTES, 'UTF-8'); ?>">Excel (كل التفاصيل)</a>
+                <a class="btn-secondary" data-server-export href="<?php echo htmlspecialchars($returnCsvHref, ENT_QUOTES, 'UTF-8'); ?>">CSV (تفاصيل)</a>
+            <?php endif; ?>
         </div>
     </form>
 </div>
@@ -1220,7 +1413,13 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     <?php if ($rows === []): ?><tr><td colspan="8" class="muted">لا توجد فواتير مبيعات في المدى المحدد.</td></tr>
                     <?php else: foreach ($rows as $r): ?>
                         <tr>
-                            <td dir="ltr"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr">
+                                <?php if ((string) ($r['doc_url'] ?? '') !== ''): ?>
+                                    <a href="<?php echo htmlspecialchars((string) $r['doc_url'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></a>
+                                <?php else: ?>
+                                    <?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?>
+                                <?php endif; ?>
+                            </td>
                             <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY((string) $r['date']), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) $r['customer'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars($sourceLabel((string) $r['source']), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -1233,22 +1432,29 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     </tbody>
                     <tfoot><tr><th colspan="5">الإجمالي (<?php echo (int) $invoiceSummary['count']; ?>)</th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['subtotal']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['discount']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['net']); ?></th></tr></tfoot>
                 <?php elseif ($tab === 'returns'): ?>
-                    <thead><tr><th>مرجع المردود</th><th>التاريخ</th><th>العميل</th><th>مرجع الفاتورة</th><th>المصدر</th><th>التحصيل</th><th class="gl-acc-stmt-col-num">الصافي</th></tr></thead>
+                    <thead><tr><th>مرجع المردود</th><th>التاريخ</th><th>العميل</th><th>مرجع الفاتورة</th><th>المصدر</th><th>التحصيل</th><th>قناة التسويق</th><th class="gl-acc-stmt-col-num">الصافي</th></tr></thead>
                     <tbody>
-                    <?php if ($rows === []): ?><tr><td colspan="7" class="muted">لا توجد مردودات مبيعات في المدى المحدد.</td></tr>
+                    <?php if ($rows === []): ?><tr><td colspan="8" class="muted">لا توجد مردودات مبيعات في المدى المحدد.</td></tr>
                     <?php else: foreach ($rows as $r): ?>
                         <tr>
-                            <td dir="ltr"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr">
+                                <?php if ((string) ($r['doc_url'] ?? '') !== ''): ?>
+                                    <a href="<?php echo htmlspecialchars((string) $r['doc_url'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></a>
+                                <?php else: ?>
+                                    <?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?>
+                                <?php endif; ?>
+                            </td>
                             <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY((string) $r['date']), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) $r['customer'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td dir="ltr"><?php echo htmlspecialchars((string) $r['invoice_reference'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars($sourceLabel((string) $r['source']), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars(orange_sales_return_payment_type_label((string) $r['payment']), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><?php echo htmlspecialchars((string) ($r['channel'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['total']); ?></td>
                         </tr>
                     <?php endforeach; endif; ?>
                     </tbody>
-                    <tfoot><tr><th colspan="6">الإجمالي (<?php echo (int) $returnSummary['count']; ?>)</th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $returnSummary['total']); ?></th></tr></tfoot>
+                    <tfoot><tr><th colspan="7">الإجمالي (<?php echo (int) $returnSummary['count']; ?>)</th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $returnSummary['total']); ?></th></tr></tfoot>
                 <?php elseif ($tab === 'customers'): ?>
                     <?php if ($customerDetailed): ?>
                         <thead><tr><th>العميل</th><th>نوع السند</th><th>المرجع</th><th>مرجع الفاتورة</th><th>التاريخ</th><th>المصدر</th><th>قناة التحصيل</th><th>قناة التسويق</th><th class="gl-acc-stmt-col-num">الصافي</th></tr></thead>
@@ -1258,7 +1464,13 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                             <tr>
                                 <td><?php echo htmlspecialchars((string) $r['customer'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars((string) $r['doc_type'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td dir="ltr"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr">
+                                    <?php if ((string) ($r['doc_url'] ?? '') !== ''): ?>
+                                        <a href="<?php echo htmlspecialchars((string) $r['doc_url'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></a>
+                                    <?php else: ?>
+                                        <?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?>
+                                    <?php endif; ?>
+                                </td>
                                 <td dir="ltr"><?php echo htmlspecialchars((string) ($r['invoice_reference'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY((string) ($r['date'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($sourceLabel((string) ($r['source'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -1329,6 +1541,86 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                 <?php endif; ?>
             </table>
         </div>
+        <?php if ($tab === 'returns' && $reportError === ''): ?>
+            <div class="srr-return-analytics">
+                <?php if ($returnSourceBuckets !== []): ?>
+                    <div class="card">
+                        <h3 class="srr-analytics-title">حسب مصدر الفاتورة</h3>
+                        <div class="table-wrap">
+                            <table class="admin-fy-table gl-acc-stmt-table">
+                                <thead><tr><th>المصدر</th><th class="gl-acc-stmt-col-num">العدد</th><th class="gl-acc-stmt-col-num">القيمة</th></tr></thead>
+                                <tbody>
+                                <?php foreach ($returnSourceBuckets as $b): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars((string) ($b['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo (int) ($b['count'] ?? 0); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) ($b['total'] ?? 0)); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                <?php if ($returnPaymentBuckets !== []): ?>
+                    <div class="card">
+                        <h3 class="srr-analytics-title">حسب قناة التحصيل</h3>
+                        <div class="table-wrap">
+                            <table class="admin-fy-table gl-acc-stmt-table">
+                                <thead><tr><th>التحصيل</th><th class="gl-acc-stmt-col-num">العدد</th><th class="gl-acc-stmt-col-num">القيمة</th></tr></thead>
+                                <tbody>
+                                <?php foreach ($returnPaymentBuckets as $b): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars((string) ($b['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo (int) ($b['count'] ?? 0); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) ($b['total'] ?? 0)); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                <?php if ($returnChannelBuckets !== []): ?>
+                    <div class="card">
+                        <h3 class="srr-analytics-title">حسب قناة التسويق</h3>
+                        <div class="table-wrap">
+                            <table class="admin-fy-table gl-acc-stmt-table">
+                                <thead><tr><th>القناة</th><th class="gl-acc-stmt-col-num">العدد</th><th class="gl-acc-stmt-col-num">القيمة</th></tr></thead>
+                                <tbody>
+                                <?php foreach ($returnChannelBuckets as $b): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars((string) ($b['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo (int) ($b['count'] ?? 0); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) ($b['total'] ?? 0)); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                <?php if ($returnTopProducts !== []): ?>
+                    <div class="card srr-analytics-wide">
+                        <h3 class="srr-analytics-title">أكثر المنتجات مرتجعة (أعلى 25)</h3>
+                        <div class="table-wrap">
+                            <table class="admin-fy-table gl-acc-stmt-table">
+                                <thead><tr><th>المنتج</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">قيمة الأسطر</th></tr></thead>
+                                <tbody>
+                                <?php foreach ($returnTopProducts as $p): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars((string) ($p['product_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $fmtQty((float) ($p['qty_sum'] ?? 0)); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) ($p['line_total'] ?? 0)); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
         <?php echo orange_accounting_report_print_metafoot_markup($printDatetime); ?>
     </div>
 </div>
@@ -1457,6 +1749,22 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     align-items: center;
     flex-basis: 100%;
     justify-content: flex-end;
+}
+.srr-return-analytics {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: 10px;
+}
+.srr-return-analytics .card {
+    margin: 0;
+}
+.srr-return-analytics .srr-analytics-wide {
+    grid-column: 1 / -1;
+}
+.srr-analytics-title {
+    margin: 0 0 8px;
+    font-size: 1rem;
 }
 </style>
 

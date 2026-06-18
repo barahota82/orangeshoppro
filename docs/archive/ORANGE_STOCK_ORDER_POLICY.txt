@@ -107,6 +107,7 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
    - **النطاق حسب الدولة:** كل الاستعلامات scoped بسياق دولة الأدمن عبر `orange_sql_country_and_fragment()` على `purchases` و`purchase_returns`.
    - **الربط في النظام:** إدراج الصفحة في `admin/index.php` (`$allowed`)، القائمة والشجرة (`admin/partials/header.php` + `includes/admin_nav_tree.php`)، وصلاحيات الشاشة ضمن مجموعة `warehouse` في `includes/admin_permissions.php`، وإضافتها في فهرس المخازن والمشتريات `admin/pages/warehouse_purchases_index.php`.
    - **توسيع الصلاحيات (2026-06-18):** إضافة عمودي **«طباعة»** و**«تنزيل»** (Excel/CSV) إلى مصفوفة صلاحيات المستخدمين، وتوحيد تطبيقها في الواجهة (`admin.js` + `admin-table-export.js`) بحيث تُحجب أزرار الطباعة/التصدير وتُمنع عمليات التصدير المباشر بدون صلاحية.
+   - **فتح السند من صفوف التقرير (2026-06-18):** في `admin/pages/purchase_reports.php` أصبحت المراجع القابلة للنقر تفتح السند مباشرة: تبويب `invoices` يفتح `purchases&purchase_id=...`، تبويب `returns` يفتح `purchase_returns&purchase_return_id=...` مع ربط مرجع فاتورة الشراء بسند الشراء، ووضع `suppliers` التفصيلي يربط رقم الفاتورة/مرجع السند بنفس المنطق.
 
 14) شاشة «تقارير المبيعات» (قرار تنفيذ 2026-06-18)
    - **أُضيفت شاشة موحّدة** `admin/pages/sales_reports.php` بنفس هيكل تقارير المخزن/المشتريات (تبويبات + شريط فلاتر + طباعة + تصدير Excel/CSV من نفس جدول التقرير).
@@ -116,5 +117,7 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
    - **النطاق حسب الدولة:** الاستعلامات على `orders` و`sales_returns` و`products` و`customers` تعمل بسياق الدولة عبر `orange_sql_country_and_fragment()`.
    - **الربط في النظام:** إضافة الصفحة إلى `admin/index.php`، وربط القائمة العلوية عليها من مجموعة «تحليل المبيعات» في `admin/partials/header.php`، وإضافتها إلى شجرة صلاحيات الشاشات في `includes/admin_nav_tree.php` وفهرس المبيعات والعروض `admin/pages/sales_promotions_index.php`.
    - **التوافق مع الصلاحيات السابقة:** إضافة mapping للشاشة الجديدة ضمن مجموعة `reports` في `includes/admin_permissions.php` مع fallback تلقائي من `page:reports` إلى `page:sales_reports` حتى لا تنكسر صلاحيات المستخدمين القديمة بعد إعادة التسمية.
+   - **تقوية تبويب «مردودات المبيعات» (2026-06-18):** دُمجت قدرات الشاشة المنفصلة داخل تبويب `returns` في `admin/pages/sales_reports.php`: جداول تحليل حسب **مصدر الفاتورة** و**قناة التحصيل** و**قناة التسويق** + جدول **أكثر المنتجات مرتجعة (Top 25)**، مع تصدير خادمي **Excel/CSV لكل التفاصيل** من نفس التبويب.
+   - **فتح السند من صفوف التقرير (2026-06-18):** أصبح مرجع الفاتورة/المردود قابلًا للنقر: فواتير المبيعات تفتح شاشة السند المناسبة (`company_sales_invoice` أو `online_sales_invoice` حسب المصدر)، مردودات المبيعات تفتح `sales_returns&sales_return_id=...`، وكذلك وضع `customers` التفصيلي يفتح السند من عمود المرجع.
 
 Agreed with project owner for Orange implementation.
