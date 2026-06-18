@@ -684,51 +684,56 @@ $filterSubtitle = implode(' — ', $subtitleParts);
         <input type="hidden" name="page" value="purchase_reports">
         <input type="hidden" name="r" value="<?php echo htmlspecialchars($reportKey, ENT_QUOTES, 'UTF-8'); ?>">
 
-        <div class="prr-date-field">
-            <label for="prr_from">من تاريخ</label>
-            <input type="text" id="prr_from" name="from" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($fromDisplay, ENT_QUOTES, 'UTF-8'); ?>">
-        </div>
-        <div class="prr-date-field prr-date-field-to">
-            <label for="prr_to">إلى تاريخ</label>
-            <input type="text" id="prr_to" name="to" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($toDisplay, ENT_QUOTES, 'UTF-8'); ?>">
-        </div>
-
-        <?php if (in_array($reportKey, ['invoices', 'returns', 'suppliers', 'items', 'monthly'], true)): ?>
-            <div class="prr-supplier-field-wrap">
-                <label for="prr_supplier_name">المورد (دبل كليك للاختيار)</label>
-                <div style="display:flex;gap:6px;align-items:center;">
-                    <input type="hidden" id="prr_supplier_id" name="supplier_id" value="<?php echo (int) $supplierId; ?>">
-                    <input type="text" id="prr_supplier_code" class="admin-inp" readonly
-                        title="يُملأ تلقائياً عند اختيار المورد"
-                        style="width:9rem;background:#f4f4f5;" dir="ltr" lang="en"
-                        placeholder="الكود"
-                        value="<?php echo htmlspecialchars($selectedSupplierCode, ENT_QUOTES, 'UTF-8'); ?>">
-                    <input type="text" id="prr_supplier_name" class="admin-inp prr-name-input prr-supplier-name" readonly
-                        title="دبل كليك لاختيار المورد"
-                        style="cursor:pointer;min-width:15rem;"
-                        placeholder="كل الموردين — دبل كليك للاختيار"
-                        value="<?php echo htmlspecialchars($selectedSupplierName, ENT_QUOTES, 'UTF-8'); ?>">
-                </div>
+        <div class="prr-main-row<?php echo $reportKey === 'items' ? ' is-items' : ''; ?>">
+            <div class="prr-date-field">
+                <label for="prr_from">من تاريخ</label>
+                <input type="text" id="prr_from" name="from" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($fromDisplay, ENT_QUOTES, 'UTF-8'); ?>">
             </div>
-        <?php endif; ?>
+            <div class="prr-date-field prr-date-field-to">
+                <label for="prr_to">إلى تاريخ</label>
+                <input type="text" id="prr_to" name="to" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($toDisplay, ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+
+            <?php if (in_array($reportKey, ['invoices', 'returns', 'suppliers', 'items', 'monthly'], true)): ?>
+                <div class="prr-supplier-field-wrap">
+                    <label for="prr_supplier_name">المورد (دبل كليك للاختيار)</label>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <input type="hidden" id="prr_supplier_id" name="supplier_id" value="<?php echo (int) $supplierId; ?>">
+                        <input type="text" id="prr_supplier_code" class="admin-inp" readonly
+                            title="يُملأ تلقائياً عند اختيار المورد"
+                            style="width:9rem;background:#f4f4f5;" dir="ltr" lang="en"
+                            placeholder="الكود"
+                            value="<?php echo htmlspecialchars($selectedSupplierCode, ENT_QUOTES, 'UTF-8'); ?>">
+                        <input type="text" id="prr_supplier_name" class="admin-inp prr-name-input prr-supplier-name" readonly
+                            title="دبل كليك لاختيار المورد"
+                            style="cursor:pointer;min-width:15rem;"
+                            placeholder="كل الموردين — دبل كليك للاختيار"
+                            value="<?php echo htmlspecialchars($selectedSupplierName, ENT_QUOTES, 'UTF-8'); ?>">
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($reportKey === 'items'): ?>
+                <div class="prr-product-field-wrap">
+                    <label for="prr_product_name">الصنف (دبل كليك للاختيار)</label>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <input type="hidden" id="prr_product_id" name="product_id" value="<?php echo (int) $productId; ?>">
+                        <input type="text" id="prr_product_code" class="admin-inp" readonly
+                            title="يُملأ تلقائياً عند اختيار الصنف"
+                            style="width:10rem;background:#f4f4f5;" dir="ltr" lang="en"
+                            placeholder="الكود"
+                            value="<?php echo htmlspecialchars($selectedProductCode, ENT_QUOTES, 'UTF-8'); ?>">
+                        <input type="text" id="prr_product_name" class="admin-inp prr-name-input prr-product-name" readonly
+                            title="دبل كليك لاختيار الصنف"
+                            style="cursor:pointer;min-width:18rem;"
+                            placeholder="كل الأصناف — دبل كليك للاختيار"
+                            value="<?php echo htmlspecialchars($selectedProductName, ENT_QUOTES, 'UTF-8'); ?>">
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
 
         <?php if ($reportKey === 'items'): ?>
-            <div class="prr-product-field-wrap">
-                <label for="prr_product_name">الصنف (دبل كليك للاختيار)</label>
-                <div style="display:flex;gap:6px;align-items:center;">
-                    <input type="hidden" id="prr_product_id" name="product_id" value="<?php echo (int) $productId; ?>">
-                    <input type="text" id="prr_product_code" class="admin-inp" readonly
-                        title="يُملأ تلقائياً عند اختيار الصنف"
-                        style="width:10rem;background:#f4f4f5;" dir="ltr" lang="en"
-                        placeholder="الكود"
-                        value="<?php echo htmlspecialchars($selectedProductCode, ENT_QUOTES, 'UTF-8'); ?>">
-                    <input type="text" id="prr_product_name" class="admin-inp prr-name-input prr-product-name" readonly
-                        title="دبل كليك لاختيار الصنف"
-                        style="cursor:pointer;min-width:18rem;"
-                        placeholder="كل الأصناف — دبل كليك للاختيار"
-                        value="<?php echo htmlspecialchars($selectedProductName, ENT_QUOTES, 'UTF-8'); ?>">
-                </div>
-            </div>
             <div class="prr-options-row">
                 <div class="prr-items-zero-wrap">
                     <label class="prr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
@@ -1059,6 +1064,16 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     font-size:0.92rem;
 }
 .prr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
+.prr-filter-form .prr-main-row {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 10px;
+    align-items: flex-end;
+    overflow-x: auto;
+    min-width: 0;
+    padding-bottom: 2px;
+}
 .prr-filter-form .prr-date-field {
     flex: 0 0 auto;
 }
@@ -1070,8 +1085,8 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     width: 6.6rem;
     min-width: 6.6rem;
 }
-.prr-filter-form .prr-supplier-field-wrap,
-.prr-filter-form .prr-product-field-wrap {
+.prr-filter-form .prr-main-row .prr-supplier-field-wrap,
+.prr-filter-form .prr-main-row .prr-product-field-wrap {
     flex: 1 1 24rem;
     min-width: 20rem;
 }
