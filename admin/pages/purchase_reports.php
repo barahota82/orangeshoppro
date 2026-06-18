@@ -43,6 +43,7 @@ $toDisplay = orange_format_date_dmY($toDate);
 $supplierId = isset($_GET['supplier_id']) ? max(0, (int) $_GET['supplier_id']) : 0;
 $productId = isset($_GET['product_id']) ? max(0, (int) $_GET['product_id']) : 0;
 $hideZero = isset($_GET['hz']) && (string) $_GET['hz'] === '1';
+$supplierDetailed = isset($_GET['supplier_detail']) && (string) $_GET['supplier_detail'] === '1';
 
 $hasItemCode = orange_table_has_column($pdo, 'products', 'item_code');
 $itemCodeExpr = $hasItemCode
@@ -202,6 +203,7 @@ $rows = [];
 $invoiceSummary = ['count' => 0, 'subtotal' => 0.0, 'discount' => 0.0, 'net' => 0.0];
 $returnSummary = ['count' => 0, 'subtotal' => 0.0, 'discount' => 0.0, 'net' => 0.0];
 $supplierSummary = ['purchase_count' => 0, 'purchase_net' => 0.0, 'return_count' => 0, 'return_net' => 0.0, 'net' => 0.0];
+$supplierDetailTotals = ['subtotal' => 0.0, 'discount' => 0.0, 'net' => 0.0];
 $itemSummary = ['purchase_qty' => 0.0, 'purchase_value' => 0.0, 'return_qty' => 0.0, 'return_value' => 0.0, 'net_qty' => 0.0, 'net_value' => 0.0];
 $monthlySummary = ['purchase_count' => 0, 'purchase_total' => 0.0, 'return_count' => 0, 'return_total' => 0.0, 'net_total' => 0.0];
 $reportError = '';
@@ -306,99 +308,241 @@ try {
             $returnSummary['net'] += $net;
         }
     } elseif ($reportKey === 'suppliers') {
-        $purchaseAgg = [];
-        $returnAgg = [];
-
-        if ($hasPurchases) {
-            $purDateSql = $purDateExpr('p');
-            $subtotalExpr = $hasPurSubtotal ? 'COALESCE(p.subtotal, p.total, 0)' : 'COALESCE(p.total, 0)';
-            $discountExpr = $hasPurDiscount ? 'COALESCE(p.invoice_discount_amount, 0)' : '0';
-            $sql = 'SELECT COALESCE(p.supplier_id, 0) AS sid,
-                           COUNT(*) AS doc_count,
-                           COALESCE(SUM(' . $subtotalExpr . '), 0) AS subtotal_sum,
-                           COALESCE(SUM(' . $discountExpr . '), 0) AS discount_sum,
-                           COALESCE(SUM(COALESCE(p.total, 0)), 0) AS net_sum
-                    FROM purchases p
-                    WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId) . '
-                      AND ' . $purDateSql . ' BETWEEN ? AND ?';
-            $params = [$fromDate, $toDate];
-            if ($supplierId > 0) {
-                $sql .= ' AND p.supplier_id = ?';
-                $params[] = $supplierId;
+        if ($supplierDetailed) {
+            if ($hasPurchases) {
+                $dateSql = $purDateExpr('p');
+                $subtotalExpr = $hasPurSubtotal ? 'COALESCE(p.subtotal, p.total, 0)' : 'COALESCE(p.total, 0)';
+                $discountExpr = $hasPurDiscount ? 'COALESCE(p.invoice_discount_amount, 0)' : '0';
+                $supplierInvSelect = $hasPurSupplierInvoice
+                    ? 'COALESCE(p.supplier_invoice_number, \'\') AS supplier_invoice_number, '
+                    : '\'\' AS supplier_invoice_number, ';
+                $sql = 'SELECT p.id, COALESCE(p.supplier_id, 0) AS sid,
+                               ' . $dateSql . ' AS doc_date,
+                               ' . $supplierInvSelect . '
+                               COALESCE(s.name, \'\') AS supplier_name,
+                               ' . $subtotalExpr . ' AS subtotal_amount,
+                               ' . $discountExpr . ' AS discount_amount,
+                               COALESCE(p.total, 0) AS net_amount
+                        FROM purchases p
+                        LEFT JOIN suppliers s ON s.id = p.supplier_id
+                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId) . '
+                          AND ' . $dateSql . ' BETWEEN ? AND ?';
+                $params = [$fromDate, $toDate];
+                if ($supplierId > 0) {
+                    $sql .= ' AND p.supplier_id = ?';
+                    $params[] = $supplierId;
+                }
+                $sql .= ' ORDER BY COALESCE(s.name, \'\') ASC, sid ASC, ' . $dateSql . ' ASC, p.id ASC';
+                $st = $pdo->prepare($sql);
+                $st->execute($params);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $sid = (int) ($r['sid'] ?? 0);
+                    $supplierName = trim((string) ($r['supplier_name'] ?? ''));
+                    if ($supplierName === '') {
+                        $supplierName = $sid > 0 ? ('#' . $sid) : 'غير محدد';
+                    }
+                    $subtotal = (float) ($r['subtotal_amount'] ?? 0);
+                    $discount = (float) ($r['discount_amount'] ?? 0);
+                    $net = (float) ($r['net_amount'] ?? 0);
+                    $invoiceNumber = 'PUR-' . (int) ($r['id'] ?? 0);
+                    $reference = trim((string) ($r['supplier_invoice_number'] ?? ''));
+                    if ($reference === '') {
+                        $reference = '—';
+                    }
+                    $rows[] = [
+                        'supplier' => $supplierName,
+                        'doc_type' => 'فاتورة شراء',
+                        'invoice_number' => $invoiceNumber,
+                        'reference' => $reference,
+                        'date' => (string) ($r['doc_date'] ?? ''),
+                        'subtotal' => $subtotal,
+                        'discount' => $discount,
+                        'net' => $net,
+                    ];
+                    $supplierSummary['purchase_count']++;
+                    $supplierSummary['purchase_net'] += $net;
+                    $supplierDetailTotals['subtotal'] += $subtotal;
+                    $supplierDetailTotals['discount'] += $discount;
+                    $supplierDetailTotals['net'] += $net;
+                }
             }
-            $sql .= ' GROUP BY COALESCE(p.supplier_id, 0)';
-            $st = $pdo->prepare($sql);
-            $st->execute($params);
-            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                $sid = (int) ($r['sid'] ?? 0);
-                $purchaseAgg[$sid] = [
-                    'count' => (int) ($r['doc_count'] ?? 0),
-                    'net' => (float) ($r['net_sum'] ?? 0),
+
+            if ($hasPurchaseReturns) {
+                $dateSql = $retDateExpr('pr');
+                $returnRefExpr = $hasRetReturnNumber
+                    ? "COALESCE(NULLIF(TRIM(pr.return_number), ''), CONCAT('PR-', pr.id))"
+                    : "CONCAT('PR-', pr.id)";
+                $purchaseRefExpr = $hasRetPurchaseId
+                    ? "CASE WHEN pr.purchase_id IS NOT NULL AND pr.purchase_id > 0 THEN CONCAT('PUR-', pr.purchase_id) ELSE '' END"
+                    : "''";
+                $subtotalExpr = $hasRetSubtotal ? 'COALESCE(pr.subtotal, pr.total, 0)' : 'COALESCE(pr.total, 0)';
+                $discountExpr = $hasRetDiscount ? 'COALESCE(pr.invoice_discount_amount, 0)' : '0';
+                $sql = 'SELECT COALESCE(pr.supplier_id, 0) AS sid,
+                               ' . $dateSql . ' AS doc_date,
+                               ' . $returnRefExpr . ' AS return_reference,
+                               ' . $purchaseRefExpr . ' AS purchase_reference,
+                               COALESCE(s.name, \'\') AS supplier_name,
+                               ' . $subtotalExpr . ' AS subtotal_amount,
+                               ' . $discountExpr . ' AS discount_amount,
+                               COALESCE(pr.total, 0) AS net_amount
+                        FROM purchase_returns pr
+                        LEFT JOIN suppliers s ON s.id = pr.supplier_id
+                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId) . '
+                          AND ' . $dateSql . ' BETWEEN ? AND ?';
+                $params = [$fromDate, $toDate];
+                if ($supplierId > 0) {
+                    $sql .= ' AND pr.supplier_id = ?';
+                    $params[] = $supplierId;
+                }
+                $sql .= ' ORDER BY COALESCE(s.name, \'\') ASC, sid ASC, ' . $dateSql . ' ASC, pr.id ASC';
+                $st = $pdo->prepare($sql);
+                $st->execute($params);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $sid = (int) ($r['sid'] ?? 0);
+                    $supplierName = trim((string) ($r['supplier_name'] ?? ''));
+                    if ($supplierName === '') {
+                        $supplierName = $sid > 0 ? ('#' . $sid) : 'غير محدد';
+                    }
+                    $subtotal = -1.0 * (float) ($r['subtotal_amount'] ?? 0);
+                    $discount = -1.0 * (float) ($r['discount_amount'] ?? 0);
+                    $net = -1.0 * (float) ($r['net_amount'] ?? 0);
+                    $invoiceNumber = trim((string) ($r['purchase_reference'] ?? ''));
+                    if ($invoiceNumber === '') {
+                        $invoiceNumber = '—';
+                    }
+                    $reference = trim((string) ($r['return_reference'] ?? ''));
+                    if ($reference === '') {
+                        $reference = '—';
+                    }
+                    $rows[] = [
+                        'supplier' => $supplierName,
+                        'doc_type' => 'مردود شراء',
+                        'invoice_number' => $invoiceNumber,
+                        'reference' => $reference,
+                        'date' => (string) ($r['doc_date'] ?? ''),
+                        'subtotal' => $subtotal,
+                        'discount' => $discount,
+                        'net' => $net,
+                    ];
+                    $supplierSummary['return_count']++;
+                    $supplierSummary['return_net'] += abs($net);
+                    $supplierDetailTotals['subtotal'] += $subtotal;
+                    $supplierDetailTotals['discount'] += $discount;
+                    $supplierDetailTotals['net'] += $net;
+                }
+            }
+
+            $supplierSummary['net'] = (float) $supplierSummary['purchase_net'] - (float) $supplierSummary['return_net'];
+            usort($rows, static function (array $a, array $b): int {
+                $supplierCmp = strcmp((string) ($a['supplier'] ?? ''), (string) ($b['supplier'] ?? ''));
+                if ($supplierCmp !== 0) {
+                    return $supplierCmp;
+                }
+                $dateCmp = strcmp((string) ($a['date'] ?? ''), (string) ($b['date'] ?? ''));
+                if ($dateCmp !== 0) {
+                    return $dateCmp;
+                }
+                $docCmp = strcmp((string) ($a['doc_type'] ?? ''), (string) ($b['doc_type'] ?? ''));
+                if ($docCmp !== 0) {
+                    return $docCmp;
+                }
+                return strcmp((string) ($a['invoice_number'] ?? ''), (string) ($b['invoice_number'] ?? ''));
+            });
+        } else {
+            $purchaseAgg = [];
+            $returnAgg = [];
+
+            if ($hasPurchases) {
+                $purDateSql = $purDateExpr('p');
+                $subtotalExpr = $hasPurSubtotal ? 'COALESCE(p.subtotal, p.total, 0)' : 'COALESCE(p.total, 0)';
+                $discountExpr = $hasPurDiscount ? 'COALESCE(p.invoice_discount_amount, 0)' : '0';
+                $sql = 'SELECT COALESCE(p.supplier_id, 0) AS sid,
+                               COUNT(*) AS doc_count,
+                               COALESCE(SUM(' . $subtotalExpr . '), 0) AS subtotal_sum,
+                               COALESCE(SUM(' . $discountExpr . '), 0) AS discount_sum,
+                               COALESCE(SUM(COALESCE(p.total, 0)), 0) AS net_sum
+                        FROM purchases p
+                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId) . '
+                          AND ' . $purDateSql . ' BETWEEN ? AND ?';
+                $params = [$fromDate, $toDate];
+                if ($supplierId > 0) {
+                    $sql .= ' AND p.supplier_id = ?';
+                    $params[] = $supplierId;
+                }
+                $sql .= ' GROUP BY COALESCE(p.supplier_id, 0)';
+                $st = $pdo->prepare($sql);
+                $st->execute($params);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $sid = (int) ($r['sid'] ?? 0);
+                    $purchaseAgg[$sid] = [
+                        'count' => (int) ($r['doc_count'] ?? 0),
+                        'net' => (float) ($r['net_sum'] ?? 0),
+                    ];
+                }
+            }
+
+            if ($hasPurchaseReturns) {
+                $retDateSql = $retDateExpr('pr');
+                $sql = 'SELECT COALESCE(pr.supplier_id, 0) AS sid,
+                               COUNT(*) AS doc_count,
+                               COALESCE(SUM(COALESCE(pr.total, 0)), 0) AS net_sum
+                        FROM purchase_returns pr
+                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId) . '
+                          AND ' . $retDateSql . ' BETWEEN ? AND ?';
+                $params = [$fromDate, $toDate];
+                if ($supplierId > 0) {
+                    $sql .= ' AND pr.supplier_id = ?';
+                    $params[] = $supplierId;
+                }
+                $sql .= ' GROUP BY COALESCE(pr.supplier_id, 0)';
+                $st = $pdo->prepare($sql);
+                $st->execute($params);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $sid = (int) ($r['sid'] ?? 0);
+                    $returnAgg[$sid] = [
+                        'count' => (int) ($r['doc_count'] ?? 0),
+                        'net' => (float) ($r['net_sum'] ?? 0),
+                    ];
+                }
+            }
+
+            $supplierIds = [];
+            foreach (array_keys($purchaseAgg) as $sid) {
+                $supplierIds[$sid] = true;
+            }
+            foreach (array_keys($returnAgg) as $sid) {
+                $supplierIds[$sid] = true;
+            }
+
+            foreach (array_keys($supplierIds) as $sid) {
+                if ($supplierId > 0 && $sid !== $supplierId) {
+                    continue;
+                }
+                $pData = $purchaseAgg[$sid] ?? ['count' => 0, 'net' => 0.0];
+                $rData = $returnAgg[$sid] ?? ['count' => 0, 'net' => 0.0];
+                $supplierName = $sid > 0
+                    ? (trim((string) ($supplierMap[$sid] ?? '')) !== '' ? (string) $supplierMap[$sid] : ('#' . $sid))
+                    : 'غير محدد';
+                $netAfterReturns = (float) $pData['net'] - (float) $rData['net'];
+                $rows[] = [
+                    'supplier' => $supplierName,
+                    'purchase_count' => (int) $pData['count'],
+                    'purchase_net' => (float) $pData['net'],
+                    'return_count' => (int) $rData['count'],
+                    'return_net' => (float) $rData['net'],
+                    'net' => $netAfterReturns,
                 ];
+                $supplierSummary['purchase_count'] += (int) $pData['count'];
+                $supplierSummary['purchase_net'] += (float) $pData['net'];
+                $supplierSummary['return_count'] += (int) $rData['count'];
+                $supplierSummary['return_net'] += (float) $rData['net'];
+                $supplierSummary['net'] += $netAfterReturns;
             }
-        }
 
-        if ($hasPurchaseReturns) {
-            $retDateSql = $retDateExpr('pr');
-            $sql = 'SELECT COALESCE(pr.supplier_id, 0) AS sid,
-                           COUNT(*) AS doc_count,
-                           COALESCE(SUM(COALESCE(pr.total, 0)), 0) AS net_sum
-                    FROM purchase_returns pr
-                    WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId) . '
-                      AND ' . $retDateSql . ' BETWEEN ? AND ?';
-            $params = [$fromDate, $toDate];
-            if ($supplierId > 0) {
-                $sql .= ' AND pr.supplier_id = ?';
-                $params[] = $supplierId;
-            }
-            $sql .= ' GROUP BY COALESCE(pr.supplier_id, 0)';
-            $st = $pdo->prepare($sql);
-            $st->execute($params);
-            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                $sid = (int) ($r['sid'] ?? 0);
-                $returnAgg[$sid] = [
-                    'count' => (int) ($r['doc_count'] ?? 0),
-                    'net' => (float) ($r['net_sum'] ?? 0),
-                ];
-            }
+            usort($rows, static function (array $a, array $b): int {
+                return strcmp((string) ($a['supplier'] ?? ''), (string) ($b['supplier'] ?? ''));
+            });
         }
-
-        $supplierIds = [];
-        foreach (array_keys($purchaseAgg) as $sid) {
-            $supplierIds[$sid] = true;
-        }
-        foreach (array_keys($returnAgg) as $sid) {
-            $supplierIds[$sid] = true;
-        }
-
-        foreach (array_keys($supplierIds) as $sid) {
-            if ($supplierId > 0 && $sid !== $supplierId) {
-                continue;
-            }
-            $pData = $purchaseAgg[$sid] ?? ['count' => 0, 'net' => 0.0];
-            $rData = $returnAgg[$sid] ?? ['count' => 0, 'net' => 0.0];
-            $supplierName = $sid > 0
-                ? (trim((string) ($supplierMap[$sid] ?? '')) !== '' ? (string) $supplierMap[$sid] : ('#' . $sid))
-                : 'غير محدد';
-            $netAfterReturns = (float) $pData['net'] - (float) $rData['net'];
-            $rows[] = [
-                'supplier' => $supplierName,
-                'purchase_count' => (int) $pData['count'],
-                'purchase_net' => (float) $pData['net'],
-                'return_count' => (int) $rData['count'],
-                'return_net' => (float) $rData['net'],
-                'net' => $netAfterReturns,
-            ];
-            $supplierSummary['purchase_count'] += (int) $pData['count'];
-            $supplierSummary['purchase_net'] += (float) $pData['net'];
-            $supplierSummary['return_count'] += (int) $rData['count'];
-            $supplierSummary['return_net'] += (float) $rData['net'];
-            $supplierSummary['net'] += $netAfterReturns;
-        }
-
-        usort($rows, static function (array $a, array $b): int {
-            return strcmp((string) ($a['supplier'] ?? ''), (string) ($b['supplier'] ?? ''));
-        });
     } elseif ($reportKey === 'items') {
         $itemsMap = [];
 
@@ -662,6 +806,9 @@ if ($supplierId > 0 && isset($supplierMap[$supplierId])) {
 if ($productId > 0 && isset($productMap[$productId])) {
     $subtitleParts[] = 'الصنف: ' . (string) ($productMap[$productId]['name'] ?? '');
 }
+if ($reportKey === 'suppliers') {
+    $subtitleParts[] = $supplierDetailed ? 'الوضع: تفصيلي' : 'الوضع: إجمالي';
+}
 $filterSubtitle = implode(' — ', $subtitleParts);
 
 ?>
@@ -733,14 +880,24 @@ $filterSubtitle = implode(' — ', $subtitleParts);
             <?php endif; ?>
         </div>
 
-        <?php if ($reportKey === 'items'): ?>
+        <?php if ($reportKey === 'items' || $reportKey === 'suppliers'): ?>
             <div class="prr-options-row">
-                <div class="prr-items-zero-wrap">
-                    <label class="prr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
-                        <input type="checkbox" name="hz" value="1" <?php echo $hideZero ? 'checked' : ''; ?>>
-                        إخفاء الصافي صفر
-                    </label>
-                </div>
+                <?php if ($reportKey === 'items'): ?>
+                    <div class="prr-items-zero-wrap">
+                        <label class="prr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
+                            <input type="checkbox" name="hz" value="1" <?php echo $hideZero ? 'checked' : ''; ?>>
+                            إخفاء الصافي صفر
+                        </label>
+                    </div>
+                <?php endif; ?>
+                <?php if ($reportKey === 'suppliers'): ?>
+                    <div class="prr-suppliers-detail-wrap">
+                        <label class="prr-suppliers-detail-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
+                            <input type="checkbox" name="supplier_detail" value="1" <?php echo $supplierDetailed ? 'checked' : ''; ?>>
+                            تقرير تفصيلي
+                        </label>
+                    </div>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
 
@@ -783,7 +940,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
             if ($reportKey === 'invoices' || $reportKey === 'returns') {
                 $prrTableClass = ' prr-doc-table';
             } elseif ($reportKey === 'suppliers') {
-                $prrTableClass = ' prr-suppliers-table';
+                $prrTableClass = $supplierDetailed ? ' prr-suppliers-table prr-suppliers-detail-table' : ' prr-suppliers-table';
             } elseif ($reportKey === 'items') {
                 $prrTableClass = ' prr-items-table';
             } elseif ($reportKey === 'monthly') {
@@ -806,14 +963,27 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         <col class="prr-col-money">
                     </colgroup>
                 <?php elseif ($reportKey === 'suppliers'): ?>
-                    <colgroup>
-                        <col class="prr-sup-col-name">
-                        <col class="prr-sup-col-count">
-                        <col class="prr-sup-col-money">
-                        <col class="prr-sup-col-count">
-                        <col class="prr-sup-col-money">
-                        <col class="prr-sup-col-money">
-                    </colgroup>
+                    <?php if ($supplierDetailed): ?>
+                        <colgroup>
+                            <col class="prr-supd-col-name">
+                            <col class="prr-supd-col-doc">
+                            <col class="prr-supd-col-invoice">
+                            <col class="prr-supd-col-ref">
+                            <col class="prr-supd-col-date">
+                            <col class="prr-supd-col-money">
+                            <col class="prr-supd-col-money">
+                            <col class="prr-supd-col-money">
+                        </colgroup>
+                    <?php else: ?>
+                        <colgroup>
+                            <col class="prr-sup-col-name">
+                            <col class="prr-sup-col-count">
+                            <col class="prr-sup-col-money">
+                            <col class="prr-sup-col-count">
+                            <col class="prr-sup-col-money">
+                            <col class="prr-sup-col-money">
+                        </colgroup>
+                    <?php endif; ?>
                 <?php elseif ($reportKey === 'items'): ?>
                     <colgroup>
                         <col class="prr-item-col-code">
@@ -911,40 +1081,79 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     </tr>
                     </tfoot>
                 <?php elseif ($reportKey === 'suppliers'): ?>
-                    <thead>
-                    <tr>
-                        <th>المورد</th>
-                        <th class="gl-acc-stmt-col-num">عدد فواتير الشراء</th>
-                        <th class="gl-acc-stmt-col-num">صافي المشتريات</th>
-                        <th class="gl-acc-stmt-col-num">عدد المردودات</th>
-                        <th class="gl-acc-stmt-col-num">صافي المردودات</th>
-                        <th class="gl-acc-stmt-col-num">الصافي بعد المردود</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <?php if ($rows === []): ?>
-                        <tr><td colspan="6" class="muted">لا توجد بيانات موردين في المدى المحدد.</td></tr>
-                    <?php else: foreach ($rows as $r): ?>
+                    <?php if ($supplierDetailed): ?>
+                        <thead>
                         <tr>
-                            <td><?php echo htmlspecialchars((string) $r['supplier'], ENT_QUOTES, 'UTF-8'); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo (int) $r['purchase_count']; ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['purchase_net']); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo (int) $r['return_count']; ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['return_net']); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['net']); ?></td>
+                            <th>المورد</th>
+                            <th>نوع السند</th>
+                            <th>رقم الفاتورة</th>
+                            <th>المرجع</th>
+                            <th>التاريخ</th>
+                            <th class="gl-acc-stmt-col-num">الإجمالي</th>
+                            <th class="gl-acc-stmt-col-num">الخصم</th>
+                            <th class="gl-acc-stmt-col-num">الصافي</th>
                         </tr>
-                    <?php endforeach; endif; ?>
-                    </tbody>
-                    <tfoot>
-                    <tr>
-                        <th>الإجمالي</th>
-                        <th class="gl-acc-stmt-col-num"><?php echo (int) $supplierSummary['purchase_count']; ?></th>
-                        <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['purchase_net']); ?></th>
-                        <th class="gl-acc-stmt-col-num"><?php echo (int) $supplierSummary['return_count']; ?></th>
-                        <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['return_net']); ?></th>
-                        <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['net']); ?></th>
-                    </tr>
-                    </tfoot>
+                        </thead>
+                        <tbody>
+                        <?php if ($rows === []): ?>
+                            <tr><td colspan="8" class="muted">لا توجد تفاصيل فواتير/مردود الموردين في المدى المحدد.</td></tr>
+                        <?php else: foreach ($rows as $r): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars((string) $r['supplier'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars((string) $r['doc_type'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr"><?php echo htmlspecialchars((string) $r['invoice_number'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY((string) $r['date']), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['subtotal']); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['discount']); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['net']); ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                        </tbody>
+                        <tfoot>
+                        <tr>
+                            <th colspan="5">الإجمالي — شراء: <?php echo (int) $supplierSummary['purchase_count']; ?> | مردود: <?php echo (int) $supplierSummary['return_count']; ?></th>
+                            <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierDetailTotals['subtotal']); ?></th>
+                            <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierDetailTotals['discount']); ?></th>
+                            <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierDetailTotals['net']); ?></th>
+                        </tr>
+                        </tfoot>
+                    <?php else: ?>
+                        <thead>
+                        <tr>
+                            <th>المورد</th>
+                            <th class="gl-acc-stmt-col-num">عدد فواتير الشراء</th>
+                            <th class="gl-acc-stmt-col-num">صافي المشتريات</th>
+                            <th class="gl-acc-stmt-col-num">عدد المردودات</th>
+                            <th class="gl-acc-stmt-col-num">صافي المردودات</th>
+                            <th class="gl-acc-stmt-col-num">الصافي بعد المردود</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <?php if ($rows === []): ?>
+                            <tr><td colspan="6" class="muted">لا توجد بيانات موردين في المدى المحدد.</td></tr>
+                        <?php else: foreach ($rows as $r): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars((string) $r['supplier'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo (int) $r['purchase_count']; ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['purchase_net']); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo (int) $r['return_count']; ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['return_net']); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['net']); ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                        </tbody>
+                        <tfoot>
+                        <tr>
+                            <th>الإجمالي</th>
+                            <th class="gl-acc-stmt-col-num"><?php echo (int) $supplierSummary['purchase_count']; ?></th>
+                            <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['purchase_net']); ?></th>
+                            <th class="gl-acc-stmt-col-num"><?php echo (int) $supplierSummary['return_count']; ?></th>
+                            <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['return_net']); ?></th>
+                            <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['net']); ?></th>
+                        </tr>
+                        </tfoot>
+                    <?php endif; ?>
                 <?php elseif ($reportKey === 'items'): ?>
                     <thead>
                     <tr>
@@ -1108,6 +1317,11 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     align-items: center;
     padding-bottom: 2px;
 }
+.prr-filter-form .prr-suppliers-detail-wrap {
+    display: flex;
+    align-items: center;
+    padding-bottom: 2px;
+}
 .prr-filter-form .prr-print-actions {
     display: flex;
     gap: 8px;
@@ -1132,6 +1346,15 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 .prr-suppliers-table .prr-sup-col-name { width: 34%; }
 .prr-suppliers-table .prr-sup-col-count { width: 10%; }
 .prr-suppliers-table .prr-sup-col-money { width: 15.333%; }
+.prr-suppliers-detail-table {
+    min-width: 80rem;
+}
+.prr-suppliers-detail-table .prr-supd-col-name { width: 24%; }
+.prr-suppliers-detail-table .prr-supd-col-doc { width: 12%; }
+.prr-suppliers-detail-table .prr-supd-col-invoice { width: 12%; }
+.prr-suppliers-detail-table .prr-supd-col-ref { width: 14%; }
+.prr-suppliers-detail-table .prr-supd-col-date { width: 10%; }
+.prr-suppliers-detail-table .prr-supd-col-money { width: 9.333%; }
 .prr-items-table {
     table-layout: fixed;
     min-width: 82rem;
