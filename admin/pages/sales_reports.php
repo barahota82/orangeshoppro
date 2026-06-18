@@ -1167,18 +1167,18 @@ $filterSubtitle = implode(' — ', $subtitleParts);
             </div>
             <?php if ($tab === 'customers'): ?>
                 <div class="srr-customers-detail-wrap">
-                    <label class="srr-customers-detail-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
-                        <input type="checkbox" name="customer_detail" value="1" <?php echo $customerDetailed ? 'checked' : ''; ?>>
-                        تقرير تفصيلي
-                    </label>
+                    <label for="srr_customer_detail">تقرير تفصيلي</label>
+                    <div class="srr-checkbox-control">
+                        <input type="checkbox" id="srr_customer_detail" name="customer_detail" value="1" <?php echo $customerDetailed ? 'checked' : ''; ?>>
+                    </div>
                 </div>
             <?php endif; ?>
             <?php if ($tab === 'items'): ?>
                 <div class="srr-items-zero-wrap">
-                    <label class="srr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
-                        <input type="checkbox" name="hz" value="1" <?php echo $hideZero ? 'checked' : ''; ?>>
-                        إخفاء الصافي صفر
-                    </label>
+                    <label for="srr_hide_zero">إخفاء الصافي صفر</label>
+                    <div class="srr-checkbox-control">
+                        <input type="checkbox" id="srr_hide_zero" name="hz" value="1" <?php echo $hideZero ? 'checked' : ''; ?>>
+                    </div>
                 </div>
             <?php endif; ?>
             <?php if ($tab !== 'items' && $tab !== 'customers'): ?>
@@ -1426,11 +1426,24 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 }
 .srr-filter-form .srr-items-zero-wrap {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 4px;
 }
 .srr-filter-form .srr-customers-detail-wrap {
     display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.srr-filter-form .srr-checkbox-control {
+    min-height: 2.1rem;
+    display: flex;
     align-items: center;
+    justify-content: center;
+}
+.srr-filter-form .srr-checkbox-control input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
 }
 .srr-filter-form .srr-options-placeholder {
     display: inline-block;
