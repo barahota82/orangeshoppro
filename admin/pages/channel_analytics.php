@@ -120,7 +120,7 @@ $stCo = $pdo->prepare($companyDirectSql);
 $stCo->execute($companyDirectParams);
 $companyDirect = $stCo->fetch(PDO::FETCH_ASSOC) ?: ['cnt_all' => 0, 'cnt_completed' => 0, 'revenue_completed' => 0];
 $companyInvoiceUrl = storefront_public_path('/admin/index.php?page=company_sales_invoice');
-$returnsReportUrl = storefront_public_path('/admin/index.php?page=sales_returns_report');
+$returnsReportUrl = storefront_public_path('/admin/index.php?page=sales_reports&r=returns');
 
 $hasSrCreated = orange_table_exists($pdo, 'sales_returns')
     && orange_table_has_column($pdo, 'sales_returns', 'created_at');

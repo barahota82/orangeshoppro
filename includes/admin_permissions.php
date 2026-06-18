@@ -131,7 +131,6 @@ function orange_admin_page_resource(string $page): string
         'partner_reports' => 'partners',
         'reports' => 'reports',
         'sales_reports' => 'reports',
-        'sales_returns_report' => 'reports',
         'channel_analytics' => 'reports',
         'logs' => 'reports',
         'company_settings' => 'settings',

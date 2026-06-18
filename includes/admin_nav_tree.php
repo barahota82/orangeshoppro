@@ -179,7 +179,6 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'reports', 'label' => 'تحليل المبيعات'],
                         ['page' => 'sales_reports', 'label' => 'تقارير المبيعات'],
                         ['page' => 'channel_analytics', 'label' => 'تحليل القنوات'],
-                        ['page' => 'sales_returns_report', 'label' => 'تقرير مردودات المبيعات'],
                     ],
                 ],
             ],
@@ -332,9 +331,7 @@ function orange_admin_permission_actions_for_page(string $page): array
         'financial_report',
     ];
 
-    static $viewExportOnly = [
-        'sales_returns_report',
-    ];
+    static $viewExportOnly = [];
 
     static $viewPrintExport = [
         'sales_reports',
