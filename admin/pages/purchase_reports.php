@@ -771,8 +771,15 @@ $filterSubtitle = implode(' — ', $subtitleParts);
         <?php endif; ?>
 
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <?php $prrDocTableClass = ($reportKey === 'invoices' || $reportKey === 'returns') ? ' prr-doc-table' : ''; ?>
-            <table class="admin-fy-table gl-acc-stmt-table ta-report-table<?php echo $prrDocTableClass; ?>"
+            <?php
+            $prrTableClass = '';
+            if ($reportKey === 'invoices' || $reportKey === 'returns') {
+                $prrTableClass = ' prr-doc-table';
+            } elseif ($reportKey === 'suppliers') {
+                $prrTableClass = ' prr-suppliers-table';
+            }
+            ?>
+            <table class="admin-fy-table gl-acc-stmt-table ta-report-table<?php echo $prrTableClass; ?>"
                 data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>"
                 data-export-target=".prr-print-actions"
                 data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
@@ -786,6 +793,15 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         <col class="prr-col-money">
                         <col class="prr-col-money">
                         <col class="prr-col-money">
+                    </colgroup>
+                <?php elseif ($reportKey === 'suppliers'): ?>
+                    <colgroup>
+                        <col class="prr-sup-col-name">
+                        <col class="prr-sup-col-count">
+                        <col class="prr-sup-col-money">
+                        <col class="prr-sup-col-count">
+                        <col class="prr-sup-col-money">
+                        <col class="prr-sup-col-money">
                     </colgroup>
                 <?php endif; ?>
                 <?php if ($reportKey === 'invoices'): ?>
@@ -1038,6 +1054,13 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 .prr-doc-table .prr-col-supplier-doc { width: 13%; }
 .prr-doc-table .prr-col-type { width: 11%; }
 .prr-doc-table .prr-col-money { width: 10.666%; }
+.prr-suppliers-table {
+    table-layout: fixed;
+    min-width: 64rem;
+}
+.prr-suppliers-table .prr-sup-col-name { width: 34%; }
+.prr-suppliers-table .prr-sup-col-count { width: 10%; }
+.prr-suppliers-table .prr-sup-col-money { width: 15.333%; }
 </style>
 
 <?php
