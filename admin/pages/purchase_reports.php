@@ -44,6 +44,14 @@ $supplierId = isset($_GET['supplier_id']) ? max(0, (int) $_GET['supplier_id']) :
 $productId = isset($_GET['product_id']) ? max(0, (int) $_GET['product_id']) : 0;
 $hideZero = isset($_GET['hz']) && (string) $_GET['hz'] === '1';
 $supplierDetailed = isset($_GET['supplier_detail']) && (string) $_GET['supplier_detail'] === '1';
+$invoiceTypeFilter = isset($_GET['invoice_type']) ? strtolower(trim((string) $_GET['invoice_type'])) : 'all';
+if (!in_array($invoiceTypeFilter, ['all', 'cash', 'credit'], true)) {
+    $invoiceTypeFilter = 'all';
+}
+$paymentStatusFilter = isset($_GET['payment_status']) ? strtolower(trim((string) $_GET['payment_status'])) : 'all';
+if (!in_array($paymentStatusFilter, ['all', 'paid', 'unpaid'], true)) {
+    $paymentStatusFilter = 'all';
+}
 
 $hasItemCode = orange_table_has_column($pdo, 'products', 'item_code');
 $itemCodeExpr = $hasItemCode
@@ -157,6 +165,8 @@ $hasPiVariant = $hasPurchaseItems && orange_table_has_column($pdo, 'purchase_ite
 $hasPiDiscount = $hasPurchaseItems && orange_table_has_column($pdo, 'purchase_items', 'discount_amount');
 $hasPriVariant = $hasPurchaseReturnItems && orange_table_has_column($pdo, 'purchase_return_items', 'variant_id');
 $hasPriDiscount = $hasPurchaseReturnItems && orange_table_has_column($pdo, 'purchase_return_items', 'discount_amount');
+$hasPartySubledger = orange_table_exists($pdo, 'party_subledger');
+$hasPartyAllocations = orange_table_exists($pdo, 'party_subledger_allocations');
 
 $purDateExpr = static function (string $alias) use ($hasPurDocumentDate, $hasPurCreatedAt): string {
     if ($hasPurDocumentDate) {
@@ -175,6 +185,78 @@ $retDateExpr = static function (string $alias) use ($hasRetDocumentDate, $hasRet
         return 'DATE(' . $alias . '.created_at)';
     }
     return 'CURDATE()';
+};
+$purchasePaymentJoinSql = static function (string $docAlias) use ($hasPartySubledger, $hasPartyAllocations): string {
+    if (!$hasPartySubledger) {
+        return '';
+    }
+    $sql = ' LEFT JOIN (
+                    SELECT party_id, ref_id, COALESCE(SUM(credit - debit), 0) AS gross_amount
+                    FROM party_subledger
+                    WHERE party_kind = \'supplier\' AND ref_type = \'purchase\'
+                    GROUP BY party_id, ref_id
+                ) psl ON psl.party_id = ' . $docAlias . '.supplier_id AND psl.ref_id = ' . $docAlias . '.id';
+    if ($hasPartyAllocations) {
+        $sql .= ' LEFT JOIN (
+                        SELECT party_id, target_ref_id, COALESCE(SUM(amount), 0) AS allocated_amount
+                        FROM party_subledger_allocations
+                        WHERE party_kind = \'supplier\' AND target_ref_type = \'purchase\'
+                        GROUP BY party_id, target_ref_id
+                    ) pal ON pal.party_id = ' . $docAlias . '.supplier_id AND pal.target_ref_id = ' . $docAlias . '.id';
+    }
+    return $sql;
+};
+$purchaseOpenAmountExpr = static function (string $docAlias) use ($hasPartySubledger, $hasPartyAllocations): string {
+    if (!$hasPartySubledger) {
+        return 'CASE WHEN COALESCE(' . $docAlias . '.type, \'\') = \'cash\' THEN 0 ELSE COALESCE(' . $docAlias . '.total, 0) END';
+    }
+    $allocatedExpr = $hasPartyAllocations ? 'COALESCE(pal.allocated_amount, 0)' : '0';
+    return 'CASE
+                WHEN COALESCE(' . $docAlias . '.type, \'\') = \'cash\' THEN 0
+                WHEN COALESCE(psl.gross_amount, 0) <= 0 THEN COALESCE(' . $docAlias . '.total, 0)
+                ELSE GREATEST(COALESCE(psl.gross_amount, 0) - ' . $allocatedExpr . ', 0)
+            END';
+};
+$appendPurchaseTypeFilter = static function (string &$sql, array &$params, string $docAlias, string $invoiceTypeFilter): void {
+    if ($invoiceTypeFilter === 'all') {
+        return;
+    }
+    $sql .= ' AND COALESCE(' . $docAlias . '.type, \'\') = ?';
+    $params[] = $invoiceTypeFilter;
+};
+$appendPurchasePaymentFilter = static function (
+    string &$sql,
+    array &$params,
+    string $docAlias,
+    string $paymentStatusFilter,
+    callable $purchaseOpenAmountExpr
+): void {
+    if ($paymentStatusFilter === 'all') {
+        return;
+    }
+    $openExpr = $purchaseOpenAmountExpr($docAlias);
+    if ($paymentStatusFilter === 'paid') {
+        $sql .= ' AND (' . $openExpr . ') <= 0.0001';
+        return;
+    }
+    $sql .= ' AND (' . $openExpr . ') > 0.0001';
+};
+$appendReturnTypeFilter = static function (string &$sql, array &$params, string $docAlias, string $invoiceTypeFilter): void {
+    if ($invoiceTypeFilter === 'all') {
+        return;
+    }
+    $sql .= ' AND COALESCE(' . $docAlias . '.type, \'\') = ?';
+    $params[] = $invoiceTypeFilter;
+};
+$appendReturnPaymentFilter = static function (string &$sql, string $docAlias, string $paymentStatusFilter): void {
+    if ($paymentStatusFilter === 'all') {
+        return;
+    }
+    if ($paymentStatusFilter === 'paid') {
+        $sql .= ' AND COALESCE(' . $docAlias . '.type, \'\') = \'cash\'';
+        return;
+    }
+    $sql .= ' AND COALESCE(' . $docAlias . '.type, \'\') = \'credit\'';
 };
 
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
@@ -197,6 +279,16 @@ $purchaseTypeLabel = static function (string $raw): string {
         return 'أونلاين';
     }
     return $raw !== '' ? $raw : '—';
+};
+$paymentStatusLabel = static function (string $raw): string {
+    $v = strtolower(trim($raw));
+    if ($v === 'paid') {
+        return 'مسدد';
+    }
+    if ($v === 'unpaid') {
+        return 'غير مسدد';
+    }
+    return 'الكل';
 };
 
 $rows = [];
@@ -226,7 +318,8 @@ try {
                        ' . $discountExpr . ' AS discount_amount,
                        COALESCE(p.total, 0) AS net_amount
                 FROM purchases p
-                LEFT JOIN suppliers s ON s.id = p.supplier_id
+                LEFT JOIN suppliers s ON s.id = p.supplier_id'
+                . $purchasePaymentJoinSql('p') . '
                 WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId) . '
                   AND ' . $dateSql . ' BETWEEN ? AND ?';
         $params = [$fromDate, $toDate];
@@ -234,6 +327,8 @@ try {
             $sql .= ' AND p.supplier_id = ?';
             $params[] = $supplierId;
         }
+        $appendPurchaseTypeFilter($sql, $params, 'p', $invoiceTypeFilter);
+        $appendPurchasePaymentFilter($sql, $params, 'p', $paymentStatusFilter, $purchaseOpenAmountExpr);
         $sql .= ' ORDER BY ' . $dateSql . ' DESC, p.id DESC';
         $st = $pdo->prepare($sql);
         $st->execute($params);
@@ -285,6 +380,8 @@ try {
             $sql .= ' AND pr.supplier_id = ?';
             $params[] = $supplierId;
         }
+        $appendReturnTypeFilter($sql, $params, 'pr', $invoiceTypeFilter);
+        $appendReturnPaymentFilter($sql, 'pr', $paymentStatusFilter);
         $sql .= ' ORDER BY ' . $dateSql . ' DESC, pr.id DESC';
         $st = $pdo->prepare($sql);
         $st->execute($params);
@@ -324,7 +421,8 @@ try {
                                ' . $discountExpr . ' AS discount_amount,
                                COALESCE(p.total, 0) AS net_amount
                         FROM purchases p
-                        LEFT JOIN suppliers s ON s.id = p.supplier_id
+                        LEFT JOIN suppliers s ON s.id = p.supplier_id'
+                        . $purchasePaymentJoinSql('p') . '
                         WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId) . '
                           AND ' . $dateSql . ' BETWEEN ? AND ?';
                 $params = [$fromDate, $toDate];
@@ -332,6 +430,8 @@ try {
                     $sql .= ' AND p.supplier_id = ?';
                     $params[] = $supplierId;
                 }
+                $appendPurchaseTypeFilter($sql, $params, 'p', $invoiceTypeFilter);
+                $appendPurchasePaymentFilter($sql, $params, 'p', $paymentStatusFilter, $purchaseOpenAmountExpr);
                 $sql .= ' ORDER BY COALESCE(s.name, \'\') ASC, sid ASC, ' . $dateSql . ' ASC, p.id ASC';
                 $st = $pdo->prepare($sql);
                 $st->execute($params);
@@ -394,6 +494,8 @@ try {
                     $sql .= ' AND pr.supplier_id = ?';
                     $params[] = $supplierId;
                 }
+                $appendReturnTypeFilter($sql, $params, 'pr', $invoiceTypeFilter);
+                $appendReturnPaymentFilter($sql, 'pr', $paymentStatusFilter);
                 $sql .= ' ORDER BY COALESCE(s.name, \'\') ASC, sid ASC, ' . $dateSql . ' ASC, pr.id ASC';
                 $st = $pdo->prepare($sql);
                 $st->execute($params);
@@ -461,7 +563,8 @@ try {
                                COALESCE(SUM(' . $subtotalExpr . '), 0) AS subtotal_sum,
                                COALESCE(SUM(' . $discountExpr . '), 0) AS discount_sum,
                                COALESCE(SUM(COALESCE(p.total, 0)), 0) AS net_sum
-                        FROM purchases p
+                        FROM purchases p'
+                        . $purchasePaymentJoinSql('p') . '
                         WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId) . '
                           AND ' . $purDateSql . ' BETWEEN ? AND ?';
                 $params = [$fromDate, $toDate];
@@ -469,6 +572,8 @@ try {
                     $sql .= ' AND p.supplier_id = ?';
                     $params[] = $supplierId;
                 }
+                $appendPurchaseTypeFilter($sql, $params, 'p', $invoiceTypeFilter);
+                $appendPurchasePaymentFilter($sql, $params, 'p', $paymentStatusFilter, $purchaseOpenAmountExpr);
                 $sql .= ' GROUP BY COALESCE(p.supplier_id, 0)';
                 $st = $pdo->prepare($sql);
                 $st->execute($params);
@@ -494,6 +599,8 @@ try {
                     $sql .= ' AND pr.supplier_id = ?';
                     $params[] = $supplierId;
                 }
+                $appendReturnTypeFilter($sql, $params, 'pr', $invoiceTypeFilter);
+                $appendReturnPaymentFilter($sql, 'pr', $paymentStatusFilter);
                 $sql .= ' GROUP BY COALESCE(pr.supplier_id, 0)';
                 $st = $pdo->prepare($sql);
                 $st->execute($params);
@@ -564,7 +671,8 @@ try {
                     FROM purchase_items pi
                     INNER JOIN purchases pur ON pur.id = pi.purchase_id
                     INNER JOIN products p ON p.id = pi.product_id
-                    ' . $variantJoin . '
+                    ' . $variantJoin
+                    . $purchasePaymentJoinSql('pur') . '
                     WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'pur', $prCountryId) . '
                       AND ' . $purDateSql . ' BETWEEN ? AND ?';
             $params = [$fromDate, $toDate];
@@ -576,6 +684,8 @@ try {
                 $sql .= ' AND pi.product_id = ?';
                 $params[] = $productId;
             }
+            $appendPurchaseTypeFilter($sql, $params, 'pur', $invoiceTypeFilter);
+            $appendPurchasePaymentFilter($sql, $params, 'pur', $paymentStatusFilter, $purchaseOpenAmountExpr);
             $sql .= ' GROUP BY pi.product_id, vid, item_code, product_name, color, size
                       ORDER BY product_name ASC, pi.product_id ASC, vid ASC';
             $st = $pdo->prepare($sql);
@@ -627,6 +737,8 @@ try {
                 $sql .= ' AND pri.product_id = ?';
                 $params[] = $productId;
             }
+            $appendReturnTypeFilter($sql, $params, 'pr', $invoiceTypeFilter);
+            $appendReturnPaymentFilter($sql, 'pr', $paymentStatusFilter);
             $sql .= ' GROUP BY pri.product_id, vid, item_code, product_name, color, size
                       ORDER BY product_name ASC, pri.product_id ASC, vid ASC';
             $st = $pdo->prepare($sql);
@@ -694,7 +806,8 @@ try {
                            MONTH(' . $purDateSql . ') AS mm,
                            COUNT(*) AS doc_count,
                            COALESCE(SUM(COALESCE(p.total, 0)), 0) AS total_sum
-                    FROM purchases p
+                    FROM purchases p'
+                    . $purchasePaymentJoinSql('p') . '
                     WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId) . '
                       AND ' . $purDateSql . ' BETWEEN ? AND ?';
             $params = [$fromDate, $toDate];
@@ -702,6 +815,8 @@ try {
                 $sql .= ' AND p.supplier_id = ?';
                 $params[] = $supplierId;
             }
+            $appendPurchaseTypeFilter($sql, $params, 'p', $invoiceTypeFilter);
+            $appendPurchasePaymentFilter($sql, $params, 'p', $paymentStatusFilter, $purchaseOpenAmountExpr);
             $sql .= ' GROUP BY YEAR(' . $purDateSql . '), MONTH(' . $purDateSql . ')';
             $st = $pdo->prepare($sql);
             $st->execute($params);
@@ -738,6 +853,8 @@ try {
                 $sql .= ' AND pr.supplier_id = ?';
                 $params[] = $supplierId;
             }
+            $appendReturnTypeFilter($sql, $params, 'pr', $invoiceTypeFilter);
+            $appendReturnPaymentFilter($sql, 'pr', $paymentStatusFilter);
             $sql .= ' GROUP BY YEAR(' . $retDateSql . '), MONTH(' . $retDateSql . ')';
             $st = $pdo->prepare($sql);
             $st->execute($params);
@@ -805,6 +922,12 @@ if ($supplierId > 0 && isset($supplierMap[$supplierId])) {
 }
 if ($productId > 0 && isset($productMap[$productId])) {
     $subtitleParts[] = 'الصنف: ' . (string) ($productMap[$productId]['name'] ?? '');
+}
+if ($invoiceTypeFilter !== 'all') {
+    $subtitleParts[] = 'نوع الفاتورة: ' . $purchaseTypeLabel($invoiceTypeFilter);
+}
+if ($paymentStatusFilter !== 'all') {
+    $subtitleParts[] = 'حالة السداد: ' . $paymentStatusLabel($paymentStatusFilter);
 }
 if ($reportKey === 'suppliers') {
     $subtitleParts[] = $supplierDetailed ? 'الوضع: تفصيلي' : 'الوضع: إجمالي';
@@ -880,7 +1003,23 @@ $filterSubtitle = implode(' — ', $subtitleParts);
             <?php endif; ?>
         </div>
 
-        <div class="prr-options-row<?php echo ($reportKey !== 'items' && $reportKey !== 'suppliers') ? ' is-empty' : ''; ?>">
+        <div class="prr-options-row">
+            <div class="prr-type-wrap">
+                <label for="prr_invoice_type">نوع الفاتورة</label>
+                <select id="prr_invoice_type" name="invoice_type" class="admin-inp">
+                    <option value="all"<?php echo $invoiceTypeFilter === 'all' ? ' selected' : ''; ?>>الكل</option>
+                    <option value="cash"<?php echo $invoiceTypeFilter === 'cash' ? ' selected' : ''; ?>>نقدي</option>
+                    <option value="credit"<?php echo $invoiceTypeFilter === 'credit' ? ' selected' : ''; ?>>آجل</option>
+                </select>
+            </div>
+            <div class="prr-payment-status-wrap">
+                <label for="prr_payment_status">حالة السداد</label>
+                <select id="prr_payment_status" name="payment_status" class="admin-inp">
+                    <option value="all"<?php echo $paymentStatusFilter === 'all' ? ' selected' : ''; ?>>الكل</option>
+                    <option value="paid"<?php echo $paymentStatusFilter === 'paid' ? ' selected' : ''; ?>>مسدد</option>
+                    <option value="unpaid"<?php echo $paymentStatusFilter === 'unpaid' ? ' selected' : ''; ?>>غير مسدد</option>
+                </select>
+            </div>
             <?php if ($reportKey === 'items'): ?>
                 <div class="prr-items-zero-wrap">
                     <label class="prr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
@@ -896,9 +1035,6 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         تقرير تفصيلي
                     </label>
                 </div>
-            <?php endif; ?>
-            <?php if ($reportKey !== 'items' && $reportKey !== 'suppliers'): ?>
-                <span class="prr-options-placeholder" aria-hidden="true">&nbsp;</span>
             <?php endif; ?>
         </div>
 
@@ -1315,14 +1451,12 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     min-height: 2.1rem;
     overflow-x: auto;
 }
-.prr-filter-form .prr-options-row.is-empty {
-    pointer-events: none;
-}
-.prr-filter-form .prr-options-placeholder {
-    display: inline-block;
-    width: 1px;
-    height: 1.6rem;
-    opacity: 0;
+.prr-filter-form .prr-type-wrap,
+.prr-filter-form .prr-payment-status-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 11rem;
 }
 .prr-filter-form .prr-items-zero-wrap {
     display: flex;
