@@ -45,6 +45,12 @@ $source = isset($_GET['src']) ? trim((string) $_GET['src']) : 'all';
 if (!in_array($source, ['all', 'company', 'online'], true)) {
     $source = 'all';
 }
+$payFilter = isset($_GET['pay']) ? trim((string) $_GET['pay']) : 'all';
+if (!in_array($payFilter, ['all', 'cash', 'online', 'credit'], true)) {
+    $payFilter = 'all';
+}
+$channelFilter = isset($_GET['channel_id']) ? (int) $_GET['channel_id'] : 0;
+$customerDetailed = isset($_GET['customer_detail']) && (string) $_GET['customer_detail'] === '1';
 
 $customerId = isset($_GET['customer_id']) ? max(0, (int) $_GET['customer_id']) : 0;
 $productId = isset($_GET['product_id']) ? max(0, (int) $_GET['product_id']) : 0;
@@ -57,6 +63,7 @@ $hasOrders = orange_table_exists($pdo, 'orders');
 $hasOrderItems = orange_table_exists($pdo, 'order_items');
 $hasSalesReturns = orange_table_exists($pdo, 'sales_returns');
 $hasSalesReturnItems = orange_table_exists($pdo, 'sales_return_items');
+$hasChannels = orange_table_exists($pdo, 'channels');
 
 $hasCustomerCode = $hasCustomers && orange_table_has_column($pdo, 'customers', 'code');
 $hasCustomerNameAr = $hasCustomers && orange_table_has_column($pdo, 'customers', 'name_ar');
@@ -133,6 +140,19 @@ if ($productId > 0 && !isset($productMap[$productId])) {
     $productId = 0;
 }
 
+$channelOptions = [];
+if ($hasChannels) {
+    $sql = 'SELECT id, name FROM channels WHERE 1=1';
+    if ($countryId > 0 && function_exists('orange_channels_has_country_column') && orange_channels_has_country_column($pdo)) {
+        $sql .= orange_sql_country_and_fragment($pdo, 'channels', 'channels', $countryId);
+    }
+    $sql .= ' ORDER BY name ASC';
+    $channelOptions = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+$directChannelLabel = function_exists('orange_sales_company_direct_channel_label')
+    ? orange_sales_company_direct_channel_label()
+    : 'الشركة';
+
 $customerPickerRows = [];
 foreach ($customers as $row) {
     $cid = (int) ($row['id'] ?? 0);
@@ -172,6 +192,7 @@ $hasOrdInvoiceNumber = $hasOrders && orange_table_has_column($pdo, 'orders', 'in
 $hasOrdOrderNumber = $hasOrders && orange_table_has_column($pdo, 'orders', 'order_number');
 $hasOrdCustomerId = $hasOrders && orange_table_has_column($pdo, 'orders', 'customer_id');
 $hasOrdCustomerName = $hasOrders && orange_table_has_column($pdo, 'orders', 'customer_name');
+$hasOrdChannelId = $hasOrders && orange_table_has_column($pdo, 'orders', 'channel_id');
 
 $hasOiLineDiscount = $hasOrderItems && orange_table_has_column($pdo, 'order_items', 'line_discount');
 $hasOiVariant = $hasOrderItems && orange_table_has_column($pdo, 'order_items', 'variant_id');
@@ -184,6 +205,7 @@ $hasSrInvoiceRef = $hasSalesReturns && orange_table_has_column($pdo, 'sales_retu
 $hasSrReturnNumber = $hasSalesReturns && orange_table_has_column($pdo, 'sales_returns', 'return_number');
 $hasSrCustomerId = $hasSalesReturns && orange_table_has_column($pdo, 'sales_returns', 'customer_id');
 $hasSrType = $hasSalesReturns && orange_table_has_column($pdo, 'sales_returns', 'type');
+$hasSrChannelId = $hasSalesReturns && orange_table_has_column($pdo, 'sales_returns', 'channel_id');
 
 $hasSriVariant = $hasSalesReturnItems && orange_table_has_column($pdo, 'sales_return_items', 'variant_id');
 $hasSriLineDiscount = $hasSalesReturnItems && orange_table_has_column($pdo, 'sales_return_items', 'line_discount');
@@ -246,11 +268,146 @@ $resolveReturnSource = static function (array $row) use ($hasSrSourceKind, $hasS
     }
     return '';
 };
+$resolveOrderSource = static function (array $row) use ($hasOrdSource, $hasOrdInvoiceNumber): string {
+    if ($hasOrdSource) {
+        return trim((string) ($row['source_kind'] ?? ''));
+    }
+    if ($hasOrdInvoiceNumber) {
+        $ref = strtoupper(trim((string) ($row['reference'] ?? '')));
+        if (str_starts_with($ref, 'INV-C-')) {
+            return 'company';
+        }
+        if (str_starts_with($ref, 'INV-O-')) {
+            return 'online';
+        }
+    }
+    return '';
+};
+$marketingLabel = static function (?int $channelId, string $channelName, string $sourceKind): string {
+    return orange_sales_return_marketing_channel_label($channelId, $channelName, $sourceKind);
+};
+
+$applyOrderSourceFilter = static function (string &$sql, array &$params) use ($source, $hasOrdSource, $hasOrdInvoiceNumber): void {
+    if ($source === 'all') {
+        return;
+    }
+    if ($hasOrdSource) {
+        if ($source === 'company') {
+            $sql .= " AND COALESCE(o.order_source,'website') = 'company'";
+        } else {
+            $sql .= " AND COALESCE(o.order_source,'website') <> 'company'";
+        }
+        return;
+    }
+    if ($hasOrdInvoiceNumber) {
+        $sql .= $source === 'company'
+            ? " AND UPPER(COALESCE(o.invoice_number,'')) LIKE 'INV-C-%'"
+            : " AND UPPER(COALESCE(o.invoice_number,'')) LIKE 'INV-O-%'";
+        return;
+    }
+    $sql .= ' AND 1=0';
+};
+$applyOrderPayFilter = static function (string &$sql, array &$params) use ($payFilter, $hasOrdPaymentTerms): void {
+    if ($payFilter === 'all') {
+        return;
+    }
+    if ($hasOrdPaymentTerms) {
+        $sql .= ' AND COALESCE(o.payment_terms,\'cash\') = ?';
+        $params[] = $payFilter;
+        return;
+    }
+    $sql .= ' AND 1=0';
+};
+$applyOrderChannelFilter = static function (string &$sql, array &$params) use ($channelFilter, $hasOrdChannelId, $hasOrdSource, $hasOrdInvoiceNumber): void {
+    if ($channelFilter === 0) {
+        return;
+    }
+    if ($channelFilter > 0) {
+        if ($hasOrdChannelId) {
+            $sql .= ' AND o.channel_id = ?';
+            $params[] = $channelFilter;
+        } else {
+            $sql .= ' AND 1=0';
+        }
+        return;
+    }
+    if ($channelFilter === -1) {
+        if ($hasOrdChannelId) {
+            $sql .= ' AND (o.channel_id IS NULL OR o.channel_id = 0)';
+        }
+        if ($hasOrdSource) {
+            $sql .= " AND COALESCE(o.order_source,'website') = 'company'";
+            return;
+        }
+        if ($hasOrdInvoiceNumber) {
+            $sql .= " AND UPPER(COALESCE(o.invoice_number,'')) LIKE 'INV-C-%'";
+            return;
+        }
+        $sql .= ' AND 1=0';
+    }
+};
+$applyReturnSourceFilter = static function (string &$sql, array &$params) use ($source, $hasSrSourceKind, $hasSrInvoiceRef): void {
+    if ($source === 'all') {
+        return;
+    }
+    if ($hasSrSourceKind) {
+        $sql .= ' AND sr.source_kind = ?';
+        $params[] = $source;
+        return;
+    }
+    if ($hasSrInvoiceRef) {
+        $sql .= $source === 'company'
+            ? " AND UPPER(COALESCE(sr.invoice_reference,'')) LIKE 'INV-C-%'"
+            : " AND UPPER(COALESCE(sr.invoice_reference,'')) LIKE 'INV-O-%'";
+        return;
+    }
+    $sql .= ' AND 1=0';
+};
+$applyReturnPayFilter = static function (string &$sql, array &$params) use ($payFilter, $hasSrType): void {
+    if ($payFilter === 'all') {
+        return;
+    }
+    if ($hasSrType) {
+        $sql .= ' AND sr.type = ?';
+        $params[] = $payFilter;
+        return;
+    }
+    $sql .= ' AND 1=0';
+};
+$applyReturnChannelFilter = static function (string &$sql, array &$params) use ($channelFilter, $hasSrChannelId, $hasSrSourceKind, $hasSrInvoiceRef, $pdo): void {
+    if ($channelFilter === 0) {
+        return;
+    }
+    if ($hasSrChannelId) {
+        [$chSql, $chParams] = orange_sales_returns_report_channel_filter_sql($pdo, $channelFilter);
+        $sql .= $chSql;
+        foreach ($chParams as $p) {
+            $params[] = $p;
+        }
+        return;
+    }
+    if ($channelFilter > 0) {
+        $sql .= ' AND 1=0';
+        return;
+    }
+    if ($channelFilter === -1) {
+        if ($hasSrSourceKind) {
+            $sql .= " AND sr.source_kind = 'company'";
+            return;
+        }
+        if ($hasSrInvoiceRef) {
+            $sql .= " AND UPPER(COALESCE(sr.invoice_reference,'')) LIKE 'INV-C-%'";
+            return;
+        }
+        $sql .= ' AND 1=0';
+    }
+};
 
 $rows = [];
 $invoiceSummary = ['count' => 0, 'subtotal' => 0.0, 'discount' => 0.0, 'net' => 0.0];
 $returnSummary = ['count' => 0, 'total' => 0.0];
 $customerSummary = ['sales_count' => 0, 'sales_total' => 0.0, 'return_count' => 0, 'return_total' => 0.0, 'net' => 0.0];
+$customerDetailSummary = ['sales_count' => 0, 'sales_total' => 0.0, 'return_count' => 0, 'return_total' => 0.0, 'net' => 0.0];
 $itemSummary = ['sales_qty' => 0.0, 'sales_value' => 0.0, 'return_qty' => 0.0, 'return_value' => 0.0, 'net_qty' => 0.0, 'net_value' => 0.0];
 $monthlySummary = ['sales_count' => 0, 'sales_total' => 0.0, 'return_count' => 0, 'return_total' => 0.0, 'net_total' => 0.0];
 $reportError = '';
@@ -289,19 +446,9 @@ try {
                 . " AND o.status = 'completed'
                   AND " . $dateSql . ' BETWEEN ? AND ?';
         $params = [$from, $to];
-        if ($source === 'company') {
-            if ($hasOrdSource) {
-                $sql .= " AND COALESCE(o.order_source,'website') = 'company'";
-            } elseif ($hasOrdInvoiceNumber) {
-                $sql .= " AND UPPER(COALESCE(o.invoice_number,'')) LIKE 'INV-C-%'";
-            }
-        } elseif ($source === 'online') {
-            if ($hasOrdSource) {
-                $sql .= " AND COALESCE(o.order_source,'website') <> 'company'";
-            } elseif ($hasOrdInvoiceNumber) {
-                $sql .= " AND UPPER(COALESCE(o.invoice_number,'')) LIKE 'INV-O-%'";
-            }
-        }
+        $applyOrderSourceFilter($sql, $params);
+        $applyOrderPayFilter($sql, $params);
+        $applyOrderChannelFilter($sql, $params);
         if ($customerId > 0 && $hasOrdCustomerId) {
             $sql .= ' AND o.customer_id = ?';
             $params[] = $customerId;
@@ -360,16 +507,9 @@ try {
             . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
             . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
         $params = [$from, $to];
-        if ($source !== 'all') {
-            if ($hasSrSourceKind) {
-                $sql .= ' AND sr.source_kind = ?';
-                $params[] = $source;
-            } elseif ($hasSrInvoiceRef) {
-                $sql .= $source === 'company'
-                    ? " AND UPPER(COALESCE(sr.invoice_reference,'')) LIKE 'INV-C-%'"
-                    : " AND UPPER(COALESCE(sr.invoice_reference,'')) LIKE 'INV-O-%'";
-            }
-        }
+        $applyReturnSourceFilter($sql, $params);
+        $applyReturnPayFilter($sql, $params);
+        $applyReturnChannelFilter($sql, $params);
         if ($customerId > 0 && $hasSrCustomerId) {
             $sql .= ' AND sr.customer_id = ?';
             $params[] = $customerId;
@@ -397,105 +537,251 @@ try {
             $returnSummary['total'] += (float) ($r['total_amount'] ?? 0);
         }
     } elseif ($tab === 'customers') {
-        $salesAgg = [];
-        $returnAgg = [];
+        if ($customerDetailed) {
+            $detailRows = [];
 
-        if ($hasOrders) {
-            $dateSql = $orderDateExpr('o');
-            $sql = 'SELECT ' . ($hasOrdCustomerId ? 'COALESCE(o.customer_id,0)' : '0') . ' AS customer_id,
-                           COUNT(*) AS cnt,
-                           COALESCE(SUM(COALESCE(o.total,0)),0) AS total_sum
-                    FROM orders o
-                    WHERE 1=1'
-                . orange_sql_country_and_fragment($pdo, 'orders', 'o', $countryId)
-                . " AND o.status = 'completed'
-                  AND " . $dateSql . ' BETWEEN ? AND ?';
-            $params = [$from, $to];
-            if ($source === 'company') {
-                if ($hasOrdSource) {
-                    $sql .= " AND COALESCE(o.order_source,'website') = 'company'";
+            if ($hasOrders) {
+                $dateSql = $orderDateExpr('o');
+                $referenceExpr = $hasOrdInvoiceNumber
+                    ? ($hasOrdOrderNumber
+                        ? "COALESCE(NULLIF(TRIM(o.invoice_number),''), NULLIF(TRIM(o.order_number),''), CONCAT('ORD-', o.id))"
+                        : "COALESCE(NULLIF(TRIM(o.invoice_number),''), CONCAT('ORD-', o.id))")
+                    : ($hasOrdOrderNumber ? "COALESCE(NULLIF(TRIM(o.order_number),''), CONCAT('ORD-', o.id))" : "CONCAT('ORD-', o.id)");
+                $joinChannel = ($hasChannels && $hasOrdChannelId) ? ' LEFT JOIN channels ch ON ch.id = o.channel_id' : '';
+                $sql = 'SELECT ' . $referenceExpr . ' AS reference,
+                               ' . $dateSql . ' AS doc_date,
+                               ' . ($hasOrdCustomerId ? 'COALESCE(o.customer_id,0)' : '0') . ' AS customer_id,
+                               ' . ($hasOrdCustomerName ? "COALESCE(o.customer_name,'')" : "''") . ' AS customer_name_raw,
+                               ' . ($hasOrdSource ? "COALESCE(o.order_source,'website')" : "''") . ' AS source_kind,
+                               ' . ($hasOrdPaymentTerms ? "COALESCE(o.payment_terms,'cash')" : "'cash'") . ' AS pay_type,
+                               ' . ($hasOrdChannelId ? 'COALESCE(o.channel_id,0)' : '0') . ' AS channel_id,
+                               ' . ($hasChannels && $hasOrdChannelId ? "COALESCE(ch.name,'')" : "''") . ' AS channel_name_db,
+                               COALESCE(o.total,0) AS net_amount
+                        FROM orders o
+                        ' . $joinChannel . '
+                        WHERE 1=1'
+                    . orange_sql_country_and_fragment($pdo, 'orders', 'o', $countryId)
+                    . " AND o.status = 'completed'
+                      AND " . $dateSql . ' BETWEEN ? AND ?';
+                $params = [$from, $to];
+                $applyOrderSourceFilter($sql, $params);
+                $applyOrderPayFilter($sql, $params);
+                $applyOrderChannelFilter($sql, $params);
+                if ($customerId > 0 && $hasOrdCustomerId) {
+                    $sql .= ' AND o.customer_id = ?';
+                    $params[] = $customerId;
                 }
-            } elseif ($source === 'online') {
-                if ($hasOrdSource) {
-                    $sql .= " AND COALESCE(o.order_source,'website') <> 'company'";
+                if ($productId > 0 && $hasOrderItems) {
+                    $sql .= ' AND EXISTS (SELECT 1 FROM order_items oi2 WHERE oi2.order_id = o.id AND oi2.product_id = ?)';
+                    $params[] = $productId;
+                }
+                $sql .= ' ORDER BY customer_id ASC, ' . $dateSql . ' ASC, o.id ASC';
+                $st = $pdo->prepare($sql);
+                $st->execute($params);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $cid = (int) ($r['customer_id'] ?? 0);
+                    $customerName = trim((string) ($r['customer_name_raw'] ?? ''));
+                    if ($customerName === '' && $cid > 0 && isset($customerMap[$cid])) {
+                        $customerName = (string) $customerMap[$cid]['name'];
+                    }
+                    if ($customerName === '') {
+                        $customerName = $cid > 0 ? ('#' . $cid) : 'غير محدد';
+                    }
+                    $src = $resolveOrderSource($r);
+                    $amount = (float) ($r['net_amount'] ?? 0);
+                    $detailRows[] = [
+                        'customer' => $customerName,
+                        'doc_type' => 'فاتورة مبيعات',
+                        'reference' => (string) ($r['reference'] ?? ''),
+                        'date' => (string) ($r['doc_date'] ?? ''),
+                        'source' => $src,
+                        'payment' => (string) ($r['pay_type'] ?? 'cash'),
+                        'channel' => $marketingLabel(
+                            (int) ($r['channel_id'] ?? 0) > 0 ? (int) ($r['channel_id'] ?? 0) : null,
+                            (string) ($r['channel_name_db'] ?? ''),
+                            $src
+                        ),
+                        'invoice_reference' => '',
+                        'amount' => $amount,
+                    ];
+                    $customerDetailSummary['sales_count']++;
+                    $customerDetailSummary['sales_total'] += $amount;
+                    $customerDetailSummary['net'] += $amount;
                 }
             }
-            if ($customerId > 0 && $hasOrdCustomerId) {
-                $sql .= ' AND o.customer_id = ?';
-                $params[] = $customerId;
-            }
-            if ($productId > 0 && $hasOrderItems) {
-                $sql .= ' AND EXISTS (SELECT 1 FROM order_items oi2 WHERE oi2.order_id = o.id AND oi2.product_id = ?)';
-                $params[] = $productId;
-            }
-            $sql .= ' GROUP BY customer_id';
-            $st = $pdo->prepare($sql);
-            $st->execute($params);
-            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                $cid = (int) ($r['customer_id'] ?? 0);
-                $salesAgg[$cid] = ['count' => (int) ($r['cnt'] ?? 0), 'total' => (float) ($r['total_sum'] ?? 0)];
-            }
-        }
 
-        if ($hasSalesReturns) {
-            $dateSql = $returnDateExpr('sr');
-            $sql = 'SELECT ' . ($hasSrCustomerId ? 'COALESCE(sr.customer_id,0)' : '0') . ' AS customer_id,
-                           COUNT(*) AS cnt,
-                           COALESCE(SUM(COALESCE(sr.total,0)),0) AS total_sum
-                    FROM sales_returns sr
-                    WHERE 1=1'
-                . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
-                . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
-            $params = [$from, $to];
-            if ($source !== 'all' && $hasSrSourceKind) {
-                $sql .= ' AND sr.source_kind = ?';
-                $params[] = $source;
+            if ($hasSalesReturns) {
+                $dateSql = $returnDateExpr('sr');
+                $referenceExpr = $hasSrReturnNumber
+                    ? "COALESCE(NULLIF(TRIM(sr.return_number),''), CONCAT('SR-', sr.id))"
+                    : "CONCAT('SR-', sr.id)";
+                $joinChannel = ($hasChannels && $hasSrChannelId) ? ' LEFT JOIN channels ch ON ch.id = sr.channel_id' : '';
+                $sql = 'SELECT ' . $referenceExpr . ' AS reference,
+                               ' . $dateSql . ' AS doc_date,
+                               ' . ($hasSrCustomerId ? 'COALESCE(sr.customer_id,0)' : '0') . ' AS customer_id,
+                               ' . ($hasSrInvoiceRef ? "COALESCE(sr.invoice_reference,'')" : "''") . ' AS invoice_reference,
+                               ' . ($hasSrSourceKind ? "COALESCE(sr.source_kind,'')" : "''") . ' AS source_kind,
+                               ' . ($hasSrType ? "COALESCE(sr.type,'cash')" : "'cash'") . ' AS pay_type,
+                               ' . ($hasSrChannelId ? 'COALESCE(sr.channel_id,0)' : '0') . ' AS channel_id,
+                               ' . ($hasChannels && $hasSrChannelId ? "COALESCE(ch.name,'')" : "''") . ' AS channel_name_db,
+                               COALESCE(sr.total,0) AS total_amount
+                        FROM sales_returns sr
+                        ' . $joinChannel . '
+                        WHERE 1=1'
+                    . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
+                    . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
+                $params = [$from, $to];
+                $applyReturnSourceFilter($sql, $params);
+                $applyReturnPayFilter($sql, $params);
+                $applyReturnChannelFilter($sql, $params);
+                if ($customerId > 0 && $hasSrCustomerId) {
+                    $sql .= ' AND sr.customer_id = ?';
+                    $params[] = $customerId;
+                }
+                if ($productId > 0 && $hasSalesReturnItems) {
+                    $sql .= ' AND EXISTS (SELECT 1 FROM sales_return_items sri2 WHERE sri2.sales_return_id = sr.id AND sri2.product_id = ?)';
+                    $params[] = $productId;
+                }
+                $sql .= ' ORDER BY customer_id ASC, ' . $dateSql . ' ASC, sr.id ASC';
+                $st = $pdo->prepare($sql);
+                $st->execute($params);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $cid = (int) ($r['customer_id'] ?? 0);
+                    $customerName = $cid > 0 && isset($customerMap[$cid]) ? (string) $customerMap[$cid]['name'] : ($cid > 0 ? ('#' . $cid) : 'غير محدد');
+                    $src = $resolveReturnSource($r);
+                    $retTotal = (float) ($r['total_amount'] ?? 0);
+                    $detailRows[] = [
+                        'customer' => $customerName,
+                        'doc_type' => 'مردود مبيعات',
+                        'reference' => (string) ($r['reference'] ?? ''),
+                        'date' => (string) ($r['doc_date'] ?? ''),
+                        'source' => $src,
+                        'payment' => (string) ($r['pay_type'] ?? 'cash'),
+                        'channel' => $marketingLabel(
+                            (int) ($r['channel_id'] ?? 0) > 0 ? (int) ($r['channel_id'] ?? 0) : null,
+                            (string) ($r['channel_name_db'] ?? ''),
+                            $src
+                        ),
+                        'invoice_reference' => (string) ($r['invoice_reference'] ?? ''),
+                        'amount' => 0 - $retTotal,
+                    ];
+                    $customerDetailSummary['return_count']++;
+                    $customerDetailSummary['return_total'] += $retTotal;
+                    $customerDetailSummary['net'] -= $retTotal;
+                }
             }
-            if ($customerId > 0 && $hasSrCustomerId) {
-                $sql .= ' AND sr.customer_id = ?';
-                $params[] = $customerId;
-            }
-            if ($productId > 0 && $hasSalesReturnItems) {
-                $sql .= ' AND EXISTS (SELECT 1 FROM sales_return_items sri2 WHERE sri2.sales_return_id = sr.id AND sri2.product_id = ?)';
-                $params[] = $productId;
-            }
-            $sql .= ' GROUP BY customer_id';
-            $st = $pdo->prepare($sql);
-            $st->execute($params);
-            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                $cid = (int) ($r['customer_id'] ?? 0);
-                $returnAgg[$cid] = ['count' => (int) ($r['cnt'] ?? 0), 'total' => (float) ($r['total_sum'] ?? 0)];
-            }
-        }
 
-        $allIds = [];
-        foreach (array_keys($salesAgg) as $cid) {
-            $allIds[$cid] = true;
-        }
-        foreach (array_keys($returnAgg) as $cid) {
-            $allIds[$cid] = true;
-        }
-        foreach (array_keys($allIds) as $cid) {
-            if ($customerId > 0 && $cid !== $customerId) {
-                continue;
+            usort($detailRows, static function (array $a, array $b): int {
+                $cmp = strcmp((string) ($a['customer'] ?? ''), (string) ($b['customer'] ?? ''));
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+                $cmp = strcmp((string) ($a['date'] ?? ''), (string) ($b['date'] ?? ''));
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+                $cmp = strcmp((string) ($a['doc_type'] ?? ''), (string) ($b['doc_type'] ?? ''));
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+
+                return strcmp((string) ($a['reference'] ?? ''), (string) ($b['reference'] ?? ''));
+            });
+            $rows = $detailRows;
+        } else {
+            $salesAgg = [];
+            $returnAgg = [];
+
+            if ($hasOrders) {
+                $dateSql = $orderDateExpr('o');
+                $sql = 'SELECT ' . ($hasOrdCustomerId ? 'COALESCE(o.customer_id,0)' : '0') . ' AS customer_id,
+                               COUNT(*) AS cnt,
+                               COALESCE(SUM(COALESCE(o.total,0)),0) AS total_sum
+                        FROM orders o
+                        WHERE 1=1'
+                    . orange_sql_country_and_fragment($pdo, 'orders', 'o', $countryId)
+                    . " AND o.status = 'completed'
+                      AND " . $dateSql . ' BETWEEN ? AND ?';
+                $params = [$from, $to];
+                $applyOrderSourceFilter($sql, $params);
+                $applyOrderPayFilter($sql, $params);
+                $applyOrderChannelFilter($sql, $params);
+                if ($customerId > 0 && $hasOrdCustomerId) {
+                    $sql .= ' AND o.customer_id = ?';
+                    $params[] = $customerId;
+                }
+                if ($productId > 0 && $hasOrderItems) {
+                    $sql .= ' AND EXISTS (SELECT 1 FROM order_items oi2 WHERE oi2.order_id = o.id AND oi2.product_id = ?)';
+                    $params[] = $productId;
+                }
+                $sql .= ' GROUP BY customer_id';
+                $st = $pdo->prepare($sql);
+                $st->execute($params);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $cid = (int) ($r['customer_id'] ?? 0);
+                    $salesAgg[$cid] = ['count' => (int) ($r['cnt'] ?? 0), 'total' => (float) ($r['total_sum'] ?? 0)];
+                }
             }
-            $s = $salesAgg[$cid] ?? ['count' => 0, 'total' => 0.0];
-            $r = $returnAgg[$cid] ?? ['count' => 0, 'total' => 0.0];
-            $name = $cid > 0 && isset($customerMap[$cid]) ? (string) $customerMap[$cid]['name'] : ($cid > 0 ? ('#' . $cid) : 'غير محدد');
-            $net = (float) $s['total'] - (float) $r['total'];
-            $rows[] = [
-                'customer' => $name,
-                'sales_count' => (int) $s['count'],
-                'sales_total' => (float) $s['total'],
-                'return_count' => (int) $r['count'],
-                'return_total' => (float) $r['total'],
-                'net' => $net,
-            ];
-            $customerSummary['sales_count'] += (int) $s['count'];
-            $customerSummary['sales_total'] += (float) $s['total'];
-            $customerSummary['return_count'] += (int) $r['count'];
-            $customerSummary['return_total'] += (float) $r['total'];
-            $customerSummary['net'] += $net;
+
+            if ($hasSalesReturns) {
+                $dateSql = $returnDateExpr('sr');
+                $sql = 'SELECT ' . ($hasSrCustomerId ? 'COALESCE(sr.customer_id,0)' : '0') . ' AS customer_id,
+                               COUNT(*) AS cnt,
+                               COALESCE(SUM(COALESCE(sr.total,0)),0) AS total_sum
+                        FROM sales_returns sr
+                        WHERE 1=1'
+                    . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
+                    . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
+                $params = [$from, $to];
+                $applyReturnSourceFilter($sql, $params);
+                $applyReturnPayFilter($sql, $params);
+                $applyReturnChannelFilter($sql, $params);
+                if ($customerId > 0 && $hasSrCustomerId) {
+                    $sql .= ' AND sr.customer_id = ?';
+                    $params[] = $customerId;
+                }
+                if ($productId > 0 && $hasSalesReturnItems) {
+                    $sql .= ' AND EXISTS (SELECT 1 FROM sales_return_items sri2 WHERE sri2.sales_return_id = sr.id AND sri2.product_id = ?)';
+                    $params[] = $productId;
+                }
+                $sql .= ' GROUP BY customer_id';
+                $st = $pdo->prepare($sql);
+                $st->execute($params);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $cid = (int) ($r['customer_id'] ?? 0);
+                    $returnAgg[$cid] = ['count' => (int) ($r['cnt'] ?? 0), 'total' => (float) ($r['total_sum'] ?? 0)];
+                }
+            }
+
+            $allIds = [];
+            foreach (array_keys($salesAgg) as $cid) {
+                $allIds[$cid] = true;
+            }
+            foreach (array_keys($returnAgg) as $cid) {
+                $allIds[$cid] = true;
+            }
+            foreach (array_keys($allIds) as $cid) {
+                if ($customerId > 0 && $cid !== $customerId) {
+                    continue;
+                }
+                $s = $salesAgg[$cid] ?? ['count' => 0, 'total' => 0.0];
+                $r = $returnAgg[$cid] ?? ['count' => 0, 'total' => 0.0];
+                $name = $cid > 0 && isset($customerMap[$cid]) ? (string) $customerMap[$cid]['name'] : ($cid > 0 ? ('#' . $cid) : 'غير محدد');
+                $net = (float) $s['total'] - (float) $r['total'];
+                $rows[] = [
+                    'customer' => $name,
+                    'sales_count' => (int) $s['count'],
+                    'sales_total' => (float) $s['total'],
+                    'return_count' => (int) $r['count'],
+                    'return_total' => (float) $r['total'],
+                    'net' => $net,
+                ];
+                $customerSummary['sales_count'] += (int) $s['count'];
+                $customerSummary['sales_total'] += (float) $s['total'];
+                $customerSummary['return_count'] += (int) $r['count'];
+                $customerSummary['return_total'] += (float) $r['total'];
+                $customerSummary['net'] += $net;
+            }
         }
     } elseif ($tab === 'items') {
         $itemsMap = [];
@@ -521,11 +807,9 @@ try {
                 . " AND o.status = 'completed'
                   AND " . $dateSql . ' BETWEEN ? AND ?';
             $params = [$from, $to];
-            if ($source === 'company' && $hasOrdSource) {
-                $sql .= " AND COALESCE(o.order_source,'website') = 'company'";
-            } elseif ($source === 'online' && $hasOrdSource) {
-                $sql .= " AND COALESCE(o.order_source,'website') <> 'company'";
-            }
+            $applyOrderSourceFilter($sql, $params);
+            $applyOrderPayFilter($sql, $params);
+            $applyOrderChannelFilter($sql, $params);
             if ($customerId > 0 && $hasOrdCustomerId) {
                 $sql .= ' AND o.customer_id = ?';
                 $params[] = $customerId;
@@ -574,10 +858,9 @@ try {
                 . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
                 . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
             $params = [$from, $to];
-            if ($source !== 'all' && $hasSrSourceKind) {
-                $sql .= ' AND sr.source_kind = ?';
-                $params[] = $source;
-            }
+            $applyReturnSourceFilter($sql, $params);
+            $applyReturnPayFilter($sql, $params);
+            $applyReturnChannelFilter($sql, $params);
             if ($customerId > 0 && $hasSrCustomerId) {
                 $sql .= ' AND sr.customer_id = ?';
                 $params[] = $customerId;
@@ -653,11 +936,9 @@ try {
                 . " AND o.status = 'completed'
                   AND " . $dateSql . ' BETWEEN ? AND ?';
             $params = [$from, $to];
-            if ($source === 'company' && $hasOrdSource) {
-                $sql .= " AND COALESCE(o.order_source,'website') = 'company'";
-            } elseif ($source === 'online' && $hasOrdSource) {
-                $sql .= " AND COALESCE(o.order_source,'website') <> 'company'";
-            }
+            $applyOrderSourceFilter($sql, $params);
+            $applyOrderPayFilter($sql, $params);
+            $applyOrderChannelFilter($sql, $params);
             if ($customerId > 0 && $hasOrdCustomerId) {
                 $sql .= ' AND o.customer_id = ?';
                 $params[] = $customerId;
@@ -688,10 +969,9 @@ try {
                 . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
                 . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
             $params = [$from, $to];
-            if ($source !== 'all' && $hasSrSourceKind) {
-                $sql .= ' AND sr.source_kind = ?';
-                $params[] = $source;
-            }
+            $applyReturnSourceFilter($sql, $params);
+            $applyReturnPayFilter($sql, $params);
+            $applyReturnChannelFilter($sql, $params);
             if ($customerId > 0 && $hasSrCustomerId) {
                 $sql .= ' AND sr.customer_id = ?';
                 $params[] = $customerId;
@@ -746,17 +1026,38 @@ $companyCr = (string) ($company['commercial_register'] ?? '');
 $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $reportTitle = $tabs[$tab];
 
+$selectedChannelFilterLabel = '';
+if ($channelFilter === -1) {
+    $selectedChannelFilterLabel = $directChannelLabel;
+} elseif ($channelFilter > 0) {
+    foreach ($channelOptions as $ch) {
+        if ((int) ($ch['id'] ?? 0) === $channelFilter) {
+            $selectedChannelFilterLabel = (string) ($ch['name'] ?? '');
+            break;
+        }
+    }
+}
+
 $subtitleParts = ['من ' . orange_format_date_dmY($from) . ' إلى ' . orange_format_date_dmY($to)];
 if ($source === 'company') {
     $subtitleParts[] = 'المصدر: شركة';
 } elseif ($source === 'online') {
     $subtitleParts[] = 'المصدر: أونلاين';
 }
+if ($payFilter !== 'all') {
+    $subtitleParts[] = 'التحصيل: ' . $paymentLabel($payFilter);
+}
+if ($selectedChannelFilterLabel !== '') {
+    $subtitleParts[] = 'قناة التسويق: ' . $selectedChannelFilterLabel;
+}
 if ($customerId > 0 && isset($customerMap[$customerId])) {
     $subtitleParts[] = 'العميل: ' . $customerMap[$customerId]['name'];
 }
 if ($productId > 0 && isset($productMap[$productId])) {
     $subtitleParts[] = 'الصنف: ' . $productMap[$productId]['name'];
+}
+if ($tab === 'customers' && $customerDetailed) {
+    $subtitleParts[] = 'الوضع: تقرير تفصيلي';
 }
 $filterSubtitle = implode(' — ', $subtitleParts);
 ?>
@@ -830,6 +1131,35 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     <option value="online"<?php echo $source === 'online' ? ' selected' : ''; ?>>أونلاين</option>
                 </select>
             </div>
+            <div class="srr-pay-wrap">
+                <label for="srr_pay">قناة التحصيل</label>
+                <select id="srr_pay" name="pay" class="admin-inp">
+                    <option value="all"<?php echo $payFilter === 'all' ? ' selected' : ''; ?>>الكل</option>
+                    <option value="cash"<?php echo $payFilter === 'cash' ? ' selected' : ''; ?>>نقدي</option>
+                    <option value="online"<?php echo $payFilter === 'online' ? ' selected' : ''; ?>>أونلاين</option>
+                    <option value="credit"<?php echo $payFilter === 'credit' ? ' selected' : ''; ?>>آجل</option>
+                </select>
+            </div>
+            <div class="srr-channel-wrap">
+                <label for="srr_channel">قناة التسويق</label>
+                <select id="srr_channel" name="channel_id" class="admin-inp">
+                    <option value="0"<?php echo $channelFilter === 0 ? ' selected' : ''; ?>>الكل</option>
+                    <option value="-1"<?php echo $channelFilter === -1 ? ' selected' : ''; ?>><?php echo htmlspecialchars($directChannelLabel, ENT_QUOTES, 'UTF-8'); ?> — مبيعات شركة مباشرة</option>
+                    <?php foreach ($channelOptions as $ch): ?>
+                        <option value="<?php echo (int) ($ch['id'] ?? 0); ?>"<?php echo $channelFilter === (int) ($ch['id'] ?? 0) ? ' selected' : ''; ?>>
+                            <?php echo htmlspecialchars((string) ($ch['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php if ($tab === 'customers'): ?>
+                <div class="srr-customers-detail-wrap">
+                    <label class="srr-customers-detail-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
+                        <input type="checkbox" name="customer_detail" value="1" <?php echo $customerDetailed ? 'checked' : ''; ?>>
+                        تقرير تفصيلي
+                    </label>
+                </div>
+            <?php endif; ?>
             <?php if ($tab === 'items'): ?>
                 <div class="srr-items-zero-wrap">
                     <label class="srr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
@@ -838,7 +1168,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     </label>
                 </div>
             <?php endif; ?>
-            <?php if ($tab !== 'items'): ?>
+            <?php if ($tab !== 'items' && $tab !== 'customers'): ?>
                 <span class="srr-options-placeholder" aria-hidden="true">&nbsp;</span>
             <?php endif; ?>
         </div>
@@ -907,21 +1237,47 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     </tbody>
                     <tfoot><tr><th colspan="6">الإجمالي (<?php echo (int) $returnSummary['count']; ?>)</th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $returnSummary['total']); ?></th></tr></tfoot>
                 <?php elseif ($tab === 'customers'): ?>
-                    <thead><tr><th>العميل</th><th class="gl-acc-stmt-col-num">عدد فواتير المبيعات</th><th class="gl-acc-stmt-col-num">صافي المبيعات</th><th class="gl-acc-stmt-col-num">عدد المردودات</th><th class="gl-acc-stmt-col-num">صافي المردودات</th><th class="gl-acc-stmt-col-num">الصافي بعد المردود</th></tr></thead>
-                    <tbody>
-                    <?php if ($rows === []): ?><tr><td colspan="6" class="muted">لا توجد بيانات عملاء في المدى المحدد.</td></tr>
-                    <?php else: foreach ($rows as $r): ?>
-                        <tr>
-                            <td><?php echo htmlspecialchars((string) $r['customer'], ENT_QUOTES, 'UTF-8'); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo (int) $r['sales_count']; ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['sales_total']); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo (int) $r['return_count']; ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['return_total']); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['net']); ?></td>
-                        </tr>
-                    <?php endforeach; endif; ?>
-                    </tbody>
-                    <tfoot><tr><th>الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $customerSummary['sales_count']; ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $customerSummary['sales_total']); ?></th><th class="gl-acc-stmt-col-num"><?php echo (int) $customerSummary['return_count']; ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $customerSummary['return_total']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $customerSummary['net']); ?></th></tr></tfoot>
+                    <?php if ($customerDetailed): ?>
+                        <thead><tr><th>العميل</th><th>نوع السند</th><th>المرجع</th><th>مرجع الفاتورة</th><th>التاريخ</th><th>المصدر</th><th>قناة التحصيل</th><th>قناة التسويق</th><th class="gl-acc-stmt-col-num">الصافي</th></tr></thead>
+                        <tbody>
+                        <?php if ($rows === []): ?><tr><td colspan="9" class="muted">لا توجد حركات عملاء في المدى المحدد.</td></tr>
+                        <?php else: foreach ($rows as $r): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars((string) $r['customer'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars((string) $r['doc_type'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr"><?php echo htmlspecialchars((string) $r['reference'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr"><?php echo htmlspecialchars((string) ($r['invoice_reference'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY((string) ($r['date'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars($sourceLabel((string) ($r['source'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars($paymentLabel((string) ($r['payment'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars((string) ($r['channel'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) ($r['amount'] ?? 0)); ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="8">الصافي (فواتير: <?php echo (int) $customerDetailSummary['sales_count']; ?>، مردودات: <?php echo (int) $customerDetailSummary['return_count']; ?>)</th>
+                                <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $customerDetailSummary['net']); ?></th>
+                            </tr>
+                        </tfoot>
+                    <?php else: ?>
+                        <thead><tr><th>العميل</th><th class="gl-acc-stmt-col-num">عدد فواتير المبيعات</th><th class="gl-acc-stmt-col-num">صافي المبيعات</th><th class="gl-acc-stmt-col-num">عدد المردودات</th><th class="gl-acc-stmt-col-num">صافي المردودات</th><th class="gl-acc-stmt-col-num">الصافي بعد المردود</th></tr></thead>
+                        <tbody>
+                        <?php if ($rows === []): ?><tr><td colspan="6" class="muted">لا توجد بيانات عملاء في المدى المحدد.</td></tr>
+                        <?php else: foreach ($rows as $r): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars((string) $r['customer'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo (int) $r['sales_count']; ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['sales_total']); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo (int) $r['return_count']; ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['return_total']); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['net']); ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                        </tbody>
+                        <tfoot><tr><th>الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $customerSummary['sales_count']; ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $customerSummary['sales_total']); ?></th><th class="gl-acc-stmt-col-num"><?php echo (int) $customerSummary['return_count']; ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $customerSummary['return_total']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $customerSummary['net']); ?></th></tr></tfoot>
+                    <?php endif; ?>
                 <?php elseif ($tab === 'items'): ?>
                     <thead><tr><th>الكود</th><th>الصنف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num">كمية مبيعات</th><th class="gl-acc-stmt-col-num">قيمة مبيعات</th><th class="gl-acc-stmt-col-num">كمية مردود</th><th class="gl-acc-stmt-col-num">قيمة مردود</th><th class="gl-acc-stmt-col-num">صافي الكمية</th><th class="gl-acc-stmt-col-num">صافي القيمة</th></tr></thead>
                     <tbody>
@@ -1039,13 +1395,19 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     min-height: 2.1rem;
     overflow-x: auto;
 }
-.srr-filter-form .srr-source-wrap {
+.srr-filter-form .srr-source-wrap,
+.srr-filter-form .srr-pay-wrap,
+.srr-filter-form .srr-channel-wrap {
     display: flex;
     flex-direction: column;
     gap: 4px;
     min-width: 11rem;
 }
 .srr-filter-form .srr-items-zero-wrap {
+    display: flex;
+    align-items: center;
+}
+.srr-filter-form .srr-customers-detail-wrap {
     display: flex;
     align-items: center;
 }
