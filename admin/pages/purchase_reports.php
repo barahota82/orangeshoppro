@@ -176,11 +176,13 @@ $retDateExpr = static function (string $alias) use ($hasRetDocumentDate, $hasRet
     return 'CURDATE()';
 };
 
-$fmtMoney = static function (float $value): string {
-    return number_format($value, 2, '.', ',');
+$reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
+
+$fmtMoney = static function (float $value) use ($reportMoney): string {
+    return orange_accounting_report_format_amount($value, $reportMoney);
 };
 $fmtQty = static function (float $value): string {
-    return number_format($value, 0, '.', ',');
+    return number_format($value, 1, '.', ',');
 };
 $purchaseTypeLabel = static function (string $raw): string {
     $v = strtolower(trim($raw));
@@ -781,7 +783,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         <th>المورد</th>
                         <th>رقم فاتورة المورد</th>
                         <th>النوع</th>
-                        <th class="gl-acc-stmt-col-num">إجمالي قبل الخصم</th>
+                        <th class="gl-acc-stmt-col-num">الإجمالي</th>
                         <th class="gl-acc-stmt-col-num">الخصم</th>
                         <th class="gl-acc-stmt-col-num">الصافي</th>
                     </tr>
@@ -818,7 +820,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         <th>المورد</th>
                         <th>فاتورة الشراء</th>
                         <th>النوع</th>
-                        <th class="gl-acc-stmt-col-num">إجمالي قبل الخصم</th>
+                        <th class="gl-acc-stmt-col-num">الإجمالي</th>
                         <th class="gl-acc-stmt-col-num">الخصم</th>
                         <th class="gl-acc-stmt-col-num">الصافي</th>
                     </tr>
