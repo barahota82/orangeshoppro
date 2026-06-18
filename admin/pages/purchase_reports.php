@@ -713,7 +713,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
         <?php endif; ?>
 
         <?php if ($reportKey === 'items'): ?>
-            <div>
+            <div class="prr-product-field-wrap">
                 <label for="prr_product_name">الصنف (دبل كليك للاختيار)</label>
                 <div style="display:flex;gap:6px;align-items:center;">
                     <input type="hidden" id="prr_product_id" name="product_id" value="<?php echo (int) $productId; ?>">
@@ -729,11 +729,13 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         value="<?php echo htmlspecialchars($selectedProductName, ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
             </div>
-            <div class="prr-items-zero-wrap" style="display:flex;align-items:flex-end;">
-                <label class="prr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
-                    <input type="checkbox" name="hz" value="1" <?php echo $hideZero ? 'checked' : ''; ?>>
-                    إخفاء الصافي صفر
-                </label>
+            <div class="prr-options-row">
+                <div class="prr-items-zero-wrap">
+                    <label class="prr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
+                        <input type="checkbox" name="hz" value="1" <?php echo $hideZero ? 'checked' : ''; ?>>
+                        إخفاء الصافي صفر
+                    </label>
+                </div>
             </div>
         <?php endif; ?>
 
@@ -1068,13 +1070,27 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     width: 6.6rem;
     min-width: 6.6rem;
 }
+.prr-filter-form .prr-supplier-field-wrap,
+.prr-filter-form .prr-product-field-wrap {
+    flex: 1 1 24rem;
+    min-width: 20rem;
+}
 .prr-filter-form.is-items .prr-supplier-name {
     min-width: 13rem !important;
 }
 .prr-filter-form.is-items .prr-product-name {
     min-width: 14rem !important;
 }
-.prr-filter-form.is-items .prr-items-zero-wrap {
+.prr-filter-form .prr-options-row {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+}
+.prr-filter-form .prr-items-zero-wrap {
+    display: flex;
+    align-items: center;
     padding-bottom: 2px;
 }
 .prr-filter-form .prr-print-actions {
@@ -1083,9 +1099,6 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     align-items: center;
     flex-basis: 100%;
     justify-content: flex-end;
-}
-.prr-filter-form:not(.is-items) .prr-supplier-field-wrap {
-    flex-basis: 100%;
 }
 .prr-doc-table {
     table-layout: fixed;
