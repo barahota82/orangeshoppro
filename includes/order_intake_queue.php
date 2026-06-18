@@ -408,7 +408,7 @@ function orange_storefront_insert_order_items_for_order(PDO $pdo, int $orderId, 
  * Must run inside caller transaction (no begin/commit).
  *
  * @param array<string,mixed> $data
- * @return array{order_id:int,order_number:string,total:float,whatsapp_number:string,whatsapp_url:string}
+ * @return array{order_id:int,order_number:string,total:float,delivery_fee:float,whatsapp_number:string,whatsapp_url:string}
  */
 function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): array
 {
@@ -417,6 +417,13 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $langCheckout = 'en';
     }
     orange_storefront_normalize_delivery_area_payload($pdo, $data, $langCheckout);
+    $deliveryFee = isset($data['delivery_fee']) && is_numeric($data['delivery_fee'])
+        ? (float) $data['delivery_fee']
+        : 0.0;
+    if (!is_finite($deliveryFee) || $deliveryFee < 0) {
+        $deliveryFee = 0.0;
+    }
+    $deliveryFee = round($deliveryFee, 4);
 
     require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
 
@@ -502,7 +509,7 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     if ($bogoLine !== null) {
         $giftLinesCharge += round((float) ($bogoLine['price'] ?? 0) * (int) ($bogoLine['qty'] ?? 1), 4);
     }
-    $orderTotal = max(0.0, round($orderTotal + $giftLinesCharge, 4));
+    $orderTotal = max(0.0, round($orderTotal + $giftLinesCharge + $deliveryFee, 4));
 
     $customerRowId = orange_storefront_upsert_customer_from_checkout(
         $pdo,
@@ -573,6 +580,11 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $ph .= ', ?';
         $daIns = isset($data['delivery_area_id']) ? (int) $data['delivery_area_id'] : 0;
         $params[] = $daIns > 0 ? $daIns : null;
+    }
+    if (orange_table_has_column($pdo, 'orders', 'delivery_fee')) {
+        $cols .= ', delivery_fee';
+        $ph .= ', ?';
+        $params[] = $deliveryFee;
     }
     $hasCartPromo = orange_table_has_column($pdo, 'orders', 'cart_promotion_id')
         && orange_table_has_column($pdo, 'orders', 'cart_promotion_discount');
@@ -678,6 +690,9 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     if ($promoDiscount > 0.00001) {
         $messageLines[] = 'Cart promotion: -' . number_format($promoDiscount, 2) . ' KD';
     }
+    if ($deliveryFee > 0.00001) {
+        $messageLines[] = 'Delivery fee: +' . number_format($deliveryFee, 2) . ' KD';
+    }
     $messageLines[] = 'Total: ' . number_format($orderTotal, 2) . ' KD';
 
     $whatsAppNumber = clean_whatsapp_number((string) $channel['whatsapp_number']);
@@ -687,6 +702,7 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         'order_id' => $orderId,
         'order_number' => $orderNumber,
         'total' => $orderTotal,
+        'delivery_fee' => $deliveryFee,
         'whatsapp_number' => $whatsAppNumber,
         'whatsapp_url' => $whatsAppUrl,
     ];

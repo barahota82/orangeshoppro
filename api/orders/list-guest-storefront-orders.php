@@ -35,6 +35,9 @@ try {
     if (orange_table_has_column($pdo, 'orders', 'cart_combo_discount')) {
         $promoSel .= ', o.cart_combo_discount';
     }
+    if (orange_table_has_column($pdo, 'orders', 'delivery_fee')) {
+        $promoSel .= ', o.delivery_fee';
+    }
     if (orange_table_has_column($pdo, 'order_items', 'line_discount')) {
         $linesSubQ = '(SELECT COALESCE(SUM(GREATEST(0, (oi.qty * CAST(oi.price AS DECIMAL(18,4))) - COALESCE(oi.line_discount, 0))), 0) FROM order_items oi WHERE oi.order_id = o.id)';
     } else {

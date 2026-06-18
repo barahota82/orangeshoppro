@@ -77,6 +77,10 @@ function orange_storefront_order_details_plain_language(array $order, array $ite
     if ($promo > 1e-9) {
         $out[] = ($T['cart_promotion_discount_label'] ?? 'Promo') . ': -' . number_format($promo, 3) . ' ' . $cur;
     }
+    $deliveryFee = isset($order['delivery_fee']) ? (float) $order['delivery_fee'] : 0.0;
+    if ($deliveryFee > 1e-9) {
+        $out[] = ($T['checkout_delivery_fee_label'] ?? 'Delivery fee') . ': +' . number_format($deliveryFee, 3) . ' ' . $cur;
+    }
     $tot = isset($order['total']) ? (float) $order['total'] : 0.0;
     $out[] = ($T['order_total_label'] ?? 'Total') . ': ' . number_format($tot, 3) . ' ' . $cur;
 

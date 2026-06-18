@@ -46,7 +46,7 @@ function orangeCartRefreshBasketTotalsClientAndPreview() {
     const sel = choice ? orangeCartGetSelectedItems(items) : items;
     if (choice && !sel.length) {
         const wrap0 = document.createElement('div');
-        wrap0.innerHTML = orangeHtmlCartMainTotals(0, 0, 0, 0);
+        wrap0.innerHTML = orangeHtmlCartMainTotals(0, 0, 0, 0, 0);
         const next0 = wrap0.firstElementChild;
         if (next0) {
             mainEl.parentNode.replaceChild(next0, mainEl);
@@ -57,7 +57,7 @@ function orangeCartRefreshBasketTotalsClientAndPreview() {
     }
     const sub = orangeCartClientSubtotalFromItems(sel);
     const wrap = document.createElement('div');
-    wrap.innerHTML = orangeHtmlCartMainTotals(sub, 0, 0, sub);
+    wrap.innerHTML = orangeHtmlCartMainTotals(sub, 0, 0, 0, sub);
     const next = wrap.firstElementChild;
     if (next) {
         mainEl.parentNode.replaceChild(next, mainEl);
@@ -905,14 +905,15 @@ function orangeCartTotalsEpsilon() {
     return 1e-6;
 }
 
-function orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, total) {
+function orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total) {
     const T = window.APP_T || {};
     const totalLbl = T.cart_total_label || 'Total';
     const subLbl = T.cart_subtotal_label || 'Subtotal';
     const promoLbl = T.cart_promotion_discount_label || 'Cart offer';
     const comboLbl = T.cart_combo_discount_label || 'Combo bundle';
+    const deliveryLbl = T.checkout_delivery_fee_label || 'Delivery fee';
     const eps = orangeCartTotalsEpsilon();
-    const showBreakdown = comboDiscount > eps || promoDiscount > eps;
+    const showBreakdown = comboDiscount > eps || promoDiscount > eps || deliveryFee > eps;
     let html =
         '<div class="cart-summary-totals" id="cartMainTotals">';
     if (showBreakdown) {
@@ -938,6 +939,14 @@ function orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, total)
                 formatMoney(promoDiscount) +
                 '</span></div>';
         }
+        if (deliveryFee > eps) {
+            html +=
+                '<div class="cart-summary-line cart-summary-line--delivery"><span>' +
+                escCartHtml(deliveryLbl) +
+                '</span><span>+' +
+                formatMoney(deliveryFee) +
+                '</span></div>';
+        }
     }
     html +=
         '<div class="cart-total-box"><strong>' +
@@ -948,14 +957,15 @@ function orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, total)
     return html;
 }
 
-function orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, total) {
+function orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total) {
     const T = window.APP_T || {};
     const totalLbl = T.cart_total_label || 'Total';
     const subLbl = T.cart_subtotal_label || 'Subtotal';
     const promoLbl = T.cart_promotion_discount_label || 'Cart offer';
     const comboLbl = T.cart_combo_discount_label || 'Combo bundle';
+    const deliveryLbl = T.checkout_delivery_fee_label || 'Delivery fee';
     const eps = orangeCartTotalsEpsilon();
-    const showBreakdown = comboDiscount > eps || promoDiscount > eps;
+    const showBreakdown = comboDiscount > eps || promoDiscount > eps || deliveryFee > eps;
     let html =
         '<div class="cart-mini-totals-breakdown" id="cartMiniTotals">';
     if (showBreakdown) {
@@ -979,6 +989,14 @@ function orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, total)
                 escCartHtml(promoLbl) +
                 '</span><span>−' +
                 formatMoney(promoDiscount) +
+                '</span></div>';
+        }
+        if (deliveryFee > eps) {
+            html +=
+                '<div class="cart-mini-total-line cart-mini-total-line--delivery"><span>' +
+                escCartHtml(deliveryLbl) +
+                '</span><span>+' +
+                formatMoney(deliveryFee) +
                 '</span></div>';
         }
     }
@@ -1089,6 +1107,7 @@ function orangePatchCartTotalsFromServer(
     subtotal,
     comboDiscount,
     promoDiscount,
+    deliveryFee,
     total,
     registerTeaser,
     giftUnlock,
@@ -1098,7 +1117,7 @@ function orangePatchCartTotalsFromServer(
     const main = document.getElementById('cartMainTotals');
     if (main && main.parentNode) {
         const wrap = document.createElement('div');
-        wrap.innerHTML = orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, total);
+        wrap.innerHTML = orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total);
         const next = wrap.firstElementChild;
         if (next) {
             main.parentNode.replaceChild(next, main);
@@ -1107,7 +1126,7 @@ function orangePatchCartTotalsFromServer(
     const mini = document.getElementById('cartMiniTotals');
     if (mini && mini.parentNode) {
         const wrap = document.createElement('div');
-        wrap.innerHTML = orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, total);
+        wrap.innerHTML = orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total);
         const next = wrap.firstElementChild;
         if (next) {
             mini.parentNode.replaceChild(next, mini);
@@ -1127,6 +1146,15 @@ function orangeScheduleCheckoutPreview() {
     }, 400);
 }
 
+function orangeCheckoutSelectedDeliveryAreaId() {
+    const areaEl = document.getElementById('customer_area');
+    if (!areaEl || String(areaEl.tagName || '').toUpperCase() !== 'SELECT') {
+        return 0;
+    }
+    const id = parseInt(String(areaEl.value || '0'), 10) || 0;
+    return id > 0 ? id : 0;
+}
+
 async function orangeRunCheckoutPreview() {
     const items = getCart();
     if (!items.length) {
@@ -1141,6 +1169,7 @@ async function orangeRunCheckoutPreview() {
     const seq = ++__orangeCartPreviewSeq;
     const payload = {
         items: cartItemsForCheckoutPreview(previewLines),
+        delivery_area_id: orangeCheckoutSelectedDeliveryAreaId(),
         lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
     };
     try {
@@ -1163,10 +1192,13 @@ async function orangeRunCheckoutPreview() {
                 typeof data.combo_discount === 'number' ? data.combo_discount : 0;
             const promo =
                 typeof data.promotion_discount === 'number' ? data.promotion_discount : 0;
+            const deliveryFee =
+                typeof data.delivery_fee === 'number' ? data.delivery_fee : 0;
             orangePatchCartTotalsFromServer(
                 data.subtotal,
                 comboD,
                 promo,
+                deliveryFee,
                 data.total,
                 data.register_promo_teaser || null,
                 data.gift_register_unlock_teaser === true,
@@ -1237,7 +1269,7 @@ function orangeRenderCheckoutMiniSummary() {
         listHtml +
         '</ul>' +
         moreHtml +
-        orangeHtmlCartMiniTotals(clientSub, 0, 0, clientSub) +
+        orangeHtmlCartMiniTotals(clientSub, 0, 0, 0, clientSub) +
         '<div class="cart-register-promo-teaser" id="cartRegisterPromoTeaser" hidden></div>' +
         '<div class="cart-register-promo-teaser cart-gift-bogo-register-teaser" id="cartGiftBogoRegisterUnlockTeaser" hidden></div>' +
         '</div>';
@@ -1412,7 +1444,7 @@ async function renderCart() {
     });
 
     html += '</div>';
-        html += '<div class="cart-summary-bar">' + orangeHtmlCartMainTotals(total, 0, 0, total) + '</div>';
+        html += '<div class="cart-summary-bar">' + orangeHtmlCartMainTotals(total, 0, 0, 0, total) + '</div>';
     html +=
             '<div class="cart-register-promo-teaser" id="cartBasketRegisterPromoTeaser" hidden></div>' +
             '<div class="cart-register-promo-teaser cart-gift-bogo-register-teaser" id="cartBasketGiftBogoRegisterUnlockTeaser" hidden></div>';
@@ -1614,6 +1646,10 @@ function orangeFinishCheckoutSuccess(result, opts) {
     const pd = typeof result.promotion_discount === 'number' ? result.promotion_discount : 0;
     if (pd > 1e-6) {
         okMsg += ' · ' + (T.cart_promotion_discount_label || '') + ' −' + Number(pd).toFixed(2) + ' ' + sfUnit;
+    }
+    const df = typeof result.delivery_fee === 'number' ? result.delivery_fee : 0;
+    if (df > 1e-6) {
+        okMsg += ' · ' + (T.checkout_delivery_fee_label || 'Delivery fee') + ' +' + Number(df).toFixed(2) + ' ' + sfUnit;
     }
     orangeShowToast(okMsg, Math.max(3400, okMsg.length > 72 ? 4800 : 3400));
     setTimeout(() => {
@@ -2148,6 +2184,20 @@ function orangeOrderCartComboDiscountAmount(order) {
     return n;
 }
 
+function orangeOrderDeliveryFeeAmount(order) {
+    if (!order || order.delivery_fee == null) {
+        return 0;
+    }
+    const n =
+        typeof order.delivery_fee === 'number'
+            ? order.delivery_fee
+            : parseFloat(String(order.delivery_fee));
+    if (!Number.isFinite(n) || n <= 0) {
+        return 0;
+    }
+    return n;
+}
+
 /** صافي سطر الطلب بعد خصم السطر — مطابقة تقريبية لـ orange_order_item_line_net في PHP. */
 function orangeOrderItemLineNetJs(it) {
     const qty = Math.max(0, parseInt(String(it.qty || 0), 10) || 0);
@@ -2299,6 +2349,27 @@ function orangeHtmlOrderComboParagraph(order, cur, paragraphClass) {
     );
 }
 
+function orangeHtmlOrderDeliveryFeeParagraph(order, cur, paragraphClass) {
+    const d = orangeOrderDeliveryFeeAmount(order);
+    if (d <= 1e-9) {
+        return '';
+    }
+    const T = window.APP_T || {};
+    const lbl = T.checkout_delivery_fee_label || 'Delivery fee';
+    const cls = paragraphClass ? ' class="' + orangeEscDomAttr(paragraphClass) + '"' : '';
+    return (
+        '<p' +
+        cls +
+        '><strong>' +
+        orangeEscDomText(lbl) +
+        ':</strong> +' +
+        orangeEscDomText(d.toFixed(3)) +
+        ' ' +
+        orangeEscDomText(String(cur || '')) +
+        '</p>'
+    );
+}
+
 function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, items) {
     const UI = window.ORANGE_MY_ORDER_UI || {};
     const labels = window.ORANGE_ORDER_STATUS_LABELS || {};
@@ -2333,7 +2404,11 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
     }
     const itemsLinesSum = orangeOrderLinesSubtotalPreferServer(order, itemRows);
     if (
-        (orangeOrderCartPromoDiscountAmount(order) > 1e-9 || orangeOrderCartComboDiscountAmount(order) > 1e-9) &&
+        (
+            orangeOrderCartPromoDiscountAmount(order) > 1e-9 ||
+            orangeOrderCartComboDiscountAmount(order) > 1e-9 ||
+            orangeOrderDeliveryFeeAmount(order) > 1e-9
+        ) &&
         itemsLinesSum > 1e-9
     ) {
         html +=
@@ -2347,6 +2422,7 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
     }
     html += orangeHtmlOrderComboParagraph(order, cur, 'order-cart-promo-line');
     html += orangeHtmlOrderPromoParagraph(order, cur, 'order-cart-promo-line');
+    html += orangeHtmlOrderDeliveryFeeParagraph(order, cur, 'order-cart-promo-line');
     html += '<p><strong>' + orangeEscDomText(UI.order_total_label || '') + ':</strong> ' + orangeEscDomText(String(order.total)) + ' ' + orangeEscDomText(cur) + '</p>';
     const pt = String(order.payment_terms || 'cash').toLowerCase();
     const ptLabel = pt === 'credit' ? (UI.payment_credit || '') : (pt === 'online' ? (UI.payment_online || '') : (UI.payment_cash || ''));
@@ -2539,7 +2615,11 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
     }
     const itemsLinesSumSu = orangeOrderLinesSubtotalPreferServer(order, itemRows);
     if (
-        (orangeOrderCartPromoDiscountAmount(order) > 1e-9 || orangeOrderCartComboDiscountAmount(order) > 1e-9) &&
+        (
+            orangeOrderCartPromoDiscountAmount(order) > 1e-9 ||
+            orangeOrderCartComboDiscountAmount(order) > 1e-9 ||
+            orangeOrderDeliveryFeeAmount(order) > 1e-9
+        ) &&
         itemsLinesSumSu > 1e-9
     ) {
         html +=
@@ -2557,6 +2637,11 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
         'track-signup-order-summary__line order-cart-promo-line'
     );
     html += orangeHtmlOrderPromoParagraph(
+        order,
+        cur,
+        'track-signup-order-summary__line order-cart-promo-line'
+    );
+    html += orangeHtmlOrderDeliveryFeeParagraph(
         order,
         cur,
         'track-signup-order-summary__line order-cart-promo-line'
@@ -2855,7 +2940,11 @@ function orangeCartRenderAccountOrderCard(row) {
     const linesSubRaw = row.lines_subtotal != null && row.lines_subtotal !== '' ? parseFloat(String(row.lines_subtotal)) : NaN;
     const linesSubNum = Number.isFinite(linesSubRaw) ? linesSubRaw : 0;
     if (
-        (orangeOrderCartPromoDiscountAmount(row) > 1e-9 || orangeOrderCartComboDiscountAmount(row) > 1e-9) &&
+        (
+            orangeOrderCartPromoDiscountAmount(row) > 1e-9 ||
+            orangeOrderCartComboDiscountAmount(row) > 1e-9 ||
+            orangeOrderDeliveryFeeAmount(row) > 1e-9
+        ) &&
         linesSubNum > 1e-9
     ) {
         html +=
@@ -2873,6 +2962,11 @@ function orangeCartRenderAccountOrderCard(row) {
         'cart-account-order-card__row order-cart-promo-line'
     );
     html += orangeHtmlOrderPromoParagraph(
+        row,
+        cur,
+        'cart-account-order-card__row order-cart-promo-line'
+    );
+    html += orangeHtmlOrderDeliveryFeeParagraph(
         row,
         cur,
         'cart-account-order-card__row order-cart-promo-line'
@@ -3088,6 +3182,15 @@ document.addEventListener('DOMContentLoaded', () => {
     orangeSyncCartProceedBtn();
     orangeSyncCartTabCount();
     orangeRenderCheckoutMiniSummary();
+    document.addEventListener('change', function (ev) {
+        const t = ev && ev.target ? ev.target : null;
+        if (!t || !t.id) {
+            return;
+        }
+        if (t.id === 'customer_area') {
+            orangeScheduleCheckoutPreview();
+        }
+    });
 
     window.orangeCartRefreshAccountOrderLists = orangeCartRefreshAccountOrderLists;
 

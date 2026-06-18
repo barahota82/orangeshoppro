@@ -162,6 +162,10 @@ $daNextSortOrder = $hasGovTable
             <label for="da_name_en">English</label>
             <input type="text" id="da_name_en" maxlength="191" autocomplete="off" lang="en" dir="ltr">
         </div>
+        <div class="da-area-fee">
+            <label for="da_delivery_fee">قيمة التوصيل</label>
+            <input type="number" id="da_delivery_fee" min="0" step="0.001" lang="en" dir="ltr" value="0.000">
+        </div>
         <div class="da-area-sort">
             <label for="da_sort_order">الترتيب</label>
             <input type="number" id="da_sort_order" class="admin-sort-field admin-sort-field--muted"
@@ -199,6 +203,7 @@ $daNextSortOrder = $hasGovTable
                     <?php if ($hasGovTable): ?><th>المحافظة</th><?php endif; ?>
                     <th>عربي</th>
                     <th>English</th>
+                    <th>قيمة التوصيل</th>
                     <th>ترتيب</th>
                     <th>منطقة توصيل</th>
                     <th></th>
@@ -224,6 +229,7 @@ $daNextSortOrder = $hasGovTable
                     <?php endif; ?>
                     <td><?php echo htmlspecialchars((string) ($aRow['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td dir="ltr"><?php echo htmlspecialchars((string) ($aRow['name_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td dir="ltr"><?php echo htmlspecialchars(number_format(max(0.0, (float) ($aRow['delivery_fee'] ?? 0)), 3, '.', ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo (int) ($aRow['sort_order'] ?? 0); ?></td>
                     <td><?php echo $aActive ? 'منطقة توصيل' : 'غير متاحة للتوصيل'; ?></td>
                     <td><button type="button" class="btn-secondary" data-da-edit="<?php echo $aid; ?>">تعديل</button></td>
@@ -256,11 +262,13 @@ $daNextSortOrder = $hasGovTable
         grid-template-areas:
             "gov gov"
             "ar en"
-            "sort active";
+            "fee sort"
+            "active active";
     }
     .da-area-gov { grid-area: gov; }
     .da-area-ar { grid-area: ar; }
     .da-area-en { grid-area: en; }
+    .da-area-fee { grid-area: fee; }
     .da-area-sort { grid-area: sort; }
     .da-area-active { grid-area: active; }
     .da-areas-list-head {
@@ -291,7 +299,7 @@ $daNextSortOrder = $hasGovTable
             grid-template-areas: unset;
         }
         .da-gov-ar, .da-gov-en, .da-gov-sort, .da-gov-active,
-        .da-area-gov, .da-area-ar, .da-area-en, .da-area-sort, .da-area-active {
+        .da-area-gov, .da-area-ar, .da-area-en, .da-area-fee, .da-area-sort, .da-area-active {
             grid-area: unset;
         }
     }
@@ -374,6 +382,7 @@ function renderDeliveryAreasTable() {
         html +=
             '<td>' + escHtml(String(r.name_ar || '')) + '</td>' +
             '<td dir="ltr">' + escHtml(String(r.name_en || '')) + '</td>' +
+            '<td dir="ltr">' + escHtml(daFormatMoney(r.delivery_fee)) + '</td>' +
             '<td>' + escHtml(String(r.sort_order != null ? r.sort_order : '')) + '</td>' +
             '<td>' + (canDeliver ? 'منطقة توصيل' : 'غير متاحة للتوصيل') + '</td>' +
             '<td><button type="button" class="btn-secondary" data-da-edit="' + escAttr(String(r.id)) + '">تعديل</button></td>';
@@ -434,6 +443,20 @@ function escHtml(s) {
 }
 function escAttr(s) {
     return String(s).replace(/"/g, '&quot;');
+}
+
+function daParseMoney(v) {
+    var raw = String(v == null ? '' : v).trim().replace(',', '.');
+    if (raw === '') return 0;
+    var n = parseFloat(raw);
+    if (!Number.isFinite(n) || n < 0) return NaN;
+    return n;
+}
+
+function daFormatMoney(v) {
+    var n = daParseMoney(v);
+    if (!Number.isFinite(n) || n < 0) n = 0;
+    return n.toFixed(3);
 }
 
 async function translateNames(arId, enId, opts) {
@@ -564,6 +587,7 @@ function resetDeliveryAreaForm() {
     document.getElementById('da_id').value = '0';
     document.getElementById('da_name_ar').value = '';
     document.getElementById('da_name_en').value = '';
+    document.getElementById('da_delivery_fee').value = '0.000';
     document.getElementById('da_is_active').checked = true;
     const sel = document.getElementById('da_governorate_id');
     if (sel) sel.value = '';
@@ -576,6 +600,7 @@ function editDeliveryArea(row) {
     document.getElementById('da_id').value = String(row.id != null ? row.id : 0);
     document.getElementById('da_name_ar').value = row.name_ar || '';
     document.getElementById('da_name_en').value = row.name_en || '';
+    document.getElementById('da_delivery_fee').value = daFormatMoney(row.delivery_fee);
     document.getElementById('da_sort_order').value = String(row.sort_order != null ? row.sort_order : 0);
     document.getElementById('da_is_active').checked = parseInt(row.is_active, 10) === 1;
     const sel = document.getElementById('da_governorate_id');
@@ -628,12 +653,18 @@ function bindDeliveryAreaEditButtons() {
 
 async function saveDeliveryArea() {
     const govEl = document.getElementById('da_governorate_id');
+    const feeVal = daParseMoney(document.getElementById('da_delivery_fee').value);
+    if (!Number.isFinite(feeVal) || feeVal < 0) {
+        alert('قيمة التوصيل غير صحيحة');
+        return;
+    }
     const payload = {
         action: 'save',
         id: parseInt(document.getElementById('da_id').value, 10) || 0,
         country_id: daCountryId(),
         name_ar: document.getElementById('da_name_ar').value.trim(),
         name_en: document.getElementById('da_name_en').value.trim(),
+        delivery_fee: Number(feeVal.toFixed(4)),
         is_active: document.getElementById('da_is_active').checked ? 1 : 0
     };
     if (govEl) {

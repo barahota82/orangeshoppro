@@ -44,6 +44,14 @@ try {
     if (!$order || !orange_order_phones_match_for_lookup($phoneNorm, (string) ($order['phone'] ?? ''))) {
         json_response(['success' => false, 'code' => 'not_found', 'message' => t('track_order_not_found')], 404);
     }
+    $existingDeliveryFee = 0.0;
+    if (orange_table_has_column($pdo, 'orders', 'delivery_fee')) {
+        $existingDeliveryFee = is_numeric($order['delivery_fee'] ?? null) ? (float) $order['delivery_fee'] : 0.0;
+        if (!is_finite($existingDeliveryFee) || $existingDeliveryFee < 0) {
+            $existingDeliveryFee = 0.0;
+        }
+        $existingDeliveryFee = round($existingDeliveryFee, 4);
+    }
 
     $accCaller = current_storefront_account($pdo);
     if (!orange_storefront_customer_may_amend_order_items($pdo, $order, $accCaller, $phoneNorm)) {
@@ -88,7 +96,7 @@ try {
         if ($bogoLine !== null) {
             $giftLinesCharge += round((float) ($bogoLine['price'] ?? 0) * (int) ($bogoLine['qty'] ?? 1), 4);
         }
-        $orderTotal = max(0.0, round($orderTotal + $giftLinesCharge, 4));
+        $orderTotal = max(0.0, round($orderTotal + $giftLinesCharge + $existingDeliveryFee, 4));
 
         $orderId = (int) $order['id'];
         $hasCartPromo = orange_table_has_column($pdo, 'orders', 'cart_promotion_id')
@@ -125,6 +133,10 @@ try {
             $setParts[] = 'cart_bogo_gift_variant_id = ?';
             $updParams[] = $bogoPromoId !== null && $bogoPromoId > 0 ? $bogoPromoId : null;
             $updParams[] = $bogoGiftVariantId !== null && $bogoGiftVariantId > 0 ? $bogoGiftVariantId : null;
+        }
+        if (orange_table_has_column($pdo, 'orders', 'delivery_fee')) {
+            $setParts[] = 'delivery_fee = ?';
+            $updParams[] = $existingDeliveryFee;
         }
         $updParams[] = $orderId;
         $pdo->prepare('UPDATE orders SET ' . implode(', ', $setParts) . ' WHERE id = ?')->execute($updParams);
@@ -180,6 +192,9 @@ try {
     if ($promoDiscount > 0.00001) {
         $messageLines[] = 'Cart promotion: -' . number_format($promoDiscount, 2) . ' KD';
     }
+    if ($existingDeliveryFee > 0.00001) {
+        $messageLines[] = 'Delivery fee: +' . number_format($existingDeliveryFee, 2) . ' KD';
+    }
     $messageLines[] = 'Total: ' . number_format($orderTotal, 2) . ' KD';
 
     $whatsAppNumber = clean_whatsapp_number((string) ($channel['whatsapp_number'] ?? ''));
@@ -193,6 +208,7 @@ try {
         'total' => $orderTotal,
         'promotion_discount' => $promoDiscount,
         'combo_discount' => $comboDiscount,
+        'delivery_fee' => $existingDeliveryFee,
         'lines_subtotal' => round($subtotal, 4),
         'whatsapp_url' => $whatsAppUrl,
         'whatsapp_number' => $whatsAppNumber,

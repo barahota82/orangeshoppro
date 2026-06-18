@@ -190,6 +190,9 @@ function orange_sales_invoice_online_document_payload(PDO $pdo, int $orderId): a
         'status' => (string) ($order['status'] ?? ''),
         'status_label' => 'تم التسليم',
         'total' => (float) ($order['total'] ?? 0),
+        'delivery_fee' => orange_table_has_column($pdo, 'orders', 'delivery_fee')
+            ? (float) ($order['delivery_fee'] ?? 0)
+            : 0.0,
         'subtotal' => $subtotal,
         'created_at' => (string) ($order['created_at'] ?? ''),
         'created_at_dmy' => !empty($order['created_at'])
@@ -346,7 +349,14 @@ function orange_sales_invoice_online_apply_update(PDO $pdo, int $orderId, array 
     $glPosted = orange_sales_invoice_online_gl_posted($pdo, $order);
 
     $validated = orange_sales_invoice_company_validate_items($pdo, $itemsIn, $orderCountryId);
-    $total = (float) $validated['total'];
+    $deliveryFee = orange_table_has_column($pdo, 'orders', 'delivery_fee')
+        ? (float) ($order['delivery_fee'] ?? 0)
+        : 0.0;
+    if (!is_finite($deliveryFee) || $deliveryFee < 0) {
+        $deliveryFee = 0.0;
+    }
+    $deliveryFee = round($deliveryFee, 4);
+    $total = round((float) $validated['total'] + $deliveryFee, 4);
     $validatedItems = $validated['items'];
 
     $extraInput = orange_invoice_ancillary_parse_request_lines(

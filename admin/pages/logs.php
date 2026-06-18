@@ -10,22 +10,67 @@ orange_catalog_ensure_schema($pdo);
 
 $rows = [];
 $total = 0;
-if (orange_table_exists($pdo, 'orange_admin_audit_log')) {
-    $total = (int) $pdo->query('SELECT COUNT(*) FROM orange_admin_audit_log')->fetchColumn();
-    $hasAdmins = orange_table_exists($pdo, 'admins');
+$hasAuditTable = orange_table_exists($pdo, 'orange_admin_audit_log');
+$hasAdmins = orange_table_exists($pdo, 'admins');
+$adminOptions = [];
+
+$fromInput = trim((string) ($_GET['from'] ?? ''));
+$toInput = trim((string) ($_GET['to'] ?? ''));
+$adminFilterId = (int) ($_GET['admin_id'] ?? 0);
+
+$fromYmd = orange_parse_admin_date_to_ymd($fromInput);
+$toYmd = orange_parse_admin_date_to_ymd($toInput);
+$hasFilters = $fromInput !== '' || $toInput !== '' || $adminFilterId > 0;
+
+$where = [];
+$whereParams = [];
+if ($fromYmd !== '') {
+    $where[] = 'l.created_at >= ?';
+    $whereParams[] = $fromYmd . ' 00:00:00';
+}
+if ($toYmd !== '') {
+    $toNext = date('Y-m-d', strtotime($toYmd . ' +1 day'));
+    $where[] = 'l.created_at < ?';
+    $whereParams[] = $toNext . ' 00:00:00';
+}
+if ($adminFilterId > 0) {
+    $where[] = 'l.admin_id = ?';
+    $whereParams[] = $adminFilterId;
+}
+$whereSql = $where === [] ? '' : (' WHERE ' . implode(' AND ', $where));
+
+if ($hasAdmins) {
+    $adminOptions = $pdo->query(
+        'SELECT id, username, display_name
+         FROM admins
+         ORDER BY username ASC, id ASC'
+    )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+if ($hasAuditTable) {
+    $countSt = $pdo->prepare('SELECT COUNT(*) FROM orange_admin_audit_log l' . $whereSql);
+    $countSt->execute($whereParams);
+    $total = (int) $countSt->fetchColumn();
+
     if ($hasAdmins) {
         $sql = 'SELECT l.id, l.created_at, l.admin_id, l.action, l.message, l.entity_table, l.entity_id,
                 a.username AS admin_username
                 FROM orange_admin_audit_log l
                 LEFT JOIN admins a ON a.id = l.admin_id
-                ORDER BY l.id DESC';
+                ' . $whereSql . '
+                ORDER BY l.id DESC
+                LIMIT 500';
     } else {
-        $sql = 'SELECT id, created_at, admin_id, action, message, entity_table, entity_id,
+        $sql = 'SELECT l.id, l.created_at, l.admin_id, l.action, l.message, l.entity_table, l.entity_id,
                 NULL AS admin_username
-                FROM orange_admin_audit_log
-                ORDER BY id DESC';
+                FROM orange_admin_audit_log l
+                ' . $whereSql . '
+                ORDER BY l.id DESC
+                LIMIT 500';
     }
-    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    $rowsSt = $pdo->prepare($sql);
+    $rowsSt->execute($whereParams);
+    $rows = $rowsSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 ?>
 <div class="page-title">
@@ -34,14 +79,59 @@ if (orange_table_exists($pdo, 'orange_admin_audit_log')) {
 </div>
 
 <div class="card">
+    <h3 class="card-title">فلترة السجل</h3>
+    <form method="get" class="logs-filter-form">
+        <input type="hidden" name="page" value="logs">
+        <div>
+            <label for="logs_from">من تاريخ</label>
+            <input type="text" id="logs_from" name="from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" value="<?php echo htmlspecialchars($fromInput, ENT_QUOTES, 'UTF-8'); ?>">
+        </div>
+        <div>
+            <label for="logs_to">إلى تاريخ</label>
+            <input type="text" id="logs_to" name="to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" value="<?php echo htmlspecialchars($toInput, ENT_QUOTES, 'UTF-8'); ?>">
+        </div>
+        <div>
+            <label for="logs_admin_id">المستخدم</label>
+            <select id="logs_admin_id" name="admin_id">
+                <option value="0">كل المستخدمين</option>
+                <?php foreach ($adminOptions as $aOpt): ?>
+                <?php
+                $aid = (int) ($aOpt['id'] ?? 0);
+                if ($aid <= 0) {
+                    continue;
+                }
+                $u = trim((string) ($aOpt['username'] ?? ''));
+                $dn = trim((string) ($aOpt['display_name'] ?? ''));
+                $label = $u !== '' ? $u : ('#' . $aid);
+                if ($dn !== '') {
+                    $label .= ' — ' . $dn;
+                }
+                ?>
+                <option value="<?php echo $aid; ?>"<?php echo $aid === $adminFilterId ? ' selected' : ''; ?>><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="logs-filter-actions">
+            <button type="submit">بحث</button>
+            <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=logs'), ENT_QUOTES, 'UTF-8'); ?>">إعادة ضبط</a>
+        </div>
+    </form>
+</div>
+
+<div class="card">
     <h3 class="card-title">آخر السجلات (حتى 500)</h3>
     <?php if ($rows === []): ?>
-        <p class="muted">لا توجد سجلات بعد. بعد أول عملية تُسجَّل (مثلاً حفظ حساب أو قيد) ستظهر هنا.</p>
-        <?php if ($total === 0 && orange_table_exists($pdo, 'orange_admin_audit_log')): ?>
+        <?php if (!$hasAuditTable): ?>
+            <p class="muted">جدول سجل النشاط غير جاهز بعد.</p>
+        <?php elseif ($hasFilters): ?>
+            <p class="muted">لا توجد نتائج مطابقة للفلاتر المحددة.</p>
+            <p class="muted">إجمالي النتائج: 0</p>
+        <?php else: ?>
+            <p class="muted">لا توجد سجلات بعد. بعد أول عملية تُسجَّل (مثلاً حفظ حساب أو قيد) ستظهر هنا.</p>
             <p class="muted">إجمالي السجلات في القاعدة: 0</p>
         <?php endif; ?>
     <?php else: ?>
-        <p class="muted" style="margin-bottom:12px;">إجمالي السجلات: <?php echo (int) $total; ?> — المعروض: <?php echo count($rows); ?></p>
+        <p class="muted" style="margin-bottom:12px;">إجمالي النتائج: <?php echo (int) $total; ?> — المعروض: <?php echo count($rows); ?></p>
         <div class="table-wrap">
             <table>
                 <thead>
@@ -87,3 +177,29 @@ if (orange_table_exists($pdo, 'orange_admin_audit_log')) {
         </div>
     <?php endif; ?>
 </div>
+
+<style>
+    .logs-filter-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        align-items: end;
+    }
+    .logs-filter-form > div {
+        min-width: 180px;
+    }
+    .logs-filter-actions {
+        margin-inline-start: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    @media (max-width: 720px) {
+        .logs-filter-form > div {
+            min-width: 100%;
+        }
+        .logs-filter-actions {
+            margin-inline-start: 0;
+        }
+    }
+</style>

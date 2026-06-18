@@ -3121,16 +3121,31 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
                 name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+                delivery_fee DECIMAL(18,4) NOT NULL DEFAULT 0,
                 sort_order INT NOT NULL DEFAULT 0,
                 is_active TINYINT(1) NOT NULL DEFAULT 1,
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
     }
+    if (orange_table_exists($pdo, 'delivery_areas') && !orange_table_has_column($pdo, 'delivery_areas', 'delivery_fee')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE delivery_areas ADD COLUMN delivery_fee DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER name_en'
+        );
+        orange_schema_invalidate_column_check('delivery_areas', 'delivery_fee');
+    }
 
     if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'delivery_area_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE orders ADD COLUMN delivery_area_id INT UNSIGNED NULL DEFAULT NULL');
         orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_orders_delivery_area_id ON orders (delivery_area_id)');
+    }
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'delivery_fee')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orders ADD COLUMN delivery_fee DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER total'
+        );
+        orange_schema_invalidate_column_check('orders', 'delivery_fee');
     }
 
     if (orange_table_exists($pdo, 'storefront_accounts') && !orange_table_has_column($pdo, 'storefront_accounts', 'customer_delivery_area_id')) {
@@ -3671,6 +3686,20 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     require_once __DIR__ . '/schema_migrations.php';
     orange_schema_run_pending_migrations($pdo);
     orange_catalog_ensure_document_public_tokens_table($pdo);
+    if (orange_table_exists($pdo, 'delivery_areas') && !orange_table_has_column($pdo, 'delivery_areas', 'delivery_fee')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE delivery_areas ADD COLUMN delivery_fee DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER name_en'
+        );
+        orange_schema_invalidate_column_check('delivery_areas', 'delivery_fee');
+    }
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'delivery_fee')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orders ADD COLUMN delivery_fee DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER total'
+        );
+        orange_schema_invalidate_column_check('orders', 'delivery_fee');
+    }
     if (orange_table_exists($pdo, 'advisory_sizing_library_bundles') && !orange_table_has_column($pdo, 'advisory_sizing_library_bundles', 'department_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE advisory_sizing_library_bundles ADD COLUMN department_id INT NULL DEFAULT NULL AFTER id');
     }

@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/cart_gift_promotions.php';
 require_once __DIR__ . '/../../includes/cart_bogo_promotions.php';
 require_once __DIR__ . '/../../includes/cart_combo_promotions.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
+require_once __DIR__ . '/../../includes/delivery_areas.php';
 
 try {
     $pdo = db();
@@ -136,7 +137,15 @@ try {
         $bogoPayload['gift_unit_charge_value'] = (float) ($bogoRule['gift_unit_charge_value'] ?? 0);
         $bogoPayload['preview_max_gift_unit_charge'] = $bogoGiftChargePreview;
     }
-    $total = max(0.0, round($total + $thresholdGiftChargePreview + $bogoGiftChargePreview, 4));
+    $deliveryAreaId = (int) ($data['delivery_area_id'] ?? 0);
+    $deliveryFee = 0.0;
+    if ($deliveryAreaId > 0) {
+        $daRow = orange_delivery_area_row_active($pdo, $deliveryAreaId);
+        if ($daRow !== null) {
+            $deliveryFee = orange_delivery_area_fee_from_row($daRow);
+        }
+    }
+    $total = max(0.0, round($total + $thresholdGiftChargePreview + $bogoGiftChargePreview + $deliveryFee, 4));
 
     json_response([
         'success' => true,
@@ -145,6 +154,8 @@ try {
         'combo_discount' => $comboDiscount,
         'promotion_id' => $promo !== null ? (int) $promo['id'] : null,
         'promotion_discount' => $promoDiscount,
+        'delivery_area_id' => $deliveryAreaId > 0 ? $deliveryAreaId : null,
+        'delivery_fee' => $deliveryFee,
         'total' => $total,
         'register_promo_teaser' => $regTeaser,
         'gift_register_unlock_teaser' => $giftRegUnlock,

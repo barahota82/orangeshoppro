@@ -66,24 +66,29 @@ try {
         $totalVal = 0.0;
         $promoDisc = 0.0;
         $comboDisc = 0.0;
+        $deliveryFee = 0.0;
         if ($oid > 0) {
             $hasPromoC = orange_table_has_column($pdo, 'orders', 'cart_promotion_discount');
             $hasComboC = orange_table_has_column($pdo, 'orders', 'cart_combo_discount');
-            if ($hasPromoC && $hasComboC) {
-                $totSt = $pdo->prepare('SELECT total, cart_promotion_discount, cart_combo_discount FROM orders WHERE id = ? LIMIT 1');
-            } elseif ($hasPromoC) {
-                $totSt = $pdo->prepare('SELECT total, cart_promotion_discount FROM orders WHERE id = ? LIMIT 1');
-            } elseif ($hasComboC) {
-                $totSt = $pdo->prepare('SELECT total, cart_combo_discount FROM orders WHERE id = ? LIMIT 1');
-            } else {
-                $totSt = $pdo->prepare('SELECT total FROM orders WHERE id = ? LIMIT 1');
+            $hasDeliveryFee = orange_table_has_column($pdo, 'orders', 'delivery_fee');
+            $selectCols = ['total'];
+            if ($hasPromoC) {
+                $selectCols[] = 'cart_promotion_discount';
             }
+            if ($hasComboC) {
+                $selectCols[] = 'cart_combo_discount';
+            }
+            if ($hasDeliveryFee) {
+                $selectCols[] = 'delivery_fee';
+            }
+            $totSt = $pdo->prepare('SELECT ' . implode(', ', $selectCols) . ' FROM orders WHERE id = ? LIMIT 1');
             $totSt->execute([$oid]);
             $rowTot = $totSt->fetch(PDO::FETCH_ASSOC);
             if ($rowTot) {
                 $totalVal = (float) ($rowTot['total'] ?? 0);
                 $promoDisc = (float) ($rowTot['cart_promotion_discount'] ?? 0);
                 $comboDisc = (float) ($rowTot['cart_combo_discount'] ?? 0);
+                $deliveryFee = (float) ($rowTot['delivery_fee'] ?? 0);
             }
         }
         $out['order_id'] = $oid;
@@ -91,6 +96,7 @@ try {
         $out['total'] = $totalVal;
         $out['promotion_discount'] = $promoDisc;
         $out['combo_discount'] = $comboDisc;
+        $out['delivery_fee'] = $deliveryFee;
         $out['whatsapp_number'] = (string) $row['whatsapp_number'];
         $out['whatsapp_url'] = (string) $row['whatsapp_url'];
         if ($oid > 0) {
