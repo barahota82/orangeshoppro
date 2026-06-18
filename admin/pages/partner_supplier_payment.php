@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 require_once __DIR__ . '/../../includes/voucher_print_banner.php';
@@ -20,6 +21,7 @@ $pdo = orange_admin_page_pdo();
 $ppvPrintTuningMode = orange_admin_voucher_print_tuning_mode();
 
 $ppvCountryId = orange_admin_context_country_id($pdo);
+$ppvCurrencyDecimals = orange_currency_decimals_for_code(orange_admin_context_currency_code($pdo));
 $ppvCountryLabel = orange_admin_page_country_label($pdo);
 $ppvSuppliersCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', $ppvCountryId);
 
@@ -122,7 +124,7 @@ foreach ($suppliers as $s) {
         'id' => $sid,
         'name' => $supplierName,
         'phone' => $supplierPhone,
-        'balance' => round($balance, 3),
+        'balance' => round($balance, $ppvCurrencyDecimals),
         'account_id' => $mapAccountId,
         'account_code' => $accountCode,
         'account_name' => $accountName,

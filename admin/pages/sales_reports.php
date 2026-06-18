@@ -173,7 +173,8 @@ $returnDateExpr = static function (string $alias) use ($hasSrCreatedAt): string 
     return $hasSrCreatedAt ? 'DATE(' . $alias . '.created_at)' : 'CURDATE()';
 };
 
-$fmtMoney = static fn(float $v): string => number_format($v, 2, '.', ',');
+$reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
+$fmtMoney = static fn(float $v): string => orange_accounting_report_format_amount($v, $reportMoney);
 $fmtQty = static fn(float $v): string => number_format($v, 0, '.', ',');
 $sourceLabel = static function (string $v): string {
     $v = strtolower(trim($v));

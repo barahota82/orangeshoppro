@@ -23,6 +23,7 @@ $pv2Caps = orange_admin_caps_for_page($admin, $pdo, 'purchases');
 
 $adminCountryId = orange_admin_context_country_id($pdo);
 $adminDefaultCurrency = orange_admin_context_currency_code($pdo);
+$adminCurrencyDecimals = orange_currency_decimals_for_code($adminDefaultCurrency);
 $adminCurrencyUnit = orange_currency_display_unit($adminDefaultCurrency);
 $purchasesProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $adminCountryId);
 $purchasesSuppliersCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', $adminCountryId);
@@ -101,7 +102,7 @@ foreach ($suppliers as $s) {
         'id' => $sid,
         'name' => $supplierName,
         'phone' => $supplierPhone,
-        'balance' => round($balance, 3),
+        'balance' => round($balance, $adminCurrencyDecimals),
         'account_id' => $mapAccountId,
         'account_code' => $accountCode,
         'account_name' => $accountName,

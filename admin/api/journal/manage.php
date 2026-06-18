@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_admin_api();
 
 /**
@@ -267,6 +268,7 @@ try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
+    $journalMoneyDecimals = (int) ((orange_admin_currency_context($pdo)['decimals'] ?? 3));
     $action = trim((string)($data['action'] ?? 'update'));
     if ($action === 'search') {
         $action = 'search_manual';
@@ -875,7 +877,7 @@ try {
                 'voucher_date' => $dateDisp,
                 'reference' => (string) ($row['reference'] ?? ''),
                 'description' => (string) ($row['description'] ?? ''),
-                'amount' => round((float) ($row['voucher_total'] ?? 0), 3),
+                'amount' => round((float) ($row['voucher_total'] ?? 0), $journalMoneyDecimals),
                 'entry_type' => $etRow,
                 'entry_type_label' => orange_gl_voucher_type_label_ar($pdo, $row),
             ];

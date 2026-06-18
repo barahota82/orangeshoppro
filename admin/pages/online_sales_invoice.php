@@ -552,13 +552,16 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     var ov2ViewMode = false;
     var ov2GlPosted = false;
     var ov2ProductPick = null;
+    var OV2_MONEY_DECIMALS = (window.ORANGE_ADMIN_MONEY && typeof window.ORANGE_ADMIN_MONEY.decimals === 'number')
+        ? Math.max(0, parseInt(String(window.ORANGE_ADMIN_MONEY.decimals), 10) || 3)
+        : 3;
+    var OV2_MONEY_EPSILON = Math.pow(10, -OV2_MONEY_DECIMALS);
 
     function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function fmt3(n) {
         var f = window.orangeFmtMoney || (window.OrangeMoney && window.OrangeMoney.formatAmount);
         if (f) return f(n);
-        var d = (window.ORANGE_ADMIN_MONEY && window.ORANGE_ADMIN_MONEY.decimals) || 3;
-        return (parseFloat(n) || 0).toFixed(d);
+        return (parseFloat(n) || 0).toFixed(OV2_MONEY_DECIMALS);
     }
     function fmtZero() {
         if (window.orangeMoneyZero) return window.orangeMoneyZero();
@@ -804,7 +807,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             var discEl = r.querySelector('.ov2-discount');
             var discAmt = parseDiscount((discEl && discEl.value || '').trim(), lineGross);
             // المبيعات: الخصم يمكن أن يساوي إجمالي الصنف (الصافي صفر) لكن لا يتجاوزه.
-            var invalid = (discAmt > 0) && (discAmt > lineGross + 0.0005);
+            var invalid = (discAmt > 0) && (discAmt > lineGross + OV2_MONEY_EPSILON);
             if (discEl) discEl.style.border = invalid ? '1px solid #dc2626' : '';
             if (invalid && !firstDiscError) firstDiscError = 'خصم الصنف في السطر ' + (i + 1) + ' أكبر من إجمالي الصنف — يمكن أن يساويه فقط.';
             if (discAmt > lineGross) discAmt = lineGross;
@@ -1308,7 +1311,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             if (!pid || q < 1) return;
             var lineGross = q * p;
             var discAmt = parseDiscount(discRaw, lineGross);
-            if (discAmt > lineGross + 0.0001) {
+            if (discAmt > lineGross + OV2_MONEY_EPSILON) {
                 if (!ov2DiscError) ov2DiscError = 'خصم الصنف في السطر ' + (idx + 1) + ' أكبر من إجمالي الصنف. صحّح الخصم قبل الحفظ.';
                 return;
             }

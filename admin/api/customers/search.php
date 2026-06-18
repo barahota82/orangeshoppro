@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_admin_api();
 
 /**
@@ -24,6 +25,7 @@ try {
     orange_catalog_ensure_schema($pdo);
 
     $adminCountryId = orange_admin_context_country_id($pdo);
+    $adminMoneyDecimals = (int) ((orange_admin_currency_context($pdo)['decimals'] ?? 3));
     $custCountryFilter = orange_sql_filter_country_id($pdo, 'customers', 'c', $adminCountryId);
 
     if (!orange_table_exists($pdo, 'customers')) {
@@ -92,7 +94,7 @@ try {
                 'phone' => (string) ($r['phone'] ?? ''),
                 'area' => $hasArea ? (string) ($r['area'] ?? '') : '',
                 'current_balance' => $picker
-                    ? round((float) orange_party_balance_customer($pdo, $id), 3)
+                    ? round((float) orange_party_balance_customer($pdo, $id), $adminMoneyDecimals)
                     : null,
             ];
         }
@@ -279,7 +281,7 @@ try {
             'credit_limit' => $hasLimit && isset($r['credit_limit']) && $r['credit_limit'] !== null && (float) $r['credit_limit'] > 0
                 ? (float) $r['credit_limit'] : null,
             'notes' => $hasNotes ? (string) ($r['notes'] ?? '') : '',
-            'current_balance' => round((float) $bal, 3),
+            'current_balance' => round((float) $bal, $adminMoneyDecimals),
             'orders_count' => (int) ($stats['count'] ?? 0),
             'orders_last_at' => (string) ($stats['last_at'] ?? ''),
             'storefront_account_id' => $sfAcc ? (int) $sfAcc['id'] : null,

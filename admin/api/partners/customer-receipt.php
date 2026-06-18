@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../includes/party_allocations.php';
 require_once __DIR__ . '/../../../includes/document_sequences.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_admin_api();
 
@@ -51,14 +52,20 @@ try {
         $stCc->execute([$customerId]);
         $custCountryId = (int) ($stCc->fetchColumn() ?: 0);
     }
+    $moneyCountryId = $custCountryId > 0 ? $custCountryId : orange_admin_context_country_id($pdo);
+    $moneyDecimals = orange_currency_decimals_for_code(
+        orange_country_functional_currency_code($pdo, $moneyCountryId)
+    );
+    $moneyEpsilon = pow(10, -$moneyDecimals);
+    $amount = round($amount, $moneyDecimals);
 
     $allowExcess = !empty($data['allow_excess']);
     $arBal = orange_party_balance_customer($pdo, $customerId);
-    if (!$allowExcess && $arBal > 0.0001 && $amount > $arBal + 0.02) {
+    if (!$allowExcess && $arBal > ($moneyEpsilon / 2) && $amount > $arBal + $moneyEpsilon) {
         json_response([
             'success' => false,
-            'message' => 'المبلغ يتجاوز ذمة العميل الحالية (' . number_format($arBal, 3) . '). صحّح المبلغ أو فعّل السماح بالزيادة (سلفة / دفعة مقدمة).',
-            'max_amount' => $arBal,
+            'message' => 'المبلغ يتجاوز ذمة العميل الحالية (' . number_format($arBal, $moneyDecimals, '.', ',') . '). صحّح المبلغ أو فعّل السماح بالزيادة (سلفة / دفعة مقدمة).',
+            'max_amount' => round($arBal, $moneyDecimals),
         ], 422);
     }
 

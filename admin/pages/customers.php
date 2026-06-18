@@ -318,7 +318,7 @@ if (orange_table_exists($pdo, 'customers')) {
             'status' => $statusRaw,
             'block_reason' => (string) ($r['block_reason'] ?? ''),
             'attachments_json' => (string) ($r['attachments_json'] ?? ''),
-            'current_balance' => round((float) $bal, 3),
+            'current_balance' => round((float) $bal, $adminCurrencyDecimals),
             'orders_count' => (int) ($stats['count'] ?? 0),
             'orders_last_at' => (string) ($stats['last_at'] ?? ''),
             'orders_cash' => (int) ($stats['cash'] ?? 0),

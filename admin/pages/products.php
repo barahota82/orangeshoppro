@@ -2039,7 +2039,10 @@ function orangeAdminProductCardPreviewPriceFormatted() {
     if (window.OrangeMoney && typeof window.OrangeMoney.formatAmount === 'function') {
         return window.OrangeMoney.formatAmount(v) + ' ' + unit;
     }
-    return v.toFixed(2) + ' ' + unit;
+    const dec = (window.ORANGE_ADMIN_MONEY && typeof window.ORANGE_ADMIN_MONEY.decimals === 'number')
+        ? Math.max(0, parseInt(String(window.ORANGE_ADMIN_MONEY.decimals), 10) || 2)
+        : 2;
+    return v.toFixed(dec) + ' ' + unit;
 }
 
 function orangeAdminPreviewMode() {

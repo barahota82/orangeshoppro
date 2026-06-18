@@ -196,16 +196,16 @@ if ($order && orange_table_has_column($pdo, 'orders', 'cart_combo_discount')) {
 }
 $linesExpectedNet = round($linesSubtotal - $cartComboDisc - $cartPromoDisc, 4);
 $linesMismatch = $order && abs($linesExpectedNet - $orderTotalVal) > 0.009;
+$invMoney = orange_order_currency_context($pdo, is_array($order) ? $order : null);
+$invCurUnit = (string) $invMoney['unit'];
+$invCurDec = (int) $invMoney['decimals'];
 $amountPaidVal = 0.0;
 if ($order && orange_table_has_column($pdo, 'orders', 'amount_paid')) {
     $amountPaidVal = max(0.0, (float) ($order['amount_paid'] ?? 0));
 }
-$balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 0.0;
+$balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, $invCurDec)) : 0.0;
 $invoiceCustomerTotal = $order ? round($orderTotalVal + $invoiceExtraPrintNet, 4) : 0.0;
-$invoiceCustomerBalance = $order ? max(0.0, round($invoiceCustomerTotal - $amountPaidVal, 3)) : 0.0;
-$invMoney = orange_order_currency_context($pdo, is_array($order) ? $order : null);
-$invCurUnit = (string) $invMoney['unit'];
-$invCurDec = (int) $invMoney['decimals'];
+$invoiceCustomerBalance = $order ? max(0.0, round($invoiceCustomerTotal - $amountPaidVal, $invCurDec)) : 0.0;
 $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney): string {
     return orange_format_money_for_context($invMoney, $amount, $withUnit);
 };

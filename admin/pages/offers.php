@@ -7,11 +7,15 @@ require_once __DIR__ . '/../../includes/cart_promo_products.php';
 require_once __DIR__ . '/../../includes/cart_promo_schedule.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/product_offers.php';
+require_once __DIR__ . '/../../includes/currency.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $offersCountryId = orange_admin_context_country_id($pdo);
+$offersMoney = isset($orangeAdminMoney) && is_array($orangeAdminMoney)
+    ? $orangeAdminMoney
+    : orange_admin_currency_context($pdo);
 $offersProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $offersCountryId);
 $ofrPickRows = orange_cart_promo_admin_product_rows($pdo, $offersCountryId);
 $ofrPickJson = json_encode($ofrPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS);
@@ -54,7 +58,7 @@ $offers = $pdo->query(
             <input type="hidden" id="offer_product_id" value="0">
         </div>
         <div>
-            <label for="discount">قيمة الخصم (د.ك)</label>
+            <label for="discount">قيمة الخصم (<?php echo htmlspecialchars((string) ($offersMoney['unit'] ?? 'KWD'), ENT_QUOTES, 'UTF-8'); ?>)</label>
             <input type="number" id="discount" class="admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr">
         </div>
         <?php if ($hasSortCol): ?>
@@ -100,7 +104,7 @@ $offers = $pdo->query(
                 <tr>
                     <td><?php echo (int) $o['id']; ?></td>
                     <td><?php echo htmlspecialchars((string) $o['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td dir="ltr"><?php echo number_format((float) $o['discount'], 3); ?></td>
+                    <td dir="ltr"><?php echo htmlspecialchars(orange_format_money_for_context($offersMoney, (float) $o['discount'], false), ENT_QUOTES, 'UTF-8'); ?></td>
                     <?php if ($hasSortCol): ?>
                     <td dir="ltr"><?php echo (int) ($o['sort_order'] ?? 0); ?></td>
                     <?php endif; ?>

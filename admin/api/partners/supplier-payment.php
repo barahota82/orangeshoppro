@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../../includes/document_sequences.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_admin_api();
 
@@ -52,17 +53,23 @@ try {
         $stSc->execute([$supplierId]);
         $supCountryId = (int) ($stSc->fetchColumn() ?: 0);
     }
+    $moneyCountryId = $supCountryId > 0 ? $supCountryId : orange_admin_context_country_id($pdo);
+    $moneyDecimals = orange_currency_decimals_for_code(
+        orange_country_functional_currency_code($pdo, $moneyCountryId)
+    );
+    $moneyEpsilon = pow(10, -$moneyDecimals);
+    $amount = round($amount, $moneyDecimals);
 
     $allowExcess = !empty($data['allow_excess']);
     $apBal = orange_party_balance_supplier($pdo, $supplierId);
-    if ($apBal <= 0.0001) {
+    if ($apBal <= ($moneyEpsilon / 2)) {
         json_response(['success' => false, 'message' => 'لا توجد ذمة مستحقة لهذا المورد (الرصيد صفر أو سالب).'], 422);
     }
-    if (!$allowExcess && $amount > $apBal + 0.02) {
+    if (!$allowExcess && $amount > $apBal + $moneyEpsilon) {
         json_response([
             'success' => false,
-            'message' => 'المبلغ يتجاوز الذمة المستحقة (' . number_format($apBal, 3) . '). أزل الزيادة أو فعّل خيار السماح بالزيادة إن كان مقصوداً (دفعة مقدمة).',
-            'max_amount' => $apBal,
+            'message' => 'المبلغ يتجاوز الذمة المستحقة (' . number_format($apBal, $moneyDecimals, '.', ',') . '). أزل الزيادة أو فعّل خيار السماح بالزيادة إن كان مقصوداً (دفعة مقدمة).',
+            'max_amount' => round($apBal, $moneyDecimals),
         ], 422);
     }
 

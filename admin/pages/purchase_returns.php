@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 require_once __DIR__ . '/../../includes/purchase_doc_product_pick.php';
@@ -22,6 +23,7 @@ $pr2Caps = orange_admin_caps_for_page($admin, $pdo, 'purchase_returns');
 
 $prCountryId = orange_admin_context_country_id($pdo);
 $prDefaultCurrency = orange_admin_context_currency_code($pdo);
+$prCurrencyDecimals = orange_currency_decimals_for_code($prDefaultCurrency);
 $prProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $prCountryId);
 $prSuppliersCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', $prCountryId);
 
@@ -105,7 +107,7 @@ foreach ($suppliers as $s) {
         'id' => $sid,
         'name' => $supplierName,
         'phone' => $supplierPhone,
-        'balance' => round($balance, 3),
+        'balance' => round($balance, $prCurrencyDecimals),
         'account_id' => $mapAccountId,
         'account_code' => $accountCode,
         'account_name' => $accountName,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 
 $pdo = db();
@@ -23,6 +24,16 @@ $daAreasList = $hasAreasTable
 $daNextSortOrder = $hasGovTable
     ? ''
     : (string) (int) orange_delivery_areas_next_sort_order($pdo, $adminCountryId, 0);
+$daMoney = isset($orangeAdminMoney) && is_array($orangeAdminMoney)
+    ? $orangeAdminMoney
+    : orange_admin_currency_context($pdo);
+$daMoneyDecimals = (int) ($daMoney['decimals'] ?? 3);
+$daMoneyStep = isset($orangeAdminMoneyStep) && is_string($orangeAdminMoneyStep)
+    ? $orangeAdminMoneyStep
+    : orange_admin_money_input_step($daMoneyDecimals);
+$daMoneyZero = isset($orangeAdminMoneyZero) && is_string($orangeAdminMoneyZero)
+    ? $orangeAdminMoneyZero
+    : orange_admin_money_zero_string($daMoneyDecimals);
 ?>
 <div class="page-title">
     <h1>محافظات ومناطق التوصيل</h1>
@@ -164,7 +175,7 @@ $daNextSortOrder = $hasGovTable
         </div>
         <div class="da-area-fee">
             <label for="da_delivery_fee">قيمة التوصيل</label>
-            <input type="number" id="da_delivery_fee" min="0" step="0.001" lang="en" dir="ltr" value="0.000">
+            <input type="number" id="da_delivery_fee" min="0" step="<?php echo htmlspecialchars($daMoneyStep, ENT_QUOTES, 'UTF-8'); ?>" lang="en" dir="ltr" value="<?php echo htmlspecialchars($daMoneyZero, ENT_QUOTES, 'UTF-8'); ?>">
         </div>
         <div class="da-area-sort">
             <label for="da_sort_order">الترتيب</label>
@@ -229,7 +240,7 @@ $daNextSortOrder = $hasGovTable
                     <?php endif; ?>
                     <td><?php echo htmlspecialchars((string) ($aRow['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td dir="ltr"><?php echo htmlspecialchars((string) ($aRow['name_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td dir="ltr"><?php echo htmlspecialchars(number_format(max(0.0, (float) ($aRow['delivery_fee'] ?? 0)), 3, '.', ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td dir="ltr"><?php echo htmlspecialchars(number_format(max(0.0, (float) ($aRow['delivery_fee'] ?? 0)), $daMoneyDecimals, '.', ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo (int) ($aRow['sort_order'] ?? 0); ?></td>
                     <td><?php echo $aActive ? 'منطقة توصيل' : 'غير متاحة للتوصيل'; ?></td>
                     <td><button type="button" class="btn-secondary" data-da-edit="<?php echo $aid; ?>">تعديل</button></td>
@@ -314,6 +325,8 @@ let daGovernoratesCache = <?php echo json_encode($daGovernoratesList, JSON_UNESC
 let daDeliveryAreasCache = <?php echo json_encode(array_values($daAreasList), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var dgSortStep = <?php echo (int) orange_delivery_governorates_sort_order_step(); ?>;
 var daSortStep = dgSortStep;
+var daMoneyDecimals = <?php echo (int) $daMoneyDecimals; ?>;
+var daMoneyZero = <?php echo json_encode($daMoneyZero, JSON_UNESCAPED_UNICODE); ?>;
 
 function dgComputeNextSort() {
     var max = 0;
@@ -453,10 +466,16 @@ function daParseMoney(v) {
     return n;
 }
 
+function daRoundMoney(v) {
+    var n = Number(v);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    var p = Math.pow(10, daMoneyDecimals);
+    return Math.round(n * p) / p;
+}
+
 function daFormatMoney(v) {
-    var n = daParseMoney(v);
-    if (!Number.isFinite(n) || n < 0) n = 0;
-    return n.toFixed(3);
+    var n = daRoundMoney(daParseMoney(v));
+    return n.toFixed(daMoneyDecimals);
 }
 
 async function translateNames(arId, enId, opts) {
@@ -587,7 +606,7 @@ function resetDeliveryAreaForm() {
     document.getElementById('da_id').value = '0';
     document.getElementById('da_name_ar').value = '';
     document.getElementById('da_name_en').value = '';
-    document.getElementById('da_delivery_fee').value = '0.000';
+    document.getElementById('da_delivery_fee').value = daMoneyZero;
     document.getElementById('da_is_active').checked = true;
     const sel = document.getElementById('da_governorate_id');
     if (sel) sel.value = '';
@@ -664,7 +683,7 @@ async function saveDeliveryArea() {
         country_id: daCountryId(),
         name_ar: document.getElementById('da_name_ar').value.trim(),
         name_en: document.getElementById('da_name_en').value.trim(),
-        delivery_fee: Number(feeVal.toFixed(4)),
+        delivery_fee: Number(daRoundMoney(feeVal).toFixed(daMoneyDecimals)),
         is_active: document.getElementById('da_is_active').checked ? 1 : 0
     };
     if (govEl) {

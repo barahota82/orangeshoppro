@@ -264,13 +264,13 @@ function orange_admin_orders_action_buttons(array $o): void
                         if ($hasCartComboDiscountCol) {
                             $cd = (float)($o['cart_combo_discount'] ?? 0);
                             if ($cd > 0.00001) {
-                                echo '<br><span class="small" title="خصم كومبو">كومبو: −' . htmlspecialchars(number_format($cd, 2), ENT_QUOTES, 'UTF-8') . '</span>';
+                                echo '<br><span class="small" title="خصم كومبو">كومبو: −' . htmlspecialchars(orange_format_money_for_context($ordersMoney, $cd, false), ENT_QUOTES, 'UTF-8') . '</span>';
                             }
                         }
                         if ($hasCartPromoDiscountCol) {
                             $pd = (float)($o['cart_promotion_discount'] ?? 0);
                             if ($pd > 0.00001) {
-                                echo '<br><span class="small" title="خصم عرض مجموع السلة">عرض: −' . htmlspecialchars(number_format($pd, 2), ENT_QUOTES, 'UTF-8') . '</span>';
+                                echo '<br><span class="small" title="خصم عرض مجموع السلة">عرض: −' . htmlspecialchars(orange_format_money_for_context($ordersMoney, $pd, false), ENT_QUOTES, 'UTF-8') . '</span>';
                             }
                         }
                     ?></td>

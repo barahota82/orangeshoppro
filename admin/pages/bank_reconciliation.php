@@ -245,6 +245,7 @@ if ($initialJson === false) {
     ], JSON_UNESCAPED_UNICODE); ?>;
     var state = <?php echo $initialJson; ?>;
     var decimals = <?php echo (int) $reportMoney['decimals']; ?>;
+    var lineMoneyStep = <?php echo json_encode(orange_admin_money_input_step((int) $reportMoney['decimals']), JSON_UNESCAPED_UNICODE); ?>;
 
     function fmt(n) {
         var x = Number(n) || 0;
@@ -295,7 +296,7 @@ if ($initialJson === false) {
             tr.innerHTML =
                 '<td><input type="text" class="orange-inp-dmy" dir="ltr" lang="en" data-idx="' + idx + '" data-f="date" value="' + (ln.line_date ? orangeIsoDateToDmy(ln.line_date) : '') + '"' + (state.status === 'closed' ? ' disabled' : '') + '></td>' +
                 '<td><input type="text" data-idx="' + idx + '" data-f="desc" value="' + (ln.description || '').replace(/"/g, '&quot;') + '" style="width:100%"' + (state.status === 'closed' ? ' disabled' : '') + '></td>' +
-                '<td><input type="number" step="0.001" data-idx="' + idx + '" data-f="amt" value="' + (ln.amount != null ? ln.amount : 0) + '" dir="ltr"' + (state.status === 'closed' ? ' disabled' : '') + '></td>' +
+                '<td><input type="number" step="' + lineMoneyStep + '" data-idx="' + idx + '" data-f="amt" value="' + (ln.amount != null ? ln.amount : 0) + '" dir="ltr"' + (state.status === 'closed' ? ' disabled' : '') + '></td>' +
                 '<td>' + (state.status === 'closed' ? '' : '<button type="button" class="btn-secondary" data-rm="' + idx + '">×</button>') + '</td>';
             tb.appendChild(tr);
         });

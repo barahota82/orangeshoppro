@@ -189,9 +189,17 @@
         return isFinite(v) ? v : 0;
     }
 
-    function money3(v) {
+    function moneyDecimals() {
+        if (global.ORANGE_ADMIN_MONEY && typeof global.ORANGE_ADMIN_MONEY.decimals === 'number') {
+            var d = parseInt(String(global.ORANGE_ADMIN_MONEY.decimals), 10);
+            if (isFinite(d) && d >= 0 && d <= 6) return d;
+        }
+        return 3;
+    }
+
+    function moneyFmt(v) {
         var n = Number(v) || 0;
-        return n.toFixed(3);
+        return n.toFixed(moneyDecimals());
     }
 
     /**
@@ -273,7 +281,7 @@
                 html += '<tr class="' + cls + '">'
                     + '<td class="sd-print-totals__lbl">' + labHtml + '</td>'
                     + '<td class="sd-print-totals__val" dir="ltr" lang="en">'
-                    + signTxt + money3(r.val) + unitTxt + '</td></tr>';
+                    + signTxt + moneyFmt(r.val) + unitTxt + '</td></tr>';
             });
             body.innerHTML = html;
         }
@@ -292,14 +300,14 @@
                     ihtml += '<tr class="' + cls2 + '">'
                         + '<td colspan="' + cspan + '" class="sd-intable-tot__lbl">' + escapeHtml(lab2) + '</td>'
                         + '<td class="sd-intable-tot__val" dir="ltr" lang="en">'
-                        + signTxt2 + money3(r.val) + unitTxt2 + '</td></tr>';
+                        + signTxt2 + moneyFmt(r.val) + unitTxt2 + '</td></tr>';
                 });
                 intbl.innerHTML = ihtml;
             }
         }
 
         var headEl = document.getElementById(prefix + '_sd_print_total');
-        if (headEl) headEl.textContent = money3(grand);
+        if (headEl) headEl.textContent = moneyFmt(grand);
 
         // إخراج على الشاشة (اختياري): ملخّص البنود الإضافية الظاهرة + الإجمالي النهائي.
         if (opts.screenExtraId) {
@@ -313,14 +321,14 @@
                     var lab = (r.label && r.label.ar) ? r.label.ar : '';
                     sh += '<span style="color:#64748b;">' + escapeHtml(lab) + ':</span> '
                         + '<strong class="admin-money-display" dir="ltr" lang="en" style="color:' + col + ';">'
-                        + sgn + money3(r.val) + '</strong><br>';
+                        + sgn + moneyFmt(r.val) + '</strong><br>';
                 });
                 sc.innerHTML = sh;
             }
         }
         if (opts.grandOutId) {
             var gEl = document.getElementById(String(opts.grandOutId));
-            if (gEl) gEl.textContent = money3(grand);
+            if (gEl) gEl.textContent = moneyFmt(grand);
         }
         if (opts.grandLabelId && opts.finalLabel) {
             var glEl = document.getElementById(String(opts.grandLabelId));
@@ -345,7 +353,7 @@
             var setFold = function (id, v) {
                 if (!id) return;
                 var el = document.getElementById(String(id));
-                if (el) el.textContent = money3(v);
+                if (el) el.textContent = moneyFmt(v);
             };
             setFold(opts.foldTotalId, foldTotal);
             setFold(opts.foldDiscountId, foldDiscount);

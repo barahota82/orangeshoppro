@@ -26,6 +26,7 @@ $sv2Caps = orange_admin_caps_for_page($admin, $pdo, 'company_sales_invoice');
 $adminCountryId = orange_admin_context_country_id($pdo);
 $adminDefaultPhoneDial = orange_admin_context_phone_dial($pdo);
 $adminDefaultCurrency = orange_admin_context_currency_code($pdo);
+$adminCurrencyDecimals = orange_currency_decimals_for_code($adminDefaultCurrency);
 $adminCurrencyUnit = orange_currency_display_unit($adminDefaultCurrency);
 $sv2CustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $adminCountryId);
 $sv2ChannelsCountrySql = orange_channels_has_country_column($pdo)
@@ -81,7 +82,7 @@ if (orange_table_exists($pdo, 'customers')) {
             'phone' => trim((string) ($c['phone'] ?? '')),
             'area' => trim((string) ($c['area'] ?? '')),
             'address' => trim((string) ($c['address'] ?? '')),
-            'balance' => round((float) ($custBal[$cid] ?? 0.0), 3),
+            'balance' => round((float) ($custBal[$cid] ?? 0.0), $adminCurrencyDecimals),
         ];
     }
 }
@@ -659,13 +660,16 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     var sv2ProductPick = null;
     var sv2ExtraPickSource = 'presets';
     var sv2ExtraPickSelected = null;
+    var SV2_MONEY_DECIMALS = (window.ORANGE_ADMIN_MONEY && typeof window.ORANGE_ADMIN_MONEY.decimals === 'number')
+        ? Math.max(0, parseInt(String(window.ORANGE_ADMIN_MONEY.decimals), 10) || 3)
+        : 3;
+    var SV2_MONEY_EPSILON = Math.pow(10, -SV2_MONEY_DECIMALS);
 
     function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function fmt3(n) {
         var f = window.orangeFmtMoney || (window.OrangeMoney && window.OrangeMoney.formatAmount);
         if (f) return f(n);
-        var d = (window.ORANGE_ADMIN_MONEY && window.ORANGE_ADMIN_MONEY.decimals) || 3;
-        return (parseFloat(n) || 0).toFixed(d);
+        return (parseFloat(n) || 0).toFixed(SV2_MONEY_DECIMALS);
     }
     function fmtZero() {
         if (window.orangeMoneyZero) return window.orangeMoneyZero();
@@ -1026,7 +1030,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             var discEl = r.querySelector('.sv2-discount');
             var discAmt = parseDiscount((discEl && discEl.value || '').trim(), lineGross);
             // المبيعات: الخصم يمكن أن يساوي إجمالي الصنف (الصافي صفر) لكن لا يتجاوزه.
-            var invalid = (discAmt > 0) && (discAmt > lineGross + 0.0005);
+            var invalid = (discAmt > 0) && (discAmt > lineGross + SV2_MONEY_EPSILON);
             if (discEl) discEl.style.border = invalid ? '1px solid #dc2626' : '';
             if (invalid && !firstDiscError) firstDiscError = 'خصم الصنف في السطر ' + (i + 1) + ' أكبر من إجمالي الصنف — يمكن أن يساويه فقط.';
             if (discAmt > lineGross) discAmt = lineGross;
@@ -1571,7 +1575,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             if (!pid || q < 1) return;
             var lineGross = q * p;
             var discAmt = parseDiscount(discRaw, lineGross);
-            if (discAmt > lineGross + 0.0001) {
+            if (discAmt > lineGross + SV2_MONEY_EPSILON) {
                 if (!sv2DiscError) sv2DiscError = 'خصم الصنف في السطر ' + (idx + 1) + ' أكبر من إجمالي الصنف. صحّح الخصم قبل الحفظ.';
                 return;
             }

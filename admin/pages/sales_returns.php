@@ -22,6 +22,7 @@ $sr2Caps = orange_admin_caps_for_page($admin, $pdo, 'sales_returns');
 
 $srCountryId = orange_admin_context_country_id($pdo);
 $srDefaultCurrency = orange_admin_context_currency_code($pdo);
+$srCurrencyDecimals = orange_currency_decimals_for_code($srDefaultCurrency);
 $srCurrencyUnit = orange_currency_display_unit($srDefaultCurrency);
 $sr2CustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $srCountryId);
 $sr2PickRows = orange_sales_doc_product_pick_rows($pdo, $srCountryId);
@@ -81,7 +82,7 @@ if (orange_table_exists($pdo, 'customers')) {
             'phone' => trim((string) ($c['phone'] ?? '')),
             'area' => trim((string) ($c['area'] ?? '')),
             'address' => trim((string) ($c['address'] ?? '')),
-            'balance' => round((float) ($custBal[$cid] ?? 0.0), 3),
+            'balance' => round((float) ($custBal[$cid] ?? 0.0), $srCurrencyDecimals),
         ];
     }
 }
@@ -566,13 +567,16 @@ $sr2DocSerialPreview = $sr2NavReady
     var sr2ViewMode = false;
     var currentCustomerId = 0;
     var sr2ProductPick = null;
+    var SR2_MONEY_DECIMALS = (window.ORANGE_ADMIN_MONEY && typeof window.ORANGE_ADMIN_MONEY.decimals === 'number')
+        ? Math.max(0, parseInt(String(window.ORANGE_ADMIN_MONEY.decimals), 10) || 3)
+        : 3;
+    var SR2_MONEY_EPSILON = Math.pow(10, -SR2_MONEY_DECIMALS);
 
     function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function fmt3(n) {
         var f = window.orangeFmtMoney || (window.OrangeMoney && window.OrangeMoney.formatAmount);
         if (f) return f(n);
-        var d = (window.ORANGE_ADMIN_MONEY && window.ORANGE_ADMIN_MONEY.decimals) || 3;
-        return (parseFloat(n) || 0).toFixed(d);
+        return (parseFloat(n) || 0).toFixed(SR2_MONEY_DECIMALS);
     }
     function fmtZero() {
         if (window.orangeMoneyZero) return window.orangeMoneyZero();
@@ -835,7 +839,7 @@ $sr2DocSerialPreview = $sr2NavReady
             var discEl = r.querySelector('.sr2-line-disc');
             var disc = parseDiscount((discEl && discEl.value || '').trim(), lineGross);
             // المردود: الخصم يمكن أن يساوي إجمالي الصنف (الصافي صفر) لكن لا يتجاوزه.
-            var invalid = (disc > 0) && (disc > lineGross + 0.0005);
+            var invalid = (disc > 0) && (disc > lineGross + SR2_MONEY_EPSILON);
             if (discEl) discEl.style.border = invalid ? '1px solid #dc2626' : '';
             if (invalid && !firstDiscError) firstDiscError = 'خصم الصنف في السطر ' + (i + 1) + ' أكبر من إجمالي الصنف — يمكن أن يساويه فقط.';
             if (disc > lineGross) disc = lineGross;
@@ -1434,14 +1438,14 @@ $sr2DocSerialPreview = $sr2NavReady
             if (!pid || q < 1) continue;
             var lineGross = q * price;
             var disc = parseDiscount((r.querySelector('.sr2-line-disc').value || '').trim(), lineGross);
-            if (disc > lineGross + 0.0001) {
+            if (disc > lineGross + SR2_MONEY_EPSILON) {
                 alert('خصم الصنف في السطر ' + (i + 1) + ' أكبر من إجمالي الصنف. صحّح الخصم قبل الحفظ.');
                 return;
             }
             var row = { product_id: pid, variant_id: vid, qty: q, price: price, line_discount: disc };
             var costRaw = (r.querySelector('.sr2-cost') && r.querySelector('.sr2-cost').value) || '';
             var costNum = parseFloat(costRaw);
-            if (!isNaN(costNum) && costNum > 0.0001) row.cost = costNum;
+            if (!isNaN(costNum) && costNum > (SR2_MONEY_EPSILON / 2)) row.cost = costNum;
             items.push(row);
         }
         if (!items.length) {

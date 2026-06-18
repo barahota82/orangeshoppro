@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/bank_reconciliation.php';
 require_once __DIR__ . '/../../../includes/admin_settings_country.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_admin_api();
 
 try {
@@ -16,6 +17,10 @@ try {
     }
 
     $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+    $brMoneyDecimals = orange_currency_decimals_for_code(
+        orange_country_functional_currency_code($pdo, $ctxCountryId)
+    );
+    $brMoneyEpsilon = pow(10, -$brMoneyDecimals);
     $data = get_json_input();
     $id = (int) ($data['id'] ?? 0);
     $adjustmentAccountId = (int) ($data['adjustment_account_id'] ?? 0);
@@ -29,7 +34,7 @@ try {
         $msg .= ' — قيد التسوية في طابور الترحيل؛ أكمل من «إقفال الحركات»';
     } elseif (($result['voucher_id'] ?? 0) > 0) {
         $msg .= ' — سند #' . (int) $result['voucher_id'];
-    } elseif (abs((float) ($result['variance'] ?? 0)) < 0.0001) {
+    } elseif (abs((float) ($result['variance'] ?? 0)) < ($brMoneyEpsilon / 2)) {
         $msg .= ' — لا فرق (مطابقة)';
     }
 

@@ -151,8 +151,9 @@ $canLastSupplier = orange_table_exists($pdo, 'purchases')
     && orange_table_has_column($pdo, 'purchase_items', 'product_id');
 
 $company = orange_sales_doc_print_company($pdo, $srCountryId);
-$reportFmtMoney = static function (float $v): string {
-    return number_format($v, 2, '.', ',');
+$reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
+$reportFmtMoney = static function (float $v) use ($reportMoney): string {
+    return orange_accounting_report_format_amount($v, $reportMoney);
 };
 $productCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $srCountryId);
 $catJoin = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', null);

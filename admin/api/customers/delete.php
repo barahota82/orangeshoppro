@@ -43,7 +43,8 @@ try {
     // 1) فحص رصيد الذمة.
     $balance = orange_party_balance_customer($pdo, $idIn);
     $custMoney = orange_admin_currency_context($pdo);
-    if (abs((float) $balance) > 0.001) {
+    $moneyEpsilon = pow(10, -(int) ($custMoney['decimals'] ?? 3));
+    if (abs((float) $balance) > ($moneyEpsilon / 2)) {
         json_response([
             'success' => false,
             'message' => 'لا يمكن الحذف: العميل عليه رصيد ذمة (' . orange_format_money_for_context($custMoney, (float) $balance) . '). سوّ الحساب أولاً.',

@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/delivery_areas.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_admin_api();
 
 /**
@@ -21,7 +22,7 @@ function da_str191($v): string
 /**
  * @param mixed $v
  */
-function da_money_non_negative($v): ?float
+function da_money_non_negative($v, int $decimals): ?float
 {
     $s = trim((string) $v);
     if ($s === '') {
@@ -35,8 +36,9 @@ function da_money_non_negative($v): ?float
     if (!is_finite($n) || $n < 0) {
         return null;
     }
+    $d = max(0, min(4, $decimals));
 
-    return round($n, 4);
+    return round($n, $d);
 }
 
 try {
@@ -54,6 +56,9 @@ try {
     }
 
     $countryId = orange_delivery_areas_api_country_id($pdo, is_array($data) ? $data : []);
+    $countryMoneyDecimals = orange_currency_decimals_for_code(
+        orange_country_functional_currency_code($pdo, $countryId)
+    );
 
     if ($action === 'list_governorates') {
         json_response([
@@ -108,7 +113,7 @@ try {
         $governorateId = (int) ($data['governorate_id'] ?? 0);
         $nameAr = da_str191($data['name_ar'] ?? '');
         $nameEn = da_str191($data['name_en'] ?? '');
-        $deliveryFee = da_money_non_negative($data['delivery_fee'] ?? 0);
+        $deliveryFee = da_money_non_negative($data['delivery_fee'] ?? 0, $countryMoneyDecimals);
         $isActive = !empty($data['is_active']) ? 1 : 0;
 
         if ($nameAr === '') {

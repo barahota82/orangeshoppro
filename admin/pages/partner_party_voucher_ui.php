@@ -14,11 +14,19 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = orange_admin_page_pdo();
+$ppvMoney = isset($orangeAdminMoney) && is_array($orangeAdminMoney)
+    ? $orangeAdminMoney
+    : orange_admin_currency_context($pdo);
+$ppvMoneyDecimals = (int) ($ppvMoney['decimals'] ?? 3);
+$ppvFmtMoney = static function (float $amount) use ($ppvMoney): string {
+    return orange_format_money_for_context($ppvMoney, $amount, false);
+};
 
 $ppvPermPage = $ppvKind === 'customer_receipt' ? 'partner_customer_receipt' : 'partner_supplier_payment';
 $ppvCaps = orange_admin_caps_for_page($admin, $pdo, $ppvPermPage);
@@ -169,7 +177,7 @@ if (!$ppvIsReceipt) {
             'id' => $sid,
             'name' => $supplierName,
             'phone' => $supplierPhone,
-            'balance' => round($balance, 3),
+            'balance' => round($balance, $ppvMoneyDecimals),
             'account_id' => $mapAccountId,
             'account_code' => $accountCode,
             'account_name' => $accountName,
@@ -269,7 +277,7 @@ if (orange_journal_vouchers_ready($pdo)) {
                 <?php foreach ($customers as $c): ?>
                     <option value="<?php echo (int) $c['id']; ?>">
                         <?php echo htmlspecialchars($c['name_ar'] . ' — ' . $c['phone'], ENT_QUOTES, 'UTF-8'); ?>
-                        (رصيد <?php echo number_format($custBal[(int) $c['id']] ?? 0, 3); ?>)
+                        (رصيد <?php echo htmlspecialchars($ppvFmtMoney((float) ($custBal[(int) $c['id']] ?? 0.0)), ENT_QUOTES, 'UTF-8'); ?>)
                     </option>
                 <?php endforeach; ?>
             </select>
@@ -878,7 +886,11 @@ function ppvSave() {
     }
     var allocs = ppvCollectAlloc();
     var sumA = allocs.reduce(function (a, x) { return a + x.amount; }, 0);
-    if (allocs.length && sumA > amt + 0.02) {
+    var moneyDecimals = (window.ORANGE_ADMIN_MONEY && typeof window.ORANGE_ADMIN_MONEY.decimals === 'number')
+        ? Math.max(0, parseInt(String(window.ORANGE_ADMIN_MONEY.decimals), 10) || 3)
+        : 3;
+    var allocTolerance = Math.pow(10, -moneyDecimals);
+    if (allocs.length && sumA > amt + allocTolerance) {
         alert('مجموع التخصيصات (' + orangeFmtMoney(sumA) + ') يتجاوز مبلغ السند (' + orangeFmtMoney(amt) + ')');
         return;
     }

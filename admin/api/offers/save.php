@@ -7,12 +7,14 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/cart_promo_schedule.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_admin_api();
 
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
+    $offersMoneyDecimals = (int) ((orange_admin_currency_context($pdo)['decimals'] ?? 3));
 
     if (empty($data['product_id']) || !isset($data['discount'])) {
         json_response(['success' => false, 'message' => 'بيانات العرض مطلوبة'], 422);
@@ -28,7 +30,7 @@ try {
     }
 
     $pid = (int) $data['product_id'];
-    $discount = (float) $data['discount'];
+    $discount = round((float) $data['discount'], $offersMoneyDecimals);
     if ($discount <= 0) {
         json_response(['success' => false, 'message' => 'قيمة الخصم يجب أن تكون أكبر من صفر'], 422);
     }

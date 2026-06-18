@@ -359,7 +359,7 @@ if (orange_table_exists($pdo, 'suppliers')) {
             'preferred_warehouse_id' => isset($r['preferred_warehouse_id']) && (int) $r['preferred_warehouse_id'] > 0 ? (int) $r['preferred_warehouse_id'] : null,
             'block_reason' => $blockReason,
             'attachments_json' => $attachmentsJson,
-            'current_balance' => round((float) $bal, 3),
+            'current_balance' => round((float) $bal, $supplierCurrencyDecimals),
             'search_text' => $searchHay,
         ];
     }

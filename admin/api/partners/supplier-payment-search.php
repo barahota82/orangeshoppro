@@ -7,12 +7,14 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_admin_api();
 
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
+    $moneyDecimals = (int) ((orange_admin_currency_context($pdo)['decimals'] ?? 3));
 
     $idFrom = (int) ($data['id_from'] ?? 0);
     $idTo = (int) ($data['id_to'] ?? 0);
@@ -65,7 +67,7 @@ try {
             'voucher_date' => orange_format_date_dmY((string) ($r['voucher_date'] ?? '')),
             'reference' => (string) ($r['reference'] ?? ''),
             'description' => (string) ($r['description'] ?? ''),
-            'total' => round((float) ($r['total'] ?? 0), 3),
+            'total' => round((float) ($r['total'] ?? 0), $moneyDecimals),
         ];
     }
 

@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 require_once __DIR__ . '/../../includes/voucher_print_banner.php';
@@ -19,6 +20,7 @@ $pdo = orange_admin_page_pdo();
 $ppvPrintTuningMode = orange_admin_voucher_print_tuning_mode();
 
 $ppvCountryId = orange_admin_context_country_id($pdo);
+$ppvCurrencyDecimals = orange_currency_decimals_for_code(orange_admin_context_currency_code($pdo));
 $ppvCountryLabel = orange_admin_page_country_label($pdo);
 $ppvCustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $ppvCountryId);
 
@@ -106,7 +108,7 @@ foreach ($customers as $c) {
         'id' => $cid,
         'name' => $customerName,
         'phone' => $customerPhone,
-        'balance' => round($balance, 3),
+        'balance' => round($balance, $ppvCurrencyDecimals),
         'customer_code' => $customerCode,
         'account_code' => $arCode,
         'account_name' => $arName,
