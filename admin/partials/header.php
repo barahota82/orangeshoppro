@@ -293,7 +293,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'items' => [
                         ['page' => 'warehouse_purchases_index', 'href' => '/admin/index.php?page=warehouse_purchases_index', 'label' => 'فهرس المخازن والمشتريات', 'class' => '', 'sub' => false],
                         ['page' => 'stock_reports', 'href' => '/admin/index.php?page=stock_reports', 'label' => 'تقارير المخزن', 'class' => '', 'sub' => false],
-                        ['page' => 'inventory_reconciliation', 'href' => '/admin/index.php?page=inventory_reconciliation', 'label' => 'تسوية المخزون / الجرد', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'inventory_reconciliation', 'href' => '/admin/index.php?page=inventory_reconciliation', 'label' => 'أرشيف الجرد', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
                     ],
                 ],
@@ -373,9 +373,9 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                 ],
                 [
                     'group' => true,
-                    'title' => 'تقارير المبيعات',
+                    'title' => 'تحليل المبيعات',
                     'items' => [
-                        ['page' => 'reports', 'href' => '/admin/index.php?page=reports', 'label' => 'تقارير المبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'reports', 'href' => '/admin/index.php?page=reports', 'label' => 'تحليل المبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'channel_analytics', 'href' => '/admin/index.php?page=channel_analytics', 'label' => 'تحليل القنوات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'sales_returns_report', 'href' => '/admin/index.php?page=sales_returns_report', 'label' => 'تقرير مردودات المبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
                     ],
