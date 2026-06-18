@@ -373,11 +373,11 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                 ],
                 [
                     'group' => true,
-                    'title' => 'تحليل المبيعات',
+                    'title' => 'تقارير المبيعات',
                     'items' => [
                         ['page' => 'reports', 'href' => '/admin/index.php?page=reports', 'label' => 'تحليل المبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
-                        ['page' => 'sales_reports', 'href' => '/admin/index.php?page=sales_reports', 'label' => 'تقارير المبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'channel_analytics', 'href' => '/admin/index.php?page=channel_analytics', 'label' => 'تحليل القنوات', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'sales_reports', 'href' => '/admin/index.php?page=sales_reports', 'label' => 'تقارير المبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
                     ],
                 ],
             ];

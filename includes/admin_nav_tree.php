@@ -174,11 +174,11 @@ function orange_admin_permission_mega_sections(): array
                     ],
                 ],
                 [
-                    'title' => 'تحليل المبيعات',
+                    'title' => 'تقارير المبيعات',
                     'pages' => [
                         ['page' => 'reports', 'label' => 'تحليل المبيعات'],
-                        ['page' => 'sales_reports', 'label' => 'تقارير المبيعات'],
                         ['page' => 'channel_analytics', 'label' => 'تحليل القنوات'],
+                        ['page' => 'sales_reports', 'label' => 'تقارير المبيعات'],
                     ],
                 ],
             ],
