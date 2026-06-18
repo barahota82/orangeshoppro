@@ -771,10 +771,23 @@ $filterSubtitle = implode(' — ', $subtitleParts);
         <?php endif; ?>
 
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <table class="admin-fy-table gl-acc-stmt-table ta-report-table"
+            <?php $prrDocTableClass = ($reportKey === 'invoices' || $reportKey === 'returns') ? ' prr-doc-table' : ''; ?>
+            <table class="admin-fy-table gl-acc-stmt-table ta-report-table<?php echo $prrDocTableClass; ?>"
                 data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>"
                 data-export-target=".prr-print-actions"
                 data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
+                <?php if ($reportKey === 'invoices' || $reportKey === 'returns'): ?>
+                    <colgroup>
+                        <col class="prr-col-ref">
+                        <col class="prr-col-date">
+                        <col class="prr-col-supplier">
+                        <col class="prr-col-supplier-doc">
+                        <col class="prr-col-type">
+                        <col class="prr-col-money">
+                        <col class="prr-col-money">
+                        <col class="prr-col-money">
+                    </colgroup>
+                <?php endif; ?>
                 <?php if ($reportKey === 'invoices'): ?>
                     <thead>
                     <tr>
@@ -1015,6 +1028,16 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 .prr-filter-form.is-items .prr-print-actions {
     margin-inline-start: 0 !important;
 }
+.prr-doc-table {
+    table-layout: fixed;
+    min-width: 72rem;
+}
+.prr-doc-table .prr-col-ref { width: 10%; }
+.prr-doc-table .prr-col-date { width: 9%; }
+.prr-doc-table .prr-col-supplier { width: 25%; }
+.prr-doc-table .prr-col-supplier-doc { width: 13%; }
+.prr-doc-table .prr-col-type { width: 11%; }
+.prr-doc-table .prr-col-money { width: 10.666%; }
 </style>
 
 <?php
