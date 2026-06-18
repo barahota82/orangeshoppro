@@ -1057,6 +1057,11 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     font-size:0.92rem;
 }
 .prr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
+.prr-filter-form #prr_from,
+.prr-filter-form #prr_to {
+    width: 8.75rem;
+    min-width: 8.75rem;
+}
 .prr-filter-form.is-items .prr-supplier-name {
     min-width: 13rem !important;
 }
