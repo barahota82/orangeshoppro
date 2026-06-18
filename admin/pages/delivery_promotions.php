@@ -49,7 +49,7 @@ foreach (orange_delivery_promotion_discount_type_values() as $key => $_) {
 <div class="card">
     <h3>قيمة التوصيل الأساسية قبل الخصم</h3>
     <p class="card-hint" style="margin-top:0;">
-        هذه القيمة هي أساس الرسوم قبل أي خصم من عروض التوصيل. يمكنك من هنا تحديث قيمة التوصيل في شاشة المناطق النشطة مباشرة.
+        هذه القيمة هي أساس الرسوم قبل أي خصم من عروض التوصيل. يمكنك حفظها فقط، أو استخدامها لتحديث المناطق مع الحفاظ على التسعير المتفاوت.
     </p>
     <div class="admin-form-actions" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
         <div style="min-width:220px;">
@@ -62,8 +62,12 @@ foreach (orange_delivery_promotion_discount_type_values() as $key => $_) {
                    dir="ltr"
                    value="<?php echo htmlspecialchars($dpBaseFeeValue, ENT_QUOTES, 'UTF-8'); ?>">
         </div>
-        <button type="button" onclick="savePromotionBaseFee(true)" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ + تحديث المناطق النشطة</button>
-        <button type="button" class="btn-secondary" onclick="savePromotionBaseFee(false)" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ كأساس فقط</button>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;max-width:38rem;line-height:1.35;">
+            <input type="checkbox" id="dp_base_preserve_custom" checked>
+            <span>عند التحديث: حافظ على الأسعار المخصصة للمناطق/المحافظات، وحدث فقط المناطق المطابقة للقيمة الأساسية السابقة.</span>
+        </label>
+        <button type="button" class="btn-secondary" onclick="savePromotionBaseFee(false)" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ كأساس فقط (لا يغيّر أسعار المناطق)</button>
+        <button type="button" onclick="savePromotionBaseFee(true)" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ + تحديث المناطق</button>
         <span id="dp_base_fee_status" class="card-hint"></span>
     </div>
 </div>
@@ -199,6 +203,12 @@ foreach (orange_delivery_promotion_discount_type_values() as $key => $_) {
         }
     }
 
+    function dpPreserveCustomAreaFees() {
+        var el = document.getElementById('dp_base_preserve_custom');
+        if (!el) return true;
+        return !!el.checked;
+    }
+
     async function loadPromotionBaseFee() {
         var res = await postJSON('/admin/api/delivery_promotions/manage.php', { action: 'get_base_fee' });
         if (!res || !res.success) {
@@ -217,10 +227,20 @@ foreach (orange_delivery_promotion_discount_type_values() as $key => $_) {
             dpShowBaseFeeStatus('قيمة التوصيل الأساسية غير صحيحة', true);
             return;
         }
+        var preserveCustomAreaFees = dpPreserveCustomAreaFees();
+        if (applyActiveAreas) {
+            var confirmMsg = preserveCustomAreaFees
+                ? 'سيتم تحديث المناطق النشطة المطابقة للقيمة الأساسية السابقة فقط، مع الحفاظ على التسعير المتفاوت المخصص. متابعة؟'
+                : 'سيتم توحيد قيمة التوصيل على كل المناطق النشطة. متابعة؟';
+            if (!window.confirm(confirmMsg)) {
+                return;
+            }
+        }
         var payload = {
             action: 'save_base_fee',
             default_delivery_fee: Number(dpRoundMoney(feeVal).toFixed(DP_MONEY_DECIMALS)),
-            apply_active_areas: applyActiveAreas ? 1 : 0
+            apply_active_areas: applyActiveAreas ? 1 : 0,
+            preserve_custom_area_fees: preserveCustomAreaFees ? 1 : 0
         };
         var res = await postJSON('/admin/api/delivery_promotions/manage.php', payload);
         if (!res || !res.success) {
