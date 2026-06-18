@@ -31,6 +31,7 @@ try {
             'label_ar' => (string) ($row['label_ar'] ?? ''),
             'label_en' => (string) ($row['label_en'] ?? ''),
             'line_kind' => (string) ($row['line_kind'] ?? ''),
+            'system_key' => (string) ($row['system_key'] ?? ''),
             'default_show_on_print' => (int) ($row['default_show_on_print'] ?? 0) === 1,
             'sort_order' => (int) ($row['sort_order'] ?? 0),
         ];

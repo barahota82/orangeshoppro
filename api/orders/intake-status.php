@@ -67,10 +67,16 @@ try {
         $promoDisc = 0.0;
         $comboDisc = 0.0;
         $deliveryFee = 0.0;
+        $deliveryFeeBase = 0.0;
+        $deliveryFeeDiscount = 0.0;
+        $deliveryPromotionId = null;
         if ($oid > 0) {
             $hasPromoC = orange_table_has_column($pdo, 'orders', 'cart_promotion_discount');
             $hasComboC = orange_table_has_column($pdo, 'orders', 'cart_combo_discount');
             $hasDeliveryFee = orange_table_has_column($pdo, 'orders', 'delivery_fee');
+            $hasDeliveryFeeBase = orange_table_has_column($pdo, 'orders', 'delivery_fee_base');
+            $hasDeliveryFeeDiscount = orange_table_has_column($pdo, 'orders', 'delivery_fee_discount');
+            $hasDeliveryPromotionId = orange_table_has_column($pdo, 'orders', 'delivery_promotion_id');
             $selectCols = ['total'];
             if ($hasPromoC) {
                 $selectCols[] = 'cart_promotion_discount';
@@ -81,6 +87,15 @@ try {
             if ($hasDeliveryFee) {
                 $selectCols[] = 'delivery_fee';
             }
+            if ($hasDeliveryFeeBase) {
+                $selectCols[] = 'delivery_fee_base';
+            }
+            if ($hasDeliveryFeeDiscount) {
+                $selectCols[] = 'delivery_fee_discount';
+            }
+            if ($hasDeliveryPromotionId) {
+                $selectCols[] = 'delivery_promotion_id';
+            }
             $totSt = $pdo->prepare('SELECT ' . implode(', ', $selectCols) . ' FROM orders WHERE id = ? LIMIT 1');
             $totSt->execute([$oid]);
             $rowTot = $totSt->fetch(PDO::FETCH_ASSOC);
@@ -89,6 +104,10 @@ try {
                 $promoDisc = (float) ($rowTot['cart_promotion_discount'] ?? 0);
                 $comboDisc = (float) ($rowTot['cart_combo_discount'] ?? 0);
                 $deliveryFee = (float) ($rowTot['delivery_fee'] ?? 0);
+                $deliveryFeeBase = (float) ($rowTot['delivery_fee_base'] ?? 0);
+                $deliveryFeeDiscount = (float) ($rowTot['delivery_fee_discount'] ?? 0);
+                $promoId = isset($rowTot['delivery_promotion_id']) ? (int) $rowTot['delivery_promotion_id'] : 0;
+                $deliveryPromotionId = $promoId > 0 ? $promoId : null;
             }
         }
         $out['order_id'] = $oid;
@@ -97,6 +116,9 @@ try {
         $out['promotion_discount'] = $promoDisc;
         $out['combo_discount'] = $comboDisc;
         $out['delivery_fee'] = $deliveryFee;
+        $out['delivery_fee_base'] = $deliveryFeeBase;
+        $out['delivery_fee_discount'] = $deliveryFeeDiscount;
+        $out['delivery_promotion_id'] = $deliveryPromotionId;
         $out['whatsapp_number'] = (string) $row['whatsapp_number'];
         $out['whatsapp_url'] = (string) $row['whatsapp_url'];
         if ($oid > 0) {

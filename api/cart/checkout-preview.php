@@ -139,9 +139,31 @@ try {
         $bogoPayload['preview_max_gift_unit_charge'] = $bogoGiftChargePreview;
     }
     $deliveryAreaId = (int) ($data['delivery_area_id'] ?? 0);
+    $deliveryFeeBase = 0.0;
+    $deliveryFeeDiscount = 0.0;
     $deliveryFee = 0.0;
+    $deliveryPromotionPayload = null;
     if ($deliveryAreaId > 0) {
-        $deliveryFee = orange_delivery_resolve_checkout_fee($pdo, $deliveryAreaId, $buyerReg, $storefrontCountryId);
+        $deliveryBundle = orange_delivery_resolve_checkout_fee_bundle(
+            $pdo,
+            $deliveryAreaId,
+            $buyerReg,
+            $storefrontCountryId
+        );
+        $deliveryFeeBase = (float) ($deliveryBundle['base_fee'] ?? 0.0);
+        $deliveryFeeDiscount = (float) ($deliveryBundle['discount_fee'] ?? 0.0);
+        $deliveryFee = (float) ($deliveryBundle['fee'] ?? 0.0);
+        $deliveryPromotion = $deliveryBundle['promotion'] ?? null;
+        if (is_array($deliveryPromotion) && (int) ($deliveryPromotion['id'] ?? 0) > 0) {
+            $deliveryPromotionPayload = [
+                'id' => (int) ($deliveryPromotion['id'] ?? 0),
+                'name_ar' => (string) ($deliveryPromotion['name_ar'] ?? ''),
+                'name_en' => (string) ($deliveryPromotion['name_en'] ?? ''),
+                'discount_type' => (string) ($deliveryPromotion['discount_type'] ?? 'amount'),
+                'discount_value' => (float) ($deliveryPromotion['discount_value'] ?? 0.0),
+                'discount_amount' => (float) ($deliveryPromotion['discount_amount'] ?? 0.0),
+            ];
+        }
     }
     $total = max(0.0, round($total + $thresholdGiftChargePreview + $bogoGiftChargePreview + $deliveryFee, 4));
 
@@ -153,7 +175,10 @@ try {
         'promotion_id' => $promo !== null ? (int) $promo['id'] : null,
         'promotion_discount' => $promoDiscount,
         'delivery_area_id' => $deliveryAreaId > 0 ? $deliveryAreaId : null,
+        'delivery_fee_base' => $deliveryFeeBase,
+        'delivery_fee_discount' => $deliveryFeeDiscount,
         'delivery_fee' => $deliveryFee,
+        'delivery_promotion' => $deliveryPromotionPayload,
         'total' => $total,
         'register_promo_teaser' => $regTeaser,
         'gift_register_unlock_teaser' => $giftRegUnlock,

@@ -385,9 +385,356 @@ function orange_delivery_policy_is_free_for_buyer(string $policy, bool $buyerReg
 }
 
 /**
+ * @return array<string, bool>
+ */
+function orange_delivery_promotion_discount_type_values(): array
+{
+    return [
+        'amount' => true,
+        'percent' => true,
+        'free' => true,
+    ];
+}
+
+function orange_delivery_promotion_discount_type_normalize(?string $discountType): string
+{
+    $key = strtolower(trim((string) $discountType));
+    if (isset(orange_delivery_promotion_discount_type_values()[$key])) {
+        return $key;
+    }
+
+    return 'amount';
+}
+
+function orange_delivery_promotions_table_exists(PDO $pdo): bool
+{
+    return orange_table_exists($pdo, 'delivery_fee_promotions');
+}
+
+/**
+ * @param list<int> $promotionIds
+ * @return array<int, list<int>>
+ */
+function orange_delivery_promotion_targets_map(
+    PDO $pdo,
+    array $promotionIds,
+    string $targetTable,
+    string $targetColumn
+): array {
+    if ($promotionIds === [] || !orange_table_exists($pdo, $targetTable)) {
+        return [];
+    }
+    $ph = implode(',', array_fill(0, count($promotionIds), '?'));
+    $sql = 'SELECT promotion_id, ' . $targetColumn . ' AS target_id'
+        . ' FROM ' . $targetTable
+        . ' WHERE promotion_id IN (' . $ph . ')';
+    $st = $pdo->prepare($sql);
+    $st->execute($promotionIds);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $out = [];
+    foreach ($rows as $row) {
+        $pid = (int) ($row['promotion_id'] ?? 0);
+        $targetId = (int) ($row['target_id'] ?? 0);
+        if ($pid <= 0 || $targetId <= 0) {
+            continue;
+        }
+        if (!isset($out[$pid])) {
+            $out[$pid] = [];
+        }
+        if (!in_array($targetId, $out[$pid], true)) {
+            $out[$pid][] = $targetId;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * @param list<int> $promotionIds
+ * @return array<int, list<string>>
+ */
+function orange_delivery_promotion_target_names_map(
+    PDO $pdo,
+    array $promotionIds,
+    string $mapTable,
+    string $targetIdColumn,
+    string $lookupTable
+): array {
+    if (
+        $promotionIds === []
+        || !orange_table_exists($pdo, $mapTable)
+        || !orange_table_exists($pdo, $lookupTable)
+    ) {
+        return [];
+    }
+    $ph = implode(',', array_fill(0, count($promotionIds), '?'));
+    $sql = 'SELECT m.promotion_id, l.name_ar, l.name_en'
+        . ' FROM ' . $mapTable . ' m'
+        . ' INNER JOIN ' . $lookupTable . ' l ON l.id = m.' . $targetIdColumn
+        . ' WHERE m.promotion_id IN (' . $ph . ')';
+    $st = $pdo->prepare($sql);
+    $st->execute($promotionIds);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $out = [];
+    foreach ($rows as $row) {
+        $pid = (int) ($row['promotion_id'] ?? 0);
+        if ($pid <= 0) {
+            continue;
+        }
+        $nameAr = trim((string) ($row['name_ar'] ?? ''));
+        $nameEn = trim((string) ($row['name_en'] ?? ''));
+        $label = $nameAr !== '' ? $nameAr : $nameEn;
+        if ($label === '') {
+            continue;
+        }
+        if (!isset($out[$pid])) {
+            $out[$pid] = [];
+        }
+        if (!in_array($label, $out[$pid], true)) {
+            $out[$pid][] = $label;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * @return list<array<string, mixed>>
+ */
+function orange_delivery_promotions_admin_list(PDO $pdo, int $countryId): array
+{
+    if (!orange_delivery_promotions_table_exists($pdo) || $countryId <= 0) {
+        return [];
+    }
+    $st = $pdo->prepare(
+        'SELECT id, country_id, name_ar, name_en, discount_type, discount_value,
+                requires_registered_account, valid_from, valid_to, sort_order, is_active
+         FROM delivery_fee_promotions
+         WHERE country_id = ?
+         ORDER BY sort_order ASC, id ASC'
+    );
+    $st->execute([$countryId]);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($rows === []) {
+        return [];
+    }
+    $promotionIds = [];
+    foreach ($rows as $row) {
+        $pid = (int) ($row['id'] ?? 0);
+        if ($pid > 0) {
+            $promotionIds[] = $pid;
+        }
+    }
+    $governorateIdsMap = orange_delivery_promotion_targets_map(
+        $pdo,
+        $promotionIds,
+        'delivery_fee_promotion_governorates',
+        'governorate_id'
+    );
+    $areaIdsMap = orange_delivery_promotion_targets_map(
+        $pdo,
+        $promotionIds,
+        'delivery_fee_promotion_areas',
+        'delivery_area_id'
+    );
+    $governorateNamesMap = orange_delivery_promotion_target_names_map(
+        $pdo,
+        $promotionIds,
+        'delivery_fee_promotion_governorates',
+        'governorate_id',
+        'delivery_governorates'
+    );
+    $areaNamesMap = orange_delivery_promotion_target_names_map(
+        $pdo,
+        $promotionIds,
+        'delivery_fee_promotion_areas',
+        'delivery_area_id',
+        'delivery_areas'
+    );
+    foreach ($rows as &$row) {
+        $pid = (int) ($row['id'] ?? 0);
+        $row['id'] = $pid;
+        $row['country_id'] = (int) ($row['country_id'] ?? 0);
+        $row['name_ar'] = (string) ($row['name_ar'] ?? '');
+        $row['name_en'] = (string) ($row['name_en'] ?? '');
+        $row['discount_type'] = orange_delivery_promotion_discount_type_normalize((string) ($row['discount_type'] ?? ''));
+        $row['discount_value'] = round(max(0.0, (float) ($row['discount_value'] ?? 0)), 4);
+        $row['requires_registered_account'] = (int) ($row['requires_registered_account'] ?? 0) === 1 ? 1 : 0;
+        $row['sort_order'] = (int) ($row['sort_order'] ?? 0);
+        $row['is_active'] = (int) ($row['is_active'] ?? 0) === 1 ? 1 : 0;
+        $row['target_governorate_ids'] = $governorateIdsMap[$pid] ?? [];
+        $row['target_area_ids'] = $areaIdsMap[$pid] ?? [];
+        $row['target_governorate_names'] = $governorateNamesMap[$pid] ?? [];
+        $row['target_area_names'] = $areaNamesMap[$pid] ?? [];
+    }
+    unset($row);
+
+    return $rows;
+}
+
+function orange_delivery_promotion_discount_amount(
+    float $baseFee,
+    string $discountType,
+    float $discountValue
+): float {
+    $baseFee = round(max(0.0, $baseFee), 4);
+    if ($baseFee <= 0.0) {
+        return 0.0;
+    }
+    $discountType = orange_delivery_promotion_discount_type_normalize($discountType);
+    $discountValue = round(max(0.0, $discountValue), 4);
+    if ($discountType === 'free') {
+        return $baseFee;
+    }
+    if ($discountType === 'percent') {
+        $pct = min(100.0, $discountValue);
+        if ($pct <= 0.0) {
+            return 0.0;
+        }
+
+        return round(min($baseFee, $baseFee * $pct / 100.0), 4);
+    }
+    if ($discountValue <= 0.0) {
+        return 0.0;
+    }
+
+    return round(min($baseFee, $discountValue), 4);
+}
+
+function orange_delivery_area_governorate_id(PDO $pdo, int $deliveryAreaId): int
+{
+    if (
+        $deliveryAreaId <= 0
+        || !orange_table_exists($pdo, 'delivery_areas')
+        || !orange_delivery_areas_has_governorate_column($pdo)
+    ) {
+        return 0;
+    }
+    $st = $pdo->prepare('SELECT governorate_id FROM delivery_areas WHERE id = ? LIMIT 1');
+    $st->execute([$deliveryAreaId]);
+
+    return (int) ($st->fetchColumn() ?: 0);
+}
+
+/**
+ * @param list<int> $areaTargets
+ * @param list<int> $governorateTargets
+ */
+function orange_delivery_promotion_target_matches_area(
+    int $deliveryAreaId,
+    int $governorateId,
+    array $areaTargets,
+    array $governorateTargets
+): bool {
+    if ($areaTargets === [] && $governorateTargets === []) {
+        return true;
+    }
+    if ($deliveryAreaId <= 0) {
+        return false;
+    }
+    if ($areaTargets !== [] && in_array($deliveryAreaId, $areaTargets, true)) {
+        return true;
+    }
+    if ($governorateTargets !== [] && $governorateId > 0 && in_array($governorateId, $governorateTargets, true)) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function orange_delivery_promotion_resolve_for_checkout(
+    PDO $pdo,
+    int $deliveryAreaId,
+    float $baseFee,
+    bool $buyerRegistered,
+    ?int $countryId = null
+): ?array {
+    $baseFee = round(max(0.0, $baseFee), 4);
+    if ($baseFee <= 0.0 || $deliveryAreaId <= 0 || !orange_delivery_promotions_table_exists($pdo)) {
+        return null;
+    }
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
+    if ($countryId <= 0) {
+        return null;
+    }
+    $st = $pdo->prepare(
+        'SELECT id, name_ar, name_en, discount_type, discount_value, requires_registered_account,
+                sort_order, valid_from, valid_to
+         FROM delivery_fee_promotions
+         WHERE country_id = ? AND is_active = 1
+           AND valid_from <= CURDATE() AND valid_to >= CURDATE()
+         ORDER BY sort_order ASC, id ASC'
+    );
+    $st->execute([$countryId]);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($rows === []) {
+        return null;
+    }
+    $promotionIds = [];
+    foreach ($rows as $row) {
+        $pid = (int) ($row['id'] ?? 0);
+        if ($pid > 0) {
+            $promotionIds[] = $pid;
+        }
+    }
+    $governorateTargetsMap = orange_delivery_promotion_targets_map(
+        $pdo,
+        $promotionIds,
+        'delivery_fee_promotion_governorates',
+        'governorate_id'
+    );
+    $areaTargetsMap = orange_delivery_promotion_targets_map(
+        $pdo,
+        $promotionIds,
+        'delivery_fee_promotion_areas',
+        'delivery_area_id'
+    );
+    $areaGovernorateId = orange_delivery_area_governorate_id($pdo, $deliveryAreaId);
+    foreach ($rows as $row) {
+        $promotionId = (int) ($row['id'] ?? 0);
+        if ($promotionId <= 0) {
+            continue;
+        }
+        if ((int) ($row['requires_registered_account'] ?? 0) === 1 && !$buyerRegistered) {
+            continue;
+        }
+        $areaTargets = $areaTargetsMap[$promotionId] ?? [];
+        $governorateTargets = $governorateTargetsMap[$promotionId] ?? [];
+        if (!orange_delivery_promotion_target_matches_area($deliveryAreaId, $areaGovernorateId, $areaTargets, $governorateTargets)) {
+            continue;
+        }
+        $discountType = orange_delivery_promotion_discount_type_normalize((string) ($row['discount_type'] ?? ''));
+        $discountValue = round(max(0.0, (float) ($row['discount_value'] ?? 0)), 4);
+        $discountAmount = orange_delivery_promotion_discount_amount($baseFee, $discountType, $discountValue);
+        if ($discountAmount <= 0.0) {
+            continue;
+        }
+        $netFee = round(max(0.0, $baseFee - $discountAmount), 4);
+
+        return [
+            'id' => $promotionId,
+            'name_ar' => (string) ($row['name_ar'] ?? ''),
+            'name_en' => (string) ($row['name_en'] ?? ''),
+            'discount_type' => $discountType,
+            'discount_value' => $discountValue,
+            'discount_amount' => $discountAmount,
+            'base_fee' => $baseFee,
+            'net_fee' => $netFee,
+        ];
+    }
+
+    return null;
+}
+
+/**
  * @param array<string, mixed>|null $areaRow
  */
-function orange_delivery_resolve_checkout_fee(
+function orange_delivery_resolve_checkout_fee_base(
     PDO $pdo,
     int $deliveryAreaId,
     bool $buyerRegistered,
@@ -416,6 +763,82 @@ function orange_delivery_resolve_checkout_fee(
     }
 
     return $baseFee;
+}
+
+/**
+ * @param array<string, mixed>|null $areaRow
+ * @return array{
+ *   base_fee: float,
+ *   discount_fee: float,
+ *   fee: float,
+ *   promotion: array<string, mixed>|null
+ * }
+ */
+function orange_delivery_resolve_checkout_fee_bundle(
+    PDO $pdo,
+    int $deliveryAreaId,
+    bool $buyerRegistered,
+    ?int $countryId = null,
+    ?array $areaRow = null
+): array {
+    $baseFee = orange_delivery_resolve_checkout_fee_base(
+        $pdo,
+        $deliveryAreaId,
+        $buyerRegistered,
+        $countryId,
+        $areaRow
+    );
+    if ($baseFee <= 0.0) {
+        return [
+            'base_fee' => 0.0,
+            'discount_fee' => 0.0,
+            'fee' => 0.0,
+            'promotion' => null,
+        ];
+    }
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
+    $promotion = orange_delivery_promotion_resolve_for_checkout(
+        $pdo,
+        $deliveryAreaId,
+        $baseFee,
+        $buyerRegistered,
+        $countryId
+    );
+    $discountFee = $promotion !== null
+        ? round(max(0.0, (float) ($promotion['discount_amount'] ?? 0)), 4)
+        : 0.0;
+    $discountFee = min($discountFee, $baseFee);
+    $netFee = round(max(0.0, $baseFee - $discountFee), 4);
+
+    return [
+        'base_fee' => $baseFee,
+        'discount_fee' => $discountFee,
+        'fee' => $netFee,
+        'promotion' => $promotion,
+    ];
+}
+
+/**
+ * @param array<string, mixed>|null $areaRow
+ */
+function orange_delivery_resolve_checkout_fee(
+    PDO $pdo,
+    int $deliveryAreaId,
+    bool $buyerRegistered,
+    ?int $countryId = null,
+    ?array $areaRow = null
+): float {
+    $bundle = orange_delivery_resolve_checkout_fee_bundle(
+        $pdo,
+        $deliveryAreaId,
+        $buyerRegistered,
+        $countryId,
+        $areaRow
+    );
+
+    return (float) ($bundle['fee'] ?? 0.0);
 }
 
 /**
@@ -617,7 +1040,7 @@ function orange_delivery_areas_count_active(PDO $pdo, ?int $countryId = null): i
 }
 
 /**
- * @return array{name_ar:string, name_en:string, delivery_fee?:float, sort_order:int, is_active:int}|null
+ * @return array{id?:int, name_ar:string, name_en:string, delivery_fee?:float, sort_order:int, is_active:int, governorate_id?:int}|null
  */
 function orange_delivery_area_row_active(PDO $pdo, int $id, ?int $countryId = null): ?array
 {
@@ -631,11 +1054,13 @@ function orange_delivery_area_row_active(PDO $pdo, int $id, ?int $countryId = nu
     $hasGov = orange_delivery_areas_has_governorate_column($pdo)
         && orange_delivery_governorates_table_exists($pdo);
     $hasFee = orange_table_has_column($pdo, 'delivery_areas', 'delivery_fee');
+    $govSelA = $hasGov ? 'a.governorate_id' : '0 AS governorate_id';
+    $govSel = $hasGov ? 'governorate_id' : '0 AS governorate_id';
     $feeSelA = $hasFee ? 'a.delivery_fee' : '0 AS delivery_fee';
     $feeSel = $hasFee ? 'delivery_fee' : '0 AS delivery_fee';
     if (orange_delivery_areas_has_country_column($pdo) && $countryId > 0 && $hasGov) {
         $st = $pdo->prepare(
-            'SELECT a.name_ar, a.name_en, ' . $feeSelA . ', a.sort_order, a.is_active
+            'SELECT a.id, a.name_ar, a.name_en, ' . $feeSelA . ', a.sort_order, a.is_active, ' . $govSelA . '
              FROM delivery_areas a
              INNER JOIN delivery_governorates g ON g.id = a.governorate_id AND g.is_active = 1
              WHERE a.id = ? AND a.is_active = 1 AND a.country_id = ? LIMIT 1'
@@ -643,13 +1068,14 @@ function orange_delivery_area_row_active(PDO $pdo, int $id, ?int $countryId = nu
         $st->execute([$id, $countryId]);
     } elseif (orange_delivery_areas_has_country_column($pdo) && $countryId > 0) {
         $st = $pdo->prepare(
-            'SELECT name_ar, name_en, ' . $feeSel . ', sort_order, is_active FROM delivery_areas
+            'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, ' . $govSel . ' FROM delivery_areas
              WHERE id = ? AND is_active = 1 AND country_id = ? LIMIT 1'
         );
         $st->execute([$id, $countryId]);
     } else {
         $st = $pdo->prepare(
-            'SELECT name_ar, name_en, ' . $feeSel . ', sort_order, is_active FROM delivery_areas WHERE id = ? AND is_active = 1 LIMIT 1'
+            'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, ' . $govSel . '
+             FROM delivery_areas WHERE id = ? AND is_active = 1 LIMIT 1'
         );
         $st->execute([$id]);
     }
@@ -669,6 +1095,9 @@ function orange_storefront_normalize_delivery_area_payload(PDO $pdo, array &$dat
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         unset($data['delivery_area_id']);
         unset($data['delivery_fee']);
+        unset($data['delivery_fee_base']);
+        unset($data['delivery_fee_discount']);
+        unset($data['delivery_promotion_id']);
 
         return;
     }
@@ -679,6 +1108,9 @@ function orange_storefront_normalize_delivery_area_payload(PDO $pdo, array &$dat
     if ($n === 0) {
         unset($data['delivery_area_id']);
         unset($data['delivery_fee']);
+        unset($data['delivery_fee_base']);
+        unset($data['delivery_fee_discount']);
+        unset($data['delivery_promotion_id']);
 
         return;
     }
@@ -694,13 +1126,22 @@ function orange_storefront_normalize_delivery_area_payload(PDO $pdo, array &$dat
     $data['delivery_area_id'] = $id;
     $data['area'] = orange_delivery_area_label_from_row($row, $lang);
     $buyerRegistered = !empty($data['_buyer_registered']);
-    $data['delivery_fee'] = orange_delivery_resolve_checkout_fee(
+    $feeBundle = orange_delivery_resolve_checkout_fee_bundle(
         $pdo,
         $id,
         $buyerRegistered,
         $countryId,
         $row
     );
+    $data['delivery_fee'] = (float) ($feeBundle['fee'] ?? 0.0);
+    $data['delivery_fee_base'] = (float) ($feeBundle['base_fee'] ?? 0.0);
+    $data['delivery_fee_discount'] = (float) ($feeBundle['discount_fee'] ?? 0.0);
+    $promo = $feeBundle['promotion'] ?? null;
+    if (is_array($promo) && (int) ($promo['id'] ?? 0) > 0) {
+        $data['delivery_promotion_id'] = (int) $promo['id'];
+    } else {
+        unset($data['delivery_promotion_id']);
+    }
 }
 
 /**

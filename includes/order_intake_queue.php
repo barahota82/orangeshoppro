@@ -11,6 +11,7 @@ require_once __DIR__ . '/storefront_cart_items.php';
 require_once __DIR__ . '/cart_promotions.php';
 require_once __DIR__ . '/cart_combo_promotions.php';
 require_once __DIR__ . '/storefront_checkout_promo_lines.php';
+require_once __DIR__ . '/invoice_ancillary_lines.php';
 require_once __DIR__ . '/countries.php';
 require_once __DIR__ . '/currency.php';
 require_once __DIR__ . '/storefront_payment_settings.php';
@@ -408,7 +409,17 @@ function orange_storefront_insert_order_items_for_order(PDO $pdo, int $orderId, 
  * Must run inside caller transaction (no begin/commit).
  *
  * @param array<string,mixed> $data
- * @return array{order_id:int,order_number:string,total:float,delivery_fee:float,whatsapp_number:string,whatsapp_url:string}
+ * @return array{
+ *   order_id:int,
+ *   order_number:string,
+ *   total:float,
+ *   delivery_fee:float,
+ *   delivery_fee_base:float,
+ *   delivery_fee_discount:float,
+ *   delivery_promotion_id:?int,
+ *   whatsapp_number:string,
+ *   whatsapp_url:string
+ * }
  */
 function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): array
 {
@@ -478,13 +489,22 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
 
     $buyerRegistered = $sfaLink !== null && $sfaLink > 0;
     $deliveryAreaId = isset($data['delivery_area_id']) ? (int) $data['delivery_area_id'] : 0;
-    $deliveryFee = $deliveryAreaId > 0
-        ? orange_delivery_resolve_checkout_fee($pdo, $deliveryAreaId, $buyerRegistered, $orderCountryId)
-        : 0.0;
-    if (!is_finite($deliveryFee) || $deliveryFee < 0) {
-        $deliveryFee = 0.0;
+    $deliveryBundle = $deliveryAreaId > 0
+        ? orange_delivery_resolve_checkout_fee_bundle($pdo, $deliveryAreaId, $buyerRegistered, $orderCountryId)
+        : [
+            'base_fee' => 0.0,
+            'discount_fee' => 0.0,
+            'fee' => 0.0,
+            'promotion' => null,
+        ];
+    $deliveryFeeBase = round(max(0.0, (float) ($deliveryBundle['base_fee'] ?? 0)), 4);
+    $deliveryFeeDiscount = round(max(0.0, (float) ($deliveryBundle['discount_fee'] ?? 0)), 4);
+    $deliveryFee = round(max(0.0, (float) ($deliveryBundle['fee'] ?? 0)), 4);
+    if ($deliveryFeeDiscount > $deliveryFeeBase) {
+        $deliveryFeeDiscount = $deliveryFeeBase;
     }
-    $deliveryFee = round($deliveryFee, 4);
+    $deliveryPromotion = $deliveryBundle['promotion'] ?? null;
+    $deliveryPromotionId = is_array($deliveryPromotion) ? (int) ($deliveryPromotion['id'] ?? 0) : 0;
     $comboPick = orange_cart_combo_best_match($pdo, $validatedItems, $buyerRegistered, $orderCountryId);
     $comboDiscount = $comboPick !== null ? (float) $comboPick['discount'] : 0.0;
     $comboId = $comboPick !== null ? (int) $comboPick['id'] : null;
@@ -587,6 +607,21 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $ph .= ', ?';
         $params[] = $deliveryFee;
     }
+    if (orange_table_has_column($pdo, 'orders', 'delivery_fee_base')) {
+        $cols .= ', delivery_fee_base';
+        $ph .= ', ?';
+        $params[] = $deliveryFeeBase;
+    }
+    if (orange_table_has_column($pdo, 'orders', 'delivery_fee_discount')) {
+        $cols .= ', delivery_fee_discount';
+        $ph .= ', ?';
+        $params[] = $deliveryFeeDiscount;
+    }
+    if (orange_table_has_column($pdo, 'orders', 'delivery_promotion_id')) {
+        $cols .= ', delivery_promotion_id';
+        $ph .= ', ?';
+        $params[] = $deliveryPromotionId > 0 ? $deliveryPromotionId : null;
+    }
     $hasCartPromo = orange_table_has_column($pdo, 'orders', 'cart_promotion_id')
         && orange_table_has_column($pdo, 'orders', 'cart_promotion_discount');
     $hasComboCols = orange_table_has_column($pdo, 'orders', 'cart_combo_promotion_id')
@@ -647,6 +682,28 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
 
     orange_storefront_insert_order_items_for_order($pdo, $orderId, $linesForStock);
 
+    if (orange_invoice_ancillary_tables_ready($pdo)) {
+        $autoDeliveryLines = orange_invoice_ancillary_merge_auto_delivery_lines(
+            $pdo,
+            $orderCountryId,
+            [
+                'delivery_fee' => $deliveryFee,
+                'delivery_fee_base' => $deliveryFeeBase,
+                'delivery_fee_discount' => $deliveryFeeDiscount,
+            ],
+            []
+        );
+        if ($autoDeliveryLines !== []) {
+            orange_invoice_ancillary_extra_lines_replace_for_doc(
+                $pdo,
+                orange_invoice_ancillary_doc_kind_sales(),
+                $orderId,
+                $orderCountryId,
+                $autoDeliveryLines
+            );
+        }
+    }
+
     orange_order_apply_pending_stock_reservation($pdo, $orderNumber, $linesForStock, $orderCountryId, $orderWarehouseId);
 
     $messageLines = [];
@@ -691,7 +748,15 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     if ($promoDiscount > 0.00001) {
         $messageLines[] = 'Cart promotion: -' . number_format($promoDiscount, 2) . ' KD';
     }
-    if ($deliveryFee > 0.00001) {
+    if ($deliveryFeeBase > 0.00001) {
+        $messageLines[] = 'Delivery fee (base): +' . number_format($deliveryFeeBase, 2) . ' KD';
+    }
+    if ($deliveryFeeDiscount > 0.00001) {
+        $messageLines[] = 'Delivery discount: -' . number_format($deliveryFeeDiscount, 2) . ' KD';
+    }
+    if ($deliveryFee > 0.00001 && $deliveryFeeDiscount > 0.00001) {
+        $messageLines[] = 'Delivery fee (net): +' . number_format($deliveryFee, 2) . ' KD';
+    } elseif ($deliveryFee > 0.00001 && $deliveryFeeBase <= 0.00001) {
         $messageLines[] = 'Delivery fee: +' . number_format($deliveryFee, 2) . ' KD';
     }
     $messageLines[] = 'Total: ' . number_format($orderTotal, 2) . ' KD';
@@ -704,6 +769,9 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         'order_number' => $orderNumber,
         'total' => $orderTotal,
         'delivery_fee' => $deliveryFee,
+        'delivery_fee_base' => $deliveryFeeBase,
+        'delivery_fee_discount' => $deliveryFeeDiscount,
+        'delivery_promotion_id' => $deliveryPromotionId > 0 ? $deliveryPromotionId : null,
         'whatsapp_number' => $whatsAppNumber,
         'whatsapp_url' => $whatsAppUrl,
     ];

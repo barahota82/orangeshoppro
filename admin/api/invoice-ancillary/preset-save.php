@@ -18,6 +18,8 @@ try {
     $invoiceContext = trim((string) ($data['invoice_context'] ?? 'purchase'));
     $labelAr = trim((string) ($data['label_ar'] ?? ''));
     $labelEn = trim((string) ($data['label_en'] ?? ''));
+    $systemKeyRaw = trim((string) ($data['system_key'] ?? ''));
+    $systemKey = $systemKeyRaw !== '' ? orange_invoice_ancillary_system_key_normalize($systemKeyRaw) : null;
     $defaultShow = !empty($data['default_show_on_print']);
 
     if ($accountId <= 0) {
@@ -29,6 +31,9 @@ try {
     if (!in_array($invoiceContext, orange_invoice_ancillary_invoice_contexts(), true)) {
         json_response(['success' => false, 'message' => 'سياق الفاتورة غير صالح'], 422);
     }
+    if ($systemKeyRaw !== '' && $systemKey === null) {
+        json_response(['success' => false, 'message' => 'مفتاح النظام غير صالح'], 422);
+    }
 
     $countryId = orange_admin_context_country_id($pdo);
     $presetId = orange_invoice_ancillary_preset_save($pdo, [
@@ -39,6 +44,7 @@ try {
         'invoice_context' => $invoiceContext,
         'label_ar' => $labelAr,
         'label_en' => $labelEn,
+        'system_key' => $systemKey,
         'default_show_on_print' => $defaultShow,
         'is_active' => 1,
     ]);

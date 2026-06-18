@@ -27,6 +27,8 @@ try {
     foreach ($rows as $row) {
         $ctx = (string) ($row['invoice_context'] ?? '');
         $lineKind = (string) ($row['line_kind'] ?? '');
+        $systemKey = (string) ($row['system_key'] ?? '');
+        $systemMeta = orange_invoice_ancillary_system_key_meta($systemKey);
         $out[] = [
             'id' => (int) ($row['id'] ?? 0),
             'account_id' => (int) ($row['account_id'] ?? 0),
@@ -38,6 +40,10 @@ try {
             'invoice_context_label' => $ctxLabels[$ctx] ?? $ctx,
             'line_kind' => $lineKind,
             'line_kind_label' => orange_invoice_ancillary_line_kind_label($lineKind),
+            'system_key' => $systemKey,
+            'system_key_label_ar' => is_array($systemMeta)
+                ? (string) ($systemMeta['label_ar'] ?? $systemKey)
+                : '',
             'default_show_on_print' => (int) ($row['default_show_on_print'] ?? 0) === 1,
             'sort_order' => (int) ($row['sort_order'] ?? 0),
             'is_active' => (int) ($row['is_active'] ?? 0) === 1,

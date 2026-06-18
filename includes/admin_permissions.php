@@ -43,7 +43,7 @@ function orange_admin_resource_screen_hints(): array
         'accounting' => 'الدليل المحاسبي، حسابات القيود، السنوات المالية، أرصدة أول المدة المالية، سندات القبض/الصرف/القيد، قيود الإقفال، إقفال التعديلات، التقارير المالية، ميزان المراجعة، أرباح وخسائر، تسوية البنك، كشف حساب…',
         'partners' => 'العملاء، الموردين، سداد فواتير آجلة، أرصدة ذمم العملاء/الموردين',
         'reports' => 'تقارير المبيعات، تحليل القنوات، سجل النشاط',
-        'settings' => 'بيانات الشركة، الدول، قنوات العملاء، مناطق التوصيل، بانر المتجر، عروض السلة (مجموع/هدايا/BOGO/كومبو)، دمج هاتف التسجيل، أرشيف المستندات',
+        'settings' => 'بيانات الشركة، الدول، قنوات العملاء، مناطق التوصيل، بانر المتجر، عروض السلة والتوصيل (مجموع/توصيل/هدايا/BOGO/كومبو)، دمج هاتف التسجيل، أرشيف المستندات',
         'admin_users' => 'المستخدمون والصلاحيات (مشرف عام فقط)',
     ];
 }
@@ -138,6 +138,7 @@ function orange_admin_page_resource(string $page): string
         'storefront_merge_requests' => 'settings',
         'delivery_areas' => 'settings',
         'cart_promotions' => 'settings',
+        'delivery_promotions' => 'settings',
         'cart_gift_promotions' => 'settings',
         'cart_bogo_promotions' => 'settings',
         'cart_combo_promotions' => 'settings',
@@ -195,6 +196,7 @@ function orange_admin_api_folder_resource(string $folder): string
         'company_documents' => 'settings',
         'delivery_areas' => 'settings',
         'cart_promotions' => 'settings',
+        'delivery_promotions' => 'settings',
         'cart_gift_promotions' => 'settings',
         'cart_bogo_promotions' => 'settings',
         'cart_combo_promotions' => 'settings',
@@ -321,6 +323,7 @@ function orange_admin_api_page_from_script(): ?string
         'company_documents' => 'company_documents',
         'delivery_areas' => 'delivery_areas',
         'cart_promotions' => 'cart_promotions',
+        'delivery_promotions' => 'delivery_promotions',
         'cart_gift_promotions' => 'cart_gift_promotions',
         'cart_bogo_promotions' => 'cart_bogo_promotions',
         'cart_combo_promotions' => 'cart_combo_promotions',

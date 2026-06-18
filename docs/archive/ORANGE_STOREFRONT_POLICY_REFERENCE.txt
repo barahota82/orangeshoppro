@@ -245,6 +245,8 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 
 **تنفيذ (س20):** `pages/cart.php` — قائمة منطقة التوصيل + حقل نص للعنوان؛ تُجمَع البيانات في `assets/js/cart.js` وتُرسل مع `api/orders/create-order.php`؛ التحقق من المنطقة النشطة كما في **س8** عند وجود جدول `delivery_areas`. عند اختيار المنطقة، تُقرأ **قيمة التوصيل** من `delivery_areas.delivery_fee` وتُضاف تلقائياً إلى إجمالي الطلب الأونلاين (`orders.total`) وتظهر في معاينة العربة وملخصات الطلب للعميل. (التسجيل ونموذج التتبع: `pages/register.php` و`pages/track.php` بنفس مبدأ القائمة.)
 
+**تنفيذ إضافي (س20 + INV-O، قرار مالك 2026-06):** دعم **عروض رسوم التوصيل** أصبح بطبقة مستقلة فوق قيمة المنطقة الأساسية: `base_fee` من `delivery_areas.delivery_fee` ثم `discount_fee` من حملات `delivery_fee_promotions` (نوع: `amount`/`percent`/`free`) والنتيجة `net_fee`. تُحسَب في `includes/delivery_areas.php` (`orange_delivery_resolve_checkout_fee_bundle`) وتظهر في `api/cart/checkout-preview.php` (`delivery_fee_base`, `delivery_fee_discount`, `delivery_fee`, `delivery_promotion`). عند إنشاء الطلب يُحفَظ التفصيل في `orders` (`delivery_fee_base`, `delivery_fee_discount`, `delivery_promotion_id`) عبر `includes/order_intake_queue.php`. وللشفافية التسويقية في **INV-O**: تُضاف رسوم/خصم التوصيل كبنود إضافية تلقائياً من `invoice_line_presets` عبر مفاتيح نظامية (`delivery_fee_charge`, `delivery_fee_discount`) في `includes/invoice_ancillary_lines.php` وتُعرض داخل شاشة الفاتورة الأونلاين (`includes/sales_invoice_online.php`). إدارة الحملات من شاشة مستقلة: `admin/pages/delivery_promotions.php` + `admin/api/delivery_promotions/manage.php`.
+
 س21. بعد الإرسال: الواتساب هو التأكيد الرسمي الوحيد؟
 نعم؛ لا SMS ولا اتصال كبديل رسمي. العميل يرسل عبر واتس والشركة تجهّز.
 

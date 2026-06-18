@@ -31,6 +31,21 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         'contexts' => $kindMeta['contexts'] ?? [],
     ];
 }
+$ilpSystemKeyOptions = [[
+    'key' => '',
+    'label_ar' => '— بدون ربط تلقائي —',
+    'line_kind' => '',
+]];
+foreach (orange_invoice_ancillary_system_key_catalog() as $sysKey => $sysMeta) {
+    if ((string) ($sysMeta['invoice_context'] ?? '') !== 'sales') {
+        continue;
+    }
+    $ilpSystemKeyOptions[] = [
+        'key' => (string) $sysKey,
+        'label_ar' => (string) ($sysMeta['label_ar'] ?? $sysKey),
+        'line_kind' => (string) ($sysMeta['line_kind'] ?? ''),
+    ];
+}
 ?>
 <style>
 .ilp-form-grid {
@@ -41,7 +56,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
 }
 .ilp-form-grid-2 {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
     gap: 10px 12px;
     align-items: end;
     margin-top: 12px;
@@ -89,7 +104,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
 
 <?php if (!$ilpReady): ?>
 <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;">
-    <p class="card-hint" style="margin:0;">جداول البنود الإضافية غير جاهزة — افتح أي صفحة أدmin بعد <code>git pull</code> لترحيل rev 68.</p>
+    <p class="card-hint" style="margin:0;">جداول البنود الإضافية غير جاهزة — افتح أي صفحة أدمن بعد <code>git pull</code> لتطبيق الترحيلات.</p>
 </div>
 <?php endif; ?>
 
@@ -139,6 +154,10 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
             <label for="ilp_label_en">English</label>
             <input type="text" id="ilp_label_en" class="admin-inp" dir="ltr" lang="en"<?php echo !$ilpReady ? ' disabled' : ''; ?>>
         </div>
+        <div>
+            <label for="ilp_system_key">مفتاح نظامي (اختياري)</label>
+            <select id="ilp_system_key" class="admin-inp"<?php echo !$ilpReady ? ' disabled' : ''; ?>></select>
+        </div>
         <div class="ilp-actions-cell">
             <button type="button" id="ilp_btn_save"<?php echo !$ilpReady ? ' disabled' : ''; ?>>حفظ</button>
             <button type="button" class="btn-secondary" id="ilp_btn_translate"<?php echo !$ilpReady ? ' disabled' : ''; ?>>ترجمة من العربي</button>
@@ -161,6 +180,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
                 <tr>
                     <th style="width:2.5rem;white-space:nowrap;">#</th>
                     <th style="width:34%;">نوع البند</th>
+                    <th style="width:18%;">مفتاح نظامي</th>
                     <th style="width:3.5rem;white-space:nowrap;text-align:center;">نشط</th>
                     <th style="width:25%;">الحساب</th>
                     <th style="width:25%;">التسمية</th>
@@ -169,7 +189,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
                 </tr>
             </thead>
             <tbody id="ilp_list_body">
-                <tr><td colspan="7" class="muted">جاري التحميل…</td></tr>
+                <tr><td colspan="8" class="muted">جاري التحميل…</td></tr>
             </tbody>
         </table>
     </div>
@@ -191,8 +211,15 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
 <script>
 (function () {
     var ILP_LINE_KINDS = <?php echo json_encode($ilpLineKinds, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+    var ILP_SYSTEM_KEYS = <?php echo json_encode($ilpSystemKeyOptions, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var ILP_NEXT_SORT = <?php echo (int) $ilpNextSort; ?>;
     var ilpAccountTimer = null;
+    var ILP_SYSTEM_KEY_MAP = {};
+    ILP_SYSTEM_KEYS.forEach(function (row) {
+        var key = String((row && row.key) || '').trim();
+        if (!key) return;
+        ILP_SYSTEM_KEY_MAP[key] = row;
+    });
 
     function esc(s) {
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -226,6 +253,42 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         if (selected) sel.value = selected;
     }
 
+    function ilpRefreshSystemKeyOptions(selected) {
+        var sel = document.getElementById('ilp_system_key');
+        if (!sel) return;
+        sel.innerHTML = '';
+        ILP_SYSTEM_KEYS.forEach(function (row) {
+            var opt = document.createElement('option');
+            opt.value = String((row && row.key) || '');
+            opt.textContent = String((row && row.label_ar) || opt.value || '—');
+            sel.appendChild(opt);
+        });
+        sel.value = selected || '';
+        if (sel.value !== (selected || '')) {
+            sel.value = '';
+        }
+    }
+
+    function ilpSyncSystemKeyBinding() {
+        var keySel = document.getElementById('ilp_system_key');
+        var lineKindSel = document.getElementById('ilp_line_kind');
+        if (!keySel || !lineKindSel) return;
+        var key = (keySel.value || '').trim();
+        var meta = key ? ILP_SYSTEM_KEY_MAP[key] : null;
+        if (meta && meta.line_kind) {
+            lineKindSel.value = String(meta.line_kind || '');
+            lineKindSel.disabled = true;
+            lineKindSel.title = 'نوع البند مُثبت حسب المفتاح النظامي';
+            var arInput = document.getElementById('ilp_label_ar');
+            if (arInput && !(arInput.value || '').trim()) {
+                arInput.value = String(meta.label_ar || '');
+            }
+        } else {
+            lineKindSel.disabled = false;
+            lineKindSel.title = '';
+        }
+    }
+
     function ilpResetForm() {
         document.getElementById('ilp_id').value = '0';
         document.getElementById('ilp_account_id').value = '0';
@@ -238,6 +301,8 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         document.getElementById('ilp_label_ar').value = '';
         document.getElementById('ilp_label_en').value = '';
         ilpRefreshLineKindOptions('');
+        ilpRefreshSystemKeyOptions('');
+        ilpSyncSystemKeyBinding();
     }
 
     function ilpFillForm(row) {
@@ -252,6 +317,8 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         document.getElementById('ilp_account_hint').textContent = '';
         document.getElementById('ilp_label_ar').value = row.label_ar || '';
         document.getElementById('ilp_label_en').value = row.label_en || '';
+        ilpRefreshSystemKeyOptions(row.system_key || '');
+        ilpSyncSystemKeyBinding();
     }
 
     function ilpRenderList(rows) {
@@ -259,7 +326,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         if (!tb) return;
         tb.innerHTML = '';
         if (!rows || !rows.length) {
-            tb.innerHTML = '<tr><td colspan="7" class="muted">لا توجد بنود محفوظة</td></tr>';
+            tb.innerHTML = '<tr><td colspan="8" class="muted">لا توجد بنود محفوظة</td></tr>';
             return;
         }
         rows.forEach(function (row, idx) {
@@ -269,6 +336,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
             tr.title = 'اضغط للتعديل';
             tr.innerHTML = '<td style="white-space:nowrap;">' + esc(String(row.id)) + '</td>'
                 + '<td style="font-size:0.85rem;">' + esc(row.line_kind_label || row.line_kind || '') + '</td>'
+                + '<td style="font-size:0.83rem;">' + esc(row.system_key_label_ar || row.system_key || '—') + '</td>'
                 + '<td style="white-space:nowrap;text-align:center;">' + (row.is_active ? 'نعم' : 'لا') + '</td>'
                 + '<td dir="ltr">' + esc((row.account_code || '') + (row.account_name ? ' — ' + row.account_name : '')) + '</td>'
                 + '<td>' + esc(row.label_ar || '') + '</td>'
@@ -326,6 +394,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
             invoice_context: ilpContextValue(),
             label_ar: (document.getElementById('ilp_label_ar').value || '').trim(),
             label_en: (document.getElementById('ilp_label_en').value || '').trim(),
+            system_key: (document.getElementById('ilp_system_key').value || '').trim(),
             default_show_on_print: true,
             is_active: document.getElementById('ilp_active').value === '1',
             sort_order: parseInt(document.getElementById('ilp_sort').value, 10) || 0
@@ -489,6 +558,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
     document.getElementById('ilp_btn_reload').addEventListener('click', ilpLoadList);
     document.getElementById('ilp_btn_save_order').addEventListener('click', ilpSaveOrder);
     document.getElementById('ilp_btn_translate').addEventListener('click', ilpTranslate);
+    document.getElementById('ilp_system_key').addEventListener('change', ilpSyncSystemKeyBinding);
     document.getElementById('ilp_account_code').addEventListener('input', function () {
         if (ilpAccountTimer) clearTimeout(ilpAccountTimer);
         var code = this.value || '';

@@ -139,6 +139,64 @@ function orange_invoice_ancillary_line_kind_matches_context(string $lineKind, st
     return in_array($ctx, $cat[$k]['contexts'], true);
 }
 
+/**
+ * مفاتيح نظامية محجوزة للربط التلقائي بين preset ومنطق الفاتورة.
+ *
+ * @return array<string, array{label_ar:string, invoice_context:string, line_kind:string}>
+ */
+function orange_invoice_ancillary_system_key_catalog(): array
+{
+    return [
+        'delivery_fee_charge' => [
+            'label_ar' => 'رسوم التوصيل',
+            'invoice_context' => 'sales',
+            'line_kind' => 'sales_credit_revenue',
+        ],
+        'delivery_fee_discount' => [
+            'label_ar' => 'خصم رسوم التوصيل',
+            'invoice_context' => 'sales',
+            'line_kind' => 'sales_debit_contra',
+        ],
+    ];
+}
+
+/**
+ * @return list<string>
+ */
+function orange_invoice_ancillary_system_key_values(): array
+{
+    return array_keys(orange_invoice_ancillary_system_key_catalog());
+}
+
+function orange_invoice_ancillary_system_key_normalize(?string $raw): ?string
+{
+    $v = strtolower(trim((string) $raw));
+    if ($v === '') {
+        return null;
+    }
+
+    return in_array($v, orange_invoice_ancillary_system_key_values(), true) ? $v : null;
+}
+
+function orange_invoice_ancillary_system_key_meta(string $systemKey): ?array
+{
+    $key = orange_invoice_ancillary_system_key_normalize($systemKey);
+    if ($key === null) {
+        return null;
+    }
+    $cat = orange_invoice_ancillary_system_key_catalog();
+
+    return $cat[$key] ?? null;
+}
+
+/**
+ * @return list<string>
+ */
+function orange_invoice_ancillary_auto_delivery_system_keys(): array
+{
+    return ['delivery_fee_charge', 'delivery_fee_discount'];
+}
+
 function orange_invoice_ancillary_tables_ready(PDO $pdo): bool
 {
     orange_catalog_ensure_invoice_ancillary_lines_schema($pdo);
@@ -199,7 +257,10 @@ function orange_invoice_ancillary_presets_list(
         return [];
     }
     $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    $hasSystemKey = orange_table_has_column($pdo, 'orange_invoice_line_presets', 'system_key');
+    $systemKeySelect = $hasSystemKey ? ', p.system_key' : ', NULL AS system_key';
     $sql = 'SELECT p.*, a.code AS account_code, a.name AS account_name
+            ' . $systemKeySelect . '
             FROM orange_invoice_line_presets p
             INNER JOIN accounts a ON a.id = p.account_id
             WHERE p.country_id = ?';
@@ -213,10 +274,17 @@ function orange_invoice_ancillary_presets_list(
     }
     $q = trim((string) ($search ?? ''));
     if ($q !== '') {
-        $sql .= ' AND (p.label_ar LIKE ? OR p.label_en LIKE ? OR a.code LIKE ? OR a.name LIKE ?)';
+        if ($hasSystemKey) {
+            $sql .= ' AND (p.label_ar LIKE ? OR p.label_en LIKE ? OR p.system_key LIKE ? OR a.code LIKE ? OR a.name LIKE ?)';
+        } else {
+            $sql .= ' AND (p.label_ar LIKE ? OR p.label_en LIKE ? OR a.code LIKE ? OR a.name LIKE ?)';
+        }
         $like = '%' . $q . '%';
         $params[] = $like;
         $params[] = $like;
+        if ($hasSystemKey) {
+            $params[] = $like;
+        }
         $params[] = $like;
         $params[] = $like;
     }
@@ -242,6 +310,14 @@ function orange_invoice_ancillary_preset_save(PDO $pdo, array $data): int
     $accountId = (int) ($data['account_id'] ?? 0);
     $lineKind = trim((string) ($data['line_kind'] ?? ''));
     $invoiceContext = trim((string) ($data['invoice_context'] ?? 'both'));
+    $systemKeyRaw = trim((string) ($data['system_key'] ?? ''));
+    $systemKey = null;
+    if ($systemKeyRaw !== '') {
+        $systemKey = orange_invoice_ancillary_system_key_normalize($systemKeyRaw);
+        if ($systemKey === null) {
+            throw new RuntimeException('مفتاح النظام غير صالح.');
+        }
+    }
     if (!in_array($invoiceContext, orange_invoice_ancillary_invoice_contexts(), true)) {
         throw new RuntimeException('سياق الفاتورة غير صالح.');
     }
@@ -250,6 +326,18 @@ function orange_invoice_ancillary_preset_save(PDO $pdo, array $data): int
     }
     if (!orange_invoice_ancillary_line_kind_matches_context($lineKind, $invoiceContext)) {
         throw new RuntimeException('نوع البند لا يطابق سياق الفاتورة.');
+    }
+    if ($systemKey !== null) {
+        $meta = orange_invoice_ancillary_system_key_meta($systemKey);
+        if ($meta === null) {
+            throw new RuntimeException('مفتاح النظام غير معتمد.');
+        }
+        if ($invoiceContext !== (string) ($meta['invoice_context'] ?? 'sales')) {
+            throw new RuntimeException('هذا مفتاح نظامي مخصص لسياق مبيعات فقط.');
+        }
+        if ($lineKind !== (string) ($meta['line_kind'] ?? '')) {
+            throw new RuntimeException('نوع البند لا يطابق مفتاح النظام المختار.');
+        }
     }
     $docKindForAssert = $invoiceContext === 'sales'
         ? orange_invoice_ancillary_doc_kind_sales()
@@ -273,45 +361,88 @@ function orange_invoice_ancillary_preset_save(PDO $pdo, array $data): int
     $defaultShow = !empty($data['default_show_on_print']) ? 1 : 0;
     $sortOrder = (int) ($data['sort_order'] ?? 0);
     $isActive = !array_key_exists('is_active', $data) || !empty($data['is_active']) ? 1 : 0;
+    $hasSystemKeyCol = orange_table_has_column($pdo, 'orange_invoice_line_presets', 'system_key');
 
     if ($id > 0) {
-        $pdo->prepare(
-            'UPDATE orange_invoice_line_presets
-             SET account_id = ?, label_ar = ?, label_en = ?, invoice_context = ?, line_kind = ?,
-                 default_show_on_print = ?, sort_order = ?, is_active = ?
-             WHERE id = ? AND country_id = ?'
-        )->execute([
-            $accountId,
-            $labelAr,
-            $labelEn,
-            $invoiceContext,
-            $lineKind,
-            $defaultShow,
-            $sortOrder,
-            $isActive,
-            $id,
-            $countryId,
-        ]);
+        try {
+            $updateSql = 'UPDATE orange_invoice_line_presets
+                 SET account_id = ?, label_ar = ?, label_en = ?, invoice_context = ?, line_kind = ?,';
+            if ($hasSystemKeyCol) {
+                $updateSql .= ' system_key = ?,';
+            }
+            $updateSql .= ' default_show_on_print = ?, sort_order = ?, is_active = ?
+                 WHERE id = ? AND country_id = ?';
+            $params = [
+                $accountId,
+                $labelAr,
+                $labelEn,
+                $invoiceContext,
+                $lineKind,
+            ];
+            if ($hasSystemKeyCol) {
+                $params[] = $systemKey;
+            }
+            $params[] = $defaultShow;
+            $params[] = $sortOrder;
+            $params[] = $isActive;
+            $params[] = $id;
+            $params[] = $countryId;
+            $pdo->prepare($updateSql)->execute($params);
+        } catch (PDOException $e) {
+            $dbCode = (int) ($e->errorInfo[1] ?? 0);
+            if ($dbCode === 1062 && str_contains($e->getMessage(), 'uq_oilp_country_system_key')) {
+                throw new RuntimeException('مفتاح النظام مستخدم مسبقاً في preset آخر لنفس الدولة.');
+            }
+            throw $e;
+        }
 
         return $id;
     }
 
-    $pdo->prepare(
-        'INSERT INTO orange_invoice_line_presets
-            (country_id, account_id, label_ar, label_en, invoice_context, line_kind,
-             default_show_on_print, sort_order, is_active)
-         VALUES (?,?,?,?,?,?,?,?,?)'
-    )->execute([
-        $countryId,
-        $accountId,
-        $labelAr,
-        $labelEn,
-        $invoiceContext,
-        $lineKind,
-        $defaultShow,
-        $sortOrder,
-        $isActive,
-    ]);
+    try {
+        if ($hasSystemKeyCol) {
+            $pdo->prepare(
+                'INSERT INTO orange_invoice_line_presets
+                    (country_id, account_id, label_ar, label_en, invoice_context, line_kind, system_key,
+                     default_show_on_print, sort_order, is_active)
+                 VALUES (?,?,?,?,?,?,?,?,?,?)'
+            )->execute([
+                $countryId,
+                $accountId,
+                $labelAr,
+                $labelEn,
+                $invoiceContext,
+                $lineKind,
+                $systemKey,
+                $defaultShow,
+                $sortOrder,
+                $isActive,
+            ]);
+        } else {
+            $pdo->prepare(
+                'INSERT INTO orange_invoice_line_presets
+                    (country_id, account_id, label_ar, label_en, invoice_context, line_kind,
+                     default_show_on_print, sort_order, is_active)
+                 VALUES (?,?,?,?,?,?,?,?,?)'
+            )->execute([
+                $countryId,
+                $accountId,
+                $labelAr,
+                $labelEn,
+                $invoiceContext,
+                $lineKind,
+                $defaultShow,
+                $sortOrder,
+                $isActive,
+            ]);
+        }
+    } catch (PDOException $e) {
+        $dbCode = (int) ($e->errorInfo[1] ?? 0);
+        if ($dbCode === 1062 && str_contains($e->getMessage(), 'uq_oilp_country_system_key')) {
+            throw new RuntimeException('مفتاح النظام مستخدم مسبقاً في preset آخر لنفس الدولة.');
+        }
+        throw $e;
+    }
 
     return (int) $pdo->lastInsertId();
 }
@@ -371,6 +502,182 @@ function orange_invoice_ancillary_presets_reorder(PDO $pdo, array $orderedIds, ?
 }
 
 /**
+ * @return array<string, array<string,mixed>>
+ */
+function orange_invoice_ancillary_system_key_presets_map(PDO $pdo, int $countryId, bool $activeOnly = true): array
+{
+    if (!orange_invoice_ancillary_tables_ready($pdo)) {
+        return [];
+    }
+    if (!orange_table_has_column($pdo, 'orange_invoice_line_presets', 'system_key')) {
+        return [];
+    }
+    $keys = orange_invoice_ancillary_system_key_values();
+    if ($keys === []) {
+        return [];
+    }
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    $ph = implode(',', array_fill(0, count($keys), '?'));
+    $sql = 'SELECT p.*, a.code AS account_code, a.name AS account_name
+            FROM orange_invoice_line_presets p
+            INNER JOIN accounts a ON a.id = p.account_id
+            WHERE p.country_id = ?
+              AND p.system_key IN (' . $ph . ')';
+    if ($activeOnly) {
+        $sql .= ' AND p.is_active = 1';
+    }
+    $sql .= ' ORDER BY p.id ASC';
+    $params = [$cid];
+    foreach ($keys as $k) {
+        $params[] = $k;
+    }
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+    if (!is_array($rows)) {
+        return [];
+    }
+    $map = [];
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $key = orange_invoice_ancillary_system_key_normalize((string) ($row['system_key'] ?? ''));
+        if ($key === null || isset($map[$key])) {
+            continue;
+        }
+        $map[$key] = $row;
+    }
+
+    return $map;
+}
+
+/**
+ * @param array<string,mixed> $documentTotals
+ * @return array{base_fee:float,discount_fee:float,fee:float}
+ */
+function orange_invoice_ancillary_delivery_amounts(array $documentTotals): array
+{
+    $net = round(max(0.0, (float) ($documentTotals['delivery_fee'] ?? 0)), 4);
+    $base = round(max(0.0, (float) ($documentTotals['delivery_fee_base'] ?? 0)), 4);
+    $discount = round(max(0.0, (float) ($documentTotals['delivery_fee_discount'] ?? 0)), 4);
+
+    if ($base <= 0.0001 && $net > 0.0001) {
+        $base = $net;
+    }
+    if ($discount <= 0.0001 && $base > $net + 0.0001) {
+        $discount = round($base - $net, 4);
+    }
+    if ($discount > $base) {
+        $discount = $base;
+    }
+    $net = round(max(0.0, $base - $discount), 4);
+
+    return [
+        'base_fee' => $base,
+        'discount_fee' => $discount,
+        'fee' => $net,
+    ];
+}
+
+/**
+ * @param array<string,mixed> $documentTotals
+ * @return list<array<string,mixed>>
+ */
+function orange_invoice_ancillary_auto_delivery_lines(PDO $pdo, int $countryId, array $documentTotals): array
+{
+    $presetMap = orange_invoice_ancillary_system_key_presets_map($pdo, $countryId, true);
+    if ($presetMap === []) {
+        return [];
+    }
+    $fees = orange_invoice_ancillary_delivery_amounts($documentTotals);
+    $baseFee = (float) ($fees['base_fee'] ?? 0);
+    $discountFee = (float) ($fees['discount_fee'] ?? 0);
+    $keys = orange_invoice_ancillary_auto_delivery_system_keys();
+    $out = [];
+
+    foreach ($keys as $key) {
+        $preset = $presetMap[$key] ?? null;
+        if (!is_array($preset)) {
+            continue;
+        }
+        $meta = orange_invoice_ancillary_system_key_meta($key) ?? [];
+        $amount = $key === 'delivery_fee_discount' ? $discountFee : $baseFee;
+        if ($amount <= 0.0001) {
+            continue;
+        }
+        $lineKind = trim((string) ($preset['line_kind'] ?? ($meta['line_kind'] ?? '')));
+        $accountId = (int) ($preset['account_id'] ?? 0);
+        if ($accountId <= 0 || !orange_invoice_ancillary_line_kind_is_valid($lineKind)) {
+            continue;
+        }
+        $labelAr = trim((string) ($preset['label_ar'] ?? ''));
+        if ($labelAr === '') {
+            $labelAr = (string) ($meta['label_ar'] ?? 'بند تلقائي');
+        }
+        $out[] = [
+            'account_id' => $accountId,
+            'line_kind' => $lineKind,
+            'amount' => round($amount, 4),
+            'label_ar' => $labelAr,
+            'show_on_print' => !empty($preset['default_show_on_print']) ? 1 : 0,
+            'preset_id' => (int) ($preset['id'] ?? 0) > 0 ? (int) ($preset['id'] ?? 0) : null,
+            'system_key' => $key,
+            'auto_delivery' => 1,
+        ];
+    }
+
+    return $out;
+}
+
+/**
+ * @param array<string,mixed> $documentTotals
+ * @param list<array<string,mixed>> $extraInput
+ * @return list<array<string,mixed>>
+ */
+function orange_invoice_ancillary_merge_auto_delivery_lines(
+    PDO $pdo,
+    int $countryId,
+    array $documentTotals,
+    array $extraInput
+): array {
+    $systemKeys = orange_invoice_ancillary_auto_delivery_system_keys();
+    $presetMapAny = orange_invoice_ancillary_system_key_presets_map($pdo, $countryId, false);
+    $autoPresetIds = [];
+    foreach ($presetMapAny as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $presetId = (int) ($row['id'] ?? 0);
+        if ($presetId > 0) {
+            $autoPresetIds[$presetId] = true;
+        }
+    }
+
+    $out = [];
+    foreach ($extraInput as $line) {
+        if (!is_array($line)) {
+            continue;
+        }
+        $lineKey = orange_invoice_ancillary_system_key_normalize((string) ($line['system_key'] ?? ''));
+        if ($lineKey !== null && in_array($lineKey, $systemKeys, true)) {
+            continue;
+        }
+        $linePresetId = (int) ($line['preset_id'] ?? 0);
+        if ($linePresetId > 0 && isset($autoPresetIds[$linePresetId])) {
+            continue;
+        }
+        $out[] = $line;
+    }
+
+    foreach (orange_invoice_ancillary_auto_delivery_lines($pdo, $countryId, $documentTotals) as $autoLine) {
+        $out[] = $autoLine;
+    }
+
+    return $out;
+}
+
+/**
  * @return array<string, string>
  */
 function orange_invoice_ancillary_line_kind_label(string $lineKind): string
@@ -406,9 +713,11 @@ function orange_invoice_ancillary_extra_lines_for_doc(PDO $pdo, string $docKind,
         return [];
     }
     $st = $pdo->prepare(
-        'SELECT e.*, a.code AS account_code, a.name AS account_name
+        'SELECT e.*, a.code AS account_code, a.name AS account_name,
+                p.system_key AS system_key
          FROM orange_invoice_extra_lines e
          INNER JOIN accounts a ON a.id = e.account_id
+         LEFT JOIN orange_invoice_line_presets p ON p.id = e.preset_id
          WHERE e.doc_kind = ? AND e.doc_id = ?
          ORDER BY e.sort_order ASC, e.id ASC'
     );
@@ -660,6 +969,7 @@ function orange_invoice_ancillary_parse_request_lines(array $data, string $docKi
         if ($accountId <= 0 || !orange_invoice_ancillary_line_kind_is_valid($lineKind)) {
             continue;
         }
+        $systemKey = orange_invoice_ancillary_system_key_normalize((string) ($row['system_key'] ?? ''));
         $out[] = [
             'account_id' => $accountId,
             'line_kind' => $lineKind,
@@ -669,6 +979,7 @@ function orange_invoice_ancillary_parse_request_lines(array $data, string $docKi
             'preset_id' => isset($row['preset_id']) && (int) $row['preset_id'] > 0
                 ? (int) $row['preset_id']
                 : null,
+            'system_key' => $systemKey,
         ];
     }
 

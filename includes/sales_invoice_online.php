@@ -193,6 +193,15 @@ function orange_sales_invoice_online_document_payload(PDO $pdo, int $orderId): a
         'delivery_fee' => orange_table_has_column($pdo, 'orders', 'delivery_fee')
             ? (float) ($order['delivery_fee'] ?? 0)
             : 0.0,
+        'delivery_fee_base' => orange_table_has_column($pdo, 'orders', 'delivery_fee_base')
+            ? (float) ($order['delivery_fee_base'] ?? 0)
+            : 0.0,
+        'delivery_fee_discount' => orange_table_has_column($pdo, 'orders', 'delivery_fee_discount')
+            ? (float) ($order['delivery_fee_discount'] ?? 0)
+            : 0.0,
+        'delivery_promotion_id' => orange_table_has_column($pdo, 'orders', 'delivery_promotion_id')
+            ? ((int) ($order['delivery_promotion_id'] ?? 0) > 0 ? (int) ($order['delivery_promotion_id'] ?? 0) : null)
+            : null,
         'subtotal' => $subtotal,
         'created_at' => (string) ($order['created_at'] ?? ''),
         'created_at_dmy' => !empty($order['created_at'])
@@ -206,10 +215,16 @@ function orange_sales_invoice_online_document_payload(PDO $pdo, int $orderId): a
 
     $extraLines = [];
     if (orange_invoice_ancillary_tables_ready($pdo)) {
-        $extraLines = orange_invoice_ancillary_extra_lines_for_doc(
+        $savedLines = orange_invoice_ancillary_extra_lines_for_doc(
             $pdo,
             orange_invoice_ancillary_doc_kind_sales(),
             $orderId
+        );
+        $extraLines = orange_invoice_ancillary_merge_auto_delivery_lines(
+            $pdo,
+            $countryId,
+            $orderOut,
+            $savedLines
         );
     }
 
@@ -356,6 +371,15 @@ function orange_sales_invoice_online_apply_update(PDO $pdo, int $orderId, array 
         $deliveryFee = 0.0;
     }
     $deliveryFee = round($deliveryFee, 4);
+    $deliveryFeeBase = orange_table_has_column($pdo, 'orders', 'delivery_fee_base')
+        ? round(max(0.0, (float) ($order['delivery_fee_base'] ?? 0)), 4)
+        : $deliveryFee;
+    $deliveryFeeDiscount = orange_table_has_column($pdo, 'orders', 'delivery_fee_discount')
+        ? round(max(0.0, (float) ($order['delivery_fee_discount'] ?? 0)), 4)
+        : 0.0;
+    if ($deliveryFeeDiscount > $deliveryFeeBase) {
+        $deliveryFeeDiscount = $deliveryFeeBase;
+    }
     $total = round((float) $validated['total'] + $deliveryFee, 4);
     $validatedItems = $validated['items'];
 
@@ -421,6 +445,16 @@ function orange_sales_invoice_online_apply_update(PDO $pdo, int $orderId, array 
     orange_sales_invoice_company_insert_items($pdo, $orderId, $validatedItems);
 
     if (orange_invoice_ancillary_tables_ready($pdo)) {
+        $extraInput = orange_invoice_ancillary_merge_auto_delivery_lines(
+            $pdo,
+            $orderCountryId,
+            [
+                'delivery_fee' => $deliveryFee,
+                'delivery_fee_base' => $deliveryFeeBase,
+                'delivery_fee_discount' => $deliveryFeeDiscount,
+            ],
+            $extraInput
+        );
         $extraInput = orange_invoice_ancillary_merge_auto_vat(
             $pdo,
             orange_invoice_ancillary_doc_kind_sales(),

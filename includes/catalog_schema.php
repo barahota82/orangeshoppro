@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 90);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 91);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3109,6 +3109,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_document_business_date_v84($pdo);
     orange_catalog_migrate_inventory_cost_layers_v89($pdo);
     orange_catalog_migrate_delivery_policy_checkout_otp_v90($pdo);
+    orange_catalog_migrate_delivery_promotions_invoice_lines_v91($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3686,6 +3687,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
 {
     require_once __DIR__ . '/schema_migrations.php';
     orange_schema_run_pending_migrations($pdo);
+    orange_catalog_migrate_delivery_promotions_invoice_lines_v91($pdo);
     orange_catalog_ensure_document_public_tokens_table($pdo);
     if (orange_table_exists($pdo, 'delivery_areas') && !orange_table_has_column($pdo, 'delivery_areas', 'delivery_fee')) {
         orange_catalog_safe_exec(
@@ -6476,6 +6478,367 @@ function orange_catalog_migrate_delivery_policy_checkout_otp_v90(PDO $pdo): void
                 $pdo,
                 'UPDATE storefront_accounts SET otp_attempts = 0
                  WHERE otp_attempts IS NULL OR otp_attempts < 0'
+            );
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v91 — عروض رسوم التوصيل + تفصيل رسوم/خصم التوصيل في orders + مفاتيح presets النظامية.
+ */
+function orange_catalog_migrate_delivery_promotions_invoice_lines_v91(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_delivery_promotions_invoice_lines_v91';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $indexExists = static function (string $table, string $indexName) use ($pdo): bool {
+        $st = $pdo->prepare(
+            'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ?
+               AND INDEX_NAME = ?
+             LIMIT 1'
+        );
+        $st->execute([$table, $indexName]);
+
+        return (bool) $st->fetchColumn();
+    };
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS delivery_fee_promotions (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            country_id INT UNSIGNED NOT NULL,
+            name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            discount_type VARCHAR(16) NOT NULL DEFAULT \'amount\',
+            discount_value DECIMAL(18,4) NOT NULL DEFAULT 0,
+            requires_registered_account TINYINT(1) NOT NULL DEFAULT 0,
+            valid_from DATE NOT NULL,
+            valid_to DATE NOT NULL,
+            sort_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_dfp_country_active (country_id, is_active, valid_from, valid_to, sort_order),
+            KEY idx_dfp_country_sort (country_id, sort_order, id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    orange_schema_invalidate_table_exists('delivery_fee_promotions');
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS delivery_fee_promotion_governorates (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            promotion_id INT UNSIGNED NOT NULL,
+            governorate_id INT UNSIGNED NOT NULL,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_dfpg_pair (promotion_id, governorate_id),
+            KEY idx_dfpg_governorate (governorate_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    orange_schema_invalidate_table_exists('delivery_fee_promotion_governorates');
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS delivery_fee_promotion_areas (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            promotion_id INT UNSIGNED NOT NULL,
+            delivery_area_id INT UNSIGNED NOT NULL,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_dfpa_pair (promotion_id, delivery_area_id),
+            KEY idx_dfpa_area (delivery_area_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    orange_schema_invalidate_table_exists('delivery_fee_promotion_areas');
+
+    if (orange_table_exists($pdo, 'delivery_fee_promotions')) {
+        if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE delivery_fee_promotions
+                    ADD COLUMN country_id INT UNSIGNED NOT NULL DEFAULT 0 AFTER id'
+            );
+            orange_schema_invalidate_column_check('delivery_fee_promotions', 'country_id');
+        }
+        if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'name_ar')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE delivery_fee_promotions
+                    ADD COLUMN name_ar VARCHAR(191) NOT NULL DEFAULT \'\' AFTER country_id'
+            );
+            orange_schema_invalidate_column_check('delivery_fee_promotions', 'name_ar');
+        }
+        if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'name_en')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE delivery_fee_promotions
+                    ADD COLUMN name_en VARCHAR(191) NOT NULL DEFAULT \'\' AFTER name_ar'
+            );
+            orange_schema_invalidate_column_check('delivery_fee_promotions', 'name_en');
+        }
+        if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'discount_type')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                "ALTER TABLE delivery_fee_promotions
+                    ADD COLUMN discount_type VARCHAR(16) NOT NULL DEFAULT 'amount' AFTER name_en"
+            );
+            orange_schema_invalidate_column_check('delivery_fee_promotions', 'discount_type');
+        }
+        if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'discount_value')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE delivery_fee_promotions
+                    ADD COLUMN discount_value DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER discount_type'
+            );
+            orange_schema_invalidate_column_check('delivery_fee_promotions', 'discount_value');
+        }
+        if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'requires_registered_account')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE delivery_fee_promotions
+                    ADD COLUMN requires_registered_account TINYINT(1) NOT NULL DEFAULT 0 AFTER discount_value'
+            );
+            orange_schema_invalidate_column_check('delivery_fee_promotions', 'requires_registered_account');
+        }
+        if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'valid_from')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE delivery_fee_promotions
+                    ADD COLUMN valid_from DATE NOT NULL AFTER requires_registered_account'
+            );
+            orange_schema_invalidate_column_check('delivery_fee_promotions', 'valid_from');
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE delivery_fee_promotions SET valid_from = CURDATE()
+                 WHERE valid_from IS NULL OR valid_from = \'0000-00-00\''
+            );
+        }
+        if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'valid_to')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE delivery_fee_promotions
+                    ADD COLUMN valid_to DATE NOT NULL AFTER valid_from'
+            );
+            orange_schema_invalidate_column_check('delivery_fee_promotions', 'valid_to');
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE delivery_fee_promotions SET valid_to = DATE_ADD(CURDATE(), INTERVAL 365 DAY)
+                 WHERE valid_to IS NULL OR valid_to = \'0000-00-00\''
+            );
+        }
+        if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'sort_order')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE delivery_fee_promotions
+                    ADD COLUMN sort_order INT NOT NULL DEFAULT 0 AFTER valid_to'
+            );
+            orange_schema_invalidate_column_check('delivery_fee_promotions', 'sort_order');
+        }
+        if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'is_active')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE delivery_fee_promotions
+                    ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1 AFTER sort_order'
+            );
+            orange_schema_invalidate_column_check('delivery_fee_promotions', 'is_active');
+        }
+        if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'created_at')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE delivery_fee_promotions
+                    ADD COLUMN created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP AFTER is_active'
+            );
+            orange_schema_invalidate_column_check('delivery_fee_promotions', 'created_at');
+        }
+        if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'updated_at')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE delivery_fee_promotions
+                    ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at'
+            );
+            orange_schema_invalidate_column_check('delivery_fee_promotions', 'updated_at');
+        }
+
+        orange_catalog_safe_exec(
+            $pdo,
+            "UPDATE delivery_fee_promotions
+             SET discount_type = 'amount'
+             WHERE discount_type IS NULL
+                OR TRIM(discount_type) = ''
+                OR LOWER(TRIM(discount_type)) NOT IN ('amount','percent','free')"
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE delivery_fee_promotions
+             SET discount_value = 0
+             WHERE discount_value IS NULL OR discount_value < 0'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE delivery_fee_promotions
+             SET discount_value = LEAST(100, discount_value)
+             WHERE LOWER(TRIM(discount_type)) = \'percent\' AND discount_value > 100'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE delivery_fee_promotions
+             SET valid_to = valid_from
+             WHERE valid_to < valid_from'
+        );
+        if (!$indexExists('delivery_fee_promotions', 'idx_dfp_country_active')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE INDEX idx_dfp_country_active
+                 ON delivery_fee_promotions (country_id, is_active, valid_from, valid_to, sort_order)'
+            );
+        }
+        if (!$indexExists('delivery_fee_promotions', 'idx_dfp_country_sort')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE INDEX idx_dfp_country_sort
+                 ON delivery_fee_promotions (country_id, sort_order, id)'
+            );
+        }
+    }
+
+    if (orange_table_exists($pdo, 'delivery_fee_promotion_governorates')) {
+        if (!$indexExists('delivery_fee_promotion_governorates', 'uq_dfpg_pair')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE UNIQUE INDEX uq_dfpg_pair
+                 ON delivery_fee_promotion_governorates (promotion_id, governorate_id)'
+            );
+        }
+        if (!$indexExists('delivery_fee_promotion_governorates', 'idx_dfpg_governorate')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE INDEX idx_dfpg_governorate
+                 ON delivery_fee_promotion_governorates (governorate_id)'
+            );
+        }
+    }
+
+    if (orange_table_exists($pdo, 'delivery_fee_promotion_areas')) {
+        if (!$indexExists('delivery_fee_promotion_areas', 'uq_dfpa_pair')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE UNIQUE INDEX uq_dfpa_pair
+                 ON delivery_fee_promotion_areas (promotion_id, delivery_area_id)'
+            );
+        }
+        if (!$indexExists('delivery_fee_promotion_areas', 'idx_dfpa_area')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE INDEX idx_dfpa_area
+                 ON delivery_fee_promotion_areas (delivery_area_id)'
+            );
+        }
+    }
+
+    if (orange_table_exists($pdo, 'orders')) {
+        if (!orange_table_has_column($pdo, 'orders', 'delivery_fee_base')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orders
+                    ADD COLUMN delivery_fee_base DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER delivery_fee'
+            );
+            orange_schema_invalidate_column_check('orders', 'delivery_fee_base');
+        }
+        if (!orange_table_has_column($pdo, 'orders', 'delivery_fee_discount')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orders
+                    ADD COLUMN delivery_fee_discount DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER delivery_fee_base'
+            );
+            orange_schema_invalidate_column_check('orders', 'delivery_fee_discount');
+        }
+        if (!orange_table_has_column($pdo, 'orders', 'delivery_promotion_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orders
+                    ADD COLUMN delivery_promotion_id INT UNSIGNED NULL DEFAULT NULL AFTER delivery_fee_discount'
+            );
+            orange_schema_invalidate_column_check('orders', 'delivery_promotion_id');
+        }
+        if (
+            orange_table_has_column($pdo, 'orders', 'delivery_fee')
+            && orange_table_has_column($pdo, 'orders', 'delivery_fee_base')
+        ) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE orders
+                 SET delivery_fee_base = GREATEST(0, COALESCE(delivery_fee, 0))
+                 WHERE delivery_fee_base IS NULL
+                    OR delivery_fee_base = 0'
+            );
+        }
+        if (orange_table_has_column($pdo, 'orders', 'delivery_fee_base')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE orders SET delivery_fee_base = 0
+                 WHERE delivery_fee_base IS NULL OR delivery_fee_base < 0'
+            );
+        }
+        if (orange_table_has_column($pdo, 'orders', 'delivery_fee_discount')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE orders SET delivery_fee_discount = 0
+                 WHERE delivery_fee_discount IS NULL OR delivery_fee_discount < 0'
+            );
+        }
+        if (
+            orange_table_has_column($pdo, 'orders', 'delivery_fee_base')
+            && orange_table_has_column($pdo, 'orders', 'delivery_fee_discount')
+        ) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE orders
+                 SET delivery_fee_discount = delivery_fee_base
+                 WHERE delivery_fee_discount > delivery_fee_base'
+            );
+        }
+        if (!$indexExists('orders', 'idx_orders_delivery_promotion_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE INDEX idx_orders_delivery_promotion_id ON orders (delivery_promotion_id)'
+            );
+        }
+    }
+
+    if (orange_table_exists($pdo, 'orange_invoice_line_presets')) {
+        if (!orange_table_has_column($pdo, 'orange_invoice_line_presets', 'system_key')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orange_invoice_line_presets
+                    ADD COLUMN system_key VARCHAR(64) NULL DEFAULT NULL AFTER line_kind'
+            );
+            orange_schema_invalidate_column_check('orange_invoice_line_presets', 'system_key');
+        }
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE orange_invoice_line_presets
+             SET system_key = NULL
+             WHERE TRIM(COALESCE(system_key, \'\')) = \'\''
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE orange_invoice_line_presets
+             SET system_key = LOWER(TRIM(system_key))
+             WHERE system_key IS NOT NULL AND TRIM(system_key) <> \'\''
+        );
+        if (!$indexExists('orange_invoice_line_presets', 'uq_oilp_country_system_key')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE UNIQUE INDEX uq_oilp_country_system_key
+                 ON orange_invoice_line_presets (country_id, system_key)'
             );
         }
     }

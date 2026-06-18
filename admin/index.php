@@ -17,6 +17,7 @@ $allowed = [
     'countries',
     'delivery_areas',
     'cart_promotions',
+    'delivery_promotions',
     'cart_gift_promotions',
     'cart_bogo_promotions',
     'cart_combo_promotions',
