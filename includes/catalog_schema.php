@@ -2892,10 +2892,38 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 can_view TINYINT(1) NOT NULL DEFAULT 0,
                 can_edit TINYINT(1) NOT NULL DEFAULT 0,
                 can_delete TINYINT(1) NOT NULL DEFAULT 0,
+                can_lock TINYINT(1) NOT NULL DEFAULT 0,
+                can_unlock TINYINT(1) NOT NULL DEFAULT 0,
+                can_print TINYINT(1) NOT NULL DEFAULT 0,
+                can_export TINYINT(1) NOT NULL DEFAULT 0,
                 PRIMARY KEY (admin_id, resource_key),
                 KEY idx_admin_permissions_admin (admin_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
+    }
+    if (orange_table_exists($pdo, 'admin_permissions') && !orange_table_has_column($pdo, 'admin_permissions', 'can_lock')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE admin_permissions ADD COLUMN can_lock TINYINT(1) NOT NULL DEFAULT 0 AFTER can_delete');
+        orange_schema_invalidate_column_check('admin_permissions', 'can_lock');
+    }
+    if (orange_table_exists($pdo, 'admin_permissions') && !orange_table_has_column($pdo, 'admin_permissions', 'can_unlock')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE admin_permissions ADD COLUMN can_unlock TINYINT(1) NOT NULL DEFAULT 0 AFTER can_lock');
+        orange_schema_invalidate_column_check('admin_permissions', 'can_unlock');
+    }
+    if (orange_table_exists($pdo, 'admin_permissions') && !orange_table_has_column($pdo, 'admin_permissions', 'can_print')) {
+        $afterPrint = orange_table_has_column($pdo, 'admin_permissions', 'can_unlock') ? 'can_unlock' : 'can_delete';
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE admin_permissions ADD COLUMN can_print TINYINT(1) NOT NULL DEFAULT 0 AFTER {$afterPrint}"
+        );
+        orange_schema_invalidate_column_check('admin_permissions', 'can_print');
+    }
+    if (orange_table_exists($pdo, 'admin_permissions') && !orange_table_has_column($pdo, 'admin_permissions', 'can_export')) {
+        $afterExport = orange_table_has_column($pdo, 'admin_permissions', 'can_print') ? 'can_print' : 'can_delete';
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE admin_permissions ADD COLUMN can_export TINYINT(1) NOT NULL DEFAULT 0 AFTER {$afterExport}"
+        );
+        orange_schema_invalidate_column_check('admin_permissions', 'can_export');
     }
 
     if (!orange_table_exists($pdo, 'document_sequences')) {

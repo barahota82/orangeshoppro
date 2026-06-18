@@ -75,7 +75,7 @@ $auCountries = orange_countries_admin_list($dbAu);
 
 <div class="card" id="au_perm_card">
     <h3 class="card-title">صلاحيات الشاشات</h3>
-    <p class="card-hint muted" id="au_perm_hint">«عرض» = ظهور الشاشة في القائمة وفتحها. «تعديل» = إدخال بيانات جديدة أو حفظ تغييرات (إنشاء/تعديل). «حذف» = حذف سجلات حيث تتوفر في الشاشة. «قفل/فك» للمستندات فقط. الأعمدة غير المناسبة للشاشة تظهر —.</p>
+    <p class="card-hint muted" id="au_perm_hint">«عرض» = ظهور الشاشة في القائمة وفتحها. «تعديل» = إدخال بيانات جديدة أو حفظ تغييرات. «حذف» = حذف السجلات. «طباعة» = أوامر الطباعة/PDF. «تنزيل» = Excel/CSV والتصدير. «قفل/فك» للمستندات فقط. الأعمدة غير المناسبة للشاشة تظهر —.</p>
     <input type="hidden" id="perm_target_id" value="0">
     <div class="table-wrap au-perm-table-wrap">
         <table class="au-perm-table" id="au_perm_table">
@@ -85,6 +85,8 @@ $auCountries = orange_countries_admin_list($dbAu);
                     <th>عرض</th>
                     <th>تعديل</th>
                     <th>حذف</th>
+                    <th>طباعة</th>
+                    <th>تنزيل</th>
                     <th>قفل</th>
                     <th>فك قفل</th>
                 </tr>
@@ -102,7 +104,7 @@ var AU_PAGE_ACTIONS = <?php echo json_encode($auPageActions, JSON_UNESCAPED_UNIC
 
 function auPermActionsForPage(page) {
     var a = AU_PAGE_ACTIONS[page];
-    return a && a.length ? a : ['view', 'edit', 'delete'];
+    return a && a.length ? a : ['view', 'edit', 'delete', 'print', 'export'];
 }
 
 function auPermActionsForMega(mega) {
@@ -124,7 +126,7 @@ function auPermHintForSuper(isSuper) {
     if (!hint) return;
     hint.textContent = isSuper
         ? 'المشرف العام يملك كل الصلاحيات — لا حاجة لتحديد شاشات.'
-        : '«عرض» = فتح الشاشة. «تعديل» = إدخال/حفظ البيانات. المجموعات مغلقة — اضغط ◀ لفتح الشاشات. صف المجموعة اختصار.';
+        : '«عرض» = فتح الشاشة. «تعديل» = إدخال/حفظ البيانات. «طباعة» = PDF. «تنزيل» = Excel/CSV. المجموعات مغلقة — اضغط ◀ لفتح الشاشات.';
 }
 
 function auPermTable() {
@@ -157,7 +159,7 @@ function auPermCreateMegaBody(mega, megaId, existing) {
         var headTr = document.createElement('tr');
         headTr.className = 'au-perm-subhead';
         headTr.setAttribute('data-mega', megaId);
-        headTr.innerHTML = '<td colspan="6" class="au-perm-subhead-label">' + escapeHtml(sg.title || '') + '</td>';
+        headTr.innerHTML = '<td colspan="8" class="au-perm-subhead-label">' + escapeHtml(sg.title || '') + '</td>';
         frag.appendChild(headTr);
         (sg.pages || []).forEach(function (p) {
             var pg = p.page || '';
@@ -218,13 +220,13 @@ function auPermRowFlags(tr) {
     var actions;
     if (page.indexOf('__mega__') === 0 && megaId) {
         var mega = (AU_PERM_TREE || []).find(function (m) { return m.id === megaId; });
-        actions = mega ? auPermActionsForMega(mega) : ['view', 'edit', 'delete', 'lock', 'unlock'];
+        actions = mega ? auPermActionsForMega(mega) : ['view', 'edit', 'delete', 'print', 'export', 'lock', 'unlock'];
     } else if (page) {
         actions = auPermActionsForPage(page);
     } else {
-        actions = ['view', 'edit', 'delete', 'lock', 'unlock'];
+        actions = ['view', 'edit', 'delete', 'print', 'export', 'lock', 'unlock'];
     }
-    var out = { can_view: false, can_edit: false, can_delete: false, can_lock: false, can_unlock: false };
+    var out = { can_view: false, can_edit: false, can_delete: false, can_print: false, can_export: false, can_lock: false, can_unlock: false };
     var v = tr.querySelector('.p-v');
     if (actions.indexOf('view') < 0 && actions.indexOf('edit') < 0) {
         return null;
@@ -237,6 +239,12 @@ function auPermRowFlags(tr) {
     }
     if (actions.indexOf('delete') >= 0 && tr.querySelector('.p-d')) {
         out.can_delete = tr.querySelector('.p-d').checked;
+    }
+    if (actions.indexOf('print') >= 0 && tr.querySelector('.p-p')) {
+        out.can_print = tr.querySelector('.p-p').checked;
+    }
+    if (actions.indexOf('export') >= 0 && tr.querySelector('.p-x')) {
+        out.can_export = tr.querySelector('.p-x').checked;
     }
     if (actions.indexOf('lock') >= 0 && tr.querySelector('.p-l')) {
         out.can_lock = tr.querySelector('.p-l').checked;
@@ -254,11 +262,11 @@ function auPermSetRowFlags(tr, flags) {
     var actions;
     if (page.indexOf('__mega__') === 0 && megaId) {
         var mega = (AU_PERM_TREE || []).find(function (m) { return m.id === megaId; });
-        actions = mega ? auPermActionsForMega(mega) : ['view', 'edit', 'delete', 'lock', 'unlock'];
+        actions = mega ? auPermActionsForMega(mega) : ['view', 'edit', 'delete', 'print', 'export', 'lock', 'unlock'];
     } else if (page) {
         actions = auPermActionsForPage(page);
     } else {
-        actions = ['view', 'edit', 'delete', 'lock', 'unlock'];
+        actions = ['view', 'edit', 'delete', 'print', 'export', 'lock', 'unlock'];
     }
     if (actions.indexOf('view') >= 0 && tr.querySelector('.p-v')) {
         tr.querySelector('.p-v').checked = !!flags.can_view;
@@ -269,6 +277,12 @@ function auPermSetRowFlags(tr, flags) {
     if (actions.indexOf('delete') >= 0 && tr.querySelector('.p-d')) {
         tr.querySelector('.p-d').checked = !!flags.can_delete;
     }
+    if (actions.indexOf('print') >= 0 && tr.querySelector('.p-p')) {
+        tr.querySelector('.p-p').checked = !!flags.can_print;
+    }
+    if (actions.indexOf('export') >= 0 && tr.querySelector('.p-x')) {
+        tr.querySelector('.p-x').checked = !!flags.can_export;
+    }
     if (actions.indexOf('lock') >= 0 && tr.querySelector('.p-l')) {
         tr.querySelector('.p-l').checked = !!flags.can_lock;
     }
@@ -278,7 +292,7 @@ function auPermSetRowFlags(tr, flags) {
 }
 
 function auPermMakeCheckboxCells(page, flags, extraClass, actionsOverride) {
-    var acts = actionsOverride || (page.indexOf('__mega__') === 0 ? ['view', 'edit', 'delete', 'lock', 'unlock'] : auPermActionsForPage(page));
+    var acts = actionsOverride || (page.indexOf('__mega__') === 0 ? ['view', 'edit', 'delete', 'print', 'export', 'lock', 'unlock'] : auPermActionsForPage(page));
     var ex = flags || {};
     var cls = extraClass || '';
     function cell(act, cssClass, key) {
@@ -290,6 +304,8 @@ function auPermMakeCheckboxCells(page, flags, extraClass, actionsOverride) {
     return cell('view', 'p-v', 'can_view') +
         cell('edit', 'p-e', 'can_edit') +
         cell('delete', 'p-d', 'can_delete') +
+        cell('print', 'p-p', 'can_print') +
+        cell('export', 'p-x', 'can_export') +
         cell('lock', 'p-l', 'can_lock') +
         cell('unlock', 'p-u', 'can_unlock');
 }
@@ -314,18 +330,18 @@ function auPermPagesInMega(mega) {
 }
 
 function auPermAggregateFlags(pageRows) {
-    var agg = { can_view: false, can_edit: false, can_delete: false, can_lock: false, can_unlock: false };
+    var agg = { can_view: false, can_edit: false, can_delete: false, can_print: false, can_export: false, can_lock: false, can_unlock: false };
     var any = false;
     pageRows.forEach(function (tr) {
         var f = auPermRowFlags(tr);
         if (!f) return;
         any = true;
-        ['can_view', 'can_edit', 'can_delete', 'can_lock', 'can_unlock'].forEach(function (k) {
+        ['can_view', 'can_edit', 'can_delete', 'can_print', 'can_export', 'can_lock', 'can_unlock'].forEach(function (k) {
             if (f[k]) agg[k] = true;
         });
     });
     if (!any) {
-        return { can_view: false, can_edit: false, can_delete: false, can_lock: false, can_unlock: false };
+        return { can_view: false, can_edit: false, can_delete: false, can_print: false, can_export: false, can_lock: false, can_unlock: false };
     }
     return agg;
 }
@@ -366,6 +382,8 @@ function auPermBindMatrixEvents() {
                     can_view: pageActs.indexOf('view') >= 0 ? flags.can_view : false,
                     can_edit: pageActs.indexOf('edit') >= 0 ? flags.can_edit : false,
                     can_delete: pageActs.indexOf('delete') >= 0 ? flags.can_delete : false,
+                    can_print: pageActs.indexOf('print') >= 0 ? flags.can_print : false,
+                    can_export: pageActs.indexOf('export') >= 0 ? flags.can_export : false,
                     can_lock: pageActs.indexOf('lock') >= 0 ? flags.can_lock : false,
                     can_unlock: pageActs.indexOf('unlock') >= 0 ? flags.can_unlock : false
                 };
@@ -375,6 +393,27 @@ function auPermBindMatrixEvents() {
         }
         var pageRow = el.closest('tr.au-perm-page');
         if (pageRow) {
+            if (el.classList.contains('p-d') && el.checked) {
+                var pe = pageRow.querySelector('.p-e');
+                var pv = pageRow.querySelector('.p-v');
+                if (pe) pe.checked = true;
+                if (pv) pv.checked = true;
+            }
+            if ((el.classList.contains('p-e') || el.classList.contains('p-p') || el.classList.contains('p-x') || el.classList.contains('p-l')) && el.checked) {
+                var pv2 = pageRow.querySelector('.p-v');
+                if (pv2) pv2.checked = true;
+            }
+            if (el.classList.contains('p-u') && el.checked) {
+                var pl = pageRow.querySelector('.p-l');
+                var pv3 = pageRow.querySelector('.p-v');
+                if (pl) pl.checked = true;
+                if (pv3) pv3.checked = true;
+            }
+            if (el.classList.contains('p-v') && !el.checked) {
+                pageRow.querySelectorAll('.p-e,.p-d,.p-p,.p-x,.p-l,.p-u').forEach(function (cb) {
+                    cb.checked = false;
+                });
+            }
             var mid = pageRow.getAttribute('data-mega');
             if (mid) auPermSyncMegaFromPages(mid);
         }
@@ -390,7 +429,7 @@ function renderPermMatrix(adminId, existing, isSuperOverride) {
     if (isSuper) {
         document.getElementById('perm_target_id').value = '0';
         var superTb = document.createElement('tbody');
-        superTb.innerHTML = '<tr><td colspan="6" class="muted">مشرف عام — كل الصلاحيات على كل الشاشات.</td></tr>';
+        superTb.innerHTML = '<tr><td colspan="8" class="muted">مشرف عام — كل الصلاحيات على كل الشاشات.</td></tr>';
         table.appendChild(superTb);
         auPermHintForSuper(true);
         return;
@@ -400,10 +439,10 @@ function renderPermMatrix(adminId, existing, isSuperOverride) {
     (AU_PERM_TREE || []).forEach(function (mega) {
         var megaId = mega.id || '';
         var pages = auPermPagesInMega(mega);
-        var megaFlags = { can_view: false, can_edit: false, can_delete: false, can_lock: false, can_unlock: false };
+        var megaFlags = { can_view: false, can_edit: false, can_delete: false, can_print: false, can_export: false, can_lock: false, can_unlock: false };
         pages.forEach(function (pg) {
             var ex = auPermResolveExisting(existing, pg);
-            ['can_view', 'can_edit', 'can_delete', 'can_lock', 'can_unlock'].forEach(function (k) {
+            ['can_view', 'can_edit', 'can_delete', 'can_print', 'can_export', 'can_lock', 'can_unlock'].forEach(function (k) {
                 if (ex[k]) megaFlags[k] = true;
             });
         });
@@ -463,6 +502,8 @@ function collectPermMatrix() {
                 can_view: acts.indexOf('view') >= 0 ? flags.can_view : false,
                 can_edit: acts.indexOf('edit') >= 0 ? flags.can_edit : false,
                 can_delete: acts.indexOf('delete') >= 0 ? flags.can_delete : false,
+                can_print: acts.indexOf('print') >= 0 ? flags.can_print : false,
+                can_export: acts.indexOf('export') >= 0 ? flags.can_export : false,
                 can_lock: acts.indexOf('lock') >= 0 ? flags.can_lock : false,
                 can_unlock: acts.indexOf('unlock') >= 0 ? flags.can_unlock : false
             };
@@ -598,7 +639,7 @@ function saveAdmin() {
             var matrix = collectPermMatrix();
             var hasAny = Object.keys(matrix).some(function (k) {
                 var f = matrix[k];
-                return f.can_view || f.can_edit || f.can_delete || f.can_lock || f.can_unlock;
+                return f.can_view || f.can_edit || f.can_delete || f.can_print || f.can_export || f.can_lock || f.can_unlock;
             });
             if (hasAny) {
                 savePermissionsForAdmin(newId, matrix, true).then(function (pr) {

@@ -990,7 +990,7 @@ $reportTitle = $reports[$reportKey];
         <?php endif; ?>
         <div class="sr-print-actions" style="display:flex;gap:8px;align-items:center;margin-inline-start:auto;">
             <button type="submit">عرض</button>
-            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
+            <button type="button" class="btn-secondary" data-orange-perm="print" onclick="window.print()">طباعة</button>
         </div>
     </form>
 </div>

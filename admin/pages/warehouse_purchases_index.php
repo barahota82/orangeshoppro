@@ -20,7 +20,7 @@ orange_admin_render_mega_section_index(
         'stock_reports' => 'تقارير المخزون والأصناف.',
         'purchase_reports' => 'تقارير المشتريات (فواتير، مردود، موردين، أصناف، شهري).',
         'opening_stock_balances' => 'أرصدة افتتاحية للمخزون.',
-        'inventory_reconciliation' => 'جرد وتسوية كميات المخزون.',
+        'inventory_reconciliation' => 'تسوية المخزون / الجرد (محاضر الجرد والمرفقات).',
         'suppliers' => 'بيانات الموردين وربط الذمم.',
         'purchases' => 'فواتير ومستندات المشتريات.',
         'purchase_returns' => 'مردودات المشتريات.',

@@ -32,9 +32,18 @@ try {
     unset($aRow);
     $perms = [];
     if (orange_table_exists($pdo, 'admin_permissions')) {
-        $lockSel = orange_table_has_column($pdo, 'admin_permissions', 'can_lock')
-            ? ', can_lock, can_unlock' : '';
-        $p = $pdo->query('SELECT admin_id, resource_key, can_view, can_edit, can_delete' . $lockSel . ' FROM admin_permissions');
+        $lockSel = orange_table_has_column($pdo, 'admin_permissions', 'can_lock') ? ', can_lock' : '';
+        $unlockSel = orange_table_has_column($pdo, 'admin_permissions', 'can_unlock') ? ', can_unlock' : '';
+        $printSel = orange_table_has_column($pdo, 'admin_permissions', 'can_print') ? ', can_print' : '';
+        $exportSel = orange_table_has_column($pdo, 'admin_permissions', 'can_export') ? ', can_export' : '';
+        $p = $pdo->query(
+            'SELECT admin_id, resource_key, can_view, can_edit, can_delete'
+            . $lockSel
+            . $unlockSel
+            . $printSel
+            . $exportSel
+            . ' FROM admin_permissions'
+        );
         while ($row = $p->fetch(PDO::FETCH_ASSOC)) {
             $aid = (int) $row['admin_id'];
             if (!isset($perms[$aid])) {
@@ -46,6 +55,8 @@ try {
                 'can_delete' => (int) $row['can_delete'] === 1,
                 'can_lock' => isset($row['can_lock']) && (int) $row['can_lock'] === 1,
                 'can_unlock' => isset($row['can_unlock']) && (int) $row['can_unlock'] === 1,
+                'can_print' => isset($row['can_print']) && (int) $row['can_print'] === 1,
+                'can_export' => isset($row['can_export']) && (int) $row['can_export'] === 1,
             ];
         }
     }

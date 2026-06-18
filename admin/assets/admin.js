@@ -936,7 +936,7 @@ function orangeAdminFlash(message, kind) {
 /**
  * صلاحيات شاشة (page=…) — window.ORANGE_ADMIN_CAPS[page].
  * @param {string} [page]
- * @returns {{can_view:boolean,can_edit:boolean,can_delete:boolean,can_lock:boolean,can_unlock:boolean}}
+ * @returns {{can_view:boolean,can_edit:boolean,can_delete:boolean,can_print:boolean,can_export:boolean,can_lock:boolean,can_unlock:boolean}}
  */
 function orangeAdminCaps(page) {
     var pg = page || window.ORANGE_ADMIN_PAGE || 'dashboard';
@@ -946,12 +946,14 @@ function orangeAdminCaps(page) {
         row = window.ORANGE_ADMIN_CAPS_PAGE;
     }
     if (!row) {
-        return { can_view: false, can_edit: false, can_delete: false, can_lock: false, can_unlock: false };
+        return { can_view: false, can_edit: false, can_delete: false, can_print: false, can_export: false, can_lock: false, can_unlock: false };
     }
     return {
         can_view: !!row.can_view,
         can_edit: !!row.can_edit,
         can_delete: !!row.can_delete,
+        can_print: !!row.can_print,
+        can_export: !!row.can_export,
         can_lock: !!row.can_lock,
         can_unlock: !!row.can_unlock
     };
@@ -959,7 +961,7 @@ function orangeAdminCaps(page) {
 
 /**
  * @param {Element|null} el
- * @param {'view'|'edit'|'delete'|'lock'|'unlock'} perm
+ * @param {'view'|'edit'|'delete'|'print'|'export'|'lock'|'unlock'} perm
  * @param {string} [page]
  */
 function orangeAdminApplyPerm(el, perm, page) {
@@ -978,6 +980,23 @@ function orangeAdminApplyPerm(el, perm, page) {
     }
 }
 
+function orangeAdminApplyImplicitPermMarkers(scope) {
+    var root = scope || document;
+    if (!root || !root.querySelectorAll) {
+        return;
+    }
+    root.querySelectorAll('a[data-server-export], button[data-server-export]').forEach(function (el) {
+        if (!el.hasAttribute('data-orange-perm')) {
+            orangeAdminApplyPerm(el, 'export', el.getAttribute('data-orange-page') || undefined);
+        }
+    });
+    root.querySelectorAll('button[onclick*="window.print"], button[onclick*="print("], a[onclick*="window.print"], a[onclick*="print("], button[id*="print"], a[id*="print"], button[class*="print"], a[class*="print"]').forEach(function (el) {
+        if (!el.hasAttribute('data-orange-perm')) {
+            orangeAdminApplyPerm(el, 'print', el.getAttribute('data-orange-page') || undefined);
+        }
+    });
+}
+
 function orangeAdminApplyPermMarkers(root) {
     var scope = root || document;
     if (!scope || !scope.querySelectorAll) {
@@ -986,6 +1005,7 @@ function orangeAdminApplyPermMarkers(root) {
     scope.querySelectorAll('[data-orange-perm]').forEach(function (el) {
         orangeAdminApplyPerm(el, el.getAttribute('data-orange-perm') || 'view', el.getAttribute('data-orange-page') || undefined);
     });
+    orangeAdminApplyImplicitPermMarkers(scope);
 }
 
 /**
@@ -1056,3 +1076,22 @@ function orangeAdminOpenPrintDialog(printTitle) {
 document.addEventListener('DOMContentLoaded', function () {
     orangeAdminApplyPermMarkers(document);
 });
+
+(function orangeAdminGuardWindowPrint() {
+    if (typeof window.print !== 'function') {
+        return;
+    }
+    var nativePrint = window.print.bind(window);
+    window.print = function () {
+        var caps = orangeAdminCaps();
+        if (!caps.can_print) {
+            if (typeof orangeAdminFlash === 'function') {
+                orangeAdminFlash('لا تملك صلاحية الطباعة', 'err');
+            } else {
+                alert('لا تملك صلاحية الطباعة');
+            }
+            return;
+        }
+        return nativePrint();
+    };
+})();

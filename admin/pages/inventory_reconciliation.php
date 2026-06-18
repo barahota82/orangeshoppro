@@ -128,7 +128,7 @@ if ($initialJson === false) {
 </style>
 <div class="admin-fy-shell" dir="rtl" id="stk_arch_app">
     <div class="page-title">
-        <h1>أرشيف الجرد</h1>
+        <h1>تسوية المخزون / الجرد</h1>
         <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
     </div>
 

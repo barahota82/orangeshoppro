@@ -309,7 +309,7 @@ function orange_admin_page_from_perm_key(string $key): ?string
 /**
  * أعمدة الصلاحيات المناسبة لكل شاشة — لا تُعرض في المصفوفة إلا ما ينطبق فعلياً.
  *
- * @return list<'view'|'edit'|'delete'|'lock'|'unlock'>
+ * @return list<'view'|'edit'|'delete'|'print'|'export'|'lock'|'unlock'>
  */
 function orange_admin_permission_actions_for_page(string $page): array
 {
@@ -317,13 +317,27 @@ function orange_admin_permission_actions_for_page(string $page): array
         'dashboard',
         'reports',
         'channel_analytics',
-        'sales_returns_report',
         'logs',
         'accounting_reports_index',
         'warehouse_purchases_index',
-        'purchase_reports',
         'sales_promotions_index',
         'settings_index',
+    ];
+
+    static $viewPrintOnly = [
+        'invoice',
+        'delivery_order_search',
+        'delivery_handover_manifest',
+        'financial_report',
+    ];
+
+    static $viewExportOnly = [
+        'sales_returns_report',
+    ];
+
+    static $viewPrintExport = [
+        'purchase_reports',
+        'stock_reports',
         'journal_voucher_reports',
         'partner_account_statement',
         'partner_reports',
@@ -336,9 +350,7 @@ function orange_admin_permission_actions_for_page(string $page): array
         'report_trial_balance',
         'report_cash_flow',
         'report_analytical',
-        'financial_report',
-        'delivery_order_search',
-        'delivery_handover_manifest',
+        'report_balance_sheet',
     ];
 
     static $editLockScreen = [
@@ -364,26 +376,59 @@ function orange_admin_permission_actions_for_page(string $page): array
 
     static $viewEditNoDelete = [
         'company_settings',
-        'storefront_hero',
         'storefront_merge_requests',
         'delivery_areas',
         'channels',
+    ];
+
+    static $viewEditDeletePages = [
+        'storefront_hero',
         'bank_reconciliation',
-        'inventory_reconciliation',
+    ];
+
+    static $viewEditDeletePrintPages = [
         'stock_adjustment_voucher',
+        'inventory_reconciliation',
+        'customers',
+        'suppliers',
+        'chart_of_accounts',
+        'fiscal_years',
+        'journal_types',
+    ];
+
+    static $viewEditDeleteExportPages = [
+        'order_intake_queue',
     ];
 
     if (in_array($page, $viewOnly, true)) {
         return ['view'];
     }
+    if (in_array($page, $viewPrintOnly, true)) {
+        return ['view', 'print'];
+    }
+    if (in_array($page, $viewExportOnly, true)) {
+        return ['view', 'export'];
+    }
+    if (in_array($page, $viewPrintExport, true)) {
+        return ['view', 'print', 'export'];
+    }
     if (in_array($page, $editLockScreen, true)) {
         return ['view', 'lock', 'unlock'];
     }
     if (in_array($page, $documentPages, true)) {
-        return ['view', 'edit', 'delete', 'lock', 'unlock'];
+        return ['view', 'edit', 'delete', 'print', 'lock', 'unlock'];
     }
     if (in_array($page, $viewEditNoDelete, true)) {
         return ['view', 'edit'];
+    }
+    if (in_array($page, $viewEditDeletePages, true)) {
+        return ['view', 'edit', 'delete'];
+    }
+    if (in_array($page, $viewEditDeletePrintPages, true)) {
+        return ['view', 'edit', 'delete', 'print'];
+    }
+    if (in_array($page, $viewEditDeleteExportPages, true)) {
+        return ['view', 'edit', 'delete', 'export'];
     }
 
     return ['view', 'edit', 'delete'];

@@ -489,11 +489,14 @@
         downloadBlob(safeName(name) + '-' + dateSlug() + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', [blob]);
     }
 
-    function makeBtn(label, onClick) {
+    function makeBtn(label, onClick, perm) {
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'btn-secondary';
         b.textContent = label;
+        if (perm) {
+            b.setAttribute('data-orange-perm', perm);
+        }
         b.addEventListener('click', onClick);
         return b;
     }
@@ -504,14 +507,14 @@
         var shortLabel = table.getAttribute('data-export-label') || '';
         var excelLabel = shortLabel !== '' ? 'Excel - ' + shortLabel : 'Excel';
         var out = [];
-        var bx = makeBtn(excelLabel, function () { exportExcel(table, name); });
+        var bx = makeBtn(excelLabel, function () { exportExcel(table, name); }, 'export');
         out.push(bx);
         /* CSV اختياري (مطفأ افتراضياً بقرار المالك 2026-06-06) — يُفعَّل بسمة data-export-csv. */
         if (table.hasAttribute('data-export-csv')) {
-            out.push(makeBtn('CSV', function () { exportCsv(table, name); }));
+            out.push(makeBtn('CSV', function () { exportCsv(table, name); }, 'export'));
         }
         if (table.hasAttribute('data-export-print')) {
-            out.push(makeBtn('طباعة / حفظ PDF', function () { window.print(); }));
+            out.push(makeBtn('طباعة / حفظ PDF', function () { window.print(); }, 'print'));
         }
         if (inline) {
             out.forEach(function (b) { b.classList.add('table-export-inline-btn'); });
@@ -546,6 +549,9 @@
         var target = targetSel ? document.querySelector(targetSel) : null;
         if (target) {
             insertButtonsInto(target, btns);
+            if (typeof orangeAdminApplyPermMarkers === 'function') {
+                orangeAdminApplyPermMarkers(target);
+            }
             return;
         }
         var bar = document.createElement('div');
@@ -558,6 +564,9 @@
         var anchor = table.closest('.table-wrap') || table;
         if (anchor.parentNode) {
             anchor.parentNode.insertBefore(bar, anchor);
+            if (typeof orangeAdminApplyPermMarkers === 'function') {
+                orangeAdminApplyPermMarkers(bar);
+            }
         }
     }
 
@@ -603,7 +612,7 @@
                 } else {
                     exportExcel(found.tables[0], hostExportName(found));
                 }
-            }));
+            }, 'export'));
             if (host.hasAttribute('data-export-csv')) {
                 btns.push(makeBtn('CSV', function () {
                     var found = findReportTables();
@@ -612,9 +621,12 @@
                         return;
                     }
                     exportCsv(found.tables[0], hostExportName(found));
-                }));
+                }, 'export'));
             }
             insertButtonsInto(host, btns);
+            if (typeof orangeAdminApplyPermMarkers === 'function') {
+                orangeAdminApplyPermMarkers(host);
+            }
         }
     }
 
@@ -651,7 +663,7 @@
             var list = groups[key];
             var first = list[0];
             var gname = first.getAttribute('data-export-name') || 'report';
-            placeButtons(first, [makeBtn('Excel', function () { exportExcelGroup(list, gname); })]);
+            placeButtons(first, [makeBtn('Excel', function () { exportExcelGroup(list, gname); }, 'export')]);
         });
 
         /* ثم: الجداول المفردة. */
@@ -719,6 +731,18 @@
         var a = e.target && e.target.closest ? e.target.closest('a[data-server-export]') : null;
         if (!a || !a.getAttribute('href')) {
             return;
+        }
+        if (typeof orangeAdminCaps === 'function') {
+            var caps = orangeAdminCaps(a.getAttribute('data-orange-page') || undefined);
+            if (!caps.can_export) {
+                e.preventDefault();
+                if (typeof orangeAdminFlash === 'function') {
+                    orangeAdminFlash('لا تملك صلاحية تنزيل الملف', 'err');
+                } else {
+                    alert('لا تملك صلاحية تنزيل الملف');
+                }
+                return;
+            }
         }
         e.preventDefault();
         var ifr = document.createElement('iframe');

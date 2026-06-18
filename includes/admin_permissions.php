@@ -39,7 +39,7 @@ function orange_admin_resource_screen_hints(): array
         'catalog' => 'الأقسام، فروع الشجرة، أنواع المنتجات، سمات الكتالوج، قاموس الألوان، أنماط الألوان، قوالب/عائلات المقاسات، دليل المقاس الاسترشادي',
         'products' => 'المنتجات، عروض المنتجات',
         'sales' => 'العملاء (عرض الطلبات)، الطلبات، الطلبات المحجوزة، طابور الطلبات، مناديب التوصيل، تسليم المندوب، فواتير أونلاين/مبيعات، فاتورة مبيعات، مردود المبيعات، إنشاء قيود التسليم',
-        'warehouse' => 'المستودع، أرصدة أول المدة المخزنية، تسوية المخزون، الموردين، المشتريات، مردود المشتريات، تقارير المخزن، تقارير المشتريات',
+        'warehouse' => 'المستودع، أرصدة أول المدة المخزنية، تسوية المخزون / الجرد، الموردين، المشتريات، مردود المشتريات، تقارير المخزن، تقارير المشتريات',
         'accounting' => 'الدليل المحاسبي، حسابات القيود، السنوات المالية، أرصدة أول المدة المالية، سندات القبض/الصرف/القيد، قيود الإقفال، إقفال التعديلات، التقارير المالية، ميزان المراجعة، أرباح وخسائر، تسوية البنك، كشف حساب…',
         'partners' => 'العملاء، الموردين، سداد فواتير آجلة، أرصدة ذمم العملاء/الموردين',
         'reports' => 'تقارير المبيعات، تحليل القنوات، سجل النشاط',
@@ -226,8 +226,14 @@ function orange_admin_api_action_from_request(): string
     if ($base === 'list.php') {
         return 'view';
     }
-    if ($base === 'delete.php' || $base === 'remove.php') {
+    if (preg_match('/(?:^|[-_])(delete|remove)(?:\.php)$/i', $base)) {
         return 'delete';
+    }
+    if (preg_match('/(?:^|[-_])export(?:[-_].*)?\.php$/i', $base)) {
+        return 'export';
+    }
+    if (isset($_GET['export']) && trim((string) $_GET['export']) !== '') {
+        return 'export';
     }
     $m = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
     if ($m === 'DELETE') {
@@ -238,6 +244,19 @@ function orange_admin_api_action_from_request(): string
     }
 
     return 'view';
+}
+
+/**
+ * @return array{has_lock:bool,has_unlock:bool,has_print:bool,has_export:bool}
+ */
+function orange_admin_permissions_cap_columns(PDO $pdo): array
+{
+    return [
+        'has_lock' => orange_table_has_column($pdo, 'admin_permissions', 'can_lock'),
+        'has_unlock' => orange_table_has_column($pdo, 'admin_permissions', 'can_unlock'),
+        'has_print' => orange_table_has_column($pdo, 'admin_permissions', 'can_print'),
+        'has_export' => orange_table_has_column($pdo, 'admin_permissions', 'can_export'),
+    ];
 }
 
 /**
@@ -318,7 +337,7 @@ function orange_admin_api_page_from_script(): ?string
 }
 
 /**
- * @return array<string, array{can_view:bool,can_edit:bool,can_delete:bool}>
+ * @return array<string, array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool,can_print:bool,can_export:bool}>
  */
 function orange_admin_permissions_matrix(PDO $pdo, int $adminId): array
 {
@@ -331,8 +350,22 @@ function orange_admin_permissions_matrix(PDO $pdo, int $adminId): array
 
         return [];
     }
+    $cols = orange_admin_permissions_cap_columns($pdo);
+    $selectCols = 'resource_key, can_view, can_edit, can_delete';
+    if ($cols['has_lock']) {
+        $selectCols .= ', can_lock';
+    }
+    if ($cols['has_unlock']) {
+        $selectCols .= ', can_unlock';
+    }
+    if ($cols['has_print']) {
+        $selectCols .= ', can_print';
+    }
+    if ($cols['has_export']) {
+        $selectCols .= ', can_export';
+    }
     $st = $pdo->prepare(
-        'SELECT resource_key, can_view, can_edit, can_delete, can_lock, can_unlock FROM admin_permissions WHERE admin_id = ?'
+        'SELECT ' . $selectCols . ' FROM admin_permissions WHERE admin_id = ?'
     );
     $st->execute([$adminId]);
     $out = [];
@@ -342,8 +375,10 @@ function orange_admin_permissions_matrix(PDO $pdo, int $adminId): array
             'can_view' => (int) $row['can_view'] === 1,
             'can_edit' => (int) $row['can_edit'] === 1,
             'can_delete' => (int) $row['can_delete'] === 1,
-            'can_lock' => (int) ($row['can_lock'] ?? 0) === 1,
-            'can_unlock' => (int) ($row['can_unlock'] ?? 0) === 1,
+            'can_lock' => $cols['has_lock'] && (int) ($row['can_lock'] ?? 0) === 1,
+            'can_unlock' => $cols['has_unlock'] && (int) ($row['can_unlock'] ?? 0) === 1,
+            'can_print' => $cols['has_print'] && (int) ($row['can_print'] ?? 0) === 1,
+            'can_export' => $cols['has_export'] && (int) ($row['can_export'] ?? 0) === 1,
         ];
     }
     $cache[$adminId] = $out;
@@ -352,7 +387,7 @@ function orange_admin_permissions_matrix(PDO $pdo, int $adminId): array
 }
 
 /**
- * @return array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool}
+ * @return array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool,can_print:bool,can_export:bool}
  */
 function orange_admin_empty_caps(): array
 {
@@ -362,11 +397,13 @@ function orange_admin_empty_caps(): array
         'can_delete' => false,
         'can_lock' => false,
         'can_unlock' => false,
+        'can_print' => false,
+        'can_export' => false,
     ];
 }
 
 /**
- * @return array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool}
+ * @return array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool,can_print:bool,can_export:bool}
  */
 function orange_admin_full_caps(): array
 {
@@ -376,12 +413,14 @@ function orange_admin_full_caps(): array
         'can_delete' => true,
         'can_lock' => true,
         'can_unlock' => true,
+        'can_print' => true,
+        'can_export' => true,
     ];
 }
 
 /**
- * @param array<string, array{can_view:bool,can_edit:bool,can_delete:bool,can_lock?:bool,can_unlock?:bool}> $matrix
- * @return array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool}|null
+ * @param array<string, array{can_view:bool,can_edit:bool,can_delete:bool,can_lock?:bool,can_unlock?:bool,can_print?:bool,can_export?:bool}> $matrix
+ * @return array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool,can_print:bool,can_export:bool}|null
  */
 function orange_admin_resolve_perm_row(array $matrix, string $page): ?array
 {
@@ -400,7 +439,7 @@ function orange_admin_resolve_perm_row(array $matrix, string $page): ?array
 /**
  * صلاحيات شاشة واحدة (page=…) — المصدر المعتمد للتحقق.
  *
- * @return array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool}
+ * @return array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool,can_print:bool,can_export:bool}
  */
 function orange_admin_caps_for_page(array $admin, PDO $pdo, string $page): array
 {
@@ -422,6 +461,8 @@ function orange_admin_caps_for_page(array $admin, PDO $pdo, string $page): array
                 'can_delete' => false,
                 'can_lock' => false,
                 'can_unlock' => false,
+                'can_print' => false,
+                'can_export' => false,
             ];
         }
 
@@ -438,6 +479,8 @@ function orange_admin_caps_for_page(array $admin, PDO $pdo, string $page): array
         'can_delete' => !empty($row['can_delete']),
         'can_lock' => !empty($row['can_lock']),
         'can_unlock' => !empty($row['can_unlock']),
+        'can_print' => !empty($row['can_print']),
+        'can_export' => !empty($row['can_export']),
     ];
 }
 
@@ -448,7 +491,7 @@ function orange_admin_caps(array $admin, PDO $pdo, string $page): array
 }
 
 /**
- * @return array<string, array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool}>
+ * @return array<string, array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool,can_print:bool,can_export:bool}>
  */
 function orange_admin_caps_all_pages(array $admin, PDO $pdo): array
 {
@@ -475,6 +518,12 @@ function orange_admin_may_page(array $admin, PDO $pdo, string $page, string $act
     if ($action === 'unlock') {
         return $caps['can_unlock'];
     }
+    if ($action === 'print') {
+        return $caps['can_print'];
+    }
+    if ($action === 'export') {
+        return $caps['can_export'];
+    }
 
     return $caps['can_view'];
 }
@@ -498,6 +547,95 @@ function orange_admin_may(array $admin, PDO $pdo, string $resource, string $acti
     return false;
 }
 
+/**
+ * @param array{has_lock:bool,has_unlock:bool,has_print:bool,has_export:bool} $cols
+ */
+function orange_admin_permissions_select_tail(array $cols): string
+{
+    $tail = '';
+    if ($cols['has_lock']) {
+        $tail .= ', can_lock';
+    }
+    if ($cols['has_unlock']) {
+        $tail .= ', can_unlock';
+    }
+    if ($cols['has_print']) {
+        $tail .= ', can_print';
+    }
+    if ($cols['has_export']) {
+        $tail .= ', can_export';
+    }
+
+    return $tail;
+}
+
+/**
+ * @param array{has_lock:bool,has_unlock:bool,has_print:bool,has_export:bool} $cols
+ */
+function orange_admin_permissions_prepare_upsert(PDO $pdo, array $cols): PDOStatement
+{
+    $fields = ['admin_id', 'resource_key', 'can_view', 'can_edit', 'can_delete'];
+    $merge = ['can_view', 'can_edit', 'can_delete'];
+    if ($cols['has_lock']) {
+        $fields[] = 'can_lock';
+        $merge[] = 'can_lock';
+    }
+    if ($cols['has_unlock']) {
+        $fields[] = 'can_unlock';
+        $merge[] = 'can_unlock';
+    }
+    if ($cols['has_print']) {
+        $fields[] = 'can_print';
+        $merge[] = 'can_print';
+    }
+    if ($cols['has_export']) {
+        $fields[] = 'can_export';
+        $merge[] = 'can_export';
+    }
+    $placeholders = implode(',', array_fill(0, count($fields), '?'));
+    $updates = [];
+    foreach ($merge as $col) {
+        $updates[] = $col . ' = GREATEST(admin_permissions.' . $col . ', VALUES(' . $col . '))';
+    }
+    $sql = 'INSERT INTO admin_permissions (' . implode(', ', $fields) . ')
+             VALUES (' . $placeholders . ')
+             ON DUPLICATE KEY UPDATE
+               ' . implode(",
+               ", $updates);
+
+    return $pdo->prepare($sql);
+}
+
+/**
+ * @param array<string, mixed> $row
+ * @param array{has_lock:bool,has_unlock:bool,has_print:bool,has_export:bool} $cols
+ * @return list<int|string>
+ */
+function orange_admin_permissions_upsert_params(array $row, int $adminId, string $resourceKey, array $cols): array
+{
+    $params = [
+        $adminId,
+        $resourceKey,
+        (int) ($row['can_view'] ?? 0),
+        (int) ($row['can_edit'] ?? 0),
+        (int) ($row['can_delete'] ?? 0),
+    ];
+    if ($cols['has_lock']) {
+        $params[] = (int) ($row['can_lock'] ?? 0);
+    }
+    if ($cols['has_unlock']) {
+        $params[] = (int) ($row['can_unlock'] ?? 0);
+    }
+    if ($cols['has_print']) {
+        $params[] = (int) ($row['can_print'] ?? 0);
+    }
+    if ($cols['has_export']) {
+        $params[] = (int) ($row['can_export'] ?? 0);
+    }
+
+    return $params;
+}
+
 function orange_admin_migrate_permissions_to_pages(PDO $pdo): void
 {
     require_once __DIR__ . '/schema_migrations.php';
@@ -509,34 +647,14 @@ function orange_admin_migrate_permissions_to_pages(PDO $pdo): void
         return;
     }
     $groupKeys = array_keys(orange_admin_resource_labels());
-    $hasLock = orange_table_has_column($pdo, 'admin_permissions', 'can_lock');
+    $cols = orange_admin_permissions_cap_columns($pdo);
     $sel = $pdo->query(
         'SELECT admin_id, resource_key, can_view, can_edit, can_delete'
-        . ($hasLock ? ', can_lock, can_unlock' : '')
+        . orange_admin_permissions_select_tail($cols)
         . ' FROM admin_permissions'
     );
     $rows = $sel ? $sel->fetchAll(PDO::FETCH_ASSOC) : [];
-    if ($hasLock) {
-        $ins = $pdo->prepare(
-            'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete, can_lock, can_unlock)
-             VALUES (?,?,?,?,?,?,?)
-             ON DUPLICATE KEY UPDATE
-               can_view = GREATEST(admin_permissions.can_view, VALUES(can_view)),
-               can_edit = GREATEST(admin_permissions.can_edit, VALUES(can_edit)),
-               can_delete = GREATEST(admin_permissions.can_delete, VALUES(can_delete)),
-               can_lock = GREATEST(admin_permissions.can_lock, VALUES(can_lock)),
-               can_unlock = GREATEST(admin_permissions.can_unlock, VALUES(can_unlock))'
-        );
-    } else {
-        $ins = $pdo->prepare(
-            'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete)
-             VALUES (?,?,?,?,?)
-             ON DUPLICATE KEY UPDATE
-               can_view = GREATEST(admin_permissions.can_view, VALUES(can_view)),
-               can_edit = GREATEST(admin_permissions.can_edit, VALUES(can_edit)),
-               can_delete = GREATEST(admin_permissions.can_delete, VALUES(can_delete))'
-        );
-    }
+    $ins = orange_admin_permissions_prepare_upsert($pdo, $cols);
     foreach ($rows as $row) {
         $rk = (string) ($row['resource_key'] ?? '');
         if (str_starts_with($rk, 'page:') || !in_array($rk, $groupKeys, true)) {
@@ -545,16 +663,9 @@ function orange_admin_migrate_permissions_to_pages(PDO $pdo): void
         $pages = orange_admin_permission_pages_in_legacy_group($rk);
         foreach ($pages as $page) {
             $pk = orange_admin_perm_storage_key($page);
-            $v = (int) ($row['can_view'] ?? 0);
-            $e = (int) ($row['can_edit'] ?? 0);
-            $d = (int) ($row['can_delete'] ?? 0);
-            $l = $hasLock ? (int) ($row['can_lock'] ?? 0) : 0;
-            $u = $hasLock ? (int) ($row['can_unlock'] ?? 0) : 0;
-            if ($hasLock) {
-                $ins->execute([(int) $row['admin_id'], $pk, $v, $e, $d, $l, $u]);
-            } else {
-                $ins->execute([(int) $row['admin_id'], $pk, $v, $e, $d]);
-            }
+            $ins->execute(
+                orange_admin_permissions_upsert_params($row, (int) $row['admin_id'], $pk, $cols)
+            );
         }
     }
     $delPlace = implode(',', array_fill(0, count($groupKeys), '?'));
@@ -605,47 +716,20 @@ function orange_admin_seed_company_sales_invoice_page_permissions(PDO $pdo): voi
     }
     $fromKey = 'page:manual_order';
     $toKey = 'page:company_sales_invoice';
-    $hasLock = orange_table_has_column($pdo, 'admin_permissions', 'can_lock');
+    $cols = orange_admin_permissions_cap_columns($pdo);
     try {
         $sel = $pdo->prepare(
             'SELECT admin_id, can_view, can_edit, can_delete'
-            . ($hasLock ? ', can_lock, can_unlock' : '')
+            . orange_admin_permissions_select_tail($cols)
             . ' FROM admin_permissions WHERE resource_key = ?'
         );
         $sel->execute([$fromKey]);
         $rows = $sel->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        if ($hasLock) {
-            $ins = $pdo->prepare(
-                'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete, can_lock, can_unlock)
-                 VALUES (?,?,?,?,?,?,?)
-                 ON DUPLICATE KEY UPDATE
-                   can_view = GREATEST(admin_permissions.can_view, VALUES(can_view)),
-                   can_edit = GREATEST(admin_permissions.can_edit, VALUES(can_edit)),
-                   can_delete = GREATEST(admin_permissions.can_delete, VALUES(can_delete)),
-                   can_lock = GREATEST(admin_permissions.can_lock, VALUES(can_lock)),
-                   can_unlock = GREATEST(admin_permissions.can_unlock, VALUES(can_unlock))'
-            );
-        } else {
-            $ins = $pdo->prepare(
-                'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete)
-                 VALUES (?,?,?,?,?)
-                 ON DUPLICATE KEY UPDATE
-                   can_view = GREATEST(admin_permissions.can_view, VALUES(can_view)),
-                   can_edit = GREATEST(admin_permissions.can_edit, VALUES(can_edit)),
-                   can_delete = GREATEST(admin_permissions.can_delete, VALUES(can_delete))'
-            );
-        }
+        $ins = orange_admin_permissions_prepare_upsert($pdo, $cols);
         foreach ($rows as $row) {
-            $v = (int) ($row['can_view'] ?? 0);
-            $e = (int) ($row['can_edit'] ?? 0);
-            $d = (int) ($row['can_delete'] ?? 0);
-            if ($hasLock) {
-                $l = (int) ($row['can_lock'] ?? 0);
-                $u = (int) ($row['can_unlock'] ?? 0);
-                $ins->execute([(int) $row['admin_id'], $toKey, $v, $e, $d, $l, $u]);
-            } else {
-                $ins->execute([(int) $row['admin_id'], $toKey, $v, $e, $d]);
-            }
+            $ins->execute(
+                orange_admin_permissions_upsert_params($row, (int) $row['admin_id'], $toKey, $cols)
+            );
         }
         $insMarker = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
         $insMarker->execute([$marker]);
@@ -671,47 +755,20 @@ function orange_admin_seed_online_sales_invoice_page_permissions(PDO $pdo): void
     }
     $fromKey = 'page:online_invoices';
     $toKey = 'page:online_sales_invoice';
-    $hasLock = orange_table_has_column($pdo, 'admin_permissions', 'can_lock');
+    $cols = orange_admin_permissions_cap_columns($pdo);
     try {
         $sel = $pdo->prepare(
             'SELECT admin_id, can_view, can_edit, can_delete'
-            . ($hasLock ? ', can_lock, can_unlock' : '')
+            . orange_admin_permissions_select_tail($cols)
             . ' FROM admin_permissions WHERE resource_key = ?'
         );
         $sel->execute([$fromKey]);
         $rows = $sel->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        if ($hasLock) {
-            $ins = $pdo->prepare(
-                'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete, can_lock, can_unlock)
-                 VALUES (?,?,?,?,?,?,?)
-                 ON DUPLICATE KEY UPDATE
-                   can_view = GREATEST(admin_permissions.can_view, VALUES(can_view)),
-                   can_edit = GREATEST(admin_permissions.can_edit, VALUES(can_edit)),
-                   can_delete = GREATEST(admin_permissions.can_delete, VALUES(can_delete)),
-                   can_lock = GREATEST(admin_permissions.can_lock, VALUES(can_lock)),
-                   can_unlock = GREATEST(admin_permissions.can_unlock, VALUES(can_unlock))'
-            );
-        } else {
-            $ins = $pdo->prepare(
-                'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete)
-                 VALUES (?,?,?,?,?)
-                 ON DUPLICATE KEY UPDATE
-                   can_view = GREATEST(admin_permissions.can_view, VALUES(can_view)),
-                   can_edit = GREATEST(admin_permissions.can_edit, VALUES(can_edit)),
-                   can_delete = GREATEST(admin_permissions.can_delete, VALUES(can_delete))'
-            );
-        }
+        $ins = orange_admin_permissions_prepare_upsert($pdo, $cols);
         foreach ($rows as $row) {
-            $v = (int) ($row['can_view'] ?? 0);
-            $e = (int) ($row['can_edit'] ?? 0);
-            $d = (int) ($row['can_delete'] ?? 0);
-            if ($hasLock) {
-                $l = (int) ($row['can_lock'] ?? 0);
-                $u = (int) ($row['can_unlock'] ?? 0);
-                $ins->execute([(int) $row['admin_id'], $toKey, $v, $e, $d, $l, $u]);
-            } else {
-                $ins->execute([(int) $row['admin_id'], $toKey, $v, $e, $d]);
-            }
+            $ins->execute(
+                orange_admin_permissions_upsert_params($row, (int) $row['admin_id'], $toKey, $cols)
+            );
         }
         $insMarker = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
         $insMarker->execute([$marker]);

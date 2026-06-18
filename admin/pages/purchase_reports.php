@@ -678,7 +678,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
         <?php endforeach; ?>
     </div>
 
-    <form method="get" class="prr-filter-form" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
+    <form method="get" class="prr-filter-form<?php echo $reportKey === 'items' ? ' is-items' : ''; ?>" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
         <input type="hidden" name="page" value="purchase_reports">
         <input type="hidden" name="r" value="<?php echo htmlspecialchars($reportKey, ENT_QUOTES, 'UTF-8'); ?>">
 
@@ -701,7 +701,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         style="width:9rem;background:#f4f4f5;" dir="ltr" lang="en"
                         placeholder="الكود"
                         value="<?php echo htmlspecialchars($selectedSupplierCode, ENT_QUOTES, 'UTF-8'); ?>">
-                    <input type="text" id="prr_supplier_name" class="admin-inp" readonly
+                    <input type="text" id="prr_supplier_name" class="admin-inp prr-name-input prr-supplier-name" readonly
                         title="دبل كليك لاختيار المورد"
                         style="cursor:pointer;min-width:15rem;"
                         placeholder="كل الموردين — دبل كليك للاختيار"
@@ -720,24 +720,24 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         style="width:10rem;background:#f4f4f5;" dir="ltr" lang="en"
                         placeholder="الكود"
                         value="<?php echo htmlspecialchars($selectedProductCode, ENT_QUOTES, 'UTF-8'); ?>">
-                    <input type="text" id="prr_product_name" class="admin-inp" readonly
+                    <input type="text" id="prr_product_name" class="admin-inp prr-name-input prr-product-name" readonly
                         title="دبل كليك لاختيار الصنف"
                         style="cursor:pointer;min-width:18rem;"
                         placeholder="كل الأصناف — دبل كليك للاختيار"
                         value="<?php echo htmlspecialchars($selectedProductName, ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
             </div>
-            <div style="display:flex;align-items:flex-end;">
-                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
+            <div class="prr-items-zero-wrap" style="display:flex;align-items:flex-end;">
+                <label class="prr-items-zero-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;">
                     <input type="checkbox" name="hz" value="1" <?php echo $hideZero ? 'checked' : ''; ?>>
                     إخفاء الصافي صفر
                 </label>
             </div>
         <?php endif; ?>
 
-        <div class="prr-print-actions" style="display:flex;gap:8px;align-items:center;margin-inline-start:auto;">
+        <div class="prr-print-actions" style="display:flex;gap:8px;align-items:center;<?php echo $reportKey === 'items' ? 'flex-basis:100%;justify-content:flex-end;' : 'margin-inline-start:auto;'; ?>">
             <button type="submit">عرض</button>
-            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
+            <button type="button" class="btn-secondary" data-orange-perm="print" onclick="window.print()">طباعة</button>
         </div>
     </form>
 </div>
@@ -1001,6 +1001,18 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     font-size:0.92rem;
 }
 .prr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
+.prr-filter-form.is-items .prr-supplier-name {
+    min-width: 13rem !important;
+}
+.prr-filter-form.is-items .prr-product-name {
+    min-width: 14rem !important;
+}
+.prr-filter-form.is-items .prr-items-zero-wrap {
+    padding-bottom: 2px;
+}
+.prr-filter-form.is-items .prr-print-actions {
+    margin-inline-start: 0 !important;
+}
 </style>
 
 <?php

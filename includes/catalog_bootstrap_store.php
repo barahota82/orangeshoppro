@@ -116,6 +116,10 @@ CREATE TABLE IF NOT EXISTS admin_permissions (
   can_view TINYINT(1) NOT NULL DEFAULT 0,
   can_edit TINYINT(1) NOT NULL DEFAULT 0,
   can_delete TINYINT(1) NOT NULL DEFAULT 0,
+  can_lock TINYINT(1) NOT NULL DEFAULT 0,
+  can_unlock TINYINT(1) NOT NULL DEFAULT 0,
+  can_print TINYINT(1) NOT NULL DEFAULT 0,
+  can_export TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (admin_id, resource_key),
   KEY idx_admin_permissions_admin (admin_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
