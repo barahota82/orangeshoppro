@@ -684,11 +684,11 @@ $filterSubtitle = implode(' — ', $subtitleParts);
         <input type="hidden" name="page" value="purchase_reports">
         <input type="hidden" name="r" value="<?php echo htmlspecialchars($reportKey, ENT_QUOTES, 'UTF-8'); ?>">
 
-        <div>
+        <div class="prr-date-field">
             <label for="prr_from">من تاريخ</label>
             <input type="text" id="prr_from" name="from" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($fromDisplay, ENT_QUOTES, 'UTF-8'); ?>">
         </div>
-        <div>
+        <div class="prr-date-field">
             <label for="prr_to">إلى تاريخ</label>
             <input type="text" id="prr_to" name="to" class="admin-inp orange-inp-dmy" lang="en" dir="ltr" value="<?php echo htmlspecialchars($toDisplay, ENT_QUOTES, 'UTF-8'); ?>">
         </div>
@@ -1057,6 +1057,10 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     font-size:0.92rem;
 }
 .prr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
+.prr-filter-form .prr-date-field {
+    flex: 0 0 auto;
+    width: 8.75rem;
+}
 .prr-filter-form #prr_from,
 .prr-filter-form #prr_to {
     width: 8.75rem;
