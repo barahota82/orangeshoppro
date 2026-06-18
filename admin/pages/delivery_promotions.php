@@ -337,16 +337,28 @@ foreach (orange_delivery_promotion_discount_type_values() as $key => $_) {
     window.resetDeliveryPromotionForm = resetDeliveryPromotionForm;
     window.saveDeliveryPromotion = saveDeliveryPromotion;
 
-    document.getElementById('dp_discount_type').addEventListener('change', dpApplyDiscountTypeUi);
-    dpFillDiscountTypeOptions('amount');
-    resetDeliveryPromotionForm();
-    if (!DP_READY) {
-        return;
+    function initDeliveryPromotionsPage() {
+        var discountTypeEl = document.getElementById('dp_discount_type');
+        if (!discountTypeEl) {
+            return;
+        }
+        discountTypeEl.addEventListener('change', dpApplyDiscountTypeUi);
+        dpFillDiscountTypeOptions('amount');
+        resetDeliveryPromotionForm();
+        if (!DP_READY) {
+            return;
+        }
+        loadDeliveryPromotionTargets().catch(function (e) {
+            alert(e.message || String(e));
+        });
+        loadDeliveryPromotions();
     }
-    loadDeliveryPromotionTargets().catch(function (e) {
-        alert(e.message || String(e));
-    });
-    loadDeliveryPromotions();
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDeliveryPromotionsPage);
+    } else {
+        initDeliveryPromotionsPage();
+    }
 })();
 </script>
 
