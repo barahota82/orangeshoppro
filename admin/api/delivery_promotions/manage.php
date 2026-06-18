@@ -204,14 +204,69 @@ try {
     }
     $action = trim((string) ($data['action'] ?? 'list'));
 
-    if (!orange_table_exists($pdo, 'delivery_fee_promotions')) {
-        json_response(['success' => false, 'message' => 'جدول delivery_fee_promotions غير جاهز'], 422);
-    }
-
     $countryId = orange_delivery_areas_api_country_id($pdo, is_array($data) ? $data : []);
     $moneyDecimals = orange_currency_decimals_for_code(
         orange_country_functional_currency_code($pdo, $countryId)
     );
+
+    if ($action === 'get_base_fee') {
+        $policy = orange_delivery_country_policy_read($pdo, $countryId);
+        json_response([
+            'success' => true,
+            'data' => [
+                'default_delivery_fee' => (float) ($policy['default_delivery_fee'] ?? 0.0),
+                'delivery_fee_policy' => (string) ($policy['delivery_fee_policy'] ?? 'paid_all'),
+                'active_areas_count' => orange_delivery_areas_count_active($pdo, $countryId),
+            ],
+        ]);
+    }
+
+    if ($action === 'save_base_fee') {
+        if ($countryId <= 0) {
+            json_response(['success' => false, 'message' => 'الدولة غير محددة'], 422);
+        }
+        $defaultFee = dp_money_non_negative($data['default_delivery_fee'] ?? '', $moneyDecimals);
+        if ($defaultFee === null) {
+            json_response(['success' => false, 'message' => 'قيمة التوصيل الأساسية غير صحيحة'], 422);
+        }
+        $applyActiveAreas = !empty($data['apply_active_areas']);
+        $appliedCount = 0;
+
+        $pdo->beginTransaction();
+        try {
+            $policy = orange_delivery_country_policy_read($pdo, $countryId);
+            $policyCode = orange_delivery_fee_policy_normalize((string) ($policy['delivery_fee_policy'] ?? 'paid_all'));
+            orange_delivery_country_policy_save($pdo, $countryId, (float) $defaultFee, $policyCode);
+            if ($applyActiveAreas) {
+                $appliedCount = orange_delivery_apply_default_fee_to_active_areas($pdo, $countryId, (float) $defaultFee);
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        $saved = orange_delivery_country_policy_read($pdo, $countryId);
+        $msg = $applyActiveAreas
+            ? ('تم حفظ القيمة الأساسية وتحديث ' . $appliedCount . ' منطقة نشطة')
+            : 'تم حفظ القيمة الأساسية للتوصيل';
+        json_response([
+            'success' => true,
+            'message' => $msg,
+            'data' => [
+                'default_delivery_fee' => (float) ($saved['default_delivery_fee'] ?? 0.0),
+                'delivery_fee_policy' => (string) ($saved['delivery_fee_policy'] ?? 'paid_all'),
+                'active_areas_count' => orange_delivery_areas_count_active($pdo, $countryId),
+                'applied_count' => $appliedCount,
+            ],
+        ]);
+    }
+
+    if (!orange_table_exists($pdo, 'delivery_fee_promotions')) {
+        json_response(['success' => false, 'message' => 'جدول delivery_fee_promotions غير جاهز'], 422);
+    }
 
     if ($action === 'list') {
         json_response([

@@ -8,6 +8,21 @@ require_once __DIR__ . '/../../includes/delivery_areas.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $hasTable = orange_table_exists($pdo, 'delivery_fee_promotions');
+$adminCountryId = orange_admin_context_country_id($pdo);
+$dpMoney = isset($orangeAdminMoney) && is_array($orangeAdminMoney)
+    ? $orangeAdminMoney
+    : orange_admin_currency_context($pdo);
+$dpMoneyDecimals = (int) ($dpMoney['decimals'] ?? 3);
+$dpMoneyStep = isset($orangeAdminMoneyStep) && is_string($orangeAdminMoneyStep)
+    ? $orangeAdminMoneyStep
+    : orange_admin_money_input_step($dpMoneyDecimals);
+$dpPolicy = orange_delivery_country_policy_read($pdo, $adminCountryId);
+$dpBaseFeeValue = number_format(
+    max(0.0, (float) ($dpPolicy['default_delivery_fee'] ?? 0.0)),
+    $dpMoneyDecimals,
+    '.',
+    ''
+);
 $discountTypes = [];
 foreach (orange_delivery_promotion_discount_type_values() as $key => $_) {
     $label = 'خصم مبلغ ثابت';
@@ -30,6 +45,28 @@ foreach (orange_delivery_promotion_discount_type_values() as $key => $_) {
     <div class="alert-error">جداول عروض التوصيل غير جاهزة.</div>
 </div>
 <?php endif; ?>
+
+<div class="card">
+    <h3>قيمة التوصيل الأساسية قبل الخصم</h3>
+    <p class="card-hint" style="margin-top:0;">
+        هذه القيمة هي أساس الرسوم قبل أي خصم من عروض التوصيل. يمكنك من هنا تحديث قيمة التوصيل في شاشة المناطق النشطة مباشرة.
+    </p>
+    <div class="admin-form-actions" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+        <div style="min-width:220px;">
+            <label for="dp_base_delivery_fee">قيمة التوصيل الأساسية</label>
+            <input type="number"
+                   id="dp_base_delivery_fee"
+                   min="0"
+                   step="<?php echo htmlspecialchars($dpMoneyStep, ENT_QUOTES, 'UTF-8'); ?>"
+                   lang="en"
+                   dir="ltr"
+                   value="<?php echo htmlspecialchars($dpBaseFeeValue, ENT_QUOTES, 'UTF-8'); ?>">
+        </div>
+        <button type="button" onclick="savePromotionBaseFee(true)" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ + تحديث المناطق النشطة</button>
+        <button type="button" class="btn-secondary" onclick="savePromotionBaseFee(false)" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ كأساس فقط</button>
+        <span id="dp_base_fee_status" class="card-hint"></span>
+    </div>
+</div>
 
 <div class="card">
     <h3>إضافة / تعديل</h3>
@@ -112,6 +149,8 @@ foreach (orange_delivery_promotion_discount_type_values() as $key => $_) {
 (function () {
     var DP_DISCOUNT_TYPES = <?php echo json_encode($discountTypes, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var DP_READY = <?php echo $hasTable ? 'true' : 'false'; ?>;
+    var DP_MONEY_DECIMALS = <?php echo (int) $dpMoneyDecimals; ?>;
+    var DP_BASE_FEE = <?php echo json_encode((float) ($dpPolicy['default_delivery_fee'] ?? 0.0), JSON_UNESCAPED_UNICODE); ?>;
     var DP_GOVS = [];
     var DP_AREAS = [];
     var DP_ROWS = [];
@@ -122,6 +161,77 @@ foreach (orange_delivery_promotion_discount_type_values() as $key => $_) {
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    function dpParseMoney(v) {
+        var raw = String(v == null ? '' : v).trim().replace(',', '.');
+        if (raw === '') return 0;
+        var n = parseFloat(raw);
+        if (!Number.isFinite(n) || n < 0) return NaN;
+        return n;
+    }
+
+    function dpRoundMoney(v) {
+        var n = Number(v);
+        if (!Number.isFinite(n) || n < 0) return 0;
+        var p = Math.pow(10, DP_MONEY_DECIMALS);
+        return Math.round(n * p) / p;
+    }
+
+    function dpFormatMoney(v) {
+        var n = dpRoundMoney(dpParseMoney(v));
+        return n.toFixed(DP_MONEY_DECIMALS);
+    }
+
+    function dpShowBaseFeeStatus(message, isError) {
+        var el = document.getElementById('dp_base_fee_status');
+        if (!el) return;
+        el.textContent = String(message || '');
+        el.style.color = isError ? '#b91c1c' : '#166534';
+    }
+
+    function dpSetBaseFeeForm(data) {
+        var fee = dpRoundMoney(dpParseMoney(data && data.default_delivery_fee != null ? data.default_delivery_fee : 0));
+        DP_BASE_FEE = fee;
+        var input = document.getElementById('dp_base_delivery_fee');
+        if (input) {
+            input.value = dpFormatMoney(fee);
+        }
+    }
+
+    async function loadPromotionBaseFee() {
+        var res = await postJSON('/admin/api/delivery_promotions/manage.php', { action: 'get_base_fee' });
+        if (!res || !res.success) {
+            dpShowBaseFeeStatus((res && res.message) ? res.message : 'تعذر تحميل القيمة الأساسية', true);
+            return;
+        }
+        dpSetBaseFeeForm(res.data || {});
+        dpShowBaseFeeStatus('', false);
+    }
+
+    async function savePromotionBaseFee(applyActiveAreas) {
+        var feeEl = document.getElementById('dp_base_delivery_fee');
+        if (!feeEl) return;
+        var feeVal = dpParseMoney(feeEl.value);
+        if (!Number.isFinite(feeVal) || feeVal < 0) {
+            dpShowBaseFeeStatus('قيمة التوصيل الأساسية غير صحيحة', true);
+            return;
+        }
+        var payload = {
+            action: 'save_base_fee',
+            default_delivery_fee: Number(dpRoundMoney(feeVal).toFixed(DP_MONEY_DECIMALS)),
+            apply_active_areas: applyActiveAreas ? 1 : 0
+        };
+        var res = await postJSON('/admin/api/delivery_promotions/manage.php', payload);
+        if (!res || !res.success) {
+            dpShowBaseFeeStatus((res && res.message) ? res.message : 'تعذر حفظ القيمة الأساسية', true);
+            return;
+        }
+        dpSetBaseFeeForm(res.data || {});
+        dpShowBaseFeeStatus(
+            res.message || (applyActiveAreas ? 'تم تحديث قيمة التوصيل في المناطق النشطة' : 'تم حفظ القيمة الأساسية'),
+            false
+        );
     }
 
     function dpSelectedIds(selectId) {
@@ -336,6 +446,7 @@ foreach (orange_delivery_promotion_discount_type_values() as $key => $_) {
 
     window.resetDeliveryPromotionForm = resetDeliveryPromotionForm;
     window.saveDeliveryPromotion = saveDeliveryPromotion;
+    window.savePromotionBaseFee = savePromotionBaseFee;
 
     function initDeliveryPromotionsPage() {
         var discountTypeEl = document.getElementById('dp_discount_type');
@@ -348,6 +459,9 @@ foreach (orange_delivery_promotion_discount_type_values() as $key => $_) {
         if (!DP_READY) {
             return;
         }
+        loadPromotionBaseFee().catch(function (e) {
+            dpShowBaseFeeStatus((e && e.message) ? e.message : String(e), true);
+        });
         loadDeliveryPromotionTargets().catch(function (e) {
             alert(e.message || String(e));
         });
