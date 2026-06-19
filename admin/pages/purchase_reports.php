@@ -934,20 +934,29 @@ $companyCr = (string) ($company['commercial_register'] ?? '');
 $todayDmY = orange_format_date_dmY($today);
 $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $reportTitle = $reports[$reportKey];
+$headerSupplierSummary = $supplierId > 0 && isset($supplierMap[$supplierId])
+    ? (string) $supplierMap[$supplierId]
+    : 'الكل';
+$headerInvoiceTypeSummary = $invoiceTypeFilter === 'all'
+    ? 'الكل'
+    : $purchaseTypeLabel($invoiceTypeFilter);
+$headerPaymentStatusSummary = $paymentStatusFilter === 'all'
+    ? 'الكل'
+    : $paymentStatusLabel($paymentStatusFilter);
 
 $subtitleParts = [
     'من ' . orange_format_date_dmY($fromDate) . ' إلى ' . orange_format_date_dmY($toDate),
 ];
-if ($supplierId > 0 && isset($supplierMap[$supplierId])) {
+if ($reportKey !== 'suppliers' && $supplierId > 0 && isset($supplierMap[$supplierId])) {
     $subtitleParts[] = 'المورد: ' . $supplierMap[$supplierId];
 }
 if ($productId > 0 && isset($productMap[$productId])) {
     $subtitleParts[] = 'الصنف: ' . (string) ($productMap[$productId]['name'] ?? '');
 }
-if ($invoiceTypeFilter !== 'all') {
+if ($reportKey !== 'suppliers' && $invoiceTypeFilter !== 'all') {
     $subtitleParts[] = 'نوع الفاتورة: ' . $purchaseTypeLabel($invoiceTypeFilter);
 }
-if ($paymentStatusFilter !== 'all') {
+if ($reportKey !== 'suppliers' && $paymentStatusFilter !== 'all') {
     $subtitleParts[] = 'حالة السداد: ' . $paymentStatusLabel($paymentStatusFilter);
 }
 if ($reportKey === 'suppliers') {
@@ -1086,6 +1095,22 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                 <span class="gl-acc-stmt-print-title-ar" lang="ar"><?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?></span>
                 <span class="bs-report-asof" lang="ar"><?php echo htmlspecialchars($filterSubtitle, ENT_QUOTES, 'UTF-8'); ?></span>
             </h2>
+            <?php if ($reportKey === 'suppliers'): ?>
+                <div class="prr-report-filter-row" lang="ar">
+                    <div class="prr-report-filter-cell">
+                        <span class="prr-report-filter-label">المورد</span>
+                        <span class="prr-report-filter-value"><?php echo htmlspecialchars($headerSupplierSummary, ENT_QUOTES, 'UTF-8'); ?></span>
+                    </div>
+                    <div class="prr-report-filter-cell">
+                        <span class="prr-report-filter-label">نوع الفاتورة</span>
+                        <span class="prr-report-filter-value"><?php echo htmlspecialchars($headerInvoiceTypeSummary, ENT_QUOTES, 'UTF-8'); ?></span>
+                    </div>
+                    <div class="prr-report-filter-cell">
+                        <span class="prr-report-filter-label">حالة السداد</span>
+                        <span class="prr-report-filter-value"><?php echo htmlspecialchars($headerPaymentStatusSummary, ENT_QUOTES, 'UTF-8'); ?></span>
+                    </div>
+                </div>
+            <?php endif; ?>
         </header>
 
         <?php if ($reportError !== ''): ?>
@@ -1461,6 +1486,37 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     font-size:0.92rem;
 }
 .prr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
+.prr-report-filter-row {
+    margin-top: 8px;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+.prr-report-filter-cell {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #f8fafc;
+    padding: 4px 8px;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.prr-report-filter-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+}
+.prr-report-filter-value {
+    font-size: 0.82rem;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .prr-filter-form .prr-main-row {
     flex-basis: 100%;
     display: flex;
@@ -1579,6 +1635,24 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 .prr-monthly-table .prr-mon-col-month { width: 26%; }
 .prr-monthly-table .prr-mon-col-count { width: 10%; }
 .prr-monthly-table .prr-mon-col-money { width: 18%; }
+@media (max-width: 960px) {
+    .prr-report-filter-row {
+        grid-template-columns: 1fr;
+    }
+}
+@media print {
+    .prr-report-filter-row {
+        margin-top: 6px;
+        gap: 6px;
+    }
+    .prr-report-filter-cell {
+        padding: 3px 6px;
+    }
+    .prr-report-filter-label,
+    .prr-report-filter-value {
+        font-size: 0.78rem;
+    }
+}
 </style>
 
 <?php
