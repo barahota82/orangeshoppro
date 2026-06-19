@@ -943,6 +943,7 @@ $headerInvoiceTypeSummary = $invoiceTypeFilter === 'all'
 $headerPaymentStatusSummary = $paymentStatusFilter === 'all'
     ? 'الكل'
     : $paymentStatusLabel($paymentStatusFilter);
+$hideSupplierColumnInSuppliersReport = $reportKey === 'suppliers' && $supplierId > 0;
 
 $subtitleParts = [
     'من ' . orange_format_date_dmY($fromDate) . ' إلى ' . orange_format_date_dmY($toDate),
@@ -1144,25 +1145,47 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     </colgroup>
                 <?php elseif ($reportKey === 'suppliers'): ?>
                     <?php if ($supplierDetailed): ?>
-                        <colgroup>
-                            <col class="prr-supd-col-name">
-                            <col class="prr-supd-col-doc">
-                            <col class="prr-supd-col-invoice">
-                            <col class="prr-supd-col-ref">
-                            <col class="prr-supd-col-date">
-                            <col class="prr-supd-col-money">
-                            <col class="prr-supd-col-money">
-                            <col class="prr-supd-col-money">
-                        </colgroup>
+                        <?php if ($hideSupplierColumnInSuppliersReport): ?>
+                            <colgroup>
+                                <col class="prr-supd-nosup-col-doc">
+                                <col class="prr-supd-nosup-col-invoice">
+                                <col class="prr-supd-nosup-col-ref">
+                                <col class="prr-supd-nosup-col-date">
+                                <col class="prr-supd-nosup-col-money">
+                                <col class="prr-supd-nosup-col-money">
+                                <col class="prr-supd-nosup-col-money">
+                            </colgroup>
+                        <?php else: ?>
+                            <colgroup>
+                                <col class="prr-supd-col-name">
+                                <col class="prr-supd-col-doc">
+                                <col class="prr-supd-col-invoice">
+                                <col class="prr-supd-col-ref">
+                                <col class="prr-supd-col-date">
+                                <col class="prr-supd-col-money">
+                                <col class="prr-supd-col-money">
+                                <col class="prr-supd-col-money">
+                            </colgroup>
+                        <?php endif; ?>
                     <?php else: ?>
-                        <colgroup>
-                            <col class="prr-sup-col-name">
-                            <col class="prr-sup-col-count">
-                            <col class="prr-sup-col-money">
-                            <col class="prr-sup-col-count">
-                            <col class="prr-sup-col-money">
-                            <col class="prr-sup-col-money">
-                        </colgroup>
+                        <?php if ($hideSupplierColumnInSuppliersReport): ?>
+                            <colgroup>
+                                <col class="prr-sup-nosup-col-count">
+                                <col class="prr-sup-nosup-col-money">
+                                <col class="prr-sup-nosup-col-count">
+                                <col class="prr-sup-nosup-col-money">
+                                <col class="prr-sup-nosup-col-money">
+                            </colgroup>
+                        <?php else: ?>
+                            <colgroup>
+                                <col class="prr-sup-col-name">
+                                <col class="prr-sup-col-count">
+                                <col class="prr-sup-col-money">
+                                <col class="prr-sup-col-count">
+                                <col class="prr-sup-col-money">
+                                <col class="prr-sup-col-money">
+                            </colgroup>
+                        <?php endif; ?>
                     <?php endif; ?>
                 <?php elseif ($reportKey === 'items'): ?>
                     <colgroup>
@@ -1280,9 +1303,15 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     </tfoot>
                 <?php elseif ($reportKey === 'suppliers'): ?>
                     <?php if ($supplierDetailed): ?>
+                        <?php
+                        $supplierDetailColspan = $hideSupplierColumnInSuppliersReport ? 7 : 8;
+                        $supplierDetailFooterColspan = $hideSupplierColumnInSuppliersReport ? 4 : 5;
+                        ?>
                         <thead>
                         <tr>
-                            <th>المورد</th>
+                            <?php if (!$hideSupplierColumnInSuppliersReport): ?>
+                                <th>المورد</th>
+                            <?php endif; ?>
                             <th>نوع السند</th>
                             <th>رقم الفاتورة</th>
                             <th>المرجع</th>
@@ -1294,10 +1323,12 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         </thead>
                         <tbody>
                         <?php if ($rows === []): ?>
-                            <tr><td colspan="8" class="muted">لا توجد تفاصيل فواتير/مردود الموردين في المدى المحدد.</td></tr>
+                            <tr><td colspan="<?php echo (int) $supplierDetailColspan; ?>" class="muted">لا توجد تفاصيل فواتير/مردود الموردين في المدى المحدد.</td></tr>
                         <?php else: foreach ($rows as $r): ?>
                             <tr>
-                                <td><?php echo htmlspecialchars((string) $r['supplier'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <?php if (!$hideSupplierColumnInSuppliersReport): ?>
+                                    <td><?php echo htmlspecialchars((string) $r['supplier'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <?php endif; ?>
                                 <td><?php echo htmlspecialchars((string) $r['doc_type'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td dir="ltr">
                                     <?php if ((string) ($r['invoice_url'] ?? '') !== '' && (string) ($r['invoice_number'] ?? '') !== '—'): ?>
@@ -1322,16 +1353,19 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         </tbody>
                         <tfoot>
                         <tr>
-                            <th colspan="5">الإجمالي — شراء: <?php echo (int) $supplierSummary['purchase_count']; ?> | مردود: <?php echo (int) $supplierSummary['return_count']; ?></th>
+                            <th colspan="<?php echo (int) $supplierDetailFooterColspan; ?>">الإجمالي — شراء: <?php echo (int) $supplierSummary['purchase_count']; ?> | مردود: <?php echo (int) $supplierSummary['return_count']; ?></th>
                             <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierDetailTotals['subtotal']); ?></th>
                             <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierDetailTotals['discount']); ?></th>
                             <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierDetailTotals['net']); ?></th>
                         </tr>
                         </tfoot>
                     <?php else: ?>
+                        <?php $supplierSummaryColspan = $hideSupplierColumnInSuppliersReport ? 5 : 6; ?>
                         <thead>
                         <tr>
-                            <th>المورد</th>
+                            <?php if (!$hideSupplierColumnInSuppliersReport): ?>
+                                <th>المورد</th>
+                            <?php endif; ?>
                             <th class="gl-acc-stmt-col-num">عدد فواتير الشراء</th>
                             <th class="gl-acc-stmt-col-num">صافي المشتريات</th>
                             <th class="gl-acc-stmt-col-num">عدد المردودات</th>
@@ -1341,10 +1375,12 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         </thead>
                         <tbody>
                         <?php if ($rows === []): ?>
-                            <tr><td colspan="6" class="muted">لا توجد بيانات موردين في المدى المحدد.</td></tr>
+                            <tr><td colspan="<?php echo (int) $supplierSummaryColspan; ?>" class="muted">لا توجد بيانات موردين في المدى المحدد.</td></tr>
                         <?php else: foreach ($rows as $r): ?>
                             <tr>
-                                <td><?php echo htmlspecialchars((string) $r['supplier'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <?php if (!$hideSupplierColumnInSuppliersReport): ?>
+                                    <td><?php echo htmlspecialchars((string) $r['supplier'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <?php endif; ?>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['purchase_count']; ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $r['purchase_net']); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['return_count']; ?></td>
@@ -1354,14 +1390,27 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                         <?php endforeach; endif; ?>
                         </tbody>
                         <tfoot>
-                        <tr>
-                            <th>الإجمالي</th>
-                            <th class="gl-acc-stmt-col-num"><?php echo (int) $supplierSummary['purchase_count']; ?></th>
-                            <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['purchase_net']); ?></th>
-                            <th class="gl-acc-stmt-col-num"><?php echo (int) $supplierSummary['return_count']; ?></th>
-                            <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['return_net']); ?></th>
-                            <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['net']); ?></th>
-                        </tr>
+                        <?php if ($hideSupplierColumnInSuppliersReport): ?>
+                            <tr>
+                                <th colspan="5">الإجمالي</th>
+                            </tr>
+                            <tr>
+                                <th class="gl-acc-stmt-col-num"><?php echo (int) $supplierSummary['purchase_count']; ?></th>
+                                <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['purchase_net']); ?></th>
+                                <th class="gl-acc-stmt-col-num"><?php echo (int) $supplierSummary['return_count']; ?></th>
+                                <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['return_net']); ?></th>
+                                <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['net']); ?></th>
+                            </tr>
+                        <?php else: ?>
+                            <tr>
+                                <th>الإجمالي</th>
+                                <th class="gl-acc-stmt-col-num"><?php echo (int) $supplierSummary['purchase_count']; ?></th>
+                                <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['purchase_net']); ?></th>
+                                <th class="gl-acc-stmt-col-num"><?php echo (int) $supplierSummary['return_count']; ?></th>
+                                <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['return_net']); ?></th>
+                                <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $supplierSummary['net']); ?></th>
+                            </tr>
+                        <?php endif; ?>
                         </tfoot>
                     <?php endif; ?>
                 <?php elseif ($reportKey === 'items'): ?>
@@ -1616,6 +1665,13 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 .prr-suppliers-detail-table .prr-supd-col-ref { width: 14%; }
 .prr-suppliers-detail-table .prr-supd-col-date { width: 10%; }
 .prr-suppliers-detail-table .prr-supd-col-money { width: 9.333%; }
+.prr-suppliers-detail-table .prr-supd-nosup-col-doc { width: 15%; }
+.prr-suppliers-detail-table .prr-supd-nosup-col-invoice { width: 16%; }
+.prr-suppliers-detail-table .prr-supd-nosup-col-ref { width: 18%; }
+.prr-suppliers-detail-table .prr-supd-nosup-col-date { width: 12%; }
+.prr-suppliers-detail-table .prr-supd-nosup-col-money { width: 13%; }
+.prr-suppliers-table .prr-sup-nosup-col-count { width: 14%; }
+.prr-suppliers-table .prr-sup-nosup-col-money { width: 24%; }
 .prr-items-table {
     table-layout: fixed;
     min-width: 82rem;
