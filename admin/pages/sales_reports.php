@@ -1820,6 +1820,10 @@ if ($returnsServerExport && $reportError === '') {
     flex-basis: 100%;
     justify-content: flex-end;
 }
+.gl-acc-stmt-print {
+    --or-report-qty-col-width: 8ch;
+    --or-report-money-col-width: 11ch;
+}
 .srr-doc-table {
     table-layout: fixed;
     min-width: 78rem;
@@ -1829,7 +1833,7 @@ if ($returnsServerExport && $reportError === '') {
 .srr-doc-table .srr-inv-col-customer { width: 24%; }
 .srr-doc-table .srr-inv-col-source { width: 11%; }
 .srr-doc-table .srr-inv-col-pay { width: 11%; }
-.srr-doc-table .srr-inv-col-money { width: 11.333%; }
+.srr-doc-table .srr-inv-col-money { width: var(--or-report-money-col-width); min-width: var(--or-report-money-col-width); }
 .srr-doc-table .srr-ret-col-ref { width: 11%; }
 .srr-doc-table .srr-ret-col-date { width: 9%; }
 .srr-doc-table .srr-ret-col-customer { width: 19%; }
@@ -1837,14 +1841,14 @@ if ($returnsServerExport && $reportError === '') {
 .srr-doc-table .srr-ret-col-source { width: 9%; }
 .srr-doc-table .srr-ret-col-pay { width: 10%; }
 .srr-doc-table .srr-ret-col-channel { width: 15%; }
-.srr-doc-table .srr-ret-col-net { width: 14%; }
+.srr-doc-table .srr-ret-col-net { width: var(--or-report-money-col-width); min-width: var(--or-report-money-col-width); }
 .srr-customers-table {
     table-layout: fixed;
     min-width: 64rem;
 }
 .srr-customers-table .srr-cus-col-name { width: 34%; }
-.srr-customers-table .srr-cus-col-count { width: 10%; }
-.srr-customers-table .srr-cus-col-money { width: 15.333%; }
+.srr-customers-table .srr-cus-col-count { width: var(--or-report-qty-col-width); min-width: var(--or-report-qty-col-width); }
+.srr-customers-table .srr-cus-col-money { width: var(--or-report-money-col-width); min-width: var(--or-report-money-col-width); }
 .srr-customers-detail-table {
     min-width: 90rem;
 }
@@ -1856,7 +1860,7 @@ if ($returnsServerExport && $reportError === '') {
 .srr-customers-detail-table .srr-cusd-col-source { width: 8%; }
 .srr-customers-detail-table .srr-cusd-col-pay { width: 10%; }
 .srr-customers-detail-table .srr-cusd-col-channel { width: 13%; }
-.srr-customers-detail-table .srr-cusd-col-net { width: 10%; }
+.srr-customers-detail-table .srr-cusd-col-net { width: var(--or-report-money-col-width); min-width: var(--or-report-money-col-width); }
 .srr-items-table {
     table-layout: fixed;
     min-width: 82rem;
@@ -1864,15 +1868,15 @@ if ($returnsServerExport && $reportError === '') {
 .srr-items-table .srr-item-col-code { width: 10%; }
 .srr-items-table .srr-item-col-name { width: 24%; }
 .srr-items-table .srr-item-col-variant { width: 16%; }
-.srr-items-table .srr-item-col-qty { width: 7%; }
-.srr-items-table .srr-item-col-money { width: 9.666%; }
+.srr-items-table .srr-item-col-qty { width: var(--or-report-qty-col-width); min-width: var(--or-report-qty-col-width); }
+.srr-items-table .srr-item-col-money { width: var(--or-report-money-col-width); min-width: var(--or-report-money-col-width); }
 .srr-monthly-table {
     table-layout: fixed;
     min-width: 58rem;
 }
 .srr-monthly-table .srr-mon-col-month { width: 26%; }
-.srr-monthly-table .srr-mon-col-count { width: 10%; }
-.srr-monthly-table .srr-mon-col-money { width: 18%; }
+.srr-monthly-table .srr-mon-col-count { width: var(--or-report-qty-col-width); min-width: var(--or-report-qty-col-width); }
+.srr-monthly-table .srr-mon-col-money { width: var(--or-report-money-col-width); min-width: var(--or-report-money-col-width); }
 .srr-return-analytics {
     margin-top: 12px;
     display: grid;

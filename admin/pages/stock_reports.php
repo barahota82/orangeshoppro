@@ -1061,7 +1061,7 @@ $reportTitle = $reports[$reportKey];
                 <?php elseif ($reportKey === 'stagnant'): ?>
                     <colgroup><col class="srw-code"><col><col class="srw-variant"><col class="srw-qty"><col class="srw-date"><col class="srw-mtype"></colgroup>
                 <?php elseif ($reportKey === 'valuation'): ?>
-                    <colgroup><col class="srw-code"><col><col class="srw-qty"><col style="width:7rem"><col style="width:8.5rem"><?php if ($valShowPrev): ?><col style="width:8.5rem"><?php endif; ?></colgroup>
+                    <colgroup><col class="srw-code"><col><col class="srw-qty"><col class="srw-money"><col class="srw-money"><?php if ($valShowPrev): ?><col class="srw-money"><?php endif; ?></colgroup>
                 <?php endif; ?>
                 <?php if ($reportKey === 'items'): ?>
                     <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num">عدد المتغيرات</th><th class="gl-acc-stmt-col-num">إجمالي الرصيد</th><th>الحالة</th></tr></thead>
@@ -1130,7 +1130,7 @@ $reportTitle = $reports[$reportKey];
                     </tr></tfoot>
                 <?php elseif ($reportKey === 'valuation'): ?>
                     <?php $valCols = $valShowPrev ? 6 : 5; ?>
-                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num sr-col-qty">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة الحالية</th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num">نهاية <?php echo htmlspecialchars(orange_format_date_dmY($valPrevEnd), ENT_QUOTES, 'UTF-8'); ?></th><?php endif; ?></tr></thead>
+                    <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="gl-acc-stmt-col-num sr-col-qty">الكمية</th><th class="gl-acc-stmt-col-num sr-col-money">التكلفة</th><th class="gl-acc-stmt-col-num sr-col-money">القيمة الحالية</th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num sr-col-money">نهاية <?php echo htmlspecialchars(orange_format_date_dmY($valPrevEnd), ENT_QUOTES, 'UTF-8'); ?></th><?php endif; ?></tr></thead>
                     <tbody>
                         <?php if ($valGroups === []): ?>
                             <tr><td colspan="<?php echo (int) $valCols; ?>" class="muted">لا أصناف.</td></tr>
@@ -1141,9 +1141,9 @@ $reportTitle = $reports[$reportKey];
                                 <td dir="ltr" class="sr-code-cell"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['cost']); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['value']); ?></td>
-                                <?php if ($valShowPrev): ?><td class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney((float) $r['value_prev']); ?></td><?php endif; ?>
+                                <td class="gl-acc-stmt-col-num sr-col-money"><?php echo $reportFmtMoney((float) $r['cost']); ?></td>
+                                <td class="gl-acc-stmt-col-num sr-col-money"><?php echo $reportFmtMoney((float) $r['value']); ?></td>
+                                <?php if ($valShowPrev): ?><td class="gl-acc-stmt-col-num sr-col-money"><?php echo $reportFmtMoney((float) $r['value_prev']); ?></td><?php endif; ?>
                             </tr>
                             <?php endforeach; ?>
                             <tr class="ta-report-subtotal">
@@ -1151,12 +1151,12 @@ $reportTitle = $reports[$reportKey];
                                 <td><strong>إجمالي <?php echo htmlspecialchars((string) $catName, ENT_QUOTES, 'UTF-8'); ?></strong></td>
                                 <td class="gl-acc-stmt-col-num">—</td>
                                 <td class="gl-acc-stmt-col-num">—</td>
-                                <td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmtMoney((float) $grp['sub_value']); ?></strong></td>
-                                <?php if ($valShowPrev): ?><td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmtMoney((float) $grp['sub_value_prev']); ?></strong></td><?php endif; ?>
+                                <td class="gl-acc-stmt-col-num sr-col-money"><strong><?php echo $reportFmtMoney((float) $grp['sub_value']); ?></strong></td>
+                                <?php if ($valShowPrev): ?><td class="gl-acc-stmt-col-num sr-col-money"><strong><?php echo $reportFmtMoney((float) $grp['sub_value_prev']); ?></strong></td><?php endif; ?>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
-                    <tfoot><tr><th colspan="2">الإجمالي العام</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th class="gl-acc-stmt-col-num">—</th><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValue); ?></th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num"><?php echo $reportFmtMoney($grandValuePrev); ?></th><?php endif; ?></tr></tfoot>
+                    <tfoot><tr><th colspan="2">الإجمالي العام</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th class="gl-acc-stmt-col-num sr-col-money">—</th><th class="gl-acc-stmt-col-num sr-col-money"><?php echo $reportFmtMoney($grandValue); ?></th><?php if ($valShowPrev): ?><th class="gl-acc-stmt-col-num sr-col-money"><?php echo $reportFmtMoney($grandValuePrev); ?></th><?php endif; ?></tr></tfoot>
                 <?php elseif ($reportKey === 'low'): ?>
                     <thead><tr><th class="sr-code-cell">الكود</th><th>الصنف</th><th class="sr-col-variant">اللون / المقاس</th><th class="gl-acc-stmt-col-num sr-col-qty">الرصيد</th><th>آخر مورد</th></tr></thead>
                     <tbody>
@@ -1294,6 +1294,10 @@ $reportTitle = $reports[$reportKey];
 .sr-tabs { display:flex; flex-wrap:wrap; gap:8px; }
 .sr-tab { padding:7px 14px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; color:#334155; text-decoration:none; font-size:0.92rem; }
 .sr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
+.gl-acc-stmt-print-sheet {
+    --or-report-qty-col-width: 8ch;
+    --or-report-money-col-width: 11ch;
+}
 .sr-move-row { cursor:pointer; }
 .sr-move-row:hover { background:#eff6ff; }
 .sr-sign-row { display:flex; justify-content:space-between; gap:32px; margin-top:48px; padding:0 8px; break-inside:avoid; page-break-inside:avoid; }
@@ -1307,14 +1311,27 @@ $reportTitle = $reports[$reportKey];
 .srw-code { width:9.5rem; }
 .srw-variant { width:12rem; }
 .srw-bal-variant { width:12rem; }
-.srw-qty { width:6rem; }
-.srw-actual { width:8rem; }
-.srw-res { width:5rem; }
+.srw-qty { width:var(--or-report-qty-col-width); }
+.srw-actual { width:var(--or-report-qty-col-width); }
+.srw-res { width:var(--or-report-qty-col-width); }
+.srw-money { width:var(--or-report-money-col-width); }
 .srw-supplier { width:16rem; }
 .srw-date { width:8.5rem; }
 .srw-mtype { width:10rem; }
-.srw-varcount { width:15rem; }
+.srw-varcount { width:var(--or-report-qty-col-width); }
 .srw-status { width:6rem; }
+.gl-acc-stmt-table th.sr-col-qty,
+.gl-acc-stmt-table td.sr-col-qty,
+.gl-acc-stmt-table.sr-grouped-cols th.sr-col-qty,
+.gl-acc-stmt-table.sr-grouped-cols td.sr-col-qty {
+    width: var(--or-report-qty-col-width);
+    min-width: var(--or-report-qty-col-width);
+}
+.gl-acc-stmt-table th.sr-col-money,
+.gl-acc-stmt-table td.sr-col-money {
+    width: var(--or-report-money-col-width);
+    min-width: var(--or-report-money-col-width);
+}
 @media print {
     /* توحيد عرض الطباعة لكل التقارير: الكود 9.5rem (يتّسع لـ14 رقماً)، الكميات 4.2rem،
        اللون/المقاس 10rem. تقرير الجرد مستثنى (srw-bal-variant + srw-actual + srw-res). */
