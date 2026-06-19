@@ -959,9 +959,6 @@ if ($reportKey !== 'suppliers' && $invoiceTypeFilter !== 'all') {
 if ($reportKey !== 'suppliers' && $paymentStatusFilter !== 'all') {
     $subtitleParts[] = 'حالة السداد: ' . $paymentStatusLabel($paymentStatusFilter);
 }
-if ($reportKey === 'suppliers') {
-    $subtitleParts[] = $supplierDetailed ? 'الوضع: تفصيلي' : 'الوضع: إجمالي';
-}
 $filterSubtitle = implode(' — ', $subtitleParts);
 
 ?>
