@@ -1661,8 +1661,8 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 }
 .prr-suppliers-detail-table .prr-supd-col-name { width: 18%; }
 .prr-suppliers-detail-table .prr-supd-col-doc { width: 8.5rem; min-width: 8.5rem; }
-.prr-suppliers-detail-table .prr-supd-col-invoice { width: 14%; }
-.prr-suppliers-detail-table .prr-supd-col-ref { width: 18%; }
+.prr-suppliers-detail-table .prr-supd-col-invoice { width: 12%; }
+.prr-suppliers-detail-table .prr-supd-col-ref { width: 14%; }
 .prr-suppliers-detail-table .prr-supd-col-date { width: 10%; }
 .prr-suppliers-detail-table .prr-supd-col-money { width: 9.333%; }
 .prr-suppliers-detail-table .prr-supd-nosup-col-doc { width: 8.5rem; min-width: 8.5rem; }
