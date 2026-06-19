@@ -1537,10 +1537,6 @@ $filterSubtitle = implode(' — ', $subtitleParts);
     flex-basis: 100%;
     justify-content: flex-end;
 }
-.prr-print-area {
-    --or-report-qty-col-width: 8ch;
-    --or-report-money-col-width: 11ch;
-}
 .prr-doc-table {
     table-layout: fixed;
     min-width: 72rem;
@@ -1550,14 +1546,14 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 .prr-doc-table .prr-col-supplier { width: 25%; }
 .prr-doc-table .prr-col-supplier-doc { width: 13%; }
 .prr-doc-table .prr-col-type { width: 11%; }
-.prr-doc-table .prr-col-money { width: var(--or-report-money-col-width); min-width: var(--or-report-money-col-width); }
+.prr-doc-table .prr-col-money { width: 10.666%; }
 .prr-suppliers-table {
     table-layout: fixed;
     min-width: 64rem;
 }
 .prr-suppliers-table .prr-sup-col-name { width: 34%; }
-.prr-suppliers-table .prr-sup-col-count { width: var(--or-report-qty-col-width); min-width: var(--or-report-qty-col-width); }
-.prr-suppliers-table .prr-sup-col-money { width: var(--or-report-money-col-width); min-width: var(--or-report-money-col-width); }
+.prr-suppliers-table .prr-sup-col-count { width: 10%; }
+.prr-suppliers-table .prr-sup-col-money { width: 15.333%; }
 .prr-suppliers-detail-table {
     min-width: 80rem;
 }
@@ -1566,7 +1562,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 .prr-suppliers-detail-table .prr-supd-col-invoice { width: 12%; }
 .prr-suppliers-detail-table .prr-supd-col-ref { width: 14%; }
 .prr-suppliers-detail-table .prr-supd-col-date { width: 10%; }
-.prr-suppliers-detail-table .prr-supd-col-money { width: var(--or-report-money-col-width); min-width: var(--or-report-money-col-width); }
+.prr-suppliers-detail-table .prr-supd-col-money { width: 9.333%; }
 .prr-items-table {
     table-layout: fixed;
     min-width: 82rem;
@@ -1574,15 +1570,15 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 .prr-items-table .prr-item-col-code { width: 10%; }
 .prr-items-table .prr-item-col-name { width: 24%; }
 .prr-items-table .prr-item-col-variant { width: 16%; }
-.prr-items-table .prr-item-col-qty { width: var(--or-report-qty-col-width); min-width: var(--or-report-qty-col-width); }
-.prr-items-table .prr-item-col-money { width: var(--or-report-money-col-width); min-width: var(--or-report-money-col-width); }
+.prr-items-table .prr-item-col-qty { width: 7%; }
+.prr-items-table .prr-item-col-money { width: 9.666%; }
 .prr-monthly-table {
     table-layout: fixed;
     min-width: 58rem;
 }
 .prr-monthly-table .prr-mon-col-month { width: 26%; }
-.prr-monthly-table .prr-mon-col-count { width: var(--or-report-qty-col-width); min-width: var(--or-report-qty-col-width); }
-.prr-monthly-table .prr-mon-col-money { width: var(--or-report-money-col-width); min-width: var(--or-report-money-col-width); }
+.prr-monthly-table .prr-mon-col-count { width: 10%; }
+.prr-monthly-table .prr-mon-col-money { width: 18%; }
 </style>
 
 <?php
