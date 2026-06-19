@@ -1406,8 +1406,30 @@ if ($returnsServerExport && $reportError === '') {
         <?php endif; ?>
 
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <table class="admin-fy-table gl-acc-stmt-table ta-report-table" data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".srr-print-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
+            <?php
+            $srrTableClass = '';
+            if ($tab === 'invoices' || $tab === 'returns') {
+                $srrTableClass = ' srr-doc-table';
+            } elseif ($tab === 'customers') {
+                $srrTableClass = $customerDetailed ? ' srr-customers-table srr-customers-detail-table' : ' srr-customers-table';
+            } elseif ($tab === 'items') {
+                $srrTableClass = ' srr-items-table';
+            } elseif ($tab === 'monthly') {
+                $srrTableClass = ' srr-monthly-table';
+            }
+            ?>
+            <table class="admin-fy-table gl-acc-stmt-table ta-report-table<?php echo $srrTableClass; ?>" data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".srr-print-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                 <?php if ($tab === 'invoices'): ?>
+                    <colgroup>
+                        <col class="srr-inv-col-ref">
+                        <col class="srr-inv-col-date">
+                        <col class="srr-inv-col-customer">
+                        <col class="srr-inv-col-source">
+                        <col class="srr-inv-col-pay">
+                        <col class="srr-inv-col-money">
+                        <col class="srr-inv-col-money">
+                        <col class="srr-inv-col-money">
+                    </colgroup>
                     <thead><tr><th>المرجع</th><th>التاريخ</th><th>العميل</th><th>المصدر</th><th>التحصيل</th><th class="gl-acc-stmt-col-num">الإجمالي</th><th class="gl-acc-stmt-col-num">الخصم</th><th class="gl-acc-stmt-col-num">الصافي</th></tr></thead>
                     <tbody>
                     <?php if ($rows === []): ?><tr><td colspan="8" class="muted">لا توجد فواتير مبيعات في المدى المحدد.</td></tr>
@@ -1432,6 +1454,16 @@ if ($returnsServerExport && $reportError === '') {
                     </tbody>
                     <tfoot><tr><th colspan="5">الإجمالي (<?php echo (int) $invoiceSummary['count']; ?>)</th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['subtotal']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['discount']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['net']); ?></th></tr></tfoot>
                 <?php elseif ($tab === 'returns'): ?>
+                    <colgroup>
+                        <col class="srr-ret-col-ref">
+                        <col class="srr-ret-col-date">
+                        <col class="srr-ret-col-customer">
+                        <col class="srr-ret-col-invoice">
+                        <col class="srr-ret-col-source">
+                        <col class="srr-ret-col-pay">
+                        <col class="srr-ret-col-channel">
+                        <col class="srr-ret-col-net">
+                    </colgroup>
                     <thead><tr><th>مرجع المردود</th><th>التاريخ</th><th>العميل</th><th>مرجع الفاتورة</th><th>المصدر</th><th>التحصيل</th><th>قناة التسويق</th><th class="gl-acc-stmt-col-num">الصافي</th></tr></thead>
                     <tbody>
                     <?php if ($rows === []): ?><tr><td colspan="8" class="muted">لا توجد مردودات مبيعات في المدى المحدد.</td></tr>
@@ -1457,6 +1489,17 @@ if ($returnsServerExport && $reportError === '') {
                     <tfoot><tr><th colspan="7">الإجمالي (<?php echo (int) $returnSummary['count']; ?>)</th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $returnSummary['total']); ?></th></tr></tfoot>
                 <?php elseif ($tab === 'customers'): ?>
                     <?php if ($customerDetailed): ?>
+                        <colgroup>
+                            <col class="srr-cusd-col-name">
+                            <col class="srr-cusd-col-doc">
+                            <col class="srr-cusd-col-ref">
+                            <col class="srr-cusd-col-invoice">
+                            <col class="srr-cusd-col-date">
+                            <col class="srr-cusd-col-source">
+                            <col class="srr-cusd-col-pay">
+                            <col class="srr-cusd-col-channel">
+                            <col class="srr-cusd-col-net">
+                        </colgroup>
                         <thead><tr><th>العميل</th><th>نوع السند</th><th>المرجع</th><th>مرجع الفاتورة</th><th>التاريخ</th><th>المصدر</th><th>قناة التحصيل</th><th>قناة التسويق</th><th class="gl-acc-stmt-col-num">الصافي</th></tr></thead>
                         <tbody>
                         <?php if ($rows === []): ?><tr><td colspan="9" class="muted">لا توجد حركات عملاء في المدى المحدد.</td></tr>
@@ -1487,6 +1530,14 @@ if ($returnsServerExport && $reportError === '') {
                             </tr>
                         </tfoot>
                     <?php else: ?>
+                        <colgroup>
+                            <col class="srr-cus-col-name">
+                            <col class="srr-cus-col-count">
+                            <col class="srr-cus-col-money">
+                            <col class="srr-cus-col-count">
+                            <col class="srr-cus-col-money">
+                            <col class="srr-cus-col-money">
+                        </colgroup>
                         <thead><tr><th>العميل</th><th class="gl-acc-stmt-col-num">عدد فواتير المبيعات</th><th class="gl-acc-stmt-col-num">صافي المبيعات</th><th class="gl-acc-stmt-col-num">عدد المردودات</th><th class="gl-acc-stmt-col-num">صافي المردودات</th><th class="gl-acc-stmt-col-num">الصافي بعد المردود</th></tr></thead>
                         <tbody>
                         <?php if ($rows === []): ?><tr><td colspan="6" class="muted">لا توجد بيانات عملاء في المدى المحدد.</td></tr>
@@ -1504,6 +1555,17 @@ if ($returnsServerExport && $reportError === '') {
                         <tfoot><tr><th>الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $customerSummary['sales_count']; ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $customerSummary['sales_total']); ?></th><th class="gl-acc-stmt-col-num"><?php echo (int) $customerSummary['return_count']; ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $customerSummary['return_total']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $customerSummary['net']); ?></th></tr></tfoot>
                     <?php endif; ?>
                 <?php elseif ($tab === 'items'): ?>
+                    <colgroup>
+                        <col class="srr-item-col-code">
+                        <col class="srr-item-col-name">
+                        <col class="srr-item-col-variant">
+                        <col class="srr-item-col-qty">
+                        <col class="srr-item-col-money">
+                        <col class="srr-item-col-qty">
+                        <col class="srr-item-col-money">
+                        <col class="srr-item-col-qty">
+                        <col class="srr-item-col-money">
+                    </colgroup>
                     <thead><tr><th>الكود</th><th>الصنف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num">كمية مبيعات</th><th class="gl-acc-stmt-col-num">قيمة مبيعات</th><th class="gl-acc-stmt-col-num">كمية مردود</th><th class="gl-acc-stmt-col-num">قيمة مردود</th><th class="gl-acc-stmt-col-num">صافي الكمية</th><th class="gl-acc-stmt-col-num">صافي القيمة</th></tr></thead>
                     <tbody>
                     <?php if ($rows === []): ?><tr><td colspan="9" class="muted">لا توجد حركة أصناف في المدى المحدد.</td></tr>
@@ -1523,6 +1585,14 @@ if ($returnsServerExport && $reportError === '') {
                     </tbody>
                     <tfoot><tr><th colspan="3">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo $fmtQty((float) $itemSummary['sales_qty']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $itemSummary['sales_value']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtQty((float) $itemSummary['return_qty']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $itemSummary['return_value']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtQty((float) $itemSummary['net_qty']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $itemSummary['net_value']); ?></th></tr></tfoot>
                 <?php elseif ($tab === 'monthly'): ?>
+                    <colgroup>
+                        <col class="srr-mon-col-month">
+                        <col class="srr-mon-col-count">
+                        <col class="srr-mon-col-money">
+                        <col class="srr-mon-col-count">
+                        <col class="srr-mon-col-money">
+                        <col class="srr-mon-col-money">
+                    </colgroup>
                     <thead><tr><th>الشهر</th><th class="gl-acc-stmt-col-num">عدد فواتير المبيعات</th><th class="gl-acc-stmt-col-num">صافي المبيعات</th><th class="gl-acc-stmt-col-num">عدد المردودات</th><th class="gl-acc-stmt-col-num">صافي المردودات</th><th class="gl-acc-stmt-col-num">الصافي</th></tr></thead>
                     <tbody>
                     <?php if ($rows === []): ?><tr><td colspan="6" class="muted">لا توجد بيانات شهرية في المدى المحدد.</td></tr>
@@ -1750,6 +1820,59 @@ if ($returnsServerExport && $reportError === '') {
     flex-basis: 100%;
     justify-content: flex-end;
 }
+.srr-doc-table {
+    table-layout: fixed;
+    min-width: 78rem;
+}
+.srr-doc-table .srr-inv-col-ref { width: 11%; }
+.srr-doc-table .srr-inv-col-date { width: 9%; }
+.srr-doc-table .srr-inv-col-customer { width: 24%; }
+.srr-doc-table .srr-inv-col-source { width: 11%; }
+.srr-doc-table .srr-inv-col-pay { width: 11%; }
+.srr-doc-table .srr-inv-col-money { width: 11.333%; }
+.srr-doc-table .srr-ret-col-ref { width: 11%; }
+.srr-doc-table .srr-ret-col-date { width: 9%; }
+.srr-doc-table .srr-ret-col-customer { width: 19%; }
+.srr-doc-table .srr-ret-col-invoice { width: 13%; }
+.srr-doc-table .srr-ret-col-source { width: 9%; }
+.srr-doc-table .srr-ret-col-pay { width: 10%; }
+.srr-doc-table .srr-ret-col-channel { width: 15%; }
+.srr-doc-table .srr-ret-col-net { width: 14%; }
+.srr-customers-table {
+    table-layout: fixed;
+    min-width: 64rem;
+}
+.srr-customers-table .srr-cus-col-name { width: 34%; }
+.srr-customers-table .srr-cus-col-count { width: 10%; }
+.srr-customers-table .srr-cus-col-money { width: 15.333%; }
+.srr-customers-detail-table {
+    min-width: 90rem;
+}
+.srr-customers-detail-table .srr-cusd-col-name { width: 18%; }
+.srr-customers-detail-table .srr-cusd-col-doc { width: 9%; }
+.srr-customers-detail-table .srr-cusd-col-ref { width: 11%; }
+.srr-customers-detail-table .srr-cusd-col-invoice { width: 12%; }
+.srr-customers-detail-table .srr-cusd-col-date { width: 9%; }
+.srr-customers-detail-table .srr-cusd-col-source { width: 8%; }
+.srr-customers-detail-table .srr-cusd-col-pay { width: 10%; }
+.srr-customers-detail-table .srr-cusd-col-channel { width: 13%; }
+.srr-customers-detail-table .srr-cusd-col-net { width: 10%; }
+.srr-items-table {
+    table-layout: fixed;
+    min-width: 82rem;
+}
+.srr-items-table .srr-item-col-code { width: 10%; }
+.srr-items-table .srr-item-col-name { width: 24%; }
+.srr-items-table .srr-item-col-variant { width: 16%; }
+.srr-items-table .srr-item-col-qty { width: 7%; }
+.srr-items-table .srr-item-col-money { width: 9.666%; }
+.srr-monthly-table {
+    table-layout: fixed;
+    min-width: 58rem;
+}
+.srr-monthly-table .srr-mon-col-month { width: 26%; }
+.srr-monthly-table .srr-mon-col-count { width: 10%; }
+.srr-monthly-table .srr-mon-col-money { width: 18%; }
 .srr-return-analytics {
     margin-top: 12px;
     display: grid;
