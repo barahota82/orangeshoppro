@@ -83,6 +83,27 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
     </div>
 </div>
 
+<div class="card">
+    <h3>سجل التفعيل الدائم</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>العرض</th>
+                    <th>بداية التفعيل الدائم</th>
+                    <th>نهاية التفعيل الدائم</th>
+                    <th>بواسطة</th>
+                    <th>إنهاء بواسطة</th>
+                </tr>
+            </thead>
+            <tbody id="ccp_history_tbody">
+                <tr><td colspan="6" class="muted">جارٍ التحميل...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 <?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
@@ -149,6 +170,7 @@ function resetCartComboPromotionForm() {
     ccpRenderComps([]);
     document.getElementById('ccp_reg').checked = false;
     document.getElementById('ccp_active').checked = true;
+    ocpSetAlwaysOn('ccp', false);
     ocpDefaultScheduleDates('ccp');
 }
 
@@ -160,6 +182,7 @@ function editCartComboPromotion(row) {
     document.getElementById('ccp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
     document.getElementById('ccp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
     document.getElementById('ccp_active').checked = parseInt(row.is_active, 10) === 1;
+    ocpSetAlwaysOn('ccp', parseInt(row.is_always_on, 10) === 1);
     ocpSetDmyFromIso('ccp_valid_from', row.valid_from);
     ocpSetDmyFromIso('ccp_valid_to', row.valid_to);
     ccpRenderComps(row.components || []);
@@ -218,6 +241,7 @@ async function saveCartComboPromotion() {
         sort_order: parseInt(document.getElementById('ccp_sort').value, 10) || 0,
         requires_registered_account: document.getElementById('ccp_reg').checked ? 1 : 0,
         is_active: document.getElementById('ccp_active').checked ? 1 : 0,
+        is_always_on: ocpIsAlwaysOn('ccp') ? 1 : 0,
         valid_from: ocpGetIso('ccp_valid_from'),
         valid_to: ocpGetIso('ccp_valid_to'),
         components: ccpCompRows()
@@ -226,10 +250,45 @@ async function saveCartComboPromotion() {
     if (res.success) {
         resetCartComboPromotionForm();
         loadCartComboPromotions();
+        loadCartComboAlwaysOnHistory();
     }
 }
 
+function ccpAdminName(name) {
+    var s = String(name || '').trim();
+    return s !== '' ? s : '—';
+}
+
+async function loadCartComboAlwaysOnHistory() {
+    var tb = document.getElementById('ccp_history_tbody');
+    if (!tb) return;
+    var res = await postJSON('/admin/api/cart_combo_promotions/manage.php', { action: 'always_on_history' });
+    if (!res || !res.success || !Array.isArray(res.data)) {
+        tb.innerHTML = '<tr><td colspan="6" class="muted">تعذر تحميل السجل.</td></tr>';
+        return;
+    }
+    var rows = res.data;
+    if (!rows.length) {
+        tb.innerHTML = '<tr><td colspan="6" class="muted">لا توجد عمليات تفعيل دائم مسجلة بعد.</td></tr>';
+        return;
+    }
+    tb.innerHTML = '';
+    rows.forEach(function (row) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td>' + escCcp(String(row.id || '')) + '</td>' +
+            '<td>عرض #' + escCcp(String(row.promotion_id || '')) + '</td>' +
+            '<td dir="ltr">' + escCcp(String(row.started_at || '')) + '</td>' +
+            '<td dir="ltr">' + escCcp(String(row.ended_at || '')) + '</td>' +
+            '<td>' + escCcp(ccpAdminName(row.started_by_name)) + '</td>' +
+            '<td>' + escCcp(ccpAdminName(row.ended_by_name)) + '</td>';
+        tb.appendChild(tr);
+    });
+}
+
 document.getElementById('ccp_add_product_btn').addEventListener('click', ccpOpenPick);
+ocpBindAlwaysOn('ccp');
 ocpDefaultScheduleDates('ccp');
 loadCartComboPromotions();
+loadCartComboAlwaysOnHistory();
 </script>

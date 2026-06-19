@@ -41,7 +41,7 @@ function orange_cart_combo_best_match(PDO $pdo, array $validatedItems, bool $buy
     $cid = orange_cart_promotion_storefront_country_id($pdo, $countryId);
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_combo_promotions', '', $cid);
     $st = $pdo->prepare(
-        'SELECT id, components_json, combo_price, requires_registered_account, is_active, valid_from, valid_to, auto_paused_at, auto_paused_reason
+        'SELECT id, components_json, combo_price, requires_registered_account, is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason
          FROM cart_combo_promotions
          WHERE 1=1' . orange_cart_promo_schedule_sql('cart_combo_promotions') . $bind['sql'] . '
          ORDER BY sort_order ASC, id ASC'
@@ -135,7 +135,7 @@ function orange_cart_combo_promotions_admin_list(PDO $pdo): array
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_combo_promotions', '', $cid);
     $st = $pdo->prepare(
         'SELECT id, title_ar, title_en, components_json, combo_price, requires_registered_account, sort_order, is_active,
-                valid_from, valid_to, auto_paused_at, auto_paused_reason
+                is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason
          FROM cart_combo_promotions WHERE 1=1' . $bind['sql'] . ' ORDER BY sort_order ASC, id ASC'
     );
     $st->execute($bind['params']);
@@ -151,6 +151,7 @@ function orange_cart_combo_promotions_admin_list(PDO $pdo): array
             'requires_registered_account' => (int) ($row['requires_registered_account'] ?? 0),
             'sort_order' => (int) ($row['sort_order'] ?? 0),
             'is_active' => (int) ($row['is_active'] ?? 0),
+            'is_always_on' => (int) ($row['is_always_on'] ?? 0),
             'valid_from' => (string) ($row['valid_from'] ?? ''),
             'valid_to' => (string) ($row['valid_to'] ?? ''),
             'auto_paused_at' => $row['auto_paused_at'] ?? null,

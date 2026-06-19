@@ -66,6 +66,27 @@ $hasTable = orange_table_exists($pdo, 'cart_promotions');
     </div>
 </div>
 
+<div class="card">
+    <h3>سجل التفعيل الدائم</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>العرض</th>
+                    <th>بداية التفعيل الدائم</th>
+                    <th>نهاية التفعيل الدائم</th>
+                    <th>بواسطة</th>
+                    <th>إنهاء بواسطة</th>
+                </tr>
+            </thead>
+            <tbody id="cp_history_tbody">
+                <tr><td colspan="6" class="muted">جارٍ التحميل...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <script>
 <?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
 function resetCartPromotionForm() {
@@ -75,6 +96,7 @@ function resetCartPromotionForm() {
     document.getElementById('cp_sort').value = '0';
     document.getElementById('cp_reg').checked = false;
     document.getElementById('cp_active').checked = true;
+    ocpSetAlwaysOn('cp', false);
     ocpDefaultScheduleDates('cp');
 }
 
@@ -85,6 +107,7 @@ function editCartPromotion(row) {
     document.getElementById('cp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
     document.getElementById('cp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
     document.getElementById('cp_active').checked = parseInt(row.is_active, 10) === 1;
+    ocpSetAlwaysOn('cp', parseInt(row.is_always_on, 10) === 1);
     ocpSetDmyFromIso('cp_valid_from', row.valid_from);
     ocpSetDmyFromIso('cp_valid_to', row.valid_to);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -137,6 +160,7 @@ async function saveCartPromotion() {
         sort_order: parseInt(document.getElementById('cp_sort').value, 10) || 0,
         requires_registered_account: document.getElementById('cp_reg').checked ? 1 : 0,
         is_active: document.getElementById('cp_active').checked ? 1 : 0,
+        is_always_on: ocpIsAlwaysOn('cp') ? 1 : 0,
         valid_from: ocpGetIso('cp_valid_from'),
         valid_to: ocpGetIso('cp_valid_to')
     });
@@ -144,9 +168,44 @@ async function saveCartPromotion() {
     if (res.success) {
         resetCartPromotionForm();
         loadCartPromotions();
+        loadCartPromotionAlwaysOnHistory();
     }
 }
 
+function cpAdminName(name) {
+    var s = String(name || '').trim();
+    return s !== '' ? s : '—';
+}
+
+async function loadCartPromotionAlwaysOnHistory() {
+    var tb = document.getElementById('cp_history_tbody');
+    if (!tb) return;
+    var res = await postJSON('/admin/api/cart_promotions/manage.php', { action: 'always_on_history' });
+    if (!res || !res.success || !Array.isArray(res.data)) {
+        tb.innerHTML = '<tr><td colspan="6" class="muted">تعذر تحميل السجل.</td></tr>';
+        return;
+    }
+    var rows = res.data;
+    if (!rows.length) {
+        tb.innerHTML = '<tr><td colspan="6" class="muted">لا توجد عمليات تفعيل دائم مسجلة بعد.</td></tr>';
+        return;
+    }
+    tb.innerHTML = '';
+    rows.forEach(function (row) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td>' + escCp(String(row.id || '')) + '</td>' +
+            '<td>عرض #' + escCp(String(row.promotion_id || '')) + '</td>' +
+            '<td dir="ltr">' + escCp(String(row.started_at || '')) + '</td>' +
+            '<td dir="ltr">' + escCp(String(row.ended_at || '')) + '</td>' +
+            '<td>' + escCp(cpAdminName(row.started_by_name)) + '</td>' +
+            '<td>' + escCp(cpAdminName(row.ended_by_name)) + '</td>';
+        tb.appendChild(tr);
+    });
+}
+
+ocpBindAlwaysOn('cp');
 ocpDefaultScheduleDates('cp');
 loadCartPromotions();
+loadCartPromotionAlwaysOnHistory();
 </script>

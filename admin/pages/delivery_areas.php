@@ -177,6 +177,7 @@ $daPolicy = orange_delivery_country_policy_read($pdo, $adminCountryId);
         <div class="da-area-fee">
             <label for="da_delivery_fee">قيمة التوصيل</label>
             <input type="number" id="da_delivery_fee" min="0" step="<?php echo htmlspecialchars($daMoneyStep, ENT_QUOTES, 'UTF-8'); ?>" lang="en" dir="ltr" value="<?php echo htmlspecialchars($daMoneyZero, ENT_QUOTES, 'UTF-8'); ?>">
+            <span class="muted" style="display:block;margin-top:4px;">اترك الحقل فارغاً مع تفعيل المنطقة لتسجيل حالة "بانتظار التحديد".</span>
         </div>
         <div class="da-area-sort">
             <label for="da_sort_order">الترتيب</label>
@@ -226,6 +227,7 @@ $daPolicy = orange_delivery_country_policy_read($pdo, $adminCountryId);
                 <?php
                 $aid = (int) ($aRow['id'] ?? 0);
                 $aActive = (int) ($aRow['is_active'] ?? 0) === 1;
+                $aPending = (int) ($aRow['delivery_fee_pending'] ?? 0) === 1 && $aActive;
                 $govLabel = trim((string) ($aRow['governorate_name_ar'] ?? ''));
                 if ($govLabel === '') {
                     $govLabel = trim((string) ($aRow['governorate_name_en'] ?? ''));
@@ -234,16 +236,22 @@ $daPolicy = orange_delivery_country_policy_read($pdo, $adminCountryId);
                     $govLabel = '—';
                 }
                 ?>
-                <tr>
+                <tr class="<?php echo $aPending ? 'da-area-pending-row' : ''; ?>">
                     <td><?php echo $aid; ?></td>
                     <?php if ($hasGovTable): ?>
                     <td><?php echo htmlspecialchars($govLabel, ENT_QUOTES, 'UTF-8'); ?></td>
                     <?php endif; ?>
                     <td><?php echo htmlspecialchars((string) ($aRow['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td dir="ltr"><?php echo htmlspecialchars((string) ($aRow['name_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td dir="ltr"><?php echo htmlspecialchars(number_format(max(0.0, (float) ($aRow['delivery_fee'] ?? 0)), $daMoneyDecimals, '.', ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td dir="ltr">
+                        <?php if ($aPending): ?>
+                            <span class="da-pending-fee-badge">بانتظار التحديد</span>
+                        <?php else: ?>
+                            <?php echo htmlspecialchars(number_format(max(0.0, (float) ($aRow['delivery_fee'] ?? 0)), $daMoneyDecimals, '.', ''), ENT_QUOTES, 'UTF-8'); ?>
+                        <?php endif; ?>
+                    </td>
                     <td><?php echo (int) ($aRow['sort_order'] ?? 0); ?></td>
-                    <td><?php echo $aActive ? 'منطقة توصيل' : 'غير متاحة للتوصيل'; ?></td>
+                    <td><?php echo $aActive ? ($aPending ? 'منطقة توصيل (بانتظار السعر)' : 'منطقة توصيل') : 'غير متاحة للتوصيل'; ?></td>
                     <td><button type="button" class="btn-secondary" data-da-edit="<?php echo $aid; ?>">تعديل</button></td>
                 </tr>
                 <?php endforeach; ?>
@@ -303,6 +311,14 @@ $daPolicy = orange_delivery_country_policy_read($pdo, $adminCountryId);
     }
     .da-list-all-label input:disabled {
         cursor: not-allowed;
+    }
+    .da-area-pending-row {
+        background: #fee2e2;
+    }
+    .da-pending-fee-badge {
+        display: inline-block;
+        color: #991b1b;
+        font-weight: 700;
     }
     @media (max-width: 720px) {
         .da-gov-form-grid,
@@ -390,6 +406,16 @@ function renderDeliveryAreasTable() {
     rows.forEach(function (r) {
         var tr = document.createElement('tr');
         var canDeliver = parseInt(r.is_active, 10) === 1;
+        var feePending = canDeliver && parseInt(r.delivery_fee_pending, 10) === 1;
+        if (feePending) {
+            tr.classList.add('da-area-pending-row');
+        }
+        var feeText = feePending
+            ? '<span class="da-pending-fee-badge">بانتظار التحديد</span>'
+            : escHtml(daFormatMoney(r.delivery_fee));
+        var deliverLabel = canDeliver
+            ? (feePending ? 'منطقة توصيل (بانتظار السعر)' : 'منطقة توصيل')
+            : 'غير متاحة للتوصيل';
         var html = '<td>' + escHtml(String(r.id)) + '</td>';
         if (daHasGovCol) {
             html += '<td>' + escHtml(String(r.governorate_name_ar || r.governorate_name_en || '—')) + '</td>';
@@ -397,9 +423,9 @@ function renderDeliveryAreasTable() {
         html +=
             '<td>' + escHtml(String(r.name_ar || '')) + '</td>' +
             '<td dir="ltr">' + escHtml(String(r.name_en || '')) + '</td>' +
-            '<td dir="ltr">' + escHtml(daFormatMoney(r.delivery_fee)) + '</td>' +
+            '<td dir="ltr">' + feeText + '</td>' +
             '<td>' + escHtml(String(r.sort_order != null ? r.sort_order : '')) + '</td>' +
-            '<td>' + (canDeliver ? 'منطقة توصيل' : 'غير متاحة للتوصيل') + '</td>' +
+            '<td>' + deliverLabel + '</td>' +
             '<td><button type="button" class="btn-secondary" data-da-edit="' + escAttr(String(r.id)) + '">تعديل</button></td>';
         tr.innerHTML = html;
         tb.appendChild(tr);
@@ -621,7 +647,8 @@ function editDeliveryArea(row) {
     document.getElementById('da_id').value = String(row.id != null ? row.id : 0);
     document.getElementById('da_name_ar').value = row.name_ar || '';
     document.getElementById('da_name_en').value = row.name_en || '';
-    document.getElementById('da_delivery_fee').value = daFormatMoney(row.delivery_fee);
+    var isPending = parseInt(row.delivery_fee_pending, 10) === 1 && parseInt(row.is_active, 10) === 1;
+    document.getElementById('da_delivery_fee').value = isPending ? '' : daFormatMoney(row.delivery_fee);
     document.getElementById('da_sort_order').value = String(row.sort_order != null ? row.sort_order : 0);
     document.getElementById('da_is_active').checked = parseInt(row.is_active, 10) === 1;
     const sel = document.getElementById('da_governorate_id');
@@ -674,10 +701,21 @@ function bindDeliveryAreaEditButtons() {
 
 async function saveDeliveryArea() {
     const govEl = document.getElementById('da_governorate_id');
-    const feeVal = daParseMoney(document.getElementById('da_delivery_fee').value);
-    if (!Number.isFinite(feeVal) || feeVal < 0) {
-        alert('قيمة التوصيل غير صحيحة');
-        return;
+    const isActive = document.getElementById('da_is_active').checked ? 1 : 0;
+    const feeRaw = String(document.getElementById('da_delivery_fee').value || '').trim();
+    let feePayload = '';
+    if (feeRaw !== '') {
+        const feeVal = daParseMoney(feeRaw);
+        if (!Number.isFinite(feeVal) || feeVal < 0) {
+            alert('قيمة التوصيل غير صحيحة');
+            return;
+        }
+        const roundedFee = Number(daRoundMoney(feeVal).toFixed(daMoneyDecimals));
+        if (isActive === 1 && roundedFee <= 0) {
+            alert('لا يمكن تنشيط منطقة بسعر صفر. أدخل قيمة أكبر من صفر أو اترك الحقل فارغاً لحالة "بانتظار التحديد".');
+            return;
+        }
+        feePayload = roundedFee;
     }
     const payload = {
         action: 'save',
@@ -685,8 +723,8 @@ async function saveDeliveryArea() {
         country_id: daCountryId(),
         name_ar: document.getElementById('da_name_ar').value.trim(),
         name_en: document.getElementById('da_name_en').value.trim(),
-        delivery_fee: Number(daRoundMoney(feeVal).toFixed(daMoneyDecimals)),
-        is_active: document.getElementById('da_is_active').checked ? 1 : 0
+        delivery_fee: feePayload,
+        is_active: isActive
     };
     if (govEl) {
         payload.governorate_id = parseInt(govEl.value, 10) || 0;

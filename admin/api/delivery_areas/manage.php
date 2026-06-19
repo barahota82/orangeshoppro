@@ -172,16 +172,31 @@ try {
         $nameAr = da_str191($data['name_ar'] ?? '');
         $nameEn = da_str191($data['name_en'] ?? '');
         $deliveryFeeRaw = trim((string) ($data['delivery_fee'] ?? ''));
-        $deliveryFee = $deliveryFeeRaw === ''
-            ? orange_delivery_country_default_fee($pdo, $countryId)
-            : da_money_non_negative($deliveryFeeRaw, $countryMoneyDecimals);
         $isActive = !empty($data['is_active']) ? 1 : 0;
+        $hasFeePendingCol = orange_delivery_areas_has_pending_fee_column($pdo);
+        $feePending = 0;
+        if ($deliveryFeeRaw === '') {
+            if ($isActive === 1 && $hasFeePendingCol) {
+                $deliveryFee = 0.0;
+                $feePending = 1;
+            } else {
+                $deliveryFee = orange_delivery_country_default_fee($pdo, $countryId);
+            }
+        } else {
+            $deliveryFee = da_money_non_negative($deliveryFeeRaw, $countryMoneyDecimals);
+        }
 
         if ($nameAr === '') {
             json_response(['success' => false, 'message' => 'اسم المنطقة بالعربي مطلوب'], 422);
         }
         if ($deliveryFee === null) {
             json_response(['success' => false, 'message' => 'قيمة التوصيل غير صحيحة'], 422);
+        }
+        if ($isActive === 1 && $feePending === 0 && (float) $deliveryFee <= 0.0) {
+            json_response([
+                'success' => false,
+                'message' => 'لا يمكن تنشيط منطقة بسعر صفر. أدخل قيمة أكبر من صفر أو اترك الحقل فارغاً لحالة "بانتظار التحديد".',
+            ], 422);
         }
         if ($countryId <= 0) {
             json_response(['success' => false, 'message' => 'الدولة غير محددة'], 422);
@@ -207,38 +222,102 @@ try {
                 json_response(['success' => false, 'message' => $e->getMessage()], 403);
             }
             if ($hasCountryCol && $hasGovCol) {
-                $st = $pdo->prepare(
-                    'UPDATE delivery_areas SET name_ar = ?, name_en = ?, delivery_fee = ?, is_active = ?, country_id = ?, governorate_id = ? WHERE id = ?'
-                );
-                $st->execute([$nameAr, $nameEn, $deliveryFee, $isActive, $countryId, $governorateId, $id]);
+                if ($hasFeePendingCol) {
+                    $st = $pdo->prepare(
+                        'UPDATE delivery_areas
+                         SET name_ar = ?, name_en = ?, delivery_fee = ?, delivery_fee_pending = ?, is_active = ?, country_id = ?, governorate_id = ?
+                         WHERE id = ?'
+                    );
+                    $st->execute([$nameAr, $nameEn, $deliveryFee, $feePending, $isActive, $countryId, $governorateId, $id]);
+                } else {
+                    $st = $pdo->prepare(
+                        'UPDATE delivery_areas
+                         SET name_ar = ?, name_en = ?, delivery_fee = ?, is_active = ?, country_id = ?, governorate_id = ?
+                         WHERE id = ?'
+                    );
+                    $st->execute([$nameAr, $nameEn, $deliveryFee, $isActive, $countryId, $governorateId, $id]);
+                }
             } elseif ($hasCountryCol) {
-                $st = $pdo->prepare(
-                    'UPDATE delivery_areas SET name_ar = ?, name_en = ?, delivery_fee = ?, is_active = ?, country_id = ? WHERE id = ?'
-                );
-                $st->execute([$nameAr, $nameEn, $deliveryFee, $isActive, $countryId, $id]);
+                if ($hasFeePendingCol) {
+                    $st = $pdo->prepare(
+                        'UPDATE delivery_areas
+                         SET name_ar = ?, name_en = ?, delivery_fee = ?, delivery_fee_pending = ?, is_active = ?, country_id = ?
+                         WHERE id = ?'
+                    );
+                    $st->execute([$nameAr, $nameEn, $deliveryFee, $feePending, $isActive, $countryId, $id]);
+                } else {
+                    $st = $pdo->prepare(
+                        'UPDATE delivery_areas
+                         SET name_ar = ?, name_en = ?, delivery_fee = ?, is_active = ?, country_id = ?
+                         WHERE id = ?'
+                    );
+                    $st->execute([$nameAr, $nameEn, $deliveryFee, $isActive, $countryId, $id]);
+                }
             } else {
-                $st = $pdo->prepare(
-                    'UPDATE delivery_areas SET name_ar = ?, name_en = ?, delivery_fee = ?, is_active = ? WHERE id = ?'
-                );
-                $st->execute([$nameAr, $nameEn, $deliveryFee, $isActive, $id]);
+                if ($hasFeePendingCol) {
+                    $st = $pdo->prepare(
+                        'UPDATE delivery_areas
+                         SET name_ar = ?, name_en = ?, delivery_fee = ?, delivery_fee_pending = ?, is_active = ?
+                         WHERE id = ?'
+                    );
+                    $st->execute([$nameAr, $nameEn, $deliveryFee, $feePending, $isActive, $id]);
+                } else {
+                    $st = $pdo->prepare(
+                        'UPDATE delivery_areas
+                         SET name_ar = ?, name_en = ?, delivery_fee = ?, is_active = ?
+                         WHERE id = ?'
+                    );
+                    $st->execute([$nameAr, $nameEn, $deliveryFee, $isActive, $id]);
+                }
             }
         } else {
             $sortOrder = orange_delivery_areas_next_sort_order($pdo, $countryId, $governorateId);
             if ($hasCountryCol && $hasGovCol) {
-                $st = $pdo->prepare(
-                    'INSERT INTO delivery_areas (name_ar, name_en, delivery_fee, sort_order, is_active, country_id, governorate_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
-                );
-                $st->execute([$nameAr, $nameEn, $deliveryFee, $sortOrder, $isActive, $countryId, $governorateId]);
+                if ($hasFeePendingCol) {
+                    $st = $pdo->prepare(
+                        'INSERT INTO delivery_areas
+                         (name_ar, name_en, delivery_fee, delivery_fee_pending, sort_order, is_active, country_id, governorate_id)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+                    );
+                    $st->execute([$nameAr, $nameEn, $deliveryFee, $feePending, $sortOrder, $isActive, $countryId, $governorateId]);
+                } else {
+                    $st = $pdo->prepare(
+                        'INSERT INTO delivery_areas
+                         (name_ar, name_en, delivery_fee, sort_order, is_active, country_id, governorate_id)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)'
+                    );
+                    $st->execute([$nameAr, $nameEn, $deliveryFee, $sortOrder, $isActive, $countryId, $governorateId]);
+                }
             } elseif ($hasCountryCol) {
-                $st = $pdo->prepare(
-                    'INSERT INTO delivery_areas (name_ar, name_en, delivery_fee, sort_order, is_active, country_id) VALUES (?, ?, ?, ?, ?, ?)'
-                );
-                $st->execute([$nameAr, $nameEn, $deliveryFee, $sortOrder, $isActive, $countryId]);
+                if ($hasFeePendingCol) {
+                    $st = $pdo->prepare(
+                        'INSERT INTO delivery_areas
+                         (name_ar, name_en, delivery_fee, delivery_fee_pending, sort_order, is_active, country_id)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)'
+                    );
+                    $st->execute([$nameAr, $nameEn, $deliveryFee, $feePending, $sortOrder, $isActive, $countryId]);
+                } else {
+                    $st = $pdo->prepare(
+                        'INSERT INTO delivery_areas
+                         (name_ar, name_en, delivery_fee, sort_order, is_active, country_id)
+                         VALUES (?, ?, ?, ?, ?, ?)'
+                    );
+                    $st->execute([$nameAr, $nameEn, $deliveryFee, $sortOrder, $isActive, $countryId]);
+                }
             } else {
-                $st = $pdo->prepare(
-                    'INSERT INTO delivery_areas (name_ar, name_en, delivery_fee, sort_order, is_active) VALUES (?, ?, ?, ?, ?)'
-                );
-                $st->execute([$nameAr, $nameEn, $deliveryFee, $sortOrder, $isActive]);
+                if ($hasFeePendingCol) {
+                    $st = $pdo->prepare(
+                        'INSERT INTO delivery_areas
+                         (name_ar, name_en, delivery_fee, delivery_fee_pending, sort_order, is_active)
+                         VALUES (?, ?, ?, ?, ?, ?)'
+                    );
+                    $st->execute([$nameAr, $nameEn, $deliveryFee, $feePending, $sortOrder, $isActive]);
+                } else {
+                    $st = $pdo->prepare(
+                        'INSERT INTO delivery_areas (name_ar, name_en, delivery_fee, sort_order, is_active) VALUES (?, ?, ?, ?, ?)'
+                    );
+                    $st->execute([$nameAr, $nameEn, $deliveryFee, $sortOrder, $isActive]);
+                }
             }
         }
 

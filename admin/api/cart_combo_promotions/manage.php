@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../includes/cart_combo_promotions.php';
 require_once __DIR__ . '/../../../includes/cart_promo_products.php';
 require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
 require_once __DIR__ . '/../../../includes/cart_promo_schedule.php';
+require_once __DIR__ . '/../../../includes/promo_always_on.php';
 require_admin_api();
 
 /**
@@ -53,6 +54,14 @@ try {
         json_response(['success' => true, 'data' => orange_cart_combo_promotions_admin_list($pdo)]);
     }
 
+    if ($action === 'always_on_history') {
+        $countryId = orange_cart_promotion_admin_country_id($pdo);
+        json_response([
+            'success' => true,
+            'data' => orange_promo_always_on_history_list($pdo, 'cart_combo_promotions', $countryId),
+        ]);
+    }
+
     if ($action === 'save') {
         $id = (int) ($data['id'] ?? 0);
         $titleAr = trim((string) ($data['title_ar'] ?? ''));
@@ -61,11 +70,13 @@ try {
         $reqReg = !empty($data['requires_registered_account']) ? 1 : 0;
         $sortOrder = (int) ($data['sort_order'] ?? 0);
         $isActive = !empty($data['is_active']) ? 1 : 0;
+        $isAlwaysOn = !empty($data['is_always_on']) ? 1 : 0;
         $dateErr = null;
         $bounds = orange_cart_promo_parse_required_admin_dates(
             trim((string) ($data['valid_from'] ?? '')),
             trim((string) ($data['valid_to'] ?? '')),
-            $dateErr
+            $dateErr,
+            $isAlwaysOn === 1
         );
         if ($bounds === null) {
             json_response(['success' => false, 'message' => $dateErr ?? 'تواريخ العرض غير صالحة'], 422);
@@ -103,7 +114,7 @@ try {
         if ($id > 0) {
             orange_cart_promo_clear_auto_pause($pdo, 'cart_combo_promotions', $id);
             $st = $pdo->prepare(
-                'UPDATE cart_combo_promotions SET title_ar = ?, title_en = ?, components_json = ?, combo_price = ?, requires_registered_account = ?, sort_order = ?, is_active = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
+                'UPDATE cart_combo_promotions SET title_ar = ?, title_en = ?, components_json = ?, combo_price = ?, requires_registered_account = ?, sort_order = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
             );
             $st->execute([
                 $titleAr,
@@ -113,13 +124,21 @@ try {
                 $reqReg,
                 $sortOrder,
                 $isActive,
+                $isAlwaysOn,
                 $bounds['valid_from'],
                 $bounds['valid_to'],
                 $id,
             ]);
+            orange_promo_always_on_sync_history(
+                $pdo,
+                'cart_combo_promotions',
+                $id,
+                $isAlwaysOn,
+                orange_cart_promotion_admin_country_id($pdo)
+            );
         } else {
             $st = $pdo->prepare(
-                'INSERT INTO cart_combo_promotions (country_id, title_ar, title_en, components_json, combo_price, requires_registered_account, sort_order, is_active, valid_from, valid_to) VALUES (?,?,?,?,?,?,?,?,?,?)'
+                'INSERT INTO cart_combo_promotions (country_id, title_ar, title_en, components_json, combo_price, requires_registered_account, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
             );
             $st->execute([
                 $insertCountryId,
@@ -130,9 +149,18 @@ try {
                 $reqReg,
                 $sortOrder,
                 $isActive,
+                $isAlwaysOn,
                 $bounds['valid_from'],
                 $bounds['valid_to'],
             ]);
+            $newId = (int) $pdo->lastInsertId();
+            orange_promo_always_on_sync_history(
+                $pdo,
+                'cart_combo_promotions',
+                $newId,
+                $isAlwaysOn,
+                $insertCountryId > 0 ? $insertCountryId : orange_cart_promotion_admin_country_id($pdo)
+            );
         }
 
         json_response(['success' => true, 'message' => 'تم حفظ عرض الكومبو']);

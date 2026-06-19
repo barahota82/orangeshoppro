@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/cart_promotion_country.php';
+require_once __DIR__ . '/promo_always_on.php';
 
 /**
  * جدول عرض سلة: جدولة تواريخ + إيقاف تلقائي عند نفاد مخزون منتجات العرض أو الهدية.
@@ -63,7 +64,8 @@ function orange_cart_promo_row_eligible_stock_auto_unpause(array $row): bool
 
     return orange_cart_promo_is_within_schedule(
         (string) ($row['valid_from'] ?? ''),
-        (string) ($row['valid_to'] ?? '')
+        (string) ($row['valid_to'] ?? ''),
+        orange_promo_always_on_enabled($row)
     );
 }
 
@@ -79,6 +81,7 @@ function orange_cart_promo_rule_row_for_stock_unpause(array $rule): array
         'is_active' => (int) ($rule['is_active'] ?? 1),
         'valid_from' => (string) ($rule['valid_from'] ?? ''),
         'valid_to' => (string) ($rule['valid_to'] ?? ''),
+        'is_always_on' => orange_promo_always_on_to_int($rule['is_always_on'] ?? 0),
         'auto_paused_at' => $rule['auto_paused_at'] ?? null,
         'auto_paused_reason' => (string) ($rule['auto_paused_reason'] ?? ''),
     ];
@@ -98,12 +101,16 @@ function orange_cart_promo_row_is_customer_effective(array $row): bool
 
     return orange_cart_promo_is_within_schedule(
         (string) ($row['valid_from'] ?? ''),
-        (string) ($row['valid_to'] ?? '')
+        (string) ($row['valid_to'] ?? ''),
+        orange_promo_always_on_enabled($row)
     );
 }
 
-function orange_cart_promo_is_within_schedule(string $validFrom, string $validTo): bool
+function orange_cart_promo_is_within_schedule(string $validFrom, string $validTo, bool $isAlwaysOn = false): bool
 {
+    if ($isAlwaysOn) {
+        return true;
+    }
     $from = strtotime(trim($validFrom));
     $to = strtotime(trim($validTo));
     if ($from === false || $to === false) {
@@ -126,8 +133,10 @@ function orange_cart_promo_schedule_sql(string $alias): string
 
     return ' AND ' . $a . '.is_active = 1'
         . ' AND ' . $a . '.auto_paused_at IS NULL'
-        . ' AND ' . $a . '.valid_from <= NOW()'
-        . ' AND ' . $a . '.valid_to >= NOW()';
+        . ' AND ('
+        . $a . '.is_always_on = 1'
+        . ' OR (' . $a . '.valid_from <= NOW() AND ' . $a . '.valid_to >= NOW())'
+        . ')';
 }
 
 /**
@@ -135,11 +144,33 @@ function orange_cart_promo_schedule_sql(string $alias): string
  *
  * @return array{valid_from:string,valid_to:string}|null null + رسالة عبر $err
  */
-function orange_cart_promo_parse_required_admin_dates(string $fromIso, string $toIso, ?string &$err = null): ?array
+function orange_cart_promo_parse_required_admin_dates(
+    string $fromIso,
+    string $toIso,
+    ?string &$err = null,
+    bool $isAlwaysOn = false
+): ?array
 {
     $err = null;
     $fromIso = trim($fromIso);
     $toIso = trim($toIso);
+    if ($isAlwaysOn) {
+        $fromTs = $fromIso !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromIso)
+            ? strtotime($fromIso . ' 00:00:00')
+            : false;
+        $toTs = $toIso !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $toIso)
+            ? strtotime($toIso . ' 23:59:59')
+            : false;
+        if ($fromTs === false || $toTs === false || $fromTs > $toTs) {
+            $fromTs = strtotime(date('Y-m-d') . ' 00:00:00');
+            $toTs = strtotime('2099-12-31 23:59:59');
+        }
+
+        return [
+            'valid_from' => date('Y-m-d H:i:s', (int) $fromTs),
+            'valid_to' => date('Y-m-d H:i:s', (int) $toTs),
+        ];
+    }
     if ($fromIso === '' || $toIso === '') {
         $err = 'تاريخ بداية ونهاية العرض إلزاميان';
 
@@ -174,6 +205,9 @@ function orange_cart_promo_parse_required_admin_dates(string $fromIso, string $t
  */
 function orange_cart_promo_admin_schedule_label(array $row): string
 {
+    if (orange_promo_always_on_enabled($row)) {
+        return 'تفعيل دائم';
+    }
     $vf = trim((string) ($row['valid_from'] ?? ''));
     $vt = trim((string) ($row['valid_to'] ?? ''));
     if ($vf === '' || $vt === '') {

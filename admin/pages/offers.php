@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/cart_promo_products.php';
 require_once __DIR__ . '/../../includes/cart_promo_schedule.php';
+require_once __DIR__ . '/../../includes/promo_always_on.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/product_offers.php';
 require_once __DIR__ . '/../../includes/currency.php';
@@ -33,6 +34,7 @@ $offers = $pdo->query(
     ORDER BY ' . $orderSql . '
 '
 )->fetchAll();
+$offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offersCountryId);
 ?>
 <div class="page-title">
     <h1>عروض المنتجات</h1>
@@ -76,8 +78,15 @@ $offers = $pdo->query(
             <label for="ofr_valid_to">نهاية العرض <span dir="ltr">*</span></label>
             <input type="text" id="ofr_valid_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
         </div>
+        <div style="grid-column:1/-1;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;max-width:22rem;">
+                <input type="checkbox" id="ofr_always_on">
+                <span><strong>التفعيل الدائم</strong></span>
+            </label>
+            <span class="card-hint" style="display:block;margin-top:4px;">عند تفعيل هذا الخيار تبقى حقول التاريخ ظاهرة ولكن غير مفعّلة.</span>
+        </div>
     </div>
-    <p class="card-hint" style="margin:8px 0 0;">التاريخ إلزامي. لتمديد العرض: عدّل «نهاية العرض» ثم احفظ.</p>
+    <p class="card-hint" style="margin:8px 0 0;">التاريخ إلزامي للعروض الزمنية. عند تفعيل «التفعيل الدائم» تبقى الحقول ظاهرة لكن غير مفعّلة.</p>
     <div class="actions" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
         <button type="button" onclick="saveOffer()">حفظ العرض</button>
         <button type="button" class="btn-secondary" onclick="ofrResetForm()">عرض جديد</button>
@@ -117,6 +126,8 @@ $offers = $pdo->query(
                             echo 'موقوف — عدم توفر الهدية';
                         } elseif ((int) ($o['is_active'] ?? 0) !== 1) {
                             echo 'مخفي';
+                        } elseif ((int) ($o['is_always_on'] ?? 0) === 1) {
+                            echo 'نشط (دائم)';
                         } else {
                             echo 'نشط';
                         }
@@ -124,6 +135,40 @@ $offers = $pdo->query(
                     <td><button type="button" class="btn-secondary btn-sm" onclick='ofrEdit(<?php echo json_encode($o, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>)'>تعديل</button></td>
                 </tr>
                 <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h3>سجل التفعيل الدائم</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>العرض</th>
+                    <th>بداية التفعيل الدائم</th>
+                    <th>نهاية التفعيل الدائم</th>
+                    <th>بواسطة</th>
+                    <th>إنهاء بواسطة</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if ($offerAlwaysHistory === []): ?>
+                <tr><td colspan="6" class="muted">لا توجد عمليات تفعيل دائم مسجلة بعد.</td></tr>
+                <?php else: ?>
+                <?php foreach ($offerAlwaysHistory as $log): ?>
+                <tr>
+                    <td><?php echo (int) ($log['id'] ?? 0); ?></td>
+                    <td><?php echo 'عرض #' . (int) ($log['promotion_id'] ?? 0); ?></td>
+                    <td dir="ltr"><?php echo htmlspecialchars((string) ($log['started_at'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td dir="ltr"><?php echo htmlspecialchars((string) ($log['ended_at'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars((string) (($log['started_by_name'] ?? '') !== '' ? $log['started_by_name'] : '—'), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars((string) (($log['ended_by_name'] ?? '') !== '' ? $log['ended_by_name'] : '—'), ENT_QUOTES, 'UTF-8'); ?></td>
+                </tr>
+                <?php endforeach; ?>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
@@ -152,6 +197,9 @@ function ofrResetForm() {
     document.getElementById('discount').value = '';
     var sortEl = document.getElementById('ofr_sort');
     if (sortEl) sortEl.value = '0';
+    if (typeof ocpSetAlwaysOn === 'function') {
+        ocpSetAlwaysOn('ofr', false);
+    }
     if (typeof ocpDefaultScheduleDates === 'function') {
         ocpDefaultScheduleDates('ofr');
     }
@@ -164,6 +212,9 @@ function ofrEdit(row) {
     document.getElementById('discount').value = row.discount != null ? String(row.discount) : '';
     var sortEl = document.getElementById('ofr_sort');
     if (sortEl) sortEl.value = String(row.sort_order != null ? row.sort_order : 0);
+    if (typeof ocpSetAlwaysOn === 'function') {
+        ocpSetAlwaysOn('ofr', parseInt(row.is_always_on, 10) === 1);
+    }
     if (typeof ocpSetDmyFromIso === 'function') {
         ocpSetDmyFromIso('ofr_valid_from', row.valid_from || '');
         ocpSetDmyFromIso('ofr_valid_to', row.valid_to || '');
@@ -179,6 +230,7 @@ async function saveOffer() {
     };
     var sortEl = document.getElementById('ofr_sort');
     if (sortEl) payload.sort_order = parseInt(sortEl.value, 10) || 0;
+    payload.is_always_on = (typeof ocpIsAlwaysOn === 'function' && ocpIsAlwaysOn('ofr')) ? 1 : 0;
     if (typeof ocpSchedulePayload === 'function') {
         Object.assign(payload, ocpSchedulePayload('ofr'));
     }
@@ -186,7 +238,7 @@ async function saveOffer() {
         alert('اختر المنتج من القائمة (نقرتان)');
         return;
     }
-    if (!payload.valid_from || !payload.valid_to) {
+    if (payload.is_always_on !== 1 && (!payload.valid_from || !payload.valid_to)) {
         alert('تاريخ بداية ونهاية العرض إلزاميان');
         return;
     }
@@ -197,6 +249,9 @@ async function saveOffer() {
 
 if (typeof ocpDefaultScheduleDates === 'function') {
     ocpDefaultScheduleDates('ofr');
+}
+if (typeof ocpBindAlwaysOn === 'function') {
+    ocpBindAlwaysOn('ofr');
 }
 if (typeof orangeInitDmyInputs === 'function') {
     orangeInitDmyInputs(document);

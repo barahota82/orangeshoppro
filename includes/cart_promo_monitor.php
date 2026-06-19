@@ -321,9 +321,14 @@ function orange_cart_promo_sync_stock_checks(
                 continue;
             }
 
-            $inWindow = orange_table_has_column($pdo, $table, 'valid_from')
-                ? 't.valid_from <= NOW() AND t.valid_to >= NOW()'
-                : '';
+            $inWindow = '';
+            if (orange_table_has_column($pdo, $table, 'valid_from')) {
+                if (orange_table_has_column($pdo, $table, 'is_always_on')) {
+                    $inWindow = '(t.is_always_on = 1 OR (t.valid_from <= NOW() AND t.valid_to >= NOW()))';
+                } else {
+                    $inWindow = 't.valid_from <= NOW() AND t.valid_to >= NOW()';
+                }
+            }
             if ($inWindow !== '' && orange_table_has_column($pdo, $table, 'auto_paused_at')) {
                 $monitorSql = ' AND t.is_active = 1 AND ((' . $inWindow . ') OR t.auto_paused_at IS NOT NULL)';
             } elseif ($inWindow !== '') {
@@ -363,6 +368,7 @@ function orange_cart_promo_sync_stock_checks(
                         'id' => $ruleId,
                         'product_id' => (int) ($row['product_id'] ?? 0),
                         'is_active' => (int) ($row['is_active'] ?? 0),
+                        'is_always_on' => (int) ($row['is_always_on'] ?? 0),
                         'valid_from' => (string) ($row['valid_from'] ?? ''),
                         'valid_to' => (string) ($row['valid_to'] ?? ''),
                         'auto_paused_at' => $row['auto_paused_at'] ?? null,
@@ -370,6 +376,7 @@ function orange_cart_promo_sync_stock_checks(
                     ]
                     : array_merge(orange_cart_promo_gift_rule_from_db_row($pdo, $row), [
                         'is_active' => (int) ($row['is_active'] ?? 0),
+                        'is_always_on' => (int) ($row['is_always_on'] ?? 0),
                         'valid_from' => (string) ($row['valid_from'] ?? ''),
                         'valid_to' => (string) ($row['valid_to'] ?? ''),
                         'auto_paused_at' => $row['auto_paused_at'] ?? null,

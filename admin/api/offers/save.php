@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/cart_promo_schedule.php';
+require_once __DIR__ . '/../../../includes/promo_always_on.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_admin_api();
 
@@ -20,10 +21,12 @@ try {
         json_response(['success' => false, 'message' => 'بيانات العرض مطلوبة'], 422);
     }
 
+    $isAlwaysOn = !empty($data['is_always_on']) ? 1 : 0;
     $bounds = orange_cart_promo_parse_required_admin_dates(
         trim((string) ($data['valid_from'] ?? '')),
         trim((string) ($data['valid_to'] ?? '')),
-        $dateErr
+        $dateErr,
+        $isAlwaysOn === 1
     );
     if ($bounds === null) {
         json_response(['success' => false, 'message' => $dateErr ?? 'تواريخ العرض غير صالحة'], 422);
@@ -65,13 +68,14 @@ try {
         if ($hasSort) {
             $st = $pdo->prepare(
                 'UPDATE offers SET product_id = ?, discount = ?, sort_order = ?, is_active = 1,
-                 valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL
+                 is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL
                  WHERE id = ?'
             );
             $st->execute([
                 $pid,
                 $discount,
                 $sortOrder,
+                $isAlwaysOn,
                 $bounds['valid_from'],
                 $bounds['valid_to'],
                 $offerId,
@@ -79,17 +83,25 @@ try {
         } else {
             $st = $pdo->prepare(
                 'UPDATE offers SET product_id = ?, discount = ?, is_active = 1,
-                 valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL
+                 is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL
                  WHERE id = ?'
             );
             $st->execute([
                 $pid,
                 $discount,
+                $isAlwaysOn,
                 $bounds['valid_from'],
                 $bounds['valid_to'],
                 $offerId,
             ]);
         }
+        orange_promo_always_on_sync_history(
+            $pdo,
+            'offers',
+            $offerId,
+            $isAlwaysOn,
+            orange_admin_context_country_id($pdo)
+        );
         json_response(['success' => true, 'message' => 'تم تحديث العرض', 'id' => $offerId]);
 
         return;
@@ -97,30 +109,40 @@ try {
 
     if ($hasSort) {
         $stmt = $pdo->prepare(
-            'INSERT INTO offers (product_id, discount, sort_order, is_active, valid_from, valid_to)
-             VALUES (?, ?, ?, 1, ?, ?)'
+            'INSERT INTO offers (product_id, discount, sort_order, is_active, is_always_on, valid_from, valid_to)
+             VALUES (?, ?, ?, 1, ?, ?, ?)'
         );
         $stmt->execute([
             $pid,
             $discount,
             $sortOrder,
+            $isAlwaysOn,
             $bounds['valid_from'],
             $bounds['valid_to'],
         ]);
     } else {
         $stmt = $pdo->prepare(
-            'INSERT INTO offers (product_id, discount, is_active, valid_from, valid_to)
-             VALUES (?, ?, 1, ?, ?)'
+            'INSERT INTO offers (product_id, discount, is_active, is_always_on, valid_from, valid_to)
+             VALUES (?, ?, 1, ?, ?, ?)'
         );
         $stmt->execute([
             $pid,
             $discount,
+            $isAlwaysOn,
             $bounds['valid_from'],
             $bounds['valid_to'],
         ]);
     }
+    $newId = (int) $pdo->lastInsertId();
+    orange_promo_always_on_sync_history(
+        $pdo,
+        'offers',
+        $newId,
+        $isAlwaysOn,
+        orange_admin_context_country_id($pdo)
+    );
 
-    json_response(['success' => true, 'message' => 'تم حفظ العرض', 'id' => (int) $pdo->lastInsertId()]);
+    json_response(['success' => true, 'message' => 'تم حفظ العرض', 'id' => $newId]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, 'تعذر حفظ العرض');
 }

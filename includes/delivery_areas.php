@@ -69,6 +69,12 @@ function orange_delivery_areas_has_governorate_column(PDO $pdo): bool
         && orange_table_has_column($pdo, 'delivery_areas', 'governorate_id');
 }
 
+function orange_delivery_areas_has_pending_fee_column(PDO $pdo): bool
+{
+    return orange_table_exists($pdo, 'delivery_areas')
+        && orange_table_has_column($pdo, 'delivery_areas', 'delivery_fee_pending');
+}
+
 /**
  * محافظة افتراضية لكل دولة (ترحيل المناطف القديمة).
  */
@@ -119,7 +125,7 @@ function orange_delivery_governorates_admin_list(PDO $pdo, int $countryId): arra
 }
 
 /**
- * @return array<int, array{id:int, name_ar:string, name_en:string, delivery_fee?:float, sort_order:int, is_active:int, country_id?:int, governorate_id?:int, governorate_name_ar?:string, governorate_name_en?:string}>
+ * @return array<int, array{id:int, name_ar:string, name_en:string, delivery_fee?:float, delivery_fee_pending?:int, sort_order:int, is_active:int, country_id?:int, governorate_id?:int, governorate_name_ar?:string, governorate_name_en?:string}>
  */
 function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): array
 {
@@ -130,8 +136,11 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
     $hasGov = orange_delivery_areas_has_governorate_column($pdo)
         && orange_delivery_governorates_table_exists($pdo);
     $hasFee = orange_table_has_column($pdo, 'delivery_areas', 'delivery_fee');
+    $hasPending = orange_delivery_areas_has_pending_fee_column($pdo);
     $feeSelA = $hasFee ? 'a.delivery_fee' : '0 AS delivery_fee';
     $feeSel = $hasFee ? 'delivery_fee' : '0 AS delivery_fee';
+    $pendingSelA = $hasPending ? 'a.delivery_fee_pending' : '0 AS delivery_fee_pending';
+    $pendingSel = $hasPending ? 'delivery_fee_pending' : '0 AS delivery_fee_pending';
     if ($countryId === null && $hasCountry) {
         $countryId = orange_countries_default_id($pdo);
     }
@@ -139,6 +148,7 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
         if ($hasGov) {
             $st = $pdo->prepare(
                 'SELECT a.id, a.name_ar, a.name_en, ' . $feeSelA . ', a.sort_order, a.is_active, a.country_id, a.governorate_id,
+                        ' . $pendingSelA . ',
                         g.name_ar AS governorate_name_ar, g.name_en AS governorate_name_en
                  FROM delivery_areas a
                  LEFT JOIN delivery_governorates g ON g.id = a.governorate_id
@@ -149,6 +159,7 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
         } else {
             $st = $pdo->prepare(
                 'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, country_id
+                        , ' . $pendingSel . '
                  FROM delivery_areas WHERE country_id = ? ORDER BY sort_order ASC, id ASC'
             );
             $st->execute([$countryId]);
@@ -158,7 +169,8 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
     }
 
     $st = $pdo->query(
-        'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active FROM delivery_areas ORDER BY sort_order ASC, id ASC'
+        'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, ' . $pendingSel . '
+         FROM delivery_areas ORDER BY sort_order ASC, id ASC'
     );
 
     return $st ? $st->fetchAll(\PDO::FETCH_ASSOC) : [];
@@ -167,7 +179,7 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
 /**
  * مناطق نشطة للدولة (يشمل الربط عبر المحافظة إن country_id على المنطقة ناقص).
  *
- * @return list<array{id:int, name_ar:string, name_en:string, delivery_fee?:float}>
+ * @return list<array{id:int, name_ar:string, name_en:string, delivery_fee?:float, delivery_fee_pending?:int}>
  */
 function orange_delivery_areas_storefront_active_rows(PDO $pdo, int $countryId): array
 {
@@ -178,26 +190,33 @@ function orange_delivery_areas_storefront_active_rows(PDO $pdo, int $countryId):
     $hasGov = orange_delivery_areas_has_governorate_column($pdo)
         && orange_delivery_governorates_table_exists($pdo);
     $hasFee = orange_table_has_column($pdo, 'delivery_areas', 'delivery_fee');
+    $hasPending = orange_delivery_areas_has_pending_fee_column($pdo);
     $feeSelA = $hasFee ? 'a.delivery_fee' : '0 AS delivery_fee';
     $feeSel = $hasFee ? 'delivery_fee' : '0 AS delivery_fee';
+    $pendingSelA = $hasPending ? 'a.delivery_fee_pending' : '0 AS delivery_fee_pending';
+    $pendingSel = $hasPending ? 'delivery_fee_pending' : '0 AS delivery_fee_pending';
+    $pendingFilterA = $hasPending ? ' AND (a.delivery_fee_pending = 0 OR a.delivery_fee_pending IS NULL)' : '';
+    $pendingFilter = $hasPending ? ' AND (delivery_fee_pending = 0 OR delivery_fee_pending IS NULL)' : '';
     if ($hasCountry && $hasGov) {
         $st = $pdo->prepare(
-            'SELECT a.id, a.name_ar, a.name_en, ' . $feeSelA . '
+            'SELECT a.id, a.name_ar, a.name_en, ' . $feeSelA . ', ' . $pendingSelA . '
              FROM delivery_areas a
              LEFT JOIN delivery_governorates g ON g.id = a.governorate_id
              WHERE a.is_active = 1
                AND (g.id IS NULL OR g.is_active = 1)
-               AND (a.country_id = ? OR g.country_id = ?)'
+               AND (a.country_id = ? OR g.country_id = ?)' . $pendingFilterA
         );
         $st->execute([$countryId, $countryId]);
     } elseif ($hasCountry) {
         $st = $pdo->prepare(
-            'SELECT id, name_ar, name_en, ' . $feeSel . ' FROM delivery_areas WHERE is_active = 1 AND country_id = ?'
+            'SELECT id, name_ar, name_en, ' . $feeSel . ', ' . $pendingSel . '
+             FROM delivery_areas WHERE is_active = 1 AND country_id = ?' . $pendingFilter
         );
         $st->execute([$countryId]);
     } else {
         $st = $pdo->query(
-            'SELECT id, name_ar, name_en, ' . $feeSel . ' FROM delivery_areas WHERE is_active = 1'
+            'SELECT id, name_ar, name_en, ' . $feeSel . ', ' . $pendingSel . '
+             FROM delivery_areas WHERE is_active = 1' . $pendingFilter
         );
     }
     if (!$st) {
@@ -241,13 +260,32 @@ function orange_delivery_fee_policy_normalize(?string $policy): string
 }
 
 /**
- * @return array{default_delivery_fee:float, delivery_fee_policy:string}
+ * @return array<string, bool>
+ */
+function orange_delivery_fee_apply_mode_values(): array
+{
+    return [
+        'all' => true,
+        'custom' => true,
+    ];
+}
+
+function orange_delivery_fee_apply_mode_normalize(?string $mode): string
+{
+    $key = strtolower(trim((string) $mode));
+
+    return isset(orange_delivery_fee_apply_mode_values()[$key]) ? $key : 'all';
+}
+
+/**
+ * @return array{default_delivery_fee:float, delivery_fee_policy:string, delivery_fee_apply_mode:string}
  */
 function orange_delivery_country_policy_read(PDO $pdo, ?int $countryId = null): array
 {
     $result = [
         'default_delivery_fee' => 0.0,
         'delivery_fee_policy' => 'paid_all',
+        'delivery_fee_apply_mode' => 'all',
     ];
     if (!orange_table_exists($pdo, 'countries')) {
         return $result;
@@ -261,13 +299,15 @@ function orange_delivery_country_policy_read(PDO $pdo, ?int $countryId = null): 
 
     $hasFee = orange_table_has_column($pdo, 'countries', 'default_delivery_fee');
     $hasPolicy = orange_table_has_column($pdo, 'countries', 'delivery_fee_policy');
-    if (!$hasFee && !$hasPolicy) {
+    $hasApplyMode = orange_table_has_column($pdo, 'countries', 'delivery_fee_apply_mode');
+    if (!$hasFee && !$hasPolicy && !$hasApplyMode) {
         return $result;
     }
     $feeSel = $hasFee ? 'default_delivery_fee' : '0 AS default_delivery_fee';
     $policySel = $hasPolicy ? "delivery_fee_policy" : "'paid_all' AS delivery_fee_policy";
+    $applyModeSel = $hasApplyMode ? "delivery_fee_apply_mode" : "'all' AS delivery_fee_apply_mode";
     $st = $pdo->prepare(
-        'SELECT ' . $feeSel . ', ' . $policySel . ' FROM countries WHERE id = ? LIMIT 1'
+        'SELECT ' . $feeSel . ', ' . $policySel . ', ' . $applyModeSel . ' FROM countries WHERE id = ? LIMIT 1'
     );
     $st->execute([$countryId]);
     $row = $st->fetch(PDO::FETCH_ASSOC);
@@ -278,6 +318,7 @@ function orange_delivery_country_policy_read(PDO $pdo, ?int $countryId = null): 
         'delivery_fee' => $row['default_delivery_fee'] ?? 0,
     ]);
     $result['delivery_fee_policy'] = orange_delivery_fee_policy_normalize((string) ($row['delivery_fee_policy'] ?? ''));
+    $result['delivery_fee_apply_mode'] = orange_delivery_fee_apply_mode_normalize((string) ($row['delivery_fee_apply_mode'] ?? 'all'));
 
     return $result;
 }
@@ -289,16 +330,24 @@ function orange_delivery_country_default_fee(PDO $pdo, ?int $countryId = null): 
     return (float) ($policy['default_delivery_fee'] ?? 0.0);
 }
 
-function orange_delivery_country_policy_save(PDO $pdo, int $countryId, float $defaultDeliveryFee, string $policy): void
+function orange_delivery_country_policy_save(
+    PDO $pdo,
+    int $countryId,
+    float $defaultDeliveryFee,
+    string $policy,
+    ?string $applyMode = null
+): void
 {
     if ($countryId <= 0 || !orange_table_exists($pdo, 'countries')) {
         return;
     }
     $fee = round(max(0.0, $defaultDeliveryFee), 4);
     $policyNorm = orange_delivery_fee_policy_normalize($policy);
+    $applyModeNorm = $applyMode === null ? null : orange_delivery_fee_apply_mode_normalize($applyMode);
     $hasFee = orange_table_has_column($pdo, 'countries', 'default_delivery_fee');
     $hasPolicy = orange_table_has_column($pdo, 'countries', 'delivery_fee_policy');
-    if (!$hasFee && !$hasPolicy) {
+    $hasApplyMode = orange_table_has_column($pdo, 'countries', 'delivery_fee_apply_mode');
+    if (!$hasFee && !$hasPolicy && !$hasApplyMode) {
         return;
     }
     $set = [];
@@ -310,6 +359,10 @@ function orange_delivery_country_policy_save(PDO $pdo, int $countryId, float $de
     if ($hasPolicy) {
         $set[] = 'delivery_fee_policy = ?';
         $params[] = $policyNorm;
+    }
+    if ($hasApplyMode && $applyModeNorm !== null) {
+        $set[] = 'delivery_fee_apply_mode = ?';
+        $params[] = $applyModeNorm;
     }
     if ($set === []) {
         return;
@@ -332,11 +385,18 @@ function orange_delivery_apply_default_fee_to_active_areas(PDO $pdo, int $countr
     $hasCountry = orange_delivery_areas_has_country_column($pdo);
     $hasGov = orange_delivery_areas_has_governorate_column($pdo)
         && orange_delivery_governorates_table_exists($pdo);
+    $hasPending = orange_delivery_areas_has_pending_fee_column($pdo);
+    $setClause = $hasPending
+        ? 'a.delivery_fee = ?, a.delivery_fee_pending = 0'
+        : 'a.delivery_fee = ?';
+    $setClauseSimple = $hasPending
+        ? 'delivery_fee = ?, delivery_fee_pending = 0'
+        : 'delivery_fee = ?';
     if ($hasCountry && $hasGov) {
         $up = $pdo->prepare(
             'UPDATE delivery_areas a
              INNER JOIN delivery_governorates g ON g.id = a.governorate_id
-             SET a.delivery_fee = ?
+             SET ' . $setClause . '
              WHERE a.is_active = 1
                AND g.is_active = 1
                AND (a.country_id = ? OR g.country_id = ?)'
@@ -349,7 +409,7 @@ function orange_delivery_apply_default_fee_to_active_areas(PDO $pdo, int $countr
         $up = $pdo->prepare(
             'UPDATE delivery_areas a
              INNER JOIN delivery_governorates g ON g.id = a.governorate_id
-             SET a.delivery_fee = ?
+             SET ' . $setClause . '
              WHERE a.is_active = 1
                AND g.is_active = 1
                AND g.country_id = ?'
@@ -360,14 +420,14 @@ function orange_delivery_apply_default_fee_to_active_areas(PDO $pdo, int $countr
     }
     if ($hasCountry) {
         $up = $pdo->prepare(
-            'UPDATE delivery_areas SET delivery_fee = ? WHERE is_active = 1 AND country_id = ?'
+            'UPDATE delivery_areas SET ' . $setClauseSimple . ' WHERE is_active = 1 AND country_id = ?'
         );
         $up->execute([$fee, $countryId]);
 
         return (int) $up->rowCount();
     }
     $up = $pdo->prepare(
-        'UPDATE delivery_areas SET delivery_fee = ? WHERE is_active = 1'
+        'UPDATE delivery_areas SET ' . $setClauseSimple . ' WHERE is_active = 1'
     );
     $up->execute([$fee]);
 
@@ -508,7 +568,7 @@ function orange_delivery_promotions_admin_list(PDO $pdo, int $countryId): array
     }
     $st = $pdo->prepare(
         'SELECT id, country_id, name_ar, name_en, discount_type, discount_value,
-                requires_registered_account, valid_from, valid_to, sort_order, is_active
+                requires_registered_account, valid_from, valid_to, sort_order, is_active, is_always_on
          FROM delivery_fee_promotions
          WHERE country_id = ?
          ORDER BY sort_order ASC, id ASC'
@@ -562,6 +622,7 @@ function orange_delivery_promotions_admin_list(PDO $pdo, int $countryId): array
         $row['requires_registered_account'] = (int) ($row['requires_registered_account'] ?? 0) === 1 ? 1 : 0;
         $row['sort_order'] = (int) ($row['sort_order'] ?? 0);
         $row['is_active'] = (int) ($row['is_active'] ?? 0) === 1 ? 1 : 0;
+        $row['is_always_on'] = (int) ($row['is_always_on'] ?? 0) === 1 ? 1 : 0;
         $row['target_governorate_ids'] = $governorateIdsMap[$pid] ?? [];
         $row['target_area_ids'] = $areaIdsMap[$pid] ?? [];
         $row['target_governorate_names'] = $governorateNamesMap[$pid] ?? [];
@@ -664,10 +725,10 @@ function orange_delivery_promotion_resolve_for_checkout(
     }
     $st = $pdo->prepare(
         'SELECT id, name_ar, name_en, discount_type, discount_value, requires_registered_account,
-                sort_order, valid_from, valid_to
+                sort_order, valid_from, valid_to, is_always_on
          FROM delivery_fee_promotions
          WHERE country_id = ? AND is_active = 1
-           AND valid_from <= CURDATE() AND valid_to >= CURDATE()
+           AND (is_always_on = 1 OR (valid_from <= CURDATE() AND valid_to >= CURDATE()))
          ORDER BY sort_order ASC, id ASC'
     );
     $st->execute([$countryId]);
@@ -978,7 +1039,9 @@ function orange_delivery_areas_admin_select_options(PDO $pdo, int $countryId, st
             continue;
         }
         $isActive = (int) ($daRow['is_active'] ?? 0) === 1;
-        if ($context === 'supplier' && !$isActive) {
+        $isPending = (int) ($daRow['delivery_fee_pending'] ?? 0) === 1;
+        $isDeliverable = $isActive && !$isPending;
+        if ($context === 'supplier' && !$isDeliverable) {
             continue;
         }
         $nameAr = trim((string) ($daRow['name_ar'] ?? ''));
@@ -993,14 +1056,14 @@ function orange_delivery_areas_admin_select_options(PDO $pdo, int $countryId, st
         }
         $seen[$areaKey] = true;
         $label = $nameAr !== '' ? $nameAr : $nameEn;
-        if ($context === 'customer' && !$isActive) {
-            $label .= ' (غير منطقة توصيل حالياً)';
+        if ($context === 'customer' && !$isDeliverable) {
+            $label .= $isPending ? ' (بانتظار تحديد سعر التوصيل)' : ' (غير منطقة توصيل حالياً)';
         }
         $options[] = [
             'value' => $areaValue,
             'label' => $label,
             'da_id' => (int) ($daRow['id'] ?? 0),
-            'is_active' => $isActive ? 1 : 0,
+            'is_active' => $isDeliverable ? 1 : 0,
         ];
     }
 
@@ -1018,29 +1081,34 @@ function orange_delivery_areas_count_active(PDO $pdo, ?int $countryId = null): i
     }
     $hasGov = orange_delivery_areas_has_governorate_column($pdo)
         && orange_delivery_governorates_table_exists($pdo);
+    $hasPending = orange_delivery_areas_has_pending_fee_column($pdo);
+    $pendingFilterA = $hasPending ? ' AND (a.delivery_fee_pending = 0 OR a.delivery_fee_pending IS NULL)' : '';
+    $pendingFilter = $hasPending ? ' AND (delivery_fee_pending = 0 OR delivery_fee_pending IS NULL)' : '';
     if (orange_delivery_areas_has_country_column($pdo) && $countryId > 0 && $hasGov) {
         $st = $pdo->prepare(
             'SELECT COUNT(*) FROM delivery_areas a
              INNER JOIN delivery_governorates g ON g.id = a.governorate_id AND g.is_active = 1
-             WHERE a.is_active = 1 AND a.country_id = ?'
+             WHERE a.is_active = 1 AND a.country_id = ?' . $pendingFilterA
         );
         $st->execute([$countryId]);
 
         return (int) $st->fetchColumn();
     }
     if (orange_delivery_areas_has_country_column($pdo) && $countryId > 0) {
-        $st = $pdo->prepare('SELECT COUNT(*) FROM delivery_areas WHERE is_active = 1 AND country_id = ?');
+        $st = $pdo->prepare(
+            'SELECT COUNT(*) FROM delivery_areas WHERE is_active = 1 AND country_id = ?' . $pendingFilter
+        );
         $st->execute([$countryId]);
 
         return (int) $st->fetchColumn();
     }
-    $n = $pdo->query('SELECT COUNT(*) FROM delivery_areas WHERE is_active = 1')->fetchColumn();
+    $n = $pdo->query('SELECT COUNT(*) FROM delivery_areas WHERE is_active = 1' . $pendingFilter)->fetchColumn();
 
     return (int) $n;
 }
 
 /**
- * @return array{id?:int, name_ar:string, name_en:string, delivery_fee?:float, sort_order:int, is_active:int, governorate_id?:int}|null
+ * @return array{id?:int, name_ar:string, name_en:string, delivery_fee?:float, delivery_fee_pending?:int, sort_order:int, is_active:int, governorate_id?:int}|null
  */
 function orange_delivery_area_row_active(PDO $pdo, int $id, ?int $countryId = null): ?array
 {
@@ -1054,28 +1122,33 @@ function orange_delivery_area_row_active(PDO $pdo, int $id, ?int $countryId = nu
     $hasGov = orange_delivery_areas_has_governorate_column($pdo)
         && orange_delivery_governorates_table_exists($pdo);
     $hasFee = orange_table_has_column($pdo, 'delivery_areas', 'delivery_fee');
+    $hasPending = orange_delivery_areas_has_pending_fee_column($pdo);
     $govSelA = $hasGov ? 'a.governorate_id' : '0 AS governorate_id';
     $govSel = $hasGov ? 'governorate_id' : '0 AS governorate_id';
     $feeSelA = $hasFee ? 'a.delivery_fee' : '0 AS delivery_fee';
     $feeSel = $hasFee ? 'delivery_fee' : '0 AS delivery_fee';
+    $pendingSelA = $hasPending ? 'a.delivery_fee_pending' : '0 AS delivery_fee_pending';
+    $pendingSel = $hasPending ? 'delivery_fee_pending' : '0 AS delivery_fee_pending';
+    $pendingFilterA = $hasPending ? ' AND (a.delivery_fee_pending = 0 OR a.delivery_fee_pending IS NULL)' : '';
+    $pendingFilter = $hasPending ? ' AND (delivery_fee_pending = 0 OR delivery_fee_pending IS NULL)' : '';
     if (orange_delivery_areas_has_country_column($pdo) && $countryId > 0 && $hasGov) {
         $st = $pdo->prepare(
-            'SELECT a.id, a.name_ar, a.name_en, ' . $feeSelA . ', a.sort_order, a.is_active, ' . $govSelA . '
+            'SELECT a.id, a.name_ar, a.name_en, ' . $feeSelA . ', a.sort_order, a.is_active, ' . $govSelA . ', ' . $pendingSelA . '
              FROM delivery_areas a
              INNER JOIN delivery_governorates g ON g.id = a.governorate_id AND g.is_active = 1
-             WHERE a.id = ? AND a.is_active = 1 AND a.country_id = ? LIMIT 1'
+             WHERE a.id = ? AND a.is_active = 1 AND a.country_id = ?' . $pendingFilterA . ' LIMIT 1'
         );
         $st->execute([$id, $countryId]);
     } elseif (orange_delivery_areas_has_country_column($pdo) && $countryId > 0) {
         $st = $pdo->prepare(
-            'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, ' . $govSel . ' FROM delivery_areas
-             WHERE id = ? AND is_active = 1 AND country_id = ? LIMIT 1'
+            'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, ' . $govSel . ', ' . $pendingSel . ' FROM delivery_areas
+             WHERE id = ? AND is_active = 1 AND country_id = ?' . $pendingFilter . ' LIMIT 1'
         );
         $st->execute([$id, $countryId]);
     } else {
         $st = $pdo->prepare(
-            'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, ' . $govSel . '
-             FROM delivery_areas WHERE id = ? AND is_active = 1 LIMIT 1'
+            'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, ' . $govSel . ', ' . $pendingSel . '
+             FROM delivery_areas WHERE id = ? AND is_active = 1' . $pendingFilter . ' LIMIT 1'
         );
         $st->execute([$id]);
     }

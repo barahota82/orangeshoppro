@@ -17,7 +17,7 @@ function orange_cart_promotions_admin_list(PDO $pdo): array
     $cid = orange_cart_promotion_admin_country_id($pdo);
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_promotions', '', $cid);
     $st = $pdo->prepare(
-        'SELECT id, min_subtotal, discount_amount, requires_registered_account, sort_order, is_active,
+        'SELECT id, min_subtotal, discount_amount, requires_registered_account, sort_order, is_active, is_always_on,
                 valid_from, valid_to, auto_paused_at, auto_paused_reason
          FROM cart_promotions WHERE 1=1' . $bind['sql'] . ' ORDER BY sort_order ASC, id ASC'
     );
@@ -41,7 +41,7 @@ function orange_cart_promotion_resolve(PDO $pdo, float $subtotal, bool $buyerIsR
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_promotions', '', $cid);
     $st = $pdo->prepare(
         "SELECT id, min_subtotal, discount_amount, requires_registered_account,
-                is_active, valid_from, valid_to, auto_paused_at, auto_paused_reason
+                is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason
          FROM cart_promotions
          WHERE 1=1" . orange_cart_promo_schedule_sql('cart_promotions') . $bind['sql'] . "
          ORDER BY min_subtotal DESC, discount_amount DESC, id DESC"
@@ -87,7 +87,7 @@ function orange_cart_promotion_best_registered_only_match(PDO $pdo, float $subto
     $cid = orange_cart_promotion_storefront_country_id($pdo, $countryId);
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_promotions', '', $cid);
     $st = $pdo->prepare(
-        "SELECT min_subtotal, discount_amount, is_active, valid_from, valid_to, auto_paused_at, auto_paused_reason
+        "SELECT min_subtotal, discount_amount, is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason
          FROM cart_promotions
          WHERE requires_registered_account = 1" . orange_cart_promo_schedule_sql('cart_promotions') . $bind['sql'] . "
          ORDER BY min_subtotal DESC, discount_amount DESC, id DESC"

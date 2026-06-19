@@ -117,7 +117,7 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $cid);
     $st = $pdo->prepare(
         'SELECT id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids,
-                gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active,
+                gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active, is_always_on,
                 valid_from, valid_to, auto_paused_at, auto_paused_reason
          FROM cart_bogo_promotions WHERE 1=1' . $bind['sql'] . ' ORDER BY sort_order ASC, id ASC'
     );
@@ -146,6 +146,7 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
             'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),
             'sort_order' => (int) ($row['sort_order'] ?? 0),
             'is_active' => (int) ($row['is_active'] ?? 0),
+            'is_always_on' => (int) ($row['is_always_on'] ?? 0),
             'valid_from' => (string) ($row['valid_from'] ?? ''),
             'valid_to' => (string) ($row['valid_to'] ?? ''),
             'auto_paused_at' => $row['auto_paused_at'] ?? null,
@@ -171,7 +172,7 @@ function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems,
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $cid);
     $st = $pdo->prepare(
         "SELECT id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids,
-                gift_unit_charge_kind, gift_unit_charge_value, is_active, valid_from, valid_to, auto_paused_at, auto_paused_reason
+                gift_unit_charge_kind, gift_unit_charge_value, is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason
          FROM cart_bogo_promotions
          WHERE 1=1" . orange_cart_promo_schedule_sql('cart_bogo_promotions') . $bind['sql'] . "
          ORDER BY sort_order ASC, id ASC"
