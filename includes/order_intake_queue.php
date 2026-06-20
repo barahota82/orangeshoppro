@@ -561,6 +561,30 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         orange_country_id_for_channel($pdo, (int) $data['channel_id'])
     );
 
+    // استبدال نقاط الولاء (للحساب المسجَّل فقط): يقلّل المبلغ المستحق؛ الاستهلاك FIFO بعد إدراج الطلب.
+    $loyaltyRedeemPoints = 0;
+    $loyaltyRedeemValue = 0.0;
+    $loyaltyPayableBeforeRedeem = $orderTotal;
+    if ($buyerRegistered && $customerRowId !== null && $customerRowId > 0) {
+        require_once __DIR__ . '/loyalty.php';
+        $redeemReq = (int) ($data['redeem_points'] ?? 0);
+        if ($redeemReq > 0 && orange_loyalty_is_active($pdo, $orderCountryId)) {
+            $redeemInfo = orange_loyalty_redeemable($pdo, (int) $customerRowId, $orderCountryId, $orderTotal);
+            $loyaltyRedeemPoints = min($redeemReq, (int) $redeemInfo['points']);
+            if ($loyaltyRedeemPoints > 0) {
+                $loySet = orange_loyalty_settings($pdo, $orderCountryId);
+                $pv = $loySet !== null ? (float) $loySet['point_value'] : 0.0;
+                $loyaltyRedeemValue = round(min($loyaltyRedeemPoints * $pv, $orderTotal), 4);
+                if ($loyaltyRedeemValue <= 0.0001) {
+                    $loyaltyRedeemPoints = 0;
+                    $loyaltyRedeemValue = 0.0;
+                } else {
+                    $orderTotal = max(0.0, round($orderTotal - $loyaltyRedeemValue, 4));
+                }
+            }
+        }
+    }
+
     $hasOrdDial = orange_table_has_column($pdo, 'orders', 'phone_country_dial');
     $hasOrdNat = orange_table_has_column($pdo, 'orders', 'phone_national');
     $cols = 'order_number, customer_name';
@@ -712,6 +736,21 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
 
     orange_storefront_insert_order_items_for_order($pdo, $orderId, $linesForStock);
 
+    if ($loyaltyRedeemPoints > 0 && $loyaltyRedeemValue > 0.0001 && $customerRowId !== null && $customerRowId > 0) {
+        $applied = orange_loyalty_apply_redemption(
+            $pdo,
+            (int) $customerRowId,
+            $orderCountryId,
+            $loyaltyRedeemPoints,
+            $loyaltyPayableBeforeRedeem,
+            'order',
+            $orderId
+        );
+        $loyaltyRedeemValue = round((float) $applied['value'], 4);
+    } else {
+        $loyaltyRedeemValue = 0.0;
+    }
+
     if (orange_invoice_ancillary_tables_ready($pdo)) {
         $autoLines = orange_invoice_ancillary_merge_auto_delivery_lines(
             $pdo,
@@ -732,6 +771,7 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
                 'promo_gift_discount' => $giftDiscount,
                 'promo_bogo_discount' => $bogoDiscount,
                 'product_offer_discount' => $productOfferDiscount,
+                'loyalty_points_redemption' => $loyaltyRedeemValue,
             ],
             $autoLines
         );

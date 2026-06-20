@@ -177,6 +177,47 @@ try {
     }
     $total = max(0.0, round($total + $thresholdGiftChargePreview + $bogoGiftChargePreview + $deliveryFee, 4));
 
+    // نظام الولاء: عرض الرصيد القابل للاستخدام وتطبيق الاستبدال المطلوب (للحساب المسجَّل فقط).
+    require_once __DIR__ . '/../../includes/loyalty.php';
+    $loyalty = ['active' => false];
+    if ($buyerReg && orange_loyalty_is_active($pdo, $storefrontCountryId)) {
+        $accPhone = trim((string) ($acc['customer_phone'] ?? ''));
+        $custId = 0;
+        if ($accPhone !== '') {
+            if (orange_table_has_country_id($pdo, 'customers') && $storefrontCountryId > 0) {
+                $cs = $pdo->prepare('SELECT id FROM customers WHERE phone = ? AND country_id = ? LIMIT 1');
+                $cs->execute([$accPhone, $storefrontCountryId]);
+            } else {
+                $cs = $pdo->prepare('SELECT id FROM customers WHERE phone = ? LIMIT 1');
+                $cs->execute([$accPhone]);
+            }
+            $custId = (int) ($cs->fetchColumn() ?: 0);
+        }
+        if ($custId > 0) {
+            $payableBefore = $total;
+            $info = orange_loyalty_redeemable($pdo, $custId, $storefrontCountryId, $payableBefore);
+            $sLoy = orange_loyalty_settings($pdo, $storefrontCountryId);
+            $pv = $sLoy !== null ? (float) $sLoy['point_value'] : 0.0;
+            $reqPts = (int) ($data['redeem_points'] ?? 0);
+            $appliedPts = $reqPts > 0 ? min($reqPts, (int) $info['points']) : 0;
+            $appliedVal = 0.0;
+            if ($appliedPts > 0 && $pv > 0) {
+                $appliedVal = round(min($appliedPts * $pv, $payableBefore), 4);
+                $total = max(0.0, round($total - $appliedVal, 4));
+            }
+            $loyalty = [
+                'active' => true,
+                'balance' => (int) $info['balance'],
+                'redeemable_points' => (int) $info['points'],
+                'redeemable_value' => (float) $info['value'],
+                'point_value' => $pv,
+                'min_redeem_points' => $sLoy !== null ? (int) $sLoy['min_redeem_points'] : 0,
+                'redeem_points' => $appliedPts,
+                'redeem_value' => $appliedVal,
+            ];
+        }
+    }
+
     json_response([
         'success' => true,
         'subtotal' => $subtotal,
@@ -197,6 +238,7 @@ try {
         'combo_register_unlock_teaser' => $comboRegUnlock,
         'gift_promotion' => $giftPayload,
         'bogo_promotion' => $bogoPayload,
+        'loyalty' => $loyalty,
     ]);
 } catch (RuntimeException $e) {
     json_response(['success' => false, 'code' => 'preview_failed', 'message' => $e->getMessage()], 422);

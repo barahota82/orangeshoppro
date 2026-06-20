@@ -670,6 +670,55 @@ function orangeSyncCartTabCount() {
 
 let __orangeCartPreviewTimer = null;
 let __orangeCartPreviewSeq = 0;
+let __orangeLoyaltyRedeemPoints = 0;
+
+function orangeUpdateLoyaltyRedeemUI(loyalty) {
+    const box = document.getElementById('cartLoyaltyRedeemBox');
+    if (!box) {
+        return;
+    }
+    if (!loyalty || loyalty.active !== true || !(Number(loyalty.balance) > 0)) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+        __orangeLoyaltyRedeemPoints = 0;
+        return;
+    }
+    const T = window.APP_T || {};
+    const balance = Number(loyalty.balance) || 0;
+    const redeemablePoints = Number(loyalty.redeemable_points) || 0;
+    const appliedPoints = Number(loyalty.redeem_points) || 0;
+    const appliedValue = Number(loyalty.redeem_value) || 0;
+    __orangeLoyaltyRedeemPoints = appliedPoints;
+    const checked = appliedPoints > 0 ? ' checked' : '';
+    const disabled = redeemablePoints > 0 ? '' : ' disabled';
+    const lblBalance = (T.loyalty_balance_label || 'رصيد نقاطك') + ': ' + balance;
+    let lblUse = T.loyalty_use_points_label || 'استخدم نقاطي في هذا الطلب';
+    if (redeemablePoints > 0) {
+        lblUse += ' (' + redeemablePoints + ' = ' + formatMoney(redeemablePoints * (Number(loyalty.point_value) || 0)) + ')';
+    }
+    let appliedHtml = '';
+    if (appliedValue > 0) {
+        appliedHtml = '<p class="cart-loyalty-applied" style="margin:0.35rem 0 0;color:#15803d;">'
+            + (T.loyalty_applied_label || 'خصم النقاط المطبّق') + ': −' + formatMoney(appliedValue)
+            + ' (' + appliedPoints + ')</p>';
+    }
+    box.innerHTML =
+        '<div class="cart-loyalty-redeem-inner" style="border:1px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.8rem;">'
+        + '<p style="margin:0 0 0.4rem;font-weight:700;">' + lblBalance + '</p>'
+        + '<label style="display:flex;gap:0.5rem;align-items:center;cursor:pointer;">'
+        + '<input type="checkbox" id="cartLoyaltyRedeemToggle"' + checked + disabled + '>'
+        + '<span>' + lblUse + '</span></label>'
+        + appliedHtml
+        + '</div>';
+    box.style.display = '';
+    const toggle = document.getElementById('cartLoyaltyRedeemToggle');
+    if (toggle) {
+        toggle.addEventListener('change', function () {
+            __orangeLoyaltyRedeemPoints = this.checked ? redeemablePoints : 0;
+            orangeRunCheckoutPreview();
+        });
+    }
+}
 
 function orangeCancelCheckoutPreview() {
     if (__orangeCartPreviewTimer) {
@@ -1574,6 +1623,7 @@ async function orangeRunCheckoutPreview() {
     const payload = {
         items: cartItemsForCheckoutPreview(previewLines),
         delivery_area_id: orangeCheckoutSelectedDeliveryAreaId(),
+        redeem_points: __orangeLoyaltyRedeemPoints,
         lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
     };
     try {
@@ -1614,17 +1664,20 @@ async function orangeRunCheckoutPreview() {
             );
             orangeUpdateCartGiftPromotionUI(data.gift_promotion || null);
             orangeUpdateCartBogoPromotionUI(data.bogo_promotion || null);
+            orangeUpdateLoyaltyRedeemUI(data.loyalty || null);
         } else {
             orangeUpdateRegisterPromoTeaser(null);
             orangeUpdateGiftBogoRegisterUnlockTeaser(false, false, false);
             orangeUpdateCartGiftPromotionUI(null);
             orangeUpdateCartBogoPromotionUI(null);
+            orangeUpdateLoyaltyRedeemUI(null);
         }
     } catch (e) {
         orangeUpdateRegisterPromoTeaser(null);
         orangeUpdateGiftBogoRegisterUnlockTeaser(false, false, false);
         orangeUpdateCartGiftPromotionUI(null);
         orangeUpdateCartBogoPromotionUI(null);
+        orangeUpdateLoyaltyRedeemUI(null);
     }
 }
 
@@ -2307,6 +2360,7 @@ async function sendOrderNow() {
         channel_id: window.APP_CHANNEL_ID || 0,
         items: itemsForOrder,
         payment_terms: paymentTerms,
+        redeem_points: __orangeLoyaltyRedeemPoints,
         lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
     };
 

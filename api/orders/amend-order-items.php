@@ -173,6 +173,13 @@ try {
                 orange_invoice_ancillary_doc_kind_sales(),
                 $orderId
             );
+            // الحفاظ على بند استبدال نقاط الولاء كما هو (لا يُعاد حسابه عند التعديل — النقاط مُستهلَكة بالفعل).
+            $existingLoyaltyRedeem = 0.0;
+            foreach ($savedExtra as $savedLine) {
+                if (is_array($savedLine) && (string) ($savedLine['system_key'] ?? '') === 'loyalty_points_redemption') {
+                    $existingLoyaltyRedeem = round($existingLoyaltyRedeem + (float) ($savedLine['amount'] ?? 0), 4);
+                }
+            }
             $mergedExtra = orange_invoice_ancillary_merge_auto_promo_lines(
                 $pdo,
                 $amendCountryId,
@@ -182,6 +189,7 @@ try {
                     'promo_gift_discount' => $giftDiscount,
                     'promo_bogo_discount' => $bogoDiscount,
                     'product_offer_discount' => $productOfferDiscount,
+                    'loyalty_points_redemption' => $existingLoyaltyRedeem,
                 ],
                 $savedExtra
             );

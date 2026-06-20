@@ -829,6 +829,12 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
 
     // مصروف التوصيل الذي تتحمّله الشركة (تكلفة الشركة per المنطقة) — قيد مستقل عن إيراد التوصيل.
     orange_order_post_delivery_expense_gl($pdo, $order, $ofGlCountryId, $isOnline);
+
+    // كسب نقاط الولاء عند التسليم على صافي مبيعات البضاعة (بنود الطلب، باستثناء التوصيل) — مرّة واحدة.
+    require_once __DIR__ . '/loyalty.php';
+    $orderForLoyalty = $order;
+    $orderForLoyalty['customer_id'] = $customerIdForAr;
+    orange_loyalty_earn_for_order($pdo, $orderForLoyalty, $ofGlCountryId, $orderSalesNet);
 }
 
 /**

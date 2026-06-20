@@ -174,6 +174,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                     <label for="customer_notes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <textarea id="customer_notes" maxlength="4000"></textarea>
                 </div>
+                <div id="cartLoyaltyRedeemBox" class="field cart-loyalty-redeem" style="display:none;"></div>
                 <?php if ($cartPaymentOnlineEnabled): ?>
                 <fieldset class="field cart-checkout-payment-fieldset">
                     <legend><?php echo htmlspecialchars(t('order_payment_terms_label'), ENT_QUOTES, 'UTF-8'); ?></legend>

@@ -171,6 +171,7 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'cart_gift_promotions', 'label' => 'عروض الهدايا'],
                         ['page' => 'cart_bogo_promotions', 'label' => 'عروض BOGO'],
                         ['page' => 'cart_combo_promotions', 'label' => 'عروض الكومبو'],
+                        ['page' => 'loyalty', 'label' => 'نظام الولاء (النقاط)'],
                         ['page' => 'cart_promo_health', 'label' => 'صحة العروض (مخزون)'],
                     ],
                 ],
@@ -379,6 +380,7 @@ function orange_admin_permission_actions_for_page(string $page): array
         'storefront_merge_requests',
         'delivery_areas',
         'delivery_promotions',
+        'loyalty',
         'channels',
     ];
 
