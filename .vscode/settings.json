@@ -1,3 +1,43 @@
 {
-  "files.encoding": "utf8"
+  "files.encoding": "utf8",
+  "files.watcherExclude": {
+    "**/_compare_old_copy/**": true,
+    "**/_compare_zip_old/**": true,
+    "**/.tmp_php_error_logs/**": true,
+    "**/.tmp_account_list_xlsx/**": true,
+    "**/.tmp_income_xlsx/**": true,
+    "**/.pl_extract/**": true,
+    "**/ref_extract1/**": true,
+    "**/ref_extract2/**": true,
+    "**/.ref_extract1/**": true,
+    "**/.ref_extract2/**": true,
+    "**/_t/**": true,
+    "**/uploads/**": true
+  },
+  "search.exclude": {
+    "**/_compare_old_copy": true,
+    "**/_compare_zip_old": true,
+    "**/.tmp_php_error_logs": true,
+    "**/.tmp_account_list_xlsx": true,
+    "**/.tmp_income_xlsx": true,
+    "**/.pl_extract": true,
+    "**/ref_extract1": true,
+    "**/ref_extract2": true,
+    "**/.ref_extract1": true,
+    "**/.ref_extract2": true,
+    "**/_t": true
+  },
+  "files.exclude": {
+    "**/_compare_old_copy": true,
+    "**/_compare_zip_old": true,
+    "**/.tmp_php_error_logs": true,
+    "**/.tmp_account_list_xlsx": true,
+    "**/.tmp_income_xlsx": true,
+    "**/.pl_extract": true,
+    "**/ref_extract1": true,
+    "**/ref_extract2": true,
+    "**/.ref_extract1": true,
+    "**/.ref_extract2": true,
+    "**/_t": true
+  }
 }

@@ -1,0 +1,26 @@
+# Excluded from Cursor INDEXING only (not from the agent).
+# Files listed here are NOT loaded into the codebase index on open, so they do
+# not slow Cursor down — BUT the agent can still open, read, edit, and push them
+# when you reference them explicitly (@file) or by path. Add any heavy file here
+# that you want available on demand without being indexed.
+
+# Local full-project comparison copies (thousands of duplicate files)
+_compare_old_copy/
+_compare_zip_old/
+
+# Large local PHP error logs (pure noise)
+.tmp_php_error_logs/
+
+# Temp / extract scratch folders
+.tmp_account_list_xlsx/
+.tmp_income_xlsx/
+.pl_extract/
+ref_extract1/
+ref_extract2/
+.ref_extract1/
+.ref_extract2/
+_t/
+
+# DB schema snapshots — opened on demand for review; no need to index
+orange_db.sql
+scripts/orange_db.sql
