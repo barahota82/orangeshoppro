@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/cart_promotions.php';
 require_once __DIR__ . '/../../includes/cart_gift_promotions.php';
 require_once __DIR__ . '/../../includes/cart_bogo_promotions.php';
 require_once __DIR__ . '/../../includes/cart_combo_promotions.php';
+require_once __DIR__ . '/../../includes/product_offers.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 
@@ -34,7 +35,12 @@ try {
     $netAfterCombo = max(0.0, round($subtotal - $comboDiscount, 4));
     $promo = orange_cart_promotion_resolve($pdo, $netAfterCombo, $buyerReg, $storefrontCountryId);
     $promoDiscount = $promo !== null ? (float) $promo['discount'] : 0.0;
-    $total = max(0.0, round($netAfterCombo - $promoDiscount, 4));
+    $productOfferDiscount = orange_product_offer_total_discount_for_items($pdo, $validatedItems, $storefrontCountryId);
+    $maxOfferRoom = max(0.0, round($subtotal - $comboDiscount - $promoDiscount, 4));
+    if ($productOfferDiscount > $maxOfferRoom) {
+        $productOfferDiscount = $maxOfferRoom;
+    }
+    $total = max(0.0, round($netAfterCombo - $promoDiscount - $productOfferDiscount, 4));
     $regTeaser = orange_cart_promotion_register_incentive_teaser($pdo, $netAfterCombo, $buyerReg, $storefrontCountryId);
     $giftRegUnlock = orange_cart_gift_register_unlock_teaser_applies($pdo, $subtotal, $buyerReg, $validatedItems, $storefrontCountryId);
     $bogoRegUnlock = orange_cart_bogo_register_unlock_teaser_applies($pdo, $validatedItems, $buyerReg, $storefrontCountryId);
@@ -174,6 +180,7 @@ try {
         'combo_discount' => $comboDiscount,
         'promotion_id' => $promo !== null ? (int) $promo['id'] : null,
         'promotion_discount' => $promoDiscount,
+        'product_offer_discount' => $productOfferDiscount,
         'delivery_area_id' => $deliveryAreaId > 0 ? $deliveryAreaId : null,
         'delivery_fee_base' => $deliveryFeeBase,
         'delivery_fee_discount' => $deliveryFeeDiscount,

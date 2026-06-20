@@ -78,7 +78,14 @@ try {
         $promoPick = orange_cart_promotion_resolve($pdo, $netAfterCombo, $buyerRegistered);
         $promoDiscount = $promoPick !== null ? (float) $promoPick['discount'] : 0.0;
         $promoId = $promoPick !== null ? (int) $promoPick['id'] : null;
-        $orderTotal = max(0.0, round($netAfterCombo - $promoDiscount, 4));
+        $amendCountryId = (int) ($order['country_id'] ?? 0);
+        $amendCountryArg = $amendCountryId > 0 ? $amendCountryId : null;
+        $productOfferDiscount = orange_product_offer_total_discount_for_items($pdo, $validatedItems, $amendCountryArg);
+        $maxOfferRoom = max(0.0, round($subtotal - $comboDiscount - $promoDiscount, 4));
+        if ($productOfferDiscount > $maxOfferRoom) {
+            $productOfferDiscount = $maxOfferRoom;
+        }
+        $orderTotal = max(0.0, round($netAfterCombo - $promoDiscount - $productOfferDiscount, 4));
 
         $promoBundle = orange_storefront_build_promotional_gift_lines($pdo, $data, $validatedItems, $subtotal, $buyerRegistered);
         $giftLine = $promoBundle['giftLine'];
@@ -139,6 +146,10 @@ try {
             $setParts[] = 'cart_bogo_discount = ?';
             $updParams[] = $bogoDiscount > 0 ? $bogoDiscount : 0.0;
         }
+        if (orange_table_has_column($pdo, 'orders', 'product_offer_discount')) {
+            $setParts[] = 'product_offer_discount = ?';
+            $updParams[] = $productOfferDiscount > 0 ? $productOfferDiscount : 0.0;
+        }
         if ($hasBogoCols) {
             $setParts[] = 'cart_bogo_promotion_id = ?';
             $setParts[] = 'cart_bogo_gift_variant_id = ?';
@@ -153,7 +164,6 @@ try {
         $pdo->prepare('UPDATE orders SET ' . implode(', ', $setParts) . ' WHERE id = ?')->execute($updParams);
 
         if (orange_invoice_ancillary_tables_ready($pdo)) {
-            $amendCountryId = (int) ($order['country_id'] ?? 0);
             $savedExtra = orange_invoice_ancillary_extra_lines_for_doc(
                 $pdo,
                 orange_invoice_ancillary_doc_kind_sales(),
@@ -167,6 +177,7 @@ try {
                     'promo_cart_discount' => $promoDiscount,
                     'promo_gift_discount' => $giftDiscount,
                     'promo_bogo_discount' => $bogoDiscount,
+                    'product_offer_discount' => $productOfferDiscount,
                 ],
                 $savedExtra
             );

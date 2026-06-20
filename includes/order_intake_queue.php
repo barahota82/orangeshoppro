@@ -10,6 +10,7 @@ require_once __DIR__ . '/delivery_areas.php';
 require_once __DIR__ . '/storefront_cart_items.php';
 require_once __DIR__ . '/cart_promotions.php';
 require_once __DIR__ . '/cart_combo_promotions.php';
+require_once __DIR__ . '/product_offers.php';
 require_once __DIR__ . '/storefront_checkout_promo_lines.php';
 require_once __DIR__ . '/invoice_ancillary_lines.php';
 require_once __DIR__ . '/countries.php';
@@ -512,7 +513,13 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     $promoPick = orange_cart_promotion_resolve($pdo, $netAfterCombo, $buyerRegistered, $orderCountryId);
     $promoDiscount = $promoPick !== null ? (float) $promoPick['discount'] : 0.0;
     $promoId = $promoPick !== null ? (int) $promoPick['id'] : null;
-    $orderTotal = max(0.0, round($netAfterCombo - $promoDiscount, 4));
+    // عروض المنتج: خصم فعلي عند الدفع (السعر الأصلي على البند + بند خصم منفصل).
+    $productOfferDiscount = orange_product_offer_total_discount_for_items($pdo, $validatedItems, $orderCountryId);
+    $maxOfferRoom = max(0.0, round($subtotal - $comboDiscount - $promoDiscount, 4));
+    if ($productOfferDiscount > $maxOfferRoom) {
+        $productOfferDiscount = $maxOfferRoom;
+    }
+    $orderTotal = max(0.0, round($netAfterCombo - $promoDiscount - $productOfferDiscount, 4));
 
     $promoBundle = orange_storefront_build_promotional_gift_lines($pdo, $data, $validatedItems, $subtotal, $buyerRegistered, $orderCountryId);
     $giftLine = $promoBundle['giftLine'];
@@ -660,6 +667,11 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $ph .= ', ?';
         $params[] = $bogoDiscount > 0 ? $bogoDiscount : 0.0;
     }
+    if (orange_table_has_column($pdo, 'orders', 'product_offer_discount')) {
+        $cols .= ', product_offer_discount';
+        $ph .= ', ?';
+        $params[] = $productOfferDiscount > 0 ? $productOfferDiscount : 0.0;
+    }
     $hasBogoCols = orange_table_has_column($pdo, 'orders', 'cart_bogo_promotion_id')
         && orange_table_has_column($pdo, 'orders', 'cart_bogo_gift_variant_id');
     if ($hasBogoCols) {
@@ -715,6 +727,7 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
                 'promo_cart_discount' => $promoDiscount,
                 'promo_gift_discount' => $giftDiscount,
                 'promo_bogo_discount' => $bogoDiscount,
+                'product_offer_discount' => $productOfferDiscount,
             ],
             $autoLines
         );

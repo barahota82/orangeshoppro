@@ -926,15 +926,17 @@ function orangeCartTotalsEpsilon() {
     return 1e-6;
 }
 
-function orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total) {
+function orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total, productOfferDiscount) {
     const T = window.APP_T || {};
+    productOfferDiscount = typeof productOfferDiscount === 'number' ? productOfferDiscount : 0;
     const totalLbl = T.cart_total_label || 'Total';
     const subLbl = T.cart_subtotal_label || 'Subtotal';
     const promoLbl = T.cart_promotion_discount_label || 'Cart offer';
     const comboLbl = T.cart_combo_discount_label || 'Combo bundle';
+    const offerLbl = T.product_offer_discount_label || T.offers || 'Offer';
     const deliveryLbl = T.checkout_delivery_fee_label || 'Delivery fee';
     const eps = orangeCartTotalsEpsilon();
-    const showBreakdown = comboDiscount > eps || promoDiscount > eps || deliveryFee > eps;
+    const showBreakdown = comboDiscount > eps || promoDiscount > eps || productOfferDiscount > eps || deliveryFee > eps;
     let html =
         '<div class="cart-summary-totals" id="cartMainTotals">';
     if (showBreakdown) {
@@ -944,6 +946,14 @@ function orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, delive
             '</span><span>' +
             formatMoney(subtotal) +
             '</span></div>';
+        if (productOfferDiscount > eps) {
+            html +=
+                '<div class="cart-summary-line cart-summary-line--offer"><span>' +
+                escCartHtml(offerLbl) +
+                '</span><span>−' +
+                formatMoney(productOfferDiscount) +
+                '</span></div>';
+        }
         if (comboDiscount > eps) {
             html +=
                 '<div class="cart-summary-line cart-summary-line--combo"><span>' +
@@ -978,15 +988,17 @@ function orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, delive
     return html;
 }
 
-function orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total) {
+function orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total, productOfferDiscount) {
     const T = window.APP_T || {};
+    productOfferDiscount = typeof productOfferDiscount === 'number' ? productOfferDiscount : 0;
     const totalLbl = T.cart_total_label || 'Total';
     const subLbl = T.cart_subtotal_label || 'Subtotal';
     const promoLbl = T.cart_promotion_discount_label || 'Cart offer';
     const comboLbl = T.cart_combo_discount_label || 'Combo bundle';
+    const offerLbl = T.product_offer_discount_label || T.offers || 'Offer';
     const deliveryLbl = T.checkout_delivery_fee_label || 'Delivery fee';
     const eps = orangeCartTotalsEpsilon();
-    const showBreakdown = comboDiscount > eps || promoDiscount > eps || deliveryFee > eps;
+    const showBreakdown = comboDiscount > eps || promoDiscount > eps || productOfferDiscount > eps || deliveryFee > eps;
     let html =
         '<div class="cart-mini-totals-breakdown" id="cartMiniTotals">';
     if (showBreakdown) {
@@ -996,6 +1008,14 @@ function orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, delive
             '</span><span>' +
             formatMoney(subtotal) +
             '</span></div>';
+        if (productOfferDiscount > eps) {
+            html +=
+                '<div class="cart-mini-total-line cart-mini-total-line--offer"><span>' +
+                escCartHtml(offerLbl) +
+                '</span><span>−' +
+                formatMoney(productOfferDiscount) +
+                '</span></div>';
+        }
         if (comboDiscount > eps) {
             html +=
                 '<div class="cart-mini-total-line cart-mini-total-line--combo"><span>' +
@@ -1133,12 +1153,13 @@ function orangePatchCartTotalsFromServer(
     registerTeaser,
     giftUnlock,
     bogoUnlock,
-    comboUnlock
+    comboUnlock,
+    productOfferDiscount
 ) {
     const main = document.getElementById('cartMainTotals');
     if (main && main.parentNode) {
         const wrap = document.createElement('div');
-        wrap.innerHTML = orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total);
+        wrap.innerHTML = orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total, productOfferDiscount);
         const next = wrap.firstElementChild;
         if (next) {
             main.parentNode.replaceChild(next, main);
@@ -1147,7 +1168,7 @@ function orangePatchCartTotalsFromServer(
     const mini = document.getElementById('cartMiniTotals');
     if (mini && mini.parentNode) {
         const wrap = document.createElement('div');
-        wrap.innerHTML = orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total);
+        wrap.innerHTML = orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total, productOfferDiscount);
         const next = wrap.firstElementChild;
         if (next) {
             mini.parentNode.replaceChild(next, mini);
@@ -1577,6 +1598,8 @@ async function orangeRunCheckoutPreview() {
                 typeof data.promotion_discount === 'number' ? data.promotion_discount : 0;
             const deliveryFee =
                 typeof data.delivery_fee === 'number' ? data.delivery_fee : 0;
+            const productOfferD =
+                typeof data.product_offer_discount === 'number' ? data.product_offer_discount : 0;
             orangePatchCartTotalsFromServer(
                 data.subtotal,
                 comboD,
@@ -1586,7 +1609,8 @@ async function orangeRunCheckoutPreview() {
                 data.register_promo_teaser || null,
                 data.gift_register_unlock_teaser === true,
                 data.bogo_register_unlock_teaser === true,
-                data.combo_register_unlock_teaser === true
+                data.combo_register_unlock_teaser === true,
+                productOfferD
             );
             orangeUpdateCartGiftPromotionUI(data.gift_promotion || null);
             orangeUpdateCartBogoPromotionUI(data.bogo_promotion || null);

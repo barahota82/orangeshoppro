@@ -57,3 +57,72 @@ function orange_product_offer_sync_all_stock_pauses(PDO $pdo, ?int $countryId = 
 
     return orange_cart_promo_run_stock_health($pdo, $countryId, ['offers']);
 }
+
+/**
+ * خصم الوحدة الفعّال لعرض منتج نشط (مبلغ ثابت يُخصم من سعر الوحدة) — 0 إن لا عرض ساري.
+ * نفس شرط المتجر: نشط + ضمن المدة + غير موقوف + ضمن الدولة.
+ */
+function orange_product_offer_active_unit_discount(PDO $pdo, int $productId, ?int $countryId = null): float
+{
+    $table = orange_product_offer_table();
+    if ($productId <= 0 || !orange_table_exists($pdo, $table)) {
+        return 0.0;
+    }
+    $scheduleSql = orange_table_has_column($pdo, $table, 'valid_from')
+        ? orange_product_offer_storefront_sql('o')
+        : '';
+    $sql = 'SELECT o.discount
+            FROM ' . $table . ' o
+            INNER JOIN products p ON p.id = o.product_id AND p.is_active = 1
+            WHERE o.is_active = 1 AND o.product_id = ?' . $scheduleSql;
+    $params = [$productId];
+    if (orange_table_has_column($pdo, $table, 'country_id') && $countryId !== null && $countryId > 0) {
+        $sql .= ' AND (o.country_id = ? OR o.country_id IS NULL)';
+        $params[] = $countryId;
+    } elseif (orange_table_has_column($pdo, 'products', 'country_id') && $countryId !== null && $countryId > 0) {
+        $sql .= ' AND p.country_id = ?';
+        $params[] = $countryId;
+    }
+    $sql .= ' ORDER BY '
+        . (orange_table_has_column($pdo, $table, 'sort_order') ? 'o.sort_order ASC, ' : '')
+        . 'o.id ASC LIMIT 1';
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+    $disc = $st->fetchColumn();
+    if ($disc === false) {
+        return 0.0;
+    }
+
+    return max(0.0, round((float) $disc, 4));
+}
+
+/**
+ * إجمالي خصم عروض المنتج لبنود السلة (لا يشمل بنود الهدية/BOGO؛ مقيّد بسعر البند).
+ *
+ * @param list<array<string,mixed>> $validatedItems
+ */
+function orange_product_offer_total_discount_for_items(PDO $pdo, array $validatedItems, ?int $countryId = null): float
+{
+    $total = 0.0;
+    $cache = [];
+    foreach ($validatedItems as $line) {
+        if (!is_array($line) || !empty($line['is_gift']) || !empty($line['is_bogo_gift'])) {
+            continue;
+        }
+        $pid = (int) (($line['product']['id'] ?? 0));
+        $qty = (int) ($line['qty'] ?? 0);
+        $price = (float) ($line['price'] ?? 0);
+        if ($pid <= 0 || $qty <= 0 || $price <= 0.0001) {
+            continue;
+        }
+        if (!array_key_exists($pid, $cache)) {
+            $cache[$pid] = orange_product_offer_active_unit_discount($pdo, $pid, $countryId);
+        }
+        $unitDisc = min($cache[$pid], $price);
+        if ($unitDisc > 0.0001) {
+            $total += round($unitDisc * $qty, 4);
+        }
+    }
+
+    return round($total, 4);
+}
