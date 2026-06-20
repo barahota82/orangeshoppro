@@ -75,8 +75,59 @@ foreach (orange_invoice_ancillary_system_key_catalog() as $sysKey => $sysMeta) {
     gap: 10px 12px;
     align-items: end;
 }
-.ilp-row-ops { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.ilp-row-ops button { padding: 3px 9px; font-size: 0.8rem; line-height: 1.2; }
+.ilp-ops-col {
+    width: 150px;
+    box-sizing: border-box;
+    text-align: center;
+    vertical-align: middle;
+    padding: 6px 8px;
+}
+.ilp-ops-wrap {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    margin: 0 auto;
+    max-width: 100%;
+    direction: rtl;
+}
+.ilp-ops-arrows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+}
+.ilp-ops-arrows button {
+    width: 30px !important;
+    min-width: 30px !important;
+    height: 28px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 13px !important;
+    line-height: 1 !important;
+    border-radius: 6px !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+}
+.ilp-ops-main {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+.ilp-ops-main button {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    border-radius: 6px !important;
+    box-sizing: border-box !important;
+    min-height: 30px !important;
+    white-space: nowrap;
+}
 .ilp-pick-results {
     margin: 6px 0 0;
     padding: 0;
@@ -186,7 +237,7 @@ foreach (orange_invoice_ancillary_system_key_catalog() as $sysKey => $sysMeta) {
                     <th style="width:25%;">الحساب</th>
                     <th style="width:25%;">التسمية</th>
                     <th style="width:4rem;white-space:nowrap;text-align:center;">الترتيب</th>
-                    <th style="width:9rem;white-space:nowrap;" title="تعديل / حذف / إعادة الترتيب">إجراءات</th>
+                    <th style="width:150px;white-space:nowrap;" title="تعديل / حذف / إعادة الترتيب">إجراءات</th>
                 </tr>
             </thead>
             <tbody id="ilp_list_body">
@@ -342,11 +393,15 @@ foreach (orange_invoice_ancillary_system_key_catalog() as $sysKey => $sysMeta) {
                 + '<td dir="ltr">' + esc((row.account_code || '') + (row.account_name ? ' — ' + row.account_name : '')) + '</td>'
                 + '<td>' + esc(row.label_ar || '') + '</td>'
                 + '<td dir="ltr" style="white-space:nowrap;text-align:center;">' + esc(String(row.sort_order || 0)) + '</td>'
-                + '<td><div class="ilp-row-ops">'
-                + '<button type="button" class="ilp-edit" title="تعديل">تعديل</button>'
+                + '<td class="ilp-ops-col"><div class="ilp-ops-wrap">'
+                + '<div class="ilp-ops-arrows">'
+                + '<button type="button" class="btn-secondary ilp-move-up" title="أعلى" aria-label="أعلى">↑</button>'
+                + '<button type="button" class="btn-secondary ilp-move-down" title="أسفل" aria-label="أسفل">↓</button>'
+                + '</div>'
+                + '<div class="ilp-ops-main">'
+                + '<button type="button" class="btn-secondary ilp-edit" title="تعديل">تعديل</button>'
                 + '<button type="button" class="btn-secondary ilp-delete" title="حذف">حذف</button>'
-                + '<button type="button" class="btn-secondary ilp-move-up" title="أعلى">↑</button>'
-                + '<button type="button" class="btn-secondary ilp-move-down" title="أسفل">↓</button>'
+                + '</div>'
                 + '</div></td>';
             tr.addEventListener('click', function () { ilpFillForm(row); });
             var editBtn = tr.querySelector('.ilp-edit');
