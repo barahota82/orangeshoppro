@@ -431,6 +431,17 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     </div>
 
 
+    <div id="sv2_offers_panel" class="jv-print-hide" style="display:none;margin-top:16px;border:1px solid #f59e0b;background:#fffbeb;border-radius:8px;padding:12px 14px;">
+        <h4 style="font-size:0.92rem;font-weight:700;color:#92400e;margin:0 0 4px;">العروض والولاء المتاحة على البنود</h4>
+        <p class="card-hint" style="margin:0 0 8px;font-size:0.82rem;line-height:1.6;color:#78350f;">
+            تظهر العروض المكتشفة تلقائياً عند إدخال الأصناف. لكل عرض: <strong>تطبيق</strong> أو <strong>تجاهل</strong> —
+            وفاتورة الشركة تملك سلطة صرف عرض «للمسجّلين فقط» حتى لو كان العميل غير مسجّل بالموقع.
+            عند الحفظ سيُطلب تأكيد أي عرض تم تجاهله.
+        </p>
+        <div id="sv2_offers_customer_reg" style="font-size:0.84rem;font-weight:600;margin:0 0 8px;"></div>
+        <div id="sv2_offers_list"></div>
+    </div>
+
     <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:18px 0 10px;">بنود إضافية</h4>
     <div class="admin-doc-frame">
         <div class="table-wrap">
@@ -660,6 +671,13 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     var sv2ProductPick = null;
     var sv2ExtraPickSource = 'presets';
     var sv2ExtraPickSelected = null;
+    // كشف العروض/الولاء: آخر نتيجة كشف + قرارات المحاسب (تطبيق/تجاهل) لكل عرض.
+    var sv2OffersData = null;
+    var sv2OfferDecisions = {};
+    var sv2OfferGiftPick = {};
+    var sv2OfferRedeemPoints = 0;
+    var sv2OfferDetectTimer = null;
+    var sv2OfferDetectSeq = 0;
     var SV2_MONEY_DECIMALS = (window.ORANGE_ADMIN_MONEY && typeof window.ORANGE_ADMIN_MONEY.decimals === 'number')
         ? Math.max(0, parseInt(String(window.ORANGE_ADMIN_MONEY.decimals), 10) || 3)
         : 3;
@@ -729,6 +747,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         if (balEl) balEl.value = fmt3(row.balance || 0);
         if (idEl) idEl.value = String(currentCustomerId);
         applyCustomerDeliveryFields(row, opts);
+        if (typeof sv2ScheduleOfferDetect === 'function') sv2ScheduleOfferDetect();
     }
 
     function applyCustomerFromApi(cust, invoice) {
@@ -860,6 +879,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         renumberRows();
         syncTrailing();
         recalcAll();
+        sv2ScheduleOfferDetect();
     }
 
     function renumberRows() {
@@ -908,6 +928,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     function sv2AdvanceFromLineTotal(tr) {
         recalcAll();
         if (!rowIsComplete(tr)) return;
+        sv2RunOfferDetect();
         var tb = document.getElementById('sv2_lines_body');
         if (!tb) return;
         var rows = tb.querySelectorAll('tr');
@@ -1449,6 +1470,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         }
         sv2LoadExtraLines(res.extra_lines || []);
         recalcAll();
+        sv2ResetOffersState();
         sv2SetViewMode(true);
         if (sv2EditLockCtl) sv2EditLockCtl.refresh();
         sv2SyncToolbar();
@@ -1543,6 +1565,246 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         location.href = (typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '') : '') + '/admin/index.php?page=company_sales_invoice';
     }
 
+    // ===== كشف العروض/الولاء وتأكيد المحاسب (INV-C) =====
+    function sv2CollectItemsForDetect() {
+        var out = [];
+        var tb = document.getElementById('sv2_lines_body');
+        if (!tb) return out;
+        tb.querySelectorAll('tr.sv2-line').forEach(function (r) {
+            var pid = parseInt(r.querySelector('.sv2-product-id').value, 10) || 0;
+            var vid = parseInt(r.querySelector('.sv2-variant-id').value, 10) || 0;
+            var q = parseInt(r.querySelector('.sv2-qty').value, 10) || 0;
+            if (pid <= 0 || q < 1) return;
+            var o = { product_id: pid, qty: q };
+            if (vid > 0) o.variant_id = vid;
+            out.push(o);
+        });
+        return out;
+    }
+
+    function sv2OfferIsPresent(data, key) {
+        if (!data) return false;
+        switch (key) {
+            case 'combo': return (parseFloat(data.combo_discount) || 0) > 0 && (parseInt(data.combo_promotion_id, 10) || 0) > 0;
+            case 'cart': return (parseFloat(data.promotion_discount) || 0) > 0 && (parseInt(data.promotion_id, 10) || 0) > 0;
+            case 'product_offer': return (parseFloat(data.product_offer_discount) || 0) > 0;
+            case 'gift': return !!(data.gift_promotion && data.gift_promotion.id);
+            case 'bogo': return !!(data.bogo_promotion && data.bogo_promotion.id);
+            case 'loyalty': return !!(data.loyalty && data.loyalty.active && (parseInt(data.loyalty.redeemable_points, 10) || 0) > 0);
+            default: return false;
+        }
+    }
+
+    function sv2OfferPresentKeys(data) {
+        return ['combo', 'cart', 'product_offer', 'gift', 'bogo', 'loyalty'].filter(function (k) {
+            return sv2OfferIsPresent(data, k);
+        });
+    }
+
+    function sv2OfferRequiresReg(data, key) {
+        if (!data) return false;
+        switch (key) {
+            case 'combo': return !!data.combo_requires_registered;
+            case 'cart': return !!data.promotion_requires_registered;
+            case 'gift': return !!(data.gift_promotion && data.gift_promotion.requires_registered);
+            case 'bogo': return !!(data.bogo_promotion && data.bogo_promotion.requires_registered);
+            default: return false;
+        }
+    }
+
+    function sv2OfferLabel(data, key) {
+        if (!data) return '';
+        switch (key) {
+            case 'combo': return 'عرض كومبو (خصم ' + fmt3(data.combo_discount) + ')';
+            case 'cart': return 'خصم مجموع السلة (خصم ' + fmt3(data.promotion_discount) + ')';
+            case 'product_offer': return 'عرض سعر على منتجات (خصم ' + fmt3(data.product_offer_discount) + ')';
+            case 'gift': return 'هدية مجموع السلة';
+            case 'bogo': return 'هدية BOGO';
+            case 'loyalty': return 'استبدال نقاط الولاء (رصيد ' + (parseInt(data.loyalty.redeemable_points, 10) || 0) + ' نقطة = ' + fmt3(data.loyalty.redeemable_value) + ')';
+            default: return key;
+        }
+    }
+
+    function sv2GiftPoolSelectHtml(idAttr, payload) {
+        var pool = (payload && payload.pool) ? payload.pool : [];
+        if (payload && payload.gift_kind === 'fixed') {
+            return '<span class="muted" style="font-size:0.82rem;">هدية ثابتة محدّدة بالعرض</span>';
+        }
+        if (!pool.length) return '<span class="muted" style="font-size:0.82rem;">لا أصناف هدية متاحة</span>';
+        var h = '<select class="' + idAttr + ' admin-inp" style="max-width:18rem;"><option value="0">— اختر صنف الهدية —</option>';
+        pool.forEach(function (o) {
+            var lbl = (o.product_name || '') + (o.color ? ' / ' + o.color : '') + (o.size ? ' / ' + o.size : '') + ' (متاح ' + (o.stock != null ? o.stock : '') + ')';
+            h += '<option value="' + (parseInt(o.variant_id, 10) || 0) + '">' + esc(lbl) + '</option>';
+        });
+        h += '</select>';
+        return h;
+    }
+
+    function sv2RenderOffersPanel() {
+        var panel = document.getElementById('sv2_offers_panel');
+        var listEl = document.getElementById('sv2_offers_list');
+        var regEl = document.getElementById('sv2_offers_customer_reg');
+        if (!panel || !listEl) return;
+        var data = sv2OffersData;
+        var keys = data ? sv2OfferPresentKeys(data) : [];
+        if (!data || !keys.length) {
+            panel.style.display = 'none';
+            listEl.innerHTML = '';
+            if (regEl) regEl.textContent = '';
+            return;
+        }
+        panel.style.display = '';
+        if (regEl) {
+            var reg = !!data.customer_registered_on_site;
+            regEl.innerHTML = 'حالة العميل: '
+                + (reg
+                    ? '<span style="color:#047857;">مسجّل بالموقع</span>'
+                    : '<span style="color:#b45309;">غير مسجّل بالموقع</span> — للفاتورة سلطة صرف عروض «المسجّلين فقط».');
+        }
+        var html = '';
+        keys.forEach(function (key) {
+            var decided = sv2OfferDecisions.hasOwnProperty(key);
+            var applied = decided ? !!sv2OfferDecisions[key] : false;
+            var reqReg = sv2OfferRequiresReg(data, key);
+            var notReg = !data.customer_registered_on_site;
+            html += '<div class="sv2-offer-row" data-offer-key="' + key + '" style="border-top:1px solid #fde68a;padding:8px 0;display:flex;flex-wrap:wrap;align-items:center;gap:10px;">';
+            html += '<label style="font-weight:600;display:flex;align-items:center;gap:6px;min-width:16rem;">'
+                + '<input type="checkbox" class="sv2-offer-apply"' + (applied ? ' checked' : '') + '> '
+                + esc(sv2OfferLabel(data, key)) + '</label>';
+            if (reqReg && notReg) {
+                html += '<span style="color:#b45309;font-size:0.8rem;font-weight:600;">⚠ عرض للمسجّلين فقط — تجاوز بسلطة الفاتورة</span>';
+            }
+            if (key === 'gift') {
+                html += '<span style="font-size:0.82rem;">صنف الهدية: ' + sv2GiftPoolSelectHtml('sv2-offer-gift-pick', data.gift_promotion) + '</span>';
+            } else if (key === 'bogo') {
+                html += '<span style="font-size:0.82rem;">صنف الهدية: ' + sv2GiftPoolSelectHtml('sv2-offer-bogo-pick', data.bogo_promotion) + '</span>';
+            } else if (key === 'loyalty') {
+                var maxPts = parseInt(data.loyalty.redeemable_points, 10) || 0;
+                html += '<span style="font-size:0.82rem;">نقاط للاستبدال: '
+                    + '<input type="number" class="sv2-offer-redeem-points admin-inp" min="0" step="1" max="' + maxPts + '" value="' + (sv2OfferRedeemPoints || 0) + '" style="max-width:8rem;" dir="ltr" lang="en"> '
+                    + '<span class="muted">/ ' + maxPts + '</span></span>';
+            }
+            html += '<span class="muted" style="font-size:0.78rem;">' + (decided ? (applied ? 'سيُطبَّق' : 'تم تجاهله') : 'بانتظار قرارك') + '</span>';
+            html += '</div>';
+        });
+        listEl.innerHTML = html;
+
+        // إعادة ربط القيم/الأحداث
+        listEl.querySelectorAll('.sv2-offer-row').forEach(function (row) {
+            var key = row.getAttribute('data-offer-key');
+            var cb = row.querySelector('.sv2-offer-apply');
+            if (cb) cb.addEventListener('change', function () {
+                sv2OfferDecisions[key] = cb.checked;
+                sv2RenderOffersPanel();
+            });
+            var gp = row.querySelector('.sv2-offer-gift-pick');
+            if (gp) {
+                if (sv2OfferGiftPick.gift) gp.value = String(sv2OfferGiftPick.gift);
+                gp.addEventListener('change', function () { sv2OfferGiftPick.gift = parseInt(gp.value, 10) || 0; });
+            }
+            var bp = row.querySelector('.sv2-offer-bogo-pick');
+            if (bp) {
+                if (sv2OfferGiftPick.bogo) bp.value = String(sv2OfferGiftPick.bogo);
+                bp.addEventListener('change', function () { sv2OfferGiftPick.bogo = parseInt(bp.value, 10) || 0; });
+            }
+            var rp = row.querySelector('.sv2-offer-redeem-points');
+            if (rp) rp.addEventListener('input', function () { sv2OfferRedeemPoints = parseInt(rp.value, 10) || 0; });
+        });
+    }
+
+    function sv2PromptNewOffers(prevKeys) {
+        if (!sv2OffersData) return;
+        var data = sv2OffersData;
+        var keys = sv2OfferPresentKeys(data);
+        var reg = !!data.customer_registered_on_site;
+        keys.forEach(function (key) {
+            if (sv2OfferDecisions.hasOwnProperty(key)) return; // قرار سابق محفوظ
+            var reqReg = sv2OfferRequiresReg(data, key);
+            var msg = 'تم اكتشاف: ' + sv2OfferLabel(data, key) + '\n\n'
+                + 'حالة العميل: ' + (reg ? 'مسجّل بالموقع' : 'غير مسجّل بالموقع') + '.\n';
+            if (reqReg && !reg) {
+                msg += 'تنبيه: هذا العرض «للمسجّلين فقط» — تطبيقه الآن تجاوز بسلطة فاتورة الشركة.\n';
+            }
+            msg += '\nتطبيق العرض؟ (موافق = تطبيق، إلغاء = تجاهل)';
+            sv2OfferDecisions[key] = !!window.confirm(msg);
+        });
+        // إزالة قرارات عروض لم تعد موجودة
+        Object.keys(sv2OfferDecisions).forEach(function (k) {
+            if (keys.indexOf(k) === -1) delete sv2OfferDecisions[k];
+        });
+        sv2RenderOffersPanel();
+    }
+
+    function sv2RunOfferDetect() {
+        if (sv2ViewMode) return;
+        var items = sv2CollectItemsForDetect();
+        if (!items.length) {
+            sv2OffersData = null;
+            sv2RenderOffersPanel();
+            return;
+        }
+        var channel = parseInt(document.getElementById('sv2_channel').value, 10);
+        if (isNaN(channel) || channel < 0) channel = 0;
+        var payload = {
+            channel_id: channel,
+            customer_id: parseInt(document.getElementById('sv2_customer_id').value, 10) || 0,
+            phone: (document.getElementById('sv2_phone').value || '').trim(),
+            items: items
+        };
+        var seq = ++sv2OfferDetectSeq;
+        fetch('/admin/api/orders/preview-company-offers.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(function (r) { return r.json(); }).then(function (res) {
+            if (seq !== sv2OfferDetectSeq) return; // نتيجة قديمة
+            if (!res || !res.success) { return; }
+            var prev = sv2OffersData ? sv2OfferPresentKeys(sv2OffersData) : [];
+            sv2OffersData = res;
+            sv2PromptNewOffers(prev);
+        }).catch(function () {});
+    }
+
+    function sv2ScheduleOfferDetect() {
+        if (sv2ViewMode) return;
+        if (sv2OfferDetectTimer) clearTimeout(sv2OfferDetectTimer);
+        sv2OfferDetectTimer = setTimeout(sv2RunOfferDetect, 650);
+    }
+
+    function sv2ResetOffersState() {
+        sv2OffersData = null;
+        sv2OfferDecisions = {};
+        sv2OfferGiftPick = {};
+        sv2OfferRedeemPoints = 0;
+        sv2RenderOffersPanel();
+    }
+
+    // يبني أعلام التطبيق في الحفظ + قائمة العروض المتجاهَلة لتأكيدها.
+    function sv2BuildOfferSavePayload() {
+        var data = sv2OffersData;
+        var p = {};
+        var ignored = [];
+        if (!data) return { payload: p, ignored: ignored };
+        sv2OfferPresentKeys(data).forEach(function (key) {
+            var applied = !!sv2OfferDecisions[key];
+            if (!applied) { ignored.push(sv2OfferLabel(data, key)); return; }
+            if (key === 'combo') p.apply_combo = true;
+            else if (key === 'cart') p.apply_cart_promotion = true;
+            else if (key === 'product_offer') p.apply_product_offer = true;
+            else if (key === 'gift') {
+                p.apply_gift = true;
+                if (sv2OfferGiftPick.gift) p.gift_variant_id = sv2OfferGiftPick.gift;
+            } else if (key === 'bogo') {
+                p.apply_bogo = true;
+                if (sv2OfferGiftPick.bogo) p.bogo_gift_variant_id = sv2OfferGiftPick.bogo;
+            } else if (key === 'loyalty') {
+                p.redeem_points = sv2OfferRedeemPoints || 0;
+            }
+        });
+        return { payload: p, ignored: ignored };
+    }
+
     function save() {
         if (!SV2_CAPS.can_edit) { alert('لا تملك صلاحية تعديل فواتير المبيعات'); return; }
         if (sv2ViewMode) return;
@@ -1611,6 +1873,27 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             payload.order_id = browseOrderId;
         }
 
+        // العروض/الولاء تُطبَّق عند إنشاء فاتورة جديدة فقط (الكشف لحظة الإدخال).
+        if (browseOrderId <= 0 && sv2OffersData) {
+            var ob = sv2BuildOfferSavePayload();
+            var gp = sv2OffersData.gift_promotion;
+            if (ob.payload.apply_gift && gp && gp.gift_kind !== 'fixed' && !ob.payload.gift_variant_id) {
+                alert('اخترت تطبيق هدية مجموع السلة — اختر صنف الهدية أولاً.');
+                return;
+            }
+            var bpr = sv2OffersData.bogo_promotion;
+            if (ob.payload.apply_bogo && bpr && bpr.gift_kind !== 'fixed' && !ob.payload.bogo_gift_variant_id) {
+                alert('اخترت تطبيق هدية BOGO — اختر صنف الهدية أولاً.');
+                return;
+            }
+            if (ob.ignored.length) {
+                var im = 'لن تُطبَّق العروض التالية (تم تجاهلها عمداً):\n- ' + ob.ignored.join('\n- ')
+                    + '\n\nتأكيد الحفظ بدون تطبيقها؟';
+                if (!window.confirm(im)) return;
+            }
+            Object.keys(ob.payload).forEach(function (k) { payload[k] = ob.payload[k]; });
+        }
+
         postJSON(apiUrl, payload).then(function (res) {
             if (!res || !res.success) {
                 if (typeof orangeAdminOfferSuggestOnFailure === 'function' && orangeAdminOfferSuggestOnFailure(res, 'فشل')) return;
@@ -1659,7 +1942,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                     varLabel: '.sv2-var-label',
                     cost: '.sv2-price'
                 },
-                onAfterResolve: function () { recalcAll(); }
+                onAfterResolve: function () { recalcAll(); sv2ScheduleOfferDetect(); }
             });
             sv2ProductPick.bindModal();
         }
@@ -1762,6 +2045,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             tb.addEventListener('input', function (e) {
                 if (e.target && e.target.classList.contains('sv2-code')) return;
                 recalcAll();
+                sv2ScheduleOfferDetect();
             });
             tb.addEventListener('keydown', sv2OnLineKeydown);
             tb.addEventListener('focusout', function (e) {
@@ -1780,6 +2064,15 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         var chSel = document.getElementById('sv2_channel');
         if (chSel && browseOrderId <= 0 && SV2_PREFILL_ORDER_ID <= 0 && !chSel.value) {
             chSel.value = '0';
+        }
+        if (chSel) chSel.addEventListener('change', sv2ScheduleOfferDetect);
+        var phoneElDetect = document.getElementById('sv2_phone');
+        if (phoneElDetect) {
+            var phoneDetectTimer = null;
+            phoneElDetect.addEventListener('input', function () {
+                if (phoneDetectTimer) clearTimeout(phoneDetectTimer);
+                phoneDetectTimer = setTimeout(sv2ScheduleOfferDetect, 400);
+            });
         }
 
         if (window.OrangeEditLock) {

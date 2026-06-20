@@ -18,6 +18,7 @@ require_once __DIR__ . '/../../../includes/warehouses.php';
 require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../../includes/sales_invoice_company.php';
 require_once __DIR__ . '/../../../includes/sales_doc_channel.php';
+require_once __DIR__ . '/../../../includes/company_invoice_offers.php';
 require_admin_api();
 
 try {
@@ -194,11 +195,121 @@ try {
         json_response(['success' => false, 'message' => 'أضف سطرًا واحدًا على الأقل من المنتجات المسجّلة'], 422);
     }
 
+    // ===== العروض والولاء على فاتورة الشركة (INV-C) =====
+    // المحاسب يؤكّد كل عرض مكتشَف (تطبيق/تجاهل) ويملك سلطة تجاوز شرط «للمسجّلين فقط».
+    // الأرقام تُحسَب على الخادم (أساس التجزئة) بنفس صيَغ مسار الأونلاين — لا يُوثَق بأي مبلغ من العميل.
+    $resolvedCustomerId = (int) ($data['customer_id'] ?? 0);
+    if ($resolvedCustomerId <= 0 && $phoneNorm !== '' && orange_table_exists($pdo, 'customers')) {
+        if (orange_table_has_country_id($pdo, 'customers') && $orderCountryId > 0) {
+            $csLk = $pdo->prepare('SELECT id FROM customers WHERE phone = ? AND country_id = ? LIMIT 1');
+            $csLk->execute([$phoneNorm, $orderCountryId]);
+        } else {
+            $csLk = $pdo->prepare('SELECT id FROM customers WHERE phone = ? LIMIT 1');
+            $csLk->execute([$phoneNorm]);
+        }
+        $resolvedCustomerId = (int) ($csLk->fetchColumn() ?: 0);
+    }
+
+    $applyCombo = !empty($data['apply_combo']);
+    $applyCart = !empty($data['apply_cart_promotion']);
+    $applyProductOffer = !empty($data['apply_product_offer']);
+    $applyGift = !empty($data['apply_gift']);
+    $applyBogo = !empty($data['apply_bogo']);
+    $giftPickVid = (int) ($data['gift_variant_id'] ?? 0);
+    $bogoPickVid = (int) ($data['bogo_gift_variant_id'] ?? 0);
+    $redeemPointsReq = max(0, (int) ($data['redeem_points'] ?? 0));
+
+    $retailSubtotal = 0.0;
+    foreach ($validatedItems as $vi) {
+        $retailSubtotal += (float) $vi['price'] * (int) $vi['qty'];
+    }
+    $retailSubtotal = round($retailSubtotal, 4);
+
+    $picks = orange_company_invoice_offer_picks($pdo, $validatedItems, $retailSubtotal, $orderCountryId);
+
+    $comboId = $applyCombo ? $picks['combo_id'] : null;
+    $comboDiscount = $applyCombo ? (float) $picks['combo_discount'] : 0.0;
+    $promoId = $applyCart ? $picks['promo_id'] : null;
+    $promoDiscount = $applyCart ? (float) $picks['promo_discount'] : 0.0;
+    $productOfferDiscount = $applyProductOffer ? (float) $picks['product_offer_discount'] : 0.0;
+
+    $giftLine = null;
+    $giftPromoId = null;
+    $giftVariantId = null;
+    $giftDiscount = 0.0;
+    if ($applyGift) {
+        $g = orange_company_invoice_resolve_gift_line($pdo, $validatedItems, $retailSubtotal, $orderCountryId, $giftPickVid);
+        if ($g !== null) {
+            $giftLine = $g['line'];
+            $giftPromoId = $g['promo_id'];
+            $giftVariantId = $g['variant_id'];
+            $giftDiscount = (float) $g['discount'];
+        }
+    }
+    $linesForBogoBase = $validatedItems;
+    if ($giftLine !== null) {
+        $linesForBogoBase[] = $giftLine;
+    }
+    $bogoLine = null;
+    $bogoPromoId = null;
+    $bogoGiftVariantId = null;
+    $bogoDiscount = 0.0;
+    if ($applyBogo) {
+        $b = orange_company_invoice_resolve_bogo_line($pdo, $linesForBogoBase, $orderCountryId, $bogoPickVid);
+        if ($b !== null) {
+            $bogoLine = $b['line'];
+            $bogoPromoId = $b['promo_id'];
+            $bogoGiftVariantId = $b['variant_id'];
+            $bogoDiscount = (float) $b['discount'];
+        }
+    }
+
+    $giftStockLines = [];
+    if ($giftLine !== null) {
+        $giftStockLines[] = $giftLine;
+    }
+    if ($bogoLine !== null) {
+        $giftStockLines[] = $bogoLine;
+    }
+
+    // الإجماليات: إيراد البضاعة الإجمالي = صافي بنود البيع + أسطر الهدايا بالتجزئة (= ما يحسبه القيد لاحقاً)؛
+    // الخصومات الترويجية والولاء بنود contra تُخفّض المستحق. الإجمالي يُخزَّن بلا ضريبة (الضريبة بند مستقل).
+    $giftRetailTotal = 0.0;
+    foreach ($giftStockLines as $gl) {
+        $giftRetailTotal += (float) ($gl['price'] ?? 0) * (int) ($gl['qty'] ?? 1);
+    }
+    $giftRetailTotal = round($giftRetailTotal, 4);
+    $goodsGross = round($total + $giftRetailTotal, 4);
+    $totalPromo = round($comboDiscount + $promoDiscount + $productOfferDiscount + $giftDiscount + $bogoDiscount, 4);
+    if ($totalPromo > $goodsGross) {
+        $totalPromo = $goodsGross;
+    }
+    $goodsAfterPromo = max(0.0, round($goodsGross - $totalPromo, 4));
+
+    // استبدال نقاط الولاء (يحدّده المحاسب)؛ مقيَّد بالرصيد القابل للاستخدام؛ الترحيل بعد إدراج الطلب.
+    $loyaltyRedeemPoints = 0;
+    $loyaltyRedeemValue = 0.0;
+    $loyaltyPayableBeforeRedeem = $goodsAfterPromo;
+    if ($redeemPointsReq > 0 && $resolvedCustomerId > 0 && orange_loyalty_is_active($pdo, $orderCountryId)) {
+        $redeemInfo = orange_loyalty_redeemable($pdo, $resolvedCustomerId, $orderCountryId, $goodsAfterPromo);
+        $loyaltyRedeemPoints = min($redeemPointsReq, (int) $redeemInfo['points']);
+        if ($loyaltyRedeemPoints > 0) {
+            $loySet = orange_loyalty_settings($pdo, $orderCountryId);
+            $pv = $loySet !== null ? (float) $loySet['point_value'] : 0.0;
+            $loyaltyRedeemValue = round(min($loyaltyRedeemPoints * $pv, $goodsAfterPromo), 4);
+            if ($loyaltyRedeemValue <= 0.0001) {
+                $loyaltyRedeemPoints = 0;
+                $loyaltyRedeemValue = 0.0;
+            }
+        }
+    }
+    $orderTotalFinal = max(0.0, round($goodsAfterPromo - $loyaltyRedeemValue, 4));
+
     $hasSource = orange_table_has_column($pdo, 'orders', 'order_source');
     $hasPay = orange_table_has_column($pdo, 'orders', 'payment_terms');
     $hasAmountPaidCol = orange_table_has_column($pdo, 'orders', 'amount_paid');
     $amountPaidIn = max(0.0, (float) ($data['amount_paid'] ?? 0));
-    $amountPaidIn = min($amountPaidIn, $total);
+    $amountPaidIn = min($amountPaidIn, $orderTotalFinal);
 
     $cols = 'order_number, customer_name, phone, area, address, notes, channel_id, status, total';
     $ph = '?, ?, ?, ?, ?, ?, ?, \'completed\', ?';
@@ -210,7 +321,7 @@ try {
         trim((string)($data['address'] ?? '')),
         trim((string)($data['notes'] ?? '')),
         $channelId > 0 ? $channelId : null,
-        $total,
+        $orderTotalFinal,
     ];
     if ($hasSource) {
         $cols .= ', order_source';
@@ -241,6 +352,57 @@ try {
         $cols .= ', document_date';
         $ph .= ', ?';
         $params[] = $documentDate;
+    }
+    if (
+        orange_table_has_column($pdo, 'orders', 'cart_combo_promotion_id')
+        && orange_table_has_column($pdo, 'orders', 'cart_combo_discount')
+    ) {
+        $cols .= ', cart_combo_promotion_id, cart_combo_discount';
+        $ph .= ', ?, ?';
+        $params[] = $comboId !== null && $comboId > 0 ? $comboId : null;
+        $params[] = $comboDiscount > 0 ? $comboDiscount : 0.0;
+    }
+    if (
+        orange_table_has_column($pdo, 'orders', 'cart_promotion_id')
+        && orange_table_has_column($pdo, 'orders', 'cart_promotion_discount')
+    ) {
+        $cols .= ', cart_promotion_id, cart_promotion_discount';
+        $ph .= ', ?, ?';
+        $params[] = $promoId !== null && $promoId > 0 ? $promoId : null;
+        $params[] = $promoDiscount > 0 ? $promoDiscount : 0.0;
+    }
+    if (
+        orange_table_has_column($pdo, 'orders', 'cart_gift_promotion_id')
+        && orange_table_has_column($pdo, 'orders', 'cart_gift_variant_id')
+    ) {
+        $cols .= ', cart_gift_promotion_id, cart_gift_variant_id';
+        $ph .= ', ?, ?';
+        $params[] = $giftPromoId !== null && $giftPromoId > 0 ? $giftPromoId : null;
+        $params[] = $giftVariantId !== null && $giftVariantId > 0 ? $giftVariantId : null;
+    }
+    if (orange_table_has_column($pdo, 'orders', 'cart_gift_discount')) {
+        $cols .= ', cart_gift_discount';
+        $ph .= ', ?';
+        $params[] = $giftDiscount > 0 ? $giftDiscount : 0.0;
+    }
+    if (orange_table_has_column($pdo, 'orders', 'cart_bogo_discount')) {
+        $cols .= ', cart_bogo_discount';
+        $ph .= ', ?';
+        $params[] = $bogoDiscount > 0 ? $bogoDiscount : 0.0;
+    }
+    if (orange_table_has_column($pdo, 'orders', 'product_offer_discount')) {
+        $cols .= ', product_offer_discount';
+        $ph .= ', ?';
+        $params[] = $productOfferDiscount > 0 ? $productOfferDiscount : 0.0;
+    }
+    if (
+        orange_table_has_column($pdo, 'orders', 'cart_bogo_promotion_id')
+        && orange_table_has_column($pdo, 'orders', 'cart_bogo_gift_variant_id')
+    ) {
+        $cols .= ', cart_bogo_promotion_id, cart_bogo_gift_variant_id';
+        $ph .= ', ?, ?';
+        $params[] = $bogoPromoId !== null && $bogoPromoId > 0 ? $bogoPromoId : null;
+        $params[] = $bogoGiftVariantId !== null && $bogoGiftVariantId > 0 ? $bogoGiftVariantId : null;
     }
     orange_sql_append_document_currency_code(
         $pdo,
@@ -298,17 +460,92 @@ try {
         $itemStmt->execute($bind);
     }
 
+    // أسطر الهدية/BOGO (بنود مجانية/مخفّضة مُسعَّرة بالتجزئة)؛ يخصمها بند contra ترويجي لاحقاً.
+    foreach ($giftStockLines as $row) {
+        $bind = [$orderId];
+        $bind[] = (int) $row['product']['id'];
+        if ($hasVariantCol) {
+            $bind[] = (int) ($row['variant_id'] ?? 0) ?: null;
+        }
+        $bind[] = $row['product']['name'];
+        $bind[] = (string) ($row['color'] ?? '');
+        $bind[] = (string) ($row['size'] ?? '');
+        $bind[] = (int) ($row['qty'] ?? 1);
+        $bind[] = (float) ($row['price'] ?? 0);
+        $bind[] = (float) ($row['cost'] ?? 0);
+        if ($hasLineDiscountCol) {
+            $bind[] = 0.0;
+        }
+        $itemStmt->execute($bind);
+    }
+
+    // استبدال نقاط الولاء: يكتب سجل الاستهلاك (FIFO) ويعيد القيمة الفعلية المستخدَمة.
+    if ($loyaltyRedeemPoints > 0 && $loyaltyRedeemValue > 0.0001 && $resolvedCustomerId > 0) {
+        $appliedRedeem = orange_loyalty_apply_redemption(
+            $pdo,
+            $resolvedCustomerId,
+            $orderCountryId,
+            $loyaltyRedeemPoints,
+            $loyaltyPayableBeforeRedeem,
+            'order',
+            $orderId
+        );
+        $loyaltyRedeemValue = round((float) $appliedRedeem['value'], 4);
+    } else {
+        $loyaltyRedeemValue = 0.0;
+    }
+
     $extraInput = orange_invoice_ancillary_parse_request_lines(
         $data,
         orange_invoice_ancillary_doc_kind_sales()
     );
+    // الضريبة على صافي البضاعة بعد الخصومات الترويجية (= القيمة الخاضعة للضريبة).
     $extraInput = orange_invoice_ancillary_merge_auto_vat(
         $pdo,
         orange_invoice_ancillary_doc_kind_sales(),
         $orderCountryId,
-        (float) $total,
+        (float) $goodsAfterPromo,
         $extraInput
     );
+    // بنود contra ترويجية/ولاء تلقائية (sales_debit_contra) تُخفّض المستحق في القيد المُجمَّع.
+    $promoAmountsByKey = [
+        'promo_combo_discount' => $comboDiscount,
+        'promo_cart_discount' => $promoDiscount,
+        'promo_gift_discount' => $giftDiscount,
+        'promo_bogo_discount' => $bogoDiscount,
+        'product_offer_discount' => $productOfferDiscount,
+        'loyalty_points_redemption' => $loyaltyRedeemValue,
+    ];
+    $extraInput = orange_invoice_ancillary_merge_auto_promo_lines(
+        $pdo,
+        $orderCountryId,
+        $promoAmountsByKey,
+        $extraInput
+    );
+    // حارس اتزان: كل خصم/استبدال مطبَّق يجب أن يولّد بند contra (حساب مربوط)؛ وإلا توقّف
+    // بدل خفض الإجمالي دون قيد مقابل (اختلال الذمم). يُربط الحساب في «إعدادات البنود الإضافية».
+    $promoKeyLabels = [
+        'promo_combo_discount' => 'خصم الكومبو',
+        'promo_cart_discount' => 'خصم مجموع السلة',
+        'promo_gift_discount' => 'خصم هدية مجموع السلة',
+        'promo_bogo_discount' => 'خصم هدية BOGO',
+        'product_offer_discount' => 'خصم عرض المنتج',
+        'loyalty_points_redemption' => 'استبدال نقاط الولاء',
+    ];
+    $promoGeneratedKeys = [];
+    foreach ($extraInput as $ln) {
+        if (is_array($ln) && !empty($ln['auto_promo']) && isset($ln['system_key'])) {
+            $promoGeneratedKeys[(string) $ln['system_key']] = true;
+        }
+    }
+    foreach ($promoAmountsByKey as $pk => $pAmt) {
+        if ((float) $pAmt > 0.0001 && empty($promoGeneratedKeys[$pk])) {
+            throw new RuntimeException(
+                'تعذّر تطبيق «' . ($promoKeyLabels[$pk] ?? $pk) . '»: لا يوجد حساب «بند خصم تلقائي» مربوط لهذه الدولة. '
+                . 'اربط الحساب من «إعدادات البنود الإضافية» ثم أعد الحفظ، أو تجاهل العرض.'
+            );
+        }
+    }
 
     orange_complete_order_fulfillment($pdo, $orderId);
 
