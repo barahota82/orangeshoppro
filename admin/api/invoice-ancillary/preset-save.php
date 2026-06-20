@@ -21,6 +21,8 @@ try {
     $systemKeyRaw = trim((string) ($data['system_key'] ?? ''));
     $systemKey = $systemKeyRaw !== '' ? orange_invoice_ancillary_system_key_normalize($systemKeyRaw) : null;
     $defaultShow = !empty($data['default_show_on_print']);
+    $sortOrder = (int) ($data['sort_order'] ?? 0);
+    $isActive = !array_key_exists('is_active', $data) || !empty($data['is_active']) ? 1 : 0;
 
     if ($accountId <= 0) {
         json_response(['success' => false, 'message' => 'اختر حساباً أولاً'], 422);
@@ -46,12 +48,13 @@ try {
         'label_en' => $labelEn,
         'system_key' => $systemKey,
         'default_show_on_print' => $defaultShow,
-        'is_active' => 1,
+        'sort_order' => $sortOrder,
+        'is_active' => $isActive,
     ]);
 
     json_response([
         'success' => true,
-        'message' => 'تمت إضافة الحساب إلى القائمة المحفوظة',
+        'message' => ((int) ($data['id'] ?? 0) > 0) ? 'تم تحديث البند' : 'تمت إضافة الحساب إلى القائمة المحفوظة',
         'preset_id' => $presetId,
     ]);
 } catch (RuntimeException $e) {

@@ -390,6 +390,9 @@ function orange_invoice_ancillary_preset_save(PDO $pdo, array $data): int
     }
     $defaultShow = !empty($data['default_show_on_print']) ? 1 : 0;
     $sortOrder = (int) ($data['sort_order'] ?? 0);
+    if ($id <= 0 && $sortOrder <= 0) {
+        $sortOrder = orange_invoice_ancillary_preset_next_sort($pdo, $countryId);
+    }
     $isActive = !array_key_exists('is_active', $data) || !empty($data['is_active']) ? 1 : 0;
     $hasSystemKeyCol = orange_table_has_column($pdo, 'orange_invoice_line_presets', 'system_key');
 

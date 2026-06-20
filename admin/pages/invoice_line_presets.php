@@ -76,6 +76,7 @@ foreach (orange_invoice_ancillary_system_key_catalog() as $sysKey => $sysMeta) {
     align-items: end;
 }
 .ilp-row-ops { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.ilp-row-ops button { padding: 3px 9px; font-size: 0.8rem; line-height: 1.2; }
 .ilp-pick-results {
     margin: 6px 0 0;
     padding: 0;
@@ -185,7 +186,7 @@ foreach (orange_invoice_ancillary_system_key_catalog() as $sysKey => $sysMeta) {
                     <th style="width:25%;">الحساب</th>
                     <th style="width:25%;">التسمية</th>
                     <th style="width:4rem;white-space:nowrap;text-align:center;">الترتيب</th>
-                    <th style="width:5rem;white-space:nowrap;" title="إعادة الترتيب">إعادة الترتيب</th>
+                    <th style="width:9rem;white-space:nowrap;" title="تعديل / حذف / إعادة الترتيب">إجراءات</th>
                 </tr>
             </thead>
             <tbody id="ilp_list_body">
@@ -342,12 +343,25 @@ foreach (orange_invoice_ancillary_system_key_catalog() as $sysKey => $sysMeta) {
                 + '<td>' + esc(row.label_ar || '') + '</td>'
                 + '<td dir="ltr" style="white-space:nowrap;text-align:center;">' + esc(String(row.sort_order || 0)) + '</td>'
                 + '<td><div class="ilp-row-ops">'
+                + '<button type="button" class="ilp-edit" title="تعديل">تعديل</button>'
+                + '<button type="button" class="btn-secondary ilp-delete" title="حذف">حذف</button>'
                 + '<button type="button" class="btn-secondary ilp-move-up" title="أعلى">↑</button>'
                 + '<button type="button" class="btn-secondary ilp-move-down" title="أسفل">↓</button>'
                 + '</div></td>';
             tr.addEventListener('click', function () { ilpFillForm(row); });
+            var editBtn = tr.querySelector('.ilp-edit');
+            var delBtn = tr.querySelector('.ilp-delete');
             var upBtn = tr.querySelector('.ilp-move-up');
             var dnBtn = tr.querySelector('.ilp-move-down');
+            if (editBtn) editBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                ilpFillForm(row);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+            if (delBtn) delBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                ilpDelete(row);
+            });
             if (upBtn) upBtn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 var prev = tr.previousElementSibling;
@@ -371,7 +385,9 @@ foreach (orange_invoice_ancillary_system_key_catalog() as $sysKey => $sysMeta) {
                     alert((res && res.message) || 'تعذر التحميل');
                     return;
                 }
-                ilpRenderList(res.presets || []);
+                var rows = res.presets || [];
+                ilpRenderList(rows);
+                ilpUpdateNextSortFromRows(rows);
             })
             .catch(function (e) { alert(e.message || String(e)); });
     }
@@ -408,6 +424,37 @@ foreach (orange_invoice_ancillary_system_key_catalog() as $sysKey => $sysMeta) {
             ilpResetForm();
             ilpLoadList();
         }).catch(function (e) { alert(e.message || String(e)); });
+    }
+
+    function ilpDelete(row) {
+        var id = parseInt(row && row.id, 10) || 0;
+        if (id <= 0) return;
+        var label = (row.label_ar || row.system_key_label_ar || row.line_kind_label || ('#' + id));
+        if (!window.confirm('حذف البند «' + label + '» نهائياً؟ الأسطر المحفوظة سابقاً لا تتأثر.')) {
+            return;
+        }
+        postJSON('/admin/api/invoice-ancillary/preset-delete.php', { id: id }).then(function (res) {
+            if (!res || !res.success) {
+                alert((res && res.message) || 'تعذر الحذف');
+                return;
+            }
+            var curId = parseInt(document.getElementById('ilp_id').value, 10) || 0;
+            if (curId === id) ilpResetForm();
+            ilpLoadList();
+        }).catch(function (e) { alert(e.message || String(e)); });
+    }
+
+    function ilpUpdateNextSortFromRows(rows) {
+        var maxSort = 0;
+        (rows || []).forEach(function (r) {
+            var s = parseInt(r && r.sort_order, 10) || 0;
+            if (s > maxSort) maxSort = s;
+        });
+        ILP_NEXT_SORT = maxSort + 1;
+        if ((parseInt(document.getElementById('ilp_id').value, 10) || 0) <= 0) {
+            var sortEl = document.getElementById('ilp_sort');
+            if (sortEl) sortEl.value = String(ILP_NEXT_SORT);
+        }
     }
 
     function ilpSaveOrder() {
