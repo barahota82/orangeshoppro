@@ -5,6 +5,29 @@ declare(strict_types=1);
 require_once __DIR__ . '/catalog_unified_product_helpers.php';
 
 /**
+ * سعر التجزئة (سعر البيع المعتاد) لوحدة صنف الهدية — يُستخدم لعرض الهدية بسعرها الكامل
+ * على الفاتورة مع بند خصم صريح بقيمة الفارق (قرار المالك: إظهار قيمة الهدية للعميل/مندوب التوصيل).
+ */
+function orange_cart_promo_gift_variant_retail_unit(PDO $pdo, int $variantId): float
+{
+    if ($variantId <= 0) {
+        return 0.0;
+    }
+    $st = $pdo->prepare(
+        'SELECT p.price FROM products p
+         INNER JOIN product_variants v ON v.product_id = p.id
+         WHERE v.id = ? AND p.is_active = 1 LIMIT 1'
+    );
+    $st->execute([$variantId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return 0.0;
+    }
+
+    return max(0.0, round((float) ($row['price'] ?? 0), 4));
+}
+
+/**
  * تسعير وحدة بند هدية ترويجية (عروض مجموع سلة + BOGO) — مجاني أو نسبة/مبلغ/سعر ثابت.
  *
  * @param array<string,mixed> $rule يحتوي gift_unit_charge_kind و gift_unit_charge_value

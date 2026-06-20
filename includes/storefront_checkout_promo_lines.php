@@ -14,9 +14,11 @@ require_once __DIR__ . '/cart_bogo_promotions.php';
  *   giftLine: ?array,
  *   giftPromoId: ?int,
  *   giftVariantId: ?int,
+ *   giftDiscount: float,
  *   bogoLine: ?array,
  *   bogoPromoId: ?int,
  *   bogoGiftVariantId: ?int,
+ *   bogoDiscount: float,
  *   linesForStock: list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float,is_gift?:bool,is_bogo_gift?:bool}>
  * }
  */
@@ -56,6 +58,7 @@ function orange_storefront_build_promotional_gift_lines(
     $giftLine = null;
     $giftPromoId = null;
     $giftVariantId = null;
+    $giftDiscount = 0.0;
     if ($giftRule !== null) {
         $pickVid = 0;
         if ($giftRule['gift_kind'] === 'fixed') {
@@ -83,7 +86,13 @@ function orange_storefront_build_promotional_gift_lines(
         }
         if ($pickVid > 0) {
             $giftUnit = orange_cart_promo_resolve_gift_unit_price_from_rule($pdo, $giftRule, $pickVid);
-            $giftLine = orange_storefront_build_gift_order_line($pdo, $pickVid, $validatedItems, true, $giftUnit);
+            $giftRetail = orange_cart_promo_gift_variant_retail_unit($pdo, $pickVid);
+            if ($giftRetail < $giftUnit) {
+                $giftRetail = $giftUnit;
+            }
+            // الهدية تُسعَّر بالتجزئة على البند، والفارق (تجزئة − ما يدفعه العميل) يظهر كبند خصم صريح.
+            $giftLine = orange_storefront_build_gift_order_line($pdo, $pickVid, $validatedItems, true, $giftRetail);
+            $giftDiscount = round(max(0.0, $giftRetail - $giftUnit) * (int) ($giftLine['qty'] ?? 1), 4);
             $giftPromoId = $giftRule['id'];
             $giftVariantId = $pickVid;
         }
@@ -121,6 +130,7 @@ function orange_storefront_build_promotional_gift_lines(
     $bogoLine = null;
     $bogoPromoId = null;
     $bogoGiftVariantId = null;
+    $bogoDiscount = 0.0;
     if ($bogoRule !== null) {
         $bogoPick = 0;
         if ($bogoRule['gift_kind'] === 'fixed') {
@@ -148,8 +158,13 @@ function orange_storefront_build_promotional_gift_lines(
         }
         if ($bogoPick > 0) {
             $bogoUnit = orange_cart_bogo_resolve_gift_unit_price($pdo, $bogoRule, $bogoPick);
-            $bogoLine = orange_storefront_build_gift_order_line($pdo, $bogoPick, $linesAfterSubtotalGift, true, $bogoUnit);
+            $bogoRetail = orange_cart_promo_gift_variant_retail_unit($pdo, $bogoPick);
+            if ($bogoRetail < $bogoUnit) {
+                $bogoRetail = $bogoUnit;
+            }
+            $bogoLine = orange_storefront_build_gift_order_line($pdo, $bogoPick, $linesAfterSubtotalGift, true, $bogoRetail);
             $bogoLine['is_bogo_gift'] = true;
+            $bogoDiscount = round(max(0.0, $bogoRetail - $bogoUnit) * (int) ($bogoLine['qty'] ?? 1), 4);
             $bogoPromoId = $bogoRule['id'];
             $bogoGiftVariantId = $bogoPick;
         }
@@ -167,9 +182,11 @@ function orange_storefront_build_promotional_gift_lines(
         'giftLine' => $giftLine,
         'giftPromoId' => $giftPromoId,
         'giftVariantId' => $giftVariantId,
+        'giftDiscount' => round((float) $giftDiscount, 4),
         'bogoLine' => $bogoLine,
         'bogoPromoId' => $bogoPromoId,
         'bogoGiftVariantId' => $bogoGiftVariantId,
+        'bogoDiscount' => round((float) $bogoDiscount, 4),
         'linesForStock' => $linesForStock,
     ];
 }

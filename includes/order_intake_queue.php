@@ -521,15 +521,19 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     $bogoLine = $promoBundle['bogoLine'];
     $bogoPromoId = $promoBundle['bogoPromoId'];
     $bogoGiftVariantId = $promoBundle['bogoGiftVariantId'];
+    $giftDiscount = round((float) ($promoBundle['giftDiscount'] ?? 0), 4);
+    $bogoDiscount = round((float) ($promoBundle['bogoDiscount'] ?? 0), 4);
     $linesForStock = $promoBundle['linesForStock'];
 
+    // البنود مُسعَّرة بالتجزئة؛ ما يدفعه العميل فعلاً = (تجزئة − خصم الهدية الصريح).
     $giftLinesCharge = 0.0;
     if ($giftLine !== null) {
-        $giftLinesCharge += round((float) ($giftLine['price'] ?? 0) * (int) ($giftLine['qty'] ?? 1), 4);
+        $giftLinesCharge += round((float) ($giftLine['price'] ?? 0) * (int) ($giftLine['qty'] ?? 1) - $giftDiscount, 4);
     }
     if ($bogoLine !== null) {
-        $giftLinesCharge += round((float) ($bogoLine['price'] ?? 0) * (int) ($bogoLine['qty'] ?? 1), 4);
+        $giftLinesCharge += round((float) ($bogoLine['price'] ?? 0) * (int) ($bogoLine['qty'] ?? 1) - $bogoDiscount, 4);
     }
+    $giftLinesCharge = round(max(0.0, $giftLinesCharge), 4);
     $orderTotal = max(0.0, round($orderTotal + $giftLinesCharge + $deliveryFee, 4));
 
     $customerRowId = orange_storefront_upsert_customer_from_checkout(
@@ -646,6 +650,16 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $params[] = $giftPromoId !== null && $giftPromoId > 0 ? $giftPromoId : null;
         $params[] = $giftVariantId !== null && $giftVariantId > 0 ? $giftVariantId : null;
     }
+    if (orange_table_has_column($pdo, 'orders', 'cart_gift_discount')) {
+        $cols .= ', cart_gift_discount';
+        $ph .= ', ?';
+        $params[] = $giftDiscount > 0 ? $giftDiscount : 0.0;
+    }
+    if (orange_table_has_column($pdo, 'orders', 'cart_bogo_discount')) {
+        $cols .= ', cart_bogo_discount';
+        $ph .= ', ?';
+        $params[] = $bogoDiscount > 0 ? $bogoDiscount : 0.0;
+    }
     $hasBogoCols = orange_table_has_column($pdo, 'orders', 'cart_bogo_promotion_id')
         && orange_table_has_column($pdo, 'orders', 'cart_bogo_gift_variant_id');
     if ($hasBogoCols) {
@@ -683,7 +697,7 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     orange_storefront_insert_order_items_for_order($pdo, $orderId, $linesForStock);
 
     if (orange_invoice_ancillary_tables_ready($pdo)) {
-        $autoDeliveryLines = orange_invoice_ancillary_merge_auto_delivery_lines(
+        $autoLines = orange_invoice_ancillary_merge_auto_delivery_lines(
             $pdo,
             $orderCountryId,
             [
@@ -693,13 +707,24 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
             ],
             []
         );
-        if ($autoDeliveryLines !== []) {
+        $autoLines = orange_invoice_ancillary_merge_auto_promo_lines(
+            $pdo,
+            $orderCountryId,
+            [
+                'promo_combo_discount' => $comboDiscount,
+                'promo_cart_discount' => $promoDiscount,
+                'promo_gift_discount' => $giftDiscount,
+                'promo_bogo_discount' => $bogoDiscount,
+            ],
+            $autoLines
+        );
+        if ($autoLines !== []) {
             orange_invoice_ancillary_extra_lines_replace_for_doc(
                 $pdo,
                 orange_invoice_ancillary_doc_kind_sales(),
                 $orderId,
                 $orderCountryId,
-                $autoDeliveryLines
+                $autoLines
             );
         }
     }

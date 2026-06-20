@@ -708,6 +708,104 @@ function orange_invoice_ancillary_merge_auto_delivery_lines(
 }
 
 /**
+ * مفاتيح الخصومات الترويجية/الولاء التلقائية (sales_debit_contra) المولّدة من قيم الطلب.
+ * كلها تحت «خصومات العروض الترويجية»/«خصم استبدال النقاط» حسب ربط الأدمن للحساب عبر system_key.
+ *
+ * @return list<string>
+ */
+function orange_invoice_ancillary_auto_promo_system_keys(): array
+{
+    return [
+        'promo_combo_discount',
+        'promo_cart_discount',
+        'promo_gift_discount',
+        'promo_bogo_discount',
+        'product_offer_discount',
+        'loyalty_points_redemption',
+    ];
+}
+
+/**
+ * يولّد بنود خصم ترويجي/ولاء تلقائية من قيم الطلب (system_key => amount) وفق presets الدولة.
+ * لا يُولَّد بند لمفتاح بلا preset مربوط (يبقى السلوك كما كان حتى يربط الأدمن الحساب).
+ *
+ * @param array<string, float> $amountsByKey
+ * @return list<array<string,mixed>>
+ */
+function orange_invoice_ancillary_auto_promo_lines(PDO $pdo, int $countryId, array $amountsByKey): array
+{
+    $presetMap = orange_invoice_ancillary_system_key_presets_map($pdo, $countryId, true);
+    if ($presetMap === []) {
+        return [];
+    }
+    $out = [];
+    foreach (orange_invoice_ancillary_auto_promo_system_keys() as $key) {
+        $amount = round((float) ($amountsByKey[$key] ?? 0), 4);
+        if ($amount <= 0.0001) {
+            continue;
+        }
+        $preset = $presetMap[$key] ?? null;
+        if (!is_array($preset)) {
+            continue;
+        }
+        $meta = orange_invoice_ancillary_system_key_meta($key) ?? [];
+        $lineKind = trim((string) ($preset['line_kind'] ?? ($meta['line_kind'] ?? '')));
+        $accountId = (int) ($preset['account_id'] ?? 0);
+        if ($accountId <= 0 || !orange_invoice_ancillary_line_kind_is_valid($lineKind)) {
+            continue;
+        }
+        $labelAr = trim((string) ($preset['label_ar'] ?? ''));
+        if ($labelAr === '') {
+            $labelAr = (string) ($meta['label_ar'] ?? 'خصم ترويجي');
+        }
+        $out[] = [
+            'account_id' => $accountId,
+            'line_kind' => $lineKind,
+            'amount' => round($amount, 4),
+            'label_ar' => $labelAr,
+            'show_on_print' => !empty($preset['default_show_on_print']) ? 1 : 0,
+            'preset_id' => (int) ($preset['id'] ?? 0) > 0 ? (int) ($preset['id'] ?? 0) : null,
+            'system_key' => $key,
+            'auto_promo' => 1,
+        ];
+    }
+
+    return $out;
+}
+
+/**
+ * يدمج بنود الخصم الترويجي/الولاء التلقائية مع المُدخلة (يزيل أي بند بنفس مفتاح ترويجي لتفادي الازدواج).
+ *
+ * @param array<string, float> $amountsByKey
+ * @param list<array<string,mixed>> $extraInput
+ * @return list<array<string,mixed>>
+ */
+function orange_invoice_ancillary_merge_auto_promo_lines(
+    PDO $pdo,
+    int $countryId,
+    array $amountsByKey,
+    array $extraInput
+): array {
+    $systemKeys = orange_invoice_ancillary_auto_promo_system_keys();
+    $out = [];
+    foreach ($extraInput as $line) {
+        if (!is_array($line)) {
+            continue;
+        }
+        $lineKey = orange_invoice_ancillary_system_key_normalize((string) ($line['system_key'] ?? ''));
+        if ($lineKey !== null && in_array($lineKey, $systemKeys, true)) {
+            continue;
+        }
+        $out[] = $line;
+    }
+    foreach (orange_invoice_ancillary_auto_promo_lines($pdo, $countryId, $amountsByKey) as $autoLine) {
+        $out[] = $autoLine;
+    }
+
+    return $out;
+}
+
+/**
  * @return array<string, string>
  */
 function orange_invoice_ancillary_line_kind_label(string $lineKind): string

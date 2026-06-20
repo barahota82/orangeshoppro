@@ -112,6 +112,8 @@ try {
     $hasPreferredWarehouseId = orange_table_has_column($pdo, 'suppliers', 'preferred_warehouse_id');
     $hasBlockReason = orange_table_has_column($pdo, 'suppliers', 'block_reason');
     $hasAttachmentsJson = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
+    $hasIsDeliveryCompany = orange_table_has_column($pdo, 'suppliers', 'is_delivery_company');
+    $isDeliveryCompanySql = !empty($data['is_delivery_company']) ? 1 : 0;
     // سياسة الموردين: الكود يُولَّد تلقائياً فقط؛ لا نقبل إدخالاً يدوياً من الواجهة.
     $codeSql = null;
     $codeManualRaw = isset($data['code']) ? trim((string) $data['code']) : '';
@@ -538,6 +540,10 @@ try {
             $fields[] = 'attachments_json = ?';
             $params[] = $attachmentsJsonSql;
         }
+        if ($hasIsDeliveryCompany) {
+            $fields[] = 'is_delivery_company = ?';
+            $params[] = $isDeliveryCompanySql;
+        }
         $params[] = $idIn;
         $pdo->prepare('UPDATE suppliers SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
         audit_log('supplier_update', 'تحديث مورد #' . $idIn . ' — ' . $name, 'suppliers', $idIn);
@@ -671,6 +677,11 @@ try {
         $cols[] = 'attachments_json';
         $placeholders[] = '?';
         $params[] = $attachmentsJsonProvided ? $attachmentsJsonSql : null;
+    }
+    if ($hasIsDeliveryCompany) {
+        $cols[] = 'is_delivery_company';
+        $placeholders[] = '?';
+        $params[] = $isDeliveryCompanySql;
     }
     $sql = 'INSERT INTO suppliers (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
     $pdo->prepare($sql)->execute($params);

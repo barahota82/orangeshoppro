@@ -87,15 +87,18 @@ try {
         $bogoLine = $promoBundle['bogoLine'];
         $bogoPromoId = $promoBundle['bogoPromoId'];
         $bogoGiftVariantId = $promoBundle['bogoGiftVariantId'];
+        $giftDiscount = round((float) ($promoBundle['giftDiscount'] ?? 0), 4);
+        $bogoDiscount = round((float) ($promoBundle['bogoDiscount'] ?? 0), 4);
         $linesForStock = $promoBundle['linesForStock'];
 
         $giftLinesCharge = 0.0;
         if ($giftLine !== null) {
-            $giftLinesCharge += round((float) ($giftLine['price'] ?? 0) * (int) ($giftLine['qty'] ?? 1), 4);
+            $giftLinesCharge += round((float) ($giftLine['price'] ?? 0) * (int) ($giftLine['qty'] ?? 1) - $giftDiscount, 4);
         }
         if ($bogoLine !== null) {
-            $giftLinesCharge += round((float) ($bogoLine['price'] ?? 0) * (int) ($bogoLine['qty'] ?? 1), 4);
+            $giftLinesCharge += round((float) ($bogoLine['price'] ?? 0) * (int) ($bogoLine['qty'] ?? 1) - $bogoDiscount, 4);
         }
+        $giftLinesCharge = round(max(0.0, $giftLinesCharge), 4);
         $orderTotal = max(0.0, round($orderTotal + $giftLinesCharge + $existingDeliveryFee, 4));
 
         $orderId = (int) $order['id'];
@@ -128,6 +131,14 @@ try {
             $updParams[] = $giftPromoId !== null && $giftPromoId > 0 ? $giftPromoId : null;
             $updParams[] = $giftVariantId !== null && $giftVariantId > 0 ? $giftVariantId : null;
         }
+        if (orange_table_has_column($pdo, 'orders', 'cart_gift_discount')) {
+            $setParts[] = 'cart_gift_discount = ?';
+            $updParams[] = $giftDiscount > 0 ? $giftDiscount : 0.0;
+        }
+        if (orange_table_has_column($pdo, 'orders', 'cart_bogo_discount')) {
+            $setParts[] = 'cart_bogo_discount = ?';
+            $updParams[] = $bogoDiscount > 0 ? $bogoDiscount : 0.0;
+        }
         if ($hasBogoCols) {
             $setParts[] = 'cart_bogo_promotion_id = ?';
             $setParts[] = 'cart_bogo_gift_variant_id = ?';
@@ -140,6 +151,33 @@ try {
         }
         $updParams[] = $orderId;
         $pdo->prepare('UPDATE orders SET ' . implode(', ', $setParts) . ' WHERE id = ?')->execute($updParams);
+
+        if (orange_invoice_ancillary_tables_ready($pdo)) {
+            $amendCountryId = (int) ($order['country_id'] ?? 0);
+            $savedExtra = orange_invoice_ancillary_extra_lines_for_doc(
+                $pdo,
+                orange_invoice_ancillary_doc_kind_sales(),
+                $orderId
+            );
+            $mergedExtra = orange_invoice_ancillary_merge_auto_promo_lines(
+                $pdo,
+                $amendCountryId,
+                [
+                    'promo_combo_discount' => $comboDiscount,
+                    'promo_cart_discount' => $promoDiscount,
+                    'promo_gift_discount' => $giftDiscount,
+                    'promo_bogo_discount' => $bogoDiscount,
+                ],
+                $savedExtra
+            );
+            orange_invoice_ancillary_extra_lines_replace_for_doc(
+                $pdo,
+                orange_invoice_ancillary_doc_kind_sales(),
+                $orderId,
+                $amendCountryId,
+                $mergedExtra
+            );
+        }
 
         orange_storefront_insert_order_items_for_order($pdo, $orderId, $linesForStock);
 

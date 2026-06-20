@@ -55,6 +55,13 @@ try {
         json_response(['success' => false, 'message' => 'جدول delivery_areas غير جاهز'], 422);
     }
 
+    if ($action === 'list_companies') {
+        json_response([
+            'success' => true,
+            'data' => orange_delivery_companies_list($pdo, orange_delivery_areas_api_country_id($pdo, is_array($data) ? $data : [])),
+        ]);
+    }
+
     $countryId = orange_delivery_areas_api_country_id($pdo, is_array($data) ? $data : []);
     $countryMoneyDecimals = orange_currency_decimals_for_code(
         orange_country_functional_currency_code($pdo, $countryId)
@@ -157,6 +164,30 @@ try {
                 'INSERT INTO delivery_governorates (country_id, name_ar, name_en, sort_order, is_active) VALUES (?, ?, ?, ?, ?)'
             );
             $st->execute([$countryId, $nameAr, $nameEn, $sortOrder, $isActive]);
+            $id = (int) $pdo->lastInsertId();
+        }
+
+        if (orange_delivery_governorates_has_company_column($pdo)
+            && array_key_exists('delivery_company_id', is_array($data) ? $data : [])
+            && $id > 0
+        ) {
+            $companyId = (int) ($data['delivery_company_id'] ?? 0);
+            if ($companyId > 0 && orange_table_exists($pdo, 'suppliers')) {
+                $supSql = 'SELECT id FROM suppliers WHERE id = ?';
+                $supParams = [$companyId];
+                if (orange_table_has_column($pdo, 'suppliers', 'country_id')) {
+                    $supSql .= ' AND (country_id = ? OR country_id IS NULL)';
+                    $supParams[] = $countryId;
+                }
+                $supSql .= ' LIMIT 1';
+                $chk = $pdo->prepare($supSql);
+                $chk->execute($supParams);
+                if (!$chk->fetch()) {
+                    json_response(['success' => false, 'message' => 'شركة التوصيل (المورّد) غير موجودة لهذه الدولة'], 422);
+                }
+            }
+            $u = $pdo->prepare('UPDATE delivery_governorates SET delivery_company_id = ? WHERE id = ?');
+            $u->execute([$companyId > 0 ? $companyId : null, $id]);
         }
 
         json_response(['success' => true, 'message' => 'تم حفظ المحافظة']);
@@ -318,6 +349,20 @@ try {
                     );
                     $st->execute([$nameAr, $nameEn, $deliveryFee, $sortOrder, $isActive]);
                 }
+            }
+        }
+
+        if (orange_delivery_areas_has_company_cost_column($pdo)
+            && array_key_exists('company_delivery_cost', is_array($data) ? $data : [])
+        ) {
+            $companyCost = da_money_non_negative($data['company_delivery_cost'] ?? '', $countryMoneyDecimals);
+            if ($companyCost === null) {
+                json_response(['success' => false, 'message' => 'تكلفة التوصيل على الشركة غير صحيحة'], 422);
+            }
+            $areaId = $id > 0 ? $id : (int) $pdo->lastInsertId();
+            if ($areaId > 0) {
+                $u = $pdo->prepare('UPDATE delivery_areas SET company_delivery_cost = ? WHERE id = ?');
+                $u->execute([$companyCost, $areaId]);
             }
         }
 

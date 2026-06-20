@@ -75,6 +75,58 @@ function orange_delivery_areas_has_pending_fee_column(PDO $pdo): bool
         && orange_table_has_column($pdo, 'delivery_areas', 'delivery_fee_pending');
 }
 
+function orange_delivery_areas_has_company_cost_column(PDO $pdo): bool
+{
+    return orange_table_exists($pdo, 'delivery_areas')
+        && orange_table_has_column($pdo, 'delivery_areas', 'company_delivery_cost');
+}
+
+function orange_delivery_governorates_has_company_column(PDO $pdo): bool
+{
+    return orange_delivery_governorates_table_exists($pdo)
+        && orange_table_has_column($pdo, 'delivery_governorates', 'delivery_company_id');
+}
+
+/**
+ * شركات التوصيل (موردون موسومون is_delivery_company) لاختيارها على المحافظة.
+ * إن غاب عمود الوسم تُعاد كل الموردين.
+ *
+ * @return list<array{id:int, name_ar:string}>
+ */
+function orange_delivery_companies_list(PDO $pdo, int $countryId): array
+{
+    if (!orange_table_exists($pdo, 'suppliers')) {
+        return [];
+    }
+    $nameCol = orange_table_has_column($pdo, 'suppliers', 'name_ar') ? 'name_ar' : 'name';
+    $where = [];
+    $params = [];
+    if (orange_table_has_column($pdo, 'suppliers', 'is_delivery_company')) {
+        $where[] = 'is_delivery_company = 1';
+    }
+    if ($countryId > 0 && orange_table_has_column($pdo, 'suppliers', 'country_id')) {
+        $where[] = '(country_id = ? OR country_id IS NULL)';
+        $params[] = $countryId;
+    }
+    $sql = 'SELECT id, ' . $nameCol . ' AS name_ar FROM suppliers';
+    if ($where !== []) {
+        $sql .= ' WHERE ' . implode(' AND ', $where);
+    }
+    $sql .= ' ORDER BY ' . $nameCol . ' ASC, id ASC';
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $out = [];
+    foreach ($rows as $r) {
+        $out[] = [
+            'id' => (int) ($r['id'] ?? 0),
+            'name_ar' => (string) ($r['name_ar'] ?? ''),
+        ];
+    }
+
+    return $out;
+}
+
 /**
  * محافظة افتراضية لكل دولة (ترحيل المناطف القديمة).
  */
@@ -107,8 +159,22 @@ function orange_delivery_governorates_admin_list(PDO $pdo, int $countryId): arra
     if (!orange_delivery_governorates_table_exists($pdo) || $countryId <= 0) {
         return [];
     }
+    $hasCompany = orange_delivery_governorates_has_company_column($pdo);
+    $hasSuppliers = orange_table_exists($pdo, 'suppliers');
+    $supplierNameCol = $hasSuppliers && orange_table_has_column($pdo, 'suppliers', 'name_ar')
+        ? 'name_ar'
+        : 'name';
+    if ($hasCompany) {
+        $companySel = 'g.delivery_company_id'
+            . ($hasSuppliers
+                ? ', (SELECT s.' . $supplierNameCol . ' FROM suppliers s WHERE s.id = g.delivery_company_id) AS delivery_company_name'
+                : ', NULL AS delivery_company_name');
+    } else {
+        $companySel = 'NULL AS delivery_company_id, NULL AS delivery_company_name';
+    }
     $st = $pdo->prepare(
         'SELECT g.id, g.country_id, g.name_ar, g.name_en, g.sort_order, g.is_active,
+                ' . $companySel . ',
                 (SELECT COUNT(*) FROM delivery_areas a WHERE a.governorate_id = g.id) AS areas_count
          FROM delivery_governorates g
          WHERE g.country_id = ?
@@ -118,6 +184,8 @@ function orange_delivery_governorates_admin_list(PDO $pdo, int $countryId): arra
     $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     foreach ($rows as &$r) {
         $r['areas_count'] = (int) ($r['areas_count'] ?? 0);
+        $r['delivery_company_id'] = (int) ($r['delivery_company_id'] ?? 0);
+        $r['delivery_company_name'] = (string) ($r['delivery_company_name'] ?? '');
     }
     unset($r);
 
@@ -137,10 +205,13 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
         && orange_delivery_governorates_table_exists($pdo);
     $hasFee = orange_table_has_column($pdo, 'delivery_areas', 'delivery_fee');
     $hasPending = orange_delivery_areas_has_pending_fee_column($pdo);
+    $hasCompanyCost = orange_delivery_areas_has_company_cost_column($pdo);
     $feeSelA = $hasFee ? 'a.delivery_fee' : '0 AS delivery_fee';
     $feeSel = $hasFee ? 'delivery_fee' : '0 AS delivery_fee';
     $pendingSelA = $hasPending ? 'a.delivery_fee_pending' : '0 AS delivery_fee_pending';
     $pendingSel = $hasPending ? 'delivery_fee_pending' : '0 AS delivery_fee_pending';
+    $ccSelA = $hasCompanyCost ? 'a.company_delivery_cost' : '0 AS company_delivery_cost';
+    $ccSel = $hasCompanyCost ? 'company_delivery_cost' : '0 AS company_delivery_cost';
     if ($countryId === null && $hasCountry) {
         $countryId = orange_countries_default_id($pdo);
     }
@@ -148,7 +219,7 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
         if ($hasGov) {
             $st = $pdo->prepare(
                 'SELECT a.id, a.name_ar, a.name_en, ' . $feeSelA . ', a.sort_order, a.is_active, a.country_id, a.governorate_id,
-                        ' . $pendingSelA . ',
+                        ' . $pendingSelA . ', ' . $ccSelA . ',
                         g.name_ar AS governorate_name_ar, g.name_en AS governorate_name_en
                  FROM delivery_areas a
                  LEFT JOIN delivery_governorates g ON g.id = a.governorate_id
@@ -159,7 +230,7 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
         } else {
             $st = $pdo->prepare(
                 'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, country_id
-                        , ' . $pendingSel . '
+                        , ' . $pendingSel . ', ' . $ccSel . '
                  FROM delivery_areas WHERE country_id = ? ORDER BY sort_order ASC, id ASC'
             );
             $st->execute([$countryId]);
@@ -169,7 +240,7 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
     }
 
     $st = $pdo->query(
-        'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, ' . $pendingSel . '
+        'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, ' . $pendingSel . ', ' . $ccSel . '
          FROM delivery_areas ORDER BY sort_order ASC, id ASC'
     );
 

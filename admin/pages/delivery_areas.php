@@ -35,6 +35,11 @@ $daMoneyZero = isset($orangeAdminMoneyZero) && is_string($orangeAdminMoneyZero)
     ? $orangeAdminMoneyZero
     : orange_admin_money_zero_string($daMoneyDecimals);
 $daPolicy = orange_delivery_country_policy_read($pdo, $adminCountryId);
+$hasCompanyCostCol = orange_delivery_areas_has_company_cost_column($pdo);
+$hasGovCompanyCol = orange_delivery_governorates_has_company_column($pdo);
+$daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
+    ? orange_delivery_companies_list($pdo, $adminCountryId)
+    : [];
 ?>
 <div class="page-title">
     <h1>محافظات ومناطق التوصيل</h1>
@@ -81,6 +86,18 @@ $daPolicy = orange_delivery_country_policy_read($pdo, $adminCountryId);
             <label for="dg_name_en">English</label>
             <input type="text" id="dg_name_en" maxlength="191" autocomplete="off" lang="en" dir="ltr">
         </div>
+        <?php if ($hasGovCompanyCol): ?>
+        <div class="da-gov-company">
+            <label for="dg_delivery_company_id">شركة التوصيل (مورّد)</label>
+            <select id="dg_delivery_company_id">
+                <option value="">بدون شركة (مستحقات توصيل افتراضي)</option>
+                <?php foreach ($daDeliveryCompanies as $coRow): ?>
+                <option value="<?php echo (int) ($coRow['id'] ?? 0); ?>"><?php echo htmlspecialchars((string) ($coRow['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <span class="muted" style="display:block;margin-top:4px;">عند تركها بدون شركة يُرحَّل مصروف التوصيل على «مستحقات توصيل افتراضي» ويُصرَف من الخزينة لاحقاً.</span>
+        </div>
+        <?php endif; ?>
         <div class="da-gov-sort">
             <label for="dg_sort_order">الترتيب</label>
             <input type="number" id="dg_sort_order" class="admin-sort-field admin-sort-field--muted"
@@ -179,6 +196,13 @@ $daPolicy = orange_delivery_country_policy_read($pdo, $adminCountryId);
             <input type="number" id="da_delivery_fee" min="0" step="<?php echo htmlspecialchars($daMoneyStep, ENT_QUOTES, 'UTF-8'); ?>" lang="en" dir="ltr" value="<?php echo htmlspecialchars($daMoneyZero, ENT_QUOTES, 'UTF-8'); ?>">
             <span class="muted" style="display:block;margin-top:4px;">اترك الحقل فارغاً مع تفعيل المنطقة لتسجيل حالة "بانتظار التحديد".</span>
         </div>
+        <?php if ($hasCompanyCostCol): ?>
+        <div class="da-area-company-cost">
+            <label for="da_company_delivery_cost">تكلفة التوصيل على الشركة</label>
+            <input type="number" id="da_company_delivery_cost" min="0" step="<?php echo htmlspecialchars($daMoneyStep, ENT_QUOTES, 'UTF-8'); ?>" lang="en" dir="ltr" value="<?php echo htmlspecialchars($daMoneyZero, ENT_QUOTES, 'UTF-8'); ?>">
+            <span class="muted" style="display:block;margin-top:4px;">القيمة التي تدفعها الشركة لشركة التوصيل (مصروف) — منفصلة عن قيمة التوصيل التي يسددها العميل (إيراد).</span>
+        </div>
+        <?php endif; ?>
         <div class="da-area-sort">
             <label for="da_sort_order">الترتيب</label>
             <input type="number" id="da_sort_order" class="admin-sort-field admin-sort-field--muted"
@@ -530,6 +554,8 @@ function resetGovernorateForm() {
     document.getElementById('dg_name_ar').value = '';
     document.getElementById('dg_name_en').value = '';
     document.getElementById('dg_is_active').checked = true;
+    var coSel = document.getElementById('dg_delivery_company_id');
+    if (coSel) coSel.value = '';
     refreshDgSortPreview();
 }
 
@@ -539,6 +565,8 @@ function editGovernorate(row) {
     document.getElementById('dg_name_en').value = row.name_en || '';
     document.getElementById('dg_sort_order').value = String(row.sort_order != null ? row.sort_order : 0);
     document.getElementById('dg_is_active').checked = parseInt(row.is_active, 10) === 1;
+    var coSel = document.getElementById('dg_delivery_company_id');
+    if (coSel) coSel.value = (row.delivery_company_id && parseInt(row.delivery_company_id, 10) > 0) ? String(row.delivery_company_id) : '';
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -614,14 +642,19 @@ function bindGovernorateEditButtons() {
 }
 
 async function saveGovernorate() {
-    const res = await postJSON('/admin/api/delivery_areas/manage.php', {
+    var coSel = document.getElementById('dg_delivery_company_id');
+    const payload = {
         action: 'save_governorate',
         id: parseInt(document.getElementById('dg_id').value, 10) || 0,
         country_id: daCountryId(),
         name_ar: document.getElementById('dg_name_ar').value.trim(),
         name_en: document.getElementById('dg_name_en').value.trim(),
         is_active: document.getElementById('dg_is_active').checked ? 1 : 0
-    });
+    };
+    if (coSel) {
+        payload.delivery_company_id = parseInt(coSel.value, 10) || 0;
+    }
+    const res = await postJSON('/admin/api/delivery_areas/manage.php', payload);
     alert(res.message || (res.success ? 'تم' : 'فشل'));
     if (res.success) {
         resetGovernorateForm();
@@ -636,6 +669,8 @@ function resetDeliveryAreaForm() {
     document.getElementById('da_name_en').value = '';
     document.getElementById('da_delivery_fee').value = daFormatMoney(daAreaDefaultFee);
     document.getElementById('da_is_active').checked = true;
+    var ccEl = document.getElementById('da_company_delivery_cost');
+    if (ccEl) ccEl.value = daFormatMoney(0);
     const sel = document.getElementById('da_governorate_id');
     if (sel) sel.value = '';
     daSyncListAllCheckbox();
@@ -654,6 +689,10 @@ function editDeliveryArea(row) {
     const sel = document.getElementById('da_governorate_id');
     if (sel && row.governorate_id) {
         sel.value = String(row.governorate_id);
+    }
+    var ccEl = document.getElementById('da_company_delivery_cost');
+    if (ccEl) {
+        ccEl.value = daFormatMoney(row.company_delivery_cost != null ? row.company_delivery_cost : 0);
     }
     daSyncListAllCheckbox();
     refreshDaSortPreview();
@@ -726,6 +765,20 @@ async function saveDeliveryArea() {
         delivery_fee: feePayload,
         is_active: isActive
     };
+    var ccEl = document.getElementById('da_company_delivery_cost');
+    if (ccEl) {
+        const ccRaw = String(ccEl.value || '').trim();
+        if (ccRaw === '') {
+            payload.company_delivery_cost = 0;
+        } else {
+            const ccVal = daParseMoney(ccRaw);
+            if (!Number.isFinite(ccVal) || ccVal < 0) {
+                alert('تكلفة التوصيل على الشركة غير صحيحة');
+                return;
+            }
+            payload.company_delivery_cost = Number(daRoundMoney(ccVal).toFixed(daMoneyDecimals));
+        }
+    }
     if (govEl) {
         payload.governorate_id = parseInt(govEl.value, 10) || 0;
         if (!payload.governorate_id) {

@@ -344,6 +344,7 @@ if (orange_table_exists($pdo, 'suppliers')) {
             'status' => $statusRaw,
             'currency_code' => $currencyCode !== '' ? $currencyCode : $supplierDefaultCurrency,
             'payment_mode' => (string) ($r['payment_mode'] ?? 'cash'),
+            'is_delivery_company' => (int) ($r['is_delivery_company'] ?? 0),
             'payment_terms_days' => isset($r['payment_terms_days']) && $r['payment_terms_days'] !== null ? (int) $r['payment_terms_days'] : null,
             'tax_profile' => $taxProfileCode !== '' ? $taxProfileCode : 'exempt',
             'tax_number' => (string) ($r['tax_number'] ?? ''),
@@ -849,6 +850,11 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
             </select>
         </div>
         <?php endif; ?>
+        <div class="sup-grid-r5-delivery-company" style="grid-column:1 / -1;">
+            <label for="sup_is_delivery_company" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:1.4rem;">
+                <input type="checkbox" id="sup_is_delivery_company"> شركة توصيل (تظهر كخيار على المحافظات لربط مصروف التوصيل)
+            </label>
+        </div>
         <?php if ($hasSupplierCurrencyCol): ?>
         <div class="sup-grid-r5-currency">
             <label for="sup_currency_code">العملة الافتراضية <span style="color:#b45309;">*</span></label>
@@ -2220,6 +2226,10 @@ function supEdit(row) {
     if (pm) {
         pm.value = row.payment_mode || 'cash';
     }
+    var dcEl = document.getElementById('sup_is_delivery_company');
+    if (dcEl) {
+        dcEl.checked = parseInt(row.is_delivery_company, 10) === 1;
+    }
     var td = document.getElementById('sup_payment_terms_days');
     if (td) {
         td.value = row.payment_terms_days != null ? String(row.payment_terms_days) : '';
@@ -2336,6 +2346,10 @@ function supSave() {
     var pm = document.getElementById('sup_payment_mode');
     if (pm) {
         payload.payment_mode = String(pm.value || 'cash');
+    }
+    var dcEl = document.getElementById('sup_is_delivery_company');
+    if (dcEl) {
+        payload.is_delivery_company = dcEl.checked ? 1 : 0;
     }
     var td = document.getElementById('sup_payment_terms_days');
     if (td) {
