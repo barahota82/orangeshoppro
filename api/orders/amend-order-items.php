@@ -71,21 +71,25 @@ try {
 
         [$subtotal, $validatedItems] = orange_storefront_validate_cart_items_core($pdo, $items, true);
 
-        $comboPick = orange_cart_combo_best_match($pdo, $validatedItems, $buyerRegistered);
-        $comboDiscount = $comboPick !== null ? (float) $comboPick['discount'] : 0.0;
-        $comboId = $comboPick !== null ? (int) $comboPick['id'] : null;
-        $netAfterCombo = max(0.0, round($subtotal - $comboDiscount, 4));
-        $promoPick = orange_cart_promotion_resolve($pdo, $netAfterCombo, $buyerRegistered);
-        $promoDiscount = $promoPick !== null ? (float) $promoPick['discount'] : 0.0;
-        $promoId = $promoPick !== null ? (int) $promoPick['id'] : null;
         $amendCountryId = (int) ($order['country_id'] ?? 0);
         $amendCountryArg = $amendCountryId > 0 ? $amendCountryId : null;
-        $productOfferDiscount = orange_product_offer_total_discount_for_items($pdo, $validatedItems, $amendCountryArg);
+        // سياسة «العرض بديل» (س4/2): استبعاد البنود ذات عرض المنتج من أساس الكومبو/خصم السلة.
+        $offerPartition = orange_product_offer_partition_items($pdo, $validatedItems, $amendCountryArg);
+        $nonOfferItems = $offerPartition['non_offer_items'];
+        $nonOfferSubtotal = max(0.0, round($subtotal - (float) $offerPartition['offer_items_value'], 4));
+        $comboPick = orange_cart_combo_best_match($pdo, $nonOfferItems, $buyerRegistered);
+        $comboDiscount = $comboPick !== null ? (float) $comboPick['discount'] : 0.0;
+        $comboId = $comboPick !== null ? (int) $comboPick['id'] : null;
+        $cartPromoBase = max(0.0, round($nonOfferSubtotal - $comboDiscount, 4));
+        $promoPick = orange_cart_promotion_resolve($pdo, $cartPromoBase, $buyerRegistered);
+        $promoDiscount = $promoPick !== null ? (float) $promoPick['discount'] : 0.0;
+        $promoId = $promoPick !== null ? (int) $promoPick['id'] : null;
+        $productOfferDiscount = (float) $offerPartition['offer_discount'];
         $maxOfferRoom = max(0.0, round($subtotal - $comboDiscount - $promoDiscount, 4));
         if ($productOfferDiscount > $maxOfferRoom) {
             $productOfferDiscount = $maxOfferRoom;
         }
-        $orderTotal = max(0.0, round($netAfterCombo - $promoDiscount - $productOfferDiscount, 4));
+        $orderTotal = max(0.0, round($subtotal - $comboDiscount - $promoDiscount - $productOfferDiscount, 4));
 
         $promoBundle = orange_storefront_build_promotional_gift_lines($pdo, $data, $validatedItems, $subtotal, $buyerRegistered);
         $giftLine = $promoBundle['giftLine'];

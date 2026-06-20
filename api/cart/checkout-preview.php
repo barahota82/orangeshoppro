@@ -29,19 +29,23 @@ try {
 
     $acc = current_storefront_account($pdo);
     $buyerReg = $acc !== null;
-    $comboPick = orange_cart_combo_best_match($pdo, $validatedItems, $buyerReg, $storefrontCountryId);
+    // سياسة «العرض بديل» (س4/2): استبعاد البنود ذات عرض المنتج من أساس الكومبو/خصم السلة.
+    $offerPartition = orange_product_offer_partition_items($pdo, $validatedItems, $storefrontCountryId);
+    $nonOfferItems = $offerPartition['non_offer_items'];
+    $nonOfferSubtotal = max(0.0, round($subtotal - (float) $offerPartition['offer_items_value'], 4));
+    $comboPick = orange_cart_combo_best_match($pdo, $nonOfferItems, $buyerReg, $storefrontCountryId);
     $comboDiscount = $comboPick !== null ? (float) $comboPick['discount'] : 0.0;
     $comboId = $comboPick !== null ? (int) $comboPick['id'] : null;
-    $netAfterCombo = max(0.0, round($subtotal - $comboDiscount, 4));
-    $promo = orange_cart_promotion_resolve($pdo, $netAfterCombo, $buyerReg, $storefrontCountryId);
+    $cartPromoBase = max(0.0, round($nonOfferSubtotal - $comboDiscount, 4));
+    $promo = orange_cart_promotion_resolve($pdo, $cartPromoBase, $buyerReg, $storefrontCountryId);
     $promoDiscount = $promo !== null ? (float) $promo['discount'] : 0.0;
-    $productOfferDiscount = orange_product_offer_total_discount_for_items($pdo, $validatedItems, $storefrontCountryId);
+    $productOfferDiscount = (float) $offerPartition['offer_discount'];
     $maxOfferRoom = max(0.0, round($subtotal - $comboDiscount - $promoDiscount, 4));
     if ($productOfferDiscount > $maxOfferRoom) {
         $productOfferDiscount = $maxOfferRoom;
     }
-    $total = max(0.0, round($netAfterCombo - $promoDiscount - $productOfferDiscount, 4));
-    $regTeaser = orange_cart_promotion_register_incentive_teaser($pdo, $netAfterCombo, $buyerReg, $storefrontCountryId);
+    $total = max(0.0, round($subtotal - $comboDiscount - $promoDiscount - $productOfferDiscount, 4));
+    $regTeaser = orange_cart_promotion_register_incentive_teaser($pdo, $cartPromoBase, $buyerReg, $storefrontCountryId);
     $giftRegUnlock = orange_cart_gift_register_unlock_teaser_applies($pdo, $subtotal, $buyerReg, $validatedItems, $storefrontCountryId);
     $bogoRegUnlock = orange_cart_bogo_register_unlock_teaser_applies($pdo, $validatedItems, $buyerReg, $storefrontCountryId);
     $comboRegUnlock = orange_cart_combo_register_unlock_teaser_applies($pdo, $validatedItems, $buyerReg, $storefrontCountryId);

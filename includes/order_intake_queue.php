@@ -506,20 +506,24 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     }
     $deliveryPromotion = $deliveryBundle['promotion'] ?? null;
     $deliveryPromotionId = is_array($deliveryPromotion) ? (int) ($deliveryPromotion['id'] ?? 0) : 0;
-    $comboPick = orange_cart_combo_best_match($pdo, $validatedItems, $buyerRegistered, $orderCountryId);
+    // سياسة «العرض بديل» (س4/2): البنود ذات عرض منتج نشط تُستبعد من أساس الكومبو/خصم السلة وتأخذ عرضها فقط.
+    $offerPartition = orange_product_offer_partition_items($pdo, $validatedItems, $orderCountryId);
+    $nonOfferItems = $offerPartition['non_offer_items'];
+    $nonOfferSubtotal = max(0.0, round($subtotal - (float) $offerPartition['offer_items_value'], 4));
+    $comboPick = orange_cart_combo_best_match($pdo, $nonOfferItems, $buyerRegistered, $orderCountryId);
     $comboDiscount = $comboPick !== null ? (float) $comboPick['discount'] : 0.0;
     $comboId = $comboPick !== null ? (int) $comboPick['id'] : null;
-    $netAfterCombo = max(0.0, round($subtotal - $comboDiscount, 4));
-    $promoPick = orange_cart_promotion_resolve($pdo, $netAfterCombo, $buyerRegistered, $orderCountryId);
+    $cartPromoBase = max(0.0, round($nonOfferSubtotal - $comboDiscount, 4));
+    $promoPick = orange_cart_promotion_resolve($pdo, $cartPromoBase, $buyerRegistered, $orderCountryId);
     $promoDiscount = $promoPick !== null ? (float) $promoPick['discount'] : 0.0;
     $promoId = $promoPick !== null ? (int) $promoPick['id'] : null;
-    // عروض المنتج: خصم فعلي عند الدفع (السعر الأصلي على البند + بند خصم منفصل).
-    $productOfferDiscount = orange_product_offer_total_discount_for_items($pdo, $validatedItems, $orderCountryId);
+    // عروض المنتج: خصم فعلي عند الدفع (السعر الأصلي على البند + بند خصم منفصل) — بديل لا يتراكم مع الكومبو/السلة.
+    $productOfferDiscount = (float) $offerPartition['offer_discount'];
     $maxOfferRoom = max(0.0, round($subtotal - $comboDiscount - $promoDiscount, 4));
     if ($productOfferDiscount > $maxOfferRoom) {
         $productOfferDiscount = $maxOfferRoom;
     }
-    $orderTotal = max(0.0, round($netAfterCombo - $promoDiscount - $productOfferDiscount, 4));
+    $orderTotal = max(0.0, round($subtotal - $comboDiscount - $promoDiscount - $productOfferDiscount, 4));
 
     $promoBundle = orange_storefront_build_promotional_gift_lines($pdo, $data, $validatedItems, $subtotal, $buyerRegistered, $orderCountryId);
     $giftLine = $promoBundle['giftLine'];

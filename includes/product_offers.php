@@ -126,3 +126,47 @@ function orange_product_offer_total_discount_for_items(PDO $pdo, array $validate
 
     return round($total, 4);
 }
+
+/**
+ * يقسّم بنود السلة إلى بنود عليها عرض منتج نشط وبقية البنود — لسياسة «العرض بديل» (س4/2).
+ * البنود ذات العرض تُستبعد من أساس عروض السلة/الكومبو وتأخذ عرضها فقط.
+ *
+ * @param list<array<string,mixed>> $validatedItems
+ *
+ * @return array{non_offer_items: list<array<string,mixed>>, offer_items_value: float, offer_discount: float, offer_product_ids: array<int,bool>}
+ */
+function orange_product_offer_partition_items(PDO $pdo, array $validatedItems, ?int $countryId = null): array
+{
+    $nonOffer = [];
+    $offerValue = 0.0;
+    $offerDiscount = 0.0;
+    $offerPids = [];
+    $cache = [];
+    foreach ($validatedItems as $line) {
+        $isGift = is_array($line) && (!empty($line['is_gift']) || !empty($line['is_bogo_gift']));
+        $pid = is_array($line) ? (int) (($line['product']['id'] ?? 0)) : 0;
+        $qty = is_array($line) ? (int) ($line['qty'] ?? 0) : 0;
+        $price = is_array($line) ? (float) ($line['price'] ?? 0) : 0.0;
+        $unitDisc = 0.0;
+        if (!$isGift && $pid > 0 && $qty > 0 && $price > 0.0001) {
+            if (!array_key_exists($pid, $cache)) {
+                $cache[$pid] = orange_product_offer_active_unit_discount($pdo, $pid, $countryId);
+            }
+            $unitDisc = min($cache[$pid], $price);
+        }
+        if ($unitDisc > 0.0001) {
+            $offerPids[$pid] = true;
+            $offerValue += round($price * $qty, 4);
+            $offerDiscount += round($unitDisc * $qty, 4);
+        } else {
+            $nonOffer[] = $line;
+        }
+    }
+
+    return [
+        'non_offer_items' => $nonOffer,
+        'offer_items_value' => round($offerValue, 4),
+        'offer_discount' => round($offerDiscount, 4),
+        'offer_product_ids' => $offerPids,
+    ];
+}
