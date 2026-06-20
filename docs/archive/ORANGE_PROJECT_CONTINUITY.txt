@@ -89,7 +89,7 @@ IMPLEMENTED (catalog pass 2026-04-16)
 - **مشتريات (استلام مقابل حفظ الفاتورة):** عمود **`purchase_items.qty_received`** وترحيله في **`includes/catalog_schema.php`**؛ حفظ الفاتورة في **`admin/api/purchases/create.php`** و**`admin/api/purchases/update.php`** لا يزيد مخزون المتغير حتى الاستلام؛ الاستلام **`admin/api/purchases/receive.php`** (كامل أو جزئي لكل سطر)؛ واجهة **`admin/pages/purchases.php`** (استلام كامل / جزئي / تعديل / حذف)؛ **`admin/api/purchases/lines.php`** و**`admin/api/purchases/get.php`** — تفصيل المسارات في **`docs/archive/ORANGE_STOCK_ORDER_POLICY.txt`** §6.
 
 STILL PENDING / NEXT
-- **GAP-SALE-DOC-01 — فواتير البيع (مستند v2):** مواءمة شاشات INV-C / INV-O / مردود المبيعات مع `purchases` / `purchase_returns` — بحث داخل الفاتورة؛ عميل like-supplier؛ قناة واتساب؛ مراحل 0–3 في **`docs/archive/ORANGE_SALES_INVOICE_DOC_UI_HANDOFF.txt`**.
+- **GAP-SALE-DOC-01 — فواتير البيع (مستند v2) — [محدَّث 2026-06-21: مغلق/منفّذ كوداً]:** المراحل 0–4 منتهية (CLOSED) — شاشات INV-C / INV-O / مردود المبيعات كاملة (بحث/تنقل/قفل/طباعة + بنود إضافية + GL) + قناة واتساب + عميل like-supplier. **متبقٍ: UAT مالك فقط.** التفاصيل في **`docs/archive/ORANGE_SALES_INVOICE_DOC_UI_HANDOFF.txt`** (Changelog: GAP-SALE-DOC-01 CLOSED). [السطر القديم «مراحل 0–3 قيد المواءمة» لاغٍ.]
 - (اختياري) قوالب HTML أغنى لدليل المقاسات إن رغبت بأكثر من جدول عائلة واحد لنطاق both من دون تقسيم بيانات في DB.
 - Data migration script from old free-text-only variants to dictionary (optional; new products use new flow).
 

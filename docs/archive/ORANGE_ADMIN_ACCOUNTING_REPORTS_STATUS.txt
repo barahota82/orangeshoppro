@@ -158,6 +158,7 @@ sales_invoices — [منتهٍ browse] — **GAP-SALE-DOC-01 مفتوح** — ي
 manual_order / create-manual.php — [منتهٍ backend] — **UI يُستبدل** مرحلة 1 GAP-SALE-DOC-01
 online_invoices — [منتهٍ browse] — **GAP-SALE-DOC-01 مرحلة 3**
 sales_returns — [جزئي UI] — **ترقية pr2 parity** GAP-SALE-DOC-01 مرحلة 2
+**[محدَّث 2026-06-21 — تصحيح حالة]:** GAP-SALE-DOC-01 **مغلق/منفّذ كوداً** (المراحل 0–4، Changelog الهاندوف CLOSED). الأسطر الأربعة أعلاه (`sales_invoices`/`manual_order`/`online_invoices`/`sales_returns`) **منتهية**: الشاشات الثلاث كاملة (بحث/تنقل/قفل/طباعة) + بنود إضافية (`sv2`/`ov2`/`sr2`) + GL (مردود عكسي عبر `orange_gl_sales_return_revenue_bundle`). أوسمة «[مفتوح]/[جزئي]/مرحلة 1–3» أعلاه **لاغية** — متبقٍ UAT مالك فقط. مرجع: `ORANGE_AGENT_QA_REFERENCE.txt`.
 
 **ACC-10 — شاشات (2026-05-20):** report_cash_flow + bank_reconciliation + inventory_reconciliation + analytical_dimensions + report_analytical **[منتهٍ]** — GAP-ACC-10 **مغلق** (§6b.5).
 
