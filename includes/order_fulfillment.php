@@ -826,6 +826,133 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
             'agg'
         );
     }
+
+    // مصروف التوصيل الذي تتحمّله الشركة (تكلفة الشركة per المنطقة) — قيد مستقل عن إيراد التوصيل.
+    orange_order_post_delivery_expense_gl($pdo, $order, $ofGlCountryId, $isOnline);
+}
+
+/**
+ * قيد مصروف التوصيل الذي تتحمّله الشركة: مدين «مصروف توصيل»؛ دائن ذمة شركة التوصيل (مورّد المحافظة)
+ * أو «مستحقات توصيل افتراضي». يُرحّل مرة واحدة مع محاسبة تسليم الطلب، ولا يثبّت أي حساب (يتوقف إن لم يُربط).
+ */
+function orange_order_post_delivery_expense_gl(PDO $pdo, array $order, int $ofGlCountryId, bool $isOnline): void
+{
+    require_once __DIR__ . '/delivery_areas.php';
+    require_once __DIR__ . '/supplier_payable_account.php';
+
+    $orderId = (int) ($order['id'] ?? 0);
+    $deliveryAreaId = (int) ($order['delivery_area_id'] ?? 0);
+    if ($orderId <= 0 || $deliveryAreaId <= 0 || !orange_delivery_areas_has_company_cost_column($pdo)) {
+        return;
+    }
+    $st = $pdo->prepare('SELECT company_delivery_cost FROM delivery_areas WHERE id = ? LIMIT 1');
+    $st->execute([$deliveryAreaId]);
+    $rawCost = $st->fetchColumn();
+    $cost = ($rawCost === false || $rawCost === null) ? 0.0 : round(max(0.0, (float) $rawCost), 4);
+    if ($cost <= 0.0001) {
+        return;
+    }
+
+    $expenseId = orange_gl_account_id_optional($pdo, 'delivery_expense', $ofGlCountryId);
+    if ($expenseId === null || (int) $expenseId <= 0) {
+        return;
+    }
+    $expenseId = (int) $expenseId;
+
+    // الطرف الدائن: شركة التوصيل (مورّد) المرتبطة بالمحافظة إن وُجدت؛ وإلا المستحقات الافتراضية.
+    $supplierId = 0;
+    if (orange_delivery_governorates_has_company_column($pdo)) {
+        $govId = orange_delivery_area_governorate_id($pdo, $deliveryAreaId);
+        if ($govId > 0) {
+            $gs = $pdo->prepare('SELECT delivery_company_id FROM delivery_governorates WHERE id = ? LIMIT 1');
+            $gs->execute([$govId]);
+            $supplierId = (int) ($gs->fetchColumn() ?: 0);
+        }
+    }
+    $creditId = 0;
+    $supplierForSub = 0;
+    if ($supplierId > 0) {
+        $creditId = orange_supplier_payable_account_id($pdo, $supplierId);
+        if ($creditId > 0) {
+            $supplierForSub = $supplierId;
+        }
+    }
+    if ($creditId <= 0) {
+        $payableDefault = orange_gl_account_id_optional($pdo, 'delivery_payable_default', $ofGlCountryId);
+        $creditId = $payableDefault !== null ? (int) $payableDefault : 0;
+        $supplierForSub = 0;
+    }
+    if ($creditId <= 0) {
+        return;
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $postingAt = orange_order_delivery_posting_datetime($order, $isOnline);
+    $pendingKey = orange_gl_pending_source_key('order', $orderId, 'delivery-expense');
+    $srcLabel = 'ORDER-' . (string) ($order['order_number'] ?? '');
+    $desc = 'قيد مصروف توصيل — تسليم الطلب';
+    $creditMemo = $supplierForSub > 0 ? 'مستحق لشركة التوصيل' : 'مستحقات توصيل افتراضي';
+    $lines = [
+        ['account_id' => $expenseId, 'debit' => $cost, 'credit' => 0.0, 'memo' => 'مصروف توصيل — تكلفة الشركة'],
+        ['account_id' => $creditId, 'debit' => 0.0, 'credit' => $cost, 'memo' => $creditMemo],
+    ];
+
+    $afterPost = null;
+    if ($supplierForSub > 0) {
+        $afterPost = [
+            'party_subledger_entries' => [
+                [
+                    'party_kind' => 'supplier',
+                    'party_id' => $supplierForSub,
+                    'debit' => 0.0,
+                    'credit' => $cost,
+                    'ref_type' => 'order',
+                    'ref_id' => $orderId,
+                    'memo' => 'مستحق توصيل — تسليم الطلب',
+                ],
+            ],
+        ];
+    }
+    $afterJson = $afterPost !== null ? json_encode($afterPost, JSON_UNESCAPED_UNICODE) : null;
+    $afterJson = orange_gl_after_post_json_with_country($afterJson, $ofGlCountryId);
+
+    if (orange_gl_use_pending_queue($pdo)) {
+        orange_gl_pending_enqueue_multi(
+            $pdo,
+            $lines,
+            $pendingKey,
+            $srcLabel,
+            $postingAt,
+            $postingAt,
+            $desc,
+            'order_delivery_expense',
+            $afterJson
+        );
+
+        return;
+    }
+
+    $vExp = orange_voucher_post($pdo, [
+        'voucher_date' => $postingAt,
+        'document_entered_at' => $now,
+        'description' => $desc,
+        'entry_type' => 'order_delivery_expense',
+        'journal_type_id' => null,
+        'country_id' => $ofGlCountryId,
+    ], $lines);
+    if ($supplierForSub > 0 && is_int($vExp) && $vExp > 0) {
+        orange_party_subledger_record(
+            $pdo,
+            'supplier',
+            $supplierForSub,
+            $vExp,
+            0.0,
+            $cost,
+            'order',
+            $orderId,
+            'مستحق توصيل — تسليم الطلب'
+        );
+    }
 }
 
 /**
