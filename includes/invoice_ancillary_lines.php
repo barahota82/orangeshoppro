@@ -157,6 +157,36 @@ function orange_invoice_ancillary_system_key_catalog(): array
             'invoice_context' => 'sales',
             'line_kind' => 'sales_debit_contra',
         ],
+        'promo_cart_discount' => [
+            'label_ar' => 'خصم السلة (عرض ترويجي)',
+            'invoice_context' => 'sales',
+            'line_kind' => 'sales_debit_contra',
+        ],
+        'promo_combo_discount' => [
+            'label_ar' => 'خصم الكومبو (عرض ترويجي)',
+            'invoice_context' => 'sales',
+            'line_kind' => 'sales_debit_contra',
+        ],
+        'promo_gift_discount' => [
+            'label_ar' => 'خصم هدية ترويجية',
+            'invoice_context' => 'sales',
+            'line_kind' => 'sales_debit_contra',
+        ],
+        'promo_bogo_discount' => [
+            'label_ar' => 'خصم اشترِ واحصل (BOGO)',
+            'invoice_context' => 'sales',
+            'line_kind' => 'sales_debit_contra',
+        ],
+        'product_offer_discount' => [
+            'label_ar' => 'خصم عرض المنتج',
+            'invoice_context' => 'sales',
+            'line_kind' => 'sales_debit_contra',
+        ],
+        'loyalty_points_redemption' => [
+            'label_ar' => 'خصم استبدال نقاط الولاء',
+            'invoice_context' => 'sales',
+            'line_kind' => 'sales_debit_contra',
+        ],
     ];
 }
 

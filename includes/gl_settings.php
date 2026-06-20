@@ -49,6 +49,10 @@ function orange_gl_setting_key_labels(): array
         'cogs_returns' => 'تكلفة مردودات المبيعات — دائن عند إلغاء التسليم وإرجاع التكلفة للمخزون',
         'sales_discount' => 'خصم المبيعات — يُستخدم عند قيود خصم مسموح على المبيعات (حسب سياسة الدليل)',
         'purchase_discount' => 'خصم مكتسب على المشتريات — يُستخدم عند خصم من المورد أو إثبات خصم مشتريات (حسب سياسة الدليل)',
+        'delivery_expense' => 'مصروف توصيل — مدين عند تسليم الطلب بقيمة تكلفة التوصيل التي تتحمّلها الشركة (الطرف الدائن: ذمة شركة التوصيل أو مستحقات التوصيل الافتراضي)',
+        'delivery_payable_default' => 'مستحقات توصيل افتراضي — دائن عند تسليم الطلب إذا لم تُعيَّن شركة توصيل للمحافظة (يُصرف من الخزينة لاحقاً)',
+        'loyalty_program_expense' => 'مصروفات برنامج الولاء والمكافآت — مدين عند كسب العميل نقاطاً (والدائن: التزامات نقاط الولاء)؛ ويُعكَس عليه المنتهي',
+        'loyalty_points_liability' => 'التزامات نقاط الولاء — دائن عند الكسب؛ مدين عند الاستبدال أو الانتهاء',
         'vat_output' => 'ضريبة القيمة المضافة المستحقة (مبيعات) — التزام؛ تُحسب تلقائياً بنسبة الدولة على فواتير البيع (الكويت 0% = لا أثر)',
         'vat_input' => 'ضريبة القيمة المضافة على المشتريات (مدخلات) — أصل/قابلة للخصم؛ تُحسب تلقائياً بنسبة الدولة على فواتير الشراء',
         /** توافق قديم — يُستبدل بمفتاح cogs */
@@ -90,6 +94,10 @@ function orange_gl_setting_row_short_labels(): array
         'cogs_returns' => $p . 'تكلفة مردودات المبيعات',
         'sales_discount' => $p . 'خصم المبيعات',
         'purchase_discount' => $p . 'خصم مكتسب على المشتريات',
+        'delivery_expense' => $p . 'مصروف توصيل',
+        'delivery_payable_default' => $p . 'مستحقات توصيل افتراضي',
+        'loyalty_program_expense' => $p . 'مصروفات برنامج الولاء',
+        'loyalty_points_liability' => $p . 'التزامات نقاط الولاء',
         'vat_output' => $p . 'ضريبة القيمة المضافة (مبيعات)',
         'vat_input' => $p . 'ضريبة القيمة المضافة (مشتريات)',
         'income_summary' => $p . 'أرباح / خسائر السنة الحالية',
@@ -121,6 +129,10 @@ function orange_gl_settings_form_key_order(): array
         'cogs_returns',
         'sales_discount',
         'purchase_discount',
+        'delivery_expense',
+        'delivery_payable_default',
+        'loyalty_program_expense',
+        'loyalty_points_liability',
         'vat_output',
         'vat_input',
         'income_summary',
@@ -386,6 +398,10 @@ function orange_gl_journal_rule_dropdown_excluded_keys(): array
         'cogs_returns_cash',
         'cogs_returns_credit',
         'cogs_returns_online',
+        'delivery_expense',
+        'delivery_payable_default',
+        'loyalty_program_expense',
+        'loyalty_points_liability',
     ];
 }
 

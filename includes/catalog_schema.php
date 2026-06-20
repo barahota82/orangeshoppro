@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 94);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 95);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3113,6 +3113,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_delivery_fee_apply_mode_v92($pdo);
     orange_catalog_migrate_delivery_fee_pending_v93($pdo);
     orange_catalog_migrate_promotions_always_on_v94($pdo);
+    orange_catalog_migrate_offer_gl_link_v95($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3723,6 +3724,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_delivery_fee_apply_mode_v92($pdo);
     orange_catalog_migrate_delivery_fee_pending_v93($pdo);
     orange_catalog_migrate_promotions_always_on_v94($pdo);
+    orange_catalog_migrate_offer_gl_link_v95($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -7051,6 +7053,119 @@ function orange_catalog_migrate_promotions_always_on_v94(PDO $pdo): void
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
         orange_schema_invalidate_table_exists('promotion_always_on_history');
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * ربط العروض/الولاء بالحسابات + قيود التوصيل/الولاء (v95).
+ *
+ * - أعمدة خصومات العروض على orders (هدية/BOGO/عرض منتج).
+ * - تكلفة التوصيل التي تتحمّلها الشركة لكل منطقة (delivery_areas.company_delivery_cost).
+ * - شركة التوصيل (مورّد) على مستوى المحافظة (delivery_governorates.delivery_company_id).
+ * - علامة المورّد كشركة توصيل (suppliers.is_delivery_company).
+ * - جداول نظام الولاء (الإعدادات لكل دولة + دفتر النقاط FIFO).
+ */
+function orange_catalog_migrate_offer_gl_link_v95(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_offer_gl_link_v95';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'orders')) {
+        foreach (['cart_gift_discount', 'cart_bogo_discount', 'product_offer_discount'] as $col) {
+            if (!orange_table_has_column($pdo, 'orders', $col)) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'ALTER TABLE orders ADD COLUMN ' . $col . ' DECIMAL(18,4) NOT NULL DEFAULT 0'
+                );
+                orange_schema_invalidate_column_check('orders', $col);
+            }
+        }
+    }
+
+    if (orange_table_exists($pdo, 'delivery_areas')
+        && !orange_table_has_column($pdo, 'delivery_areas', 'company_delivery_cost')
+    ) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE delivery_areas ADD COLUMN company_delivery_cost DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER delivery_fee'
+        );
+        orange_schema_invalidate_column_check('delivery_areas', 'company_delivery_cost');
+    }
+
+    if (orange_table_exists($pdo, 'delivery_governorates')
+        && !orange_table_has_column($pdo, 'delivery_governorates', 'delivery_company_id')
+    ) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE delivery_governorates ADD COLUMN delivery_company_id INT UNSIGNED NULL DEFAULT NULL'
+        );
+        orange_schema_invalidate_column_check('delivery_governorates', 'delivery_company_id');
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_delivery_governorates_company ON delivery_governorates (delivery_company_id)'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'suppliers')
+        && !orange_table_has_column($pdo, 'suppliers', 'is_delivery_company')
+    ) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN is_delivery_company TINYINT(1) NOT NULL DEFAULT 0'
+        );
+        orange_schema_invalidate_column_check('suppliers', 'is_delivery_company');
+    }
+
+    if (!orange_table_exists($pdo, 'loyalty_settings')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS loyalty_settings (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                country_id INT UNSIGNED NOT NULL,
+                is_active TINYINT(1) NOT NULL DEFAULT 0,
+                earn_rate DECIMAL(18,6) NOT NULL DEFAULT 0,
+                point_value DECIMAL(18,6) NOT NULL DEFAULT 0,
+                min_redeem_points INT UNSIGNED NOT NULL DEFAULT 0,
+                max_redeem_pct DECIMAL(5,2) NOT NULL DEFAULT 0,
+                expiry_months INT UNSIGNED NOT NULL DEFAULT 0,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT NULL,
+                UNIQUE KEY uq_loyalty_settings_country (country_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+        orange_schema_invalidate_table_exists('loyalty_settings');
+    }
+
+    if (!orange_table_exists($pdo, 'loyalty_ledger')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS loyalty_ledger (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                country_id INT UNSIGNED NULL,
+                customer_id INT UNSIGNED NOT NULL,
+                kind VARCHAR(16) NOT NULL,
+                points INT NOT NULL DEFAULT 0,
+                points_remaining INT NOT NULL DEFAULT 0,
+                point_value DECIMAL(18,6) NOT NULL DEFAULT 0,
+                expires_at DATETIME NULL DEFAULT NULL,
+                ref_type VARCHAR(32) NULL DEFAULT NULL,
+                ref_id INT UNSIGNED NULL DEFAULT NULL,
+                memo VARCHAR(255) NOT NULL DEFAULT \'\',
+                admin_id INT UNSIGNED NULL DEFAULT NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_loyalty_ledger_customer (customer_id, id),
+                KEY idx_loyalty_ledger_fifo (customer_id, kind, points_remaining, expires_at, id),
+                KEY idx_loyalty_ledger_expiry (kind, points_remaining, expires_at),
+                KEY idx_loyalty_ledger_ref (ref_type, ref_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+        orange_schema_invalidate_table_exists('loyalty_ledger');
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

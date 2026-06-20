@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/cart_promo_products.php';
+require_once __DIR__ . '/../../includes/offer_gl_link_card.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -15,6 +16,7 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
     <h1>عروض الكومبو</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<?php echo orange_offer_gl_link_card_html($pdo, ['promo_combo_discount']); ?>
 
 <?php if (!$hasTable): ?>
 <div class="card">

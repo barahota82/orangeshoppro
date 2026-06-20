@@ -39,6 +39,15 @@ foreach (orange_delivery_promotion_discount_type_values() as $key => $_) {
     <h1>عروض ورسوم التوصيل</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<?php
+require_once __DIR__ . '/../../includes/offer_gl_link_card.php';
+echo orange_offer_gl_link_card_html(
+    $pdo,
+    ['delivery_fee_charge', 'delivery_fee_discount'],
+    ['delivery_expense', 'delivery_payable_default'],
+    'الربط المحاسبي للتوصيل (للقراءة فقط)'
+);
+?>
 
 <?php if (!$hasTable): ?>
 <div class="card">

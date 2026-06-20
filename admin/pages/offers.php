@@ -40,6 +40,7 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
     <h1>عروض المنتجات</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<?php require_once __DIR__ . '/../../includes/offer_gl_link_card.php'; echo orange_offer_gl_link_card_html($pdo, ['product_offer_discount']); ?>
 
 <?php if (!$hasScheduleCols): ?>
 <div class="card" style="border:1px solid #dc2626;background:#fef2f2;margin-bottom:16px;">
