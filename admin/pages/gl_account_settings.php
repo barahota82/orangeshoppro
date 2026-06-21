@@ -179,7 +179,6 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
             <h3 class="card-title gl-jt-rules-card-head__title">٢ — ربط نوع اليومية بحساب مدين وحساب دائن</h3>
             <button type="button" class="btn-secondary" id="gl_btn_seed_rules" title="إضافة كل قواعد القيود التلقائية المعرفة في النظام (دون حذف الموجود)">إنشاء القيود التلقائية</button>
         </div>
-        <p class="card-hint" style="margin:0 0 0.65rem;line-height:1.55;">عند اختيار نوع اليومية يُقترَح المدين والدائن من البنود المربوطة في القسم ١. جانب «ذمة المورد (من المستند)» فقط — في شراء/مردود آجل — بلا قائمة لأنه يُؤخذ من حساب المورد عند الترحيل.</p>
         <div class="table-wrap gl-settings-table-wrap">
             <table class="gl-settings-table" id="gl_jt_rules_table">
                 <thead>
