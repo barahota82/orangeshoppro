@@ -8,9 +8,14 @@ require_once __DIR__ . '/../../includes/report_line_master.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
+require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$coaAdmin = current_admin();
+$coaIsSuper = $coaAdmin !== null && orange_admin_is_superuser($coaAdmin);
+$coaCountries = $coaIsSuper ? orange_countries_admin_list($pdo) : [];
 
 $ctxCountryId = orange_admin_context_country_id($pdo);
 $ctxCountryLabel = orange_admin_page_country_label($pdo);
@@ -187,6 +192,69 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
         </div>
     </div>
 </div>
+
+<?php if ($coaIsSuper && orange_table_has_column($pdo, 'accounts', 'country_id')): ?>
+<div class="card coa-copy-card" dir="rtl" style="margin-top:1rem;" id="coa_copy_card">
+    <h3 class="card-title">نسخ حسابات الدليل إلى دولة أخرى</h3>
+    <p class="card-hint" style="margin:0 0 0.75rem;">
+        المصدر: <strong><?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> —
+        حدّد الحسابات (يُنسخ الأسلاف تلقائياً). إن وُجد نفس الكود في الهدف تُحدَّث الأسماء والتصنيف.
+    </p>
+    <div class="form-grid" style="grid-template-columns:minmax(180px,1fr) auto auto;align-items:end;gap:12px;max-width:720px;margin-bottom:12px;">
+        <div>
+            <label for="coa_copy_target">الدولة الهدف</label>
+            <select id="coa_copy_target" class="admin-inp">
+                <option value="">— اختر الدولة —</option>
+                <?php foreach ($coaCountries as $c):
+                    $cid = (int) ($c['id'] ?? 0);
+                    if ($cid <= 0 || $cid === $ctxCountryId) {
+                        continue;
+                    }
+                    $lbl = trim((string) ($c['name_ar'] ?? ''));
+                    if ($lbl === '') {
+                        $lbl = trim((string) ($c['name_en'] ?? ''));
+                    }
+                    if ($lbl === '') {
+                        $lbl = orange_countries_display_code((string) ($c['code'] ?? ''));
+                    }
+                    ?>
+                <option value="<?php echo $cid; ?>"><?php echo htmlspecialchars($lbl, ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <button type="button" class="btn-secondary" id="coa_copy_sel_all">تحديد الكل</button>
+        <button type="button" id="coa_copy_btn">نسخ المحدّد</button>
+    </div>
+    <div class="table-wrap" style="max-height:320px;overflow:auto;">
+        <table class="admin-table" style="width:100%;">
+            <thead>
+                <tr>
+                    <th style="width:2.5rem;text-align:center;"><input type="checkbox" id="coa_copy_all" aria-label="تحديد الكل"></th>
+                    <th style="width:8rem;">الكود</th>
+                    <th>الاسم</th>
+                    <th style="width:5rem;">مستوى</th>
+                </tr>
+            </thead>
+            <tbody id="coa_copy_tbody">
+                <?php foreach ($flat as $acc):
+                    $aid = (int) ($acc['id'] ?? 0);
+                    if ($aid <= 0) {
+                        continue;
+                    }
+                    $depth = (int) ($depths[$aid] ?? 0);
+                    ?>
+                <tr>
+                    <td style="text-align:center;"><input type="checkbox" class="coa-copy-chk" value="<?php echo $aid; ?>" aria-label="تحديد"></td>
+                    <td dir="ltr"><?php echo htmlspecialchars((string) ($acc['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars((string) ($acc['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo $depth + 1; ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="coa-setup-modal" id="coa_setup_modal" hidden aria-hidden="true">
     <div class="coa-setup-modal__backdrop" id="coa_setup_backdrop" role="presentation"></div>
@@ -1026,5 +1094,48 @@ document.addEventListener('DOMContentLoaded', function () {
         updatePreviewFromParent();
         updateStatementLink();
     }
+
+    (function initCoaCopyPanel() {
+        var copyBtn = document.getElementById('coa_copy_btn');
+        var copyTarget = document.getElementById('coa_copy_target');
+        var copyAll = document.getElementById('coa_copy_all');
+        var selAllBtn = document.getElementById('coa_copy_sel_all');
+        if (!copyBtn || !copyTarget) { return; }
+        function setAll(checked) {
+            document.querySelectorAll('.coa-copy-chk').forEach(function (cb) { cb.checked = checked; });
+            if (copyAll) { copyAll.checked = checked; }
+        }
+        if (copyAll) {
+            copyAll.addEventListener('change', function () { setAll(copyAll.checked); });
+        }
+        if (selAllBtn) {
+            selAllBtn.addEventListener('click', function () { setAll(true); });
+        }
+        copyBtn.addEventListener('click', function () {
+            var targetId = parseInt(copyTarget.value, 10) || 0;
+            if (targetId <= 0) {
+                alert('اختر الدولة الهدف');
+                return;
+            }
+            var ids = [];
+            document.querySelectorAll('.coa-copy-chk:checked').forEach(function (cb) {
+                var v = parseInt(cb.value, 10) || 0;
+                if (v > 0) { ids.push(v); }
+            });
+            if (ids.length === 0) {
+                alert('حدّد حساباً واحداً على الأقل');
+                return;
+            }
+            if (!confirm('نسخ ' + ids.length + ' حساب (مع الأسلاف) إلى الدولة المختارة؟')) {
+                return;
+            }
+            postJSON('/admin/api/country-copy/accounts.php', {
+                target_country_id: targetId,
+                account_ids: ids
+            }).then(function (r) {
+                alert(r.message || (r.success ? 'تم' : 'فشل'));
+            }).catch(function (e) { alert(e.message || String(e)); });
+        });
+    })();
 });
 </script>
