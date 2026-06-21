@@ -290,6 +290,45 @@ function orange_gl_journal_type_rule_ui_defaults(): array
 }
 
 /**
+ * صفوف جاهزة لزر «إنشاء القيود التلقائية» — كل تركيبة نوع يومية + نقدي/آجل/… مع مفاتيح القسم ١.
+ *
+ * @return list<array{journal_type_id:int,payment_terms:string,debit_setting_key:string,credit_setting_key:string,code:string}>
+ */
+function orange_gl_journal_type_rule_ui_seed_rows(PDO $pdo, ?int $countryId = null): array
+{
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    $out = [];
+    foreach (orange_gl_journal_type_rule_ui_defaults() as $code => $byPt) {
+        $jtId = orange_journal_type_id_by_code($pdo, (string) $code, $cid);
+        if ($jtId <= 0) {
+            continue;
+        }
+        foreach ($byPt as $pt => $def) {
+            if (!is_array($def)) {
+                continue;
+            }
+            $dk = trim((string) ($def['debit_key'] ?? ''));
+            $ck = trim((string) ($def['credit_key'] ?? ''));
+            if (!empty($def['debit_from_supplier'])) {
+                $dk = '';
+            }
+            if (!empty($def['credit_from_supplier'])) {
+                $ck = '';
+            }
+            $out[] = [
+                'journal_type_id' => $jtId,
+                'payment_terms' => (string) $pt,
+                'debit_setting_key' => $dk,
+                'credit_setting_key' => $ck,
+                'code' => (string) $code,
+            ];
+        }
+    }
+
+    return $out;
+}
+
+/**
  * قاعدة «مدين/دائن» من شاشة ربط أنواع اليومية (payment_terms فارغ) لتسليم الطلب ومردود المبيعات.
  *
  * - إيراد آجل: SIN — مدين: عملاء آجل، دائن: إيراد مبيعات آجل (أو ما يعادلهما في القاعدة).

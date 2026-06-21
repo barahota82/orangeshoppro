@@ -73,6 +73,10 @@ $hintsJson = json_encode($keyHints, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
 $ruleKeysJson = json_encode($ruleKeyOrder, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $rulesJson = json_encode($journalRules, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $ruleDefaultsJson = json_encode(orange_gl_journal_type_rule_ui_defaults(), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+$ruleSeedPlanJson = json_encode(
+    orange_gl_journal_type_rule_ui_seed_rows($pdo, $glCountryId),
+    JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+);
 $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
 $accountsByIdForJs = [];
 foreach ($byId as $aidJs => $aRow) {
@@ -171,7 +175,10 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
 </div>
 
 <div class="card gl-auto-form-card" style="margin-top:1rem;">
-        <h3 class="card-title">٢ — ربط نوع اليومية بحساب مدين وحساب دائن</h3>
+        <div class="gl-jt-rules-card-head">
+            <h3 class="card-title gl-jt-rules-card-head__title">٢ — ربط نوع اليومية بحساب مدين وحساب دائن</h3>
+            <button type="button" class="btn-secondary" id="gl_btn_seed_rules" title="إضافة كل قواعد القيود التلقائية المعرفة في النظام (دون حذف الموجود)">إنشاء القيود التلقائية</button>
+        </div>
         <p class="card-hint" style="margin:0 0 0.65rem;line-height:1.55;">عند اختيار نوع اليومية يُقترَح المدين والدائن من البنود المربوطة في القسم ١. جانب «ذمة المورد (من المستند)» فقط — في شراء/مردود آجل — بلا قائمة لأنه يُؤخذ من حساب المورد عند الترحيل.</p>
         <div class="table-wrap gl-settings-table-wrap">
             <table class="gl-settings-table" id="gl_jt_rules_table">
@@ -213,6 +220,7 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
     var glRuleKeyOrder = <?php echo $ruleKeysJson; ?>;
     var glInitialRules = <?php echo $rulesJson; ?>;
     var glRuleDefaults = <?php echo $ruleDefaultsJson; ?>;
+    var glRuleSeedPlan = <?php echo $ruleSeedPlanJson; ?>;
     var glKeyAccountInitial = <?php echo $currentForRulesJson; ?>;
     var glAccountsById = <?php echo $accountsByIdJson; ?>;
     var glResolvedLineByKey = <?php echo $resolvedLineByKeyJson; ?>;
@@ -686,6 +694,53 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
         });
     }
 
+    function existingRuleSignatures() {
+        var sigs = {};
+        document.querySelectorAll('#gl_jt_rules_body tr[data-jt-rule]').forEach(function (tr) {
+            var jt = parseInt((tr.querySelector('.gl-sel-jt-id') || {}).value, 10) || 0;
+            if (jt <= 0) {
+                return;
+            }
+            sigs[jt + '\0' + rulePaymentTermsForRow(tr)] = true;
+        });
+        return sigs;
+    }
+
+    function seedAllAutomaticRules() {
+        if (!glRuleSeedPlan || !glRuleSeedPlan.length) {
+            alert('لا توجد قواعد تلقائية جاهزة — تأكد من وجود أنواع اليوميات في هذه الدولة.');
+            return;
+        }
+        var existing = existingRuleSignatures();
+        var added = 0;
+        glRuleSeedPlan.forEach(function (row) {
+            var jtId = parseInt(row.journal_type_id, 10) || 0;
+            if (jtId <= 0) {
+                return;
+            }
+            var pt = String(row.payment_terms != null ? row.payment_terms : '');
+            var sig = jtId + '\0' + pt;
+            if (existing[sig]) {
+                return;
+            }
+            addRuleRow(
+                jtId,
+                pt,
+                String(row.debit_setting_key || ''),
+                String(row.credit_setting_key || '')
+            );
+            existing[sig] = true;
+            added++;
+        });
+        refreshJournalTypeOptions();
+        refreshAllRuleAccountPreviews();
+        if (added <= 0) {
+            alert('كل القيود التلقائية موجودة في الجدول — اضغط «حفظ الكل» إن لم تحفظ بعد.');
+            return;
+        }
+        alert('تمت إضافة ' + added + ' قاعدة. راجع الجدول ثم اضغط «حفظ الكل».');
+    }
+
     function addRuleRow(jtId, paymentTerms, dk, ck) {
         jtId = jtId || 0;
         dk = dk || '';
@@ -762,6 +817,8 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
     document.getElementById('gl_btn_add_rule').addEventListener('click', function () {
         addRuleRow(0, '', '', '');
     });
+
+    document.getElementById('gl_btn_seed_rules').addEventListener('click', seedAllAutomaticRules);
 
     var pickModal = document.getElementById('gl_pick_modal');
     var pickList = document.getElementById('gl_pick_list');
