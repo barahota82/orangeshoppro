@@ -56,7 +56,7 @@ if ($coaCopyTreeJson === false) {
     <?php else: ?>
     <p class="card-hint" style="margin:0 0 0.75rem;">
         المصدر: <strong><?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> —
-        افتح فرعاً بالسهم (◀) ثم حدّد حساباً أو مجموعة؛ تُنسخ الأسلاف تلقائياً. يمكن «حتى المستوى 4» ثم إضافة حسابات من المستوى 5.
+        كل خانة <strong>مستقلة</strong>: تحديد حساب رئيسي (مجموعة) لا يحدّد الفروع — مثلاً «بنوك» بدون حسابات البنوك الفرعية. عند نسخ حساب فرعي فقط تُضاف <strong>الأسلاف</strong> تلقائياً لإكمال الشجرة.
     </p>
     <div class="form-grid" style="grid-template-columns:minmax(180px,1fr) auto;align-items:end;gap:12px;max-width:720px;margin-bottom:10px;">
         <div>
@@ -329,66 +329,6 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.title = expanded ? 'طي الفرع' : 'فتح الفرع';
     }
 
-    function coaCopySubtreeCheckboxes(itemLi) {
-        if (!itemLi) {
-            return [];
-        }
-        return Array.prototype.slice.call(itemLi.querySelectorAll('.coa-copy-chk'));
-    }
-
-    function coaCopySyncParentChecks(fromLi) {
-        var cur = fromLi;
-        while (cur && cur.classList && cur.classList.contains('coa-copy-item')) {
-            var parentLi = cur.parentElement ? cur.parentElement.closest('.coa-copy-item') : null;
-            if (!parentLi) {
-                break;
-            }
-            var parentCb = parentLi.querySelector(':scope > .coa-copy-row > .coa-copy-chk');
-            if (!parentCb) {
-                cur = parentLi;
-                continue;
-            }
-            var childCbs = coaCopySubtreeCheckboxes(parentLi).filter(function (cb) {
-                return cb !== parentCb;
-            });
-            var allOn = childCbs.length > 0 && childCbs.every(function (cb) { return cb.checked; });
-            parentCb.checked = allOn;
-            cur = parentLi;
-        }
-    }
-
-    function coaCopyOnCheckboxChange(cb) {
-        var li = cb.closest('.coa-copy-item');
-        if (!li) {
-            return;
-        }
-        var hasKids = li.querySelector(':scope > .coa-copy-tree-list');
-        if (hasKids) {
-            coaCopySubtreeCheckboxes(li).forEach(function (c) {
-                if (c !== cb) {
-                    c.checked = cb.checked;
-                }
-            });
-        }
-        if (!cb.checked) {
-            var p = li.parentElement;
-            while (p) {
-                var pli = p.closest ? p.closest('.coa-copy-item') : null;
-                if (!pli) {
-                    break;
-                }
-                var pcb = pli.querySelector(':scope > .coa-copy-row > .coa-copy-chk');
-                if (pcb) {
-                    pcb.checked = false;
-                }
-                p = pli.parentElement;
-            }
-        } else {
-            coaCopySyncParentChecks(li);
-        }
-        coaCopyUpdateSelCount();
-    }
-
     function coaCopyUpdateSelCount() {
         var el = document.getElementById('coa_copy_sel_count');
         if (!el) {
@@ -396,6 +336,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         var n = document.querySelectorAll('.coa-copy-chk:checked').length;
         el.textContent = n + ' محدَّد';
+    }
+
+    function coaCopyOnCheckboxChange() {
+        coaCopyUpdateSelCount();
     }
 
     function coaCopyBuildList(nodes, depth) {
@@ -444,7 +388,7 @@ document.addEventListener('DOMContentLoaded', function () {
             cb.className = 'coa-copy-chk';
             cb.value = String(n.id);
             cb.dataset.level = String(n.level || 1);
-            cb.addEventListener('change', function () { coaCopyOnCheckboxChange(cb); });
+            cb.addEventListener('change', coaCopyOnCheckboxChange);
             row.appendChild(cb);
             var lbl = document.createElement('span');
             lbl.className = 'coa-copy-label';
@@ -1296,7 +1240,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('حدّد حساباً واحداً على الأقل');
                 return;
             }
-            if (!confirm('نسخ ' + ids.length + ' حساب (مع الأسلاف الناقصة تلقائياً) إلى الدولة المختارة؟')) {
+            if (!confirm('نسخ ' + ids.length + ' حساب (الأسلاف فقط إن لزم — بدون الفروع غير المحددة) إلى الدولة المختارة؟')) {
                 return;
             }
             postJSON('/admin/api/country-copy/accounts.php', {
