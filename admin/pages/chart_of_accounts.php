@@ -35,6 +35,11 @@ $fyList = orange_fiscal_years_list($pdo);
 $fyDefault = $fyList !== [] ? (int) $fyList[0]['id'] : 0;
 
 $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
+$coaCopyTreePayload = orange_coa_copy_tree_payload($tree);
+$coaCopyTreeJson = json_encode($coaCopyTreePayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS);
+if ($coaCopyTreeJson === false) {
+    $coaCopyTreeJson = '[]';
+}
 ?>
 <div class="page-title">
     <h1>الدليل المحاسبي</h1>
@@ -51,9 +56,9 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
     <?php else: ?>
     <p class="card-hint" style="margin:0 0 0.75rem;">
         المصدر: <strong><?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> —
-        حدّد الحسابات (يُنسخ الأسلاف تلقائياً). إن وُجد نفس الكود في الهدف تُحدَّث الأسماء والتصنيف.
+        افتح فرعاً بالسهم (◀) ثم حدّد حساباً أو مجموعة؛ تُنسخ الأسلاف تلقائياً. يمكن «حتى المستوى 4» ثم إضافة حسابات من المستوى 5.
     </p>
-    <div class="form-grid" style="grid-template-columns:minmax(180px,1fr) auto auto;align-items:end;gap:12px;max-width:720px;margin-bottom:12px;">
+    <div class="form-grid" style="grid-template-columns:minmax(180px,1fr) auto;align-items:end;gap:12px;max-width:720px;margin-bottom:10px;">
         <div>
             <label for="coa_copy_target">الدولة الهدف</label>
             <select id="coa_copy_target" class="admin-inp">
@@ -75,36 +80,16 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
                 <?php endforeach; ?>
             </select>
         </div>
-        <button type="button" class="btn-secondary" id="coa_copy_sel_all">تحديد الكل</button>
         <button type="button" id="coa_copy_btn">نسخ المحدّد</button>
     </div>
-    <div class="table-wrap" style="max-height:320px;overflow:auto;">
-        <table class="admin-table" style="width:100%;">
-            <thead>
-                <tr>
-                    <th style="width:2.5rem;text-align:center;"><input type="checkbox" id="coa_copy_all" aria-label="تحديد الكل"></th>
-                    <th style="width:8rem;">الكود</th>
-                    <th>الاسم</th>
-                    <th style="width:5rem;">مستوى</th>
-                </tr>
-            </thead>
-            <tbody id="coa_copy_tbody">
-                <?php foreach ($flat as $acc):
-                    $aid = (int) ($acc['id'] ?? 0);
-                    if ($aid <= 0) {
-                        continue;
-                    }
-                    $depth = (int) ($depths[$aid] ?? 0);
-                    ?>
-                <tr>
-                    <td style="text-align:center;"><input type="checkbox" class="coa-copy-chk" value="<?php echo $aid; ?>" aria-label="تحديد"></td>
-                    <td dir="ltr"><?php echo htmlspecialchars((string) ($acc['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo htmlspecialchars((string) ($acc['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo $depth + 1; ?></td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+    <div class="coa-copy-toolbar" dir="rtl">
+        <button type="button" class="btn-secondary" id="coa_copy_sel_all">تحديد الكل</button>
+        <button type="button" class="btn-secondary" id="coa_copy_sel_l4">حتى المستوى 4</button>
+        <button type="button" class="btn-secondary" id="coa_copy_clear">إلغاء التحديد</button>
+        <span class="coa-copy-toolbar__hint muted" id="coa_copy_sel_count">0 محدَّد</span>
+    </div>
+    <div class="coa-copy-tree-wrap" dir="rtl">
+        <div id="coa_copy_tree_root" class="coa-copy-tree-root" role="tree" aria-label="اختيار حسابات للنسخ"></div>
     </div>
     <?php endif; ?>
 </div>
@@ -329,6 +314,168 @@ document.addEventListener('DOMContentLoaded', function () {
     var coaSetupSaveInFlight = false;
 
     var levelOrds = ['', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
+    var COA_COPY_TREE = <?php echo $coaCopyTreeJson; ?>;
+
+    function coaCopyEsc(s) {
+        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    }
+
+    function coaCopyUpdateExpandBtn(btn, expanded) {
+        if (!btn) {
+            return;
+        }
+        btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        btn.textContent = expanded ? '\u25BC' : '\u25C0';
+        btn.title = expanded ? 'طي الفرع' : 'فتح الفرع';
+    }
+
+    function coaCopySubtreeCheckboxes(itemLi) {
+        if (!itemLi) {
+            return [];
+        }
+        return Array.prototype.slice.call(itemLi.querySelectorAll('.coa-copy-chk'));
+    }
+
+    function coaCopySyncParentChecks(fromLi) {
+        var cur = fromLi;
+        while (cur && cur.classList && cur.classList.contains('coa-copy-item')) {
+            var parentLi = cur.parentElement ? cur.parentElement.closest('.coa-copy-item') : null;
+            if (!parentLi) {
+                break;
+            }
+            var parentCb = parentLi.querySelector(':scope > .coa-copy-row > .coa-copy-chk');
+            if (!parentCb) {
+                cur = parentLi;
+                continue;
+            }
+            var childCbs = coaCopySubtreeCheckboxes(parentLi).filter(function (cb) {
+                return cb !== parentCb;
+            });
+            var allOn = childCbs.length > 0 && childCbs.every(function (cb) { return cb.checked; });
+            parentCb.checked = allOn;
+            cur = parentLi;
+        }
+    }
+
+    function coaCopyOnCheckboxChange(cb) {
+        var li = cb.closest('.coa-copy-item');
+        if (!li) {
+            return;
+        }
+        var hasKids = li.querySelector(':scope > .coa-copy-tree-list');
+        if (hasKids) {
+            coaCopySubtreeCheckboxes(li).forEach(function (c) {
+                if (c !== cb) {
+                    c.checked = cb.checked;
+                }
+            });
+        }
+        if (!cb.checked) {
+            var p = li.parentElement;
+            while (p) {
+                var pli = p.closest ? p.closest('.coa-copy-item') : null;
+                if (!pli) {
+                    break;
+                }
+                var pcb = pli.querySelector(':scope > .coa-copy-row > .coa-copy-chk');
+                if (pcb) {
+                    pcb.checked = false;
+                }
+                p = pli.parentElement;
+            }
+        } else {
+            coaCopySyncParentChecks(li);
+        }
+        coaCopyUpdateSelCount();
+    }
+
+    function coaCopyUpdateSelCount() {
+        var el = document.getElementById('coa_copy_sel_count');
+        if (!el) {
+            return;
+        }
+        var n = document.querySelectorAll('.coa-copy-chk:checked').length;
+        el.textContent = n + ' محدَّد';
+    }
+
+    function coaCopyBuildList(nodes, depth) {
+        depth = typeof depth === 'number' ? depth : 0;
+        var ul = document.createElement('ul');
+        ul.className = 'coa-copy-tree-list';
+        (nodes || []).forEach(function (n) {
+            if (!n || !n.id) {
+                return;
+            }
+            var li = document.createElement('li');
+            li.className = 'coa-copy-item' + (depth === 0 ? ' coa-copy-item--root' : '');
+            li.setAttribute('role', 'treeitem');
+            li.dataset.id = String(n.id);
+            li.dataset.level = String(n.level || 1);
+            var hasKids = n.children && n.children.length;
+            var row = document.createElement('div');
+            row.className = 'coa-copy-row';
+            if (hasKids) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'coa-copy-expand';
+                coaCopyUpdateExpandBtn(btn, false);
+                btn.addEventListener('click', function (ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    var childUl = li.querySelector(':scope > .coa-copy-tree-list');
+                    if (!childUl) {
+                        return;
+                    }
+                    var open = childUl.hidden;
+                    childUl.hidden = !open;
+                    coaCopyUpdateExpandBtn(btn, open);
+                    li.setAttribute('aria-expanded', open ? 'true' : 'false');
+                });
+                row.appendChild(btn);
+                li.setAttribute('aria-expanded', 'false');
+            } else {
+                var sp = document.createElement('span');
+                sp.className = 'coa-copy-expand coa-copy-expand--spacer';
+                sp.setAttribute('aria-hidden', 'true');
+                row.appendChild(sp);
+            }
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'coa-copy-chk';
+            cb.value = String(n.id);
+            cb.dataset.level = String(n.level || 1);
+            cb.addEventListener('change', function () { coaCopyOnCheckboxChange(cb); });
+            row.appendChild(cb);
+            var lbl = document.createElement('span');
+            lbl.className = 'coa-copy-label';
+            var codePart = n.code ? ('<span dir="ltr" class="coa-copy-code">' + coaCopyEsc(n.code) + '</span> — ') : '';
+            lbl.innerHTML = codePart + coaCopyEsc(n.name || '')
+                + ' <small class="muted">(م.' + (n.level || 1) + (n.is_group ? '، رئيسي' : '') + ')</small>';
+            row.appendChild(lbl);
+            li.appendChild(row);
+            if (hasKids) {
+                var childUl = coaCopyBuildList(n.children, depth + 1);
+                childUl.hidden = true;
+                li.appendChild(childUl);
+            }
+            ul.appendChild(li);
+        });
+        return ul;
+    }
+
+    function coaCopyRenderTree() {
+        var root = document.getElementById('coa_copy_tree_root');
+        if (!root) {
+            return;
+        }
+        root.innerHTML = '';
+        if (!COA_COPY_TREE || !COA_COPY_TREE.length) {
+            root.innerHTML = '<p class="muted">لا توجد حسابات في سياق الدولة الحالي.</p>';
+            return;
+        }
+        root.appendChild(coaCopyBuildList(COA_COPY_TREE));
+        coaCopyUpdateSelCount();
+    }
 
     /** ملء حقول التصنيف من عُقدة الشجرة (الحساب نفسه أو الأب عند «إضافة»). */
     function coaApplyDatasetToMappingFields(li) {
@@ -1106,18 +1253,33 @@ document.addEventListener('DOMContentLoaded', function () {
     (function initCoaCopyPanel() {
         var copyBtn = document.getElementById('coa_copy_btn');
         var copyTarget = document.getElementById('coa_copy_target');
-        var copyAll = document.getElementById('coa_copy_all');
         var selAllBtn = document.getElementById('coa_copy_sel_all');
+        var selL4Btn = document.getElementById('coa_copy_sel_l4');
+        var clearBtn = document.getElementById('coa_copy_clear');
         if (!copyBtn || !copyTarget) { return; }
-        function setAll(checked) {
-            document.querySelectorAll('.coa-copy-chk').forEach(function (cb) { cb.checked = checked; });
-            if (copyAll) { copyAll.checked = checked; }
-        }
-        if (copyAll) {
-            copyAll.addEventListener('change', function () { setAll(copyAll.checked); });
+        coaCopyRenderTree();
+        function setChecked(predicate) {
+            document.querySelectorAll('.coa-copy-chk').forEach(function (cb) {
+                cb.checked = predicate(cb);
+            });
+            coaCopyUpdateSelCount();
         }
         if (selAllBtn) {
-            selAllBtn.addEventListener('click', function () { setAll(true); });
+            selAllBtn.addEventListener('click', function () {
+                setChecked(function () { return true; });
+            });
+        }
+        if (selL4Btn) {
+            selL4Btn.addEventListener('click', function () {
+                setChecked(function (cb) {
+                    return (parseInt(cb.dataset.level, 10) || 99) <= 4;
+                });
+            });
+        }
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function () {
+                setChecked(function () { return false; });
+            });
         }
         copyBtn.addEventListener('click', function () {
             var targetId = parseInt(copyTarget.value, 10) || 0;
@@ -1134,7 +1296,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('حدّد حساباً واحداً على الأقل');
                 return;
             }
-            if (!confirm('نسخ ' + ids.length + ' حساب (مع الأسلاف) إلى الدولة المختارة؟')) {
+            if (!confirm('نسخ ' + ids.length + ' حساب (مع الأسلاف الناقصة تلقائياً) إلى الدولة المختارة؟')) {
                 return;
             }
             postJSON('/admin/api/country-copy/accounts.php', {

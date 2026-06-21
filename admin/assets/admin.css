@@ -6260,6 +6260,73 @@ td.tb-col-name,
 .au-perm-page .p-v, .au-perm-page .p-e, .au-perm-page .p-d, .au-perm-page .p-l, .au-perm-page .p-u { cursor: pointer; }
 .au-perm-na { font-size: 12px; user-select: none; }
 
+/* نسخ الدليل بين الدول — شجرة قابلة للطي (نمط صلاحيات الشاشات) */
+.coa-copy-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+}
+.coa-copy-toolbar__hint {
+    font-size: 0.85rem;
+    margin-inline-start: auto;
+}
+.coa-copy-tree-wrap {
+    max-height: 420px;
+    overflow: auto;
+    border: 1px solid var(--border, #d1d5db);
+    border-radius: 6px;
+    background: #fff;
+    padding: 8px 10px;
+}
+.coa-copy-tree-root { min-height: 48px; }
+.coa-copy-tree-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.coa-copy-tree-list .coa-copy-tree-list {
+    padding-inline-start: 18px;
+    margin-top: 2px;
+    border-inline-start: 1px dashed #e5e7eb;
+}
+.coa-copy-tree-list[hidden] { display: none; }
+.coa-copy-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 2px;
+    border-radius: 4px;
+}
+.coa-copy-row:hover { background: #f9fafb; }
+.coa-copy-expand {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 2px 8px;
+    color: var(--muted, #6b7280);
+    font-size: 10px;
+    line-height: 1;
+    min-width: 1.6em;
+    touch-action: manipulation;
+    flex-shrink: 0;
+}
+.coa-copy-expand--spacer {
+    display: inline-block;
+    min-width: 1.6em;
+    padding: 2px 8px;
+}
+.coa-copy-chk { flex-shrink: 0; cursor: pointer; }
+.coa-copy-label {
+    flex: 1;
+    text-align: right;
+    font-size: 13px;
+    line-height: 1.35;
+}
+.coa-copy-code { font-family: ui-monospace, monospace; font-size: 12px; }
+.coa-copy-item--root > .coa-copy-row .coa-copy-label { font-weight: 600; }
+
 /* شريط تصدير جداول التقارير (Excel/CSV) — admin-table-export.js */
 .table-export-bar {
     display: flex;

@@ -525,6 +525,38 @@ function orange_accounts_build_tree(array $flat): array
     return $walk(0);
 }
 
+/**
+ * شجرة مبسّطة لنسخ الدليل بين الدول (واجهة الأدمن).
+ *
+ * @param list<array<string, mixed>> $nodes
+ * @return list<array{id:int, code:string, name:string, depth:int, level:int, is_group:bool, children:list<mixed>}>
+ */
+function orange_coa_copy_tree_payload(array $nodes, int $depth = 0): array
+{
+    $out = [];
+    foreach ($nodes as $n) {
+        if (!is_array($n)) {
+            continue;
+        }
+        $id = (int) ($n['id'] ?? 0);
+        if ($id <= 0) {
+            continue;
+        }
+        $children = orange_coa_copy_tree_payload($n['children'] ?? [], $depth + 1);
+        $out[] = [
+            'id' => $id,
+            'code' => trim((string) ($n['code'] ?? '')),
+            'name' => trim((string) ($n['name'] ?? '')),
+            'depth' => $depth,
+            'level' => $depth + 1,
+            'is_group' => (int) ($n['is_group'] ?? 0) === 1,
+            'children' => $children,
+        ];
+    }
+
+    return $out;
+}
+
 function orange_accounts_is_descendant(PDO $pdo, int $ancestorId, int $nodeId): bool
 {
     if ($ancestorId <= 0 || $nodeId <= 0 || !orange_table_has_column($pdo, 'accounts', 'parent_id')) {
