@@ -33,7 +33,6 @@ function orange_catalog_ensure_invoice_ancillary_lines_schema(PDO $pdo): void
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
                 PRIMARY KEY (id),
-                UNIQUE KEY uq_oilp_country_account_ctx (country_id, account_id, invoice_context),
                 UNIQUE KEY uq_oilp_country_system_key (country_id, system_key),
                 KEY idx_oilp_lookup (country_id, invoice_context, is_active, sort_order),
                 KEY idx_oilp_account (account_id)
@@ -108,6 +107,23 @@ function orange_catalog_ensure_invoice_ancillary_lines_schema(PDO $pdo): void
     }
 
     if (orange_table_exists($pdo, 'orange_invoice_line_presets')) {
+        // إزالة قيد فريد قديم كان يمنع استخدام نفس الحساب في أكثر من بند لنفس الدولة/السياق؛
+        // التصميم يسمح بتوجيه عدة عروض (مفاتيح نظامية مختلفة) إلى حساب «خصم العروض» واحد.
+        // التفرّد المعتمد هو (country_id, system_key) فقط.
+        $ixAccCtx = $pdo->prepare(
+            'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = \'orange_invoice_line_presets\'
+               AND INDEX_NAME = \'uq_oilp_country_account_ctx\'
+             LIMIT 1'
+        );
+        $ixAccCtx->execute();
+        if ($ixAccCtx->fetchColumn()) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orange_invoice_line_presets DROP INDEX uq_oilp_country_account_ctx'
+            );
+        }
         if (!orange_table_has_column($pdo, 'orange_invoice_line_presets', 'system_key')) {
             orange_catalog_safe_exec(
                 $pdo,

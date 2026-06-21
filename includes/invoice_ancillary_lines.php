@@ -289,10 +289,12 @@ function orange_invoice_ancillary_presets_list(
     $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
     $hasSystemKey = orange_table_has_column($pdo, 'orange_invoice_line_presets', 'system_key');
     $systemKeySelect = $hasSystemKey ? ', p.system_key' : ', NULL AS system_key';
+    // LEFT JOIN: يبقى البند ظاهراً في شاشة الإدارة حتى لو تعذّر جلب بيانات الحساب،
+    // فلا «يختفي» بند محفوظ من القائمة لسبب يخص الحساب.
     $sql = 'SELECT p.*, a.code AS account_code, a.name AS account_name
             ' . $systemKeySelect . '
             FROM orange_invoice_line_presets p
-            INNER JOIN accounts a ON a.id = p.account_id
+            LEFT JOIN accounts a ON a.id = p.account_id
             WHERE p.country_id = ?';
     $params = [$cid];
     if ($activeOnly) {
