@@ -52,6 +52,9 @@ try {
         'is_active' => $isActive,
     ]);
 
+    // إبقاء sort_order متسلسلاً 1..N بلا فراغات (يشمل تنظيف فراغات سابقة).
+    orange_invoice_ancillary_presets_normalize_sort($pdo, $countryId);
+
     json_response([
         'success' => true,
         'message' => ((int) ($data['id'] ?? 0) > 0) ? 'تم تحديث البند' : 'تمت إضافة الحساب إلى القائمة المحفوظة',

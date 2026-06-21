@@ -537,6 +537,32 @@ function orange_invoice_ancillary_presets_reorder(PDO $pdo, array $orderedIds, ?
 }
 
 /**
+ * يعيد ترقيم sort_order تسلسلياً 1..N لإزالة الفراغات (مثلاً بعد حذف بنود وسطية).
+ * يحافظ على الترتيب الحالي (sort_order ثم id).
+ */
+function orange_invoice_ancillary_presets_normalize_sort(PDO $pdo, ?int $countryId = null): void
+{
+    if (!orange_table_exists($pdo, 'orange_invoice_line_presets')) {
+        return;
+    }
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    $sel = $pdo->prepare(
+        'SELECT id FROM orange_invoice_line_presets WHERE country_id = ? ORDER BY sort_order ASC, id ASC'
+    );
+    $sel->execute([$cid]);
+    $ids = $sel->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    if ($ids === []) {
+        return;
+    }
+    $upd = $pdo->prepare('UPDATE orange_invoice_line_presets SET sort_order = ? WHERE id = ? AND country_id = ?');
+    $sort = 0;
+    foreach ($ids as $rawId) {
+        $sort++;
+        $upd->execute([$sort, (int) $rawId, $cid]);
+    }
+}
+
+/**
  * @return array<string, array<string,mixed>>
  */
 function orange_invoice_ancillary_system_key_presets_map(PDO $pdo, int $countryId, bool $activeOnly = true): array

@@ -410,7 +410,7 @@ foreach ($ilpSysOrdered as $sysKey => $sysMeta) {
             tr.dataset.id = String(row.id || 0);
             tr.style.cursor = 'pointer';
             tr.title = 'اضغط للتعديل';
-            tr.innerHTML = '<td style="white-space:nowrap;">' + esc(String(row.id)) + '</td>'
+            tr.innerHTML = '<td style="white-space:nowrap;">' + esc(String(idx + 1)) + '</td>'
                 + '<td style="font-size:0.85rem;">' + esc(row.line_kind_label || row.line_kind || '') + '</td>'
                 + '<td style="font-size:0.83rem;">' + esc(row.system_key_label_ar || row.system_key || '—') + '</td>'
                 + '<td style="white-space:nowrap;text-align:center;">' + (row.is_active ? 'نعم' : 'لا') + '</td>'

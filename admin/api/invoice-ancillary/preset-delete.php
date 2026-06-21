@@ -31,6 +31,9 @@ try {
         json_response(['success' => false, 'message' => 'البند غير موجود في سياق هذه الدولة'], 404);
     }
 
+    // إزالة فراغات sort_order الناتجة عن حذف بند وسطي (إعادة ترقيم 1..N).
+    orange_invoice_ancillary_presets_normalize_sort($pdo, $countryId);
+
     json_response(['success' => true, 'message' => 'تم حذف البند']);
 } catch (RuntimeException $e) {
     json_response(['success' => false, 'message' => $e->getMessage()], 422);
