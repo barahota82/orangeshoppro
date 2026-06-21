@@ -456,6 +456,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'title' => 'الأسواق (مشرف عام)',
                     'items' => [
                         ['page' => 'countries', 'href' => '/admin/index.php?page=countries', 'label' => 'الدول', 'class' => '', 'sub' => false],
+                        ['page' => 'country_screen_copy', 'href' => '/admin/index.php?page=country_screen_copy', 'label' => 'نسخ إعدادات بين الدول', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'admin_users', 'href' => '/admin/index.php?page=admin_users', 'label' => 'المستخدمون والصلاحيات', 'class' => 'admin-nav-sub', 'sub' => true],
                     ],
                 ],
