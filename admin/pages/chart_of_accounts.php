@@ -56,7 +56,7 @@ if ($coaCopyTreeJson === false) {
     <?php else: ?>
     <p class="card-hint" style="margin:0 0 0.75rem;">
         المصدر: <strong><?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> —
-        كل خانة <strong>مستقلة</strong>: تحديد حساب رئيسي (مجموعة) لا يحدّد الفروع — مثلاً «بنوك» بدون حسابات البنوك الفرعية. عند نسخ حساب فرعي فقط تُضاف <strong>الأسلاف</strong> تلقائياً لإكمال الشجرة.
+        كل خانة: **تحديد حساب** يحدّد **كل ما تحته** (حتى M5). **إلغاء** حساب يلغي **فقط فروعه** (إلغاء M4 يلغي M5 تحته) **دون** إلغاء الأب — مثلاً «أصول» مع كل الهيكل ثم إلغاء حساب بنك واحد فقط.
     </p>
     <div class="form-grid" style="grid-template-columns:minmax(180px,1fr) auto;align-items:end;gap:12px;max-width:720px;margin-bottom:10px;">
         <div>
@@ -329,6 +329,14 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.title = expanded ? 'طي الفرع' : 'فتح الفرع';
     }
 
+    function coaCopyDescendantCheckboxes(itemLi) {
+        var childList = itemLi ? itemLi.querySelector(':scope > .coa-copy-tree-list') : null;
+        if (!childList) {
+            return [];
+        }
+        return Array.prototype.slice.call(childList.querySelectorAll('.coa-copy-chk'));
+    }
+
     function coaCopyUpdateSelCount() {
         var el = document.getElementById('coa_copy_sel_count');
         if (!el) {
@@ -338,7 +346,20 @@ document.addEventListener('DOMContentLoaded', function () {
         el.textContent = n + ' محدَّد';
     }
 
-    function coaCopyOnCheckboxChange() {
+    function coaCopyOnCheckboxChange(ev) {
+        var cb = ev.target;
+        if (!cb || !cb.classList || !cb.classList.contains('coa-copy-chk')) {
+            return;
+        }
+        var li = cb.closest('.coa-copy-item');
+        if (!li) {
+            coaCopyUpdateSelCount();
+            return;
+        }
+        var checked = cb.checked;
+        coaCopyDescendantCheckboxes(li).forEach(function (c) {
+            c.checked = checked;
+        });
         coaCopyUpdateSelCount();
     }
 
@@ -1240,7 +1261,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('حدّد حساباً واحداً على الأقل');
                 return;
             }
-            if (!confirm('نسخ ' + ids.length + ' حساب (الأسلاف فقط إن لزم — بدون الفروع غير المحددة) إلى الدولة المختارة؟')) {
+            if (!confirm('نسخ ' + ids.length + ' حساب (الأسلاف تُضاف تلقائياً عند الحاجة فقط) إلى الدولة المختارة؟')) {
                 return;
             }
             postJSON('/admin/api/country-copy/accounts.php', {
