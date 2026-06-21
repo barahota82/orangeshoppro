@@ -6318,6 +6318,17 @@ td.tb-col-name,
     padding: 2px 8px;
 }
 .coa-copy-chk { flex-shrink: 0; cursor: pointer; }
+.coa-copy-auto-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1rem;
+    flex-shrink: 0;
+    color: #059669;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+.coa-copy-row--mandatory .coa-copy-label { color: #374151; }
 .coa-copy-label {
     flex: 1;
     text-align: right;

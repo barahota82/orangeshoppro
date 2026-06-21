@@ -9,6 +9,44 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/countries.php';
 require_once __DIR__ . '/journal_types.php';
+require_once __DIR__ . '/account_tree.php';
+
+/**
+ * كل حسابات المستويات 1–4 في الدولة المصدر — تُدمَج دائماً عند النسخ الانتقائي.
+ *
+ * @return list<int>
+ */
+function orange_country_copy_mandatory_account_ids(PDO $pdo, int $sourceCountryId, int $maxLevel = 4): array
+{
+    if ($sourceCountryId <= 0 || !orange_table_exists($pdo, 'accounts')
+        || !orange_table_has_column($pdo, 'accounts', 'country_id')) {
+        return [];
+    }
+    orange_catalog_ensure_schema($pdo);
+    $st = $pdo->prepare('SELECT id, parent_id FROM accounts WHERE country_id = ?');
+    $st->execute([$sourceCountryId]);
+    $flat = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($flat === []) {
+        return [];
+    }
+    $depths = orange_accounts_depth_by_id($flat);
+    $ids = [];
+    foreach ($flat as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $id = (int) ($row['id'] ?? 0);
+        if ($id <= 0) {
+            continue;
+        }
+        $level = (int) ($depths[$id] ?? 0) + 1;
+        if ($level <= $maxLevel) {
+            $ids[$id] = $id;
+        }
+    }
+
+    return array_values($ids);
+}
 
 /**
  * @return array{success:bool, message:string, inserted:int, updated:int, skipped:int, errors:list<string>}
@@ -204,6 +242,9 @@ function orange_country_copy_accounts_selective(
         if ($v > 0) {
             $selectedIds[$v] = $v;
         }
+    }
+    foreach (orange_country_copy_mandatory_account_ids($pdo, $sourceCountryId) as $mid) {
+        $selectedIds[$mid] = $mid;
     }
     if ($selectedIds === []) {
         $out['message'] = 'لم تُحدَّد حسابات للنسخ.';

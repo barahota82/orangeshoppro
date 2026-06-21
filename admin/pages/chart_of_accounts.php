@@ -56,7 +56,7 @@ if ($coaCopyTreeJson === false) {
     <?php else: ?>
     <p class="card-hint" style="margin:0 0 0.75rem;">
         المصدر: <strong><?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> —
-        كل خانة: **تحديد حساب** يحدّد **كل ما تحته** (حتى M5). **إلغاء** حساب يلغي **فقط فروعه** (إلغاء M4 يلغي M5 تحته) **دون** إلغاء الأب — مثلاً «أصول» مع كل الهيكل ثم إلغاء حساب بنك واحد فقط.
+        <strong>المستويات 1–4 تُنسخ كاملة تلقائياً</strong> (هيكل الدليل). حدّد من الشجرة <strong>حسابات المستوى 5</strong> فقط — التي تختلف أسماؤها بين الدول (مثل البنوك).
     </p>
     <div class="form-grid" style="grid-template-columns:minmax(180px,1fr) auto;align-items:end;gap:12px;max-width:720px;margin-bottom:10px;">
         <div>
@@ -83,9 +83,8 @@ if ($coaCopyTreeJson === false) {
         <button type="button" id="coa_copy_btn">نسخ المحدّد</button>
     </div>
     <div class="coa-copy-toolbar" dir="rtl">
-        <button type="button" class="btn-secondary" id="coa_copy_sel_all">تحديد الكل</button>
-        <button type="button" class="btn-secondary" id="coa_copy_sel_l4">حتى المستوى 4</button>
-        <button type="button" class="btn-secondary" id="coa_copy_clear">إلغاء التحديد</button>
+        <button type="button" class="btn-secondary" id="coa_copy_sel_all">تحديد كل M5</button>
+        <button type="button" class="btn-secondary" id="coa_copy_clear">إلغاء M5</button>
         <span class="coa-copy-toolbar__hint muted" id="coa_copy_sel_count">0 محدَّد</span>
     </div>
     <div class="coa-copy-tree-wrap" dir="rtl">
@@ -315,6 +314,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var levelOrds = ['', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
     var COA_COPY_TREE = <?php echo $coaCopyTreeJson; ?>;
+    var COA_COPY_MANDATORY_MAX_LEVEL = 4;
+
+    function coaCopyFlatten(nodes, out) {
+        out = out || [];
+        (nodes || []).forEach(function (n) {
+            if (!n || !n.id) {
+                return;
+            }
+            out.push(n);
+            if (n.children && n.children.length) {
+                coaCopyFlatten(n.children, out);
+            }
+        });
+        return out;
+    }
+
+    var COA_COPY_FLAT = coaCopyFlatten(COA_COPY_TREE, []);
+    var COA_COPY_MANDATORY_IDS = COA_COPY_FLAT.filter(function (n) {
+        return (parseInt(n.level, 10) || 99) <= COA_COPY_MANDATORY_MAX_LEVEL;
+    }).map(function (n) { return parseInt(n.id, 10) || 0; }).filter(function (id) { return id > 0; });
+
+    function coaCopyIsMandatoryLevel(level) {
+        return (parseInt(level, 10) || 99) <= COA_COPY_MANDATORY_MAX_LEVEL;
+    }
+
+    function coaCopyIsSelectableLevel(level) {
+        return !coaCopyIsMandatoryLevel(level);
+    }
 
     function coaCopyEsc(s) {
         return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -337,13 +364,34 @@ document.addEventListener('DOMContentLoaded', function () {
         return Array.prototype.slice.call(childList.querySelectorAll('.coa-copy-chk'));
     }
 
+    function coaCopyAncestorCheckboxes(itemLi) {
+        var out = [];
+        var cur = itemLi;
+        while (cur) {
+            var parentUl = cur.parentElement;
+            if (!parentUl || !parentUl.classList.contains('coa-copy-tree-list')) {
+                break;
+            }
+            var parentLi = parentUl.closest('.coa-copy-item');
+            if (!parentLi) {
+                break;
+            }
+            var cb = parentLi.querySelector(':scope > .coa-copy-row > .coa-copy-chk');
+            if (cb) {
+                out.push(cb);
+            }
+            cur = parentLi;
+        }
+        return out;
+    }
+
     function coaCopyUpdateSelCount() {
         var el = document.getElementById('coa_copy_sel_count');
         if (!el) {
             return;
         }
-        var n = document.querySelectorAll('.coa-copy-chk:checked').length;
-        el.textContent = n + ' محدَّد';
+        var l5 = document.querySelectorAll('.coa-copy-chk:checked').length;
+        el.textContent = 'M1–4: ' + COA_COPY_MANDATORY_IDS.length + ' تلقائي | M5: ' + l5 + ' محدَّد';
     }
 
     function coaCopyOnCheckboxChange(ev) {
@@ -357,10 +405,34 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         var checked = cb.checked;
+        if (checked) {
+            coaCopyAncestorCheckboxes(li).forEach(function (c) {
+                c.checked = true;
+            });
+        }
         coaCopyDescendantCheckboxes(li).forEach(function (c) {
             c.checked = checked;
         });
         coaCopyUpdateSelCount();
+    }
+
+    function coaCopyCollectIdsForSubmit() {
+        var seen = {};
+        var ids = [];
+        COA_COPY_MANDATORY_IDS.forEach(function (id) {
+            if (id > 0 && !seen[id]) {
+                seen[id] = true;
+                ids.push(id);
+            }
+        });
+        document.querySelectorAll('.coa-copy-chk:checked').forEach(function (cb) {
+            var v = parseInt(cb.value, 10) || 0;
+            if (v > 0 && !seen[v]) {
+                seen[v] = true;
+                ids.push(v);
+            }
+        });
+        return ids;
     }
 
     function coaCopyBuildList(nodes, depth) {
@@ -378,7 +450,7 @@ document.addEventListener('DOMContentLoaded', function () {
             li.dataset.level = String(n.level || 1);
             var hasKids = n.children && n.children.length;
             var row = document.createElement('div');
-            row.className = 'coa-copy-row';
+            row.className = 'coa-copy-row' + (coaCopyIsMandatoryLevel(n.level) ? ' coa-copy-row--mandatory' : '');
             if (hasKids) {
                 var btn = document.createElement('button');
                 btn.type = 'button';
@@ -404,13 +476,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 sp.setAttribute('aria-hidden', 'true');
                 row.appendChild(sp);
             }
-            var cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.className = 'coa-copy-chk';
-            cb.value = String(n.id);
-            cb.dataset.level = String(n.level || 1);
-            cb.addEventListener('change', coaCopyOnCheckboxChange);
-            row.appendChild(cb);
+            if (coaCopyIsSelectableLevel(n.level)) {
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.className = 'coa-copy-chk';
+                cb.value = String(n.id);
+                cb.dataset.level = String(n.level || 1);
+                cb.addEventListener('change', coaCopyOnCheckboxChange);
+                row.appendChild(cb);
+            } else {
+                var auto = document.createElement('span');
+                auto.className = 'coa-copy-auto-badge';
+                auto.title = 'يُنسخ تلقائياً مع هيكل M1–4';
+                auto.textContent = '✓';
+                row.appendChild(auto);
+            }
             var lbl = document.createElement('span');
             lbl.className = 'coa-copy-label';
             var codePart = n.code ? ('<span dir="ltr" class="coa-copy-code">' + coaCopyEsc(n.code) + '</span> — ') : '';
@@ -1219,31 +1299,23 @@ document.addEventListener('DOMContentLoaded', function () {
         var copyBtn = document.getElementById('coa_copy_btn');
         var copyTarget = document.getElementById('coa_copy_target');
         var selAllBtn = document.getElementById('coa_copy_sel_all');
-        var selL4Btn = document.getElementById('coa_copy_sel_l4');
         var clearBtn = document.getElementById('coa_copy_clear');
         if (!copyBtn || !copyTarget) { return; }
         coaCopyRenderTree();
-        function setChecked(predicate) {
+        function setL5Checked(checked) {
             document.querySelectorAll('.coa-copy-chk').forEach(function (cb) {
-                cb.checked = predicate(cb);
+                cb.checked = checked;
             });
             coaCopyUpdateSelCount();
         }
         if (selAllBtn) {
             selAllBtn.addEventListener('click', function () {
-                setChecked(function () { return true; });
-            });
-        }
-        if (selL4Btn) {
-            selL4Btn.addEventListener('click', function () {
-                setChecked(function (cb) {
-                    return (parseInt(cb.dataset.level, 10) || 99) <= 4;
-                });
+                setL5Checked(true);
             });
         }
         if (clearBtn) {
             clearBtn.addEventListener('click', function () {
-                setChecked(function () { return false; });
+                setL5Checked(false);
             });
         }
         copyBtn.addEventListener('click', function () {
@@ -1252,16 +1324,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('اختر الدولة الهدف');
                 return;
             }
-            var ids = [];
-            document.querySelectorAll('.coa-copy-chk:checked').forEach(function (cb) {
-                var v = parseInt(cb.value, 10) || 0;
-                if (v > 0) { ids.push(v); }
-            });
+            var ids = coaCopyCollectIdsForSubmit();
             if (ids.length === 0) {
-                alert('حدّد حساباً واحداً على الأقل');
+                alert('لا توجد حسابات للنسخ في سياق الدولة');
                 return;
             }
-            if (!confirm('نسخ ' + ids.length + ' حساب (الأسلاف تُضاف تلقائياً عند الحاجة فقط) إلى الدولة المختارة؟')) {
+            var l5Count = document.querySelectorAll('.coa-copy-chk:checked').length;
+            if (!confirm('نسخ ' + COA_COPY_MANDATORY_IDS.length + ' حساب (M1–4 كاملة)'
+                + (l5Count > 0 ? (' + ' + l5Count + ' من M5') : '')
+                + ' إلى الدولة المختارة؟')) {
                 return;
             }
             postJSON('/admin/api/country-copy/accounts.php', {
