@@ -120,6 +120,8 @@ function orange_journal_types_canonical_rows(): array
         ['OSR', 'مردود مبيعات الاونلاين', 'Online sales return'],
         ['COR', 'تكلفة مردود مبيعات الاونلاين', 'Cost of online sales return'],
         ['SAJ', 'قيد تسوية مخزون', 'Stock adjustment voucher'],
+        ['LYE', 'قيد كسب نقاط ولاء', 'Loyalty points earn'],
+        ['LYX', 'قيد انتهاء نقاط ولاء', 'Loyalty points expiry'],
     ];
 }
 
@@ -444,6 +446,8 @@ function orange_gl_entry_types_for_journal_type_code(string $code): array
         'CGR' => ['order_return_cogs'],
         'COR' => ['order_return_cogs'],
         'SAJ' => ['stock_adjustment'],
+        'LYE' => ['loyalty_earn'],
+        'LYX' => ['loyalty_expire'],
     ];
 
     return $map[$code] ?? [];
@@ -560,6 +564,8 @@ function orange_journal_type_code_from_entry_type(string $entryType): string
         'expense_adjustment' => 'PV',
         'expense_reversal' => 'PV',
         'stock_adjustment' => 'SAJ',
+        'loyalty_earn' => 'LYE',
+        'loyalty_expire' => 'LYX',
     ];
 
     return $map[$k] ?? '';
