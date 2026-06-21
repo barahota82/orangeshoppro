@@ -682,7 +682,16 @@ foreach (orange_invoice_ancillary_system_key_catalog() as $sysKey => $sysMeta) {
         }
     });
 
-    ilpResetForm();
-    ilpLoadList();
+    // admin.js مُحمّل بـ defer؛ ننتظر DOMContentLoaded حتى تكون orangeAdminCountryHeaders/postJSON معرّفة،
+    // وإلا فشل أول ilpLoadList وبقي الجدول على «جاري التحميل…» حتى أول حفظ.
+    function ilpInit() {
+        ilpResetForm();
+        ilpLoadList();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ilpInit);
+    } else {
+        ilpInit();
+    }
 })();
 </script>
