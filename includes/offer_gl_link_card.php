@@ -64,16 +64,28 @@ function orange_offer_gl_link_card_html(
         $label = (string) ($sysCatalog[$k]['label_ar'] ?? $k);
         $preset = $presetMap[$k] ?? null;
         $accId = is_array($preset) ? (int) ($preset['account_id'] ?? 0) : 0;
+        $invLabel = '';
+        if (is_array($preset)) {
+            $invLabel = trim((string) ($preset['label_ar'] ?? ''));
+            if ($invLabel === '') {
+                $invLabel = trim((string) ($preset['label_en'] ?? ''));
+            }
+        }
+        $invCell = $invLabel !== ''
+            ? $esc($invLabel)
+            : '<span style="color:#9ca3af;">—</span>';
         if ($accId > 0) {
             $acc = orange_offer_gl_link_account_label($pdo, $accId);
             $accText = $acc !== null
                 ? trim($acc['code'] . ' — ' . $acc['name'])
                 : ('#' . $accId);
             $rows[] = '<tr><td>' . $esc($label) . '</td>'
+                . '<td>' . $invCell . '</td>'
                 . '<td><strong style="color:#1b5e20;">' . $esc($accText) . '</strong></td>'
                 . '<td>بند فاتورة إضافي</td></tr>';
         } else {
             $rows[] = '<tr style="background:#fdecea;"><td>' . $esc($label) . '</td>'
+                . '<td>' . $invCell . '</td>'
                 . '<td><strong style="color:#b71c1c;">غير مربوط</strong> — '
                 . '<a href="' . $esc($presetsHref) . '">اربطه من «بنود الفاتورة الإضافية»</a></td>'
                 . '<td>بند فاتورة إضافي</td></tr>';
@@ -93,10 +105,12 @@ function orange_offer_gl_link_card_html(
                 ? trim($acc['code'] . ' — ' . $acc['name'])
                 : ('#' . $accId);
             $rows[] = '<tr><td>' . $esc($label) . '</td>'
+                . '<td><span style="color:#9ca3af;">—</span></td>'
                 . '<td><strong style="color:#1b5e20;">' . $esc($accText) . '</strong></td>'
                 . '<td>قيد تلقائي</td></tr>';
         } else {
             $rows[] = '<tr style="background:#fdecea;"><td>' . $esc($label) . '</td>'
+                . '<td><span style="color:#9ca3af;">—</span></td>'
                 . '<td><strong style="color:#b71c1c;">غير مربوط</strong> — '
                 . '<a href="' . $esc($glHref) . '">اربطه من «حسابات القيود التلقائية»</a></td>'
                 . '<td>قيد تلقائي</td></tr>';
@@ -110,9 +124,10 @@ function orange_offer_gl_link_card_html(
     $html = '<div class="card">'
         . '<h3>' . $esc($title) . '</h3>'
         . '<p class="card-hint" style="margin:0 0 0.6rem;">قيمة العرض تظهر كبند على الفاتورة وتُرحَّل على الحساب المربوط أدناه. '
+        . '«المسمى على الفاتورة» هو نص بند الفاتورة الإضافي المربوط (يُحرَّر من «بنود الفاتورة الإضافية»). '
         . 'لا يوجد أي حساب مثبّت في الكود — الربط من شاشات الحسابات. عند عدم الربط لا يُطبَّق القيد ويظهر تنبيه أحمر.</p>'
         . '<div class="table-wrap"><table><thead><tr>'
-        . '<th>البند</th><th>الحساب المربوط</th><th>النوع</th>'
+        . '<th>البند</th><th>المسمى على الفاتورة</th><th>الحساب المربوط</th><th>النوع</th>'
         . '</tr></thead><tbody>'
         . implode('', $rows)
         . '</tbody></table></div></div>';
