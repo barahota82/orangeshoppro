@@ -6,17 +6,11 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/report_line_master.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
-require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
-
-$coaAdmin = (isset($admin) && is_array($admin)) ? $admin : orange_admin_active_record($pdo);
-$coaCanCopyBetweenCountries = $coaAdmin !== null && orange_admin_has_full_access($coaAdmin);
-$coaCountries = $coaCanCopyBetweenCountries ? orange_countries_admin_list($pdo) : [];
-$coaAccountsScoped = orange_table_has_column($pdo, 'accounts', 'country_id');
 
 $ctxCountryId = orange_admin_context_country_id($pdo);
 $ctxCountryLabel = orange_admin_page_country_label($pdo);
@@ -35,64 +29,11 @@ $fyList = orange_fiscal_years_list($pdo);
 $fyDefault = $fyList !== [] ? (int) $fyList[0]['id'] : 0;
 
 $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
-$coaCopyTreePayload = orange_coa_copy_tree_payload($tree);
-$coaCopyTreeJson = json_encode($coaCopyTreePayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS);
-if ($coaCopyTreeJson === false) {
-    $coaCopyTreeJson = '[]';
-}
 ?>
 <div class="page-title">
     <h1>الدليل المحاسبي</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-
-<?php if ($coaCanCopyBetweenCountries): ?>
-<div class="card coa-copy-card" dir="rtl" style="margin-bottom:1rem;" id="coa_copy_card">
-    <h3 class="card-title">نسخ حسابات الدليل إلى دولة أخرى</h3>
-    <?php if (!$coaAccountsScoped): ?>
-    <p class="card-hint" style="margin:0;color:#92400e;">
-        النسخ بين الدول يتطلّب تفعيل عمود <code dir="ltr">country_id</code> على جدول الحسابات — أعد تحميل الصفحة بعد اكتمال الترحيل.
-    </p>
-    <?php else: ?>
-    <p class="card-hint" style="margin:0 0 0.75rem;">
-        المصدر: <strong><?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> —
-        <strong>المستويات 1–4 تُنسخ كاملة تلقائياً</strong> (هيكل الدليل). حدّد من الشجرة <strong>حسابات المستوى 5</strong> فقط — التي تختلف أسماؤها بين الدول (مثل البنوك).
-    </p>
-    <div class="form-grid" style="grid-template-columns:minmax(180px,1fr) auto;align-items:end;gap:12px;max-width:720px;margin-bottom:10px;">
-        <div>
-            <label for="coa_copy_target">الدولة الهدف</label>
-            <select id="coa_copy_target" class="admin-inp">
-                <option value="">— اختر الدولة —</option>
-                <?php foreach ($coaCountries as $c):
-                    $cid = (int) ($c['id'] ?? 0);
-                    if ($cid <= 0 || $cid === $ctxCountryId) {
-                        continue;
-                    }
-                    $lbl = trim((string) ($c['name_ar'] ?? ''));
-                    if ($lbl === '') {
-                        $lbl = trim((string) ($c['name_en'] ?? ''));
-                    }
-                    if ($lbl === '') {
-                        $lbl = orange_countries_display_code((string) ($c['code'] ?? ''));
-                    }
-                    ?>
-                <option value="<?php echo $cid; ?>"><?php echo htmlspecialchars($lbl, ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <button type="button" id="coa_copy_btn">نسخ المحدّد</button>
-    </div>
-    <div class="coa-copy-toolbar" dir="rtl">
-        <button type="button" class="btn-secondary" id="coa_copy_sel_all">تحديد كل M5</button>
-        <button type="button" class="btn-secondary" id="coa_copy_clear">إلغاء M5</button>
-        <span class="coa-copy-toolbar__hint muted" id="coa_copy_sel_count">0 محدَّد</span>
-    </div>
-    <div class="coa-copy-tree-wrap" dir="rtl">
-        <div id="coa_copy_tree_root" class="coa-copy-tree-root" role="tree" aria-label="اختيار حسابات للنسخ"></div>
-    </div>
-    <?php endif; ?>
-</div>
-<?php endif; ?>
 
 <div class="coa-shell" dir="rtl" data-fy-default="<?php echo (int) $fyDefault; ?>" data-admin-country-id="<?php echo (int) $ctxCountryId; ?>">
     <div class="coa-shell__body" dir="ltr">
@@ -313,214 +254,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var coaSetupSaveInFlight = false;
 
     var levelOrds = ['', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
-    var COA_COPY_TREE = <?php echo $coaCopyTreeJson; ?>;
-    var COA_COPY_MANDATORY_MAX_LEVEL = 4;
-
-    function coaCopyFlatten(nodes, out) {
-        out = out || [];
-        (nodes || []).forEach(function (n) {
-            if (!n || !n.id) {
-                return;
-            }
-            out.push(n);
-            if (n.children && n.children.length) {
-                coaCopyFlatten(n.children, out);
-            }
-        });
-        return out;
-    }
-
-    var COA_COPY_FLAT = coaCopyFlatten(COA_COPY_TREE, []);
-    var COA_COPY_MANDATORY_IDS = COA_COPY_FLAT.filter(function (n) {
-        return (parseInt(n.level, 10) || 99) <= COA_COPY_MANDATORY_MAX_LEVEL;
-    }).map(function (n) { return parseInt(n.id, 10) || 0; }).filter(function (id) { return id > 0; });
-
-    function coaCopyIsMandatoryLevel(level) {
-        return (parseInt(level, 10) || 99) <= COA_COPY_MANDATORY_MAX_LEVEL;
-    }
-
-    function coaCopyIsSelectableLevel(level) {
-        return !coaCopyIsMandatoryLevel(level);
-    }
-
-    function coaCopyEsc(s) {
-        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-    }
-
-    function coaCopyUpdateExpandBtn(btn, expanded) {
-        if (!btn) {
-            return;
-        }
-        btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        btn.textContent = expanded ? '\u25BC' : '\u25C0';
-        btn.title = expanded ? 'طي الفرع' : 'فتح الفرع';
-    }
-
-    function coaCopyDescendantCheckboxes(itemLi) {
-        var childList = itemLi ? itemLi.querySelector(':scope > .coa-copy-tree-list') : null;
-        if (!childList) {
-            return [];
-        }
-        return Array.prototype.slice.call(childList.querySelectorAll('.coa-copy-chk'));
-    }
-
-    function coaCopyAncestorCheckboxes(itemLi) {
-        var out = [];
-        var cur = itemLi;
-        while (cur) {
-            var parentUl = cur.parentElement;
-            if (!parentUl || !parentUl.classList.contains('coa-copy-tree-list')) {
-                break;
-            }
-            var parentLi = parentUl.closest('.coa-copy-item');
-            if (!parentLi) {
-                break;
-            }
-            var cb = parentLi.querySelector(':scope > .coa-copy-row > .coa-copy-chk');
-            if (cb) {
-                out.push(cb);
-            }
-            cur = parentLi;
-        }
-        return out;
-    }
-
-    function coaCopyUpdateSelCount() {
-        var el = document.getElementById('coa_copy_sel_count');
-        if (!el) {
-            return;
-        }
-        var l5 = document.querySelectorAll('.coa-copy-chk:checked').length;
-        el.textContent = 'M1–4: ' + COA_COPY_MANDATORY_IDS.length + ' تلقائي | M5: ' + l5 + ' محدَّد';
-    }
-
-    function coaCopyOnCheckboxChange(ev) {
-        var cb = ev.target;
-        if (!cb || !cb.classList || !cb.classList.contains('coa-copy-chk')) {
-            return;
-        }
-        var li = cb.closest('.coa-copy-item');
-        if (!li) {
-            coaCopyUpdateSelCount();
-            return;
-        }
-        var checked = cb.checked;
-        if (checked) {
-            coaCopyAncestorCheckboxes(li).forEach(function (c) {
-                c.checked = true;
-            });
-        }
-        coaCopyDescendantCheckboxes(li).forEach(function (c) {
-            c.checked = checked;
-        });
-        coaCopyUpdateSelCount();
-    }
-
-    function coaCopyCollectIdsForSubmit() {
-        var seen = {};
-        var ids = [];
-        COA_COPY_MANDATORY_IDS.forEach(function (id) {
-            if (id > 0 && !seen[id]) {
-                seen[id] = true;
-                ids.push(id);
-            }
-        });
-        document.querySelectorAll('.coa-copy-chk:checked').forEach(function (cb) {
-            var v = parseInt(cb.value, 10) || 0;
-            if (v > 0 && !seen[v]) {
-                seen[v] = true;
-                ids.push(v);
-            }
-        });
-        return ids;
-    }
-
-    function coaCopyBuildList(nodes, depth) {
-        depth = typeof depth === 'number' ? depth : 0;
-        var ul = document.createElement('ul');
-        ul.className = 'coa-copy-tree-list';
-        (nodes || []).forEach(function (n) {
-            if (!n || !n.id) {
-                return;
-            }
-            var li = document.createElement('li');
-            li.className = 'coa-copy-item' + (depth === 0 ? ' coa-copy-item--root' : '');
-            li.setAttribute('role', 'treeitem');
-            li.dataset.id = String(n.id);
-            li.dataset.level = String(n.level || 1);
-            var hasKids = n.children && n.children.length;
-            var row = document.createElement('div');
-            row.className = 'coa-copy-row' + (coaCopyIsMandatoryLevel(n.level) ? ' coa-copy-row--mandatory' : '');
-            if (hasKids) {
-                var btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'coa-copy-expand';
-                coaCopyUpdateExpandBtn(btn, false);
-                btn.addEventListener('click', function (ev) {
-                    ev.preventDefault();
-                    ev.stopPropagation();
-                    var childUl = li.querySelector(':scope > .coa-copy-tree-list');
-                    if (!childUl) {
-                        return;
-                    }
-                    var open = childUl.hidden;
-                    childUl.hidden = !open;
-                    coaCopyUpdateExpandBtn(btn, open);
-                    li.setAttribute('aria-expanded', open ? 'true' : 'false');
-                });
-                row.appendChild(btn);
-                li.setAttribute('aria-expanded', 'false');
-            } else {
-                var sp = document.createElement('span');
-                sp.className = 'coa-copy-expand coa-copy-expand--spacer';
-                sp.setAttribute('aria-hidden', 'true');
-                row.appendChild(sp);
-            }
-            if (coaCopyIsSelectableLevel(n.level)) {
-                var cb = document.createElement('input');
-                cb.type = 'checkbox';
-                cb.className = 'coa-copy-chk';
-                cb.value = String(n.id);
-                cb.dataset.level = String(n.level || 1);
-                cb.addEventListener('change', coaCopyOnCheckboxChange);
-                row.appendChild(cb);
-            } else {
-                var auto = document.createElement('span');
-                auto.className = 'coa-copy-auto-badge';
-                auto.title = 'يُنسخ تلقائياً مع هيكل M1–4';
-                auto.textContent = '✓';
-                row.appendChild(auto);
-            }
-            var lbl = document.createElement('span');
-            lbl.className = 'coa-copy-label';
-            var codePart = n.code ? ('<span dir="ltr" class="coa-copy-code">' + coaCopyEsc(n.code) + '</span> — ') : '';
-            lbl.innerHTML = codePart + coaCopyEsc(n.name || '')
-                + ' <small class="muted">(م.' + (n.level || 1) + (n.is_group ? '، رئيسي' : '') + ')</small>';
-            row.appendChild(lbl);
-            li.appendChild(row);
-            if (hasKids) {
-                var childUl = coaCopyBuildList(n.children, depth + 1);
-                childUl.hidden = true;
-                li.appendChild(childUl);
-            }
-            ul.appendChild(li);
-        });
-        return ul;
-    }
-
-    function coaCopyRenderTree() {
-        var root = document.getElementById('coa_copy_tree_root');
-        if (!root) {
-            return;
-        }
-        root.innerHTML = '';
-        if (!COA_COPY_TREE || !COA_COPY_TREE.length) {
-            root.innerHTML = '<p class="muted">لا توجد حسابات في سياق الدولة الحالي.</p>';
-            return;
-        }
-        root.appendChild(coaCopyBuildList(COA_COPY_TREE));
-        coaCopyUpdateSelCount();
-    }
 
     /** ملء حقول التصنيف من عُقدة الشجرة (الحساب نفسه أو الأب عند «إضافة»). */
     function coaApplyDatasetToMappingFields(li) {
@@ -1294,54 +1027,5 @@ document.addEventListener('DOMContentLoaded', function () {
         updatePreviewFromParent();
         updateStatementLink();
     }
-
-    (function initCoaCopyPanel() {
-        var copyBtn = document.getElementById('coa_copy_btn');
-        var copyTarget = document.getElementById('coa_copy_target');
-        var selAllBtn = document.getElementById('coa_copy_sel_all');
-        var clearBtn = document.getElementById('coa_copy_clear');
-        if (!copyBtn || !copyTarget) { return; }
-        coaCopyRenderTree();
-        function setL5Checked(checked) {
-            document.querySelectorAll('.coa-copy-chk').forEach(function (cb) {
-                cb.checked = checked;
-            });
-            coaCopyUpdateSelCount();
-        }
-        if (selAllBtn) {
-            selAllBtn.addEventListener('click', function () {
-                setL5Checked(true);
-            });
-        }
-        if (clearBtn) {
-            clearBtn.addEventListener('click', function () {
-                setL5Checked(false);
-            });
-        }
-        copyBtn.addEventListener('click', function () {
-            var targetId = parseInt(copyTarget.value, 10) || 0;
-            if (targetId <= 0) {
-                alert('اختر الدولة الهدف');
-                return;
-            }
-            var ids = coaCopyCollectIdsForSubmit();
-            if (ids.length === 0) {
-                alert('لا توجد حسابات للنسخ في سياق الدولة');
-                return;
-            }
-            var l5Count = document.querySelectorAll('.coa-copy-chk:checked').length;
-            if (!confirm('نسخ ' + COA_COPY_MANDATORY_IDS.length + ' حساب (M1–4 كاملة)'
-                + (l5Count > 0 ? (' + ' + l5Count + ' من M5') : '')
-                + ' إلى الدولة المختارة؟')) {
-                return;
-            }
-            postJSON('/admin/api/country-copy/accounts.php', {
-                target_country_id: targetId,
-                account_ids: ids
-            }).then(function (r) {
-                alert(r.message || (r.success ? 'تم' : 'فشل'));
-            }).catch(function (e) { alert(e.message || String(e)); });
-        });
-    })();
 });
 </script>

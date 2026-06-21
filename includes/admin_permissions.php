@@ -144,6 +144,7 @@ function orange_admin_page_resource(string $page): string
         'cart_combo_promotions' => 'settings',
         'channels' => 'settings',
         'countries' => 'settings',
+        'country_screen_copy' => 'settings',
         'company_documents' => 'settings',
         'admin_users' => 'admin_users',
     ];
@@ -329,6 +330,7 @@ function orange_admin_api_page_from_script(): ?string
         'cart_combo_promotions' => 'cart_combo_promotions',
         'storefront' => 'storefront_hero',
         'countries' => 'countries',
+        'country-screen-copy' => 'country_screen_copy',
         'admins' => 'admin_users',
     ];
 
@@ -945,6 +947,9 @@ function orange_admin_nav_visible(array $admin, PDO $pdo, string $page): bool
     }
     if ($page === 'countries') {
         return orange_admin_can_manage_countries($admin);
+    }
+    if ($page === 'country_screen_copy') {
+        return orange_admin_has_full_access($admin);
     }
     return orange_admin_may_page($admin, $pdo, $page, 'view');
 }

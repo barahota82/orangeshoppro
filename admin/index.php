@@ -15,6 +15,7 @@ $allowed = [
     'storefront_hero',
     'storefront_merge_requests',
     'countries',
+    'country_screen_copy',
     'delivery_areas',
     'cart_promotions',
     'delivery_promotions',

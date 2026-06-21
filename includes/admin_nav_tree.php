@@ -202,6 +202,7 @@ function orange_admin_permission_mega_sections(): array
                     'title' => 'الأسواق (مشرف عام)',
                     'pages' => [
                         ['page' => 'countries', 'label' => 'الدول'],
+                        ['page' => 'country_screen_copy', 'label' => 'نسخ إعدادات بين الدول'],
                         ['page' => 'admin_users', 'label' => 'المستخدمون والصلاحيات'],
                     ],
                 ],

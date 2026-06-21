@@ -12,11 +12,6 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 orange_catalog_ensure_journal_types_country_scope($pdo);
 
-/** @var array<string, mixed>|null $admin — من admin/index.php عند التضمين */
-$jtAdmin = (isset($admin) && is_array($admin)) ? $admin : orange_admin_active_record($pdo);
-$jtCanCopyBetweenCountries = $jtAdmin !== null && orange_admin_has_full_access($jtAdmin);
-$jtCountries = $jtCanCopyBetweenCountries ? orange_countries_admin_list($pdo) : [];
-
 $jtCountryId = orange_admin_context_country_id($pdo);
 $jtCountryRow = orange_country_row_by_id($pdo, $jtCountryId, false);
 $jtCountryLabel = trim((string) ($jtCountryRow['name_ar'] ?? ''));
@@ -43,46 +38,6 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
     </p>
     <?php endif; ?>
 
-    <?php if ($jtCanCopyBetweenCountries): ?>
-    <div class="card" style="margin:0 0 1rem;" id="jt_copy_card">
-        <h3 class="card-title">نسخ أنواع اليوميات إلى دولة أخرى</h3>
-        <?php if (!$jtScoped): ?>
-        <p class="card-hint" style="margin:0;color:#92400e;">
-            النسخ بين الدول يتطلّب تفعيل عمود <code dir="ltr">country_id</code> على جدول أنواع اليوميات — أعد تحميل الصفحة بعد اكتمال الترحيل.
-        </p>
-        <?php else: ?>
-        <p class="card-hint" style="margin:0 0 0.75rem;">
-            المصدر: <strong><?php echo htmlspecialchars($jtCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> —
-            حدّد الصفوف بالمربعات في الجدول أدناه ثم اختر الدولة الهدف. إن وُجد نفس الكود في الهدف يُحدَّث الاسم فقط.
-        </p>
-        <div class="form-grid" style="grid-template-columns:minmax(180px,1fr) auto;align-items:end;gap:12px;max-width:640px;">
-            <div>
-                <label for="jt_copy_target">الدولة الهدف</label>
-                <select id="jt_copy_target" class="admin-inp">
-                    <option value="">— اختر الدولة —</option>
-                    <?php foreach ($jtCountries as $c):
-                        $cid = (int) ($c['id'] ?? 0);
-                        if ($cid <= 0 || $cid === $jtCountryId) {
-                            continue;
-                        }
-                        $lbl = trim((string) ($c['name_ar'] ?? ''));
-                        if ($lbl === '') {
-                            $lbl = trim((string) ($c['name_en'] ?? ''));
-                        }
-                        if ($lbl === '') {
-                            $lbl = orange_countries_display_code((string) ($c['code'] ?? ''));
-                        }
-                        ?>
-                    <option value="<?php echo $cid; ?>"><?php echo htmlspecialchars($lbl, ENT_QUOTES, 'UTF-8'); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <button type="button" id="jt_copy_btn">نسخ المحدّد</button>
-        </div>
-        <?php endif; ?>
-    </div>
-    <?php endif; ?>
-
     <div class="card fy-years-card fy-print-area">
         <?php if ($jtShowEmptyHint): ?>
             <p class="card-hint" style="margin:0 0 0.75rem;">
@@ -99,11 +54,6 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
             <table class="fy-years-table">
                 <thead>
                     <tr>
-                        <?php if ($jtCanCopyBetweenCountries): ?>
-                        <th class="fy-col-check" style="width:2.5rem;text-align:center;" title="تحديد للنسخ">
-                            <input type="checkbox" id="jt_copy_all" aria-label="تحديد الكل">
-                        </th>
-                        <?php endif; ?>
                         <th class="fy-col-num">مسلسل</th>
                         <th class="fy-col-jt-code">ترميز الكود</th>
                         <th class="fy-col-jt-name-ar">الاسم عربي</th>
@@ -122,13 +72,6 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
                         $nameEn = (string) ($t['name_en'] ?? '');
                         ?>
                     <tr data-jt-row data-id="<?php echo $id; ?>">
-                        <?php if ($jtCanCopyBetweenCountries): ?>
-                        <td class="fy-col-check" style="text-align:center;">
-                            <?php if ($id > 0): ?>
-                            <input type="checkbox" class="jt-copy-chk" value="<?php echo $id; ?>" aria-label="تحديد للنسخ">
-                            <?php endif; ?>
-                        </td>
-                        <?php endif; ?>
                         <td class="fy-col-num"><span class="jt-serial"><?php echo $serial; ?></span></td>
                         <td class="fy-col-jt-code">
                             <input type="text" class="jt-inp-code" dir="ltr" maxlength="32" autocomplete="off" value="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>" aria-label="ترميز الكود">
@@ -159,10 +102,6 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
 <script>
 (function () {
     var jtCanAutoSeed = <?php echo $jtCanAutoSeed ? 'true' : 'false'; ?>;
-    var jtIsSuper = <?php echo $jtCanCopyBetweenCountries ? 'true' : 'false'; ?>;
-    function jtCopyColHtml() {
-        return jtIsSuper ? '<td class="fy-col-check" style="text-align:center;"></td>' : '';
-    }
     function jtNormalizeCode(s) {
         s = String(s || '').trim().toUpperCase().replace(/\s+/g, '');
         return s.replace(/[^A-Z0-9]/g, '');
@@ -182,7 +121,6 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
             tr.setAttribute('data-jt-row', '');
             tr.setAttribute('data-id', '0');
             tr.innerHTML =
-                jtCopyColHtml() +
                 '<td class="fy-col-num"><span class="jt-serial"></span></td>' +
                 '<td class="fy-col-jt-code"><input type="text" class="jt-inp-code" dir="ltr" maxlength="32" autocomplete="off" value="OBV" aria-label="ترميز الكود"></td>' +
                 '<td class="fy-col-jt-name-ar"><input type="text" class="jt-inp-name-ar" maxlength="255" value="سند رصيد افتتاحي" aria-label="الاسم عربي"></td>' +
@@ -268,7 +206,6 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
             tr.setAttribute('data-jt-row', '');
             tr.setAttribute('data-id', '0');
             tr.innerHTML =
-                jtCopyColHtml() +
                 '<td class="fy-col-num"><span class="jt-serial"></span></td>' +
                 '<td class="fy-col-jt-code"><input type="text" class="jt-inp-code" dir="ltr" maxlength="32" autocomplete="off" value="" aria-label="ترميز الكود"></td>' +
                 '<td class="fy-col-jt-name-ar"><input type="text" class="jt-inp-name-ar" maxlength="255" value="" aria-label="الاسم عربي"></td>' +
@@ -311,46 +248,6 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
         btnPrint.addEventListener('click', function () {
             window.print();
         });
-
-        if (jtIsSuper) {
-            var copyAll = document.getElementById('jt_copy_all');
-            var copyBtn = document.getElementById('jt_copy_btn');
-            var copyTarget = document.getElementById('jt_copy_target');
-            if (copyAll) {
-                copyAll.addEventListener('change', function () {
-                    tbody.querySelectorAll('.jt-copy-chk').forEach(function (cb) {
-                        cb.checked = copyAll.checked;
-                    });
-                });
-            }
-            if (copyBtn && copyTarget) {
-                copyBtn.addEventListener('click', function () {
-                    var targetId = parseInt(copyTarget.value, 10) || 0;
-                    if (targetId <= 0) {
-                        alert('اختر الدولة الهدف');
-                        return;
-                    }
-                    var ids = [];
-                    tbody.querySelectorAll('.jt-copy-chk:checked').forEach(function (cb) {
-                        var v = parseInt(cb.value, 10) || 0;
-                        if (v > 0) { ids.push(v); }
-                    });
-                    if (ids.length === 0) {
-                        alert('حدّد نوعاً واحداً على الأقل');
-                        return;
-                    }
-                    if (!confirm('نسخ ' + ids.length + ' نوع يومية إلى الدولة المختارة؟')) {
-                        return;
-                    }
-                    postJSON('/admin/api/country-copy/journal-types.php', {
-                        target_country_id: targetId,
-                        journal_type_ids: ids
-                    }).then(function (r) {
-                        alert(r.message || (r.success ? 'تم' : 'فشل'));
-                    }).catch(function (e) { alert(e.message || String(e)); });
-                });
-            }
-        }
 
         renumberRows();
     }
