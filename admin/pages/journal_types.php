@@ -12,8 +12,8 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 orange_catalog_ensure_journal_types_country_scope($pdo);
 
-$jtAdmin = current_admin();
-// نفس شرط مبدّل الدول في الهيدر (orange_admin_has_full_access) — ليس is_superuser وحده.
+/** @var array<string, mixed>|null $admin — من admin/index.php عند التضمين */
+$jtAdmin = (isset($admin) && is_array($admin)) ? $admin : orange_admin_active_record($pdo);
 $jtCanCopyBetweenCountries = $jtAdmin !== null && orange_admin_has_full_access($jtAdmin);
 $jtCountries = $jtCanCopyBetweenCountries ? orange_countries_admin_list($pdo) : [];
 
@@ -41,6 +41,46 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
     <p class="card-hint" style="margin:0.35rem 0 0.75rem;color:#92400e;">
         تنبيه: عمود <code dir="ltr">country_id</code> غير مفعّل بعد على جدول أنواع اليوميات — افتح أي صفحة أدmin لإكمال الترحيل، أو تحقق من سجل PHP.
     </p>
+    <?php endif; ?>
+
+    <?php if ($jtCanCopyBetweenCountries): ?>
+    <div class="card" style="margin:0 0 1rem;" id="jt_copy_card">
+        <h3 class="card-title">نسخ أنواع اليوميات إلى دولة أخرى</h3>
+        <?php if (!$jtScoped): ?>
+        <p class="card-hint" style="margin:0;color:#92400e;">
+            النسخ بين الدول يتطلّب تفعيل عمود <code dir="ltr">country_id</code> على جدول أنواع اليوميات — أعد تحميل الصفحة بعد اكتمال الترحيل.
+        </p>
+        <?php else: ?>
+        <p class="card-hint" style="margin:0 0 0.75rem;">
+            المصدر: <strong><?php echo htmlspecialchars($jtCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> —
+            حدّد الصفوف بالمربعات في الجدول أدناه ثم اختر الدولة الهدف. إن وُجد نفس الكود في الهدف يُحدَّث الاسم فقط.
+        </p>
+        <div class="form-grid" style="grid-template-columns:minmax(180px,1fr) auto;align-items:end;gap:12px;max-width:640px;">
+            <div>
+                <label for="jt_copy_target">الدولة الهدف</label>
+                <select id="jt_copy_target" class="admin-inp">
+                    <option value="">— اختر الدولة —</option>
+                    <?php foreach ($jtCountries as $c):
+                        $cid = (int) ($c['id'] ?? 0);
+                        if ($cid <= 0 || $cid === $jtCountryId) {
+                            continue;
+                        }
+                        $lbl = trim((string) ($c['name_ar'] ?? ''));
+                        if ($lbl === '') {
+                            $lbl = trim((string) ($c['name_en'] ?? ''));
+                        }
+                        if ($lbl === '') {
+                            $lbl = orange_countries_display_code((string) ($c['code'] ?? ''));
+                        }
+                        ?>
+                    <option value="<?php echo $cid; ?>"><?php echo htmlspecialchars($lbl, ENT_QUOTES, 'UTF-8'); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <button type="button" id="jt_copy_btn">نسخ المحدّد</button>
+        </div>
+        <?php endif; ?>
+    </div>
     <?php endif; ?>
 
     <div class="card fy-years-card fy-print-area">
@@ -114,40 +154,6 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
             <button type="button" class="btn-secondary" id="jt_btn_print">طباعة</button>
         </div>
     </div>
-
-    <?php if ($jtCanCopyBetweenCountries && $jtScoped): ?>
-    <div class="card" style="margin-top:1rem;" id="jt_copy_card">
-        <h3 class="card-title">نسخ أنواع اليوميات إلى دولة أخرى</h3>
-        <p class="card-hint" style="margin:0 0 0.75rem;">
-            المصدر: <strong><?php echo htmlspecialchars($jtCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> —
-            حدّد الصفوف بالمربعات ثم اختر الدولة الهدف. إن وُجد نفس الكود في الهدف يُحدَّث الاسم فقط.
-        </p>
-        <div class="form-grid" style="grid-template-columns:minmax(180px,1fr) auto;align-items:end;gap:12px;max-width:640px;">
-            <div>
-                <label for="jt_copy_target">الدولة الهدف</label>
-                <select id="jt_copy_target" class="admin-inp">
-                    <option value="">— اختر الدولة —</option>
-                    <?php foreach ($jtCountries as $c):
-                        $cid = (int) ($c['id'] ?? 0);
-                        if ($cid <= 0 || $cid === $jtCountryId) {
-                            continue;
-                        }
-                        $lbl = trim((string) ($c['name_ar'] ?? ''));
-                        if ($lbl === '') {
-                            $lbl = trim((string) ($c['name_en'] ?? ''));
-                        }
-                        if ($lbl === '') {
-                            $lbl = orange_countries_display_code((string) ($c['code'] ?? ''));
-                        }
-                        ?>
-                    <option value="<?php echo $cid; ?>"><?php echo htmlspecialchars($lbl, ENT_QUOTES, 'UTF-8'); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <button type="button" id="jt_copy_btn">نسخ المحدّد</button>
-        </div>
-    </div>
-    <?php endif; ?>
 </div>
 
 <script>

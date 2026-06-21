@@ -10,7 +10,7 @@ require_once __DIR__ . '/../../../includes/country_selective_copy.php';
 require_admin_api();
 
 try {
-    $admin = current_admin();
+    $admin = orange_admin_active_record($pdo);
     if ($admin === null || !orange_admin_has_full_access($admin)) {
         json_response(['success' => false, 'message' => 'نسخ بين الدول — للمشرف العام (وصول كامل / مبدّل الدول) فقط'], 403);
     }

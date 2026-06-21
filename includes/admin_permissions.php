@@ -795,6 +795,40 @@ function orange_admin_is_superuser(array $admin): bool
 }
 
 /**
+ * سجل الأدmin الكامل (is_superuser، country_id، …) — لا تستخدم current_admin() للصلاحيات.
+ *
+ * @return array<string, mixed>|null
+ */
+function orange_admin_active_record(PDO $pdo): ?array
+{
+    if (isset($GLOBALS['orange_admin_active_record']) && is_array($GLOBALS['orange_admin_active_record'])) {
+        return $GLOBALS['orange_admin_active_record'];
+    }
+    $id = (int) ($_SESSION['admin_id'] ?? 0);
+    if ($id <= 0) {
+        return null;
+    }
+    try {
+        $st = $pdo->prepare('SELECT * FROM admins WHERE id = ? AND is_active = 1 LIMIT 1');
+        $st->execute([$id]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+        $GLOBALS['orange_admin_active_record'] = $row;
+        orange_admin_sync_session_country_lock($row);
+
+        return $row;
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_admin_active_record: ' . $e->getMessage());
+        }
+
+        return null;
+    }
+}
+
+/**
  * مشرف عام — وصول كامل: superuser أو admins.country_id فارغ (بند 13.8).
  * فريق دولة (country_id محدد + غير superuser) لا يُعامَل كمشرف عام.
  * يعتمد على سجل admins فقط — لا على admin_country_lock في الجلسة.

@@ -2828,6 +2828,7 @@ function require_admin_page(): array {
     }
     require_once __DIR__ . '/includes/admin_permissions.php';
     orange_admin_sync_session_country_lock($admin);
+    $GLOBALS['orange_admin_active_record'] = $admin;
 
     return $admin;
 }
@@ -2846,6 +2847,7 @@ function require_admin_api(): void {
     require_once __DIR__ . '/includes/catalog_schema.php';
     require_once __DIR__ . '/includes/admin_permissions.php';
     orange_admin_sync_session_country_lock($admin);
+    $GLOBALS['orange_admin_active_record'] = $admin;
     require_once __DIR__ . '/includes/countries.php';
     if (function_exists('orange_table_exists') && orange_table_exists($pdo, 'countries')) {
         orange_admin_bootstrap_country_context($pdo);
