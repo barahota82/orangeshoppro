@@ -411,6 +411,8 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                         ['page' => 'partner_customer_receipt', 'href' => '/admin/index.php?page=partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'partner_supplier_payment', 'href' => '/admin/index.php?page=partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'stock_adjustment_voucher', 'href' => '/admin/index.php?page=stock_adjustment_voucher', 'label' => 'قيد تسوية مخزون', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'loyalty_earn_voucher', 'href' => '/admin/index.php?page=loyalty_earn_voucher', 'label' => 'قيد كسب نقاط ولاء', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'loyalty_expire_voucher', 'href' => '/admin/index.php?page=loyalty_expire_voucher', 'label' => 'قيد انتهاء نقاط ولاء', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'bank_accounts', 'href' => '/admin/index.php?page=bank_accounts', 'label' => 'الحسابات البنكية (دفع مباشر)', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'payment_review', 'href' => '/admin/index.php?page=payment_review', 'label' => 'مراجعة الدفعات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'bank_reconciliation', 'href' => '/admin/index.php?page=bank_reconciliation', 'label' => 'تسوية البنك', 'class' => 'admin-nav-sub', 'sub' => true],

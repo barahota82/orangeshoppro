@@ -20,7 +20,7 @@ require_admin_api();
  */
 function orange_journal_manage_ui_entry_types(): array
 {
-    return ['manual', 'other_voucher', 'receipt_voucher', 'payment_voucher'];
+    return ['manual', 'other_voucher', 'receipt_voucher', 'payment_voucher', 'loyalty_earn', 'loyalty_expire'];
 }
 
 /**

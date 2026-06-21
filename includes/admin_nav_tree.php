@@ -51,6 +51,8 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة'],
                         ['page' => 'partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة'],
                         ['page' => 'stock_adjustment_voucher', 'label' => 'قيد تسوية مخزون'],
+                        ['page' => 'loyalty_earn_voucher', 'label' => 'قيد كسب نقاط ولاء'],
+                        ['page' => 'loyalty_expire_voucher', 'label' => 'قيد انتهاء نقاط ولاء'],
                         ['page' => 'bank_accounts', 'label' => 'الحسابات البنكية (دفع مباشر)'],
                         ['page' => 'payment_review', 'label' => 'مراجعة الدفعات'],
                         ['page' => 'bank_reconciliation', 'label' => 'تسوية البنك'],
@@ -374,6 +376,8 @@ function orange_admin_permission_actions_for_page(string $page): array
         'opening_stock_balances',
         'partner_customer_receipt',
         'partner_supplier_payment',
+        'loyalty_earn_voucher',
+        'loyalty_expire_voucher',
     ];
 
     static $viewEditNoDelete = [

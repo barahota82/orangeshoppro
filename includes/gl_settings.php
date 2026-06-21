@@ -1032,6 +1032,8 @@ function orange_gl_entry_type_labels_map(): array
         'order_return_sale' => 'مردود مبيعات',
         'order_return_cogs' => 'تكلفة مردود مبيعات',
         'stock_adjustment' => 'قيد تسوية مخزون',
+        'loyalty_earn' => 'قيد كسب نقاط ولاء',
+        'loyalty_expire' => 'قيد انتهاء نقاط ولاء',
         'migrated' => 'مرحّل من نظام سابق',
     ];
 }
