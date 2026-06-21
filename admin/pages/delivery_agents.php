@@ -25,7 +25,7 @@ $nextSort = $hasTable && $adminCountryId > 0 ? orange_delivery_agents_next_sort_
 <div class="card"><div class="alert-error">جدول <code>delivery_agents</code> غير جاهز.</div></div>
 <?php else: ?>
 
-<div class="card">
+<div class="card" id="dag_form_card">
     <h3>إضافة / تعديل مندوب</h3>
     <input type="hidden" id="dag_id" value="0">
     <input type="hidden" id="dag_country_id" value="<?php echo (int) $adminCountryId; ?>">
@@ -133,11 +133,25 @@ function fillDeliveryAgentForm(row) {
     }
 }
 
+function dagScrollToForm() {
+    var card = document.getElementById('dag_form_card');
+    if (card && typeof card.scrollIntoView === 'function') {
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    var nameEl = document.getElementById('dag_name_ar');
+    if (nameEl) {
+        setTimeout(function () { nameEl.focus(); }, 350);
+    }
+}
+
 document.querySelectorAll('[data-dag-edit]').forEach(function (btn) {
     btn.addEventListener('click', function () {
         var id = parseInt(btn.getAttribute('data-dag-edit'), 10);
         var row = dagAgentsJson.find(function (r) { return parseInt(r.id, 10) === id; });
-        if (row) fillDeliveryAgentForm(row);
+        if (row) {
+            fillDeliveryAgentForm(row);
+            dagScrollToForm();
+        }
     });
 });
 
