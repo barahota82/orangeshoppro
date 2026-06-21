@@ -110,7 +110,7 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
                         </tr>
                     </thead>
                     <tbody id="el_lock_tbody">
-                        <tr><td colspan="7" class="gl-posting-empty-cell">اضغط «تحديث القائمة».</td></tr>
+                        <tr><td colspan="7" class="gl-posting-empty-cell"></td></tr>
                     </tbody>
                 </table>
             </div>
@@ -136,7 +136,7 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
                         </tr>
                     </thead>
                     <tbody id="el_preview_tbody">
-                        <tr><td colspan="6" class="gl-posting-empty-cell gl-posting-empty-cell--ledger">انقر صفاً للمعاينة.</td></tr>
+                        <tr><td colspan="6" class="gl-posting-empty-cell gl-posting-empty-cell--ledger"></td></tr>
                     </tbody>
                 </table>
             </div>
@@ -245,7 +245,7 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
         lastFilterInfo = j.filter || null;
         renderRows(j.rows || []);
         document.getElementById('el_preview_tbody').innerHTML =
-            '<tr><td colspan="6" class="gl-posting-empty-cell gl-posting-empty-cell--ledger">انقر صفاً للمعاينة.</td></tr>';
+            '<tr><td colspan="6" class="gl-posting-empty-cell gl-posting-empty-cell--ledger"></td></tr>';
     }
     async function loadPreview(id) {
         var tb = document.getElementById('el_preview_tbody');
