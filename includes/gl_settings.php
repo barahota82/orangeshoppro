@@ -252,39 +252,35 @@ function orange_gl_journal_type_rule_for_terms(PDO $pdo, int $journalTypeId, str
  * خريطة افتراضية لقسم «ربط نوع اليومية» — تُمرَّر للواجهة لملء المدين/الدائن عند اختيار النوع.
  *
  * مفاتيح الصف: payment_terms (فارغ = قياسي). الحقول الاختيارية:
- * - debit_key / credit_key — مفتاح بند القسم ١
- * - debit_auto_inventory / credit_auto_inventory — إخفاء القائمة وعرض «مدين/دائن مخزن»
- * - debit_from_supplier / credit_from_supplier — ذمة المورد من المستند
+ * - debit_key / credit_key — مفتاح بند القسم ١ (يُختار من قائمة القسم ١)
+ * - debit_from_supplier / credit_from_supplier — ذمة المورد من المستند (بدون قائمة؛ لا بند في القسم ١)
  *
  * @return array<string, array<string, array<string, bool|string>>>
  */
 function orange_gl_journal_type_rule_ui_defaults(): array
 {
-    $invDeb = ['debit_key' => 'inventory', 'debit_auto_inventory' => true];
-    $invCred = ['credit_key' => 'inventory', 'credit_auto_inventory' => true];
-
     return [
         'PIN' => [
-            'cash' => array_merge($invDeb, ['credit_key' => 'cash']),
-            'credit' => array_merge($invDeb, ['credit_from_supplier' => true]),
+            'cash' => ['debit_key' => 'inventory', 'credit_key' => 'cash'],
+            'credit' => ['debit_key' => 'inventory', 'credit_from_supplier' => true],
         ],
         'PDN' => [
-            'cash' => array_merge($invCred, ['debit_key' => 'cash']),
-            'credit' => array_merge($invCred, ['debit_from_supplier' => true]),
+            'cash' => ['debit_key' => 'cash', 'credit_key' => 'inventory'],
+            'credit' => ['debit_from_supplier' => true, 'credit_key' => 'inventory'],
         ],
         'SAJ' => [
-            'gain' => array_merge($invDeb, ['credit_key' => 'stock_adjustment_gain']),
-            'loss' => array_merge($invCred, ['debit_key' => 'stock_adjustment_loss']),
+            'gain' => ['debit_key' => 'inventory', 'credit_key' => 'stock_adjustment_gain'],
+            'loss' => ['debit_key' => 'stock_adjustment_loss', 'credit_key' => 'inventory'],
         ],
         'CSI' => ['' => ['debit_key' => 'ar_cash', 'credit_key' => 'sales_revenue_cash']],
         'SIN' => ['' => ['debit_key' => 'ar_credit', 'credit_key' => 'sales_revenue_credit']],
         'OSI' => ['' => ['debit_key' => 'ar_cash', 'credit_key' => 'sales_revenue_online']],
-        'CGT' => ['' => array_merge(['debit_key' => 'cogs'], $invCred)],
-        'CGC' => ['' => array_merge(['debit_key' => 'cogs'], $invCred)],
-        'CGO' => ['' => array_merge(['debit_key' => 'cogs'], $invCred)],
-        'CSR' => ['' => array_merge($invDeb, ['credit_key' => 'cogs_returns'])],
-        'CGR' => ['' => array_merge($invDeb, ['credit_key' => 'cogs_returns'])],
-        'COR' => ['' => array_merge($invDeb, ['credit_key' => 'cogs_returns'])],
+        'CGT' => ['' => ['debit_key' => 'cogs', 'credit_key' => 'inventory']],
+        'CGC' => ['' => ['debit_key' => 'cogs', 'credit_key' => 'inventory']],
+        'CGO' => ['' => ['debit_key' => 'cogs', 'credit_key' => 'inventory']],
+        'CSR' => ['' => ['debit_key' => 'inventory', 'credit_key' => 'cogs_returns']],
+        'CGR' => ['' => ['debit_key' => 'inventory', 'credit_key' => 'cogs_returns']],
+        'COR' => ['' => ['debit_key' => 'inventory', 'credit_key' => 'cogs_returns']],
         'SCR' => ['' => ['debit_key' => 'sales_returns_cash', 'credit_key' => 'cash']],
         'SRR' => ['' => ['debit_key' => 'sales_returns_credit', 'credit_key' => 'ar_credit']],
         'OSR' => ['' => ['debit_key' => 'sales_returns_online', 'credit_key' => 'cash']],

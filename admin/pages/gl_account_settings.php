@@ -172,7 +172,7 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
 
 <div class="card gl-auto-form-card" style="margin-top:1rem;">
         <h3 class="card-title">٢ — ربط نوع اليومية بحساب مدين وحساب دائن</h3>
-        <p class="card-hint" style="margin:0 0 0.65rem;line-height:1.55;">عند اختيار نوع اليومية يُملأ المدين والدائن تلقائياً من البنود المربوطة في القسم ١. المخزون يظهر «مدين مخزن» أو «دائن مخزن» دون قائمة؛ ذمة المورد «من المستند» في شراء/مردود آجل.</p>
+        <p class="card-hint" style="margin:0 0 0.65rem;line-height:1.55;">عند اختيار نوع اليومية يُقترَح المدين والدائن من البنود المربوطة في القسم ١. جانب «ذمة المورد (من المستند)» فقط — في شراء/مردود آجل — بلا قائمة لأنه يُؤخذ من حساب المورد عند الترحيل.</p>
         <div class="table-wrap gl-settings-table-wrap">
             <table class="gl-settings-table" id="gl_jt_rules_table">
                 <thead>
@@ -412,10 +412,6 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
         return ph;
     }
 
-    function inventorySidePlaceholder(side) {
-        return side === 'credit' ? 'دائن مخزن' : 'مدين مخزن';
-    }
-
     function syncRuleAccountPreviews(tr) {
         if (!tr) {
             return;
@@ -432,11 +428,6 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
             debDiv.removeAttribute('aria-hidden');
             if (def && def.debit_from_supplier) {
                 debDiv.innerHTML = '<span class="gl-rule-acct-muted">ذمة المورد (من المستند)</span>';
-            } else if (def && def.debit_auto_inventory) {
-                var invPrev = accountPreviewForSettingKey('inventory');
-                debDiv.innerHTML = '<span class="gl-rule-acct-muted">مدين مخزن'
-                    + (invPrev && invPrev.indexOf('—') !== 0 ? ' — ' + esc(invPrev) : '')
-                    + '</span>';
             } else if (deb && deb.style.display !== 'none' && !deb.disabled) {
                 debDiv.textContent = '';
                 debDiv.setAttribute('aria-hidden', 'true');
@@ -450,11 +441,6 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
             creDiv.removeAttribute('aria-hidden');
             if (def && def.credit_from_supplier) {
                 creDiv.innerHTML = '<span class="gl-rule-acct-muted">ذمة المورد (من المستند)</span>';
-            } else if (def && def.credit_auto_inventory) {
-                var invPrevC = accountPreviewForSettingKey('inventory');
-                creDiv.innerHTML = '<span class="gl-rule-acct-muted">دائن مخزن'
-                    + (invPrevC && invPrevC.indexOf('—') !== 0 ? ' — ' + esc(invPrevC) : '')
-                    + '</span>';
             } else if (cre && cre.style.display !== 'none' && !cre.disabled) {
                 creDiv.textContent = '';
                 creDiv.setAttribute('aria-hidden', 'true');
@@ -552,9 +538,7 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
         }
     }
 
-    /**
-     * إخفاء القوائم للجانب الثابت: مخزن تلقائي، ذمة مورد من المستند.
-     */
+    /** إخفاء القائمة لجانب «ذمة المورد (من المستند)» فقط — لا بند له في القسم ١. */
     function applyRuleRowLayout(tr) {
         var jt = parseInt((tr.querySelector('.gl-sel-jt-id') || {}).value, 10) || 0;
         var code = journalTypeCodeById(jt);
@@ -589,14 +573,6 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
                 'ذمة المورد (من المستند)',
                 'يُحدَّد عند الترحيل من حساب المورد — لا يُختار في هذه الشاشة'
             ));
-        } else if (def.debit_auto_inventory && deb && tdDeb) {
-            deb.value = 'inventory';
-            deb.style.display = 'none';
-            deb.disabled = true;
-            tdDeb.appendChild(makeRulePlaceholder(
-                inventorySidePlaceholder('debit'),
-                'حساب المخزن من القسم ١ — يُضاف تلقائياً عند الترحيل'
-            ));
         }
         if (def.credit_from_supplier && cre && tdCre) {
             cre.value = '';
@@ -605,14 +581,6 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
             tdCre.appendChild(makeRulePlaceholder(
                 'ذمة المورد (من المستند)',
                 'يُحدَّد عند الترحيل من حساب المورد — لا يُختار في هذه الشاشة'
-            ));
-        } else if (def.credit_auto_inventory && cre && tdCre) {
-            cre.value = 'inventory';
-            cre.style.display = 'none';
-            cre.disabled = true;
-            tdCre.appendChild(makeRulePlaceholder(
-                inventorySidePlaceholder('credit'),
-                'حساب المخزن من القسم ١ — يُضاف تلقائياً عند الترحيل'
             ));
         }
     }
@@ -995,12 +963,6 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
         var dk = String((tr.querySelector('.gl-sel-debit-key') || {}).value || '').trim();
         var ck = String((tr.querySelector('.gl-sel-credit-key') || {}).value || '').trim();
         if (def) {
-            if (def.debit_auto_inventory) {
-                dk = 'inventory';
-            }
-            if (def.credit_auto_inventory) {
-                ck = 'inventory';
-            }
             if (def.debit_from_supplier) {
                 dk = '';
             }
@@ -1073,7 +1035,7 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
             seenRuleSig[sig] = true;
             if (jcode === 'PIN' && pt === 'credit') {
                 if (!dk) {
-                    alert('فاتورة مشتريات آجل: يلزم مدين مخزن من القسم ١.');
+                    alert('فاتورة مشتريات آجل: اختر حساب المدين (مثلاً المخزن من القسم ١).');
                     jtRulesInvalid = true;
                     return;
                 }
@@ -1084,13 +1046,13 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
                 }
             } else if (jcode === 'PIN' && pt === 'cash') {
                 if (!dk || !ck || glDebitCreditKeysConflict(dk, ck)) {
-                    alert('فاتورة مشتريات نقدي: مدين مخزن تلقائياً — اختر حساب الدائن (الخزينة) من القسم ١.');
+                    alert('فاتورة مشتريات نقدي: اختر حسابين مختلفين للمدين والدائن (لا نفس الحساب).');
                     jtRulesInvalid = true;
                     return;
                 }
             } else if (jcode === 'PDN' && pt === 'credit') {
                 if (!ck) {
-                    alert('مردود مشتريات آجل: يلزم دائن مخزن من القسم ١.');
+                    alert('مردود مشتريات آجل: اختر حساب الدائن (مثلاً المخزن من القسم ١).');
                     jtRulesInvalid = true;
                     return;
                 }
@@ -1101,19 +1063,19 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
                 }
             } else if (jcode === 'PDN' && pt === 'cash') {
                 if (!dk || !ck || glDebitCreditKeysConflict(dk, ck)) {
-                    alert('مردود مشتريات نقدي: دائن مخزن تلقائياً — اختر حساب المدين (الخزينة) من القسم ١.');
+                    alert('مردود مشتريات نقدي: اختر حسابين مختلفين للمدين والدائن (لا نفس الحساب).');
                     jtRulesInvalid = true;
                     return;
                 }
             } else if (jcode === 'SAJ' && pt === 'gain') {
-                if (!ck || dk === ck) {
-                    alert('تسوية مخزون — ربح: مدين مخزن تلقائياً — اختر حساب الدائن (أرباح جرد) من القسم ١.');
+                if (!dk || !ck || dk === ck) {
+                    alert('تسوية مخزون — ربح: اختر حسابي المدين والدائن (المخزن وأرباح جرد) من القسم ١.');
                     jtRulesInvalid = true;
                     return;
                 }
             } else if (jcode === 'SAJ' && pt === 'loss') {
-                if (!dk || dk === ck) {
-                    alert('تسوية مخزون — خسارة: دائن مخزن تلقائياً — اختر حساب المدين (خسائر جرد) من القسم ١.');
+                if (!dk || !ck || dk === ck) {
+                    alert('تسوية مخزون — خسارة: اختر حسابي المدين والدائن (خسائر جرد والمخزن) من القسم ١.');
                     jtRulesInvalid = true;
                     return;
                 }
