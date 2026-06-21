@@ -10,12 +10,12 @@ require_once __DIR__ . '/../../../includes/country_screen_copy.php';
 require_admin_api();
 
 try {
+    $pdo = db();
     $admin = orange_admin_active_record($pdo);
     if ($admin === null || !orange_admin_has_full_access($admin)) {
         json_response(['success' => false, 'message' => 'نسخ بين الدول — للمشرف العام (وصول كامل) فقط'], 403);
     }
 
-    $pdo = db();
     orange_catalog_ensure_schema($pdo);
 
     $screenKey = trim((string) ($_GET['screen_key'] ?? ''));
