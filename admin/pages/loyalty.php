@@ -26,6 +26,15 @@ if ($loySettings === null || (int) ($loySettings['country_id'] ?? -1) !== (int) 
     <h1>نظام ولاء العميل (النقاط)</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+<?php
+require_once __DIR__ . '/../../includes/offer_gl_link_card.php';
+echo orange_offer_gl_link_card_html(
+    $pdo,
+    ['loyalty_points_redemption'],
+    ['loyalty_program_expense', 'loyalty_points_liability'],
+    'الربط المحاسبي للولاء (للقراءة فقط)'
+);
+?>
 
 <?php if (!$loyReady): ?>
 <div class="card"><p class="card-hint" style="margin:0;">جداول الولاء غير متوفرة بعد — سيتم إنشاؤها تلقائياً عند تحديث المخطط (catalog_schema).</p></div>
