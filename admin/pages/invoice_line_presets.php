@@ -76,7 +76,8 @@ foreach (orange_invoice_ancillary_system_key_catalog() as $sysKey => $sysMeta) {
     align-items: end;
 }
 .ilp-ops-col {
-    width: 150px;
+    width: 160px;
+    min-width: 160px;
     box-sizing: border-box;
     text-align: center;
     vertical-align: middle;
@@ -231,13 +232,13 @@ foreach (orange_invoice_ancillary_system_key_catalog() as $sysKey => $sysMeta) {
             <thead>
                 <tr>
                     <th style="width:2.5rem;white-space:nowrap;">#</th>
-                    <th style="width:34%;">نوع البند</th>
-                    <th style="width:18%;">مفتاح نظامي</th>
-                    <th style="width:3.5rem;white-space:nowrap;text-align:center;">نشط</th>
-                    <th style="width:25%;">الحساب</th>
-                    <th style="width:25%;">التسمية</th>
-                    <th style="width:4rem;white-space:nowrap;text-align:center;">الترتيب</th>
-                    <th style="width:150px;white-space:nowrap;" title="تعديل / حذف / إعادة الترتيب">إجراءات</th>
+                    <th style="width:22%;">نوع البند</th>
+                    <th style="width:12%;">مفتاح نظامي</th>
+                    <th style="width:3rem;white-space:nowrap;text-align:center;">نشط</th>
+                    <th style="width:22%;">الحساب</th>
+                    <th style="width:16%;">التسمية</th>
+                    <th style="width:3.5rem;white-space:nowrap;text-align:center;">الترتيب</th>
+                    <th style="width:160px;min-width:160px;white-space:nowrap;" title="تعديل / حذف / إعادة الترتيب">إجراءات</th>
                 </tr>
             </thead>
             <tbody id="ilp_list_body">
