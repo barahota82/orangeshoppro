@@ -34,6 +34,17 @@ $invAccJson = json_encode([
     'name' => (string) $invAccCN['name'],
 ], JSON_UNESCAPED_UNICODE) ?: '{"id":0,"code":"","name":""}';
 
+// الطرف المقابل الافتراضي (اختياري): يُقترَح في أول سطر معالجة بالكارت السفلي ويبقى قابلاً للتعديل.
+$contraAccId = $ready
+    ? (int) (orange_gl_account_id_optional($pdo, 'stock_adjustment_contra', $ctxCountryId > 0 ? $ctxCountryId : null) ?? 0)
+    : 0;
+$contraAccCN = orange_stock_adjustment_account_code_name($pdo, $contraAccId);
+$contraAccJson = json_encode([
+    'id' => $contraAccId,
+    'code' => (string) $contraAccCN['code'],
+    'name' => (string) $contraAccCN['name'],
+], JSON_UNESCAPED_UNICODE) ?: '{"id":0,"code":"","name":""}';
+
 $initial = [
     'id' => 0,
     'document_date' => date('Y-m-d'),
@@ -416,6 +427,7 @@ if ($editSv !== null) {
     var NEXT_NO = <?php echo (int) $nextNo; ?>;
     var STK_PRINT_TUNING = <?php echo $stkPrintTuning ? 'true' : 'false'; ?>;
     var INV_ACC = <?php echo $invAccJson; ?>;
+    var STK_CONTRA_DEFAULT = <?php echo $contraAccJson; ?>;
     var STK_REF_PREVIEW = <?php echo json_encode($stkRefPreview, JSON_UNESCAPED_UNICODE) ?: '""'; ?>;
     var state = <?php echo $initialJson; ?>;
     if (!state.lines) { state.lines = []; }
@@ -519,10 +531,24 @@ if ($editSv !== null) {
 
     function emptyGlLine() { return { account_id: 0, account_code: '', account_name: '', debit: 0, credit: 0 }; }
 
+    // أول سطر معالجة لسند جديد: يُقترَح فيه الطرف المقابل الافتراضي (إن رُبط) ويبقى قابلاً للتعديل/الحذف.
+    function suggestedGlLine() {
+        var g = emptyGlLine();
+        if (STK_CONTRA_DEFAULT && (parseInt(STK_CONTRA_DEFAULT.id, 10) || 0) > 0) {
+            g.account_id = parseInt(STK_CONTRA_DEFAULT.id, 10) || 0;
+            g.account_code = STK_CONTRA_DEFAULT.code || '';
+            g.account_name = STK_CONTRA_DEFAULT.name || '';
+        }
+        return g;
+    }
+
     function renderTreat() {
         var tb = el('stk_treat_body');
         if (!tb) { return; }
-        if (!isApproved() && state.gl_lines.length === 0) { state.gl_lines.push(emptyGlLine()); }
+        if (!isApproved() && state.gl_lines.length === 0) {
+            // اقتراح الطرف المقابل الافتراضي فقط لسند جديد (لا للمحفوظ/المعتمد).
+            state.gl_lines.push(state.id > 0 ? emptyGlLine() : suggestedGlLine());
+        }
         var mv = invMovement();
         var html = '';
         // سطر المخزون التلقائي (مدين عند الزيادة / دائن عند النقص) — للعرض ليبدو القيد كاملاً متوازناً.

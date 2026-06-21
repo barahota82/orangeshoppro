@@ -3114,6 +3114,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_delivery_fee_pending_v93($pdo);
     orange_catalog_migrate_promotions_always_on_v94($pdo);
     orange_catalog_migrate_offer_gl_link_v95($pdo);
+    orange_catalog_migrate_loyalty_journal_rules_seed_v96($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3725,6 +3726,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_delivery_fee_pending_v93($pdo);
     orange_catalog_migrate_promotions_always_on_v94($pdo);
     orange_catalog_migrate_offer_gl_link_v95($pdo);
+    orange_catalog_migrate_loyalty_journal_rules_seed_v96($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -7166,6 +7168,80 @@ function orange_catalog_migrate_offer_gl_link_v95(PDO $pdo): void
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
         orange_schema_invalidate_table_exists('loyalty_ledger');
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v96 — بذرة قواعد «ربط نوع اليومية» (القسم ٢) لقيود الولاء LYE/LYX.
+ *
+ * تجعل اتجاه قيد الولاء مرئياً وقابلاً للتعديل من شاشة «حسابات القيود التلقائية»:
+ * - LYE (كسب): مدين loyalty_program_expense / دائن loyalty_points_liability.
+ * - LYX (انتهاء): مدين loyalty_points_liability / دائن loyalty_program_expense.
+ *
+ * لا تُدرَج إن وُجدت قاعدة سابقة لنفس نوع اليومية؛ والترحيل للدول الجديدة عبر النسخ
+ * (orange_country_copy_gl_journal_type_rules_from_source). القيد نفسه له بديل آمن في
+ * includes/loyalty.php إن لم تُضبط القاعدة.
+ */
+function orange_catalog_migrate_loyalty_journal_rules_seed_v96(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_loyalty_journal_rules_seed_v96';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'orange_gl_journal_type_rules')
+        && orange_table_exists($pdo, 'journal_types')) {
+        $rulesScoped = orange_table_has_column($pdo, 'orange_gl_journal_type_rules', 'country_id');
+        $jtScoped = orange_table_has_column($pdo, 'journal_types', 'country_id');
+        $seed = [
+            'LYE' => ['loyalty_program_expense', 'loyalty_points_liability'],
+            'LYX' => ['loyalty_points_liability', 'loyalty_program_expense'],
+        ];
+        try {
+            $jtRows = $pdo->query(
+                'SELECT id, code' . ($jtScoped ? ', country_id' : '')
+                . " FROM journal_types WHERE code IN ('LYE','LYX')"
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $chk = $pdo->prepare(
+                "SELECT id FROM orange_gl_journal_type_rules WHERE journal_type_id = ? AND payment_terms = '' LIMIT 1"
+            );
+            $insScoped = $pdo->prepare(
+                'INSERT INTO orange_gl_journal_type_rules
+                    (country_id, journal_type_id, payment_terms, debit_setting_key, credit_setting_key)
+                 VALUES (?, ?, \'\', ?, ?)'
+            );
+            $insPlain = $pdo->prepare(
+                'INSERT INTO orange_gl_journal_type_rules
+                    (journal_type_id, payment_terms, debit_setting_key, credit_setting_key)
+                 VALUES (?, \'\', ?, ?)'
+            );
+            foreach ($jtRows as $jt) {
+                $code = strtoupper(trim((string) ($jt['code'] ?? '')));
+                $jtId = (int) ($jt['id'] ?? 0);
+                if ($jtId <= 0 || !isset($seed[$code])) {
+                    continue;
+                }
+                $chk->execute([$jtId]);
+                if ($chk->fetchColumn() !== false) {
+                    continue;
+                }
+                [$dk, $ck] = $seed[$code];
+                if ($rulesScoped) {
+                    $cid = $jtScoped ? (int) ($jt['country_id'] ?? 0) : 0;
+                    $insScoped->execute([$cid > 0 ? $cid : null, $jtId, $dk, $ck]);
+                } else {
+                    $insPlain->execute([$jtId, $dk, $ck]);
+                }
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] loyalty journal rules seed v96: ' . $e->getMessage());
+            }
+        }
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

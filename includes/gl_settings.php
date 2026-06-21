@@ -53,6 +53,7 @@ function orange_gl_setting_key_labels(): array
         'delivery_payable_default' => 'مستحقات توصيل افتراضي — دائن عند تسليم الطلب إذا لم تُعيَّن شركة توصيل للمحافظة (يُصرف من الخزينة لاحقاً)',
         'loyalty_program_expense' => 'مصروفات برنامج الولاء والمكافآت — مدين عند كسب العميل نقاطاً (والدائن: التزامات نقاط الولاء)؛ ويُعكَس عليه المنتهي',
         'loyalty_points_liability' => 'التزامات نقاط الولاء — دائن عند الكسب؛ مدين عند الاستبدال أو الانتهاء',
+        'stock_adjustment_contra' => 'الطرف المقابل الافتراضي لتسوية المخزون (أرباح/خسائر جرد) — يُقترَح تلقائياً في الكارت السفلي لقيد تسوية المخزون، ويبقى قابلاً للتعديل لكل سند حسب سبب التسوية',
         'vat_output' => 'ضريبة القيمة المضافة المستحقة (مبيعات) — التزام؛ تُحسب تلقائياً بنسبة الدولة على فواتير البيع (الكويت 0% = لا أثر)',
         'vat_input' => 'ضريبة القيمة المضافة على المشتريات (مدخلات) — أصل/قابلة للخصم؛ تُحسب تلقائياً بنسبة الدولة على فواتير الشراء',
         /** توافق قديم — يُستبدل بمفتاح cogs */
@@ -98,6 +99,7 @@ function orange_gl_setting_row_short_labels(): array
         'delivery_payable_default' => $p . 'مستحقات توصيل افتراضي',
         'loyalty_program_expense' => $p . 'مصروفات برنامج الولاء',
         'loyalty_points_liability' => $p . 'التزامات نقاط الولاء',
+        'stock_adjustment_contra' => $p . 'الطرف المقابل لتسوية المخزون',
         'vat_output' => $p . 'ضريبة القيمة المضافة (مبيعات)',
         'vat_input' => $p . 'ضريبة القيمة المضافة (مشتريات)',
         'income_summary' => $p . 'أرباح / خسائر السنة الحالية',
@@ -133,6 +135,7 @@ function orange_gl_settings_form_key_order(): array
         'delivery_payable_default',
         'loyalty_program_expense',
         'loyalty_points_liability',
+        'stock_adjustment_contra',
         'vat_output',
         'vat_input',
         'income_summary',
@@ -280,6 +283,44 @@ function orange_gl_order_delivery_setting_keys_from_rule(PDO $pdo, string $journ
 }
 
 /**
+ * يحلّ معرّفات حسابي المدين/الدائن من قاعدة القسم ٢ «ربط نوع اليومية» لأي كود نوع يومية
+ * (مثل LYE / LYX) في سياق دولة محدّدة. يُستعمل للقيود التلقائية التي لها زوج مدين/دائن ثابت
+ * (الولاء) بحيث يُحدِّد المحاسب الحسابين من شاشة واحدة بدل تثبيتهما في الكود.
+ *
+ * يُعيد null إن لم تُضبط القاعدة أو كانت ناقصة/غير صالحة — فيقع المستدعي على بديل آمن.
+ *
+ * @return array{debit:int, credit:int, debit_key:string, credit_key:string}|null
+ */
+function orange_gl_rule_accounts_for_code(PDO $pdo, string $journalCode, ?int $countryId = null): ?array
+{
+    $code = orange_journal_type_normalize_code($journalCode);
+    if ($code === '') {
+        return null;
+    }
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    $jtId = orange_journal_type_id_by_code($pdo, $code, $cid);
+    if ($jtId <= 0) {
+        return null;
+    }
+    $rule = orange_gl_journal_type_rule_for_terms($pdo, $jtId, '');
+    if ($rule === null) {
+        return null;
+    }
+    $dk = trim((string) ($rule['debit_setting_key'] ?? ''));
+    $ck = trim((string) ($rule['credit_setting_key'] ?? ''));
+    if ($dk === '' || $ck === '' || $dk === $ck) {
+        return null;
+    }
+    $deb = (int) (orange_gl_account_id_optional($pdo, $dk, $cid) ?? 0);
+    $cred = (int) (orange_gl_account_id_optional($pdo, $ck, $cid) ?? 0);
+    if ($deb <= 0 || $cred <= 0 || $deb === $cred) {
+        return null;
+    }
+
+    return ['debit' => $deb, 'credit' => $cred, 'debit_key' => $dk, 'credit_key' => $ck];
+}
+
+/**
  * أنواع اليومية لشاشة الترحيل: من جدول القواعد إن وُجد، وإلا من الربط القديم في orange_gl_account_settings.
  *
  * @return list<array<string, mixed>>
@@ -400,8 +441,10 @@ function orange_gl_journal_rule_dropdown_excluded_keys(): array
         'cogs_returns_online',
         'delivery_expense',
         'delivery_payable_default',
-        'loyalty_program_expense',
-        'loyalty_points_liability',
+        // الطرف المقابل لتسوية المخزون = افتراضي يُقترح في الكارت السفلي، وليس قاعدة مدين/دائن ثابتة.
+        'stock_adjustment_contra',
+        // ملاحظة: مفاتيح الولاء (loyalty_program_expense / loyalty_points_liability) لم تَعُد مستبعدة
+        // كي تظهر في قوائم «ربط نوع اليومية» لقيدَي LYE/LYX (الحل الأول للولاء).
     ];
 }
 

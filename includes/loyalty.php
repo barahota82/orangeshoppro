@@ -180,12 +180,19 @@ function orange_loyalty_earn_for_order(PDO $pdo, array $order, int $countryId, f
     ]);
 
     $value = round($points * $pointValue, 4);
-    $expenseId = (int) (orange_gl_account_id_optional($pdo, 'loyalty_program_expense', $countryId) ?? 0);
-    $liabilityId = (int) (orange_gl_account_id_optional($pdo, 'loyalty_points_liability', $countryId) ?? 0);
+    // الاتجاه الافتراضي: مدين «مصروف الولاء» / دائن «التزام نقاط الولاء».
+    $debitId = (int) (orange_gl_account_id_optional($pdo, 'loyalty_program_expense', $countryId) ?? 0);
+    $creditId = (int) (orange_gl_account_id_optional($pdo, 'loyalty_points_liability', $countryId) ?? 0);
+    // إن ضُبطت قاعدة LYE في «ربط نوع اليومية» (القسم ٢) فهي مصدر الحقيقة للحسابين.
+    $ruleAcc = orange_gl_rule_accounts_for_code($pdo, 'LYE', $countryId);
+    if ($ruleAcc !== null) {
+        $debitId = (int) $ruleAcc['debit'];
+        $creditId = (int) $ruleAcc['credit'];
+    }
     orange_loyalty_post_simple_gl(
         $pdo,
-        $expenseId,
-        $liabilityId,
+        $debitId,
+        $creditId,
         $value,
         $countryId,
         'قيد كسب نقاط ولاء — تسليم الطلب',
@@ -422,13 +429,19 @@ function orange_loyalty_expire_due(PDO $pdo, ?int $countryId = null): array
             (int) $layer['id'],
             'انتهاء صلاحية نقاط ولاء',
         ]);
-        $expenseId = (int) (orange_gl_account_id_optional($pdo, 'loyalty_program_expense', $layerCountry) ?? 0);
-        $liabilityId = (int) (orange_gl_account_id_optional($pdo, 'loyalty_points_liability', $layerCountry) ?? 0);
-        // عكس: مدين الالتزام / دائن المصروف.
+        // عكس الالتزام: مدين «التزام نقاط الولاء» / دائن «مصروف الولاء» افتراضياً.
+        $debitId = (int) (orange_gl_account_id_optional($pdo, 'loyalty_points_liability', $layerCountry) ?? 0);
+        $creditId = (int) (orange_gl_account_id_optional($pdo, 'loyalty_program_expense', $layerCountry) ?? 0);
+        // إن ضُبطت قاعدة LYX في «ربط نوع اليومية» (القسم ٢) فهي مصدر الحقيقة للحسابين.
+        $ruleAcc = orange_gl_rule_accounts_for_code($pdo, 'LYX', $layerCountry);
+        if ($ruleAcc !== null) {
+            $debitId = (int) $ruleAcc['debit'];
+            $creditId = (int) $ruleAcc['credit'];
+        }
         orange_loyalty_post_simple_gl(
             $pdo,
-            $liabilityId,
-            $expenseId,
+            $debitId,
+            $creditId,
             $value,
             $layerCountry,
             'قيد انتهاء نقاط ولاء — عكس الالتزام',
