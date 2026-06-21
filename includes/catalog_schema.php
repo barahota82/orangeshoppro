@@ -3116,6 +3116,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_offer_gl_link_v95($pdo);
     orange_catalog_migrate_loyalty_journal_rules_seed_v96($pdo);
     orange_catalog_migrate_stock_adjustment_gain_loss_v97($pdo);
+    orange_catalog_migrate_delivery_agents_sort_renumber_v98($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3729,6 +3730,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_offer_gl_link_v95($pdo);
     orange_catalog_migrate_loyalty_journal_rules_seed_v96($pdo);
     orange_catalog_migrate_stock_adjustment_gain_loss_v97($pdo);
+    orange_catalog_migrate_delivery_agents_sort_renumber_v98($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -7374,6 +7376,60 @@ function orange_catalog_migrate_stock_adjustment_gain_loss_v97(PDO $pdo): void
             if (function_exists('error_log')) {
                 error_log('[orange] stock adjustment SAJ rules seed v97: ' . $e->getMessage());
             }
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * إصلاح sort_order=0 لمناديب التوصيل (خطأ تحديث قديم) — إعادة ترقيم 1، 2، 3… لكل دولة.
+ */
+function orange_catalog_migrate_delivery_agents_sort_renumber_v98(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_delivery_agents_sort_renumber_v98';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'delivery_agents')) {
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+
+        return;
+    }
+
+    try {
+        $needs = (int) ($pdo->query('SELECT COUNT(*) FROM delivery_agents WHERE sort_order <= 0')->fetchColumn() ?: 0);
+        if ($needs > 0) {
+            $countryIds = $pdo->query(
+                'SELECT DISTINCT country_id FROM delivery_agents WHERE country_id > 0 ORDER BY country_id ASC'
+            )->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            $up = $pdo->prepare('UPDATE delivery_agents SET sort_order = ? WHERE id = ? LIMIT 1');
+            foreach ($countryIds as $countryId) {
+                $cid = (int) $countryId;
+                if ($cid <= 0) {
+                    continue;
+                }
+                $st = $pdo->prepare(
+                    'SELECT id FROM delivery_agents WHERE country_id = ? ORDER BY sort_order ASC, id ASC'
+                );
+                $st->execute([$cid]);
+                $next = 1;
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+                    $id = (int) ($row['id'] ?? 0);
+                    if ($id <= 0) {
+                        continue;
+                    }
+                    $up->execute([$next, $id]);
+                    ++$next;
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] delivery_agents_sort_renumber_v98: ' . $e->getMessage());
         }
     }
 
