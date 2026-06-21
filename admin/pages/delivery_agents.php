@@ -52,7 +52,8 @@ $nextSort = $hasTable && $adminCountryId > 0 ? orange_delivery_agents_next_sort_
         </div>
         <div>
             <label for="dag_sort">الترتيب</label>
-            <input type="number" id="dag_sort" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int) $nextSort; ?>" disabled tabindex="-1">
+            <input type="number" id="dag_sort" class="admin-sort-field admin-sort-field--muted"
+                value="<?php echo (int) $nextSort; ?>" readonly tabindex="-1" aria-readonly="true">
         </div>
     </div>
     <div style="margin-top:10px;">
@@ -104,6 +105,7 @@ $nextSort = $hasTable && $adminCountryId > 0 ? orange_delivery_agents_next_sort_
 
 <script>
 const dagAgentsJson = <?php echo json_encode($agents, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+let dagNextSort = <?php echo (int) $nextSort; ?>;
 
 function resetDeliveryAgentForm() {
     document.getElementById('dag_id').value = '0';
@@ -112,6 +114,10 @@ function resetDeliveryAgentForm() {
     document.getElementById('dag_phone').value = '';
     document.getElementById('dag_status').value = 'active';
     document.getElementById('dag_notes').value = '';
+    var sortEl = document.getElementById('dag_sort');
+    if (sortEl) {
+        sortEl.value = String(dagNextSort);
+    }
 }
 
 function fillDeliveryAgentForm(row) {
@@ -121,6 +127,10 @@ function fillDeliveryAgentForm(row) {
     document.getElementById('dag_phone').value = row.phone || '';
     document.getElementById('dag_status').value = row.status || 'active';
     document.getElementById('dag_notes').value = row.notes || '';
+    var sortEl = document.getElementById('dag_sort');
+    if (sortEl) {
+        sortEl.value = String(parseInt(row.sort_order, 10) || 0);
+    }
 }
 
 document.querySelectorAll('[data-dag-edit]').forEach(function (btn) {
@@ -172,7 +182,12 @@ async function saveDeliveryAgent() {
         notes: document.getElementById('dag_notes').value.trim()
     });
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل الحفظ'));
-    if (res.success) location.reload();
+    if (res.success) {
+        if (res.next_sort_order) {
+            dagNextSort = parseInt(res.next_sort_order, 10) || dagNextSort;
+        }
+        location.reload();
+    }
 }
 </script>
 <?php endif; ?>

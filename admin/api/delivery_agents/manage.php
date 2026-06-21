@@ -51,7 +51,6 @@ try {
         $nameEn = dag_str191($data['name_en'] ?? '');
         $phone = dag_str191($data['phone'] ?? '');
         $status = orange_delivery_agent_status_normalize((string) ($data['status'] ?? 'active'));
-        $sortOrder = isset($data['sort_order']) ? (int) $data['sort_order'] : 0;
         $notes = trim((string) ($data['notes'] ?? ''));
 
         if ($nameAr === '') {
@@ -67,20 +66,22 @@ try {
                 // مسموح — إنهاء خدمات بدل حذف
             }
             $st = $pdo->prepare(
-                'UPDATE delivery_agents SET country_id = ?, name_ar = ?, name_en = ?, phone = ?, status = ?, sort_order = ?, notes = ? WHERE id = ?'
+                'UPDATE delivery_agents SET country_id = ?, name_ar = ?, name_en = ?, phone = ?, status = ?, notes = ? WHERE id = ?'
             );
-            $st->execute([$countryId, $nameAr, $nameEn, $phone !== '' ? $phone : null, $status, $sortOrder, $notes !== '' ? $notes : null, $id]);
+            $st->execute([$countryId, $nameAr, $nameEn, $phone !== '' ? $phone : null, $status, $notes !== '' ? $notes : null, $id]);
         } else {
-            if ($sortOrder <= 0) {
-                $sortOrder = orange_delivery_agents_next_sort_order($pdo, $countryId);
-            }
+            $sortOrder = orange_delivery_agents_next_sort_order($pdo, $countryId);
             $st = $pdo->prepare(
                 'INSERT INTO delivery_agents (country_id, name_ar, name_en, phone, status, sort_order, notes) VALUES (?, ?, ?, ?, ?, ?, ?)'
             );
             $st->execute([$countryId, $nameAr, $nameEn, $phone !== '' ? $phone : null, $status, $sortOrder, $notes !== '' ? $notes : null]);
         }
 
-        json_response(['success' => true, 'message' => 'تم حفظ المندوب']);
+        json_response([
+            'success' => true,
+            'message' => 'تم حفظ المندوب',
+            'next_sort_order' => orange_delivery_agents_next_sort_order($pdo, $countryId),
+        ]);
     }
 
     json_response(['success' => false, 'message' => 'إجراء غير معروف'], 422);
