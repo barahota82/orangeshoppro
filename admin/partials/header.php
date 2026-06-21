@@ -365,11 +365,11 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'items' => [
                         ['page' => 'delivery_promotions', 'href' => '/admin/index.php?page=delivery_promotions', 'label' => 'عروض التوصيل', 'class' => '', 'sub' => false],
                         ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'عروض المنتجات', 'class' => '', 'sub' => false],
-                        ['page' => 'loyalty', 'href' => '/admin/index.php?page=loyalty', 'label' => 'ولاء العملاء (النقاط)', 'class' => '', 'sub' => false],
                         ['page' => 'cart_promotions', 'href' => '/admin/index.php?page=cart_promotions', 'label' => 'عروض مجموع السلة', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'cart_gift_promotions', 'href' => '/admin/index.php?page=cart_gift_promotions', 'label' => 'عروض الهدايا', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'cart_bogo_promotions', 'href' => '/admin/index.php?page=cart_bogo_promotions', 'label' => 'عروض BOGO', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'cart_combo_promotions', 'href' => '/admin/index.php?page=cart_combo_promotions', 'label' => 'عروض الكومبو', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'loyalty', 'href' => '/admin/index.php?page=loyalty', 'label' => 'ولاء العملاء (النقاط)', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'cart_promo_health', 'href' => '/admin/index.php?page=cart_promo_health', 'label' => 'صحة العروض (مخزون)', 'class' => 'admin-nav-sub', 'sub' => true],
                     ],
                 ],

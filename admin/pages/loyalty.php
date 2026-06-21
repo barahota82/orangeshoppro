@@ -28,64 +28,66 @@ if ($loySettings === null || (int) ($loySettings['country_id'] ?? -1) !== (int) 
 </div>
 
 <?php if (!$loyReady): ?>
-<div class="admin-card"><p class="card-hint">جداول الولاء غير متوفرة بعد — سيتم إنشاؤها تلقائياً عند تحديث المخطط (catalog_schema).</p></div>
+<div class="card"><p class="card-hint" style="margin:0;">جداول الولاء غير متوفرة بعد — سيتم إنشاؤها تلقائياً عند تحديث المخطط (catalog_schema).</p></div>
 <?php else: ?>
 
-<div class="admin-card" style="margin-bottom:1rem;">
-    <h2 style="margin:0 0 0.75rem;">إعدادات الكسب والاستبدال</h2>
-    <p class="card-hint" style="margin:0 0 1rem;">
+<div class="card">
+    <h3 class="card-title">إعدادات الكسب والاستبدال</h3>
+    <p class="card-hint">
         نموذج محاسبي: التزام مؤجّل. عند الكسب: <strong>مدين «مصروفات برنامج الولاء» / دائن «التزامات نقاط الولاء»</strong>؛
         عند الاستبدال يُخصم من الالتزام كبند فاتورة؛ عند الانتهاء يُعكَس. اربط الحسابات من شاشة
         <strong>إعدادات قيود GL</strong> (المفاتيح: <code>loyalty_program_expense</code> و<code>loyalty_points_liability</code>)
         وبند الاستبدال <code>loyalty_points_redemption</code> من <strong>بنود الفاتورة الإضافية</strong>. لا يوجد تثبيت لأي حساب في الكود.
     </p>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.85rem;">
-        <label style="display:flex;flex-direction:column;gap:0.3rem;">
-            <span>مُفعَّل</span>
+    <div class="form-grid form-grid-3">
+        <div>
+            <label for="loy_is_active">مُفعَّل</label>
             <select id="loy_is_active" class="admin-inp">
                 <option value="0">غير مُفعَّل</option>
                 <option value="1">مُفعَّل</option>
             </select>
-        </label>
-        <label style="display:flex;flex-direction:column;gap:0.3rem;">
-            <span>نقاط مكتسبة لكل وحدة عملة (على صافي مبيعات البضاعة)</span>
+        </div>
+        <div>
+            <label for="loy_earn_rate">نقاط مكتسبة لكل وحدة عملة (صافي مبيعات البضاعة)</label>
             <input type="number" id="loy_earn_rate" class="admin-inp" step="any" min="0" inputmode="decimal" lang="en" dir="ltr">
-        </label>
-        <label style="display:flex;flex-direction:column;gap:0.3rem;">
-            <span>قيمة النقطة (بالعملة) عند الاستبدال</span>
+        </div>
+        <div>
+            <label for="loy_point_value">قيمة النقطة (بالعملة) عند الاستبدال</label>
             <input type="number" id="loy_point_value" class="admin-inp" step="any" min="0" inputmode="decimal" lang="en" dir="ltr">
-        </label>
-        <label style="display:flex;flex-direction:column;gap:0.3rem;">
-            <span>أدنى نقاط للاستبدال</span>
+        </div>
+        <div>
+            <label for="loy_min_redeem">أدنى نقاط للاستبدال</label>
             <input type="number" id="loy_min_redeem" class="admin-inp" step="1" min="0" inputmode="numeric" lang="en" dir="ltr">
-        </label>
-        <label style="display:flex;flex-direction:column;gap:0.3rem;">
-            <span>أقصى نسبة من المبلغ المستحق تُدفع بالنقاط (%)</span>
+        </div>
+        <div>
+            <label for="loy_max_pct">أقصى نسبة من المبلغ المستحق تُدفع بالنقاط (%)</label>
             <input type="number" id="loy_max_pct" class="admin-inp" step="any" min="0" max="100" inputmode="decimal" lang="en" dir="ltr">
-        </label>
-        <label style="display:flex;flex-direction:column;gap:0.3rem;">
-            <span>مدة صلاحية النقاط (شهور — 0 = بلا انتهاء)</span>
+        </div>
+        <div>
+            <label for="loy_expiry_months">مدة صلاحية النقاط (شهور — 0 = بلا انتهاء)</label>
             <input type="number" id="loy_expiry_months" class="admin-inp" step="1" min="0" inputmode="numeric" lang="en" dir="ltr">
-        </label>
+        </div>
     </div>
-    <div style="margin-top:1rem;display:flex;gap:0.6rem;flex-wrap:wrap;">
-        <button type="button" class="btn btn-primary" id="loySaveBtn">حفظ الإعدادات</button>
-        <button type="button" class="btn" id="loyExpireBtn">تشغيل انتهاء النقاط المستحقة الآن</button>
+    <div class="admin-form-actions" style="margin-top:14px;">
+        <button type="button" id="loySaveBtn">حفظ الإعدادات</button>
+        <button type="button" class="btn-secondary" id="loyExpireBtn">تشغيل انتهاء النقاط المستحقة الآن</button>
     </div>
-    <p id="loyMsg" class="card-hint" style="margin-top:0.6rem;"></p>
+    <p id="loyMsg" class="card-hint" style="margin:10px 0 0;"></p>
 </div>
 
-<div class="admin-card">
-    <h2 style="margin:0 0 0.75rem;">رصيد وحركة نقاط عميل</h2>
-    <div style="display:flex;gap:0.6rem;align-items:flex-end;flex-wrap:wrap;">
-        <label style="display:flex;flex-direction:column;gap:0.3rem;">
-            <span>رقم العميل (ID)</span>
+<div class="card">
+    <h3 class="card-title">رصيد وحركة نقاط عميل</h3>
+    <div class="form-grid">
+        <div>
+            <label for="loy_customer_id">رقم العميل (ID)</label>
             <input type="number" id="loy_customer_id" class="admin-inp" step="1" min="0" inputmode="numeric" lang="en" dir="ltr">
-        </label>
-        <button type="button" class="btn" id="loyLookupBtn">عرض الرصيد والحركة</button>
-        <span id="loyBalance" style="font-weight:700;"></span>
+        </div>
+        <div class="admin-form-actions" style="align-self:flex-end;">
+            <button type="button" class="btn-secondary" id="loyLookupBtn">عرض الرصيد والحركة</button>
+            <span id="loyBalance" style="font-weight:700;align-self:center;"></span>
+        </div>
     </div>
-    <div style="overflow:auto;margin-top:0.85rem;">
+    <div class="table-wrap" style="margin-top:0.85rem;">
         <table class="admin-table" id="loyLedgerTable" style="display:none;">
             <thead>
                 <tr>
