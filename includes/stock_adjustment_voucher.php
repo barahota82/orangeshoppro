@@ -51,6 +51,16 @@ function orange_stock_adjustment_voucher_ensure_schema(PDO $pdo): void
         orange_schema_invalidate_table_exists('stock_adjustment_voucher');
     }
 
+    if (orange_table_exists($pdo, 'stock_adjustment_voucher')
+        && ! orange_table_has_column($pdo, 'stock_adjustment_voucher', 'treatment_kind')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE stock_adjustment_voucher ADD COLUMN treatment_kind VARCHAR(8) NOT NULL DEFAULT 'gain'
+             COMMENT 'gain|loss — نوع المعالجة المحاسبية (ربح/خسارة جرد)' AFTER notes"
+        );
+        orange_schema_invalidate_column_check('stock_adjustment_voucher', 'treatment_kind');
+    }
+
     if (! orange_table_exists($pdo, 'stock_adjustment_voucher_line')) {
         orange_catalog_safe_exec(
             $pdo,
@@ -594,6 +604,11 @@ function orange_stock_adjustment_voucher_save(PDO $pdo, array $headerIn, array $
     $id = (int) ($headerIn['id'] ?? 0);
     $documentDate = trim((string) ($headerIn['document_date'] ?? ''));
     $notes = trim((string) ($headerIn['notes'] ?? ''));
+    $treatmentKind = trim((string) ($headerIn['treatment_kind'] ?? 'gain'));
+    if ($treatmentKind !== 'loss') {
+        $treatmentKind = 'gain';
+    }
+    $hasTreatmentKind = orange_table_has_column($pdo, 'stock_adjustment_voucher', 'treatment_kind');
 
     if ($documentDate === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $documentDate)) {
         throw new InvalidArgumentException('تاريخ السند مطلوب (يوم/شهر/سنة).');
@@ -641,16 +656,23 @@ function orange_stock_adjustment_voucher_save(PDO $pdo, array $headerIn, array $
     try {
         if ($id > 0) {
             $upd = $pdo->prepare(
-                'UPDATE stock_adjustment_voucher SET warehouse_id = ?, document_date = ?, notes = ?, country_id = ?
-                 WHERE id = ? AND status = \'draft\''
+                $hasTreatmentKind
+                    ? 'UPDATE stock_adjustment_voucher SET warehouse_id = ?, document_date = ?, notes = ?, treatment_kind = ?, country_id = ?
+                       WHERE id = ? AND status = \'draft\''
+                    : 'UPDATE stock_adjustment_voucher SET warehouse_id = ?, document_date = ?, notes = ?, country_id = ?
+                       WHERE id = ? AND status = \'draft\''
             );
-            $upd->execute([
+            $updParams = [
                 $warehouseId,
                 $documentDate,
                 $notes !== '' ? $notes : null,
-                $countryId > 0 ? $countryId : null,
-                $id,
-            ]);
+            ];
+            if ($hasTreatmentKind) {
+                $updParams[] = $treatmentKind;
+            }
+            $updParams[] = $countryId > 0 ? $countryId : null;
+            $updParams[] = $id;
+            $upd->execute($updParams);
             if ($upd->rowCount() === 0) {
                 // لا تغيّر في الرأس لكن قد تتغيّر الأسطر — لا نعتبره فشلاً إلا إن لم يكن مسودة.
                 $chk = $pdo->prepare('SELECT status FROM stock_adjustment_voucher WHERE id = ? LIMIT 1');
@@ -663,15 +685,22 @@ function orange_stock_adjustment_voucher_save(PDO $pdo, array $headerIn, array $
             $pdo->prepare('DELETE FROM stock_adjustment_voucher_gl WHERE voucher_id = ?')->execute([$id]);
         } else {
             $ins = $pdo->prepare(
-                'INSERT INTO stock_adjustment_voucher (warehouse_id, status, document_date, notes, country_id)
-                 VALUES (?, \'draft\', ?, ?, ?)'
+                $hasTreatmentKind
+                    ? 'INSERT INTO stock_adjustment_voucher (warehouse_id, status, document_date, notes, treatment_kind, country_id)
+                       VALUES (?, \'draft\', ?, ?, ?, ?)'
+                    : 'INSERT INTO stock_adjustment_voucher (warehouse_id, status, document_date, notes, country_id)
+                       VALUES (?, \'draft\', ?, ?, ?)'
             );
-            $ins->execute([
+            $insParams = [
                 $warehouseId,
                 $documentDate,
                 $notes !== '' ? $notes : null,
-                $countryId > 0 ? $countryId : null,
-            ]);
+            ];
+            if ($hasTreatmentKind) {
+                $insParams[] = $treatmentKind;
+            }
+            $insParams[] = $countryId > 0 ? $countryId : null;
+            $ins->execute($insParams);
             $id = (int) $pdo->lastInsertId();
         }
 

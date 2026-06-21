@@ -3115,6 +3115,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_promotions_always_on_v94($pdo);
     orange_catalog_migrate_offer_gl_link_v95($pdo);
     orange_catalog_migrate_loyalty_journal_rules_seed_v96($pdo);
+    orange_catalog_migrate_stock_adjustment_gain_loss_v97($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3727,6 +3728,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_promotions_always_on_v94($pdo);
     orange_catalog_migrate_offer_gl_link_v95($pdo);
     orange_catalog_migrate_loyalty_journal_rules_seed_v96($pdo);
+    orange_catalog_migrate_stock_adjustment_gain_loss_v97($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -7240,6 +7242,137 @@ function orange_catalog_migrate_loyalty_journal_rules_seed_v96(PDO $pdo): void
         } catch (Throwable $e) {
             if (function_exists('error_log')) {
                 error_log('[orange] loyalty journal rules seed v96: ' . $e->getMessage());
+            }
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v97 — تسوية المخزون SAJ: مفاتيح ربح/خسارة في القسم ١ + قواعد gain/loss في القسم ٢ (نمط PIN/PDN).
+ *
+ * - ينسخ account_id من stock_adjustment_contra القديم إلى stock_adjustment_gain و stock_adjustment_loss إن لم يُربَطا.
+ * - يُدرج قاعدتَي SAJ: gain (مدين inventory / دائن stock_adjustment_gain)،
+ *   loss (مدين stock_adjustment_loss / دائن inventory) إن لم توجد.
+ */
+function orange_catalog_migrate_stock_adjustment_gain_loss_v97(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_stock_adjustment_gain_loss_v97';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'orange_gl_account_settings')) {
+        $scoped = orange_table_has_column($pdo, 'orange_gl_account_settings', 'country_id');
+        try {
+            $contraRows = $pdo->query(
+                "SELECT setting_key, account_id" . ($scoped ? ', country_id' : '')
+                . " FROM orange_gl_account_settings WHERE setting_key = 'stock_adjustment_contra' AND account_id > 0"
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach (['stock_adjustment_gain', 'stock_adjustment_loss'] as $newKey) {
+                foreach ($contraRows as $row) {
+                    $accId = (int) ($row['account_id'] ?? 0);
+                    if ($accId <= 0) {
+                        continue;
+                    }
+                    if ($scoped) {
+                        $cid = (int) ($row['country_id'] ?? 0);
+                        $chk = $pdo->prepare(
+                            'SELECT account_id FROM orange_gl_account_settings
+                             WHERE setting_key = ? AND country_id = ? LIMIT 1'
+                        );
+                        $chk->execute([$newKey, $cid]);
+                        $existing = $chk->fetch(PDO::FETCH_ASSOC);
+                        if ($existing !== false && (int) ($existing['account_id'] ?? 0) > 0) {
+                            continue;
+                        }
+                        if ($existing !== false) {
+                            $pdo->prepare(
+                                'UPDATE orange_gl_account_settings SET account_id = ? WHERE setting_key = ? AND country_id = ?'
+                            )->execute([$accId, $newKey, $cid]);
+                        } else {
+                            $pdo->prepare(
+                                'INSERT INTO orange_gl_account_settings (setting_key, account_id, country_id) VALUES (?, ?, ?)'
+                            )->execute([$newKey, $accId, $cid]);
+                        }
+                    } else {
+                        $chk = $pdo->prepare(
+                            'SELECT account_id FROM orange_gl_account_settings WHERE setting_key = ? LIMIT 1'
+                        );
+                        $chk->execute([$newKey]);
+                        $existing = $chk->fetch(PDO::FETCH_ASSOC);
+                        if ($existing !== false && (int) ($existing['account_id'] ?? 0) > 0) {
+                            continue;
+                        }
+                        if ($existing !== false) {
+                            $pdo->prepare(
+                                'UPDATE orange_gl_account_settings SET account_id = ? WHERE setting_key = ?'
+                            )->execute([$accId, $newKey]);
+                        } else {
+                            $pdo->prepare(
+                                'INSERT INTO orange_gl_account_settings (setting_key, account_id) VALUES (?, ?)'
+                            )->execute([$newKey, $accId]);
+                        }
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] stock adjustment gain/loss settings v97: ' . $e->getMessage());
+            }
+        }
+    }
+
+    if (orange_table_exists($pdo, 'orange_gl_journal_type_rules')
+        && orange_table_exists($pdo, 'journal_types')) {
+        $rulesScoped = orange_table_has_column($pdo, 'orange_gl_journal_type_rules', 'country_id');
+        $jtScoped = orange_table_has_column($pdo, 'journal_types', 'country_id');
+        $seed = [
+            'gain' => ['inventory', 'stock_adjustment_gain'],
+            'loss' => ['stock_adjustment_loss', 'inventory'],
+        ];
+        try {
+            $jtRows = $pdo->query(
+                'SELECT id' . ($jtScoped ? ', country_id' : '')
+                . " FROM journal_types WHERE code = 'SAJ'"
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $chk = $pdo->prepare(
+                'SELECT id FROM orange_gl_journal_type_rules WHERE journal_type_id = ? AND payment_terms = ? LIMIT 1'
+            );
+            $insScoped = $pdo->prepare(
+                'INSERT INTO orange_gl_journal_type_rules
+                    (country_id, journal_type_id, payment_terms, debit_setting_key, credit_setting_key)
+                 VALUES (?, ?, ?, ?, ?)'
+            );
+            $insPlain = $pdo->prepare(
+                'INSERT INTO orange_gl_journal_type_rules
+                    (journal_type_id, payment_terms, debit_setting_key, credit_setting_key)
+                 VALUES (?, ?, ?, ?)'
+            );
+            foreach ($jtRows as $jt) {
+                $jtId = (int) ($jt['id'] ?? 0);
+                if ($jtId <= 0) {
+                    continue;
+                }
+                foreach ($seed as $pt => [$dk, $ck]) {
+                    $chk->execute([$jtId, $pt]);
+                    if ($chk->fetchColumn() !== false) {
+                        continue;
+                    }
+                    if ($rulesScoped) {
+                        $cid = $jtScoped ? (int) ($jt['country_id'] ?? 0) : 0;
+                        $insScoped->execute([$cid > 0 ? $cid : null, $jtId, $pt, $dk, $ck]);
+                    } else {
+                        $insPlain->execute([$jtId, $pt, $dk, $ck]);
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] stock adjustment SAJ rules seed v97: ' . $e->getMessage());
             }
         }
     }

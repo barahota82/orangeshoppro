@@ -3,7 +3,7 @@ ORANGE — أرشيف منهج التصنيف المحاسبي والتقاري�
 المسار: docs/archive/ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt
 تاريخ حفظ الأرشيف: 2026-04-19
 آخر تحديث: 2026-06-15 (سند تعديل الرصيد: معالجة على مستوى السند بشبكة مدين/دائن مرنة + نوع يومية مستقل «قيد تسوية مخزون» SAJ + نقل الشاشة للحسابات؛ + جعل الجرد تقريراً فقط؛ القسم أدناه)
-آخر تحديث: 2026-06-21 (الحل الثالث: نسخ انتقائي بين الدول لأنواع اليوميات والدليل — checkboxes + API للمشرف العام؛ بالإضافة إلى الحل الأول LYE/LYX/SAJ)
+آخر تحديث: 2026-06-21 (SAJ ربح/خسارة في القسم ٢ — نمط PIN/PDN؛ مفاتيح stock_adjustment_gain/loss + الحل الثالث + LYE/LYX)
 
 ================================================================================
 قرار مالك نهائي (2026-06-21): نوعا يومية مستقلان لقيود الولاء (LYE / LYX)
@@ -34,11 +34,12 @@ ORANGE — أرشيف منهج التصنيف المحاسبي والتقاري�
     تُدرج قاعدتَي LYE (مدين expense / دائن liability) و LYX (العكس) إن لم توجد — تظهران جاهزتين في القسم ٢
     وتُنسخان للدول الجديدة عبر `orange_country_copy_gl_journal_type_rules_from_source`.
   • مفاتيح الولاء **أُزيلت من** `orange_gl_journal_rule_dropdown_excluded_keys` كي تظهر في قوائم القسم ٢.
-- **تسوية المخزون (SAJ) — ضمن نفس الجولة:** SAJ مختلف بطبيعته (طرف المخزون تلقائي عبر مفتاح inventory،
-  والطرف المقابل **متغيّر** حسب سبب التسوية: ربح/خسارة جرد، ذمة موظف…). لذلك **لا يُربط بزوج ثابت** في القسم ٢.
-  بدلاً من ذلك: مفتاح اختياري جديد **`stock_adjustment_contra`** في القسم ١ يُقترَح تلقائياً في **أول سطر
-  معالجة** بالكارت السفلي لسند جديد (قابل للتعديل/الحذف، ويبقى تحقّق التوازن كما هو). إن لم يُربط المفتاح
-  يبقى السلوك كالسابق (سطر فارغ). نوع اليومية SAJ نفسه canonical/auto-seed كما كان.
+- **تسوية المخزون (SAJ) — نمط فواتير المشتريات (PIN/PDN):** طرف **المخزون تلقائي** (مفتاح inventory)؛ الطرف المقابل **أرباح/خسائر جرد** من الإعدادات مع **اختيارين** في القسم ٢:
+  • **ربح (gain):** مدين = inventory (تلقائي) / دائن = stock_adjustment_gain (أرباح جرد — يمكن أن يكون نفس حساب أرباح وخسائر).
+  • **خسارة (loss):** مدين = stock_adjustment_loss (خسائر جرد) / دائن = inventory (تلقائي).
+  • **شاشة قيد التسوية:** قائمة «نوع التسوية المحاسبية» (ربح/خسارة) تُحدِّد الطرف المقابل المقترَح في الكارت السفلي عبر `orange_gl_stock_adjustment_contra_meta()` — **قابل للتعديل** (مثلاً إلى ذمة موظف) قبل الاعتماد؛ المحاسب يراجع القيد المحاسبي كما هو.
+  • **بذرة v97** (`orange_catalog_migrate_stock_adjustment_gain_loss_v97`): ينسخ `stock_adjustment_contra` القديم إلى المفتاحين الجديدين إن وُجد؛ يُدرج قاعدتَي SAJ gain/loss إن لم توجد.
+  • **توافق:** مفتاح `stock_adjustment_contra` الواحد يبقى fallback في الكود فقط — لا يظهر في قوائم القسم ٢.
 - **مراجعة القيود:** قيود LYE/LYX/SAJ تظهر في «سندات أخرى/تقارير السندات» بنوعها، ولا تُسجَّل يدوياً في
   «سند القيد» — الترقيم يُخصَّص آلياً عند الترحيل (orange_voucher_post) من entry_type.
 
@@ -51,7 +52,8 @@ ORANGE — أرشيف منهج التصنيف المحاسبي والتقاري�
   • `includes/country_selective_copy.php` — `orange_country_copy_journal_types_selective()` (upsert بالكود:
     جديد أو تحديث name_ar/name_en/sort_order)؛ `orange_country_copy_accounts_selective()` (upsert بالكود +
     تضمين الأسلاف تلقائياً؛ تحديث الأسماء/التصنيف عند وجود الكود في الهدف).
-  • API (مشرف عام فقط): `admin/api/country-copy/journal-types.php`، `admin/api/country-copy/accounts.php`.
+  • API + UI (مشرف عام = `orange_admin_has_full_access` — نفس مبدّل الدول؛ ليس `is_superuser` وحده):
+    `admin/api/country-copy/journal-types.php`، `admin/api/country-copy/accounts.php`.
   • UI: checkboxes + اختيار الدولة الهدف في `admin/pages/journal_types.php` و`admin/pages/chart_of_accounts.php`.
 - **الفرق عن provision الكامل:** `orange_country_copy_*_from_source` في `country_provision.php` يعمل عند
   تهيئة دولة **فارغة** (target_has_rows / target_has_accounts). النسخ الانتقائي يعمل في أي وقت على

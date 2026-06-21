@@ -14,8 +14,9 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $coaAdmin = current_admin();
-$coaIsSuper = $coaAdmin !== null && orange_admin_is_superuser($coaAdmin);
-$coaCountries = $coaIsSuper ? orange_countries_admin_list($pdo) : [];
+// نفس شرط مبدّل الدول في الهيدر (orange_admin_has_full_access) — ليس is_superuser وحده.
+$coaCanCopyBetweenCountries = $coaAdmin !== null && orange_admin_has_full_access($coaAdmin);
+$coaCountries = $coaCanCopyBetweenCountries ? orange_countries_admin_list($pdo) : [];
 
 $ctxCountryId = orange_admin_context_country_id($pdo);
 $ctxCountryLabel = orange_admin_page_country_label($pdo);
@@ -193,7 +194,13 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
     </div>
 </div>
 
-<?php if ($coaIsSuper && orange_table_has_column($pdo, 'accounts', 'country_id')): ?>
+<?php if ($coaCanCopyBetweenCountries && !orange_table_has_column($pdo, 'accounts', 'country_id')): ?>
+<p class="card-hint" style="margin:0.75rem 0;color:#92400e;">
+    تنبيه: عمود <code dir="ltr">country_id</code> غير مفعّل بعد على جدول الحسابات — افتح أي صفحة أدmin لإكمال الترحيل؛ النسخ بين الدول يظهر بعد ذلك.
+</p>
+<?php endif; ?>
+
+<?php if ($coaCanCopyBetweenCountries && orange_table_has_column($pdo, 'accounts', 'country_id')): ?>
 <div class="card coa-copy-card" dir="rtl" style="margin-top:1rem;" id="coa_copy_card">
     <h3 class="card-title">نسخ حسابات الدليل إلى دولة أخرى</h3>
     <p class="card-hint" style="margin:0 0 0.75rem;">

@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/voucher_print_banner.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
+require_once __DIR__ . '/../../includes/gl_settings.php';
 
 $pdo = orange_admin_page_pdo();
 $stkPrintTuning = orange_admin_voucher_print_tuning_mode();
@@ -34,16 +35,11 @@ $invAccJson = json_encode([
     'name' => (string) $invAccCN['name'],
 ], JSON_UNESCAPED_UNICODE) ?: '{"id":0,"code":"","name":""}';
 
-// الطرف المقابل الافتراضي (اختياري): يُقترَح في أول سطر معالجة بالكارت السفلي ويبقى قابلاً للتعديل.
-$contraAccId = $ready
-    ? (int) (orange_gl_account_id_optional($pdo, 'stock_adjustment_contra', $ctxCountryId > 0 ? $ctxCountryId : null) ?? 0)
-    : 0;
-$contraAccCN = orange_stock_adjustment_account_code_name($pdo, $contraAccId);
-$contraAccJson = json_encode([
-    'id' => $contraAccId,
-    'code' => (string) $contraAccCN['code'],
-    'name' => (string) $contraAccCN['name'],
-], JSON_UNESCAPED_UNICODE) ?: '{"id":0,"code":"","name":""}';
+// الطرف المقابل القياسي (ربح/خسارة) — من «ربط نوع اليومية» SAJ أو مفاتيح القسم ١.
+$stkGainMeta = $ready ? orange_gl_stock_adjustment_contra_meta($pdo, 'gain', $ctxCountryId) : ['account_id' => 0, 'code' => '', 'name' => ''];
+$stkLossMeta = $ready ? orange_gl_stock_adjustment_contra_meta($pdo, 'loss', $ctxCountryId) : ['account_id' => 0, 'code' => '', 'name' => ''];
+$stkGainJson = json_encode($stkGainMeta, JSON_UNESCAPED_UNICODE) ?: '{}';
+$stkLossJson = json_encode($stkLossMeta, JSON_UNESCAPED_UNICODE) ?: '{}';
 
 $initial = [
     'id' => 0,
@@ -51,6 +47,7 @@ $initial = [
     'notes' => '',
     'status' => 'draft',
     'journal_voucher_id' => 0,
+    'treatment_kind' => 'gain',
     'lines' => [],
     'gl_lines' => [],
     'reference' => '',
@@ -58,12 +55,17 @@ $initial = [
 ];
 if ($editSv !== null) {
     $h = $editSv['header'];
+    $tk = trim((string) ($h['treatment_kind'] ?? 'gain'));
+    if ($tk !== 'loss') {
+        $tk = 'gain';
+    }
     $initial = [
         'id' => (int) ($h['id'] ?? 0),
         'document_date' => substr((string) ($h['document_date'] ?? ''), 0, 10) ?: date('Y-m-d'),
         'notes' => (string) ($h['notes'] ?? ''),
         'status' => (string) ($h['status'] ?? 'draft'),
         'journal_voucher_id' => (int) ($h['journal_voucher_id'] ?? 0),
+        'treatment_kind' => $tk,
         'lines' => $editSv['lines'],
         'gl_lines' => $editSv['gl_lines'] ?? [],
         'total_value' => (float) ($editSv['total_value'] ?? 0),
@@ -200,6 +202,16 @@ if ($editSv !== null) {
 
     <div class="stk-treat-card">
         <h4 class="stk-treat-title">المعالجة المحاسبية (قيد التسوية)</h4>
+        <div class="form-grid jv-print-hide" style="grid-template-columns:minmax(220px,1fr);max-width:480px;margin-bottom:8px;">
+            <div>
+                <label for="stk_treat_kind">نوع التسوية المحاسبية</label>
+                <select id="stk_treat_kind" class="admin-inp" aria-label="نوع التسوية المحاسبية">
+                    <option value="gain">ربح — زيادة مخزون (دائن: أرباح/خسائر)</option>
+                    <option value="loss">خسارة — نقص مخزون (مدين: أرباح/خسائر)</option>
+                </select>
+            </div>
+        </div>
+        <p class="card-hint jv-print-hide" style="margin:0 0 8px;">حساب المخزون يُولَّد تلقائياً. اختر ربح أو خسارة لاقتراح حساب أرباح/خسائر من الإعدادات — ويمكنك تغييره (مثلاً إلى ذمة موظف).</p>
         <div class="admin-doc-frame">
             <div class="table-wrap">
                 <table class="admin-table admin-doc-lines-table jv-lines-table stk-treat-table" id="stk_treat_table">
@@ -427,11 +439,15 @@ if ($editSv !== null) {
     var NEXT_NO = <?php echo (int) $nextNo; ?>;
     var STK_PRINT_TUNING = <?php echo $stkPrintTuning ? 'true' : 'false'; ?>;
     var INV_ACC = <?php echo $invAccJson; ?>;
-    var STK_CONTRA_DEFAULT = <?php echo $contraAccJson; ?>;
+    var STK_GAIN_META = <?php echo $stkGainJson; ?>;
+    var STK_LOSS_META = <?php echo $stkLossJson; ?>;
     var STK_REF_PREVIEW = <?php echo json_encode($stkRefPreview, JSON_UNESCAPED_UNICODE) ?: '""'; ?>;
     var state = <?php echo $initialJson; ?>;
     if (!state.lines) { state.lines = []; }
     if (!state.gl_lines) { state.gl_lines = []; }
+    if (!state.treatment_kind || (state.treatment_kind !== 'loss' && state.treatment_kind !== 'gain')) {
+        state.treatment_kind = 'gain';
+    }
     var browseId = state.id > 0 ? state.id : 0;
     var stkEditLockCtl = null;
     function round4(n) { return Math.round((Number(n) || 0) * 10000) / 10000; }
@@ -531,13 +547,42 @@ if ($editSv !== null) {
 
     function emptyGlLine() { return { account_id: 0, account_code: '', account_name: '', debit: 0, credit: 0 }; }
 
-    // أول سطر معالجة لسند جديد: يُقترَح فيه الطرف المقابل الافتراضي (إن رُبط) ويبقى قابلاً للتعديل/الحذف.
+    function getTreatKind() {
+        var sel = el('stk_treat_kind');
+        var v = sel ? String(sel.value || '').trim() : '';
+        return v === 'loss' ? 'loss' : 'gain';
+    }
+
+    function contraMetaForKind(kind) {
+        return kind === 'loss' ? STK_LOSS_META : STK_GAIN_META;
+    }
+
+    function syncTreatKindFromUi() {
+        state.treatment_kind = getTreatKind();
+    }
+
+    function applyContraAccountToFirstLine(kind) {
+        var meta = contraMetaForKind(kind);
+        var accId = parseInt(meta.account_id, 10) || 0;
+        if (accId <= 0) { return; }
+        if (state.gl_lines.length === 0) {
+            state.gl_lines.push(emptyGlLine());
+        }
+        var g = state.gl_lines[0];
+        g.account_id = accId;
+        g.account_code = meta.code || '';
+        g.account_name = meta.name || '';
+    }
+
     function suggestedGlLine() {
         var g = emptyGlLine();
-        if (STK_CONTRA_DEFAULT && (parseInt(STK_CONTRA_DEFAULT.id, 10) || 0) > 0) {
-            g.account_id = parseInt(STK_CONTRA_DEFAULT.id, 10) || 0;
-            g.account_code = STK_CONTRA_DEFAULT.code || '';
-            g.account_name = STK_CONTRA_DEFAULT.name || '';
+        var kind = getTreatKind();
+        var meta = contraMetaForKind(kind);
+        var accId = parseInt(meta.account_id, 10) || 0;
+        if (accId > 0) {
+            g.account_id = accId;
+            g.account_code = meta.code || '';
+            g.account_name = meta.name || '';
         }
         return g;
     }
@@ -713,6 +758,11 @@ if ($editSv !== null) {
         el('stk_number').value = state.id > 0 ? state.id : NEXT_NO;
         el('stk_ref').value = state.reference || STK_REF_PREVIEW;
         el('stk_desc').value = state.notes || '';
+        var tkSel = el('stk_treat_kind');
+        if (tkSel) {
+            tkSel.value = state.treatment_kind === 'loss' ? 'loss' : 'gain';
+            tkSel.disabled = isApproved();
+        }
         el('stk_status_badge').textContent = state.id > 0
             ? ('سند #' + state.id + ' — ' + (isApproved() ? ('معتمد' + (state.journal_voucher_id ? ' (قيد #' + state.journal_voucher_id + ')' : '')) : 'مسودة'))
             : '';
@@ -738,6 +788,7 @@ if ($editSv !== null) {
         el('stk_desc').readOnly = ro;
         var ta = el('stk_treat_add'); if (ta) { ta.disabled = ro; }
         var tb = el('stk_treat_balance_btn'); if (tb) { tb.disabled = ro; }
+        var tk = el('stk_treat_kind'); if (tk) { tk.disabled = ro; }
     }
 
     function syncFromInputs() {
@@ -925,6 +976,7 @@ if ($editSv !== null) {
             id: state.id || 0,
             document_date: (typeof orangeGetDmyValueAsIso === 'function') ? orangeGetDmyValueAsIso(el('stk_document_date')) : '',
             notes: el('stk_desc').value.trim(),
+            treatment_kind: getTreatKind(),
             lines: state.lines.filter(function (l) { return (parseInt(l.variant_id, 10) || 0) > 0; }).map(function (ln) {
                 return {
                     variant_id: parseInt(ln.variant_id, 10) || 0,
@@ -953,6 +1005,7 @@ if ($editSv !== null) {
         state.notes = h.notes || '';
         state.status = h.status || 'draft';
         state.journal_voucher_id = parseInt(h.journal_voucher_id, 10) || 0;
+        state.treatment_kind = (h.treatment_kind === 'loss') ? 'loss' : 'gain';
         state.reference = sv.reference || '';
         state.lines = sv.lines || [];
         state.gl_lines = sv.gl_lines || [];
@@ -1011,7 +1064,7 @@ if ($editSv !== null) {
     }
 
     function newSheet() {
-        state = { id: 0, document_date: '<?php echo $initial['document_date']; ?>', notes: '', status: 'draft', journal_voucher_id: 0, reference: '', lines: [], gl_lines: [], total_value: 0 };
+        state = { id: 0, document_date: '<?php echo $initial['document_date']; ?>', notes: '', status: 'draft', journal_voucher_id: 0, treatment_kind: 'gain', reference: '', lines: [], gl_lines: [], total_value: 0 };
         browseId = 0;
         if (typeof orangeIsoDateToDmy === 'function') { el('stk_document_date').value = orangeIsoDateToDmy(state.document_date); }
         showErr(''); showOk('');
@@ -1097,6 +1150,16 @@ if ($editSv !== null) {
             page: 'stock_adjustment_voucher',
             countryId: <?php echo (int) $ctxCountryId; ?>,
             getEntityId: function () { return state.journal_voucher_id || 0; }
+        });
+    }
+
+    var tkSelInit = el('stk_treat_kind');
+    if (tkSelInit) {
+        tkSelInit.addEventListener('change', function () {
+            syncTreatKindFromUi();
+            applyContraAccountToFirstLine(getTreatKind());
+            renderTreat();
+            updateTreatBalance();
         });
     }
 

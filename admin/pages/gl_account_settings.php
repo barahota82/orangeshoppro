@@ -368,6 +368,8 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
             debDiv.removeAttribute('aria-hidden');
             if (code === 'PDN' && pt === 'credit') {
                 debDiv.innerHTML = '<span class="gl-rule-acct-muted">ذمة المورد (من المستند)</span>';
+            } else if (code === 'SAJ' && pt === 'gain') {
+                debDiv.innerHTML = '<span class="gl-rule-acct-muted">المخزون (تلقائي — مفتاح inventory)</span>';
             } else if (deb && deb.style.display !== 'none' && !deb.disabled) {
                 debDiv.textContent = '';
                 debDiv.setAttribute('aria-hidden', 'true');
@@ -381,6 +383,8 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
             creDiv.removeAttribute('aria-hidden');
             if (code === 'PIN' && pt === 'credit') {
                 creDiv.innerHTML = '<span class="gl-rule-acct-muted">ذمة المورد (من المستند)</span>';
+            } else if (code === 'SAJ' && pt === 'loss') {
+                creDiv.innerHTML = '<span class="gl-rule-acct-muted">المخزون (تلقائي — مفتاح inventory)</span>';
             } else if (cre && cre.style.display !== 'none' && !cre.disabled) {
                 creDiv.textContent = '';
                 creDiv.setAttribute('aria-hidden', 'true');
@@ -426,8 +430,24 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
     function isPurchaseSplitJournalCode(code) {
         return code === 'PIN' || code === 'PDN';
     }
+    function isStockAdjustmentSplitJournalCode(code) {
+        return code === 'SAJ';
+    }
+    function isSplitPaymentTermsJournalCode(code) {
+        return isPurchaseSplitJournalCode(code) || isStockAdjustmentSplitJournalCode(code);
+    }
     function paymentTermsSelectHtml(jtId, selectedPt) {
         var code = journalTypeCodeById(jtId);
+        if (isStockAdjustmentSplitJournalCode(code)) {
+            var pt = String(selectedPt || '').trim();
+            if (pt !== 'gain' && pt !== 'loss') {
+                pt = 'gain';
+            }
+            return '<select class="gl-sel-pt" aria-label="ربح أو خسارة">' +
+                '<option value="gain"' + (pt === 'gain' ? ' selected' : '') + '>ربح (زيادة مخزون)</option>' +
+                '<option value="loss"' + (pt === 'loss' ? ' selected' : '') + '>خسارة (نقص مخزون)</option>' +
+                '</select>';
+        }
         if (!isPurchaseSplitJournalCode(code)) {
             return '<select class="gl-sel-pt gl-sel-pt--standard" aria-label="نقدي أو آجل">' +
                 '<option value="" selected>قياسي</option></select>';
@@ -459,6 +479,64 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
         }
         if (code === 'PDN' && pt === 'credit' && deb) {
             deb.title = '';
+        }
+    }
+
+    /**
+     * SAJ: gain — المدين مخزون تلقائي؛ loss — الدائن مخزون تلقائي.
+     */
+    function applyStockAdjustmentColumnLayout(tr) {
+        var jt = parseInt((tr.querySelector('.gl-sel-jt-id') || {}).value, 10) || 0;
+        var code = journalTypeCodeById(jt);
+        var ptSel = tr.querySelector('.gl-sel-pt');
+        var pt = ptSel && !ptSel.classList.contains('gl-sel-pt--standard')
+            ? String(ptSel.value || '').trim()
+            : '';
+        var tdDeb = tr.querySelector('.gl-td-debit');
+        var tdCre = tr.querySelector('.gl-td-credit');
+        var deb = tr.querySelector('.gl-sel-debit-key');
+        var cre = tr.querySelector('.gl-sel-credit-key');
+        if (tdDeb) {
+            tdDeb.querySelectorAll('.gl-rule-from-doc-placeholder').forEach(function (n) { n.remove(); });
+        }
+        if (tdCre) {
+            tdCre.querySelectorAll('.gl-rule-from-doc-placeholder').forEach(function (n) { n.remove(); });
+        }
+        if (deb) {
+            deb.style.display = '';
+            deb.disabled = false;
+        }
+        if (cre) {
+            cre.style.display = '';
+            cre.disabled = false;
+        }
+        if (!isStockAdjustmentSplitJournalCode(code) || (pt !== 'gain' && pt !== 'loss')) {
+            return;
+        }
+        var ph = document.createElement('span');
+        ph.className = 'gl-rule-from-doc-placeholder';
+        ph.style.cssText = 'display:inline-block;padding:0.35rem 0.5rem;color:var(--muted,#666);font-size:0.92em;line-height:1.4;';
+        ph.textContent = 'المخزون (تلقائي — مفتاح inventory)';
+        ph.title = 'يُضاف تلقائياً عند ترحيل قيد التسوية — لا يُختار هنا';
+
+        if (code === 'SAJ' && pt === 'gain') {
+            if (deb) {
+                deb.value = 'inventory';
+                deb.style.display = 'none';
+                deb.disabled = true;
+            }
+            if (tdDeb) {
+                tdDeb.appendChild(ph.cloneNode(true));
+            }
+        } else if (code === 'SAJ' && pt === 'loss') {
+            if (cre) {
+                cre.value = 'inventory';
+                cre.style.display = 'none';
+                cre.disabled = true;
+            }
+            if (tdCre) {
+                tdCre.appendChild(ph.cloneNode(true));
+            }
         }
     }
 
@@ -531,11 +609,13 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
             ptEl.addEventListener('change', function () {
                 syncRuleRowLabels(tr);
                 applyPurchaseCreditColumnLayout(tr);
+                applyStockAdjustmentColumnLayout(tr);
                 refreshAllRuleAccountPreviews();
             });
         }
         syncRuleRowLabels(tr);
         applyPurchaseCreditColumnLayout(tr);
+        applyStockAdjustmentColumnLayout(tr);
         refreshAllRuleAccountPreviews();
     }
 
@@ -552,13 +632,19 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
             var code = journalTypeCodeById(jt);
             var pt = String((tr.querySelector('.gl-sel-pt') || {}).value || '').trim();
             if (!u[jt]) {
-                u[jt] = { standard: false, cash: false, credit: false };
+                u[jt] = { standard: false, cash: false, credit: false, gain: false, loss: false };
             }
             if (isPurchaseSplitJournalCode(code)) {
                 if (pt === 'cash') {
                     u[jt].cash = true;
                 } else if (pt === 'credit') {
                     u[jt].credit = true;
+                }
+            } else if (isStockAdjustmentSplitJournalCode(code)) {
+                if (pt === 'gain') {
+                    u[jt].gain = true;
+                } else if (pt === 'loss') {
+                    u[jt].loss = true;
                 }
             } else {
                 u[jt].standard = true;
@@ -581,6 +667,10 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
                 if (u) {
                     if (isPurchaseSplitJournalCode(code)) {
                         if (u.cash && u.credit) {
+                            continue;
+                        }
+                    } else if (isStockAdjustmentSplitJournalCode(code)) {
+                        if (u.gain && u.loss) {
                             continue;
                         }
                     } else if (u.standard) {
@@ -918,12 +1008,18 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
                     jtRulesInvalid = true;
                     return;
                 }
+            } else if (isStockAdjustmentSplitJournalCode(jcode)) {
+                if (pt !== 'gain' && pt !== 'loss') {
+                    alert('اختر «ربح» أو «خسارة» لقيد تسوية المخزون (SAJ).');
+                    jtRulesInvalid = true;
+                    return;
+                }
             } else {
                 pt = '';
             }
             var sig = jt + '\0' + pt;
             if (seenRuleSig[sig]) {
-                alert('قاعدة مكررة لنفس نوع اليومية ونفس نقدي/آجل.');
+                alert('قاعدة مكررة لنفس نوع اليومية ونفس نوع الصف.');
                 jtRulesInvalid = true;
                 return;
             }
@@ -959,6 +1055,30 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
             } else if (jcode === 'PDN' && pt === 'cash') {
                 if (!dk || !ck || glDebitCreditKeysConflict(dk, ck)) {
                     alert('مردود مشتريات نقدي: اختر حسابين مختلفين للمدين والدائن (لا نفس الحساب).');
+                    jtRulesInvalid = true;
+                    return;
+                }
+            } else if (jcode === 'SAJ' && pt === 'gain') {
+                dk = 'inventory';
+                if (!ck) {
+                    alert('تسوية مخزون — ربح: اختر حساب الدائن (أرباح/خسائر جرد) من القسم ١.');
+                    jtRulesInvalid = true;
+                    return;
+                }
+                if (dk === ck) {
+                    alert('لا يمكن أن يكون المخزون وأرباح/خسائر الجرد نفس الحساب.');
+                    jtRulesInvalid = true;
+                    return;
+                }
+            } else if (jcode === 'SAJ' && pt === 'loss') {
+                ck = 'inventory';
+                if (!dk) {
+                    alert('تسوية مخزون — خسارة: اختر حساب المدين (أرباح/خسائر جرد) من القسم ١.');
+                    jtRulesInvalid = true;
+                    return;
+                }
+                if (dk === ck) {
+                    alert('لا يمكن أن يكون المخزون وأرباح/خسائر الجرد نفس الحساب.');
                     jtRulesInvalid = true;
                     return;
                 }

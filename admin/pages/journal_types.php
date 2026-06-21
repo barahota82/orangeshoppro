@@ -13,8 +13,9 @@ orange_catalog_ensure_schema($pdo);
 orange_catalog_ensure_journal_types_country_scope($pdo);
 
 $jtAdmin = current_admin();
-$jtIsSuper = $jtAdmin !== null && orange_admin_is_superuser($jtAdmin);
-$jtCountries = $jtIsSuper ? orange_countries_admin_list($pdo) : [];
+// نفس شرط مبدّل الدول في الهيدر (orange_admin_has_full_access) — ليس is_superuser وحده.
+$jtCanCopyBetweenCountries = $jtAdmin !== null && orange_admin_has_full_access($jtAdmin);
+$jtCountries = $jtCanCopyBetweenCountries ? orange_countries_admin_list($pdo) : [];
 
 $jtCountryId = orange_admin_context_country_id($pdo);
 $jtCountryRow = orange_country_row_by_id($pdo, $jtCountryId, false);
@@ -58,7 +59,7 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
             <table class="fy-years-table">
                 <thead>
                     <tr>
-                        <?php if ($jtIsSuper): ?>
+                        <?php if ($jtCanCopyBetweenCountries): ?>
                         <th class="fy-col-check" style="width:2.5rem;text-align:center;" title="تحديد للنسخ">
                             <input type="checkbox" id="jt_copy_all" aria-label="تحديد الكل">
                         </th>
@@ -81,7 +82,7 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
                         $nameEn = (string) ($t['name_en'] ?? '');
                         ?>
                     <tr data-jt-row data-id="<?php echo $id; ?>">
-                        <?php if ($jtIsSuper): ?>
+                        <?php if ($jtCanCopyBetweenCountries): ?>
                         <td class="fy-col-check" style="text-align:center;">
                             <?php if ($id > 0): ?>
                             <input type="checkbox" class="jt-copy-chk" value="<?php echo $id; ?>" aria-label="تحديد للنسخ">
@@ -114,7 +115,7 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
         </div>
     </div>
 
-    <?php if ($jtIsSuper && $jtScoped): ?>
+    <?php if ($jtCanCopyBetweenCountries && $jtScoped): ?>
     <div class="card" style="margin-top:1rem;" id="jt_copy_card">
         <h3 class="card-title">نسخ أنواع اليوميات إلى دولة أخرى</h3>
         <p class="card-hint" style="margin:0 0 0.75rem;">
@@ -152,7 +153,7 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
 <script>
 (function () {
     var jtCanAutoSeed = <?php echo $jtCanAutoSeed ? 'true' : 'false'; ?>;
-    var jtIsSuper = <?php echo $jtIsSuper ? 'true' : 'false'; ?>;
+    var jtIsSuper = <?php echo $jtCanCopyBetweenCountries ? 'true' : 'false'; ?>;
     function jtCopyColHtml() {
         return jtIsSuper ? '<td class="fy-col-check" style="text-align:center;"></td>' : '';
     }

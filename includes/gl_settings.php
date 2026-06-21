@@ -53,7 +53,8 @@ function orange_gl_setting_key_labels(): array
         'delivery_payable_default' => 'مستحقات توصيل افتراضي — دائن عند تسليم الطلب إذا لم تُعيَّن شركة توصيل للمحافظة (يُصرف من الخزينة لاحقاً)',
         'loyalty_program_expense' => 'مصروفات برنامج الولاء والمكافآت — مدين عند كسب العميل نقاطاً (والدائن: التزامات نقاط الولاء)؛ ويُعكَس عليه المنتهي',
         'loyalty_points_liability' => 'التزامات نقاط الولاء — دائن عند الكسب؛ مدين عند الاستبدال أو الانتهاء',
-        'stock_adjustment_contra' => 'الطرف المقابل الافتراضي لتسوية المخزون (أرباح/خسائر جرد) — يُقترَح تلقائياً في الكارت السفلي لقيد تسوية المخزون، ويبقى قابلاً للتعديل لكل سند حسب سبب التسوية',
+        'stock_adjustment_gain' => 'أرباح جرد (تسوية مخزون — زيادة) — دائن مقابل زيادة المخزون؛ يُقترَح في الكارت السفلي ويمكن تغييره (مثلاً إلى ذمة موظف)',
+        'stock_adjustment_loss' => 'خسائر جرد (تسوية مخزون — نقص) — مدين مقابل نقص المخزون؛ يُقترَح في الكارت السفلي ويمكن تغييره (مثلاً إلى ذمة موظف)',
         'vat_output' => 'ضريبة القيمة المضافة المستحقة (مبيعات) — التزام؛ تُحسب تلقائياً بنسبة الدولة على فواتير البيع (الكويت 0% = لا أثر)',
         'vat_input' => 'ضريبة القيمة المضافة على المشتريات (مدخلات) — أصل/قابلة للخصم؛ تُحسب تلقائياً بنسبة الدولة على فواتير الشراء',
         /** توافق قديم — يُستبدل بمفتاح cogs */
@@ -99,7 +100,8 @@ function orange_gl_setting_row_short_labels(): array
         'delivery_payable_default' => $p . 'مستحقات توصيل افتراضي',
         'loyalty_program_expense' => $p . 'مصروفات برنامج الولاء',
         'loyalty_points_liability' => $p . 'التزامات نقاط الولاء',
-        'stock_adjustment_contra' => $p . 'الطرف المقابل لتسوية المخزون',
+        'stock_adjustment_gain' => $p . 'أرباح جرد (تسوية)',
+        'stock_adjustment_loss' => $p . 'خسائر جرد (تسوية)',
         'vat_output' => $p . 'ضريبة القيمة المضافة (مبيعات)',
         'vat_input' => $p . 'ضريبة القيمة المضافة (مشتريات)',
         'income_summary' => $p . 'أرباح / خسائر السنة الحالية',
@@ -135,7 +137,8 @@ function orange_gl_settings_form_key_order(): array
         'delivery_payable_default',
         'loyalty_program_expense',
         'loyalty_points_liability',
-        'stock_adjustment_contra',
+        'stock_adjustment_gain',
+        'stock_adjustment_loss',
         'vat_output',
         'vat_input',
         'income_summary',
@@ -205,7 +208,11 @@ function orange_gl_journal_type_rule_for_terms(PDO $pdo, int $journalTypeId, str
     }
     $pt = trim($paymentTerms);
     $code = orange_journal_type_code_by_id($pdo, $journalTypeId);
-    if ($code !== 'PIN' && $code !== 'PDN') {
+    if ($code === 'SAJ') {
+        if ($pt !== 'gain' && $pt !== 'loss') {
+            return null;
+        }
+    } elseif ($code !== 'PIN' && $code !== 'PDN') {
         $pt = '';
     } elseif ($pt !== 'cash' && $pt !== 'credit') {
         return null;
@@ -318,6 +325,65 @@ function orange_gl_rule_accounts_for_code(PDO $pdo, string $journalCode, ?int $c
     }
 
     return ['debit' => $deb, 'credit' => $cred, 'debit_key' => $dk, 'credit_key' => $ck];
+}
+
+/**
+ * حساب الطرف المقابل لقيد تسوية المخزون (الكارت السفلي) حسب نوع التسوية.
+ *
+ * - gain (ربح/زيادة): دائن — من قاعدة SAJ+gain أو مفتاح stock_adjustment_gain.
+ * - loss (خسارة/نقص): مدين — من قاعدة SAJ+loss أو مفتاح stock_adjustment_loss.
+ *
+ * @param 'gain'|'loss' $kind
+ *
+ * @return array{account_id:int, side:string, setting_key:string, code:string, name:string}
+ */
+function orange_gl_stock_adjustment_contra_meta(PDO $pdo, string $kind, ?int $countryId = null): array
+{
+    $kind = $kind === 'loss' ? 'loss' : 'gain';
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    $out = ['account_id' => 0, 'side' => $kind === 'gain' ? 'credit' : 'debit', 'setting_key' => '', 'code' => '', 'name' => ''];
+    $fallbackKey = $kind === 'gain' ? 'stock_adjustment_gain' : 'stock_adjustment_loss';
+    $settingKey = $fallbackKey;
+
+    $jtId = orange_journal_type_id_by_code($pdo, 'SAJ', $cid);
+    if ($jtId > 0) {
+        $rule = orange_gl_journal_type_rule_for_terms($pdo, $jtId, $kind);
+        if ($rule !== null) {
+            $settingKey = $kind === 'gain'
+                ? trim((string) ($rule['credit_setting_key'] ?? ''))
+                : trim((string) ($rule['debit_setting_key'] ?? ''));
+            if ($settingKey === '') {
+                $settingKey = $fallbackKey;
+            }
+        }
+    }
+
+    $accId = (int) (orange_gl_account_id_optional($pdo, $settingKey, $cid) ?? 0);
+    if ($accId <= 0 && $settingKey !== $fallbackKey) {
+        $accId = (int) (orange_gl_account_id_optional($pdo, $fallbackKey, $cid) ?? 0);
+        $settingKey = $fallbackKey;
+    }
+    // توافق قديم: مفتاح stock_adjustment_contra الواحد.
+    if ($accId <= 0) {
+        $accId = (int) (orange_gl_account_id_optional($pdo, 'stock_adjustment_contra', $cid) ?? 0);
+        if ($accId > 0) {
+            $settingKey = 'stock_adjustment_contra';
+        }
+    }
+
+    $out['account_id'] = $accId;
+    $out['setting_key'] = $settingKey;
+    if ($accId > 0 && orange_table_exists($pdo, 'accounts')) {
+        $st = $pdo->prepare('SELECT code, name FROM accounts WHERE id = ? LIMIT 1');
+        $st->execute([$accId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (is_array($row)) {
+            $out['code'] = trim((string) ($row['code'] ?? ''));
+            $out['name'] = trim((string) ($row['name'] ?? ''));
+        }
+    }
+
+    return $out;
 }
 
 /**
@@ -441,7 +507,8 @@ function orange_gl_journal_rule_dropdown_excluded_keys(): array
         'cogs_returns_online',
         'delivery_expense',
         'delivery_payable_default',
-        // الطرف المقابل لتسوية المخزون = افتراضي يُقترح في الكارت السفلي، وليس قاعدة مدين/دائن ثابتة.
+        // stock_adjustment_gain / stock_adjustment_loss تظهر في قوائم القسم ٢ لقواعد SAJ.
+        // stock_adjustment_contra — مفتاح قديم (يُنسخ تلقائياً إلى gain/loss عند الترحيل v97).
         'stock_adjustment_contra',
         // ملاحظة: مفاتيح الولاء (loyalty_program_expense / loyalty_points_liability) لم تَعُد مستبعدة
         // كي تظهر في قوائم «ربط نوع اليومية» لقيدَي LYE/LYX (الحل الأول للولاء).

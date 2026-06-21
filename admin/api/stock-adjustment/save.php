@@ -38,6 +38,7 @@ try {
         'id' => (int) ($data['id'] ?? 0),
         'document_date' => trim((string) ($data['document_date'] ?? '')),
         'notes' => trim((string) ($data['notes'] ?? '')),
+        'treatment_kind' => trim((string) ($data['treatment_kind'] ?? 'gain')),
         'gl_lines' => $glLinesIn,
     ], $lines, $ctxCountryId);
 

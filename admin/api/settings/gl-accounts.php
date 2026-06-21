@@ -251,6 +251,7 @@ try {
             $jCode = orange_journal_type_code_by_id($pdo, $jt);
             $isPin = $jCode === 'PIN';
             $isPdn = $jCode === 'PDN';
+            $isSaj = $jCode === 'SAJ';
             if ($isPin || $isPdn) {
                 if ($pt !== 'cash' && $pt !== 'credit') {
                     $pdo->rollBack();
@@ -259,12 +260,20 @@ try {
                         'message' => 'لفاتورة/مردود المشتريات اختر «نقدي» أو «آجل» في العمود الثاني.',
                     ], 422);
                 }
+            } elseif ($isSaj) {
+                if ($pt !== 'gain' && $pt !== 'loss') {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'لقيد تسوية المخزون (SAJ) اختر «ربح» أو «خسارة» في العمود الثاني.',
+                    ], 422);
+                }
             } else {
                 if ($pt !== '') {
                     $pdo->rollBack();
                     json_response([
                         'success' => false,
-                        'message' => 'عمود نقدي/آجل يخص فاتورة المشتريات (PIN) ومردود المشتريات (PDN) فقط.',
+                        'message' => 'عمود نقدي/آجل يخص PIN/PDN؛ عمود ربح/خسارة يخص SAJ فقط.',
                     ], 422);
                 }
                 $pt = '';
@@ -272,7 +281,7 @@ try {
             $ruleSig = $jt . "\0" . $pt;
             if (isset($seenRule[$ruleSig])) {
                 $pdo->rollBack();
-                json_response(['success' => false, 'message' => 'قاعدة مكررة لنفس نوع اليومية ونفس نقدي/آجل.'], 422);
+                json_response(['success' => false, 'message' => 'قاعدة مكررة لنفس نوع اليومية ونفس نوع الصف.'], 422);
             }
             $seenRule[$ruleSig] = true;
 
@@ -367,6 +376,72 @@ try {
                             'message' => 'اربط حساباً لبند المدين في الجدول العلوي قبل الحفظ.',
                         ], 422);
                     }
+                }
+                $insertJournalRule($jt, $pt, $dk, $ck);
+
+                continue;
+            }
+            if ($isSaj && $pt === 'gain') {
+                $dk = 'inventory';
+                if ($ck === '') {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'تسوية مخزون — ربح: اختر حساب الدائن (أرباح/خسائر جرد) في القسم ١.',
+                    ], 422);
+                }
+                if ($dk === $ck) {
+                    $pdo->rollBack();
+                    json_response(['success' => false, 'message' => 'لا يمكن أن يكون المخزون وأرباح/خسائر الجرد نفس الحساب.'], 422);
+                }
+                if (!in_array($dk, $allowedKeys, true) || !in_array($ck, $allowedKeys, true)) {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'بند المدين/الدائن يجب أن يكون مفتاحاً معرفاً في النظام.',
+                    ], 422);
+                }
+                $aidD = (int) ($resolved[$dk] ?? 0);
+                $aidC = (int) ($resolved[$ck] ?? 0);
+                if ($aidD <= 0 || $aidC <= 0) {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'اربط حساب المخزون وأرباح/خسائر الجرد في الجدول العلوي قبل الحفظ.',
+                    ], 422);
+                }
+                $insertJournalRule($jt, $pt, $dk, $ck);
+
+                continue;
+            }
+            if ($isSaj && $pt === 'loss') {
+                $ck = 'inventory';
+                if ($dk === '') {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'تسوية مخزون — خسارة: اختر حساب المدين (أرباح/خسائر جرد) في القسم ١.',
+                    ], 422);
+                }
+                if ($dk === $ck) {
+                    $pdo->rollBack();
+                    json_response(['success' => false, 'message' => 'لا يمكن أن يكون المخزون وأرباح/خسائر الجرد نفس الحساب.'], 422);
+                }
+                if (!in_array($dk, $allowedKeys, true) || !in_array($ck, $allowedKeys, true)) {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'بند المدين/الدائن يجب أن يكون مفتاحاً معرفاً في النظام.',
+                    ], 422);
+                }
+                $aidD = (int) ($resolved[$dk] ?? 0);
+                $aidC = (int) ($resolved[$ck] ?? 0);
+                if ($aidD <= 0 || $aidC <= 0) {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'اربط حساب المخزون وأرباح/خسائر الجرد في الجدول العلوي قبل الحفظ.',
+                    ], 422);
                 }
                 $insertJournalRule($jt, $pt, $dk, $ck);
 

@@ -11,8 +11,8 @@ require_admin_api();
 
 try {
     $admin = current_admin();
-    if ($admin === null || !orange_admin_is_superuser($admin)) {
-        json_response(['success' => false, 'message' => 'نسخ بين الدول — للمشرف العام فقط'], 403);
+    if ($admin === null || !orange_admin_has_full_access($admin)) {
+        json_response(['success' => false, 'message' => 'نسخ بين الدول — للمشرف العام (وصول كامل / مبدّل الدول) فقط'], 403);
     }
 
     $pdo = db();
