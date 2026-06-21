@@ -36,7 +36,30 @@ $ilpSystemKeyOptions = [[
     'label_ar' => '— بدون ربط تلقائي —',
     'line_kind' => '',
 ]];
-foreach (orange_invoice_ancillary_system_key_catalog() as $sysKey => $sysMeta) {
+// ترتيب القائمة حسب ترتيب شاشة العروض في الأدمن: توصيل ← منتجات ← مجموع السلة ← هدايا ← BOGO ← كومبو ← ولاء.
+$ilpSysCatalog = orange_invoice_ancillary_system_key_catalog();
+$ilpSysOrder = [
+    'delivery_fee_charge',
+    'delivery_fee_discount',
+    'product_offer_discount',
+    'promo_cart_discount',
+    'promo_gift_discount',
+    'promo_bogo_discount',
+    'promo_combo_discount',
+    'loyalty_points_redemption',
+];
+$ilpSysOrdered = [];
+foreach ($ilpSysOrder as $ilpOk) {
+    if (isset($ilpSysCatalog[$ilpOk])) {
+        $ilpSysOrdered[$ilpOk] = $ilpSysCatalog[$ilpOk];
+    }
+}
+foreach ($ilpSysCatalog as $ilpCk => $ilpCm) {
+    if (!isset($ilpSysOrdered[$ilpCk])) {
+        $ilpSysOrdered[$ilpCk] = $ilpCm;
+    }
+}
+foreach ($ilpSysOrdered as $sysKey => $sysMeta) {
     if ((string) ($sysMeta['invoice_context'] ?? '') !== 'sales') {
         continue;
     }
