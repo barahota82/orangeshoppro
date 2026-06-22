@@ -701,8 +701,8 @@ $count = count($customerRows);
         <div class="cus-grid-r1-code">
             <div class="cus-code-nav-row">
                 <div class="cus-code-nav-main">
-                    <label for="cus_code">كود العميل (تلقائي)</label>
-                    <input type="text" id="cus_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" value="<?php echo htmlspecialchars($nextCustomerCodePreview, ENT_QUOTES, 'UTF-8'); ?>" readonly>
+                    <label for="cus_code">كود العميل</label>
+                    <input type="text" id="cus_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" value="<?php echo htmlspecialchars($nextCustomerCodePreview, ENT_QUOTES, 'UTF-8'); ?>" readonly style="background:#f4f4f5;text-align:center;">
                 </div>
                 <div class="cus-code-nav-btns" role="group" aria-label="تنقل بين العملاء">
                     <button type="button" class="btn-secondary cus-code-nav-btn" id="cus_code_edit_btn" title="تعديل الكود يدوياً">تعديل الكود</button>
@@ -1404,6 +1404,7 @@ function cusResetForm() {
         codeEl.value = String(CUS_NEXT_AUTO_CODE || '1');
         codeEl.readOnly = true;
         codeEl.classList.add('admin-sort-field--muted');
+        codeEl.style.background = '#f4f4f5';
     }
     document.getElementById('cus_name').value = '';
     document.getElementById('cus_phone').value = '';
@@ -1444,6 +1445,7 @@ function cusEdit(row) {
         codeEl.value = String(row.code || '');
         codeEl.readOnly = true;
         codeEl.classList.add('admin-sort-field--muted');
+        codeEl.style.background = '#f4f4f5';
     }
     document.getElementById('cus_name').value = String(row.name_ar || '');
     var split = cusSplitPhoneForForm(row.phone || '', row.phone_country_dial || '', row.phone_national || '');
@@ -1677,11 +1679,13 @@ function cusToggleCodeEdit() {
         }
         codeEl.readOnly = false;
         codeEl.classList.remove('admin-sort-field--muted');
+        codeEl.style.background = '';
         codeEl.focus();
         codeEl.select();
     } else {
         codeEl.readOnly = true;
         codeEl.classList.add('admin-sort-field--muted');
+        codeEl.style.background = '#f4f4f5';
     }
 }
 

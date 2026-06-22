@@ -771,7 +771,7 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
             <div class="sup-code-nav-row">
                 <div class="sup-code-nav-main">
                     <label for="sup_code">كود المورد</label>
-                    <input type="text" id="sup_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" value="<?php echo htmlspecialchars($nextSupplierCodePreview, ENT_QUOTES, 'UTF-8'); ?>" readonly style="background:#f4f4f5;">
+                    <input type="text" id="sup_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" value="<?php echo htmlspecialchars($nextSupplierCodePreview, ENT_QUOTES, 'UTF-8'); ?>" readonly style="background:#f4f4f5;text-align:center;">
                 </div>
                 <div class="sup-code-nav-btns" role="group" aria-label="تنقل بين الموردين">
                     <button type="button" class="btn-secondary sup-code-nav-btn" id="sup_code_edit_btn" title="تعديل الكود يدوياً">تعديل الكود</button>
