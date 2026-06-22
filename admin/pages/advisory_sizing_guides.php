@@ -23,7 +23,7 @@ $asgLibraryReady = false;
 if ($tablesReady) {
     try {
         $families = $pdo->query(
-            'SELECT id, name_ar, name_en, commercial_kind_key, sizing_category_key, size_scheme_template_id
+            'SELECT id, name_ar, name_en, commercial_kind_key, size_scheme_template_id
              FROM size_families WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
         )->fetchAll(PDO::FETCH_ASSOC);
         $sStmt = $pdo->query(
@@ -179,24 +179,23 @@ $asgJson = static function (array $rows): string {
             </select>
         </div>
         <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
-            <label for="asg_w_family" style="margin:0;font-size:13px;white-space:nowrap;"><strong>2.</strong> عائلة المقاسات</label>
-            <select id="asg_w_family" style="width:100%;min-width:0;"><option value="0">— اختر —</option>
-                <?php foreach ($families as $ff): ?>
-                <option value="<?php echo (int) $ff['id']; ?>"><?php echo htmlspecialchars(trim((string) ($ff['name_ar'] ?: $ff['name_en'])) ?: ('#' . (int) $ff['id']), ENT_QUOTES, 'UTF-8'); ?></option>
+            <label for="asg_w_tpl" style="margin:0;font-size:13px;white-space:nowrap;"><strong>2.</strong> قالب المقاسات</label>
+            <select id="asg_w_tpl" style="width:100%;min-width:0;"><option value="0">— اختر —</option>
+                <?php foreach ($asgTemplates as $t): ?>
+                <option value="<?php echo (int) $t['id']; ?>"><?php echo htmlspecialchars((string) ($t['name_ar'] ?: $t['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
-        <div style="flex:1 1 0;min-width:9rem;display:flex;flex-direction:column;gap:4px;">
-            <label for="asg_w_layout" style="margin:0;font-size:13px;white-space:nowrap;"><strong>3.</strong> شكل الدليل</label>
-            <select id="asg_w_layout" style="width:100%;min-width:0;">
-                <option value="single">جدول واحد</option>
-                <option value="dual">جدولان (علوي + سفلي — للأطقم)</option>
+        <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
+            <label for="asg_w_ck" style="margin:0;font-size:13px;white-space:nowrap;"><strong>3.</strong> النوع التجاري (مستوى 1)</label>
+            <select id="asg_w_ck" style="width:100%;min-width:0;"><option value="">— اختر —</option>
+                <?php foreach ($asgCommercialKinds as $k): ?>
+                <option value="<?php echo htmlspecialchars((string) $k['kind_key'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) ($k['label_ar'] ?: $k['label_en'] ?: $k['kind_key']), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
             </select>
         </div>
-        <input type="hidden" id="asg_w_tpl" value="0">
-        <input type="hidden" id="asg_w_ck" value="">
         <div style="flex:0 0 auto;">
-            <button type="button" class="btn" id="asg_new_btn" disabled title="أكمل اختيار القسم (1) وعائلة المقاسات (2)">دليل جديد</button>
+            <button type="button" class="btn" id="asg_new_btn" disabled title="أكمل اختيار القسم (1) وقالب المقاسات (2) والنوع التجاري (3)">دليل جديد</button>
         </div>
     </div>
     <p id="asg_w_hint" class="card-hint" style="margin:12px 0 0;"></p>
@@ -208,7 +207,6 @@ $asgJson = static function (array $rows): string {
     <input type="hidden" id="asg_bound_family" value="">
     <input type="hidden" id="asg_scope" value="single">
     <input type="hidden" id="asg_active" value="1">
-    <input type="hidden" id="asg_layout" value="single">
     <div class="form-grid" style="max-width:900px;">
         <div style="grid-column:1/-1;"><label for="asg_name_ar">اسم النموذج (داخلي — عربي فقط) <span style="color:#b91c1c;">*</span></label><input type="text" id="asg_name_ar" maxlength="191" placeholder="مثال: علوي قمصان EU"></div>
     </div>
@@ -216,53 +214,27 @@ $asgJson = static function (array $rows): string {
     <h4 style="margin-top:20px;">تعريف الأعمدة</h4>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:8px;">
         <div>
-            <label for="asg_col_count_upper">عدد الأعمدة</label>
-            <input type="number" id="asg_col_count_upper" min="1" max="24" value="3" style="width:5rem;">
+            <label for="asg_col_count">عدد الأعمدة</label>
+            <input type="number" id="asg_col_count" min="1" max="24" value="3" style="width:5rem;">
         </div>
-        <button type="button" class="btn asg-gen-cols" data-asg-panel="upper">توليد صفوف العناوين</button>
-        <button type="button" class="btn-secondary asg-col-add" data-asg-panel="upper" title="يضيف عموداً جديداً">+ عمود</button>
-        <button type="button" class="btn-secondary asg-col-remove" data-asg-panel="upper" title="يحذف آخر عمود">− حذف آخر عمود</button>
+        <button type="button" class="btn" id="asg_gen_cols">توليد صفوف العناوين</button>
+        <button type="button" class="btn-secondary" id="asg_col_add" title="يضيف عموداً جديداً في النهاية ويضيف خلية فارغة لكل صف بيانات">+ عمود</button>
+        <button type="button" class="btn-secondary" id="asg_col_remove" title="يحذف آخر عمود من التعريف وآخر خلية من كل صف بيانات">− حذف آخر عمود</button>
     </div>
     <div style="overflow-x:auto;">
-        <table class="data-table" id="asg_cols_table_upper">
+        <table class="data-table" id="asg_cols_table">
             <thead><tr><th>ترتيب</th><th>عربي <span style="color:#b91c1c;">*</span></th><th>EN <span style="color:#b91c1c;">*</span></th><th>Fil <span style="color:#b91c1c;">*</span></th><th>Hi <span style="color:#b91c1c;">*</span></th><th>نوع القيمة</th><th>وحدة (عرض)</th><th>تخزين الطول</th><th>عمود النظام (كود)</th></tr></thead>
-            <tbody id="asg_cols_body_upper"></tbody>
+            <tbody id="asg_cols_body"></tbody>
         </table>
     </div>
 
     <h4 style="margin-top:20px;">صفوف الجدول</h4>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
-        <button type="button" class="btn asg-bulk-rows" data-asg-panel="upper" title="يضيف صفاً لكل مقاس في عائلة المعالج؛ مع تخطي ما اختير مسبقاً">إضافة صف لكل مقاس</button>
-        <button type="button" class="btn-secondary asg-row-data" data-asg-panel="upper">+ صف بيانات</button>
-        <button type="button" class="btn-secondary asg-row-label" data-asg-panel="upper" title="سطر عنوان يظهر داخل الدليل للعميل">+ صف عنوان (مجموعة)</button>
+        <button type="button" class="btn" id="asg_bulk_rows" title="يضيف صفاً لكل صف في قالب المقاسات (2)؛ بلا عائلة مربوطة يُستخدم صف القالب للمعاينة (مسودة)، ومع عائلة مطابقة تُستخدم مقاسات العائلة — مع تخطي ما اختير مسبقاً">إضافة صف لكل مقاس حسب القالب (2)</button>
+        <button type="button" class="btn-secondary" id="asg_row_data">+ صف بيانات</button>
+        <button type="button" class="btn-secondary" id="asg_row_label" title="سطر عنوان يظهر داخل الدليل للعميل — مفيد لو جدول واحد فيه أكثر من مجموعة أو عنوان فرعي؛ لجدول مسطح واحد غالباً لا تحتاجه">+ صف عنوان (مجموعة)</button>
     </div>
-    <div id="asg_rows_box_upper"></div>
-
-    <div id="asg_panel_lower_wrap" style="display:none;margin-top:24px;border-top:1px solid #e2e8f0;padding-top:16px;">
-    <h4 style="margin-top:0;">القسم السفلي — تعريف الجدول</h4>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:8px;">
-        <div>
-            <label for="asg_col_count_lower">عدد الأعمدة</label>
-            <input type="number" id="asg_col_count_lower" min="1" max="24" value="3" style="width:5rem;">
-        </div>
-        <button type="button" class="btn asg-gen-cols" data-asg-panel="lower">توليد صفوف العناوين</button>
-        <button type="button" class="btn-secondary asg-col-add" data-asg-panel="lower">+ عمود</button>
-        <button type="button" class="btn-secondary asg-col-remove" data-asg-panel="lower">− حذف آخر عمود</button>
-    </div>
-    <div style="overflow-x:auto;">
-        <table class="data-table" id="asg_cols_table_lower">
-            <thead><tr><th>ترتيب</th><th>عربي <span style="color:#b91c1c;">*</span></th><th>EN <span style="color:#b91c1c;">*</span></th><th>Fil <span style="color:#b91c1c;">*</span></th><th>Hi <span style="color:#b91c1c;">*</span></th><th>نوع القيمة</th><th>وحدة (عرض)</th><th>تخزين الطول</th><th>عمود النظام (كود)</th></tr></thead>
-            <tbody id="asg_cols_body_lower"></tbody>
-        </table>
-    </div>
-    <h4 style="margin-top:20px;">صفوف الجدول — سفلي</h4>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
-        <button type="button" class="btn asg-bulk-rows" data-asg-panel="lower">إضافة صف لكل مقاس</button>
-        <button type="button" class="btn-secondary asg-row-data" data-asg-panel="lower">+ صف بيانات</button>
-        <button type="button" class="btn-secondary asg-row-label" data-asg-panel="lower">+ صف عنوان (مجموعة)</button>
-    </div>
-    <div id="asg_rows_box_lower"></div>
-    </div>
+    <div id="asg_rows_box"></div>
 
     <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
         <button type="button" class="btn" id="asg_save_btn">حفظ</button>
@@ -369,76 +341,13 @@ $asgJson = static function (array $rows): string {
     /** عند فتح «دليل جديد» (مسودة غير محفوظة): توقيع القسم+القالب+النوع وقت الفتح؛ يُصفّر عند التعديل أو الإغلاق. */
     var asgNewEditorWizardSig = null;
 
-    function wizardFamilyId() {
-        var el = document.getElementById('asg_w_family');
-        return el ? (parseInt(el.value, 10) || 0) : 0;
-    }
-
-    function wizardLayoutKind() {
-        var el = document.getElementById('asg_w_layout');
-        return (el && el.value === 'dual') ? 'dual' : 'single';
-    }
-
-    function asgSyncLayoutPanels() {
-        var lk = wizardLayoutKind();
-        var layEl = document.getElementById('asg_layout');
-        if (layEl) {
-            layEl.value = lk;
-        }
-        var lw = document.getElementById('asg_panel_lower_wrap');
-        if (lw) {
-            lw.style.display = (lk === 'dual') ? 'block' : 'none';
-        }
-    }
-
-    function asgPanelList() {
-        return wizardLayoutKind() === 'dual' ? ['upper', 'lower'] : ['upper'];
-    }
-
-    function asgColsBodyId(panel) {
-        return 'asg_cols_body_' + panel;
-    }
-
-    function asgRowsBoxId(panel) {
-        return 'asg_rows_box_' + panel;
-    }
-
-    function asgColCountId(panel) {
-        return 'asg_col_count_' + panel;
-    }
-
-    function syncWizardFromFamily(famId) {
-        famId = parseInt(famId, 10) || 0;
-        var tplEl = document.getElementById('asg_w_tpl');
-        var ckEl = document.getElementById('asg_w_ck');
-        var famEl = document.getElementById('asg_w_family');
-        if (famEl && famId > 0) {
-            famEl.value = String(famId);
-        }
-        if (famId <= 0) {
-            return;
-        }
-        for (var fi = 0; fi < FAMILIES_FULL.length; fi++) {
-            if (parseInt(FAMILIES_FULL[fi].id, 10) !== famId) {
-                continue;
-            }
-            if (tplEl) {
-                tplEl.value = String(parseInt(FAMILIES_FULL[fi].size_scheme_template_id, 10) || 0);
-            }
-            if (ckEl) {
-                ckEl.value = String(FAMILIES_FULL[fi].commercial_kind_key || '').trim();
-            }
-            break;
-        }
-    }
-
     function asgWizardSigStr() {
-        return String(wizardDeptId()) + '|' + String(wizardFamilyId()) + '|' + wizardLayoutKind();
+        return String(wizardDeptId()) + '|' + String(wizardTplId()) + '|' + String(wizardCk());
     }
 
     /** لقطة معالج 1–2–3 لإعادة تطبيقها بعد حفظ/تحديث قوائم (تجنّب فراغ الحقول أو إخفاء المحرّر). */
     function asgSnapshotWizardTriple() {
-        return { d: wizardDeptId(), f: wizardFamilyId(), l: wizardLayoutKind() };
+        return { d: wizardDeptId(), t: wizardTplId(), c: wizardCk() };
     }
 
     function asgApplyWizardTriple(snap) {
@@ -446,19 +355,17 @@ $asgJson = static function (array $rows): string {
             return;
         }
         var de = document.getElementById('asg_w_dept');
-        var fe = document.getElementById('asg_w_family');
-        var le = document.getElementById('asg_w_layout');
+        var te = document.getElementById('asg_w_tpl');
+        var ce = document.getElementById('asg_w_ck');
         if (de && snap.d > 0) {
             de.value = String(snap.d);
         }
-        if (fe && snap.f > 0) {
-            fe.value = String(snap.f);
-            syncWizardFromFamily(snap.f);
+        if (te && snap.t > 0) {
+            te.value = String(snap.t);
         }
-        if (le && snap.l) {
-            le.value = snap.l === 'dual' ? 'dual' : 'single';
+        if (ce && snap.c !== '') {
+            ce.value = snap.c;
         }
-        asgSyncLayoutPanels();
     }
 
     function asgClearNewEditorFormFields() {
@@ -472,14 +379,11 @@ $asgJson = static function (array $rows): string {
         if (gSortOpen) {
             gSortOpen.value = '0';
         }
-        document.getElementById('asg_scope').value = wizardLayoutKind() === 'dual' ? 'dual' : 'single';
+        document.getElementById('asg_scope').value = 'single';
         document.getElementById('asg_active').value = '1';
         document.getElementById('asg_name_ar').value = '';
-        asgSyncLayoutPanels();
-        asgPanelList().forEach(function (pn) {
-            genColRows(3, pn);
-            clearRows(pn);
-        });
+        genColRows(3);
+        clearRows();
         refreshSizeSelects();
         document.getElementById('asg_editor_title').textContent = 'دليل جديد';
         asgRefreshGuideSortDisp();
@@ -550,7 +454,7 @@ $asgJson = static function (array $rows): string {
     }
 
     function asgWizardTripleComplete() {
-        return wizardDeptId() > 0 && wizardFamilyId() > 0;
+        return wizardDeptId() > 0 && wizardTplId() > 0 && wizardCk() !== '';
     }
 
     function familyMatchesTplCk(famId, tpl, ck) {
@@ -571,14 +475,45 @@ $asgJson = static function (array $rows): string {
 
     function resolveWizardFamily(preferredId) {
         preferredId = parseInt(preferredId, 10) || 0;
-        if (preferredId > 0) {
-            syncWizardFromFamily(preferredId);
+        var tpl = wizardTplId();
+        var ck = wizardCk();
+        if (tpl <= 0 || ck === '') {
+            return 0;
+        }
+        /* عائلة صريحة (رابط ?size_family_id= أو فتح دليل): يجب أن تسبق اختيار «مصدر الحزمة»
+           وإلا يُستبدل معرّف عائلة المستهلك بمصدر الحزمة فيُحفظ الدليل لعائلة ويُعرض الجدول لعائلة أخرى. */
+        if (preferredId > 0 && familyMatchesTplCk(preferredId, tpl, ck)) {
             return preferredId;
         }
-        var wf = wizardFamilyId();
-        if (wf > 0) {
-            syncWizardFromFamily(wf);
-            return wf;
+        var dept = wizardDeptId();
+        if (ASG_LIBRARY_READY && dept > 0 && BUNDLE_SCOPES && BUNDLE_SCOPES.length) {
+            for (var bi = 0; bi < BUNDLE_SCOPES.length; bi++) {
+                var b = BUNDLE_SCOPES[bi];
+                var bd = parseInt(b.department_id, 10) || 0;
+                var bt = parseInt(b.size_scheme_template_id, 10) || 0;
+                var bck = String(b.commercial_kind_key || '').trim();
+                if (bd !== dept || bt !== tpl || bck !== ck) {
+                    continue;
+                }
+                var sid = parseInt(b.source_size_family_id, 10) || 0;
+                if (sid > 0 && familyMatchesTplCk(sid, tpl, ck)) {
+                    return sid;
+                }
+            }
+        }
+        for (var j = 0; j < FAMILIES_FULL.length; j++) {
+            var f = FAMILIES_FULL[j];
+            var fid0 = parseInt(f.id, 10) || 0;
+            if (fid0 <= 0) {
+                continue;
+            }
+            if (String(f.commercial_kind_key || '').trim() !== ck) {
+                continue;
+            }
+            if ((parseInt(f.size_scheme_template_id, 10) || 0) !== tpl) {
+                continue;
+            }
+            return fid0;
         }
         return 0;
     }
@@ -669,11 +604,6 @@ $asgJson = static function (array $rows): string {
         if (prefId <= 0) {
             return;
         }
-        var famEl = document.getElementById('asg_w_family');
-        if (famEl) {
-            famEl.value = String(prefId);
-        }
-        syncWizardFromFamily(prefId);
         var meta = null;
         for (var i = 0; i < FAMILIES_FULL.length; i++) {
             if (parseInt(FAMILIES_FULL[i].id, 10) === prefId) {
@@ -745,7 +675,7 @@ $asgJson = static function (array $rows): string {
         var wizOk = asgWizardTripleComplete();
         if (nb) {
             nb.disabled = !wizOk;
-            nb.title = wizOk ? '' : 'أكمل اختيار القسم (1) وعائلة المقاسات (2) وشكل الدليل (3)';
+            nb.title = wizOk ? '' : 'أكمل اختيار القسم (1) وقالب المقاسات (2) والنوع التجاري (3)';
         }
         if (hintEl) {
             hintEl.textContent = '';
@@ -758,7 +688,7 @@ $asgJson = static function (array $rows): string {
                     listWrap.style.display = 'block';
                 }
                 if (listTbody) {
-                    listTbody.innerHTML = '<tr><td colspan="5" class="card-hint">أكمل القسم (1) وعائلة المقاسات (2) وشكل الدليل (3) لتُعرض هنا الأدلة المربوطة. لمسودة جديدة: بعد اكتمال المعالج استخدم «دليل جديد»؛ تُعرض المسودات في «مكتبة جداول المقاسات الإرشادية».</td></tr>';
+                    listTbody.innerHTML = '<tr><td colspan="5" class="card-hint">أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) لتُعرض هنا الأدلة المربوطة بالعائلة المطابقة. لمسودة جديدة: بعد اكتمال 1–2–3 استخدم «دليل جديد» في أول بطاقة بالصفحة؛ تُعرض المسودات في «مكتبة جداول المقاسات الإرشادية».</td></tr>';
                 }
             }
             if (hintEl && tpl > 0 && ck !== '') {
@@ -884,7 +814,7 @@ $asgJson = static function (array $rows): string {
             ASG_FAMILY_GUIDES_CACHE = [];
             if (!silent) {
                 if (!asgWizardTripleComplete()) {
-                    alert('أكمل القسم (1) وعائلة المقاسات (2) وشكل الدليل (3) أولاً');
+                    alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) أولاً');
                 } else {
                     alert('لا توجد عائلة مقاسات مطابقة للمعالج (1–2–3) — يمكن العمل بمسودة من المكتبة؛ في المحرّر تُستخرج أسماء المقاسات من قالب (2). ربط الجدول بعائلة المستهلك من بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة».');
                 }
@@ -1171,22 +1101,13 @@ $asgJson = static function (array $rows): string {
         return tr;
     }
 
-    function asgSyncColCountInput(panel) {
-        panel = panel || 'upper';
-        var tb = document.getElementById(asgColsBodyId(panel));
-        var ce = document.getElementById(asgColCountId(panel));
-        if (!tb || !ce) {
-            return;
-        }
-        ce.value = String(Math.max(1, tb.querySelectorAll('tr').length));
+    function asgSyncColCountInput() {
+        var n = document.querySelectorAll('#asg_cols_body tr').length;
+        document.getElementById('asg_col_count').value = String(Math.max(1, n));
     }
 
-    function asgRenumberDataCellIx(panel) {
-        if (!panel) {
-            asgPanelList().forEach(function (pn) { asgRenumberDataCellIx(pn); });
-            return;
-        }
-        document.querySelectorAll('#' + asgRowsBoxId(panel) + ' .asg-row-block[data-row-kind="data"]').forEach(function (block) {
+    function asgRenumberDataCellIx() {
+        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(function (block) {
             var ins = block.querySelectorAll('.asg-cell');
             for (var j = 0; j < ins.length; j++) {
                 ins[j].setAttribute('data-ix', String(j));
@@ -1196,13 +1117,12 @@ $asgJson = static function (array $rows): string {
         });
     }
 
-    function asgAppendCellToAllDataRows(colIndex, panel) {
-        panel = panel || 'upper';
-        var cols = readColumns().filter(function (c) { return (c.panel_kind || 'upper') === panel; });
+    function asgAppendCellToAllDataRows(colIndex) {
+        var cols = readColumns();
         var lab = (cols[colIndex] && (cols[colIndex].label_ar || cols[colIndex].label_en))
             ? esc(cols[colIndex].label_ar || cols[colIndex].label_en)
             : ('عمود ' + (colIndex + 1));
-        document.querySelectorAll('#' + asgRowsBoxId(panel) + ' .asg-row-block[data-row-kind="data"]').forEach(function (block) {
+        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(function (block) {
             var grid = block.querySelector('.form-grid');
             if (!grid) {
                 return;
@@ -1215,14 +1135,9 @@ $asgJson = static function (array $rows): string {
         });
     }
 
-    function asgSyncDataRowCellsToColumnCount(panel) {
-        if (!panel) {
-            asgPanelList().forEach(function (pn) { asgSyncDataRowCellsToColumnCount(pn); });
-            return;
-        }
-        var tb = document.getElementById(asgColsBodyId(panel));
-        var n = Math.max(1, tb ? tb.querySelectorAll('tr').length : 1);
-        document.querySelectorAll('#' + asgRowsBoxId(panel) + ' .asg-row-block[data-row-kind="data"]').forEach(function (block) {
+    function asgSyncDataRowCellsToColumnCount() {
+        var n = Math.max(1, document.querySelectorAll('#asg_cols_body tr').length);
+        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(function (block) {
             var grid = block.querySelector('.form-grid');
             if (!grid) {
                 return;
@@ -1234,7 +1149,7 @@ $asgJson = static function (array $rows): string {
                 }
                 cells = grid.querySelectorAll('.asg-cell');
             }
-            var colsSnap = readColumns().filter(function (c) { return (c.panel_kind || 'upper') === panel; });
+            var colsSnap = readColumns();
             while (cells.length < n) {
                 var j = cells.length;
                 var lab = (colsSnap[j] && (colsSnap[j].label_ar || colsSnap[j].label_en))
@@ -1248,45 +1163,33 @@ $asgJson = static function (array $rows): string {
                 cells = grid.querySelectorAll('.asg-cell');
             }
         });
-        asgRenumberDataCellIx(panel);
+        asgRenumberDataCellIx();
     }
 
-    function genColRows(n, panel) {
-        panel = panel || 'upper';
-        var tb = document.getElementById(asgColsBodyId(panel));
-        if (!tb) {
-            return;
-        }
+    function genColRows(n) {
+        var tb = document.getElementById('asg_cols_body');
         tb.innerHTML = '';
         for (var i = 0; i < n; i++) {
             tb.appendChild(asgCreateColumnRow(i + 1));
         }
-        asgSyncColCountInput(panel);
-        asgSyncDataRowCellsToColumnCount(panel);
+        asgSyncColCountInput();
+        asgSyncDataRowCellsToColumnCount();
     }
 
-    function asgAppendColumnDef(panel) {
-        panel = panel || 'upper';
-        var tb = document.getElementById(asgColsBodyId(panel));
-        if (!tb) {
-            return;
-        }
+    function asgAppendColumnDef() {
+        var tb = document.getElementById('asg_cols_body');
         var n = tb.querySelectorAll('tr').length;
         if (n >= 24) {
             alert('الحد الأقصى 24 عموداً');
             return;
         }
         tb.appendChild(asgCreateColumnRow(n + 1));
-        asgSyncColCountInput(panel);
-        asgAppendCellToAllDataRows(n, panel);
+        asgSyncColCountInput();
+        asgAppendCellToAllDataRows(n);
     }
 
-    function asgRemoveLastColumnDef(panel) {
-        panel = panel || 'upper';
-        var tb = document.getElementById(asgColsBodyId(panel));
-        if (!tb) {
-            return;
-        }
+    function asgRemoveLastColumnDef() {
+        var tb = document.getElementById('asg_cols_body');
         var trs = tb.querySelectorAll('tr');
         if (trs.length <= 1) {
             alert('يجب أن يبقى عمود واحد على الأقل');
@@ -1294,7 +1197,7 @@ $asgJson = static function (array $rows): string {
         }
         var lastIx = trs.length - 1;
         var lastHasData = false;
-        document.querySelectorAll('#' + asgRowsBoxId(panel) + ' .asg-row-block[data-row-kind="data"]').forEach(function (block) {
+        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(function (block) {
             var ins = block.querySelectorAll('.asg-cell');
             if (ins[lastIx] && ins[lastIx].value.trim() !== '') {
                 lastHasData = true;
@@ -1304,79 +1207,66 @@ $asgJson = static function (array $rows): string {
             return;
         }
         trs[trs.length - 1].remove();
-        document.querySelectorAll('#' + asgRowsBoxId(panel) + ' .asg-row-block[data-row-kind="data"]').forEach(function (block) {
+        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(function (block) {
             var grid = block.querySelector('.form-grid');
             if (grid && grid.lastElementChild) {
                 grid.lastElementChild.remove();
             }
         });
-        asgSyncColCountInput(panel);
-        asgRenumberDataCellIx(panel);
+        asgSyncColCountInput();
+        asgRenumberDataCellIx();
     }
 
     function readColumns() {
+        var trs = document.querySelectorAll('#asg_cols_body tr');
         var out = [];
-        asgPanelList().forEach(function (panel) {
-            var trs = document.querySelectorAll('#' + asgColsBodyId(panel) + ' tr');
-            for (var i = 0; i < trs.length; i++) {
-                var tr = trs[i];
-                out.push({
-                    panel_kind: panel,
-                    sort_order: parseInt(tr.querySelector('.asg-c-sort').value, 10) || (i + 1),
-                    label_ar: tr.querySelector('.asg-c-ar').value.trim(),
-                    label_en: tr.querySelector('.asg-c-en').value.trim(),
-                    label_fil: tr.querySelector('.asg-c-fil').value.trim(),
-                    label_hi: tr.querySelector('.asg-c-hi').value.trim(),
-                    value_kind: tr.querySelector('.asg-c-vk').value,
-                    unit_hint: tr.querySelector('.asg-c-unit').value.trim(),
-                    storage_measure: tr.querySelector('.asg-c-stor').value,
-                    display_system: asgNormalizeDisplaySystem(tr.querySelector('.asg-c-dsys').value)
-                });
-            }
-        });
+        for (var i = 0; i < trs.length; i++) {
+            var tr = trs[i];
+            out.push({
+                sort_order: parseInt(tr.querySelector('.asg-c-sort').value, 10) || (i + 1),
+                label_ar: tr.querySelector('.asg-c-ar').value.trim(),
+                label_en: tr.querySelector('.asg-c-en').value.trim(),
+                label_fil: tr.querySelector('.asg-c-fil').value.trim(),
+                label_hi: tr.querySelector('.asg-c-hi').value.trim(),
+                value_kind: tr.querySelector('.asg-c-vk').value,
+                unit_hint: tr.querySelector('.asg-c-unit').value.trim(),
+                storage_measure: tr.querySelector('.asg-c-stor').value,
+                display_system: asgNormalizeDisplaySystem(tr.querySelector('.asg-c-dsys').value)
+            });
+        }
         return out;
     }
 
     function fillColumns(cols) {
-        asgPanelList().forEach(function (panel) {
-            var panelCols = (cols || []).filter(function (c) {
-                var pk = String(c.panel_kind || 'upper').trim();
-                return pk === panel;
-            });
-            document.getElementById(asgColCountId(panel)).value = String(Math.max(1, panelCols.length || 1));
-            genColRows(Math.max(1, panelCols.length || 1), panel);
-            var trs = document.querySelectorAll('#' + asgColsBodyId(panel) + ' tr');
-            for (var i = 0; i < panelCols.length && i < trs.length; i++) {
-                var c = panelCols[i];
-                var tr = trs[i];
-                tr.querySelector('.asg-c-sort').value = String(c.sort_order != null ? c.sort_order : (i + 1));
-                tr.querySelector('.asg-c-ar').value = c.label_ar || '';
-                tr.querySelector('.asg-c-en').value = c.label_en || '';
-                tr.querySelector('.asg-c-fil').value = c.label_fil || '';
-                tr.querySelector('.asg-c-hi').value = c.label_hi || '';
-                tr.querySelector('.asg-c-vk').value = (c.value_kind === 'number') ? 'number' : 'text';
-                tr.querySelector('.asg-c-unit').value = c.unit_hint || '';
-                if (tr.querySelector('.asg-c-stor')) {
-                    tr.querySelector('.asg-c-stor').value = (c.storage_measure === 'length_cm') ? 'length_cm' : '';
-                }
-                if (tr.querySelector('.asg-c-dsys')) {
-                    tr.querySelector('.asg-c-dsys').value = asgNormalizeDisplaySystem(c.display_system || '');
-                }
+        document.getElementById('asg_col_count').value = String(Math.max(1, cols.length));
+        genColRows(cols.length);
+        var trs = document.querySelectorAll('#asg_cols_body tr');
+        for (var i = 0; i < cols.length && i < trs.length; i++) {
+            var c = cols[i];
+            var tr = trs[i];
+            tr.querySelector('.asg-c-sort').value = String(c.sort_order != null ? c.sort_order : (i + 1));
+            tr.querySelector('.asg-c-ar').value = c.label_ar || '';
+            tr.querySelector('.asg-c-en').value = c.label_en || '';
+            tr.querySelector('.asg-c-fil').value = c.label_fil || '';
+            tr.querySelector('.asg-c-hi').value = c.label_hi || '';
+            tr.querySelector('.asg-c-vk').value = (c.value_kind === 'number') ? 'number' : 'text';
+            tr.querySelector('.asg-c-unit').value = c.unit_hint || '';
+            if (tr.querySelector('.asg-c-stor')) {
+                tr.querySelector('.asg-c-stor').value = (c.storage_measure === 'length_cm') ? 'length_cm' : '';
             }
-        });
+            if (tr.querySelector('.asg-c-dsys')) {
+                tr.querySelector('.asg-c-dsys').value = asgNormalizeDisplaySystem(c.display_system || '');
+            }
+        }
     }
 
     var rowSeq = 0;
 
-    function addDataRow(prefill, panel) {
-        panel = panel || 'upper';
+    function addDataRow(prefill) {
         prefill = prefill || {};
-        var wrap = document.getElementById(asgRowsBoxId(panel));
-        if (!wrap) {
-            return;
-        }
-        var id = 'asg_r_' + panel + '_' + (++rowSeq);
-        var cols = readColumns().filter(function (c) { return (c.panel_kind || 'upper') === panel; });
+        var wrap = document.getElementById('asg_rows_box');
+        var id = 'asg_r_' + (++rowSeq);
+        var cols = readColumns();
         var n = Math.max(1, cols.length);
         var cells = prefill.cells || [];
         while (cells.length < n) cells.push('');
@@ -1409,13 +1299,9 @@ $asgJson = static function (array $rows): string {
         asgUpdateFamilySizeHint(div);
     }
 
-    function addLabelRow(prefill, panel) {
-        panel = panel || 'upper';
+    function addLabelRow(prefill) {
         prefill = prefill || {};
-        var wrap = document.getElementById(asgRowsBoxId(panel));
-        if (!wrap) {
-            return;
-        }
+        var wrap = document.getElementById('asg_rows_box');
         var div = document.createElement('div');
         div.className = 'asg-row-block card';
         div.dataset.rowKind = 'label';
@@ -1433,58 +1319,47 @@ $asgJson = static function (array $rows): string {
         wrap.appendChild(div);
     }
 
-    function clearRows(panel) {
-        if (panel) {
-            var w1 = document.getElementById(asgRowsBoxId(panel));
-            if (w1) {
-                w1.innerHTML = '';
-            }
-            return;
-        }
-        asgPanelList().forEach(function (pn) { clearRows(pn); });
+    function clearRows() {
+        document.getElementById('asg_rows_box').innerHTML = '';
     }
 
     function readRowsPayload() {
+        var blocks = document.querySelectorAll('#asg_rows_box .asg-row-block');
         var rows = [];
         var b = 0;
-        asgPanelList().forEach(function (panel) {
-            var blocks = document.querySelectorAll('#' + asgRowsBoxId(panel) + ' .asg-row-block');
-            for (var i = 0; i < blocks.length; i++) {
-                var el = blocks[i];
-                var rk = el.dataset.rowKind === 'label' ? 'label' : 'data';
-                b++;
-                if (rk === 'label') {
-                    rows.push({
-                        panel_kind: panel,
-                        row_kind: 'label',
-                        sort_order: b,
-                        label_ar: el.querySelector('.asg-l-ar').value.trim(),
-                        label_en: el.querySelector('.asg-l-en').value.trim(),
-                        label_fil: el.querySelector('.asg-l-fil').value.trim(),
-                        label_hi: el.querySelector('.asg-l-hi').value.trim(),
-                        cells: []
-                    });
-                } else {
-                    var sfsRaw = parseInt(el.querySelector('.asg-sfs').value, 10) || 0;
-                    var ins = el.querySelectorAll('.asg-cell');
-                    var cells = [];
-                    for (var j = 0; j < ins.length; j++) {
-                        cells.push(ins[j].value);
-                    }
-                    if (sfsRaw > 0 && cells.length > 0) {
-                        cells[0] = '';
-                    }
-                    var sfs = sfsRaw < 0 ? 0 : sfsRaw;
-                    rows.push({
-                        panel_kind: panel,
-                        row_kind: 'data',
-                        sort_order: b,
-                        size_family_size_id: sfs,
-                        cells: cells
-                    });
+        for (var i = 0; i < blocks.length; i++) {
+            var el = blocks[i];
+            var rk = el.dataset.rowKind === 'label' ? 'label' : 'data';
+            b++;
+            if (rk === 'label') {
+                rows.push({
+                    row_kind: 'label',
+                    sort_order: b,
+                    label_ar: el.querySelector('.asg-l-ar').value.trim(),
+                    label_en: el.querySelector('.asg-l-en').value.trim(),
+                    label_fil: el.querySelector('.asg-l-fil').value.trim(),
+                    label_hi: el.querySelector('.asg-l-hi').value.trim(),
+                    cells: []
+                });
+            } else {
+                var sfsRaw = parseInt(el.querySelector('.asg-sfs').value, 10) || 0;
+                var ins = el.querySelectorAll('.asg-cell');
+                var cells = [];
+                for (var j = 0; j < ins.length; j++) {
+                    cells.push(ins[j].value);
                 }
+                if (sfsRaw > 0 && cells.length > 0) {
+                    cells[0] = '';
+                }
+                var sfs = sfsRaw < 0 ? 0 : sfsRaw;
+                rows.push({
+                    row_kind: 'data',
+                    sort_order: b,
+                    size_family_size_id: sfs,
+                    cells: cells
+                });
             }
-        });
+        }
         return rows;
     }
 
@@ -1548,11 +1423,9 @@ $asgJson = static function (array $rows): string {
     }
 
     function asgRefreshAllFamilyHints() {
-        asgPanelList().forEach(function (panel) {
-            document.querySelectorAll('#' + asgRowsBoxId(panel) + ' .asg-row-block[data-row-kind="data"]').forEach(function (b) {
-                asgSyncFirstDataCellFromFamily(b);
-                asgUpdateFamilySizeHint(b);
-            });
+        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(function (b) {
+            asgSyncFirstDataCellFromFamily(b);
+            asgUpdateFamilySizeHint(b);
         });
     }
 
@@ -1564,7 +1437,7 @@ $asgJson = static function (array $rows): string {
         asgRefreshAllFamilyHints();
     }
 
-    document.addEventListener('change', function (e) {
+    document.getElementById('asg_rows_box').addEventListener('change', function (e) {
         if (e.target && e.target.classList && e.target.classList.contains('asg-sfs')) {
             var div = e.target.closest('.asg-row-block');
             if (div) {
@@ -1574,44 +1447,24 @@ $asgJson = static function (array $rows): string {
         }
     });
 
-    document.querySelectorAll('.asg-gen-cols').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var panel = btn.getAttribute('data-asg-panel') || 'upper';
-            var cur = document.querySelectorAll('#' + asgColsBodyId(panel) + ' tr').length;
-            var n = parseInt(document.getElementById(asgColCountId(panel)).value, 10) || 3;
-            n = Math.min(24, Math.max(1, n));
-            if (cur > 0 && !confirm('«توليد صفوف العناوين» سيمسح تعريف الأعمدة الحالي ويعيد بناءه (' + n + ' أعمدة). صفوف البيانات تبقى لكن عدد خلاياها قد لا يطابق — يُفضّل استخدام + عمود / − حذف إن كنت تعدّل العدد فقط. المتابعة؟')) {
-                return;
-            }
-            genColRows(n, panel);
-        });
-    });
-    document.querySelectorAll('.asg-col-add').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            asgAppendColumnDef(btn.getAttribute('data-asg-panel') || 'upper');
-        });
-    });
-    document.querySelectorAll('.asg-col-remove').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            asgRemoveLastColumnDef(btn.getAttribute('data-asg-panel') || 'upper');
-        });
-    });
-    document.querySelectorAll('.asg-row-data').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            addDataRow({}, btn.getAttribute('data-asg-panel') || 'upper');
-            refreshSizeSelects();
-        });
-    });
-    document.querySelectorAll('.asg-row-label').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            addLabelRow({}, btn.getAttribute('data-asg-panel') || 'upper');
-        });
-    });
+    document.getElementById('asg_gen_cols').onclick = function () {
+        var cur = document.querySelectorAll('#asg_cols_body tr').length;
+        var n = parseInt(document.getElementById('asg_col_count').value, 10) || 3;
+        n = Math.min(24, Math.max(1, n));
+        if (cur > 0 && !confirm('«توليد صفوف العناوين» سيمسح تعريف الأعمدة الحالي ويعيد بناءه (' + n + ' أعمدة). صفوف البيانات تبقى لكن عدد خلاياها قد لا يطابق — يُفضّل استخدام + عمود / − حذف إن كنت تعدّل العدد فقط. المتابعة؟')) {
+            return;
+        }
+        genColRows(n);
+    };
+    document.getElementById('asg_col_add').onclick = function () { asgAppendColumnDef(); };
+    document.getElementById('asg_col_remove').onclick = function () { asgRemoveLastColumnDef(); };
 
-    function asgCollectLinkedSizeIds(panel) {
-        panel = panel || 'upper';
+    document.getElementById('asg_row_data').onclick = function () { addDataRow({}); refreshSizeSelects(); };
+    document.getElementById('asg_row_label').onclick = function () { addLabelRow({}); };
+
+    function asgCollectLinkedSizeIds() {
         var out = {};
-        document.querySelectorAll('#' + asgRowsBoxId(panel) + ' .asg-row-block').forEach(function (block) {
+        document.querySelectorAll('#asg_rows_box .asg-row-block').forEach(function (block) {
             if (block.dataset.rowKind !== 'data') {
                 return;
             }
@@ -1627,23 +1480,26 @@ $asgJson = static function (array $rows): string {
         return out;
     }
 
-    function asgBulkRowsForPanel(panel) {
-        panel = panel || 'upper';
+    document.getElementById('asg_bulk_rows').onclick = function () {
         if (!asgWizardTripleComplete()) {
-            alert('أكمل القسم (1) وعائلة المقاسات (2) وشكل الدليل (3).');
+            alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3).');
             return;
         }
         var fam = effectiveFamilySizeRows();
         if (!fam.length) {
-            alert('لا توجد مقاسات في عائلة المعالج — راجع عائلة المقاسات (2).');
+            if (wizardTplId() > 0) {
+                alert('لا توجد صفوف مقاس في قالب المقاسات (2) المختار — راجع إعداد القالب.');
+            } else {
+                alert('اختر قالب المقاسات (2) في المعالج.');
+            }
             return;
         }
-        var cols = readColumns().filter(function (c) { return (c.panel_kind || 'upper') === panel; });
+        var cols = readColumns();
         if (!cols.length) {
-            alert('عرّف أعمدة ' + (panel === 'lower' ? 'القسم السفلي ' : '') + 'أولاً (عدد الأعمدة ثم توليد صفوف العناوين)');
+            alert('عرّف الأعمدة أولاً (عدد الأعمدة ثم توليد صفوف العناوين)');
             return;
         }
-        var linked = asgCollectLinkedSizeIds(panel);
+        var linked = asgCollectLinkedSizeIds();
         var toAdd = [];
         for (var i = 0; i < fam.length; i++) {
             var rid = parseInt(fam[i].id, 10) || 0;
@@ -1652,10 +1508,10 @@ $asgJson = static function (array $rows): string {
             }
         }
         if (!toAdd.length) {
-            alert('كل المقاسات المعروضة لها صف مربوط بالفعل في هذا القسم — لا يوجد جديد للإضافة');
+            alert('كل المقاسات المعروضة حسب قالب المعالج (2) لها صف مربوط بالفعل — لا يوجد جديد للإضافة');
             return;
         }
-        if (!confirm('سيتم إضافة ' + toAdd.length + ' صف بيانات في ' + (panel === 'lower' ? 'القسم السفلي' : 'القسم العلوي') + '. المتابعة؟')) {
+        if (!confirm('سيتم إضافة ' + toAdd.length + ' صف بيانات، كل صف مربوط بمقاس من القائمة (حسب قالب المعالج 2). المتابعة؟')) {
             return;
         }
         var n = Math.max(1, cols.length);
@@ -1667,16 +1523,10 @@ $asgJson = static function (array $rows): string {
             return a;
         }
         for (var j = 0; j < toAdd.length; j++) {
-            addDataRow({ cells: emptyCells(), size_family_size_id: toAdd[j] }, panel);
+            addDataRow({ cells: emptyCells(), size_family_size_id: toAdd[j] });
         }
         refreshSizeSelects();
-    }
-
-    document.querySelectorAll('.asg-bulk-rows').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            asgBulkRowsForPanel(btn.getAttribute('data-asg-panel') || 'upper');
-        });
-    });
+    };
 
     async function loadList(opts) {
         opts = opts || {};
@@ -1694,7 +1544,7 @@ $asgJson = static function (array $rows): string {
             ASG_FAMILY_GUIDES_CACHE = [];
             if (!silent) {
                 if (!asgWizardTripleComplete()) {
-                    alert('أكمل القسم (1) وعائلة المقاسات (2) وشكل الدليل (3) أولاً');
+                    alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) أولاً');
                 } else {
                     alert('لا توجد عائلة مقاسات مطابقة للمعالج (1–2–3) — يمكن العمل بمسودة من المكتبة؛ في المحرّر تُستخرج أسماء المقاسات من قالب (2). ربط الجدول بعائلة المستهلك من بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة».');
                 }
@@ -1702,11 +1552,7 @@ $asgJson = static function (array $rows): string {
             asgRefreshGuideSortDisp();
             return;
         }
-        var res = await orangeAdminJsonPost(ADVISORY_API, {
-            action: 'list_by_family',
-            size_family_id: f,
-            department_id: wizardDeptId()
-        });
+        var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'list_by_family', size_family_id: f });
         if (!res.success) { alert(res.message || 'خطأ'); return; }
         var tbody = document.getElementById('asg_list_tbody');
         if (!tbody) {
@@ -1911,23 +1757,16 @@ $asgJson = static function (array $rows): string {
             await asgRefreshResolvedContext();
         }
         document.getElementById('asg_edit_id').value = String(g.id);
-        var layoutKind = (g.layout_kind === 'dual') ? 'dual' : 'single';
-        var layoutEl = document.getElementById('asg_w_layout');
-        if (layoutEl) {
-            layoutEl.value = layoutKind;
-        }
-        asgSyncLayoutPanels();
-        document.getElementById('asg_scope').value = layoutKind === 'dual' ? 'dual' : (g.scope_kind || 'single');
+        document.getElementById('asg_scope').value = g.scope_kind || 'single';
         document.getElementById('asg_active').value = String(parseInt(g.is_active, 10) ? 1 : 0);
         document.getElementById('asg_name_ar').value = g.name_ar || '';
         fillColumns(res.columns || []);
         clearRows();
         (res.rows || []).forEach(function (r) {
-            var panel = (r.panel_kind === 'lower') ? 'lower' : 'upper';
             if (r.row_kind === 'label') {
-                addLabelRow(r, panel);
+                addLabelRow(r);
             } else {
-                addDataRow({ cells: r.cells || [], size_family_size_id: r.size_family_size_id }, panel);
+                addDataRow({ cells: r.cells || [], size_family_size_id: r.size_family_size_id });
             }
         });
         refreshSizeSelects();
@@ -1938,15 +1777,15 @@ $asgJson = static function (array $rows): string {
     }
 
     function openNew(preserveSnap) {
-        if (preserveSnap && preserveSnap.d > 0 && preserveSnap.f > 0) {
+        if (preserveSnap && preserveSnap.d > 0 && preserveSnap.t > 0 && preserveSnap.c !== '') {
             asgApplyWizardTriple(preserveSnap);
         }
         if (!asgWizardTripleComplete()) {
-            alert('أكمل اختيار القسم (1) وعائلة المقاسات (2) وشكل الدليل (3) قبل «دليل جديد».');
+            alert('أكمل اختيار القسم (1) وقالب المقاسات (2) والنوع التجاري (3) قبل «دليل جديد».');
             return;
         }
         asgClearNewEditorFormFields();
-        if (preserveSnap && preserveSnap.d > 0 && preserveSnap.f > 0) {
+        if (preserveSnap && preserveSnap.d > 0 && preserveSnap.t > 0 && preserveSnap.c !== '') {
             asgApplyWizardTriple(preserveSnap);
         }
         document.getElementById('asg_editor').style.display = 'block';
@@ -1956,15 +1795,6 @@ $asgJson = static function (array $rows): string {
 
     document.getElementById('asg_new_btn').onclick = openNew;
 
-    document.getElementById('asg_w_family').onchange = function () {
-        syncWizardFromFamily(wizardFamilyId());
-        asgSyncLayoutPanels();
-        void asgRefreshResolvedContext();
-    };
-    document.getElementById('asg_w_layout').onchange = function () {
-        asgSyncLayoutPanels();
-        asgMaybeResetNewEditorIfWizardChanged();
-    };
     document.getElementById('asg_w_tpl').onchange = asgRefreshResolvedContext;
     document.getElementById('asg_w_ck').onchange = asgRefreshResolvedContext;
     document.getElementById('asg_w_dept').onchange = asgRefreshResolvedContext;
@@ -2006,56 +1836,48 @@ $asgJson = static function (array $rows): string {
 
     function asgValidateRowsBeforeSave(rows, cols) {
         cols = cols || [];
-        rows = rows || [];
-        var panels = asgPanelList();
-        for (var pi = 0; pi < panels.length; pi++) {
-            var panel = panels[pi];
-            var panelPrefix = panel === 'lower' ? 'القسم السفلي: ' : '';
-            var panelCols = cols.filter(function (c) { return (c.panel_kind || 'upper') === panel; });
-            var colDefErr = asgValidateColumnDefs(panelCols);
-            if (colDefErr) {
-                return panelPrefix + colDefErr;
+        var colDefErr = asgValidateColumnDefs(cols);
+        if (colDefErr) {
+            return colDefErr;
+        }
+        var seen = {};
+        var hasData = false;
+        var famOk = fid() > 0;
+        var dataRowNum = 0;
+        for (var i = 0; i < rows.length; i++) {
+            var r = rows[i];
+            if (!r || r.row_kind !== 'data') {
+                continue;
             }
-            var panelRows = rows.filter(function (r) { return (r.panel_kind || 'upper') === panel; });
-            var seen = {};
-            var hasData = false;
-            var famOk = fid() > 0;
-            var dataRowNum = 0;
-            for (var i = 0; i < panelRows.length; i++) {
-                var r = panelRows[i];
-                if (!r || r.row_kind !== 'data') {
-                    continue;
+            hasData = true;
+            dataRowNum++;
+            var sid = parseInt(r.size_family_size_id, 10) || 0;
+            if (!famOk) {
+                if (sid > 0) {
+                    return 'مسودة بدون عائلة: لا تربط صفاً بمقاس فعلي قبل مزامنة الدليل إلى عائلة — استخدم بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة»، ثم افتح التعديل على الدليل بعد ارتباطه بالعائلة المستهدفة.';
                 }
-                hasData = true;
-                dataRowNum++;
-                var sid = parseInt(r.size_family_size_id, 10) || 0;
-                if (!famOk) {
-                    if (sid > 0) {
-                        return 'مسودة بدون عائلة: لا تربط صفاً بمقاس فعلي قبل مزامنة الدليل إلى عائلة — استخدم بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة»، ثم افتح التعديل على الدليل بعد ارتباطه بالعائلة المستهدفة.';
-                    }
-                } else {
-                    if (sid <= 0) {
-                        return panelPrefix + 'في صف البيانات رقم ' + dataRowNum + ': اختر مقاساً من القائمة.';
-                    }
-                    if (seen[sid]) {
-                        return panelPrefix + 'نفس المقاس مكرر في أكثر من صف — اربط كل مقاس مرة واحدة فقط في هذا القسم.';
-                    }
-                    seen[sid] = true;
+            } else {
+                if (sid <= 0) {
+                    return 'في صف البيانات رقم ' + dataRowNum + ': اختر مقاساً من القائمة (مرتبة حسب قالب المعالج 2). لا يُشترط إضافة صفاً لكل مقاس — فقط أكمل الصفوف التي تضيفها.';
                 }
-                var effCells = asgRowCellsEffectiveForSave(r, panelCols, famOk);
-                var ne = effCells.length;
-                var startIx = (famOk && sid > 0) ? 1 : 0;
-                if (!(famOk && sid > 0 && ne === 1)) {
-                    for (var j = startIx; j < ne; j++) {
-                        if (effCells[j] === '') {
-                            return panelPrefix + 'أكمل جميع خلايا صف البيانات رقم ' + dataRowNum + ' (العمود ' + (j + 1) + ').';
-                        }
+                if (seen[sid]) {
+                    return 'نفس المقاس (من القائمة حسب القالب) مكرر في أكثر من صف — اربط كل مقاس مرة واحدة فقط.';
+                }
+                seen[sid] = true;
+            }
+            var effCells = asgRowCellsEffectiveForSave(r, cols, famOk);
+            var ne = effCells.length;
+            var startIx = (famOk && sid > 0) ? 1 : 0;
+            if (!(famOk && sid > 0 && ne === 1)) {
+                for (var j = startIx; j < ne; j++) {
+                    if (effCells[j] === '') {
+                        return 'أكمل جميع خلايا صف البيانات رقم ' + dataRowNum + ' (العمود ' + (j + 1) + ' من أعمدة الجدول المحفوظة). لا يُشترط إضافة صفاً لكل مقاس حسب القالب.';
                     }
                 }
             }
-            if (!hasData) {
-                return panelPrefix + 'أضف صف بيانات واحداً على الأقل.';
-            }
+        }
+        if (!hasData) {
+            return 'أضف صف بيانات واحداً على الأقل.';
         }
         return '';
     }
@@ -2065,15 +1887,15 @@ $asgJson = static function (array $rows): string {
         var boundStored = parseInt(document.getElementById('asg_bound_family').value, 10) || 0;
         var isUnboundContext = boundStored <= 0;
         if (f <= 0 && !isUnboundContext) {
-            alert('أكمل القسم (1) وعائلة المقاسات (2) وشكل الدليل (3)، أو افتح مسودة من «مكتبة جداول المقاسات الإرشادية»');
+            alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3)، أو افتح مسودة من «مكتبة جداول المقاسات الإرشادية»');
             return;
         }
         if (wizardDeptId() <= 0) {
-            alert('اختر القسم الرئيسي (1) في بطاقة المعالج — يُحفظ مع الدليل.');
+            alert('اختر القسم الرئيسي (1) في بطاقة المعالج — يُحفظ مع الدليل قبل أو بعد ربط العائلة.');
             return;
         }
-        if (wizardFamilyId() <= 0) {
-            alert('اختر عائلة المقاسات (2) في بطاقة المعالج — تُربط بالدليل عند الحفظ.');
+        if (wizardTplId() <= 0 || wizardCk() === '') {
+            alert('أكمل قالب المقاسات والنوع التجاري (2 و 3) في بطاقة المعالج — يُحفظان مع الدليل.');
             return;
         }
         var nameAr0 = document.getElementById('asg_name_ar').value.trim();
@@ -2096,7 +1918,6 @@ $asgJson = static function (array $rows): string {
             size_scheme_template_id: wizardTplId(),
             commercial_kind_key: wizardCk(),
             scope_kind: document.getElementById('asg_scope').value,
-            layout_kind: wizardLayoutKind(),
             name_ar: document.getElementById('asg_name_ar').value.trim(),
             is_active: parseInt(document.getElementById('asg_active').value, 10),
             columns: colsPayload,
@@ -2233,7 +2054,7 @@ $asgJson = static function (array $rows): string {
     asgLibMapWire();
 
     async function asgBoot() {
-        genColRows(3, 'upper');
+        genColRows(3);
         if (PREF_FAMILY > 0) {
             applyWizardFieldsFromFamily(PREF_FAMILY);
             asgPreferFamilyOnce = PREF_FAMILY;
