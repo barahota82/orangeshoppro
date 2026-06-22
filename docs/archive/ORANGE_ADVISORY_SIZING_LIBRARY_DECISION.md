@@ -125,6 +125,10 @@
 
 **كل شيء من شاشة `admin/pages/advisory_sizing_guides.php`** (التأليف + الربط). **لا** تُلمَس شاشتا «أنواع المنتج» و«المنتج» للربط — المستخدم يكون قد سجّل بياناته ثم يأتي للدليل، فالربط يتم من هنا.
 
+### فلترة قائمة العائلة حسب القسم (قرار المالك 2026-06-22)
+
+العائلة **غير مرتبطة بالقسم في المخطط** (`size_families` بلا `department_id`)؛ الجسر هو النوع التجاري/فئة القياس عبر هرم الكتالوج. القرار: قائمة «عائلة المقاسات» **تابعة للقسم** — تُعطَّل حتى اختيار قسم، ثم تُفلتَر بـ **تدرّج آمن**: تطابق زوج (`commercial_kind_key` + `sizing_category_key`) → وإلا تطابق النوع التجاري وحده → وإلا (قسم بلا أنواع مضبوطة) **تُعرض كل العائلات**. الأزواج المسموحة لكل قسم تُستنتَج من `product_types.expected_commercial_kind_key/expected_sizing_category_key` المنضمّة عبر `catalog_subcategories → catalog_categories → catalog_sections.department_id`. هذا يخفي عائلات الأحذية عن قسم ملابس، ويفصل رجالي/حريمي **إذا** كانت الفئات موسومة بذلك. **واجهة فقط** — بلا تغيير مخطط/API/متجر.
+
 ### مخطط القاعدة (موجود — يُعاد استخدامه)
 
 - `products.sizing_advisory_guide_id` + `products.sizing_guide_scope` (مستوى المنتج) — **موجود**.
@@ -139,6 +143,7 @@
 
 - **المخطط:** `includes/catalog_schema.php` — أُعيدت أعمدة `advisory_sizing_guides.layout_kind` (`single|dual`، افتراضي single) و`advisory_sizing_guide_columns.panel_kind` و`advisory_sizing_guide_rows.panel_kind` (`upper|lower|single`، افتراضي upper) بشكل idempotent داخل `orange_catalog_ensure_schema`. (حذف البيانات القديمة `php_advisory_sizing_clean_wipe_v99` باقٍ.)
 - **الشاشة (نموذج واحد):** `admin/pages/advisory_sizing_guides.php` — أُعيد بناؤها بالكامل: القسم → العائلة → شكل (single/dual) → الاسم → جدول لكل لوحة (عند dual لوحتان: علوي/سفلي) → ربط أنواع منتج + منتجات (داخل نفس النموذج) → حفظة واحدة. **حُذِف** نهائياً: «المكتبة»، «ربط حزمة + مزامنة»، معالج القالب/النوع التجاري، قائمة المسودات.
+- **فلترة العائلة حسب القسم (2026-06-22):** في نفس الشاشة فقط — استعلام العائلات يقرأ أيضاً `sizing_category_key`؛ خريطة PHP `deptKindPairs` (القسم → أزواج `ck|sk`) عبر هرم الكتالوج تُمرَّر JSON (`DEPT_KINDS`)؛ JS: `familyAllowed()` (تدرّج: زوج → نوع تجاري → الكل) + `rebuildFamilyOptions()` (تعطيل العائلة قبل اختيار قسم، وإعادة البناء عند تغيير القسم)؛ `loadGuide` يضبط القسم ثم يبني ثم يختار العائلة (مع حقن العائلة المحفوظة إن خرجت عن الفلتر). بلا تغيير مخطط/API/متجر.
 - **الـ API:** `admin/api/advisory_sizing_guides/manage.php` — أُعيد كتابته: `save` (عائلة هي العمود الفقري، يُستنتَج القالب/النوع التجاري منها؛ panel_kind لكل عمود/صف؛ الربط في نفس الحفظة)، `list_by_family`، `list_link_targets` (أنواع مرشّحة بالقسم عبر هرم الكتالوج + النوع التجاري للعائلة؛ منتجات بنفس العائلة)، `get`، `delete` (يفكّ الربط أيضاً).
 - **سلسلة الأولوية + المتجر:** `includes/advisory_sizing_guides.php` — `orange_advisory_sizing_resolve_guide_id()` صار ثلاثي المستوى (منتج→نوع→**دليل العائلة العام** عبر `orange_advisory_sizing_family_general_guide_id()`: نشِط، غير مربوط بنوع/منتج، الأقل `sort_order` ثم `id`)؛ `build_sections_for_guide_id()` dual-aware (قسمان علوي/سفلي عبر `panel_kind`). `pages/product.php` يعتمد على السلسلة وحدها (حُذف المسار القديم `build_sections` بالنطاق لأنه غير متوافق مع dual)، وعند dual يعرض **تابين** (علوي افتراضياً) مع تبديل JS؛ CSS في `assets/css/main.css` (`.product-sizing-tabs`, `.product-sizing-adv-panel`). **لا** خانة ترتيب يدوية (يكفي `sort_order` التلقائي).
 - **لم تُلمَس** شاشتا «أنواع المنتج» و«المنتج» للربط (النطاق محصور بشاشة الدليل).
