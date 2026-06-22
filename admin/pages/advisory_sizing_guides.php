@@ -463,11 +463,11 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         panel.querySelectorAll('.asg-row-block[data-row-kind="data"]').forEach(syncFirstCell);
     }
 
-    function bulkRows(panel) {
-        if (famId() <= 0) { alert('اختر عائلة المقاسات أولاً'); return; }
+    function bulkRows(panel, silent) {
+        if (famId() <= 0) { if (!silent) { alert('اختر عائلة المقاسات أولاً'); } return; }
         var fam = familySizeRows();
-        if (!fam.length) { alert('لا توجد مقاسات في هذه العائلة'); return; }
-        if (!colsBody(panel).querySelectorAll('tr').length) { alert('عرّف الأعمدة أولاً'); return; }
+        if (!fam.length) { if (!silent) { alert('لا توجد مقاسات مسجّلة في هذه العائلة'); } return; }
+        if (!colsBody(panel).querySelectorAll('tr').length) { if (!silent) { alert('عرّف الأعمدة أولاً'); } return; }
         var used = {};
         panel.querySelectorAll('.asg-row-block[data-row-kind="data"] .asg-sfs').forEach(function (s) {
             var v = parseInt(s.value, 10) || 0; if (v > 0) { used[v] = true; }
@@ -477,15 +477,34 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
             var rid = parseInt(fam[i].id, 10) || 0;
             if (rid > 0 && !used[rid]) { addDataRow(panel, { size_family_size_id: rid }); added++; }
         }
-        if (!added) { alert('كل المقاسات مضافة بالفعل في هذا الجدول'); }
+        if (!added && !silent) { alert('كل المقاسات المسجّلة في العائلة مضافة بالفعل في هذا الجدول'); }
+    }
+
+    // أول عمود = عمود المقاس (يُملأ تلقائياً باسم المقاس المسجّل في العائلة: Alpha = S/M/L).
+    function prefillSizeColumn(panel) {
+        var firstTr = colsBody(panel).querySelector('tr');
+        if (!firstTr) { return; }
+        var pairs = [['.asg-c-ar', 'المقاس'], ['.asg-c-en', 'Size'], ['.asg-c-fil', 'Sukat'], ['.asg-c-hi', 'साइज़']];
+        for (var i = 0; i < pairs.length; i++) {
+            var el = firstTr.querySelector(pairs[i][0]);
+            if (el && el.value.trim() === '') { el.value = pairs[i][1]; }
+        }
     }
 
     function wirePanel(panel) {
         panel.querySelector('.asg-gen-cols').onclick = function () {
             var n = parseInt(panel.querySelector('.asg-col-count').value, 10) || 3;
             n = Math.min(24, Math.max(1, n));
-            if (colsBody(panel).querySelectorAll('tr').length > 0 && !confirm('توليد العناوين سيعيد بناء تعريف الأعمدة. المتابعة؟')) { return; }
+            var hadCols = colsBody(panel).querySelectorAll('tr').length > 0;
+            var hadRows = panel.querySelectorAll('.asg-rows-box .asg-row-block[data-row-kind="data"]').length > 0;
+            if ((hadCols || hadRows) && !confirm('توليد العناوين سيعيد بناء تعريف الأعمدة ويولّد صف لكل مقاس مسجّل في العائلة (Alpha = S/M/L). المتابعة؟')) { return; }
             genColRows(panel, n);
+            prefillSizeColumn(panel);
+            // توليد صفوف المقاسات من العائلة المسجّلة تلقائياً (نفس سلوك الكود القديم).
+            if (famId() > 0) {
+                rowsBox(panel).querySelectorAll('.asg-row-block[data-row-kind="data"]').forEach(function (b) { b.remove(); });
+                bulkRows(panel, true);
+            }
         };
         panel.querySelector('.asg-col-add').onclick = function () { appendColumnDef(panel); };
         panel.querySelector('.asg-col-remove').onclick = function () { removeLastColumnDef(panel); };
