@@ -231,9 +231,9 @@ if ($subOptionsJson === false) {
     <div class="pt-form-grid">
         <div class="pt-row pt-row--r1">
             <div class="pt-sort admin-sort-field-wrap">
-                <label for="pt_sort">ترتيب ضمن الورقة</label>
+                <label for="pt_sort">الترتيب</label>
                 <input type="number" id="pt_sort" class="admin-sort-field admin-sort-field--muted" min="1" step="1" value=""
-                    <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
+                    <?php echo $subOptions === [] ? 'disabled' : ''; ?> style="background:#f4f4f5;">
             </div>
             <div class="pt-slug">
                 <label for="pt_slug">slug</label>
