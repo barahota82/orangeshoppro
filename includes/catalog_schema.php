@@ -7568,7 +7568,13 @@ function orange_catalog_migrate_advisory_sizing_clean_wipe_v99(PDO $pdo): void
         return;
     }
 
-    require_once __DIR__ . '/advisory_sizing_wipe.php';
-    orange_advisory_sizing_wipe_all($pdo);
-    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+    try {
+        require_once __DIR__ . '/advisory_sizing_wipe.php';
+        orange_advisory_sizing_wipe_all($pdo);
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] php_advisory_sizing_clean_wipe_v99: ' . $e->getMessage());
+        }
+    }
 }

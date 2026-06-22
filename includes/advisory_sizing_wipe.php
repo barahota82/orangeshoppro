@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * فراغ أدلة المقاس الاسترشادية + ربط المكتبة — قرار المالك 2026-06-21.
  *
- * @return list<string> سطور ملخص (عدد الصفوف المحذوفة / إعادة العداد)
+ * @return list<string> سطور ملخص (عدد الصfوف المحذوفة / إعادة العداد)
  */
 function orange_advisory_sizing_wipe_all(PDO $pdo): array
 {
@@ -18,6 +18,14 @@ function orange_advisory_sizing_wipe_all(PDO $pdo): array
     }
 
     $steps = [];
+    $resetTables = [
+        'advisory_sizing_guide_cells',
+        'advisory_sizing_guide_rows',
+        'advisory_sizing_guide_columns',
+        'advisory_sizing_guides',
+        'size_family_advisory_library_map',
+        'advisory_sizing_library_bundles',
+    ];
 
     $pdo->beginTransaction();
     try {
@@ -60,27 +68,21 @@ function orange_advisory_sizing_wipe_all(PDO $pdo): array
             $steps[] = 'product_types default guide cleared: ' . $n;
         }
 
-        foreach ([
-            'advisory_sizing_guide_cells',
-            'advisory_sizing_guide_rows',
-            'advisory_sizing_guide_columns',
-            'advisory_sizing_guides',
-            'size_family_advisory_library_map',
-            'advisory_sizing_library_bundles',
-        ] as $tbl) {
-            if (!orange_table_exists($pdo, $tbl)) {
-                continue;
-            }
-            $pdo->exec('ALTER TABLE `' . $tbl . '` AUTO_INCREMENT = 1');
-            $steps[] = $tbl . ' AUTO_INCREMENT = 1';
-        }
-
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
         throw $e;
+    }
+
+    // DDL (ALTER) خارج المعاملة — MySQL/MariaDB يلغي المعاملة ضمنياً وقد يكسر commit().
+    foreach ($resetTables as $tbl) {
+        if (!orange_table_exists($pdo, $tbl)) {
+            continue;
+        }
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE `' . $tbl . '` AUTO_INCREMENT = 1');
+        $steps[] = $tbl . ' AUTO_INCREMENT = 1';
     }
 
     return $steps;
