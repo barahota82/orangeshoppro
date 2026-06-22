@@ -491,18 +491,25 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     }
 
     function wirePanel(panel) {
+        // زر واحد غير هدّام: أول مرة يبني الأعمدة + كل مقاسات العائلة؛ على دليل محفوظ يضيف المقاسات الناقصة فقط دون مسح ما أُدخل.
         panel.querySelector('.asg-gen-cols').onclick = function () {
-            var n = parseInt(panel.querySelector('.asg-col-count').value, 10) || 3;
-            n = Math.min(24, Math.max(1, n));
-            var hadCols = colsBody(panel).querySelectorAll('tr').length > 0;
-            var hadRows = panel.querySelectorAll('.asg-rows-box .asg-row-block[data-row-kind="data"]').length > 0;
-            if ((hadCols || hadRows) && !confirm('توليد العناوين سيعيد بناء تعريف الأعمدة ويولّد صف لكل مقاس مسجّل في العائلة (Alpha = S/M/L). المتابعة؟')) { return; }
-            genColRows(panel, n);
-            prefillSizeColumn(panel);
-            // توليد صفوف المقاسات من العائلة المسجّلة تلقائياً (نفس سلوك الكود القديم).
-            if (famId() > 0) {
-                rowsBox(panel).querySelectorAll('.asg-row-block[data-row-kind="data"]').forEach(function (b) { b.remove(); });
-                bulkRows(panel, true);
+            if (famId() <= 0) { alert('اختر عائلة المقاسات أولاً'); return; }
+            var hasCols = colsBody(panel).querySelectorAll('tr').length > 0;
+            if (!hasCols) {
+                var n = parseInt(panel.querySelector('.asg-col-count').value, 10) || 3;
+                n = Math.min(24, Math.max(1, n));
+                genColRows(panel, n);
+                prefillSizeColumn(panel);
+            }
+            var before = panel.querySelectorAll('.asg-row-block[data-row-kind="data"]').length;
+            bulkRows(panel, true);
+            var after = panel.querySelectorAll('.asg-row-block[data-row-kind="data"]').length;
+            if (hasCols) {
+                if (after > before) {
+                    alert('تمت إضافة ' + (after - before) + ' مقاس/مقاسات ناقصة من العائلة. أكمل القياسات ثم احفظ.');
+                } else {
+                    alert('لا مقاسات ناقصة — كل مقاسات العائلة موجودة في الجدول.');
+                }
             }
         };
         panel.querySelector('.asg-col-add').onclick = function () { appendColumnDef(panel); };
