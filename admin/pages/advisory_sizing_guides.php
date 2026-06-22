@@ -154,7 +154,7 @@ if ($familiesJson === false) {
                 <label>عدد الأعمدة</label>
                 <input type="number" class="asg-col-count" min="1" max="24" value="3" style="width:5rem;">
             </div>
-            <button type="button" class="btn asg-gen-cols">توليد العناوين</button>
+            <button type="button" class="btn asg-gen-cols">توليد الجدول (أعمدة + مقاسات العائلة)</button>
             <button type="button" class="btn-secondary asg-col-add">+ عمود</button>
             <button type="button" class="btn-secondary asg-col-remove">− حذف آخر عمود</button>
         </div>
@@ -165,7 +165,6 @@ if ($familiesJson === false) {
             </table>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 8px;align-items:center;">
-            <button type="button" class="btn asg-bulk-rows">صف لكل مقاس في العائلة</button>
             <button type="button" class="btn-secondary asg-row-data">+ صف بيانات</button>
             <button type="button" class="btn-secondary asg-row-label">+ صف عنوان</button>
         </div>
@@ -508,7 +507,6 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         };
         panel.querySelector('.asg-col-add').onclick = function () { appendColumnDef(panel); };
         panel.querySelector('.asg-col-remove').onclick = function () { removeLastColumnDef(panel); };
-        panel.querySelector('.asg-bulk-rows').onclick = function () { bulkRows(panel); };
         panel.querySelector('.asg-row-data').onclick = function () { addDataRow(panel, {}); };
         panel.querySelector('.asg-row-label').onclick = function () { addLabelRow(panel, {}); };
     }
