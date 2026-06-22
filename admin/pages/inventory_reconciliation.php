@@ -144,7 +144,9 @@ if ($initialJson === false) {
         <div class="stk-top-row" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:12px;">
             <div style="flex:0 0 120px;">
                 <label for="stk_sort_order">رقم المستند</label>
-                <input type="number" id="stk_sort_order" dir="ltr" lang="en" step="1" min="1" value="<?php echo (int) $initialSortOrder; ?>" style="width:100%;">
+                <input type="text" id="stk_sort_order" dir="ltr" lang="en" readonly tabindex="-1" aria-readonly="true"
+                    class="admin-inp-readonly" value="<?php echo (int) $initialSortOrder; ?>"
+                    style="width:100%;background:#f4f4f5;cursor:default;text-align:center;">
             </div>
             <div style="flex:1 1 220px;min-width:180px;">
                 <label for="stk_scope">المخزن / المندوب</label>
