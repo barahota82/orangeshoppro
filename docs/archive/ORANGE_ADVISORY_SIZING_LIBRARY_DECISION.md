@@ -48,7 +48,9 @@
 
 ## قرار المالك — سياسة التشغيل والواجهة (2026-06-21)
 
-**الحالة:** **تنفيذ** — `layout_kind` + `panel_kind` في `includes/catalog_schema.php`؛ `admin/pages/advisory_sizing_guides.php` + `admin/api/advisory_sizing_guides/manage.php`؛ `includes/advisory_sizing_guides.php`؛ `admin/pages/products.php`؛ `pages/product.php` + `assets/css/main.css`؛ حذف بيانات قديمة: **`php_advisory_sizing_clean_wipe_v99`** (أوتوماتيك) + `includes/advisory_sizing_wipe.php` + `scripts/maintenance_wipe_advisory_sizing_guides.php` (CLI).
+**الحالة:** **قرار سياسة مُثبَّت — التنفيذ البرمجي تراجَع بقرار المالك (2026-06-22).** الأسئلة/القرارات أدناه (س1–س7) تبقى **مرجع السياسة المعتمد** للوكيل القادم لإعادة التنفيذ بشكل صحيح على **شاشة دليل المقاس الاسترشادي**. كود الميزة السابق (`layout_kind`/`panel_kind`، معالج dual، auto-select منتج، تابات المتجر) **أُرجِع** إلى ما قبل commit `b9a3453` (الأساس `2b16975d`).
+
+**ما بقي منفّذاً (قرار المالك — يُبقى):** **حذف بيانات الأدلة القديمة من القاعدة** فقط — `includes/advisory_sizing_wipe.php` + ترحيل **`php_advisory_sizing_clean_wipe_v99`** (أوتوماتيك بعد `git pull`) + `scripts/maintenance_wipe_advisory_sizing_guides.php` (CLI). هذا يفرّغ `advisory_sizing_guides` والتابعة ويعيد `AUTO_INCREMENT = 1` للتسجيل النظيف.
 
 ### أسئلة/قرارات
 
@@ -73,9 +75,8 @@
 **س7:** بيانات قديمة قبل التسجيل النظيف؟  
 **ج:** **حذف** كل صفوف `advisory_sizing_guides` والتابعة + مسح `products.sizing_advisory_guide_id` و `product_types.default_advisory_sizing_guide_id` + خرائط المكتبة + **`AUTO_INCREMENT = 1`** — **أوتوماتيك مرة واحدة** عبر ترحيل **`php_advisory_sizing_clean_wipe_v99`** في `includes/catalog_schema.php` بعد `git pull`. CLI اختياري: `scripts/maintenance_wipe_advisory_sizing_guides.php`.
 
-### تنفيذ (مسارات)
+### تنفيذ (الحالة بعد التراجع 2026-06-22)
 
-- **مخطط:** `advisory_sizing_guides.layout_kind` (`single`|`dual`); `advisory_sizing_guide_columns.panel_kind` و `advisory_sizing_guide_rows.panel_kind` (`upper`|`lower`).
-- **حفظ:** ربط إلزامي `size_family_id` + `department_id` في المسار السعيد؛ `scope_kind` على الدليل: `single` أو `dual`.
-- **منتج:** `list_by_family` + `department_id`؛ `sizing_guide_scope` = `both` عند `layout_kind=dual` وإلا `single`.
-- **متجر:** `orange_advisory_sizing_build_sections_for_guide_id` → قسمان عند dual؛ واجهة تابين في `pages/product.php`.
+- **مُبقىً (منفّذ):** **حذف بيانات الدليل من القاعدة** — `includes/advisory_sizing_wipe.php` (`orange_advisory_sizing_wipe_all`) + ترحيل `php_advisory_sizing_clean_wipe_v99` في `includes/catalog_schema.php` (أوتوماتيك، مرة واحدة) + `scripts/maintenance_wipe_advisory_sizing_guides.php` (CLI طوارئ).
+- **مُرجَع (لم يَعُد في الكود):** أعمدة `layout_kind`/`panel_kind` (لم تَعُد تُضاف عبر `catalog_schema`)، معالج dual والحفظ بـ `department_id` في `admin/pages/advisory_sizing_guides.php` + `manage.php`، auto-select واشتقاق `sizing_guide_scope` في `admin/pages/products.php` + `create.php`/`update.php`، تابات المتجر في `pages/product.php` + `assets/css/main.css` + `assets/js/product.js`، و`orange_advisory_sizing_build_sections_for_guide_id` في `includes/advisory_sizing_guides.php`.
+- **ملاحظة للوكيل القادم:** إن كان السيرفر شغّل الميزة سابقاً فقد تبقى أعمدة `layout_kind`/`panel_kind` في القاعدة (غير ضارّة، قيم افتراضية). أعد التنفيذ وفق س1–س7 أعلاه على شاشة الدليل تحديداً.
