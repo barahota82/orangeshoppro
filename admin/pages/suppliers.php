@@ -771,7 +771,7 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
             <div class="sup-code-nav-row">
                 <div class="sup-code-nav-main">
                     <label for="sup_code">كود المورد</label>
-                    <input type="text" id="sup_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" value="<?php echo htmlspecialchars($nextSupplierCodePreview, ENT_QUOTES, 'UTF-8'); ?>" readonly>
+                    <input type="text" id="sup_code" class="admin-inp-readonly" maxlength="32" autocomplete="off" dir="ltr" lang="en" value="<?php echo htmlspecialchars($nextSupplierCodePreview, ENT_QUOTES, 'UTF-8'); ?>" readonly style="background:#f4f4f5;cursor:default;text-align:center;">
                 </div>
                 <div class="sup-code-nav-btns" role="group" aria-label="تنقل بين الموردين">
                     <button type="button" class="btn-secondary sup-code-nav-btn" id="sup_code_edit_btn" title="تعديل الكود يدوياً">تعديل الكود</button>
@@ -1991,8 +1991,7 @@ function supResetForm() {
     var codeElR = document.getElementById('sup_code');
     if (codeElR) {
         codeElR.value = String(SUP_NEXT_AUTO_CODE || '1');
-        codeElR.readOnly = true;
-        codeElR.classList.add('admin-sort-field--muted');
+        supCodeApplyReadonlyLook(codeElR);
     }
     supSetCurrentBalance(0);
     document.getElementById('sup_name').value = '';
@@ -2173,6 +2172,22 @@ function supPrintCurrentCard() {
     }
     window.open(SUP_PRINT_URL + '?supplier_id=' + encodeURIComponent(String(row.id)), '_blank');
 }
+function supCodeApplyReadonlyLook(el) {
+    if (!el) return;
+    el.readOnly = true;
+    el.classList.add('admin-inp-readonly');
+    el.style.background = '#f4f4f5';
+    el.style.cursor = 'default';
+    el.style.textAlign = 'center';
+}
+function supCodeApplyEditableLook(el) {
+    if (!el) return;
+    el.readOnly = false;
+    el.classList.remove('admin-inp-readonly');
+    el.style.background = '';
+    el.style.cursor = '';
+    el.style.textAlign = '';
+}
 function supToggleCodeEdit() {
     var codeEl = document.getElementById('sup_code');
     if (!codeEl) return;
@@ -2181,13 +2196,11 @@ function supToggleCodeEdit() {
         if (!window.confirm('تحذير: تعديل كود مورد قائم قد يكسر تقارير قديمة.\nهل أنت متأكد؟')) {
             return;
         }
-        codeEl.readOnly = false;
-        codeEl.classList.remove('admin-sort-field--muted');
+        supCodeApplyEditableLook(codeEl);
         codeEl.focus();
         codeEl.select();
     } else {
-        codeEl.readOnly = true;
-        codeEl.classList.add('admin-sort-field--muted');
+        supCodeApplyReadonlyLook(codeEl);
     }
 }
 function supEdit(row) {
@@ -2195,8 +2208,7 @@ function supEdit(row) {
     var codeEl3 = document.getElementById('sup_code');
     if (codeEl3) {
         codeEl3.value = row.code || '';
-        codeEl3.readOnly = true;
-        codeEl3.classList.add('admin-sort-field--muted');
+        supCodeApplyReadonlyLook(codeEl3);
     }
     document.getElementById('sup_name').value = row.name || '';
     var split = supSplitPhoneForForm(row.phone || '', row.phone_country_dial || '', row.phone_national || '');
