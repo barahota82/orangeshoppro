@@ -147,22 +147,24 @@ $sizingText = $sizingHintKey !== '' ? t($sizingHintKey) : '';
 $sfId = isset($product['size_family_id']) ? (int) $product['size_family_id'] : 0;
 $advisorySizing = ['use_dynamic' => false, 'sections' => []];
 $sizingKinds = orange_advisory_sizing_product_scope_kinds($scope);
+// سلسلة الأولوية (قرار المالك 2026-06-22): دليل المنتج → دليل نوع المنتج → دليل العائلة.
 $agProductGuideId = 0;
 if (
     $sfId > 0
     && orange_table_exists($pdo, 'products')
     && orange_table_has_column($pdo, 'products', 'sizing_advisory_guide_id')
 ) {
-    $agProductGuideId = (int) ($product['sizing_advisory_guide_id'] ?? 0);
+    $agProductGuideId = orange_advisory_sizing_resolve_guide_id($pdo, $product);
 }
 if ($sfId > 0 && $agProductGuideId > 0) {
     $advisorySizing = orange_advisory_sizing_build_sections_for_guide_id($pdo, $agProductGuideId, $sfId, $lang);
-    if (!empty($advisorySizing['use_dynamic']) && !empty($advisorySizing['sections'][0])) {
-        $sk = strtolower(trim((string) ($advisorySizing['sections'][0]['scope_kind'] ?? '')));
-        if (in_array($sk, ['upper', 'lower', 'single'], true)) {
-            $scope = $sk;
+    $advSecCount = !empty($advisorySizing['use_dynamic']) ? count($advisorySizing['sections'] ?? []) : 0;
+    if ($advSecCount > 0) {
+        if ($advSecCount > 1) {
+            $scope = 'both';
         } else {
-            $scope = 'single';
+            $sk = strtolower(trim((string) ($advisorySizing['sections'][0]['scope_kind'] ?? '')));
+            $scope = in_array($sk, ['upper', 'lower', 'single'], true) ? $sk : 'single';
         }
         $sizingHintKey = $sizingHintKeys[$scope] ?? '';
         $sizingText = $sizingHintKey !== '' ? t($sizingHintKey) : '';
@@ -507,6 +509,21 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
+            <?php $advUseTabs = ($advSectionCount > 1); ?>
+            <?php if ($advUseTabs): ?>
+                <div class="product-sizing-tabs" id="productSizingTabs" role="tablist">
+                    <?php foreach ($advSections as $tabIdx => $tabSec): ?>
+                        <?php
+                        $tk = strtolower(trim((string) ($tabSec['scope_kind'] ?? '')));
+                        $tabKey = $tk === 'lower' ? 'sizing_guide_section_lower' : ($tk === 'upper' ? 'sizing_guide_section_upper' : '');
+                        $tabLabel = $tabKey !== '' ? t($tabKey) : ('#' . ((int) $tabIdx + 1));
+                        ?>
+                        <button type="button" class="product-sizing-tabs__btn<?php echo $tabIdx === 0 ? ' is-active' : ''; ?>"
+                            role="tab" data-adv-tab="<?php echo (int) $tabIdx; ?>"
+                            aria-selected="<?php echo $tabIdx === 0 ? 'true' : 'false'; ?>"><?php echo htmlspecialchars($tabLabel, ENT_QUOTES, 'UTF-8'); ?></button>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
             <?php foreach ($advSections as $secTableIdx => $sec): ?>
                 <?php
                 $cols = isset($sec['columns']) && is_array($sec['columns']) ? $sec['columns'] : [];
@@ -514,7 +531,7 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
                 $colCount = max(1, count($cols));
                 $secKind = strtolower(trim((string) ($sec['scope_kind'] ?? '')));
                 $subKey = '';
-                if ($scope === 'both' && $advSectionCount > 1) {
+                if (!$advUseTabs && $scope === 'both' && $advSectionCount > 1) {
                     if ($secKind === 'upper') {
                         $subKey = 'sizing_guide_section_upper';
                     } elseif ($secKind === 'lower') {
@@ -525,7 +542,7 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
                 <?php if ($subKey !== ''): ?>
                     <h4 class="product-sizing-dialog__subtitle"><?php echo htmlspecialchars(t($subKey), ENT_QUOTES, 'UTF-8'); ?></h4>
                 <?php endif; ?>
-                <div class="product-sizing-table-panel">
+                <div class="product-sizing-table-panel<?php echo $advUseTabs ? ' product-sizing-adv-panel' . ($secTableIdx === 0 ? ' is-active' : '') : ''; ?>"<?php echo $advUseTabs ? ' data-adv-panel="' . (int) $secTableIdx . '"' : ''; ?>>
                     <div class="product-sizing-table-wrap" role="region" aria-label="<?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>">
                         <table class="product-sizing-table product-sizing-table--pro" data-adv-table="<?php echo (int) $secTableIdx; ?>">
                             <thead>
@@ -637,6 +654,31 @@ window.ORANGE_ADVISORY_UX = {
     labelCm: <?php echo json_encode(t('sizing_unit_cm_short'), JSON_UNESCAPED_UNICODE); ?>,
     labelInch: <?php echo json_encode(t('sizing_unit_inch_short'), JSON_UNESCAPED_UNICODE); ?>
 };
+</script>
+    <?php endif; ?>
+    <?php if (!empty($advUseTabs)): ?>
+<script>
+(function () {
+    var tabs = document.getElementById('productSizingTabs');
+    if (!tabs) { return; }
+    var dialog = document.getElementById('productSizingDialog');
+    if (!dialog) { return; }
+    var btns = tabs.querySelectorAll('.product-sizing-tabs__btn');
+    var panels = dialog.querySelectorAll('.product-sizing-adv-panel');
+    tabs.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('.product-sizing-tabs__btn');
+        if (!btn) { return; }
+        var idx = btn.getAttribute('data-adv-tab');
+        btns.forEach(function (b) {
+            var on = b === btn;
+            b.classList.toggle('is-active', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        panels.forEach(function (p) {
+            p.classList.toggle('is-active', p.getAttribute('data-adv-panel') === idx);
+        });
+    });
+})();
 </script>
     <?php endif; ?>
 <?php endif; ?>

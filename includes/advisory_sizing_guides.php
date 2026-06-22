@@ -212,7 +212,7 @@ function orange_advisory_sizing_has_ready_section(PDO $pdo, int $familyId, array
  * @param array<string, mixed> $guide صف advisory_sizing_guides
  * @return array{scope_kind: string, columns: list<array<string, mixed>>, rows: list<array<string, mixed>>}|null
  */
-function orange_advisory_sizing_build_section_array_for_guide(PDO $pdo, array $guide, string $lang): ?array
+function orange_advisory_sizing_build_section_array_for_guide(PDO $pdo, array $guide, string $lang, string $panelFilter = ''): ?array
 {
     if (!isset($guide['id']) || !orange_table_exists($pdo, 'advisory_sizing_guides')) {
         return null;
@@ -222,28 +222,51 @@ function orange_advisory_sizing_build_section_array_for_guide(PDO $pdo, array $g
     if ($gid <= 0 || $familyId <= 0) {
         return null;
     }
-    $scopeOut = strtolower(trim((string) ($guide['scope_kind'] ?? '')));
-    if (!in_array($scopeOut, ['upper', 'lower', 'single'], true)) {
-        $scopeOut = 'single';
+    $panelFilter = strtolower(trim($panelFilter));
+    if (!in_array($panelFilter, ['upper', 'lower', 'single'], true)) {
+        $panelFilter = '';
+    }
+    // scope_kind للعرض: عند تصفية لوحة (dual) نتبع اللوحة؛ وإلا scope_kind المحفوظ.
+    if ($panelFilter !== '') {
+        $scopeOut = $panelFilter;
+    } else {
+        $scopeOut = strtolower(trim((string) ($guide['scope_kind'] ?? '')));
+        if (!in_array($scopeOut, ['upper', 'lower', 'single'], true)) {
+            $scopeOut = 'single';
+        }
+    }
+    $colHasPanel = orange_table_has_column($pdo, 'advisory_sizing_guide_columns', 'panel_kind');
+    $rowHasPanel = orange_table_has_column($pdo, 'advisory_sizing_guide_rows', 'panel_kind');
+    $colWhere = 'guide_id = ?';
+    $colParams = [$gid];
+    if ($panelFilter !== '' && $colHasPanel) {
+        $colWhere .= ' AND panel_kind = ?';
+        $colParams[] = $panelFilter;
     }
     $cSt = $pdo->prepare(
         'SELECT id, label_ar, label_en, label_fil, label_hi, unit_hint, value_kind, storage_measure, display_system
          FROM advisory_sizing_guide_columns
-         WHERE guide_id = ?
+         WHERE ' . $colWhere . '
          ORDER BY sort_order ASC, id ASC'
     );
-    $cSt->execute([$gid]);
+    $cSt->execute($colParams);
     $columns = $cSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     if ($columns === []) {
         return null;
     }
+    $rowWhere = 'guide_id = ?';
+    $rowParams = [$gid];
+    if ($panelFilter !== '' && $rowHasPanel) {
+        $rowWhere .= ' AND panel_kind = ?';
+        $rowParams[] = $panelFilter;
+    }
     $rSt = $pdo->prepare(
         'SELECT id, row_kind, size_family_size_id, label_ar, label_en, label_fil, label_hi
          FROM advisory_sizing_guide_rows
-         WHERE guide_id = ?
+         WHERE ' . $rowWhere . '
          ORDER BY sort_order ASC, id ASC'
     );
-    $rSt->execute([$gid]);
+    $rSt->execute($rowParams);
     $rows = $rSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     if ($rows === []) {
         return null;
@@ -371,12 +394,68 @@ function orange_advisory_sizing_build_sections_for_guide_id(PDO $pdo, int $guide
     if ((int) ($guide['is_active'] ?? 0) !== 1) {
         return ['use_dynamic' => false, 'sections' => []];
     }
+    $layoutKind = strtolower(trim((string) ($guide['layout_kind'] ?? 'single')));
+    if ($layoutKind === 'dual' && orange_table_has_column($pdo, 'advisory_sizing_guide_columns', 'panel_kind')) {
+        $sections = [];
+        foreach (['upper', 'lower'] as $pk) {
+            $sec = orange_advisory_sizing_build_section_array_for_guide($pdo, $guide, $lang, $pk);
+            if ($sec !== null) {
+                $sections[] = $sec;
+            }
+        }
+        if ($sections === []) {
+            return ['use_dynamic' => false, 'sections' => []];
+        }
+
+        return ['use_dynamic' => true, 'sections' => $sections];
+    }
     $sec = orange_advisory_sizing_build_section_array_for_guide($pdo, $guide, $lang);
     if ($sec === null) {
         return ['use_dynamic' => false, 'sections' => []];
     }
 
     return ['use_dynamic' => true, 'sections' => [$sec]];
+}
+
+/**
+ * سلسلة الأولوية (قرار المالك 2026-06-22): دليل المنتج → دليل نوع المنتج → 0 (يتبعه المتجر بدليل العائلة).
+ *
+ * @param array<string, mixed> $product صف المنتج (يحوي sizing_advisory_guide_id و product_type_id إن وُجدا)
+ * @return int معرّف الدليل الأخصّ النشِط أو 0
+ */
+function orange_advisory_sizing_resolve_guide_id(PDO $pdo, array $product): int
+{
+    if (!orange_table_exists($pdo, 'advisory_sizing_guides')) {
+        return 0;
+    }
+    $isActive = static function (int $gid) use ($pdo): bool {
+        if ($gid <= 0) {
+            return false;
+        }
+        $st = $pdo->prepare('SELECT id FROM advisory_sizing_guides WHERE id = ? AND is_active = 1 LIMIT 1');
+        $st->execute([$gid]);
+
+        return (bool) $st->fetchColumn();
+    };
+
+    $productGuideId = (int) ($product['sizing_advisory_guide_id'] ?? 0);
+    if ($isActive($productGuideId)) {
+        return $productGuideId;
+    }
+
+    $ptId = (int) ($product['product_type_id'] ?? 0);
+    if ($ptId > 0
+        && orange_table_exists($pdo, 'product_types')
+        && orange_table_has_column($pdo, 'product_types', 'default_advisory_sizing_guide_id')) {
+        $st = $pdo->prepare('SELECT default_advisory_sizing_guide_id FROM product_types WHERE id = ? LIMIT 1');
+        $st->execute([$ptId]);
+        $typeGuideId = (int) ($st->fetchColumn() ?: 0);
+        if ($isActive($typeGuideId)) {
+            return $typeGuideId;
+        }
+    }
+
+    return 0;
 }
 
 /**

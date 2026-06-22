@@ -1235,6 +1235,41 @@ body.storefront-browse-menu-lock {
     overflow: hidden;
 }
 
+/* تابات الدليل الاسترشادي ذي الشكل dual (علوي/سفلي) */
+.product-sizing-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 4px 0 14px;
+    flex-wrap: wrap;
+}
+
+.product-sizing-tabs__btn {
+    appearance: none;
+    border: 1px solid color-mix(in srgb, var(--border) 80%, var(--muted));
+    background: color-mix(in srgb, var(--card) 92%, var(--muted));
+    color: var(--text);
+    padding: 8px 18px;
+    border-radius: 999px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.product-sizing-tabs__btn.is-active {
+    background: var(--accent, #ea580c);
+    border-color: var(--accent, #ea580c);
+    color: #fff;
+}
+
+.product-sizing-adv-panel {
+    display: none;
+}
+
+.product-sizing-adv-panel.is-active {
+    display: block;
+}
+
 .product-sizing-table__label-row td,
 .product-sizing-table__label-cell {
     background: color-mix(in srgb, var(--card) 78%, var(--muted));
