@@ -312,6 +312,9 @@ if ($hasTable) {
         max-width: none;
         box-sizing: border-box;
     }
+    .ca-attr-form-grid #ca_sort {
+        text-align: center;
+    }
     .ca-attr-form-grid .ca-active-wrap select#ca_active,
     .ca-attr-form-grid .ca-input-kind-wrap select#ca_input_kind,
     .ca-attr-form-grid .ca-filter-wrap select#ca_filterable {

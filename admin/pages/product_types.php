@@ -522,6 +522,7 @@ if ($subOptionsJson === false) {
 .pt-form-grid input#pt_sort {
     -moz-appearance: textfield;
     appearance: textfield;
+    text-align: center;
 }
 .pt-form-grid #pt_active,
 .pt-form-grid select#pt_expected_commercial_kind_key,

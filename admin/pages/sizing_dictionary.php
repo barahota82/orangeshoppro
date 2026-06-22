@@ -118,6 +118,7 @@ if ($sdNextKindSort < 1) {
         color: var(--text, #0f172a);
         opacity: 1;
         -webkit-text-fill-color: var(--text, #0f172a);
+        text-align: center;
     }
     .sd-kind-form-grid #sd_kind_key {
         width: 100%;
@@ -242,6 +243,7 @@ if ($sdNextKindSort < 1) {
         color: var(--text, #0f172a);
         opacity: 1;
         -webkit-text-fill-color: var(--text, #0f172a);
+        text-align: center;
     }
     .sd-cat-form-grid #sd_cat_key {
         width: 100%;

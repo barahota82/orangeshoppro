@@ -479,6 +479,7 @@ if (translateBtnDep) {
             max-height:var(--input-min-h,36px);
             padding-block:0;
             padding-inline:12px;
+            text-align:center;
         }
         .dep-form-grid .dep-slug-field #slug{
             margin-inline:0;

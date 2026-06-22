@@ -357,6 +357,7 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
         .cd-form-grid input#c_sort{
             -moz-appearance:textfield;
             appearance:textfield;
+            text-align:center;
         }
         .cd-form-grid #c_active{
             -webkit-appearance:none;

@@ -190,6 +190,7 @@ $tablesReady = $hasFamilies && $hasSizes;
         color: var(--text, #0f172a);
         opacity: 1;
         -webkit-text-fill-color: var(--text, #0f172a);
+        text-align: center;
     }
     .sf-fam-form-grid #fam_size_scheme_key {
         width: 100%;

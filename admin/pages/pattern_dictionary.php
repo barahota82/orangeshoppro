@@ -348,6 +348,7 @@ if (pEnEl) pEnEl.addEventListener('input', schedulePatternTranslateFromEnglish);
         .pd-form-grid input#p_sort{
             -moz-appearance:textfield;
             appearance:textfield;
+            text-align:center;
         }
         .pd-form-grid #p_active{
             -webkit-appearance:none;
