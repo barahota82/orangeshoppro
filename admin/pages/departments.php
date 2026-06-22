@@ -86,8 +86,8 @@ if ($hasDepartmentsTable) {
             </div>
         </div>
         <div class="dep-sort admin-sort-field-wrap">
-            <label for="sort_order">الترتيب (تلقائي)</label>
-            <input type="number" id="sort_order" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int)$nextSort; ?>" disabled>
+            <label for="sort_order">الترتيب</label>
+            <input type="number" id="sort_order" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int)$nextSort; ?>" disabled style="background:#f4f4f5;">
         </div>
         <div class="dep-ar">
             <label for="name_ar">الاسم العربي</label>
