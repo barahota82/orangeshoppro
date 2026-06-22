@@ -48,7 +48,7 @@
 
 ## قرار المالك — سياسة التشغيل والواجهة (2026-06-21)
 
-**الحالة:** **تنفيذ** — `layout_kind` + `panel_kind` في `includes/catalog_schema.php`؛ `admin/pages/advisory_sizing_guides.php` + `admin/api/advisory_sizing_guides/manage.php`؛ `includes/advisory_sizing_guides.php`؛ `admin/pages/products.php`؛ `pages/product.php` + `assets/css/main.css`؛ حذف بيانات قديمة: `scripts/maintenance_wipe_advisory_sizing_guides.php` (مرة واحدة قبل التسجيل النظيف).
+**الحالة:** **تنفيذ** — `layout_kind` + `panel_kind` في `includes/catalog_schema.php`؛ `admin/pages/advisory_sizing_guides.php` + `admin/api/advisory_sizing_guides/manage.php`؛ `includes/advisory_sizing_guides.php`؛ `admin/pages/products.php`؛ `pages/product.php` + `assets/css/main.css`؛ حذف بيانات قديمة: **`php_advisory_sizing_clean_wipe_v99`** (أوتوماتيك) + `includes/advisory_sizing_wipe.php` + `scripts/maintenance_wipe_advisory_sizing_guides.php` (CLI).
 
 ### أسئلة/قرارات
 
@@ -71,7 +71,7 @@
 **ج:** بعد **عائلة المقاس** → إن وُجد **دليل واحد** مطابق (قسم + عائلة) **يُختار تلقائياً**؛ يبقى **«بدون»** لإلغاء الاختيار؛ لا إعادة فرض بعد الإلغاء إلا بتغيير العائلة.
 
 **س7:** بيانات قديمة قبل التسجيل النظيف؟  
-**ج:** **حذف** كل صفوف `advisory_sizing_guides` والتابعة + مسح `products.sizing_advisory_guide_id` و `product_types.default_advisory_sizing_guide_id` + خرائط المكتبة — عبر `scripts/maintenance_wipe_advisory_sizing_guides.php` **مرة واحدة** بعد الرفع وقبل إعادة التسجيل.
+**ج:** **حذف** كل صفوف `advisory_sizing_guides` والتابعة + مسح `products.sizing_advisory_guide_id` و `product_types.default_advisory_sizing_guide_id` + خرائط المكتبة + **`AUTO_INCREMENT = 1`** — **أوتوماتيك مرة واحدة** عبر ترحيل **`php_advisory_sizing_clean_wipe_v99`** في `includes/catalog_schema.php` بعد `git pull`. CLI اختياري: `scripts/maintenance_wipe_advisory_sizing_guides.php`.
 
 ### تنفيذ (مسارات)
 
