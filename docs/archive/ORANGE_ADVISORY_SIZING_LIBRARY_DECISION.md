@@ -107,7 +107,11 @@
 
 ### سلسلة الأولوية عند العرض للعميل (الأخصّ يفوز)
 
-`دليل المنتج` → وإلا `دليل نوع المنتج` → وإلا `دليل القسم+العائلة` → وإلا **لا يظهر زر الدليل**.
+`دليل المنتج` → وإلا `دليل نوع المنتج` → وإلا `دليل العائلة العام` → وإلا **لا يظهر زر الدليل**.
+
+**احتياطي العائلة حاسم (قرار المالك 2026-06-22):** «دليل العائلة العام» = الدليل النشِط للعائلة **غير المربوط بأي نوع منتج أو منتج**، يُختار **الأقل `sort_order` ثم الأقدم `id`** (اختيار حاسم، لا عشوائي). الدليل المربوط بنوع/منتج لا يُستخدم كاحتياطي عام. عند توفّر دليل عائلة عام، يظهر زر الدليل لكل منتجات العائلة (سيناريو السوق) ما لم يُتجاوَز بدليل منتج/نوع.
+
+**خانة ترتيب يدوية:** **لا** تُضاف الآن (قرار المالك 2026-06-22) — `sort_order` التلقائي (ترتيب الإنشاء) كافٍ كفاصل حاسم؛ تُضاف لاحقاً فقط إن ظهرت حاجة للتحكم اليدوي بترتيب أدلة عامة متعددة لنفس العائلة.
 
 ### الأطقم / dual = تابان
 
@@ -136,5 +140,5 @@
 - **المخطط:** `includes/catalog_schema.php` — أُعيدت أعمدة `advisory_sizing_guides.layout_kind` (`single|dual`، افتراضي single) و`advisory_sizing_guide_columns.panel_kind` و`advisory_sizing_guide_rows.panel_kind` (`upper|lower|single`، افتراضي upper) بشكل idempotent داخل `orange_catalog_ensure_schema`. (حذف البيانات القديمة `php_advisory_sizing_clean_wipe_v99` باقٍ.)
 - **الشاشة (نموذج واحد):** `admin/pages/advisory_sizing_guides.php` — أُعيد بناؤها بالكامل: القسم → العائلة → شكل (single/dual) → الاسم → جدول لكل لوحة (عند dual لوحتان: علوي/سفلي) → ربط أنواع منتج + منتجات (داخل نفس النموذج) → حفظة واحدة. **حُذِف** نهائياً: «المكتبة»، «ربط حزمة + مزامنة»، معالج القالب/النوع التجاري، قائمة المسودات.
 - **الـ API:** `admin/api/advisory_sizing_guides/manage.php` — أُعيد كتابته: `save` (عائلة هي العمود الفقري، يُستنتَج القالب/النوع التجاري منها؛ panel_kind لكل عمود/صف؛ الربط في نفس الحفظة)، `list_by_family`، `list_link_targets` (أنواع مرشّحة بالقسم عبر هرم الكتالوج + النوع التجاري للعائلة؛ منتجات بنفس العائلة)، `get`، `delete` (يفكّ الربط أيضاً).
-- **سلسلة الأولوية + المتجر:** `includes/advisory_sizing_guides.php` — `orange_advisory_sizing_resolve_guide_id()` (منتج→نوع→0)؛ `build_sections_for_guide_id()` صار dual-aware (يبني قسمين علوي/سفلي عبر `panel_kind`). `pages/product.php` يستخدم السلسلة، وعند dual يعرض **تابين** (علوي افتراضياً) مع تبديل JS؛ CSS في `assets/css/main.css` (`.product-sizing-tabs`, `.product-sizing-adv-panel`).
+- **سلسلة الأولوية + المتجر:** `includes/advisory_sizing_guides.php` — `orange_advisory_sizing_resolve_guide_id()` صار ثلاثي المستوى (منتج→نوع→**دليل العائلة العام** عبر `orange_advisory_sizing_family_general_guide_id()`: نشِط، غير مربوط بنوع/منتج، الأقل `sort_order` ثم `id`)؛ `build_sections_for_guide_id()` dual-aware (قسمان علوي/سفلي عبر `panel_kind`). `pages/product.php` يعتمد على السلسلة وحدها (حُذف المسار القديم `build_sections` بالنطاق لأنه غير متوافق مع dual)، وعند dual يعرض **تابين** (علوي افتراضياً) مع تبديل JS؛ CSS في `assets/css/main.css` (`.product-sizing-tabs`, `.product-sizing-adv-panel`). **لا** خانة ترتيب يدوية (يكفي `sort_order` التلقائي).
 - **لم تُلمَس** شاشتا «أنواع المنتج» و«المنتج» للربط (النطاق محصور بشاشة الدليل).

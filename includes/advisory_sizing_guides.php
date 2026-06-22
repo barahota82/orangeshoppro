@@ -455,7 +455,40 @@ function orange_advisory_sizing_resolve_guide_id(PDO $pdo, array $product): int
         }
     }
 
+    // احتياطي العائلة: الدليل العام (غير المربوط بأي نوع/منتج) النشِط، الأقل ترتيباً ثم الأقدم — اختيار حاسم.
+    $familyId = (int) ($product['size_family_id'] ?? 0);
+    if ($familyId > 0) {
+        return orange_advisory_sizing_family_general_guide_id($pdo, $familyId);
+    }
+
     return 0;
+}
+
+/**
+ * دليل العائلة العام (غير المربوط بأي نوع منتج أو منتج) النشِط — الأقل ترتيباً ثم الأقدم.
+ */
+function orange_advisory_sizing_family_general_guide_id(PDO $pdo, int $familyId): int
+{
+    if ($familyId <= 0 || !orange_table_exists($pdo, 'advisory_sizing_guides')) {
+        return 0;
+    }
+    $notType = '';
+    if (orange_table_exists($pdo, 'product_types') && orange_table_has_column($pdo, 'product_types', 'default_advisory_sizing_guide_id')) {
+        $notType = ' AND NOT EXISTS (SELECT 1 FROM product_types pt WHERE pt.default_advisory_sizing_guide_id = g.id)';
+    }
+    $notProduct = '';
+    if (orange_table_exists($pdo, 'products') && orange_table_has_column($pdo, 'products', 'sizing_advisory_guide_id')) {
+        $notProduct = ' AND NOT EXISTS (SELECT 1 FROM products p WHERE p.sizing_advisory_guide_id = g.id)';
+    }
+    $st = $pdo->prepare(
+        'SELECT g.id FROM advisory_sizing_guides g
+         WHERE g.size_family_id = ? AND g.is_active = 1' . $notType . $notProduct . '
+         ORDER BY g.sort_order ASC, g.id ASC
+         LIMIT 1'
+    );
+    $st->execute([$familyId]);
+
+    return (int) ($st->fetchColumn() ?: 0);
 }
 
 /**

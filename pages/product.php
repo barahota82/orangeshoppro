@@ -146,8 +146,7 @@ $sizingText = $sizingHintKey !== '' ? t($sizingHintKey) : '';
 
 $sfId = isset($product['size_family_id']) ? (int) $product['size_family_id'] : 0;
 $advisorySizing = ['use_dynamic' => false, 'sections' => []];
-$sizingKinds = orange_advisory_sizing_product_scope_kinds($scope);
-// سلسلة الأولوية (قرار المالك 2026-06-22): دليل المنتج → دليل نوع المنتج → دليل العائلة.
+// سلسلة الأولوية (قرار المالك 2026-06-22): دليل المنتج → دليل نوع المنتج → دليل العائلة العام.
 $agProductGuideId = 0;
 if (
     $sfId > 0
@@ -171,9 +170,6 @@ if ($sfId > 0 && $agProductGuideId > 0) {
     } else {
         $advisorySizing = ['use_dynamic' => false, 'sections' => []];
     }
-}
-if ($sfId > 0 && empty($advisorySizing['use_dynamic']) && $sizingKinds !== []) {
-    $advisorySizing = orange_advisory_sizing_build_sections($pdo, $sfId, $sizingKinds, $lang);
 }
 
 $sizingChartRows = [];
