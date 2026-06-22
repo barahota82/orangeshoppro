@@ -187,9 +187,7 @@ function ucApplyNextSortForNewSec() {
     }
     const depId = String(d.value || '').trim();
     if (!depId) {
-        const firstOpt = d.options.length > 1 ? d.options[1] : null;
-        const previewId = firstOpt ? String(firstOpt.value || '').trim() : '';
-        s.value = previewId ? ucPickNextSort(ucNextSortByDept, previewId) : '1';
+        s.value = '';
         return;
     }
     s.value = ucPickNextSort(ucNextSortByDept, depId);
@@ -210,9 +208,7 @@ function ucApplyNextSortForNewCat() {
     }
     const sid = String(sel.value || '').trim();
     if (!sid) {
-        const firstOpt = sel.options.length > 1 ? sel.options[1] : null;
-        const previewId = firstOpt ? String(firstOpt.value || '').trim() : '';
-        s.value = previewId ? ucPickNextSort(ucNextSortBySec, previewId) : '1';
+        s.value = '';
         return;
     }
     s.value = ucPickNextSort(ucNextSortBySec, sid);

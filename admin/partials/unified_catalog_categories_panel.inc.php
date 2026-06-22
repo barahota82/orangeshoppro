@@ -5,16 +5,6 @@
 $ucCatsFlat = $orange_uc['categories_flat'] ?? [];
 $ucSecOpts = $orange_uc['section_select_options'] ?? [];
 $ucSecEmpty = !empty($orange_uc['sections_empty_for_categories']);
-$ucCatSortPreview = 1;
-if (!$ucSecEmpty) {
-    $nextBySec = $orange_uc['next_sort_by_section'] ?? [];
-    if (is_array($ucSecOpts) && $ucSecOpts !== []) {
-        $firstSid = (int) ($ucSecOpts[0]['id'] ?? 0);
-        if ($firstSid > 0) {
-            $ucCatSortPreview = max(1, (int) ($nextBySec[$firstSid] ?? $nextBySec[(string) $firstSid] ?? 1));
-        }
-    }
-}
 ?>
 <div class="card" id="uc_branch_card_cat" style="margin-bottom:14px;">
     <h3 style="margin-top:0;">2 — فئات الموحّد (catalog_categories)</h3>
@@ -22,7 +12,7 @@ if (!$ucSecEmpty) {
     <div class="form-grid uc-cat-form-grid">
         <div class="uc-cat-sort admin-sort-field-wrap">
             <label for="uc_cat_sort">الترتيب</label>
-            <input type="number" id="uc_cat_sort" class="admin-sort-field admin-sort-field--muted" min="1" step="1" value="<?php echo $ucSecEmpty ? '' : (int) $ucCatSortPreview; ?>" <?php echo $ucSecEmpty ? 'disabled' : ''; ?> style="background:#f4f4f5;">
+            <input type="number" id="uc_cat_sort" class="admin-sort-field admin-sort-field--muted" min="1" step="1" value="" <?php echo $ucSecEmpty ? 'disabled' : ''; ?> style="background:#f4f4f5;">
         </div>
         <div class="uc-cat-active admin-sort-field-wrap">
             <label for="uc_cat_active">نشط</label>

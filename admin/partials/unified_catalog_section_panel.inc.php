@@ -7,16 +7,6 @@ $ucDepartments = $orange_uc['departments'] ?? [];
 $ucSectionsFlat = $orange_uc['sections_flat'] ?? [];
 $ucSecOpts = $orange_uc['section_select_options'] ?? [];
 $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
-$ucSecSortPreview = 1;
-if (!$ucDepsEmpty) {
-    $nextByDept = $orange_uc['next_sort_by_department'] ?? [];
-    if (is_array($ucDepartments) && $ucDepartments !== []) {
-        $firstDid = (int) ($ucDepartments[0]['id'] ?? 0);
-        if ($firstDid > 0) {
-            $ucSecSortPreview = max(1, (int) ($nextByDept[$firstDid] ?? $nextByDept[(string) $firstDid] ?? 1));
-        }
-    }
-}
 ?>
 <div class="card" id="uc_branch_card_sec" style="margin-bottom:14px;">
     <h3 style="margin-top:0;">1 — أقسام داخلية (catalog_sections)</h3>
@@ -24,7 +14,7 @@ if (!$ucDepsEmpty) {
     <div class="form-grid uc-sec-form-grid">
         <div class="uc-sec-sort admin-sort-field-wrap">
             <label for="uc_sec_sort">الترتيب</label>
-            <input type="number" id="uc_sec_sort" class="admin-sort-field admin-sort-field--muted" min="1" step="1" value="<?php echo $ucDepsEmpty ? '' : (int) $ucSecSortPreview; ?>" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?> style="background:#f4f4f5;">
+            <input type="number" id="uc_sec_sort" class="admin-sort-field admin-sort-field--muted" min="1" step="1" value="" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?> style="background:#f4f4f5;">
         </div>
         <div class="uc-sec-active admin-sort-field-wrap">
             <label for="uc_sec_active">نشط</label>
