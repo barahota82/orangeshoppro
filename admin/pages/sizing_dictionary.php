@@ -408,7 +408,7 @@ if ($sdNextKindSort < 1) {
     <input type="hidden" id="sd_kind_old_key" value="">
     <div class="form-grid sd-kind-form-grid">
         <div class="sd-kind-sort admin-sort-field-wrap">
-            <label>الترتيب (تلقائي)</label>
+            <label>الترتيب</label>
             <input type="hidden" id="sd_kind_sort" value="0">
             <input type="text" id="sd_kind_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="<?php echo (int) $sdNextKindSort; ?>">
         </div>
@@ -454,7 +454,7 @@ if ($sdNextKindSort < 1) {
     <input type="hidden" id="sd_cat_old_key" value="">
     <div class="form-grid sd-cat-form-grid">
         <div class="sd-cat-sort admin-sort-field-wrap">
-            <label>الترتيب (تلقائي)</label>
+            <label>الترتيب</label>
             <input type="hidden" id="sd_cat_sort" value="0">
             <input type="text" id="sd_cat_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="1">
         </div>
@@ -543,6 +543,7 @@ if ($sdNextKindSort < 1) {
 <script>
 (function () {
     const api = '/admin/api/sizing_dictionary/manage.php';
+    const SD_KIND_STORAGE_KEY = 'orangeSdSelectedCommercialKind';
     var sdNextKindSortPreview = <?php echo (int) $sdNextKindSort; ?>;
     var sdNextCatSortPreview = 1;
     window.sdCatParentProgrammaticDepth = 0;
@@ -551,6 +552,24 @@ if ($sdNextKindSort < 1) {
     }
     function sdCatParentEndProgrammatic() {
         window.sdCatParentProgrammaticDepth = Math.max(0, window.sdCatParentProgrammaticDepth - 1);
+    }
+
+    function sdPersistSelectedKind(ck) {
+        try {
+            if (ck) {
+                sessionStorage.setItem(SD_KIND_STORAGE_KEY, ck);
+            } else {
+                sessionStorage.removeItem(SD_KIND_STORAGE_KEY);
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    function sdRestoreSelectedKindPreference() {
+        try {
+            return sessionStorage.getItem(SD_KIND_STORAGE_KEY) || '';
+        } catch (e) {
+            return '';
+        }
     }
 
     function sdRefreshNextKindPreviewFromKinds(kinds) {
@@ -880,7 +899,7 @@ if ($sdNextKindSort < 1) {
         const sel = document.getElementById('sd_cat_parent_kind');
         sdCatParentBeginProgrammatic();
         try {
-            const prev = preferred || sel.value || '';
+            const prev = preferred || sel.value || sdRestoreSelectedKindPreference() || '';
             sel.innerHTML = '';
             const opt0 = document.createElement('option');
             opt0.value = '';
@@ -949,9 +968,11 @@ if ($sdNextKindSort < 1) {
             tb.innerHTML = '';
             sdNextCatSortPreview = 1;
             sdSyncCatSortView();
+            sdPersistSelectedKind('');
             return;
         }
         prevKindForCats = ck;
+        sdPersistSelectedKind(ck);
         try {
             const res = await postJSON(api, { action: 'list_categories', commercial_kind_key: ck });
             if (!res || !res.success) {
@@ -1169,6 +1190,7 @@ if ($sdNextKindSort < 1) {
         if (window.sdCatParentProgrammaticDepth > 0) {
             return;
         }
+        sdPersistSelectedKind(this.value.trim());
         sdApplyAutoCatKey();
         await sdLoadCategories();
         const oldKey = document.getElementById('sd_cat_old_key').value.trim();

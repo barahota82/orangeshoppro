@@ -286,7 +286,7 @@ $tablesReady = $hasFamilies && $hasSizes;
     <input type="hidden" id="fam_id" value="0">
     <div class="form-grid sf-fam-form-grid">
         <div class="sf-fam-sort admin-sort-field-wrap">
-            <label>الترتيب (تلقائي)</label>
+            <label>الترتيب</label>
             <input type="number" id="fam_sort" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int) $nextSort; ?>" disabled>
         </div>
         <div class="sf-fam-scheme">

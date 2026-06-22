@@ -40,8 +40,8 @@ if ($hasTable) {
     <input type="hidden" id="pattern_id" value="0">
     <div class="form-grid pd-form-grid">
         <div class="pd-sort admin-sort-field-wrap">
-            <label>الترتيب (تلقائي)</label>
-            <input type="number" id="p_sort" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int) $nextSort; ?>" disabled>
+            <label>الترتيب</label>
+            <input type="number" id="p_sort" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int) $nextSort; ?>" disabled style="background:#f4f4f5;">
         </div>
         <div class="pd-active admin-sort-field-wrap">
             <label>نشط</label>

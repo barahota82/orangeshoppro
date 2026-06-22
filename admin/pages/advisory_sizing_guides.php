@@ -165,7 +165,7 @@ $asgJson = static function (array $rows): string {
     <input type="hidden" id="asg_guide_sort" value="0">
     <div class="asg-wizard-row-sort" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-top:12px;width:100%;box-sizing:border-box;direction:rtl;justify-content:flex-start;">
         <div style="flex:0 0 auto;width:6.5rem;min-width:6rem;display:flex;flex-direction:column;gap:4px;">
-            <label for="asg_guide_sort_disp" style="margin:0;font-size:13px;white-space:nowrap;">ترتيب عرض الدليل (تلقائي)</label>
+            <label for="asg_guide_sort_disp" style="margin:0;font-size:13px;white-space:nowrap;">الترتيب</label>
             <input type="text" id="asg_guide_sort_disp" readonly class="input-narrow" style="width:100%;box-sizing:border-box;text-align:center;background:#f1f5f9;cursor:default;" title="للدليل الجديد: الرقم التالي في القاعدة (يبدأ من 1 ويزيد 1 بعد كل حفظ). عند التعديل: القيمة المحفوظة.">
         </div>
     </div>

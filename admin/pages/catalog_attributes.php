@@ -75,11 +75,11 @@ if ($hasTable) {
     <div class="ca-attr-form-grid">
         <div class="ca-row ca-row--r1">
             <div class="ca-sort-wrap admin-sort-field-wrap">
-                <label>ترتيب العرض</label>
+                <label>الترتيب</label>
                 <input type="number" id="ca_sort" class="admin-sort-field admin-sort-field--muted"
                     min="0" step="1"
                     value="<?php echo $hasTable ? htmlspecialchars((string) $nextSort, ENT_QUOTES, 'UTF-8') : ''; ?>"
-                    disabled>
+                    disabled style="background:#f4f4f5;">
             </div>
             <div class="ca-key-wrap">
                 <label for="ca_key">attribute_key</label>

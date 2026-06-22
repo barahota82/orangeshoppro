@@ -167,8 +167,8 @@ if ($tablesReady) {
     <div class="sst-header-row-wrap">
         <div class="sst-header-row">
             <div class="admin-sort-field-wrap">
-                <label for="sst_sort_display">ترتيب</label>
-                <input type="text" id="sst_sort_display" class="admin-sort-field admin-sort-field--muted" readonly tabindex="-1" value="<?php echo (int) $nextSort; ?>" title="ترتيب ظهور القالب في القائمة" aria-readonly="true" autocomplete="off">
+                <label for="sst_sort_display">الترتيب</label>
+                <input type="text" id="sst_sort_display" class="admin-sort-field admin-sort-field--muted" readonly tabindex="-1" value="<?php echo (int) $nextSort; ?>" title="ترتيب ظهور القالب في القائمة" aria-readonly="true" autocomplete="off" style="background:#f4f4f5;">
             </div>
             <div class="admin-sort-field-wrap">
                 <label for="sst_name_en">English</label>
