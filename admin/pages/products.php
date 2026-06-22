@@ -925,6 +925,29 @@ const PRODUCT_MSG = {
     OK_TOG: 'تم تحديث الحالة'
 };
 
+function orangeProductEffectiveDepartmentId() {
+    if (window.ORANGE_PT_DEPT_STEP_ENABLED !== true) {
+        return 0;
+    }
+    const d = document.getElementById('product_main_department_id');
+    return d ? (parseInt(String(d.value || '0'), 10) || 0) : 0;
+}
+
+function orangeProductAdvisoryScopeFromOption(opt) {
+    if (!opt) {
+        return 'none';
+    }
+    const lk = String(opt.dataset.layoutKind || 'single');
+    if (lk === 'dual') {
+        return 'both';
+    }
+    const sk = String(opt.dataset.scopeKind || 'single');
+    if (sk === 'upper' || sk === 'lower' || sk === 'single') {
+        return sk;
+    }
+    return 'single';
+}
+
 /** اعتماد التصنيف الموحّد فقط: التلميح يُحدَّث من الورقة المختارة. */
 function orangeProductApplyDefaultAdvisoryFromProductType(onlyIfEmpty) {
     const advEl = document.getElementById('sizing_advisory_guide_id');
@@ -3268,9 +3291,14 @@ async function uploadGalleryProductImages() {
 function orangeProductSizingSaveFields() {
     const advEl = document.getElementById('sizing_advisory_guide_id');
     const adv = advEl ? parseInt(String(advEl.value || '0'), 10) || 0 : 0;
+    let scope = 'none';
+    if (adv > 0 && advEl) {
+        const opt = advEl.querySelector('option[value="' + adv + '"]');
+        scope = orangeProductAdvisoryScopeFromOption(opt);
+    }
     return {
         sizing_advisory_guide_id: adv,
-        sizing_guide_scope: 'none',
+        sizing_guide_scope: scope,
     };
 }
 
@@ -3297,16 +3325,22 @@ async function orangeProductRefreshAdvisoryGuideSelect(preserveId) {
         return;
     }
     sel.disabled = false;
+    const deptId = orangeProductEffectiveDepartmentId();
     try {
-        const res = await postJSON(adminApiPath('api/advisory_sizing_guides/manage.php'), {
+        const listPayload = {
             action: 'list_by_family',
             size_family_id: famId,
-        });
+        };
+        if (deptId > 0) {
+            listPayload.department_id = deptId;
+        }
+        const res = await postJSON(adminApiPath('api/advisory_sizing_guides/manage.php'), listPayload);
         if (!res || !res.success) {
             sel.value = '0';
             return;
         }
         const guides = res.guides || [];
+        const activeGuides = [];
         guides.forEach(function (g) {
             const active = parseInt(String(g.is_active != null ? g.is_active : '1'), 10) || 0;
             if (active !== 1) {
@@ -3321,10 +3355,13 @@ async function orangeProductRefreshAdvisoryGuideSelect(preserveId) {
             if (id <= 0) {
                 return;
             }
+            activeGuides.push(g);
             const lab = String(g.name_ar || g.name_en || ('#' + id)).replace(/</g, '');
             const o = document.createElement('option');
             o.value = String(id);
             o.textContent = lab;
+            o.dataset.layoutKind = String(g.layout_kind || 'single');
+            o.dataset.scopeKind = String(g.scope_kind || 'single');
             sel.appendChild(o);
         });
         if (prev > 0) {
@@ -3336,7 +3373,11 @@ async function orangeProductRefreshAdvisoryGuideSelect(preserveId) {
             }
         } else {
             sel.value = '0';
-            orangeProductApplyDefaultAdvisoryFromProductType(true);
+            if (activeGuides.length === 1) {
+                sel.value = String(parseInt(String(activeGuides[0].id), 10) || 0);
+            } else {
+                orangeProductApplyDefaultAdvisoryFromProductType(true);
+            }
         }
     } catch (e) {
         sel.value = '0';

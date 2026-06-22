@@ -1208,6 +1208,27 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             );
             orange_schema_invalidate_column_check('advisory_sizing_guides', 'commercial_kind_key');
         }
+        if (!orange_table_has_column($pdo, 'advisory_sizing_guides', 'layout_kind')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE advisory_sizing_guides ADD COLUMN layout_kind VARCHAR(16) NOT NULL DEFAULT \'single\' AFTER scope_kind'
+            );
+            orange_schema_invalidate_column_check('advisory_sizing_guides', 'layout_kind');
+        }
+        if (orange_table_has_column($pdo, 'advisory_sizing_guide_columns') && !orange_table_has_column($pdo, 'advisory_sizing_guide_columns', 'panel_kind')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE advisory_sizing_guide_columns ADD COLUMN panel_kind VARCHAR(16) NOT NULL DEFAULT \'upper\' AFTER guide_id'
+            );
+            orange_schema_invalidate_column_check('advisory_sizing_guide_columns', 'panel_kind');
+        }
+        if (orange_table_exists($pdo, 'advisory_sizing_guide_rows') && !orange_table_has_column($pdo, 'advisory_sizing_guide_rows', 'panel_kind')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE advisory_sizing_guide_rows ADD COLUMN panel_kind VARCHAR(16) NOT NULL DEFAULT \'upper\' AFTER guide_id'
+            );
+            orange_schema_invalidate_column_check('advisory_sizing_guide_rows', 'panel_kind');
+        }
         if (orange_table_has_column($pdo, 'advisory_sizing_guides', 'name_en')) {
             orange_catalog_safe_exec(
                 $pdo,

@@ -11,7 +11,7 @@ require_once __DIR__ . '/../../../includes/product_colorway_images.php';
 require_once __DIR__ . '/../../../includes/product_channels.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_once __DIR__ . '/../../../includes/countries.php';
-require_once __DIR__ . '/../../../includes/catalog_polish_phase6.php';
+require_once __DIR__ . '/../../../includes/advisory_sizing_guides.php';
 require_admin_api();
 
 try {
@@ -75,7 +75,7 @@ try {
                 json_response(['success' => false, 'message' => 'جداول دليل المقاس غير جاهزة'], 422);
             }
             $gst = $pdo->prepare(
-                'SELECT id, size_family_id, scope_kind, is_active FROM advisory_sizing_guides WHERE id = ? LIMIT 1'
+                'SELECT id, size_family_id, scope_kind, layout_kind, is_active FROM advisory_sizing_guides WHERE id = ? LIMIT 1'
             );
             $gst->execute([$gid]);
             $grow = $gst->fetch(PDO::FETCH_ASSOC);
@@ -87,12 +87,7 @@ try {
                 json_response(['success' => false, 'message' => 'دليل المقاس المختار غير نشط'], 422);
             }
             $sizingAdvisoryGuideId = $gid;
-            $sk = strtolower(trim((string) ($grow['scope_kind'] ?? '')));
-            if (in_array($sk, ['upper', 'lower', 'single'], true)) {
-                $scope = $sk;
-            } else {
-                $scope = 'single';
-            }
+            $scope = orange_advisory_sizing_product_scope_from_guide($grow);
         } else {
             $sizingAdvisoryGuideId = null;
         }

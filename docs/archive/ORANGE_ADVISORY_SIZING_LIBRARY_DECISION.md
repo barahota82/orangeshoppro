@@ -43,3 +43,39 @@
 ## مرجع سريع (إنجليزي للوكلاء)
 
 **Decision:** Author advisory content as a **reusable library** keyed by broad catalog context (section + size template + commercial kind L1). **Map** library bundle(s) to **`size_family`** for SKU-aligned rows. **Products inherit** default advisory from family; **optional product-level override** for rare cases. Keep **L2** for merchandising/filtering, not forced 1:1 ownership of duplicated guide files.
+
+---
+
+## قرار المالك — سياسة التشغيل والواجهة (2026-06-21)
+
+**الحالة:** **تنفيذ** — `layout_kind` + `panel_kind` في `includes/catalog_schema.php`؛ `admin/pages/advisory_sizing_guides.php` + `admin/api/advisory_sizing_guides/manage.php`؛ `includes/advisory_sizing_guides.php`؛ `admin/pages/products.php`؛ `pages/product.php` + `assets/css/main.css`؛ حذف بيانات قديمة: `scripts/maintenance_wipe_advisory_sizing_guides.php` (مرة واحدة قبل التسجيل النظيف).
+
+### أسئلة/قرارات
+
+**س1:** هل الدليل يُشارك بين أقسام (رجali/نسائي)؟  
+**ج:** **لا.** كل قسم له أدلته؛ `department_id` **إلزامي** عند التسجيل؛ لا يُعرض دليل قسم لمنتج قسم آخر.
+
+**س2:** هل نربط دليلاً لكل `product_type` (169 نوعاً)؟  
+**ج:** **لا.** الربط عبر **`size_family_id` + القسم**؛ أنواع منتج كثيرة على نفس L2 (مثل `clothing_tops`) **تشارك** نفس عائلات/أدلة المقاس (Alpha / أرقام / Free / One size = **4 عائلات ≈ 4 أدلة** لكل قسم+L2، وليس دليلاً لكل slug).
+
+**س3:** ما خانات تسجيل الدليل في المعالج؟  
+**ج:** **(1) القسم** → **(2) عائلة المقاسات** (يستنتج القالب + L1 + L2 من العائلة) → **(3) شكل الدليل:** `جدول واحد` | `جدولان (علوي+سفلي)` → اسم + أعمدة/صفوف.
+
+**س4:** الأطقم (`clothing_sets`) — كم دليل؟  
+**ج:** **دليل واحد** في الأدمن والمنتج (`sizing_advisory_guide_id` واحد)؛ داخل الدليل **قسمان** (علوي / سفلي) عند `layout_kind = dual`؛ للعميل **تاب علوي + تاب سفلي** (جدول لكل تاب).
+
+**س5:** التيشيرت/العلوي — كم دليل؟  
+**ج:** **دليل واحد لكل (قسم + عائلة)** — ليس «دليلاً واحداً لكل علوي» بكل أنظمة المقاس؛ Alpha ≠ أرقام = عائلتان = دليلان.
+
+**س6:** المنتج — اختيار الدليل؟  
+**ج:** بعد **عائلة المقاس** → إن وُجد **دليل واحد** مطابق (قسم + عائلة) **يُختار تلقائياً**؛ يبقى **«بدون»** لإلغاء الاختيار؛ لا إعادة فرض بعد الإلغاء إلا بتغيير العائلة.
+
+**س7:** بيانات قديمة قبل التسجيل النظيف؟  
+**ج:** **حذف** كل صفوف `advisory_sizing_guides` والتابعة + مسح `products.sizing_advisory_guide_id` و `product_types.default_advisory_sizing_guide_id` + خرائط المكتبة — عبر `scripts/maintenance_wipe_advisory_sizing_guides.php` **مرة واحدة** بعد الرفع وقبل إعادة التسجيل.
+
+### تنفيذ (مسارات)
+
+- **مخطط:** `advisory_sizing_guides.layout_kind` (`single`|`dual`); `advisory_sizing_guide_columns.panel_kind` و `advisory_sizing_guide_rows.panel_kind` (`upper`|`lower`).
+- **حفظ:** ربط إلزامي `size_family_id` + `department_id` في المسار السعيد؛ `scope_kind` على الدليل: `single` أو `dual`.
+- **منتج:** `list_by_family` + `department_id`؛ `sizing_guide_scope` = `both` عند `layout_kind=dual` وإلا `single`.
+- **متجر:** `orange_advisory_sizing_build_sections_for_guide_id` → قسمان عند dual؛ واجهة تابين في `pages/product.php`.

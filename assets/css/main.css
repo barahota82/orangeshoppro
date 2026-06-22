@@ -1235,6 +1235,45 @@ body.storefront-browse-menu-lock {
     overflow: hidden;
 }
 
+.product-sizing-adv-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 12px;
+}
+
+.product-sizing-adv-tabs__btn {
+    flex: 1 1 0;
+    min-width: 7rem;
+    padding: 10px 14px;
+    border: 1px solid color-mix(in srgb, var(--border) 85%, var(--muted));
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--card) 92%, var(--muted));
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.product-sizing-adv-tabs__btn.is-active,
+.product-sizing-adv-tabs__btn[aria-selected="true"] {
+    background: color-mix(in srgb, var(--text) 8%, var(--card));
+    border-color: color-mix(in srgb, var(--text) 22%, var(--border));
+}
+
+.product-sizing-adv-tabpanels {
+    margin: 0;
+}
+
+.product-sizing-adv-tabpanel:not(.is-active) {
+    display: none;
+}
+
+.product-sizing-adv-tabpanel[hidden] {
+    display: none !important;
+}
+
 .product-sizing-table__label-row td,
 .product-sizing-table__label-cell {
     background: color-mix(in srgb, var(--card) 78%, var(--muted));

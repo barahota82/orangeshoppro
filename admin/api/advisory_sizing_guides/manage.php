@@ -13,9 +13,25 @@ require_admin_api();
 function orange_advisory_scope_kind_valid($raw): ?string
 {
     $s = strtolower(trim((string) $raw));
-    $ok = ['upper', 'lower', 'single'];
+    $ok = ['upper', 'lower', 'single', 'dual'];
 
     return in_array($s, $ok, true) ? $s : null;
+}
+
+/**
+ * @param mixed $raw
+ */
+function orange_advisory_layout_kind_valid($raw): string
+{
+    return strtolower(trim((string) $raw)) === 'dual' ? 'dual' : 'single';
+}
+
+/**
+ * @param mixed $raw
+ */
+function orange_advisory_panel_kind_valid($raw): string
+{
+    return strtolower(trim((string) $raw)) === 'lower' ? 'lower' : 'upper';
 }
 
 /**
@@ -98,7 +114,8 @@ function orange_advisory_api_save_schema_ready(PDO $pdo): ?string
         ['advisory_sizing_guides', 'department_id'],
         ['advisory_sizing_guides', 'size_scheme_template_id'],
         ['advisory_sizing_guides', 'commercial_kind_key'],
-        ['advisory_sizing_guide_columns', 'label_fil'],
+        ['advisory_sizing_guides', 'layout_kind'],
+        ['advisory_sizing_guide_columns', 'panel_kind'],
         ['advisory_sizing_guide_columns', 'label_hi'],
         ['advisory_sizing_guide_columns', 'storage_measure'],
         ['advisory_sizing_guide_columns', 'display_system'],
@@ -113,7 +130,8 @@ function orange_advisory_api_save_schema_ready(PDO $pdo): ?string
         ['advisory_sizing_guides', 'department_id'],
         ['advisory_sizing_guides', 'size_scheme_template_id'],
         ['advisory_sizing_guides', 'commercial_kind_key'],
-        ['advisory_sizing_guide_columns', 'label_fil'],
+        ['advisory_sizing_guides', 'layout_kind'],
+        ['advisory_sizing_guide_columns', 'panel_kind'],
         ['advisory_sizing_guide_columns', 'label_hi'],
         ['advisory_sizing_guide_columns', 'storage_measure'],
         ['advisory_sizing_guide_columns', 'display_system'],
@@ -187,15 +205,20 @@ try {
             if ($fid <= 0) {
                 json_response(['success' => false, 'message' => 'اختر عائلة مقاسات'], 422);
             }
-            $st = $pdo->prepare(
-                'SELECT g.id, g.scope_kind, g.name_ar, g.is_active, g.sort_order,
+            $deptFilter = (int) ($data['department_id'] ?? 0);
+            $sql = 'SELECT g.id, g.scope_kind, g.layout_kind, g.name_ar, g.is_active, g.sort_order, g.department_id,
                     (SELECT COUNT(*) FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id) AS columns_count,
                     (SELECT COUNT(*) FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id) AS rows_count
                  FROM advisory_sizing_guides g
-                 WHERE g.size_family_id = ?
-                 ORDER BY g.sort_order ASC, CASE g.scope_kind WHEN \'upper\' THEN 1 WHEN \'lower\' THEN 2 WHEN \'single\' THEN 3 ELSE 9 END, g.id ASC'
-            );
-            $st->execute([$fid]);
+                 WHERE g.size_family_id = ?';
+            $params = [$fid];
+            if ($deptFilter > 0) {
+                $sql .= ' AND COALESCE(g.department_id, 0) = ?';
+                $params[] = $deptFilter;
+            }
+            $sql .= ' ORDER BY g.sort_order ASC, g.id ASC';
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
             $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 
             json_response(['success' => true, 'guides' => is_array($rows) ? $rows : []]);
@@ -312,15 +335,23 @@ try {
                 json_response(['success' => false, 'message' => 'غير موجود'], 404);
             }
             $gid = (int) $guide['id'];
+            $hasPanelCol = orange_table_has_column($pdo, 'advisory_sizing_guide_columns', 'panel_kind');
             $cols = $pdo->prepare(
-                'SELECT id, sort_order, label_ar, label_en, label_fil, label_hi, value_kind, unit_hint, storage_measure, display_system
-                 FROM advisory_sizing_guide_columns WHERE guide_id = ? ORDER BY sort_order ASC, id ASC'
+                $hasPanelCol
+                    ? 'SELECT id, panel_kind, sort_order, label_ar, label_en, label_fil, label_hi, value_kind, unit_hint, storage_measure, display_system
+                       FROM advisory_sizing_guide_columns WHERE guide_id = ? ORDER BY sort_order ASC, id ASC'
+                    : 'SELECT id, sort_order, label_ar, label_en, label_fil, label_hi, value_kind, unit_hint, storage_measure, display_system
+                       FROM advisory_sizing_guide_columns WHERE guide_id = ? ORDER BY sort_order ASC, id ASC'
             );
             $cols->execute([$gid]);
             $columns = $cols->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $hasPanelRow = orange_table_has_column($pdo, 'advisory_sizing_guide_rows', 'panel_kind');
             $rws = $pdo->prepare(
-                'SELECT id, sort_order, row_kind, size_family_size_id, label_ar, label_en, label_fil, label_hi
-                 FROM advisory_sizing_guide_rows WHERE guide_id = ? ORDER BY sort_order ASC, id ASC'
+                $hasPanelRow
+                    ? 'SELECT id, panel_kind, sort_order, row_kind, size_family_size_id, label_ar, label_en, label_fil, label_hi
+                       FROM advisory_sizing_guide_rows WHERE guide_id = ? ORDER BY sort_order ASC, id ASC'
+                    : 'SELECT id, sort_order, row_kind, size_family_size_id, label_ar, label_en, label_fil, label_hi
+                       FROM advisory_sizing_guide_rows WHERE guide_id = ? ORDER BY sort_order ASC, id ASC'
             );
             $rws->execute([$gid]);
             $rows = $rws->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -421,6 +452,9 @@ try {
             $id = (int) ($data['id'] ?? 0);
             $fidRaw = (int) ($data['size_family_id'] ?? 0);
             $boundFamily = $fidRaw > 0;
+            if ($id <= 0 && !$boundFamily) {
+                json_response(['success' => false, 'message' => 'اختر عائلة المقاسات (2) في المعالج قبل حفظ دليل جديد.'], 422);
+            }
             $exGuide = null;
             $exFam = 0;
             if ($id > 0) {
@@ -451,6 +485,12 @@ try {
                 $scopeKind = orange_advisory_scope_kind_valid(is_array($exGuide) ? ((string) ($exGuide['scope_kind'] ?? '')) : '') ?? 'single';
             }
             if ($scopeKind === null) {
+                $scopeKind = 'single';
+            }
+            $layoutKind = orange_advisory_layout_kind_valid($data['layout_kind'] ?? '');
+            if ($layoutKind === 'dual') {
+                $scopeKind = 'dual';
+            } elseif (!in_array($scopeKind, ['upper', 'lower', 'single'], true)) {
                 $scopeKind = 'single';
             }
             if ($boundFamily) {
@@ -537,6 +577,7 @@ try {
                     $vk = 'number';
                 }
                 $normCols[] = [
+                    'panel_kind' => orange_advisory_panel_kind_valid($c['panel_kind'] ?? 'upper'),
                     'label_ar' => orange_advisory_api_trunc_utf8($la, 191),
                     'label_en' => orange_advisory_api_trunc_utf8($le, 191),
                     'label_fil' => orange_advisory_api_trunc_utf8($lf, 191),
@@ -598,6 +639,7 @@ try {
                     $cells[0] = '';
                 }
                 $normRows[] = [
+                    'panel_kind' => orange_advisory_panel_kind_valid($r['panel_kind'] ?? 'upper'),
                     'row_kind' => $rk,
                     'sort_order' => (int) ($r['sort_order'] ?? 0) > 0 ? (int) $r['sort_order'] : $rso,
                     'size_family_size_id' => $rk === 'data' ? $sfsId : 0,
@@ -633,25 +675,55 @@ try {
             if (!$hasDataRow) {
                 json_response(['success' => false, 'message' => 'أضف صف بيانات واحداً على الأقل'], 422);
             }
+            if ($layoutKind === 'dual') {
+                $hasUpper = false;
+                $hasLower = false;
+                foreach ($normRows as $nrDual) {
+                    if (($nrDual['row_kind'] ?? '') !== 'data') {
+                        continue;
+                    }
+                    if (($nrDual['panel_kind'] ?? 'upper') === 'lower') {
+                        $hasLower = true;
+                    } else {
+                        $hasUpper = true;
+                    }
+                }
+                if (!$hasUpper || !$hasLower) {
+                    json_response(['success' => false, 'message' => 'دليل الأطقم (جدولان): أضف صف بيانات في القسم العلوي والسفلي على الأقل.'], 422);
+                }
+            }
             foreach ($normRows as $nr) {
                 if ($nr['row_kind'] === 'label' && trim($nr['label_ar']) === '' && trim($nr['label_en']) === '') {
                     json_response(['success' => false, 'message' => 'كل صف عنوان يجب أن يحتوي على نص عربي أو English'], 422);
                 }
             }
+            $hasPanelColSave = orange_table_has_column($pdo, 'advisory_sizing_guide_columns', 'panel_kind');
+            $hasPanelRowSave = orange_table_has_column($pdo, 'advisory_sizing_guide_rows', 'panel_kind');
+            $hasLayoutColSave = orange_table_has_column($pdo, 'advisory_sizing_guides', 'layout_kind');
             $ncol = count($normCols);
             $dataRowNum = 0;
-            foreach ($normRows as $nr) {
-                if (($nr['row_kind'] ?? '') !== 'data') {
+            foreach ($normRows as $nrVal) {
+                if (($nrVal['row_kind'] ?? '') !== 'data') {
                     continue;
                 }
                 ++$dataRowNum;
-                $cells = $nr['cells'] ?? [];
-                $sfsData = (int) ($nr['size_family_size_id'] ?? 0);
+                $cells = $nrVal['cells'] ?? [];
+                $sfsData = (int) ($nrVal['size_family_size_id'] ?? 0);
+                $rowPanel = orange_advisory_panel_kind_valid($nrVal['panel_kind'] ?? 'upper');
+                $panelColCount = 0;
+                foreach ($normCols as $ncVal) {
+                    if (orange_advisory_panel_kind_valid($ncVal['panel_kind'] ?? 'upper') === $rowPanel) {
+                        ++$panelColCount;
+                    }
+                }
+                if ($panelColCount <= 0) {
+                    json_response(['success' => false, 'message' => 'كل قسم (علوي/سفلي) يحتاج عموداً واحداً على الأقل في تعريف الأعمدة.'], 422);
+                }
                 $startIx = ($effFam > 0 && $sfsData > 0) ? 1 : 0;
-                if ($effFam > 0 && $sfsData > 0 && $ncol === 1) {
+                if ($effFam > 0 && $sfsData > 0 && $panelColCount === 1) {
                     continue;
                 }
-                for ($jx = $startIx; $jx < $ncol; $jx++) {
+                for ($jx = $startIx; $jx < $panelColCount; $jx++) {
                     if (trim((string) ($cells[$jx] ?? '')) === '') {
                         json_response([
                             'success' => false,
@@ -706,11 +778,19 @@ try {
                     $deptIns = $deptId > 0 ? $deptId : null;
                     $tplIns = $tplId > 0 ? $tplId : null;
                     $ins = $pdo->prepare(
-                        'INSERT INTO advisory_sizing_guides
-                            (size_family_id, department_id, size_scheme_template_id, commercial_kind_key, scope_kind, name_ar, sort_order, is_active)
-                         VALUES (?,?,?,?,?,?,?,?)'
+                        $hasLayoutColSave
+                            ? 'INSERT INTO advisory_sizing_guides
+                                (size_family_id, department_id, size_scheme_template_id, commercial_kind_key, scope_kind, layout_kind, name_ar, sort_order, is_active)
+                             VALUES (?,?,?,?,?,?,?,?,?)'
+                            : 'INSERT INTO advisory_sizing_guides
+                                (size_family_id, department_id, size_scheme_template_id, commercial_kind_key, scope_kind, name_ar, sort_order, is_active)
+                             VALUES (?,?,?,?,?,?,?,?)'
                     );
-                    $ins->execute([$famIns, $deptIns, $tplIns, $ckKey, $scopeKind, $nameAr, $guideSortIns, $active]);
+                    if ($hasLayoutColSave) {
+                        $ins->execute([$famIns, $deptIns, $tplIns, $ckKey, $scopeKind, $layoutKind, $nameAr, $guideSortIns, $active]);
+                    } else {
+                        $ins->execute([$famIns, $deptIns, $tplIns, $ckKey, $scopeKind, $nameAr, $guideSortIns, $active]);
+                    }
                     $id = (int) $pdo->lastInsertId();
                 } else {
                     $nextSf = null;
@@ -740,12 +820,21 @@ try {
                     $deptIns = $deptId > 0 ? $deptId : null;
                     $tplIns = $tplId > 0 ? $tplId : null;
                     $upd = $pdo->prepare(
-                        'UPDATE advisory_sizing_guides SET
-                            size_family_id = ?, department_id = ?, size_scheme_template_id = ?, commercial_kind_key = ?,
-                            scope_kind = ?, name_ar = ?, is_active = ?
-                         WHERE id = ?'
+                        $hasLayoutColSave
+                            ? 'UPDATE advisory_sizing_guides SET
+                                size_family_id = ?, department_id = ?, size_scheme_template_id = ?, commercial_kind_key = ?,
+                                scope_kind = ?, layout_kind = ?, name_ar = ?, is_active = ?
+                             WHERE id = ?'
+                            : 'UPDATE advisory_sizing_guides SET
+                                size_family_id = ?, department_id = ?, size_scheme_template_id = ?, commercial_kind_key = ?,
+                                scope_kind = ?, name_ar = ?, is_active = ?
+                             WHERE id = ?'
                     );
-                    $upd->execute([$bindSf, $deptIns, $tplIns, $ckKey, $scopeKind, $nameAr, $active, $id]);
+                    if ($hasLayoutColSave) {
+                        $upd->execute([$bindSf, $deptIns, $tplIns, $ckKey, $scopeKind, $layoutKind, $nameAr, $active, $id]);
+                    } else {
+                        $upd->execute([$bindSf, $deptIns, $tplIns, $ckKey, $scopeKind, $nameAr, $active, $id]);
+                    }
                     $stR2 = $pdo->prepare('SELECT id FROM advisory_sizing_guide_rows WHERE guide_id = ?');
                     $stR2->execute([$id]);
                     $rids2 = $stR2->fetchAll(PDO::FETCH_COLUMN);
@@ -759,50 +848,103 @@ try {
 
                 $colIdMap = [];
                 foreach ($normCols as $nc) {
-                    $ic = $pdo->prepare(
-                        'INSERT INTO advisory_sizing_guide_columns
-                            (guide_id, sort_order, label_ar, label_en, label_fil, label_hi, value_kind, unit_hint, storage_measure, display_system)
-                         VALUES (?,?,?,?,?,?,?,?,?,?)'
-                    );
-                    $ic->execute([
-                        $id,
-                        (int) $nc['sort_order'],
-                        $nc['label_ar'],
-                        $nc['label_en'],
-                        $nc['label_fil'],
-                        $nc['label_hi'],
-                        $nc['value_kind'],
-                        $nc['unit_hint'],
-                        $nc['storage_measure'],
-                        $nc['display_system'],
-                    ]);
+                    if ($hasPanelColSave) {
+                        $ic = $pdo->prepare(
+                            'INSERT INTO advisory_sizing_guide_columns
+                                (guide_id, panel_kind, sort_order, label_ar, label_en, label_fil, label_hi, value_kind, unit_hint, storage_measure, display_system)
+                             VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+                        );
+                        $ic->execute([
+                            $id,
+                            orange_advisory_panel_kind_valid($nc['panel_kind'] ?? 'upper'),
+                            (int) $nc['sort_order'],
+                            $nc['label_ar'],
+                            $nc['label_en'],
+                            $nc['label_fil'],
+                            $nc['label_hi'],
+                            $nc['value_kind'],
+                            $nc['unit_hint'],
+                            $nc['storage_measure'],
+                            $nc['display_system'],
+                        ]);
+                    } else {
+                        $ic = $pdo->prepare(
+                            'INSERT INTO advisory_sizing_guide_columns
+                                (guide_id, sort_order, label_ar, label_en, label_fil, label_hi, value_kind, unit_hint, storage_measure, display_system)
+                             VALUES (?,?,?,?,?,?,?,?,?,?)'
+                        );
+                        $ic->execute([
+                            $id,
+                            (int) $nc['sort_order'],
+                            $nc['label_ar'],
+                            $nc['label_en'],
+                            $nc['label_fil'],
+                            $nc['label_hi'],
+                            $nc['value_kind'],
+                            $nc['unit_hint'],
+                            $nc['storage_measure'],
+                            $nc['display_system'],
+                        ]);
+                    }
                     $colIdMap[] = (int) $pdo->lastInsertId();
                 }
 
                 foreach ($normRows as $nr) {
-                    $ir = $pdo->prepare(
-                        'INSERT INTO advisory_sizing_guide_rows
-                            (guide_id, sort_order, row_kind, size_family_size_id, label_ar, label_en, label_fil, label_hi)
-                         VALUES (?,?,?,?,?,?,?,?)'
-                    );
+                    $rowPanel = orange_advisory_panel_kind_valid($nr['panel_kind'] ?? 'upper');
+                    if ($hasPanelRowSave) {
+                        $ir = $pdo->prepare(
+                            'INSERT INTO advisory_sizing_guide_rows
+                                (guide_id, panel_kind, sort_order, row_kind, size_family_size_id, label_ar, label_en, label_fil, label_hi)
+                             VALUES (?,?,?,?,?,?,?,?,?)'
+                        );
+                    } else {
+                        $ir = $pdo->prepare(
+                            'INSERT INTO advisory_sizing_guide_rows
+                                (guide_id, sort_order, row_kind, size_family_size_id, label_ar, label_en, label_fil, label_hi)
+                             VALUES (?,?,?,?,?,?,?,?)'
+                        );
+                    }
                     $sfsIns = $nr['row_kind'] === 'data' ? (int) $nr['size_family_size_id'] : 0;
                     if ($sfsIns <= 0) {
                         $sfsIns = null;
                     }
-                    $ir->execute([
-                        $id,
-                        (int) $nr['sort_order'],
-                        $nr['row_kind'],
-                        $sfsIns,
-                        $nr['label_ar'],
-                        $nr['label_en'],
-                        $nr['label_fil'],
-                        $nr['label_hi'],
-                    ]);
+                    if ($hasPanelRowSave) {
+                        $ir->execute([
+                            $id,
+                            $rowPanel,
+                            (int) $nr['sort_order'],
+                            $nr['row_kind'],
+                            $sfsIns,
+                            $nr['label_ar'],
+                            $nr['label_en'],
+                            $nr['label_fil'],
+                            $nr['label_hi'],
+                        ]);
+                    } else {
+                        $ir->execute([
+                            $id,
+                            (int) $nr['sort_order'],
+                            $nr['row_kind'],
+                            $sfsIns,
+                            $nr['label_ar'],
+                            $nr['label_en'],
+                            $nr['label_fil'],
+                            $nr['label_hi'],
+                        ]);
+                    }
                     $rid = (int) $pdo->lastInsertId();
                     if ($nr['row_kind'] === 'data') {
-                        foreach ($colIdMap as $ix => $cid) {
-                            $val = orange_advisory_api_trunc_utf8((string) ($nr['cells'][$ix] ?? ''), 50000);
+                        $colIdx = 0;
+                        foreach ($normCols as $ix => $ncCol) {
+                            if (orange_advisory_panel_kind_valid($ncCol['panel_kind'] ?? 'upper') !== $rowPanel) {
+                                continue;
+                            }
+                            $cid = $colIdMap[$ix] ?? 0;
+                            if ($cid <= 0) {
+                                continue;
+                            }
+                            $val = orange_advisory_api_trunc_utf8((string) ($nr['cells'][$colIdx] ?? ''), 50000);
+                            ++$colIdx;
                             $pdo->prepare(
                                 'INSERT INTO advisory_sizing_guide_cells (row_id, column_id, cell_value) VALUES (?,?,?)'
                             )->execute([$rid, $cid, $val]);

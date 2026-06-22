@@ -157,15 +157,15 @@ if (
 }
 if ($sfId > 0 && $agProductGuideId > 0) {
     $advisorySizing = orange_advisory_sizing_build_sections_for_guide_id($pdo, $agProductGuideId, $sfId, $lang);
-    if (!empty($advisorySizing['use_dynamic']) && !empty($advisorySizing['sections'][0])) {
-        $sk = strtolower(trim((string) ($advisorySizing['sections'][0]['scope_kind'] ?? '')));
-        if (in_array($sk, ['upper', 'lower', 'single'], true)) {
-            $scope = $sk;
-        } else {
-            $scope = 'single';
+    if (!empty($advisorySizing['use_dynamic']) && ($advisorySizing['sections'] ?? []) !== []) {
+        $agScopeSt = $pdo->prepare('SELECT layout_kind, scope_kind FROM advisory_sizing_guides WHERE id = ? LIMIT 1');
+        $agScopeSt->execute([$agProductGuideId]);
+        $agGuideRow = $agScopeSt->fetch(PDO::FETCH_ASSOC);
+        if (is_array($agGuideRow)) {
+            $scope = orange_advisory_sizing_product_scope_from_guide($agGuideRow);
+            $sizingHintKey = $sizingHintKeys[$scope] ?? '';
+            $sizingText = $sizingHintKey !== '' ? t($sizingHintKey) : '';
         }
-        $sizingHintKey = $sizingHintKeys[$scope] ?? '';
-        $sizingText = $sizingHintKey !== '' ? t($sizingHintKey) : '';
     } else {
         $advisorySizing = ['use_dynamic' => false, 'sections' => []];
     }
@@ -481,6 +481,7 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
             <?php
             $advSections = $advisorySizing['sections'] ?? [];
             $advSectionCount = is_array($advSections) ? count($advSections) : 0;
+            $advUseDualTabs = ($scope === 'both' && $advSectionCount > 1);
             ?>
             <?php if ($advUxShowToolbar): ?>
                 <div class="product-sizing-adv-toolbar" id="productSizingAdvToolbar">
@@ -507,6 +508,23 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
+            <?php if ($advUseDualTabs): ?>
+            <div class="product-sizing-adv-tabs" role="tablist" aria-label="<?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>">
+                <?php foreach ($advSections as $tabIdx => $tabSec): ?>
+                    <?php
+                    $tabKind = strtolower(trim((string) ($tabSec['scope_kind'] ?? '')));
+                    $tabKey = $tabKind === 'lower' ? 'sizing_guide_section_lower' : 'sizing_guide_section_upper';
+                    ?>
+                    <button type="button"
+                        class="product-sizing-adv-tabs__btn<?php echo $tabIdx === 0 ? ' is-active' : ''; ?>"
+                        role="tab"
+                        aria-selected="<?php echo $tabIdx === 0 ? 'true' : 'false'; ?>"
+                        data-adv-tab="<?php echo htmlspecialchars($tabKind !== '' ? $tabKind : 'upper', ENT_QUOTES, 'UTF-8'); ?>"
+                        id="productSizingAdvTab-<?php echo (int) $tabIdx; ?>"><?php echo htmlspecialchars(t($tabKey), ENT_QUOTES, 'UTF-8'); ?></button>
+                <?php endforeach; ?>
+            </div>
+            <div class="product-sizing-adv-tabpanels">
+            <?php endif; ?>
             <?php foreach ($advSections as $secTableIdx => $sec): ?>
                 <?php
                 $cols = isset($sec['columns']) && is_array($sec['columns']) ? $sec['columns'] : [];
@@ -514,7 +532,7 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
                 $colCount = max(1, count($cols));
                 $secKind = strtolower(trim((string) ($sec['scope_kind'] ?? '')));
                 $subKey = '';
-                if ($scope === 'both' && $advSectionCount > 1) {
+                if (!$advUseDualTabs && $scope === 'both' && $advSectionCount > 1) {
                     if ($secKind === 'upper') {
                         $subKey = 'sizing_guide_section_upper';
                     } elseif ($secKind === 'lower') {
@@ -524,6 +542,13 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
                 ?>
                 <?php if ($subKey !== ''): ?>
                     <h4 class="product-sizing-dialog__subtitle"><?php echo htmlspecialchars(t($subKey), ENT_QUOTES, 'UTF-8'); ?></h4>
+                <?php endif; ?>
+                <?php if ($advUseDualTabs): ?>
+                <div class="product-sizing-adv-tabpanel<?php echo $secTableIdx === 0 ? ' is-active' : ''; ?>"
+                    role="tabpanel"
+                    data-adv-panel="<?php echo htmlspecialchars($secKind !== '' ? $secKind : 'upper', ENT_QUOTES, 'UTF-8'); ?>"
+                    aria-labelledby="productSizingAdvTab-<?php echo (int) $secTableIdx; ?>"
+                    <?php echo $secTableIdx === 0 ? '' : ' hidden'; ?>>
                 <?php endif; ?>
                 <div class="product-sizing-table-panel">
                     <div class="product-sizing-table-wrap" role="region" aria-label="<?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>">
@@ -590,7 +615,13 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
                         </table>
                     </div>
                 </div>
+                <?php if ($advUseDualTabs): ?>
+                </div>
+                <?php endif; ?>
             <?php endforeach; ?>
+            <?php if ($advUseDualTabs): ?>
+            </div>
+            <?php endif; ?>
         <?php elseif ($sizingChartRows !== []): ?>
             <div class="product-sizing-table-panel">
                 <div class="product-sizing-table-wrap" role="region" aria-label="<?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>">
