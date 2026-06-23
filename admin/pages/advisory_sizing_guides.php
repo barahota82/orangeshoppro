@@ -711,9 +711,14 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         var box = document.getElementById('asg_link_products');
         filter = (filter || '').trim().toLowerCase();
         if (!LINK_CACHE.products.length) { box.innerHTML = '<span class="card-hint">لا منتجات في هذه العائلة.</span>'; updateChips('products'); return; }
+        // ترشيح بأنواع المنتج المختارة: عند اختيار نوع تظهر فقط منتجات ذلك النوع؛ وإن لم يُختر نوع تظهر كل منتجات العائلة.
+        var selTypes = LINK_SELECTED.types || {};
+        var anyType = Object.keys(selTypes).some(function (k) { return selTypes[k]; });
         var h = '';
         LINK_CACHE.products.forEach(function (p) {
             var id = parseInt(p.id, 10) || 0;
+            var ptId = parseInt(p.product_type_id, 10) || 0;
+            if (anyType && !selTypes[ptId]) { return; }
             var nm = (p.name_ar || p.name_en || ('#' + id));
             if (filter && nm.toLowerCase().indexOf(filter) === -1) { return; }
             var other = parseInt(p.sizing_advisory_guide_id, 10) || 0;
@@ -721,7 +726,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
             var note = (other > 0 && !LINK_SELECTED.products[id]) ? ' <span class="card-hint">(دليل آخر #' + other + ')</span>' : '';
             h += '<label><input type="checkbox" value="' + id + '"' + checked + '> ' + esc(nm) + note + '</label>';
         });
-        box.innerHTML = h || '<span class="card-hint">لا نتائج للتصفية.</span>';
+        box.innerHTML = h || '<span class="card-hint">' + (anyType ? 'لا منتجات تحت الأنواع المختارة.' : 'لا نتائج للتصفية.') + '</span>';
         updateChips('products');
     }
     async function loadLinkTargets(preTypeIds, preProductIds) {
@@ -789,6 +794,10 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
             if (ev.target && ev.target.matches('input[type="checkbox"]')) {
                 LINK_SELECTED[name][ev.target.value] = ev.target.checked;
                 updateChips(name);
+                // تغيّر اختيار الأنواع يعيد تصفية قائمة المنتجات (تظهر منتجات الأنواع المختارة فقط).
+                if (name === 'types') {
+                    renderLinkProducts(document.getElementById('asg_link_products_search').value);
+                }
             }
         });
     }

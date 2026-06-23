@@ -223,9 +223,10 @@ try {
             $products = [];
             if (orange_table_exists($pdo, 'products') && orange_table_has_column($pdo, 'products', 'size_family_id')) {
                 // جدول products يستخدم العمود `name` للاسم العربي (لا `name_ar`)؛ نعمل alias ليتوافق مع الواجهة.
+                // نعيد product_type_id لتتمكن الواجهة من عرض منتجات النوع المختار فقط، ونُرشّح المفعّلة فقط.
                 $pSt = $pdo->prepare(
-                    'SELECT id, name AS name_ar, name_en, sizing_advisory_guide_id
-                     FROM products WHERE size_family_id = ? ORDER BY name ASC, id ASC LIMIT 500'
+                    'SELECT id, name AS name_ar, name_en, sizing_advisory_guide_id, product_type_id
+                     FROM products WHERE size_family_id = ? AND is_active = 1 ORDER BY name ASC, id ASC LIMIT 500'
                 );
                 $pSt->execute([$fid]);
                 $products = $pSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
