@@ -1724,7 +1724,6 @@ body.storefront .product-gallery__img {
     padding: 0;
     border: 0;
     background: transparent;
-    color: transparent;
     opacity: 0;
     cursor: pointer;
     -webkit-appearance: none;
@@ -1732,6 +1731,11 @@ body.storefront .product-gallery__img {
 }
 .qty-picker:disabled {
     cursor: default;
+}
+/* قائمة الكميات المنبثقة (النظام يرسمها مستقلة عن opacity) — ألوان واضحة دائماً. */
+.qty-picker option {
+    color: #1a1a1a;
+    background: #ffffff;
 }
 
 .actions-row {
@@ -1889,7 +1893,7 @@ body.storefront .product-gallery__img {
 }
 
 .cart-page-panel--basket .cart-basket-card {
-    padding-bottom: 8px;
+    padding: 16px 18px;
     box-shadow: var(--card-shadow);
     border-radius: var(--radius-md);
 }
@@ -2236,6 +2240,10 @@ body.storefront .product-gallery__img {
             color-mix(in srgb, var(--card) 40%, transparent)
         );
     }
+    /* مسافة سفلية حتى لا يغطّي زر «تنفيذ الطلب» الثابت شريط الإجمالي. */
+    body.storefront .cart-page-panel--basket #cartItems {
+        padding-bottom: 88px;
+    }
 }
 
 .cart-orders-stack {
@@ -2535,9 +2543,9 @@ body.storefront .product-gallery__img {
 
 .cart-page-panel--basket .cart-qty-control {
     border-radius: var(--radius-pill);
-    border: 1px solid var(--border);
-    padding: 2px;
-    background: var(--card);
+    border: 0;
+    padding: 0;
+    background: transparent;
 }
 
 .cart-page-panel--basket .cart-remove-btn {
@@ -3324,17 +3332,18 @@ button.track-signup-cta__btn[hidden] {
     min-width: 40px;
     min-height: 40px;
     padding: 0 12px;
-    border: 1px solid var(--border);
+    border: 0;
     border-radius: var(--radius-sm);
-    background: var(--card);
+    background: transparent;
+    color: var(--text);
     cursor: pointer;
     font-size: 1.1rem;
     line-height: 1;
-    transition: border-color 0.2s, background 0.2s;
+    transition: background 0.2s;
 }
 
 .cart-qty-btn:hover {
-    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
 }
 
 .cart-line-price {

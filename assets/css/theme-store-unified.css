@@ -147,8 +147,13 @@ body.storefront .stock-out {
     border: 1px solid rgba(248, 113, 113, 0.28);
 }
 
-/* زر شبح السلة */
-body.storefront .btn-ghost:hover:not([disabled]) {
+/* زر شبح السلة — يبقى بلا خلفية برتقالية على hover/الضغط (اللمس) حتى لا يختفي النص */
+body.storefront .btn-ghost:hover:not([disabled]),
+body.storefront .btn-ghost:active:not([disabled]),
+body.storefront .btn-ghost:focus:not([disabled]) {
+    background: transparent;
+    box-shadow: none;
+    filter: none;
     color: var(--primary-hover);
 }
 
