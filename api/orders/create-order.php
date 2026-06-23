@@ -10,10 +10,29 @@ require_once __DIR__ . '/../../includes/phone_validation.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/product_preview.php';
 
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
+
+    /*
+     * معاينة المنتج قبل النشر (docs/archive/ORANGE_PRODUCT_PREPUBLISH_PREVIEW_ROLLOUT.txt):
+     * في وضع المعاينة لا يُكتَب أي طلب فعلي — نعيد «نجاحاً وهمياً» (قرار المالك: simulated_ok).
+     * شبكة أمان خادمية إضافة لتعطيل الإرسال في الواجهة.
+     */
+    if (orange_preview_is_active($pdo)) {
+        json_response([
+            'success' => true,
+            'preview' => true,
+            'order_number' => 'PREVIEW',
+            'message' => 'هذا طلب معاينة — لم يُرسَل فعلياً.',
+            'whatsapp_url' => '',
+            'whatsapp_number' => '',
+            'total' => 0,
+        ]);
+    }
+
     $data = get_json_input();
     orange_storefront_apply_lang_from_payload($data);
 

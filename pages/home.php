@@ -26,6 +26,7 @@ require_once __DIR__ . '/../includes/catalog_unified_nav.php';
 require_once __DIR__ . '/../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../includes/countries.php';
 require_once __DIR__ . '/../includes/department_countries.php';
+require_once __DIR__ . '/../includes/product_preview.php';
 
 $tbState = storefront_toolbar_state();
 $channel = $tbState['channel'];
@@ -60,6 +61,7 @@ $canUnifiedProductSql = $navUnified
 $sfHomeCountryId = orange_storefront_current_country_id($pdo);
 $sfHomeCurrencyUnit = orange_storefront_currency_unit($pdo, $sfHomeCountryId);
 $homeProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $sfHomeCountryId);
+$homeProductsCountrySql .= orange_preview_hide_sql($pdo, 'p');
 $homeDeptActiveSql = orange_department_country_active_sql($pdo, 'd', $sfHomeCountryId);
 
 if ($canUnifiedProductSql) {

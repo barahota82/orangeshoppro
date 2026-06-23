@@ -763,6 +763,25 @@ $orangeAdminSfProductUrlPartsForJs = [
             <a id="orangeAdminProductFullPreviewLink" class="btn-secondary" href="#" target="_blank" rel="noopener noreferrer">فتح صفحة المنتج كاملة في المتجر (كما للزائر)</a>
             <span style="display:block;margin-top:6px;color:#64748b;font-size:12px;">يستخدم القناة الافتراضية واللغة العربية في الرابط؛ إن لم يطابق رابطك المعتاد عدّل القناة من شاشة القنوات أو افتح المنتج من الواجهة.</span>
         </p>
+        <?php
+        $sfPreviewCountries = function_exists('orange_countries_storefront_active')
+            ? orange_countries_storefront_active($pdo, 'ar')
+            : [];
+        ?>
+        <div class="admin-product-fullpreview-row" style="margin:0 0 12px;padding:10px;border:1px solid #fed7aa;border-radius:8px;background:#fff7ed;">
+            <strong style="display:block;margin-bottom:6px;font-size:13px;">معاينة كاملة — تصفّح الموقع كعميل (المحفوظ + غير المحفوظ)</strong>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                <label for="orangeFullPreviewCountry" style="margin:0;font-size:13px;">دولة المعاينة</label>
+                <select id="orangeFullPreviewCountry" style="min-width:160px;">
+                    <?php foreach ($sfPreviewCountries as $sfC): ?>
+                    <option value="<?php echo (int) $sfC['id']; ?>"<?php echo ((int) $sfC['id'] === (int) $adminCountryId) ? ' selected' : ''; ?>><?php echo htmlspecialchars((string) $sfC['name'], ENT_QUOTES, 'UTF-8'); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="button" class="btn" id="orangeBtnFullPreview">فتح المعاينة الكاملة</button>
+                <span id="orangeFullPreviewStatus" style="font-size:12px;color:#64748b;"></span>
+            </div>
+            <span style="display:block;margin-top:6px;color:#9a3412;font-size:12px;">يُجهّز نسخة معاينة مخفيّة عن العملاء، ويفتح المتجر بقناة الدولة الافتراضية. أي طلب داخل المعاينة لا يُرسَل فعلياً. تنتهي المعاينة تلقائياً خلال 24 ساعة.</span>
+        </div>
         <div class="admin-product-card-preview-frame-wrap">
             <iframe id="orangeAdminProductCardPreviewFrame" class="admin-product-card-preview-frame" title="معاينة كارت المنتج في المتجر"></iframe>
         </div>
@@ -4357,6 +4376,93 @@ async function saveProduct() {
         location.reload();
     }
 }
+
+/* معاينة المنتج قبل النشر: يبني حمولة متساهلة (تتحمّل بيانات ناقصة) من النموذج الحالي. */
+function orangeBuildProductPreviewPayload() {
+    const val = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.value.trim() : '';
+    };
+    const variants = Array.from(document.querySelectorAll('#variantsBox tbody tr')).map((tr) => ({
+        primary_color_id: parseInt((tr.querySelector('.v-p') && tr.querySelector('.v-p').value) || '0', 10) || 0,
+        secondary_color_id: parseInt((tr.querySelector('.v-s') && tr.querySelector('.v-s').value) || '0', 10) || 0,
+        primary_pattern_id: parseInt((tr.querySelector('.v-pp') && tr.querySelector('.v-pp').value) || '0', 10) || 0,
+        secondary_pattern_id: parseInt((tr.querySelector('.v-sp') && tr.querySelector('.v-sp').value) || '0', 10) || 0,
+        size_family_size_id: parseInt((tr.querySelector('.v-zid') && tr.querySelector('.v-zid').value) || '0', 10) || 0,
+        stock_quantity: parseInt((tr.querySelector('.v-stock') && tr.querySelector('.v-stock').value) || '0', 10) || 0
+    }));
+    const payload = {
+        name: val('name'),
+        name_en: val('name_en'),
+        name_fil: val('name_fil'),
+        name_hi: val('name_hi'),
+        description: val('description'),
+        description_en: val('description_en'),
+        description_fil: val('description_fil'),
+        description_hi: val('description_hi'),
+        seo_meta_title_ar: val('seo_meta_title_ar'),
+        seo_meta_title_en: val('seo_meta_title_en'),
+        seo_meta_title_fil: val('seo_meta_title_fil'),
+        seo_meta_title_hi: val('seo_meta_title_hi'),
+        seo_meta_description_ar: val('seo_meta_description_ar'),
+        seo_meta_description_en: val('seo_meta_description_en'),
+        seo_meta_description_fil: val('seo_meta_description_fil'),
+        seo_meta_description_hi: val('seo_meta_description_hi'),
+        category_id: parseInt(val('category_id'), 10) || 0,
+        product_type_id: parseInt(val('product_type_id'), 10) || 0,
+        price: parseFloat(val('price') || '0') || 0,
+        cost: parseFloat(val('cost') || '0') || 0,
+        main_image: val('main_image') || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES[0] ? window.PRODUCT_EXTRA_IMAGES[0] : ''),
+        has_sizes: orangeProductEffectiveHasSizes() ? 1 : 0,
+        has_colors: parseInt(val('has_colors'), 10) || 0,
+        size_family_id: parseInt(val('size_family_id'), 10) || 0,
+        item_code: val('product_item_code'),
+        barcode: val('product_barcode'),
+        extra_images: window.PRODUCT_EXTRA_IMAGES || [],
+        variants
+    };
+    try { Object.assign(payload, orangeProductSizingSaveFields()); } catch (e) {}
+    try { payload.catalog_attribute_values = orangeCollectCatalogAttributePayload(); } catch (e) {}
+    try { payload.colorway_images = orangeCollectColorwayImagesPayload(); } catch (e) {}
+    const subEl = document.getElementById('subcategory_id');
+    if (subEl) {
+        const sv = subEl.value.trim();
+        payload.subcategory_id = sv === '' ? null : parseInt(sv, 10);
+    }
+    return payload;
+}
+
+async function orangeOpenFullPreview() {
+    const statusEl = document.getElementById('orangeFullPreviewStatus');
+    const btn = document.getElementById('orangeBtnFullPreview');
+    const setStatus = (msg) => { if (statusEl) { statusEl.textContent = msg || ''; } };
+    if (btn) { btn.disabled = true; }
+    setStatus('جارٍ تجهيز المعاينة…');
+    try {
+        const payload = orangeBuildProductPreviewPayload();
+        const countryEl = document.getElementById('orangeFullPreviewCountry');
+        payload.preview_country_id = countryEl ? (parseInt(countryEl.value, 10) || 0) : 0;
+        payload.preview_source_product_id = parseInt((document.getElementById('product_record_id') && document.getElementById('product_record_id').value) || '0', 10) || 0;
+        const res = await postJSON('/admin/api/products/save-preview-draft.php', payload);
+        if (res && res.success && res.preview_url) {
+            setStatus('تم — افتحت المعاينة في تبويب جديد.');
+            window.open(res.preview_url, '_blank', 'noopener');
+        } else {
+            setStatus((res && res.message) ? res.message : 'تعذّر تجهيز المعاينة');
+            alert((res && res.message) ? res.message : 'تعذّر تجهيز المعاينة');
+        }
+    } catch (e) {
+        setStatus('تعذّر تجهيز المعاينة');
+        alert('تعذّر تجهيز المعاينة: ' + (e && e.message ? e.message : e));
+    } finally {
+        if (btn) { btn.disabled = false; }
+    }
+}
+
+(function () {
+    const b = document.getElementById('orangeBtnFullPreview');
+    if (b) { b.addEventListener('click', orangeOpenFullPreview); }
+}());
 
 document.getElementById('name').addEventListener('input', scheduleProductAutoTranslate);
 document.getElementById('name_en').addEventListener('input', scheduleProductTranslateFromEnglish);

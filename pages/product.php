@@ -11,29 +11,46 @@ require_once __DIR__ . '/../includes/upload_paths.php';
 require_once __DIR__ . '/../includes/countries.php';
 require_once __DIR__ . '/../includes/warehouses.php';
 require_once __DIR__ . '/../includes/stock_alerts.php';
+require_once __DIR__ . '/../includes/product_preview.php';
 
 $pdo = db();
 orange_catalog_ensure_storefront_page($pdo);
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $sfProductCountryId = orange_storefront_current_country_id($pdo);
 
-$stmt = $pdo->prepare("SELECT * FROM products WHERE id = ? AND is_active = 1 LIMIT 1");
-$stmt->execute([$id]);
-$product = $stmt->fetch();
-if (
-    $product !== false
-    && is_array($product)
-    && orange_table_has_column($pdo, 'products', 'country_id')
-    && (int) ($product['country_id'] ?? 0) !== $sfProductCountryId
-) {
-    $product = false;
-}
-if (
-    $product !== false
-    && is_array($product)
-    && !orange_storefront_product_in_active_unified_chain($pdo, $id)
-) {
-    $product = false;
+/*
+ * معاينة المنتج قبل النشر (docs/archive/ORANGE_PRODUCT_PREPUBLISH_PREVIEW_ROLLOUT.txt):
+ * إن كانت جلسة معاينة صالحة والمعرّف المطلوب هو صفّ الظِلّ نفسه، نعرضه متجاوزين is_active
+ * والحارس الموحّد وحارس الدولة (السياق يأتي من دولة الظِلّ). بقية المنتجات تبقى طبيعية.
+ * لا تكلفة على المسار الساخن للعميل: لا استعلام معاينة إلا عند وجود الكوكي.
+ */
+$orangePreviewCtx = orange_preview_active_context($pdo);
+$orangeProductPreview = ($orangePreviewCtx !== null && (int) $orangePreviewCtx['draft_id'] === $id && $id > 0);
+
+if ($orangeProductPreview) {
+    $product = $orangePreviewCtx['product'];
+    if (orange_table_has_column($pdo, 'products', 'country_id') && (int) ($product['country_id'] ?? 0) > 0) {
+        $sfProductCountryId = (int) $product['country_id'];
+    }
+} else {
+    $stmt = $pdo->prepare("SELECT * FROM products WHERE id = ? AND is_active = 1 LIMIT 1");
+    $stmt->execute([$id]);
+    $product = $stmt->fetch();
+    if (
+        $product !== false
+        && is_array($product)
+        && orange_table_has_column($pdo, 'products', 'country_id')
+        && (int) ($product['country_id'] ?? 0) !== $sfProductCountryId
+    ) {
+        $product = false;
+    }
+    if (
+        $product !== false
+        && is_array($product)
+        && !orange_storefront_product_in_active_unified_chain($pdo, $id)
+    ) {
+        $product = false;
+    }
 }
 
 $tbState = storefront_toolbar_state();
@@ -121,9 +138,10 @@ foreach ($variants as $vi => $vRow) {
         continue;
     }
     $vid = (int) ($vRow['id'] ?? 0);
-    if ($vid > 0) {
+    if ($vid > 0 && !$orangeProductPreview) {
         $variants[$vi]['stock_quantity'] = orange_warehouse_effective_variant_stock($pdo, $vid, $sfProductCountryId);
     }
+    /* في المعاينة: تُعرض الكمية المُدخلة كما هي (المخزن لا يحوي صفوفاً لصفّ الظِلّ). */
 }
 
 $colorChipOrder = [];

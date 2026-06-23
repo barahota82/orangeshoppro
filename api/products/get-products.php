@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/department_countries.php';
+require_once __DIR__ . '/../../includes/product_preview.php';
 
 try {
     $pdo = db();
@@ -39,6 +40,7 @@ try {
 
     $sfCountryId = orange_storefront_current_country_id($pdo);
     $productsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $sfCountryId);
+    $productsCountrySql .= orange_preview_hide_sql($pdo, 'p');
     $depActiveSql = orange_department_country_active_sql($pdo, 'd', $sfCountryId);
 
     $sql = '

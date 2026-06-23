@@ -13,6 +13,10 @@ require_once __DIR__ . '/catalog_schema.php';
 /* الترحيل الكامل orange_catalog_ensure_schema() يُستدعى من صفحة الواجهة قبل تضمين هذا الملف (IBRAHIM §2)؛ الهيدر يبقي SET NAMES + bootstrap المتجر الأساسي فقط */
 orange_catalog_ensure_storefront_read_bootstrap(db());
 
+/* معاينة المنتج قبل النشر: شارة + noindex على مستوى الموقع كاملاً. لا تكلفة على العميل (لا استعلام بلا كوكي). */
+require_once __DIR__ . '/product_preview.php';
+$orangePreviewActiveGlobal = orange_preview_is_active(db());
+
 orange_send_html_no_cache_headers();
 
 extract(storefront_toolbar_state());
@@ -183,6 +187,9 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
         : 'website';
     ?>
     <title><?php echo htmlspecialchars($orangeHeadTitle, ENT_QUOTES, 'UTF-8'); ?></title>
+    <?php if (!empty($orangePreviewActiveGlobal)): ?>
+    <meta name="robots" content="noindex, nofollow">
+    <?php endif; ?>
     <?php if ($orangeHeadDesc !== ''): ?>
     <meta name="description" content="<?php echo htmlspecialchars($orangeHeadDesc, ENT_QUOTES, 'UTF-8'); ?>">
     <?php endif; ?>
@@ -207,6 +214,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
         window.APP_TAGLINE_CYCLE = <?php echo json_encode($taglineCycle, JSON_UNESCAPED_UNICODE); ?>;
         window.APP_CHANNEL_ID = <?php echo (int)($channel['id'] ?? 0); ?>;
         window.APP_CHANNEL_SLUG = <?php echo json_encode($channelSlug, JSON_UNESCAPED_UNICODE); ?>;
+        window.ORANGE_PREVIEW = <?php echo !empty($orangePreviewActiveGlobal) ? 'true' : 'false'; ?>;
         window.APP_COUNTRY_ID = <?php echo (int)($countryId ?? 0); ?>;
         window.ORANGE_SF_CURRENCY_UNIT = <?php echo json_encode(orange_storefront_currency_unit(db(), (int) ($countryId ?? 0)), JSON_UNESCAPED_UNICODE); ?>;
         window.APP_COUNTRY_CODE = <?php echo json_encode($countryCode ?? '', JSON_UNESCAPED_UNICODE); ?>;
@@ -377,7 +385,13 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
         };
     </script>
 </head>
-<body class="theme-<?php echo htmlspecialchars($theme, ENT_QUOTES, 'UTF-8'); ?> storefront">
+<body class="theme-<?php echo htmlspecialchars($theme, ENT_QUOTES, 'UTF-8'); ?> storefront<?php echo !empty($orangePreviewActiveGlobal) ? ' orange-preview-mode' : ''; ?>">
+<?php if (!empty($orangePreviewActiveGlobal)): ?>
+<div class="orange-preview-banner" role="status" dir="rtl" style="position:sticky;top:0;z-index:9999;background:#b45309;color:#fff;padding:8px 14px;font-size:14px;font-weight:700;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.25);">
+    وضع المعاينة — تتصفّح كعميل. أي طلب هنا لا يُرسَل فعلياً (معاينة فقط).
+    <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/api/products/preview-exit.php'), ENT_QUOTES, 'UTF-8'); ?>" style="color:#fff;text-decoration:underline;margin-inline-start:10px;">إنهاء المعاينة</a>
+</div>
+<?php endif; ?>
 <header class="site-header" dir="ltr">
     <div class="container header-inner">
         <div class="brand-wrap">
