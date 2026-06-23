@@ -1612,6 +1612,18 @@ body.storefront .product-gallery__img {
     border-color: transparent;
 }
 
+/* مقاس غير متوفّر للّون المختار: معطَّل ومُظلَّل (لا يُختار). */
+.chip:disabled,
+.chip--unavailable {
+    opacity: 0.38;
+    cursor: not-allowed;
+    text-decoration: line-through;
+    pointer-events: none;
+    background: var(--card);
+    border-color: var(--border);
+    color: var(--muted);
+}
+
 .chip-text {
     display: inline;
 }

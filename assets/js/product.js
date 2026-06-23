@@ -430,15 +430,60 @@ function syncProductQtyLimits() {
     }
 }
 
+/* هل يوجد متغيّر (لون+مقاس) متوفّر بمخزون؟ */
+function orangeProductHasVariantInStock(color, size) {
+    const p = window.CURRENT_PRODUCT;
+    if (!p || !p.variants) {
+        return false;
+    }
+    for (let i = 0; i < p.variants.length; i++) {
+        const v = p.variants[i];
+        if ((v.color || '') === color && (v.size || '') === size) {
+            return (parseInt(v.stock_quantity, 10) || 0) > 0;
+        }
+    }
+    return false;
+}
+
+/* تفعيل/تعطيل شرائح المقاسات حسب اللون المختار (المقاس غير المتوفّر للون يُعطَّل). */
+function orangeProductRefreshSizeAvailability() {
+    const p = window.CURRENT_PRODUCT;
+    if (!p || p.has_sizes !== 1) {
+        return;
+    }
+    const hasColors = p.has_colors === 1;
+    document.querySelectorAll('.size-chip').forEach((chip) => {
+        const sz = chip.dataset.size || '';
+        let available;
+        if (hasColors && selectedColor) {
+            available = orangeProductHasVariantInStock(selectedColor, sz);
+        } else {
+            available = (p.variants || []).some(
+                (v) => (v.size || '') === sz && (parseInt(v.stock_quantity, 10) || 0) > 0
+            );
+        }
+        chip.disabled = !available;
+        chip.classList.toggle('chip--unavailable', !available);
+        if (!available && selectedSize === sz) {
+            selectedSize = '';
+            chip.classList.remove('active');
+        }
+    });
+}
+
 function selectColor(btn) {
     document.querySelectorAll('.color-chip').forEach((el) => el.classList.remove('active'));
     btn.classList.add('active');
     selectedColor = btn.dataset.color || '';
+    orangeProductRefreshSizeAvailability();
     orangeProductGalleryApplyForSelection();
     syncProductQtyLimits();
 }
 
 function selectSize(btn) {
+    if (btn.disabled || btn.classList.contains('chip--unavailable')) {
+        return;
+    }
     document.querySelectorAll('.size-chip').forEach((el) => el.classList.remove('active'));
     btn.classList.add('active');
     selectedSize = btn.dataset.size || '';
@@ -681,6 +726,7 @@ document.addEventListener('DOMContentLoaded', () => {
         input.addEventListener('change', clampQtyInput);
         input.addEventListener('blur', clampQtyInput);
     }
+    orangeProductRefreshSizeAvailability();
     syncProductQtyLimits();
     initProductGallery();
 });
