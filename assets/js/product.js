@@ -630,10 +630,15 @@ function initProductGallery() {
     }
 
     let index = 0;
+    /* اتجاه الصفحة: في RTL (العربية) يُعكس محور flex فتُرتَّب الشرائح من اليمين لليسار،
+       لذا يجب أن تكون إزاحة الشريط موجبة (يميناً) بدل سالبة حتى تظهر الشريحة الصحيحة. */
+    const galleryRtl = (window.getComputedStyle(root).direction === 'rtl')
+        || (document.documentElement && document.documentElement.dir === 'rtl');
+    const galleryShiftSign = galleryRtl ? 1 : -1;
 
     function setIndex(i) {
         index = Math.max(0, Math.min(n - 1, i));
-        track.style.transform = 'translateX(-' + index * 100 + '%)';
+        track.style.transform = 'translateX(' + (galleryShiftSign * index * 100) + '%)';
         document.querySelectorAll('.product-gallery__dot').forEach((d, di) => {
             const on = di === index;
             d.classList.toggle('is-active', on);
@@ -687,10 +692,15 @@ function initProductGallery() {
             const x = e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : touchStartX;
             const dx = x - touchStartX;
             touchStartX = null;
-            if (dx > 55) {
-                prev();
-            } else if (dx < -55) {
+            if (Math.abs(dx) < 55) {
+                return;
+            }
+            /* في RTL يُعكس اتجاه السحب الطبيعي. */
+            const goNext = galleryRtl ? dx > 0 : dx < 0;
+            if (goNext) {
                 next();
+            } else {
+                prev();
             }
         },
         { passive: true }
