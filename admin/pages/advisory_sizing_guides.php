@@ -234,11 +234,11 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
 .asg-form-grid select:disabled { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
 .asg-applies-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 14px 18px;
     direction: rtl;
     align-items: start;
-    max-width: 1000px;
+    width: 100%;
 }
 .asg-applies-grid > div { min-width: 0; }
 .asg-applies-grid label { display: block; margin: 0 0 4px; }
