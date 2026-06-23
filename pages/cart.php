@@ -80,7 +80,6 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
 
     <div id="cart-panel-basket" role="tabpanel" aria-labelledby="cart-tab-basket" class="cart-page-panel cart-page-panel--basket">
         <div class="card-box cart-basket-card">
-            <p class="cart-checkout-intro cart-basket-tab-intro"><?php echo htmlspecialchars(t('cart_basket_tab_intro'), ENT_QUOTES, 'UTF-8'); ?></p>
             <div id="cartItems"></div>
             <div class="cart-basket-footer">
                 <button type="button" class="btn cart-proceed-btn" id="cartProceedBtn" onclick="orangeCartProceedToCheckout()" disabled>
