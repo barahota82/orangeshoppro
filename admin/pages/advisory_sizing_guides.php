@@ -77,7 +77,6 @@ if ($familiesJson === false) {
 <div class="page-title">
     <h1>دليل المقاس الاسترشادي (عرض للعميل)</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
-    <p class="card-hint" style="margin:0.25rem 0 0;">نموذج واحد: اختر القسم ثم العائلة ثم شكل الدليل، أنشئ الجدول، واربطه بأنواع المنتج/المنتجات — كله بحفظة واحدة.</p>
 </div>
 
 <?php if (!$tablesReady): ?>
@@ -89,7 +88,8 @@ if ($familiesJson === false) {
 <div class="card">
     <h3 style="margin:0 0 14px;">إنشاء / تعديل دليل المقاس</h3>
     <input type="hidden" id="asg_edit_id" value="0">
-    <div class="form-grid" style="max-width:1000px;">
+    <div class="asg-form-grid">
+        <!-- السطر الأول (يُقرأ يميناً→يساراً): القسم الرئيسي · نوع المقاس · عائلة المقاسات -->
         <div>
             <label for="asg_dept">القسم الرئيسي <span style="color:#b91c1c;">*</span></label>
             <select id="asg_dept"><option value="0">— اختر —</option>
@@ -99,12 +99,17 @@ if ($familiesJson === false) {
             </select>
         </div>
         <div>
-            <label for="asg_family">عائلة المقاسات <span style="color:#b91c1c;">*</span></label>
-            <select id="asg_family"><option value="0">— اختر —</option></select>
+            <label for="asg_kind_filter">نوع المقاس (تصفية) <span style="color:#b91c1c;">*</span></label>
+            <select id="asg_kind_filter" disabled><option value="">— اختر —</option></select>
         </div>
         <div>
-            <label for="asg_kind_filter">نوع المقاس (تصفية)</label>
-            <select id="asg_kind_filter"><option value="">— كل الأنواع —</option></select>
+            <label for="asg_family">عائلة المقاسات <span style="color:#b91c1c;">*</span></label>
+            <select id="asg_family" disabled><option value="0">— اختر —</option></select>
+        </div>
+        <!-- السطر الثاني: الاسم الداخلي · شكل الدليل · الحالة -->
+        <div>
+            <label for="asg_name">الاسم الداخلي (عربي) <span style="color:#b91c1c;">*</span></label>
+            <input type="text" id="asg_name" maxlength="191" placeholder="مثال: قمصان رجالي EU">
         </div>
         <div>
             <label>شكل الدليل <span style="color:#b91c1c;">*</span></label>
@@ -118,10 +123,6 @@ if ($familiesJson === false) {
             </div>
         </div>
         <div>
-            <label for="asg_name">الاسم الداخلي (عربي) <span style="color:#b91c1c;">*</span></label>
-            <input type="text" id="asg_name" maxlength="191" placeholder="مثال: قمصان رجالي EU">
-        </div>
-        <div>
             <label for="asg_active">الحالة</label>
             <select id="asg_active"><option value="1">نشط</option><option value="0">موقوف</option></select>
         </div>
@@ -131,19 +132,29 @@ if ($familiesJson === false) {
 
     <div class="card" style="margin-top:18px;background:#f8fafc;">
         <h4 style="margin:0 0 6px;">يطبَّق على (اختياري)</h4>
-        <p class="card-hint" style="margin:0 0 12px;">لو تركت الاثنين فارغين، يصبح الدليل أساساً عاماً للقسم + العائلة. الأخصّ يفوز: دليل المنتج، ثم دليل نوع المنتج، ثم دليل العائلة.</p>
-        <div class="form-grid" style="max-width:1000px;">
-            <div>
+        <p class="card-hint" style="margin:0 0 12px;">لو تركت الاثنين فارغين، يصبح الدليل أساساً عاماً للقسم + العائلة. الأخصّ يفوز: دليل المنتج، ثم دليل نوع المنتج، ثم دليل العائلة. <strong>الاختيار بالنقر المزدوج</strong> على الحقل لفتح القائمة (لا كتابة).</p>
+        <div class="asg-applies-grid">
+            <div class="asg-picker" data-picker="types">
                 <label>أنواع المنتج</label>
-                <div id="asg_link_types" class="asg-link-box" style="max-height:180px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px;background:#fff;">
-                    <span class="card-hint">اختر عائلة لعرض أنواع المنتج المرشّحة.</span>
+                <div class="asg-picker-field" id="asg_pick_types" tabindex="0" role="button" aria-label="اختر أنواع المنتج بالنقر المزدوج">
+                    <span class="asg-picker-placeholder">انقر مرتين للاختيار…</span>
+                </div>
+                <div class="asg-picker-panel" id="asg_panel_types" hidden>
+                    <div id="asg_link_types" class="asg-link-box">
+                        <span class="card-hint">اختر عائلة لعرض أنواع المنتج المرشّحة.</span>
+                    </div>
                 </div>
             </div>
-            <div>
+            <div class="asg-picker" data-picker="products">
                 <label>منتجات</label>
-                <input type="text" id="asg_link_products_search" placeholder="بحث بالاسم…" style="margin-bottom:6px;">
-                <div id="asg_link_products" class="asg-link-box" style="max-height:180px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px;background:#fff;">
-                    <span class="card-hint">اختر عائلة لعرض منتجاتها.</span>
+                <div class="asg-picker-field" id="asg_pick_products" tabindex="0" role="button" aria-label="اختر المنتجات بالنقر المزدوج">
+                    <span class="asg-picker-placeholder">انقر مرتين للاختيار…</span>
+                </div>
+                <div class="asg-picker-panel" id="asg_panel_products" hidden>
+                    <input type="text" id="asg_link_products_search" placeholder="تصفية بالاسم (اختياري)…" style="width:100%;box-sizing:border-box;margin-bottom:6px;">
+                    <div id="asg_link_products" class="asg-link-box">
+                        <span class="card-hint">اختر عائلة لعرض منتجاتها.</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -197,6 +208,78 @@ if ($familiesJson === false) {
 .asg-row-block { margin-bottom: 10px; padding: 12px; }
 input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: default; }
 .asg-link-box label { font-weight: normal; display:flex; align-items:center; gap:6px; margin:0 0 4px; cursor:pointer; }
+/* نموذج إنشاء/تعديل: صفّان × 3 أعمدة، الترتيب يُقرأ يميناً→يساراً (RTL) فالحقل الأول DOM يظهر يميناً */
+.asg-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px 18px;
+    direction: rtl;
+    align-items: start;
+    max-width: 1000px;
+}
+.asg-form-grid > div { min-width: 0; }
+.asg-form-grid label { display: block; margin: 0 0 4px; }
+.asg-form-grid select,
+.asg-form-grid input[type="text"] { width: 100%; box-sizing: border-box; }
+.asg-form-grid select:disabled { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
+.asg-applies-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 18px;
+    direction: rtl;
+    align-items: start;
+    max-width: 1000px;
+}
+.asg-applies-grid > div { min-width: 0; }
+.asg-applies-grid label { display: block; margin: 0 0 4px; }
+.asg-picker { position: relative; }
+.asg-picker-field {
+    min-height: 38px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    padding: 6px 8px;
+    cursor: pointer;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    user-select: none;
+}
+.asg-picker-field:focus { outline: 2px solid #93c5fd; outline-offset: 1px; }
+.asg-picker-placeholder { color: #94a3b8; font-size: 13px; }
+.asg-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e3a8a;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 12px;
+    max-width: 100%;
+}
+.asg-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asg-chip button { border: none; background: transparent; cursor: pointer; color: #1e3a8a; font-size: 14px; line-height: 1; padding: 0; }
+.asg-picker-panel {
+    position: absolute;
+    z-index: 30;
+    inset-inline-start: 0;
+    inset-inline-end: 0;
+    top: calc(100% + 4px);
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .14);
+    padding: 8px;
+}
+.asg-picker-panel .asg-link-box { max-height: 220px; overflow: auto; }
+.asg-link-box { border: 0; }
+@media (max-width: 720px) {
+    .asg-form-grid { grid-template-columns: 1fr; }
+    .asg-applies-grid { grid-template-columns: 1fr; }
+}
 </style>
 
 <script>
@@ -556,63 +639,136 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     function getPanel(pk) { return document.querySelector('.asg-panel[data-panel="' + pk + '"]'); }
     function allPanels() { return Array.prototype.slice.call(document.querySelectorAll('.asg-panel')); }
 
-    // ---- linking ----
+    // ---- linking (اختيار بالنقر المزدوج: لا كتابة في الحقل؛ التحديد محفوظ في مجموعات مستقلة عن التصفية) ----
     var LINK_CACHE = { types: [], products: [] };
-    function selectedTypeIds() {
-        var ids = [];
-        document.querySelectorAll('#asg_link_types input[type="checkbox"]:checked').forEach(function (c) { ids.push(parseInt(c.value, 10) || 0); });
-        return ids.filter(function (x) { return x > 0; });
+    var LINK_NAME = { types: {}, products: {} };   // id -> الاسم المعروض
+    var LINK_SELECTED = { types: {}, products: {} }; // id -> true
+
+    function selectedIds(name) {
+        var out = [];
+        Object.keys(LINK_SELECTED[name]).forEach(function (k) {
+            if (LINK_SELECTED[name][k]) { var n = parseInt(k, 10) || 0; if (n > 0) { out.push(n); } }
+        });
+        return out;
     }
-    function selectedProductIds() {
-        var ids = [];
-        document.querySelectorAll('#asg_link_products input[type="checkbox"]:checked').forEach(function (c) { ids.push(parseInt(c.value, 10) || 0); });
-        return ids.filter(function (x) { return x > 0; });
+    function selectedTypeIds() { return selectedIds('types'); }
+    function selectedProductIds() { return selectedIds('products'); }
+
+    function updateChips(name) {
+        var fieldId = (name === 'types') ? 'asg_pick_types' : 'asg_pick_products';
+        var field = document.getElementById(fieldId);
+        if (!field) { return; }
+        var ids = selectedIds(name);
+        if (!ids.length) {
+            field.innerHTML = '<span class="asg-picker-placeholder">انقر مرتين للاختيار…</span>';
+            return;
+        }
+        var h = '';
+        ids.forEach(function (id) {
+            var nm = LINK_NAME[name][id] || ('#' + id);
+            h += '<span class="asg-chip"><span>' + esc(nm) + '</span><button type="button" data-rm="' + id + '" title="إزالة">×</button></span>';
+        });
+        field.innerHTML = h;
+        field.querySelectorAll('button[data-rm]').forEach(function (b) {
+            b.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                var v = b.getAttribute('data-rm');
+                LINK_SELECTED[name][v] = false;
+                var listId = (name === 'types') ? 'asg_link_types' : 'asg_link_products';
+                var cb = document.querySelector('#' + listId + ' input[type="checkbox"][value="' + v + '"]');
+                if (cb) { cb.checked = false; }
+                updateChips(name);
+            });
+        });
     }
-    function renderLinkTypes(preIds) {
+
+    function renderLinkTypes() {
         var box = document.getElementById('asg_link_types');
-        preIds = preIds || [];
-        if (!LINK_CACHE.types.length) { box.innerHTML = '<span class="card-hint">لا أنواع منتج مرشّحة لهذه العائلة/القسم.</span>'; return; }
+        if (!LINK_CACHE.types.length) { box.innerHTML = '<span class="card-hint">لا أنواع منتج مرشّحة لهذه العائلة/القسم.</span>'; updateChips('types'); return; }
         var h = '';
         LINK_CACHE.types.forEach(function (t) {
             var id = parseInt(t.id, 10) || 0;
             var nm = esc(t.name_ar || t.name_en || ('#' + id));
             var other = parseInt(t.default_advisory_sizing_guide_id, 10) || 0;
-            var checked = preIds.indexOf(id) !== -1 ? ' checked' : '';
-            var note = (other > 0 && preIds.indexOf(id) === -1) ? ' <span class="card-hint">(مربوط بدليل آخر #' + other + ')</span>' : '';
+            var checked = LINK_SELECTED.types[id] ? ' checked' : '';
+            var note = (other > 0 && !LINK_SELECTED.types[id]) ? ' <span class="card-hint">(مربوط بدليل آخر #' + other + ')</span>' : '';
             h += '<label><input type="checkbox" value="' + id + '"' + checked + '> ' + nm + note + '</label>';
         });
         box.innerHTML = h;
+        updateChips('types');
     }
-    function renderLinkProducts(preIds, filter) {
+    function renderLinkProducts(filter) {
         var box = document.getElementById('asg_link_products');
-        preIds = preIds || [];
         filter = (filter || '').trim().toLowerCase();
-        if (!LINK_CACHE.products.length) { box.innerHTML = '<span class="card-hint">لا منتجات في هذه العائلة.</span>'; return; }
+        if (!LINK_CACHE.products.length) { box.innerHTML = '<span class="card-hint">لا منتجات في هذه العائلة.</span>'; updateChips('products'); return; }
         var h = '';
         LINK_CACHE.products.forEach(function (p) {
             var id = parseInt(p.id, 10) || 0;
             var nm = (p.name_ar || p.name_en || ('#' + id));
             if (filter && nm.toLowerCase().indexOf(filter) === -1) { return; }
             var other = parseInt(p.sizing_advisory_guide_id, 10) || 0;
-            var checked = preIds.indexOf(id) !== -1 ? ' checked' : '';
-            var note = (other > 0 && preIds.indexOf(id) === -1) ? ' <span class="card-hint">(دليل آخر #' + other + ')</span>' : '';
+            var checked = LINK_SELECTED.products[id] ? ' checked' : '';
+            var note = (other > 0 && !LINK_SELECTED.products[id]) ? ' <span class="card-hint">(دليل آخر #' + other + ')</span>' : '';
             h += '<label><input type="checkbox" value="' + id + '"' + checked + '> ' + esc(nm) + note + '</label>';
         });
-        box.innerHTML = h || '<span class="card-hint">لا نتائج للبحث.</span>';
+        box.innerHTML = h || '<span class="card-hint">لا نتائج للتصفية.</span>';
+        updateChips('products');
     }
     async function loadLinkTargets(preTypeIds, preProductIds) {
+        LINK_SELECTED.types = {}; (preTypeIds || []).forEach(function (id) { LINK_SELECTED.types[parseInt(id, 10) || 0] = true; });
+        LINK_SELECTED.products = {}; (preProductIds || []).forEach(function (id) { LINK_SELECTED.products[parseInt(id, 10) || 0] = true; });
         var f = famId();
         if (f <= 0) {
+            LINK_CACHE.types = []; LINK_CACHE.products = [];
+            LINK_NAME.types = {}; LINK_NAME.products = {};
+            LINK_SELECTED.types = {}; LINK_SELECTED.products = {};
             document.getElementById('asg_link_types').innerHTML = '<span class="card-hint">اختر عائلة لعرض أنواع المنتج.</span>';
             document.getElementById('asg_link_products').innerHTML = '<span class="card-hint">اختر عائلة لعرض منتجاتها.</span>';
+            updateChips('types'); updateChips('products');
             return;
         }
         var res = await post(ADVISORY_API, { action: 'list_link_targets', size_family_id: f, department_id: deptId() });
         if (!res || !res.success) { return; }
         LINK_CACHE.types = res.types || [];
         LINK_CACHE.products = res.products || [];
-        renderLinkTypes(preTypeIds || []);
-        renderLinkProducts(preProductIds || [], document.getElementById('asg_link_products_search').value);
+        LINK_NAME.types = {}; LINK_CACHE.types.forEach(function (t) { var id = parseInt(t.id, 10) || 0; LINK_NAME.types[id] = (t.name_ar || t.name_en || ('#' + id)); });
+        LINK_NAME.products = {}; LINK_CACHE.products.forEach(function (p) { var id = parseInt(p.id, 10) || 0; LINK_NAME.products[id] = (p.name_ar || p.name_en || ('#' + id)); });
+        renderLinkTypes();
+        renderLinkProducts(document.getElementById('asg_link_products_search').value);
+    }
+
+    function closeAllPickers() {
+        ['asg_panel_types', 'asg_panel_products'].forEach(function (id) {
+            var p = document.getElementById(id);
+            if (p) { p.setAttribute('hidden', ''); }
+        });
+    }
+    function bindPicker(name) {
+        var fieldId = (name === 'types') ? 'asg_pick_types' : 'asg_pick_products';
+        var panelId = (name === 'types') ? 'asg_panel_types' : 'asg_panel_products';
+        var listId = (name === 'types') ? 'asg_link_types' : 'asg_link_products';
+        var field = document.getElementById(fieldId);
+        var panel = document.getElementById(panelId);
+        if (!field || !panel) { return; }
+        field.addEventListener('dblclick', function () {
+            var wasOpen = !panel.hasAttribute('hidden');
+            closeAllPickers();
+            if (!wasOpen) { panel.removeAttribute('hidden'); }
+        });
+        field.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                var wasOpen = !panel.hasAttribute('hidden');
+                closeAllPickers();
+                if (!wasOpen) { panel.removeAttribute('hidden'); }
+            }
+        });
+        document.getElementById(listId).addEventListener('change', function (ev) {
+            if (ev.target && ev.target.matches('input[type="checkbox"]')) {
+                LINK_SELECTED[name][ev.target.value] = ev.target.checked;
+                updateChips(name);
+            }
+        });
     }
 
     // ---- list ----
@@ -653,14 +809,18 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
 
     function resetForm() {
         document.getElementById('asg_edit_id').value = '0';
+        document.getElementById('asg_dept').value = '0';
         document.getElementById('asg_kind_filter').value = '';
         rebuildFamilyOptions();
+        document.getElementById('asg_family').value = '0';
         document.getElementById('asg_name').value = '';
         document.getElementById('asg_active').value = '1';
         var single = document.querySelector('input[name="asg_shape"][value="single"]');
         if (single) { single.checked = true; }
+        applyCascadeState();
         buildPanels();
         loadLinkTargets([], []);
+        loadList();
     }
 
     async function loadGuide(id) {
@@ -671,10 +831,29 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         var fam = parseInt(g.size_family_id, 10) || 0;
         var dep = parseInt(g.department_id, 10) || 0;
         document.getElementById('asg_dept').value = String(dep);
-        // عند التعديل: صفّر الفلتر كي تظهر العائلة المحفوظة دائماً.
-        document.getElementById('asg_kind_filter').value = '';
+        // عند التعديل: اشتق «نوع المقاس» من العائلة المحفوظة كي يتسق التدرّج، ثم فعّل الحقول.
+        var famObj = null;
+        for (var fi = 0; fi < FAMILIES.length; fi++) {
+            if ((parseInt(FAMILIES[fi].id, 10) || 0) === fam) { famObj = FAMILIES[fi]; break; }
+        }
+        var derivedKind = famObj ? String(famObj.commercial_kind_key || '') : '';
+        document.getElementById('asg_kind_filter').value = derivedKind;
         rebuildFamilyOptions();
-        document.getElementById('asg_family').value = String(fam);
+        var famSel = document.getElementById('asg_family');
+        var hasOpt = false;
+        for (var oi = 0; oi < famSel.options.length; oi++) {
+            if ((parseInt(famSel.options[oi].value, 10) || 0) === fam) { hasOpt = true; break; }
+        }
+        if (!hasOpt && famObj) {
+            var o = document.createElement('option');
+            o.value = String(fam);
+            o.textContent = (famObj.name_ar || famObj.name_en || ('#' + fam));
+            famSel.appendChild(o);
+        }
+        famSel.value = String(fam);
+        // التعديل يسمح بإظهار/تغيير الحقلين بصرف النظر عن التدرّج.
+        document.getElementById('asg_kind_filter').disabled = false;
+        famSel.disabled = false;
         document.getElementById('asg_name').value = g.name_ar || '';
         document.getElementById('asg_active').value = String(parseInt(g.is_active, 10) ? 1 : 0);
         var lk = (g.layout_kind === 'dual') ? 'dual' : 'single';
@@ -753,8 +932,9 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     }
 
     document.getElementById('asg_save_btn').onclick = async function () {
-        if (famId() <= 0) { alert('اختر عائلة المقاسات.'); return; }
         if (deptId() <= 0) { alert('اختر القسم الرئيسي.'); return; }
+        if (kindFilter() === '') { alert('اختر نوع المقاس.'); return; }
+        if (famId() <= 0) { alert('اختر عائلة المقاسات.'); return; }
         if (document.getElementById('asg_name').value.trim() === '') { alert('الاسم الداخلي إلزامي.'); return; }
         var pr = collectPayload();
         if (pr.err) { alert(pr.err); return; }
@@ -792,7 +972,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
             var ck = String(f.commercial_kind_key || '');
             if (ck !== '' && !seen[ck]) { seen[ck] = true; kinds.push(ck); }
         });
-        var html = '<option value="">— كل الأنواع —</option>';
+        var html = '<option value="">— اختر —</option>';
         kinds.forEach(function (ck) {
             html += '<option value="' + esc(ck) + '">' + esc(KIND_LABELS[ck] || ck) + '</option>';
         });
@@ -819,6 +999,15 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         sel.value = keepPrev ? String(prev) : '0';
     }
 
+    // تفعيل تدرّجي: القسم يفعّل «نوع المقاس»، ونوع المقاس يفعّل «عائلة المقاسات».
+    function applyCascadeState() {
+        var d = deptId();
+        var kindSel = document.getElementById('asg_kind_filter');
+        var famSel = document.getElementById('asg_family');
+        kindSel.disabled = !(d > 0);
+        famSel.disabled = !(d > 0 && kindFilter() !== '');
+    }
+
     function onFamilyChange() {
         allPanels().forEach(refreshSizeSelects);
         loadList();
@@ -826,10 +1015,21 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     }
     document.getElementById('asg_family').onchange = onFamilyChange;
     document.getElementById('asg_dept').onchange = function () {
+        if (deptId() <= 0) {
+            document.getElementById('asg_kind_filter').value = '';
+            document.getElementById('asg_family').value = '0';
+            rebuildFamilyOptions();
+            applyCascadeState();
+            onFamilyChange();
+            return;
+        }
+        applyCascadeState();
         loadLinkTargets(selectedTypeIds(), selectedProductIds());
     };
     document.getElementById('asg_kind_filter').addEventListener('change', function () {
+        document.getElementById('asg_family').value = '0';
         rebuildFamilyOptions();
+        applyCascadeState();
         onFamilyChange();
     });
     document.querySelectorAll('input[name="asg_shape"]').forEach(function (r) {
@@ -848,9 +1048,15 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         buildPanels();
         rebuildKindFilter();
         rebuildFamilyOptions();
+        applyCascadeState();
+        bindPicker('types');
+        bindPicker('products');
+        document.addEventListener('click', function (ev) {
+            if (!ev.target.closest('.asg-picker')) { closeAllPickers(); }
+        });
         if (famId() > 0) { loadList(); loadLinkTargets([], []); }
         document.getElementById('asg_link_products_search').addEventListener('input', function () {
-            renderLinkProducts(selectedProductIds(), this.value);
+            renderLinkProducts(this.value);
         });
     }
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', boot); } else { boot(); }
