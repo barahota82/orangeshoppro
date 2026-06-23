@@ -78,6 +78,19 @@ try {
             json_response(['success' => true, 'categories' => is_array($rows) ? $rows : []]);
             break;
 
+        case 'list_all_categories':
+            // كل فئات القياس عبر كل الأنواع التجارية، مع تسمية النوع الأب (لجدول مسطّح يظهر دون اختيار نوع).
+            $rows = $pdo->query(
+                'SELECT c.commercial_kind_key, c.category_key, c.label_ar, c.label_en, c.sort_order, c.is_active,
+                        k.label_ar AS kind_label_ar, k.label_en AS kind_label_en,
+                        COALESCE(k.sort_order, 999999) AS kind_sort
+                 FROM sizing_category_dictionary c
+                 LEFT JOIN commercial_kind_dictionary k ON k.kind_key = c.commercial_kind_key
+                 ORDER BY kind_sort ASC, c.commercial_kind_key ASC, c.sort_order ASC, c.category_key ASC'
+            )->fetchAll(PDO::FETCH_ASSOC);
+            json_response(['success' => true, 'categories' => is_array($rows) ? $rows : []]);
+            break;
+
         case 'save_kind':
             $kindKey = $sanitizeKind((string) ($data['kind_key'] ?? ''));
             $oldKind = $sanitizeKind((string) ($data['old_kind_key'] ?? ''));

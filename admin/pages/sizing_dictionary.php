@@ -325,6 +325,17 @@ if ($sdNextKindSort < 1) {
     .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(5),
     .cat-dep-list-wrap[data-list="cats"] > table th:nth-child(5),
     .cat-dep-list-wrap[data-list="cats"] > table td:nth-child(5){ width:80px; text-align:center; }
+    /* جدول الفئات يحوي عموداً إضافياً (النوع التجاري) → 7 أعمدة؛ تجاوُز عروض الأعمدة 2..6 */
+    .cat-dep-list-wrap[data-list="cats"] > table th:nth-child(2),
+    .cat-dep-list-wrap[data-list="cats"] > table td:nth-child(2){ width:150px; text-align:right; }
+    .cat-dep-list-wrap[data-list="cats"] > table th:nth-child(3),
+    .cat-dep-list-wrap[data-list="cats"] > table td:nth-child(3){ width:160px; }
+    .cat-dep-list-wrap[data-list="cats"] > table th:nth-child(4),
+    .cat-dep-list-wrap[data-list="cats"] > table td:nth-child(4){ width:160px; }
+    .cat-dep-list-wrap[data-list="cats"] > table th:nth-child(5),
+    .cat-dep-list-wrap[data-list="cats"] > table td:nth-child(5){ width:220px; text-align:left; }
+    .cat-dep-list-wrap[data-list="cats"] > table th:nth-child(6),
+    .cat-dep-list-wrap[data-list="cats"] > table td:nth-child(6){ width:70px; text-align:center; }
     .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-ops-col,
     .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-row-ops{
         width:200px !important;
@@ -480,7 +491,7 @@ if ($sdNextKindSort < 1) {
         <div class="sd-cat-sort admin-sort-field-wrap">
             <label>الترتيب</label>
             <input type="hidden" id="sd_cat_sort" value="0">
-            <input type="text" id="sd_cat_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="1">
+            <input type="text" id="sd_cat_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="">
         </div>
         <div class="sd-cat-key">
             <label for="sd_cat_key">category_key</label>
@@ -524,12 +535,13 @@ if ($sdNextKindSort < 1) {
 </div>
 
 <div class="card">
-    <h3 style="margin-top:0;">فئات القياس ضمن النوع المحدّد</h3>
+    <h3 style="margin-top:0;">فئات القياس (كل الأنواع التجارية)</h3>
     <div class="table-wrap cat-dep-list-wrap" data-list="cats">
         <table>
             <thead>
                 <tr>
                     <th>ترتيب</th>
+                    <th>النوع التجاري</th>
                     <th>عرض عربي</th>
                     <th>عرض EN</th>
                     <th>المفتاح</th>
@@ -547,7 +559,7 @@ if ($sdNextKindSort < 1) {
     const api = '/admin/api/sizing_dictionary/manage.php';
     const SD_KIND_STORAGE_KEY = 'orangeSdSelectedCommercialKind';
     var sdNextKindSortPreview = <?php echo (int) $sdNextKindSort; ?>;
-    var sdNextCatSortPreview = 1;
+    var sdAllCats = [];
     window.sdCatParentProgrammaticDepth = 0;
     function sdCatParentBeginProgrammatic() {
         window.sdCatParentProgrammaticDepth++;
@@ -604,15 +616,21 @@ if ($sdNextKindSort < 1) {
         }
     }
 
-    function sdRefreshNextCatPreviewFromCats(cats) {
+    /** الرقم التالي للترتيب ضمن نوع تجاري محدّد، محسوباً من كل الفئات المحمّلة (دون نداء شبكي إضافي). */
+    function sdNextCatSortForKind(kindKey) {
+        if (!kindKey) {
+            return 0;
+        }
         var maxSo = 0;
-        (cats || []).forEach(function (c) {
-            var s = parseInt(String(c.sort_order != null ? c.sort_order : '0'), 10) || 0;
-            if (s > maxSo) {
-                maxSo = s;
+        (sdAllCats || []).forEach(function (c) {
+            if (String(c.commercial_kind_key || '') === kindKey) {
+                var s = parseInt(String(c.sort_order != null ? c.sort_order : '0'), 10) || 0;
+                if (s > maxSo) {
+                    maxSo = s;
+                }
             }
         });
-        sdNextCatSortPreview = maxSo + 1;
+        return maxSo + 1;
     }
 
     function sdSyncKindSortView() {
@@ -637,41 +655,31 @@ if ($sdNextKindSort < 1) {
         const hid = document.getElementById('sd_cat_sort');
         const vw = document.getElementById('sd_cat_sort_view');
         const oldC = document.getElementById('sd_cat_old_key').value.trim();
+        const ck = String(document.getElementById('sd_cat_parent_kind').value || '').trim();
+
         if (oldC === '') {
+            // سجل جديد: «الترتيب» يبقى فارغاً حتى يُختار نوع تجاري، ثم يُعرض الرقم التالي ضمنه (يُرسَل 0 → السيرفر يعيّن التالي).
             hid.value = '0';
-            var nc = parseInt(String(sdNextCatSortPreview), 10) || 1;
-            if (nc < 1) {
-                nc = 1;
-            }
-            vw.value = String(nc);
+            vw.value = ck ? String(sdNextCatSortForKind(ck)) : '';
+            return;
+        }
+        // تعديل سجل قائم
+        const relocate = window.sdCatRelocateSort === true;
+        if (relocate) {
+            hid.value = '0';
+            vw.value = ck ? String(sdNextCatSortForKind(ck)) : '';
             return;
         }
         let hidNum = parseInt(String(hid.value || '').trim(), 10);
-        if (Number.isNaN(hidNum)) {
-            hidNum = 0;
-        }
-        const relocate = window.sdCatRelocateSort === true;
-        if (relocate && hidNum <= 0) {
-            hid.value = '0';
-            var nc2 = parseInt(String(sdNextCatSortPreview), 10) || 1;
-            if (nc2 < 1) {
-                nc2 = 1;
-            }
-            vw.value = String(nc2);
-            return;
-        }
-        if (!relocate && hidNum <= 0) {
+        if (Number.isNaN(hidNum) || hidNum <= 0) {
             const os = window.sdCatEditOriginalSort;
-            var fb = parseInt(String(os != null ? os : '0'), 10);
-            if (Number.isNaN(fb)) {
-                fb = 0;
+            hidNum = parseInt(String(os != null ? os : '0'), 10);
+            if (Number.isNaN(hidNum)) {
+                hidNum = 0;
             }
-            hid.value = String(fb);
-            vw.value = String(fb);
-            return;
         }
         hid.value = String(hidNum);
-        vw.value = String(hidNum);
+        vw.value = hidNum > 0 ? String(hidNum) : '';
     }
 
     /** يطابق تعقيم السيرفر: أحرف صغيرة + a-z0-9_- فقط */
@@ -901,7 +909,9 @@ if ($sdNextKindSort < 1) {
         const sel = document.getElementById('sd_cat_parent_kind');
         sdCatParentBeginProgrammatic();
         try {
-            const prev = preferred || sel.value || sdRestoreSelectedKindPreference() || '';
+            // الجدول الأسفل يعرض كل الفئات مسطّحةً دون الحاجة لاختيار نوع، لذا يبقى المنسدل افتراضياً على «— اختر —»
+            // (نمط شاشة فروع شجرة المنتجات): «الترتيب» يبقى فارغاً حتى يُختار نوع تجاري لإضافة فئة جديدة.
+            const prev = preferred || sel.value || '';
             sel.innerHTML = '';
             const opt0 = document.createElement('option');
             opt0.value = '';
@@ -915,11 +925,6 @@ if ($sdNextKindSort < 1) {
             });
             if (prev && [...sel.options].some(function (x) { return x.value === prev; })) {
                 sel.value = prev;
-            } else if ((kinds || []).length > 0) {
-                // اختيار أول نوع تجاري تلقائياً كي يظهر جدول الفئات المحفوظة دون اضطرار المستخدم لاختيار نوع يدوياً،
-                // ويُحدَّث «الترتيب» تلقائياً للرقم التالي ضمن هذا النوع.
-                sel.value = String(kinds[0].kind_key || '');
-                sdPersistSelectedKind(sel.value);
             }
             sdApplyAutoCatKey();
         } finally {
@@ -968,30 +973,22 @@ if ($sdNextKindSort < 1) {
     let prevKindForCats = '';
 
     window.sdLoadCategories = async function () {
-        const sel = document.getElementById('sd_cat_parent_kind');
-        let ck = sel.value;
+        // الجدول يعرض كل الفئات مسطّحةً عبر كل الأنواع التجارية دون الحاجة لاختيار نوع (نمط شاشة فروع شجرة المنتجات).
         const tb = document.getElementById('sd_cats_tbody');
-        if (!ck) {
-            tb.innerHTML = '';
-            sdNextCatSortPreview = 1;
-            sdSyncCatSortView();
-            sdPersistSelectedKind('');
-            return;
-        }
-        prevKindForCats = ck;
-        sdPersistSelectedKind(ck);
         try {
-            const res = await postJSON(api, { action: 'list_categories', commercial_kind_key: ck });
+            const res = await postJSON(api, { action: 'list_all_categories' });
             if (!res || !res.success) {
                 alert(res && res.message ? res.message : 'تعذر تحميل الفئات');
                 return;
             }
-            const cats = res.categories || [];
+            sdAllCats = res.categories || [];
             tb.innerHTML = '';
-            cats.forEach(function (c) {
+            sdAllCats.forEach(function (c) {
                 const tr = document.createElement('tr');
+                const kindLabel = (c.kind_label_ar || c.kind_label_en || c.commercial_kind_key || '');
                 tr.innerHTML =
                     '<td>' + String(c.sort_order != null ? c.sort_order : '') + '</td>' +
+                    '<td>' + escapeHtml(kindLabel) + '</td>' +
                     '<td>' + escapeHtml(c.label_ar || '') + '</td>' +
                     '<td>' + escapeHtml(c.label_en || '') + '</td>' +
                     '<td><code>' + escapeHtml(c.category_key || '') + '</code></td>' +
@@ -1005,7 +1002,6 @@ if ($sdNextKindSort < 1) {
                 btns[1].onclick = function () { sdDeleteCategory(c); };
                 tb.appendChild(tr);
             });
-            sdRefreshNextCatPreviewFromCats(cats);
             sdSyncCatSortView();
         } catch (e) {
             alert('خطأ شبكة أو خادم');
@@ -1104,7 +1100,6 @@ if ($sdNextKindSort < 1) {
         } finally {
             sdCatParentEndProgrammatic();
         }
-        await sdLoadCategories();
         sdSyncCatSortView();
         sdScrollToEditSection('sd_section_cat_form', 'sd_cat_label_ar');
     };
@@ -1193,26 +1188,20 @@ if ($sdNextKindSort < 1) {
         return d.innerHTML;
     }
 
-    document.getElementById('sd_cat_parent_kind').addEventListener('change', async function () {
+    document.getElementById('sd_cat_parent_kind').addEventListener('change', function () {
         if (window.sdCatParentProgrammaticDepth > 0) {
             return;
         }
         sdPersistSelectedKind(this.value.trim());
         sdApplyAutoCatKey();
-        await sdLoadCategories();
         const oldKey = document.getElementById('sd_cat_old_key').value.trim();
         if (oldKey !== '') {
             const now = this.value.trim();
             const orig = typeof window.sdCatEditOriginalCommercialKind === 'string' ? window.sdCatEditOriginalCommercialKind.trim() : '';
             window.sdCatRelocateSort = now !== orig && orig !== '';
-            if (window.sdCatRelocateSort) {
-                document.getElementById('sd_cat_sort').value = '0';
-            } else {
-                const os = window.sdCatEditOriginalSort;
-                document.getElementById('sd_cat_sort').value = String(os != null ? os : 0);
-            }
-            sdSyncCatSortView();
         }
+        // «الترتيب» يُحدَّث للرقم التالي ضمن النوع المختار (سجل جديد) أو يبقى على ترتيب السجل عند التعديل.
+        sdSyncCatSortView();
     });
 
     document.getElementById('sd_kind_label_en').addEventListener('input', sdOnKindEnInput);

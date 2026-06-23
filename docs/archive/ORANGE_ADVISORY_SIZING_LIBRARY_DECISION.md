@@ -164,3 +164,11 @@
 - **`admin/pages/size_families.php`** و**`admin/pages/size_scheme_templates.php`:** أُزيلت أعمدة/حقول طول القدم من العرض والإدخال والتجميع والتحميل من القالب.
 - **`admin/api/size_families/save_sizes.php`** و**`admin/api/size_scheme_templates/manage.php`:** أُزيل `foot_length_cm` من كل INSERT/UPDATE والمزامنة، وحُذفت `orange_parse_foot_length_nullable` وفروع `$hasFoot`/`$hasFamFoot`.
 - **`pages/product.php`:** أُزيل عرض «طول القدم» من جدول المقاسات القديم (`$sizingShowFoot`/`$hasFootCol`). مفاتيح الترجمة `sizing_col_foot_cm` بقيت في `config.php` (غير ضارة؛ قد تُعاد كتسمية عمود إرشادي).
+
+### قاموس هرَم المقاس — كارت «فئة قياس (المستوى 2)» يتبع نمط فروع شجرة المنتجات (قرار المالك 2026-06-23)
+
+**القرار:** في `admin/pages/sizing_dictionary.php` فقط — كارت «فئة قياس (المستوى 2)» يجب أن يَعرض **كل الفئات المحفوظة مسطّحةً** دون اشتراط اختيار نوع تجاري أولاً، وأن تبقى خانة «الترتيب» **فارغة افتراضياً** وتُملأ بالرقم التالي عند اختيار نوع تجاري لإضافة فئة جديدة (نمط `admin/pages/unified_catalog_branches.php`). أُلغيت محاولة الاختيار التلقائي لأول نوع تجاري.
+
+**تنفيذ:**
+- **API (`admin/api/sizing_dictionary/manage.php`):** أُضيف إجراء `list_all_categories` يُرجع كل فئات القياس مع تسمية النوع الأب (`kind_label_ar/_en`، JOIN على `commercial_kind_dictionary`، ترتيب حسب ترتيب النوع ثم ترتيب الفئة). `save_category` يبقى كما هو يُعيّن الترتيب التالي تلقائياً عند إرسال `sort_order<=0`.
+- **الشاشة (`admin/pages/sizing_dictionary.php`):** جدول الفئات صار يَعرض **كل الأنواع** مع عمود «النوع التجاري» (7 أعمدة + عروض CSS مخصّصة)؛ `sdLoadCategories()` يستدعي `list_all_categories` ويملأ الكاش `sdAllCats`؛ `sdSyncCatSortView()` يحسب الرقم التالي ضمن النوع المختار من الكاش (`sdNextCatSortForKind`) ويُبقي «الترتيب» فارغاً حتى يُختار نوع؛ `sd_cat_sort_view` افتراضه `value=""`؛ المنسدل يبقى على «— اختر —» عند التحميل (أُزيل اختيار أول نوع تلقائياً واسترجاع تفضيل الجلسة). بلا تغيير على كارت «نوع تجاري (المستوى 1)».
