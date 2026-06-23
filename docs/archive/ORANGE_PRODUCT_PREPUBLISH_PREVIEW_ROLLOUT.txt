@@ -273,7 +273,8 @@ Resolved: preview model (session, not channel); TTL = 24h + lazy + optional main
 1) `includes/storefront_cart_items.php` (`orange_storefront_validate_cart_items_core`): عند جلسة معاينة فعّالة
    ومطابقة `id` للمسودّة (`orange_preview_active_context().draft_id`)، يُجلب المنتج بـ `is_preview_draft=1`
    بدل `is_active=1`، ويُتخطّى فحص الدولة وسلسلة التصنيف الموحّد، ويُعامَل المخزون كـ `PHP_INT_MAX` (متوفّر).
-2) `api/cart/stock-limits.php`: حد مخزون سخي (`ORANGE_PREVIEW_CART_STOCK=99`) لمسودّة الجلسة.
+2) `api/cart/stock-limits.php`: مسودّة الجلسة تُعاد بحدّ `null` (بلا سقف) فلا يظهر تلميح «حتى N متوفر»
+   ولا كمية وهمية في السلة — الطلب محاكاة لا يُسجَّل أصلاً.
 3) `api/orders/create-order.php`: كان **مسبقاً** يعيد «نجاحاً وهمياً» (`preview=true`) في وضع المعاينة — الطلب
    محاكاة فقط ولا يُسجَّل ولا يُنقص مخزوناً. لا تغيير هنا.
 حماية: بلا جلسة معاينة ⇒ `previewDraftId=0` ⇒ السلوك الطبيعي تماماً (لا يمكن لعميل تمرير مسودّة).

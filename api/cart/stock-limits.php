@@ -9,9 +9,6 @@ require_once __DIR__ . '/../../includes/warehouses.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/product_preview.php';
 
-/** سقف مخزون المعاينة لمسودّة الجلسة (يماثل صفحة المنتج) — الطلب محاكاة لا يُسجَّل. */
-const ORANGE_PREVIEW_CART_STOCK = 99;
-
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -32,9 +29,10 @@ try {
             continue;
         }
 
-        /* مسودّة المعاينة لجلسة الأدمن: حد مخزون سخي للتصفّح كعميل (الطلب محاكاة لا يُسجَّل). */
+        /* مسودّة المعاينة لجلسة الأدمن: بلا حدّ كمية (null) فلا يظهر تلميح «حتى N متوفر»
+           ولا تُكتب كمية وهمية — الطلب محاكاة لا يُسجَّل أصلاً. */
         if ($previewDraftId > 0 && $pid === $previewDraftId) {
-            $limits[] = ORANGE_PREVIEW_CART_STOCK;
+            $limits[] = null;
             continue;
         }
 
