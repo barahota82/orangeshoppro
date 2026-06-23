@@ -89,8 +89,8 @@ if ($familiesJson === false) {
     <h3 style="margin:0 0 14px;">إنشاء / تعديل دليل المقاس</h3>
     <input type="hidden" id="asg_edit_id" value="0">
     <div class="asg-form-grid">
-        <!-- السطر الأول (يُقرأ يميناً→يساراً): القسم الرئيسي · نوع المقاس · عائلة المقاسات -->
-        <div>
+        <!-- السطر الأول (يُقرأ يميناً→يساراً): القسم الرئيسي · نوع المقاس · عائلة المقاسات · الحالة -->
+        <div class="asg-fg-dept">
             <label for="asg_dept">القسم الرئيسي <span style="color:#b91c1c;">*</span></label>
             <select id="asg_dept"><option value="0">— اختر —</option>
                 <?php foreach ($departments as $d): ?>
@@ -98,20 +98,24 @@ if ($familiesJson === false) {
                 <?php endforeach; ?>
             </select>
         </div>
-        <div>
+        <div class="asg-fg-kind">
             <label for="asg_kind_filter">نوع المقاس (تصفية) <span style="color:#b91c1c;">*</span></label>
             <select id="asg_kind_filter" disabled><option value="">— اختر —</option></select>
         </div>
-        <div>
+        <div class="asg-fg-family">
             <label for="asg_family">عائلة المقاسات <span style="color:#b91c1c;">*</span></label>
             <select id="asg_family" disabled><option value="0">— اختر —</option></select>
         </div>
-        <!-- السطر الثاني: الاسم الداخلي · شكل الدليل · الحالة -->
-        <div>
+        <div class="asg-fg-status">
+            <label for="asg_active">الحالة</label>
+            <select id="asg_active"><option value="1">نشط</option><option value="0">موقوف</option></select>
+        </div>
+        <!-- السطر الثاني: الاسم الداخلي · شكل الدليل -->
+        <div class="asg-fg-name">
             <label for="asg_name">الاسم الداخلي (عربي) <span style="color:#b91c1c;">*</span></label>
             <input type="text" id="asg_name" maxlength="191" placeholder="مثال: قمصان رجالي EU">
         </div>
-        <div>
+        <div class="asg-fg-shape">
             <label>شكل الدليل <span style="color:#b91c1c;">*</span></label>
             <div style="display:flex;gap:16px;align-items:center;padding-top:6px;">
                 <label style="display:flex;align-items:center;gap:6px;font-weight:normal;margin:0;cursor:pointer;">
@@ -121,10 +125,6 @@ if ($familiesJson === false) {
                     <input type="radio" name="asg_shape" value="dual"> جدولان: علوي + سفلي
                 </label>
             </div>
-        </div>
-        <div>
-            <label for="asg_active">الحالة</label>
-            <select id="asg_active"><option value="1">نشط</option><option value="0">موقوف</option></select>
         </div>
     </div>
 
@@ -208,16 +208,26 @@ if ($familiesJson === false) {
 .asg-row-block { margin-bottom: 10px; padding: 12px; }
 input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: default; }
 .asg-link-box label { font-weight: normal; display:flex; align-items:center; gap:6px; margin:0 0 4px; cursor:pointer; }
-/* نموذج إنشاء/تعديل: صفّان × 3 أعمدة، الترتيب يُقرأ يميناً→يساراً (RTL) فالحقل الأول DOM يظهر يميناً */
+/* نموذج إنشاء/تعديل: السطر الأول 4 خانات (القسم/نوع/العائلة/الحالة) بعرض متساوٍ، والسطر الثاني الاسم + شكل الدليل.
+   الترتيب يُقرأ يميناً→يساراً (RTL): أول عمود في الـ areas يظهر يميناً. عرض النموذج وُسِّع كي تبقى الخانات الثلاث بعرضها الحالي تقريباً. */
 .asg-form-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-areas:
+        "dept kind family status"
+        "name shape shape shape";
     gap: 14px 18px;
     direction: rtl;
     align-items: start;
-    max-width: 1000px;
+    max-width: 1340px;
 }
 .asg-form-grid > div { min-width: 0; }
+.asg-fg-dept { grid-area: dept; }
+.asg-fg-kind { grid-area: kind; }
+.asg-fg-family { grid-area: family; }
+.asg-fg-status { grid-area: status; }
+.asg-fg-name { grid-area: name; }
+.asg-fg-shape { grid-area: shape; }
 .asg-form-grid label { display: block; margin: 0 0 4px; }
 .asg-form-grid select,
 .asg-form-grid input[type="text"] { width: 100%; box-sizing: border-box; }
@@ -277,7 +287,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
 .asg-picker-panel .asg-link-box { max-height: 220px; overflow: auto; }
 .asg-link-box { border: 0; }
 @media (max-width: 720px) {
-    .asg-form-grid { grid-template-columns: 1fr; }
+    .asg-form-grid { grid-template-columns: 1fr; grid-template-areas: none; }
     .asg-applies-grid { grid-template-columns: 1fr; }
 }
 </style>
