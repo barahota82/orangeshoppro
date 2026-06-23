@@ -131,3 +131,70 @@ function orange_product_sync_colorway_images_from_payload(PDO $pdo, int $product
         }
     }
 }
+
+if (! function_exists('orange_product_first_colorway_image_map')) {
+    /**
+     * خريطة (product_id => اسم أول صورة لون) لمجموعة منتجات — استعلام واحد (تفادي N+1).
+     * تُستعمل كاحتياط لصورة الكارت/المعرض عند غياب الصورة العامة main_image.
+     *
+     * @param list<int>|array<int,int|string> $productIds
+     * @return array<int,string>
+     */
+    function orange_product_first_colorway_image_map(PDO $pdo, array $productIds): array
+    {
+        $ids = [];
+        foreach ($productIds as $raw) {
+            $pid = (int) $raw;
+            if ($pid > 0) {
+                $ids[$pid] = true;
+            }
+        }
+        $ids = array_keys($ids);
+        if (
+            $ids === []
+            || ! orange_table_exists($pdo, 'product_colorway_images')
+            || ! orange_table_exists($pdo, 'product_colorways')
+        ) {
+            return [];
+        }
+
+        $place = implode(',', array_fill(0, count($ids), '?'));
+        $sql = 'SELECT cw.product_id AS pid, pci.image_path
+                FROM product_colorway_images pci
+                INNER JOIN product_colorways cw ON cw.id = pci.product_colorway_id
+                WHERE cw.product_id IN (' . $place . ')
+                ORDER BY cw.product_id ASC, pci.product_colorway_id ASC, pci.sort_order ASC, pci.id ASC';
+        $st = $pdo->prepare($sql);
+        $st->execute(array_map('intval', $ids));
+
+        $out = [];
+        while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+            if (! is_array($r)) {
+                continue;
+            }
+            $pid = (int) ($r['pid'] ?? 0);
+            if ($pid <= 0 || isset($out[$pid])) {
+                continue; // نُبقي أوّل صورة فقط لكل منتج
+            }
+            $fn = trim((string) ($r['image_path'] ?? ''));
+            if ($fn !== '') {
+                $out[$pid] = $fn;
+            }
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('orange_product_first_colorway_image')) {
+    /** اسم أول صورة لون لمنتج واحد (أو '' إن لم توجد). */
+    function orange_product_first_colorway_image(PDO $pdo, int $productId): string
+    {
+        if ($productId <= 0) {
+            return '';
+        }
+        $map = orange_product_first_colorway_image_map($pdo, [$productId]);
+
+        return $map[$productId] ?? '';
+    }
+}

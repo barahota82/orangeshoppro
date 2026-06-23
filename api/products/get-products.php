@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/department_countries.php';
 require_once __DIR__ . '/../../includes/product_preview.php';
+require_once __DIR__ . '/../../includes/product_colorway_images.php';
 
 try {
     $pdo = db();
@@ -73,6 +74,25 @@ try {
             if ($pvDraft !== null) {
                 $pvDraft['is_preview_draft_card'] = 1;
                 array_unshift($products, $pvDraft);
+            }
+        }
+    }
+
+    /* احتياط صورة الكارت: أوّل صورة لون عند غياب main_image (استعلام واحد، بلا N+1). */
+    $imgFallbackIds = [];
+    foreach ($products as $fbP) {
+        if (trim((string) ($fbP['main_image'] ?? '')) === '') {
+            $imgFallbackIds[] = (int) ($fbP['id'] ?? 0);
+        }
+    }
+    if ($imgFallbackIds !== []) {
+        $imgFallbackMap = orange_product_first_colorway_image_map($pdo, $imgFallbackIds);
+        if ($imgFallbackMap !== []) {
+            foreach ($products as $fbI => $fbP) {
+                $fbPid = (int) ($fbP['id'] ?? 0);
+                if (trim((string) ($fbP['main_image'] ?? '')) === '' && ! empty($imgFallbackMap[$fbPid])) {
+                    $products[$fbI]['main_image'] = $imgFallbackMap[$fbPid];
+                }
             }
         }
     }

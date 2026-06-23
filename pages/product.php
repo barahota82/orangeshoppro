@@ -142,10 +142,15 @@ foreach ($variants as $vi => $vRow) {
         continue;
     }
     $vid = (int) ($vRow['id'] ?? 0);
-    if ($vid > 0 && !$orangeProductPreview) {
+    if ($orangeProductPreview) {
+        /* المعاينة: نموذج المنتج الجديد لا يلتقط مخزون المتغيّر (يأتي لاحقاً من أرصدة أول المدة)،
+           لذا نعرض صفّ الظِلّ كمتوفّر ليتصفّحه الأدمن كعميل ويختبر الألوان/المقاسات والإضافة للسلة.
+           الطلب في وضع المعاينة محاكاة فقط ولا يُرسَل فعلياً. */
+        $pvStock = (int) ($vRow['stock_quantity'] ?? 0);
+        $variants[$vi]['stock_quantity'] = $pvStock > 0 ? $pvStock : 99;
+    } elseif ($vid > 0) {
         $variants[$vi]['stock_quantity'] = orange_warehouse_effective_variant_stock($pdo, $vid, $sfProductCountryId);
     }
-    /* في المعاينة: تُعرض الكمية المُدخلة كما هي (المخزن لا يحوي صفوفاً لصفّ الظِلّ). */
 }
 
 $colorChipOrder = [];
@@ -351,6 +356,20 @@ if ((int) $product['has_colors'] === 1 && orange_table_exists($pdo, 'product_col
             $colorwayGalleryByChip[$chip][] = $href;
         }
     }
+}
+
+/*
+ * احتياط المعرض الافتراضي: عند غياب الصورة العامة وصور المعرض، نستخدم أوّل مجموعة صور لون متاحة
+ * (مُحمّلة أصلاً أعلاه — بلا استعلام إضافي) ليفتح المعرض بصورة بدل أن يكون فارغاً.
+ */
+if ($galleryUrls === [] && $colorwayGalleryByChip !== []) {
+    foreach ($colorwayGalleryByChip as $cwChipUrls) {
+        if (is_array($cwChipUrls) && $cwChipUrls !== []) {
+            $galleryUrls = $cwChipUrls;
+            break;
+        }
+    }
+    $galleryCount = count($galleryUrls);
 }
 
 $glPrevLabel = htmlspecialchars(t('product_gallery_prev'), ENT_QUOTES, 'UTF-8');

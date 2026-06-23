@@ -27,6 +27,7 @@ require_once __DIR__ . '/../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../includes/countries.php';
 require_once __DIR__ . '/../includes/department_countries.php';
 require_once __DIR__ . '/../includes/product_preview.php';
+require_once __DIR__ . '/../includes/product_colorway_images.php';
 
 $tbState = storefront_toolbar_state();
 $channel = $tbState['channel'];
@@ -105,6 +106,39 @@ $products = $productsStmt ? $productsStmt->fetchAll() : [];
 
 $offersStmt = $pdo->query($offersSql);
 $offers = $offersStmt ? $offersStmt->fetchAll() : [];
+
+/*
+ * احتياط صورة الكارت: عند غياب الصورة العامة main_image، نستخدم أوّل صورة لون متاحة.
+ * نجلب الخريطة باستعلام واحد للمنتجات التي تنقصها الصورة فقط (لا N+1 على المسار الساخن).
+ */
+$sfImgFallbackIds = [];
+foreach ($products as $sfImgP) {
+    if (trim((string) ($sfImgP['main_image'] ?? '')) === '') {
+        $sfImgFallbackIds[] = (int) ($sfImgP['id'] ?? 0);
+    }
+}
+foreach ($offers as $sfImgP) {
+    if (trim((string) ($sfImgP['main_image'] ?? '')) === '') {
+        $sfImgFallbackIds[] = (int) ($sfImgP['id'] ?? 0);
+    }
+}
+if ($sfImgFallbackIds !== []) {
+    $sfImgFallbackMap = orange_product_first_colorway_image_map($pdo, $sfImgFallbackIds);
+    if ($sfImgFallbackMap !== []) {
+        foreach ($products as $sfImgI => $sfImgP) {
+            $sfImgPid = (int) ($sfImgP['id'] ?? 0);
+            if (trim((string) ($sfImgP['main_image'] ?? '')) === '' && ! empty($sfImgFallbackMap[$sfImgPid])) {
+                $products[$sfImgI]['main_image'] = $sfImgFallbackMap[$sfImgPid];
+            }
+        }
+        foreach ($offers as $sfImgI => $sfImgP) {
+            $sfImgPid = (int) ($sfImgP['id'] ?? 0);
+            if (trim((string) ($sfImgP['main_image'] ?? '')) === '' && ! empty($sfImgFallbackMap[$sfImgPid])) {
+                $offers[$sfImgI]['main_image'] = $sfImgFallbackMap[$sfImgPid];
+            }
+        }
+    }
+}
 
 $sfHomeGridInitial = 24;
 $sfHomeGridScrollBatch = 24;
@@ -418,7 +452,12 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
 
     <section id="productsGrid" class="products-grid">
         <?php if ($sfPreviewActive && $sfPreviewDraftRow !== null): ?>
-            <?php $sfPvImg = trim((string) ($sfPreviewDraftRow['main_image'] ?? '')); ?>
+            <?php
+            $sfPvImg = trim((string) ($sfPreviewDraftRow['main_image'] ?? ''));
+            if ($sfPvImg === '') {
+                $sfPvImg = orange_product_first_colorway_image($pdo, (int) ($sfPreviewDraftRow['id'] ?? 0));
+            }
+            ?>
             <article class="product-card product-card--preview-draft" data-filter="all" data-preview="draft">
                 <div class="product-image-wrap">
                     <span class="product-card__preview-tag product-card__preview-tag--draft">منتجك (معاينة)</span>
