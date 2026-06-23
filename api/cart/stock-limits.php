@@ -7,6 +7,10 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/product_preview.php';
+
+/** سقف مخزون المعاينة لمسودّة الجلسة (يماثل صفحة المنتج) — الطلب محاكاة لا يُسجَّل. */
+const ORANGE_PREVIEW_CART_STOCK = 99;
 
 try {
     $pdo = db();
@@ -18,11 +22,19 @@ try {
     }
 
     $stockCountryId = orange_storefront_current_country_id($pdo);
+    $previewCtx = function_exists('orange_preview_active_context') ? orange_preview_active_context($pdo) : null;
+    $previewDraftId = is_array($previewCtx) ? (int) ($previewCtx['draft_id'] ?? 0) : 0;
     $limits = [];
     foreach ($data['items'] as $item) {
         $pid = (int)($item['id'] ?? 0);
         if ($pid <= 0) {
             $limits[] = 0;
+            continue;
+        }
+
+        /* مسودّة المعاينة لجلسة الأدمن: حد مخزون سخي للتصفّح كعميل (الطلب محاكاة لا يُسجَّل). */
+        if ($previewDraftId > 0 && $pid === $previewDraftId) {
+            $limits[] = ORANGE_PREVIEW_CART_STOCK;
             continue;
         }
 

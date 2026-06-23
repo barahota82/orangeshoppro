@@ -6,6 +6,7 @@ require_once __DIR__ . '/order_helpers.php';
 require_once __DIR__ . '/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/product_preview.php';
 
 /**
  * التحقق من بنود السلة وحساب المجموع الفرعي. عند checkout استخدم lockVariants=true داخل معاملة.
@@ -22,6 +23,12 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
     $lockSql = $lockVariants ? ' FOR UPDATE' : '';
     $stockCountryId = orange_storefront_current_country_id($pdo);
 
+    /* معاينة المنتج قبل النشر: نسمح بمسودّة المعاينة (is_active=0) في السلة لجلسة الأدمن صاحبها فقط،
+       ونعاملها كمتوفّرة المخزون — الطلب نفسه محاكاة لا يُسجَّل (api/orders/create-order.php).
+       محصور بصرامة: يتطلّب جلسة معاينة فعّالة ومطابقة مُعرّف المسودّة؛ بلا جلسة ⇒ السلوك الطبيعي تماماً. */
+    $previewCtx = function_exists('orange_preview_active_context') ? orange_preview_active_context($pdo) : null;
+    $previewDraftId = is_array($previewCtx) ? (int) ($previewCtx['draft_id'] ?? 0) : 0;
+
     $subtotal = 0.0;
     /** @var array<int, int> $variantQtyAccumulated */
     $variantQtyAccumulated = [];
@@ -30,21 +37,29 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
     foreach ($items as $item) {
         require_fields($item, ['id', 'qty']);
 
-        $productStmt = $pdo->prepare('SELECT * FROM products WHERE id = ? AND is_active = 1 LIMIT 1');
+        $isPreviewDraftItem = ($previewDraftId > 0 && (int) $item['id'] === $previewDraftId);
+
+        if ($isPreviewDraftItem) {
+            $productStmt = $pdo->prepare('SELECT * FROM products WHERE id = ? AND is_preview_draft = 1 LIMIT 1');
+        } else {
+            $productStmt = $pdo->prepare('SELECT * FROM products WHERE id = ? AND is_active = 1 LIMIT 1');
+        }
         $productStmt->execute([(int) $item['id']]);
         $product = $productStmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$product) {
             throw new RuntimeException('Product not found: ' . (int) $item['id']);
         }
-        if (
-            orange_table_has_column($pdo, 'products', 'country_id')
-            && (int) ($product['country_id'] ?? 0) !== $stockCountryId
-        ) {
-            throw new RuntimeException(function_exists('t') ? t('product_not_found') : 'Product not available');
-        }
-        if (!orange_storefront_product_in_active_unified_chain($pdo, (int) $product['id'])) {
-            throw new RuntimeException(function_exists('t') ? t('product_not_found') : 'Product not available');
+        if (!$isPreviewDraftItem) {
+            if (
+                orange_table_has_column($pdo, 'products', 'country_id')
+                && (int) ($product['country_id'] ?? 0) !== $stockCountryId
+            ) {
+                throw new RuntimeException(function_exists('t') ? t('product_not_found') : 'Product not available');
+            }
+            if (!orange_storefront_product_in_active_unified_chain($pdo, (int) $product['id'])) {
+                throw new RuntimeException(function_exists('t') ? t('product_not_found') : 'Product not available');
+            }
         }
 
         $qty = max(1, (int) $item['qty']);
@@ -77,7 +92,9 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
 
             $vId = (int) $variant['id'];
             $alreadyRequested = $variantQtyAccumulated[$vId] ?? 0;
-            $available = orange_warehouse_effective_variant_stock($pdo, $vId, $stockCountryId);
+            $available = $isPreviewDraftItem
+                ? PHP_INT_MAX
+                : orange_warehouse_effective_variant_stock($pdo, $vId, $stockCountryId);
             if ($available < $alreadyRequested + $qty) {
                 throw new RuntimeException('Insufficient stock for product: ' . $product['name']);
             }
@@ -93,7 +110,9 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
             }
             $vId = (int) $variant['id'];
             $alreadyRequested = $variantQtyAccumulated[$vId] ?? 0;
-            $available = orange_warehouse_effective_variant_stock($pdo, $vId, $stockCountryId);
+            $available = $isPreviewDraftItem
+                ? PHP_INT_MAX
+                : orange_warehouse_effective_variant_stock($pdo, $vId, $stockCountryId);
             if ($available < $alreadyRequested + $qty) {
                 throw new RuntimeException('Insufficient stock for product: ' . $product['name']);
             }
