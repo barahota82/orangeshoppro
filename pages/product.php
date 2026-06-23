@@ -495,7 +495,10 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
                 <label><?php echo htmlspecialchars(t('quantity'), ENT_QUOTES, 'UTF-8'); ?></label>
                 <div class="qty-control">
                     <button type="button" onclick="decreaseQty()">-</button>
-                    <input type="number" id="qtyInput" value="1" min="1">
+                    <span class="qty-field">
+                        <input type="number" id="qtyInput" value="1" min="1" inputmode="numeric">
+                        <select id="qtySelect" class="qty-picker" aria-label="<?php echo htmlspecialchars(t('quantity'), ENT_QUOTES, 'UTF-8'); ?>"></select>
+                    </span>
                     <button type="button" onclick="increaseQty()">+</button>
                 </div>
             </div>

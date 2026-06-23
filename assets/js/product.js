@@ -428,6 +428,11 @@ function syncProductQtyLimits() {
             stock > 0;
         addBtn.disabled = !canAdd;
     }
+
+    if (input) {
+        input.dataset.prev = String(Math.max(1, parseInt(input.value || '1', 10) || 1));
+    }
+    orangeProductRefreshQtyPicker();
 }
 
 /* هل يوجد متغيّر (لون+مقاس) متوفّر بمخزون؟ */
@@ -490,20 +495,75 @@ function selectSize(btn) {
     syncProductQtyLimits();
 }
 
+/* أقصى عدد خيارات تُعرض في القائمة المنسدلة للكمية (الكتابة اليدوية تظل مسموحة لما هو أكثر). */
+const ORANGE_QTY_PICKER_CAP = 99;
+/* سقف افتراضي للقائمة حين لا يوجد حدّ معروف للكمية (مثل وضع المعاينة). */
+const ORANGE_QTY_PICKER_FALLBACK = 10;
+
+/* الحدّ الأقصى الفعلي للكمية الحالية (0 = الاختيار غير مكتمل أو غير متاح). */
+function orangeProductQtyLimit() {
+    const p = window.CURRENT_PRODUCT;
+    const { selectionComplete, avail } = getQtyState();
+    const hc = p && parseInt(p.has_colors, 10) === 1;
+    const hs = p && parseInt(p.has_sizes, 10) === 1;
+    if ((hc || hs) && !selectionComplete) {
+        return 0;
+    }
+    return Math.max(0, avail);
+}
+
+/* تعبئة القائمة المنسدلة بالكميات 1..المتاح (بسقف للعرض) ومزامنتها مع الحقل. */
+function orangeProductRefreshQtyPicker() {
+    const sel = document.getElementById('qtySelect');
+    const input = document.getElementById('qtyInput');
+    if (!sel || !input) {
+        return;
+    }
+    const limit = orangeProductQtyLimit();
+    const cur = Math.max(1, parseInt(input.value || '1', 10) || 1);
+    if (limit <= 0) {
+        sel.innerHTML = '<option value="1">1</option>';
+        sel.value = '1';
+        sel.disabled = true;
+        return;
+    }
+    const top = Math.max(1, Math.min(limit, ORANGE_QTY_PICKER_CAP));
+    const showTop = Math.max(top, Math.min(cur, limit));
+    let opts = '';
+    for (let i = 1; i <= showTop; i++) {
+        opts += '<option value="' + i + '">' + i + '</option>';
+    }
+    sel.innerHTML = opts;
+    sel.disabled = false;
+    sel.value = String(Math.min(cur, showTop));
+}
+
+/* ضبط الكمية بقيمة صالحة، تحديث القيمة السابقة، ومزامنة القائمة. */
+function orangeProductSetQty(val) {
+    const input = document.getElementById('qtyInput');
+    if (!input) {
+        return;
+    }
+    let q = parseInt(val, 10);
+    if (!q || q < 1) {
+        q = 1;
+    }
+    input.value = String(q);
+    input.dataset.prev = String(q);
+    orangeProductRefreshQtyPicker();
+}
+
 function increaseQty() {
     const input = document.getElementById('qtyInput');
     if (!input) {
         return;
     }
     const { avail, selectionComplete } = getQtyState();
-    if (!selectionComplete) {
+    if (!selectionComplete || avail <= 0) {
         return;
     }
-    if (avail <= 0) {
-        return;
-    }
-    const current = parseInt(input.value || '1', 10);
-    input.value = String(Math.min(avail, current + 1));
+    const current = parseInt(input.value || '1', 10) || 1;
+    orangeProductSetQty(Math.min(avail, current + 1));
 }
 
 function decreaseQty() {
@@ -511,24 +571,37 @@ function decreaseQty() {
     if (!input) {
         return;
     }
-    const current = parseInt(input.value || '1', 10);
-    input.value = String(Math.max(1, current - 1));
+    const current = parseInt(input.value || '1', 10) || 1;
+    orangeProductSetQty(Math.max(1, current - 1));
 }
 
+/* اختيار الكمية من القائمة المنسدلة. */
+function orangeProductQtyFromPicker() {
+    const sel = document.getElementById('qtySelect');
+    if (!sel) {
+        return;
+    }
+    orangeProductSetQty(sel.value);
+}
+
+/* الكتابة اليدوية: عند تجاوز المتاح يظهر تنبيه «غير متوفرة» وترجع الخانة لقيمتها السابقة. */
 function clampQtyInput() {
     const input = document.getElementById('qtyInput');
     if (!input) {
         return;
     }
     const { avail, selectionComplete } = getQtyState();
-    let q = parseInt(input.value || '1', 10);
+    const q = parseInt(input.value || '', 10);
     if (!q || q < 1) {
-        q = 1;
+        orangeProductSetQty(input.dataset.prev || '1');
+        return;
     }
-    if (selectionComplete && avail > 0) {
-        q = Math.min(q, avail);
+    if (selectionComplete && avail > 0 && q > avail) {
+        orangeProductToast(window.APP_T.qty_not_available || 'Quantity not available', 2600);
+        orangeProductSetQty(input.dataset.prev || '1');
+        return;
     }
-    input.value = String(q);
+    orangeProductSetQty(q);
 }
 
 function resolveSelectedVariant(p) {
@@ -735,6 +808,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (input) {
         input.addEventListener('change', clampQtyInput);
         input.addEventListener('blur', clampQtyInput);
+    }
+    const qtySel = document.getElementById('qtySelect');
+    if (qtySel) {
+        qtySel.addEventListener('change', orangeProductQtyFromPicker);
     }
     orangeProductRefreshSizeAvailability();
     syncProductQtyLimits();

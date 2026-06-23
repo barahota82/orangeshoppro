@@ -1681,6 +1681,59 @@ body.storefront .product-gallery__img {
     color: var(--text);
 }
 
+/* إزالة أسهم المتصفّح من حقل الرقم (نستبدلها بقائمة الكميات). */
+.qty-control input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+.qty-control input[type="number"]::-webkit-outer-spin-button,
+.qty-control input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* حقل الكمية + سهم القائمة المنسدلة (سورت الكميات المتاحة). */
+.qty-field {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+}
+.qty-field > input {
+    padding-inline-end: 30px !important;
+}
+.qty-field::after {
+    content: "";
+    position: absolute;
+    inset-inline-end: 11px;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -6px;
+    border-right: 2px solid var(--muted);
+    border-bottom: 2px solid var(--muted);
+    transform: rotate(45deg);
+    pointer-events: none;
+}
+.qty-picker {
+    position: absolute;
+    inset-inline-end: 0;
+    top: 0;
+    width: 30px;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: transparent;
+    opacity: 0;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+}
+.qty-picker:disabled {
+    cursor: default;
+}
+
 .actions-row {
     margin-top: 22px;
 }
@@ -3257,7 +3310,7 @@ button.track-signup-cta__btn[hidden] {
 }
 
 .cart-qty-control .cart-qty-input {
-    width: 52px;
+    width: 64px;
     text-align: center;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);

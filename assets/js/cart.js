@@ -1806,7 +1806,6 @@ async function renderCart() {
         const countStr = countTpl.replace(/\{n\}/g, String(itemsModel.length));
     const unitLbl = T.cart_unit_price || '';
     const subLbl = T.cart_line_subtotal || '';
-    const maxShortTpl = T.cart_max_available_short || '';
         const choiceOn = orangeCartLineChoiceApplies(itemsModel);
 
         itemsModel.forEach((itInit) => {
@@ -1851,12 +1850,7 @@ async function renderCart() {
                     ? Math.max(0, parseInt(limitsArr[idx], 10))
                 : null;
         const maxAttr = maxStock != null && maxStock > 0 ? ` max="${maxStock}"` : '';
-        const stockHint =
-            maxStock != null && maxStock > 0 && maxShortTpl
-                ? '<p class="cart-stock-hint">' +
-                  escCartHtml(maxShortTpl.replace(/\{n\}/g, String(maxStock))) +
-                  '</p>'
-                    : '';
+        const qtyOptions = orangeCartQtyOptions(qty, maxStock);
 
             const incl = orangeCartLineIsIncluded(item);
             const lineChoiceHtml = choiceOn
@@ -1894,12 +1888,14 @@ async function renderCart() {
                         <span class="cart-unit-price"><span class="cart-meta-label">${escCartHtml(unitLbl)}</span> ${formatMoney(item.price)}</span>
                         <span class="cart-line-subtotal"><span class="cart-meta-label">${escCartHtml(subLbl)}</span><strong>${formatMoney(lineTotal)}</strong></span>
                     </div>
-                    ${stockHint}
                     <div class="cart-qty-row">
                         <span class="cart-qty-label">${escCartHtml(T.quantity || '')}</span>
                         <div class="qty-control cart-qty-control">
                             <button type="button" class="cart-qty-btn" onclick="adjustCartQty(${idx}, -1)" aria-label="-">−</button>
-                            <input type="number" class="cart-qty-input" id="cartQty${idx}" value="${qty}" min="1"${maxAttr} inputmode="numeric" onchange="setCartQtyFromInput(${idx})" onblur="setCartQtyFromInput(${idx})">
+                            <span class="qty-field">
+                                <input type="number" class="cart-qty-input" id="cartQty${idx}" value="${qty}" min="1"${maxAttr} inputmode="numeric" onchange="setCartQtyFromInput(${idx})" onblur="setCartQtyFromInput(${idx})">
+                                <select class="qty-picker cart-qty-picker" id="cartQtySel${idx}" aria-label="${escCartHtml(T.quantity || '')}" onchange="setCartQtyFromSelect(${idx})">${qtyOptions}</select>
+                            </span>
                             <button type="button" class="cart-qty-btn" onclick="adjustCartQty(${idx}, 1)" aria-label="+">+</button>
                         </div>
                     </div>
@@ -2004,13 +2000,11 @@ function clampCartLineQty(idx, rawQty) {
     if (!q || q < 1) {
         q = 1;
     }
-    if (max != null && !Number.isNaN(max) && max > 0) {
-        const beforeCap = q;
-        q = Math.min(q, max);
-        if (beforeCap > max) {
-            const tpl = window.APP_T.available_max_qty || 'Max: {n}';
-            orangeShowToast(tpl.replace(/\{n\}/g, String(max)), 3200);
-        }
+    /* تجاوز المتاح: تنبيه بسيط ثم رجوع الخانة لقيمتها السابقة (لا قصّ صامت). */
+    if (max != null && !Number.isNaN(max) && max > 0 && q > max) {
+        orangeShowToast(window.APP_T.qty_not_available || 'Quantity not available', 2600);
+        renderCart();
+        return;
     }
     item.qty = q;
     setCart(items);
@@ -2064,6 +2058,27 @@ function setCartQtyFromInput(idx) {
         return;
     }
     clampCartLineQty(idx, input.value);
+}
+
+function setCartQtyFromSelect(idx) {
+    const sel = document.getElementById('cartQtySel' + idx);
+    if (!sel) {
+        return;
+    }
+    clampCartLineQty(idx, sel.value);
+}
+
+/* خيارات القائمة المنسدلة لكمية بند السلة: 1..المتاح (بسقف عرض)، مع ضمان ظهور الكمية الحالية. */
+function orangeCartQtyOptions(qty, maxStock) {
+    const cap = 99;
+    const fallback = 10;
+    let top = maxStock != null && maxStock > 0 ? Math.min(maxStock, cap) : fallback;
+    top = Math.max(top, qty, 1);
+    let opts = '';
+    for (let i = 1; i <= top; i++) {
+        opts += '<option value="' + i + '"' + (i === qty ? ' selected' : '') + '>' + i + '</option>';
+    }
+    return opts;
 }
 
 function removeCartItem(index) {
