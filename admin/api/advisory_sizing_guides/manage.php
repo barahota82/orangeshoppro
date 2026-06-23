@@ -222,9 +222,10 @@ try {
             // المنتجات المرشّحة: نفس عائلة المقاسات.
             $products = [];
             if (orange_table_exists($pdo, 'products') && orange_table_has_column($pdo, 'products', 'size_family_id')) {
+                // جدول products يستخدم العمود `name` للاسم العربي (لا `name_ar`)؛ نعمل alias ليتوافق مع الواجهة.
                 $pSt = $pdo->prepare(
-                    'SELECT id, name_ar, name_en, sizing_advisory_guide_id
-                     FROM products WHERE size_family_id = ? ORDER BY name_ar ASC, id ASC LIMIT 500'
+                    'SELECT id, name AS name_ar, name_en, sizing_advisory_guide_id
+                     FROM products WHERE size_family_id = ? ORDER BY name ASC, id ASC LIMIT 500'
                 );
                 $pSt->execute([$fid]);
                 $products = $pSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -712,10 +713,8 @@ try {
     if (function_exists('error_log')) {
         error_log('[orange] advisory_sizing_guides/manage: ' . $e->getMessage() . ' @' . $e->getFile() . ':' . (string) $e->getLine());
     }
-    // تشخيص مؤقت (الـ API محمي للأدمن فقط): نُظهر نص الاستثناء الفعلي لمعرفة السبب الحقيقي.
     json_response([
         'success' => false,
-        'message' => 'خطأ خادم: ' . $e->getMessage()
-            . ' @' . basename($e->getFile()) . ':' . (string) $e->getLine(),
+        'message' => 'حدث خطأ على الخادم أثناء معالجة الطلب. حدّث الصفحة أو راجع سجل أخطاء PHP إن استمرّ.',
     ], 500);
 }
