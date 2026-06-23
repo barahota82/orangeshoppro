@@ -129,11 +129,13 @@ $variantsStmt = $pdo->prepare(
     "SELECT v.*,
         cw.primary_color_id, cw.secondary_color_id, cw.primary_pattern_id, cw.secondary_pattern_id,
         sfs.label_ar AS sfs_la, sfs.label_en AS sfs_le,
-        sfs.label_fil AS sfs_lf, sfs.label_hi AS sfs_lh
+        sfs.label_fil AS sfs_lf, sfs.label_hi AS sfs_lh,
+        sfs.sort_order AS sfs_so
      FROM product_variants v
      LEFT JOIN product_colorways cw ON cw.id = v.product_colorway_id
      LEFT JOIN size_family_sizes sfs ON sfs.id = v.size_family_size_id
-     WHERE v.product_id = ? ORDER BY v.color ASC, v.size ASC, v.id ASC"
+     WHERE v.product_id = ?
+     ORDER BY v.id ASC"
 );
 $variantsStmt->execute([$id]);
 $variants = $variantsStmt->fetchAll();
@@ -159,6 +161,8 @@ $colorChipMeta = [];
 $sizeChipOrder = [];
 /** @var array<string, string> */
 $sizeChipLabel = [];
+/** @var array<string, int> */
+$sizeChipSort = [];
 $totalStock = 0;
 $scope = isset($product['sizing_guide_scope']) ? (string)$product['sizing_guide_scope'] : 'none';
 $sizingHintKeys = [
@@ -287,13 +291,30 @@ foreach ($variants as $v) {
             }
             $sizeChipLabel[$sk] = $szRow ? orange_size_display_label($szRow, $lang) : $sk;
             $sizeChipOrder[] = $sk;
+            /* ترتيب المقاس من جدول المقاسات (size_family_sizes.sort_order)؛ غياب الربط يُبقي ترتيب الظهور. */
+            $sizeChipSort[$sk] = isset($v['sfs_so']) && $v['sfs_so'] !== null
+                ? (int) $v['sfs_so']
+                : (1000000 + count($sizeChipSort));
         }
     }
     $totalStock += (int) $v['stock_quantity'];
 }
 
+/* الألوان: ترتيب الإضافة عند تسجيل المنتج (ترتيب إنشاء المتغيّر v.id) — مضبوط مسبقاً عبر ترتيب الاستعلام. */
 $colors = $colorChipOrder;
+/* المقاسات: ترتيب جدول المقاسات (sort_order) مع ترتيب ثابت عند التساوي. */
 $sizes = $sizeChipOrder;
+if ($sizes !== [] && $sizeChipSort !== []) {
+    $sizeStableIndex = array_flip($sizeChipOrder);
+    usort($sizes, static function ($a, $b) use ($sizeChipSort, $sizeStableIndex) {
+        $sa = $sizeChipSort[$a] ?? PHP_INT_MAX;
+        $sb = $sizeChipSort[$b] ?? PHP_INT_MAX;
+        if ($sa !== $sb) {
+            return $sa <=> $sb;
+        }
+        return ($sizeStableIndex[$a] ?? 0) <=> ($sizeStableIndex[$b] ?? 0);
+    });
+}
 
 $mainFile = trim((string)($product['main_image'] ?? ''));
 $galleryUrls = [];

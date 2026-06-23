@@ -1,6 +1,9 @@
 /* Google Fonts: تُحمَّل من includes/header.php (link) لتفادي @import المعطّل للتصيير */
 
 :root {
+    /* نسبة صور المنتجات الموحّدة (الكارت + معرض الصفحة + الصورة الرئيسية).
+       غيّر هذا السطر فقط لتبديل النسبة لكل الموقع (مثلاً 1 / 1 أو 3 / 4). */
+    --sf-product-img-ratio: 4 / 5;
     /* Brand — مواءمة هوية Orange الموحّدة */
     --primary: #ff6a00;
     --primary-hover: #ff7a1a;
@@ -913,8 +916,10 @@ body.storefront-browse-menu-lock {
 
 .product-image-wrap img {
     width: 100%;
-    height: 260px;
+    aspect-ratio: var(--sf-product-img-ratio);
+    height: auto;
     object-fit: cover;
+    background: var(--bg-soft);
     display: block;
 }
 
@@ -1437,8 +1442,10 @@ body.storefront-browse-menu-lock {
 
 .product-gallery__img {
     width: 100%;
-    height: 500px;
+    aspect-ratio: var(--sf-product-img-ratio);
+    height: auto;
     object-fit: cover;
+    background: var(--bg-soft);
     display: block;
     border-radius: var(--radius-md);
     box-shadow: var(--card-shadow);
@@ -1508,12 +1515,14 @@ body.storefront-browse-menu-lock {
 }
 
 body.storefront .product-gallery__img {
-    height: 400px;
+    height: auto;
+    aspect-ratio: var(--sf-product-img-ratio);
 }
 
 @media (max-width: 1024px) {
     .product-gallery__img {
-        height: 360px;
+        height: auto;
+        aspect-ratio: var(--sf-product-img-ratio);
     }
 }
 
@@ -1535,8 +1544,10 @@ body.storefront .product-gallery__img {
 
 .main-product-image {
     width: 100%;
-    height: 500px;
+    aspect-ratio: var(--sf-product-img-ratio);
+    height: auto;
     object-fit: cover;
+    background: var(--bg-soft);
     border-radius: var(--radius-md);
     box-shadow: var(--card-shadow);
 }
@@ -3710,7 +3721,8 @@ body.storefront .app-bottom-dock .app-dock-btn--current:not(.app-dock-btn--whats
         grid-template-columns: 1fr;
     }
     .main-product-image {
-        height: 360px;
+        height: auto;
+        aspect-ratio: var(--sf-product-img-ratio);
     }
 }
 
@@ -3901,6 +3913,16 @@ body.storefront .product-page {
     grid-template-columns: 1fr;
 }
 
+/* المتجر بعمود واحد: على الشاشات الأوسع نقيّد عرض صورة المنتج (نسبة 4:5) ونوسّطها
+   حتى لا تتضخّم رأسياً بعرض الشاشة الكامل — مع بقائها بعرض الكارت على الموبايل. */
+@media (min-width: 768px) {
+    body.storefront .product-gallery,
+    body.storefront .main-product-image {
+        max-width: 460px;
+        margin-inline: auto;
+    }
+}
+
 /* متجر: ملء عرض الشاشة على الكمبيوتر والموبايل (هامش جانبي + safe-area) */
 body.storefront .site-header .container,
 body.storefront .site-main > .container {
@@ -3922,7 +3944,8 @@ body.storefront .site-main > .container {
 
 @media (min-width: 1025px) {
     body.storefront .main-product-image {
-        height: 400px;
+        height: auto;
+        aspect-ratio: var(--sf-product-img-ratio);
     }
 }
 
@@ -4046,7 +4069,8 @@ body.storefront .site-main > .container {
 }
 @media (min-width: 900px) {
     .product-image-wrap img {
-        height: 280px;
+        height: auto;
+        aspect-ratio: var(--sf-product-img-ratio);
     }
 }
 
