@@ -212,14 +212,14 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
    الترتيب يُقرأ يميناً→يساراً (RTL): أول عمود في الـ areas يظهر يميناً. عرض النموذج وُسِّع كي تبقى الخانات الثلاث بعرضها الحالي تقريباً. */
 .asg-form-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 0.5fr);
     grid-template-areas:
         "dept kind family status"
-        "name shape shape shape";
+        "name .    shape  shape";
     gap: 14px 18px;
     direction: rtl;
     align-items: start;
-    max-width: 1340px;
+    max-width: 1180px;
 }
 .asg-form-grid > div { min-width: 0; }
 .asg-fg-dept { grid-area: dept; }
