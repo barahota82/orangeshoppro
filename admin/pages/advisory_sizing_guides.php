@@ -16,8 +16,8 @@ $tablesReady = orange_table_exists($pdo, 'size_families')
 $departments = [];
 $families = [];
 $sizesByFamily = [];
-$deptKindPairs = [];
-$deptFamilies = [];
+$kindLabels = [];
+$catLabels = [];
 if ($tablesReady) {
     try {
         if (orange_table_exists($pdo, 'departments')) {
@@ -38,89 +38,48 @@ if ($tablesReady) {
             $sizesByFamily[$fid][] = $s;
         }
 
-        // خريطة القسم → أزواج (نوع تجاري | فئة قياس) المستخدمة في أنواع منتجاته عبر هرم الكتالوج.
-        if (
-            orange_table_exists($pdo, 'product_types')
-            && orange_table_has_column($pdo, 'product_types', 'expected_commercial_kind_key')
-            && orange_table_has_column($pdo, 'product_types', 'expected_sizing_category_key')
-            && orange_table_exists($pdo, 'catalog_subcategories')
-            && orange_table_exists($pdo, 'catalog_categories')
-            && orange_table_exists($pdo, 'catalog_sections')
-        ) {
-            $dkStmt = $pdo->query(
-                'SELECT cs.department_id AS dept,
-                        pt.expected_commercial_kind_key AS ck,
-                        pt.expected_sizing_category_key AS sk
-                 FROM product_types pt
-                 JOIN catalog_subcategories sc ON sc.id = pt.catalog_subcategory_id
-                 JOIN catalog_categories cc ON cc.id = sc.catalog_category_id
-                 JOIN catalog_sections cs ON cs.id = cc.catalog_section_id
-                 WHERE pt.is_active = 1 AND pt.expected_commercial_kind_key <> \'\''
-            );
-            foreach ($dkStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                $dep = (int) ($r['dept'] ?? 0);
-                if ($dep <= 0) {
+        // تسميات النوع التجاري والفئة (لفلترة العائلات حسب نوعها هي، لا حسب القسم).
+        if (orange_table_exists($pdo, 'commercial_kind_dictionary')) {
+            $ckRows = $pdo->query(
+                'SELECT kind_key, label_ar, label_en FROM commercial_kind_dictionary WHERE is_active = 1'
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($ckRows as $r) {
+                $k = trim((string) ($r['kind_key'] ?? ''));
+                if ($k === '') {
                     continue;
                 }
-                $ck = trim((string) ($r['ck'] ?? ''));
-                $sk = trim((string) ($r['sk'] ?? ''));
-                $deptKindPairs[$dep][$ck . '|' . $sk] = true;
+                $kindLabels[$k] = (string) (($r['label_ar'] ?? '') !== '' ? $r['label_ar'] : (($r['label_en'] ?? '') !== '' ? $r['label_en'] : $k));
             }
         }
-
-        // خريطة القسم → عائلات المقاسات المستخدمة فعلاً في منتجاته (إشارة لا تعتمد على وسم النوع التجاري).
-        if (
-            orange_table_exists($pdo, 'products')
-            && orange_table_has_column($pdo, 'products', 'product_type_id')
-            && orange_table_has_column($pdo, 'products', 'size_family_id')
-            && orange_table_exists($pdo, 'product_types')
-            && orange_table_has_column($pdo, 'product_types', 'catalog_subcategory_id')
-            && orange_table_exists($pdo, 'catalog_subcategories')
-            && orange_table_exists($pdo, 'catalog_categories')
-            && orange_table_exists($pdo, 'catalog_sections')
-        ) {
-            $dfStmt = $pdo->query(
-                'SELECT cs.department_id AS dept, p.size_family_id AS fam
-                 FROM products p
-                 JOIN product_types pt ON pt.id = p.product_type_id
-                 JOIN catalog_subcategories sc ON sc.id = pt.catalog_subcategory_id
-                 JOIN catalog_categories cc ON cc.id = sc.catalog_category_id
-                 JOIN catalog_sections cs ON cs.id = cc.catalog_section_id
-                 WHERE p.size_family_id IS NOT NULL AND p.size_family_id > 0'
-            );
-            foreach ($dfStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                $dep = (int) ($r['dept'] ?? 0);
-                $fam = (int) ($r['fam'] ?? 0);
-                if ($dep > 0 && $fam > 0) {
-                    $deptFamilies[$dep][$fam] = true;
+        if (orange_table_exists($pdo, 'sizing_category_dictionary')) {
+            $catRows = $pdo->query(
+                'SELECT commercial_kind_key, category_key, label_ar, label_en FROM sizing_category_dictionary WHERE is_active = 1'
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($catRows as $r) {
+                $k = trim((string) ($r['commercial_kind_key'] ?? ''));
+                $c = trim((string) ($r['category_key'] ?? ''));
+                if ($k === '' || $c === '') {
+                    continue;
                 }
+                $catLabels[$k . '|' . $c] = (string) (($r['label_ar'] ?? '') !== '' ? $r['label_ar'] : (($r['label_en'] ?? '') !== '' ? $r['label_en'] : $c));
             }
         }
     } catch (Throwable $e) {
         $departments = [];
         $families = [];
         $sizesByFamily = [];
-        $deptKindPairs = [];
-        $deptFamilies = [];
+        $kindLabels = [];
+        $catLabels = [];
     }
 }
 
-$deptKindsOut = [];
-foreach ($deptKindPairs as $dep => $set) {
-    $deptKindsOut[(string) $dep] = array_keys($set);
+$kindLabelsJson = json_encode($kindLabels, JSON_UNESCAPED_UNICODE);
+if ($kindLabelsJson === false) {
+    $kindLabelsJson = '{}';
 }
-$deptKindsJson = json_encode($deptKindsOut, JSON_UNESCAPED_UNICODE);
-if ($deptKindsJson === false) {
-    $deptKindsJson = '{}';
-}
-
-$deptFamiliesOut = [];
-foreach ($deptFamilies as $dep => $set) {
-    $deptFamiliesOut[(string) $dep] = array_map('intval', array_keys($set));
-}
-$deptFamiliesJson = json_encode($deptFamiliesOut, JSON_UNESCAPED_UNICODE);
-if ($deptFamiliesJson === false) {
-    $deptFamiliesJson = '{}';
+$catLabelsJson = json_encode($catLabels, JSON_UNESCAPED_UNICODE);
+if ($catLabelsJson === false) {
+    $catLabelsJson = '{}';
 }
 
 $prefSizeFamilyId = isset($_GET['size_family_id']) ? (int) $_GET['size_family_id'] : 0;
@@ -160,10 +119,15 @@ if ($familiesJson === false) {
         </div>
         <div>
             <label for="asg_family">عائلة المقاسات <span style="color:#b91c1c;">*</span></label>
-            <select id="asg_family"><option value="0">— اختر القسم أولاً —</option></select>
-            <label style="display:flex;align-items:center;gap:6px;font-weight:normal;margin:6px 0 0;cursor:pointer;font-size:.85rem;color:#475569;">
-                <input type="checkbox" id="asg_family_all"> عرض كل العائلات (تجاهل فلتر القسم)
-            </label>
+            <select id="asg_family"><option value="0">— اختر —</option></select>
+        </div>
+        <div>
+            <label for="asg_kind_filter">نوع المقاس (تصفية)</label>
+            <select id="asg_kind_filter"><option value="">— كل الأنواع —</option></select>
+        </div>
+        <div>
+            <label for="asg_cat_filter">الفئة (تصفية)</label>
+            <select id="asg_cat_filter"><option value="">— كل الفئات —</option></select>
         </div>
         <div>
             <label>شكل الدليل <span style="color:#b91c1c;">*</span></label>
@@ -264,8 +228,8 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     var TRANSLATE_API = '/admin/api/translate/names.php';
     var FAMILY_SIZES = <?php echo $sizesJson; ?>;
     var FAMILIES = <?php echo $familiesJson; ?>;
-    var DEPT_KINDS = <?php echo $deptKindsJson; ?>;
-    var DEPT_FAMILIES = <?php echo $deptFamiliesJson; ?>;
+    var KIND_LABELS = <?php echo $kindLabelsJson; ?>;
+    var CAT_LABELS = <?php echo $catLabelsJson; ?>;
     var PREF_FAMILY = <?php echo (int) $prefSizeFamilyId; ?>;
     var rowSeq = 0;
 
@@ -713,8 +677,9 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
 
     function resetForm() {
         document.getElementById('asg_edit_id').value = '0';
-        var allChk = document.getElementById('asg_family_all');
-        if (allChk) { allChk.checked = false; }
+        document.getElementById('asg_kind_filter').value = '';
+        rebuildCatFilter();
+        rebuildFamilyOptions();
         document.getElementById('asg_name').value = '';
         document.getElementById('asg_active').value = '1';
         var single = document.querySelector('input[name="asg_shape"][value="single"]');
@@ -731,19 +696,11 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         var fam = parseInt(g.size_family_id, 10) || 0;
         var dep = parseInt(g.department_id, 10) || 0;
         document.getElementById('asg_dept').value = String(dep);
+        // عند التعديل: صفّر الفلاتر كي تظهر العائلة المحفوظة دائماً.
+        document.getElementById('asg_kind_filter').value = '';
+        rebuildCatFilter();
         rebuildFamilyOptions();
-        var famSel = document.getElementById('asg_family');
-        famSel.value = String(fam);
-        if ((parseInt(famSel.value, 10) || 0) !== fam && fam > 0) {
-            // العائلة المحفوظة خارج فلتر القسم الحالي — أضِفها كي لا تُفقَد عند التعديل.
-            var meta = null;
-            for (var fi = 0; fi < FAMILIES.length; fi++) { if ((parseInt(FAMILIES[fi].id, 10) || 0) === fam) { meta = FAMILIES[fi]; break; } }
-            var opt = document.createElement('option');
-            opt.value = String(fam);
-            opt.textContent = meta ? (meta.name_ar || meta.name_en || ('#' + fam)) : ('#' + fam);
-            famSel.appendChild(opt);
-            famSel.value = String(fam);
-        }
+        document.getElementById('asg_family').value = String(fam);
         document.getElementById('asg_name').value = g.name_ar || '';
         document.getElementById('asg_active').value = String(parseInt(g.is_active, 10) ? 1 : 0);
         var lk = (g.layout_kind === 'dual') ? 'dual' : 'single';
@@ -849,52 +806,61 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
 
     document.getElementById('asg_reset_btn').onclick = function () { resetForm(); };
 
-    // ---- فلترة العائلات حسب القسم ----
-    // اتحاد إشارتين: (1) عائلات مستخدمة فعلاً في منتجات القسم، (2) مطابقة النوع التجاري/الفئة لأنواع منتجاته.
-    // تدرّج آمن: لو لا إشارة للقسم إطلاقاً → اعرض الكل (حتى لا تختفي القائمة).
-    function familyMatchesPairs(fam, deptPairs) {
-        if (!deptPairs || !deptPairs.length) { return false; }
-        var fck = String(fam.commercial_kind_key || '');
-        var fsk = String(fam.sizing_category_key || '');
-        var ckSet = {}, skByCk = {};
-        deptPairs.forEach(function (p) {
-            var parts = String(p).split('|');
-            var ck = parts[0] || '';
-            var sk = parts[1] || '';
-            ckSet[ck] = true;
-            if (sk !== '') { (skByCk[ck] = skByCk[ck] || {})[sk] = true; }
+    // ---- فلترة العائلات حسب نوعها هي (النوع التجاري + الفئة) — لا علاقة لها بالقسم ----
+    function kindFilter() { return String((document.getElementById('asg_kind_filter') || {}).value || ''); }
+    function catFilter() { return String((document.getElementById('asg_cat_filter') || {}).value || ''); }
+
+    function rebuildKindFilter() {
+        var sel = document.getElementById('asg_kind_filter');
+        if (!sel) { return; }
+        var prev = sel.value;
+        var seen = {}, kinds = [];
+        FAMILIES.forEach(function (f) {
+            var ck = String(f.commercial_kind_key || '');
+            if (ck !== '' && !seen[ck]) { seen[ck] = true; kinds.push(ck); }
         });
-        if (!ckSet[fck]) { return false; }
-        if (fsk === '') { return true; }
-        if (!skByCk[fck]) { return true; }
-        return !!skByCk[fck][fsk];
+        var html = '<option value="">— كل الأنواع —</option>';
+        kinds.forEach(function (ck) {
+            html += '<option value="' + esc(ck) + '">' + esc(KIND_LABELS[ck] || ck) + '</option>';
+        });
+        sel.innerHTML = html;
+        sel.value = (prev && seen[prev]) ? prev : '';
     }
-    function familyAllowed(fam, deptPairs, usageIds) {
-        var hasPairs = deptPairs && deptPairs.length;
-        var hasUsage = usageIds && usageIds.length;
-        if (!hasPairs && !hasUsage) { return true; }
-        var fid = parseInt(fam.id, 10) || 0;
-        if (hasUsage && usageIds.indexOf(fid) !== -1) { return true; }
-        return familyMatchesPairs(fam, deptPairs);
+    function rebuildCatFilter() {
+        var sel = document.getElementById('asg_cat_filter');
+        if (!sel) { return; }
+        var ck = kindFilter();
+        var prev = sel.value;
+        var seen = {}, cats = [];
+        if (ck !== '') {
+            FAMILIES.forEach(function (f) {
+                if (String(f.commercial_kind_key || '') !== ck) { return; }
+                var sk = String(f.sizing_category_key || '');
+                if (sk !== '' && !seen[sk]) { seen[sk] = true; cats.push(sk); }
+            });
+        }
+        var html = '<option value="">— كل الفئات —</option>';
+        cats.forEach(function (sk) {
+            html += '<option value="' + esc(sk) + '">' + esc(CAT_LABELS[ck + '|' + sk] || sk) + '</option>';
+        });
+        sel.innerHTML = html;
+        sel.value = (prev && seen[prev]) ? prev : '';
+        sel.disabled = (ck === '');
+    }
+    function familyAllowed(fam) {
+        var ck = kindFilter();
+        var sk = catFilter();
+        if (ck !== '' && String(fam.commercial_kind_key || '') !== ck) { return false; }
+        if (sk !== '' && String(fam.sizing_category_key || '') !== sk) { return false; }
+        return true;
     }
     function rebuildFamilyOptions() {
         var sel = document.getElementById('asg_family');
-        var dep = deptId();
         var prev = parseInt(sel.value, 10) || 0;
-        if (dep <= 0) {
-            sel.innerHTML = '<option value="0">— اختر القسم أولاً —</option>';
-            sel.value = '0';
-            sel.disabled = true;
-            return;
-        }
-        sel.disabled = false;
-        var showAll = !!(document.getElementById('asg_family_all') || {}).checked;
-        var pairs = DEPT_KINDS[String(dep)] || [];
-        var usage = DEPT_FAMILIES[String(dep)] || [];
         var html = '<option value="0">— اختر —</option>';
         var keepPrev = false;
         FAMILIES.forEach(function (f) {
-            if (!showAll && !familyAllowed(f, pairs, usage)) { return; }
+            if (!familyAllowed(f)) { return; }
             var id = parseInt(f.id, 10) || 0;
             if (id === prev) { keepPrev = true; }
             html += '<option value="' + id + '">' + esc(f.name_ar || f.name_en || ('#' + id)) + '</option>';
@@ -910,10 +876,14 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     }
     document.getElementById('asg_family').onchange = onFamilyChange;
     document.getElementById('asg_dept').onchange = function () {
+        loadLinkTargets(selectedTypeIds(), selectedProductIds());
+    };
+    document.getElementById('asg_kind_filter').addEventListener('change', function () {
+        rebuildCatFilter();
         rebuildFamilyOptions();
         onFamilyChange();
-    };
-    document.getElementById('asg_family_all').addEventListener('change', function () {
+    });
+    document.getElementById('asg_cat_filter').addEventListener('change', function () {
         rebuildFamilyOptions();
         onFamilyChange();
     });
@@ -931,6 +901,8 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
 
     function boot() {
         buildPanels();
+        rebuildKindFilter();
+        rebuildCatFilter();
         rebuildFamilyOptions();
         if (famId() > 0) { loadList(); loadLinkTargets([], []); }
         document.getElementById('asg_link_products_search').addEventListener('input', function () {
