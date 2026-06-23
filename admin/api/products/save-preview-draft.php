@@ -61,16 +61,24 @@ try {
     /* يُنشأ الكارت الأخضر فقط عند توفّر اسم + نوع منتج + جاهزية الأعمدة. */
     $canCreateDraft = $hasColumns && $nameAr !== '' && $productTypeId > 0;
 
-    /* تنظيف مسوّدات هذا الأدمن السابقة دائماً (حتى عند التصفّح بلا منتج، لإزالة كارت أخضر قديم). */
+    /*
+     * إعادة استخدام صفّ ظِلّ واحد لكل أدمن (يبقى نفس الـid عبر فتحات المعاينة، فلا يتصاعد العدّاد).
+     * نُبقي الأقدم للاستخدام ونحذف أي نسخ زائدة. عند التصفّح بلا منتج نحذف الصفّ كلياً (لا كارت أخضر).
+     */
+    $reuseDraftId = 0;
     if ($hasColumns) {
         try {
-            $oldStmt = $pdo->prepare('SELECT id FROM products WHERE is_preview_draft = 1 AND preview_admin_id = ?');
+            $oldStmt = $pdo->prepare('SELECT id FROM products WHERE is_preview_draft = 1 AND preview_admin_id = ? ORDER BY id ASC');
             $oldStmt->execute([$adminId]);
-            foreach ($oldStmt->fetchAll(PDO::FETCH_COLUMN) as $oldId) {
-                orange_preview_delete_draft_row($pdo, (int) $oldId);
+            $existingDrafts = array_map('intval', $oldStmt->fetchAll(PDO::FETCH_COLUMN));
+            if ($existingDrafts !== []) {
+                $reuseDraftId = (int) array_shift($existingDrafts);
+                foreach ($existingDrafts as $extraId) {
+                    orange_preview_delete_draft_row($pdo, (int) $extraId);
+                }
             }
         } catch (Throwable $ce) {
-            /* لا يكسر فتح المعاينة */
+            $reuseDraftId = 0;
         }
     }
 
@@ -165,10 +173,19 @@ try {
         $cols[] = 'preview_expires_at';
         $vals[] = $expiresAt;
 
-        $placeholders = implode(', ', array_fill(0, count($vals), '?')) . ', NOW()';
-        $insSql = 'INSERT INTO products (' . implode(', ', $cols) . ', created_at) VALUES (' . $placeholders . ')';
-        $pdo->prepare($insSql)->execute($vals);
-        $draftId = (int) $pdo->lastInsertId();
+        if ($reuseDraftId > 0) {
+            /* إعادة استخدام نفس الصفّ (id ثابت) — نُفرّغ أبناءه ثم نُحدّث حقوله. */
+            orange_preview_clear_draft_children($pdo, $reuseDraftId);
+            $setSql = implode(', ', array_map(static fn ($c) => $c . ' = ?', $cols));
+            $updSql = 'UPDATE products SET ' . $setSql . ' WHERE id = ? AND is_preview_draft = 1';
+            $pdo->prepare($updSql)->execute(array_merge($vals, [$reuseDraftId]));
+            $draftId = $reuseDraftId;
+        } else {
+            $placeholders = implode(', ', array_fill(0, count($vals), '?')) . ', NOW()';
+            $insSql = 'INSERT INTO products (' . implode(', ', $cols) . ', created_at) VALUES (' . $placeholders . ')';
+            $pdo->prepare($insSql)->execute($vals);
+            $draftId = (int) $pdo->lastInsertId();
+        }
 
         /* المتغيّرات — كمية المخزون المُدخلة تُحفظ كما هي (قرار المالك: المعاينة تُظهر الكمية المُدخلة). */
         $variantsIn = $data['variants'] ?? null;
@@ -258,6 +275,9 @@ try {
         }
 
         $pdo->commit();
+    } elseif ($reuseDraftId > 0) {
+        /* تصفّح بلا منتج: احذف صفّ الظِلّ القابل لإعادة الاستخدام كي لا يبقى كارت أخضر قديم. */
+        orange_preview_delete_draft_row($pdo, $reuseDraftId);
     }
 
     /* فتح جلسة المعاينة (تتصفّح الموقع كعميل؛ draft_id=0 = بلا منتج). */

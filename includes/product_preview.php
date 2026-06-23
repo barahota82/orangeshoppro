@@ -281,3 +281,39 @@ if (! function_exists('orange_preview_delete_draft_row')) {
         }
     }
 }
+
+if (! function_exists('orange_preview_clear_draft_children')) {
+    /**
+     * تفريغ أبناء صفّ الظِلّ (دون حذف صفّ المنتج) لإعادة استخدام نفس الـid عند تحديث المعاينة —
+     * فلا يتصاعد عدّاد AUTO_INCREMENT مع كل فتح معاينة. القنوات/الصفات/صور الألوان تنظّف نفسها لاحقاً،
+     * لكن المتغيّرات والصور والـcolorways إدراجٌ صِرف فتُمسح هنا.
+     */
+    function orange_preview_clear_draft_children(PDO $pdo, int $draftId): void
+    {
+        if ($draftId <= 0 || ! function_exists('orange_table_exists')) {
+            return;
+        }
+        try {
+            if (orange_table_exists($pdo, 'product_colorway_images') && orange_table_exists($pdo, 'product_colorways')) {
+                $pdo->prepare(
+                    'DELETE pci FROM product_colorway_images pci
+                     INNER JOIN product_colorways cw ON cw.id = pci.product_colorway_id
+                     WHERE cw.product_id = ?'
+                )->execute([$draftId]);
+            }
+            if (orange_table_exists($pdo, 'product_colorways')) {
+                $pdo->prepare('DELETE FROM product_colorways WHERE product_id = ?')->execute([$draftId]);
+            }
+            if (orange_table_exists($pdo, 'product_variants')) {
+                $pdo->prepare('DELETE FROM product_variants WHERE product_id = ?')->execute([$draftId]);
+            }
+            if (orange_table_exists($pdo, 'product_images')) {
+                $pdo->prepare('DELETE FROM product_images WHERE product_id = ?')->execute([$draftId]);
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] orange_preview_clear_draft_children: ' . $e->getMessage());
+            }
+        }
+    }
+}

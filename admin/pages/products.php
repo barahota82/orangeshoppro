@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
+require_once __DIR__ . '/../../includes/product_preview.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -15,6 +16,8 @@ orange_catalog_ensure_schema($pdo);
 $adminCountryId = orange_admin_context_country_id($pdo);
 $prodMoney = orange_admin_currency_context($pdo);
 $productsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $adminCountryId);
+/* استبعاد صفوف ظِلّ المعاينة (is_preview_draft=1) من قائمة منتجات الأدمن — ليست منتجات محفوظة. */
+$productsCountrySql .= orange_preview_hide_sql($pdo, 'p');
 
 $catalogNavUnified = orange_catalog_nav_use_unified($pdo);
 $ptDefaultAdvGuideMap = orange_catalog_product_type_default_advisory_guide_map($pdo);
