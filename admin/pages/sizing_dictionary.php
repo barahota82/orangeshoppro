@@ -451,6 +451,28 @@ if ($sdNextKindSort < 1) {
     </div>
 </div>
 
+<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <h3 style="margin:0;">الأنواع التجارية</h3>
+        <button type="button" class="btn-secondary" onclick="sdReloadAll()">تحديث القائمة</button>
+    </div>
+    <div class="table-wrap cat-dep-list-wrap" data-list="kinds" style="margin-top:10px;">
+        <table>
+            <thead>
+                <tr>
+                    <th>ترتيب</th>
+                    <th>عرض عربي</th>
+                    <th>عرض EN</th>
+                    <th>المفتاح</th>
+                    <th>نشط</th>
+                    <th class="sd-kind-ops-col">إجراءات</th>
+                </tr>
+            </thead>
+            <tbody id="sd_kinds_tbody"></tbody>
+        </table>
+    </div>
+</div>
+
 <div class="card" id="sd_section_cat_form" tabindex="-1">
     <h3 style="margin-top:0;">فئة قياس (المستوى 2)</h3>
     <input type="hidden" id="sd_cat_old_key" value="">
@@ -498,28 +520,6 @@ if ($sdNextKindSort < 1) {
         <button type="button" onclick="sdSaveCategory()">حفظ الفئة</button>
         <button type="button" class="btn-secondary" onclick="sdTranslateCatEn({ forceFromArabic: true })">ترجمة</button>
         <button type="button" class="btn-secondary" onclick="sdResetCatForm(false)">جديد</button>
-    </div>
-</div>
-
-<div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-        <h3 style="margin:0;">الأنواع التجارية</h3>
-        <button type="button" class="btn-secondary" onclick="sdReloadAll()">تحديث القائمة</button>
-    </div>
-    <div class="table-wrap cat-dep-list-wrap" data-list="kinds" style="margin-top:10px;">
-        <table>
-            <thead>
-                <tr>
-                    <th>ترتيب</th>
-                    <th>عرض عربي</th>
-                    <th>عرض EN</th>
-                    <th>المفتاح</th>
-                    <th>نشط</th>
-                    <th class="sd-kind-ops-col">إجراءات</th>
-                </tr>
-            </thead>
-            <tbody id="sd_kinds_tbody"></tbody>
-        </table>
     </div>
 </div>
 
@@ -915,6 +915,11 @@ if ($sdNextKindSort < 1) {
             });
             if (prev && [...sel.options].some(function (x) { return x.value === prev; })) {
                 sel.value = prev;
+            } else if ((kinds || []).length > 0) {
+                // اختيار أول نوع تجاري تلقائياً كي يظهر جدول الفئات المحفوظة دون اضطرار المستخدم لاختيار نوع يدوياً،
+                // ويُحدَّث «الترتيب» تلقائياً للرقم التالي ضمن هذا النوع.
+                sel.value = String(kinds[0].kind_key || '');
+                sdPersistSelectedKind(sel.value);
             }
             sdApplyAutoCatKey();
         } finally {
