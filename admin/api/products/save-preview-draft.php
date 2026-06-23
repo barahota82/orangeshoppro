@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 /**
- * معاينة المنتج قبل النشر — حفظ «صفّ ظِلّ/مسودّة» متساهل + إنشاء جلسة المعاينة (كوكي).
+ * معاينة المنتج قبل النشر — فتح جلسة معاينة موقعية + (اختياري) حفظ «صفّ ظِلّ/مسودّة» متساهل.
  * المرجع: docs/archive/ORANGE_PRODUCT_PREPUBLISH_PREVIEW_ROLLOUT.txt
  *
- * يتحمّل بيانات ناقصة (جوهر المعاينة) فلا يطبّق تحقّقات create/update الصارمة.
- * يُخزَّن الصفّ دائماً: is_active=0، is_preview_draft=1 (فلا يظهر للعميل في أي قائمة).
+ * النموذج (محدّث): الجلسة عبر $_SESSION['orange_product_preview'] (admin/country/draft/exp).
+ *   - تُفتح المعاينة دائماً للتصفّح كعميل حتى دون إدخال منتج (draft_id=0).
+ *   - يُنشأ صفّ المسودّة (الكارت الأخضر) فقط عند توفّر اسم + نوع منتج.
+ *   - يتحمّل بيانات ناقصة (جوهر المعاينة) فلا يطبّق تحقّقات create/update الصارمة.
+ *   - الصفّ دائماً is_active=0، is_preview_draft=1 (لا يظهر للعميل في أي قائمة؛ يُحقَن منفصلاً للأدمن).
  */
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
@@ -23,10 +26,6 @@ require_admin_api();
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
-
-    if (! orange_table_has_column($pdo, 'products', 'is_preview_draft')) {
-        json_response(['success' => false, 'message' => 'أعمدة المعاينة غير جاهزة بعد — أعد تحميل الصفحة'], 422);
-    }
 
     $data = get_json_input();
     $adminId = (int) ($_SESSION['admin_id'] ?? 0);
@@ -47,6 +46,7 @@ try {
         json_response(['success' => false, 'message' => 'اختر دولة المعاينة'], 422);
     }
 
+    /* نوع المنتج لم يَعُد شرطاً لفتح المعاينة — فقط لإظهار كارت المسودّة الأخضر. */
     $productTypeId = (int) ($data['product_type_id'] ?? 0);
     if ($productTypeId <= 0) {
         $class = orange_catalog_resolve_product_classification($pdo, $data);
@@ -54,220 +54,214 @@ try {
             $productTypeId = (int) $class['product_type_id'];
         }
     }
-    if ($productTypeId <= 0) {
-        json_response(['success' => false, 'message' => 'اختر نوع المنتج قبل المعاينة'], 422);
-    }
 
     $nameAr = trim((string) ($data['name'] ?? ''));
-    if ($nameAr === '') {
-        $nameAr = 'منتج معاينة';
-    }
-    $nameEn = trim((string) ($data['name_en'] ?? ''));
-    $nameFil = trim((string) ($data['name_fil'] ?? ''));
-    $nameHi = trim((string) ($data['name_hi'] ?? ''));
+    $hasColumns = orange_table_has_column($pdo, 'products', 'is_preview_draft');
 
-    $hasColors = (int) ($data['has_colors'] ?? 0) === 1;
-    $sizeFamilyId = (int) ($data['size_family_id'] ?? 0);
-    if ($sizeFamilyId <= 0) {
-        $sizeFamilyId = null;
-    }
-    $hasSizes = ((int) ($data['has_sizes'] ?? 0) === 1) || ($sizeFamilyId !== null);
+    /* يُنشأ الكارت الأخضر فقط عند توفّر اسم + نوع منتج + جاهزية الأعمدة. */
+    $canCreateDraft = $hasColumns && $nameAr !== '' && $productTypeId > 0;
 
-    $scope = trim((string) ($data['sizing_guide_scope'] ?? 'none'));
-    if (! in_array($scope, ['none', 'upper', 'lower', 'both', 'single'], true)) {
-        $scope = 'none';
-    }
-    $advisoryGuideId = (int) ($data['sizing_advisory_guide_id'] ?? 0);
-    if ($advisoryGuideId <= 0 || ! $hasSizes) {
-        $advisoryGuideId = null;
-    }
-
-    $normSku = static function ($raw): ?string {
-        $s = trim((string) $raw);
-        if ($s === '') {
-            return null;
-        }
-
-        return function_exists('mb_substr') ? mb_substr($s, 0, 64, 'UTF-8') : substr($s, 0, 64);
-    };
-
-    $mainImage = trim((string) ($data['main_image'] ?? ''));
-    $extraImages = $data['extra_images'] ?? null;
-    if ($mainImage === '' && is_array($extraImages)) {
-        foreach ($extraImages as $raw) {
-            $fn = preg_replace('/[^a-zA-Z0-9._-]/', '', basename((string) $raw));
-            if ($fn !== '' && $fn !== '.' && $fn !== '..') {
-                $mainImage = $fn;
-                break;
+    /* تنظيف مسوّدات هذا الأدمن السابقة دائماً (حتى عند التصفّح بلا منتج، لإزالة كارت أخضر قديم). */
+    if ($hasColumns) {
+        try {
+            $oldStmt = $pdo->prepare('SELECT id FROM products WHERE is_preview_draft = 1 AND preview_admin_id = ?');
+            $oldStmt->execute([$adminId]);
+            foreach ($oldStmt->fetchAll(PDO::FETCH_COLUMN) as $oldId) {
+                orange_preview_delete_draft_row($pdo, (int) $oldId);
             }
+        } catch (Throwable $ce) {
+            /* لا يكسر فتح المعاينة */
         }
     }
 
+    $draftId = 0;
     $token = orange_preview_generate_token();
     $expiresAt = date('Y-m-d H:i:s', time() + 86400);
 
-    $pdo->beginTransaction();
+    if ($canCreateDraft) {
+        $nameEn = trim((string) ($data['name_en'] ?? ''));
+        $nameFil = trim((string) ($data['name_fil'] ?? ''));
+        $nameHi = trim((string) ($data['name_hi'] ?? ''));
 
-    /* جلسة معاينة واحدة لكل أدمن: احذف مسوّداته السابقة + المنتهية (تنظيف lazy). */
-    $oldStmt = $pdo->prepare('SELECT id FROM products WHERE is_preview_draft = 1 AND preview_admin_id = ?');
-    $oldStmt->execute([$adminId]);
-    foreach ($oldStmt->fetchAll(PDO::FETCH_COLUMN) as $oldId) {
-        orange_preview_delete_draft_row($pdo, (int) $oldId);
-    }
-
-    $cols = ['name', 'name_en', 'name_fil', 'name_hi', 'product_type_id', 'price', 'cost', 'main_image', 'has_sizes', 'has_colors', 'sort_order'];
-    $vals = [$nameAr, $nameEn, $nameFil, $nameHi, $productTypeId, (float) ($data['price'] ?? 0), (float) ($data['cost'] ?? 0), $mainImage, $hasSizes ? 1 : 0, $hasColors ? 1 : 0, 0];
-
-    $optional = [
-        'description' => trim((string) ($data['description'] ?? '')),
-        'description_en' => trim((string) ($data['description_en'] ?? '')),
-        'description_fil' => trim((string) ($data['description_fil'] ?? '')),
-        'description_hi' => trim((string) ($data['description_hi'] ?? '')),
-        'seo_meta_title_ar' => trim((string) ($data['seo_meta_title_ar'] ?? '')),
-        'seo_meta_title_en' => trim((string) ($data['seo_meta_title_en'] ?? '')),
-        'seo_meta_title_fil' => trim((string) ($data['seo_meta_title_fil'] ?? '')),
-        'seo_meta_title_hi' => trim((string) ($data['seo_meta_title_hi'] ?? '')),
-        'seo_meta_description_ar' => trim((string) ($data['seo_meta_description_ar'] ?? '')),
-        'seo_meta_description_en' => trim((string) ($data['seo_meta_description_en'] ?? '')),
-        'seo_meta_description_fil' => trim((string) ($data['seo_meta_description_fil'] ?? '')),
-        'seo_meta_description_hi' => trim((string) ($data['seo_meta_description_hi'] ?? '')),
-        'size_family_id' => $sizeFamilyId,
-        'sizing_guide_scope' => $scope,
-        'sizing_advisory_guide_id' => $advisoryGuideId,
-        'item_code' => $normSku($data['item_code'] ?? ''),
-        'barcode' => $normSku($data['barcode'] ?? ''),
-        'country_id' => $previewCountryId,
-    ];
-    foreach ($optional as $col => $val) {
-        if (orange_table_has_column($pdo, 'products', $col)) {
-            $cols[] = $col;
-            $vals[] = $val;
+        $hasColors = (int) ($data['has_colors'] ?? 0) === 1;
+        $sizeFamilyId = (int) ($data['size_family_id'] ?? 0);
+        if ($sizeFamilyId <= 0) {
+            $sizeFamilyId = null;
         }
-    }
+        $hasSizes = ((int) ($data['has_sizes'] ?? 0) === 1) || ($sizeFamilyId !== null);
 
-    $cols[] = 'is_active';
-    $vals[] = 0;
-    $cols[] = 'is_preview_draft';
-    $vals[] = 1;
-    $cols[] = 'preview_admin_id';
-    $vals[] = $adminId;
-    $cols[] = 'preview_source_product_id';
-    $vals[] = $sourceId > 0 ? $sourceId : null;
-    $cols[] = 'preview_token';
-    $vals[] = $token;
-    $cols[] = 'preview_expires_at';
-    $vals[] = $expiresAt;
+        $scope = trim((string) ($data['sizing_guide_scope'] ?? 'none'));
+        if (! in_array($scope, ['none', 'upper', 'lower', 'both', 'single'], true)) {
+            $scope = 'none';
+        }
+        $advisoryGuideId = (int) ($data['sizing_advisory_guide_id'] ?? 0);
+        if ($advisoryGuideId <= 0 || ! $hasSizes) {
+            $advisoryGuideId = null;
+        }
 
-    $placeholders = implode(', ', array_fill(0, count($vals), '?')) . ', NOW()';
-    $insSql = 'INSERT INTO products (' . implode(', ', $cols) . ', created_at) VALUES (' . $placeholders . ')';
-    $pdo->prepare($insSql)->execute($vals);
-    $draftId = (int) $pdo->lastInsertId();
+        $normSku = static function ($raw): ?string {
+            $s = trim((string) $raw);
+            if ($s === '') {
+                return null;
+            }
 
-    /* المتغيّرات — كمية المخزون المُدخلة تُحفظ كما هي (قرار المالك: المعاينة تُظهر الكمية المُدخلة). */
-    $variantsIn = $data['variants'] ?? null;
-    if (is_array($variantsIn) && count($variantsIn) > 0) {
-        $cwMap = orange_product_ensure_colorways($pdo, $draftId, $variantsIn, $hasColors);
-        $variantStmt = $pdo->prepare(
-            'INSERT INTO product_variants (product_id, product_colorway_id, size_family_size_id, size, color, stock_quantity)
-             VALUES (?,?,?,?,?,?)'
-        );
-        foreach ($variantsIn as $variant) {
-            try {
-                $p = (int) ($variant['primary_color_id'] ?? 0);
-                $s = (int) ($variant['secondary_color_id'] ?? 0);
-                $pp = (int) ($variant['primary_pattern_id'] ?? 0);
-                $sp = (int) ($variant['secondary_pattern_id'] ?? 0);
-                $szId = (int) ($variant['size_family_size_id'] ?? 0);
-                $stock = max(0, (int) ($variant['stock_quantity'] ?? 0));
+            return function_exists('mb_substr') ? mb_substr($s, 0, 64, 'UTF-8') : substr($s, 0, 64);
+        };
 
-                if (! $hasColors) {
-                    $cwKey = '-';
-                } else {
-                    $p = $p > 0 ? $p : null;
-                    $s = $s > 0 ? $s : null;
-                    $pp = $pp > 0 ? $pp : null;
-                    $sp = $sp > 0 ? $sp : null;
-                    $cwKey = ($p ?? 0) . ':' . ($s ?? 0) . ':' . ($pp ?? 0) . ':' . ($sp ?? 0);
+        $mainImage = trim((string) ($data['main_image'] ?? ''));
+        $extraImages = $data['extra_images'] ?? null;
+        if ($mainImage === '' && is_array($extraImages)) {
+            foreach ($extraImages as $raw) {
+                $fn = preg_replace('/[^a-zA-Z0-9._-]/', '', basename((string) $raw));
+                if ($fn !== '' && $fn !== '.' && $fn !== '..') {
+                    $mainImage = $fn;
+                    break;
                 }
-                $colorwayId = $cwMap[$cwKey] ?? null;
-                if ($colorwayId === null) {
+            }
+        }
+
+        $pdo->beginTransaction();
+
+        $cols = ['name', 'name_en', 'name_fil', 'name_hi', 'product_type_id', 'price', 'cost', 'main_image', 'has_sizes', 'has_colors', 'sort_order'];
+        $vals = [$nameAr, $nameEn, $nameFil, $nameHi, $productTypeId, (float) ($data['price'] ?? 0), (float) ($data['cost'] ?? 0), $mainImage, $hasSizes ? 1 : 0, $hasColors ? 1 : 0, 0];
+
+        $optional = [
+            'description' => trim((string) ($data['description'] ?? '')),
+            'description_en' => trim((string) ($data['description_en'] ?? '')),
+            'description_fil' => trim((string) ($data['description_fil'] ?? '')),
+            'description_hi' => trim((string) ($data['description_hi'] ?? '')),
+            'seo_meta_title_ar' => trim((string) ($data['seo_meta_title_ar'] ?? '')),
+            'seo_meta_title_en' => trim((string) ($data['seo_meta_title_en'] ?? '')),
+            'seo_meta_title_fil' => trim((string) ($data['seo_meta_title_fil'] ?? '')),
+            'seo_meta_title_hi' => trim((string) ($data['seo_meta_title_hi'] ?? '')),
+            'seo_meta_description_ar' => trim((string) ($data['seo_meta_description_ar'] ?? '')),
+            'seo_meta_description_en' => trim((string) ($data['seo_meta_description_en'] ?? '')),
+            'seo_meta_description_fil' => trim((string) ($data['seo_meta_description_fil'] ?? '')),
+            'seo_meta_description_hi' => trim((string) ($data['seo_meta_description_hi'] ?? '')),
+            'size_family_id' => $sizeFamilyId,
+            'sizing_guide_scope' => $scope,
+            'sizing_advisory_guide_id' => $advisoryGuideId,
+            'item_code' => $normSku($data['item_code'] ?? ''),
+            'barcode' => $normSku($data['barcode'] ?? ''),
+            'country_id' => $previewCountryId,
+        ];
+        foreach ($optional as $col => $val) {
+            if (orange_table_has_column($pdo, 'products', $col)) {
+                $cols[] = $col;
+                $vals[] = $val;
+            }
+        }
+
+        $cols[] = 'is_active';
+        $vals[] = 0;
+        $cols[] = 'is_preview_draft';
+        $vals[] = 1;
+        $cols[] = 'preview_admin_id';
+        $vals[] = $adminId;
+        $cols[] = 'preview_source_product_id';
+        $vals[] = $sourceId > 0 ? $sourceId : null;
+        $cols[] = 'preview_token';
+        $vals[] = $token;
+        $cols[] = 'preview_expires_at';
+        $vals[] = $expiresAt;
+
+        $placeholders = implode(', ', array_fill(0, count($vals), '?')) . ', NOW()';
+        $insSql = 'INSERT INTO products (' . implode(', ', $cols) . ', created_at) VALUES (' . $placeholders . ')';
+        $pdo->prepare($insSql)->execute($vals);
+        $draftId = (int) $pdo->lastInsertId();
+
+        /* المتغيّرات — كمية المخزون المُدخلة تُحفظ كما هي (قرار المالك: المعاينة تُظهر الكمية المُدخلة). */
+        $variantsIn = $data['variants'] ?? null;
+        if (is_array($variantsIn) && count($variantsIn) > 0) {
+            $cwMap = orange_product_ensure_colorways($pdo, $draftId, $variantsIn, $hasColors);
+            $variantStmt = $pdo->prepare(
+                'INSERT INTO product_variants (product_id, product_colorway_id, size_family_size_id, size, color, stock_quantity)
+                 VALUES (?,?,?,?,?,?)'
+            );
+            foreach ($variantsIn as $variant) {
+                try {
+                    $p = (int) ($variant['primary_color_id'] ?? 0);
+                    $s = (int) ($variant['secondary_color_id'] ?? 0);
+                    $pp = (int) ($variant['primary_pattern_id'] ?? 0);
+                    $sp = (int) ($variant['secondary_pattern_id'] ?? 0);
+                    $szId = (int) ($variant['size_family_size_id'] ?? 0);
+                    $stock = max(0, (int) ($variant['stock_quantity'] ?? 0));
+
+                    if (! $hasColors) {
+                        $cwKey = '-';
+                    } else {
+                        $p = $p > 0 ? $p : null;
+                        $s = $s > 0 ? $s : null;
+                        $pp = $pp > 0 ? $pp : null;
+                        $sp = $sp > 0 ? $sp : null;
+                        $cwKey = ($p ?? 0) . ':' . ($s ?? 0) . ':' . ($pp ?? 0) . ':' . ($sp ?? 0);
+                    }
+                    $colorwayId = $cwMap[$cwKey] ?? null;
+                    if ($colorwayId === null) {
+                        continue;
+                    }
+
+                    $sizeFamilySizeId = ($hasSizes && $szId > 0) ? $szId : null;
+                    $sizeRow = null;
+                    if ($sizeFamilySizeId !== null && $sizeFamilyId !== null) {
+                        $szStmt = $pdo->prepare('SELECT * FROM size_family_sizes WHERE id = ? AND size_family_id = ? LIMIT 1');
+                        $szStmt->execute([$sizeFamilySizeId, $sizeFamilyId]);
+                        $sizeRow = $szStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+                        if (! $sizeRow) {
+                            $sizeFamilySizeId = null;
+                        }
+                    }
+
+                    $colorLabel = orange_colorway_display_label(
+                        $pdo,
+                        $hasColors ? $p : null,
+                        $hasColors ? $s : null,
+                        $hasColors ? $pp : null,
+                        $hasColors ? $sp : null,
+                        'ar'
+                    );
+                    $sizeLabel = orange_size_display_label($sizeRow);
+
+                    $variantStmt->execute([$draftId, $colorwayId, $sizeFamilySizeId, $sizeLabel, $colorLabel, $stock]);
+                } catch (Throwable $ve) {
+                    /* صف متغيّر معطوب لا يكسر المعاينة */
                     continue;
                 }
+            }
+        }
 
-                $sizeFamilySizeId = ($hasSizes && $szId > 0) ? $szId : null;
-                $sizeRow = null;
-                if ($sizeFamilySizeId !== null && $sizeFamilyId !== null) {
-                    $szStmt = $pdo->prepare('SELECT * FROM size_family_sizes WHERE id = ? AND size_family_id = ? LIMIT 1');
-                    $szStmt->execute([$sizeFamilySizeId, $sizeFamilyId]);
-                    $sizeRow = $szStmt->fetch(PDO::FETCH_ASSOC) ?: null;
-                    if (! $sizeRow) {
-                        $sizeFamilySizeId = null;
-                    }
+        /* الصور */
+        if (is_array($extraImages) && orange_table_exists($pdo, 'product_images')) {
+            $imgIns = $pdo->prepare('INSERT INTO product_images (product_id, image_path) VALUES (?, ?)');
+            $mainBasename = $mainImage !== '' ? basename($mainImage) : '';
+            foreach ($extraImages as $raw) {
+                $fn = preg_replace('/[^a-zA-Z0-9._-]/', '', basename((string) $raw));
+                if ($fn === '' || $fn === '.' || $fn === '..' || ($mainBasename !== '' && $fn === $mainBasename)) {
+                    continue;
                 }
-
-                $colorLabel = orange_colorway_display_label(
-                    $pdo,
-                    $hasColors ? $p : null,
-                    $hasColors ? $s : null,
-                    $hasColors ? $pp : null,
-                    $hasColors ? $sp : null,
-                    'ar'
-                );
-                $sizeLabel = orange_size_display_label($sizeRow);
-
-                $variantStmt->execute([$draftId, $colorwayId, $sizeFamilySizeId, $sizeLabel, $colorLabel, $stock]);
-            } catch (Throwable $ve) {
-                /* صف متغيّر معطوب لا يكسر المعاينة */
-                continue;
+                $imgIns->execute([$draftId, $fn]);
             }
         }
-    }
 
-    /* الصور */
-    if (is_array($extraImages) && orange_table_exists($pdo, 'product_images')) {
-        $imgIns = $pdo->prepare('INSERT INTO product_images (product_id, image_path) VALUES (?, ?)');
-        $mainBasename = $mainImage !== '' ? basename($mainImage) : '';
-        foreach ($extraImages as $raw) {
-            $fn = preg_replace('/[^a-zA-Z0-9._-]/', '', basename((string) $raw));
-            if ($fn === '' || $fn === '.' || $fn === '..' || ($mainBasename !== '' && $fn === $mainBasename)) {
-                continue;
+        if (function_exists('orange_product_sync_colorway_images_from_payload')) {
+            orange_product_sync_colorway_images_from_payload($pdo, $draftId, $data['colorway_images'] ?? null, $hasColors);
+        }
+        if (function_exists('orange_product_attach_all_active_channels')) {
+            orange_product_attach_all_active_channels($pdo, $draftId);
+        }
+        if (array_key_exists('catalog_attribute_values', $data) && function_exists('orange_catalog_save_product_attribute_values')) {
+            try {
+                orange_catalog_save_product_attribute_values($pdo, $draftId, $data['catalog_attribute_values']);
+            } catch (Throwable $ae) {
+                /* صفات ناقصة لا تكسر المعاينة */
             }
-            $imgIns->execute([$draftId, $fn]);
         }
+
+        $pdo->commit();
     }
 
-    if (function_exists('orange_product_sync_colorway_images_from_payload')) {
-        orange_product_sync_colorway_images_from_payload($pdo, $draftId, $data['colorway_images'] ?? null, $hasColors);
-    }
-    if (function_exists('orange_product_attach_all_active_channels')) {
-        orange_product_attach_all_active_channels($pdo, $draftId);
-    }
-    if (array_key_exists('catalog_attribute_values', $data) && function_exists('orange_catalog_save_product_attribute_values')) {
-        try {
-            orange_catalog_save_product_attribute_values($pdo, $draftId, $data['catalog_attribute_values']);
-        } catch (Throwable $ae) {
-            /* صفات ناقصة لا تكسر المعاينة */
-        }
-    }
-
-    $pdo->commit();
-
-    /* جلسة المعاينة: كوكي path=/ ليُلازم تصفّح الموقع كاملاً (24 ساعة). */
-    $isHttps = (! empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (($_SERVER['SERVER_PORT'] ?? '') === '443')
-        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-    $cookieVal = $draftId . ':' . $token;
-    if (PHP_VERSION_ID >= 70300) {
-        setcookie(orange_preview_cookie_name(), $cookieVal, [
-            'expires' => time() + 86400,
-            'path' => '/',
-            'secure' => $isHttps,
-            'httponly' => true,
-            'samesite' => 'Lax',
-        ]);
-    } else {
-        setcookie(orange_preview_cookie_name(), $cookieVal, time() + 86400, '/; samesite=Lax', '', $isHttps, true);
-    }
+    /* فتح جلسة المعاينة (تتصفّح الموقع كعميل؛ draft_id=0 = بلا منتج). */
+    orange_preview_set_session($adminId, $previewCountryId, $draftId, 86400);
 
     $channelSlug = orange_storefront_main_channel_slug_for_country($pdo, $previewCountryId);
     if ($channelSlug === null || $channelSlug === '') {
@@ -281,16 +275,21 @@ try {
     if ($channelSlug === '') {
         json_response(['success' => false, 'message' => 'لا توجد قناة نشطة لدولة المعاينة'], 422);
     }
-    $previewUrl = storefront_url('product', (string) $channelSlug, 'ar', ['id' => $draftId]);
+
+    $previewUrl = storefront_url('home', (string) $channelSlug, 'ar');
+    $productUrl = $draftId > 0
+        ? storefront_url('product', (string) $channelSlug, 'ar', ['id' => $draftId])
+        : null;
 
     json_response([
         'success' => true,
-        'message' => 'تم تجهيز المعاينة',
+        'message' => $draftId > 0 ? 'تم تجهيز المعاينة' : 'فُتحت المعاينة للتصفّح (بلا منتج بعد)',
         'draft_id' => $draftId,
-        'token' => $token,
+        'browse_only' => $draftId === 0,
         'channel' => $channelSlug,
         'country_id' => $previewCountryId,
         'preview_url' => $previewUrl,
+        'product_url' => $productUrl,
         'expires_at' => $expiresAt,
     ]);
 } catch (Throwable $e) {

@@ -65,6 +65,18 @@ try {
 
     $products = $stmt->fetchAll();
 
+    /* معاينة موقعية: أظهِر مسودّة الأدمن الحالي (لهذه الدولة) في سياق «الكل» فقط — لا تظهر للعميل. */
+    if ($categoryId === 0) {
+        $pvCtx = orange_preview_active_context($pdo);
+        if ($pvCtx !== null) {
+            $pvDraft = orange_preview_draft_card_for_country($pvCtx, $sfCountryId);
+            if ($pvDraft !== null) {
+                $pvDraft['is_preview_draft_card'] = 1;
+                array_unshift($products, $pvDraft);
+            }
+        }
+    }
+
     json_response([
         'success' => true,
         'unified' => true,

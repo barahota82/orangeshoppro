@@ -933,6 +933,62 @@ body.storefront-browse-menu-lock {
     box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
 }
 
+/* معاينة المنتج قبل النشر: برواز خفيف (outline لا يغيّر مقاس الكارت) + شارة ركن لا تزيح المحتوى. */
+.product-card--preview-draft {
+    outline: 2px solid #16a34a;
+    outline-offset: -2px;
+}
+
+.product-card--preview-demo {
+    outline: 2px dashed #eab308;
+    outline-offset: -2px;
+}
+
+.product-card__preview-tag {
+    position: absolute;
+    top: 12px;
+    inset-inline-start: 12px;
+    z-index: 2;
+    padding: 4px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.product-card__preview-tag--draft {
+    background: #16a34a;
+}
+
+.product-card__preview-tag--demo {
+    background: #eab308;
+    color: #3a2f00;
+}
+
+.product-image-wrap__placeholder {
+    width: 100%;
+    height: 260px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted, #94a3b8);
+    font-size: 0.85rem;
+    background: repeating-linear-gradient(45deg, var(--bg-soft, #f1f5f9), var(--bg-soft, #f1f5f9) 10px, rgba(0, 0, 0, 0.03) 10px, rgba(0, 0, 0, 0.03) 20px);
+}
+
+.orange-preview-product-note {
+    margin: 12px 0 0;
+    padding: 10px 14px;
+    border: 1px solid #16a34a;
+    border-radius: 8px;
+    background: #f0fdf4;
+    color: #166534;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
 .product-body {
     padding: 16px;
 }

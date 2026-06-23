@@ -4420,7 +4420,7 @@ async function orangeOpenFullPreview() {
     const btn = document.getElementById('orangeBtnFullPreview');
     const setStatus = (msg) => { if (statusEl) { statusEl.textContent = msg || ''; } };
     if (btn) { btn.disabled = true; }
-    setStatus('جارٍ تجهيز المعاينة…');
+    setStatus('جارٍ فتح الموقع للمعاينة…');
     try {
         const payload = orangeBuildProductPreviewPayload();
         const countryEl = document.getElementById('orangeFullPreviewCountry');
@@ -4428,7 +4428,9 @@ async function orangeOpenFullPreview() {
         payload.preview_source_product_id = parseInt((document.getElementById('product_record_id') && document.getElementById('product_record_id').value) || '0', 10) || 0;
         const res = await postJSON('/admin/api/products/save-preview-draft.php', payload);
         if (res && res.success && res.preview_url) {
-            setStatus('تم — افتحت المعاينة في تبويب جديد.');
+            setStatus(res.browse_only
+                ? 'فُتح الموقع للتصفّح — أدخِل اسم المنتج ونوعه ليظهر كارتك بالبرواز الأخضر.'
+                : 'تم — فُتح الموقع للمعاينة في تبويب جديد (كارتك بالبرواز الأخضر).');
             window.open(res.preview_url, '_blank', 'noopener');
         } else {
             setStatus((res && res.message) ? res.message : 'تعذّر تجهيز المعاينة');

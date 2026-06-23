@@ -127,6 +127,18 @@ foreach ($products as $p) {
 $productsInitial = array_slice($productsNonOffer, 0, $sfHomeGridInitial);
 $productsLazyRows = array_slice($productsNonOffer, $sfHomeGridInitial);
 
+/* معاينة موقعية: كارت المسودّة (أخضر) + كروت تجريبية (أصفر عند فراغ/قلّة القوائم). تصيير خادمي. */
+$sfPreviewCtx = orange_preview_active_context($pdo);
+$sfPreviewActive = ($sfPreviewCtx !== null);
+$sfPreviewDraftRow = $sfPreviewActive ? orange_preview_draft_card_for_country($sfPreviewCtx, $sfHomeCountryId) : null;
+$sfPreviewDemoCards = [];
+if ($sfPreviewActive) {
+    $sfRealCardCount = count($products) + count($offers);
+    if ($sfRealCardCount < 4) {
+        $sfPreviewDemoCards = orange_preview_demo_cards(4 - $sfRealCardCount);
+    }
+}
+
 $sfHomeCardColorPidList = [];
 foreach ($products as $hp) {
     if ((int) ($hp['has_colors'] ?? 0) === 1) {
@@ -405,6 +417,45 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
     </section>
 
     <section id="productsGrid" class="products-grid">
+        <?php if ($sfPreviewActive && $sfPreviewDraftRow !== null): ?>
+            <?php $sfPvImg = trim((string) ($sfPreviewDraftRow['main_image'] ?? '')); ?>
+            <article class="product-card product-card--preview-draft" data-filter="all" data-preview="draft">
+                <div class="product-image-wrap">
+                    <span class="product-card__preview-tag product-card__preview-tag--draft">منتجك (معاينة)</span>
+                    <?php if ($sfPvImg !== ''): ?>
+                    <img src="<?php echo htmlspecialchars(storefront_product_image_href($sfPvImg), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($sfPreviewDraftRow), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
+                    <?php else: ?>
+                    <div class="product-image-wrap__placeholder" aria-hidden="true"><?php echo htmlspecialchars(t('view_product'), ENT_QUOTES, 'UTF-8'); ?></div>
+                    <?php endif; ?>
+                </div>
+                <div class="product-body">
+                    <h3><?php echo htmlspecialchars(storefront_product_display_name($sfPreviewDraftRow), ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <div class="price-row">
+                        <strong><?php echo number_format((float) ($sfPreviewDraftRow['price'] ?? 0), 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                    </div>
+                    <?php if ((int) ($sfPreviewDraftRow['id'] ?? 0) > 0): ?>
+                    <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $sfPreviewDraftRow['id']]), ENT_QUOTES, 'UTF-8'); ?>">
+                        <?php echo htmlspecialchars(t('view_product'), ENT_QUOTES, 'UTF-8'); ?>
+                    </a>
+                    <?php endif; ?>
+                </div>
+            </article>
+        <?php endif; ?>
+        <?php foreach ($sfPreviewDemoCards as $sfDemo): ?>
+            <article class="product-card product-card--preview-demo" data-filter="all" data-preview="demo">
+                <div class="product-image-wrap">
+                    <span class="product-card__preview-tag product-card__preview-tag--demo">نموذج تجريبي</span>
+                    <div class="product-image-wrap__placeholder" aria-hidden="true">&nbsp;</div>
+                </div>
+                <div class="product-body">
+                    <h3><?php echo htmlspecialchars((string) $sfDemo['name'], ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <div class="price-row">
+                        <strong><?php echo number_format((float) $sfDemo['price'], 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                    </div>
+                    <span class="btn" aria-disabled="true" style="opacity:.6;pointer-events:none;"><?php echo htmlspecialchars(t('view_product'), ENT_QUOTES, 'UTF-8'); ?></span>
+                </div>
+            </article>
+        <?php endforeach; ?>
         <?php foreach ($offersInitial as $p): ?>
             <?php
             $sfCardPidOff = (int) $p['id'];

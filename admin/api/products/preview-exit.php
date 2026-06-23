@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 /**
- * إنهاء جلسة معاينة المنتج: حذف الكوكي ثم العودة لمتجر الواجهة.
+ * إنهاء جلسة معاينة المنتج: مسح مفتاح الجلسة ثم العودة لمتجر الواجهة.
  * المرجع: docs/archive/ORANGE_PRODUCT_PREPUBLISH_PREVIEW_ROLLOUT.txt
- * لا يتطلّب جلسة أدمن — مجرّد مسح كوكي المعاينة الخاص بالمتصفّح (غير ضار).
+ * لا يتطلّب جلسة أدمن — مجرّد مسح حالة المعاينة الخاصة بهذا المتصفّح (غير ضار).
  */
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/product_preview.php';
 
+orange_preview_clear_session();
+
+/* حذف الكوكي القديم احتياطاً (نموذج سابق لم يَعُد يُقرأ). */
 $isHttps = (! empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || (($_SERVER['SERVER_PORT'] ?? '') === '443')
     || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');

@@ -22,7 +22,7 @@ $sfProductCountryId = orange_storefront_current_country_id($pdo);
  * معاينة المنتج قبل النشر (docs/archive/ORANGE_PRODUCT_PREPUBLISH_PREVIEW_ROLLOUT.txt):
  * إن كانت جلسة معاينة صالحة والمعرّف المطلوب هو صفّ الظِلّ نفسه، نعرضه متجاوزين is_active
  * والحارس الموحّد وحارس الدولة (السياق يأتي من دولة الظِلّ). بقية المنتجات تبقى طبيعية.
- * لا تكلفة على المسار الساخن للعميل: لا استعلام معاينة إلا عند وجود الكوكي.
+ * لا تكلفة على المسار الساخن للعميل: لا استعلام معاينة إلا عند وجود جلسة معاينة فعّالة.
  */
 $orangePreviewCtx = orange_preview_active_context($pdo);
 $orangeProductPreview = ($orangePreviewCtx !== null && (int) $orangePreviewCtx['draft_id'] === $id && $id > 0);
@@ -94,6 +94,10 @@ if ($mainForOg !== '') {
 }
 
 include __DIR__ . '/../includes/header.php';
+
+if ($orangeProductPreview) {
+    echo '<div class="container"><div class="orange-preview-product-note" role="status">هذه معاينة منتجك غير المحفوظ — يظهر لك وحدك ولا يراه العملاء.</div></div>';
+}
 
 $sfProductJsonLd = [
     '@context' => 'https://schema.org',

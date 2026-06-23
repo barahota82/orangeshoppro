@@ -388,7 +388,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
 <body class="theme-<?php echo htmlspecialchars($theme, ENT_QUOTES, 'UTF-8'); ?> storefront<?php echo !empty($orangePreviewActiveGlobal) ? ' orange-preview-mode' : ''; ?>">
 <?php if (!empty($orangePreviewActiveGlobal)): ?>
 <div class="orange-preview-banner" role="status" dir="rtl" style="position:sticky;top:0;z-index:9999;background:#b45309;color:#fff;padding:8px 14px;font-size:14px;font-weight:700;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.25);">
-    وضع المعاينة — تتصفّح كعميل. أي طلب هنا لا يُرسَل فعلياً (معاينة فقط).
+    وضع المعاينة — تتصفّح كعميل. الكارت ذو البرواز الأخضر = منتجك غير المحفوظ، والأصفر = نموذج تجريبي. أي طلب هنا لا يُرسَل فعلياً (معاينة فقط).
     <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/api/products/preview-exit.php'), ENT_QUOTES, 'UTF-8'); ?>" style="color:#fff;text-decoration:underline;margin-inline-start:10px;">إنهاء المعاينة</a>
 </div>
 <?php endif; ?>

@@ -6,21 +6,33 @@ declare(strict_types=1);
  * معاينة المنتج قبل النشر — مساعدات مشتركة.
  * المرجع: docs/archive/ORANGE_PRODUCT_PREPUBLISH_PREVIEW_ROLLOUT.txt
  *
- * النموذج: جلسة معاينة مقيّدة بأدمن (كوكي يحمل "<draftId>:<token>") + صفّ ظِلّ/مسودّة
- * في جدول products (is_preview_draft=1، is_active=0، preview_token عشوائي، preview_expires_at).
- * المسار الساخن للعميل لا يدفع أي تكلفة: لا استعلام إلا عند وجود الكوكي.
+ * النموذج (محدّث): جلسة معاينة موقعية عبر $_SESSION['orange_product_preview']
+ * (متّسقة مع سابقة $_SESSION['orange_sf_preview'] في config.php) — مفصولة عن المسودّة:
+ *   - تُضبط فقط من admin/api/products/save-preview-draft.php المحمي بـ require_admin_api().
+ *   - تحمل: admin_id، country_id، draft_id (0 = تصفّح بلا منتج)، exp.
+ *   - الجلسة تبدأ عالمياً في config.php ⇒ فحص مفتاح المصفوفة دون أي استعلام على المسار الساخن للعميل.
+ *   - صفّ الظِلّ/المسودّة في جدول products (is_preview_draft=1، is_active=0، preview_admin_id، preview_expires_at)
+ *     يُحمَّل فقط عند draft_id>0 لإظهار كارت/صفحة المنتج للأدمن صاحب الجلسة وحده.
  */
 
 if (! function_exists('orange_preview_cookie_name')) {
-    /** اسم كوكي جلسة المعاينة (path=/ ليُلازم تصفّح الموقع كاملاً). */
+    /** اسم كوكي قديم (لم يَعُد يُقرأ؛ يُمسح عند الخروج احتياطاً للجلسات القديمة). */
     function orange_preview_cookie_name(): string
     {
         return 'orange_preview';
     }
 }
 
+if (! function_exists('orange_preview_session_key')) {
+    /** مفتاح جلسة معاينة المنتج. */
+    function orange_preview_session_key(): string
+    {
+        return 'orange_product_preview';
+    }
+}
+
 if (! function_exists('orange_preview_generate_token')) {
-    /** توكن عشوائي غير قابل للتخمين (مثل سابقة مستند الفاتورة س27). */
+    /** توكن عشوائي غير قابل للتخمين (يُختم به صفّ المسودّة؛ غير مستخدم لتحقّق الجلسة بعد الآن). */
     function orange_preview_generate_token(): string
     {
         try {
@@ -31,10 +43,37 @@ if (! function_exists('orange_preview_generate_token')) {
     }
 }
 
+if (! function_exists('orange_preview_set_session')) {
+    /** يفتح جلسة معاينة (يُستدعى من API الأدمن فقط). draftId=0 يعني تصفّح بلا منتج. */
+    function orange_preview_set_session(int $adminId, int $countryId, int $draftId, int $ttlSeconds = 86400): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE || $adminId <= 0) {
+            return;
+        }
+        $_SESSION[orange_preview_session_key()] = [
+            'admin_id' => $adminId,
+            'country_id' => max(0, $countryId),
+            'draft_id' => max(0, $draftId),
+            'exp' => time() + max(60, $ttlSeconds),
+        ];
+    }
+}
+
+if (! function_exists('orange_preview_clear_session')) {
+    /** ينهي جلسة المعاينة. */
+    function orange_preview_clear_session(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            unset($_SESSION[orange_preview_session_key()]);
+        }
+    }
+}
+
 if (! function_exists('orange_preview_hide_sql')) {
     /**
      * جزء SQL لإخفاء صفوف الظِلّ/المسودّة عن كل استعلامات الواجهة للعميل.
      * يُعاد فارغاً إن لم يوجد العمود بعد (قبل أول ensure_schema) فلا يكسر الاستعلام.
+     * يبقى ثابتاً حتى داخل المعاينة: كارت المسودّة يُحقَن منفصلاً (لا تعديل WHERE ⇒ لا تسريب).
      */
     function orange_preview_hide_sql(PDO $pdo, string $alias = 'p'): string
     {
@@ -50,10 +89,10 @@ if (! function_exists('orange_preview_hide_sql')) {
 
 if (! function_exists('orange_preview_active_context')) {
     /**
-     * يقرأ كوكي المعاينة ويتحقّق منه مقابل صفّ ظِلّ نشِط غير منتهٍ.
-     * يُعيد سياق المعاينة أو null. لا يلمس القاعدة إطلاقاً إن غاب الكوكي (حماية المسار الساخن).
+     * يقرأ جلسة المعاينة ويتحقّق من صلاحيتها. يحمّل صفّ المسودّة فقط عند draft_id>0.
+     * يُعيد سياق المعاينة أو null. لا يلمس القاعدة إطلاقاً إن لم تكن الجلسة فعّالة (حماية المسار الساخن).
      *
-     * @return array{draft_id:int,product:array<string,mixed>,source_id:int,country_id:int}|null
+     * @return array{admin_id:int,country_id:int,draft_id:int,product:?array<string,mixed>,source_id:int}|null
      */
     function orange_preview_active_context(PDO $pdo): ?array
     {
@@ -63,47 +102,60 @@ if (! function_exists('orange_preview_active_context')) {
         }
         $cache = null;
 
-        $raw = $_COOKIE[orange_preview_cookie_name()] ?? '';
-        if (! is_string($raw) || $raw === '' || strpos($raw, ':') === false) {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
             return null;
         }
-        [$idPart, $tokenPart] = explode(':', $raw, 2);
-        $draftId = (int) $idPart;
-        $token = preg_replace('/[^a-f0-9]/', '', (string) $tokenPart);
-        if ($draftId <= 0 || $token === '' || strlen($token) < 16) {
+        $pv = $_SESSION[orange_preview_session_key()] ?? null;
+        if (! is_array($pv)) {
             return null;
         }
-        if (! function_exists('orange_table_has_column') || ! orange_table_has_column($pdo, 'products', 'preview_token')) {
-            return null;
-        }
+        if ((int) ($pv['exp'] ?? 0) < time()) {
+            unset($_SESSION[orange_preview_session_key()]);
 
-        try {
-            $st = $pdo->prepare(
-                'SELECT * FROM products
-                 WHERE id = ? AND is_preview_draft = 1 AND preview_token = ?
-                   AND (preview_expires_at IS NULL OR preview_expires_at > NOW())
-                 LIMIT 1'
-            );
-            $st->execute([$draftId, $token]);
-            $row = $st->fetch(PDO::FETCH_ASSOC);
-            if (! is_array($row) || empty($row)) {
-                return null;
+            return null;
+        }
+        $adminId = (int) ($pv['admin_id'] ?? 0);
+        if ($adminId <= 0) {
+            return null;
+        }
+        $countryId = (int) ($pv['country_id'] ?? 0);
+        $draftId = (int) ($pv['draft_id'] ?? 0);
+        $product = null;
+
+        if ($draftId > 0
+            && function_exists('orange_table_has_column')
+            && orange_table_has_column($pdo, 'products', 'is_preview_draft')) {
+            try {
+                $st = $pdo->prepare(
+                    'SELECT * FROM products
+                     WHERE id = ? AND is_preview_draft = 1 AND preview_admin_id = ?
+                       AND (preview_expires_at IS NULL OR preview_expires_at > NOW())
+                     LIMIT 1'
+                );
+                $st->execute([$draftId, $adminId]);
+                $row = $st->fetch(PDO::FETCH_ASSOC);
+                if (is_array($row) && ! empty($row)) {
+                    $product = $row;
+                } else {
+                    $draftId = 0; // المسودّة لم تَعُد موجودة — تبقى جلسة تصفّح فقط
+                }
+            } catch (Throwable $e) {
+                if (function_exists('error_log')) {
+                    error_log('[orange] orange_preview_active_context: ' . $e->getMessage());
+                }
+                $draftId = 0;
             }
-            $cache = [
-                'draft_id' => $draftId,
-                'product' => $row,
-                'source_id' => (int) ($row['preview_source_product_id'] ?? 0),
-                'country_id' => (int) ($row['country_id'] ?? 0),
-            ];
-
-            return $cache;
-        } catch (Throwable $e) {
-            if (function_exists('error_log')) {
-                error_log('[orange] orange_preview_active_context: ' . $e->getMessage());
-            }
-
-            return null;
         }
+
+        $cache = [
+            'admin_id' => $adminId,
+            'country_id' => $countryId,
+            'draft_id' => $draftId,
+            'product' => $product,
+            'source_id' => $product !== null ? (int) ($product['preview_source_product_id'] ?? 0) : 0,
+        ];
+
+        return $cache;
     }
 }
 
@@ -112,6 +164,55 @@ if (! function_exists('orange_preview_is_active')) {
     function orange_preview_is_active(PDO $pdo): bool
     {
         return orange_preview_active_context($pdo) !== null;
+    }
+}
+
+if (! function_exists('orange_preview_draft_card_for_country')) {
+    /**
+     * يُعيد صفّ المسودّة الجاهز لعرضه ككارت في قوائم الواجهة، أو null.
+     * مشروط بمطابقة دولة المسودّة لدولة المتجر المعروضة (لا تسرّب لدول أخرى).
+     *
+     * @param array<string,mixed>|null $ctx سياق orange_preview_active_context()
+     * @return array<string,mixed>|null
+     */
+    function orange_preview_draft_card_for_country(?array $ctx, int $storefrontCountryId): ?array
+    {
+        if (! is_array($ctx) || (int) ($ctx['draft_id'] ?? 0) <= 0 || ! is_array($ctx['product'] ?? null)) {
+            return null;
+        }
+        $p = $ctx['product'];
+        if ((int) ($p['country_id'] ?? 0) !== $storefrontCountryId) {
+            return null;
+        }
+
+        return $p;
+    }
+}
+
+if (! function_exists('orange_preview_demo_cards')) {
+    /**
+     * كروت تجريبية (برواز أصفر) لملء فراغ القوائم أثناء المعاينة فقط. بيانات ثابتة لا تمسّ القاعدة.
+     *
+     * @return list<array{name:string,price:float}>
+     */
+    function orange_preview_demo_cards(int $count): array
+    {
+        if ($count <= 0) {
+            return [];
+        }
+        $count = min($count, 8);
+        $samples = [
+            ['name' => 'نموذج تجريبي ١', 'price' => 9.90],
+            ['name' => 'نموذج تجريبي ٢', 'price' => 14.50],
+            ['name' => 'نموذج تجريبي ٣', 'price' => 19.00],
+            ['name' => 'نموذج تجريبي ٤', 'price' => 24.75],
+            ['name' => 'نموذج تجريبي ٥', 'price' => 7.25],
+            ['name' => 'نموذج تجريبي ٦', 'price' => 32.00],
+            ['name' => 'نموذج تجريبي ٧', 'price' => 12.30],
+            ['name' => 'نموذج تجريبي ٨', 'price' => 49.99],
+        ];
+
+        return array_slice($samples, 0, $count);
     }
 }
 
