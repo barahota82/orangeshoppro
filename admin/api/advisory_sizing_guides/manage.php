@@ -161,31 +161,62 @@ try {
             }
             $famCk = $meta['ck'];
 
-            // أنواع المنتج المرشّحة: نفس النوع التجاري للعائلة + (اختياري) نفس القسم عبر هرم الكتالوج.
+            // أنواع المنتج المرشّحة: نفس النوع التجاري للعائلة + (تفضيلاً) نفس القسم عبر هرم الكتالوج.
+            // سقوط تلقائي: إن لم يوجد أي نوع تحت القسم المختار، نعرض المطابق بالنوع التجاري بغض النظر عن القسم
+            // (مثلاً عائلة أحذية/حقائب مُسجّلة أنواعها تحت قسمها الخاص لا تحت القسم المختار).
             $types = [];
+            $diag = [
+                'famCk'        => $famCk,
+                'deptId'       => $deptId,
+                'total_active' => 0,
+                'after_kind'   => 0,
+                'after_dept'   => 0,
+                'used_fallback'=> false,
+            ];
             if (orange_table_exists($pdo, 'product_types')) {
-                $sql = 'SELECT pt.id, pt.name_ar, pt.name_en, pt.default_advisory_sizing_guide_id
-                        FROM product_types pt';
-                $params = [];
-                $where = ['pt.is_active = 1'];
-                if ($famCk !== '' && orange_table_has_column($pdo, 'product_types', 'expected_commercial_kind_key')) {
-                    $where[] = '(pt.expected_commercial_kind_key = ? OR pt.expected_commercial_kind_key = \'\')';
-                    $params[] = $famCk;
-                }
-                if ($deptId > 0
-                    && orange_table_exists($pdo, 'catalog_subcategories')
+                $hasKindCol = orange_table_has_column($pdo, 'product_types', 'expected_commercial_kind_key');
+                $hasTree = orange_table_exists($pdo, 'catalog_subcategories')
                     && orange_table_exists($pdo, 'catalog_categories')
-                    && orange_table_exists($pdo, 'catalog_sections')) {
-                    $sql .= ' JOIN catalog_subcategories sc ON sc.id = pt.catalog_subcategory_id
-                              JOIN catalog_categories cc ON cc.id = sc.catalog_category_id
-                              JOIN catalog_sections cs ON cs.id = cc.catalog_section_id';
-                    $where[] = 'cs.department_id = ?';
-                    $params[] = $deptId;
+                    && orange_table_exists($pdo, 'catalog_sections');
+
+                $diag['total_active'] = (int) $pdo->query('SELECT COUNT(*) FROM product_types WHERE is_active = 1')->fetchColumn();
+
+                $buildTypes = function (bool $withDept) use ($pdo, $famCk, $deptId, $hasKindCol, $hasTree) {
+                    $sql = 'SELECT pt.id, pt.name_ar, pt.name_en, pt.default_advisory_sizing_guide_id
+                            FROM product_types pt';
+                    $params = [];
+                    $where = ['pt.is_active = 1'];
+                    if ($famCk !== '' && $hasKindCol) {
+                        $where[] = '(pt.expected_commercial_kind_key = ? OR pt.expected_commercial_kind_key = \'\')';
+                        $params[] = $famCk;
+                    }
+                    if ($withDept && $deptId > 0 && $hasTree) {
+                        $sql .= ' JOIN catalog_subcategories sc ON sc.id = pt.catalog_subcategory_id
+                                  JOIN catalog_categories cc ON cc.id = sc.catalog_category_id
+                                  JOIN catalog_sections cs ON cs.id = cc.catalog_section_id';
+                        $where[] = 'cs.department_id = ?';
+                        $params[] = $deptId;
+                    }
+                    $sql .= ' WHERE ' . implode(' AND ', $where) . ' ORDER BY pt.name_ar ASC, pt.id ASC';
+                    $st = $pdo->prepare($sql);
+                    $st->execute($params);
+                    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                };
+
+                $kindOnly = $buildTypes(false);
+                $diag['after_kind'] = count($kindOnly);
+
+                if ($deptId > 0 && $hasTree) {
+                    $types = $buildTypes(true);
+                    $diag['after_dept'] = count($types);
+                    if (count($types) === 0 && count($kindOnly) > 0) {
+                        $types = $kindOnly;
+                        $diag['used_fallback'] = true;
+                    }
+                } else {
+                    $types = $kindOnly;
+                    $diag['after_dept'] = count($types);
                 }
-                $sql .= ' WHERE ' . implode(' AND ', $where) . ' ORDER BY pt.name_ar ASC, pt.id ASC';
-                $tSt = $pdo->prepare($sql);
-                $tSt->execute($params);
-                $types = $tSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
             }
 
             // المنتجات المرشّحة: نفس عائلة المقاسات.
@@ -199,7 +230,7 @@ try {
                 $products = $pSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
             }
 
-            json_response(['success' => true, 'types' => $types, 'products' => $products]);
+            json_response(['success' => true, 'types' => $types, 'products' => $products, 'diag' => $diag]);
 
         case 'get':
             $id = (int) ($data['id'] ?? 0);

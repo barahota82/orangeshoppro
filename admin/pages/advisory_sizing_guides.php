@@ -738,12 +738,24 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
             return;
         }
         var res = await post(ADVISORY_API, { action: 'list_link_targets', size_family_id: f, department_id: deptId() });
-        if (!res || !res.success) { return; }
+        if (!res || !res.success) {
+            var emsg = (res && res.message) ? res.message : 'تعذّر تحميل أنواع المنتج (خطأ بالخادم — حدّث الصفحة أو راجع السجل).';
+            document.getElementById('asg_link_types').innerHTML = '<span class="alert-error">' + esc(emsg) + '</span>';
+            return;
+        }
         LINK_CACHE.types = res.types || [];
         LINK_CACHE.products = res.products || [];
         LINK_NAME.types = {}; LINK_CACHE.types.forEach(function (t) { var id = parseInt(t.id, 10) || 0; LINK_NAME.types[id] = (t.name_ar || t.name_en || ('#' + id)); });
         LINK_NAME.products = {}; LINK_CACHE.products.forEach(function (p) { var id = parseInt(p.id, 10) || 0; LINK_NAME.products[id] = (p.name_ar || p.name_en || ('#' + id)); });
         renderLinkTypes();
+        if (!LINK_CACHE.types.length && res.diag) {
+            var d = res.diag;
+            document.getElementById('asg_link_types').innerHTML =
+                '<span class="card-hint">لا أنواع مرشّحة. تشخيص: نوع تجاري للعائلة=«' + esc(String(d.famCk || '(فارغ)')) +
+                '»، القسم=' + (parseInt(d.deptId, 10) || 0) + '، أنواع نشطة=' + (parseInt(d.total_active, 10) || 0) +
+                '، مطابقة للنوع التجاري=' + (parseInt(d.after_kind, 10) || 0) +
+                '، منها تحت القسم=' + (parseInt(d.after_dept, 10) || 0) + '.</span>';
+        }
         renderLinkProducts(document.getElementById('asg_link_products_search').value);
     }
 
