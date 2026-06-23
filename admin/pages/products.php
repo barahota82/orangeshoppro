@@ -433,7 +433,7 @@ $orangeAdminSfProductUrlPartsForJs = [
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnVariants" aria-controls="productTabPanelVariants" aria-selected="false" data-product-tab="variants">المتغيرات والباركود</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnAttributes" aria-controls="productTabPanelAttributes" aria-selected="false" data-product-tab="attributes">سمات المنتج</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnDescription" aria-controls="productTabPanelDescription" aria-selected="false" data-product-tab="description">وصف المنتج</button>
-            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnCardPreview" aria-controls="productTabPanelCardPreview" aria-selected="false" data-product-tab="cardpreview">معاينة كارت المنتج</button>
+            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnCardPreview" aria-controls="productTabPanelCardPreview" aria-selected="false" data-product-tab="cardpreview">معاينة المنتج</button>
         </div>
 
         <div class="admin-product-tab-panels">
@@ -747,22 +747,8 @@ $orangeAdminSfProductUrlPartsForJs = [
 
         <div id="productTabPanelCardPreview" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnCardPreview" hidden>
         <div class="admin-product-section">
-        <h4 class="admin-product-subsection-title">محاكاة بصرية لكارت وصفحة المنتج</h4>
-        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">هذه محاكاة داخل الأدمن بنفس أصناف المتجر (<code>main.css</code>) وتُحدَّث مباشرة من حقول النموذج قبل الحفظ. يمكنك التنقّل بين: <strong>كارت القائمة</strong>، <strong>صفحة المنتج</strong>، و<strong>عرض موبايل</strong>، أو تشغيل <strong>محاكاة شاملة</strong> (قائمة + صفحة منتج). بعد الحفظ يظهر رابط الصفحة الحقيقية كما للزائر.</p>
-        <div class="admin-product-preview-mode-row" style="margin:0 0 12px;">
-            <label for="orangeAdminProductPreviewMode" style="margin:0;">وضع المحاكاة</label>
-            <select id="orangeAdminProductPreviewMode">
-                <option value="flow">محاكاة شاملة (قائمة + صفحة المنتج)</option>
-                <option value="card">كارت القائمة فقط</option>
-                <option value="product">صفحة المنتج (سطح مكتب)</option>
-                <option value="mobile">صفحة المنتج (موبايل)</option>
-            </select>
-            <button type="button" class="btn-secondary" id="orangeAdminProductPreviewRefreshNow">تحديث الآن</button>
-        </div>
-        <p id="orangeAdminProductFullPreviewWrap" class="card-hint" style="margin:0 0 12px;display:none;font-size:13px;">
-            <a id="orangeAdminProductFullPreviewLink" class="btn-secondary" href="#" target="_blank" rel="noopener noreferrer">فتح صفحة المنتج كاملة في المتجر (كما للزائر)</a>
-            <span style="display:block;margin-top:6px;color:#64748b;font-size:12px;">يستخدم القناة الافتراضية واللغة العربية في الرابط؛ إن لم يطابق رابطك المعتاد عدّل القناة من شاشة القنوات أو افتح المنتج من الواجهة.</span>
-        </p>
+        <h4 class="admin-product-subsection-title">معاينة المنتج كما يراها العميل</h4>
+        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">تفتح المعاينة المتجر الحقيقي بقوالبه الفعلية وتُحدَّث مباشرة من حقول النموذج قبل الحفظ. يمكنك التنقّل بين: <strong>كارت القائمة</strong>، <strong>صفحة المنتج</strong>، و<strong>عرض موبايل</strong>، أو تشغيل <strong>محاكاة شاملة</strong> (قائمة + صفحة منتج). بعد الحفظ يظهر رابط الصفحة الحقيقية كما للزائر.</p>
         <?php
         $sfPreviewCountries = function_exists('orange_countries_storefront_active')
             ? orange_countries_storefront_active($pdo, 'ar')
@@ -781,9 +767,6 @@ $orangeAdminSfProductUrlPartsForJs = [
                 <span id="orangeFullPreviewStatus" style="font-size:12px;color:#64748b;"></span>
             </div>
             <span style="display:block;margin-top:6px;color:#9a3412;font-size:12px;">يُجهّز نسخة معاينة مخفيّة عن العملاء، ويفتح المتجر بقناة الدولة الافتراضية. أي طلب داخل المعاينة لا يُرسَل فعلياً. تنتهي المعاينة تلقائياً خلال 24 ساعة.</span>
-        </div>
-        <div class="admin-product-card-preview-frame-wrap">
-            <iframe id="orangeAdminProductCardPreviewFrame" class="admin-product-card-preview-frame" title="معاينة كارت المنتج في المتجر"></iframe>
         </div>
         </div>
         </div>
