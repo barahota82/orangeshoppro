@@ -29,7 +29,7 @@ function orangeProductGalleryReplaceUrls(urls) {
                 orangeProductEscAttr(u) +
                 '" alt="' +
                 orangeProductEscAttr(alt) +
-                '" loading="lazy"></div>'
+                '" decoding="async"></div>'
         )
         .join('');
     let inner = '';

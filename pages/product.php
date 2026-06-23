@@ -417,7 +417,7 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
                     <div class="product-gallery__track" id="productGalleryTrack">
                         <?php foreach ($galleryUrls as $url): ?>
                         <div class="product-gallery__slide">
-                            <img class="product-gallery__img" src="<?php echo htmlspecialchars($url, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'); ?>" loading="lazy">
+                            <img class="product-gallery__img" src="<?php echo htmlspecialchars($url, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'); ?>" decoding="async">
                         </div>
                         <?php endforeach; ?>
                     </div>
