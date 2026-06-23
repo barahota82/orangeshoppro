@@ -590,6 +590,12 @@ function orangeSyncCartProceedBtn() {
         items.length > 0 &&
         (!orangeCartLineChoiceApplies(items) || orangeCartGetSelectedItems(items).length > 0);
     btn.disabled = !ok;
+    /* السلة الفارغة تعرض زر «متابعة التسوق» داخلها؛ نخفي تذييل «تنفيذ الطلب» (الثابت على الموبايل)
+       حتى لا يتداخل الزرّان فوق بعضهما. */
+    const footer = btn.closest('.cart-basket-footer');
+    if (footer) {
+        footer.hidden = items.length === 0;
+    }
 }
 
 /** س22: يظهر في صفحة العربة عند تعديل طلب قائم؛ يُمسح مع إفراغ السلة. */
