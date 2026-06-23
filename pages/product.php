@@ -173,18 +173,13 @@ if ($sfId > 0 && $agProductGuideId > 0) {
 }
 
 $sizingChartRows = [];
-$sizingShowFoot = false;
 if ($sfId > 0 && orange_table_exists($pdo, 'size_family_sizes')) {
-    $hasFootCol = orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm');
     $cols = 'label_ar, label_en';
     if (
         orange_table_has_column($pdo, 'size_family_sizes', 'label_fil')
         && orange_table_has_column($pdo, 'size_family_sizes', 'label_hi')
     ) {
         $cols .= ', label_fil, label_hi';
-    }
-    if ($hasFootCol) {
-        $cols .= ', foot_length_cm';
     }
     $sst = $pdo->prepare(
         "SELECT {$cols} FROM size_family_sizes
@@ -193,14 +188,6 @@ if ($sfId > 0 && orange_table_exists($pdo, 'size_family_sizes')) {
     );
     $sst->execute([$sfId]);
     $sizingChartRows = $sst->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    if ($hasFootCol) {
-        foreach ($sizingChartRows as $r) {
-            if (isset($r['foot_length_cm']) && $r['foot_length_cm'] !== null && trim((string) $r['foot_length_cm']) !== '') {
-                $sizingShowFoot = true;
-                break;
-            }
-        }
-    }
 }
 $advisorySizingReady = !empty($advisorySizing['use_dynamic']) && ($advisorySizing['sections'] ?? []) !== [];
 $advUxHasLength = false;
@@ -611,23 +598,12 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
                         <thead>
                             <tr>
                                 <th class="product-sizing-table__th" scope="col"><?php echo htmlspecialchars(t('sizing_col_size'), ENT_QUOTES, 'UTF-8'); ?></th>
-                                <?php if ($sizingShowFoot): ?>
-                                    <th class="product-sizing-table__th product-sizing-table__th--num" scope="col"><?php echo htmlspecialchars(t('sizing_col_foot_cm'), ENT_QUOTES, 'UTF-8'); ?></th>
-                                <?php endif; ?>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($sizingChartRows as $srow): ?>
                                 <tr class="product-sizing-table__data-row">
                                     <td class="product-sizing-table__td"><?php echo htmlspecialchars(storefront_size_chart_cell_label($srow), ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <?php if ($sizingShowFoot): ?>
-                                        <td class="product-sizing-table__td product-sizing-table__td--num"><?php
-                                        $fc = $srow['foot_length_cm'] ?? null;
-                                        echo $fc !== null && trim((string) $fc) !== ''
-                                            ? htmlspecialchars((string) $fc, ENT_QUOTES, 'UTF-8')
-                                            : '—';
-                                        ?></td>
-                                    <?php endif; ?>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>

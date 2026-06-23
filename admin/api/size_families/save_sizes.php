@@ -9,8 +9,6 @@ require_admin_api();
 
 /**
  * تحديث سطر القالب وجميع مقاسات العائلات المربوطة به (مزامنة ثنائية).
- *
- * @param float|null $foot
  */
 function orange_catalog_sync_template_size_to_linked_families(
     PDO $pdo,
@@ -19,17 +17,16 @@ function orange_catalog_sync_template_size_to_linked_families(
     string $le,
     string $lf,
     string $lh,
-    int $sortOrder,
-    $foot
+    int $sortOrder
 ): void {
     $wu = $pdo->prepare(
-        'UPDATE size_scheme_template_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, foot_length_cm=? WHERE id=? LIMIT 1'
+        'UPDATE size_scheme_template_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=? WHERE id=? LIMIT 1'
     );
-    $wu->execute([$la, $le, $lf, $lh, $sortOrder, $foot, $templateSizeId]);
+    $wu->execute([$la, $le, $lf, $lh, $sortOrder, $templateSizeId]);
     $wf = $pdo->prepare(
-        'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, foot_length_cm=? WHERE scheme_template_size_id=?'
+        'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=? WHERE scheme_template_size_id=?'
     );
-    $wf->execute([$la, $le, $lf, $lh, $sortOrder, $foot, $templateSizeId]);
+    $wf->execute([$la, $le, $lf, $lh, $sortOrder, $templateSizeId]);
 }
 
 function orange_tpl_slugify_key(string $s): string
@@ -40,57 +37,6 @@ function orange_tpl_slugify_key(string $s): string
     $s = trim($s, '_');
 
     return $s;
-}
-
-/**
- * @param mixed $raw
- */
-function orange_parse_foot_length_nullable($raw, ?string &$err = null): ?float
-{
-    $err = null;
-    if ($raw === null) {
-        return null;
-    }
-    $v = trim((string) $raw);
-    if ($v === '') {
-        return null;
-    }
-    $v = strtr($v, [
-        '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
-        '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
-        '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
-        '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
-        '٫' => '.', '،' => '.', ',' => '.', '٬' => '',
-        "\u{00A0}" => ' ', "\u{202F}" => ' ', "\u{200F}" => '', "\u{200E}" => '',
-    ]);
-    $v = preg_replace('/\s+/u', '', $v) ?? $v;
-    $v = preg_replace('/(?:cm|cms|سم)$/iu', '', $v) ?? $v;
-    $v = preg_replace('/[^0-9\.\-]/u', '', $v) ?? '';
-    if ($v === '') {
-        $err = 'طول القدم يجب أن يكون رقماً (سم)';
-        return null;
-    }
-    $sign = '';
-    if (strpos($v, '-') === 0) {
-        $sign = '-';
-    }
-    $v = str_replace('-', '', $v);
-    if ($v === '') {
-        $err = 'طول القدم يجب أن يكون رقماً (سم)';
-        return null;
-    }
-    if (substr_count($v, '.') > 1) {
-        $parts = explode('.', $v);
-        $dec = (string) array_pop($parts);
-        $v = implode('', $parts) . '.' . $dec;
-    }
-    $v = $sign . $v;
-    if (!preg_match('/^-?\d+(?:\.\d+)?$/', $v)) {
-        $err = 'طول القدم يجب أن يكون رقماً (سم)';
-        return null;
-    }
-
-    return round((float) $v, 2);
 }
 
 /**
@@ -195,7 +141,6 @@ try {
     $pdo->beginTransaction();
 
     $keepIds = [];
-    $hasFoot = orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm');
     $hasSfLang = orange_table_has_column($pdo, 'size_family_sizes', 'label_fil')
         && orange_table_has_column($pdo, 'size_family_sizes', 'label_hi');
     $hasTplLink = orange_table_exists($pdo, 'size_family_sizes')
@@ -260,40 +205,24 @@ try {
     $insTplSz = null;
     if ($hasTplLink && $syncTemplateId > 0) {
         $insTplSz = $pdo->prepare(
-            'INSERT INTO size_scheme_template_sizes (template_id, label_ar, label_en, label_fil, label_hi, sort_order, foot_length_cm, is_active) VALUES (?,?,?,?,?,?,?,1)'
+            'INSERT INTO size_scheme_template_sizes (template_id, label_ar, label_en, label_fil, label_hi, sort_order, is_active) VALUES (?,?,?,?,?,?,1)'
         );
     }
 
-    $ins = $hasFoot && $hasSfLang
+    $ins = $hasSfLang
         ? $pdo->prepare(
-            'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, label_fil, label_hi, sort_order, foot_length_cm, is_active) VALUES (?,?,?,?,?,?,?,1)'
+            'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, label_fil, label_hi, sort_order, is_active) VALUES (?,?,?,?,?,?,1)'
         )
-        : ($hasFoot
+        : $pdo->prepare(
+            'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, sort_order, is_active) VALUES (?,?,?,?,1)'
+        );
+    $upd = $hasSfLang
         ? $pdo->prepare(
-            'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, sort_order, foot_length_cm, is_active) VALUES (?,?,?,?,?,1)'
+            'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=? WHERE id=? AND size_family_id=? LIMIT 1'
         )
-        : ($hasSfLang
-            ? $pdo->prepare(
-                'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, label_fil, label_hi, sort_order, is_active) VALUES (?,?,?,?,?,?,1)'
-            )
-            : $pdo->prepare(
-                'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, sort_order, is_active) VALUES (?,?,?,?,1)'
-            )));
-    $upd = $hasFoot && $hasSfLang
-        ? $pdo->prepare(
-            'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, foot_length_cm=? WHERE id=? AND size_family_id=? LIMIT 1'
-        )
-        : ($hasFoot
-        ? $pdo->prepare(
-            'UPDATE size_family_sizes SET label_ar=?, label_en=?, sort_order=?, foot_length_cm=? WHERE id=? AND size_family_id=? LIMIT 1'
-        )
-        : ($hasSfLang
-            ? $pdo->prepare(
-                'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=? WHERE id=? AND size_family_id=? LIMIT 1'
-            )
-            : $pdo->prepare(
-                'UPDATE size_family_sizes SET label_ar=?, label_en=?, sort_order=? WHERE id=? AND size_family_id=? LIMIT 1'
-            )));
+        : $pdo->prepare(
+            'UPDATE size_family_sizes SET label_ar=?, label_en=?, sort_order=? WHERE id=? AND size_family_id=? LIMIT 1'
+        );
 
     $linkStmt = $hasTplLink
         ? $pdo->prepare('UPDATE size_family_sizes SET scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1')
@@ -322,11 +251,6 @@ try {
             $lh = $le;
         }
         $so = (int)($row['sort_order'] ?? $i);
-        $footErr = null;
-        $foot = orange_parse_foot_length_nullable($row['foot_length_cm'] ?? null, $footErr);
-        if ($footErr !== null) {
-            json_response(['success' => false, 'message' => $footErr], 422);
-        }
         if ($la === '' && $le === '') {
             continue;
         }
@@ -349,14 +273,10 @@ try {
                 if ($linkStmt !== null) {
                     $linkStmt->execute([$tstId, $sid, $familyId]);
                 }
-                orange_catalog_sync_template_size_to_linked_families($pdo, $tstId, $la, $le, $lf, $lh, $so, $foot);
+                orange_catalog_sync_template_size_to_linked_families($pdo, $tstId, $la, $le, $lf, $lh, $so);
                 $keepIds[] = $sid;
             } else {
-                if ($hasFoot && $hasSfLang) {
-                    $upd->execute([$la, $le, $lf, $lh, $so, $foot, $sid, $familyId]);
-                } elseif ($hasFoot) {
-                    $upd->execute([$la, $le, $so, $foot, $sid, $familyId]);
-                } elseif ($hasSfLang) {
+                if ($hasSfLang) {
                     $upd->execute([$la, $le, $lf, $lh, $so, $sid, $familyId]);
                 } else {
                     $upd->execute([$la, $le, $so, $sid, $familyId]);
@@ -375,15 +295,11 @@ try {
                     $pdo->rollBack();
                     json_response(['success' => false, 'message' => 'قالب المقاسات غير موجود'], 422);
                 }
-                $insTplSz->execute([$syncTemplateId, $la, $le, $lf, $lh, $so, $foot]);
+                $insTplSz->execute([$syncTemplateId, $la, $le, $lf, $lh, $so]);
                 $attachTpl = (int) $pdo->lastInsertId();
             }
 
-            if ($hasFoot && $hasSfLang) {
-                $ins->execute([$familyId, $la, $le, $lf, $lh, $so, $foot]);
-            } elseif ($hasFoot) {
-                $ins->execute([$familyId, $la, $le, $so, $foot]);
-            } elseif ($hasSfLang) {
+            if ($hasSfLang) {
                 $ins->execute([$familyId, $la, $le, $lf, $lh, $so]);
             } else {
                 $ins->execute([$familyId, $la, $le, $so]);

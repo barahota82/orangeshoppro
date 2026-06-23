@@ -1132,7 +1132,6 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             label_fil VARCHAR(191) NOT NULL DEFAULT \'\',
             label_hi VARCHAR(191) NOT NULL DEFAULT \'\',
             sort_order INT NOT NULL DEFAULT 0,
-            foot_length_cm DECIMAL(6,2) NULL,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
             KEY idx_size_scheme_template_sizes_tpl (template_id)
@@ -1651,8 +1650,13 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         }
     }
 
-    if (orange_table_exists($pdo, 'size_family_sizes') && !orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm')) {
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE size_family_sizes ADD COLUMN foot_length_cm DECIMAL(6,2) NULL');
+    // طول القدم لم يعد جزءاً من عائلات/قوالب المقاسات (صار عموداً إرشادياً داخل الدليل الإرشادي للأحذية).
+    // إسقاط محروس لمرة واحدة (idempotent): يُحذف العمود إن وُجد، ثم لا يُعاد لأنه أُزيل من CREATE وANY ADD.
+    if (orange_table_exists($pdo, 'size_family_sizes') && orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE size_family_sizes DROP COLUMN foot_length_cm');
+    }
+    if (orange_table_exists($pdo, 'size_scheme_template_sizes') && orange_table_has_column($pdo, 'size_scheme_template_sizes', 'foot_length_cm')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE size_scheme_template_sizes DROP COLUMN foot_length_cm');
     }
     if (orange_table_exists($pdo, 'size_families') && !orange_table_has_column($pdo, 'size_families', 'size_scheme_key')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE size_families ADD COLUMN size_scheme_key VARCHAR(64) NOT NULL DEFAULT \'\' AFTER name_en');

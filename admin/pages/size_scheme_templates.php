@@ -205,7 +205,6 @@ if ($tablesReady) {
                     <th>عربي</th>
                     <th>Fil</th>
                     <th>Hi</th>
-                    <th>طول القدم (سم)</th>
                     <th></th>
                 </tr>
             </thead>
@@ -334,7 +333,6 @@ function sstAddSizeRow() {
         '<td><input type="text" class="sst-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true"></td>' +
         '<td><input type="text" class="sst-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true"></td>' +
         '<td><input type="text" class="sst-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true"></td>' +
-        '<td><input type="text" class="sst-fl" placeholder="اختياري"></td>' +
         '<td><button type="button" class="btn-secondary" onclick="sstRemoveSizeRow(this)">حذف الصف</button></td>';
     tb.appendChild(tr);
     sstRefreshSizeRowOrder();
@@ -347,7 +345,6 @@ function sstCollectSizes() {
         var le = tr.querySelector('.sst-le');
         var lf = tr.querySelector('.sst-lf');
         var lh = tr.querySelector('.sst-lh');
-        var fl = tr.querySelector('.sst-fl');
         var o = {
             label_ar: la ? String(la.value || '').trim() : '',
             label_en: le ? String(le.value || '').trim() : '',
@@ -355,10 +352,6 @@ function sstCollectSizes() {
             label_hi: lh ? String(lh.value || '').trim() : '',
             sort_order: idx + 1
         };
-        var flv = fl ? String(fl.value || '').trim() : '';
-        if (flv !== '') {
-            o.foot_length_cm = flv;
-        }
         var sid = parseInt(tr.getAttribute('data-sst-size-id') || '0', 10) || 0;
         if (sid > 0) {
             o.id = sid;
@@ -531,13 +524,11 @@ async function sstLoadOne(tplId) {
                 if (r.id != null && parseInt(String(r.id), 10) > 0) {
                     tr.setAttribute('data-sst-size-id', String(parseInt(String(r.id), 10)));
                 }
-                var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
                 tr.innerHTML = '<td class="sst-ord">' + String(idx + 1) + '</td>' +
                     '<td><input type="text" class="sst-le admin-sort-field" maxlength="191" autocomplete="off" value="' + sstEscapeAttr(r.label_en) + '"></td>' +
                     '<td><input type="text" class="sst-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value="' + sstEscapeAttr(r.label_ar) + '"></td>' +
                     '<td><input type="text" class="sst-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value="' + sstEscapeAttr(r.label_fil) + '"></td>' +
                     '<td><input type="text" class="sst-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value="' + sstEscapeAttr(r.label_hi) + '"></td>' +
-                    '<td><input type="text" class="sst-fl" value="' + sstEscapeAttr(fl) + '"></td>' +
                     '<td><button type="button" class="btn-secondary" onclick="sstRemoveSizeRow(this)">حذف الصف</button></td>';
                 tb.appendChild(tr);
                 sstSyncRowArFilHiFromEn(tr);

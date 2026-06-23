@@ -152,3 +152,15 @@
 - **الـ API:** `admin/api/advisory_sizing_guides/manage.php` — أُعيد كتابته: `save` (عائلة هي العمود الفقري، يُستنتَج القالب/النوع التجاري منها؛ panel_kind لكل عمود/صف؛ الربط في نفس الحفظة)، `list_by_family`، `list_link_targets` (أنواع مرشّحة بالقسم عبر هرم الكتالوج + النوع التجاري للعائلة؛ منتجات بنفس العائلة)، `get`، `delete` (يفكّ الربط أيضاً).
 - **سلسلة الأولوية + المتجر:** `includes/advisory_sizing_guides.php` — `orange_advisory_sizing_resolve_guide_id()` صار ثلاثي المستوى (منتج→نوع→**دليل العائلة العام** عبر `orange_advisory_sizing_family_general_guide_id()`: نشِط، غير مربوط بنوع/منتج، الأقل `sort_order` ثم `id`)؛ `build_sections_for_guide_id()` dual-aware (قسمان علوي/سفلي عبر `panel_kind`). `pages/product.php` يعتمد على السلسلة وحدها (حُذف المسار القديم `build_sections` بالنطاق لأنه غير متوافق مع dual)، وعند dual يعرض **تابين** (علوي افتراضياً) مع تبديل JS؛ CSS في `assets/css/main.css` (`.product-sizing-tabs`, `.product-sizing-adv-panel`). **لا** خانة ترتيب يدوية (يكفي `sort_order` التلقائي).
 - **لم تُلمَس** شاشتا «أنواع المنتج» و«المنتج» للربط (النطاق محصور بشاشة الدليل).
+
+### طول القدم لم يعد في عائلات/قوالب المقاسات (قرار المالك 2026-06-23 — حذف كامل متّسق)
+
+**القرار:** «طول القدم (سم)» **ليس** خاصية لعائلة/قالب المقاسات؛ هو **عمود إرشادي** يُضاف داخل **الدليل الإرشادي للأحذية** عند تأليفه. لذلك حُذِف نهائياً من شاشة «عائلات المقاسات» وشاشة «قوالب المقاسات» والجدول القديم في المتجر، **ومن قاعدة البيانات** (العمود `foot_length_cm` على `size_family_sizes` و`size_scheme_template_sizes`). (المالك اختار «حذف كامل متّسق» وطلب تنفيذ الإسقاط آلياً والرفع.)
+
+**شاشة «مقاسات داخل العائلة» (`admin/pages/size_families.php`):** أُزيل عمود `id` (داخلي بقاعدة البيانات، يبقى في `data-id` للصف للحفظ فقط)، وأُزيل عمود «طول القدم»، ونُقل عمود «الترتيب» ليكون **أول عمود** مكان `id`. الأعمدة الآن: ترتيب → EN → عربي → Fil → Hi.
+
+**تنفيذ:**
+- **المخطط (`includes/catalog_schema.php`):** أُزيل `foot_length_cm` من `CREATE size_scheme_template_sizes` ومن أي `ADD COLUMN`؛ أُضيف **إسقاط محروس idempotent** (يُسقط العمود إن وُجد على كلا الجدولين، ولا يُعاد) — يُطبَّق تلقائياً بعد `git pull` عند أول طلب. (إسقاط عمود إجراء هدّام لكن مقصود بقرار المالك؛ محروس بـ`orange_table_has_column` فلا يتكرر.)
+- **`admin/pages/size_families.php`** و**`admin/pages/size_scheme_templates.php`:** أُزيلت أعمدة/حقول طول القدم من العرض والإدخال والتجميع والتحميل من القالب.
+- **`admin/api/size_families/save_sizes.php`** و**`admin/api/size_scheme_templates/manage.php`:** أُزيل `foot_length_cm` من كل INSERT/UPDATE والمزامنة، وحُذفت `orange_parse_foot_length_nullable` وفروع `$hasFoot`/`$hasFamFoot`.
+- **`pages/product.php`:** أُزيل عرض «طول القدم» من جدول المقاسات القديم (`$sizingShowFoot`/`$hasFootCol`). مفاتيح الترجمة `sizing_col_foot_cm` بقيت في `config.php` (غير ضارة؛ قد تُعاد كتسمية عمود إرشادي).

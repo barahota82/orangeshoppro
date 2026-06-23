@@ -1009,16 +1009,15 @@ function loadSizesEditor() {
         return;
     }
     var rows = ORANGE_SIZES_BY_FAMILY[String(fid)] || ORANGE_SIZES_BY_FAMILY[fid] || [];
-    var thead = '<thead><tr><th>id</th><th>EN</th><th>عربي</th><th>Fil</th><th>Hi</th><th>طول القدم (سم)</th><th>ترتيب</th></tr></thead>';
+    var thead = '<thead><tr><th>ترتيب</th><th>EN</th><th>عربي</th><th>Fil</th><th>Hi</th></tr></thead>';
     var html = '<div class="table-wrap"><table>' + thead + '<tbody>';
     if (!rows.length) {
         html += '</tbody></table></div>';
     } else {
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
-            var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
             var tplSz = parseInt(String(r.scheme_template_size_id != null ? r.scheme_template_size_id : '0'), 10) || 0;
-            html += '<tr class="size-row" data-id="' + r.id + '" data-scheme-template-size-id="' + tplSz + '"><td>' + r.id + '</td><td><input type="text" class="s-le admin-sort-field" maxlength="191" autocomplete="off" value="' + escapeAttr(r.label_en) + '"></td><td><input type="text" class="s-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value=""></td><td><input type="text" class="s-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-fl admin-sort-field" maxlength="32" autocomplete="off" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + (Number(r.sort_order) || 0) + '"></td></tr>';
+            html += '<tr class="size-row" data-id="' + r.id + '" data-scheme-template-size-id="' + tplSz + '"><td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + (Number(r.sort_order) || 0) + '"></td><td><input type="text" class="s-le admin-sort-field" maxlength="191" autocomplete="off" value="' + escapeAttr(r.label_en) + '"></td><td><input type="text" class="s-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value=""></td><td><input type="text" class="s-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td></tr>';
         }
         html += '</tbody></table></div>';
     }
@@ -1064,7 +1063,7 @@ function famEnsureSizesEditorEmptyTable() {
     if (tbody) {
         return tbody;
     }
-    var thead = '<thead><tr><th>id</th><th>EN</th><th>عربي</th><th>Fil</th><th>Hi</th><th>طول القدم (سم)</th><th>ترتيب</th></tr></thead>';
+    var thead = '<thead><tr><th>ترتيب</th><th>EN</th><th>عربي</th><th>Fil</th><th>Hi</th></tr></thead>';
     box.innerHTML = '<div class="table-wrap"><table>' + thead + '<tbody></tbody></table></div>';
     return box.querySelector('tbody');
 }
@@ -1078,13 +1077,11 @@ function famAddEmptySizeRow() {
     var tr = document.createElement('tr');
     tr.className = 'size-row';
     tr.setAttribute('data-new', '1');
-    tr.innerHTML = '<td>0</td>' +
+    tr.innerHTML = '<td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + String(n + 1) + '"></td>' +
         '<td><input type="text" class="s-le admin-sort-field" maxlength="191" autocomplete="off" value=""></td>' +
         '<td><input type="text" class="s-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value=""></td>' +
         '<td><input type="text" class="s-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td>' +
-        '<td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td>' +
-        '<td><input type="text" class="s-fl admin-sort-field" maxlength="32" autocomplete="off" value=""></td>' +
-        '<td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + String(n + 1) + '"></td>';
+        '<td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td>';
     tbody.appendChild(tr);
 }
 
@@ -1095,7 +1092,6 @@ function famCollectSizesRowsFromEditor() {
         var tr = trs[idx];
         var id = parseInt(tr.getAttribute('data-id') || '0', 10) || 0;
         var leEl = tr.querySelector('.s-le');
-        var flEl = tr.querySelector('.s-fl');
         var soEl = tr.querySelector('.s-so');
         var le = leEl ? String(leEl.value || '').trim() : '';
         if (le === '') {
@@ -1104,11 +1100,9 @@ function famCollectSizesRowsFromEditor() {
         var la = le;
         var lf = le;
         var lh = le;
-        var fl = flEl ? String(flEl.value || '').trim() : '';
         var so = soEl ? parseInt(soEl.value || String(idx), 10) : idx;
         if (isNaN(so)) so = idx;
         var row = { id: id, label_ar: la, label_en: le, label_fil: lf, label_hi: lh, sort_order: so };
-        if (fl !== '') row.foot_length_cm = fl;
         var tplL = parseInt(tr.getAttribute('data-scheme-template-size-id') || '0', 10) || 0;
         if (tplL > 0) {
             row.scheme_template_size_id = tplL;
@@ -1199,8 +1193,7 @@ async function famApplyTemplateSizesToEditor(tid, opts) {
             } else {
                 tr.setAttribute('data-new', '1');
             }
-            var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
-            tr.innerHTML = '<td>' + String(keepId > 0 ? keepId : 0) + '</td><td><input type="text" class="s-le admin-sort-field" maxlength="191" autocomplete="off" value="' + escapeAttr(r.label_en || '') + '"></td><td><input type="text" class="s-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value=""></td><td><input type="text" class="s-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-fl admin-sort-field" maxlength="32" autocomplete="off" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + (Number(r.sort_order) || (i + 1)) + '"></td>';
+            tr.innerHTML = '<td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + (Number(r.sort_order) || (i + 1)) + '"></td><td><input type="text" class="s-le admin-sort-field" maxlength="191" autocomplete="off" value="' + escapeAttr(r.label_en || '') + '"></td><td><input type="text" class="s-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value=""></td><td><input type="text" class="s-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td>';
             tbody.appendChild(tr);
             famSyncRowLabelsFromEn(tr);
         }

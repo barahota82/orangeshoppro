@@ -17,57 +17,6 @@ function orange_tpl_slugify_key(string $s): string
 }
 
 /**
- * @param mixed $raw
- */
-function orange_parse_foot_length_nullable($raw, ?string &$err = null): ?float
-{
-    $err = null;
-    if ($raw === null) {
-        return null;
-    }
-    $v = trim((string) $raw);
-    if ($v === '') {
-        return null;
-    }
-    $v = strtr($v, [
-        '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
-        '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
-        '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
-        '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
-        '٫' => '.', '،' => '.', ',' => '.', '٬' => '',
-        "\u{00A0}" => ' ', "\u{202F}" => ' ', "\u{200F}" => '', "\u{200E}" => '',
-    ]);
-    $v = preg_replace('/\s+/u', '', $v) ?? $v;
-    $v = preg_replace('/(?:cm|cms|سم)$/iu', '', $v) ?? $v;
-    $v = preg_replace('/[^0-9\.\-]/u', '', $v) ?? '';
-    if ($v === '') {
-        $err = 'طول القدم يجب أن يكون رقماً (سم)';
-        return null;
-    }
-    $sign = '';
-    if (strpos($v, '-') === 0) {
-        $sign = '-';
-    }
-    $v = str_replace('-', '', $v);
-    if ($v === '') {
-        $err = 'طول القدم يجب أن يكون رقماً (سم)';
-        return null;
-    }
-    if (substr_count($v, '.') > 1) {
-        $parts = explode('.', $v);
-        $dec = (string) array_pop($parts);
-        $v = implode('', $parts) . '.' . $dec;
-    }
-    $v = $sign . $v;
-    if (!preg_match('/^-?\d+(?:\.\d+)?$/', $v)) {
-        $err = 'طول القدم يجب أن يكون رقماً (سم)';
-        return null;
-    }
-
-    return round((float) $v, 2);
-}
-
-/**
  * يطابق العائلة مع القالب حتى عند غياب size_scheme_template_id (اعتماداً على size_scheme_key / الاسم الإنجليزي).
  *
  * @param array<string,mixed> $famRow
@@ -152,7 +101,7 @@ try {
                 json_response(['success' => false, 'message' => 'القالب غير موجود'], 404);
             }
             $st2 = $pdo->prepare(
-                'SELECT id, label_ar, label_en, label_fil, label_hi, sort_order, foot_length_cm
+                'SELECT id, label_ar, label_en, label_fil, label_hi, sort_order
                  FROM size_scheme_template_sizes
                  WHERE template_id = ?
                  ORDER BY sort_order ASC, id ASC'
@@ -196,11 +145,6 @@ try {
                 $lf = trim((string) ($row['label_fil'] ?? ''));
                 $lh = trim((string) ($row['label_hi'] ?? ''));
                 $so = (int) ($row['sort_order'] ?? 0);
-                $footErr = null;
-                $fl = orange_parse_foot_length_nullable($row['foot_length_cm'] ?? null, $footErr);
-                if ($footErr !== null) {
-                    json_response(['success' => false, 'message' => $footErr], 422);
-                }
                 $rowTplSizeId = (int) ($row['id'] ?? 0);
                 $normalized[] = [
                     'id' => $rowTplSizeId,
@@ -209,7 +153,6 @@ try {
                     'label_fil' => $lf,
                     'label_hi' => $lh,
                     'sort_order' => $so,
-                    'foot_length_cm' => $fl,
                 ];
             }
 
@@ -252,11 +195,11 @@ try {
 
                 $insTplSz = $pdo->prepare(
                     'INSERT INTO size_scheme_template_sizes
-                        (template_id, label_ar, label_en, label_fil, label_hi, sort_order, foot_length_cm, is_active)
-                     VALUES (?,?,?,?,?,?,?,1)'
+                        (template_id, label_ar, label_en, label_fil, label_hi, sort_order, is_active)
+                     VALUES (?,?,?,?,?,?,1)'
                 );
                 $updTplSz = $pdo->prepare(
-                    'UPDATE size_scheme_template_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, foot_length_cm=?
+                    'UPDATE size_scheme_template_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?
                      WHERE id=? AND template_id=? LIMIT 1'
                 );
 
@@ -271,7 +214,6 @@ try {
                             $r['label_fil'],
                             $r['label_hi'],
                             $so,
-                            $r['foot_length_cm'],
                             $rid,
                             $tplId,
                         ]);
@@ -284,7 +226,6 @@ try {
                             $r['label_fil'],
                             $r['label_hi'],
                             $so,
-                            $r['foot_length_cm'],
                         ]);
                         $keptTplSizeIds[] = (int) $pdo->lastInsertId();
                     }
@@ -320,7 +261,7 @@ try {
                     $sqlSync = 'UPDATE size_family_sizes sfs
                         INNER JOIN size_scheme_template_sizes tst ON tst.id = sfs.scheme_template_size_id
                         SET sfs.label_ar = tst.label_ar, sfs.label_en = tst.label_en, sfs.label_fil = tst.label_fil,
-                            sfs.label_hi = tst.label_hi, sfs.sort_order = tst.sort_order, sfs.foot_length_cm = tst.foot_length_cm
+                            sfs.label_hi = tst.label_hi, sfs.sort_order = tst.sort_order
                         WHERE tst.template_id = ? AND sfs.scheme_template_size_id IN (' . $phK . ')';
                     $pdo->prepare($sqlSync)->execute(array_merge([$tplId], $keptTplSizeIds));
                 }
@@ -355,7 +296,7 @@ try {
                         INNER JOIN size_families fam ON fam.id = sfs.size_family_id AND fam.size_scheme_template_id = ?
                         INNER JOIN size_scheme_template_sizes tst ON tst.template_id = ? AND tst.sort_order = sfs.sort_order
                         SET sfs.label_ar = tst.label_ar, sfs.label_en = tst.label_en, sfs.label_fil = tst.label_fil,
-                            sfs.label_hi = tst.label_hi, sfs.foot_length_cm = tst.foot_length_cm, sfs.scheme_template_size_id = tst.id
+                            sfs.label_hi = tst.label_hi, sfs.scheme_template_size_id = tst.id
                         WHERE sfs.scheme_template_size_id IS NULL';
                     $pdo->prepare($sqlBack)->execute([$tplId, $tplId]);
                 }
@@ -366,45 +307,28 @@ try {
                  */
                 if ($hasFamLink && $hasFamTplRef) {
                     $tplRowsOrd = $pdo->prepare(
-                        'SELECT id, label_ar, label_en, label_fil, label_hi, sort_order, foot_length_cm
+                        'SELECT id, label_ar, label_en, label_fil, label_hi, sort_order
                          FROM size_scheme_template_sizes WHERE template_id = ? ORDER BY sort_order ASC, id ASC'
                     );
                     $tplRowsOrd->execute([$tplId]);
                     $tplRowsList = $tplRowsOrd->fetchAll(PDO::FETCH_ASSOC) ?: [];
                     if ($tplRowsList !== []) {
-                        $hasFamFoot = orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm');
                         $hasFamSfLang = orange_table_has_column($pdo, 'size_family_sizes', 'label_fil')
                             && orange_table_has_column($pdo, 'size_family_sizes', 'label_hi');
-                        $ordUp = $hasFamFoot && $hasFamSfLang
+                        $ordUp = $hasFamSfLang
                             ? $pdo->prepare(
-                                'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, foot_length_cm=?, scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1'
+                                'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1'
                             )
-                            : ($hasFamFoot
-                                ? $pdo->prepare(
-                                    'UPDATE size_family_sizes SET label_ar=?, label_en=?, sort_order=?, foot_length_cm=?, scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1'
-                                )
-                                : ($hasFamSfLang
-                                    ? $pdo->prepare(
-                                        'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1'
-                                    )
-                                    : $pdo->prepare(
-                                        'UPDATE size_family_sizes SET label_ar=?, label_en=?, sort_order=?, scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1'
-                                    )));
-                        $ordIns = $hasFamFoot && $hasFamSfLang
+                            : $pdo->prepare(
+                                'UPDATE size_family_sizes SET label_ar=?, label_en=?, sort_order=?, scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1'
+                            );
+                        $ordIns = $hasFamSfLang
                             ? $pdo->prepare(
-                                'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, label_fil, label_hi, sort_order, foot_length_cm, is_active, scheme_template_size_id) VALUES (?,?,?,?,?,?,?,?,?)'
+                                'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, label_fil, label_hi, sort_order, is_active, scheme_template_size_id) VALUES (?,?,?,?,?,?,?,?)'
                             )
-                            : ($hasFamFoot
-                                ? $pdo->prepare(
-                                    'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, sort_order, foot_length_cm, is_active, scheme_template_size_id) VALUES (?,?,?,?,?,?,?)'
-                                )
-                                : ($hasFamSfLang
-                                    ? $pdo->prepare(
-                                        'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, label_fil, label_hi, sort_order, is_active, scheme_template_size_id) VALUES (?,?,?,?,?,?,?,?)'
-                                    )
-                                    : $pdo->prepare(
-                                        'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, sort_order, is_active, scheme_template_size_id) VALUES (?,?,?,?,?,?)'
-                                    )));
+                            : $pdo->prepare(
+                                'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, sort_order, is_active, scheme_template_size_id) VALUES (?,?,?,?,?,?)'
+                            );
                         $famIdsStmt = $pdo->prepare('SELECT id FROM size_families WHERE size_scheme_template_id = ?');
                         $famIdsStmt->execute([$tplId]);
                         foreach ($famIdsStmt->fetchAll(PDO::FETCH_COLUMN) ?: [] as $syncFamId) {
@@ -431,30 +355,7 @@ try {
                                     continue;
                                 }
                                 $soT = (int) ($t['sort_order'] ?? ($pi + 1));
-                                $footT = $t['foot_length_cm'] ?? null;
-                                if ($hasFamFoot && $hasFamSfLang) {
-                                    $ordUp->execute([
-                                        (string) ($t['label_ar'] ?? ''),
-                                        (string) ($t['label_en'] ?? ''),
-                                        (string) ($t['label_fil'] ?? ''),
-                                        (string) ($t['label_hi'] ?? ''),
-                                        $soT,
-                                        $footT,
-                                        $tstIdRow,
-                                        $fSid,
-                                        $syncFamId,
-                                    ]);
-                                } elseif ($hasFamFoot) {
-                                    $ordUp->execute([
-                                        (string) ($t['label_ar'] ?? ''),
-                                        (string) ($t['label_en'] ?? ''),
-                                        $soT,
-                                        $footT,
-                                        $tstIdRow,
-                                        $fSid,
-                                        $syncFamId,
-                                    ]);
-                                } elseif ($hasFamSfLang) {
+                                if ($hasFamSfLang) {
                                     $ordUp->execute([
                                         (string) ($t['label_ar'] ?? ''),
                                         (string) ($t['label_en'] ?? ''),
@@ -483,30 +384,7 @@ try {
                                     continue;
                                 }
                                 $soT = (int) ($t['sort_order'] ?? ($pi + 1));
-                                $footT = $t['foot_length_cm'] ?? null;
-                                if ($hasFamFoot && $hasFamSfLang) {
-                                    $ordIns->execute([
-                                        $syncFamId,
-                                        (string) ($t['label_ar'] ?? ''),
-                                        (string) ($t['label_en'] ?? ''),
-                                        (string) ($t['label_fil'] ?? ''),
-                                        (string) ($t['label_hi'] ?? ''),
-                                        $soT,
-                                        $footT,
-                                        1,
-                                        $tstIdRow,
-                                    ]);
-                                } elseif ($hasFamFoot) {
-                                    $ordIns->execute([
-                                        $syncFamId,
-                                        (string) ($t['label_ar'] ?? ''),
-                                        (string) ($t['label_en'] ?? ''),
-                                        $soT,
-                                        $footT,
-                                        1,
-                                        $tstIdRow,
-                                    ]);
-                                } elseif ($hasFamSfLang) {
+                                if ($hasFamSfLang) {
                                     $ordIns->execute([
                                         $syncFamId,
                                         (string) ($t['label_ar'] ?? ''),
