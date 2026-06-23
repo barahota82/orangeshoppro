@@ -712,8 +712,10 @@ try {
     if (function_exists('error_log')) {
         error_log('[orange] advisory_sizing_guides/manage: ' . $e->getMessage() . ' @' . $e->getFile() . ':' . (string) $e->getLine());
     }
+    // تشخيص مؤقت (الـ API محمي للأدمن فقط): نُظهر نص الاستثناء الفعلي لمعرفة السبب الحقيقي.
     json_response([
         'success' => false,
-        'message' => 'حدث خطأ على الخادم أثناء معالجة الطلب. حدّث الصفحة أو راجع سجل أخطاء PHP إن استمرّ.',
+        'message' => 'خطأ خادم: ' . $e->getMessage()
+            . ' @' . basename($e->getFile()) . ':' . (string) $e->getLine(),
     ], 500);
 }
