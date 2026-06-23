@@ -4415,13 +4415,34 @@ function orangeBuildProductPreviewPayload() {
     return payload;
 }
 
+/* المعاينة: تولّد المتغيّرات تلقائياً إن لم تكن مولّدة بعد (لا حاجة لتذكّر ضغط «ولّد المتغيّرات»). */
+function orangeEnsureVariantsForPreview() {
+    try {
+        if (document.querySelectorAll('#variantsBox tbody tr').length > 0) {
+            return; // مولّدة بالفعل
+        }
+        const hasC = !!(document.getElementById('has_colors') && document.getElementById('has_colors').value === '1');
+        let hasS = false;
+        try { hasS = (typeof orangeProductEffectiveHasSizes === 'function') && !!orangeProductEffectiveHasSizes(); } catch (e) {}
+        if (!hasC && !hasS) {
+            return; // منتج بلا ألوان/مقاسات — لا متغيّرات لتوليدها
+        }
+        if (typeof generateVariants === 'function') {
+            generateVariants();
+        }
+    } catch (e) {
+        /* فشل التوليد لا يكسر فتح المعاينة — تُفتح للتصفّح */
+    }
+}
+
 async function orangeOpenFullPreview() {
     const statusEl = document.getElementById('orangeFullPreviewStatus');
     const btn = document.getElementById('orangeBtnFullPreview');
     const setStatus = (msg) => { if (statusEl) { statusEl.textContent = msg || ''; } };
     if (btn) { btn.disabled = true; }
-    setStatus('جارٍ فتح الموقع للمعاينة…');
+    setStatus('جارٍ تجهيز المعاينة…');
     try {
+        orangeEnsureVariantsForPreview();
         const payload = orangeBuildProductPreviewPayload();
         const countryEl = document.getElementById('orangeFullPreviewCountry');
         payload.preview_country_id = countryEl ? (parseInt(countryEl.value, 10) || 0) : 0;
