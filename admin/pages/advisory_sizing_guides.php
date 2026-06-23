@@ -17,6 +17,7 @@ $departments = [];
 $families = [];
 $sizesByFamily = [];
 $deptKindPairs = [];
+$deptFamilies = [];
 if ($tablesReady) {
     try {
         if (orange_table_exists($pdo, 'departments')) {
@@ -66,11 +67,41 @@ if ($tablesReady) {
                 $deptKindPairs[$dep][$ck . '|' . $sk] = true;
             }
         }
+
+        // خريطة القسم → عائلات المقاسات المستخدمة فعلاً في منتجاته (إشارة لا تعتمد على وسم النوع التجاري).
+        if (
+            orange_table_exists($pdo, 'products')
+            && orange_table_has_column($pdo, 'products', 'product_type_id')
+            && orange_table_has_column($pdo, 'products', 'size_family_id')
+            && orange_table_exists($pdo, 'product_types')
+            && orange_table_has_column($pdo, 'product_types', 'catalog_subcategory_id')
+            && orange_table_exists($pdo, 'catalog_subcategories')
+            && orange_table_exists($pdo, 'catalog_categories')
+            && orange_table_exists($pdo, 'catalog_sections')
+        ) {
+            $dfStmt = $pdo->query(
+                'SELECT cs.department_id AS dept, p.size_family_id AS fam
+                 FROM products p
+                 JOIN product_types pt ON pt.id = p.product_type_id
+                 JOIN catalog_subcategories sc ON sc.id = pt.catalog_subcategory_id
+                 JOIN catalog_categories cc ON cc.id = sc.catalog_category_id
+                 JOIN catalog_sections cs ON cs.id = cc.catalog_section_id
+                 WHERE p.size_family_id IS NOT NULL AND p.size_family_id > 0'
+            );
+            foreach ($dfStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $dep = (int) ($r['dept'] ?? 0);
+                $fam = (int) ($r['fam'] ?? 0);
+                if ($dep > 0 && $fam > 0) {
+                    $deptFamilies[$dep][$fam] = true;
+                }
+            }
+        }
     } catch (Throwable $e) {
         $departments = [];
         $families = [];
         $sizesByFamily = [];
         $deptKindPairs = [];
+        $deptFamilies = [];
     }
 }
 
@@ -81,6 +112,15 @@ foreach ($deptKindPairs as $dep => $set) {
 $deptKindsJson = json_encode($deptKindsOut, JSON_UNESCAPED_UNICODE);
 if ($deptKindsJson === false) {
     $deptKindsJson = '{}';
+}
+
+$deptFamiliesOut = [];
+foreach ($deptFamilies as $dep => $set) {
+    $deptFamiliesOut[(string) $dep] = array_map('intval', array_keys($set));
+}
+$deptFamiliesJson = json_encode($deptFamiliesOut, JSON_UNESCAPED_UNICODE);
+if ($deptFamiliesJson === false) {
+    $deptFamiliesJson = '{}';
 }
 
 $prefSizeFamilyId = isset($_GET['size_family_id']) ? (int) $_GET['size_family_id'] : 0;
@@ -120,11 +160,10 @@ if ($familiesJson === false) {
         </div>
         <div>
             <label for="asg_family">عائلة المقاسات <span style="color:#b91c1c;">*</span></label>
-            <select id="asg_family"><option value="0">— اختر —</option>
-                <?php foreach ($families as $f): ?>
-                <option value="<?php echo (int) $f['id']; ?>"><?php echo htmlspecialchars((string) ($f['name_ar'] ?: $f['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
+            <select id="asg_family"><option value="0">— اختر القسم أولاً —</option></select>
+            <label style="display:flex;align-items:center;gap:6px;font-weight:normal;margin:6px 0 0;cursor:pointer;font-size:.85rem;color:#475569;">
+                <input type="checkbox" id="asg_family_all"> عرض كل العائلات (تجاهل فلتر القسم)
+            </label>
         </div>
         <div>
             <label>شكل الدليل <span style="color:#b91c1c;">*</span></label>
@@ -226,6 +265,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     var FAMILY_SIZES = <?php echo $sizesJson; ?>;
     var FAMILIES = <?php echo $familiesJson; ?>;
     var DEPT_KINDS = <?php echo $deptKindsJson; ?>;
+    var DEPT_FAMILIES = <?php echo $deptFamiliesJson; ?>;
     var PREF_FAMILY = <?php echo (int) $prefSizeFamilyId; ?>;
     var rowSeq = 0;
 
@@ -673,6 +713,8 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
 
     function resetForm() {
         document.getElementById('asg_edit_id').value = '0';
+        var allChk = document.getElementById('asg_family_all');
+        if (allChk) { allChk.checked = false; }
         document.getElementById('asg_name').value = '';
         document.getElementById('asg_active').value = '1';
         var single = document.querySelector('input[name="asg_shape"][value="single"]');
@@ -807,9 +849,11 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
 
     document.getElementById('asg_reset_btn').onclick = function () { resetForm(); };
 
-    // ---- فلترة العائلات حسب القسم (تدرّج آمن: زوج → نوع تجاري → الكل) ----
-    function familyAllowed(fam, deptPairs) {
-        if (!deptPairs || !deptPairs.length) { return true; }
+    // ---- فلترة العائلات حسب القسم ----
+    // اتحاد إشارتين: (1) عائلات مستخدمة فعلاً في منتجات القسم، (2) مطابقة النوع التجاري/الفئة لأنواع منتجاته.
+    // تدرّج آمن: لو لا إشارة للقسم إطلاقاً → اعرض الكل (حتى لا تختفي القائمة).
+    function familyMatchesPairs(fam, deptPairs) {
+        if (!deptPairs || !deptPairs.length) { return false; }
         var fck = String(fam.commercial_kind_key || '');
         var fsk = String(fam.sizing_category_key || '');
         var ckSet = {}, skByCk = {};
@@ -825,6 +869,14 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         if (!skByCk[fck]) { return true; }
         return !!skByCk[fck][fsk];
     }
+    function familyAllowed(fam, deptPairs, usageIds) {
+        var hasPairs = deptPairs && deptPairs.length;
+        var hasUsage = usageIds && usageIds.length;
+        if (!hasPairs && !hasUsage) { return true; }
+        var fid = parseInt(fam.id, 10) || 0;
+        if (hasUsage && usageIds.indexOf(fid) !== -1) { return true; }
+        return familyMatchesPairs(fam, deptPairs);
+    }
     function rebuildFamilyOptions() {
         var sel = document.getElementById('asg_family');
         var dep = deptId();
@@ -836,11 +888,13 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
             return;
         }
         sel.disabled = false;
+        var showAll = !!(document.getElementById('asg_family_all') || {}).checked;
         var pairs = DEPT_KINDS[String(dep)] || [];
+        var usage = DEPT_FAMILIES[String(dep)] || [];
         var html = '<option value="0">— اختر —</option>';
         var keepPrev = false;
         FAMILIES.forEach(function (f) {
-            if (!familyAllowed(f, pairs)) { return; }
+            if (!showAll && !familyAllowed(f, pairs, usage)) { return; }
             var id = parseInt(f.id, 10) || 0;
             if (id === prev) { keepPrev = true; }
             html += '<option value="' + id + '">' + esc(f.name_ar || f.name_en || ('#' + id)) + '</option>';
@@ -859,6 +913,10 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         rebuildFamilyOptions();
         onFamilyChange();
     };
+    document.getElementById('asg_family_all').addEventListener('change', function () {
+        rebuildFamilyOptions();
+        onFamilyChange();
+    });
     document.querySelectorAll('input[name="asg_shape"]').forEach(function (r) {
         r.addEventListener('change', function () {
             if (document.querySelector('.asg-rows-box .asg-row-block') && !confirm('تغيير الشكل سيعيد بناء الجداول ويمسح ما أدخلته. المتابعة؟')) {
