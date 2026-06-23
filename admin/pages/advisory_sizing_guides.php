@@ -17,7 +17,6 @@ $departments = [];
 $families = [];
 $sizesByFamily = [];
 $kindLabels = [];
-$catLabels = [];
 if ($tablesReady) {
     try {
         if (orange_table_exists($pdo, 'departments')) {
@@ -38,7 +37,7 @@ if ($tablesReady) {
             $sizesByFamily[$fid][] = $s;
         }
 
-        // تسميات النوع التجاري والفئة (لفلترة العائلات حسب نوعها هي، لا حسب القسم).
+        // تسميات النوع التجاري (لفلترة العائلات حسب نوعها هي، لا حسب القسم).
         if (orange_table_exists($pdo, 'commercial_kind_dictionary')) {
             $ckRows = $pdo->query(
                 'SELECT kind_key, label_ar, label_en FROM commercial_kind_dictionary WHERE is_active = 1'
@@ -51,35 +50,17 @@ if ($tablesReady) {
                 $kindLabels[$k] = (string) (($r['label_ar'] ?? '') !== '' ? $r['label_ar'] : (($r['label_en'] ?? '') !== '' ? $r['label_en'] : $k));
             }
         }
-        if (orange_table_exists($pdo, 'sizing_category_dictionary')) {
-            $catRows = $pdo->query(
-                'SELECT commercial_kind_key, category_key, label_ar, label_en FROM sizing_category_dictionary WHERE is_active = 1'
-            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
-            foreach ($catRows as $r) {
-                $k = trim((string) ($r['commercial_kind_key'] ?? ''));
-                $c = trim((string) ($r['category_key'] ?? ''));
-                if ($k === '' || $c === '') {
-                    continue;
-                }
-                $catLabels[$k . '|' . $c] = (string) (($r['label_ar'] ?? '') !== '' ? $r['label_ar'] : (($r['label_en'] ?? '') !== '' ? $r['label_en'] : $c));
-            }
-        }
     } catch (Throwable $e) {
         $departments = [];
         $families = [];
         $sizesByFamily = [];
         $kindLabels = [];
-        $catLabels = [];
     }
 }
 
 $kindLabelsJson = json_encode($kindLabels, JSON_UNESCAPED_UNICODE);
 if ($kindLabelsJson === false) {
     $kindLabelsJson = '{}';
-}
-$catLabelsJson = json_encode($catLabels, JSON_UNESCAPED_UNICODE);
-if ($catLabelsJson === false) {
-    $catLabelsJson = '{}';
 }
 
 $prefSizeFamilyId = isset($_GET['size_family_id']) ? (int) $_GET['size_family_id'] : 0;
@@ -124,10 +105,6 @@ if ($familiesJson === false) {
         <div>
             <label for="asg_kind_filter">نوع المقاس (تصفية)</label>
             <select id="asg_kind_filter"><option value="">— كل الأنواع —</option></select>
-        </div>
-        <div>
-            <label for="asg_cat_filter">الفئة (تصفية)</label>
-            <select id="asg_cat_filter"><option value="">— كل الفئات —</option></select>
         </div>
         <div>
             <label>شكل الدليل <span style="color:#b91c1c;">*</span></label>
@@ -229,7 +206,6 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     var FAMILY_SIZES = <?php echo $sizesJson; ?>;
     var FAMILIES = <?php echo $familiesJson; ?>;
     var KIND_LABELS = <?php echo $kindLabelsJson; ?>;
-    var CAT_LABELS = <?php echo $catLabelsJson; ?>;
     var PREF_FAMILY = <?php echo (int) $prefSizeFamilyId; ?>;
     var rowSeq = 0;
 
@@ -678,7 +654,6 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     function resetForm() {
         document.getElementById('asg_edit_id').value = '0';
         document.getElementById('asg_kind_filter').value = '';
-        rebuildCatFilter();
         rebuildFamilyOptions();
         document.getElementById('asg_name').value = '';
         document.getElementById('asg_active').value = '1';
@@ -696,9 +671,8 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         var fam = parseInt(g.size_family_id, 10) || 0;
         var dep = parseInt(g.department_id, 10) || 0;
         document.getElementById('asg_dept').value = String(dep);
-        // عند التعديل: صفّر الفلاتر كي تظهر العائلة المحفوظة دائماً.
+        // عند التعديل: صفّر الفلتر كي تظهر العائلة المحفوظة دائماً.
         document.getElementById('asg_kind_filter').value = '';
-        rebuildCatFilter();
         rebuildFamilyOptions();
         document.getElementById('asg_family').value = String(fam);
         document.getElementById('asg_name').value = g.name_ar || '';
@@ -806,9 +780,8 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
 
     document.getElementById('asg_reset_btn').onclick = function () { resetForm(); };
 
-    // ---- فلترة العائلات حسب نوعها هي (النوع التجاري + الفئة) — لا علاقة لها بالقسم ----
+    // ---- فلترة العائلات حسب نوعها هي (النوع التجاري) — لا علاقة لها بالقسم ----
     function kindFilter() { return String((document.getElementById('asg_kind_filter') || {}).value || ''); }
-    function catFilter() { return String((document.getElementById('asg_cat_filter') || {}).value || ''); }
 
     function rebuildKindFilter() {
         var sel = document.getElementById('asg_kind_filter');
@@ -826,32 +799,9 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         sel.innerHTML = html;
         sel.value = (prev && seen[prev]) ? prev : '';
     }
-    function rebuildCatFilter() {
-        var sel = document.getElementById('asg_cat_filter');
-        if (!sel) { return; }
-        var ck = kindFilter();
-        var prev = sel.value;
-        var seen = {}, cats = [];
-        if (ck !== '') {
-            FAMILIES.forEach(function (f) {
-                if (String(f.commercial_kind_key || '') !== ck) { return; }
-                var sk = String(f.sizing_category_key || '');
-                if (sk !== '' && !seen[sk]) { seen[sk] = true; cats.push(sk); }
-            });
-        }
-        var html = '<option value="">— كل الفئات —</option>';
-        cats.forEach(function (sk) {
-            html += '<option value="' + esc(sk) + '">' + esc(CAT_LABELS[ck + '|' + sk] || sk) + '</option>';
-        });
-        sel.innerHTML = html;
-        sel.value = (prev && seen[prev]) ? prev : '';
-        sel.disabled = (ck === '');
-    }
     function familyAllowed(fam) {
         var ck = kindFilter();
-        var sk = catFilter();
         if (ck !== '' && String(fam.commercial_kind_key || '') !== ck) { return false; }
-        if (sk !== '' && String(fam.sizing_category_key || '') !== sk) { return false; }
         return true;
     }
     function rebuildFamilyOptions() {
@@ -879,11 +829,6 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
         loadLinkTargets(selectedTypeIds(), selectedProductIds());
     };
     document.getElementById('asg_kind_filter').addEventListener('change', function () {
-        rebuildCatFilter();
-        rebuildFamilyOptions();
-        onFamilyChange();
-    });
-    document.getElementById('asg_cat_filter').addEventListener('change', function () {
         rebuildFamilyOptions();
         onFamilyChange();
     });
@@ -902,7 +847,6 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     function boot() {
         buildPanels();
         rebuildKindFilter();
-        rebuildCatFilter();
         rebuildFamilyOptions();
         if (famId() > 0) { loadList(); loadLinkTargets([], []); }
         document.getElementById('asg_link_products_search').addEventListener('input', function () {
