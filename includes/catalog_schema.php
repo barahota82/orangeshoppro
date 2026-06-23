@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 100);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 101);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3822,6 +3822,34 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     }
     if (orange_table_exists($pdo, 'advisory_sizing_library_bundles') && !orange_table_has_column($pdo, 'advisory_sizing_library_bundles', 'size_scheme_template_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE advisory_sizing_library_bundles ADD COLUMN size_scheme_template_id INT NULL DEFAULT NULL AFTER department_id');
+    }
+    /*
+     * معاينة المنتج قبل النشر (docs/archive/ORANGE_PRODUCT_PREPUBLISH_PREVIEW_ROLLOUT.txt):
+     * يجب أن تُطبَّق هذه الأعمدة على **مسار الويب السريع** (لا _core فقط) كي تُرحَّل تلقائياً بعد git pull
+     * دون CLI — لأن HTTP لا يستدعي orange_catalog_ensure_schema_core. idempotent + إبطال كاش الأعمدة.
+     */
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'is_preview_draft')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN is_preview_draft TINYINT(1) NOT NULL DEFAULT 0');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD INDEX idx_products_is_preview_draft (is_preview_draft)');
+        orange_schema_invalidate_column_check('products', 'is_preview_draft');
+    }
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'preview_admin_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN preview_admin_id INT NULL DEFAULT NULL');
+        orange_schema_invalidate_column_check('products', 'preview_admin_id');
+    }
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'preview_token')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN preview_token VARCHAR(64) NULL DEFAULT NULL');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD INDEX idx_products_preview_token (preview_token)');
+        orange_schema_invalidate_column_check('products', 'preview_token');
+    }
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'preview_source_product_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN preview_source_product_id INT NULL DEFAULT NULL');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD INDEX idx_products_preview_owner (preview_admin_id, preview_source_product_id)');
+        orange_schema_invalidate_column_check('products', 'preview_source_product_id');
+    }
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'preview_expires_at')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN preview_expires_at DATETIME NULL DEFAULT NULL');
+        orange_schema_invalidate_column_check('products', 'preview_expires_at');
     }
     orange_catalog_ensure_suppliers_schema($pdo);
     if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'vat_rate')) {
