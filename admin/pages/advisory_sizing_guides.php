@@ -219,7 +219,7 @@ input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: defau
     gap: 14px 18px;
     direction: rtl;
     align-items: start;
-    max-width: 1180px;
+    width: 100%;
 }
 .asg-form-grid > div { min-width: 0; }
 .asg-fg-dept { grid-area: dept; }
