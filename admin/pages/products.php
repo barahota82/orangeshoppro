@@ -767,10 +767,55 @@ $orangeAdminSfProductUrlPartsForJs = [
                     <?php endforeach; ?>
                 </select>
                 <button type="button" class="btn" id="orangeBtnFullPreview">فتح المعاينة الكاملة</button>
+                <button type="button" class="btn btn-secondary" id="orangeBtnMobilePreview">معاينة الجوال 📱</button>
                 <span id="orangeFullPreviewStatus" style="font-size:12px;color:#64748b;"></span>
             </div>
-            <span style="display:block;margin-top:6px;color:#9a3412;font-size:12px;">يُجهّز نسخة معاينة مخفيّة عن العملاء، ويفتح المتجر بقناة الدولة الافتراضية. أي طلب داخل المعاينة لا يُرسَل فعلياً. تنتهي المعاينة تلقائياً خلال 24 ساعة.</span>
+            <span style="display:block;margin-top:6px;color:#9a3412;font-size:12px;">يُجهّز نسخة معاينة مخفيّة عن العملاء، ويفتح المتجر بقناة الدولة الافتراضية. زر <strong>معاينة الجوال</strong> يعرض الموقع داخل إطار بحجم هاتف على الكمبيوتر (لضبط الصور والخط والمقاسات) — مع تبديل المقاس والتدوير. أي طلب داخل المعاينة لا يُرسَل فعلياً. تنتهي المعاينة تلقائياً خلال 24 ساعة.</span>
         </div>
+
+        <div id="orangeMobilePreviewModal" class="orange-mpv-modal" hidden>
+            <div class="orange-mpv-backdrop" data-mpv-close></div>
+            <div class="orange-mpv-dialog" role="dialog" aria-modal="true" aria-label="معاينة الجوال">
+                <div class="orange-mpv-toolbar">
+                    <span class="orange-mpv-heading">معاينة الجوال</span>
+                    <div class="orange-mpv-sizes">
+                        <button type="button" class="orange-mpv-size is-active" data-w="390" data-h="844">جوال 390</button>
+                        <button type="button" class="orange-mpv-size" data-w="360" data-h="800">صغير 360</button>
+                        <button type="button" class="orange-mpv-size" data-w="430" data-h="932">كبير 430</button>
+                        <button type="button" class="orange-mpv-size" data-w="768" data-h="1024">تابلت 768</button>
+                    </div>
+                    <div class="orange-mpv-actions">
+                        <button type="button" class="orange-mpv-tbtn" id="orangeMpvRotate" title="تدوير">⟲ تدوير</button>
+                        <button type="button" class="orange-mpv-tbtn" id="orangeMpvReload" title="إعادة تحميل">↻ تحميل</button>
+                        <button type="button" class="orange-mpv-tbtn" id="orangeMpvOpenTab" title="فتح في تبويب">↗ تبويب</button>
+                        <button type="button" class="orange-mpv-tbtn orange-mpv-close-btn" data-mpv-close title="إغلاق">✕ إغلاق</button>
+                    </div>
+                </div>
+                <div class="orange-mpv-stage">
+                    <div class="orange-mpv-device" id="orangeMpvDevice" data-w="390" data-h="844">
+                        <iframe id="orangeMpvFrame" title="معاينة الجوال للمتجر" src="about:blank"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <style>
+        .orange-mpv-modal{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;}
+        .orange-mpv-modal[hidden]{display:none;}
+        .orange-mpv-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.78);backdrop-filter:blur(2px);}
+        .orange-mpv-dialog{position:relative;z-index:1;margin:auto;display:flex;flex-direction:column;width:100%;height:100%;}
+        .orange-mpv-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;padding:10px 14px;background:#0f172a;color:#fff;}
+        .orange-mpv-heading{font-weight:700;font-size:14px;margin-inline-end:auto;}
+        .orange-mpv-sizes{display:flex;gap:6px;flex-wrap:wrap;}
+        .orange-mpv-size,.orange-mpv-tbtn{cursor:pointer;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;line-height:1;}
+        .orange-mpv-size.is-active{background:#f97316;border-color:#f97316;color:#fff;font-weight:700;}
+        .orange-mpv-size:hover,.orange-mpv-tbtn:hover{background:rgba(255,255,255,.18);}
+        .orange-mpv-actions{display:flex;gap:6px;flex-wrap:wrap;margin-inline-start:auto;}
+        .orange-mpv-close-btn{background:#dc2626;border-color:#dc2626;}
+        .orange-mpv-stage{flex:1;display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto;}
+        .orange-mpv-device{background:#111827;border-radius:34px;padding:14px;box-shadow:0 24px 60px rgba(0,0,0,.5);max-width:100%;max-height:100%;}
+        .orange-mpv-device iframe{display:block;width:390px;height:844px;max-width:calc(100vw - 70px);max-height:calc(100vh - 120px);border:0;border-radius:22px;background:#fff;}
+        </style>
         </div>
         </div>
         </div>
@@ -4438,6 +4483,16 @@ function orangeEnsureVariantsForPreview() {
     }
 }
 
+/* تجهيز نسخة المعاينة (المسودة المخفيّة) وإرجاع استجابة الـ API — مشترك بين معاينة التبويب ومعاينة الجوال. */
+async function orangePreparePreviewSession() {
+    orangeEnsureVariantsForPreview();
+    const payload = orangeBuildProductPreviewPayload();
+    const countryEl = document.getElementById('orangeFullPreviewCountry');
+    payload.preview_country_id = countryEl ? (parseInt(countryEl.value, 10) || 0) : 0;
+    payload.preview_source_product_id = parseInt((document.getElementById('product_record_id') && document.getElementById('product_record_id').value) || '0', 10) || 0;
+    return await postJSON('/admin/api/products/save-preview-draft.php', payload);
+}
+
 async function orangeOpenFullPreview() {
     const statusEl = document.getElementById('orangeFullPreviewStatus');
     const btn = document.getElementById('orangeBtnFullPreview');
@@ -4445,12 +4500,7 @@ async function orangeOpenFullPreview() {
     if (btn) { btn.disabled = true; }
     setStatus('جارٍ تجهيز المعاينة…');
     try {
-        orangeEnsureVariantsForPreview();
-        const payload = orangeBuildProductPreviewPayload();
-        const countryEl = document.getElementById('orangeFullPreviewCountry');
-        payload.preview_country_id = countryEl ? (parseInt(countryEl.value, 10) || 0) : 0;
-        payload.preview_source_product_id = parseInt((document.getElementById('product_record_id') && document.getElementById('product_record_id').value) || '0', 10) || 0;
-        const res = await postJSON('/admin/api/products/save-preview-draft.php', payload);
+        const res = await orangePreparePreviewSession();
         if (res && res.success && res.preview_url) {
             setStatus(res.browse_only
                 ? 'فُتح الموقع للتصفّح — أدخِل اسم المنتج ونوعه ليظهر كارتك بالبرواز الأخضر.'
@@ -4468,9 +4518,103 @@ async function orangeOpenFullPreview() {
     }
 }
 
+/* ====== معاينة الجوال داخل إطار هاتف على الكمبيوتر ====== */
+var orangeMpvUrl = '';
+function orangeMpvApplySize(w, h) {
+    const f = document.getElementById('orangeMpvFrame');
+    const dev = document.getElementById('orangeMpvDevice');
+    if (!f || !dev) { return; }
+    dev.dataset.w = String(w);
+    dev.dataset.h = String(h);
+    f.style.width = w + 'px';
+    f.style.height = h + 'px';
+}
+function orangeMpvSetActiveBtn(btn) {
+    document.querySelectorAll('.orange-mpv-size').forEach((el) => el.classList.remove('is-active'));
+    if (btn) { btn.classList.add('is-active'); }
+}
+function orangeMpvClose() {
+    const modal = document.getElementById('orangeMobilePreviewModal');
+    const f = document.getElementById('orangeMpvFrame');
+    if (f) { f.src = 'about:blank'; }
+    if (modal) { modal.hidden = true; }
+}
+async function orangeOpenMobilePreview() {
+    const statusEl = document.getElementById('orangeFullPreviewStatus');
+    const btn = document.getElementById('orangeBtnMobilePreview');
+    const setStatus = (msg) => { if (statusEl) { statusEl.textContent = msg || ''; } };
+    if (btn) { btn.disabled = true; }
+    setStatus('جارٍ تجهيز معاينة الجوال…');
+    try {
+        const res = await orangePreparePreviewSession();
+        if (res && res.success && res.preview_url) {
+            orangeMpvUrl = res.preview_url;
+            const frame = document.getElementById('orangeMpvFrame');
+            const modal = document.getElementById('orangeMobilePreviewModal');
+            const firstBtn = document.querySelector('.orange-mpv-size');
+            orangeMpvSetActiveBtn(firstBtn);
+            orangeMpvApplySize(firstBtn ? parseInt(firstBtn.dataset.w, 10) || 390 : 390, firstBtn ? parseInt(firstBtn.dataset.h, 10) || 844 : 844);
+            if (frame) { frame.src = res.preview_url; }
+            if (modal) { modal.hidden = false; }
+            setStatus(res.browse_only
+                ? 'فُتحت معاينة الجوال للتصفّح — أدخِل اسم المنتج ونوعه ليظهر كارتك الأخضر.'
+                : 'فُتحت معاينة الجوال (كارتك بالبرواز الأخضر).');
+        } else {
+            setStatus((res && res.message) ? res.message : 'تعذّر تجهيز المعاينة');
+            alert((res && res.message) ? res.message : 'تعذّر تجهيز المعاينة');
+        }
+    } catch (e) {
+        setStatus('تعذّر تجهيز معاينة الجوال');
+        alert('تعذّر تجهيز معاينة الجوال: ' + (e && e.message ? e.message : e));
+    } finally {
+        if (btn) { btn.disabled = false; }
+    }
+}
+
 (function () {
     const b = document.getElementById('orangeBtnFullPreview');
     if (b) { b.addEventListener('click', orangeOpenFullPreview); }
+    const m = document.getElementById('orangeBtnMobilePreview');
+    if (m) { m.addEventListener('click', orangeOpenMobilePreview); }
+
+    document.querySelectorAll('.orange-mpv-size').forEach((el) => {
+        el.addEventListener('click', () => {
+            orangeMpvSetActiveBtn(el);
+            orangeMpvApplySize(parseInt(el.dataset.w, 10) || 390, parseInt(el.dataset.h, 10) || 844);
+        });
+    });
+    const rotate = document.getElementById('orangeMpvRotate');
+    if (rotate) {
+        rotate.addEventListener('click', () => {
+            const dev = document.getElementById('orangeMpvDevice');
+            if (!dev) { return; }
+            const w = parseInt(dev.dataset.w, 10) || 390;
+            const h = parseInt(dev.dataset.h, 10) || 844;
+            orangeMpvApplySize(h, w);
+        });
+    }
+    const reload = document.getElementById('orangeMpvReload');
+    if (reload) {
+        reload.addEventListener('click', () => {
+            const f = document.getElementById('orangeMpvFrame');
+            if (f && orangeMpvUrl) { f.src = orangeMpvUrl; }
+        });
+    }
+    const openTab = document.getElementById('orangeMpvOpenTab');
+    if (openTab) {
+        openTab.addEventListener('click', () => {
+            if (orangeMpvUrl) { window.open(orangeMpvUrl, '_blank', 'noopener'); }
+        });
+    }
+    document.querySelectorAll('[data-mpv-close]').forEach((el) => {
+        el.addEventListener('click', orangeMpvClose);
+    });
+    document.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape') {
+            const modal = document.getElementById('orangeMobilePreviewModal');
+            if (modal && !modal.hidden) { orangeMpvClose(); }
+        }
+    });
 }());
 
 document.getElementById('name').addEventListener('input', scheduleProductAutoTranslate);
