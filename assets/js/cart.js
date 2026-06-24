@@ -1710,22 +1710,14 @@ function orangeRenderCheckoutMiniSummary() {
         rows.push({ name: it.name || '', q });
     });
     const title = T.cart_mini_summary_title || '';
-    const maxShow = 3;
     let listHtml = '';
-    for (let i = 0; i < Math.min(rows.length, maxShow); i++) {
+    for (let i = 0; i < rows.length; i++) {
         listHtml +=
             '<li><span class="cart-mini-list__name">' +
             escCartHtml(rows[i].name) +
             '</span><span class="cart-mini-list__qty">×' +
             rows[i].q +
             '</span></li>';
-    }
-    const more = rows.length - maxShow;
-    let moreHtml = '';
-    if (more > 0) {
-        const tpl = T.cart_mini_more || '';
-        moreHtml =
-            '<p class="cart-mini-more">' + escCartHtml(tpl.replace(/\{n\}/g, String(more))) + '</p>';
     }
     el.hidden = false;
     el.innerHTML =
@@ -1734,7 +1726,6 @@ function orangeRenderCheckoutMiniSummary() {
         '<ul class="cart-mini-list">' +
         listHtml +
         '</ul>' +
-        moreHtml +
         orangeHtmlCartMiniTotals(clientSub, 0, 0, 0, clientSub) +
         '<div class="cart-register-promo-teaser" id="cartRegisterPromoTeaser" hidden></div>' +
         '<div class="cart-register-promo-teaser cart-gift-bogo-register-teaser" id="cartGiftBogoRegisterUnlockTeaser" hidden></div>' +
