@@ -4077,29 +4077,32 @@ function orangeGetPickedSizesForVariantGen(famId, allSizes) {
     });
 }
 
-function generateVariants() {
-    const wizErr = orangeProductValidateWizardBeforeMatrix();
-    if (wizErr) {
-        productFormShowTab(wizErr.tab);
-        alert(wizErr.message);
-        return;
-    }
-    assignMainImageFromGalleryIfEmpty();
+/**
+ * حساب تركيبات المتغيرات من حالة النموذج (قراءة فقط، بلا أي تأثير على الشاشة).
+ * silent=true (المعاينة): لا تنبيهات ولا تبديل تبويب — تُرجِع null بصمت عند نقص المعطيات.
+ * @returns {null|{combos:Array, sizeLookupList:Array, hasC:boolean, hasS:boolean}}
+ */
+function orangeComputeVariantCombos(opts) {
+    opts = opts || {};
+    const silent = opts.silent === true;
+    const fail = function (tab, msg) {
+        if (!silent) {
+            if (tab) { productFormShowTab(tab); }
+            alert(msg);
+        }
+        return null;
+    };
     const hasC = document.getElementById('has_colors').value === '1';
     const hasS = orangeProductEffectiveHasSizes();
     const famId = parseInt(document.getElementById('size_family_id').value, 10) || 0;
-    const box = document.getElementById('variantsBox');
 
     if (hasS && !famId) {
-        productFormShowTab('basic');
-        alert('اختر عائلة مقاسات من البيانات الأساسية.');
-        return;
+        return fail('basic', 'اختر عائلة مقاسات من البيانات الأساسية.');
     }
     if (hasC) {
         const rows = document.querySelectorAll('#colorwaysBox .cw-row');
         if (!rows.length) {
-            alert('أضف صف لون واحد على الأقل');
-            return;
+            return fail(null, 'أضف صف لون واحد على الأقل');
         }
     }
 
@@ -4107,8 +4110,7 @@ function generateVariants() {
     if (hasS) {
         const allSz0 = sizesForFamily(famId);
         if (!allSz0.length) {
-            alert('لا توجد مقاسات في العائلة المختارة');
-            return;
+            return fail(null, 'لا توجد مقاسات في العائلة المختارة');
         }
         sizeLookupList = allSz0;
     }
@@ -4147,8 +4149,7 @@ function generateVariants() {
             });
         });
         if (!anyCombo || !combos.length) {
-            alert('لكل صف لون حدّد مقاساً واحداً على الأقل من قائمة المقاسات أسفل الألوان (واختر عائلة من البيانات الأساسية).');
-            return;
+            return fail(null, 'لكل صف لون حدّد مقاساً واحداً على الأقل من قائمة المقاسات أسفل الألوان (واختر عائلة من البيانات الأساسية).');
         }
     } else if (hasC && !hasS) {
         document.querySelectorAll('#colorwaysBox .cw-row').forEach(row => {
@@ -4162,8 +4163,7 @@ function generateVariants() {
     } else if (!hasC && hasS) {
         const picked = orangeGetPickedSizesForVariantGen(famId, sizeLookupList);
         if (!picked.length) {
-            alert('حدّد مقاساً واحداً على الأقل من قائمة المقاسات (منتج بمقاسات دون ألوان).');
-            return;
+            return fail(null, 'حدّد مقاساً واحداً على الأقل من قائمة المقاسات (منتج بمقاسات دون ألوان).');
         }
         picked.forEach(function (sz) {
             combos.push({ primary_color_id: 0, secondary_color_id: 0, primary_pattern_id: 0, secondary_pattern_id: 0, size_family_size_id: sz.id, stock: 0 });
@@ -4171,9 +4171,47 @@ function generateVariants() {
     }
 
     if (!combos.length) {
-        alert('لا توجد تركيبات');
+        return fail(null, 'لا توجد تركيبات');
+    }
+    return { combos: combos, sizeLookupList: sizeLookupList, hasC: hasC, hasS: hasS };
+}
+
+/**
+ * المعاينة فقط: قائمة المتغيرات المحسوبة افتراضياً (توليد وهمي) لبناء حمولة المعاينة —
+ * بلا كتابة في جدول المتغيرات وبلا تفعيل زر الحفظ وبلا تبديل تبويب.
+ */
+function orangeBuildPreviewVariantList() {
+    const computed = orangeComputeVariantCombos({ silent: true });
+    if (!computed || !computed.combos.length) {
+        return [];
+    }
+    return computed.combos.map(function (c) {
+        return {
+            primary_color_id: c.primary_color_id,
+            secondary_color_id: c.secondary_color_id,
+            primary_pattern_id: c.primary_pattern_id || 0,
+            secondary_pattern_id: c.secondary_pattern_id || 0,
+            size_family_size_id: c.size_family_size_id,
+            stock_quantity: 0
+        };
+    });
+}
+
+function generateVariants() {
+    const wizErr = orangeProductValidateWizardBeforeMatrix();
+    if (wizErr) {
+        productFormShowTab(wizErr.tab);
+        alert(wizErr.message);
         return;
     }
+    assignMainImageFromGalleryIfEmpty();
+    const box = document.getElementById('variantsBox');
+    const computed = orangeComputeVariantCombos({ silent: false });
+    if (!computed) {
+        return;
+    }
+    const combos = computed.combos;
+    const sizeLookupList = computed.sizeLookupList;
 
     let html = '<p class="admin-variants-lead"><strong>منتج بلا ألوان وبلا مقاسات:</strong> صف واحد = SKU واحد وباركود واحد بعد الحفظ. <strong>منتج بلون أو بمقاسات:</strong> كل صف يمثل نفس الصنف مع دمج لون ونمط اختياري × مقاس. عمود «صورة المرجع»: عند رفع صور لكل لون من تبويب الألوان تُعرض صورة ذلك اللون لكل صف؛ وإلا تُستخدم الصورة الرئيسية أو معرض الصور العام. <strong>الكميات:</strong> لا تُدخل من هنا — بعد الحفظ عالج المخزون من <a href="' + adminPublicPath('/admin/index.php?page=opening_stock_balances') + '">أرصدة أول المدة المخزنية</a> أو <a href="' + adminPublicPath('/admin/index.php?page=stock_adjustment_voucher') + '">قيد تسوية مخزون</a> أو من <a href="' + adminPublicPath('/admin/index.php?page=purchases') + '">استلام فاتورة شراء</a>.</p>';
     html += '<div class="table-wrap admin-table-wrap-elevated"><table class="admin-table admin-variants-matrix"><thead><tr>';
@@ -4414,7 +4452,7 @@ function orangeBuildProductPreviewPayload() {
         const el = document.getElementById(id);
         return el ? el.value.trim() : '';
     };
-    const variants = Array.from(document.querySelectorAll('#variantsBox tbody tr')).map((tr) => ({
+    let variants = Array.from(document.querySelectorAll('#variantsBox tbody tr')).map((tr) => ({
         primary_color_id: parseInt((tr.querySelector('.v-p') && tr.querySelector('.v-p').value) || '0', 10) || 0,
         secondary_color_id: parseInt((tr.querySelector('.v-s') && tr.querySelector('.v-s').value) || '0', 10) || 0,
         primary_pattern_id: parseInt((tr.querySelector('.v-pp') && tr.querySelector('.v-pp').value) || '0', 10) || 0,
@@ -4422,6 +4460,10 @@ function orangeBuildProductPreviewPayload() {
         size_family_size_id: parseInt((tr.querySelector('.v-zid') && tr.querySelector('.v-zid').value) || '0', 10) || 0,
         stock_quantity: parseInt((tr.querySelector('.v-stock') && tr.querySelector('.v-stock').value) || '0', 10) || 0
     }));
+    // لم يتم التوليد الحقيقي بعد: احسب المتغيرات افتراضياً للمعاينة فقط (لا يؤثر على الشاشة ولا زر الحفظ).
+    if (!variants.length) {
+        try { variants = orangeBuildPreviewVariantList(); } catch (ePv) { variants = []; }
+    }
     const payload = {
         name: val('name'),
         name_en: val('name_en'),
@@ -4463,28 +4505,36 @@ function orangeBuildProductPreviewPayload() {
     return payload;
 }
 
-/* المعاينة: تولّد المتغيّرات تلقائياً إن لم تكن مولّدة بعد (لا حاجة لتذكّر ضغط «ولّد المتغيّرات»). */
+/*
+ * المعاينة: لا تُجري توليداً حقيقياً للمتغيّرات (كان سابقاً يستدعي generateVariants فيُفعّل زر
+ * الحفظ ويبدّل التبويب). الآن المتغيّرات تُحسب افتراضياً داخل حمولة المعاينة فقط
+ * (orangeBuildPreviewVariantList) دون أي تأثير على الشاشة، ويظل «حفظ المنتج» معطّلاً حتى
+ * التوليد الحقيقي بزر «توليد المتغيرات».
+ */
 function orangeEnsureVariantsForPreview() {
-    try {
-        if (document.querySelectorAll('#variantsBox tbody tr').length > 0) {
-            return; // مولّدة بالفعل
-        }
-        const hasC = !!(document.getElementById('has_colors') && document.getElementById('has_colors').value === '1');
-        let hasS = false;
-        try { hasS = (typeof orangeProductEffectiveHasSizes === 'function') && !!orangeProductEffectiveHasSizes(); } catch (e) {}
-        if (!hasC && !hasS) {
-            return; // منتج بلا ألوان/مقاسات — لا متغيّرات لتوليدها
-        }
-        if (typeof generateVariants === 'function') {
-            generateVariants();
-        }
-    } catch (e) {
-        /* فشل التوليد لا يكسر فتح المعاينة — تُفتح للتصفّح */
-    }
+    /* لا شيء: التوليد الوهمي للمعاينة يتم في orangeBuildProductPreviewPayload. */
 }
 
 /* تجهيز نسخة المعاينة (المسودة المخفيّة) وإرجاع استجابة الـ API — مشترك بين معاينة التبويب ومعاينة الجوال. */
+/*
+ * تنظيف حالة متجر المعاينة (نفس الأصل): تُفرَّغ السلة ومفاتيحها حتى تبدأ كل معاينة جديدة نظيفة
+ * فلا تظهر مسميات/منتجات من معاينة سابقة. يُستدعى عند بدء معاينة جديدة وعند إغلاق معاينة الجوال.
+ */
+function orangeClearPreviewStorefrontState() {
+    try {
+        const toRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && (k.indexOf('orange_sf_cart_') === 0 || k === 'cart' || k === 'orange_sf_pending_amend')) {
+                toRemove.push(k);
+            }
+        }
+        toRemove.forEach(function (k) { localStorage.removeItem(k); });
+    } catch (e) {}
+}
+
 async function orangePreparePreviewSession() {
+    orangeClearPreviewStorefrontState();
     orangeEnsureVariantsForPreview();
     const payload = orangeBuildProductPreviewPayload();
     const countryEl = document.getElementById('orangeFullPreviewCountry');
@@ -4538,6 +4588,8 @@ function orangeMpvClose() {
     const f = document.getElementById('orangeMpvFrame');
     if (f) { f.src = 'about:blank'; }
     if (modal) { modal.hidden = true; }
+    orangeMpvUrl = '';
+    orangeClearPreviewStorefrontState();
 }
 async function orangeOpenMobilePreview() {
     const statusEl = document.getElementById('orangeFullPreviewStatus');
