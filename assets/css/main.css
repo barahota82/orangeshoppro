@@ -3633,6 +3633,11 @@ button.track-signup-cta__btn[hidden] {
     margin-inline-start: 2px;
 }
 
+.cart-checkout-loyalty-invite {
+    color: var(--primary-dark);
+    font-weight: 600;
+}
+
 .field input,
 .field textarea,
 .field select {

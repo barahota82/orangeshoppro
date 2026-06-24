@@ -149,6 +149,9 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                 <h3 class="cart-section-title" id="cartCheckoutOverlayTitle"><?php echo htmlspecialchars($checkoutTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
                 <p id="cartAmendModeBanner" class="cart-amend-mode-banner" role="status" aria-live="polite" hidden></p>
                 <p class="cart-checkout-intro"><?php echo htmlspecialchars($checkoutIntro, ENT_QUOTES, 'UTF-8'); ?></p>
+                <?php if (!$cartSfLoggedIn): ?>
+                <p class="cart-checkout-intro cart-checkout-loyalty-invite"><?php echo htmlspecialchars(t('checkout_loyalty_invite'), ENT_QUOTES, 'UTF-8'); ?></p>
+                <?php endif; ?>
                 <p class="cart-checkout-intro"><?php echo htmlspecialchars(t('storefront_guest_checkout_note'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <?php if ($cartSfLoggedIn): ?>
                 <p id="cartCheckoutRegisteredHint" class="cart-checkout-registered-hint" hidden><?php echo htmlspecialchars(t('checkout_overlay_registered_hint'), ENT_QUOTES, 'UTF-8'); ?></p>
