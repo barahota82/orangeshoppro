@@ -3164,6 +3164,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_stock_adjustment_gain_loss_v97($pdo);
     orange_catalog_migrate_delivery_agents_sort_renumber_v98($pdo);
     orange_catalog_migrate_advisory_sizing_clean_wipe_v99($pdo);
+    orange_catalog_migrate_customer_addresses_v100($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3779,6 +3780,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_stock_adjustment_gain_loss_v97($pdo);
     orange_catalog_migrate_delivery_agents_sort_renumber_v98($pdo);
     orange_catalog_migrate_advisory_sizing_clean_wipe_v99($pdo);
+    orange_catalog_migrate_customer_addresses_v100($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -7630,4 +7632,41 @@ function orange_catalog_migrate_advisory_sizing_clean_wipe_v99(PDO $pdo): void
             error_log('[orange] php_advisory_sizing_clean_wipe_v99: ' . $e->getMessage());
         }
     }
+}
+
+/**
+ * المهمة 2: سجل عناوين العميل — تاريخ + علم «الحالي»؛ يُحدَّث عند إنشاء قيد التسليم
+ * (final-posting) لا عند إنشاء الطلب. انظر includes/customer_addresses.php.
+ */
+function orange_catalog_migrate_customer_addresses_v100(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_customer_addresses_v100';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'customer_addresses')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS customer_addresses (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                customer_id INT UNSIGNED NOT NULL,
+                delivery_area_id INT UNSIGNED NULL DEFAULT NULL,
+                area VARCHAR(255) NOT NULL DEFAULT \'\',
+                address VARCHAR(2000) NOT NULL DEFAULT \'\',
+                order_id INT UNSIGNED NULL DEFAULT NULL,
+                received_at DATETIME NOT NULL,
+                is_current TINYINT(1) NOT NULL DEFAULT 0,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_customer_addresses_customer (customer_id),
+                KEY idx_customer_addresses_current (customer_id, is_current),
+                UNIQUE KEY uq_customer_addresses_order (order_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+        orange_schema_invalidate_table_exists('customer_addresses');
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
 }

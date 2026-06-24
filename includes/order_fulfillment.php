@@ -835,6 +835,17 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
     $orderForLoyalty = $order;
     $orderForLoyalty['customer_id'] = $customerIdForAr;
     orange_loyalty_earn_for_order($pdo, $orderForLoyalty, $ofGlCountryId, $orderSalesNet);
+
+    // المهمة 2: ترقية عنوان الطلب إلى «الحالي» للعميل + إضافته لسجل العناوين عند تأكيد الاستلام
+    // (إنشاء القيد المحاسبي) — لا عند إنشاء الطلب. مرّة واحدة لكل طلب (UNIQUE order_id).
+    require_once __DIR__ . '/customer_addresses.php';
+    $orderForAddress = $order;
+    $orderForAddress['customer_id'] = $customerIdForAr;
+    orange_customer_address_promote_from_order(
+        $pdo,
+        $orderForAddress,
+        orange_order_delivery_posting_datetime($order, $isOnline)
+    );
 }
 
 /**

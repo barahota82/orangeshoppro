@@ -151,7 +151,11 @@ function orange_order_intake_sql_country_scope(PDO $pdo, string $alias = 'oiq', 
 
 /**
  * Upsert customer by phone for storefront checkout (phone = unique key for the customer row).
- * Updates name, area, address, email from the latest order; appends order notes to customer notes.
+ * Updates name, email, phone fields from the latest order; appends order notes to customer notes.
+ *
+ * **المهمة 2:** لا يكتب area/address على «الحالي» للعميل عند إنشاء الطلب (كان يدهس السابق)؛
+ * يبقى عنوان الطلب على صف الطلب نفسه، وتُرقّى قيمة «الحالي» + يُضاف للسجل عند إنشاء قيد التسليم
+ * (orange_customer_address_promote_from_order في includes/customer_addresses.php).
  */
 function orange_storefront_upsert_customer_from_checkout(
     PDO $pdo,
@@ -230,16 +234,9 @@ function orange_storefront_upsert_customer_from_checkout(
         $id = (int) $existing['id'];
         $newNotes = $mergeNotes($existing['notes'] ?? null, $appendLine);
 
+        // المهمة 2: لا نكتب area/address هنا — يبقيان على صف الطلب ويُرقّيان عند قيد التسليم.
         $set = ['name_ar = ?'];
         $params = [$nameAr];
-        if ($hasArea) {
-            $set[] = 'area = ?';
-            $params[] = $area;
-        }
-        if ($hasAddress) {
-            $set[] = 'address = ?';
-            $params[] = $address;
-        }
         if ($hasEmail && $emailSql !== null) {
             $set[] = 'email = ?';
             $params[] = $emailSql;
@@ -269,16 +266,7 @@ function orange_storefront_upsert_customer_from_checkout(
         $placeholders[] = '?';
         $params[] = $countryId;
     }
-    if ($hasArea) {
-        $cols[] = 'area';
-        $placeholders[] = '?';
-        $params[] = $area;
-    }
-    if ($hasAddress) {
-        $cols[] = 'address';
-        $placeholders[] = '?';
-        $params[] = $address;
-    }
+    // المهمة 2: لا نكتب area/address عند إنشاء العميل من الطلب — تُرقّى عند قيد التسليم.
     if ($hasEmail) {
         $cols[] = 'email';
         $placeholders[] = '?';
@@ -320,16 +308,9 @@ function orange_storefront_upsert_customer_from_checkout(
             if ($ex2 !== false && $ex2 !== null) {
                 $id = (int) $ex2['id'];
                 $newNotes2 = $mergeNotes($ex2['notes'] ?? null, $appendLine);
+                // المهمة 2: لا نكتب area/address هنا — تُرقّى عند قيد التسليم.
                 $set = ['name_ar = ?'];
                 $params2 = [$nameAr];
-                if ($hasArea) {
-                    $set[] = 'area = ?';
-                    $params2[] = $area;
-                }
-                if ($hasAddress) {
-                    $set[] = 'address = ?';
-                    $params2[] = $address;
-                }
                 if ($hasEmail && $emailSql !== null) {
                     $set[] = 'email = ?';
                     $params2[] = $emailSql;

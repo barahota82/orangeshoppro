@@ -150,9 +150,13 @@ function current_storefront_account(PDO $pdo): ?array
     $hasCh = orange_table_has_column($pdo, 'storefront_accounts', 'registered_channel_slug');
     $hasProfile = orange_table_has_column($pdo, 'storefront_accounts', 'customer_name');
     $hasDa = orange_table_has_column($pdo, 'storefront_accounts', 'customer_delivery_area_id');
+    $hasCustLink = orange_table_has_column($pdo, 'storefront_accounts', 'customer_id');
     $cols = ['id', 'email', 'email_verified_at'];
     if ($hasCh) {
         $cols[] = 'registered_channel_slug';
+    }
+    if ($hasCustLink) {
+        $cols[] = 'customer_id';
     }
     if ($hasProfile) {
         array_push($cols, 'customer_name', 'customer_phone', 'customer_area', 'customer_address', 'customer_notes');
@@ -207,6 +211,25 @@ function current_storefront_account(PDO $pdo): ?array
         if ($hasDa) {
             $da = isset($row['customer_delivery_area_id']) ? (int) $row['customer_delivery_area_id'] : 0;
             $out['customer_delivery_area_id'] = $da > 0 ? $da : null;
+        }
+    }
+
+    // المهمة 2: التعبئة المسبقة من آخر عنوان **مُستلَم** (سجل العناوين «الحالي») حين يرتبط الحساب بعميل.
+    if ($hasProfile && $hasCustLink && isset($row['customer_id']) && (int) $row['customer_id'] > 0) {
+        require_once __DIR__ . '/customer_addresses.php';
+        $currentAddr = orange_customer_address_current_row($pdo, (int) $row['customer_id']);
+        if ($currentAddr !== null) {
+            $areaTxt = trim((string) ($currentAddr['area'] ?? ''));
+            $addrTxt = trim((string) ($currentAddr['address'] ?? ''));
+            if ($areaTxt !== '') {
+                $out['customer_area'] = $areaTxt;
+            }
+            if ($addrTxt !== '') {
+                $out['customer_address'] = $addrTxt;
+            }
+            if ($hasDa && $currentAddr['delivery_area_id'] !== null) {
+                $out['customer_delivery_area_id'] = (int) $currentAddr['delivery_area_id'];
+            }
         }
     }
 

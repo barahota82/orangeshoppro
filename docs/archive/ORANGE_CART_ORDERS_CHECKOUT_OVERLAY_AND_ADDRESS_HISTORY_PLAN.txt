@@ -1,8 +1,22 @@
 ORANGE — خطة: تاب «طلباتي» + كشاشة الإتمام المؤقتة + إشارة واتساب + سجل عناوين العميل
 =====================================================================================
 آخر تحديث: 2026-06-24
-الحالة العامة: المهمة (1) **منفّذة** (2026-06-24) — كشاشة إتمام مؤقتة + رسالة تأكيد (الخيار أ). المهمة (2) سجل العناوين **مؤجّلة**.
+الحالة العامة: المهمة (1) **منفّذة** (2026-06-24) — كشاشة إتمام مؤقتة + رسالة تأكيد (الخيار أ). المهمة (2) سجل العناوين **منفّذة** (2026-06-24، إعادة تنفيذ نظيف).
 (قرار واتساب: حُسم — الخيار (أ) مجاني + رسالة تأكيد، انظر القسم 1.)
+
+تنفيذ المهمة (2) — ملخّص ما لُمس فعلياً (2026-06-24):
+- مخطط: جدول `customer_addresses` (customer_id، delivery_area_id، area، address، order_id، received_at،
+  is_current، UNIQUE order_id) عبر ترحيل `orange_catalog_migrate_customer_addresses_v100` في
+  `includes/catalog_schema.php` (مُسجَّل في مساري ensure_schema core + fast-path).
+- مكتبة جديدة `includes/customer_addresses.php`: `orange_customer_address_promote_from_order` (ترقية «الحالي»
+  + إدراج صف تاريخي مرّة واحدة لكل طلب + مزامنة customers) و`orange_customer_address_current_row` (آخر مُستلَم).
+- المُحفِّز: نهاية `orange_post_order_delivery_accounting` في `includes/order_fulfillment.php` (إنشاء قيد التسليم)
+  — لا عند إنشاء الطلب.
+- إنشاء الطلب: `includes/order_intake_queue.php` (`orange_storefront_upsert_customer_from_checkout`) لم يعد
+  يكتب area/address على «الحالي» للعميل (اسم/بريد/هاتف/ملاحظات فقط)؛ عنوان الطلب يبقى على صف الطلب.
+- التعبئة المسبقة: `includes/storefront_account.php` (`current_storefront_account`) يفضّل آخر عنوان مُستلَم
+  من `customer_addresses` عبر ربط `storefront_accounts.customer_id` (مع fallback لحقول الحساب).
+- البند (5) «اختيار من العناوين المحفوظة في الإتمام» يبقى **مؤجَّلاً** (لاحقاً) ولم يُنفَّذ.
 
 تنفيذ المهمة (1) — ملخّص ما لُمس فعلياً (2026-06-24):
 - ترجمة (4 لغات) في `config.php`: `checkout_confirm_title` / `checkout_confirm_body` / `checkout_confirm_ok` /
@@ -112,7 +126,7 @@ ORANGE — خطة: تاب «طلباتي» + كشاشة الإتمام المؤ�
      (مسجّل/زائر، نجاح/فشل/إلغاء، موبايل/كمبيوتر) قبل الرفع.
 
 
-3) المهمة (2): سجل عناوين العميل + تحديث العنوان عند الاستلام  [مؤجَّلة بعد المهمة 1]
+3) المهمة (2): سجل عناوين العميل + تحديث العنوان عند الاستلام  [منفّذة 2026-06-24 — انظر «تنفيذ المهمة (2)» أعلى الملف]
 --------------------------------------------------------------------------------
 الواقع الحالي من الكود (`includes/order_intake_queue.php`):
 - جدول `customers` فيه عمودا `area` و`address` (يُفحص وجودهما عبر `orange_table_has_column`).
