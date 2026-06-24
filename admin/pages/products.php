@@ -519,12 +519,13 @@ $orangeAdminSfProductUrlPartsForJs = [
                 <div class="form-grid form-grid-3 product-form-basic-top3-inner" style="margin-top:12px;">
                     <div>
                         <label>السعر</label>
-                        <input type="number" id="price" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
+                        <input type="number" id="price" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr" placeholder="0" data-money-empty-when-zero>
                     </div>
                     <div>
                         <label>آخر تكلفة شراء (إرشادي)</label>
-                        <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
+                        <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr" placeholder="0" data-money-empty-when-zero>
                         <small class="card-hint" style="display:block;margin-top:4px;color:#6b7280;">قيمة إرشادية تُحدَّث آلياً بصافي آخر شراء — لا تؤثر على تقييم المخزون أو تكلفة المبيعات (تُحسب بـ FIFO من طبقات التكلفة).</small>
+                        <small id="cost_gt_price_warn" class="card-hint" style="display:none;margin-top:4px;color:#b91c1c;font-weight:600;">التكلفة لا يمكن أن تكون أكبر من السعر.</small>
                     </div>
                     <div class="product-basic-class-cell">
                         <label for="product_is_active">حالة العرض</label>
@@ -1194,6 +1195,19 @@ function orangeProductBasicPriceOk() {
     return !isNaN(p) && !isNaN(c) && p >= 0 && c >= 0;
 }
 
+/** تنبيه فوري عند تجاوز التكلفة للسعر (لا يحفظ — التحقق الحاسم في orangeProductValidateWizardBeforeMatrix). */
+function orangeProductCostPriceLiveCheck() {
+    const warn = document.getElementById('cost_gt_price_warn');
+    if (!warn) {
+        return;
+    }
+    const pe = document.getElementById('price');
+    const ce = document.getElementById('cost');
+    const pv = parseFloat(String((pe && pe.value) || '').trim().replace(',', '.'));
+    const cv = parseFloat(String((ce && ce.value) || '').trim().replace(',', '.'));
+    warn.style.display = (!isNaN(pv) && !isNaN(cv) && cv > pv) ? 'block' : 'none';
+}
+
 /** منتج بسيط: بلا ألوان وبلا مقاسات — صف بيع واحد (باركود بعد الحفظ). */
 function orangeProductIsSimpleSkuMatrix() {
     const hcEl = document.getElementById('has_colors');
@@ -1277,6 +1291,16 @@ function orangeProductValidateWizardBeforeMatrix() {
 
     if (!orangeProductBasicPriceOk()) {
         return { tab: 'basic', message: 'أدخل السعر والتكلفة (أرقام ≥ 0) قبل المتابعة.' };
+    }
+
+    {
+        const peChk = document.getElementById('price');
+        const ceChk = document.getElementById('cost');
+        const pv = parseFloat(String((peChk && peChk.value) || '').trim().replace(',', '.'));
+        const cv = parseFloat(String((ceChk && ceChk.value) || '').trim().replace(',', '.'));
+        if (!isNaN(pv) && !isNaN(cv) && cv > pv) {
+            return { tab: 'basic', message: 'التكلفة لا يمكن أن تكون أكبر من السعر.' };
+        }
     }
 
     const hsCheck = orangeProductEffectiveHasSizes();
@@ -4883,6 +4907,9 @@ if (orangePreviewRefreshNowBtn) {
         const refresh = function () {
             if (id === 'name' || id === 'name_en' || id === 'name_fil' || id === 'name_hi' || id === 'price' || id === 'cost') {
                 orangeProductInvalidateVariantsReadyForSave();
+            }
+            if (id === 'price' || id === 'cost') {
+                orangeProductCostPriceLiveCheck();
             }
             orangeApplyProductBasicStepLocks();
             if (id === 'name' || id === 'name_en' || id === 'name_fil' || id === 'name_hi' || id === 'price') {

@@ -2745,6 +2745,26 @@ body.storefront .cart-page-panel--basket .cart-remove-btn.btn-ghost:focus-visibl
     color: #dc2626;
 }
 
+/* أزرار «تحديد الكل / إلغاء التحديد» في السلة: نص واضح ثابت بخلفية شفافة في كل الحالات
+   (hover/active/focus — ماوس ولمس) حتى لا يختفي النص خلف الخلفية البرتقالية لـ body.storefront .btn:hover.
+   تخصيص عالٍ (يشمل .btn-ghost + كلاس الزر) ليتغلّب على theme-store-unified.css. */
+body.storefront .cart-list-selection-actions .btn-ghost.cart-select-all-btn,
+body.storefront .cart-list-selection-actions .btn-ghost.cart-deselect-all-btn,
+body.storefront .cart-list-selection-actions .btn-ghost.cart-select-all-btn:hover:not([disabled]),
+body.storefront .cart-list-selection-actions .btn-ghost.cart-deselect-all-btn:hover:not([disabled]),
+body.storefront .cart-list-selection-actions .btn-ghost.cart-select-all-btn:active:not([disabled]),
+body.storefront .cart-list-selection-actions .btn-ghost.cart-deselect-all-btn:active:not([disabled]),
+body.storefront .cart-list-selection-actions .btn-ghost.cart-select-all-btn:focus:not([disabled]),
+body.storefront .cart-list-selection-actions .btn-ghost.cart-deselect-all-btn:focus:not([disabled]),
+body.storefront .cart-list-selection-actions .btn-ghost.cart-select-all-btn:focus-visible,
+body.storefront .cart-list-selection-actions .btn-ghost.cart-deselect-all-btn:focus-visible {
+    background: transparent;
+    box-shadow: none;
+    filter: none;
+    color: var(--primary-hover);
+    text-decoration: none;
+}
+
 .cart-empty-cta {
     margin-top: 16px;
     width: 100%;

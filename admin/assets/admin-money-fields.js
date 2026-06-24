@@ -119,12 +119,16 @@
                 /* الحقول القابلة للكتابة (مدين/دائن، مبالغ القبض/الدفع): الصفر استرشادي (placeholder)
                    لا قيمة ثابتة، حتى يكتب المستخدم مباشرة دون الحاجة لمسح الأصفار.
                    الحقول للقراءة فقط (مجاميع/أسطر محسوبة/data-money-allow-zero) تبقى تعرض 0.000. */
+                /* حقول إدخال مبوّبة (مثل سعر/تكلفة المنتج) قد تكون disabled مؤقتاً قبل اختيار النوع؛
+                   data-money-empty-when-zero يمنع تثبيت 0 حقيقي فيها فيبقى الصفر إرشادياً (placeholder). */
                 var keepZeroValue =
-                    el.readOnly ||
-                    el.disabled ||
-                    el.hasAttribute('data-money-allow-zero') ||
-                    el.classList.contains('jv-tot-readonly') ||
-                    el.classList.contains('mo-line-net');
+                    !el.hasAttribute('data-money-empty-when-zero') && (
+                        el.readOnly ||
+                        el.disabled ||
+                        el.hasAttribute('data-money-allow-zero') ||
+                        el.classList.contains('jv-tot-readonly') ||
+                        el.classList.contains('mo-line-net')
+                    );
                 el.value = keepZeroValue ? z : '';
             }
         });

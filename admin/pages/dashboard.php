@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/order_intake_queue.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
 require_once __DIR__ . '/../../includes/cart_promo_schedule.php';
+require_once __DIR__ . '/../../includes/product_preview.php';
 
 /** @var array<string, mixed> $admin — من admin/index.php */
 $pdo = db();
@@ -29,7 +30,7 @@ if (!orange_admin_is_superuser($admin) && orange_admin_permissions_matrix($pdo, 
 $ordersToday = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()" . $dashOrdersSql)->fetchColumn();
 $salesToday = (float)$pdo->query("SELECT COALESCE(SUM(total),0) FROM orders WHERE DATE(created_at) = CURDATE()" . $dashOrdersSql)->fetchColumn();
 $pendingOrders = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending'" . $dashOrdersSql)->fetchColumn();
-$productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE 1=1" . orange_sql_country_and_fragment($pdo, 'products', 'products', $dashCountryId))->fetchColumn();
+$productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE 1=1" . orange_sql_country_and_fragment($pdo, 'products', 'products', $dashCountryId) . orange_preview_hide_sql($pdo, 'products'))->fetchColumn();
 
 $lowStockThDash = orange_stock_low_alert_threshold($pdo, $dashCountryId);
 $wQtyDash = orange_warehouse_effective_qty_sql($pdo, $dashCountryId, 'pv', 'wvs_dash');

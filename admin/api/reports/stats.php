@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../../includes/stock_alerts.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
+require_once __DIR__ . '/../../../includes/product_preview.php';
 require_admin_api('GET');
 
 try {
@@ -25,7 +26,7 @@ try {
         "SELECT COUNT(*) FROM orders WHERE status = 'pending'" . $ordersSql
     )->fetchColumn();
     $productsCount = (int)$pdo->query(
-        'SELECT COUNT(*) FROM products WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'products', 'products', $countryId)
+        'SELECT COUNT(*) FROM products WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'products', 'products', $countryId) . orange_preview_hide_sql($pdo, 'products')
     )->fetchColumn();
 
     $wQty = orange_warehouse_effective_qty_sql($pdo, $countryId, 'pv', 'wvs_rep');
