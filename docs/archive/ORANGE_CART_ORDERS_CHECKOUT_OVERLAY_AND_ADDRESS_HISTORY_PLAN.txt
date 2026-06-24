@@ -22,6 +22,12 @@ ORANGE — خطة: تاب «طلباتي» + كشاشة الإتمام المؤ�
 تنفيذ المهمة (1) — ملخّص ما لُمس فعلياً (2026-06-24):
 - ترجمة (4 لغات) في `config.php`: `checkout_confirm_title` / `checkout_confirm_body` / `checkout_confirm_ok` /
   `checkout_confirm_cancel` / `checkout_overlay_registered_hint`؛ كُشِفت في `includes/header.php` ضمن `APP_T`.
+- **تحديث (قرار مالك 2026-06-24):** أُلغيت **النافذة المنبثقة (modal)** للإتمام؛ صار «تنفيذ الطلب» **يحوّل تاب العربة نفسه**
+  في مكانه إلى **عرض «بيانات إرسال الطلب»**: `pages/cart.php` يقسم تاب العربة إلى `#cartBasketView` (السلة + زر التنفيذ)
+  و`#cartCheckoutView` (زر «رجوع للسلة» + بطاقة الإتمام التي تُنقَل إليه عبر JS من `#cartCheckoutCardHolder`). زر «تنفيذ الطلب»
+  → `orangeOpenCheckoutOverlay` يُظهر عرض الإتمام ويُخفي السلة؛ «رجوع للسلة» أو تبديل التاب → عودة لعرض السلة
+  (`orangeCloseCheckoutOverlay` + إعادة الضبط داخل `showTab`). رسالة التأكيد `#cartCheckoutConfirm` تبقى modal صغيرة.
+  ترجمة: `cart_checkout_back` (4 لغات). ملخّص الطلب يبقى ظاهراً فوق الحقول.
 - `pages/cart.php`: نُقِل `cartCheckoutCard` من تاب «طلباتي» إلى `#cartCheckoutOverlay` (modal) + أُضيف `#cartCheckoutConfirm`
   (رسالة موافق/إلغاء). تاب «طلباتي» = سجلّ فقط (بطاقة الحساب للمسجّل / بطاقة الزائر). زر «إرسال الطلب» يستدعي
   `orangeCheckoutConfirmSubmit()`. كُشِفت بيانات المسجّل للتعبئة عبر `window.ORANGE_CART_SF_ACCOUNT`. ربط أزرار الإغلاق/Esc.

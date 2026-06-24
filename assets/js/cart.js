@@ -569,8 +569,9 @@ window.orangeCartProceedToCheckout = orangeCartProceedToCheckout;
  * المسجّل: تُعبّأ بياناته المحفوظة (الاسم/الجوال/المنطقة/العنوان) ويُطلب تأكيد العنوان. الزائر: فارغ.
  */
 function orangeOpenCheckoutOverlay() {
-    const ov = document.getElementById('cartCheckoutOverlay');
-    if (!ov) {
+    const basketView = document.getElementById('cartBasketView');
+    const checkoutView = document.getElementById('cartCheckoutView');
+    if (!checkoutView) {
         return;
     }
     if (typeof orangeRenderCheckoutMiniSummary === 'function') {
@@ -584,17 +585,15 @@ function orangeOpenCheckoutOverlay() {
             orangeSyncAmendCheckoutSendLabel();
         } catch (e2) {}
     }
-    ov.hidden = false;
-    ov.setAttribute('aria-hidden', 'false');
-    if (document.body) {
-        document.body.classList.add('cart-overlay-open');
+    if (basketView) {
+        basketView.hidden = true;
     }
+    checkoutView.hidden = false;
     requestAnimationFrame(() => {
-        const dialog = ov.querySelector('.cart-checkout-overlay__dialog');
-        if (dialog && typeof dialog.scrollTo === 'function') {
-            try {
-                dialog.scrollTo(0, 0);
-            } catch (e3) {}
+        try {
+            checkoutView.scrollIntoView({ block: 'start', behavior: 'auto' });
+        } catch (e3) {
+            window.scrollTo(0, 0);
         }
         const nameEl = document.getElementById('customer_name');
         if (nameEl) {
@@ -608,10 +607,13 @@ function orangeOpenCheckoutOverlay() {
 }
 
 function orangeCloseCheckoutOverlay() {
-    const ov = document.getElementById('cartCheckoutOverlay');
-    if (ov) {
-        ov.hidden = true;
-        ov.setAttribute('aria-hidden', 'true');
+    const basketView = document.getElementById('cartBasketView');
+    const checkoutView = document.getElementById('cartCheckoutView');
+    if (checkoutView) {
+        checkoutView.hidden = true;
+    }
+    if (basketView) {
+        basketView.hidden = false;
     }
     orangeSyncOverlayBodyLock();
 }
@@ -620,9 +622,8 @@ function orangeSyncOverlayBodyLock() {
     if (!document.body) {
         return;
     }
-    const ov = document.getElementById('cartCheckoutOverlay');
     const cf = document.getElementById('cartCheckoutConfirm');
-    const anyOpen = (ov && !ov.hidden) || (cf && !cf.hidden);
+    const anyOpen = cf && !cf.hidden;
     document.body.classList.toggle('cart-overlay-open', !!anyOpen);
 }
 

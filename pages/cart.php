@@ -99,13 +99,20 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
     </div>
 
     <div id="cart-panel-basket" role="tabpanel" aria-labelledby="cart-tab-basket" class="cart-page-panel cart-page-panel--basket">
-        <div class="card-box cart-basket-card">
-            <div id="cartItems"></div>
-            <div class="cart-basket-footer">
-                <button type="button" class="btn cart-proceed-btn" id="cartProceedBtn" onclick="orangeCartProceedToCheckout()" disabled>
-                    <?php echo htmlspecialchars($proceedLabel, ENT_QUOTES, 'UTF-8'); ?>
-                </button>
+        <div id="cartBasketView">
+            <div class="card-box cart-basket-card">
+                <div id="cartItems"></div>
+                <div class="cart-basket-footer">
+                    <button type="button" class="btn cart-proceed-btn" id="cartProceedBtn" onclick="orangeCartProceedToCheckout()" disabled>
+                        <?php echo htmlspecialchars($proceedLabel, ENT_QUOTES, 'UTF-8'); ?>
+                    </button>
+                </div>
             </div>
+        </div>
+        <div id="cartCheckoutView" hidden>
+            <button type="button" class="btn btn-ghost cart-checkout-back" data-cart-checkout-close>
+                <span aria-hidden="true">&#8594;</span> <?php echo htmlspecialchars(t('cart_checkout_back'), ENT_QUOTES, 'UTF-8'); ?>
+            </button>
         </div>
     </div>
 
@@ -137,10 +144,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
     <?php endif; ?>
 </div>
 
-<div id="cartCheckoutOverlay" class="cart-checkout-overlay" hidden aria-hidden="true">
-    <div class="cart-checkout-overlay__backdrop" data-cart-checkout-close></div>
-    <div class="cart-checkout-overlay__dialog" role="dialog" aria-modal="true" aria-labelledby="cartCheckoutOverlayTitle">
-        <button type="button" class="cart-checkout-overlay__close" data-cart-checkout-close aria-label="<?php echo htmlspecialchars(t('cart_close'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></button>
+<div id="cartCheckoutCardHolder" hidden aria-hidden="true">
         <div class="card-box cart-checkout-card" id="cartCheckoutCard">
                 <h3 class="cart-section-title" id="cartCheckoutOverlayTitle"><?php echo htmlspecialchars($checkoutTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
                 <p id="cartAmendModeBanner" class="cart-amend-mode-banner" role="status" aria-live="polite" hidden></p>
@@ -230,7 +234,6 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                 <?php endif; ?>
                 <button type="button" class="btn" id="cartCheckoutSendBtn" onclick="orangeCheckoutConfirmSubmit()"><?php echo htmlspecialchars(t('send_order'), ENT_QUOTES, 'UTF-8'); ?></button>
         </div>
-    </div>
 </div>
 
 <div id="cartCheckoutConfirm" class="cart-confirm-overlay" hidden aria-hidden="true">
@@ -287,6 +290,12 @@ window.ORANGE_TRACK_LABELS = window.ORANGE_TRACK_LABELS || {
     var threeTabs = !!(tabDelivered && panelDelivered);
 
     function showTab(which) {
+        var cbv = document.getElementById('cartBasketView');
+        var ccv = document.getElementById('cartCheckoutView');
+        if (cbv && ccv) {
+            cbv.hidden = false;
+            ccv.hidden = true;
+        }
         var isBasket = which === 'basket';
         var isOrders = which === 'orders';
         var isDel = threeTabs && which === 'delivered';
@@ -337,6 +346,19 @@ window.ORANGE_TRACK_LABELS = window.ORANGE_TRACK_LABELS || {
 })();
 
 document.addEventListener('DOMContentLoaded', function () {
+    // نقل بطاقة الإتمام داخل تاب العربة (عرض «بيانات إرسال الطلب») بدل النافذة المنبثقة.
+    (function () {
+        var card = document.getElementById('cartCheckoutCard');
+        var view = document.getElementById('cartCheckoutView');
+        var holder = document.getElementById('cartCheckoutCardHolder');
+        if (card && view && card.parentNode !== view) {
+            view.appendChild(card);
+        }
+        if (holder && holder.parentNode) {
+            holder.parentNode.removeChild(holder);
+        }
+    })();
+
     if (window.ORANGE_DELIVERY_AREAS && window.ORANGE_DELIVERY_AREAS.length) {
         if (typeof window.orangeReplaceInputWithDeliveryAreaSelect === 'function') {
             window.orangeReplaceInputWithDeliveryAreaSelect('customer_area', window.ORANGE_DELIVERY_AREAS);
