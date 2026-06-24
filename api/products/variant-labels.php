@@ -24,21 +24,65 @@ try {
         echo json_encode(['success' => false, 'message' => 'Invalid JSON'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    $ids = $data['variant_ids'] ?? $data['ids'] ?? null;
+    $ids = $data['variant_ids'] ?? $data['ids'] ?? [];
     if (!is_array($ids)) {
-        echo json_encode(['success' => false, 'message' => 'variant_ids required'], JSON_UNESCAPED_UNICODE);
-        exit;
+        $ids = [];
+    }
+    $pidsRaw = $data['product_ids'] ?? [];
+    if (!is_array($pidsRaw)) {
+        $pidsRaw = [];
     }
     $langRaw = isset($data['lang']) ? (string) $data['lang'] : 'ar';
     $allowed = ['ar', 'en', 'fil', 'hi'];
     $lang = in_array(strtolower($langRaw), $allowed, true) ? strtolower($langRaw) : 'ar';
 
+    // اسم المنتج في السلة: العربية → الاسم العربي؛ باقي اللغات → الاسم الإنجليزي (مع احتياط).
+    $pickName = static function (array $r) use ($lang): string {
+        $cols = $lang === 'ar'
+            ? ['name', 'name_en', 'name_fil', 'name_hi']
+            : ['name_en', 'name', 'name_fil', 'name_hi'];
+        foreach ($cols as $c) {
+            $v = trim((string) ($r[$c] ?? ''));
+            if ($v !== '') {
+                return $v;
+            }
+        }
+
+        return '';
+    };
+
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
 
     $intIds = array_values(array_unique(array_filter(array_map(static fn ($x): int => (int) $x, $ids), static fn ($x): bool => $x > 0)));
+    $prodIds = array_values(array_unique(array_filter(array_map(static fn ($x): int => (int) $x, $pidsRaw), static fn ($x): bool => $x > 0)));
+
+    // خريطة أسماء المنتجات المترجَمة (تغطي كل بنود السلة، بمتغيّر أو بدونه).
+    $products = [];
+    if ($prodIds !== []) {
+        $nameCols = ['name'];
+        foreach (['name_en', 'name_fil', 'name_hi'] as $nc) {
+            if (orange_table_has_column($pdo, 'products', $nc)) {
+                $nameCols[] = $nc;
+            }
+        }
+        $phP = implode(',', array_fill(0, count($prodIds), '?'));
+        $pst = $pdo->prepare('SELECT id, ' . implode(', ', $nameCols) . " FROM products WHERE id IN ($phP)");
+        $pst->execute($prodIds);
+        while ($pr = $pst->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($pr)) {
+                continue;
+            }
+            $pid = (int) ($pr['id'] ?? 0);
+            if ($pid <= 0) {
+                continue;
+            }
+            $products[(string) $pid] = $pickName($pr);
+        }
+    }
+
     if ($intIds === []) {
-        echo json_encode(['success' => true, 'labels' => []], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['success' => true, 'labels' => [], 'products' => $products, 'lang' => $lang], JSON_UNESCAPED_UNICODE);
         exit;
     }
     $ph = implode(',', array_fill(0, count($intIds), '?'));
@@ -136,7 +180,7 @@ try {
         ];
     }
 
-    echo json_encode(['success' => true, 'labels' => $labels, 'lang' => $lang], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => true, 'labels' => $labels, 'products' => $products, 'lang' => $lang], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);

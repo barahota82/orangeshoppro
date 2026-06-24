@@ -312,27 +312,51 @@ async function orangeHydrateCartVariantDisplayLang(itemsModel) {
     }
     const lang = typeof window.APP_LANG === 'string' ? window.APP_LANG : 'ar';
     const ids = [];
+    const pids = [];
     itemsModel.forEach((it) => {
         const v = parseInt(it.variant_id || 0, 10) || 0;
         if (v && ids.indexOf(v) === -1) {
             ids.push(v);
         }
+        const p = parseInt(it.id || 0, 10) || 0;
+        if (p && pids.indexOf(p) === -1) {
+            pids.push(p);
+        }
     });
-    if (!ids.length || typeof fetch !== 'function') {
+    if ((!ids.length && !pids.length) || typeof fetch !== 'function') {
         return;
     }
     try {
         const response = await fetch(storefrontApiUrl('/api/products/variant-labels.php'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ variant_ids: ids, lang: lang }),
+            body: JSON.stringify({ variant_ids: ids, product_ids: pids, lang: lang }),
         });
         const data = await response.json();
-        if (!data.success || !data.labels) {
+        if (!data.success) {
             return;
         }
-        const L = data.labels;
+        const L = data.labels || {};
+        const P = data.products || {};
         const imgUpdates = {};
+        let nameChanged = false;
+        // اسم المنتج حسب اللغة الحالية (يعالج الأسماء المعدّلة والقديمة المخزّنة) لكل البنود.
+        document.querySelectorAll('.cart-item-card[data-cart-idx]').forEach((card) => {
+            const idx = parseInt(card.getAttribute('data-cart-idx') || '-1', 10);
+            const it = idx >= 0 && itemsModel[idx] ? itemsModel[idx] : null;
+            if (!it) {
+                return;
+            }
+            const pid = parseInt(it.id || 0, 10) || 0;
+            const locName = pid && P[String(pid)] ? String(P[String(pid)]) : '';
+            if (locName) {
+                const h4 = card.querySelector('.cart-item-right h4');
+                if (h4 && h4.textContent !== locName) {
+                    h4.textContent = locName;
+                    nameChanged = true;
+                }
+            }
+        });
         document.querySelectorAll('.cart-item-card[data-variant-id]').forEach((card) => {
             const vid = parseInt(card.getAttribute('data-variant-id') || '0', 10) || 0;
             const row = L[String(vid)];
@@ -395,8 +419,8 @@ async function orangeHydrateCartVariantDisplayLang(itemsModel) {
                 host.innerHTML = h;
             }
         });
-        // تثبيت صور الألوان في التخزين المحلي حتى تبقى صحيحة في العرض التالي والمعاينة.
-        if (Object.keys(imgUpdates).length) {
+        // تثبيت الاسم المترجَم وصور الألوان في التخزين المحلي حتى يبقيا صحيحين في العرض التالي والمعاينة.
+        if (Object.keys(imgUpdates).length || Object.keys(P).length) {
             try {
                 const cartArr = getCart();
                 let changed = false;
@@ -406,11 +430,22 @@ async function orangeHydrateCartVariantDisplayLang(itemsModel) {
                         it.image = imgUpdates[v];
                         changed = true;
                     }
+                    const p = parseInt(it.id || 0, 10) || 0;
+                    if (p && P[String(p)] && String(it.name || '') !== String(P[String(p)])) {
+                        it.name = String(P[String(p)]);
+                        changed = true;
+                    }
                 });
                 if (changed && typeof setCart === 'function') {
                     setCart(cartArr);
                 }
             } catch (ePersist) {}
+        }
+        // تحديث ملخص الطلب (تفاصيل الطلب) بالأسماء المترجَمة بعد المزامنة.
+        if (nameChanged && typeof orangeRenderCheckoutMiniSummary === 'function') {
+            try {
+                orangeRenderCheckoutMiniSummary();
+            } catch (eMini) {}
         }
     } catch (e) {
         /* offline */

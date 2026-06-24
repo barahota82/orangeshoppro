@@ -1342,12 +1342,8 @@ function storefront_product_display_name(array $product): string
 
         return '';
     }
-    $try = match ($lang) {
-        'en' => ['name_en', 'name'],
-        'fil' => ['name_fil', 'name'],
-        'hi' => ['name_hi', 'name'],
-        default => ['name'],
-    };
+    // باقي اللغات (en/fil/hi): الاسم الإنجليزي، واحتياطاً العربي ثم بقية اللغات.
+    $try = ['name_en', 'name', 'name_fil', 'name_hi'];
     foreach ($try as $k) {
         $v = trim((string)($product[$k] ?? ''));
         if ($v !== '') {
