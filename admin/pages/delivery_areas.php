@@ -258,6 +258,7 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
                     <th>عربي</th>
                     <th>English</th>
                     <th>قيمة التوصيل</th>
+                    <?php if ($hasCompanyCostCol): ?><th>تكلفة التوصيل</th><?php endif; ?>
                     <th>ترتيب</th>
                     <th>منطقة توصيل</th>
                     <th></th>
@@ -291,6 +292,9 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
                             <?php echo htmlspecialchars(number_format(max(0.0, (float) ($aRow['delivery_fee'] ?? 0)), $daMoneyDecimals, '.', ''), ENT_QUOTES, 'UTF-8'); ?>
                         <?php endif; ?>
                     </td>
+                    <?php if ($hasCompanyCostCol): ?>
+                    <td dir="ltr"><?php echo htmlspecialchars(number_format(max(0.0, (float) ($aRow['company_delivery_cost'] ?? 0)), $daMoneyDecimals, '.', ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <?php endif; ?>
                     <td><?php echo (int) ($aRow['sort_order'] ?? 0); ?></td>
                     <td><?php echo $aActive ? ($aPending ? 'منطقة توصيل (بانتظار السعر)' : 'منطقة توصيل') : 'غير متاحة للتوصيل'; ?></td>
                     <td><button type="button" class="btn-secondary" data-da-edit="<?php echo $aid; ?>">تعديل</button></td>
@@ -599,6 +603,7 @@ function daAreasForList() {
 }
 
 var daHasGovCol = <?php echo $hasGovTable ? 'true' : 'false'; ?>;
+var daHasCompanyCostCol = <?php echo $hasCompanyCostCol ? 'true' : 'false'; ?>;
 
 function renderDeliveryAreasTable() {
     var tb = document.getElementById('da_tbody');
@@ -625,7 +630,11 @@ function renderDeliveryAreasTable() {
         html +=
             '<td>' + escHtml(String(r.name_ar || '')) + '</td>' +
             '<td dir="ltr">' + escHtml(String(r.name_en || '')) + '</td>' +
-            '<td dir="ltr">' + feeText + '</td>' +
+            '<td dir="ltr">' + feeText + '</td>';
+        if (daHasCompanyCostCol) {
+            html += '<td dir="ltr">' + escHtml(daFormatMoney(r.company_delivery_cost != null ? r.company_delivery_cost : 0)) + '</td>';
+        }
+        html +=
             '<td>' + escHtml(String(r.sort_order != null ? r.sort_order : '')) + '</td>' +
             '<td>' + deliverLabel + '</td>' +
             '<td><button type="button" class="btn-secondary" data-da-edit="' + escAttr(String(r.id)) + '">تعديل</button></td>';
