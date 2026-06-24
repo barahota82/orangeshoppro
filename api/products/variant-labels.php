@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/catalog_labels.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/product_preview.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -53,6 +54,11 @@ try {
 
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
+
+    // جلسة معاينة الأدمن: صفّ المسودّة (is_active=0) مستبعَد من السلسلة النشطة، فنسمح به هنا
+    // كي تُترجَم تفاصيله (اللون/المقاس/صورة اللون) في السلة بدل بقاء القيمة المخزّنة بالعربية.
+    $previewCtx = function_exists('orange_preview_active_context') ? orange_preview_active_context($pdo) : null;
+    $previewDraftId = is_array($previewCtx) ? (int) ($previewCtx['draft_id'] ?? 0) : 0;
 
     $intIds = array_values(array_unique(array_filter(array_map(static fn ($x): int => (int) $x, $ids), static fn ($x): bool => $x > 0)));
     $prodIds = array_values(array_unique(array_filter(array_map(static fn ($x): int => (int) $x, $pidsRaw), static fn ($x): bool => $x > 0)));
@@ -115,7 +121,7 @@ try {
         }
         $vid = (int) ($rw['id'] ?? 0);
         $productId = (int) ($rw['product_id'] ?? 0);
-        if ($productId > 0 && !orange_storefront_product_in_active_unified_chain($pdo, $productId)) {
+        if ($productId > 0 && $productId !== $previewDraftId && !orange_storefront_product_in_active_unified_chain($pdo, $productId)) {
             continue;
         }
         $p = isset($rw['primary_color_id']) ? (int) $rw['primary_color_id'] : 0;
