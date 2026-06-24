@@ -2207,6 +2207,10 @@ body.storefront .product-gallery__img {
     white-space: nowrap;
 }
 
+.cart-checkout-card {
+    padding: 16px 18px;
+}
+
 .cart-checkout-card > .btn:last-of-type {
     width: 100%;
     margin-top: 6px;
@@ -2253,7 +2257,7 @@ body.storefront .product-gallery__img {
 }
 
 .cart-account-orders-card {
-    padding-bottom: 4px;
+    padding: 16px 18px;
 }
 
 .cart-account-orders-mount {
@@ -2551,6 +2555,19 @@ body.storefront .product-gallery__img {
 .cart-page-panel--basket .cart-remove-btn {
     align-self: flex-start;
     margin-top: 2px;
+}
+
+/* زر «حذف»: خلفية شفافة دائماً (hover/active/focus — ماوس ولمس) حتى تبقى الكلمة ظاهرة.
+   تخصيص عالٍ ليتغلّب على body.storefront .btn:hover (خلفية برتقالية) في theme-store-unified.css. */
+body.storefront .cart-page-panel--basket .cart-remove-btn.btn-ghost,
+body.storefront .cart-page-panel--basket .cart-remove-btn.btn-ghost:hover:not([disabled]),
+body.storefront .cart-page-panel--basket .cart-remove-btn.btn-ghost:active:not([disabled]),
+body.storefront .cart-page-panel--basket .cart-remove-btn.btn-ghost:focus:not([disabled]),
+body.storefront .cart-page-panel--basket .cart-remove-btn.btn-ghost:focus-visible {
+    background: transparent;
+    box-shadow: none;
+    filter: none;
+    color: #dc2626;
 }
 
 .cart-empty-cta {
