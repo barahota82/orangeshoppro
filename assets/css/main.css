@@ -2222,6 +2222,18 @@ body.storefront .product-gallery__img {
     margin: 0 0 12px;
     padding: 7px 14px;
     font-size: 0.92rem;
+    border-radius: var(--radius-sm);
+}
+
+/* إبقاء النص ظاهراً عند المرور بالماوس على الأزرار الشبحية (رجوع للسلة / إلغاء) */
+.cart-checkout-back.btn-ghost:hover:not([disabled]),
+.cart-checkout-back.btn-ghost:focus-visible,
+#cartCheckoutConfirmCancel.btn-ghost:hover:not([disabled]),
+#cartCheckoutConfirmCancel.btn-ghost:focus-visible {
+    color: var(--text);
+    background: var(--primary-soft);
+    box-shadow: none;
+    filter: none;
 }
 
 #cartCheckoutView {
@@ -3613,6 +3625,12 @@ button.track-signup-cta__btn[hidden] {
 .field label .form-optional-hint {
     font-weight: 400;
     color: var(--muted);
+}
+
+.field label .form-required-mark {
+    color: #dc2626;
+    font-weight: 700;
+    margin-inline-start: 2px;
 }
 
 .field input,
