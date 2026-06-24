@@ -2498,6 +2498,12 @@ body.cart-overlay-open {
     line-height: 1.55;
 }
 
+/* تمييز عبارة «سجّل حسابك لتتابع جميع طلباتك» بلون مميّز داخل سطر التتبّع. */
+.cart-guest-orders-register-highlight {
+    color: var(--primary-dark);
+    font-weight: 700;
+}
+
 .cart-section-title {
     margin: 0 0 10px;
     font-family: var(--font-display);
