@@ -100,6 +100,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
             <div class="card-box cart-account-orders-card cart-guest-orders-card">
                 <h3 class="cart-account-orders-title"><?php echo htmlspecialchars(t('cart_guest_orders_heading'), ENT_QUOTES, 'UTF-8'); ?></h3>
                 <p class="cart-checkout-intro"><?php echo htmlspecialchars(t('cart_guest_orders_intro'), ENT_QUOTES, 'UTF-8'); ?></p>
+                <p class="cart-guest-orders-incentive"><?php echo htmlspecialchars(t('cart_guest_orders_empty'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <div id="cartGuestOrdersMount" class="cart-account-orders-mount" data-bucket="guest"></div>
             </div>
             <?php endif; ?>

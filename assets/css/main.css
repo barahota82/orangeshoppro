@@ -2312,6 +2312,18 @@ body.storefront .product-gallery__img {
     color: #b42318;
 }
 
+/* دعوة التسجيل/الولاء لزوّار غير مسجّلين — ظاهرة دائماً (لا تعتمد على وجود طلبات). */
+.cart-guest-orders-incentive {
+    margin: 10px 0 0;
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--primary) 26%, var(--border));
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--primary-soft) 55%, var(--card));
+    color: var(--text);
+    font-size: 0.92rem;
+    line-height: 1.55;
+}
+
 .cart-section-title {
     margin: 0 0 10px;
     font-family: var(--font-display);

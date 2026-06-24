@@ -3547,9 +3547,9 @@ async function orangeCartFetchGuestOrdersIntoMount(mountEl) {
     if (!mountEl) {
         return;
     }
-    const emptyMsg = (window.APP_T && window.APP_T.cart_guest_orders_empty) || '';
     const errMsg = (window.APP_T && window.APP_T.api_request_failed) || '';
-    mountEl.innerHTML = '<p class="cart-account-orders-empty">' + orangeEscDomText(emptyMsg) + '</p>';
+    /* رسالة التحفيز ثابتة في cart.php (cart-guest-orders-incentive)؛ هنا لا نكرّرها — نعرض الطلبات فقط. */
+    mountEl.innerHTML = '';
     let res;
     let data;
     try {
@@ -3568,7 +3568,7 @@ async function orangeCartFetchGuestOrdersIntoMount(mountEl) {
         return;
     }
     if (data.orders.length === 0) {
-        mountEl.innerHTML = '<p class="cart-account-orders-empty">' + orangeEscDomText(emptyMsg) + '</p>';
+        mountEl.innerHTML = '';
         return;
     }
     let html = '';
