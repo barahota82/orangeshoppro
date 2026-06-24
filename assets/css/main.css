@@ -2218,22 +2218,8 @@ body.storefront .product-gallery__img {
 
 .cart-checkout-back {
     width: auto;
-    align-self: flex-start;
     margin: 0 0 12px;
-    padding: 7px 14px;
-    font-size: 0.92rem;
-    border-radius: var(--radius-sm);
-}
-
-/* إبقاء النص ظاهراً عند المرور بالماوس على الأزرار الشبحية (رجوع للسلة / إلغاء) */
-.cart-checkout-back.btn-ghost:hover:not([disabled]),
-.cart-checkout-back.btn-ghost:focus-visible,
-#cartCheckoutConfirmCancel.btn-ghost:hover:not([disabled]),
-#cartCheckoutConfirmCancel.btn-ghost:focus-visible {
-    color: var(--text);
-    background: var(--primary-soft);
-    box-shadow: none;
-    filter: none;
+    min-width: 140px;
 }
 
 #cartCheckoutView {
