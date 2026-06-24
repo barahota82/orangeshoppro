@@ -332,11 +332,27 @@ async function orangeHydrateCartVariantDisplayLang(itemsModel) {
             return;
         }
         const L = data.labels;
+        const imgUpdates = {};
         document.querySelectorAll('.cart-item-card[data-variant-id]').forEach((card) => {
             const vid = parseInt(card.getAttribute('data-variant-id') || '0', 10) || 0;
             const row = L[String(vid)];
             if (!row) {
                 return;
+            }
+            // صورة اللون المختار: حدّث صورة البند الظاهرة وخزّنها للبنود القائمة.
+            if (row.image) {
+                imgUpdates[vid] = String(row.image);
+                const left = card.querySelector('.cart-item-left');
+                if (left) {
+                    const h4 = card.querySelector('.cart-item-right h4');
+                    const newMarkup = orangeCartProductImageMarkup({
+                        image: row.image,
+                        name: h4 ? h4.textContent : '',
+                    });
+                    if (newMarkup) {
+                        left.innerHTML = newMarkup;
+                    }
+                }
             }
             const host = card.querySelector('.js-cart-vlabel-host');
             if (!host) {
@@ -379,6 +395,23 @@ async function orangeHydrateCartVariantDisplayLang(itemsModel) {
                 host.innerHTML = h;
             }
         });
+        // تثبيت صور الألوان في التخزين المحلي حتى تبقى صحيحة في العرض التالي والمعاينة.
+        if (Object.keys(imgUpdates).length) {
+            try {
+                const cartArr = getCart();
+                let changed = false;
+                cartArr.forEach((it) => {
+                    const v = parseInt(it.variant_id || 0, 10) || 0;
+                    if (v && imgUpdates[v] && String(it.image || '') !== imgUpdates[v]) {
+                        it.image = imgUpdates[v];
+                        changed = true;
+                    }
+                });
+                if (changed && typeof setCart === 'function') {
+                    setCart(cartArr);
+                }
+            } catch (ePersist) {}
+        }
     } catch (e) {
         /* offline */
     }

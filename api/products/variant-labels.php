@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/catalog_labels.php';
+require_once __DIR__ . '/../../includes/upload_paths.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -41,14 +42,25 @@ try {
         exit;
     }
     $ph = implode(',', array_fill(0, count($intIds), '?'));
+    // صورة اللون المختار (colorway): أوّل صورة لـ product_colorway المرتبط بالمتغيّر، واحتياطاً صورة المنتج الرئيسية.
+    $hasCwImages = orange_table_exists($pdo, 'product_colorway_images');
+    $cwImgSel = $hasCwImages
+        ? "(SELECT pci.image_path FROM product_colorway_images pci
+             WHERE pci.product_colorway_id = v.product_colorway_id
+             ORDER BY pci.sort_order ASC, pci.id ASC LIMIT 1)"
+        : 'NULL';
+    $hasMainImage = orange_table_has_column($pdo, 'products', 'main_image');
+    $mainImgSel = $hasMainImage ? 'pr.main_image' : 'NULL';
     $stmt = $pdo->prepare(
         "SELECT v.id, v.product_id, v.size, v.size_family_size_id, v.stock_quantity, v.color,
                 cw.primary_color_id, cw.secondary_color_id, cw.primary_pattern_id, cw.secondary_pattern_id,
                 sfs.label_ar AS sfs_la, sfs.label_en AS sfs_le,
-                sfs.label_fil AS sfs_lf, sfs.label_hi AS sfs_lh
+                sfs.label_fil AS sfs_lf, sfs.label_hi AS sfs_lh,
+                $cwImgSel AS cw_image, $mainImgSel AS main_img
          FROM product_variants v
          LEFT JOIN product_colorways cw ON cw.id = v.product_colorway_id
          LEFT JOIN size_family_sizes sfs ON sfs.id = v.size_family_size_id
+         LEFT JOIN products pr ON pr.id = v.product_id
          WHERE v.id IN ($ph)"
     );
     $stmt->execute($intIds);
@@ -107,12 +119,20 @@ try {
             $colorFull = trim((string) ($rw['color'] ?? ''));
         }
 
+        $imgRaw = trim((string) ($rw['cw_image'] ?? ''));
+        if ($imgRaw === '') {
+            $imgRaw = trim((string) ($rw['main_img'] ?? ''));
+        }
+        $imgWeb = $imgRaw !== '' ? storefront_product_image_web_path($imgRaw) : '';
+        $imgBase = $imgWeb !== '' ? basename($imgWeb) : '';
+
         $labels[(string) $vid] = [
             'variant_id' => $vid,
             'color_part' => (string) ($segs['color'] ?? ''),
             'pattern_part' => (string) ($segs['pattern'] ?? ''),
             'color' => $colorFull !== '' ? $colorFull : trim((string) ($rw['color'] ?? '')),
             'size' => $szLbl,
+            'image' => $imgBase,
         ];
     }
 

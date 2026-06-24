@@ -652,6 +652,17 @@ function addCurrentProductToCart() {
     const vMatch = resolveSelectedVariant(p);
     const variantId = vMatch && vMatch.id ? parseInt(vMatch.id, 10) : 0;
 
+    // صورة بند العربة = صورة اللون المختار (إن وُجدت)، وإلا الصورة الرئيسية.
+    let cartImage = p.image;
+    const cwMap = p.colorway_gallery || {};
+    if (p.has_colors === 1 && selectedColor && cwMap[selectedColor] && cwMap[selectedColor].length) {
+        const firstUrl = String(cwMap[selectedColor][0] || '').replace(/[?#].*$/, '');
+        const base = firstUrl.split(/[/\\]/).pop();
+        if (base) {
+            cartImage = base;
+        }
+    }
+
     const item = {
         id: p.id,
         name: p.name,
@@ -660,7 +671,7 @@ function addCurrentProductToCart() {
         color: selectedColor,
         size: selectedSize,
         variant_id: variantId,
-        image: p.image,
+        image: cartImage,
     };
 
     let cart = readCartJson();
