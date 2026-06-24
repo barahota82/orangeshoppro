@@ -104,11 +104,31 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                 <div id="cartGuestOrdersMount" class="cart-account-orders-mount" data-bucket="guest"></div>
             </div>
             <?php endif; ?>
-            <div class="card-box cart-checkout-card" id="cartCheckoutCard">
-                <h3 class="cart-section-title"><?php echo htmlspecialchars($checkoutTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+        </div>
+    </div>
+
+    <?php if ($cartSfLoggedIn): ?>
+    <div id="cart-panel-delivered" role="tabpanel" aria-labelledby="cart-tab-delivered" class="cart-page-panel cart-page-panel--delivered" hidden>
+        <div class="card-box cart-account-orders-card">
+            <h3 class="cart-account-orders-title"><?php echo htmlspecialchars(t('cart_account_orders_heading_delivered'), ENT_QUOTES, 'UTF-8'); ?></h3>
+            <div id="cartAccountOrdersDeliveredMount" class="cart-account-orders-mount" data-bucket="delivered"></div>
+        </div>
+    </div>
+    <?php endif; ?>
+</div>
+
+<div id="cartCheckoutOverlay" class="cart-checkout-overlay" hidden aria-hidden="true">
+    <div class="cart-checkout-overlay__backdrop" data-cart-checkout-close></div>
+    <div class="cart-checkout-overlay__dialog" role="dialog" aria-modal="true" aria-labelledby="cartCheckoutOverlayTitle">
+        <button type="button" class="cart-checkout-overlay__close" data-cart-checkout-close aria-label="<?php echo htmlspecialchars(t('cart_close'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></button>
+        <div class="card-box cart-checkout-card" id="cartCheckoutCard">
+                <h3 class="cart-section-title" id="cartCheckoutOverlayTitle"><?php echo htmlspecialchars($checkoutTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
                 <p id="cartAmendModeBanner" class="cart-amend-mode-banner" role="status" aria-live="polite" hidden></p>
                 <p class="cart-checkout-intro"><?php echo htmlspecialchars($checkoutIntro, ENT_QUOTES, 'UTF-8'); ?></p>
                 <p class="cart-checkout-intro"><?php echo htmlspecialchars(t('storefront_guest_checkout_note'), ENT_QUOTES, 'UTF-8'); ?></p>
+                <?php if ($cartSfLoggedIn): ?>
+                <p id="cartCheckoutRegisteredHint" class="cart-checkout-registered-hint" hidden><?php echo htmlspecialchars(t('checkout_overlay_registered_hint'), ENT_QUOTES, 'UTF-8'); ?></p>
+                <?php endif; ?>
                 <div id="cartOrderMiniSummary" class="cart-mini-summary" hidden></div>
                 <div class="field">
                     <label for="customer_name"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
@@ -188,19 +208,21 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                     <p class="cart-checkout-intro" style="margin:0.5rem 0 0;"><?php echo htmlspecialchars(t('checkout_online_cash_only'), ENT_QUOTES, 'UTF-8'); ?></p>
                 </fieldset>
                 <?php endif; ?>
-                <button type="button" class="btn" id="cartCheckoutSendBtn" onclick="sendOrderNow()"><?php echo htmlspecialchars(t('send_order'), ENT_QUOTES, 'UTF-8'); ?></button>
-            </div>
+                <button type="button" class="btn" id="cartCheckoutSendBtn" onclick="orangeCheckoutConfirmSubmit()"><?php echo htmlspecialchars(t('send_order'), ENT_QUOTES, 'UTF-8'); ?></button>
         </div>
     </div>
+</div>
 
-    <?php if ($cartSfLoggedIn): ?>
-    <div id="cart-panel-delivered" role="tabpanel" aria-labelledby="cart-tab-delivered" class="cart-page-panel cart-page-panel--delivered" hidden>
-        <div class="card-box cart-account-orders-card">
-            <h3 class="cart-account-orders-title"><?php echo htmlspecialchars(t('cart_account_orders_heading_delivered'), ENT_QUOTES, 'UTF-8'); ?></h3>
-            <div id="cartAccountOrdersDeliveredMount" class="cart-account-orders-mount" data-bucket="delivered"></div>
+<div id="cartCheckoutConfirm" class="cart-confirm-overlay" hidden aria-hidden="true">
+    <div class="cart-confirm-overlay__backdrop" data-cart-confirm-cancel></div>
+    <div class="cart-confirm-overlay__dialog" role="alertdialog" aria-modal="true" aria-labelledby="cartCheckoutConfirmTitle" aria-describedby="cartCheckoutConfirmBody">
+        <h3 id="cartCheckoutConfirmTitle" class="cart-confirm-overlay__title"><?php echo htmlspecialchars(t('checkout_confirm_title'), ENT_QUOTES, 'UTF-8'); ?></h3>
+        <p id="cartCheckoutConfirmBody" class="cart-confirm-overlay__body"><?php echo htmlspecialchars(t('checkout_confirm_body'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <div class="cart-confirm-overlay__actions">
+            <button type="button" class="btn btn-ghost" id="cartCheckoutConfirmCancel" data-cart-confirm-cancel><?php echo htmlspecialchars(t('checkout_confirm_cancel'), ENT_QUOTES, 'UTF-8'); ?></button>
+            <button type="button" class="btn" id="cartCheckoutConfirmOk"><?php echo htmlspecialchars(t('checkout_confirm_ok'), ENT_QUOTES, 'UTF-8'); ?></button>
         </div>
     </div>
-    <?php endif; ?>
 </div>
 
 <script>
@@ -208,7 +230,20 @@ window.ORANGE_DELIVERY_AREAS = <?php echo json_encode($orangeDeliveryAreasStoref
 window.ORANGE_CART_HOME = <?php echo json_encode(storefront_url('home', $channelSlug, $lang), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_REGISTER_URL = <?php echo json_encode(storefront_url('register', $channelSlug, $lang), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_STOREFRONT_WA = <?php echo json_encode($cartWaHref, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-window.ORANGE_CART_SF_ACCOUNT = <?php echo json_encode(['logged_in' => $cartSfLoggedIn], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+<?php
+$cartSfAccountJs = ['logged_in' => $cartSfLoggedIn];
+if ($cartSfLoggedIn && is_array($cartSfAccount)) {
+    $cartSfAccountJs['customer_name'] = (string) ($cartSfAccount['customer_name'] ?? '');
+    $cartSfAccountJs['customer_phone'] = (string) ($cartSfAccount['customer_phone'] ?? '');
+    $cartSfAccountJs['customer_phone_country_dial'] = (string) ($cartSfAccount['customer_phone_country_dial'] ?? '');
+    $cartSfAccountJs['customer_phone_national'] = (string) ($cartSfAccount['customer_phone_national'] ?? '');
+    $cartSfAccountJs['customer_area'] = (string) ($cartSfAccount['customer_area'] ?? '');
+    $cartSfAccountJs['customer_address'] = (string) ($cartSfAccount['customer_address'] ?? '');
+    $cartSfAccountJs['customer_notes'] = (string) ($cartSfAccount['customer_notes'] ?? '');
+    $cartSfAccountJs['customer_delivery_area_id'] = (int) ($cartSfAccount['customer_delivery_area_id'] ?? 0);
+}
+?>
+window.ORANGE_CART_SF_ACCOUNT = <?php echo json_encode($cartSfAccountJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_PAYMENT_ONLINE_ENABLED = <?php echo $cartPaymentOnlineEnabled ? 'true' : 'false'; ?>;
 window.ORANGE_ORDER_STATUS_LABELS = <?php echo json_encode($orangeOrderStatusLabelsCart, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_MY_ORDER_UI = <?php echo json_encode($orangeMyOrderUiCart, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
@@ -289,6 +324,55 @@ document.addEventListener('DOMContentLoaded', function () {
             window.orangeEnhanceDeliveryAreaSelect('customer_area', window.ORANGE_DELIVERY_AREAS);
         }
     }
+
+    // كشاشة الإتمام المؤقتة: أزرار الإغلاق (X / الخلفية)
+    document.querySelectorAll('[data-cart-checkout-close]').forEach(function (el) {
+        el.addEventListener('click', function () {
+            if (typeof window.orangeCloseCheckoutOverlay === 'function') {
+                window.orangeCloseCheckoutOverlay();
+            }
+        });
+    });
+
+    // رسالة التأكيد (موافق/إلغاء) قبل إرسال الطلب
+    document.querySelectorAll('[data-cart-confirm-cancel]').forEach(function (el) {
+        el.addEventListener('click', function () {
+            if (typeof window.orangeCloseCheckoutConfirm === 'function') {
+                window.orangeCloseCheckoutConfirm();
+            }
+        });
+    });
+    var ccOk = document.getElementById('cartCheckoutConfirmOk');
+    if (ccOk) {
+        ccOk.addEventListener('click', function () {
+            if (typeof window.orangeCloseCheckoutConfirm === 'function') {
+                window.orangeCloseCheckoutConfirm();
+            }
+            if (typeof window.sendOrderNow === 'function') {
+                window.sendOrderNow();
+            }
+        });
+    }
+
+    // Esc يغلق رسالة التأكيد أولاً ثم الكشاشة
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape' && e.key !== 'Esc') {
+            return;
+        }
+        var confirmEl = document.getElementById('cartCheckoutConfirm');
+        if (confirmEl && !confirmEl.hidden) {
+            if (typeof window.orangeCloseCheckoutConfirm === 'function') {
+                window.orangeCloseCheckoutConfirm();
+            }
+            return;
+        }
+        var overlayEl = document.getElementById('cartCheckoutOverlay');
+        if (overlayEl && !overlayEl.hidden) {
+            if (typeof window.orangeCloseCheckoutOverlay === 'function') {
+                window.orangeCloseCheckoutOverlay();
+            }
+        }
+    });
 });
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -559,26 +559,169 @@ function orangeCartProceedToCheckout() {
         orangeShowToast(T.cart_no_lines_selected_for_order || T.checkout_cart_items_required || '', 3200);
         return;
     }
-    if (typeof window.orangeCartUiShowTab === 'function') {
-        window.orangeCartUiShowTab('orders');
+    orangeOpenCheckoutOverlay();
+}
+
+window.orangeCartProceedToCheckout = orangeCartProceedToCheckout;
+
+/**
+ * كشاشة الإتمام المؤقتة: نموذج البيانات لا يعيش في تاب «طلباتي» بل يُفتح overlay عند «تنفيذ الطلب».
+ * المسجّل: تُعبّأ بياناته المحفوظة (الاسم/الجوال/المنطقة/العنوان) ويُطلب تأكيد العنوان. الزائر: فارغ.
+ */
+function orangeOpenCheckoutOverlay() {
+    const ov = document.getElementById('cartCheckoutOverlay');
+    if (!ov) {
+        return;
+    }
+    if (typeof orangeRenderCheckoutMiniSummary === 'function') {
+        try {
+            orangeRenderCheckoutMiniSummary();
+        } catch (e) {}
+    }
+    orangeCheckoutPrefillRegistered();
+    if (typeof orangeSyncAmendCheckoutSendLabel === 'function') {
+        try {
+            orangeSyncAmendCheckoutSendLabel();
+        } catch (e2) {}
+    }
+    ov.hidden = false;
+    ov.setAttribute('aria-hidden', 'false');
+    if (document.body) {
+        document.body.classList.add('cart-overlay-open');
     }
     requestAnimationFrame(() => {
-        const card = document.getElementById('cartCheckoutCard');
-        if (card) {
-            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            card.classList.add('cart-checkout-card--highlight');
-            window.setTimeout(() => {
-                card.classList.remove('cart-checkout-card--highlight');
-            }, 1400);
+        const dialog = ov.querySelector('.cart-checkout-overlay__dialog');
+        if (dialog && typeof dialog.scrollTo === 'function') {
+            try {
+                dialog.scrollTo(0, 0);
+            } catch (e3) {}
         }
         const nameEl = document.getElementById('customer_name');
         if (nameEl) {
-            window.setTimeout(() => nameEl.focus(), 350);
+            window.setTimeout(() => {
+                try {
+                    nameEl.focus();
+                } catch (e4) {}
+            }, 160);
         }
     });
 }
 
-window.orangeCartProceedToCheckout = orangeCartProceedToCheckout;
+function orangeCloseCheckoutOverlay() {
+    const ov = document.getElementById('cartCheckoutOverlay');
+    if (ov) {
+        ov.hidden = true;
+        ov.setAttribute('aria-hidden', 'true');
+    }
+    orangeSyncOverlayBodyLock();
+}
+
+function orangeSyncOverlayBodyLock() {
+    if (!document.body) {
+        return;
+    }
+    const ov = document.getElementById('cartCheckoutOverlay');
+    const cf = document.getElementById('cartCheckoutConfirm');
+    const anyOpen = (ov && !ov.hidden) || (cf && !cf.hidden);
+    document.body.classList.toggle('cart-overlay-open', !!anyOpen);
+}
+
+/** المسجّل فقط: تعبئة الحقول الفارغة من بياناته المحفوظة (لا نطمس ما أدخله العميل). */
+function orangeCheckoutPrefillRegistered() {
+    const acc = window.ORANGE_CART_SF_ACCOUNT || {};
+    if (!acc || !acc.logged_in) {
+        return;
+    }
+    const setIfEmpty = (id, val) => {
+        const el = document.getElementById(id);
+        if (el && !String(el.value || '').trim() && val) {
+            el.value = String(val);
+        }
+    };
+    setIfEmpty('customer_name', acc.customer_name);
+    setIfEmpty('customer_address', acc.customer_address);
+    setIfEmpty('customer_notes', acc.customer_notes);
+
+    const phoneEl = document.getElementById('customer_phone');
+    if (phoneEl && !String(phoneEl.value || '').trim()) {
+        let phoneSet = false;
+        if (
+            acc.customer_phone_country_dial &&
+            acc.customer_phone_national &&
+            typeof window.orangeStorefrontSetPhoneCountryByDial === 'function' &&
+            window.orangeStorefrontSetPhoneCountryByDial(
+                'customer_phone_country',
+                acc.customer_phone_country_dial
+            )
+        ) {
+            phoneEl.value = String(acc.customer_phone_national);
+            phoneSet = true;
+        }
+        if (!phoneSet && acc.customer_phone) {
+            if (typeof window.orangeStorefrontSetComboboxValue === 'function') {
+                window.orangeStorefrontSetComboboxValue('customer_phone_country', '__intl__');
+            }
+            phoneEl.value = String(acc.customer_phone);
+        }
+    }
+
+    const areaEl = document.getElementById('customer_area');
+    if (
+        areaEl &&
+        areaEl.tagName === 'SELECT' &&
+        !areaEl.disabled &&
+        !areaEl.value &&
+        acc.customer_delivery_area_id &&
+        typeof window.orangeStorefrontSetComboboxValue === 'function'
+    ) {
+        window.orangeStorefrontSetComboboxValue(
+            'customer_area',
+            String(acc.customer_delivery_area_id)
+        );
+    }
+
+    const hint = document.getElementById('cartCheckoutRegisteredHint');
+    if (hint) {
+        hint.hidden = false;
+    }
+}
+
+/** رسالة التأكيد (موافق/إلغاء) قبل الإرسال الفعلي. */
+function orangeCheckoutConfirmSubmit() {
+    const c = document.getElementById('cartCheckoutConfirm');
+    if (!c) {
+        if (typeof window.sendOrderNow === 'function') {
+            window.sendOrderNow();
+        }
+        return;
+    }
+    c.hidden = false;
+    c.setAttribute('aria-hidden', 'false');
+    orangeSyncOverlayBodyLock();
+    const ok = document.getElementById('cartCheckoutConfirmOk');
+    if (ok) {
+        window.setTimeout(() => {
+            try {
+                ok.focus();
+            } catch (e) {}
+        }, 80);
+    }
+}
+
+function orangeCloseCheckoutConfirm() {
+    const c = document.getElementById('cartCheckoutConfirm');
+    if (c) {
+        c.hidden = true;
+        c.setAttribute('aria-hidden', 'true');
+    }
+    orangeSyncOverlayBodyLock();
+}
+
+window.orangeOpenCheckoutOverlay = orangeOpenCheckoutOverlay;
+window.orangeCloseCheckoutOverlay = orangeCloseCheckoutOverlay;
+window.orangeCheckoutPrefillRegistered = orangeCheckoutPrefillRegistered;
+window.orangeCheckoutConfirmSubmit = orangeCheckoutConfirmSubmit;
+window.orangeCloseCheckoutConfirm = orangeCloseCheckoutConfirm;
 
 function orangeSyncCartProceedBtn() {
     const btn = document.getElementById('cartProceedBtn');
@@ -2091,6 +2234,21 @@ function orangeFinishCheckoutSuccess(result, opts) {
     } catch (e0) {}
     orangeClearPendingAmendStorage();
     orangeSyncAmendModeBanner();
+    /* نجاح الخادم برقم الطلب = التأكيد. نغلق الكشاشة ورسالة التأكيد وننتقل لتاب «طلباتي»،
+       وواتساب يفتح كإشعار فقط (لا يُعتمد عليه للتأكيد). */
+    if (typeof orangeCloseCheckoutConfirm === 'function') {
+        try {
+            orangeCloseCheckoutConfirm();
+        } catch (eC) {}
+    }
+    if (typeof orangeCloseCheckoutOverlay === 'function') {
+        try {
+            orangeCloseCheckoutOverlay();
+        } catch (eO) {}
+    }
+    try {
+        sessionStorage.setItem('orange_cart_ui_tab', 'orders');
+    } catch (eT) {}
     const orderedKeys = opts.orderedLineKeys;
     if (orderedKeys && orderedKeys.size > 0) {
         const cartNow = getCart();

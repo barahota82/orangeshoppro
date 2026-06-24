@@ -559,9 +559,73 @@
         return digits || null;
     }
 
+    /**
+     * يضبط قيمة select مرتبط بـ combobox (هاتف/منطقة) ويُزامن النص الظاهر في حقل البحث.
+     * @returns {boolean} نجح الضبط (وُجدت القيمة ضمن الخيارات)
+     */
+    function orangeStorefrontSetComboboxValue(selectIdOrEl, value) {
+        var el = typeof selectIdOrEl === 'string' ? document.getElementById(selectIdOrEl) : selectIdOrEl;
+        if (!el || el.tagName !== 'SELECT') {
+            return false;
+        }
+        var v = String(value);
+        var matched = false;
+        for (var i = 0; i < el.options.length; i++) {
+            if (el.options[i].value === v) {
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            return false;
+        }
+        el.value = v;
+        var box = el.closest ? el.closest('.orange-country-combobox') : null;
+        if (box) {
+            var input = box.querySelector('.orange-country-combobox__input');
+            var opt = el.options[el.selectedIndex];
+            if (input && opt && opt.value) {
+                input.value = opt.textContent;
+                input.classList.add('is-filled');
+            }
+        }
+        try {
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch (eCh) {}
+        return true;
+    }
+
+    /**
+     * يضبط قائمة بادئة الهاتف على الدولة المطابقة لأرقام البادئة (مثل 965)، مع مزامنة النص الظاهر.
+     * @returns {boolean}
+     */
+    function orangeStorefrontSetPhoneCountryByDial(selectIdOrEl, dialDigits) {
+        var el = typeof selectIdOrEl === 'string' ? document.getElementById(selectIdOrEl) : selectIdOrEl;
+        if (!el || el.tagName !== 'SELECT') {
+            return false;
+        }
+        var dial = String(dialDigits || '').replace(/\D/g, '');
+        if (!dial || !window.COUNTRY_CODES || !window.COUNTRY_CODES.length) {
+            return false;
+        }
+        var idx = -1;
+        for (var i = 0; i < window.COUNTRY_CODES.length; i++) {
+            if (String(window.COUNTRY_CODES[i].code).replace(/\D/g, '') === dial) {
+                idx = i;
+                break;
+            }
+        }
+        if (idx < 0) {
+            return false;
+        }
+        return orangeStorefrontSetComboboxValue(el, String(idx));
+    }
+
     window.orangeAttachSearchableCombobox = orangeAttachSearchableCombobox;
     window.orangePopulateCountryCodeSelect = orangePopulateCountryCodeSelect;
     window.orangeStorefrontPhoneCountryDigits = orangeStorefrontPhoneCountryDigits;
+    window.orangeStorefrontSetComboboxValue = orangeStorefrontSetComboboxValue;
+    window.orangeStorefrontSetPhoneCountryByDial = orangeStorefrontSetPhoneCountryByDial;
 
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('select[data-orange-country-codes]').forEach(orangePopulateCountryCodeSelect);
