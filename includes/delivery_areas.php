@@ -88,10 +88,11 @@ function orange_delivery_governorates_has_company_column(PDO $pdo): bool
 }
 
 /**
- * شركات التوصيل (موردون موسومون is_delivery_company) لاختيارها على المحافظة.
- * إن غاب عمود الوسم تُعاد كل الموردين.
+ * الموردون المتاحون لاختيارهم كشركة توصيل على المحافظة.
+ * تُعاد كل الموردين (أبناء «الحساب الأب للموردين») بصرف النظر عن وسم is_delivery_company،
+ * لأن شركة التوصيل قد تكون مورّداً عادياً غير موسوم.
  *
- * @return list<array{id:int, name_ar:string}>
+ * @return list<array{id:int, name_ar:string, code:string}>
  */
 function orange_delivery_companies_list(PDO $pdo, int $countryId): array
 {
@@ -102,9 +103,6 @@ function orange_delivery_companies_list(PDO $pdo, int $countryId): array
     $hasCode = orange_table_has_column($pdo, 'suppliers', 'code');
     $where = [];
     $params = [];
-    if (orange_table_has_column($pdo, 'suppliers', 'is_delivery_company')) {
-        $where[] = 'is_delivery_company = 1';
-    }
     if ($countryId > 0 && orange_table_has_column($pdo, 'suppliers', 'country_id')) {
         $where[] = '(country_id = ? OR country_id IS NULL)';
         $params[] = $countryId;
