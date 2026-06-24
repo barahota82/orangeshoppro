@@ -18,6 +18,26 @@ $cartSfLoggedIn = $cartSfAccount !== null;
 include __DIR__ . '/../includes/header.php';
 $orangeDeliveryAreaGroups = orange_delivery_areas_storefront_groups($pdoCartAcc, $lang);
 $orangeDeliveryAreasStorefront = orange_delivery_areas_flatten_groups($orangeDeliveryAreaGroups);
+
+// بند (5): العناوين السابقة للعميل المسجَّل — تُثبَّت أعلى قائمة المنطقة في الإتمام.
+// تُحقن من الخادم (لا استدعاء API إضافي) وتُقصَر على المناطق المفعّلة حالياً في هذه القناة/الدولة.
+$orangeCartSavedAreas = [];
+if ($cartSfLoggedIn && is_array($cartSfAccount) && (int) ($cartSfAccount['customer_id'] ?? 0) > 0) {
+    require_once __DIR__ . '/../includes/customer_addresses.php';
+    $orangeCartActiveAreaIds = [];
+    foreach ($orangeDeliveryAreasStorefront as $orangeCartAreaRow) {
+        $orangeCartActiveAreaIds[(int) ($orangeCartAreaRow['id'] ?? 0)] = true;
+    }
+    foreach (orange_customer_address_history_areas($pdoCartAcc, (int) $cartSfAccount['customer_id']) as $orangeCartSavedRow) {
+        $orangeCartSavedAreaId = (int) ($orangeCartSavedRow['delivery_area_id'] ?? 0);
+        if ($orangeCartSavedAreaId > 0 && isset($orangeCartActiveAreaIds[$orangeCartSavedAreaId])) {
+            $orangeCartSavedAreas[] = [
+                'id' => $orangeCartSavedAreaId,
+                'address' => (string) ($orangeCartSavedRow['address'] ?? ''),
+            ];
+        }
+    }
+}
 $cartHomeUrl = storefront_url('home', $channelSlug, $lang);
 $tabBasketLabel = t('cart_tab_basket');
 $tabOrdersLabel = t('cart_tab_my_orders');
@@ -227,6 +247,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
 
 <script>
 window.ORANGE_DELIVERY_AREAS = <?php echo json_encode($orangeDeliveryAreasStorefront, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ORANGE_CART_SAVED_AREAS = <?php echo json_encode($orangeCartSavedAreas, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_CART_HOME = <?php echo json_encode(storefront_url('home', $channelSlug, $lang), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_REGISTER_URL = <?php echo json_encode(storefront_url('register', $channelSlug, $lang), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_STOREFRONT_WA = <?php echo json_encode($cartWaHref, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
@@ -321,7 +342,9 @@ document.addEventListener('DOMContentLoaded', function () {
             window.orangeReplaceInputWithDeliveryAreaSelect('customer_area', window.ORANGE_DELIVERY_AREAS);
         }
         if (typeof window.orangeEnhanceDeliveryAreaSelect === 'function') {
-            window.orangeEnhanceDeliveryAreaSelect('customer_area', window.ORANGE_DELIVERY_AREAS);
+            window.orangeEnhanceDeliveryAreaSelect('customer_area', window.ORANGE_DELIVERY_AREAS, {
+                savedAreas: window.ORANGE_CART_SAVED_AREAS || [],
+            });
         }
     }
 

@@ -88,6 +88,33 @@
         var openAria = opts.openListAria != null ? String(opts.openListAria) : 'Open list';
         var inputDir = opts.inputDir || 'auto';
 
+        // دعم رؤوس أقسام غير قابلة للنقر (isHeader): تثبيت «عناوين سابقة» أعلى القائمة ثم «كل المناطق».
+        var hasHeaders = false;
+        for (var hh = 0; hh < rows.length; hh++) {
+            if (rows[hh] && rows[hh].isHeader) {
+                hasHeaders = true;
+                break;
+            }
+        }
+        var groups = null;
+        if (hasHeaders) {
+            groups = [];
+            var curG = null;
+            for (var gg = 0; gg < rows.length; gg++) {
+                var rg = rows[gg];
+                if (rg && rg.isHeader) {
+                    curG = { header: rg, items: [] };
+                    groups.push(curG);
+                } else {
+                    if (!curG) {
+                        curG = { header: null, items: [] };
+                        groups.push(curG);
+                    }
+                    curG.items.push(rg);
+                }
+            }
+        }
+
         selectEl.dataset.orangeSearchableCombobox = '1';
         selectEl.setAttribute('tabindex', '-1');
 
@@ -174,6 +201,7 @@
         }
 
         function getFiltered() {
+            var n = normalizeNeedle(input.value);
             var v = selectEl.value;
             if (v) {
                 var optSel = selectEl.options[selectEl.selectedIndex];
@@ -181,10 +209,30 @@
                     optSel &&
                     String(optSel.textContent || '').trim() === String(input.value || '').trim()
                 ) {
-                    return rows.slice();
+                    n = '';
                 }
             }
-            var n = normalizeNeedle(input.value);
+            if (hasHeaders) {
+                var out = [];
+                for (var i = 0; i < groups.length; i++) {
+                    var g = groups[i];
+                    var matched = [];
+                    for (var j = 0; j < g.items.length; j++) {
+                        if (matchRow(g.items[j], n)) {
+                            matched.push(g.items[j]);
+                        }
+                    }
+                    if (matched.length) {
+                        if (g.header) {
+                            out.push(g.header);
+                        }
+                        for (var m = 0; m < matched.length; m++) {
+                            out.push(matched[m]);
+                        }
+                    }
+                }
+                return out;
+            }
             return rows.filter(function (r) {
                 return matchRow(r, n);
             });
@@ -193,6 +241,15 @@
         function renderList(items) {
             ul.innerHTML = '';
             items.forEach(function (r) {
+                if (r && r.isHeader) {
+                    var h = document.createElement('li');
+                    h.className = 'orange-country-combobox__header';
+                    h.setAttribute('role', 'presentation');
+                    h.setAttribute('aria-hidden', 'true');
+                    h.textContent = r.label;
+                    ul.appendChild(h);
+                    return;
+                }
                 var li = document.createElement('li');
                 li.className = 'orange-country-combobox__option';
                 li.setAttribute('role', 'option');

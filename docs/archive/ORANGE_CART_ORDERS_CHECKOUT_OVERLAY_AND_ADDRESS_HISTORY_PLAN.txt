@@ -16,7 +16,8 @@ ORANGE — خطة: تاب «طلباتي» + كشاشة الإتمام المؤ�
   يكتب area/address على «الحالي» للعميل (اسم/بريد/هاتف/ملاحظات فقط)؛ عنوان الطلب يبقى على صف الطلب.
 - التعبئة المسبقة: `includes/storefront_account.php` (`current_storefront_account`) يفضّل آخر عنوان مُستلَم
   من `customer_addresses` عبر ربط `storefront_accounts.customer_id` (مع fallback لحقول الحساب).
-- البند (5) «اختيار من العناوين المحفوظة في الإتمام» يبقى **مؤجَّلاً** (لاحقاً) ولم يُنفَّذ.
+- البند (5) «اختيار من العناوين المحفوظة في الإتمام»: **منفّذ** (2026-06-24) — دمج العناوين السابقة داخل قائمة المنطقة
+  (عناوين سابقة فوق + «كل المناطق»). انظر القسم «5) بند (5)» أسفل لفقرة «تنفيذ».
 
 تنفيذ المهمة (1) — ملخّص ما لُمس فعلياً (2026-06-24):
 - ترجمة (4 لغات) في `config.php`: `checkout_confirm_title` / `checkout_confirm_body` / `checkout_confirm_ok` /
@@ -153,6 +154,53 @@ ORANGE — خطة: تاب «طلباتي» + كشاشة الإتمام المؤ�
 - سياسة الواجهة/الطلب/التسجيل ⇒ `docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`.
 - ترقيات المخطط تُنفَّذ في `includes/catalog_schema.php` (PHP) ثم push، لا تعليمات SQL يدوية على السيرفر
   (إلا ملف `D:\orange_sql_updates.sql` خارج الريبو عند الحاجة، آمن لإعادة التشغيل).
+
+
+5) بند (5): اختيار من العناوين المحفوظة في الإتمام  [منفّذ 2026-06-24 — انظر «تنفيذ» أسفل القسم]
+--------------------------------------------------------------------------------
+قرار المالك (نقاش الجلسة 2026-06-24): تُدمَج العناوين السابقة **داخل قائمة المنطقة نفسها** في الإتمام
+(لا بطاقة/picker منفصل). قائمة المنطقة هي combobox بحث مبنية من صفوف
+(`orangeAttachSearchableCombobox` في `assets/js/storefront-country-codes.js`؛ البناء في `assets/js/app.js`
+عبر `orangeEnhanceDeliveryAreaSelect` / `orangeReplaceInputWithDeliveryAreaSelect`؛ markup الخادم
+`orange_storefront_delivery_area_select_markup` في `includes/delivery_areas.php`).
+
+القرارات النهائية:
+- **المثبّت في الأعلى**: كل المناطق المميّزة (distinct) التي استلم فيها العميل فعلاً، مرتّبة **بالأحدث استلاماً**
+  (لا حدّ أقصى للعدد — عادةً قليلة). تُجلب من `customer_addresses` للعميل المرتبط.
+- **التكرار**: لو نفس المنطقة باكثر من عنوان ⇒ تظهر **مرة واحدة**؛ عند اختيارها يُعبّأ **أحدث عنوان** فيها
+  تلقائياً في خانة العنوان (قابل للتعديل يدوياً).
+- **التقسيم بعنوانين نصّيين غير قابلين للنقر** (لا خط فاصل): عنوان «عناوين سابقة» فوق المناطق المثبّتة،
+  ثم عنوان «كل المناطق» فوق باقي المناطق.
+- **أثناء البحث**: يبقى التقسيم — المطابقات من «عناوين سابقة» تظهر أولاً ثم «كل المناطق» المطابقة
+  (إن لم توجد مطابقات سابقة يختفي عنوان «عناوين سابقة»).
+- **المسجّلون فقط**؛ والمناطق التي لم تعد مفعّلة في القناة/الدولة الحالية **تُخفى** من القسم المثبّت.
+- **التعبئة الافتراضية تبقى كما نُفّذت** (المهمة 2): عند فتح الإتمام، آخر عنوان «الحالي» مختار ومعبّأ مسبقاً
+  (`current_storefront_account` في `includes/storefront_account.php`).
+- **مصدر البيانات**: المناطق السابقة تُحقن **من الخادم مع الصفحة** (لا استدعاء API إضافي) — اتساقاً مع
+  `docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`.
+
+ترجمة مطلوبة عند التنفيذ (4 لغات في `config.php` + كشف في `APP_T`): عنوانا القسمين «عناوين سابقة» و«كل المناطق».
+
+تنبيهات نطاق قبل تنفيذ هذا البند: نموذج المناطق متعدد الدول (`docs/archive/ORANGE_OWNER_MULTICOUNTRY_VISION.txt`
+و`includes/delivery_areas.php`)؛ وسياسة الواجهة `docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`.
+
+تنفيذ بند (5) — ملخّص ما لُمس فعلياً (2026-06-24):
+- مكتبة: `includes/customer_addresses.php` → دالة `orange_customer_address_history_areas($pdo, $customerId)`
+  تُرجِع المناطق المميّزة (distinct) التي لها `delivery_area_id` مرتّبة بالأحدث استلاماً، مع أحدث عنوان لكل منطقة.
+- خادم: `includes/storefront_account.php` (`current_storefront_account`) صار يُضمِّن `customer_id` في الناتج
+  (عند ربط الحساب بعميل) ليتاح للواجهة.
+- حقن (مسجّلون فقط، بدون API): `pages/cart.php` يبني `$orangeCartSavedAreas` (id + address) مقصوراً على المناطق
+  **المفعّلة حالياً** في القناة/الدولة (تقاطع مع `$orangeDeliveryAreasStorefront`) ويكشفه عبر
+  `window.ORANGE_CART_SAVED_AREAS`، ويمرّره لـ `orangeEnhanceDeliveryAreaSelect('customer_area', areas, {savedAreas})`.
+- combobox عام: `assets/js/storefront-country-codes.js` (`orangeAttachSearchableCombobox`) دعم صفوف رؤوس
+  غير قابلة للنقر (`isHeader`) + فلترة مجمَّعة تُبقي التقسيم أثناء البحث (المطابقات من كل قسم تحت رأسه؛ يختفي الرأس
+  إن لم توجد مطابقات). السلوك القديم (بلا رؤوس) دون تغيير.
+- بناء القائمة: `assets/js/app.js` (`orangeEnhanceDeliveryAreaSelect`) يضيف رأس «عناوين سابقة» + المناطق المثبّتة،
+  ثم رأس «كل المناطق» + القائمة الكاملة؛ وعند اختيار منطقة سابقة يُعبّأ **أحدث عنوان** لها تلقائياً في `customer_address`.
+- ترجمة: مفاتيح `checkout_saved_areas_title` و`checkout_all_areas_title` (4 لغات) في `config.php` + كشفها في
+  `includes/header.php` ضمن `APP_T`.
+- تنسيق: `.orange-country-combobox__header` في `assets/css/main.css`.
+ملاحظة: التعبئة الافتراضية لآخر عنوان «الحالي» تبقى كما في المهمة 2 (`current_storefront_account`).
 
 
 4) مراجع كود سريعة

@@ -3751,6 +3751,22 @@ button.track-signup-cta__btn[hidden] {
     background: var(--primary-soft);
 }
 
+.field .orange-country-combobox__header {
+    padding: 7px 14px 4px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: none;
+    letter-spacing: 0.01em;
+    cursor: default;
+    user-select: none;
+    border-top: 1px solid var(--border);
+}
+
+.field .orange-country-combobox__list .orange-country-combobox__header:first-child {
+    border-top: 0;
+}
+
 .orange-country-combobox__native {
     position: absolute !important;
     width: 1px !important;

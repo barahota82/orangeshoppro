@@ -159,3 +159,48 @@ function orange_customer_address_current_row(PDO $pdo, int $customerId): ?array
         return null;
     }
 }
+
+/**
+ * سجل المناطق المميّزة (distinct) التي استلم فيها العميل فعلاً — للتثبيت أعلى قائمة المنطقة في الإتمام.
+ *
+ * يُرجَّع لكل منطقة **أحدث عنوان** استلم فيها (مرتّبة بالأحدث استلاماً). تُدرَج فقط الصفوف التي لها
+ * `delivery_area_id` (إذ تُطابَق بقيمة خيار القائمة في الواجهة)؛ الصفوف بنص منطقة حر بلا معرّف تُتجاهَل.
+ *
+ * @return list<array{delivery_area_id:int, area:string, address:string}>
+ */
+function orange_customer_address_history_areas(PDO $pdo, int $customerId): array
+{
+    if ($customerId <= 0 || !orange_table_exists($pdo, 'customer_addresses')) {
+        return [];
+    }
+
+    try {
+        $st = $pdo->prepare(
+            'SELECT delivery_area_id, area, address
+             FROM customer_addresses
+             WHERE customer_id = ? AND delivery_area_id IS NOT NULL AND delivery_area_id > 0
+             ORDER BY received_at DESC, id DESC'
+        );
+        $st->execute([$customerId]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        return [];
+    }
+
+    $out = [];
+    $seen = [];
+    foreach ($rows as $row) {
+        $daId = (int) ($row['delivery_area_id'] ?? 0);
+        if ($daId <= 0 || isset($seen[$daId])) {
+            continue;
+        }
+        $seen[$daId] = true;
+        $out[] = [
+            'delivery_area_id' => $daId,
+            'area' => (string) ($row['area'] ?? ''),
+            'address' => (string) ($row['address'] ?? ''),
+        ];
+    }
+
+    return $out;
+}

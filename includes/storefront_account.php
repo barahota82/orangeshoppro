@@ -189,6 +189,9 @@ function current_storefront_account(PDO $pdo): ?array
         'email_verified_at' => $row['email_verified_at'] !== null ? (string) $row['email_verified_at'] : null,
         'registered_channel_slug' => $regSlug,
     ];
+    if ($hasCustLink && isset($row['customer_id']) && (int) $row['customer_id'] > 0) {
+        $out['customer_id'] = (int) $row['customer_id'];
+    }
     if ($hasProfile) {
         $out['customer_name'] = isset($row['customer_name']) && $row['customer_name'] !== null && (string) $row['customer_name'] !== ''
             ? (string) $row['customer_name'] : null;

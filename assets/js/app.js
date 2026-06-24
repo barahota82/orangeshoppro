@@ -559,7 +559,7 @@ function orangeReplaceInputWithDeliveryAreaSelect(inputId, areasList) {
 /**
  * عند بناء قائمة المناطق من الخادم (‎<select>‎ جاهز): يُفعَّل نفس البحث القابل للفلترة كمسار الاستبدال من حقل نصّي.
  */
-function orangeEnhanceDeliveryAreaSelect(selectId, areasList) {
+function orangeEnhanceDeliveryAreaSelect(selectId, areasList, opts) {
     if (!selectId || !Array.isArray(areasList) || areasList.length === 0) {
         return;
     }
@@ -570,19 +570,79 @@ function orangeEnhanceDeliveryAreaSelect(selectId, areasList) {
     if (sel.dataset && sel.dataset.orangeSearchableCombobox === '1') {
         return;
     }
-    var comboRows = [];
+    opts = opts || {};
+    var savedAreas = Array.isArray(opts.savedAreas) ? opts.savedAreas : [];
+    var T = typeof window.APP_T === 'object' && window.APP_T ? window.APP_T : {};
+
+    var nameById = {};
+    var allRows = [];
     for (var i = 0; i < areasList.length; i++) {
         var a = areasList[i];
         if (!a || a.id == null) {
             continue;
         }
+        var id = String(a.id);
         var label = a.name != null ? String(a.name) : '';
-        comboRows.push({ value: String(a.id), label: label, filterText: label });
+        nameById[id] = label;
+        allRows.push({ value: id, label: label, filterText: label });
     }
-    if (!comboRows.length || typeof window.orangeAttachSearchableCombobox !== 'function') {
+    if (!allRows.length || typeof window.orangeAttachSearchableCombobox !== 'function') {
         return;
     }
-    var T = typeof window.APP_T === 'object' && window.APP_T ? window.APP_T : {};
+
+    // بند (5): العناوين السابقة — تُثبَّت أعلى القائمة (المناطق المفعّلة فقط) + خريطة العنوان للتعبئة التلقائية.
+    var savedRows = [];
+    var addressById = {};
+    var seenSaved = {};
+    for (var k = 0; k < savedAreas.length; k++) {
+        var sv = savedAreas[k];
+        if (!sv || sv.id == null) {
+            continue;
+        }
+        var sid = String(sv.id);
+        if (seenSaved[sid] || !Object.prototype.hasOwnProperty.call(nameById, sid)) {
+            continue;
+        }
+        seenSaved[sid] = true;
+        savedRows.push({ value: sid, label: nameById[sid], filterText: nameById[sid] });
+        addressById[sid] = sv.address != null ? String(sv.address) : '';
+    }
+
+    var comboRows;
+    if (savedRows.length > 0) {
+        comboRows = [{ isHeader: true, label: T.checkout_saved_areas_title || 'عناوين سابقة' }];
+        for (var s = 0; s < savedRows.length; s++) {
+            comboRows.push(savedRows[s]);
+        }
+        comboRows.push({ isHeader: true, label: T.checkout_all_areas_title || 'كل المناطق' });
+        for (var s2 = 0; s2 < allRows.length; s2++) {
+            comboRows.push(allRows[s2]);
+        }
+
+        if (!sel.dataset.orangeSavedAddrBound) {
+            sel.dataset.orangeSavedAddrBound = '1';
+            sel.addEventListener('change', function () {
+                var v = sel.value;
+                if (!v || !Object.prototype.hasOwnProperty.call(addressById, v)) {
+                    return;
+                }
+                var addr = addressById[v];
+                if (!addr) {
+                    return;
+                }
+                var addrEl = document.getElementById('customer_address');
+                if (addrEl) {
+                    addrEl.value = addr;
+                    try {
+                        addrEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    } catch (eIn) {}
+                }
+            });
+        }
+    } else {
+        comboRows = allRows;
+    }
+
     window.orangeAttachSearchableCombobox(sel, comboRows, {
         placeholder: T.checkout_select_area || '',
         openListAria: T.delivery_area_open_list || T.phone_country_open_list || 'Open list',
