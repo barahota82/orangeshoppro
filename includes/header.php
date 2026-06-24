@@ -301,6 +301,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             cart_subtotal_label: <?php echo json_encode(t('cart_subtotal_label'), JSON_UNESCAPED_UNICODE); ?>,
             cart_promotion_discount_label: <?php echo json_encode(t('cart_promotion_discount_label'), JSON_UNESCAPED_UNICODE); ?>,
             cart_combo_discount_label: <?php echo json_encode(t('cart_combo_discount_label'), JSON_UNESCAPED_UNICODE); ?>,
+            checkout_delivery_fee_label: <?php echo json_encode(t('checkout_delivery_fee_label'), JSON_UNESCAPED_UNICODE); ?>,
             cart_gift_promo_title: <?php echo json_encode(t('cart_gift_promo_title'), JSON_UNESCAPED_UNICODE); ?>,
             cart_gift_pick_label: <?php echo json_encode(t('cart_gift_pick_label'), JSON_UNESCAPED_UNICODE); ?>,
             cart_gift_included_fixed: <?php echo json_encode(t('cart_gift_included_fixed'), JSON_UNESCAPED_UNICODE); ?>,

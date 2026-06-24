@@ -229,6 +229,26 @@ function orangeStorefrontPublicPath(path) {
 }
 
 /**
+ * احتياط الصورة: إن فشل تحميل نسخة ‎.webp‎ المُخمَّنة (غير موجودة على الخادم) — يحذف مصدر webp
+ * ويُعيد تحميل الملف الأصلي. ‎<picture>‎ لا يسقط تلقائياً للـ ‎<img>‎ عند فشل المصدر المختار.
+ */
+window.orangeCartImgFallback = function (img) {
+    if (!img || img.dataset.orangeImgFellBack === '1') {
+        return;
+    }
+    img.dataset.orangeImgFellBack = '1';
+    const pic = img.parentNode && img.parentNode.tagName === 'PICTURE' ? img.parentNode : null;
+    if (pic) {
+        pic.querySelectorAll('source').forEach((s) => s.parentNode && s.parentNode.removeChild(s));
+    }
+    const fb = img.getAttribute('data-orange-img-src') || '';
+    if (fb) {
+        img.removeAttribute('srcset');
+        img.src = fb;
+    }
+};
+
+/**
  * صورة بند العربة: يفضّل ‎.webp‎ بنفس الجذر عبر ‎<picture>‎ إن كان الملف الأصلي ليس webp.
  */
 function orangeCartProductImageMarkup(item) {
@@ -265,7 +285,9 @@ function orangeCartProductImageMarkup(item) {
         '">' +
         '<img src="' +
         escCartAttr(fallbackSrc) +
-        '" alt="' +
+        '" data-orange-img-src="' +
+        escCartAttr(fallbackSrc) +
+        '" onerror="orangeCartImgFallback(this)" alt="' +
         alt +
         '" loading="lazy" decoding="async">' +
         '</picture>'
