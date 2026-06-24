@@ -68,7 +68,6 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
         <div>
             <label for="ofr_sort">الترتيب</label>
             <input type="number" id="ofr_sort" value="0" class="admin-inp" style="max-width:120px;" dir="ltr">
-            <p class="card-hint" style="margin:4px 0 0;">في تبويب العروض: رقم أصغر = يظهر قبل غيره.</p>
         </div>
         <?php endif; ?>
         <div>
@@ -84,10 +83,8 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
                 <input type="checkbox" id="ofr_always_on">
                 <span><strong>التفعيل الدائم</strong></span>
             </label>
-            <span class="card-hint" style="display:block;margin-top:4px;">عند تفعيل هذا الخيار تبقى حقول التاريخ ظاهرة ولكن غير مفعّلة.</span>
         </div>
     </div>
-    <p class="card-hint" style="margin:8px 0 0;">التاريخ إلزامي للعروض الزمنية. عند تفعيل «التفعيل الدائم» تبقى الحقول ظاهرة لكن غير مفعّلة.</p>
     <div class="actions" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
         <button type="button" onclick="saveOffer()">حفظ العرض</button>
         <button type="button" class="btn-secondary" onclick="ofrResetForm()">عرض جديد</button>

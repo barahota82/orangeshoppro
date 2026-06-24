@@ -42,12 +42,6 @@ echo orange_offer_gl_link_card_html(
 
 <div class="card">
     <h3 class="card-title">إعدادات الكسب والاستبدال</h3>
-    <p class="card-hint">
-        نموذج محاسبي: التزام مؤجّل. عند الكسب: <strong>مدين «مصروفات برنامج الولاء» / دائن «التزامات نقاط الولاء»</strong>؛
-        عند الاستبدال يُخصم من الالتزام كبند فاتورة؛ عند الانتهاء يُعكَس. اربط الحسابات من شاشة
-        <strong>إعدادات قيود GL</strong> (المفاتيح: <code>loyalty_program_expense</code> و<code>loyalty_points_liability</code>)
-        وبند الاستبدال <code>loyalty_points_redemption</code> من <strong>بنود الفاتورة الإضافية</strong>. لا يوجد تثبيت لأي حساب في الكود.
-    </p>
     <div class="form-grid form-grid-3">
         <div>
             <label for="loy_is_active">مُفعَّل</label>

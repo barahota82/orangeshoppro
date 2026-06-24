@@ -169,7 +169,6 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                 <option value="amount_off_unit">خصم مبلغ ثابت من سعر التجزئة للوحدة</option>
                 <option value="fixed_unit">سعر بيع ثابت للوحدة (د.ك)</option>
             </select>
-            <p class="page-subtitle" style="margin-top:6px;">للنسبة والمبلغ المخصوم: يُحسب من <code dir="ltr">products.price</code> للمنتج المختار كهدية. معاينة العربة تضيف أعلى تكلفة ممكنة عند «اختيار من مجموعة».</p>
         </div>
         <div id="cbp_gift_charge_val_wrap" style="grid-column:1/-1;display:none;">
             <label id="cbp_gift_charge_val_label">القيمة</label>

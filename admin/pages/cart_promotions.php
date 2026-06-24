@@ -49,7 +49,6 @@ $hasTable = orange_table_exists($pdo, 'cart_promotions');
 
 <div class="card">
     <h3>القواعد</h3>
-    <p class="page-subtitle" style="margin-top:0;">عند تعدّد القواعد يُختار أعلى حد أدنى يحقق مجموع السلة الحالي (طبقة أعلى).</p>
     <div class="table-wrap">
         <table>
             <thead>

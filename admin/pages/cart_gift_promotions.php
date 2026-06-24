@@ -69,7 +69,6 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                 <option value="amount_off_unit">خصم مبلغ ثابت من سعر التجزئة للوحدة</option>
                 <option value="fixed_unit">سعر بيع ثابت للوحدة (د.ك)</option>
             </select>
-            <p class="page-subtitle" style="margin-top:6px;">للنسبة والمبلغ: يُحسب من <code dir="ltr">products.price</code>. معاينة العربة تضيف أعلى تكلفة عند «اختيار من مجموعة».</p>
         </div>
         <div id="cgp_gift_charge_val_wrap" style="grid-column:1/-1;display:none;">
             <label id="cgp_gift_charge_val_label">القيمة</label>
@@ -95,7 +94,6 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 
 <div class="card">
     <h3>القواعد</h3>
-    <p class="page-subtitle" style="margin-top:0;">عند تعدّد القواعد يُختار أعلى حد أدنى يحقق مجموع السلة.</p>
     <div class="table-wrap">
         <table>
             <thead>

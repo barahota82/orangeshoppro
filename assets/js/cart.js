@@ -961,13 +961,56 @@ function orangeBuildConfirmSummaryHtml() {
             '</span></li>';
     });
     const title = T.cart_mini_summary_title || '';
+    // ملخّص المجاميع الكامل (توصيل/خصومات/استبدال نقاط/إجمالي) من معاينة الخادم إن توفّرت،
+    // وإلا الإجمالي المبدئي من العميل لحين وصول المعاينة.
+    const st = window.__orangeCartServerTotals;
+    let totalsHtml;
+    if (st && typeof st.total === 'number') {
+        totalsHtml = orangeHtmlCartMiniTotals(
+            st.subtotal,
+            st.comboDiscount,
+            st.promoDiscount,
+            st.deliveryFee,
+            st.total,
+            st.productOfferDiscount
+        );
+        if (typeof st.loyaltyValue === 'number' && st.loyaltyValue > orangeCartTotalsEpsilon()) {
+            const loyLbl =
+                T.loyalty_applied_label ||
+                T.cart_loyalty_redeem_label ||
+                T.loyalty_points_redemption ||
+                'خصم النقاط المطبّق';
+            let inject = '';
+            // لو لم يظهر سطر الإجمالي الفرعي (لا توصيل/خصومات)، أظهره ليتّضح الأساس قبل خصم النقاط.
+            if (totalsHtml.indexOf('cart-mini-total-line') === -1) {
+                inject +=
+                    '<div class="cart-mini-total-line"><span>' +
+                    escCartHtml(T.cart_subtotal_label || 'Subtotal') +
+                    '</span><span>' +
+                    formatMoney(st.subtotal) +
+                    '</span></div>';
+            }
+            inject +=
+                '<div class="cart-mini-total-line cart-mini-total-line--loyalty"><span>' +
+                escCartHtml(loyLbl) +
+                '</span><span>−' +
+                formatMoney(st.loyaltyValue) +
+                '</span></div>';
+            totalsHtml = totalsHtml.replace(
+                '<div class="cart-mini-total">',
+                inject + '<div class="cart-mini-total">'
+            );
+        }
+    } else {
+        totalsHtml = orangeHtmlCartMiniTotals(clientSub, 0, 0, 0, clientSub);
+    }
     return (
         '<div class="cart-mini-summary cart-confirm-summary"><div class="cart-mini-summary__inner">' +
         (title ? '<div class="cart-mini-summary__title">' + escCartHtml(title) + '</div>' : '') +
         '<ul class="cart-mini-list">' +
         listHtml +
         '</ul>' +
-        orangeHtmlCartMiniTotals(clientSub, 0, 0, 0, clientSub) +
+        totalsHtml +
         '</div></div>'
     );
 }
@@ -2062,6 +2105,7 @@ async function orangeRunCheckoutPreview() {
     if (!previewLines.length) {
         orangeUpdateRegisterPromoTeaser(null);
         orangeUpdateGiftBogoRegisterUnlockTeaser(false, false, false);
+        window.__orangeCartServerTotals = null;
         return;
     }
     const seq = ++__orangeCartPreviewSeq;
@@ -2110,12 +2154,23 @@ async function orangeRunCheckoutPreview() {
             orangeUpdateCartGiftPromotionUI(data.gift_promotion || null);
             orangeUpdateCartBogoPromotionUI(data.bogo_promotion || null);
             orangeUpdateLoyaltyRedeemUI(data.loyalty || null);
+            // خزّن مجاميع الخادم الكاملة لإعادة استخدامها في ملخّص كارت التأكيد (توصيل/خصومات/إجمالي).
+            window.__orangeCartServerTotals = {
+                subtotal: data.subtotal,
+                comboDiscount: comboD,
+                promoDiscount: promo,
+                deliveryFee: deliveryFee,
+                total: data.total,
+                productOfferDiscount: productOfferD,
+                loyaltyValue: (data.loyalty && typeof data.loyalty.redeem_value === 'number') ? data.loyalty.redeem_value : 0,
+            };
         } else {
             orangeUpdateRegisterPromoTeaser(null);
             orangeUpdateGiftBogoRegisterUnlockTeaser(false, false, false);
             orangeUpdateCartGiftPromotionUI(null);
             orangeUpdateCartBogoPromotionUI(null);
             orangeUpdateLoyaltyRedeemUI(null);
+            window.__orangeCartServerTotals = null;
         }
     } catch (e) {
         orangeUpdateRegisterPromoTeaser(null);
@@ -2123,6 +2178,7 @@ async function orangeRunCheckoutPreview() {
         orangeUpdateCartGiftPromotionUI(null);
         orangeUpdateCartBogoPromotionUI(null);
         orangeUpdateLoyaltyRedeemUI(null);
+        window.__orangeCartServerTotals = null;
     }
 }
 

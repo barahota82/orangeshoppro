@@ -57,9 +57,6 @@ echo orange_offer_gl_link_card_html(
 
 <div class="card">
     <h3>قيمة التوصيل الأساسية قبل الخصم</h3>
-    <p class="card-hint" style="margin-top:0;">
-        هذه القيمة هي أساس الرسوم قبل أي خصم من عروض التوصيل. اختر نمط التطبيق أولاً، ثم احفظ الأساس أو طبّقه على المناطق عند الحاجة.
-    </p>
     <div class="admin-form-actions" style="display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end;">
         <div style="min-width:220px;">
             <label for="dp_base_delivery_fee">قيمة التوصيل الأساسية</label>
@@ -130,9 +127,6 @@ echo orange_offer_gl_link_card_html(
 
 <div class="card">
     <h3>ملخص القيم المحفوظة</h3>
-    <p class="card-hint" style="margin-top:0;">
-        هذا الكارت الثابت يعرض القيم المحفوظة فعلياً حسب النمط الحالي (الكل/المخصص) لكل محافظة مع المناطق غير النشطة.
-    </p>
     <div class="table-wrap">
         <table>
             <thead>
@@ -207,7 +201,6 @@ echo orange_offer_gl_link_card_html(
 
 <div class="card">
     <h3>القواعد</h3>
-    <p class="page-subtitle" style="margin-top:0;">عند تعدد العروض النشطة في نفس التاريخ يُختار أول عرض حسب الترتيب.</p>
     <div class="table-wrap">
         <table>
             <thead>
