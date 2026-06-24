@@ -78,26 +78,6 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
     <input type="hidden" id="dg_id" value="0">
     <input type="hidden" id="dg_country_id" value="<?php echo (int) $adminCountryId; ?>">
     <div class="form-grid da-gov-form-grid">
-        <div class="da-gov-ar">
-            <label for="dg_name_ar">اسم المحافظة (عربي) <span style="color:#b45309;">*</span></label>
-            <input type="text" id="dg_name_ar" maxlength="191" autocomplete="off">
-        </div>
-        <div class="da-gov-en">
-            <label for="dg_name_en">English</label>
-            <input type="text" id="dg_name_en" maxlength="191" autocomplete="off" lang="en" dir="ltr">
-        </div>
-        <?php if ($hasGovCompanyCol): ?>
-        <div class="da-gov-company">
-            <label for="dg_delivery_company_id">شركة التوصيل (مورّد)</label>
-            <select id="dg_delivery_company_id">
-                <option value="">بدون شركة (مستحقات توصيل افتراضي)</option>
-                <?php foreach ($daDeliveryCompanies as $coRow): ?>
-                <option value="<?php echo (int) ($coRow['id'] ?? 0); ?>"><?php echo htmlspecialchars((string) ($coRow['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
-            <span class="muted" style="display:block;margin-top:4px;">عند تركها بدون شركة يُرحَّل مصروف التوصيل على «مستحقات توصيل افتراضي» ويُصرَف من الخزينة لاحقاً.</span>
-        </div>
-        <?php endif; ?>
         <div class="da-gov-sort">
             <label for="dg_sort_order">الترتيب</label>
             <input type="number" id="dg_sort_order" class="admin-sort-field admin-sort-field--muted"
@@ -108,6 +88,36 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
             <label for="dg_is_active" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:1.4rem;">
                 <input type="checkbox" id="dg_is_active" checked> محافظة نشطة
             </label>
+        </div>
+        <div class="da-gov-ar">
+            <label for="dg_name_ar">اسم المحافظة (عربي) <span style="color:#b45309;">*</span></label>
+            <input type="text" id="dg_name_ar" maxlength="191" autocomplete="off">
+        </div>
+        <div class="da-gov-en">
+            <label for="dg_name_en">English</label>
+            <input type="text" id="dg_name_en" maxlength="191" autocomplete="off" lang="en" dir="ltr">
+        </div>
+        <?php if ($hasGovCompanyCol): ?>
+        <div class="da-gov-company">
+            <label for="dg_delivery_company_code">شركة التوصيل (مورّد)</label>
+            <input type="hidden" id="dg_delivery_company_id" value="0">
+            <div class="dg-company-pick">
+                <input type="text" id="dg_delivery_company_code" class="admin-inp dg-company-code" readonly placeholder="—" title="نقرتان لاختيار المورد" dir="ltr">
+                <span id="dg_delivery_company_name" class="dg-company-name muted">لا يوجد شركة توصيل</span>
+                <button type="button" class="btn-secondary" id="dg_company_pick_btn">اختيار مورد</button>
+                <button type="button" class="btn-secondary" id="dg_company_clear_btn">مسح</button>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+
+    <div class="gl-pick-modal" id="dg_company_pick_modal" hidden aria-hidden="true">
+        <div class="gl-pick-modal__backdrop" id="dg_company_pick_backdrop"></div>
+        <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="dg_company_pick_title">
+            <h3 id="dg_company_pick_title" class="gl-pick-modal__title">اختيار شركة توصيل (مورّد)</h3>
+            <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان للاختيار</p>
+            <input type="search" id="dg_company_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
+            <ul class="gl-pick-modal__list" id="dg_company_pick_list"></ul>
         </div>
     </div>
     <div class="admin-form-actions" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;">
@@ -159,10 +169,21 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
     <input type="hidden" id="da_id" value="0">
     <input type="hidden" id="da_country_id" value="<?php echo (int) $adminCountryId; ?>">
     <div class="form-grid da-area-form-grid">
+        <div class="da-area-sort">
+            <label for="da_sort_order">الترتيب</label>
+            <input type="number" id="da_sort_order" class="admin-sort-field admin-sort-field--muted"
+                value="<?php echo htmlspecialchars((string) $daNextSortOrder, ENT_QUOTES, 'UTF-8'); ?>"
+                disabled tabindex="-1" aria-readonly="true">
+        </div>
+        <div class="da-area-active">
+            <label for="da_is_active" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:1.4rem;">
+                <input type="checkbox" id="da_is_active" checked> منطقة توصيل
+            </label>
+        </div>
         <?php if ($hasGovTable): ?>
         <div class="da-area-gov">
-            <label for="da_governorate_id">المحافظة <span style="color:#b45309;">*</span></label>
-            <select id="da_governorate_id" required>
+            <label for="da_gov_combo_field">المحافظة <span style="color:#b45309;">*</span></label>
+            <select id="da_governorate_id" required class="da-gov-combo__native">
                 <option value="">اختر محافظة</option>
                 <?php foreach ($daGovernoratesList as $gRow): ?>
                 <?php
@@ -181,6 +202,16 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
                 <option value="<?php echo $gid; ?>"><?php echo htmlspecialchars($gLabel, ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php endforeach; ?>
             </select>
+            <div class="da-gov-combo" id="da_gov_combo">
+                <button type="button" class="da-gov-combo__field" id="da_gov_combo_field" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="da-gov-combo__text muted" id="da_gov_combo_text">اختر محافظة</span>
+                    <span class="da-gov-combo__arrow" aria-hidden="true">▾</span>
+                </button>
+                <div class="da-gov-combo__panel" id="da_gov_combo_panel" hidden>
+                    <input type="search" class="da-gov-combo__search admin-inp" id="da_gov_combo_q" placeholder="ابحث باسم المحافظة…" autocomplete="off" dir="rtl">
+                    <ul class="da-gov-combo__list" id="da_gov_combo_list" role="listbox"></ul>
+                </div>
+            </div>
         </div>
         <?php endif; ?>
         <div class="da-area-ar">
@@ -194,26 +225,13 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
         <div class="da-area-fee">
             <label for="da_delivery_fee">قيمة التوصيل</label>
             <input type="number" id="da_delivery_fee" min="0" step="<?php echo htmlspecialchars($daMoneyStep, ENT_QUOTES, 'UTF-8'); ?>" lang="en" dir="ltr" value="<?php echo htmlspecialchars($daMoneyZero, ENT_QUOTES, 'UTF-8'); ?>">
-            <span class="muted" style="display:block;margin-top:4px;">اترك الحقل فارغاً مع تفعيل المنطقة لتسجيل حالة "بانتظار التحديد".</span>
         </div>
         <?php if ($hasCompanyCostCol): ?>
         <div class="da-area-company-cost">
             <label for="da_company_delivery_cost">تكلفة التوصيل على الشركة</label>
             <input type="number" id="da_company_delivery_cost" min="0" step="<?php echo htmlspecialchars($daMoneyStep, ENT_QUOTES, 'UTF-8'); ?>" lang="en" dir="ltr" value="<?php echo htmlspecialchars($daMoneyZero, ENT_QUOTES, 'UTF-8'); ?>">
-            <span class="muted" style="display:block;margin-top:4px;">القيمة التي تدفعها الشركة لشركة التوصيل (مصروف) — منفصلة عن قيمة التوصيل التي يسددها العميل (إيراد).</span>
         </div>
         <?php endif; ?>
-        <div class="da-area-sort">
-            <label for="da_sort_order">الترتيب</label>
-            <input type="number" id="da_sort_order" class="admin-sort-field admin-sort-field--muted"
-                value="<?php echo htmlspecialchars((string) $daNextSortOrder, ENT_QUOTES, 'UTF-8'); ?>"
-                disabled tabindex="-1" aria-readonly="true">
-        </div>
-        <div class="da-area-active">
-            <label for="da_is_active" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:1.4rem;">
-                <input type="checkbox" id="da_is_active" checked> منطقة توصيل
-            </label>
-        </div>
     </div>
     <div class="admin-form-actions" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;">
         <button type="button" onclick="saveDeliveryArea()" <?php echo !$hasAreasTable ? 'disabled' : ''; ?>>حفظ المنطقة</button>
@@ -294,27 +312,101 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
     .da-gov-form-grid {
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
+            "sort active"
             "ar en"
-            "sort active";
+            "company company";
     }
     .da-gov-ar { grid-area: ar; }
     .da-gov-en { grid-area: en; }
     .da-gov-sort { grid-area: sort; }
     .da-gov-active { grid-area: active; }
+    .da-gov-company { grid-area: company; }
+    .dg-company-pick {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+    }
+    .dg-company-pick .dg-company-code {
+        max-width: 140px;
+        cursor: pointer;
+        background: #fff;
+    }
+    .dg-company-pick .dg-company-name {
+        font-weight: 600;
+    }
     .da-area-form-grid {
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
+            "sort active"
             "gov gov"
             "ar en"
-            "fee sort"
-            "active active";
+            "fee cost";
     }
     .da-area-gov { grid-area: gov; }
     .da-area-ar { grid-area: ar; }
     .da-area-en { grid-area: en; }
     .da-area-fee { grid-area: fee; }
+    .da-area-company-cost { grid-area: cost; }
     .da-area-sort { grid-area: sort; }
     .da-area-active { grid-area: active; }
+    .da-gov-combo__native { display: none; }
+    .da-gov-combo { position: relative; }
+    .da-gov-combo__field {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        width: 100%;
+        min-height: 42px;
+        padding: 0 12px;
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
+        text-align: right;
+    }
+    .da-gov-combo__field:hover { border-color: #94a3b8; }
+    .da-gov-combo__text {
+        flex: 1;
+        text-align: right;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .da-gov-combo__arrow { color: #64748b; font-size: 0.85rem; }
+    .da-gov-combo__panel {
+        position: absolute;
+        z-index: 60;
+        top: calc(100% + 4px);
+        right: 0;
+        left: 0;
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+        padding: 8px;
+    }
+    .da-gov-combo__panel[hidden] { display: none; }
+    .da-gov-combo__search { width: 100%; margin-bottom: 8px; }
+    .da-gov-combo__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        max-height: 240px;
+        overflow-y: auto;
+    }
+    .da-gov-combo__opt {
+        padding: 9px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .da-gov-combo__opt:hover { background: #e0e7ff; }
+    .da-gov-combo__opt.is-selected { font-weight: 700; background: #eef2ff; }
+    .da-gov-combo__empty { padding: 12px; color: #64748b; font-size: 13px; }
     .da-areas-list-head {
         display: flex;
         flex-wrap: wrap;
@@ -350,8 +442,8 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
             grid-template-columns: 1fr;
             grid-template-areas: unset;
         }
-        .da-gov-ar, .da-gov-en, .da-gov-sort, .da-gov-active,
-        .da-area-gov, .da-area-ar, .da-area-en, .da-area-fee, .da-area-sort, .da-area-active {
+        .da-gov-ar, .da-gov-en, .da-gov-sort, .da-gov-active, .da-gov-company,
+        .da-area-gov, .da-area-ar, .da-area-en, .da-area-fee, .da-area-company-cost, .da-area-sort, .da-area-active {
             grid-area: unset;
         }
     }
@@ -369,6 +461,93 @@ var daSortStep = dgSortStep;
 var daMoneyDecimals = <?php echo (int) $daMoneyDecimals; ?>;
 var daMoneyZero = <?php echo json_encode($daMoneyZero, JSON_UNESCAPED_UNICODE); ?>;
 var daAreaDefaultFee = <?php echo json_encode((float) ($daPolicy['default_delivery_fee'] ?? 0), JSON_UNESCAPED_UNICODE); ?>;
+var dgCompanies = <?php echo json_encode(array_values($daDeliveryCompanies), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+
+function dgCompanyNoneLabel() { return 'لا يوجد شركة توصيل'; }
+
+function dgSetCompany(id) {
+    var hid = document.getElementById('dg_delivery_company_id');
+    var codeEl = document.getElementById('dg_delivery_company_code');
+    var nameEl = document.getElementById('dg_delivery_company_name');
+    if (!hid) return;
+    var cid = parseInt(id, 10) || 0;
+    var match = null;
+    if (cid > 0) {
+        match = dgCompanies.find(function (c) { return parseInt(c.id, 10) === cid; }) || null;
+    }
+    if (match) {
+        hid.value = String(cid);
+        if (codeEl) codeEl.value = String(match.code || '');
+        if (nameEl) {
+            nameEl.textContent = String(match.name_ar || '');
+            nameEl.classList.remove('muted');
+        }
+    } else {
+        hid.value = '0';
+        if (codeEl) codeEl.value = '';
+        if (nameEl) {
+            nameEl.textContent = dgCompanyNoneLabel();
+            nameEl.classList.add('muted');
+        }
+    }
+}
+
+function dgCompanyPickerClose() {
+    var pm = document.getElementById('dg_company_pick_modal');
+    if (pm) {
+        pm.hidden = true;
+        pm.setAttribute('aria-hidden', 'true');
+    }
+    document.body.classList.remove('gl-pick-open');
+}
+
+function dgCompanyPickerRender(q) {
+    var list = document.getElementById('dg_company_pick_list');
+    if (!list) return;
+    var needle = String(q || '').trim().toLowerCase();
+    list.innerHTML = '';
+    var rows = dgCompanies.filter(function (c) {
+        if (needle === '') return true;
+        var code = String(c.code || '').toLowerCase();
+        var name = String(c.name_ar || '').toLowerCase();
+        return code.indexOf(needle) !== -1 || name.indexOf(needle) !== -1;
+    });
+    if (rows.length === 0) {
+        list.innerHTML = '<li class="gl-pick-empty">لا توجد نتائج</li>';
+        return;
+    }
+    rows.forEach(function (c) {
+        var li = document.createElement('li');
+        li.className = 'gl-pick-item';
+        li.tabIndex = 0;
+        var code = String(c.code || '');
+        var name = String(c.name_ar || '');
+        li.textContent = (code !== '' ? code + ' — ' : '') + name;
+        li.addEventListener('dblclick', function () {
+            dgSetCompany(c.id);
+            dgCompanyPickerClose();
+        });
+        li.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') {
+                dgSetCompany(c.id);
+                dgCompanyPickerClose();
+            }
+        });
+        list.appendChild(li);
+    });
+}
+
+function dgCompanyPickerOpen() {
+    var pm = document.getElementById('dg_company_pick_modal');
+    var q = document.getElementById('dg_company_pick_q');
+    if (!pm || !q) return;
+    q.value = '';
+    dgCompanyPickerRender('');
+    pm.hidden = false;
+    pm.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('gl-pick-open');
+    q.focus();
+}
 
 function dgComputeNextSort() {
     var max = 0;
@@ -554,8 +733,7 @@ function resetGovernorateForm() {
     document.getElementById('dg_name_ar').value = '';
     document.getElementById('dg_name_en').value = '';
     document.getElementById('dg_is_active').checked = true;
-    var coSel = document.getElementById('dg_delivery_company_id');
-    if (coSel) coSel.value = '';
+    dgSetCompany(0);
     refreshDgSortPreview();
 }
 
@@ -565,8 +743,7 @@ function editGovernorate(row) {
     document.getElementById('dg_name_en').value = row.name_en || '';
     document.getElementById('dg_sort_order').value = String(row.sort_order != null ? row.sort_order : 0);
     document.getElementById('dg_is_active').checked = parseInt(row.is_active, 10) === 1;
-    var coSel = document.getElementById('dg_delivery_company_id');
-    if (coSel) coSel.value = (row.delivery_company_id && parseInt(row.delivery_company_id, 10) > 0) ? String(row.delivery_company_id) : '';
+    dgSetCompany((row.delivery_company_id && parseInt(row.delivery_company_id, 10) > 0) ? row.delivery_company_id : 0);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -610,6 +787,7 @@ async function loadGovernorates() {
         } else {
             sel.value = '';
         }
+        if (typeof daGovComboSync === 'function') daGovComboSync();
     }
     daGovernoratesCache.forEach(function (g) {
         const tr = document.createElement('tr');
@@ -673,6 +851,7 @@ function resetDeliveryAreaForm() {
     if (ccEl) ccEl.value = daFormatMoney(0);
     const sel = document.getElementById('da_governorate_id');
     if (sel) sel.value = '';
+    daGovComboSync();
     daSyncListAllCheckbox();
     refreshDaSortPreview();
     renderDeliveryAreasTable();
@@ -690,6 +869,7 @@ function editDeliveryArea(row) {
     if (sel && row.governorate_id) {
         sel.value = String(row.governorate_id);
     }
+    daGovComboSync();
     var ccEl = document.getElementById('da_company_delivery_cost');
     if (ccEl) {
         ccEl.value = daFormatMoney(row.company_delivery_cost != null ? row.company_delivery_cost : 0);
@@ -860,8 +1040,118 @@ if (daGovSel) daGovSel.addEventListener('change', onDaGovernorateChange);
 const daListAll = document.getElementById('da_list_all');
 if (daListAll) daListAll.addEventListener('change', renderDeliveryAreasTable);
 
+function daGovComboSync() {
+    var sel = document.getElementById('da_governorate_id');
+    var txt = document.getElementById('da_gov_combo_text');
+    if (!sel || !txt) return;
+    if (!sel.value) {
+        txt.textContent = 'اختر محافظة';
+        txt.classList.add('muted');
+        return;
+    }
+    var opt = sel.options[sel.selectedIndex];
+    txt.textContent = opt ? opt.textContent : 'اختر محافظة';
+    txt.classList.remove('muted');
+}
+
+function daGovComboRender(q) {
+    var sel = document.getElementById('da_governorate_id');
+    var list = document.getElementById('da_gov_combo_list');
+    if (!sel || !list) return;
+    var needle = String(q || '').trim().toLowerCase();
+    list.innerHTML = '';
+    var opts = Array.prototype.slice.call(sel.options);
+    var matches = opts.filter(function (o) {
+        if (needle === '') return true;
+        return String(o.textContent || '').toLowerCase().indexOf(needle) !== -1;
+    });
+    if (matches.length === 0) {
+        list.innerHTML = '<li class="da-gov-combo__empty">لا توجد نتائج</li>';
+        return;
+    }
+    matches.forEach(function (o) {
+        var li = document.createElement('li');
+        li.className = 'da-gov-combo__opt' + (String(o.value) === String(sel.value) ? ' is-selected' : '');
+        li.setAttribute('role', 'option');
+        li.textContent = o.textContent;
+        li.addEventListener('click', function () {
+            sel.value = o.value;
+            sel.dispatchEvent(new Event('change'));
+            daGovComboSync();
+            daGovComboClose();
+        });
+        list.appendChild(li);
+    });
+}
+
+function daGovComboOpen() {
+    var panel = document.getElementById('da_gov_combo_panel');
+    var field = document.getElementById('da_gov_combo_field');
+    var q = document.getElementById('da_gov_combo_q');
+    if (!panel || !field) return;
+    panel.hidden = false;
+    field.setAttribute('aria-expanded', 'true');
+    if (q) { q.value = ''; }
+    daGovComboRender('');
+    if (q) { q.focus(); }
+}
+
+function daGovComboClose() {
+    var panel = document.getElementById('da_gov_combo_panel');
+    var field = document.getElementById('da_gov_combo_field');
+    if (panel) panel.hidden = true;
+    if (field) field.setAttribute('aria-expanded', 'false');
+}
+
+(function daBindGovCombo() {
+    var combo = document.getElementById('da_gov_combo');
+    var field = document.getElementById('da_gov_combo_field');
+    var q = document.getElementById('da_gov_combo_q');
+    if (!combo || !field) return;
+    field.addEventListener('click', function () {
+        var panel = document.getElementById('da_gov_combo_panel');
+        if (panel && panel.hidden) {
+            daGovComboOpen();
+        } else {
+            daGovComboClose();
+        }
+    });
+    if (q) q.addEventListener('input', function () { daGovComboRender(q.value); });
+    document.addEventListener('click', function (ev) {
+        if (!combo.contains(ev.target)) daGovComboClose();
+    });
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Escape') return;
+        var panel = document.getElementById('da_gov_combo_panel');
+        if (panel && !panel.hidden) daGovComboClose();
+    });
+    daGovComboSync();
+})();
+
+(function dgBindCompanyPicker() {
+    var codeEl = document.getElementById('dg_delivery_company_code');
+    var pickBtn = document.getElementById('dg_company_pick_btn');
+    var clearBtn = document.getElementById('dg_company_clear_btn');
+    var q = document.getElementById('dg_company_pick_q');
+    var backdrop = document.getElementById('dg_company_pick_backdrop');
+    if (codeEl) {
+        codeEl.addEventListener('dblclick', dgCompanyPickerOpen);
+        codeEl.addEventListener('click', dgCompanyPickerOpen);
+    }
+    if (pickBtn) pickBtn.addEventListener('click', dgCompanyPickerOpen);
+    if (clearBtn) clearBtn.addEventListener('click', function () { dgSetCompany(0); });
+    if (q) q.addEventListener('input', function () { dgCompanyPickerRender(q.value); });
+    if (backdrop) backdrop.addEventListener('click', dgCompanyPickerClose);
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Escape') return;
+        var pm = document.getElementById('dg_company_pick_modal');
+        if (pm && !pm.hidden) dgCompanyPickerClose();
+    });
+})();
+
 (async function daInit() {
     try {
+        dgSetCompany(0);
         bindGovernorateEditButtons();
         daSyncListAllCheckbox();
         bindDeliveryAreaEditButtons();

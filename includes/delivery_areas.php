@@ -99,6 +99,7 @@ function orange_delivery_companies_list(PDO $pdo, int $countryId): array
         return [];
     }
     $nameCol = orange_table_has_column($pdo, 'suppliers', 'name_ar') ? 'name_ar' : 'name';
+    $hasCode = orange_table_has_column($pdo, 'suppliers', 'code');
     $where = [];
     $params = [];
     if (orange_table_has_column($pdo, 'suppliers', 'is_delivery_company')) {
@@ -108,7 +109,7 @@ function orange_delivery_companies_list(PDO $pdo, int $countryId): array
         $where[] = '(country_id = ? OR country_id IS NULL)';
         $params[] = $countryId;
     }
-    $sql = 'SELECT id, ' . $nameCol . ' AS name_ar FROM suppliers';
+    $sql = 'SELECT id, ' . $nameCol . ' AS name_ar' . ($hasCode ? ', code' : '') . ' FROM suppliers';
     if ($where !== []) {
         $sql .= ' WHERE ' . implode(' AND ', $where);
     }
@@ -121,6 +122,7 @@ function orange_delivery_companies_list(PDO $pdo, int $countryId): array
         $out[] = [
             'id' => (int) ($r['id'] ?? 0),
             'name_ar' => (string) ($r['name_ar'] ?? ''),
+            'code' => $hasCode ? (string) ($r['code'] ?? '') : '',
         ];
     }
 
