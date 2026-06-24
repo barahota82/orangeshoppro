@@ -3753,6 +3753,9 @@ function addColorwayRow() {
     const div = document.createElement('div');
     div.className = 'cw-row cw-row--with-sizes';
     div.innerHTML = `
+        <div class="cw-row-head" style="display:flex;justify-content:flex-end;margin-bottom:6px;">
+            <button type="button" class="btn-secondary cw-row-remove" style="font-size:12px;padding:4px 10px;color:#b91c1c;border-color:#fca5a5;">− حذف صف اللون</button>
+        </div>
         <div class="cw-row-colors form-grid cw-row--compact">
             <div><label>أساسي</label><select class="cw-p">${colorOptionsHtml()}</select></div>
             <div><label>ثانوي (اختياري)</label><select class="cw-s">${colorOptionsHtml()}</select></div>
@@ -4824,6 +4827,18 @@ if (orangeCatalogAttrAddRowBtnEl) {
 const orangeColorwaysBoxEl = document.getElementById('colorwaysBox');
 if (orangeColorwaysBoxEl) {
     orangeColorwaysBoxEl.addEventListener('click', function (ev) {
+        const rmRow = ev.target.closest && ev.target.closest('.cw-row-remove');
+        if (rmRow) {
+            const row = rmRow.closest('.cw-row');
+            if (row) {
+                row.remove();
+            }
+            orangeProductClearGeneratedVariantsMatrixIfNeeded();
+            orangeProductInvalidateVariantsReadyForSave();
+            orangeScheduleProductCardPreviewRefresh();
+            orangeApplyProductWizardActionButtons();
+            return;
+        }
         const rm = ev.target.closest && ev.target.closest('.cw-gallery-remove');
         if (rm) {
             const li = rm.closest('li');

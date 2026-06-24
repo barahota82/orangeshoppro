@@ -15,6 +15,13 @@ $cartPaymentOnlineEnabled = orange_storefront_payment_online_enabled($pdoCartAcc
 $cartSfAccount = current_storefront_account($pdoCartAcc);
 $cartSfLoggedIn = $cartSfAccount !== null;
 
+// دعوة الانضمام لبرنامج الولاء تظهر للضيف فقط وعندما يكون البرنامج مُفعَّلاً فعلاً للدولة الحالية.
+$cartLoyaltyInviteVisible = false;
+if (!$cartSfLoggedIn) {
+    require_once __DIR__ . '/../includes/loyalty.php';
+    $cartLoyaltyInviteVisible = orange_loyalty_is_active($pdoCartAcc, orange_storefront_current_country_id($pdoCartAcc));
+}
+
 include __DIR__ . '/../includes/header.php';
 $orangeDeliveryAreaGroups = orange_delivery_areas_storefront_groups($pdoCartAcc, $lang);
 $orangeDeliveryAreasStorefront = orange_delivery_areas_flatten_groups($orangeDeliveryAreaGroups);
@@ -149,7 +156,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                 <h3 class="cart-section-title" id="cartCheckoutOverlayTitle"><?php echo htmlspecialchars($checkoutTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
                 <p id="cartAmendModeBanner" class="cart-amend-mode-banner" role="status" aria-live="polite" hidden></p>
                 <p class="cart-checkout-intro"><?php echo htmlspecialchars($checkoutIntro, ENT_QUOTES, 'UTF-8'); ?></p>
-                <?php if (!$cartSfLoggedIn): ?>
+                <?php if ($cartLoyaltyInviteVisible): ?>
                 <p class="cart-checkout-intro cart-checkout-loyalty-invite"><?php echo htmlspecialchars(t('checkout_loyalty_invite'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <?php endif; ?>
                 <p class="cart-checkout-intro"><?php echo htmlspecialchars(t('storefront_guest_checkout_note'), ENT_QUOTES, 'UTF-8'); ?></p>
