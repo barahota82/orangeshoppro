@@ -104,7 +104,6 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
             <div class="dg-company-pick">
                 <input type="text" id="dg_delivery_company_code" class="admin-inp dg-company-code" readonly placeholder="—" title="نقرتان لاختيار المورد" dir="ltr">
                 <span id="dg_delivery_company_name" class="dg-company-name muted">لا يوجد شركة توصيل</span>
-                <button type="button" class="btn-secondary" id="dg_company_pick_btn">اختيار مورد</button>
                 <button type="button" class="btn-secondary" id="dg_company_clear_btn">مسح</button>
             </div>
         </div>
@@ -1130,15 +1129,12 @@ function daGovComboClose() {
 
 (function dgBindCompanyPicker() {
     var codeEl = document.getElementById('dg_delivery_company_code');
-    var pickBtn = document.getElementById('dg_company_pick_btn');
     var clearBtn = document.getElementById('dg_company_clear_btn');
     var q = document.getElementById('dg_company_pick_q');
     var backdrop = document.getElementById('dg_company_pick_backdrop');
     if (codeEl) {
         codeEl.addEventListener('dblclick', dgCompanyPickerOpen);
-        codeEl.addEventListener('click', dgCompanyPickerOpen);
     }
-    if (pickBtn) pickBtn.addEventListener('click', dgCompanyPickerOpen);
     if (clearBtn) clearBtn.addEventListener('click', function () { dgSetCompany(0); });
     if (q) q.addEventListener('input', function () { dgCompanyPickerRender(q.value); });
     if (backdrop) backdrop.addEventListener('click', dgCompanyPickerClose);
