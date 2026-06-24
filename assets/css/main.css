@@ -2344,6 +2344,17 @@ body.cart-overlay-open {
     color: var(--text-muted, #555);
 }
 
+/* ملخّص الطلب داخل كارت التأكيد — مراجعة أخيرة قبل الموافقة (قابل للتمرير إن طال). */
+.cart-confirm-overlay__summary {
+    margin: 0 0 16px;
+    max-height: 38vh;
+    overflow-y: auto;
+}
+
+.cart-confirm-overlay__summary .cart-mini-summary {
+    margin: 0;
+}
+
 .cart-confirm-overlay__actions {
     display: flex;
     gap: 10px;
@@ -2745,8 +2756,9 @@ body.storefront .cart-page-panel--basket .cart-remove-btn.btn-ghost:focus-visibl
     color: #dc2626;
 }
 
-/* أزرار «تحديد الكل / إلغاء التحديد» في السلة: نص واضح ثابت بخلفية شفافة في كل الحالات
+/* أزرار «تحديد الكل / إلغاء التحديد» في السلة: خلفية شفافة ثابتة في كل الحالات
    (hover/active/focus — ماوس ولمس) حتى لا يختفي النص خلف الخلفية البرتقالية لـ body.storefront .btn:hover.
+   الزر المطابق للحالة الحالية (is-active) بلون العلامة، والآخر بخط باهت ليتضح الفرق بصرياً.
    تخصيص عالٍ (يشمل .btn-ghost + كلاس الزر) ليتغلّب على theme-store-unified.css. */
 body.storefront .cart-list-selection-actions .btn-ghost.cart-select-all-btn,
 body.storefront .cart-list-selection-actions .btn-ghost.cart-deselect-all-btn,
@@ -2761,8 +2773,25 @@ body.storefront .cart-list-selection-actions .btn-ghost.cart-deselect-all-btn:fo
     background: transparent;
     box-shadow: none;
     filter: none;
-    color: var(--primary-hover);
     text-decoration: none;
+    color: var(--muted);
+    opacity: 0.7;
+    font-weight: 600;
+    transition: color 0.15s, opacity 0.15s;
+}
+
+/* الزر المطابق للحالة الحالية: لون العلامة وواضح. */
+body.storefront .cart-list-selection-actions .btn-ghost.cart-select-all-btn.is-active,
+body.storefront .cart-list-selection-actions .btn-ghost.cart-deselect-all-btn.is-active,
+body.storefront .cart-list-selection-actions .btn-ghost.cart-select-all-btn.is-active:hover:not([disabled]),
+body.storefront .cart-list-selection-actions .btn-ghost.cart-deselect-all-btn.is-active:hover:not([disabled]),
+body.storefront .cart-list-selection-actions .btn-ghost.cart-select-all-btn.is-active:focus:not([disabled]),
+body.storefront .cart-list-selection-actions .btn-ghost.cart-deselect-all-btn.is-active:focus:not([disabled]),
+body.storefront .cart-list-selection-actions .btn-ghost.cart-select-all-btn.is-active:focus-visible,
+body.storefront .cart-list-selection-actions .btn-ghost.cart-deselect-all-btn.is-active:focus-visible {
+    color: var(--primary-hover);
+    opacity: 1;
+    font-weight: 800;
 }
 
 .cart-empty-cta {

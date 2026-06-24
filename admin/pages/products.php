@@ -524,7 +524,6 @@ $orangeAdminSfProductUrlPartsForJs = [
                     <div>
                         <label>آخر تكلفة شراء (إرشادي)</label>
                         <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr" placeholder="0" data-money-empty-when-zero>
-                        <small class="card-hint" style="display:block;margin-top:4px;color:#6b7280;">قيمة إرشادية تُحدَّث آلياً بصافي آخر شراء — لا تؤثر على تقييم المخزون أو تكلفة المبيعات (تُحسب بـ FIFO من طبقات التكلفة).</small>
                         <small id="cost_gt_price_warn" class="card-hint" style="display:none;margin-top:4px;color:#b91c1c;font-weight:600;">التكلفة لا يمكن أن تكون أكبر من السعر.</small>
                     </div>
                     <div class="product-basic-class-cell">

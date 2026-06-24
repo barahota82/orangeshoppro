@@ -244,6 +244,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
     <div class="cart-confirm-overlay__dialog" role="alertdialog" aria-modal="true" aria-labelledby="cartCheckoutConfirmTitle" aria-describedby="cartCheckoutConfirmBody">
         <h3 id="cartCheckoutConfirmTitle" class="cart-confirm-overlay__title"><?php echo htmlspecialchars(t('checkout_confirm_title'), ENT_QUOTES, 'UTF-8'); ?></h3>
         <p id="cartCheckoutConfirmBody" class="cart-confirm-overlay__body"><?php echo htmlspecialchars(t('checkout_confirm_body'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <div id="cartCheckoutConfirmSummary" class="cart-confirm-overlay__summary" hidden></div>
         <div class="cart-confirm-overlay__actions">
             <button type="button" class="btn" id="cartCheckoutConfirmCancel" data-cart-confirm-cancel><?php echo htmlspecialchars(t('checkout_confirm_cancel'), ENT_QUOTES, 'UTF-8'); ?></button>
             <button type="button" class="btn" id="cartCheckoutConfirmOk"><?php echo htmlspecialchars(t('checkout_confirm_ok'), ENT_QUOTES, 'UTF-8'); ?></button>

@@ -65,6 +65,28 @@ function orangeCartRefreshBasketTotalsClientAndPreview() {
     orangeRenderCheckoutMiniSummary();
 }
 
+/** يحدّث حالة (is-active) لزرّي «تحديد الكل / إلغاء التحديد» حسب التحديد الحالي دون إعادة رسم كامل. */
+function orangeCartSyncSelectionButtonsState() {
+    const selAll = document.querySelector('.cart-list-selection-actions .cart-select-all-btn');
+    const selNone = document.querySelector('.cart-list-selection-actions .cart-deselect-all-btn');
+    if (!selAll && !selNone) {
+        return;
+    }
+    const items = getCart();
+    const total = items.length;
+    const selCount = items.filter(orangeCartLineIsIncluded).length;
+    const allSel = total > 0 && selCount === total;
+    const noneSel = selCount === 0;
+    if (selAll) {
+        selAll.classList.toggle('is-active', allSel);
+        selAll.setAttribute('aria-pressed', allSel ? 'true' : 'false');
+    }
+    if (selNone) {
+        selNone.classList.toggle('is-active', noneSel);
+        selNone.setAttribute('aria-pressed', noneSel ? 'true' : 'false');
+    }
+}
+
 function orangeCartSetLineIncluded(idx, checked) {
     const items = getCart();
     const it = items[idx];
@@ -74,6 +96,7 @@ function orangeCartSetLineIncluded(idx, checked) {
     orangeCartLineIncluded[orangeCartLineKey(it)] = !!checked;
     orangeCartRefreshBasketTotalsClientAndPreview();
     orangeSyncCartProceedBtn();
+    orangeCartSyncSelectionButtonsState();
 }
 
 function orangeCartSelectAllLines(flag) {
@@ -304,6 +327,74 @@ function storefrontApiUrl(path) {
         url += (url.indexOf('?') !== -1 ? '&' : '?') + 'lang=' + encodeURIComponent(lang);
     }
     return url;
+}
+
+/**
+ * يجلب خرائط الترجمة (أسماء المنتجات + تفاصيل المتغيّرات) من الخادم للّغة الحالية.
+ * يُستخدم قبل أول رسم للسلة كي تظهر بطاقات السلة باللغة المختارة من البداية بلا وميض عربي.
+ * @returns {Promise<{labels:Object, products:Object}|null>}
+ */
+async function orangeFetchCartDisplayMaps(itemsModel) {
+    if (!itemsModel || !itemsModel.length || typeof fetch !== 'function') {
+        return null;
+    }
+    const lang = typeof window.APP_LANG === 'string' ? window.APP_LANG : 'ar';
+    const ids = [];
+    const pids = [];
+    itemsModel.forEach((it) => {
+        const v = parseInt(it.variant_id || 0, 10) || 0;
+        if (v && ids.indexOf(v) === -1) {
+            ids.push(v);
+        }
+        const p = parseInt(it.id || 0, 10) || 0;
+        if (p && pids.indexOf(p) === -1) {
+            pids.push(p);
+        }
+    });
+    if (!ids.length && !pids.length) {
+        return null;
+    }
+    try {
+        const response = await fetch(storefrontApiUrl('/api/products/variant-labels.php'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ variant_ids: ids, product_ids: pids, lang: lang }),
+        });
+        const data = await response.json();
+        if (!data || !data.success) {
+            return null;
+        }
+        return { labels: data.labels || {}, products: data.products || {} };
+    } catch (e) {
+        return null;
+    }
+}
+
+/** قيم العرض (الاسم/اللون/المقاس) للبند حسب خرائط الترجمة، مع التراجع للقيم المخزّنة عند الغياب. */
+function orangeCartItemDisplayValues(item, maps) {
+    const out = {
+        name: item && item.name != null ? String(item.name) : '',
+        color: item && item.color != null ? String(item.color) : '',
+        size: item && item.size != null ? String(item.size) : '',
+    };
+    if (!maps) {
+        return out;
+    }
+    const pid = parseInt((item && item.id) || 0, 10) || 0;
+    if (pid && maps.products && maps.products[String(pid)]) {
+        out.name = String(maps.products[String(pid)]);
+    }
+    const vid = parseInt((item && item.variant_id) || 0, 10) || 0;
+    if (vid && maps.labels && maps.labels[String(vid)]) {
+        const row = maps.labels[String(vid)];
+        if (row.color) {
+            out.color = String(row.color);
+        }
+        if (row.size) {
+            out.size = String(row.size);
+        }
+    }
+    return out;
 }
 
 async function orangeHydrateCartVariantDisplayLang(itemsModel) {
@@ -846,6 +937,41 @@ function orangeCheckoutValidateForSend() {
 }
 window.orangeCheckoutValidateForSend = orangeCheckoutValidateForSend;
 
+/** يبني HTML لملخّص الطلب (نفس بنود/مجاميع الملخّص المصغّر) لعرضه داخل كارت التأكيد للمراجعة النهائية. */
+function orangeBuildConfirmSummaryHtml() {
+    const T = window.APP_T || {};
+    const items = getCart();
+    if (!items.length) {
+        return '';
+    }
+    const choice = orangeCartLineChoiceApplies(items);
+    const summaryItems = choice ? orangeCartGetSelectedItems(items) : items;
+    if (!summaryItems.length) {
+        return '';
+    }
+    const clientSub = orangeCartClientSubtotalFromItems(summaryItems);
+    let listHtml = '';
+    summaryItems.forEach((it) => {
+        const q = Math.max(1, parseInt(it.qty, 10) || 1);
+        listHtml +=
+            '<li><span class="cart-mini-list__name">' +
+            escCartHtml(it.name || '') +
+            '</span><span class="cart-mini-list__qty">×' +
+            q +
+            '</span></li>';
+    });
+    const title = T.cart_mini_summary_title || '';
+    return (
+        '<div class="cart-mini-summary cart-confirm-summary"><div class="cart-mini-summary__inner">' +
+        (title ? '<div class="cart-mini-summary__title">' + escCartHtml(title) + '</div>' : '') +
+        '<ul class="cart-mini-list">' +
+        listHtml +
+        '</ul>' +
+        orangeHtmlCartMiniTotals(clientSub, 0, 0, 0, clientSub) +
+        '</div></div>'
+    );
+}
+
 /** رسالة التأكيد (موافق/إلغاء) قبل الإرسال الفعلي. */
 function orangeCheckoutConfirmSubmit() {
     if (!orangeCheckoutValidateForSend()) {
@@ -857,6 +983,13 @@ function orangeCheckoutConfirmSubmit() {
             window.sendOrderNow();
         }
         return;
+    }
+    // ملخّص الطلب داخل كارت التأكيد ليراجعه العميل مرة أخيرة قبل الموافقة النهائية.
+    const sumHost = document.getElementById('cartCheckoutConfirmSummary');
+    if (sumHost) {
+        const sumHtml = orangeBuildConfirmSummaryHtml();
+        sumHost.innerHTML = sumHtml;
+        sumHost.hidden = !sumHtml;
     }
     c.hidden = false;
     c.setAttribute('aria-hidden', 'false');
@@ -2093,8 +2226,13 @@ async function renderCart() {
     }
 
     const limitsPromise = fetchCartStockLimits(items);
+    const renderLang = typeof window.APP_LANG === 'string' ? window.APP_LANG : 'ar';
+    // لغير العربية: اجلب الترجمة قبل أول رسم لتظهر بطاقات السلة باللغة المختارة فوراً بلا وميض عربي.
+    const langMapsPromise = (renderLang && renderLang !== 'ar')
+        ? orangeFetchCartDisplayMaps(items)
+        : Promise.resolve(null);
 
-    function paintCartBasket(itemsModel, limitsArr) {
+    function paintCartBasket(itemsModel, limitsArr, langMaps) {
     let total = 0;
     let html = '';
     const T = window.APP_T || {};
@@ -2118,16 +2256,19 @@ async function renderCart() {
         escCartHtml(countStr) +
             '</span>';
         if (choiceOn) {
+            const selCount = itemsModel.filter(orangeCartLineIsIncluded).length;
+            const allSelected = selCount === itemsModel.length;
+            const noneSelected = selCount === 0;
             html +=
                 '<div class="cart-list-selection-tools">' +
                 '<span class="cart-list-selection-hint">' +
                 escCartHtml(T.cart_order_line_choice_hint || '') +
                 '</span>' +
                 '<span class="cart-list-selection-actions">' +
-                '<button type="button" class="btn btn-ghost cart-select-all-btn" onclick="orangeCartSelectAllLines(true)">' +
+                '<button type="button" class="btn btn-ghost cart-select-all-btn' + (allSelected ? ' is-active' : '') + '" aria-pressed="' + (allSelected ? 'true' : 'false') + '" onclick="orangeCartSelectAllLines(true)">' +
                 escCartHtml(T.cart_select_all_lines || '') +
                 '</button>' +
-                '<button type="button" class="btn btn-ghost cart-deselect-all-btn" onclick="orangeCartSelectAllLines(false)">' +
+                '<button type="button" class="btn btn-ghost cart-deselect-all-btn' + (noneSelected ? ' is-active' : '') + '" aria-pressed="' + (noneSelected ? 'true' : 'false') + '" onclick="orangeCartSelectAllLines(false)">' +
                 escCartHtml(T.cart_deselect_all_lines || '') +
                 '</button>' +
         '</span></div>';
@@ -2137,6 +2278,7 @@ async function renderCart() {
 
         itemsModel.forEach((item, idx) => {
         const qty = Math.max(1, parseInt(item.qty, 10) || 1);
+            const disp = orangeCartItemDisplayValues(item, langMaps);
             const vidLine = parseInt(item.variant_id || 0, 10) || 0;
         const lineTotal = qty * Number(item.price);
             if (!choiceOn || orangeCartLineIsIncluded(item)) {
@@ -2165,20 +2307,20 @@ async function renderCart() {
                 </div>
                 <div class="cart-item-right">
                     ${lineChoiceHtml}
-                    <h4>${escCartHtml(item.name || '')}</h4>
+                    <h4>${escCartHtml(disp.name || '')}</h4>
                     ${
                         vidLine
                             ? `<div class="js-cart-vlabel-host">${
-                                  item.color
-                                      ? `<p class="cart-item-variant">${escCartHtml(T.color || '')}: ${escCartHtml(item.color)}</p>`
+                                  disp.color
+                                      ? `<p class="cart-item-variant"><span class="cart-meta-k">${escCartHtml(T.color || '')}</span> ${escCartHtml(disp.color)}</p>`
                                       : ''
                               }${
-                                  item.size
-                                      ? `<p class="cart-item-variant">${escCartHtml(T.size || '')}: ${escCartHtml(item.size)}</p>`
+                                  disp.size
+                                      ? `<p class="cart-item-variant"><span class="cart-meta-k">${escCartHtml(T.size || '')}</span> ${escCartHtml(disp.size)}</p>`
                                       : ''
                               }</div>`
-                            : `<div class="cart-item-variants">${item.color ? `<p class="cart-item-variant">${escCartHtml(T.color || '')}: ${escCartHtml(item.color)}</p>` : ''}${
-                                  item.size ? `<p class="cart-item-variant">${escCartHtml(T.size || '')}: ${escCartHtml(item.size)}</p>` : ''
+                            : `<div class="cart-item-variants">${disp.color ? `<p class="cart-item-variant"><span class="cart-meta-k">${escCartHtml(T.color || '')}</span> ${escCartHtml(disp.color)}</p>` : ''}${
+                                  disp.size ? `<p class="cart-item-variant"><span class="cart-meta-k">${escCartHtml(T.size || '')}</span> ${escCartHtml(disp.size)}</p>` : ''
                               }</div>`
                     }
                     <div class="cart-line-price-row">
@@ -2216,7 +2358,27 @@ async function renderCart() {
     box.innerHTML = html;
     }
 
-    paintCartBasket(items, null);
+    let langMaps = await langMapsPromise;
+    // ثبّت الاسم المترجَم في التخزين حتى يظهر ملخّص الطلب باللغة المختارة من أول رسم (اللون/المقاس عرضٌ فقط).
+    if (langMaps && langMaps.products) {
+        try {
+            const arr = getCart();
+            let ch = false;
+            arr.forEach((it) => {
+                const p = parseInt(it.id || 0, 10) || 0;
+                const loc = p && langMaps.products[String(p)] ? String(langMaps.products[String(p)]) : '';
+                if (loc && String(it.name || '') !== loc) {
+                    it.name = loc;
+                    ch = true;
+                }
+            });
+            if (ch) {
+                setCart(arr);
+                items = getCart();
+            }
+        } catch (eName) {}
+    }
+    paintCartBasket(items, null, langMaps);
 
     let limits = await limitsPromise;
     let cartMutated = false;
@@ -2268,7 +2430,7 @@ async function renderCart() {
 
     const limitsOk = !!(limits && limits.length === items.length);
     if (limitsOk || cartMutated) {
-        paintCartBasket(items, limitsOk ? limits : null);
+        paintCartBasket(items, limitsOk ? limits : null, langMaps);
     }
 
     orangeSyncCartProceedBtn();
