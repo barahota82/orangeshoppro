@@ -608,14 +608,9 @@ $orangeAdminSfProductUrlPartsForJs = [
         <?php if ($patterns === [] && orange_table_exists($pdo, 'pattern_dictionary')): ?>
         <p style="margin:0 0 12px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;color:#64748b;font-size:13px;">قاموس <strong>الأنماط</strong> بلا صفوف نشطة — يمكنك المتابعة بألوان فقط، أو إضافة أنماط من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=pattern_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">أنماط الألوان</a>.</p>
         <?php endif; ?>
-        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">يُضبَط <strong>له ألوان ؟</strong> من تبويب <strong>البيانات الأساسية</strong> (صف: عائلة المقاسات، دليل المقاس الاسترشادي، له ألوان ؟). قائمة <strong>مقاسات المنتج (بدون ألوان)</strong> تظهر هناك عند اختيار عائلة مقاسات مع «لا» للألوان.</p>
 
         <div id="colorwaysSection" class="card admin-nested-panel" style="display:none;">
             <h4 class="admin-nested-panel__title">تركيبات اللون (أساسي / ثانوي اختياري)</h4>
-            <p id="colorways_sizes_hint" class="card-hint" style="display:none;margin:0 0 10px;font-size:13px;line-height:1.55;">
-                لكل صف لون: حدّد بالأسفل <strong>المقاسات المتاحة لهذا اللون</strong> من عائلة المقاسات المختارة في البيانات الأساسية. المقاسات الجديدة في العائلة تظهر هنا تلقائياً بعد تحديث الصفحة.
-                الصفوف المسجّلة مسبقاً تظهر باهتة؛ إن وُجد <strong>مخزون</strong> على متغير لا يُلغى اختياره من هنا.
-            </p>
             <div id="colorwaysBox"></div>
             <div class="cw-rows-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
                 <button type="button" class="btn-secondary" onclick="addColorwayRow()">+ صف لون</button>
@@ -628,7 +623,6 @@ $orangeAdminSfProductUrlPartsForJs = [
         <div id="productTabPanelImages" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnImages" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">صور المنتج العامة</h4>
-        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">صور <strong>المنتج العامة</strong> (رئيسية + معرض) للقوائم والاحتياط. إن كان المنتج <strong>له ألوان</strong> يمكن إضافة <strong>معرض لكل لون</strong> من تبويب <strong>الألوان</strong> أسفل صف اللون — وإلا يُعرض في المتجر نفس المعرض العام.</p>
         <div class="form-grid">
             <div style="grid-column:1/-1;">
                 <label>الصورة الرئيسية — رفع ملف</label>
@@ -659,7 +653,6 @@ $orangeAdminSfProductUrlPartsForJs = [
         <div id="productTabPanelVariants" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnVariants" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">المتغيرات والباركود</h4>
-        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">كل منتج — بما فيه <strong>بدون ألوان وبدون مقاسات</strong> — يحتاج <strong>صف بيع واحد على الأقل</strong> في الجدول أدناه؛ يظهر <strong>باركود المتغير</strong> بعد الحفظ. <strong>منتج جديد:</strong> أكمل البيانات في التبويبات ثم اضغط «توليد المتغيرات»؛ بعد ظهور الجدول يُفعّل «حفظ المنتج». المنتج البسيط = صف واحد في الجدول بعد التوليد.</p>
         <div id="variantsBox"></div>
         </div>
         </div>
@@ -670,7 +663,6 @@ $orangeAdminSfProductUrlPartsForJs = [
         <div class="form-grid product-form-tab-basic-grid">
         <?php if ($catalogAttributesActive !== []): ?>
         <div style="grid-column:1/-1;">
-            <p style="margin:0 0 10px;font-size:13px;color:#64748b;">لكل سطر: اختر نوع السمة ثم القيمة. استخدم «إضافة سمة أخرى» لصف إضافي.</p>
             <div id="orangeCatalogAttrRows"></div>
             <button type="button" class="btn-secondary" id="orangeCatalogAttrAddRowBtn" style="margin-top:6px;">إضافة سمة أخرى</button>
         </div>
@@ -754,7 +746,6 @@ $orangeAdminSfProductUrlPartsForJs = [
         <div id="productTabPanelCardPreview" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnCardPreview" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">معاينة المنتج كما يراها العميل</h4>
-        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">تفتح المعاينة المتجر الحقيقي بقوالبه الفعلية وتُحدَّث مباشرة من حقول النموذج قبل الحفظ. يمكنك التنقّل بين: <strong>كارت القائمة</strong>، <strong>صفحة المنتج</strong>، و<strong>عرض موبايل</strong>، أو تشغيل <strong>محاكاة شاملة</strong> (قائمة + صفحة منتج). بعد الحفظ يظهر رابط الصفحة الحقيقية كما للزائر.</p>
         <?php
         $sfPreviewCountries = function_exists('orange_countries_storefront_active')
             ? orange_countries_storefront_active($pdo, 'ar')
@@ -773,7 +764,6 @@ $orangeAdminSfProductUrlPartsForJs = [
                 <button type="button" class="btn btn-secondary" id="orangeBtnMobilePreview">معاينة الجوال 📱</button>
                 <span id="orangeFullPreviewStatus" style="font-size:12px;color:#64748b;"></span>
             </div>
-            <span style="display:block;margin-top:6px;color:#9a3412;font-size:12px;">يُجهّز نسخة معاينة مخفيّة عن العملاء، ويفتح المتجر بقناة الدولة الافتراضية. زر <strong>معاينة الجوال</strong> يعرض الموقع داخل إطار بحجم هاتف على الكمبيوتر (لضبط الصور والخط والمقاسات) — مع تبديل المقاس والتدوير. أي طلب داخل المعاينة لا يُرسَل فعلياً. تنتهي المعاينة تلقائياً خلال 24 ساعة.</span>
         </div>
 
         <div id="orangeMobilePreviewModal" class="orange-mpv-modal" hidden>
@@ -854,9 +844,6 @@ $orangeAdminSfProductUrlPartsForJs = [
             </select>
         </div>
     </div>
-    <?php endif; ?>
-    <?php if ($catalogNavUnified && $hasProductTypesTable): ?>
-    <p style="margin:4px 0 12px;font-size:13px;color:#92400e;background:#fffbeb;padding:10px 12px;border-radius:8px;border:1px solid #fcd34d;">مع تفعيل التصنيف الموحّد، يُشترط اختيار نوع منتج على كل منتج جديد؛ راجع عمود «نوع (موحّد)» في الجدول وصحّح الصفوف التي تظهر تنبيه «ناقص».</p>
     <?php endif; ?>
     <div class="table-wrap cat-dep-list-wrap" data-list="products">
         <table>
