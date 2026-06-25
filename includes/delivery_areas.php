@@ -87,6 +87,20 @@ function orange_delivery_governorates_has_company_column(PDO $pdo): bool
         && orange_table_has_column($pdo, 'delivery_governorates', 'delivery_company_id');
 }
 
+function orange_delivery_governorates_has_default_amounts_column(PDO $pdo): bool
+{
+    return orange_delivery_governorates_table_exists($pdo)
+        && orange_table_has_column($pdo, 'delivery_governorates', 'default_delivery_fee')
+        && orange_table_has_column($pdo, 'delivery_governorates', 'default_company_delivery_cost');
+}
+
+function orange_delivery_areas_has_follow_flags_column(PDO $pdo): bool
+{
+    return orange_table_exists($pdo, 'delivery_areas')
+        && orange_table_has_column($pdo, 'delivery_areas', 'fee_follows_gov')
+        && orange_table_has_column($pdo, 'delivery_areas', 'cost_follows_gov');
+}
+
 /**
  * الموردون المتاحون لاختيارهم كشركة توصيل على المحافظة.
  * تُعاد كل الموردين (أبناء «الحساب الأب للموردين») بصرف النظر عن وسم is_delivery_company،
@@ -160,6 +174,7 @@ function orange_delivery_governorates_admin_list(PDO $pdo, int $countryId): arra
         return [];
     }
     $hasCompany = orange_delivery_governorates_has_company_column($pdo);
+    $hasDefaults = orange_delivery_governorates_has_default_amounts_column($pdo);
     $hasSuppliers = orange_table_exists($pdo, 'suppliers');
     $supplierNameCol = $hasSuppliers && orange_table_has_column($pdo, 'suppliers', 'name_ar')
         ? 'name_ar'
@@ -172,9 +187,13 @@ function orange_delivery_governorates_admin_list(PDO $pdo, int $countryId): arra
     } else {
         $companySel = 'NULL AS delivery_company_id, NULL AS delivery_company_name';
     }
+    $defaultsSel = $hasDefaults
+        ? 'g.default_delivery_fee, g.default_company_delivery_cost'
+        : 'NULL AS default_delivery_fee, NULL AS default_company_delivery_cost';
     $st = $pdo->prepare(
         'SELECT g.id, g.country_id, g.name_ar, g.name_en, g.sort_order, g.is_active,
                 ' . $companySel . ',
+                ' . $defaultsSel . ',
                 (SELECT COUNT(*) FROM delivery_areas a WHERE a.governorate_id = g.id) AS areas_count
          FROM delivery_governorates g
          WHERE g.country_id = ?
@@ -186,6 +205,8 @@ function orange_delivery_governorates_admin_list(PDO $pdo, int $countryId): arra
         $r['areas_count'] = (int) ($r['areas_count'] ?? 0);
         $r['delivery_company_id'] = (int) ($r['delivery_company_id'] ?? 0);
         $r['delivery_company_name'] = (string) ($r['delivery_company_name'] ?? '');
+        $r['default_delivery_fee'] = ($r['default_delivery_fee'] === null) ? null : (float) $r['default_delivery_fee'];
+        $r['default_company_delivery_cost'] = ($r['default_company_delivery_cost'] === null) ? null : (float) $r['default_company_delivery_cost'];
     }
     unset($r);
 
@@ -212,6 +233,9 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
     $pendingSel = $hasPending ? 'delivery_fee_pending' : '0 AS delivery_fee_pending';
     $ccSelA = $hasCompanyCost ? 'a.company_delivery_cost' : '0 AS company_delivery_cost';
     $ccSel = $hasCompanyCost ? 'company_delivery_cost' : '0 AS company_delivery_cost';
+    $hasFollow = orange_delivery_areas_has_follow_flags_column($pdo);
+    $followSelA = $hasFollow ? 'a.fee_follows_gov, a.cost_follows_gov' : '0 AS fee_follows_gov, 0 AS cost_follows_gov';
+    $followSel = $hasFollow ? 'fee_follows_gov, cost_follows_gov' : '0 AS fee_follows_gov, 0 AS cost_follows_gov';
     if ($countryId === null && $hasCountry) {
         $countryId = orange_countries_default_id($pdo);
     }
@@ -219,7 +243,7 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
         if ($hasGov) {
             $st = $pdo->prepare(
                 'SELECT a.id, a.name_ar, a.name_en, ' . $feeSelA . ', a.sort_order, a.is_active, a.country_id, a.governorate_id,
-                        ' . $pendingSelA . ', ' . $ccSelA . ',
+                        ' . $pendingSelA . ', ' . $ccSelA . ', ' . $followSelA . ',
                         g.name_ar AS governorate_name_ar, g.name_en AS governorate_name_en
                  FROM delivery_areas a
                  LEFT JOIN delivery_governorates g ON g.id = a.governorate_id
@@ -230,7 +254,7 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
         } else {
             $st = $pdo->prepare(
                 'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, country_id
-                        , ' . $pendingSel . ', ' . $ccSel . '
+                        , ' . $pendingSel . ', ' . $ccSel . ', ' . $followSel . '
                  FROM delivery_areas WHERE country_id = ? ORDER BY sort_order ASC, id ASC'
             );
             $st->execute([$countryId]);
@@ -240,7 +264,7 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
     }
 
     $st = $pdo->query(
-        'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, ' . $pendingSel . ', ' . $ccSel . '
+        'SELECT id, name_ar, name_en, ' . $feeSel . ', sort_order, is_active, ' . $pendingSel . ', ' . $ccSel . ', ' . $followSel . '
          FROM delivery_areas ORDER BY sort_order ASC, id ASC'
     );
 
