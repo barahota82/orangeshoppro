@@ -318,7 +318,7 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
                         <?php else: ?>
                             <?php echo htmlspecialchars(number_format(max(0.0, (float) ($aRow['delivery_fee'] ?? 0)), $daMoneyDecimals, '.', ''), ENT_QUOTES, 'UTF-8'); ?>
                         <?php endif; ?>
-                        <?php if ($hasAreaFollowFlags && $hasGovDefaultAmounts): ?>
+                        <?php if ($hasAreaFollowFlags && $hasGovDefaultAmounts && $aActive): ?>
                             <?php if ((int) ($aRow['fee_follows_gov'] ?? 0) === 1): ?>
                                 <span class="da-follow-badge" title="موروثة من المحافظة">🔗 محافظة</span>
                             <?php else: ?>
@@ -329,7 +329,7 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
                     <?php if ($hasCompanyCostCol): ?>
                     <td dir="ltr">
                         <?php echo htmlspecialchars(number_format(max(0.0, (float) ($aRow['company_delivery_cost'] ?? 0)), $daMoneyDecimals, '.', ''), ENT_QUOTES, 'UTF-8'); ?>
-                        <?php if ($hasAreaFollowFlags && $hasGovDefaultAmounts): ?>
+                        <?php if ($hasAreaFollowFlags && $hasGovDefaultAmounts && $aActive): ?>
                             <?php if ((int) ($aRow['cost_follows_gov'] ?? 0) === 1): ?>
                                 <span class="da-follow-badge" title="موروثة من المحافظة">🔗 محافظة</span>
                             <?php else: ?>
@@ -339,7 +339,7 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
                     </td>
                     <?php endif; ?>
                     <td><?php echo (int) ($aRow['sort_order'] ?? 0); ?></td>
-                    <td><?php echo $aActive ? ($aPending ? 'منطقة توصيل (بانتظار السعر)' : 'منطقة توصيل') : 'غير متاحة للتوصيل'; ?></td>
+                    <td><?php echo $aActive ? ($aPending ? 'منطقة توصيل (بانتظار السعر)' : 'منطقة توصيل') : '<span class="da-custom-badge">غير متاحة للتوصيل</span>'; ?></td>
                     <td><button type="button" class="btn-secondary" data-da-edit="<?php echo $aid; ?>">تعديل</button></td>
                 </tr>
                 <?php endforeach; ?>
@@ -766,17 +766,17 @@ function renderDeliveryAreasTable() {
             : escHtml(daFormatMoney(r.delivery_fee));
         var deliverLabel = canDeliver
             ? (feePending ? 'منطقة توصيل (بانتظار السعر)' : 'منطقة توصيل')
-            : 'غير متاحة للتوصيل';
+            : '<span class="da-custom-badge">غير متاحة للتوصيل</span>';
         var html = '<td>' + escHtml(String(r.id)) + '</td>';
         if (daHasGovCol) {
             html += '<td>' + escHtml(String(r.governorate_name_ar || r.governorate_name_en || '—')) + '</td>';
         }
-        var feeBadge = daHasFollowFeature
+        var feeBadge = (daHasFollowFeature && canDeliver)
             ? (parseInt(r.fee_follows_gov, 10) === 1
                 ? ' <span class="da-follow-badge" title="موروثة من المحافظة">🔗 محافظة</span>'
                 : ' <span class="da-custom-badge">مخصّص</span>')
             : '';
-        var costBadge = daHasFollowFeature
+        var costBadge = (daHasFollowFeature && canDeliver)
             ? (parseInt(r.cost_follows_gov, 10) === 1
                 ? ' <span class="da-follow-badge" title="موروثة من المحافظة">🔗 محافظة</span>'
                 : ' <span class="da-custom-badge">مخصّص</span>')
