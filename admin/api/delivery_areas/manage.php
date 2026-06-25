@@ -208,36 +208,33 @@ try {
                 $feeApplyAll = !empty($data['fee_apply_all']);
                 $costApplyAll = !empty($data['cost_apply_all']);
                 $hasPend = orange_delivery_areas_has_pending_fee_column($pdo);
+                $pendExpr = $hasPend ? ', delivery_fee_pending = 0' : '';
+                // الترحيل يقتصر على المناطق المتاحة للتوصيل (النشطة) فقط — غير المتاحة تبقى صفراً بلا قيمة.
                 if ($defFee !== null) {
                     $feeVal = round(max(0.0, (float) $defFee), max(0, min(4, $countryMoneyDecimals)));
-                    $pendExpr = $hasPend
-                        ? ($feeVal <= 0.0
-                            ? ', delivery_fee_pending = (CASE WHEN is_active = 1 THEN 1 ELSE 0 END)'
-                            : ', delivery_fee_pending = 0')
-                        : '';
                     if ($feeApplyAll) {
-                        $pdo->prepare('UPDATE delivery_areas SET delivery_fee = ?, fee_follows_gov = 1' . $pendExpr . ' WHERE governorate_id = ?')
+                        $pdo->prepare('UPDATE delivery_areas SET delivery_fee = ?, fee_follows_gov = 1' . $pendExpr . ' WHERE governorate_id = ? AND is_active = 1')
                             ->execute([$feeVal, $id]);
                     } else {
-                        $pdo->prepare('UPDATE delivery_areas SET delivery_fee = ?' . $pendExpr . ' WHERE governorate_id = ? AND fee_follows_gov = 1')
+                        $pdo->prepare('UPDATE delivery_areas SET delivery_fee = ?' . $pendExpr . ' WHERE governorate_id = ? AND is_active = 1 AND fee_follows_gov = 1')
                             ->execute([$feeVal, $id]);
                     }
                 } elseif ($feeApplyAll) {
-                    $pdo->prepare('UPDATE delivery_areas SET fee_follows_gov = 1 WHERE governorate_id = ?')->execute([$id]);
+                    $pdo->prepare('UPDATE delivery_areas SET fee_follows_gov = 1 WHERE governorate_id = ? AND is_active = 1')->execute([$id]);
                 }
 
                 if (orange_delivery_areas_has_company_cost_column($pdo)) {
                     if ($defCost !== null) {
                         $costVal = round(max(0.0, (float) $defCost), max(0, min(4, $countryMoneyDecimals)));
                         if ($costApplyAll) {
-                            $pdo->prepare('UPDATE delivery_areas SET company_delivery_cost = ?, cost_follows_gov = 1 WHERE governorate_id = ?')
+                            $pdo->prepare('UPDATE delivery_areas SET company_delivery_cost = ?, cost_follows_gov = 1 WHERE governorate_id = ? AND is_active = 1')
                                 ->execute([$costVal, $id]);
                         } else {
-                            $pdo->prepare('UPDATE delivery_areas SET company_delivery_cost = ? WHERE governorate_id = ? AND cost_follows_gov = 1')
+                            $pdo->prepare('UPDATE delivery_areas SET company_delivery_cost = ? WHERE governorate_id = ? AND is_active = 1 AND cost_follows_gov = 1')
                                 ->execute([$costVal, $id]);
                         }
                     } elseif ($costApplyAll) {
-                        $pdo->prepare('UPDATE delivery_areas SET cost_follows_gov = 1 WHERE governorate_id = ?')->execute([$id]);
+                        $pdo->prepare('UPDATE delivery_areas SET cost_follows_gov = 1 WHERE governorate_id = ? AND is_active = 1')->execute([$id]);
                     }
                 }
             }
@@ -258,34 +255,20 @@ try {
         $deliveryFeeRaw = trim((string) ($data['delivery_fee'] ?? ''));
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $hasFeePendingCol = orange_delivery_areas_has_pending_fee_column($pdo);
-        $feePending = 0;
-        if ($deliveryFeeRaw === '') {
-            if ($isActive === 1 && $hasFeePendingCol) {
-                $deliveryFee = 0.0;
-                $feePending = 1;
-            } else {
-                $deliveryFee = orange_delivery_country_default_fee($pdo, $countryId);
-            }
-        } else {
-            $deliveryFee = da_money_non_negative($deliveryFeeRaw, $countryMoneyDecimals);
-        }
+        $hasGovCol = orange_delivery_areas_has_governorate_column($pdo);
+        $hasCountryCol = orange_delivery_areas_has_country_column($pdo);
+        $hasCompanyCostCol = orange_delivery_areas_has_company_cost_column($pdo);
+        $hasFollowCols = orange_delivery_areas_has_follow_flags_column($pdo);
+        $feeFollows = $hasFollowCols && !empty($data['fee_follows_gov']);
+        $costFollows = $hasFollowCols && !empty($data['cost_follows_gov']);
+        $moneyDec = max(0, min(4, $countryMoneyDecimals));
 
         if ($nameAr === '') {
             json_response(['success' => false, 'message' => 'اسم المنطقة بالعربي مطلوب'], 422);
         }
-        if ($deliveryFee === null) {
-            json_response(['success' => false, 'message' => 'قيمة التوصيل غير صحيحة'], 422);
-        }
-        if ($isActive === 1 && $feePending === 0 && (float) $deliveryFee <= 0.0 && empty($data['fee_follows_gov'])) {
-            json_response([
-                'success' => false,
-                'message' => 'لا يمكن تنشيط منطقة بسعر صفر. أدخل قيمة أكبر من صفر أو اترك الحقل فارغاً لحالة "بانتظار التحديد".',
-            ], 422);
-        }
         if ($countryId <= 0) {
             json_response(['success' => false, 'message' => 'الدولة غير محددة'], 422);
         }
-        $hasGovCol = orange_delivery_areas_has_governorate_column($pdo);
         if ($hasGovCol && $governorateId <= 0) {
             json_response(['success' => false, 'message' => 'اختر المحافظة'], 422);
         }
@@ -297,28 +280,55 @@ try {
             }
         }
 
-        $hasCountryCol = orange_delivery_areas_has_country_column($pdo);
-
-        $hasFollowCols = orange_delivery_areas_has_follow_flags_column($pdo);
-        $feeFollows = false;
-        $costFollows = false;
+        // افتراضيا المحافظة (مصدر الختم عند التتبّع)
+        $govDefFee = null;
         $govDefCost = null;
-        if ($hasFollowCols) {
-            $feeFollows = !empty($data['fee_follows_gov']);
-            $costFollows = !empty($data['cost_follows_gov']);
-            $govDefFee = null;
-            if ($hasGovCol && $governorateId > 0 && orange_delivery_governorates_has_default_amounts_column($pdo)) {
-                $gd = $pdo->prepare('SELECT default_delivery_fee, default_company_delivery_cost FROM delivery_governorates WHERE id = ? LIMIT 1');
-                $gd->execute([$governorateId]);
-                $gdRow = $gd->fetch(PDO::FETCH_ASSOC) ?: [];
-                $govDefFee = (($gdRow['default_delivery_fee'] ?? null) === null) ? null : (float) $gdRow['default_delivery_fee'];
-                $govDefCost = (($gdRow['default_company_delivery_cost'] ?? null) === null) ? null : (float) $gdRow['default_company_delivery_cost'];
+        if ($hasGovCol && $governorateId > 0 && orange_delivery_governorates_has_default_amounts_column($pdo)) {
+            $gd = $pdo->prepare('SELECT default_delivery_fee, default_company_delivery_cost FROM delivery_governorates WHERE id = ? LIMIT 1');
+            $gd->execute([$governorateId]);
+            $gdRow = $gd->fetch(PDO::FETCH_ASSOC) ?: [];
+            $govDefFee = (($gdRow['default_delivery_fee'] ?? null) === null) ? null : (float) $gdRow['default_delivery_fee'];
+            $govDefCost = (($gdRow['default_company_delivery_cost'] ?? null) === null) ? null : (float) $gdRow['default_company_delivery_cost'];
+        }
+
+        // القيمة النهائية: التتبّع يختم من المحافظة، وإلا من المُدخل (الفارغ = صفر؛ غير المتاحة تبقى صفراً)
+        if ($feeFollows && $govDefFee !== null) {
+            $deliveryFee = round(max(0.0, $govDefFee), $moneyDec);
+        } elseif ($deliveryFeeRaw === '') {
+            $deliveryFee = 0.0;
+        } else {
+            $deliveryFee = da_money_non_negative($deliveryFeeRaw, $countryMoneyDecimals);
+        }
+        if ($deliveryFee === null) {
+            json_response(['success' => false, 'message' => 'قيمة التوصيل غير صحيحة'], 422);
+        }
+
+        if ($costFollows && $govDefCost !== null) {
+            $companyCost = round(max(0.0, $govDefCost), $moneyDec);
+        } else {
+            $companyCost = da_money_non_negative($data['company_delivery_cost'] ?? '', $countryMoneyDecimals);
+        }
+        if ($companyCost === null) {
+            json_response(['success' => false, 'message' => 'تكلفة التوصيل على الشركة غير صحيحة'], 422);
+        }
+
+        // سياسة المالك: أي منطقة متاحة للتوصيل (نشطة) يجب أن تحمل قيمة توصيل وتكلفة توصيل أكبر من صفر.
+        if ($isActive === 1) {
+            if ((float) $deliveryFee <= 0.0) {
+                json_response([
+                    'success' => false,
+                    'message' => 'لا يمكن تفعيل التوصيل لهذه المنطقة بدون قيمة توصيل. أدخل قيمة أكبر من صفر، أو فعّل «تتبع المحافظة» مع وجود قيمة افتراضية للمحافظة.',
+                ], 422);
             }
-            if ($feeFollows && $govDefFee !== null) {
-                $deliveryFee = round(max(0.0, $govDefFee), max(0, min(4, $countryMoneyDecimals)));
-                $feePending = ($isActive === 1 && $deliveryFee <= 0.0 && $hasFeePendingCol) ? 1 : 0;
+            if ($hasCompanyCostCol && (float) $companyCost <= 0.0) {
+                json_response([
+                    'success' => false,
+                    'message' => 'لا يمكن تفعيل التوصيل لهذه المنطقة بدون تكلفة توصيل على الشركة. أدخل تكلفة أكبر من صفر، أو فعّل «تتبع المحافظة».',
+                ], 422);
             }
         }
+
+        $feePending = 0;
 
         if ($id > 0) {
             try {
@@ -428,21 +438,9 @@ try {
 
         $areaId = $id > 0 ? $id : (int) $pdo->lastInsertId();
 
-        if (orange_delivery_areas_has_company_cost_column($pdo)
-            && (array_key_exists('company_delivery_cost', is_array($data) ? $data : []) || ($costFollows && $govDefCost !== null))
-        ) {
-            if ($costFollows && $govDefCost !== null) {
-                $companyCost = round(max(0.0, $govDefCost), max(0, min(4, $countryMoneyDecimals)));
-            } else {
-                $companyCost = da_money_non_negative($data['company_delivery_cost'] ?? '', $countryMoneyDecimals);
-            }
-            if ($companyCost === null) {
-                json_response(['success' => false, 'message' => 'تكلفة التوصيل على الشركة غير صحيحة'], 422);
-            }
-            if ($areaId > 0) {
-                $u = $pdo->prepare('UPDATE delivery_areas SET company_delivery_cost = ? WHERE id = ?');
-                $u->execute([$companyCost, $areaId]);
-            }
+        if ($hasCompanyCostCol && $areaId > 0) {
+            $u = $pdo->prepare('UPDATE delivery_areas SET company_delivery_cost = ? WHERE id = ?');
+            $u->execute([$companyCost, $areaId]);
         }
 
         if ($hasFollowCols && $areaId > 0) {

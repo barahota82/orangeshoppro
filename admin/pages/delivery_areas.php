@@ -241,7 +241,7 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
         </div>
         <div class="da-area-fee">
             <label for="da_delivery_fee">قيمة التوصيل</label>
-            <input type="number" id="da_delivery_fee" min="0" step="<?php echo htmlspecialchars($daMoneyStep, ENT_QUOTES, 'UTF-8'); ?>" lang="en" dir="ltr" value="<?php echo htmlspecialchars($daMoneyZero, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="number" id="da_delivery_fee" min="0" step="<?php echo htmlspecialchars($daMoneyStep, ENT_QUOTES, 'UTF-8'); ?>" lang="en" dir="ltr" placeholder="<?php echo htmlspecialchars($daMoneyZero, ENT_QUOTES, 'UTF-8'); ?>">
             <?php if ($hasAreaFollowFlags && $hasGovDefaultAmounts): ?>
             <label class="da-follow-toggle"><input type="checkbox" id="da_fee_follows_gov"> <span class="da-follow-toggle__txt">تتبع المحافظة</span></label>
             <?php endif; ?>
@@ -249,7 +249,7 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
         <?php if ($hasCompanyCostCol): ?>
         <div class="da-area-company-cost">
             <label for="da_company_delivery_cost">تكلفة التوصيل على الشركة</label>
-            <input type="number" id="da_company_delivery_cost" min="0" step="<?php echo htmlspecialchars($daMoneyStep, ENT_QUOTES, 'UTF-8'); ?>" lang="en" dir="ltr" value="<?php echo htmlspecialchars($daMoneyZero, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="number" id="da_company_delivery_cost" min="0" step="<?php echo htmlspecialchars($daMoneyStep, ENT_QUOTES, 'UTF-8'); ?>" lang="en" dir="ltr" placeholder="<?php echo htmlspecialchars($daMoneyZero, ENT_QUOTES, 'UTF-8'); ?>">
             <?php if ($hasAreaFollowFlags && $hasGovDefaultAmounts): ?>
             <label class="da-follow-toggle"><input type="checkbox" id="da_cost_follows_gov"> <span class="da-follow-toggle__txt">تتبع المحافظة</span></label>
             <?php endif; ?>
@@ -360,8 +360,8 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
         grid-template-areas:
             "sort active"
             "ar en"
-            "company company"
-            "deffee defcost";
+            "deffee defcost"
+            "company company";
     }
     .da-gov-ar { grid-area: ar; }
     .da-gov-en { grid-area: en; }
@@ -372,12 +372,12 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
     .da-gov-defcost { grid-area: defcost; }
     .dg-default-amount {
         display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
     }
     .dg-default-amount input[type="number"] {
-        max-width: 160px;
+        width: 100%;
     }
     .dg-apply-all-label {
         display: inline-flex;
@@ -385,8 +385,9 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
         gap: 6px;
         cursor: pointer;
         user-select: none;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         white-space: nowrap;
+        margin-top: 2px;
     }
     .dg-company-pick {
         display: flex;
@@ -1045,10 +1046,10 @@ function resetDeliveryAreaForm() {
     document.getElementById('da_id').value = '0';
     document.getElementById('da_name_ar').value = '';
     document.getElementById('da_name_en').value = '';
-    document.getElementById('da_delivery_fee').value = daFormatMoney(daAreaDefaultFee);
+    document.getElementById('da_delivery_fee').value = (daAreaDefaultFee > 0) ? daFormatMoney(daAreaDefaultFee) : '';
     document.getElementById('da_is_active').checked = true;
     var ccEl = document.getElementById('da_company_delivery_cost');
-    if (ccEl) ccEl.value = daFormatMoney(0);
+    if (ccEl) ccEl.value = '';
     const sel = document.getElementById('da_governorate_id');
     if (sel) sel.value = '';
     daGovComboSync();
@@ -1149,12 +1150,7 @@ async function saveDeliveryArea() {
             alert('قيمة التوصيل غير صحيحة');
             return;
         }
-        const roundedFee = Number(daRoundMoney(feeVal).toFixed(daMoneyDecimals));
-        if (isActive === 1 && roundedFee <= 0 && !feeFollows) {
-            alert('لا يمكن تنشيط منطقة بسعر صفر. أدخل قيمة أكبر من صفر أو اترك الحقل فارغاً لحالة "بانتظار التحديد".');
-            return;
-        }
-        feePayload = roundedFee;
+        feePayload = Number(daRoundMoney(feeVal).toFixed(daMoneyDecimals));
     }
     const payload = {
         action: 'save',
@@ -1193,6 +1189,20 @@ async function saveDeliveryArea() {
     if (!payload.name_ar) {
         alert('اسم المنطقة بالعربي مطلوب');
         return;
+    }
+    if (isActive === 1) {
+        var effFee = (feePayload === '' || feePayload == null) ? 0 : Number(feePayload);
+        if (!(effFee > 0)) {
+            alert('لا يمكن تفعيل التوصيل لهذه المنطقة بدون قيمة توصيل. أدخل قيمة أكبر من صفر، أو فعّل «تتبع المحافظة» مع وجود قيمة افتراضية للمحافظة.');
+            return;
+        }
+        if (daHasCompanyCostCol) {
+            var effCost = (payload.company_delivery_cost != null) ? Number(payload.company_delivery_cost) : 0;
+            if (!(effCost > 0)) {
+                alert('لا يمكن تفعيل التوصيل لهذه المنطقة بدون تكلفة توصيل على الشركة. أدخل تكلفة أكبر من صفر، أو فعّل «تتبع المحافظة».');
+                return;
+            }
+        }
     }
     const res = await postJSON('/admin/api/delivery_areas/manage.php', payload);
     alert(res.message || (res.success ? 'تم' : 'فشل'));
