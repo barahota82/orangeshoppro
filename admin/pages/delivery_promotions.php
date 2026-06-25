@@ -66,6 +66,8 @@ echo orange_offer_gl_link_card_html(
 .dp-form-row .dp-field > label { margin-bottom:4px; }
 .dp-form-row .dp-field .admin-inp { height:var(--input-min-h,40px); box-sizing:border-box; }
 .dp-form-row .dp-check { display:flex; align-items:center; gap:8px; cursor:pointer; height:var(--input-min-h,40px); white-space:nowrap; }
+.admin-inp-dmy-with-picker.is-disabled { opacity:.55; }
+.admin-inp-dmy-with-picker.is-disabled .admin-inp { background:#f1f5f9; color:#94a3b8; cursor:not-allowed; }
 </style>
 
 <div class="card">
@@ -88,12 +90,6 @@ echo orange_offer_gl_link_card_html(
         </div>
         <label class="dp-check">
             <input type="checkbox" id="dp_active" checked> نشط
-        </label>
-        <label class="dp-check">
-            <input type="checkbox" id="dp_reg"> للمسجّلين فقط
-        </label>
-        <label class="dp-check">
-            <input type="checkbox" id="dp_first_delivered"> أول طلب مُسلَّم
         </label>
     </div>
     <div class="form-grid">
@@ -126,6 +122,12 @@ echo orange_offer_gl_link_card_html(
             <label for="dp_valid_to">نهاية العرض <span dir="ltr">*</span></label>
             <input type="text" id="dp_valid_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
         </div>
+        <label class="dp-check">
+            <input type="checkbox" id="dp_reg"> <strong>للمسجّلين فقط</strong>
+        </label>
+        <label class="dp-check">
+            <input type="checkbox" id="dp_first_delivered"> <strong>أول طلب مُسلَّم</strong>
+        </label>
     </div>
     <div class="admin-form-actions">
         <button type="button" onclick="saveDeliveryPromotion()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ</button>

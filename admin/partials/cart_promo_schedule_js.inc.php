@@ -18,6 +18,15 @@ function ocpSyncAlwaysOnUi(prefix) {
         el.disabled = alwaysOn;
         el.required = !alwaysOn;
         el.setAttribute('aria-disabled', alwaysOn ? 'true' : 'false');
+        // حقل DMY يلتفّ بزر تقويم أصلي منفصل — لا بد من تعطيله أيضاً وإلا بقي الاختيار ممكناً
+        var wrap = el.closest ? el.closest('.admin-inp-dmy-with-picker') : null;
+        if (wrap) {
+            wrap.classList.toggle('is-disabled', alwaysOn);
+            var pickWrap = wrap.querySelector('.admin-inp-dmy-picker-wrap');
+            if (pickWrap) pickWrap.style.display = alwaysOn ? 'none' : '';
+            var native = wrap.querySelector('.admin-inp-dmy-picker-native');
+            if (native) native.disabled = alwaysOn;
+        }
     });
 }
 function ocpSetAlwaysOn(prefix, enabled) {
