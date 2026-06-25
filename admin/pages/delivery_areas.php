@@ -112,14 +112,14 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
         <?php endif; ?>
         <?php if ($hasGovDefaultAmounts): ?>
         <div class="da-gov-deffee">
-            <label for="dg_default_delivery_fee">قيمة التوصيل (افتراضي المحافظة)</label>
+            <label for="dg_default_delivery_fee">قيمة التوصيل (افتراضي المحافظة) <span style="color:#dc2626">*</span></label>
             <div class="dg-default-amount">
                 <input type="number" id="dg_default_delivery_fee" min="0" step="<?php echo htmlspecialchars($daMoneyStep, ENT_QUOTES, 'UTF-8'); ?>" lang="en" dir="ltr" placeholder="<?php echo htmlspecialchars($daMoneyZero, ENT_QUOTES, 'UTF-8'); ?>">
                 <label class="dg-apply-all-label"><input type="checkbox" id="dg_fee_apply_all"> كل المناطق</label>
             </div>
         </div>
         <div class="da-gov-defcost">
-            <label for="dg_default_company_cost">تكلفة التوصيل على الشركة (افتراضي المحافظة)</label>
+            <label for="dg_default_company_cost">تكلفة التوصيل على الشركة (افتراضي المحافظة) <span style="color:#dc2626">*</span></label>
             <div class="dg-default-amount">
                 <input type="number" id="dg_default_company_cost" min="0" step="<?php echo htmlspecialchars($daMoneyStep, ENT_QUOTES, 'UTF-8'); ?>" lang="en" dir="ltr" placeholder="<?php echo htmlspecialchars($daMoneyZero, ENT_QUOTES, 'UTF-8'); ?>">
                 <label class="dg-apply-all-label"><input type="checkbox" id="dg_cost_apply_all"> كل المناطق</label>
@@ -1044,8 +1044,20 @@ async function saveGovernorate() {
     var feeApplyAllEl = document.getElementById('dg_fee_apply_all');
     var costApplyAllEl = document.getElementById('dg_cost_apply_all');
     if (defFeeEl || defCostEl) {
-        payload.default_delivery_fee = defFeeEl ? defFeeEl.value.trim() : '';
-        payload.default_company_delivery_cost = defCostEl ? defCostEl.value.trim() : '';
+        var defFeeRaw = defFeeEl ? defFeeEl.value.trim() : '';
+        var defCostRaw = defCostEl ? defCostEl.value.trim() : '';
+        var defFeeVal = defFeeRaw === '' ? NaN : daParseMoney(defFeeRaw);
+        var defCostVal = defCostRaw === '' ? NaN : daParseMoney(defCostRaw);
+        if (!(Number.isFinite(defFeeVal) && defFeeVal > 0)) {
+            alert('قيمة التوصيل الافتراضية للمحافظة مطلوبة ويجب أن تكون أكبر من صفر (التوصيل المجاني يُضبط من شاشة عروض التوصيل).');
+            return;
+        }
+        if (!(Number.isFinite(defCostVal) && defCostVal > 0)) {
+            alert('تكلفة التوصيل على الشركة الافتراضية للمحافظة مطلوبة ويجب أن تكون أكبر من صفر.');
+            return;
+        }
+        payload.default_delivery_fee = defFeeRaw;
+        payload.default_company_delivery_cost = defCostRaw;
         var feeApplyAll = !!(feeApplyAllEl && feeApplyAllEl.checked);
         var costApplyAll = !!(costApplyAllEl && costApplyAllEl.checked);
         if (feeApplyAll || costApplyAll) {

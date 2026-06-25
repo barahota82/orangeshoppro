@@ -148,6 +148,22 @@ try {
             json_response(['success' => false, 'message' => 'الدولة غير محددة'], 422);
         }
 
+        // سياسة المالك (Option B): قيمة وتكلفة التوصيل الافتراضيتان للمحافظة إلزاميتان وأكبر من صفر.
+        // (التوصيل المجاني = صفر يُضبط من شاشة عروض التوصيل، لا من هنا.) تُتحقّق مبكراً قبل أي كتابة لتجنّب حفظ جزئي.
+        $hasGovDefaults = orange_delivery_governorates_has_default_amounts_column($pdo);
+        $defFee = null;
+        $defCost = null;
+        if ($hasGovDefaults) {
+            $defFee = da_money_non_negative(trim((string) ($data['default_delivery_fee'] ?? '')), $countryMoneyDecimals);
+            $defCost = da_money_non_negative(trim((string) ($data['default_company_delivery_cost'] ?? '')), $countryMoneyDecimals);
+            if ($defFee === null || (float) $defFee <= 0.0) {
+                json_response(['success' => false, 'message' => 'قيمة التوصيل الافتراضية للمحافظة مطلوبة ويجب أن تكون أكبر من صفر (التوصيل المجاني يُضبط من شاشة عروض التوصيل).'], 422);
+            }
+            if ($defCost === null || (float) $defCost <= 0.0) {
+                json_response(['success' => false, 'message' => 'تكلفة التوصيل على الشركة الافتراضية للمحافظة مطلوبة ويجب أن تكون أكبر من صفر.'], 422);
+            }
+        }
+
         if ($id > 0) {
             try {
                 orange_admin_assert_row_country($pdo, 'delivery_governorates', $id);
@@ -190,19 +206,11 @@ try {
             $u->execute([$companyId > 0 ? $companyId : null, $id]);
         }
 
-        if (orange_delivery_governorates_has_default_amounts_column($pdo) && $id > 0) {
-            $defFeeRaw = trim((string) ($data['default_delivery_fee'] ?? ''));
-            $defCostRaw = trim((string) ($data['default_company_delivery_cost'] ?? ''));
-            $defFee = ($defFeeRaw === '') ? null : da_money_non_negative($defFeeRaw, $countryMoneyDecimals);
-            $defCost = ($defCostRaw === '') ? null : da_money_non_negative($defCostRaw, $countryMoneyDecimals);
-            if ($defFee === null && $defFeeRaw !== '') {
-                json_response(['success' => false, 'message' => 'قيمة التوصيل الافتراضية للمحافظة غير صحيحة'], 422);
-            }
-            if ($defCost === null && $defCostRaw !== '') {
-                json_response(['success' => false, 'message' => 'تكلفة التوصيل الافتراضية للمحافظة غير صحيحة'], 422);
-            }
+        if ($hasGovDefaults && $id > 0) {
+            $feeVal = round(max(0.0, (float) $defFee), max(0, min(4, $countryMoneyDecimals)));
+            $costVal = round(max(0.0, (float) $defCost), max(0, min(4, $countryMoneyDecimals)));
             $ud = $pdo->prepare('UPDATE delivery_governorates SET default_delivery_fee = ?, default_company_delivery_cost = ? WHERE id = ?');
-            $ud->execute([$defFee, $defCost, $id]);
+            $ud->execute([$feeVal, $costVal, $id]);
 
             if (orange_delivery_areas_has_follow_flags_column($pdo)) {
                 $feeApplyAll = !empty($data['fee_apply_all']);
@@ -210,31 +218,21 @@ try {
                 $hasPend = orange_delivery_areas_has_pending_fee_column($pdo);
                 $pendExpr = $hasPend ? ', delivery_fee_pending = 0' : '';
                 // الترحيل يقتصر على المناطق المتاحة للتوصيل (النشطة) فقط — غير المتاحة تبقى صفراً بلا قيمة.
-                if ($defFee !== null) {
-                    $feeVal = round(max(0.0, (float) $defFee), max(0, min(4, $countryMoneyDecimals)));
-                    if ($feeApplyAll) {
-                        $pdo->prepare('UPDATE delivery_areas SET delivery_fee = ?, fee_follows_gov = 1' . $pendExpr . ' WHERE governorate_id = ? AND is_active = 1')
-                            ->execute([$feeVal, $id]);
-                    } else {
-                        $pdo->prepare('UPDATE delivery_areas SET delivery_fee = ?' . $pendExpr . ' WHERE governorate_id = ? AND is_active = 1 AND fee_follows_gov = 1')
-                            ->execute([$feeVal, $id]);
-                    }
-                } elseif ($feeApplyAll) {
-                    $pdo->prepare('UPDATE delivery_areas SET fee_follows_gov = 1 WHERE governorate_id = ? AND is_active = 1')->execute([$id]);
+                if ($feeApplyAll) {
+                    $pdo->prepare('UPDATE delivery_areas SET delivery_fee = ?, fee_follows_gov = 1' . $pendExpr . ' WHERE governorate_id = ? AND is_active = 1')
+                        ->execute([$feeVal, $id]);
+                } else {
+                    $pdo->prepare('UPDATE delivery_areas SET delivery_fee = ?' . $pendExpr . ' WHERE governorate_id = ? AND is_active = 1 AND fee_follows_gov = 1')
+                        ->execute([$feeVal, $id]);
                 }
 
                 if (orange_delivery_areas_has_company_cost_column($pdo)) {
-                    if ($defCost !== null) {
-                        $costVal = round(max(0.0, (float) $defCost), max(0, min(4, $countryMoneyDecimals)));
-                        if ($costApplyAll) {
-                            $pdo->prepare('UPDATE delivery_areas SET company_delivery_cost = ?, cost_follows_gov = 1 WHERE governorate_id = ? AND is_active = 1')
-                                ->execute([$costVal, $id]);
-                        } else {
-                            $pdo->prepare('UPDATE delivery_areas SET company_delivery_cost = ? WHERE governorate_id = ? AND is_active = 1 AND cost_follows_gov = 1')
-                                ->execute([$costVal, $id]);
-                        }
-                    } elseif ($costApplyAll) {
-                        $pdo->prepare('UPDATE delivery_areas SET cost_follows_gov = 1 WHERE governorate_id = ? AND is_active = 1')->execute([$id]);
+                    if ($costApplyAll) {
+                        $pdo->prepare('UPDATE delivery_areas SET company_delivery_cost = ?, cost_follows_gov = 1 WHERE governorate_id = ? AND is_active = 1')
+                            ->execute([$costVal, $id]);
+                    } else {
+                        $pdo->prepare('UPDATE delivery_areas SET company_delivery_cost = ? WHERE governorate_id = ? AND is_active = 1 AND cost_follows_gov = 1')
+                            ->execute([$costVal, $id]);
                     }
                 }
             }
