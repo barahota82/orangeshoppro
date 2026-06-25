@@ -44,28 +44,36 @@ echo orange_offer_gl_link_card_html(
 </div>
 <?php endif; ?>
 
+<style>
+.dp-tree { border:1px solid #e5e7eb; border-radius:10px; padding:6px 8px; max-height:520px; overflow:auto; }
+.dp-tree-all { display:flex; align-items:center; gap:8px; font-weight:700; cursor:pointer; margin:6px 2px 10px; }
+.dp-node-row { display:flex; align-items:center; gap:8px; padding:5px 4px; border-radius:8px; }
+.dp-node-row:hover { background:#f8fafc; }
+.dp-gov > .dp-node-row { font-weight:700; }
+.dp-toggle { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer; width:26px; height:24px; line-height:1; padding:0; color:#334155; flex:0 0 auto; }
+.dp-toggle.is-leaf { visibility:hidden; }
+.dp-node-label { display:flex; align-items:center; gap:8px; cursor:pointer; flex:1 1 auto; }
+.dp-amounts { color:#64748b; font-weight:400; }
+.dp-default-tag { color:#166534; font-size:.8em; }
+.dp-custom-tag { color:#b45309; font-size:.8em; }
+.dp-gov-body, .dp-grp-body, .dp-inactive-body { margin-inline-start:26px; border-inline-start:2px solid #eef2f7; padding-inline-start:8px; }
+.dp-area-search { width:100%; max-width:320px; margin:6px 0; padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; }
+.dp-area-row { display:flex; align-items:center; gap:8px; padding:3px 4px; }
+.dp-inactive-badge { color:#b91c1c; background:#fee2e2; padding:2px 8px; border-radius:6px; font-size:.85em; }
+.dp-tree-empty { color:#64748b; padding:10px; }
+</style>
+
 <div class="card">
-    <h3>ملخص قيم التوصيل المحفوظة (للقراءة فقط)</h3>
+    <h3>استهداف العرض — محافظات ومناطق التوصيل</h3>
     <p class="card-hint" style="margin-top:0;">
-        قيمة التوصيل وتكلفته تُضبطان من شاشة «محافظات ومناطق التوصيل». هذا العرض للمساعدة أثناء إنشاء العروض فقط.
-        المناطق مجمّعة لكل محافظة حسب (قيمة التوصيل + التكلفة)، واضغط السهم لعرض أسماء المناطق.
+        اختر نطاق العرض: «كل مناطق التوصيل»، أو محافظة كاملة، أو تركيبة سعر داخلها، أو مناطق مفردة.
+        القيم تُضبط من شاشة «محافظات ومناطق التوصيل» (هنا للعرض والاختيار فقط). لا تنضم أي منطقة جديدة تلقائياً — تُضاف يدوياً من هنا.
     </p>
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th style="width:42px;"></th>
-                    <th>المحافظة</th>
-                    <th>عدد المناطق</th>
-                    <th>قيمة التوصيل</th>
-                    <th>التكلفة على الشركة</th>
-                    <th>الحالة</th>
-                </tr>
-            </thead>
-            <tbody id="dp_fee_summary_tbody">
-                <tr><td colspan="6" class="muted">جارٍ تحميل البيانات...</td></tr>
-            </tbody>
-        </table>
+    <label class="dp-tree-all">
+        <input type="checkbox" id="dp_tree_all"> كل مناطق التوصيل
+    </label>
+    <div id="dp_tree" class="dp-tree">
+        <div class="dp-tree-empty">جارٍ تحميل البيانات...</div>
     </div>
 </div>
 
@@ -89,10 +97,6 @@ echo orange_offer_gl_link_card_html(
             <label for="dp_discount_value" id="dp_discount_value_label">قيمة الخصم</label>
             <input type="text" id="dp_discount_value" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="2">
         </div>
-        <div>
-            <label for="dp_sort">الترتيب</label>
-            <input type="number" id="dp_sort" value="0" style="max-width:120px;">
-        </div>
         <?php $ocpFieldPrefix = 'dp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
         <div style="grid-column:1/-1;">
             <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;max-width:52rem;line-height:1.45;">
@@ -100,15 +104,8 @@ echo orange_offer_gl_link_card_html(
                 <span><strong>للمسجّلين فقط</strong> — عند التفعيل يُطبّق العرض على حسابات المتجر المسجّلة فقط، وإلا فيشمل الزائر والعميل المسجّل.</span>
             </label>
         </div>
-        <div>
-            <label for="dp_target_governorates">المحافظات المستهدفة (اختياري)</label>
-            <select id="dp_target_governorates" class="admin-inp" multiple size="6"></select>
-            <span class="muted" style="display:block;margin-top:4px;">اتركه فارغاً لتطبيق العرض على كل المحافظات.</span>
-        </div>
-        <div>
-            <label for="dp_target_areas">المناطق المستهدفة (اختياري)</label>
-            <select id="dp_target_areas" class="admin-inp" multiple size="6"></select>
-            <span class="muted" style="display:block;margin-top:4px;">يمكن تحديد مناطق محددة داخل المحافظة.</span>
+        <div style="grid-column:1/-1;">
+            <span class="muted">نطاق العرض (المحافظات/المناطق المستهدفة) يُحدَّد من جدول «استهداف العرض» بالأعلى.</span>
         </div>
         <div style="display:flex;align-items:flex-end;gap:8px;">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -171,10 +168,9 @@ echo orange_offer_gl_link_card_html(
     var DP_DISCOUNT_TYPES = <?php echo json_encode($discountTypes, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var DP_READY = <?php echo $hasTable ? 'true' : 'false'; ?>;
     var DP_MONEY_DECIMALS = <?php echo (int) $dpMoneyDecimals; ?>;
-    var DP_GOVS = [];
-    var DP_AREAS = [];
     var DP_ROWS = [];
-    var DP_SUM_SEQ = 0;
+    var DP_FEE_SUMMARY = { governorates: [] };
+    var DP_TREE_SEQ = 0;
 
     function escDp(s) {
         return String(s == null ? '' : s)
@@ -204,183 +200,339 @@ echo orange_offer_gl_link_card_html(
         return n.toFixed(DP_MONEY_DECIMALS);
     }
 
-    function dpSummaryGovernorateName(row) {
-        return row && (row.governorate_name_ar || row.governorate_name_en)
-            ? (row.governorate_name_ar || row.governorate_name_en)
+    function dpSummaryGovernorateName(gov) {
+        return gov && (gov.governorate_name_ar || gov.governorate_name_en)
+            ? (gov.governorate_name_ar || gov.governorate_name_en)
             : 'بدون محافظة';
     }
 
-    function dpRenderFeeSummaryEmpty(message) {
-        var tb = document.getElementById('dp_fee_summary_tbody');
-        if (!tb) return;
-        tb.innerHTML = '<tr><td colspan="6" class="muted">' + escDp(message || 'لا توجد بيانات') + '</td></tr>';
-    }
-
-    function dpFeeStatusBadge(isDefault) {
-        return isDefault
-            ? '<span style="color:#166534;font-weight:600;">مربوط بالمحافظة</span>'
-            : '<span style="color:#b45309;font-weight:600;">مخصّص</span>';
-    }
-
-    function dpAreaNamesHtml(areas) {
-        var list = Array.isArray(areas) ? areas : [];
-        if (!list.length) {
-            return '—';
-        }
-        return list.map(function (a) {
-            return escDp(a.name_ar || a.name_en || ('#' + (a.id || '')));
-        }).join('، ');
-    }
-
-    function dpAppendSummaryRow(tb, opts) {
-        DP_SUM_SEQ++;
-        var detailId = 'dp_sum_detail_' + DP_SUM_SEQ;
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-            '<td><button type="button" class="btn-secondary dp-sum-toggle" data-dp-detail="' + detailId + '" style="padding:2px 9px;line-height:1;">&#9656;</button></td>' +
-            '<td>' + escDp(opts.govName) + '</td>' +
-            '<td>' + escDp(String(opts.count)) + '</td>' +
-            '<td dir="ltr">' + opts.feeCell + '</td>' +
-            '<td dir="ltr">' + opts.costCell + '</td>' +
-            '<td>' + opts.statusCell + '</td>';
-        tb.appendChild(tr);
-        var trd = document.createElement('tr');
-        trd.id = detailId;
-        trd.style.display = 'none';
-        trd.innerHTML = '<td></td><td colspan="5" class="muted">' + dpAreaNamesHtml(opts.areas) + '</td>';
-        tb.appendChild(trd);
-    }
-
-    function dpBindFeeSummaryToggles() {
-        var tb = document.getElementById('dp_fee_summary_tbody');
-        if (!tb) return;
-        tb.querySelectorAll('.dp-sum-toggle').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var id = btn.getAttribute('data-dp-detail');
-                var row = id ? document.getElementById(id) : null;
-                if (!row) return;
-                var open = row.style.display === 'none';
-                row.style.display = open ? '' : 'none';
-                btn.innerHTML = open ? '&#9662;' : '&#9656;';
+    function dpGovActiveAreaIds(gov) {
+        var ids = [];
+        (Array.isArray(gov.fee_groups) ? gov.fee_groups : []).forEach(function (g) {
+            (Array.isArray(g.areas) ? g.areas : []).forEach(function (a) {
+                var id = parseInt(a.id, 10) || 0;
+                if (id > 0) ids.push(id);
             });
         });
+        return ids;
     }
 
-    function dpRenderFeeSummary(data) {
-        var tb = document.getElementById('dp_fee_summary_tbody');
-        if (!tb) return;
-        var govs = Array.isArray(data && data.governorates) ? data.governorates : [];
-        DP_SUM_SEQ = 0;
-        tb.innerHTML = '';
+    function dpAllActiveAreaIds() {
+        var ids = [];
+        (DP_FEE_SUMMARY.governorates || []).forEach(function (gov) {
+            ids = ids.concat(dpGovActiveAreaIds(gov));
+        });
+        return ids;
+    }
+
+    // ===== شجرة الاستهداف (مصدر الحقيقة = صناديق المناطق المختارة) =====
+
+    function dpTreeRenderEmpty(message) {
+        var box = document.getElementById('dp_tree');
+        if (box) box.innerHTML = '<div class="dp-tree-empty">' + escDp(message || 'لا توجد بيانات') + '</div>';
+    }
+
+    function dpMakeToggle(targetEl) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'dp-toggle';
+        btn.innerHTML = '&#9656;';
+        btn.addEventListener('click', function () {
+            var open = targetEl.style.display === 'none';
+            targetEl.style.display = open ? '' : 'none';
+            btn.innerHTML = open ? '&#9662;' : '&#9656;';
+        });
+        return btn;
+    }
+
+    function dpBuildAreaRow(area) {
+        var id = parseInt(area.id, 10) || 0;
+        var row = document.createElement('label');
+        row.className = 'dp-area-row';
+        row.setAttribute('data-area-name', String(area.name_ar || area.name_en || '').toLowerCase());
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'dp-area-cb';
+        cb.value = String(id);
+        cb.addEventListener('change', dpRecomputeTreeStates);
+        var span = document.createElement('span');
+        span.textContent = area.name_ar || area.name_en || ('#' + id);
+        row.appendChild(cb);
+        row.appendChild(span);
+        return row;
+    }
+
+    function dpRenderTree() {
+        var box = document.getElementById('dp_tree');
+        if (!box) return;
+        DP_TREE_SEQ = 0;
+        box.innerHTML = '';
+        var govs = DP_FEE_SUMMARY.governorates || [];
         if (!govs.length) {
-            dpRenderFeeSummaryEmpty('لا توجد بيانات محافظات/مناطق متاحة.');
+            dpTreeRenderEmpty('لا توجد محافظات/مناطق متاحة. أضِفها من شاشة «محافظات ومناطق التوصيل».');
             return;
         }
         govs.forEach(function (gov) {
-            var govName = dpSummaryGovernorateName(gov);
-            var groups = Array.isArray(gov.fee_groups) ? gov.fee_groups : [];
-            groups.forEach(function (group) {
-                dpAppendSummaryRow(tb, {
-                    govName: govName,
-                    count: parseInt(group.area_count, 10) || 0,
-                    feeCell: escDp(dpFormatMoney(group.delivery_fee || 0)),
-                    costCell: escDp(dpFormatMoney(group.company_delivery_cost || 0)),
-                    statusCell: dpFeeStatusBadge(!!group.is_default),
-                    areas: group.areas
-                });
+            var govWrap = document.createElement('div');
+            govWrap.className = 'dp-gov';
+
+            var govBody = document.createElement('div');
+            govBody.className = 'dp-gov-body';
+            govBody.style.display = 'none';
+
+            var govRow = document.createElement('div');
+            govRow.className = 'dp-node-row';
+            var govActiveIds = dpGovActiveAreaIds(gov);
+            var govToggle = (govActiveIds.length || (gov.inactive_areas || []).length)
+                ? dpMakeToggle(govBody)
+                : null;
+            if (govToggle) {
+                govRow.appendChild(govToggle);
+            } else {
+                var spacer = document.createElement('span');
+                spacer.className = 'dp-toggle is-leaf';
+                govRow.appendChild(spacer);
+            }
+            var govLabel = document.createElement('label');
+            govLabel.className = 'dp-node-label';
+            var govCb = document.createElement('input');
+            govCb.type = 'checkbox';
+            govCb.className = 'dp-gov-cb';
+            govCb.disabled = govActiveIds.length === 0;
+            govCb.addEventListener('change', function () {
+                dpSetDescendants(govWrap, govCb.checked);
+                dpRecomputeTreeStates();
             });
+            var govNameSpan = document.createElement('span');
+            govNameSpan.innerHTML = escDp(dpSummaryGovernorateName(gov))
+                + ' <span class="dp-amounts">(' + govActiveIds.length + ' منطقة)</span>';
+            govLabel.appendChild(govCb);
+            govLabel.appendChild(govNameSpan);
+            govRow.appendChild(govLabel);
+            govWrap.appendChild(govRow);
+
+            (Array.isArray(gov.fee_groups) ? gov.fee_groups : []).forEach(function (group) {
+                var areas = Array.isArray(group.areas) ? group.areas : [];
+                if (!areas.length) return;
+                var grpWrap = document.createElement('div');
+                grpWrap.className = 'dp-grp';
+
+                var grpBody = document.createElement('div');
+                grpBody.className = 'dp-grp-body';
+                grpBody.style.display = 'none';
+
+                var grpRow = document.createElement('div');
+                grpRow.className = 'dp-node-row';
+                grpRow.appendChild(dpMakeToggle(grpBody));
+                var grpLabel = document.createElement('label');
+                grpLabel.className = 'dp-node-label';
+                var grpCb = document.createElement('input');
+                grpCb.type = 'checkbox';
+                grpCb.className = 'dp-grp-cb';
+                grpCb.addEventListener('change', function () {
+                    dpSetDescendants(grpWrap, grpCb.checked);
+                    dpRecomputeTreeStates();
+                });
+                var tag = group.is_default
+                    ? ' <span class="dp-default-tag">مربوط بالمحافظة</span>'
+                    : ' <span class="dp-custom-tag">مخصّص</span>';
+                var grpText = document.createElement('span');
+                grpText.innerHTML = '<span class="dp-amounts" dir="ltr">'
+                    + escDp(dpFormatMoney(group.delivery_fee || 0)) + ' / '
+                    + escDp(dpFormatMoney(group.company_delivery_cost || 0)) + '</span> '
+                    + '<span class="dp-amounts">(' + areas.length + ')</span>' + tag;
+                grpLabel.appendChild(grpCb);
+                grpLabel.appendChild(grpText);
+                grpRow.appendChild(grpLabel);
+                grpWrap.appendChild(grpRow);
+
+                var search = document.createElement('input');
+                search.type = 'search';
+                search.className = 'dp-area-search';
+                search.placeholder = 'بحث في المناطق...';
+                search.addEventListener('input', function () {
+                    var q = search.value.trim().toLowerCase();
+                    grpBody.querySelectorAll('.dp-area-row').forEach(function (r) {
+                        var name = r.getAttribute('data-area-name') || '';
+                        r.style.display = (!q || name.indexOf(q) !== -1) ? '' : 'none';
+                    });
+                });
+                grpBody.appendChild(search);
+                var areasWrap = document.createElement('div');
+                areasWrap.className = 'dp-areas';
+                areas.forEach(function (area) {
+                    areasWrap.appendChild(dpBuildAreaRow(area));
+                });
+                grpBody.appendChild(areasWrap);
+                grpWrap.appendChild(grpBody);
+                govBody.appendChild(grpWrap);
+            });
+
             var inactive = Array.isArray(gov.inactive_areas) ? gov.inactive_areas : [];
             if (inactive.length) {
-                dpAppendSummaryRow(tb, {
-                    govName: govName,
-                    count: inactive.length,
-                    feeCell: '<span class="muted">—</span>',
-                    costCell: '<span class="muted">—</span>',
-                    statusCell: '<span style="color:#b91c1c;background:#fee2e2;padding:2px 8px;border-radius:6px;">غير متاحة للتوصيل</span>',
-                    areas: inactive
-                });
+                var inWrap = document.createElement('div');
+                inWrap.className = 'dp-inactive';
+                var inBody = document.createElement('div');
+                inBody.className = 'dp-inactive-body';
+                inBody.style.display = 'none';
+                inBody.textContent = inactive.map(function (a) {
+                    return a.name_ar || a.name_en || ('#' + (a.id || ''));
+                }).join('، ');
+                var inRow = document.createElement('div');
+                inRow.className = 'dp-node-row';
+                inRow.appendChild(dpMakeToggle(inBody));
+                var inSpan = document.createElement('span');
+                inSpan.innerHTML = '<span class="dp-inactive-badge">غير متاحة للتوصيل (' + inactive.length + ')</span>';
+                inRow.appendChild(inSpan);
+                inWrap.appendChild(inRow);
+                inWrap.appendChild(inBody);
+                govBody.appendChild(inWrap);
             }
-            if (!groups.length && !inactive.length) {
-                dpAppendSummaryRow(tb, {
-                    govName: govName,
-                    count: 0,
-                    feeCell: '<span class="muted">—</span>',
-                    costCell: '<span class="muted">—</span>',
-                    statusCell: '<span class="muted">لا توجد مناطق</span>',
-                    areas: []
-                });
-            }
+
+            govWrap.appendChild(govBody);
+            box.appendChild(govWrap);
         });
-        dpBindFeeSummaryToggles();
+        dpRecomputeTreeStates();
     }
 
-    async function loadDeliveryFeeSummary() {
-        var res = await postJSON('/admin/api/delivery_promotions/manage.php', { action: 'get_fee_summary' });
-        if (!res || !res.success) {
-            dpRenderFeeSummaryEmpty((res && res.message) ? res.message : 'تعذر تحميل ملخص القيم المحفوظة.');
-            return;
+    function dpSetDescendants(wrap, checked) {
+        wrap.querySelectorAll('.dp-area-cb').forEach(function (cb) {
+            cb.checked = checked;
+        });
+    }
+
+    function dpRecomputeTreeStates() {
+        var box = document.getElementById('dp_tree');
+        if (!box) return;
+        var allTotal = 0;
+        var allChecked = 0;
+        box.querySelectorAll('.dp-gov').forEach(function (govWrap) {
+            var govAreas = govWrap.querySelectorAll('.dp-area-cb');
+            var govChecked = 0;
+            govWrap.querySelectorAll('.dp-grp').forEach(function (grpWrap) {
+                var grpAreas = grpWrap.querySelectorAll('.dp-area-cb');
+                var grpChecked = 0;
+                grpAreas.forEach(function (cb) { if (cb.checked) grpChecked++; });
+                var grpCb = grpWrap.querySelector('.dp-grp-cb');
+                if (grpCb) {
+                    grpCb.checked = grpAreas.length > 0 && grpChecked === grpAreas.length;
+                    grpCb.indeterminate = grpChecked > 0 && grpChecked < grpAreas.length;
+                }
+            });
+            govAreas.forEach(function (cb) { if (cb.checked) govChecked++; });
+            var govCb = govWrap.querySelector('.dp-gov-cb');
+            if (govCb) {
+                govCb.checked = govAreas.length > 0 && govChecked === govAreas.length;
+                govCb.indeterminate = govChecked > 0 && govChecked < govAreas.length;
+            }
+            allTotal += govAreas.length;
+            allChecked += govChecked;
+        });
+        var allCb = document.getElementById('dp_tree_all');
+        if (allCb) {
+            allCb.checked = allTotal > 0 && allChecked === allTotal;
+            allCb.indeterminate = allChecked > 0 && allChecked < allTotal;
         }
-        dpRenderFeeSummary(res.data || {});
     }
 
-    function dpSelectedIds(selectId) {
-        var el = document.getElementById(selectId);
-        if (!el) return [];
+    function dpBindTreeAll() {
+        var allCb = document.getElementById('dp_tree_all');
+        if (!allCb) return;
+        allCb.addEventListener('change', function () {
+            var box = document.getElementById('dp_tree');
+            if (!box) return;
+            box.querySelectorAll('.dp-area-cb').forEach(function (cb) {
+                cb.checked = allCb.checked;
+            });
+            dpRecomputeTreeStates();
+        });
+    }
+
+    function dpTreeSelectedAreaIds() {
+        var box = document.getElementById('dp_tree');
+        if (!box) return [];
         var out = [];
-        Array.prototype.forEach.call(el.options, function (opt) {
-            if (opt.selected) {
-                var id = parseInt(opt.value, 10) || 0;
+        box.querySelectorAll('.dp-area-cb').forEach(function (cb) {
+            if (cb.checked) {
+                var id = parseInt(cb.value, 10) || 0;
                 if (id > 0) out.push(id);
             }
         });
         return out;
     }
 
-    function dpRenderSelect(selectId, rows, selectedIds, getLabel) {
-        var el = document.getElementById(selectId);
-        if (!el) return;
+    function dpTreeSetSelection(areaIds, governorateIds) {
+        // محافظات قديمة (legacy) تُترجَم إلى كل مناطقها النشطة الحالية (لقطة).
         var picked = {};
-        (selectedIds || []).forEach(function (id) { picked[String(id)] = true; });
-        el.innerHTML = '';
-        (rows || []).forEach(function (row) {
-            var id = parseInt(row.id, 10) || 0;
-            if (id <= 0) return;
-            var opt = document.createElement('option');
-            opt.value = String(id);
-            opt.selected = !!picked[String(id)];
-            opt.textContent = getLabel(row);
-            if (parseInt(row.is_active, 10) !== 1) {
-                opt.textContent += ' (غير نشط)';
+        (areaIds || []).forEach(function (id) { picked[String(parseInt(id, 10) || 0)] = true; });
+        var govSet = {};
+        (governorateIds || []).forEach(function (id) { govSet[String(parseInt(id, 10) || 0)] = true; });
+        (DP_FEE_SUMMARY.governorates || []).forEach(function (gov) {
+            if (govSet[String(parseInt(gov.governorate_id, 10) || 0)]) {
+                dpGovActiveAreaIds(gov).forEach(function (id) { picked[String(id)] = true; });
             }
-            el.appendChild(opt);
         });
+        var box = document.getElementById('dp_tree');
+        if (box) {
+            box.querySelectorAll('.dp-area-cb').forEach(function (cb) {
+                cb.checked = !!picked[String(parseInt(cb.value, 10) || 0)];
+            });
+        }
+        dpRecomputeTreeStates();
     }
 
-    function dpRenderTargets(govIds, areaIds) {
-        dpRenderSelect('dp_target_governorates', DP_GOVS, govIds || [], function (row) {
-            return row.name_ar || row.name_en || ('#' + row.id);
-        });
-        dpRenderSelect('dp_target_areas', DP_AREAS, areaIds || [], function (row) {
-            var areaName = row.name_ar || row.name_en || ('#' + row.id);
-            var govName = row.governorate_name_ar || '';
-            return govName ? (govName + ' — ' + areaName) : areaName;
-        });
+    function dpTreeClear() {
+        var box = document.getElementById('dp_tree');
+        if (box) {
+            box.querySelectorAll('.dp-area-cb').forEach(function (cb) { cb.checked = false; });
+        }
+        dpRecomputeTreeStates();
+    }
+
+    async function loadDeliveryFeeSummary() {
+        var res = await postJSON('/admin/api/delivery_promotions/manage.php', { action: 'get_fee_summary' });
+        if (!res || !res.success) {
+            DP_FEE_SUMMARY = { governorates: [] };
+            dpTreeRenderEmpty((res && res.message) ? res.message : 'تعذر تحميل بيانات المحافظات/المناطق.');
+            return;
+        }
+        DP_FEE_SUMMARY = (res.data && Array.isArray(res.data.governorates))
+            ? res.data
+            : { governorates: [] };
+        dpRenderTree();
     }
 
     function dpScopeLabel(row) {
-        var govNames = Array.isArray(row.target_governorate_names) ? row.target_governorate_names : [];
-        var areaNames = Array.isArray(row.target_area_names) ? row.target_area_names : [];
-        if (!govNames.length && !areaNames.length) {
+        var areaIds = Array.isArray(row.target_area_ids) ? row.target_area_ids.map(function (x) { return parseInt(x, 10) || 0; }) : [];
+        var govIds = Array.isArray(row.target_governorate_ids) ? row.target_governorate_ids.map(function (x) { return parseInt(x, 10) || 0; }) : [];
+        if (!areaIds.length && !govIds.length) {
             return 'كل مناطق التوصيل';
         }
+        var pickedAreas = {};
+        areaIds.forEach(function (id) { if (id > 0) pickedAreas[String(id)] = true; });
+        var govPicked = {};
+        govIds.forEach(function (id) { if (id > 0) govPicked[String(id)] = true; });
         var parts = [];
-        if (govNames.length) {
-            parts.push('محافظات: ' + govNames.join('، '));
-        }
-        if (areaNames.length) {
-            parts.push('مناطق: ' + areaNames.join('، '));
-        }
-        return parts.join(' | ');
+        (DP_FEE_SUMMARY.governorates || []).forEach(function (gov) {
+            var gid = parseInt(gov.governorate_id, 10) || 0;
+            var govName = dpSummaryGovernorateName(gov);
+            var govActive = dpGovActiveAreaIds(gov);
+            var inGov = govActive.filter(function (id) { return pickedAreas[String(id)]; });
+            if (govPicked[String(gid)] || (govActive.length > 0 && inGov.length === govActive.length)) {
+                parts.push(govName + ' (الكل)');
+            } else if (inGov.length) {
+                var names = [];
+                (gov.fee_groups || []).forEach(function (g) {
+                    (g.areas || []).forEach(function (a) {
+                        if (pickedAreas[String(parseInt(a.id, 10) || 0)]) {
+                            names.push(a.name_ar || a.name_en || ('#' + a.id));
+                        }
+                    });
+                });
+                parts.push(govName + ': ' + names.join('، '));
+            }
+        });
+        return parts.length ? parts.join(' | ') : 'مناطق محددة';
     }
 
     function dpDiscountLabel(row) {
@@ -440,12 +592,11 @@ echo orange_offer_gl_link_card_html(
         document.getElementById('dp_name_en').value = '';
         document.getElementById('dp_discount_type').value = 'amount';
         document.getElementById('dp_discount_value').value = '';
-        document.getElementById('dp_sort').value = '0';
         document.getElementById('dp_reg').checked = false;
         document.getElementById('dp_active').checked = true;
         ocpSetAlwaysOn('dp', false);
         ocpDefaultScheduleDates('dp');
-        dpRenderTargets([], []);
+        dpTreeClear();
         dpApplyDiscountTypeUi();
     }
 
@@ -455,25 +606,14 @@ echo orange_offer_gl_link_card_html(
         document.getElementById('dp_name_en').value = row.name_en || '';
         document.getElementById('dp_discount_type').value = row.discount_type || 'amount';
         document.getElementById('dp_discount_value').value = row.discount_value != null ? String(row.discount_value) : '';
-        document.getElementById('dp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
         document.getElementById('dp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
         document.getElementById('dp_active').checked = parseInt(row.is_active, 10) === 1;
         ocpSetAlwaysOn('dp', parseInt(row.is_always_on, 10) === 1);
         ocpSetDmyFromIso('dp_valid_from', row.valid_from);
         ocpSetDmyFromIso('dp_valid_to', row.valid_to);
-        dpRenderTargets(row.target_governorate_ids || [], row.target_area_ids || []);
+        dpTreeSetSelection(row.target_area_ids || [], row.target_governorate_ids || []);
         dpApplyDiscountTypeUi();
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    async function loadDeliveryPromotionTargets() {
-        var res = await postJSON('/admin/api/delivery_promotions/manage.php', { action: 'list_targets' });
-        if (!res || !res.success) {
-            throw new Error((res && res.message) || 'تعذر تحميل المحافظات والمناطق');
-        }
-        DP_GOVS = Array.isArray(res.governorates) ? res.governorates : [];
-        DP_AREAS = Array.isArray(res.areas) ? res.areas : [];
-        dpRenderTargets(dpSelectedIds('dp_target_governorates'), dpSelectedIds('dp_target_areas'));
     }
 
     async function loadDeliveryPromotions() {
@@ -499,7 +639,7 @@ echo orange_offer_gl_link_card_html(
                 '<td>' + escDp(dpScopeLabel(row)) + '</td>' +
                 '<td dir="ltr">' + escDp(ocpScheduleLabel(row)) + '</td>' +
                 '<td>' + escDp(dpStatusLabel(row)) + '</td>' +
-                '<td>' + escDp(String(row.sort_order || 0)) + '</td>' +
+                '<td>' + escDp(String(row.sort_order != null ? row.sort_order : 0)) + '</td>' +
                 '<td><button type="button" class="btn-secondary" data-dp-edit="' + escDp(String(row.id || 0)) + '">تعديل</button></td>';
             tb.appendChild(tr);
         });
@@ -520,14 +660,13 @@ echo orange_offer_gl_link_card_html(
             name_en: (document.getElementById('dp_name_en').value || '').trim(),
             discount_type: (document.getElementById('dp_discount_type').value || 'amount').trim(),
             discount_value: (document.getElementById('dp_discount_value').value || '').trim(),
-            sort_order: parseInt(document.getElementById('dp_sort').value, 10) || 0,
             requires_registered_account: document.getElementById('dp_reg').checked ? 1 : 0,
             is_active: document.getElementById('dp_active').checked ? 1 : 0,
             is_always_on: ocpIsAlwaysOn('dp') ? 1 : 0,
             valid_from: ocpGetIso('dp_valid_from'),
             valid_to: ocpGetIso('dp_valid_to'),
-            target_governorate_ids: dpSelectedIds('dp_target_governorates'),
-            target_area_ids: dpSelectedIds('dp_target_areas')
+            target_governorate_ids: [],
+            target_area_ids: dpTreeSelectedAreaIds()
         };
         var res = await postJSON('/admin/api/delivery_promotions/manage.php', payload);
         alert((res && res.message) || (res && res.success ? 'تم الحفظ' : 'فشل الحفظ'));
@@ -573,7 +712,7 @@ echo orange_offer_gl_link_card_html(
     window.resetDeliveryPromotionForm = resetDeliveryPromotionForm;
     window.saveDeliveryPromotion = saveDeliveryPromotion;
 
-    function initDeliveryPromotionsPage() {
+    async function initDeliveryPromotionsPage() {
         var discountTypeEl = document.getElementById('dp_discount_type');
         if (!discountTypeEl) {
             return;
@@ -581,20 +720,20 @@ echo orange_offer_gl_link_card_html(
         ocpBindAlwaysOn('dp');
         discountTypeEl.addEventListener('change', dpApplyDiscountTypeUi);
         dpFillDiscountTypeOptions('amount');
+        dpBindTreeAll();
         resetDeliveryPromotionForm();
-        loadDeliveryFeeSummary().catch(function () {
-            dpRenderFeeSummaryEmpty('تعذر تحميل الملخص.');
-        });
         loadDeliveryPromotionAlwaysOnHistory().catch(function () {
             var tb = document.getElementById('dp_history_tbody');
             if (tb) tb.innerHTML = '<tr><td colspan="6" class="muted">تعذر تحميل السجل.</td></tr>';
         });
+        try {
+            await loadDeliveryFeeSummary();
+        } catch (e) {
+            dpTreeRenderEmpty('تعذر تحميل بيانات المحافظات/المناطق.');
+        }
         if (!DP_READY) {
             return;
         }
-        loadDeliveryPromotionTargets().catch(function (e) {
-            alert(e.message || String(e));
-        });
         loadDeliveryPromotions();
     }
 

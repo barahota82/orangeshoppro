@@ -526,7 +526,8 @@ try {
             json_response(['success' => false, 'message' => $dateErr ?? 'تواريخ العرض غير صالحة'], 422);
         }
 
-        $sortOrder = (int) ($data['sort_order'] ?? 0);
+        // الترتيب أوتوماتيكي: لا إدخال يدوي — يُحفظ التالي عند الإنشاء، ولا يُمَسّ عند التعديل.
+        $sortOrder = 0;
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $requiresRegistered = !empty($data['requires_registered_account']) ? 1 : 0;
         $governorateIds = dp_int_id_list($data['target_governorate_ids'] ?? []);
@@ -556,7 +557,7 @@ try {
                     'UPDATE delivery_fee_promotions
                      SET name_ar = ?, name_en = ?, discount_type = ?, discount_value = ?,
                          requires_registered_account = ?, valid_from = ?, valid_to = ?,
-                         sort_order = ?, is_active = ?, is_always_on = ?, country_id = ?
+                         is_active = ?, is_always_on = ?, country_id = ?
                      WHERE id = ?'
                 );
                 $up->execute([
@@ -567,7 +568,6 @@ try {
                     $requiresRegistered,
                     $bounds['valid_from'],
                     $bounds['valid_to'],
-                    $sortOrder,
                     $isActive,
                     $isAlwaysOn,
                     $countryId,
@@ -581,10 +581,7 @@ try {
                      WHERE country_id = ?'
                 );
                 $stSort->execute([$countryId]);
-                $nextSort = (int) ($stSort->fetchColumn() ?: 1);
-                if ($sortOrder <= 0) {
-                    $sortOrder = $nextSort;
-                }
+                $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
                 $ins = $pdo->prepare(
                     'INSERT INTO delivery_fee_promotions
                         (country_id, name_ar, name_en, discount_type, discount_value, requires_registered_account,
