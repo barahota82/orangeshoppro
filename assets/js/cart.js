@@ -2109,10 +2109,23 @@ async function orangeRunCheckoutPreview() {
         return;
     }
     const seq = ++__orangeCartPreviewSeq;
+    const previewIntl = (document.getElementById('customer_phone_country') || {}).value === '__intl__';
+    const previewCc = previewIntl
+        ? ''
+        : (window.orangeStorefrontPhoneCountryDigits
+            ? window.orangeStorefrontPhoneCountryDigits('customer_phone_country')
+            : '');
+    const previewPhoneRaw = document.getElementById('customer_phone')
+        ? String(document.getElementById('customer_phone').value || '').trim()
+        : '';
+    const previewPhoneNorm = (previewPhoneRaw && window.orangeNormalizeCustomerPhone)
+        ? (window.orangeNormalizeCustomerPhone(previewPhoneRaw, previewIntl ? null : previewCc, previewIntl) || '')
+        : '';
     const payload = {
         items: cartItemsForCheckoutPreview(previewLines),
         delivery_area_id: orangeCheckoutSelectedDeliveryAreaId(),
         redeem_points: __orangeLoyaltyRedeemPoints,
+        phone: previewPhoneNorm,
         lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
     };
     try {
@@ -4205,11 +4218,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (t.id === 'customer_phone_country') {
             orangeCheckoutOtpOnPhoneEdited();
+            orangeScheduleCheckoutPreview();
         }
     });
     const otpPhoneEl = document.getElementById('customer_phone');
     if (otpPhoneEl) {
-        otpPhoneEl.addEventListener('input', orangeCheckoutOtpOnPhoneEdited);
+        otpPhoneEl.addEventListener('input', function () {
+            orangeCheckoutOtpOnPhoneEdited();
+            orangeScheduleCheckoutPreview();
+        });
     }
     const otpCodeEl = document.getElementById('checkoutOtpCode');
     if (otpCodeEl) {

@@ -154,6 +154,10 @@ try {
     $deliveryFee = 0.0;
     $deliveryPromotionPayload = null;
     if ($deliveryAreaId > 0) {
+        $previewPhone = trim((string) ($data['phone'] ?? ''));
+        if ($previewPhone === '' && $acc !== null && isset($acc['customer_phone'])) {
+            $previewPhone = trim((string) $acc['customer_phone']);
+        }
         $deliveryBundle = orange_delivery_resolve_checkout_fee_bundle(
             $pdo,
             $deliveryAreaId,
@@ -161,7 +165,7 @@ try {
             $storefrontCountryId,
             null,
             ($acc !== null && isset($acc['id'])) ? (int) $acc['id'] : null,
-            ($acc !== null && isset($acc['customer_phone'])) ? (string) $acc['customer_phone'] : null
+            $previewPhone !== '' ? $previewPhone : null
         );
         $deliveryFeeBase = (float) ($deliveryBundle['base_fee'] ?? 0.0);
         $deliveryFeeDiscount = (float) ($deliveryBundle['discount_fee'] ?? 0.0);

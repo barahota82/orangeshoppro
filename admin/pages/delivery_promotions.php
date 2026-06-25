@@ -61,6 +61,11 @@ echo orange_offer_gl_link_card_html(
 .dp-area-row { display:flex; align-items:center; gap:8px; padding:3px 4px; }
 .dp-inactive-badge { color:#b91c1c; background:#fee2e2; padding:2px 8px; border-radius:6px; font-size:.85em; }
 .dp-tree-empty { color:#64748b; padding:10px; }
+.dp-form-row { display:flex; flex-wrap:wrap; gap:18px; align-items:flex-end; }
+.dp-form-row .dp-field { display:flex; flex-direction:column; }
+.dp-form-row .dp-field > label { margin-bottom:4px; }
+.dp-form-row .dp-field .admin-inp { height:var(--input-min-h,40px); box-sizing:border-box; }
+.dp-form-row .dp-check { display:flex; align-items:center; gap:8px; cursor:pointer; height:var(--input-min-h,40px); white-space:nowrap; }
 </style>
 
 <div class="card">
@@ -76,14 +81,18 @@ echo orange_offer_gl_link_card_html(
 <div class="card">
     <h3>إضافة / تعديل</h3>
     <input type="hidden" id="dp_id" value="0">
-    <div style="display:flex;flex-wrap:wrap;gap:22px;align-items:center;margin-bottom:14px;">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+    <div class="dp-form-row" style="margin-bottom:14px;">
+        <div class="dp-field" style="max-width:120px;">
+            <label for="dp_sort">الترتيب</label>
+            <input type="number" id="dp_sort" class="admin-inp" value="0">
+        </div>
+        <label class="dp-check">
             <input type="checkbox" id="dp_active" checked> نشط
         </label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <label class="dp-check">
             <input type="checkbox" id="dp_reg"> للمسجّلين فقط
         </label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <label class="dp-check">
             <input type="checkbox" id="dp_first_delivered"> أول طلب مُسلَّم
         </label>
     </div>
@@ -97,26 +106,23 @@ echo orange_offer_gl_link_card_html(
             <input type="text" id="dp_name_en" class="admin-inp" dir="ltr" lang="en" placeholder="Weekend delivery promo">
         </div>
     </div>
-    <div class="form-grid" style="margin-top:12px;">
-        <div>
+    <div class="dp-form-row" style="margin-top:12px;">
+        <div class="dp-field" style="min-width:160px;">
             <label for="dp_discount_type">نوع الخصم</label>
             <select id="dp_discount_type" class="admin-inp"></select>
         </div>
-        <div>
+        <div class="dp-field" style="min-width:140px;">
             <label for="dp_discount_value" id="dp_discount_value_label">قيمة الخصم</label>
-            <input type="text" id="dp_discount_value" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="2">
+            <input type="text" id="dp_discount_value" class="admin-inp admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="2">
         </div>
-        <div style="grid-column:1/-1;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;max-width:22rem;">
-                <input type="checkbox" id="dp_always_on">
-                <span><strong>التفعيل الدائم</strong></span>
-            </label>
-        </div>
-        <div>
+        <label class="dp-check">
+            <input type="checkbox" id="dp_always_on"> <strong>التفعيل الدائم</strong>
+        </label>
+        <div class="dp-field" style="min-width:150px;">
             <label for="dp_valid_from">بداية العرض <span dir="ltr">*</span></label>
             <input type="text" id="dp_valid_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
         </div>
-        <div>
+        <div class="dp-field" style="min-width:150px;">
             <label for="dp_valid_to">نهاية العرض <span dir="ltr">*</span></label>
             <input type="text" id="dp_valid_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
         </div>
@@ -608,6 +614,7 @@ echo orange_offer_gl_link_card_html(
         document.getElementById('dp_name_en').value = '';
         document.getElementById('dp_discount_type').value = 'amount';
         document.getElementById('dp_discount_value').value = '';
+        document.getElementById('dp_sort').value = '0';
         document.getElementById('dp_reg').checked = false;
         document.getElementById('dp_first_delivered').checked = false;
         document.getElementById('dp_active').checked = true;
@@ -623,6 +630,7 @@ echo orange_offer_gl_link_card_html(
         document.getElementById('dp_name_en').value = row.name_en || '';
         document.getElementById('dp_discount_type').value = row.discount_type || 'amount';
         document.getElementById('dp_discount_value').value = row.discount_value != null ? String(row.discount_value) : '';
+        document.getElementById('dp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
         document.getElementById('dp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
         document.getElementById('dp_first_delivered').checked = parseInt(row.first_delivered_order_only, 10) === 1;
         document.getElementById('dp_active').checked = parseInt(row.is_active, 10) === 1;
@@ -678,6 +686,7 @@ echo orange_offer_gl_link_card_html(
             name_en: (document.getElementById('dp_name_en').value || '').trim(),
             discount_type: (document.getElementById('dp_discount_type').value || 'amount').trim(),
             discount_value: (document.getElementById('dp_discount_value').value || '').trim(),
+            sort_order: parseInt(document.getElementById('dp_sort').value, 10) || 0,
             requires_registered_account: document.getElementById('dp_reg').checked ? 1 : 0,
             first_delivered_order_only: document.getElementById('dp_first_delivered').checked ? 1 : 0,
             is_active: document.getElementById('dp_active').checked ? 1 : 0,
