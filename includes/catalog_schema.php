@@ -6666,6 +6666,7 @@ function orange_catalog_migrate_delivery_promotions_invoice_lines_v91(PDO $pdo):
             discount_type VARCHAR(16) NOT NULL DEFAULT \'amount\',
             discount_value DECIMAL(18,4) NOT NULL DEFAULT 0,
             requires_registered_account TINYINT(1) NOT NULL DEFAULT 0,
+            first_delivered_order_only TINYINT(1) NOT NULL DEFAULT 0,
             valid_from DATE NOT NULL,
             valid_to DATE NOT NULL,
             sort_order INT NOT NULL DEFAULT 0,
@@ -6754,6 +6755,14 @@ function orange_catalog_migrate_delivery_promotions_invoice_lines_v91(PDO $pdo):
                     ADD COLUMN requires_registered_account TINYINT(1) NOT NULL DEFAULT 0 AFTER discount_value'
             );
             orange_schema_invalidate_column_check('delivery_fee_promotions', 'requires_registered_account');
+        }
+        if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'first_delivered_order_only')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE delivery_fee_promotions
+                    ADD COLUMN first_delivered_order_only TINYINT(1) NOT NULL DEFAULT 0 AFTER requires_registered_account'
+            );
+            orange_schema_invalidate_column_check('delivery_fee_promotions', 'first_delivered_order_only');
         }
         if (!orange_table_has_column($pdo, 'delivery_fee_promotions', 'valid_from')) {
             orange_catalog_safe_exec(

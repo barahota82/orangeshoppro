@@ -65,10 +65,6 @@ echo orange_offer_gl_link_card_html(
 
 <div class="card">
     <h3>استهداف العرض — محافظات ومناطق التوصيل</h3>
-    <p class="card-hint" style="margin-top:0;">
-        اختر نطاق العرض: «كل مناطق التوصيل»، أو محافظة كاملة، أو تركيبة سعر داخلها، أو مناطق مفردة.
-        القيم تُضبط من شاشة «محافظات ومناطق التوصيل» (هنا للعرض والاختيار فقط). لا تنضم أي منطقة جديدة تلقائياً — تُضاف يدوياً من هنا.
-    </p>
     <label class="dp-tree-all">
         <input type="checkbox" id="dp_tree_all"> كل مناطق التوصيل
     </label>
@@ -80,6 +76,17 @@ echo orange_offer_gl_link_card_html(
 <div class="card">
     <h3>إضافة / تعديل</h3>
     <input type="hidden" id="dp_id" value="0">
+    <div style="display:flex;flex-wrap:wrap;gap:22px;align-items:center;margin-bottom:14px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="dp_active" checked> نشط
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="dp_reg"> للمسجّلين فقط
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="dp_first_delivered"> أول طلب مُسلَّم
+        </label>
+    </div>
     <div class="form-grid">
         <div>
             <label for="dp_name_ar">اسم العرض (عربي)</label>
@@ -89,6 +96,8 @@ echo orange_offer_gl_link_card_html(
             <label for="dp_name_en">English</label>
             <input type="text" id="dp_name_en" class="admin-inp" dir="ltr" lang="en" placeholder="Weekend delivery promo">
         </div>
+    </div>
+    <div class="form-grid" style="margin-top:12px;">
         <div>
             <label for="dp_discount_type">نوع الخصم</label>
             <select id="dp_discount_type" class="admin-inp"></select>
@@ -97,20 +106,19 @@ echo orange_offer_gl_link_card_html(
             <label for="dp_discount_value" id="dp_discount_value_label">قيمة الخصم</label>
             <input type="text" id="dp_discount_value" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="2">
         </div>
-        <?php $ocpFieldPrefix = 'dp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
         <div style="grid-column:1/-1;">
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;max-width:52rem;line-height:1.45;">
-                <input type="checkbox" id="dp_reg" style="margin-top:4px;flex-shrink:0;">
-                <span><strong>للمسجّلين فقط</strong> — عند التفعيل يُطبّق العرض على حسابات المتجر المسجّلة فقط، وإلا فيشمل الزائر والعميل المسجّل.</span>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;max-width:22rem;">
+                <input type="checkbox" id="dp_always_on">
+                <span><strong>التفعيل الدائم</strong></span>
             </label>
         </div>
-        <div style="grid-column:1/-1;">
-            <span class="muted">نطاق العرض (المحافظات/المناطق المستهدفة) يُحدَّد من جدول «استهداف العرض» بالأعلى.</span>
+        <div>
+            <label for="dp_valid_from">بداية العرض <span dir="ltr">*</span></label>
+            <input type="text" id="dp_valid_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
         </div>
-        <div style="display:flex;align-items:flex-end;gap:8px;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="dp_active" checked> نشط
-            </label>
+        <div>
+            <label for="dp_valid_to">نهاية العرض <span dir="ltr">*</span></label>
+            <input type="text" id="dp_valid_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
         </div>
     </div>
     <div class="admin-form-actions">
@@ -549,6 +557,14 @@ echo orange_offer_gl_link_card_html(
         return 'نشط';
     }
 
+    function dpEligibilityLabel(row) {
+        var parts = [parseInt(row.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'جميع الزوار'];
+        if (parseInt(row.first_delivered_order_only, 10) === 1) {
+            parts.push('أول طلب مُسلَّم');
+        }
+        return parts.join(' + ');
+    }
+
     function dpFillDiscountTypeOptions(selected) {
         var sel = document.getElementById('dp_discount_type');
         if (!sel) return;
@@ -593,6 +609,7 @@ echo orange_offer_gl_link_card_html(
         document.getElementById('dp_discount_type').value = 'amount';
         document.getElementById('dp_discount_value').value = '';
         document.getElementById('dp_reg').checked = false;
+        document.getElementById('dp_first_delivered').checked = false;
         document.getElementById('dp_active').checked = true;
         ocpSetAlwaysOn('dp', false);
         ocpDefaultScheduleDates('dp');
@@ -607,6 +624,7 @@ echo orange_offer_gl_link_card_html(
         document.getElementById('dp_discount_type').value = row.discount_type || 'amount';
         document.getElementById('dp_discount_value').value = row.discount_value != null ? String(row.discount_value) : '';
         document.getElementById('dp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
+        document.getElementById('dp_first_delivered').checked = parseInt(row.first_delivered_order_only, 10) === 1;
         document.getElementById('dp_active').checked = parseInt(row.is_active, 10) === 1;
         ocpSetAlwaysOn('dp', parseInt(row.is_always_on, 10) === 1);
         ocpSetDmyFromIso('dp_valid_from', row.valid_from);
@@ -635,7 +653,7 @@ echo orange_offer_gl_link_card_html(
                 '<td>' + escDp(String(row.id || '')) + '</td>' +
                 '<td>' + escDp(row.name_ar || row.name_en || '') + '</td>' +
                 '<td dir="ltr">' + escDp(dpDiscountLabel(row)) + '</td>' +
-                '<td>' + (parseInt(row.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'جميع الزوار') + '</td>' +
+                '<td>' + escDp(dpEligibilityLabel(row)) + '</td>' +
                 '<td>' + escDp(dpScopeLabel(row)) + '</td>' +
                 '<td dir="ltr">' + escDp(ocpScheduleLabel(row)) + '</td>' +
                 '<td>' + escDp(dpStatusLabel(row)) + '</td>' +
@@ -661,6 +679,7 @@ echo orange_offer_gl_link_card_html(
             discount_type: (document.getElementById('dp_discount_type').value || 'amount').trim(),
             discount_value: (document.getElementById('dp_discount_value').value || '').trim(),
             requires_registered_account: document.getElementById('dp_reg').checked ? 1 : 0,
+            first_delivered_order_only: document.getElementById('dp_first_delivered').checked ? 1 : 0,
             is_active: document.getElementById('dp_active').checked ? 1 : 0,
             is_always_on: ocpIsAlwaysOn('dp') ? 1 : 0,
             valid_from: ocpGetIso('dp_valid_from'),

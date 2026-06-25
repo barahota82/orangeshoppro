@@ -158,7 +158,10 @@ try {
             $pdo,
             $deliveryAreaId,
             $buyerReg,
-            $storefrontCountryId
+            $storefrontCountryId,
+            null,
+            ($acc !== null && isset($acc['id'])) ? (int) $acc['id'] : null,
+            ($acc !== null && isset($acc['customer_phone'])) ? (string) $acc['customer_phone'] : null
         );
         $deliveryFeeBase = (float) ($deliveryBundle['base_fee'] ?? 0.0);
         $deliveryFeeDiscount = (float) ($deliveryBundle['discount_fee'] ?? 0.0);

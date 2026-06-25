@@ -661,9 +661,13 @@ function orange_delivery_promotions_admin_list(PDO $pdo, int $countryId): array
     if (!orange_delivery_promotions_table_exists($pdo) || $countryId <= 0) {
         return [];
     }
+    $hasFirstDeliveredColumn = orange_table_has_column($pdo, 'delivery_fee_promotions', 'first_delivered_order_only');
+    $firstDeliveredSelect = $hasFirstDeliveredColumn
+        ? 'first_delivered_order_only'
+        : '0 AS first_delivered_order_only';
     $st = $pdo->prepare(
         'SELECT id, country_id, name_ar, name_en, discount_type, discount_value,
-                requires_registered_account, valid_from, valid_to, sort_order, is_active, is_always_on
+                requires_registered_account, ' . $firstDeliveredSelect . ', valid_from, valid_to, sort_order, is_active, is_always_on
          FROM delivery_fee_promotions
          WHERE country_id = ?
          ORDER BY sort_order ASC, id ASC'
@@ -715,6 +719,7 @@ function orange_delivery_promotions_admin_list(PDO $pdo, int $countryId): array
         $row['discount_type'] = orange_delivery_promotion_discount_type_normalize((string) ($row['discount_type'] ?? ''));
         $row['discount_value'] = round(max(0.0, (float) ($row['discount_value'] ?? 0)), 4);
         $row['requires_registered_account'] = (int) ($row['requires_registered_account'] ?? 0) === 1 ? 1 : 0;
+        $row['first_delivered_order_only'] = (int) ($row['first_delivered_order_only'] ?? 0) === 1 ? 1 : 0;
         $row['sort_order'] = (int) ($row['sort_order'] ?? 0);
         $row['is_active'] = (int) ($row['is_active'] ?? 0) === 1 ? 1 : 0;
         $row['is_always_on'] = (int) ($row['is_always_on'] ?? 0) === 1 ? 1 : 0;
@@ -799,6 +804,78 @@ function orange_delivery_promotion_target_matches_area(
 }
 
 /**
+ * هل سبق للعميل أن استلم طلباً فعلياً (status = 'completed')؟
+ *
+ * يُطابَق العميل بالحساب المسجّل (storefront_account_id) إن وُجد، وإلا بالهاتف.
+ * الطلبات الملغاة/المرفوضة/غير المستلمة لا تُحتسب (ليست completed) — «كأن لم تكن».
+ */
+function orange_delivery_buyer_has_completed_order(
+    PDO $pdo,
+    ?int $accountId,
+    ?string $phone,
+    ?int $countryId
+): bool {
+    if (!orange_table_exists($pdo, 'orders')) {
+        return false;
+    }
+    $hasCountry = $countryId !== null && $countryId > 0
+        && orange_table_has_column($pdo, 'orders', 'country_id');
+
+    if ($accountId !== null && $accountId > 0
+        && orange_table_has_column($pdo, 'orders', 'storefront_account_id')) {
+        $sql = "SELECT 1 FROM orders WHERE storefront_account_id = ? AND status = 'completed'";
+        $params = [$accountId];
+        if ($hasCountry) {
+            $sql .= ' AND country_id = ?';
+            $params[] = $countryId;
+        }
+        $sql .= ' LIMIT 1';
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        if ($st->fetchColumn()) {
+            return true;
+        }
+    }
+
+    $phone = trim((string) $phone);
+    if ($phone !== '') {
+        $sql = "SELECT 1 FROM orders WHERE phone = ? AND status = 'completed'";
+        $params = [$phone];
+        if ($hasCountry) {
+            $sql .= ' AND country_id = ?';
+            $params[] = $countryId;
+        }
+        $sql .= ' LIMIT 1';
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        if ($st->fetchColumn()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * أهليّة عرض «أول طلب مُسلَّم»: يجب أن نتعرّف على العميل (حساب أو هاتف) وألا يكون
+ * لديه طلب مُسلَّم سابق. إن تعذّر التعرّف (لا حساب ولا هاتف) → غير مؤهَّل (fail-safe مالي).
+ */
+function orange_delivery_buyer_first_delivered_eligible(
+    PDO $pdo,
+    ?int $accountId,
+    ?string $phone,
+    ?int $countryId
+): bool {
+    $hasAccount = $accountId !== null && $accountId > 0;
+    $hasPhone = trim((string) $phone) !== '';
+    if (!$hasAccount && !$hasPhone) {
+        return false;
+    }
+
+    return !orange_delivery_buyer_has_completed_order($pdo, $accountId, $phone, $countryId);
+}
+
+/**
  * @return array<string, mixed>|null
  */
 function orange_delivery_promotion_resolve_for_checkout(
@@ -806,7 +883,9 @@ function orange_delivery_promotion_resolve_for_checkout(
     int $deliveryAreaId,
     float $baseFee,
     bool $buyerRegistered,
-    ?int $countryId = null
+    ?int $countryId = null,
+    ?int $buyerAccountId = null,
+    ?string $buyerPhone = null
 ): ?array {
     $baseFee = round(max(0.0, $baseFee), 4);
     if ($baseFee <= 0.0 || $deliveryAreaId <= 0 || !orange_delivery_promotions_table_exists($pdo)) {
@@ -818,9 +897,13 @@ function orange_delivery_promotion_resolve_for_checkout(
     if ($countryId <= 0) {
         return null;
     }
+    $hasFirstDeliveredCol = orange_table_has_column($pdo, 'delivery_fee_promotions', 'first_delivered_order_only');
+    $firstDeliveredSelect = $hasFirstDeliveredCol
+        ? 'first_delivered_order_only'
+        : '0 AS first_delivered_order_only';
     $st = $pdo->prepare(
         'SELECT id, name_ar, name_en, discount_type, discount_value, requires_registered_account,
-                sort_order, valid_from, valid_to, is_always_on
+                ' . $firstDeliveredSelect . ', sort_order, valid_from, valid_to, is_always_on
          FROM delivery_fee_promotions
          WHERE country_id = ? AND is_active = 1
            AND (is_always_on = 1 OR (valid_from <= CURDATE() AND valid_to >= CURDATE()))
@@ -857,6 +940,10 @@ function orange_delivery_promotion_resolve_for_checkout(
             continue;
         }
         if ((int) ($row['requires_registered_account'] ?? 0) === 1 && !$buyerRegistered) {
+            continue;
+        }
+        if ((int) ($row['first_delivered_order_only'] ?? 0) === 1
+            && !orange_delivery_buyer_first_delivered_eligible($pdo, $buyerAccountId, $buyerPhone, $countryId)) {
             continue;
         }
         $areaTargets = $areaTargetsMap[$promotionId] ?? [];
@@ -935,7 +1022,9 @@ function orange_delivery_resolve_checkout_fee_bundle(
     int $deliveryAreaId,
     bool $buyerRegistered,
     ?int $countryId = null,
-    ?array $areaRow = null
+    ?array $areaRow = null,
+    ?int $buyerAccountId = null,
+    ?string $buyerPhone = null
 ): array {
     $baseFee = orange_delivery_resolve_checkout_fee_base(
         $pdo,
@@ -960,7 +1049,9 @@ function orange_delivery_resolve_checkout_fee_bundle(
         $deliveryAreaId,
         $baseFee,
         $buyerRegistered,
-        $countryId
+        $countryId,
+        $buyerAccountId,
+        $buyerPhone
     );
     $discountFee = $promotion !== null
         ? round(max(0.0, (float) ($promotion['discount_amount'] ?? 0)), 4)

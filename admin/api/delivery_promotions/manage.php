@@ -530,6 +530,7 @@ try {
         $sortOrder = 0;
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $requiresRegistered = !empty($data['requires_registered_account']) ? 1 : 0;
+        $firstDeliveredOnly = !empty($data['first_delivered_order_only']) ? 1 : 0;
         $governorateIds = dp_int_id_list($data['target_governorate_ids'] ?? []);
         $areaIds = dp_int_id_list($data['target_area_ids'] ?? []);
 
@@ -556,7 +557,8 @@ try {
                 $up = $pdo->prepare(
                     'UPDATE delivery_fee_promotions
                      SET name_ar = ?, name_en = ?, discount_type = ?, discount_value = ?,
-                         requires_registered_account = ?, valid_from = ?, valid_to = ?,
+                         requires_registered_account = ?, first_delivered_order_only = ?,
+                         valid_from = ?, valid_to = ?,
                          is_active = ?, is_always_on = ?, country_id = ?
                      WHERE id = ?'
                 );
@@ -566,6 +568,7 @@ try {
                     $discountType,
                     $discountValue,
                     $requiresRegistered,
+                    $firstDeliveredOnly,
                     $bounds['valid_from'],
                     $bounds['valid_to'],
                     $isActive,
@@ -585,8 +588,8 @@ try {
                 $ins = $pdo->prepare(
                     'INSERT INTO delivery_fee_promotions
                         (country_id, name_ar, name_en, discount_type, discount_value, requires_registered_account,
-                         valid_from, valid_to, sort_order, is_active, is_always_on)
-                     VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+                         first_delivered_order_only, valid_from, valid_to, sort_order, is_active, is_always_on)
+                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
                 );
                 $ins->execute([
                     $countryId,
@@ -595,6 +598,7 @@ try {
                     $discountType,
                     $discountValue,
                     $requiresRegistered,
+                    $firstDeliveredOnly,
                     $bounds['valid_from'],
                     $bounds['valid_to'],
                     $sortOrder,

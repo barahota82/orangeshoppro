@@ -472,7 +472,15 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     $buyerRegistered = $sfaLink !== null && $sfaLink > 0;
     $deliveryAreaId = isset($data['delivery_area_id']) ? (int) $data['delivery_area_id'] : 0;
     $deliveryBundle = $deliveryAreaId > 0
-        ? orange_delivery_resolve_checkout_fee_bundle($pdo, $deliveryAreaId, $buyerRegistered, $orderCountryId)
+        ? orange_delivery_resolve_checkout_fee_bundle(
+            $pdo,
+            $deliveryAreaId,
+            $buyerRegistered,
+            $orderCountryId,
+            null,
+            $sfaLink,
+            isset($data['phone']) ? trim((string) $data['phone']) : null
+        )
         : [
             'base_fee' => 0.0,
             'discount_fee' => 0.0,
