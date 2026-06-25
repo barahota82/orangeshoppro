@@ -83,8 +83,8 @@ echo orange_offer_gl_link_card_html(
     <input type="hidden" id="dp_id" value="0">
     <div class="dp-form-row" style="margin-bottom:14px;">
         <div class="dp-field" style="max-width:120px;">
-            <label for="dp_sort">الترتيب</label>
-            <input type="number" id="dp_sort" class="admin-inp" value="0">
+            <label for="dp_sort">الترتيب (تلقائي)</label>
+            <input type="number" id="dp_sort" class="admin-inp" value="0" readonly tabindex="-1" title="يُحدَّد تلقائياً" style="background:#f1f5f9;color:#64748b;cursor:not-allowed;">
         </div>
         <label class="dp-check">
             <input type="checkbox" id="dp_active" checked> نشط
@@ -608,13 +608,22 @@ echo orange_offer_gl_link_card_html(
         }
     }
 
+    function dpComputeNextSort() {
+        var max = 0;
+        (DP_ROWS || []).forEach(function (r) {
+            var s = parseInt(r.sort_order, 10) || 0;
+            if (s > max) max = s;
+        });
+        return max + 1;
+    }
+
     function resetDeliveryPromotionForm() {
         document.getElementById('dp_id').value = '0';
         document.getElementById('dp_name_ar').value = '';
         document.getElementById('dp_name_en').value = '';
         document.getElementById('dp_discount_type').value = 'amount';
         document.getElementById('dp_discount_value').value = '';
-        document.getElementById('dp_sort').value = '0';
+        document.getElementById('dp_sort').value = String(dpComputeNextSort());
         document.getElementById('dp_reg').checked = false;
         document.getElementById('dp_first_delivered').checked = false;
         document.getElementById('dp_active').checked = true;
@@ -676,6 +685,10 @@ echo orange_offer_gl_link_card_html(
                 if (row) editDeliveryPromotion(row);
             });
         });
+        // عند وضع «إضافة جديد» اعرض الترتيب التلقائي التالي
+        if ((parseInt(document.getElementById('dp_id').value, 10) || 0) === 0) {
+            document.getElementById('dp_sort').value = String(dpComputeNextSort());
+        }
     }
 
     async function saveDeliveryPromotion() {
@@ -686,7 +699,6 @@ echo orange_offer_gl_link_card_html(
             name_en: (document.getElementById('dp_name_en').value || '').trim(),
             discount_type: (document.getElementById('dp_discount_type').value || 'amount').trim(),
             discount_value: (document.getElementById('dp_discount_value').value || '').trim(),
-            sort_order: parseInt(document.getElementById('dp_sort').value, 10) || 0,
             requires_registered_account: document.getElementById('dp_reg').checked ? 1 : 0,
             first_delivered_order_only: document.getElementById('dp_first_delivered').checked ? 1 : 0,
             is_active: document.getElementById('dp_active').checked ? 1 : 0,
