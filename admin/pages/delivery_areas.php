@@ -272,6 +272,14 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
             الكل
         </label>
         <?php endif; ?>
+        <label for="da_filter_active" class="da-list-all-label">
+            <input type="checkbox" id="da_filter_active" checked>
+            منطقة توصيل
+        </label>
+        <label for="da_filter_inactive" class="da-list-all-label">
+            <input type="checkbox" id="da_filter_inactive" checked>
+            غير متاحة للتوصيل
+        </label>
     </div>
     <?php if ($hasAreaFollowFlags && $hasGovDefaultAmounts): ?>
     <p class="da-amounts-legend muted"><span class="da-follow-badge">🔗 محافظة</span> = تتبع المحافظة (تتحدّث معها) • <span class="da-custom-badge">مخصّص</span> = قيمة خاصة بالمنطقة</p>
@@ -436,7 +444,16 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
         cursor: pointer;
         text-align: right;
     }
-    .da-gov-combo__field:hover { border-color: #94a3b8; }
+    .da-gov-combo__field:hover,
+    .da-gov-combo__field:focus,
+    .da-gov-combo__field:active,
+    .da-gov-combo__field[aria-expanded="true"] {
+        background: #fff;
+        color: inherit;
+        filter: none;
+        border-color: #94a3b8;
+    }
+    .da-gov-combo__field:focus { outline: none; }
     .da-gov-combo__text {
         flex: 1;
         text-align: right;
@@ -695,16 +712,22 @@ function daSyncListAllCheckbox() {
 function daAreasForList() {
     var rows = daDeliveryAreasCache || [];
     var allCb = document.getElementById('da_list_all');
-    if (!allCb || allCb.checked) {
-        return rows;
-    }
     var govId = daSelectedGovernorateId();
-    if (govId <= 0) {
-        return rows;
+    if (allCb && !allCb.checked && govId > 0) {
+        rows = rows.filter(function (r) {
+            return parseInt(r.governorate_id, 10) === govId;
+        });
     }
-    return rows.filter(function (r) {
-        return parseInt(r.governorate_id, 10) === govId;
-    });
+    var fActive = document.getElementById('da_filter_active');
+    var fInactive = document.getElementById('da_filter_inactive');
+    var showActive = !fActive || fActive.checked;
+    var showInactive = !fInactive || fInactive.checked;
+    if (!showActive || !showInactive) {
+        rows = rows.filter(function (r) {
+            return (parseInt(r.is_active, 10) === 1) ? showActive : showInactive;
+        });
+    }
+    return rows;
 }
 
 var daHasGovCol = <?php echo $hasGovTable ? 'true' : 'false'; ?>;
@@ -1273,6 +1296,10 @@ const daGovSel = document.getElementById('da_governorate_id');
 if (daGovSel) daGovSel.addEventListener('change', onDaGovernorateChange);
 const daListAll = document.getElementById('da_list_all');
 if (daListAll) daListAll.addEventListener('change', renderDeliveryAreasTable);
+const daFilterActive = document.getElementById('da_filter_active');
+if (daFilterActive) daFilterActive.addEventListener('change', renderDeliveryAreasTable);
+const daFilterInactive = document.getElementById('da_filter_inactive');
+if (daFilterInactive) daFilterInactive.addEventListener('change', renderDeliveryAreasTable);
 if (daHasFollowFeature) {
     var daFeeFollowCb = document.getElementById('da_fee_follows_gov');
     var daCostFollowCb = document.getElementById('da_cost_follows_gov');
