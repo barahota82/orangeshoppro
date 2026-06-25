@@ -85,7 +85,7 @@ echo orange_offer_gl_link_card_html(
     <input type="hidden" id="dp_id" value="0">
     <div class="dp-form-row" style="margin-bottom:14px;">
         <div class="dp-field" style="max-width:120px;">
-            <label for="dp_sort">الترتيب (تلقائي)</label>
+            <label for="dp_sort">الترتيب</label>
             <input type="number" id="dp_sort" class="admin-inp" value="0" readonly tabindex="-1" title="يُحدَّد تلقائياً" style="background:#f1f5f9;color:#64748b;cursor:not-allowed;">
         </div>
         <label class="dp-check">
