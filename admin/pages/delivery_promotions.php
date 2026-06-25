@@ -86,7 +86,7 @@ echo orange_offer_gl_link_card_html(
     <div class="dp-form-row" style="margin-bottom:14px;">
         <div class="dp-field" style="max-width:120px;">
             <label for="dp_sort">الترتيب</label>
-            <input type="number" id="dp_sort" class="admin-inp" value="0" readonly tabindex="-1" title="يُحدَّد تلقائياً" style="background:#f1f5f9;color:#64748b;cursor:not-allowed;">
+            <input type="number" id="dp_sort" class="admin-inp" value="0" readonly tabindex="-1" title="يُحدَّد تلقائياً" style="background:#f1f5f9;color:#64748b;cursor:not-allowed;text-align:center;">
         </div>
         <label class="dp-check">
             <input type="checkbox" id="dp_active" checked> نشط
