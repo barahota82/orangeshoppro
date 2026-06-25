@@ -258,31 +258,32 @@ function dp_targets_areas(PDO $pdo, int $countryId): array
 }
 
 /**
+ * ملخص قيم/تكاليف التوصيل للقراءة فقط (مصدره شاشة المحافظات/المناطق).
+ *
+ * لكل محافظة: القيم الافتراضية + مجموعات المناطق النشطة حسب (قيمة + تكلفة) + المناطق غير النشطة.
+ *
  * @return array{
- *   apply_mode:string,
- *   default_delivery_fee:float,
  *   governorates:list<array{
  *     governorate_id:int,
  *     governorate_name_ar:string,
  *     governorate_name_en:string,
+ *     default_delivery_fee:float|null,
+ *     default_company_delivery_cost:float|null,
  *     active_count:int,
  *     inactive_count:int,
- *     pending_count:int,
- *     pending_area_ids:list<int>,
- *     custom_groups:list<array{
+ *     fee_groups:list<array{
  *       delivery_fee:float,
+ *       company_delivery_cost:float,
  *       area_count:int,
- *       area_ids:list<int>
- *     }>
+ *       is_default:bool,
+ *       areas:list<array{id:int,name_ar:string,name_en:string}>
+ *     }>,
+ *     inactive_areas:list<array{id:int,name_ar:string,name_en:string}>
  *   }>
  * }
  */
 function dp_build_delivery_fee_summary(PDO $pdo, int $countryId): array
 {
-    $policy = orange_delivery_country_policy_read($pdo, $countryId);
-    $applyMode = orange_delivery_fee_apply_mode_normalize((string) ($policy['delivery_fee_apply_mode'] ?? 'all'));
-    $defaultFee = round(max(0.0, (float) ($policy['default_delivery_fee'] ?? 0.0)), 4);
-
     $govMap = [];
     $governorates = orange_delivery_governorates_table_exists($pdo)
         ? orange_delivery_governorates_admin_list($pdo, $countryId)
@@ -300,11 +301,14 @@ function dp_build_delivery_fee_summary(PDO $pdo, int $countryId): array
             'governorate_name_ar' => (string) ($row['name_ar'] ?? ''),
             'governorate_name_en' => (string) ($row['name_en'] ?? ''),
             'sort_order' => (int) ($row['sort_order'] ?? 0),
-            'active_count' => 0,
-            'inactive_count' => 0,
-            'pending_count' => 0,
-            'pending_area_ids' => [],
-            'custom_groups' => [],
+            'default_delivery_fee' => ($row['default_delivery_fee'] === null)
+                ? null
+                : round(max(0.0, (float) $row['default_delivery_fee']), 4),
+            'default_company_delivery_cost' => ($row['default_company_delivery_cost'] === null)
+                ? null
+                : round(max(0.0, (float) $row['default_company_delivery_cost']), 4),
+            'active_groups' => [],
+            'inactive_areas' => [],
         ];
     }
 
@@ -327,38 +331,45 @@ function dp_build_delivery_fee_summary(PDO $pdo, int $countryId): array
                 'governorate_name_ar' => (string) ($row['governorate_name_ar'] ?? ''),
                 'governorate_name_en' => (string) ($row['governorate_name_en'] ?? ''),
                 'sort_order' => 999999,
-                'active_count' => 0,
-                'inactive_count' => 0,
-                'pending_count' => 0,
-                'pending_area_ids' => [],
-                'custom_groups' => [],
+                'default_delivery_fee' => null,
+                'default_company_delivery_cost' => null,
+                'active_groups' => [],
+                'inactive_areas' => [],
             ];
         }
+
+        $areaInfo = [
+            'id' => $areaId,
+            'name_ar' => (string) ($row['name_ar'] ?? ''),
+            'name_en' => (string) ($row['name_en'] ?? ''),
+        ];
 
         $isActive = (int) ($row['is_active'] ?? 0) === 1;
         if (!$isActive) {
-            $govMap[$key]['inactive_count']++;
+            $govMap[$key]['inactive_areas'][] = $areaInfo;
             continue;
         }
 
-        $govMap[$key]['active_count']++;
-        $isPending = (int) ($row['delivery_fee_pending'] ?? 0) === 1;
-        if ($isPending) {
-            $govMap[$key]['pending_count']++;
-            $govMap[$key]['pending_area_ids'][] = $areaId;
-            continue;
-        }
-        $fee = round(max(0.0, (float) ($row['delivery_fee'] ?? 0.0)), 4);
-        $feeKey = number_format($fee, 4, '.', '');
-        if (!isset($govMap[$key]['custom_groups'][$feeKey])) {
-            $govMap[$key]['custom_groups'][$feeKey] = [
-                'delivery_fee' => (float) $fee,
-                'area_count' => 0,
-                'area_ids' => [],
+        $followFee = (int) ($row['fee_follows_gov'] ?? 0) === 1;
+        $followCost = (int) ($row['cost_follows_gov'] ?? 0) === 1;
+        $defFee = $govMap[$key]['default_delivery_fee'];
+        $defCost = $govMap[$key]['default_company_delivery_cost'];
+        $fee = ($followFee && $defFee !== null)
+            ? $defFee
+            : round(max(0.0, (float) ($row['delivery_fee'] ?? 0.0)), 4);
+        $cost = ($followCost && $defCost !== null)
+            ? $defCost
+            : round(max(0.0, (float) ($row['company_delivery_cost'] ?? 0.0)), 4);
+
+        $groupKey = number_format($fee, 4, '.', '') . '|' . number_format($cost, 4, '.', '');
+        if (!isset($govMap[$key]['active_groups'][$groupKey])) {
+            $govMap[$key]['active_groups'][$groupKey] = [
+                'delivery_fee' => $fee,
+                'company_delivery_cost' => $cost,
+                'areas' => [],
             ];
         }
-        $govMap[$key]['custom_groups'][$feeKey]['area_count']++;
-        $govMap[$key]['custom_groups'][$feeKey]['area_ids'][] = $areaId;
+        $govMap[$key]['active_groups'][$groupKey]['areas'][] = $areaInfo;
     }
 
     $govList = array_values($govMap);
@@ -374,46 +385,56 @@ function dp_build_delivery_fee_summary(PDO $pdo, int $countryId): array
 
     $outGovs = [];
     foreach ($govList as $gov) {
-        $groupMap = is_array($gov['custom_groups'] ?? null) ? $gov['custom_groups'] : [];
-        $groups = array_values($groupMap);
+        $defFee = $gov['default_delivery_fee'];
+        $defCost = $gov['default_company_delivery_cost'];
+        $groups = array_values(is_array($gov['active_groups'] ?? null) ? $gov['active_groups'] : []);
         usort($groups, static function (array $a, array $b): int {
             $fA = (float) ($a['delivery_fee'] ?? 0.0);
             $fB = (float) ($b['delivery_fee'] ?? 0.0);
-            if (abs($fA - $fB) > 0.0001) {
+            if (abs($fA - $fB) > 0.00005) {
                 return $fA <=> $fB;
             }
+            $cA = (float) ($a['company_delivery_cost'] ?? 0.0);
+            $cB = (float) ($b['company_delivery_cost'] ?? 0.0);
 
-            return ((int) ($a['area_count'] ?? 0)) <=> ((int) ($b['area_count'] ?? 0));
+            return $cA <=> $cB;
         });
-        foreach ($groups as &$group) {
-            $ids = array_values(array_unique(array_map(static fn ($v): int => (int) $v, (array) ($group['area_ids'] ?? []))));
-            sort($ids);
-            $group['area_ids'] = $ids;
-            $group['area_count'] = count($ids);
-            $group['delivery_fee'] = round(max(0.0, (float) ($group['delivery_fee'] ?? 0.0)), 4);
+
+        $groupsOut = [];
+        $activeCount = 0;
+        foreach ($groups as $group) {
+            $fee = round(max(0.0, (float) ($group['delivery_fee'] ?? 0.0)), 4);
+            $cost = round(max(0.0, (float) ($group['company_delivery_cost'] ?? 0.0)), 4);
+            $areas = is_array($group['areas'] ?? null) ? array_values($group['areas']) : [];
+            $isDefault = $defFee !== null && $defCost !== null
+                && abs($fee - $defFee) < 0.00005
+                && abs($cost - $defCost) < 0.00005;
+            $activeCount += count($areas);
+            $groupsOut[] = [
+                'delivery_fee' => $fee,
+                'company_delivery_cost' => $cost,
+                'area_count' => count($areas),
+                'is_default' => $isDefault,
+                'areas' => $areas,
+            ];
         }
-        unset($group);
-        $pendingIds = array_values(array_unique(array_map(
-            static fn ($v): int => (int) $v,
-            (array) ($gov['pending_area_ids'] ?? [])
-        )));
-        sort($pendingIds);
+
+        $inactiveAreas = is_array($gov['inactive_areas'] ?? null) ? array_values($gov['inactive_areas']) : [];
 
         $outGovs[] = [
             'governorate_id' => (int) ($gov['governorate_id'] ?? 0),
             'governorate_name_ar' => (string) ($gov['governorate_name_ar'] ?? ''),
             'governorate_name_en' => (string) ($gov['governorate_name_en'] ?? ''),
-            'active_count' => (int) ($gov['active_count'] ?? 0),
-            'inactive_count' => (int) ($gov['inactive_count'] ?? 0),
-            'pending_count' => count($pendingIds),
-            'pending_area_ids' => $pendingIds,
-            'custom_groups' => $groups,
+            'default_delivery_fee' => $defFee,
+            'default_company_delivery_cost' => $defCost,
+            'active_count' => $activeCount,
+            'inactive_count' => count($inactiveAreas),
+            'fee_groups' => $groupsOut,
+            'inactive_areas' => $inactiveAreas,
         ];
     }
 
     return [
-        'apply_mode' => $applyMode,
-        'default_delivery_fee' => $defaultFee,
         'governorates' => $outGovs,
     ];
 }
@@ -433,166 +454,10 @@ try {
         orange_country_functional_currency_code($pdo, $countryId)
     );
 
-    if ($action === 'get_base_fee') {
-        $policy = orange_delivery_country_policy_read($pdo, $countryId);
-        json_response([
-            'success' => true,
-            'data' => [
-                'default_delivery_fee' => (float) ($policy['default_delivery_fee'] ?? 0.0),
-                'delivery_fee_policy' => (string) ($policy['delivery_fee_policy'] ?? 'paid_all'),
-                'delivery_fee_apply_mode' => (string) ($policy['delivery_fee_apply_mode'] ?? 'all'),
-                'active_areas_count' => orange_delivery_areas_count_active($pdo, $countryId),
-            ],
-        ]);
-    }
-
     if ($action === 'get_fee_summary') {
         json_response([
             'success' => true,
             'data' => dp_build_delivery_fee_summary($pdo, $countryId),
-        ]);
-    }
-
-    if ($action === 'save_base_fee') {
-        if ($countryId <= 0) {
-            json_response(['success' => false, 'message' => 'الدولة غير محددة'], 422);
-        }
-        $defaultFee = dp_money_non_negative($data['default_delivery_fee'] ?? '', $moneyDecimals);
-        if ($defaultFee === null) {
-            json_response(['success' => false, 'message' => 'قيمة التوصيل الأساسية غير صحيحة'], 422);
-        }
-        $applyActiveAreas = !empty($data['apply_active_areas']);
-        $applyModeInput = array_key_exists('delivery_fee_apply_mode', $data)
-            ? orange_delivery_fee_apply_mode_normalize((string) $data['delivery_fee_apply_mode'])
-            : null;
-        $appliedCount = 0;
-        $policy = orange_delivery_country_policy_read($pdo, $countryId);
-        $applyMode = $applyModeInput ?? orange_delivery_fee_apply_mode_normalize((string) ($policy['delivery_fee_apply_mode'] ?? 'all'));
-        if ($applyActiveAreas && $applyMode !== 'all') {
-            json_response([
-                'success' => false,
-                'message' => 'توحيد المناطق متاح فقط عند اختيار نمط "تطبيق على الكل"',
-            ], 422);
-        }
-        $policyCode = orange_delivery_fee_policy_normalize((string) ($policy['delivery_fee_policy'] ?? 'paid_all'));
-
-        $pdo->beginTransaction();
-        try {
-            orange_delivery_country_policy_save($pdo, $countryId, (float) $defaultFee, $policyCode, $applyMode);
-            if ($applyActiveAreas) {
-                $appliedCount = orange_delivery_apply_default_fee_to_active_areas($pdo, $countryId, (float) $defaultFee);
-            }
-            $pdo->commit();
-        } catch (Throwable $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-            throw $e;
-        }
-
-        $saved = orange_delivery_country_policy_read($pdo, $countryId);
-        if (!$applyActiveAreas) {
-            $msg = $applyMode === 'custom'
-                ? 'تم حفظ القيمة الأساسية ونمط التطبيق المخصص بدون توحيد للمناطق'
-                : 'تم حفظ القيمة الأساسية ونمط تطبيق الكل (بدون توحيد للمناطق)';
-        } else {
-            $msg = 'تم حفظ القيمة الأساسية وتطبيقها على ' . $appliedCount . ' منطقة نشطة';
-        }
-        json_response([
-            'success' => true,
-            'message' => $msg,
-            'data' => [
-                'default_delivery_fee' => (float) ($saved['default_delivery_fee'] ?? 0.0),
-                'delivery_fee_policy' => (string) ($saved['delivery_fee_policy'] ?? 'paid_all'),
-                'delivery_fee_apply_mode' => (string) ($saved['delivery_fee_apply_mode'] ?? 'all'),
-                'active_areas_count' => orange_delivery_areas_count_active($pdo, $countryId),
-                'applied_count' => $appliedCount,
-            ],
-        ]);
-    }
-
-    if ($action === 'save_custom_fee_group') {
-        if ($countryId <= 0) {
-            json_response(['success' => false, 'message' => 'الدولة غير محددة'], 422);
-        }
-        if (!orange_table_exists($pdo, 'delivery_areas')) {
-            json_response(['success' => false, 'message' => 'جدول المناطق غير جاهز'], 422);
-        }
-        if (
-            !orange_delivery_areas_has_governorate_column($pdo)
-            || !orange_delivery_governorates_table_exists($pdo)
-        ) {
-            json_response(['success' => false, 'message' => 'التطبيق المخصص يتطلب ربط المناطق بمحافظات'], 422);
-        }
-
-        $governorateId = (int) ($data['governorate_id'] ?? 0);
-        if ($governorateId <= 0) {
-            json_response(['success' => false, 'message' => 'اختر المحافظة أولاً'], 422);
-        }
-        $customFee = dp_money_non_negative($data['custom_delivery_fee'] ?? '', $moneyDecimals);
-        if ($customFee === null || $customFee <= 0.0) {
-            json_response(['success' => false, 'message' => 'قيمة التوصيل المخصص يجب أن تكون أكبر من صفر'], 422);
-        }
-        $areaIds = dp_int_id_list($data['delivery_area_ids'] ?? []);
-        if ($areaIds === []) {
-            json_response(['success' => false, 'message' => 'اختر منطقة واحدة على الأقل'], 422);
-        }
-
-        $validGovernorate = dp_valid_governorate_ids($pdo, $countryId, [$governorateId]);
-        if (count($validGovernorate) !== 1) {
-            json_response(['success' => false, 'message' => 'المحافظة غير صالحة لهذه الدولة'], 422);
-        }
-
-        $validAreaIds = dp_valid_area_ids($pdo, $countryId, $areaIds);
-        if (count($validAreaIds) !== count($areaIds)) {
-            json_response(['success' => false, 'message' => 'يوجد مناطق غير صالحة لهذه الدولة'], 422);
-        }
-
-        $validActiveAreaIds = dp_valid_active_area_ids_for_governorate($pdo, $countryId, $governorateId, $areaIds);
-        if (count($validActiveAreaIds) !== count($areaIds)) {
-            json_response([
-                'success' => false,
-                'message' => 'اختر مناطق نشطة داخل المحافظة المحددة فقط',
-            ], 422);
-        }
-
-        $fee = round((float) $customFee, max(0, min(4, $moneyDecimals)));
-        $ph = implode(',', array_fill(0, count($validActiveAreaIds), '?'));
-        $params = [$fee];
-        foreach ($validActiveAreaIds as $id) {
-            $params[] = $id;
-        }
-                $hasPendingCol = orange_delivery_areas_has_pending_fee_column($pdo);
-
-        $pdo->beginTransaction();
-        try {
-            $up = $pdo->prepare(
-                'UPDATE delivery_areas
-                         SET delivery_fee = ?' . ($hasPendingCol ? ', delivery_fee_pending = 0' : '') . '
-                 WHERE id IN (' . $ph . ')'
-            );
-            $up->execute($params);
-            $policy = orange_delivery_country_policy_read($pdo, $countryId);
-            $defaultFee = (float) ($policy['default_delivery_fee'] ?? 0.0);
-            $policyCode = orange_delivery_fee_policy_normalize((string) ($policy['delivery_fee_policy'] ?? 'paid_all'));
-            orange_delivery_country_policy_save($pdo, $countryId, $defaultFee, $policyCode, 'custom');
-            $pdo->commit();
-            $updatedCount = (int) $up->rowCount();
-        } catch (Throwable $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-            throw $e;
-        }
-
-        json_response([
-            'success' => true,
-            'message' => 'تم حفظ التطبيق المخصص على ' . $updatedCount . ' منطقة نشطة',
-            'data' => [
-                'governorate_id' => $governorateId,
-                'delivery_fee' => $fee,
-                'updated_count' => $updatedCount,
-            ],
         ]);
     }
 
