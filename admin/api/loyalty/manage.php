@@ -99,7 +99,7 @@ try {
         if ($customerId <= 0) {
             json_response(['success' => false, 'message' => 'حدّد العميل.'], 422);
         }
-        $balance = orange_loyalty_balance_points($pdo, $customerId);
+        $balance = orange_loyalty_balance_points($pdo, $customerId, $countryId > 0 ? $countryId : null);
         $st = $pdo->prepare(
             'SELECT id, kind, points, points_remaining, point_value, expires_at, ref_type, ref_id, memo, created_at
              FROM loyalty_ledger WHERE customer_id = ? ORDER BY id DESC LIMIT 100'

@@ -291,16 +291,20 @@ try {
     $loyaltyRedeemValue = 0.0;
     $loyaltyPayableBeforeRedeem = $goodsAfterPromo;
     if ($redeemPointsReq > 0 && $resolvedCustomerId > 0 && orange_loyalty_is_active($pdo, $orderCountryId)) {
-        $redeemInfo = orange_loyalty_redeemable($pdo, $resolvedCustomerId, $orderCountryId, $goodsAfterPromo);
-        $loyaltyRedeemPoints = min($redeemPointsReq, (int) $redeemInfo['points']);
-        if ($loyaltyRedeemPoints > 0) {
-            $loySet = orange_loyalty_settings($pdo, $orderCountryId);
-            $pv = $loySet !== null ? (float) $loySet['point_value'] : 0.0;
-            $loyaltyRedeemValue = round(min($loyaltyRedeemPoints * $pv, $goodsAfterPromo), 4);
-            if ($loyaltyRedeemValue <= 0.0001) {
-                $loyaltyRedeemPoints = 0;
-                $loyaltyRedeemValue = 0.0;
-            }
+        // معاينة مقفولة (FOR UPDATE): القيمة بأسعار الطبقات FIFO، وتُطابق ما سيُطبَّق فعلياً
+        // في نفس المعاملة — فيتطابق إجمالي الطلب مع بند الاستبدال في الفاتورة.
+        $prev = orange_loyalty_redemption_value_preview(
+            $pdo,
+            $resolvedCustomerId,
+            $orderCountryId,
+            $redeemPointsReq,
+            $goodsAfterPromo
+        );
+        $loyaltyRedeemPoints = (int) $prev['points'];
+        $loyaltyRedeemValue = round((float) $prev['value'], 4);
+        if ($loyaltyRedeemPoints <= 0 || $loyaltyRedeemValue <= 0.0001) {
+            $loyaltyRedeemPoints = 0;
+            $loyaltyRedeemValue = 0.0;
         }
     }
     $orderTotalFinal = max(0.0, round($goodsAfterPromo - $loyaltyRedeemValue, 4));

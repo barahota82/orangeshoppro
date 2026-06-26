@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 102);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 103);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3167,6 +3167,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_customer_addresses_v100($pdo);
     orange_catalog_migrate_delivery_gov_default_amounts_v101($pdo);
     orange_catalog_migrate_delivery_promo_first_delivered_v102($pdo);
+    orange_catalog_migrate_loyalty_ledger_unique_ref_v103($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3785,6 +3786,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_customer_addresses_v100($pdo);
     orange_catalog_migrate_delivery_gov_default_amounts_v101($pdo);
     orange_catalog_migrate_delivery_promo_first_delivered_v102($pdo);
+    orange_catalog_migrate_loyalty_ledger_unique_ref_v103($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -7259,7 +7261,8 @@ function orange_catalog_migrate_offer_gl_link_v95(PDO $pdo): void
                 KEY idx_loyalty_ledger_customer (customer_id, id),
                 KEY idx_loyalty_ledger_fifo (customer_id, kind, points_remaining, expires_at, id),
                 KEY idx_loyalty_ledger_expiry (kind, points_remaining, expires_at),
-                KEY idx_loyalty_ledger_ref (ref_type, ref_id)
+                KEY idx_loyalty_ledger_ref (ref_type, ref_id),
+                UNIQUE KEY uq_loyalty_ledger_ref (kind, ref_type, ref_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
         orange_schema_invalidate_table_exists('loyalty_ledger');
@@ -7764,6 +7767,33 @@ function orange_catalog_migrate_delivery_promo_first_delivered_v102(PDO $pdo): v
                 ADD COLUMN first_delivered_order_only TINYINT(1) NOT NULL DEFAULT 0' . $after
         );
         orange_schema_invalidate_column_check('delivery_fee_promotions', 'first_delivered_order_only');
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v103 — فهرس فريد على سجل الولاء لمنع تكرار قيود الكسب/الاستبدال/الانتهاء لنفس المرجع
+ * (idempotency على مستوى القاعدة، حارس أخير ضد سباق التزامن). الثلاثية (kind, ref_type, ref_id)
+ * فريدة في التصميم: كسب لكل طلب مرّة، استبدال لكل طلب مرّة، استرجاع لكل طلب مرّة، انتهاء لكل طبقة مرّة.
+ * marker-gated + idempotent؛ يُستدعى من المسار الكامل والمسار السريع (نفس درس v102).
+ */
+function orange_catalog_migrate_loyalty_ledger_unique_ref_v103(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_loyalty_ledger_unique_ref_v103';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'loyalty_ledger')) {
+        // safe_exec يبتلع الخطأ إن وُجد الفهرس مسبقاً أو تعذّر إنشاؤه بسبب تكرار قائم.
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE loyalty_ledger
+                ADD UNIQUE KEY uq_loyalty_ledger_ref (kind, ref_type, ref_id)'
+        );
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);
