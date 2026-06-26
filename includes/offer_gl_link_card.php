@@ -55,6 +55,7 @@ function orange_offer_gl_link_card_html(
     $glLabels = orange_gl_setting_key_labels();
 
     $rows = [];
+    $hasUnlinked = false;
 
     foreach ($systemKeys as $key) {
         $k = orange_invoice_ancillary_system_key_normalize($key);
@@ -84,6 +85,7 @@ function orange_offer_gl_link_card_html(
                 . '<td><strong style="color:#1b5e20;">' . $esc($accText) . '</strong></td>'
                 . '<td>بند فاتورة إضافي</td></tr>';
         } else {
+            $hasUnlinked = true;
             $rows[] = '<tr style="background:#fdecea;"><td>' . $esc($label) . '</td>'
                 . '<td>' . $invCell . '</td>'
                 . '<td><strong style="color:#b71c1c;">غير مربوط</strong> — '
@@ -109,6 +111,7 @@ function orange_offer_gl_link_card_html(
                 . '<td><strong style="color:#1b5e20;">' . $esc($accText) . '</strong></td>'
                 . '<td>قيد تلقائي</td></tr>';
         } else {
+            $hasUnlinked = true;
             $rows[] = '<tr style="background:#fdecea;"><td>' . $esc($label) . '</td>'
                 . '<td><span style="color:#9ca3af;">—</span></td>'
                 . '<td><strong style="color:#b71c1c;">غير مربوط</strong> — '
@@ -121,13 +124,24 @@ function orange_offer_gl_link_card_html(
         return '';
     }
 
+    // السهم مفتوح افتراضياً عند وجود حساب غير مربوط (تنبيه)، ومقفول عند اكتمال الربط.
+    // المستخدم يقدر يفتح/يقفل بالسهم في الحالتين.
+    $openAttr = $hasUnlinked ? ' open' : '';
+    $badge = $hasUnlinked
+        ? '<span style="color:#b71c1c;background:#fee2e2;font-size:.8em;font-weight:700;padding:2px 8px;border-radius:6px;">يوجد حساب غير مربوط</span>'
+        : '<span style="color:#166534;background:#dcfce7;font-size:.8em;font-weight:700;padding:2px 8px;border-radius:6px;">كل الحسابات مربوطة</span>';
+
     $html = '<div class="card">'
-        . '<h3>' . $esc($title) . '</h3>'
-        . '<div class="table-wrap"><table><thead><tr>'
+        . '<details class="ogl-link-card"' . $openAttr . '>'
+        . '<summary style="cursor:pointer;font-weight:700;font-size:1.05rem;">'
+        . $esc($title) . ' &nbsp;' . $badge
+        . '</summary>'
+        . '<div class="table-wrap" style="margin-top:12px;"><table><thead><tr>'
         . '<th>البند</th><th>المسمى على الفاتورة</th><th>الحساب المربوط</th><th>النوع</th>'
         . '</tr></thead><tbody>'
         . implode('', $rows)
-        . '</tbody></table></div></div>';
+        . '</tbody></table></div>'
+        . '</details></div>';
 
     return $html;
 }
