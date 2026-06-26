@@ -102,6 +102,9 @@ echo orange_offer_gl_link_card_html(
             <input type="text" id="dp_name_en" class="admin-inp" dir="ltr" lang="en" placeholder="Weekend delivery promo">
         </div>
     </div>
+    <div style="margin-top:8px;">
+        <button type="button" class="btn-secondary" onclick="dpTranslateOfferFromAr()">ترجمة تلقائية من العربي</button>
+    </div>
     <div class="dp-form-row" style="margin-top:12px;">
         <div class="dp-field" style="min-width:160px;">
             <label for="dp_discount_type">نوع الخصم</label>
@@ -187,6 +190,8 @@ echo orange_offer_gl_link_card_html(
     var DP_ROWS = [];
     var DP_FEE_SUMMARY = { governorates: [] };
     var DP_TREE_SEQ = 0;
+    var dpNameArTimer = null;
+    var dpNameEnTimer = null;
 
     function escDp(s) {
         return String(s == null ? '' : s)
@@ -751,8 +756,58 @@ echo orange_offer_gl_link_card_html(
         });
     }
 
+    async function dpTranslateNames(opts) {
+        var silent = !!(opts && opts.silent);
+        var forceFromArabic = !!(opts && opts.forceFromArabic);
+        var arEl = document.getElementById('dp_name_ar');
+        var enEl = document.getElementById('dp_name_en');
+        if (!arEl || !enEl) return;
+        try {
+            var res = await postJSON('/admin/api/translate/names.php', {
+                name_ar: arEl.value.trim(),
+                name_en: forceFromArabic ? '' : enEl.value.trim()
+            });
+            if (!res || !res.success) {
+                if (!silent) alert((res && res.message) ? res.message : 'فشل الترجمة');
+                return;
+            }
+            var t = res.translations || {};
+            if (t.name_en) enEl.value = t.name_en;
+        } catch (e) {
+            if (!silent) alert('فشل طلب الترجمة');
+        }
+    }
+
+    function dpScheduleNameFromAr() {
+        var arEl = document.getElementById('dp_name_ar');
+        var enEl = document.getElementById('dp_name_en');
+        if (!arEl) return;
+        if (arEl.value.trim() === '') {
+            if (enEl) enEl.value = '';
+            return;
+        }
+        clearTimeout(dpNameArTimer);
+        dpNameArTimer = setTimeout(function () {
+            dpTranslateNames({ silent: true, forceFromArabic: true });
+        }, 700);
+    }
+
+    function dpScheduleNameFromEn() {
+        var enEl = document.getElementById('dp_name_en');
+        if (!enEl || enEl.value.trim() === '') return;
+        clearTimeout(dpNameEnTimer);
+        dpNameEnTimer = setTimeout(function () {
+            dpTranslateNames({ silent: true, forceFromArabic: false });
+        }, 600);
+    }
+
+    async function dpTranslateOfferFromAr() {
+        await dpTranslateNames({ silent: false, forceFromArabic: true });
+    }
+
     window.resetDeliveryPromotionForm = resetDeliveryPromotionForm;
     window.saveDeliveryPromotion = saveDeliveryPromotion;
+    window.dpTranslateOfferFromAr = dpTranslateOfferFromAr;
 
     async function initDeliveryPromotionsPage() {
         var discountTypeEl = document.getElementById('dp_discount_type');
@@ -760,6 +815,10 @@ echo orange_offer_gl_link_card_html(
             return;
         }
         ocpBindAlwaysOn('dp');
+        var dpNameArEl = document.getElementById('dp_name_ar');
+        var dpNameEnEl = document.getElementById('dp_name_en');
+        if (dpNameArEl) dpNameArEl.addEventListener('input', dpScheduleNameFromAr);
+        if (dpNameEnEl) dpNameEnEl.addEventListener('input', dpScheduleNameFromEn);
         discountTypeEl.addEventListener('change', dpApplyDiscountTypeUi);
         dpFillDiscountTypeOptions('amount');
         dpBindTreeAll();
