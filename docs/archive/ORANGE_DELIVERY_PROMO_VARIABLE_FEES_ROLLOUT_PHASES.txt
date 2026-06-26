@@ -89,6 +89,11 @@ Last updated: 2026-06-25 (تحديث لاحق — انظر قسم «تحديث 2
 - **التنفيذ:**
   - العمود `delivery_fee_promotions.first_delivered_order_only TINYINT(1) DEFAULT 0`
     (`includes/catalog_schema.php` — CREATE + ترقية idempotent).
+    **إصلاح 2026-06-27:** ظهر خطأ `Unknown column 'first_delivered_order_only' in INSERT`
+    لأن العمود أُضيف بدون رفع `ORANGE_CATALOG_SCHEMA_PHP_REVISION`، فتأخذ القواعد المُهيّأة
+    المسار السريع وتتخطّى الترقية. الحل: رفع الـ revision (101 → 102) ليُعاد تشغيل كتلة
+    الترحيل الكاملة (idempotent) عند أول طلب. **تذكير: أي عمود/جدول جديد في الكتلة الكاملة
+    يستلزم رفع الـ revision وإلا لن يُطبَّق على القواعد القائمة.**
   - الحفظ/التعديل/العرض: `admin/api/delivery_promotions/manage.php` +
     `admin/pages/delivery_promotions.php` + قائمة `orange_delivery_promotions_admin_list`.
   - الاحتساب وقت الشراء: `orange_delivery_promotion_resolve_for_checkout` /
