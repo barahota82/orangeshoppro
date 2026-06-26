@@ -551,3 +551,176 @@ function orange_loyalty_expire_due(PDO $pdo, ?int $countryId = null): array
 
     return $out;
 }
+
+/**
+ * استرداد نقاط الكسب عند إرجاع طلب مُسلَّم (قرار مالك 2026-06-27): «النقاط تُكتسب على صافي
+ * الإنفاق، والمرتجع يقلّل الصافي». يُوزَّع المسحوب على ثلاث دِلاء بحسب وضع طبقة الكسب للطلب:
+ *   - متاح (R): نقاط لم تُصرَف بعد → تُسحب من الرصيد + عكس التزام (مدين التزام/دائن مصروف). لا نقد.
+ *   - مصروف (S): استُبدِلت فعلاً (أخذ العميل قيمتها) → تُسترَد نقداً كسطر على فاتورة المرتجع
+ *     (يُبنى لدى المستدعي بحساب «مصروف الولاء»). لا تعديل دفتر (النقاط رحلت).
+ *   - منتهٍ (E): انتهت بلا استخدام (عُكِس التزامها وقت الانتهاء، لم يأخذ العميل شيئاً) → تُتجاهَل.
+ * النقاط المسحوبة متناسبة مع قيمة المُرتَجَع: P = floor(returnedRevenue × earn_rate) محدودةً
+ * بمكتسب الطلب (متطابق مع معادلة الكسب)، ثم تُوزَّع على R/S/E بنسبة حصصها من المكتسب.
+ * idempotent عبر صف علامة (kind='return_clawback') + الفهرس الفريد (kind, ref_type, ref_id).
+ *
+ * @return array{available_points:int, available_value:float, spent_points:int, spent_value:float, expired_points:int, expense_account_id:int, point_value:float}
+ */
+function orange_loyalty_clawback_for_return(
+    PDO $pdo,
+    int $orderId,
+    int $returnId,
+    float $returnedRevenue,
+    ?int $countryId
+): array {
+    $zero = [
+        'available_points' => 0,
+        'available_value' => 0.0,
+        'spent_points' => 0,
+        'spent_value' => 0.0,
+        'expired_points' => 0,
+        'expense_account_id' => 0,
+        'point_value' => 0.0,
+    ];
+    if ($orderId <= 0 || $returnId <= 0 || $returnedRevenue <= 0.0001 || !orange_loyalty_tables_ready($pdo)) {
+        return $zero;
+    }
+
+    // idempotency: لا تكرار لاسترداد نفس المردود.
+    $done = $pdo->prepare(
+        "SELECT id FROM loyalty_ledger
+         WHERE kind = 'return_clawback' AND ref_type = 'sales_return' AND ref_id = ? LIMIT 1"
+    );
+    $done->execute([$returnId]);
+    if ($done->fetchColumn() !== false) {
+        return $zero;
+    }
+
+    // طبقة الكسب لهذا الطلب (الكسب مرّة واحدة لكل طلب) مع القفل.
+    $layerStmt = $pdo->prepare(
+        "SELECT id, country_id, customer_id, points, points_remaining, point_value
+         FROM loyalty_ledger
+         WHERE kind = 'earn' AND ref_type = 'order' AND ref_id = ? LIMIT 1 FOR UPDATE"
+    );
+    $layerStmt->execute([$orderId]);
+    $layer = $layerStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$layer) {
+        return $zero; // الطلب لم يكسب نقاطاً.
+    }
+    $layerId = (int) $layer['id'];
+    $earned = (int) $layer['points'];
+    $remaining = (int) $layer['points_remaining'];
+    $pv = (float) $layer['point_value'];
+    $layerCountry = (int) ($layer['country_id'] ?? 0);
+    $cid = $layerCountry > 0 ? $layerCountry : ($countryId !== null && $countryId > 0 ? $countryId : 0);
+    if ($earned <= 0) {
+        return $zero;
+    }
+
+    // المنتهي من هذه الطبقة (مجموع صفوف الانتهاء المرتبطة بها).
+    $expStmt = $pdo->prepare(
+        "SELECT COALESCE(SUM(-points), 0) FROM loyalty_ledger
+         WHERE kind = 'expire' AND ref_type = 'loyalty_layer' AND ref_id = ?"
+    );
+    $expStmt->execute([$layerId]);
+    $expired = (int) $expStmt->fetchColumn();
+    $spent = $earned - $remaining - $expired;
+    if ($spent < 0) {
+        $spent = 0;
+    }
+
+    $s = orange_loyalty_settings($pdo, $cid > 0 ? $cid : null);
+    $earnRate = $s !== null ? (float) $s['earn_rate'] : 0.0;
+    if ($earnRate <= 0) {
+        return $zero;
+    }
+    $toClaw = (int) floor($returnedRevenue * $earnRate);
+    if ($toClaw > $earned) {
+        $toClaw = $earned;
+    }
+    if ($toClaw <= 0) {
+        return $zero;
+    }
+
+    // توزيع متناسب على الدِلاء بحسب حصصها من المكتسب.
+    $clawAvail = (int) round($toClaw * $remaining / $earned);
+    if ($clawAvail > $remaining) {
+        $clawAvail = $remaining;
+    }
+    $clawSpent = (int) round($toClaw * $spent / $earned);
+    if ($clawSpent > $spent) {
+        $clawSpent = $spent;
+    }
+
+    // 1) المتاح: سحب من الرصيد + عكس الالتزام (لا نقد).
+    $availValue = 0.0;
+    if ($clawAvail > 0) {
+        $upd = $pdo->prepare(
+            'UPDATE loyalty_ledger SET points_remaining = points_remaining - ? WHERE id = ? AND points_remaining >= ?'
+        );
+        $upd->execute([$clawAvail, $layerId, $clawAvail]);
+        if ($upd->rowCount() >= 1) {
+            $availValue = round($clawAvail * $pv, 4);
+            $debitId = (int) (orange_gl_account_id_optional($pdo, 'loyalty_points_liability', $cid) ?? 0);
+            $creditId = (int) (orange_gl_account_id_optional($pdo, 'loyalty_program_expense', $cid) ?? 0);
+            $ruleAcc = orange_gl_rule_accounts_for_code($pdo, 'LYX', $cid);
+            if ($ruleAcc !== null) {
+                $debitId = (int) $ruleAcc['debit'];
+                $creditId = (int) $ruleAcc['credit'];
+            }
+            orange_loyalty_post_simple_gl(
+                $pdo,
+                $debitId,
+                $creditId,
+                $availValue,
+                $cid,
+                'قيد استرداد نقاط ولاء (متاحة) — مردود مبيعات',
+                'loyalty_return_clawback',
+                'sales_return',
+                $returnId,
+                'loyalty-return-clawback'
+            );
+        } else {
+            $clawAvail = 0;
+        }
+    }
+
+    // حساب «مصروف الولاء» للسطر النقدي لدى المستدعي (دائن عند استرداد المصروف).
+    $expenseAccId = (int) (orange_gl_account_id_optional($pdo, 'loyalty_program_expense', $cid) ?? 0);
+    $ruleAccLye = orange_gl_rule_accounts_for_code($pdo, 'LYE', $cid);
+    if ($ruleAccLye !== null) {
+        $expenseAccId = (int) $ruleAccLye['debit']; // مدين الكسب = حساب المصروف.
+    }
+    $spentValue = round($clawSpent * $pv, 4);
+
+    // 2) صف علامة (idempotency + تدقيق): يسجّل ما سُحب (متاح + مصروف) دون التأثير على الرصيد.
+    $insMark = $pdo->prepare(
+        "INSERT INTO loyalty_ledger
+            (country_id, customer_id, kind, points, points_remaining, point_value, expires_at, ref_type, ref_id, memo)
+         VALUES (?, ?, 'return_clawback', ?, 0, ?, NULL, 'sales_return', ?, ?)"
+    );
+    try {
+        $insMark->execute([
+            $cid > 0 ? $cid : null,
+            (int) $layer['customer_id'],
+            -($clawAvail + $clawSpent),
+            $pv,
+            $returnId,
+            'استرداد نقاط ولاء — مردود مبيعات (متاح ' . $clawAvail . ' / مصروف ' . $clawSpent . ')',
+        ]);
+    } catch (PDOException $e) {
+        if ($e->getCode() === '23000') {
+            return $zero; // سُجِّل بالفعل لمردود متزامن.
+        }
+        throw $e;
+    }
+
+    return [
+        'available_points' => $clawAvail,
+        'available_value' => $availValue,
+        'spent_points' => $clawSpent,
+        'spent_value' => $spentValue,
+        'expired_points' => max(0, $toClaw - $clawAvail - $clawSpent),
+        'expense_account_id' => $expenseAccId,
+        'point_value' => $pv,
+    ];
+}

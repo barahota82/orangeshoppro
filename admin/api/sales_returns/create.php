@@ -20,6 +20,7 @@ require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
 require_once __DIR__ . '/../../../includes/inventory_cost_layers.php';
+require_once __DIR__ . '/../../../includes/loyalty.php';
 require_admin_api();
 
 try {
@@ -221,6 +222,38 @@ try {
                 $line['price'],
                 $line['line_discount'],
             ]);
+        }
+    }
+
+    // استرداد نقاط ولاء مكتسبة من الطلب المُرتَجَع (متناسب مع قيمة المردود): سحب المتاح + عكس
+    // التزامه، واسترداد قيمة المصروف نقداً كسطر يقلّل المردود؛ المنتهي يُتجاهَل (لا ظلم).
+    if ($orderIdOpt > 0 && orange_loyalty_is_active($pdo, $returnCountryId)) {
+        $claw = orange_loyalty_clawback_for_return($pdo, $orderIdOpt, $returnId, (float) $revenueTotal, $returnCountryId);
+        if ((float) $claw['spent_value'] > 0.0001 && (int) $claw['expense_account_id'] > 0) {
+            $clawLineOk = false;
+            try {
+                orange_invoice_ancillary_assert_account_for_line(
+                    $pdo,
+                    (int) $claw['expense_account_id'],
+                    $returnCountryId,
+                    'sales_debit_contra',
+                    orange_invoice_ancillary_doc_kind_sales_return()
+                );
+                $clawLineOk = true;
+            } catch (Throwable $e) {
+                error_log('[orange] loyalty return clawback cash line skipped: ' . $e->getMessage());
+            }
+            if ($clawLineOk) {
+                $extraInput[] = [
+                    'account_id' => (int) $claw['expense_account_id'],
+                    'line_kind' => 'sales_debit_contra',
+                    'amount' => round((float) $claw['spent_value'], 4),
+                    'label_ar' => 'استرداد قيمة نقاط ولاء مصروفة (' . (int) $claw['spent_points'] . ' نقطة)',
+                    'show_on_print' => 1,
+                    'preset_id' => 0,
+                    'auto_loyalty_return' => 1,
+                ];
+            }
         }
     }
 
