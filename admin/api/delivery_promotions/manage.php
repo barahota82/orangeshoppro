@@ -531,19 +531,16 @@ try {
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $requiresRegistered = !empty($data['requires_registered_account']) ? 1 : 0;
         $firstDeliveredOnly = !empty($data['first_delivered_order_only']) ? 1 : 0;
-        $governorateIds = dp_int_id_list($data['target_governorate_ids'] ?? []);
+        // سياسة «اللقطة» الصارمة: الاستهداف بمعرّفات المناطق فقط.
+        // أي استهداف محافظة وارد يُتجاهَل (كان يضمّ المناطق الجديدة ديناميكياً) — لا يُخزَّن.
+        $validGovernorateIds = [];
         $areaIds = dp_int_id_list($data['target_area_ids'] ?? []);
-
-        $validGovernorateIds = dp_valid_governorate_ids($pdo, $countryId, $governorateIds);
         $validAreaIds = dp_valid_area_ids($pdo, $countryId, $areaIds);
-        if (count($validGovernorateIds) !== count($governorateIds)) {
-            json_response(['success' => false, 'message' => 'يوجد محافظات غير صالحة لهذه الدولة'], 422);
-        }
         if (count($validAreaIds) !== count($areaIds)) {
             json_response(['success' => false, 'message' => 'يوجد مناطق غير صالحة لهذه الدولة'], 422);
         }
-        // منع الحفظ بدون استهداف: العرض الفارغ يُطبَّق على كل المناطق (يخالف سياسة «اللقطة»).
-        if ($validGovernorateIds === [] && $validAreaIds === []) {
+        // منع الحفظ بدون استهداف مناطق: العرض الفارغ كان يُطبَّق على كل المناطق (مخالفة سياسة «اللقطة»).
+        if ($validAreaIds === []) {
             json_response([
                 'success' => false,
                 'message' => 'اختر نطاق العرض من جدول الاستهداف: «كل مناطق التوصيل» أو محافظة أو مناطق محددة قبل الحفظ.',

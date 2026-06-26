@@ -787,20 +787,15 @@ function orange_delivery_promotion_target_matches_area(
     array $areaTargets,
     array $governorateTargets
 ): bool {
-    if ($areaTargets === [] && $governorateTargets === []) {
-        return true;
-    }
-    if ($deliveryAreaId <= 0) {
+    // سياسة «اللقطة» (قرار مالك 2026-06-26/27) — تطبيق صارم:
+    // 1) لا «فارغ = الكل»: العرض بلا استهداف مناطق لا يُطبَّق على أي منطقة.
+    // 2) المطابقة بمعرّفات المناطق فقط — لا مطابقة ديناميكية بالمحافظة (كانت تضمّ
+    //    المناطق الجديدة تلقائياً). $governorateTargets يبقى للتوافق فقط ولا يُستخدم.
+    if ($areaTargets === [] || $deliveryAreaId <= 0) {
         return false;
     }
-    if ($areaTargets !== [] && in_array($deliveryAreaId, $areaTargets, true)) {
-        return true;
-    }
-    if ($governorateTargets !== [] && $governorateId > 0 && in_array($governorateId, $governorateTargets, true)) {
-        return true;
-    }
 
-    return false;
+    return in_array($deliveryAreaId, $areaTargets, true);
 }
 
 /**
