@@ -699,6 +699,11 @@ echo orange_offer_gl_link_card_html(
     }
 
     async function saveDeliveryPromotion() {
+        var selectedAreaIds = dpTreeSelectedAreaIds();
+        if (!selectedAreaIds.length) {
+            alert('اختر نطاق العرض من جدول الاستهداف: «كل مناطق التوصيل» أو محافظة أو مناطق محددة قبل الحفظ.');
+            return;
+        }
         var payload = {
             action: 'save',
             id: parseInt(document.getElementById('dp_id').value, 10) || 0,
@@ -713,7 +718,7 @@ echo orange_offer_gl_link_card_html(
             valid_from: ocpGetIso('dp_valid_from'),
             valid_to: ocpGetIso('dp_valid_to'),
             target_governorate_ids: [],
-            target_area_ids: dpTreeSelectedAreaIds()
+            target_area_ids: selectedAreaIds
         };
         var res = await postJSON('/admin/api/delivery_promotions/manage.php', payload);
         alert((res && res.message) || (res && res.success ? 'تم الحفظ' : 'فشل الحفظ'));

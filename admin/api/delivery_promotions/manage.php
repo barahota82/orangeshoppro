@@ -542,6 +542,13 @@ try {
         if (count($validAreaIds) !== count($areaIds)) {
             json_response(['success' => false, 'message' => 'يوجد مناطق غير صالحة لهذه الدولة'], 422);
         }
+        // منع الحفظ بدون استهداف: العرض الفارغ يُطبَّق على كل المناطق (يخالف سياسة «اللقطة»).
+        if ($validGovernorateIds === [] && $validAreaIds === []) {
+            json_response([
+                'success' => false,
+                'message' => 'اختر نطاق العرض من جدول الاستهداف: «كل مناطق التوصيل» أو محافظة أو مناطق محددة قبل الحفظ.',
+            ], 422);
+        }
 
         if ($id > 0) {
             try {
