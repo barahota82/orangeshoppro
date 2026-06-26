@@ -31,8 +31,7 @@ require_once __DIR__ . '/../../includes/offer_gl_link_card.php';
 echo orange_offer_gl_link_card_html(
     $pdo,
     ['loyalty_points_redemption'],
-    ['loyalty_program_expense', 'loyalty_points_liability'],
-    'الربط المحاسبي للولاء (للقراءة فقط)'
+    ['loyalty_program_expense', 'loyalty_points_liability']
 );
 ?>
 

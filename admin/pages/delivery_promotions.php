@@ -33,8 +33,7 @@ require_once __DIR__ . '/../../includes/offer_gl_link_card.php';
 echo orange_offer_gl_link_card_html(
     $pdo,
     ['delivery_fee_charge', 'delivery_fee_discount'],
-    ['delivery_expense', 'delivery_payable_default'],
-    'الربط المحاسبي للتوصيل (للقراءة فقط)'
+    ['delivery_expense', 'delivery_payable_default']
 );
 ?>
 
