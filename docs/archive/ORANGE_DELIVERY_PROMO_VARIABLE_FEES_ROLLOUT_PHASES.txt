@@ -89,11 +89,16 @@ Last updated: 2026-06-25 (تحديث لاحق — انظر قسم «تحديث 2
 - **التنفيذ:**
   - العمود `delivery_fee_promotions.first_delivered_order_only TINYINT(1) DEFAULT 0`
     (`includes/catalog_schema.php` — CREATE + ترقية idempotent).
-    **إصلاح 2026-06-27:** ظهر خطأ `Unknown column 'first_delivered_order_only' in INSERT`
-    لأن العمود أُضيف بدون رفع `ORANGE_CATALOG_SCHEMA_PHP_REVISION`، فتأخذ القواعد المُهيّأة
-    المسار السريع وتتخطّى الترقية. الحل: رفع الـ revision (101 → 102) ليُعاد تشغيل كتلة
-    الترحيل الكاملة (idempotent) عند أول طلب. **تذكير: أي عمود/جدول جديد في الكتلة الكاملة
-    يستلزم رفع الـ revision وإلا لن يُطبَّق على القواعد القائمة.**
+    **إصلاح 2026-06-27 (السبب الجذري):** ظهر خطأ `Unknown column 'first_delivered_order_only'
+    in INSERT`. السبب الحقيقي: العمود أُضيف **داخل دالة الترحيل v91** المحميّة بعلامة
+    (`php_delivery_promotions_invoice_lines_v91`) — وبما أن v91 طُبِّقت مسبقاً على القواعد
+    القائمة، ترجع الدالة مبكراً ولا تُطبّق الإضافة المستجدّة (رفع الـ revision لا يُجدي لأن
+    الترحيل محميّ بعلامة لا برقم النسخة). **الحل النهائي:** ترحيلة مستقلة جديدة
+    `orange_catalog_migrate_delivery_promo_first_delivered_v102` بعلامتها الخاصة
+    (`php_delivery_promo_first_delivered_v102`)، تُستدعى في **المسار الكامل وفي المسار السريع**
+    (الذي يعمل كل طلب) فتُطبّق العمود مرة واحدة على أي قاعدة. **درس إلزامي: لا تضِف عمود/جدول
+    إلى دالة ترحيل vNN مطبّقة مسبقاً (محميّة بعلامة) — أنشئ ترحيلة جديدة بعلامة جديدة، وادرجها
+    في قائمتَي الإرسال (الكامل + fast-path slice).**
   - الحفظ/التعديل/العرض: `admin/api/delivery_promotions/manage.php` +
     `admin/pages/delivery_promotions.php` + قائمة `orange_delivery_promotions_admin_list`.
   - الاحتساب وقت الشراء: `orange_delivery_promotion_resolve_for_checkout` /

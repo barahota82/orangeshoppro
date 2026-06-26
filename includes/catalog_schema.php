@@ -3166,6 +3166,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_advisory_sizing_clean_wipe_v99($pdo);
     orange_catalog_migrate_customer_addresses_v100($pdo);
     orange_catalog_migrate_delivery_gov_default_amounts_v101($pdo);
+    orange_catalog_migrate_delivery_promo_first_delivered_v102($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3783,6 +3784,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_advisory_sizing_clean_wipe_v99($pdo);
     orange_catalog_migrate_customer_addresses_v100($pdo);
     orange_catalog_migrate_delivery_gov_default_amounts_v101($pdo);
+    orange_catalog_migrate_delivery_promo_first_delivered_v102($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -7730,6 +7732,38 @@ function orange_catalog_migrate_delivery_gov_default_amounts_v101(PDO $pdo): voi
             );
             orange_schema_invalidate_column_check('delivery_areas', 'cost_follows_gov');
         }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v102 — عمود «أول طلب مُسلَّم» لعروض رسوم التوصيل.
+ *
+ * أُضيف العمود سابقاً داخل v91 (المُطبَّق مسبقاً بعلامة) فلم يُطبَّق على القواعد القائمة
+ * → خطأ Unknown column في INSERT. هذه الترحيلة المستقلة بعلامتها الخاصة تضمن تطبيقه مرة
+ * واحدة على أي قاعدة (idempotent عبر orange_table_has_column).
+ */
+function orange_catalog_migrate_delivery_promo_first_delivered_v102(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_delivery_promo_first_delivered_v102';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'delivery_fee_promotions')
+        && !orange_table_has_column($pdo, 'delivery_fee_promotions', 'first_delivered_order_only')) {
+        $after = orange_table_has_column($pdo, 'delivery_fee_promotions', 'requires_registered_account')
+            ? ' AFTER requires_registered_account'
+            : '';
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE delivery_fee_promotions
+                ADD COLUMN first_delivered_order_only TINYINT(1) NOT NULL DEFAULT 0' . $after
+        );
+        orange_schema_invalidate_column_check('delivery_fee_promotions', 'first_delivered_order_only');
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);
