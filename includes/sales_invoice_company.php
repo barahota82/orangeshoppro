@@ -482,6 +482,17 @@ function orange_sales_invoice_company_remove_forward_accounting(PDO $pdo, array 
             orange_voucher_delete_by_reference($pdo, (string) $ref, $countryArg);
         }
     }
+
+    // قيود تلقائية إضافية لا يغطّيها نمط -S-/-C-: مصروف التوصيل (لا حارس تكرار له → يتضاعف بدون
+    // إزالة) وكسب نقاط الولاء — تُزال/تُعكَس هنا كي يُعاد بناؤها بالقيم الجديدة عند إعادة الترحيل.
+    $vExp = orange_voucher_find_by_document($pdo, 'order', $orderId, 'order_delivery_expense', $countryArg, 'delivery-expense');
+    if ($vExp !== null) {
+        orange_voucher_delete_by_reference($pdo, (string) ($vExp['reference'] ?? ''), $countryArg);
+    }
+    orange_gl_pending_remove_by_reference($pdo, orange_gl_pending_source_key('order', $orderId, 'delivery-expense'));
+
+    require_once __DIR__ . '/loyalty.php';
+    orange_loyalty_reverse_earn_for_order($pdo, $orderId);
 }
 
 /**

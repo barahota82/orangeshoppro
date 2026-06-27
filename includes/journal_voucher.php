@@ -364,12 +364,27 @@ function orange_sales_return_remove_accounting(PDO $pdo, int $returnId, ?int $co
     $rs = 'SR-' . $returnId . '-RS';
     $rc = 'SR-' . $returnId . '-RC';
     if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
+        // أسطر البنود الإضافية للمردود تُرحَّل بمراجع «...:sale-EX{accId}» — تُحذف سنداتها المُرحَّلة
+        // وصفوف الطابور كي لا تتضاعف عند إعادة بناء التعديل (وكي لا تبقى يتيمة عند الحذف).
+        $exLike = orange_gl_pending_source_key('sales_return', $returnId, 'sale') . '-EX%';
+        $stEx = $pdo->prepare(
+            'SELECT DISTINCT journal_voucher_id FROM orange_gl_pending_movements
+             WHERE reference LIKE ? AND journal_voucher_id IS NOT NULL AND journal_voucher_id > 0'
+        );
+        $stEx->execute([$exLike]);
+        foreach (($stEx->fetchAll(PDO::FETCH_COLUMN) ?: []) as $exVid) {
+            $exV = orange_voucher_by_id($pdo, (int) $exVid);
+            if ($exV !== null) {
+                orange_voucher_delete_by_reference($pdo, (string) ($exV['reference'] ?? ''), $countryId);
+            }
+        }
         $pdo->prepare('DELETE FROM orange_gl_pending_movements WHERE reference IN (?,?,?,?)')->execute([
             $rs,
             $rc,
             orange_gl_pending_source_key('sales_return', $returnId, 'sale'),
             orange_gl_pending_source_key('sales_return', $returnId, 'cogs'),
         ]);
+        $pdo->prepare('DELETE FROM orange_gl_pending_movements WHERE reference LIKE ?')->execute([$exLike]);
     }
     orange_purchase_remove_accounting($pdo, $rs, $countryId);
     orange_purchase_remove_accounting($pdo, $rc, $countryId);
@@ -407,6 +422,53 @@ function orange_accounting_is_locked(PDO $pdo, ?array $row): bool
     }
 
     return orange_fiscal_is_closed_for_entry($pdo, $row);
+}
+
+/**
+ * يفحص كل القيود الأوتوماتيكية التابعة لمستند، ويُعيد «مسمّى القيد (مرجعه)» لأوّل قيد مرتبط بسنة
+ * مالية مغلقة، أو null إن لم يكن أيٌّ منها مغلقاً. يُستخدم لمنع التعديل/الحذف برسالة موحّدة تُسمّي
+ * القيد المغلق المطلوب فكّه (قرار المالك: القيود الأوتوماتيكية تُعدَّل بالخلفية ما لم تكن مغلقة،
+ * وحينها يُمنع التعديل بتسمية القيد ورقمه). بما أنّ قيود المستند الواحد تتشارك تاريخ المستند وفترته،
+ * فإغلاق أيٍّ منها يعني إغلاقها جميعاً؛ ومع ذلك نمرّ على القائمة لإظهار الاسم الصحيح.
+ *
+ * @param list<array{entry_type?:string,suffix?:string,label:string}> $specs
+ */
+function orange_gl_first_locked_document_voucher_label(
+    PDO $pdo,
+    string $refType,
+    int $refId,
+    array $specs,
+    ?int $countryId = null,
+    ?string $legacyReference = null
+): ?string {
+    $legacyTried = false;
+    foreach ($specs as $spec) {
+        $et = trim((string) ($spec['entry_type'] ?? ''));
+        $suffix = (string) ($spec['suffix'] ?? '');
+        $label = trim((string) ($spec['label'] ?? $et));
+        $vRow = orange_voucher_find_by_document(
+            $pdo,
+            $refType,
+            $refId,
+            $et !== '' ? $et : null,
+            $countryId,
+            $suffix
+        );
+        if ($vRow === null && !$legacyTried && $legacyReference !== null && trim($legacyReference) !== '') {
+            $vRow = orange_accounting_row_by_reference($pdo, trim($legacyReference));
+            $legacyTried = true;
+        }
+        if (orange_accounting_is_locked($pdo, $vRow)) {
+            $num = trim((string) ($vRow['reference'] ?? ''));
+            if ($num === '') {
+                $num = '#' . (int) ($vRow['id'] ?? 0);
+            }
+
+            return $label . ' (' . $num . ')';
+        }
+    }
+
+    return null;
 }
 
 /** SQL fragment: exclude voided journal vouchers from GL totals (§9.6). */

@@ -186,12 +186,21 @@ try {
         }
     }
 
-    $accRow = orange_voucher_find_by_document($pdo, 'purchase', $purchaseId, 'purchase', $purchaseCountryId > 0 ? $purchaseCountryId : null)
-        ?? orange_accounting_row_by_reference($pdo, 'PUR-' . $purchaseId);
-    if (orange_accounting_is_locked($pdo, $accRow)) {
+    $lockedVoucherLabel = orange_gl_first_locked_document_voucher_label(
+        $pdo,
+        'purchase',
+        $purchaseId,
+        [
+            ['entry_type' => 'purchase', 'label' => 'قيد الشراء'],
+            ['entry_type' => 'purchase_receive', 'suffix' => 'receive', 'label' => 'قيد استلام المشتريات'],
+        ],
+        $purchaseCountryId > 0 ? $purchaseCountryId : null,
+        'PUR-' . $purchaseId
+    );
+    if ($lockedVoucherLabel !== null) {
         json_response([
             'success' => false,
-            'message' => 'لا يمكن تعديل أو حذف شراء مرتبط بسنة مالية مغلقة',
+            'message' => 'لا يمكن التعديل قبل فكّ القيد المغلق: ' . $lockedVoucherLabel,
             'suggest_admin' => orange_gl_suggest_admin_fiscal_years_screen(),
         ], 422);
     }

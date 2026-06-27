@@ -219,6 +219,61 @@ function orange_loyalty_earn_for_order(PDO $pdo, array $order, int $countryId, f
 }
 
 /**
+ * عكس «كسب نقاط» طلب (عند إعادة بناء محاسبة الطلب عند تعديل فاتورة الشركة): يحذف طبقة الكسب وقيدها
+ * المُرحَّل ليُعاد إنشاؤها بقيمة صافي البيع الجديدة. حارس أمان: إن استُهلِكت الطبقة (استبدال) أو انتهت
+ * أو سُحب منها استرداد مردود (points_remaining ≠ points) لا نحذفها حتى لا نُفسد رصيد العميل — يبقى
+ * الكسب القديم كما هو (متسقاً مع ما صُرف) ويُسجَّل تنبيه.
+ */
+function orange_loyalty_reverse_earn_for_order(PDO $pdo, int $orderId): void
+{
+    if ($orderId <= 0 || !orange_loyalty_tables_ready($pdo)) {
+        return;
+    }
+    $st = $pdo->prepare(
+        "SELECT id, country_id, points, points_remaining
+         FROM loyalty_ledger
+         WHERE kind = 'earn' AND ref_type = 'order' AND ref_id = ? LIMIT 1 FOR UPDATE"
+    );
+    $st->execute([$orderId]);
+    $layer = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$layer) {
+        return; // لم يكسب الطلب نقاطاً.
+    }
+    $layerId = (int) $layer['id'];
+    $points = (int) $layer['points'];
+    $remaining = (int) $layer['points_remaining'];
+    $cid = (int) ($layer['country_id'] ?? 0);
+
+    if ($remaining !== $points) {
+        error_log('[orange] loyalty earn reverse skipped (layer consumed/clawed) order=' . $orderId);
+
+        return;
+    }
+    $expChk = $pdo->prepare(
+        "SELECT 1 FROM loyalty_ledger
+         WHERE kind = 'expire' AND ref_type = 'loyalty_layer' AND ref_id = ? LIMIT 1"
+    );
+    $expChk->execute([$layerId]);
+    if ($expChk->fetchColumn() !== false) {
+        error_log('[orange] loyalty earn reverse skipped (layer expired) order=' . $orderId);
+
+        return;
+    }
+
+    // حذف قيد الكسب (السند المُرحَّل عبر الطابور + صف الطابور).
+    $v = orange_voucher_find_by_document($pdo, 'order', $orderId, 'loyalty_earn', $cid > 0 ? $cid : null, 'loyalty-earn');
+    if ($v !== null) {
+        orange_voucher_delete_by_reference($pdo, (string) ($v['reference'] ?? ''), $cid > 0 ? $cid : null);
+    }
+    if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
+        $pdo->prepare('DELETE FROM orange_gl_pending_movements WHERE reference = ?')
+            ->execute([orange_gl_pending_source_key('order', $orderId, 'loyalty-earn')]);
+    }
+    // حذف صف الكسب كي يُعاد إنشاؤه بقيمة جديدة عند إعادة الترحيل.
+    $pdo->prepare('DELETE FROM loyalty_ledger WHERE id = ?')->execute([$layerId]);
+}
+
+/**
  * نواة حساب الاستبدال (FIFO): تمشي على طبقات الكسب من الأقدم انتهاءً، وتُقيّم كل طبقة
  * بسعر نقطتها المسجَّل لحظة الكسب (point_value للطبقة) — لا بسعر الإعدادات الحالي — حتى
  * يتطابق خصم الاستبدال مع الالتزام المُرحَّل ويصفر صافي حساب الالتزام بلا انجراف عند تغيّر
@@ -693,16 +748,19 @@ function orange_loyalty_clawback_for_return(
     $spentValue = round($clawSpent * $pv, 4);
 
     // 2) صف علامة (idempotency + تدقيق): يسجّل ما سُحب (متاح + مصروف) دون التأثير على الرصيد.
+    // ملاحظة: نُخزّن «المتاح المسحوب» في points_remaining ليكون الجزء القابل للعكس عند التعديل/الحذف
+    // (دالة orange_loyalty_reverse_clawback_for_return). استعلام الرصيد يقتصر على kind='earn' فلا يتأثر.
     $insMark = $pdo->prepare(
         "INSERT INTO loyalty_ledger
             (country_id, customer_id, kind, points, points_remaining, point_value, expires_at, ref_type, ref_id, memo)
-         VALUES (?, ?, 'return_clawback', ?, 0, ?, NULL, 'sales_return', ?, ?)"
+         VALUES (?, ?, 'return_clawback', ?, ?, ?, NULL, 'sales_return', ?, ?)"
     );
     try {
         $insMark->execute([
             $cid > 0 ? $cid : null,
             (int) $layer['customer_id'],
             -($clawAvail + $clawSpent),
+            $clawAvail,
             $pv,
             $returnId,
             'استرداد نقاط ولاء — مردود مبيعات (متاح ' . $clawAvail . ' / مصروف ' . $clawSpent . ')',
@@ -723,4 +781,62 @@ function orange_loyalty_clawback_for_return(
         'expense_account_id' => $expenseAccId,
         'point_value' => $pv,
     ];
+}
+
+/**
+ * عكس استرداد نقاط الولاء لمردود مبيعات (عند تعديله أو حذفه): يُعيد النقاط المتاحة المسحوبة إلى طبقة
+ * كسب الطلب، ويحذف قيد استرداد الالتزام (قائمة الانتظار + السند المُرحَّل عبرها)، ثم يحذف صف العلامة
+ * كي يُعاد احتساب الاسترداد على القيمة الجديدة عند إعادة البناء. النقاط «المصروفة» لا تُعاد للطبقة
+ * (لم تُسحب منها أصلاً — عُولِجت نقداً كسطر على الفاتورة يُلغى تلقائياً بإعادة بناء البنود الإضافية).
+ */
+function orange_loyalty_reverse_clawback_for_return(PDO $pdo, int $returnId): void
+{
+    if ($returnId <= 0 || !orange_loyalty_tables_ready($pdo)) {
+        return;
+    }
+    $m = $pdo->prepare(
+        "SELECT id, country_id, points_remaining
+         FROM loyalty_ledger
+         WHERE kind = 'return_clawback' AND ref_type = 'sales_return' AND ref_id = ? LIMIT 1 FOR UPDATE"
+    );
+    $m->execute([$returnId]);
+    $marker = $m->fetch(PDO::FETCH_ASSOC);
+    if (!$marker) {
+        return; // لا استرداد سابق لهذا المردود.
+    }
+    $availPoints = (int) ($marker['points_remaining'] ?? 0);
+    $cid = (int) ($marker['country_id'] ?? 0);
+
+    // إعادة النقاط المتاحة المسحوبة إلى طبقة كسب الطلب.
+    if ($availPoints > 0) {
+        $oid = $pdo->prepare('SELECT order_id FROM sales_returns WHERE id = ? LIMIT 1');
+        $oid->execute([$returnId]);
+        $orderId = (int) ($oid->fetchColumn() ?: 0);
+        if ($orderId > 0) {
+            $pdo->prepare(
+                "UPDATE loyalty_ledger SET points_remaining = points_remaining + ?
+                 WHERE kind = 'earn' AND ref_type = 'order' AND ref_id = ?"
+            )->execute([$availPoints, $orderId]);
+        }
+    }
+
+    // حذف قيد استرداد الالتزام (المتاح) — السند المُرحَّل عبر الطابور + صف الطابور نفسه.
+    $v = orange_voucher_find_by_document(
+        $pdo,
+        'sales_return',
+        $returnId,
+        'loyalty_return_clawback',
+        $cid > 0 ? $cid : null,
+        'loyalty-return-clawback'
+    );
+    if ($v !== null) {
+        orange_voucher_delete_by_reference($pdo, (string) ($v['reference'] ?? ''), $cid > 0 ? $cid : null);
+    }
+    if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
+        $pdo->prepare('DELETE FROM orange_gl_pending_movements WHERE reference = ?')
+            ->execute([orange_gl_pending_source_key('sales_return', $returnId, 'loyalty-return-clawback')]);
+    }
+
+    // حذف صف العلامة كي يُعاد الاسترداد عند إعادة البناء.
+    $pdo->prepare('DELETE FROM loyalty_ledger WHERE id = ?')->execute([(int) $marker['id']]);
 }

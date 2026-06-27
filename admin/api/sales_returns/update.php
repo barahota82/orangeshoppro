@@ -17,6 +17,9 @@ require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
 require_once __DIR__ . '/../../../includes/inventory_cost_layers.php';
+require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
+require_once __DIR__ . '/../../../includes/loyalty.php';
+require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_admin_api();
 
 function reverse_sales_return_stock(PDO $pdo, int $returnId): void
@@ -161,12 +164,25 @@ try {
         json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
-    $accRow = orange_voucher_find_by_document($pdo, 'sales_return', $returnId, 'order_return_sale', null, 'sale')
-        ?? orange_accounting_row_by_reference($pdo, 'SR-' . $returnId . '-RS');
-    if (orange_accounting_is_locked($pdo, $accRow)) {
+    // فحص إغلاق كل القيود التابعة للمستند (مردود البيع + تكلفة المردود + استرداد نقاط الولاء):
+    // قيود التعديل أوتوماتيكية، تُستدعى وتُعاد بناؤها بالخلفية — لكن إن كان أيٌّ منها مرتبطاً بسنة
+    // مالية مغلقة يُمنع التعديل/الحذف مع تسمية القيد ورقمه المطلوب فكّه أولاً.
+    $lockedVoucherLabel = orange_gl_first_locked_document_voucher_label(
+        $pdo,
+        'sales_return',
+        $returnId,
+        [
+            ['entry_type' => 'order_return_sale', 'suffix' => 'sale', 'label' => 'قيد مردود المبيعات'],
+            ['entry_type' => 'order_return_cogs', 'suffix' => 'cogs', 'label' => 'قيد تكلفة المردود'],
+            ['entry_type' => 'loyalty_return_clawback', 'suffix' => 'loyalty-return-clawback', 'label' => 'قيد استرداد نقاط الولاء'],
+        ],
+        null,
+        'SR-' . $returnId . '-RS'
+    );
+    if ($lockedVoucherLabel !== null) {
         json_response([
             'success' => false,
-            'message' => 'لا يمكن تعديل أو حذف مردود مرتبط بسنة مالية مغلقة',
+            'message' => 'لا يمكن التعديل قبل فكّ القيد المغلق: ' . $lockedVoucherLabel,
             'suggest_admin' => orange_gl_suggest_admin_fiscal_years_screen(),
         ], 422);
     }
@@ -176,6 +192,10 @@ try {
     // FIFO م3: حذف طبقات هذا المردود (تُعاد بناءً على البنود الجديدة، أو تبقى محذوفة عند الحذف).
     orange_inventory_cost_layers_delete_for_source($pdo, 'sale_return', $returnId);
     $pdo->prepare('DELETE FROM sales_return_items WHERE sales_return_id = ?')->execute([$returnId]);
+
+    // عكس استرداد نقاط الولاء السابق (إن وُجد): إعادة المتاح لطبقة الكسب + حذف قيد الاسترداد وعلامته.
+    // يُعاد احتسابه على القيمة الجديدة في مسار التعديل؛ وفي الحذف يبقى ملغى (لا مردود → لا استرداد).
+    orange_loyalty_reverse_clawback_for_return($pdo, $returnId);
 
     if ($action === 'delete') {
         orange_sales_return_remove_accounting($pdo, $returnId);
@@ -273,6 +293,66 @@ try {
     $pendingRev = orange_gl_pending_source_key('sales_return', $returnId, 'sale');
     $pendingCogs = orange_gl_pending_source_key('sales_return', $returnId, 'cogs');
 
+    // البنود الإضافية للمردود (VAT/شحن/خصم + سطر استرداد نقاط الولاء النقدي): تُعاد بناؤها على القيمة
+    // الجديدة كما في مسار الإنشاء، حتى لا يسقط أثرها المحاسبي ولا تبقى أسطر طباعة قديمة بعد التعديل.
+    $extraInput = orange_invoice_ancillary_parse_request_lines(
+        $data,
+        orange_invoice_ancillary_doc_kind_sales_return()
+    );
+
+    // استرداد نقاط الولاء على القيمة الجديدة (السابق عُكِس قبل إعادة البناء): سحب المتاح + عكس التزامه،
+    // واسترداد قيمة المصروف نقداً كسطر يقلّل المردود؛ المنتهي يُتجاهَل (لا ظلم).
+    if ($orderIdOpt > 0 && orange_loyalty_is_active($pdo, $updCountryId)) {
+        $claw = orange_loyalty_clawback_for_return($pdo, $orderIdOpt, $returnId, (float) $revenueTotal, $updCountryId);
+        if ((float) $claw['spent_value'] > 0.0001 && (int) $claw['expense_account_id'] > 0) {
+            $clawLineOk = false;
+            try {
+                orange_invoice_ancillary_assert_account_for_line(
+                    $pdo,
+                    (int) $claw['expense_account_id'],
+                    $updCountryId,
+                    'sales_debit_contra',
+                    orange_invoice_ancillary_doc_kind_sales_return()
+                );
+                $clawLineOk = true;
+            } catch (Throwable $e) {
+                error_log('[orange] loyalty return clawback cash line skipped (update): ' . $e->getMessage());
+            }
+            if ($clawLineOk) {
+                $extraInput[] = [
+                    'account_id' => (int) $claw['expense_account_id'],
+                    'line_kind' => 'sales_debit_contra',
+                    'amount' => round((float) $claw['spent_value'], 4),
+                    'label_ar' => 'استرداد قيمة نقاط ولاء مصروفة (' . (int) $claw['spent_points'] . ' نقطة)',
+                    'show_on_print' => 1,
+                    'preset_id' => 0,
+                    'auto_loyalty_return' => 1,
+                ];
+            }
+        }
+    }
+
+    if (orange_invoice_ancillary_tables_ready($pdo)) {
+        $extraInput = orange_invoice_ancillary_merge_auto_vat(
+            $pdo,
+            orange_invoice_ancillary_doc_kind_sales_return(),
+            $updCountryId,
+            (float) $revenueTotal,
+            $extraInput
+        );
+        orange_invoice_ancillary_extra_lines_replace_for_doc(
+            $pdo,
+            orange_invoice_ancillary_doc_kind_sales_return(),
+            $returnId,
+            $updCountryId,
+            $extraInput
+        );
+    }
+    $extraRows = orange_invoice_ancillary_extra_lines_journal_rows($extraInput);
+    $extraTotals = orange_invoice_ancillary_extra_lines_totals($extraInput);
+    $extraDelta = round((float) $extraTotals['credit'] - (float) $extraTotals['debit'], 4);
+    $customerRefundTotal = round($revenueTotal + $extraDelta, 4);
+
     if ($revenueTotal > 0.0001) {
         $glRev = orange_gl_sales_return_revenue_bundle($pdo, $channel, $customerId, $returnId, $revenueTotal);
         $afterJson = $glRev['after_post'] !== null
@@ -301,7 +381,52 @@ try {
                 'entry_type' => 'order_return_sale',
             ]);
             if ($glRev['legacy_ar_subledger']) {
-                orange_sales_return_record_ar_subledger($pdo, $returnId, $customerId, $channel, $revenueTotal);
+                orange_sales_return_record_ar_subledger($pdo, $returnId, $customerId, $channel, $customerRefundTotal);
+            }
+        }
+
+        /* بنود إضافية (VAT/شحن/خصم/استرداد نقاط) — أسطر GL عكسية مقابل حساب النقد/الذمة نفسه. */
+        foreach ($extraRows as $jr) {
+            $accId = (int) ($jr['account_id'] ?? 0);
+            $memo = trim((string) ($jr['memo'] ?? 'بند مردود'));
+            if ($accId <= 0) {
+                continue;
+            }
+            if ((float) ($jr['credit'] ?? 0) > 0.0001) {
+                $exDebit = $accId;
+                $exCredit = (int) $glRev['credit'];
+                $exAmount = round((float) $jr['credit'], 4);
+            } elseif ((float) ($jr['debit'] ?? 0) > 0.0001) {
+                $exDebit = (int) $glRev['credit'];
+                $exCredit = $accId;
+                $exAmount = round((float) $jr['debit'], 4);
+            } else {
+                continue;
+            }
+            if ($exDebit === $exCredit || $exAmount <= 0.0001) {
+                continue;
+            }
+            if (orange_gl_use_pending_queue($pdo)) {
+                orange_gl_pending_enqueue_simple($pdo, [
+                    'reference' => $pendingRev . '-EX' . $accId,
+                    'source_label' => $retNum,
+                    'movement_at' => $now,
+                    'voucher_date' => $now,
+                    'account_debit' => $exDebit,
+                    'account_credit' => $exCredit,
+                    'amount' => $exAmount,
+                    'description' => 'مردود — ' . $memo,
+                    'entry_type' => 'order_return_sale',
+                ]);
+            } else {
+                orange_journal_insert_line($pdo, [
+                    'date' => $now,
+                    'account_debit' => $exDebit,
+                    'account_credit' => $exCredit,
+                    'amount' => $exAmount,
+                    'description' => 'مردود — ' . $memo,
+                    'entry_type' => 'order_return_sale',
+                ]);
             }
         }
     }

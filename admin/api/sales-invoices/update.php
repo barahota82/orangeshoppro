@@ -56,20 +56,41 @@ try {
 
     $orderNumber = trim((string) ($order['order_number'] ?? ''));
     if ($orderNumber !== '' && orange_order_fulfillment_vouchers_exist($pdo, $orderNumber, $orderCountryId > 0 ? $orderCountryId : null)) {
-        $refs = orange_gl_voucher_select_references_like(
-            $pdo,
-            'ORDER-' . $orderNumber . '-S-%',
-            $orderCountryId > 0 ? $orderCountryId : null
-        );
-        foreach ($refs as $ref) {
-            $v = orange_voucher_by_reference($pdo, (string) $ref, $orderCountryId > 0 ? $orderCountryId : null);
-            if ($v && orange_accounting_is_locked($pdo, $v)) {
-                json_response([
-                    'success' => false,
-                    'message' => 'لا يمكن تعديل فاتورة مرتبطة بسنة مالية مغلقة',
-                    'suggest_admin' => orange_gl_suggest_admin_fiscal_years_screen(),
-                ], 422);
+        $invCountryArg = $orderCountryId > 0 ? $orderCountryId : null;
+        // قيود المبيعات/التكلفة قد تكون متعددة (سند لكل سطر) → نفحص كل المراجع بالنمط ونُسمّي المغلق.
+        $patternLabels = [
+            'ORDER-' . $orderNumber . '-S-%' => 'قيد المبيعات',
+            'ORDER-' . $orderNumber . '-C-%' => 'قيد تكلفة المبيعات',
+        ];
+        $lockedInvLabel = null;
+        foreach ($patternLabels as $pat => $patLabel) {
+            foreach (orange_gl_voucher_select_references_like($pdo, $pat, $invCountryArg) as $ref) {
+                $v = orange_voucher_by_reference($pdo, (string) $ref, $invCountryArg);
+                if ($v && orange_accounting_is_locked($pdo, $v)) {
+                    $lockedInvLabel = $patLabel . ' (' . (string) $ref . ')';
+                    break 2;
+                }
             }
+        }
+        // القيود التلقائية المفردة: مصروف التوصيل + كسب نقاط الولاء.
+        if ($lockedInvLabel === null) {
+            $lockedInvLabel = orange_gl_first_locked_document_voucher_label(
+                $pdo,
+                'order',
+                $orderId,
+                [
+                    ['entry_type' => 'order_delivery_expense', 'suffix' => 'delivery-expense', 'label' => 'قيد مصروف التوصيل'],
+                    ['entry_type' => 'loyalty_earn', 'suffix' => 'loyalty-earn', 'label' => 'قيد كسب نقاط الولاء'],
+                ],
+                $invCountryArg
+            );
+        }
+        if ($lockedInvLabel !== null) {
+            json_response([
+                'success' => false,
+                'message' => 'لا يمكن التعديل قبل فكّ القيد المغلق: ' . $lockedInvLabel,
+                'suggest_admin' => orange_gl_suggest_admin_fiscal_years_screen(),
+            ], 422);
         }
     }
 

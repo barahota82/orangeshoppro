@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/purchase_return_helpers.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
@@ -158,12 +159,20 @@ try {
         json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
-    $accRow = orange_voucher_find_by_document($pdo, 'purchase_return', $returnId, 'purchase_return')
-        ?? orange_accounting_row_by_reference($pdo, 'PR-' . $returnId);
-    if (orange_accounting_is_locked($pdo, $accRow)) {
+    $lockedVoucherLabel = orange_gl_first_locked_document_voucher_label(
+        $pdo,
+        'purchase_return',
+        $returnId,
+        [
+            ['entry_type' => 'purchase_return', 'label' => 'قيد مردود المشتريات'],
+        ],
+        null,
+        'PR-' . $returnId
+    );
+    if ($lockedVoucherLabel !== null) {
         json_response([
             'success' => false,
-            'message' => 'لا يمكن تعديل أو حذف مردود مرتبط بسنة مالية مغلقة',
+            'message' => 'لا يمكن التعديل قبل فكّ القيد المغلق: ' . $lockedVoucherLabel,
             'suggest_admin' => orange_gl_suggest_admin_fiscal_years_screen(),
         ], 422);
     }
@@ -308,6 +317,9 @@ try {
         $sc->execute([$supplierId]);
         $returnCountryId = (int) ($sc->fetchColumn() ?: $returnCountryId);
     }
+
+    // منع إعادة الترحيل داخل فترة مالية مغلقة (اتساقاً مع باقي المستندات).
+    orange_fiscal_require_open_for_posting($pdo, date('Y-m-d H:i:s'), $returnCountryId > 0 ? $returnCountryId : null);
 
     $glB = orange_gl_purchase_return_posting_bundle($pdo, $type, $supplierId, $returnId, $newTotal, $returnCountryId);
     // عكس خصم الفاتورة المكتسب بحصة المردود (قيد مركّب) — دون مسّ تكلفة المخزن.
