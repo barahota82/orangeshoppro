@@ -380,6 +380,8 @@ $sr2DocSerialPreview = $sr2NavReady
         <button type="button" class="btn-secondary" id="sr2_btn_add_extra">إضافة بند</button>
     </div>
 
+    <div id="sr2_loyalty_clawback_note" style="display:none;margin-top:10px;padding:8px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:0.9rem;color:#9a3412;line-height:1.7;"></div>
+
     <div class="jv-print-hide" style="margin-top:14px;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
         <span style="color:#64748b;">إجمالي الأصناف:</span> <strong id="sr2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
         <span style="color:#64748b;">خصم الأصناف:</span> <strong id="sr2_discount_total" class="admin-money-display" dir="ltr" lang="en" style="color:#b91c1c;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
@@ -963,6 +965,7 @@ $sr2DocSerialPreview = $sr2NavReady
             return;
         }
         var o = res.order;
+        sr2SetLoyaltyClawbackNote(null);
         var oid = parseInt(String(o.id || '0'), 10) || 0;
         var hid = document.getElementById('sr2_order_id');
         if (hid) hid.value = oid > 0 ? String(oid) : '0';
@@ -1100,6 +1103,7 @@ $sr2DocSerialPreview = $sr2NavReady
             syncTrailing();
         }
         sr2LoadExtraLines(res.extra_lines || []);
+        sr2SetLoyaltyClawbackNote(res.loyalty_clawback || null);
         recalcAll();
         sr2SetViewMode(true);
         if (sr2EditLockCtl) sr2EditLockCtl.refresh();
@@ -1264,6 +1268,19 @@ $sr2DocSerialPreview = $sr2NavReady
     function sr2LoadExtraLines(lines) {
         sr2ClearExtraLines();
         (lines || []).forEach(function (row) { sr2AddExtraLine(row); });
+    }
+
+    function sr2SetLoyaltyClawbackNote(cb) {
+        var el = document.getElementById('sr2_loyalty_clawback_note');
+        if (!el) return;
+        var tp = cb ? (parseInt(String(cb.total_points || '0'), 10) || 0) : 0;
+        if (tp > 0) {
+            el.textContent = 'ملاحظة ولاء: تم استرداد ' + tp + ' نقطة كانت مكتسبة من الطلب المرتبط، بسبب هذا المردود.';
+            el.style.display = '';
+        } else {
+            el.textContent = '';
+            el.style.display = 'none';
+        }
     }
 
     function sr2CollectExtraLines() {

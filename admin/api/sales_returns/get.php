@@ -107,4 +107,16 @@ json_response([
         orange_invoice_ancillary_doc_kind_sales_return(),
         $returnId
     ),
+    'loyalty_clawback' => (static function (PDO $pdo, int $returnId): array {
+        if (!orange_table_exists($pdo, 'loyalty_ledger')) {
+            return ['total_points' => 0];
+        }
+        $st = $pdo->prepare(
+            "SELECT COALESCE(SUM(-points), 0) FROM loyalty_ledger
+             WHERE kind = 'return_clawback' AND ref_type = 'sales_return' AND ref_id = ?"
+        );
+        $st->execute([$returnId]);
+
+        return ['total_points' => (int) $st->fetchColumn()];
+    })($pdo, $returnId),
 ]);
