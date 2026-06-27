@@ -89,7 +89,6 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
             <input type="checkbox" id="ofr_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
         </label>
     </div>
-    <p class="card-hint" style="margin:6px 0 0;color:#64748b;">اسم العرض يظهر للعميل كشارة على بطاقة المنتج في الكتالوج فقط عند تفعيل «السماح بظهور الاسم»؛ وإلا تظهر كلمة «عروض» العامة.</p>
     <div class="form-grid" style="margin-top:12px;">
         <div style="grid-column:1/-1;">
             <label>المنتج</label>
