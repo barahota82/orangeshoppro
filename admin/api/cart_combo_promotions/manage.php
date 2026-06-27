@@ -111,6 +111,31 @@ try {
             json_response(['success' => false, 'message' => $chainErr], 422);
         }
 
+        // منع بيع الحزمة تحت التكلفة: سعر الحزمة الواحدة يجب ألا يقل عن إجمالي تكلفة مكوّناتها
+        // (تكلفة المنتج الأساسية products.cost × الكمية). قرار مالك 2026-06-27 — يسري على شاشات
+        // العروض التي تبيع منتجات (عروض المنتجات + الكومبو)؛ لا يسري على الهدية/BOGO (هدايا بسعر صفر).
+        if (orange_table_has_column($pdo, 'products', 'cost')) {
+            $uniquePids = array_values(array_unique($pids));
+            $costPlaceholders = implode(',', array_fill(0, count($uniquePids), '?'));
+            $costStmt = $pdo->prepare('SELECT id, cost FROM products WHERE id IN (' . $costPlaceholders . ')');
+            $costStmt->execute($uniquePids);
+            $costMap = [];
+            foreach ($costStmt->fetchAll(PDO::FETCH_ASSOC) as $costRow) {
+                $costMap[(int) $costRow['id']] = (float) ($costRow['cost'] ?? 0);
+            }
+            $totalCost = 0.0;
+            foreach ($comps as $c) {
+                $totalCost += ($costMap[(int) $c['product_id']] ?? 0.0) * (int) $c['qty'];
+            }
+            $totalCost = round($totalCost, 4);
+            if ($totalCost > 0 && $comboPrice < $totalCost - 0.00001) {
+                json_response([
+                    'success' => false,
+                    'message' => 'سعر الحزمة أقل من إجمالي تكلفة مكوّناتها الأساسية — غير مسموح. ارفع سعر الحزمة.',
+                ], 422);
+            }
+        }
+
         $json = orange_cart_promo_encode_components_json($comps);
 
         try {

@@ -52,12 +52,11 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <input type="checkbox" id="ccp_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
         </label>
     </div>
-    <div class="form-grid" style="margin-top:12px;">
-        <div><label>سعر الحزمة الواحدة (د.ك)</label><input type="text" id="ccp_price" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="9.5"></div>
-        <?php $ocpFieldPrefix = 'ccp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
-        <div style="grid-column:1/-1;">
-            <label>منتجات الحزمة</label>
-            <div style="margin:6px 0 8px;">
+    <div class="ccp-split" style="margin-top:14px;">
+        <!-- النصف الأيمن: مكوّنات الحزمة + مراجعة التكلفة قبل تسعير الحزمة -->
+        <div class="ccp-half">
+            <h4 style="margin:0 0 10px;">منتجات الحزمة</h4>
+            <div style="margin:0 0 8px;">
                 <button type="button" class="btn-secondary" id="ccp_add_product_btn">إضافة منتج (دبل كليك من القائمة)</button>
             </div>
             <div class="table-wrap">
@@ -66,16 +65,41 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                     <tbody id="ccp_comp_body"></tbody>
                 </table>
             </div>
+            <div class="ccp-facts" style="margin-top:12px;">
+                <div class="ccp-fact"><span>إجمالي تكلفة المكوّنات (للحزمة)</span><b id="ccp_fact_cost" dir="ltr">—</b></div>
+                <div class="ccp-fact"><span>إجمالي سعر بيعها منفصلة</span><b id="ccp_fact_retail" dir="ltr">—</b></div>
+                <div class="ccp-fact ccp-fact-after"><span>سعر الحزمة</span><b id="ccp_fact_price" dir="ltr">—</b></div>
+            </div>
+            <p id="ccp_below_cost_warn" style="display:none;margin:10px 0 0;color:#dc2626;font-weight:700;">⚠ سعر الحزمة أقل من إجمالي تكلفة مكوّناتها — غير مسموح بالحفظ.</p>
         </div>
-        <div style="grid-column:1/-1;display:flex;flex-wrap:wrap;gap:20px;align-items:center;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="ccp_reg"> <strong>للمسجّلين فقط</strong>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="ccp_first_delivered"> <strong>أول طلب مُسلَّم</strong>
-            </label>
+
+        <!-- النصف الأيسر: السعر والفترة والأهلية -->
+        <div class="ccp-half">
+            <h4 style="margin:0 0 10px;">السعر والفترة</h4>
+            <div class="form-grid">
+                <div style="grid-column:1/-1;"><label>سعر الحزمة الواحدة (د.ك)</label><input type="text" id="ccp_price" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="9.5"></div>
+            </div>
+            <?php $ocpFieldPrefix = 'ccp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
+            <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:center;margin-top:10px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="ccp_reg"> <strong>للمسجّلين فقط</strong>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="ccp_first_delivered"> <strong>أول طلب مُسلَّم</strong>
+                </label>
+            </div>
         </div>
     </div>
+    <style>
+    .ccp-split { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .ccp-half { border:1px solid #e2e8f0; border-radius:10px; padding:14px; background:#f8fafc; }
+    .ccp-facts { display:flex; flex-direction:column; gap:6px; }
+    .ccp-fact { display:flex; justify-content:space-between; gap:12px; padding:6px 10px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; }
+    .ccp-fact span { color:#64748b; }
+    .ccp-fact b { font-variant-numeric:tabular-nums; }
+    .ccp-fact-after b { color:#0f766e; }
+    @media (max-width: 720px) { .ccp-split { grid-template-columns:1fr; } }
+    </style>
     <div class="admin-form-actions">
         <button type="button" onclick="saveCartComboPromotion()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ</button>
         <button type="button" class="btn-secondary" onclick="resetCartComboPromotionForm()">جديد</button>
@@ -150,6 +174,62 @@ function ccpFmtComps(comps) {
     }).join(' + ');
 }
 
+var CCP_MONEY_DECIMALS = 3;
+
+function ccpFmtMoney(v) {
+    if (v == null || isNaN(v)) return '—';
+    return Number(v).toFixed(CCP_MONEY_DECIMALS) + ' د.ك';
+}
+
+function ccpPickMeta(pid) {
+    var id = parseInt(pid, 10) || 0;
+    for (var i = 0; i < (CCP_PICK_ROWS || []).length; i++) {
+        if (parseInt(CCP_PICK_ROWS[i].product_id, 10) === id) {
+            return CCP_PICK_ROWS[i];
+        }
+    }
+    return null;
+}
+
+function ccpParseMoney(v) {
+    var raw = String(v == null ? '' : v).trim().replace(',', '.');
+    if (raw === '') return 0;
+    var n = parseFloat(raw);
+    return (isFinite(n) && n >= 0) ? n : 0;
+}
+
+// يحسب إجمالي تكلفة وسعر المكوّنات للحزمة الواحدة، ويحدّث المعاينة + تنبيه ما دون التكلفة.
+// يُرجِع true إذا الحالة سليمة للحفظ (سعر الحزمة >= إجمالي التكلفة وكل التكاليف معروفة).
+function ccpRenderFacts() {
+    var comps = ccpCompRows();
+    var totalCost = 0;
+    var totalRetail = 0;
+    var costKnown = true;
+    comps.forEach(function (c) {
+        var meta = ccpPickMeta(c.product_id);
+        var qty = parseInt(c.qty, 10) || 0;
+        if (!meta || meta.cost == null || meta.cost === '') {
+            costKnown = false;
+        } else {
+            totalCost += Number(meta.cost) * qty;
+        }
+        if (meta && meta.price != null && meta.price !== '') {
+            totalRetail += Number(meta.price) * qty;
+        }
+    });
+    var comboPrice = ccpParseMoney(document.getElementById('ccp_price').value);
+    var costEl = document.getElementById('ccp_fact_cost');
+    var retailEl = document.getElementById('ccp_fact_retail');
+    var priceEl = document.getElementById('ccp_fact_price');
+    var warnEl = document.getElementById('ccp_below_cost_warn');
+    if (costEl) costEl.textContent = comps.length ? (costKnown ? ccpFmtMoney(totalCost) : '— غير مكتمل') : '—';
+    if (retailEl) retailEl.textContent = comps.length ? ccpFmtMoney(totalRetail) : '—';
+    if (priceEl) priceEl.textContent = comboPrice > 0 ? ccpFmtMoney(comboPrice) : '—';
+    var below = costKnown && comps.length > 0 && comboPrice > 0 && comboPrice < (totalCost - 1e-9);
+    if (warnEl) warnEl.style.display = below ? 'block' : 'none';
+    return !below;
+}
+
 function ccpCompRows() {
     var tb = document.getElementById('ccp_comp_body');
     if (!tb) return [];
@@ -183,8 +263,11 @@ function ccpAddCompRow(c) {
         '<td>' + (c.product_name ? String(c.product_name) : '') + '</td>' +
         '<td><input type="number" class="ccp-qty admin-inp-qty" min="1" step="1" value="' + (parseInt(c.qty, 10) || 1) + '" style="width:5rem;"></td>' +
         '<td><button type="button" class="btn-secondary ccp-rm">&times;</button></td>';
-    tr.querySelector('.ccp-rm').addEventListener('click', function () { tr.remove(); });
+    tr.querySelector('.ccp-rm').addEventListener('click', function () { tr.remove(); ccpRenderFacts(); });
+    var qtyEl = tr.querySelector('.ccp-qty');
+    if (qtyEl) qtyEl.addEventListener('input', ccpRenderFacts);
     tb.appendChild(tr);
+    ccpRenderFacts();
 }
 
 function ccpOpenPick() {
@@ -207,6 +290,7 @@ function resetCartComboPromotionForm() {
     document.getElementById('ccp_active').checked = true;
     ocpSetAlwaysOn('ccp', false);
     ocpDefaultScheduleDates('ccp');
+    ccpRenderFacts();
 }
 
 function editCartComboPromotion(row) {
@@ -223,6 +307,7 @@ function editCartComboPromotion(row) {
     ocpSetDmyFromIso('ccp_valid_from', row.valid_from);
     ocpSetDmyFromIso('ccp_valid_to', row.valid_to);
     ccpRenderComps(row.components || []);
+    ccpRenderFacts();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -324,6 +409,10 @@ async function loadCartComboPromotions() {
 }
 
 async function saveCartComboPromotion() {
+    if (!ccpRenderFacts()) {
+        alert('سعر الحزمة أقل من إجمالي تكلفة مكوّناتها — ارفع سعر الحزمة قبل الحفظ.');
+        return;
+    }
     var res = await postJSON('/admin/api/cart_combo_promotions/manage.php', {
         action: 'save',
         id: parseInt(document.getElementById('ccp_id').value, 10) || 0,
@@ -386,6 +475,10 @@ async function loadCartComboAlwaysOnHistory() {
     if (enEl) enEl.addEventListener('input', ccpScheduleNameFromEn);
 })();
 document.getElementById('ccp_add_product_btn').addEventListener('click', ccpOpenPick);
+(function () {
+    var priceEl = document.getElementById('ccp_price');
+    if (priceEl) priceEl.addEventListener('input', ccpRenderFacts);
+})();
 ocpBindAlwaysOn('ccp');
 ocpDefaultScheduleDates('ccp');
 loadCartComboPromotions();
