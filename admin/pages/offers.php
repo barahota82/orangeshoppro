@@ -116,18 +116,19 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
                     <input type="number" id="discount" class="admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr">
                 </div>
                 <div>
+                    <label>&nbsp;</label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;height:38px;">
+                        <input type="checkbox" id="ofr_always_on">
+                        <span><strong>التفعيل الدائم</strong></span>
+                    </label>
+                </div>
+                <div>
                     <label for="ofr_valid_from">بداية العرض <span dir="ltr">*</span></label>
                     <input type="text" id="ofr_valid_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
                 </div>
                 <div>
                     <label for="ofr_valid_to">نهاية العرض <span dir="ltr">*</span></label>
                     <input type="text" id="ofr_valid_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
-                </div>
-                <div style="grid-column:1/-1;">
-                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;max-width:22rem;">
-                        <input type="checkbox" id="ofr_always_on">
-                        <span><strong>التفعيل الدائم</strong></span>
-                    </label>
                 </div>
             </div>
         </div>
