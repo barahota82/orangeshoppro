@@ -60,8 +60,17 @@ try {
 
     $offerId = (int) ($data['id'] ?? 0);
     if ($offerId > 0) {
+        // دولة العرض = دولة منتجه (العرض مرتبط بمنتج واحد، والمنتج تابع لدولة واحدة؛ الجدول offers
+        // بلا country_id بالتصميم). نتحقق من دولة المنتج الحالي للعرض قبل التعديل لمنع إعادة توجيه
+        // عرض يخص دولة أخرى — لأن orange_admin_assert_entity_country لا يدعم الكيان 'offers'.
+        $existingOffer = $pdo->prepare('SELECT product_id FROM offers WHERE id = ? LIMIT 1');
+        $existingOffer->execute([$offerId]);
+        $existingOfferPid = (int) ($existingOffer->fetchColumn() ?: 0);
+        if ($existingOfferPid <= 0) {
+            json_response(['success' => false, 'message' => 'العرض غير موجود'], 404);
+        }
         try {
-            orange_admin_assert_entity_country($pdo, 'offers', $offerId);
+            orange_admin_assert_entity_country($pdo, 'products', $existingOfferPid);
         } catch (RuntimeException $e) {
             json_response(['success' => false, 'message' => $e->getMessage()], 403);
         }

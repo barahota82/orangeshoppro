@@ -1,6 +1,7 @@
 ORANGE — رؤية المالك: تعدد الدول والقنوات والجغرافيا
 ========================================================
 آخر تحديث: 2026-05-20 (+ بند 13؛ **v44–v60**؛ **مرحلة 19 منفّذة**؛ فصل الدول **15–19 مكتمل**)
+آخر تحديث: 2026-06-27 (مراجعة ربط الدولة لشاشات العروض الخمس: عروض السلة الأربع سليمة؛ إغلاق ثغرة assert ميت في عروض المنتجات — انظر §13)
 الحالة: **قرارات مالك مُثبَّتة** — **بند 13 مراحل 1–19 منفّذة**؛ فصل الدول الكامل (§15) **مغلق**؛ التالي **تشغيل** (تفعيل دول جديدة §10).
 
 الغرض
@@ -179,6 +180,17 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 **تنفيذ (13 — مرحلة 10 — طابور الطلبات + سندات المورد + backfill):** **`orange_order_intake_sql_country_scope`** + **`orange_admin_assert_order_intake_id`** في **`includes/order_intake_queue.php`**؛ فلترة شاشة/APIs الطابور (**`order_intake_queue`**, **`retry`**, **`delete`**, **`cleanup`**, **`retry-bulk-failed`**, **`export-csv`**, **`process-next`** scoped)؛ **`orange_gl_voucher_country_bind`** على **`partners/supplier-payment-list`** و**`supplier-payment-search`**؛ **`customers/backfill-orders`** + **`orange_ensure_customer(..., countryId)`** scoped بالدولة.
 
 **تنفيذ (13 — مرحلة 11 — عروض السلة + قنوات + مردودات):** ترحيل **`orange_catalog_migrate_country_cart_promotions_v48`** (`country_id` على **`cart_promotions`**, **`cart_gift_promotions`**, **`cart_bogo_promotions`**, **`cart_combo_promotions`**)؛ **`includes/cart_promotion_country.php`** + فلترة/حفظ scoped في **`admin/api/cart_*_promotions/manage.php`** و**`includes/cart_*.php`**؛ فلترة **`admin/pages/offers.php`** و**`channels.php`**؛ **`orange_admin_assert_row_country`** على **`channels/toggle-active`**؛ assert على **`sales_returns/get`** و**`purchase_returns/get`**؛ فلترة قائمة **`sales_returns`** الأخيرة بالدولة.
+
+**تنفيذ (13 — مراجعة شاشات العروض الخمس — 2026-06-27):** تدقيق ربط الدولة لجميع شاشات العروض المتبقية:
+**عروض السلة الأربع** (`cart_promotions`, `cart_combo_promotions`, `cart_bogo_promotions`, `cart_gift_promotions`)
+سليمة بالكامل — ختم `country_id` عند الإدراج عبر `orange_cart_promotion_prepare_admin_save`، assert على
+التعديل، فلترة قائمة الأدمن ومطابقة الواجهة وقت التشغيل عبر `orange_cart_promotion_sql_bind`، وassert منتجات
+البنود الداخلية (`orange_cart_promo_validate_product_ids`). **شاشة عروض المنتجات** (`offers`) — الجدول **بلا
+`country_id` بالتصميم** (العرض مرتبط بمنتج واحد والمنتج تابع لدولة واحدة → المنتج مصدر الحقيقة للدولة؛ القائمة
+والتطبيق وقت التشغيل مفلترتان عبر `products.country_id`). **ثغرة أُغلقت:** كان `orange_admin_assert_entity_country
+($pdo,'offers',$offerId)` على التعديل **كوداً ميتاً** (`offers` ليست في قائمة الكيانات المسموحة + لا عمود
+`country_id`) — استُبدِل بجلب `product_id` للعرض القائم وassert دولة منتجه قبل `UPDATE` (admin/api/offers/save.php)
+لمنع إعادة توجيه عرض يخص دولة أخرى. لا توجد مسارات `delete`/`toggle` لهذه الجداول (الحذف عبر تتالي حذف المنتج).
 
 **تنفيذ (13 — مرحلة 12 — assert تشغيلي):** **`channels/save`** (assert + قفل **`country_id`** لسياق الأدمن)؛ **`orders/create-manual`** (قناة + منتجات + عميل آجل)؛ **`delivery_areas/manage`** (assert على تعديل محافظة/منطقة)؛ **`sales_returns/update`** و**`purchase_returns/update`** (assert عميل/طلب/مورد/شراء + منتجات البنود).
 
