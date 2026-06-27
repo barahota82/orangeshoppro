@@ -43,8 +43,11 @@ $hasTable = orange_table_exists($pdo, 'cart_promotions');
             <input type="text" id="cp_name_en" class="admin-inp" dir="ltr" lang="en" placeholder="Weekend cart discount">
         </div>
     </div>
-    <div style="margin-top:8px;">
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:18px;align-items:center;">
         <button type="button" class="btn-secondary" onclick="cpTranslateOfferFromAr()">ترجمة تلقائية من العربي</button>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="cp_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
+        </label>
     </div>
     <div class="form-grid" style="margin-top:12px;">
         <div><label>الحد الأدنى لمجموع السلة (د.ك)</label><input type="text" id="cp_min" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="10"></div>
@@ -117,6 +120,7 @@ function resetCartPromotionForm() {
     document.getElementById('cp_id').value = '0';
     document.getElementById('cp_name_ar').value = '';
     document.getElementById('cp_name_en').value = '';
+    document.getElementById('cp_show_name').checked = false;
     document.getElementById('cp_min').value = '';
     document.getElementById('cp_disc').value = '';
     document.getElementById('cp_sort').value = '0';
@@ -131,6 +135,7 @@ function editCartPromotion(row) {
     document.getElementById('cp_id').value = String(row.id != null ? row.id : 0);
     document.getElementById('cp_name_ar').value = row.name_ar != null ? String(row.name_ar) : '';
     document.getElementById('cp_name_en').value = row.name_en != null ? String(row.name_en) : '';
+    document.getElementById('cp_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
     document.getElementById('cp_min').value = row.min_subtotal != null ? String(row.min_subtotal) : '';
     document.getElementById('cp_disc').value = row.discount_amount != null ? String(row.discount_amount) : '';
     document.getElementById('cp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
@@ -239,6 +244,7 @@ async function saveCartPromotion() {
         id: parseInt(document.getElementById('cp_id').value, 10) || 0,
         name_ar: document.getElementById('cp_name_ar').value.trim(),
         name_en: document.getElementById('cp_name_en').value.trim(),
+        show_name_to_customer: document.getElementById('cp_show_name').checked ? 1 : 0,
         min_subtotal: document.getElementById('cp_min').value.trim(),
         discount_amount: document.getElementById('cp_disc').value.trim(),
         requires_registered_account: document.getElementById('cp_reg').checked ? 1 : 0,

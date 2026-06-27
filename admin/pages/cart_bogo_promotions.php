@@ -93,8 +93,11 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <input type="text" id="cbp_name_en" class="admin-inp" dir="ltr" lang="en" placeholder="Buy 2 get 1">
         </div>
     </div>
-    <div style="margin-top:8px;">
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:18px;align-items:center;">
         <button type="button" class="btn-secondary" onclick="cbpTranslateOfferFromAr()">ترجمة تلقائية من العربي</button>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="cbp_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
+        </label>
     </div>
     <div class="form-grid">
         <div style="grid-column:1/-1;">
@@ -428,6 +431,7 @@ function resetCartBogoPromotionForm() {
     document.getElementById('cbp_id').value = '0';
     document.getElementById('cbp_name_ar').value = '';
     document.getElementById('cbp_name_en').value = '';
+    document.getElementById('cbp_show_name').checked = false;
     document.getElementById('cbp_cat').value = '';
     document.getElementById('cbp_minbuy').value = '2';
     document.getElementById('cbp_sort').value = '0';
@@ -452,6 +456,7 @@ function editCartBogoPromotion(row) {
     document.getElementById('cbp_id').value = String(row.id != null ? row.id : 0);
     document.getElementById('cbp_name_ar').value = row.name_ar != null ? String(row.name_ar) : '';
     document.getElementById('cbp_name_en').value = row.name_en != null ? String(row.name_en) : '';
+    document.getElementById('cbp_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
     let bk = 'same_variant';
     if ((row.bogo_kind || '') === 'same_category') {
         bk = 'same_category';
@@ -619,6 +624,7 @@ async function saveCartBogoPromotion() {
         category_id: parseInt(document.getElementById('cbp_cat').value, 10) || 0,
         name_ar: document.getElementById('cbp_name_ar').value.trim(),
         name_en: document.getElementById('cbp_name_en').value.trim(),
+        show_name_to_customer: document.getElementById('cbp_show_name').checked ? 1 : 0,
         min_buy_qty: parseInt(document.getElementById('cbp_minbuy').value, 10) || 2,
         requires_registered_account: document.getElementById('cbp_reg').checked ? 1 : 0,
         first_delivered_order_only: document.getElementById('cbp_first_delivered').checked ? 1 : 0,

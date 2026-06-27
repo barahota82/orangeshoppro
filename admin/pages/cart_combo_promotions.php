@@ -46,8 +46,11 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <input type="text" id="ccp_title_en" class="admin-inp" dir="ltr" lang="en" placeholder="Weekend combo">
         </div>
     </div>
-    <div style="margin-top:8px;">
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:18px;align-items:center;">
         <button type="button" class="btn-secondary" onclick="ccpTranslateOfferFromAr()">ترجمة تلقائية من العربي</button>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="ccp_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
+        </label>
     </div>
     <div class="form-grid" style="margin-top:12px;">
         <div><label>سعر الحزمة الواحدة (د.ك)</label><input type="text" id="ccp_price" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="9.5"></div>
@@ -185,6 +188,7 @@ function resetCartComboPromotionForm() {
     document.getElementById('ccp_id').value = '0';
     document.getElementById('ccp_title_ar').value = '';
     document.getElementById('ccp_title_en').value = '';
+    document.getElementById('ccp_show_name').checked = false;
     document.getElementById('ccp_price').value = '';
     document.getElementById('ccp_sort').value = '0';
     ccpRenderComps([]);
@@ -199,6 +203,7 @@ function editCartComboPromotion(row) {
     document.getElementById('ccp_id').value = String(row.id != null ? row.id : 0);
     document.getElementById('ccp_title_ar').value = row.title_ar != null ? String(row.title_ar) : '';
     document.getElementById('ccp_title_en').value = row.title_en != null ? String(row.title_en) : '';
+    document.getElementById('ccp_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
     document.getElementById('ccp_price').value = row.combo_price != null ? String(row.combo_price) : '';
     document.getElementById('ccp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
     document.getElementById('ccp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
@@ -310,6 +315,7 @@ async function saveCartComboPromotion() {
         id: parseInt(document.getElementById('ccp_id').value, 10) || 0,
         title_ar: document.getElementById('ccp_title_ar').value,
         title_en: document.getElementById('ccp_title_en').value,
+        show_name_to_customer: document.getElementById('ccp_show_name').checked ? 1 : 0,
         combo_price: document.getElementById('ccp_price').value,
         requires_registered_account: document.getElementById('ccp_reg').checked ? 1 : 0,
         first_delivered_order_only: document.getElementById('ccp_first_delivered').checked ? 1 : 0,

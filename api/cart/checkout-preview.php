@@ -145,6 +145,7 @@ try {
         $giftPayload['gift_unit_charge_kind'] = (string) ($giftRule['gift_unit_charge_kind'] ?? 'free');
         $giftPayload['gift_unit_charge_value'] = (float) ($giftRule['gift_unit_charge_value'] ?? 0);
         $giftPayload['preview_max_gift_unit_charge'] = $thresholdGiftChargePreview;
+        $giftPayload['display_name'] = (string) ($giftRule['display_name'] ?? '');
     }
 
     $bogoGiftChargePreview = 0.0;
@@ -153,6 +154,7 @@ try {
         $bogoPayload['gift_unit_charge_kind'] = (string) ($bogoRule['gift_unit_charge_kind'] ?? 'free');
         $bogoPayload['gift_unit_charge_value'] = (float) ($bogoRule['gift_unit_charge_value'] ?? 0);
         $bogoPayload['preview_max_gift_unit_charge'] = $bogoGiftChargePreview;
+        $bogoPayload['display_name'] = (string) ($bogoRule['display_name'] ?? '');
     }
     $deliveryAreaId = (int) ($data['delivery_area_id'] ?? 0);
     $deliveryFeeBase = 0.0;
@@ -182,6 +184,7 @@ try {
                 'id' => (int) ($deliveryPromotion['id'] ?? 0),
                 'name_ar' => (string) ($deliveryPromotion['name_ar'] ?? ''),
                 'name_en' => (string) ($deliveryPromotion['name_en'] ?? ''),
+                'display_name' => orange_promo_customer_display_name($deliveryPromotion),
                 'discount_type' => (string) ($deliveryPromotion['discount_type'] ?? 'amount'),
                 'discount_value' => (float) ($deliveryPromotion['discount_value'] ?? 0.0),
                 'discount_amount' => (float) ($deliveryPromotion['discount_amount'] ?? 0.0),
@@ -236,8 +239,10 @@ try {
         'subtotal' => $subtotal,
         'combo_promotion_id' => $comboId,
         'combo_discount' => $comboDiscount,
+        'combo_display_name' => $comboPick !== null ? (string) ($comboPick['display_name'] ?? '') : '',
         'promotion_id' => $promo !== null ? (int) $promo['id'] : null,
         'promotion_discount' => $promoDiscount,
+        'promotion_display_name' => $promo !== null ? (string) ($promo['display_name'] ?? '') : '',
         'product_offer_discount' => $productOfferDiscount,
         'delivery_area_id' => $deliveryAreaId > 0 ? $deliveryAreaId : null,
         'delivery_fee_base' => $deliveryFeeBase,

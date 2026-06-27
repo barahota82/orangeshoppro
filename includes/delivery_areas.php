@@ -665,8 +665,11 @@ function orange_delivery_promotions_admin_list(PDO $pdo, int $countryId): array
     $firstDeliveredSelect = $hasFirstDeliveredColumn
         ? 'first_delivered_order_only'
         : '0 AS first_delivered_order_only';
+    $showNameSelect = orange_table_has_column($pdo, 'delivery_fee_promotions', 'show_name_to_customer')
+        ? 'show_name_to_customer'
+        : '0 AS show_name_to_customer';
     $st = $pdo->prepare(
-        'SELECT id, country_id, name_ar, name_en, discount_type, discount_value,
+        'SELECT id, country_id, name_ar, name_en, ' . $showNameSelect . ', discount_type, discount_value,
                 requires_registered_account, ' . $firstDeliveredSelect . ', valid_from, valid_to, sort_order, is_active, is_always_on
          FROM delivery_fee_promotions
          WHERE country_id = ?
@@ -720,6 +723,7 @@ function orange_delivery_promotions_admin_list(PDO $pdo, int $countryId): array
         $row['discount_value'] = round(max(0.0, (float) ($row['discount_value'] ?? 0)), 4);
         $row['requires_registered_account'] = (int) ($row['requires_registered_account'] ?? 0) === 1 ? 1 : 0;
         $row['first_delivered_order_only'] = (int) ($row['first_delivered_order_only'] ?? 0) === 1 ? 1 : 0;
+        $row['show_name_to_customer'] = (int) ($row['show_name_to_customer'] ?? 0) === 1 ? 1 : 0;
         $row['sort_order'] = (int) ($row['sort_order'] ?? 0);
         $row['is_active'] = (int) ($row['is_active'] ?? 0) === 1 ? 1 : 0;
         $row['is_always_on'] = (int) ($row['is_always_on'] ?? 0) === 1 ? 1 : 0;
@@ -896,8 +900,11 @@ function orange_delivery_promotion_resolve_for_checkout(
     $firstDeliveredSelect = $hasFirstDeliveredCol
         ? 'first_delivered_order_only'
         : '0 AS first_delivered_order_only';
+    $showNameSelect = orange_table_has_column($pdo, 'delivery_fee_promotions', 'show_name_to_customer')
+        ? 'show_name_to_customer'
+        : '0 AS show_name_to_customer';
     $st = $pdo->prepare(
-        'SELECT id, name_ar, name_en, discount_type, discount_value, requires_registered_account,
+        'SELECT id, name_ar, name_en, ' . $showNameSelect . ', discount_type, discount_value, requires_registered_account,
                 ' . $firstDeliveredSelect . ', sort_order, valid_from, valid_to, is_always_on
          FROM delivery_fee_promotions
          WHERE country_id = ? AND is_active = 1
@@ -958,6 +965,7 @@ function orange_delivery_promotion_resolve_for_checkout(
             'id' => $promotionId,
             'name_ar' => (string) ($row['name_ar'] ?? ''),
             'name_en' => (string) ($row['name_en'] ?? ''),
+            'show_name_to_customer' => (int) ($row['show_name_to_customer'] ?? 0) === 1 ? 1 : 0,
             'discount_type' => $discountType,
             'discount_value' => $discountValue,
             'discount_amount' => $discountAmount,

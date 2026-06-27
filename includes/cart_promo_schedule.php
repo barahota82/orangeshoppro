@@ -28,6 +28,31 @@ function orange_cart_promo_buyer_first_delivered_ok(
 }
 
 /**
+ * اسم العرض المعروض للعميل حسب لغة المتجر — أو سلسلة فارغة إذا كان العلم مُغلقاً
+ * (`show_name_to_customer` = 0) أو لا اسم محفوظ. الافتراضي مُغلق للأمان القانوني (قرار مالك 2026-06-27).
+ * يُستعمل لعروض السلة والتوصيل (name_ar/name_en) ولعروض المنتجات (name_ar/name_en) وللكومبو (title_ar/title_en).
+ *
+ * @param array<string,mixed> $row صف العرض (يجب أن يحوي show_name_to_customer + حقلَي الاسم)
+ */
+function orange_promo_customer_display_name(array $row, ?string $lang = null, string $arKey = 'name_ar', string $enKey = 'name_en'): string
+{
+    if ((int) ($row['show_name_to_customer'] ?? 0) !== 1) {
+        return '';
+    }
+    if ($lang === null) {
+        $lang = function_exists('current_lang') ? (string) current_lang() : 'ar';
+    }
+    $lang = strtolower(trim((string) $lang));
+    $ar = trim((string) ($row[$arKey] ?? ''));
+    $en = trim((string) ($row[$enKey] ?? ''));
+    if ($lang === 'ar') {
+        return $ar !== '' ? $ar : $en;
+    }
+
+    return $en !== '' ? $en : $ar;
+}
+
+/**
  * جدول عرض سلة: جدولة تواريخ + إيقاف تلقائي عند نفاد مخزون منتجات العرض أو الهدية.
  *
  * @return list<string>

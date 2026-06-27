@@ -59,6 +59,18 @@ try {
     // التفعيل (نشط/مخفي) — افتراضياً نشط للحفاظ على سلوك النداءات القديمة بلا الحقل.
     $isActive = array_key_exists('is_active', $data) ? (!empty($data['is_active']) ? 1 : 0) : 1;
 
+    // اسم العرض (اختياري لعروض المنتجات — المنتج هو الهوية) + علم الظهور للعميل على الكتالوج.
+    $hasNameCols = orange_table_has_column($pdo, 'offers', 'name_ar')
+        && orange_table_has_column($pdo, 'offers', 'name_en');
+    $hasShowCol = orange_table_has_column($pdo, 'offers', 'show_name_to_customer');
+    $nameAr = function_exists('mb_substr')
+        ? mb_substr(trim((string) ($data['name_ar'] ?? '')), 0, 191, 'UTF-8')
+        : substr(trim((string) ($data['name_ar'] ?? '')), 0, 191);
+    $nameEn = function_exists('mb_substr')
+        ? mb_substr(trim((string) ($data['name_en'] ?? '')), 0, 191, 'UTF-8')
+        : substr(trim((string) ($data['name_en'] ?? '')), 0, 191);
+    $showName = !empty($data['show_name_to_customer']) ? 1 : 0;
+
     $offerId = (int) ($data['id'] ?? 0);
     if ($offerId > 0) {
         // دولة العرض = دولة منتجه (العرض مرتبط بمنتج واحد، والمنتج تابع لدولة واحدة؛ الجدول offers
@@ -76,20 +88,29 @@ try {
             json_response(['success' => false, 'message' => $e->getMessage()], 403);
         }
         // الترتيب تلقائي بالكامل: لا يُمَسّ عند التعديل.
-        $st = $pdo->prepare(
-            'UPDATE offers SET product_id = ?, discount = ?, is_active = ?,
-             is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL
-             WHERE id = ?'
-        );
-        $st->execute([
-            $pid,
-            $discount,
-            $isActive,
-            $isAlwaysOn,
-            $bounds['valid_from'],
-            $bounds['valid_to'],
-            $offerId,
-        ]);
+        $sets = ['product_id = ?', 'discount = ?', 'is_active = ?'];
+        $vals = [$pid, $discount, $isActive];
+        if ($hasNameCols) {
+            $sets[] = 'name_ar = ?';
+            $sets[] = 'name_en = ?';
+            $vals[] = $nameAr;
+            $vals[] = $nameEn;
+        }
+        if ($hasShowCol) {
+            $sets[] = 'show_name_to_customer = ?';
+            $vals[] = $showName;
+        }
+        $sets[] = 'is_always_on = ?';
+        $sets[] = 'valid_from = ?';
+        $sets[] = 'valid_to = ?';
+        $sets[] = 'auto_paused_at = NULL';
+        $sets[] = 'auto_paused_reason = NULL';
+        $vals[] = $isAlwaysOn;
+        $vals[] = $bounds['valid_from'];
+        $vals[] = $bounds['valid_to'];
+        $vals[] = $offerId;
+        $st = $pdo->prepare('UPDATE offers SET ' . implode(', ', $sets) . ' WHERE id = ?');
+        $st->execute($vals);
         orange_promo_always_on_sync_history(
             $pdo,
             'offers',
@@ -102,36 +123,35 @@ try {
         return;
     }
 
+    $cols = ['product_id', 'discount'];
+    $vals = [$pid, $discount];
     if ($hasSort) {
         // الترتيب تلقائي: التالي في الجدول (offers بلا country_id بالتصميم).
         $sortOrder = (int) ($pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM offers')->fetchColumn() ?: 1);
-        $stmt = $pdo->prepare(
-            'INSERT INTO offers (product_id, discount, sort_order, is_active, is_always_on, valid_from, valid_to)
-             VALUES (?, ?, ?, ?, ?, ?, ?)'
-        );
-        $stmt->execute([
-            $pid,
-            $discount,
-            $sortOrder,
-            $isActive,
-            $isAlwaysOn,
-            $bounds['valid_from'],
-            $bounds['valid_to'],
-        ]);
-    } else {
-        $stmt = $pdo->prepare(
-            'INSERT INTO offers (product_id, discount, is_active, is_always_on, valid_from, valid_to)
-             VALUES (?, ?, ?, ?, ?, ?)'
-        );
-        $stmt->execute([
-            $pid,
-            $discount,
-            $isActive,
-            $isAlwaysOn,
-            $bounds['valid_from'],
-            $bounds['valid_to'],
-        ]);
+        $cols[] = 'sort_order';
+        $vals[] = $sortOrder;
     }
+    if ($hasNameCols) {
+        $cols[] = 'name_ar';
+        $cols[] = 'name_en';
+        $vals[] = $nameAr;
+        $vals[] = $nameEn;
+    }
+    if ($hasShowCol) {
+        $cols[] = 'show_name_to_customer';
+        $vals[] = $showName;
+    }
+    $cols[] = 'is_active';
+    $cols[] = 'is_always_on';
+    $cols[] = 'valid_from';
+    $cols[] = 'valid_to';
+    $vals[] = $isActive;
+    $vals[] = $isAlwaysOn;
+    $vals[] = $bounds['valid_from'];
+    $vals[] = $bounds['valid_to'];
+    $placeholders = implode(', ', array_fill(0, count($cols), '?'));
+    $stmt = $pdo->prepare('INSERT INTO offers (' . implode(', ', $cols) . ') VALUES (' . $placeholders . ')');
+    $stmt->execute($vals);
     $newId = (int) $pdo->lastInsertId();
     orange_promo_always_on_sync_history(
         $pdo,

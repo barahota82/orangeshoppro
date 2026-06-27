@@ -80,8 +80,11 @@ if ($canUnifiedProductSql) {
     $offersScheduleSql = orange_table_has_column($pdo, 'offers', 'valid_from')
         ? orange_product_offer_storefront_sql('o')
         : '';
+    $offerNameSelect = orange_table_has_column($pdo, 'offers', 'show_name_to_customer')
+        ? ', o.name_ar AS offer_name_ar, o.name_en AS offer_name_en, o.show_name_to_customer AS offer_show_name'
+        : '';
     $offersSql = '
-    SELECT o.id AS offer_id, o.discount,
+    SELECT o.id AS offer_id, o.discount' . $offerNameSelect . ',
            p.*, ucs2.department_id AS uf_dept_id, ucc.id AS uf_cat_id, ucs.id AS uf_sub_id
     FROM offers o
     INNER JOIN products p ON p.id = o.product_id
@@ -503,7 +506,18 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
             <article class="product-card" data-product-id="<?php echo $sfCardPidOff; ?>" data-filter="offers cat-<?php echo $sfHomeFilterCatalogId($p); ?><?php echo $storefrontExtraFilterSuffix($p); ?>"<?php echo $sfCardAttrsOff !== '' ? ' data-attrs="' . htmlspecialchars($sfCardAttrsOff, ENT_QUOTES, 'UTF-8') . '"' : ''; ?>>
                 <div class="product-image-wrap">
                     <img src="<?php echo htmlspecialchars(storefront_product_image_href((string) ($p['main_image'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
-                    <span class="offer-badge"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></span>
+                    <?php
+                    $sfOfferBadge = t('offers');
+                    $sfOfferCustomName = orange_promo_customer_display_name([
+                        'show_name_to_customer' => (int) ($p['offer_show_name'] ?? 0),
+                        'name_ar' => (string) ($p['offer_name_ar'] ?? ''),
+                        'name_en' => (string) ($p['offer_name_en'] ?? ''),
+                    ], $lang);
+                    if ($sfOfferCustomName !== '') {
+                        $sfOfferBadge = $sfOfferCustomName;
+                    }
+                    ?>
+                    <span class="offer-badge"><?php echo htmlspecialchars($sfOfferBadge, ENT_QUOTES, 'UTF-8'); ?></span>
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?></h3>

@@ -531,6 +531,7 @@ try {
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $requiresRegistered = !empty($data['requires_registered_account']) ? 1 : 0;
         $firstDeliveredOnly = !empty($data['first_delivered_order_only']) ? 1 : 0;
+        $showNameToCustomer = !empty($data['show_name_to_customer']) ? 1 : 0;
         // سياسة «اللقطة» الصارمة: الاستهداف بمعرّفات المناطق فقط.
         // أي استهداف محافظة وارد يُتجاهَل (كان يضمّ المناطق الجديدة ديناميكياً) — لا يُخزَّن.
         $validGovernorateIds = [];
@@ -560,7 +561,7 @@ try {
             if ($id > 0) {
                 $up = $pdo->prepare(
                     'UPDATE delivery_fee_promotions
-                     SET name_ar = ?, name_en = ?, discount_type = ?, discount_value = ?,
+                     SET name_ar = ?, name_en = ?, show_name_to_customer = ?, discount_type = ?, discount_value = ?,
                          requires_registered_account = ?, first_delivered_order_only = ?,
                          valid_from = ?, valid_to = ?,
                          is_active = ?, is_always_on = ?, country_id = ?
@@ -569,6 +570,7 @@ try {
                 $up->execute([
                     $nameAr,
                     $nameEn,
+                    $showNameToCustomer,
                     $discountType,
                     $discountValue,
                     $requiresRegistered,
@@ -591,14 +593,15 @@ try {
                 $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
                 $ins = $pdo->prepare(
                     'INSERT INTO delivery_fee_promotions
-                        (country_id, name_ar, name_en, discount_type, discount_value, requires_registered_account,
+                        (country_id, name_ar, name_en, show_name_to_customer, discount_type, discount_value, requires_registered_account,
                          first_delivered_order_only, valid_from, valid_to, sort_order, is_active, is_always_on)
-                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
+                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
                 );
                 $ins->execute([
                     $countryId,
                     $nameAr,
                     $nameEn,
+                    $showNameToCustomer,
                     $discountType,
                     $discountValue,
                     $requiresRegistered,

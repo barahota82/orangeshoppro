@@ -67,6 +67,7 @@ try {
         $disc = cp_money($data['discount_amount'] ?? 0);
         $reqReg = !empty($data['requires_registered_account']) ? 1 : 0;
         $firstDeliveredOnly = !empty($data['first_delivered_order_only']) ? 1 : 0;
+        $showNameToCustomer = !empty($data['show_name_to_customer']) ? 1 : 0;
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $isAlwaysOn = !empty($data['is_always_on']) ? 1 : 0;
         $dateErr = null;
@@ -100,11 +101,12 @@ try {
             orange_cart_promo_clear_auto_pause($pdo, 'cart_promotions', $id);
             // الترتيب تلقائي بالكامل: لا يُمَسّ عند التعديل (مثل عروض التوصيل).
             $st = $pdo->prepare(
-                'UPDATE cart_promotions SET name_ar = ?, name_en = ?, min_subtotal = ?, discount_amount = ?, requires_registered_account = ?, first_delivered_order_only = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
+                'UPDATE cart_promotions SET name_ar = ?, name_en = ?, show_name_to_customer = ?, min_subtotal = ?, discount_amount = ?, requires_registered_account = ?, first_delivered_order_only = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
             );
             $st->execute([
                 $nameAr,
                 $nameEn,
+                $showNameToCustomer,
                 $minSub,
                 $disc,
                 $reqReg,
@@ -131,12 +133,13 @@ try {
             $stSort->execute($sortBind['params']);
             $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
             $st = $pdo->prepare(
-                'INSERT INTO cart_promotions (country_id, name_ar, name_en, min_subtotal, discount_amount, requires_registered_account, first_delivered_order_only, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO cart_promotions (country_id, name_ar, name_en, show_name_to_customer, min_subtotal, discount_amount, requires_registered_account, first_delivered_order_only, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $st->execute([
                 $insertCountryId,
                 $nameAr,
                 $nameEn,
+                $showNameToCustomer,
                 $minSub,
                 $disc,
                 $reqReg,

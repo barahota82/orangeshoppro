@@ -63,6 +63,23 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
         </label>
     </div>
     <div class="form-grid">
+        <div>
+            <label for="ofr_name_ar">اسم العرض (عربي)</label>
+            <input type="text" id="ofr_name_ar" class="admin-inp" dir="auto" placeholder="مثال: تخفيضات نهاية الموسم">
+        </div>
+        <div>
+            <label for="ofr_name_en">English</label>
+            <input type="text" id="ofr_name_en" class="admin-inp" dir="ltr" lang="en" placeholder="End of season sale">
+        </div>
+    </div>
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:18px;align-items:center;">
+        <button type="button" class="btn-secondary" onclick="ofrTranslateOfferFromAr()">ترجمة تلقائية من العربي</button>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="ofr_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
+        </label>
+    </div>
+    <p class="card-hint" style="margin:6px 0 0;color:#64748b;">اسم العرض يظهر للعميل كشارة على بطاقة المنتج في الكتالوج فقط عند تفعيل «السماح بظهور الاسم»؛ وإلا تظهر كلمة «عروض» العامة.</p>
+    <div class="form-grid" style="margin-top:12px;">
         <div style="grid-column:1/-1;">
             <label>المنتج</label>
             <div style="margin:6px 0 8px;">
@@ -193,10 +210,60 @@ document.getElementById('ofr_pick_btn').addEventListener('click', function () {
     OrangeCartPromoProductPick.open(window.OFR_PICK_ROWS || [], ofrSetProduct);
 });
 
+var ofrNameArTimer = null;
+var ofrNameEnTimer = null;
+
+async function ofrTranslateNames(opts) {
+    var silent = !!(opts && opts.silent);
+    var forceFromArabic = !!(opts && opts.forceFromArabic);
+    var arEl = document.getElementById('ofr_name_ar');
+    var enEl = document.getElementById('ofr_name_en');
+    if (!arEl || !enEl) return;
+    try {
+        var res = await postJSON('/admin/api/translate/names.php', {
+            name_ar: arEl.value.trim(),
+            name_en: forceFromArabic ? '' : enEl.value.trim()
+        });
+        if (!res || !res.success) {
+            if (!silent) alert((res && res.message) ? res.message : 'فشل الترجمة');
+            return;
+        }
+        if (res.name_en != null) enEl.value = String(res.name_en);
+    } catch (e) {
+        if (!silent) alert('تعذر الاتصال بخدمة الترجمة');
+    }
+}
+
+function ofrScheduleNameFromAr() {
+    var arEl = document.getElementById('ofr_name_ar');
+    if (!arEl) return;
+    clearTimeout(ofrNameArTimer);
+    ofrNameArTimer = setTimeout(function () {
+        ofrTranslateNames({ silent: true, forceFromArabic: true });
+    }, 700);
+}
+
+function ofrScheduleNameFromEn() {
+    var enEl = document.getElementById('ofr_name_en');
+    if (!enEl || enEl.value.trim() === '') return;
+    clearTimeout(ofrNameEnTimer);
+    ofrNameEnTimer = setTimeout(function () {
+        ofrTranslateNames({ silent: true, forceFromArabic: false });
+    }, 600);
+}
+
+async function ofrTranslateOfferFromAr() {
+    await ofrTranslateNames({ silent: false, forceFromArabic: true });
+}
+window.ofrTranslateOfferFromAr = ofrTranslateOfferFromAr;
+
 function ofrResetForm() {
     document.getElementById('ofr_id').value = '0';
     document.getElementById('offer_product_id').value = '0';
     document.getElementById('ofr_product_label').textContent = '— لم يُختر منتج —';
+    document.getElementById('ofr_name_ar').value = '';
+    document.getElementById('ofr_name_en').value = '';
+    document.getElementById('ofr_show_name').checked = false;
     document.getElementById('discount').value = '';
     var sortEl = document.getElementById('ofr_sort');
     if (sortEl) sortEl.value = '0';
@@ -214,6 +281,9 @@ function ofrEdit(row) {
     document.getElementById('ofr_id').value = String(row.id || 0);
     document.getElementById('offer_product_id').value = String(row.product_id || 0);
     document.getElementById('ofr_product_label').textContent = (row.product_name || '') + ' (#' + row.product_id + ')';
+    document.getElementById('ofr_name_ar').value = row.name_ar != null ? String(row.name_ar) : '';
+    document.getElementById('ofr_name_en').value = row.name_en != null ? String(row.name_en) : '';
+    document.getElementById('ofr_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
     document.getElementById('discount').value = row.discount != null ? String(row.discount) : '';
     var sortEl = document.getElementById('ofr_sort');
     if (sortEl) sortEl.value = String(row.sort_order != null ? row.sort_order : 0);
@@ -233,7 +303,10 @@ async function saveOffer() {
     var payload = {
         id: parseInt(document.getElementById('ofr_id').value, 10) || 0,
         product_id: parseInt(document.getElementById('offer_product_id').value, 10),
-        discount: parseFloat(document.getElementById('discount').value || '0')
+        discount: parseFloat(document.getElementById('discount').value || '0'),
+        name_ar: document.getElementById('ofr_name_ar').value.trim(),
+        name_en: document.getElementById('ofr_name_en').value.trim(),
+        show_name_to_customer: document.getElementById('ofr_show_name').checked ? 1 : 0
     };
     var activeEl = document.getElementById('ofr_active');
     payload.is_active = (activeEl && activeEl.checked) ? 1 : 0;
@@ -254,6 +327,12 @@ async function saveOffer() {
     if (res.success) location.reload();
 }
 
+(function () {
+    var arEl = document.getElementById('ofr_name_ar');
+    var enEl = document.getElementById('ofr_name_en');
+    if (arEl) arEl.addEventListener('input', ofrScheduleNameFromAr);
+    if (enEl) enEl.addEventListener('input', ofrScheduleNameFromEn);
+})();
 if (typeof ocpDefaultScheduleDates === 'function') {
     ocpDefaultScheduleDates('ofr');
 }

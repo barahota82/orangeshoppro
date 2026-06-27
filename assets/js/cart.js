@@ -972,7 +972,8 @@ function orangeBuildConfirmSummaryHtml() {
             st.promoDiscount,
             st.deliveryFee,
             st.total,
-            st.productOfferDiscount
+            st.productOfferDiscount,
+            st.names || null
         );
         if (typeof st.loyaltyValue === 'number' && st.loyaltyValue > orangeCartTotalsEpsilon()) {
             const loyLbl =
@@ -1240,7 +1241,9 @@ function orangeUpdateCartGiftPromotionUI(gift) {
         return;
     }
     const T = window.APP_T || {};
-    const title = T.cart_gift_promo_title || '';
+    const title = (typeof gift.display_name === 'string' && gift.display_name.trim() !== '')
+        ? gift.display_name.trim()
+        : (T.cart_gift_promo_title || '');
     if (gift.gift_kind === 'fixed' && gift.fixed_variant_id) {
         try {
             window.__orangeCheckoutGiftVariantId = parseInt(String(gift.fixed_variant_id), 10) || 0;
@@ -1350,7 +1353,9 @@ function orangeUpdateCartBogoPromotionUI(bogo) {
         return;
     }
     const T = window.APP_T || {};
-    const title = T.cart_bogo_promo_title || '';
+    const title = (typeof bogo.display_name === 'string' && bogo.display_name.trim() !== '')
+        ? bogo.display_name.trim()
+        : (T.cart_bogo_promo_title || '');
     if (bogo.gift_kind === 'fixed' && bogo.fixed_variant_id) {
         try {
             window.__orangeCheckoutBogoGiftVariantId = parseInt(String(bogo.fixed_variant_id), 10) || 0;
@@ -1463,15 +1468,22 @@ function orangeCartTotalsEpsilon() {
     return 1e-6;
 }
 
-function orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total, productOfferDiscount) {
+function orangeCartPromoName(names, key, fallback) {
+    if (names && typeof names[key] === 'string' && names[key].trim() !== '') {
+        return names[key].trim();
+    }
+    return fallback;
+}
+
+function orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total, productOfferDiscount, names) {
     const T = window.APP_T || {};
     productOfferDiscount = typeof productOfferDiscount === 'number' ? productOfferDiscount : 0;
     const totalLbl = T.cart_total_label || 'Total';
     const subLbl = T.cart_subtotal_label || 'Subtotal';
-    const promoLbl = T.cart_promotion_discount_label || 'Cart offer';
-    const comboLbl = T.cart_combo_discount_label || 'Combo bundle';
+    const promoLbl = orangeCartPromoName(names, 'promo', T.cart_promotion_discount_label || 'Cart offer');
+    const comboLbl = orangeCartPromoName(names, 'combo', T.cart_combo_discount_label || 'Combo bundle');
     const offerLbl = T.product_offer_discount_label || T.offers || 'Offer';
-    const deliveryLbl = T.checkout_delivery_fee_label || 'Delivery fee';
+    const deliveryLbl = orangeCartPromoName(names, 'delivery', T.checkout_delivery_fee_label || 'Delivery fee');
     const eps = orangeCartTotalsEpsilon();
     const showBreakdown = comboDiscount > eps || promoDiscount > eps || productOfferDiscount > eps || deliveryFee > eps;
     let html =
@@ -1525,15 +1537,15 @@ function orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, delive
     return html;
 }
 
-function orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total, productOfferDiscount) {
+function orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total, productOfferDiscount, names) {
     const T = window.APP_T || {};
     productOfferDiscount = typeof productOfferDiscount === 'number' ? productOfferDiscount : 0;
     const totalLbl = T.cart_total_label || 'Total';
     const subLbl = T.cart_subtotal_label || 'Subtotal';
-    const promoLbl = T.cart_promotion_discount_label || 'Cart offer';
-    const comboLbl = T.cart_combo_discount_label || 'Combo bundle';
+    const promoLbl = orangeCartPromoName(names, 'promo', T.cart_promotion_discount_label || 'Cart offer');
+    const comboLbl = orangeCartPromoName(names, 'combo', T.cart_combo_discount_label || 'Combo bundle');
     const offerLbl = T.product_offer_discount_label || T.offers || 'Offer';
-    const deliveryLbl = T.checkout_delivery_fee_label || 'Delivery fee';
+    const deliveryLbl = orangeCartPromoName(names, 'delivery', T.checkout_delivery_fee_label || 'Delivery fee');
     const eps = orangeCartTotalsEpsilon();
     const showBreakdown = comboDiscount > eps || promoDiscount > eps || productOfferDiscount > eps || deliveryFee > eps;
     let html =
@@ -1691,12 +1703,13 @@ function orangePatchCartTotalsFromServer(
     giftUnlock,
     bogoUnlock,
     comboUnlock,
-    productOfferDiscount
+    productOfferDiscount,
+    names
 ) {
     const main = document.getElementById('cartMainTotals');
     if (main && main.parentNode) {
         const wrap = document.createElement('div');
-        wrap.innerHTML = orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total, productOfferDiscount);
+        wrap.innerHTML = orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total, productOfferDiscount, names);
         const next = wrap.firstElementChild;
         if (next) {
             main.parentNode.replaceChild(next, main);
@@ -1705,7 +1718,7 @@ function orangePatchCartTotalsFromServer(
     const mini = document.getElementById('cartMiniTotals');
     if (mini && mini.parentNode) {
         const wrap = document.createElement('div');
-        wrap.innerHTML = orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total, productOfferDiscount);
+        wrap.innerHTML = orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, deliveryFee, total, productOfferDiscount, names);
         const next = wrap.firstElementChild;
         if (next) {
             mini.parentNode.replaceChild(next, mini);
@@ -2152,6 +2165,12 @@ async function orangeRunCheckoutPreview() {
                 typeof data.delivery_fee === 'number' ? data.delivery_fee : 0;
             const productOfferD =
                 typeof data.product_offer_discount === 'number' ? data.product_offer_discount : 0;
+            const promoNames = {
+                promo: typeof data.promotion_display_name === 'string' ? data.promotion_display_name : '',
+                combo: typeof data.combo_display_name === 'string' ? data.combo_display_name : '',
+                delivery: (data.delivery_promotion && typeof data.delivery_promotion.display_name === 'string')
+                    ? data.delivery_promotion.display_name : ''
+            };
             orangePatchCartTotalsFromServer(
                 data.subtotal,
                 comboD,
@@ -2162,7 +2181,8 @@ async function orangeRunCheckoutPreview() {
                 data.gift_register_unlock_teaser === true,
                 data.bogo_register_unlock_teaser === true,
                 data.combo_register_unlock_teaser === true,
-                productOfferD
+                productOfferD,
+                promoNames
             );
             orangeUpdateCartGiftPromotionUI(data.gift_promotion || null);
             orangeUpdateCartBogoPromotionUI(data.bogo_promotion || null);
@@ -2176,6 +2196,7 @@ async function orangeRunCheckoutPreview() {
                 total: data.total,
                 productOfferDiscount: productOfferD,
                 loyaltyValue: (data.loyalty && typeof data.loyalty.redeem_value === 'number') ? data.loyalty.redeem_value : 0,
+                names: promoNames,
             };
         } else {
             orangeUpdateRegisterPromoTeaser(null);

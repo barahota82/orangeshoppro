@@ -101,8 +101,11 @@ echo orange_offer_gl_link_card_html(
             <input type="text" id="dp_name_en" class="admin-inp" dir="ltr" lang="en" placeholder="Weekend delivery promo">
         </div>
     </div>
-    <div style="margin-top:8px;">
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:18px;align-items:center;">
         <button type="button" class="btn-secondary" onclick="dpTranslateOfferFromAr()">ترجمة تلقائية من العربي</button>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="dp_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
+        </label>
     </div>
     <div class="dp-form-row" style="margin-top:12px;">
         <div class="dp-field" style="min-width:160px;">
@@ -627,6 +630,7 @@ echo orange_offer_gl_link_card_html(
         document.getElementById('dp_id').value = '0';
         document.getElementById('dp_name_ar').value = '';
         document.getElementById('dp_name_en').value = '';
+        document.getElementById('dp_show_name').checked = false;
         document.getElementById('dp_discount_type').value = 'amount';
         document.getElementById('dp_discount_value').value = '';
         document.getElementById('dp_sort').value = String(dpComputeNextSort());
@@ -643,6 +647,7 @@ echo orange_offer_gl_link_card_html(
         document.getElementById('dp_id').value = String(row.id != null ? row.id : 0);
         document.getElementById('dp_name_ar').value = row.name_ar || '';
         document.getElementById('dp_name_en').value = row.name_en || '';
+        document.getElementById('dp_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
         document.getElementById('dp_discount_type').value = row.discount_type || 'amount';
         document.getElementById('dp_discount_value').value = row.discount_value != null ? String(row.discount_value) : '';
         document.getElementById('dp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
@@ -708,6 +713,7 @@ echo orange_offer_gl_link_card_html(
             id: parseInt(document.getElementById('dp_id').value, 10) || 0,
             name_ar: (document.getElementById('dp_name_ar').value || '').trim(),
             name_en: (document.getElementById('dp_name_en').value || '').trim(),
+            show_name_to_customer: document.getElementById('dp_show_name').checked ? 1 : 0,
             discount_type: (document.getElementById('dp_discount_type').value || 'amount').trim(),
             discount_value: (document.getElementById('dp_discount_value').value || '').trim(),
             requires_registered_account: document.getElementById('dp_reg').checked ? 1 : 0,

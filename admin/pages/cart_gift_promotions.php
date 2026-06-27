@@ -45,8 +45,11 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <input type="text" id="cgp_name_en" class="admin-inp" dir="ltr" lang="en" placeholder="Free gift over threshold">
         </div>
     </div>
-    <div style="margin-top:8px;">
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:18px;align-items:center;">
         <button type="button" class="btn-secondary" onclick="cgpTranslateOfferFromAr()">ترجمة تلقائية من العربي</button>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="cgp_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
+        </label>
     </div>
     <div class="form-grid" style="margin-top:12px;">
         <div><label>الحد الأدنى لمجموع السلة (د.ك) — 0 يعني بدون شرط مبلغ</label><input type="text" id="cgp_min" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="0"></div>
@@ -276,6 +279,7 @@ function resetCartGiftPromotionForm() {
     document.getElementById('cgp_id').value = '0';
     document.getElementById('cgp_name_ar').value = '';
     document.getElementById('cgp_name_en').value = '';
+    document.getElementById('cgp_show_name').checked = false;
     document.getElementById('cgp_min').value = '';
     document.getElementById('cgp_sort').value = '0';
     cgpRenderPool([]);
@@ -296,6 +300,7 @@ function editCartGiftPromotion(row) {
     document.getElementById('cgp_id').value = String(row.id != null ? row.id : 0);
     document.getElementById('cgp_name_ar').value = row.name_ar != null ? String(row.name_ar) : '';
     document.getElementById('cgp_name_en').value = row.name_en != null ? String(row.name_en) : '';
+    document.getElementById('cgp_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
     document.getElementById('cgp_min').value = row.min_subtotal != null ? String(row.min_subtotal) : '';
     document.getElementById('cgp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
     const kind = (row.gift_kind || 'choice') === 'fixed' ? 'fixed' : 'choice';
@@ -430,6 +435,7 @@ async function saveCartGiftPromotion() {
         id: parseInt(document.getElementById('cgp_id').value, 10) || 0,
         name_ar: document.getElementById('cgp_name_ar').value.trim(),
         name_en: document.getElementById('cgp_name_en').value.trim(),
+        show_name_to_customer: document.getElementById('cgp_show_name').checked ? 1 : 0,
         min_subtotal: document.getElementById('cgp_min').value.trim(),
         requires_registered_account: document.getElementById('cgp_reg').checked ? 1 : 0,
         first_delivered_order_only: document.getElementById('cgp_first_delivered').checked ? 1 : 0,
