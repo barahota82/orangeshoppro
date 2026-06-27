@@ -19,6 +19,15 @@ function orange_cart_promo_admin_product_rows(PDO $pdo, ?int $countryId = null):
     if (orange_table_has_column($pdo, 'products', 'item_code')) {
         $cols .= ', p.item_code';
     }
+    // سعر البيع والتكلفة الأساسيان للمنتج (للمراجعة قبل تحديد الخصم في شاشة عروض المنتجات).
+    $hasPrice = orange_table_has_column($pdo, 'products', 'price');
+    $hasCost = orange_table_has_column($pdo, 'products', 'cost');
+    if ($hasPrice) {
+        $cols .= ', p.price';
+    }
+    if ($hasCost) {
+        $cols .= ', p.cost';
+    }
     $st = $pdo->query(
         "SELECT $cols FROM products p WHERE p.is_active = 1" . $countrySql . ' ORDER BY p.name ASC, p.id ASC'
     );
@@ -36,6 +45,8 @@ function orange_cart_promo_admin_product_rows(PDO $pdo, ?int $countryId = null):
             'product_id' => $pid,
             'code' => $code,
             'name' => trim((string) ($row['name'] ?? '')),
+            'price' => $hasPrice ? (float) ($row['price'] ?? 0) : null,
+            'cost' => $hasCost ? (float) ($row['cost'] ?? 0) : null,
         ];
     }
 

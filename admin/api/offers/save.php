@@ -38,10 +38,40 @@ try {
         json_response(['success' => false, 'message' => 'قيمة الخصم يجب أن تكون أكبر من صفر'], 422);
     }
 
-    $ch = $pdo->prepare('SELECT id FROM products WHERE id = ? AND is_active = 1 LIMIT 1');
+    // جلب سعر/تكلفة المنتج للتحقق من ألا يهبط السعر بعد الخصم تحت التكلفة (قرار مالك 2026-06-27).
+    $prodCols = 'id';
+    $hasPriceCol = orange_table_has_column($pdo, 'products', 'price');
+    $hasCostCol = orange_table_has_column($pdo, 'products', 'cost');
+    if ($hasPriceCol) {
+        $prodCols .= ', price';
+    }
+    if ($hasCostCol) {
+        $prodCols .= ', cost';
+    }
+    $ch = $pdo->prepare('SELECT ' . $prodCols . ' FROM products WHERE id = ? AND is_active = 1 LIMIT 1');
     $ch->execute([$pid]);
-    if (!$ch->fetchColumn()) {
+    $prodRow = $ch->fetch(PDO::FETCH_ASSOC);
+    if (!$prodRow) {
         json_response(['success' => false, 'message' => 'المنتج غير موجود أو غير نشط'], 422);
+    }
+    if ($hasPriceCol) {
+        $prodPrice = round((float) ($prodRow['price'] ?? 0), $offersMoneyDecimals);
+        $prodCost = $hasCostCol ? round((float) ($prodRow['cost'] ?? 0), $offersMoneyDecimals) : 0.0;
+        if ($discount >= $prodPrice) {
+            json_response([
+                'success' => false,
+                'message' => 'قيمة الخصم تساوي سعر البيع أو تتجاوزه — السعر بعد الخصم لا يصحّ أن يكون صفراً أو سالباً.',
+            ], 422);
+        }
+        if ($hasCostCol && $prodCost > 0) {
+            $priceAfter = round($prodPrice - $discount, $offersMoneyDecimals);
+            if ($priceAfter < $prodCost) {
+                json_response([
+                    'success' => false,
+                    'message' => 'السعر بعد الخصم أقل من تكلفة المنتج الأساسية — غير مسموح. قلّل قيمة الخصم.',
+                ], 422);
+            }
+        }
     }
     try {
         orange_admin_assert_entity_country($pdo, 'products', $pid);

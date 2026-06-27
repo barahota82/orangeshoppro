@@ -89,34 +89,59 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
             <input type="checkbox" id="ofr_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
         </label>
     </div>
-    <div class="form-grid" style="margin-top:12px;">
-        <div style="grid-column:1/-1;">
-            <label>المنتج</label>
-            <div style="margin:6px 0 8px;">
+
+    <div class="ofr-split" style="margin-top:14px;">
+        <!-- النصف الأيمن: المنتج وبياناته (مراجعة قبل تحديد الخصم) -->
+        <div class="ofr-half">
+            <h4 style="margin:0 0 10px;">المنتج</h4>
+            <div style="margin:0 0 10px;">
                 <button type="button" class="btn-secondary" id="ofr_pick_btn">اختيار منتج (دبل كليك من القائمة)</button>
             </div>
-            <p id="ofr_product_label" class="page-subtitle" style="margin:0;">— لم يُختر منتج —</p>
             <input type="hidden" id="offer_product_id" value="0">
+            <p id="ofr_product_label" class="page-subtitle" style="margin:0 0 10px;">— لم يُختر منتج —</p>
+            <div class="ofr-prod-facts">
+                <div class="ofr-fact"><span>التكلفة</span><b id="ofr_fact_cost" dir="ltr">—</b></div>
+                <div class="ofr-fact"><span>سعر البيع</span><b id="ofr_fact_price" dir="ltr">—</b></div>
+                <div class="ofr-fact ofr-fact-after"><span>السعر بعد الخصم</span><b id="ofr_fact_after" dir="ltr">—</b></div>
+            </div>
+            <p id="ofr_below_cost_warn" style="display:none;margin:10px 0 0;color:#dc2626;font-weight:700;">⚠ السعر بعد الخصم أقل من التكلفة — غير مسموح بالحفظ.</p>
         </div>
-        <div>
-            <label for="discount">قيمة الخصم (<?php echo htmlspecialchars((string) ($offersMoney['unit'] ?? 'KWD'), ENT_QUOTES, 'UTF-8'); ?>)</label>
-            <input type="number" id="discount" class="admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr">
-        </div>
-        <div>
-            <label for="ofr_valid_from">بداية العرض <span dir="ltr">*</span></label>
-            <input type="text" id="ofr_valid_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
-        </div>
-        <div>
-            <label for="ofr_valid_to">نهاية العرض <span dir="ltr">*</span></label>
-            <input type="text" id="ofr_valid_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
-        </div>
-        <div style="grid-column:1/-1;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;max-width:22rem;">
-                <input type="checkbox" id="ofr_always_on">
-                <span><strong>التفعيل الدائم</strong></span>
-            </label>
+
+        <!-- النصف الأيسر: الخصم والفترة -->
+        <div class="ofr-half">
+            <h4 style="margin:0 0 10px;">الخصم والفترة</h4>
+            <div class="form-grid">
+                <div>
+                    <label for="discount">قيمة الخصم (<?php echo htmlspecialchars((string) ($offersMoney['unit'] ?? 'KWD'), ENT_QUOTES, 'UTF-8'); ?>)</label>
+                    <input type="number" id="discount" class="admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr">
+                </div>
+                <div>
+                    <label for="ofr_valid_from">بداية العرض <span dir="ltr">*</span></label>
+                    <input type="text" id="ofr_valid_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
+                </div>
+                <div>
+                    <label for="ofr_valid_to">نهاية العرض <span dir="ltr">*</span></label>
+                    <input type="text" id="ofr_valid_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
+                </div>
+                <div style="grid-column:1/-1;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;max-width:22rem;">
+                        <input type="checkbox" id="ofr_always_on">
+                        <span><strong>التفعيل الدائم</strong></span>
+                    </label>
+                </div>
+            </div>
         </div>
     </div>
+    <style>
+    .ofr-split { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .ofr-half { border:1px solid #e2e8f0; border-radius:10px; padding:14px; background:#f8fafc; }
+    .ofr-prod-facts { display:flex; flex-direction:column; gap:6px; }
+    .ofr-fact { display:flex; justify-content:space-between; gap:12px; padding:6px 10px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; }
+    .ofr-fact span { color:#64748b; }
+    .ofr-fact b { font-variant-numeric:tabular-nums; }
+    .ofr-fact-after b { color:#0f766e; }
+    @media (max-width: 720px) { .ofr-split { grid-template-columns:1fr; } }
+    </style>
     <div class="actions" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
         <button type="button" onclick="saveOffer()">حفظ العرض</button>
         <button type="button" class="btn-secondary" onclick="ofrResetForm()">عرض جديد</button>
@@ -219,10 +244,48 @@ function ofrComputeNextSort() {
     return max + 1;
 }
 
+var OFR_MONEY_UNIT = <?php echo json_encode((string) ($offersMoney['unit'] ?? 'KWD'), JSON_UNESCAPED_UNICODE); ?>;
+var OFR_MONEY_DECIMALS = <?php echo (int) ($offersMoney['decimals'] ?? 3); ?>;
+var ofrSelProduct = { price: null, cost: null };
+
+function ofrFmtMoney(v) {
+    if (v == null || isNaN(v)) return '—';
+    return Number(v).toFixed(OFR_MONEY_DECIMALS) + ' ' + OFR_MONEY_UNIT;
+}
+
 function ofrSetProduct(row) {
     document.getElementById('offer_product_id').value = String(row.product_id || 0);
     var code = row.code ? row.code + ' — ' : '';
     document.getElementById('ofr_product_label').textContent = code + (row.name || '');
+    ofrSelProduct.price = (row.price != null && row.price !== '') ? Number(row.price) : null;
+    ofrSelProduct.cost = (row.cost != null && row.cost !== '') ? Number(row.cost) : null;
+    ofrRenderFacts();
+}
+
+// يحدّث التكلفة/سعر البيع/السعر بعد الخصم + تنبيه ما دون التكلفة. يُرجِع true إذا الحالة سليمة للحفظ.
+function ofrRenderFacts() {
+    var costEl = document.getElementById('ofr_fact_cost');
+    var priceEl = document.getElementById('ofr_fact_price');
+    var afterEl = document.getElementById('ofr_fact_after');
+    var warnEl = document.getElementById('ofr_below_cost_warn');
+    var cost = ofrSelProduct.cost;
+    var price = ofrSelProduct.price;
+    if (costEl) costEl.textContent = ofrFmtMoney(cost);
+    if (priceEl) priceEl.textContent = ofrFmtMoney(price);
+    var discount = parseFloat(document.getElementById('discount').value || '0') || 0;
+    var ok = true;
+    var after = null;
+    if (price != null) {
+        after = price - discount;
+        if (afterEl) afterEl.textContent = ofrFmtMoney(after);
+        var below = (cost != null && cost > 0 && after < cost) || after <= 0;
+        if (warnEl) warnEl.style.display = (discount > 0 && below) ? 'block' : 'none';
+        if (discount > 0 && below) ok = false;
+    } else {
+        if (afterEl) afterEl.textContent = '—';
+        if (warnEl) warnEl.style.display = 'none';
+    }
+    return ok;
 }
 
 document.getElementById('ofr_pick_btn').addEventListener('click', function () {
@@ -285,6 +348,8 @@ function ofrResetForm() {
     document.getElementById('ofr_name_en').value = '';
     document.getElementById('ofr_show_name').checked = false;
     document.getElementById('discount').value = '';
+    ofrSelProduct = { price: null, cost: null };
+    ofrRenderFacts();
     var sortEl = document.getElementById('ofr_sort');
     if (sortEl) sortEl.value = String(ofrComputeNextSort());
     var activeEl = document.getElementById('ofr_active');
@@ -301,6 +366,11 @@ function ofrEdit(row) {
     document.getElementById('ofr_id').value = String(row.id || 0);
     document.getElementById('offer_product_id').value = String(row.product_id || 0);
     document.getElementById('ofr_product_label').textContent = (row.product_name || '') + ' (#' + row.product_id + ')';
+    var pickRow = (window.OFR_PICK_ROWS || []).find(function (r) {
+        return parseInt(r.product_id, 10) === parseInt(row.product_id, 10);
+    });
+    ofrSelProduct.price = (pickRow && pickRow.price != null && pickRow.price !== '') ? Number(pickRow.price) : null;
+    ofrSelProduct.cost = (pickRow && pickRow.cost != null && pickRow.cost !== '') ? Number(pickRow.cost) : null;
     document.getElementById('ofr_name_ar').value = row.name_ar != null ? String(row.name_ar) : '';
     document.getElementById('ofr_name_en').value = row.name_en != null ? String(row.name_en) : '';
     document.getElementById('ofr_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
@@ -316,6 +386,7 @@ function ofrEdit(row) {
         ocpSetDmyFromIso('ofr_valid_from', row.valid_from || '');
         ocpSetDmyFromIso('ofr_valid_to', row.valid_to || '');
     }
+    ofrRenderFacts();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -342,6 +413,14 @@ async function saveOffer() {
         alert('تاريخ بداية ونهاية العرض إلزاميان');
         return;
     }
+    if (!(payload.discount > 0)) {
+        alert('قيمة الخصم يجب أن تكون أكبر من صفر');
+        return;
+    }
+    if (!ofrRenderFacts()) {
+        alert('السعر بعد الخصم أقل من تكلفة المنتج (أو صفر/سالب) — قلّل قيمة الخصم قبل الحفظ.');
+        return;
+    }
     var res = await postJSON('/admin/api/offers/save.php', payload);
     alert(res.message || (res.success ? 'تم حفظ العرض' : 'فشل حفظ العرض'));
     if (res.success) location.reload();
@@ -352,6 +431,8 @@ async function saveOffer() {
     var enEl = document.getElementById('ofr_name_en');
     if (arEl) arEl.addEventListener('input', ofrScheduleNameFromAr);
     if (enEl) enEl.addEventListener('input', ofrScheduleNameFromEn);
+    var discEl = document.getElementById('discount');
+    if (discEl) discEl.addEventListener('input', ofrRenderFacts);
 })();
 if (typeof ocpDefaultScheduleDates === 'function') {
     ocpDefaultScheduleDates('ofr');
