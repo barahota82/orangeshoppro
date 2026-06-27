@@ -34,6 +34,17 @@ $offers = $pdo->query(
     ORDER BY ' . $orderSql . '
 '
 )->fetchAll();
+$ofrNextSort = 1;
+if ($hasSortCol) {
+    $ofrMaxSort = 0;
+    foreach ($offers as $ofrRow) {
+        $ofrSortVal = (int) ($ofrRow['sort_order'] ?? 0);
+        if ($ofrSortVal > $ofrMaxSort) {
+            $ofrMaxSort = $ofrSortVal;
+        }
+    }
+    $ofrNextSort = $ofrMaxSort + 1;
+}
 $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offersCountryId);
 ?>
 <div class="page-title">
@@ -55,7 +66,7 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
         <?php if ($hasSortCol): ?>
         <div style="max-width:120px;">
             <label for="ofr_sort">الترتيب</label>
-            <input type="number" id="ofr_sort" class="admin-inp" value="0" readonly tabindex="-1" title="يُحدَّد تلقائياً" style="background:#f1f5f9;color:#64748b;cursor:not-allowed;text-align:center;" dir="ltr">
+            <input type="number" id="ofr_sort" class="admin-inp" value="<?php echo (int) $ofrNextSort; ?>" readonly tabindex="-1" title="يُحدَّد تلقائياً" style="background:#f1f5f9;color:#64748b;cursor:not-allowed;text-align:center;" dir="ltr">
         </div>
         <?php endif; ?>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -198,6 +209,16 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
 <script>
 <?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
 window.OFR_PICK_ROWS = <?php echo $ofrPickJson !== false ? $ofrPickJson : '[]'; ?>;
+var OFR_ROWS = <?php echo json_encode(array_values($offers), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
+
+function ofrComputeNextSort() {
+    var max = 0;
+    (OFR_ROWS || []).forEach(function (r) {
+        var s = parseInt(r.sort_order, 10) || 0;
+        if (s > max) max = s;
+    });
+    return max + 1;
+}
 
 function ofrSetProduct(row) {
     document.getElementById('offer_product_id').value = String(row.product_id || 0);
@@ -266,7 +287,7 @@ function ofrResetForm() {
     document.getElementById('ofr_show_name').checked = false;
     document.getElementById('discount').value = '';
     var sortEl = document.getElementById('ofr_sort');
-    if (sortEl) sortEl.value = '0';
+    if (sortEl) sortEl.value = String(ofrComputeNextSort());
     var activeEl = document.getElementById('ofr_active');
     if (activeEl) activeEl.checked = true;
     if (typeof ocpSetAlwaysOn === 'function') {

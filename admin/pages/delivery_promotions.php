@@ -60,11 +60,6 @@ echo orange_offer_gl_link_card_html(
 .dp-area-row { display:flex; align-items:center; gap:8px; padding:3px 4px; }
 .dp-inactive-badge { color:#b91c1c; background:#fee2e2; padding:2px 8px; border-radius:6px; font-size:.85em; }
 .dp-tree-empty { color:#64748b; padding:10px; }
-.dp-form-row { display:flex; flex-wrap:wrap; gap:18px; align-items:flex-end; }
-.dp-form-row .dp-field { display:flex; flex-direction:column; }
-.dp-form-row .dp-field > label { margin-bottom:4px; }
-.dp-form-row .dp-field .admin-inp { height:var(--input-min-h,40px); box-sizing:border-box; }
-.dp-form-row .dp-check { display:flex; align-items:center; gap:8px; cursor:pointer; height:var(--input-min-h,40px); white-space:nowrap; }
 .admin-inp-dmy-with-picker.is-disabled { opacity:.55; }
 .admin-inp-dmy-with-picker.is-disabled .admin-inp { background:#f1f5f9; color:#94a3b8; cursor:not-allowed; }
 </style>
@@ -82,12 +77,12 @@ echo orange_offer_gl_link_card_html(
 <div class="card">
     <h3>إضافة / تعديل</h3>
     <input type="hidden" id="dp_id" value="0">
-    <div class="dp-form-row" style="margin-bottom:14px;">
-        <div class="dp-field" style="max-width:120px;">
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:14px;">
+        <div style="max-width:120px;">
             <label for="dp_sort">الترتيب</label>
             <input type="number" id="dp_sort" class="admin-inp" value="0" readonly tabindex="-1" title="يُحدَّد تلقائياً" style="background:#f1f5f9;color:#64748b;cursor:not-allowed;text-align:center;">
         </div>
-        <label class="dp-check">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="dp_active" checked> نشط
         </label>
     </div>
@@ -107,30 +102,30 @@ echo orange_offer_gl_link_card_html(
             <input type="checkbox" id="dp_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
         </label>
     </div>
-    <div class="dp-form-row" style="margin-top:12px;">
-        <div class="dp-field" style="min-width:160px;">
+    <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;">
+        <div style="min-width:160px;">
             <label for="dp_discount_type">نوع الخصم</label>
             <select id="dp_discount_type" class="admin-inp"></select>
         </div>
-        <div class="dp-field" style="min-width:140px;">
+        <div style="min-width:140px;">
             <label for="dp_discount_value" id="dp_discount_value_label">قيمة الخصم</label>
             <input type="text" id="dp_discount_value" class="admin-inp admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="2">
         </div>
-        <label class="dp-check">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;">
             <input type="checkbox" id="dp_always_on"> <strong>التفعيل الدائم</strong>
         </label>
-        <div class="dp-field" style="min-width:150px;">
+        <div style="min-width:150px;">
             <label for="dp_valid_from">بداية العرض <span dir="ltr">*</span></label>
             <input type="text" id="dp_valid_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
         </div>
-        <div class="dp-field" style="min-width:150px;">
+        <div style="min-width:150px;">
             <label for="dp_valid_to">نهاية العرض <span dir="ltr">*</span></label>
             <input type="text" id="dp_valid_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
         </div>
-        <label class="dp-check">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;">
             <input type="checkbox" id="dp_reg"> <strong>للمسجّلين فقط</strong>
         </label>
-        <label class="dp-check">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;">
             <input type="checkbox" id="dp_first_delivered"> <strong>أول طلب مُسلَّم</strong>
         </label>
     </div>

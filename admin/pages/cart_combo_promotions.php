@@ -131,6 +131,16 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 var CCP_PICK_ROWS = <?php echo $ccpPickJson !== false ? $ccpPickJson : '[]'; ?>;
 var ccpNameArTimer = null;
 var ccpNameEnTimer = null;
+var CCP_ROWS = [];
+
+function ccpComputeNextSort() {
+    var max = 0;
+    (CCP_ROWS || []).forEach(function (r) {
+        var s = parseInt(r.sort_order, 10) || 0;
+        if (s > max) max = s;
+    });
+    return max + 1;
+}
 
 function ccpFmtComps(comps) {
     if (!comps || !comps.length) return '—';
@@ -190,7 +200,7 @@ function resetCartComboPromotionForm() {
     document.getElementById('ccp_title_en').value = '';
     document.getElementById('ccp_show_name').checked = false;
     document.getElementById('ccp_price').value = '';
-    document.getElementById('ccp_sort').value = '0';
+    document.getElementById('ccp_sort').value = String(ccpComputeNextSort());
     ccpRenderComps([]);
     document.getElementById('ccp_reg').checked = false;
     document.getElementById('ccp_first_delivered').checked = false;
@@ -282,6 +292,7 @@ async function loadCartComboPromotions() {
         return;
     }
     var rows = res.data;
+    CCP_ROWS = rows;
     tb.innerHTML = '';
     rows.forEach(function (r) {
         var scope = (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'الكل') + (parseInt(r.first_delivered_order_only, 10) === 1 ? ' • أول طلب مُسلَّم' : '');
@@ -307,6 +318,9 @@ async function loadCartComboPromotions() {
             }
         });
     });
+    if ((parseInt(document.getElementById('ccp_id').value, 10) || 0) === 0) {
+        document.getElementById('ccp_sort').value = String(ccpComputeNextSort());
+    }
 }
 
 async function saveCartComboPromotion() {

@@ -129,6 +129,16 @@ $hasTable = orange_table_exists($pdo, 'cart_promotions');
 <?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
 var cpNameArTimer = null;
 var cpNameEnTimer = null;
+var CP_ROWS = [];
+
+function cpComputeNextSort() {
+    var max = 0;
+    (CP_ROWS || []).forEach(function (r) {
+        var s = parseInt(r.sort_order, 10) || 0;
+        if (s > max) max = s;
+    });
+    return max + 1;
+}
 
 function resetCartPromotionForm() {
     document.getElementById('cp_id').value = '0';
@@ -137,7 +147,7 @@ function resetCartPromotionForm() {
     document.getElementById('cp_show_name').checked = false;
     document.getElementById('cp_min').value = '';
     document.getElementById('cp_disc').value = '';
-    document.getElementById('cp_sort').value = '0';
+    document.getElementById('cp_sort').value = String(cpComputeNextSort());
     document.getElementById('cp_reg').checked = false;
     document.getElementById('cp_first_delivered').checked = false;
     document.getElementById('cp_active').checked = true;
@@ -227,6 +237,7 @@ async function loadCartPromotions() {
         return;
     }
     const rows = res.data || [];
+    CP_ROWS = rows;
     const tb = document.getElementById('cp_tbody');
     tb.innerHTML = '';
     rows.forEach(function (r) {
@@ -250,6 +261,9 @@ async function loadCartPromotions() {
             if (row) editCartPromotion(row);
         });
     });
+    if ((parseInt(document.getElementById('cp_id').value, 10) || 0) === 0) {
+        document.getElementById('cp_sort').value = String(cpComputeNextSort());
+    }
 }
 
 async function saveCartPromotion() {

@@ -434,7 +434,7 @@ function resetCartBogoPromotionForm() {
     document.getElementById('cbp_show_name').checked = false;
     document.getElementById('cbp_cat').value = '';
     document.getElementById('cbp_minbuy').value = '2';
-    document.getElementById('cbp_sort').value = '0';
+    document.getElementById('cbp_sort').value = String(cbpComputeNextSort());
     cbpRenderPool([]);
     cbpSetFixed(0);
     cbpRenderBuy([]);
@@ -499,6 +499,16 @@ function escCbp(s) {
 
 var cbpNameArTimer = null;
 var cbpNameEnTimer = null;
+var CBP_ROWS = [];
+
+function cbpComputeNextSort() {
+    var max = 0;
+    (CBP_ROWS || []).forEach(function (r) {
+        var s = parseInt(r.sort_order, 10) || 0;
+        if (s > max) max = s;
+    });
+    return max + 1;
+}
 
 function cbpRowName(row) {
     var ar = (row.name_ar != null ? String(row.name_ar) : '').trim();
@@ -558,6 +568,7 @@ async function loadCartBogoPromotions() {
         return;
     }
     const rows = res.data || [];
+    CBP_ROWS = rows;
     const tb = document.getElementById('cbp_tbody');
     tb.innerHTML = '';
     rows.forEach(function (r) {
@@ -611,6 +622,9 @@ async function loadCartBogoPromotions() {
             if (row) editCartBogoPromotion(row);
         });
     });
+    if ((parseInt(document.getElementById('cbp_id').value, 10) || 0) === 0) {
+        document.getElementById('cbp_sort').value = String(cbpComputeNextSort());
+    }
 }
 
 async function saveCartBogoPromotion() {

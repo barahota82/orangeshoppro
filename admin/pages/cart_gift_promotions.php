@@ -164,6 +164,16 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 var CGP_PICK_ROWS = <?php echo $cgpPickJson !== false ? $cgpPickJson : '[]'; ?>;
 var cgpNameArTimer = null;
 var cgpNameEnTimer = null;
+var CGP_ROWS = [];
+
+function cgpComputeNextSort() {
+    var max = 0;
+    (CGP_ROWS || []).forEach(function (r) {
+        var s = parseInt(r.sort_order, 10) || 0;
+        if (s > max) max = s;
+    });
+    return max + 1;
+}
 
 function cgpPickMeta(pid) {
     var id = parseInt(pid, 10) || 0;
@@ -281,7 +291,7 @@ function resetCartGiftPromotionForm() {
     document.getElementById('cgp_name_en').value = '';
     document.getElementById('cgp_show_name').checked = false;
     document.getElementById('cgp_min').value = '';
-    document.getElementById('cgp_sort').value = '0';
+    document.getElementById('cgp_sort').value = String(cgpComputeNextSort());
     cgpRenderPool([]);
     cgpSetFixed(0);
     document.querySelector('input[name="cgp_kind"][value="choice"]').checked = true;
@@ -388,6 +398,7 @@ async function loadCartGiftPromotions() {
         return;
     }
     const rows = res.data || [];
+    CGP_ROWS = rows;
     const tb = document.getElementById('cgp_tbody');
     tb.innerHTML = '';
     rows.forEach(function (r) {
@@ -426,6 +437,9 @@ async function loadCartGiftPromotions() {
             if (row) editCartGiftPromotion(row);
         });
     });
+    if ((parseInt(document.getElementById('cgp_id').value, 10) || 0) === 0) {
+        document.getElementById('cgp_sort').value = String(cgpComputeNextSort());
+    }
 }
 
 async function saveCartGiftPromotion() {
