@@ -61,6 +61,8 @@ try {
     $sfaClaim = $accCaller ? (int) ($accCaller['id'] ?? 0) : 0;
     $sfaLink = $sfaClaim > 0 ? orange_storefront_resolve_order_account_link($pdo, $sfaClaim, $phoneNorm) : null;
     $buyerRegistered = $sfaLink !== null && $sfaLink > 0;
+    $buyerAccountId = ($sfaLink !== null && $sfaLink > 0) ? (int) $sfaLink : null;
+    $buyerPhone = $phoneNorm !== '' ? $phoneNorm : null;
 
     $pdo->beginTransaction();
 
@@ -77,11 +79,11 @@ try {
         $offerPartition = orange_product_offer_partition_items($pdo, $validatedItems, $amendCountryArg);
         $nonOfferItems = $offerPartition['non_offer_items'];
         $nonOfferSubtotal = max(0.0, round($subtotal - (float) $offerPartition['offer_items_value'], 4));
-        $comboPick = orange_cart_combo_best_match($pdo, $nonOfferItems, $buyerRegistered);
+        $comboPick = orange_cart_combo_best_match($pdo, $nonOfferItems, $buyerRegistered, $amendCountryArg, $buyerAccountId, $buyerPhone);
         $comboDiscount = $comboPick !== null ? (float) $comboPick['discount'] : 0.0;
         $comboId = $comboPick !== null ? (int) $comboPick['id'] : null;
         $cartPromoBase = max(0.0, round($nonOfferSubtotal - $comboDiscount, 4));
-        $promoPick = orange_cart_promotion_resolve($pdo, $cartPromoBase, $buyerRegistered);
+        $promoPick = orange_cart_promotion_resolve($pdo, $cartPromoBase, $buyerRegistered, $amendCountryArg, $buyerAccountId, $buyerPhone);
         $promoDiscount = $promoPick !== null ? (float) $promoPick['discount'] : 0.0;
         $promoId = $promoPick !== null ? (int) $promoPick['id'] : null;
         $productOfferDiscount = (float) $offerPartition['offer_discount'];
@@ -91,7 +93,7 @@ try {
         }
         $orderTotal = max(0.0, round($subtotal - $comboDiscount - $promoDiscount - $productOfferDiscount, 4));
 
-        $promoBundle = orange_storefront_build_promotional_gift_lines($pdo, $data, $validatedItems, $subtotal, $buyerRegistered);
+        $promoBundle = orange_storefront_build_promotional_gift_lines($pdo, $data, $validatedItems, $subtotal, $buyerRegistered, $amendCountryArg, $buyerAccountId, $buyerPhone);
         $giftLine = $promoBundle['giftLine'];
         $giftPromoId = $promoBundle['giftPromoId'];
         $giftVariantId = $promoBundle['giftVariantId'];

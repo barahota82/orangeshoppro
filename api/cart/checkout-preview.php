@@ -29,15 +29,21 @@ try {
 
     $acc = current_storefront_account($pdo);
     $buyerReg = $acc !== null;
+    // هوية المشتري لأهليّة «أول طلب مُسلَّم» (مثل التوصيل): الحساب أساس، والهاتف من ملف الحساب.
+    // الزائر بلا هاتف في المعاينة → عرض «أول طلب مُسلَّم» قد لا يظهر هنا لكنه يُطبَّق عند إنشاء الطلب إن كان مؤهَّلاً.
+    $buyerAccountId = ($acc !== null && (int) ($acc['id'] ?? 0) > 0) ? (int) $acc['id'] : null;
+    $buyerPhone = ($acc !== null && isset($acc['customer_phone']) && trim((string) $acc['customer_phone']) !== '')
+        ? trim((string) $acc['customer_phone'])
+        : null;
     // سياسة «العرض بديل» (س4/2): استبعاد البنود ذات عرض المنتج من أساس الكومبو/خصم السلة.
     $offerPartition = orange_product_offer_partition_items($pdo, $validatedItems, $storefrontCountryId);
     $nonOfferItems = $offerPartition['non_offer_items'];
     $nonOfferSubtotal = max(0.0, round($subtotal - (float) $offerPartition['offer_items_value'], 4));
-    $comboPick = orange_cart_combo_best_match($pdo, $nonOfferItems, $buyerReg, $storefrontCountryId);
+    $comboPick = orange_cart_combo_best_match($pdo, $nonOfferItems, $buyerReg, $storefrontCountryId, $buyerAccountId, $buyerPhone);
     $comboDiscount = $comboPick !== null ? (float) $comboPick['discount'] : 0.0;
     $comboId = $comboPick !== null ? (int) $comboPick['id'] : null;
     $cartPromoBase = max(0.0, round($nonOfferSubtotal - $comboDiscount, 4));
-    $promo = orange_cart_promotion_resolve($pdo, $cartPromoBase, $buyerReg, $storefrontCountryId);
+    $promo = orange_cart_promotion_resolve($pdo, $cartPromoBase, $buyerReg, $storefrontCountryId, $buyerAccountId, $buyerPhone);
     $promoDiscount = $promo !== null ? (float) $promo['discount'] : 0.0;
     $productOfferDiscount = (float) $offerPartition['offer_discount'];
     $maxOfferRoom = max(0.0, round($subtotal - $comboDiscount - $promoDiscount, 4));
@@ -51,7 +57,7 @@ try {
     $comboRegUnlock = orange_cart_combo_register_unlock_teaser_applies($pdo, $validatedItems, $buyerReg, $storefrontCountryId);
 
     $giftPayload = null;
-    $giftRule = orange_cart_gift_promotion_select_rule($pdo, $subtotal, $buyerReg, $storefrontCountryId);
+    $giftRule = orange_cart_gift_promotion_select_rule($pdo, $subtotal, $buyerReg, $storefrontCountryId, $buyerAccountId, $buyerPhone);
     if ($giftRule !== null) {
         if ($giftRule['gift_kind'] === 'fixed') {
             $fv = (int) ($giftRule['fixed_variant_id'] ?? 0);
@@ -85,7 +91,7 @@ try {
     }
 
     $bogoPayload = null;
-    $bogoRule = orange_cart_bogo_promotion_select_rule($pdo, $validatedItems, $buyerReg, $storefrontCountryId);
+    $bogoRule = orange_cart_bogo_promotion_select_rule($pdo, $validatedItems, $buyerReg, $storefrontCountryId, $buyerAccountId, $buyerPhone);
     $bogoCtx = $validatedItems;
     if ($bogoRule !== null) {
         $bogoCtx = $validatedItems;

@@ -55,8 +55,9 @@ try {
         ], 422);
     }
 
-    $sortOrder = (int) ($data['sort_order'] ?? 0);
     $hasSort = orange_table_has_column($pdo, 'offers', 'sort_order');
+    // التفعيل (نشط/مخفي) — افتراضياً نشط للحفاظ على سلوك النداءات القديمة بلا الحقل.
+    $isActive = array_key_exists('is_active', $data) ? (!empty($data['is_active']) ? 1 : 0) : 1;
 
     $offerId = (int) ($data['id'] ?? 0);
     if ($offerId > 0) {
@@ -74,36 +75,21 @@ try {
         } catch (RuntimeException $e) {
             json_response(['success' => false, 'message' => $e->getMessage()], 403);
         }
-        if ($hasSort) {
-            $st = $pdo->prepare(
-                'UPDATE offers SET product_id = ?, discount = ?, sort_order = ?, is_active = 1,
-                 is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL
-                 WHERE id = ?'
-            );
-            $st->execute([
-                $pid,
-                $discount,
-                $sortOrder,
-                $isAlwaysOn,
-                $bounds['valid_from'],
-                $bounds['valid_to'],
-                $offerId,
-            ]);
-        } else {
-            $st = $pdo->prepare(
-                'UPDATE offers SET product_id = ?, discount = ?, is_active = 1,
-                 is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL
-                 WHERE id = ?'
-            );
-            $st->execute([
-                $pid,
-                $discount,
-                $isAlwaysOn,
-                $bounds['valid_from'],
-                $bounds['valid_to'],
-                $offerId,
-            ]);
-        }
+        // الترتيب تلقائي بالكامل: لا يُمَسّ عند التعديل.
+        $st = $pdo->prepare(
+            'UPDATE offers SET product_id = ?, discount = ?, is_active = ?,
+             is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL
+             WHERE id = ?'
+        );
+        $st->execute([
+            $pid,
+            $discount,
+            $isActive,
+            $isAlwaysOn,
+            $bounds['valid_from'],
+            $bounds['valid_to'],
+            $offerId,
+        ]);
         orange_promo_always_on_sync_history(
             $pdo,
             'offers',
@@ -117,14 +103,17 @@ try {
     }
 
     if ($hasSort) {
+        // الترتيب تلقائي: التالي في الجدول (offers بلا country_id بالتصميم).
+        $sortOrder = (int) ($pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM offers')->fetchColumn() ?: 1);
         $stmt = $pdo->prepare(
             'INSERT INTO offers (product_id, discount, sort_order, is_active, is_always_on, valid_from, valid_to)
-             VALUES (?, ?, ?, 1, ?, ?, ?)'
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $pid,
             $discount,
             $sortOrder,
+            $isActive,
             $isAlwaysOn,
             $bounds['valid_from'],
             $bounds['valid_to'],
@@ -132,11 +121,12 @@ try {
     } else {
         $stmt = $pdo->prepare(
             'INSERT INTO offers (product_id, discount, is_active, is_always_on, valid_from, valid_to)
-             VALUES (?, ?, 1, ?, ?, ?)'
+             VALUES (?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $pid,
             $discount,
+            $isActive,
             $isAlwaysOn,
             $bounds['valid_from'],
             $bounds['valid_to'],

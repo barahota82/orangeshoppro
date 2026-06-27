@@ -92,6 +92,15 @@ try {
 
     if ($action === 'save') {
         $id = (int) ($data['id'] ?? 0);
+        $nameAr = function_exists('mb_substr')
+            ? mb_substr(trim((string) ($data['name_ar'] ?? '')), 0, 191, 'UTF-8')
+            : substr(trim((string) ($data['name_ar'] ?? '')), 0, 191);
+        $nameEn = function_exists('mb_substr')
+            ? mb_substr(trim((string) ($data['name_en'] ?? '')), 0, 191, 'UTF-8')
+            : substr(trim((string) ($data['name_en'] ?? '')), 0, 191);
+        if ($nameAr === '') {
+            json_response(['success' => false, 'message' => 'اسم العرض بالعربي مطلوب'], 422);
+        }
         $bogoRaw = strtolower(trim((string) ($data['bogo_kind'] ?? 'same_variant')));
         if ($bogoRaw === 'same_category') {
             $bogoKind = 'same_category';
@@ -112,7 +121,7 @@ try {
         }
         $buyJson = null;
         $reqReg = !empty($data['requires_registered_account']) ? 1 : 0;
-        $sortOrder = (int) ($data['sort_order'] ?? 0);
+        $firstDeliveredOnly = !empty($data['first_delivered_order_only']) ? 1 : 0;
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $isAlwaysOn = !empty($data['is_always_on']) ? 1 : 0;
         $dateErr = null;
@@ -227,21 +236,24 @@ try {
 
         if ($id > 0) {
             orange_cart_promo_clear_auto_pause($pdo, 'cart_bogo_promotions', $id);
+            // الترتيب تلقائي بالكامل: لا يُمَسّ عند التعديل.
             $st = $pdo->prepare(
-                'UPDATE cart_bogo_promotions SET bogo_kind = ?, category_id = ?, min_buy_qty = ?, buy_components_json = ?, requires_registered_account = ?, gift_kind = ?, fixed_variant_id = ?, pool_variant_ids = ?, gift_unit_charge_kind = ?, gift_unit_charge_value = ?, sort_order = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
+                'UPDATE cart_bogo_promotions SET name_ar = ?, name_en = ?, bogo_kind = ?, category_id = ?, min_buy_qty = ?, buy_components_json = ?, requires_registered_account = ?, first_delivered_order_only = ?, gift_kind = ?, fixed_variant_id = ?, pool_variant_ids = ?, gift_unit_charge_kind = ?, gift_unit_charge_value = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
             );
             $st->execute([
+                $nameAr,
+                $nameEn,
                 $bogoKind,
                 $catSql,
                 $minBuy,
                 $buyJson,
                 $reqReg,
+                $firstDeliveredOnly,
                 $giftKind,
                 $giftKind === 'fixed' ? $fixedVid : null,
                 $giftKind === 'choice' ? $poolJson : null,
                 $giftChargeKind,
                 $giftChargeVal,
-                $sortOrder,
                 $isActive,
                 $isAlwaysOn,
                 $bounds['valid_from'],
@@ -256,16 +268,26 @@ try {
                 orange_cart_promotion_admin_country_id($pdo)
             );
         } else {
+            // الترتيب تلقائي: التالي ضمن نفس الدولة.
+            $sortBind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $insertCountryId);
+            $stSort = $pdo->prepare(
+                'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cart_bogo_promotions WHERE 1=1' . $sortBind['sql']
+            );
+            $stSort->execute($sortBind['params']);
+            $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
             $st = $pdo->prepare(
-                'INSERT INTO cart_bogo_promotions (country_id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO cart_bogo_promotions (country_id, name_ar, name_en, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, first_delivered_order_only, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $st->execute([
                 $insertCountryId,
+                $nameAr,
+                $nameEn,
                 $bogoKind,
                 $catSql,
                 $minBuy,
                 $buyJson,
                 $reqReg,
+                $firstDeliveredOnly,
                 $giftKind,
                 $giftKind === 'fixed' ? $fixedVid : null,
                 $giftKind === 'choice' ? $poolJson : null,

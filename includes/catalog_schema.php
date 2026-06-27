@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 103);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 104);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3168,6 +3168,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_delivery_gov_default_amounts_v101($pdo);
     orange_catalog_migrate_delivery_promo_first_delivered_v102($pdo);
     orange_catalog_migrate_loyalty_ledger_unique_ref_v103($pdo);
+    orange_catalog_migrate_cart_promos_name_first_delivered_v104($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3787,6 +3788,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_delivery_gov_default_amounts_v101($pdo);
     orange_catalog_migrate_delivery_promo_first_delivered_v102($pdo);
     orange_catalog_migrate_loyalty_ledger_unique_ref_v103($pdo);
+    orange_catalog_migrate_cart_promos_name_first_delivered_v104($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -7794,6 +7796,63 @@ function orange_catalog_migrate_loyalty_ledger_unique_ref_v103(PDO $pdo): void
             'ALTER TABLE loyalty_ledger
                 ADD UNIQUE KEY uq_loyalty_ledger_ref (kind, ref_type, ref_id)'
         );
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v104 — توحيد شاشات عروض السلة مع شاشة عرض التوصيل:
+ *  - اسم العرض (عربي/إنجليزي) name_ar/name_en للجداول التي لا تملك عنواناً
+ *    (cart_promotions, cart_bogo_promotions, cart_gift_promotions). الكومبو يملك title_ar/title_en مسبقاً فيُعاد استخدامه كاسم.
+ *  - أهليّة «أول طلب مُسلَّم» first_delivered_order_only لجداول السلة الأربعة (تطبيق runtime مثل التوصيل:
+ *    التعرّف على العميل بحساب أو هاتف وألا يكون لديه طلب مُسلَّم سابق ضمن نفس الدولة).
+ * marker-gated + idempotent؛ يُستدعى من المسار الكامل والمسار السريع (نفس درس v102).
+ */
+function orange_catalog_migrate_cart_promos_name_first_delivered_v104(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_cart_promos_name_first_delivered_v104';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    foreach (['cart_promotions', 'cart_bogo_promotions', 'cart_gift_promotions'] as $table) {
+        if (!orange_table_exists($pdo, $table)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $table, 'name_ar')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE ' . $table . ' ADD COLUMN name_ar VARCHAR(191) NULL'
+            );
+            orange_schema_invalidate_column_check($table, 'name_ar');
+        }
+        if (!orange_table_has_column($pdo, $table, 'name_en')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE ' . $table . ' ADD COLUMN name_en VARCHAR(191) NULL'
+            );
+            orange_schema_invalidate_column_check($table, 'name_en');
+        }
+    }
+
+    foreach (['cart_promotions', 'cart_combo_promotions', 'cart_bogo_promotions', 'cart_gift_promotions'] as $table) {
+        if (!orange_table_exists($pdo, $table)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $table, 'first_delivered_order_only')) {
+            $after = orange_table_has_column($pdo, $table, 'requires_registered_account')
+                ? ' AFTER requires_registered_account'
+                : '';
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE ' . $table . '
+                    ADD COLUMN first_delivered_order_only TINYINT(1) NOT NULL DEFAULT 0' . $after
+            );
+            orange_schema_invalidate_column_check($table, 'first_delivered_order_only');
+        }
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

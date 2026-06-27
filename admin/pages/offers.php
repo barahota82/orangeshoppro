@@ -51,6 +51,17 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
 <div class="card">
     <h3>إضافة / تعديل عرض</h3>
     <input type="hidden" id="ofr_id" value="0">
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:14px;">
+        <?php if ($hasSortCol): ?>
+        <div style="max-width:120px;">
+            <label for="ofr_sort">الترتيب</label>
+            <input type="number" id="ofr_sort" class="admin-inp" value="0" readonly tabindex="-1" title="يُحدَّد تلقائياً" style="background:#f1f5f9;color:#64748b;cursor:not-allowed;text-align:center;" dir="ltr">
+        </div>
+        <?php endif; ?>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="ofr_active" checked> نشط
+        </label>
+    </div>
     <div class="form-grid">
         <div style="grid-column:1/-1;">
             <label>المنتج</label>
@@ -64,12 +75,6 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
             <label for="discount">قيمة الخصم (<?php echo htmlspecialchars((string) ($offersMoney['unit'] ?? 'KWD'), ENT_QUOTES, 'UTF-8'); ?>)</label>
             <input type="number" id="discount" class="admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr">
         </div>
-        <?php if ($hasSortCol): ?>
-        <div>
-            <label for="ofr_sort">الترتيب</label>
-            <input type="number" id="ofr_sort" value="0" class="admin-inp" style="max-width:120px;" dir="ltr">
-        </div>
-        <?php endif; ?>
         <div>
             <label for="ofr_valid_from">بداية العرض <span dir="ltr">*</span></label>
             <input type="text" id="ofr_valid_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
@@ -195,6 +200,8 @@ function ofrResetForm() {
     document.getElementById('discount').value = '';
     var sortEl = document.getElementById('ofr_sort');
     if (sortEl) sortEl.value = '0';
+    var activeEl = document.getElementById('ofr_active');
+    if (activeEl) activeEl.checked = true;
     if (typeof ocpSetAlwaysOn === 'function') {
         ocpSetAlwaysOn('ofr', false);
     }
@@ -210,6 +217,8 @@ function ofrEdit(row) {
     document.getElementById('discount').value = row.discount != null ? String(row.discount) : '';
     var sortEl = document.getElementById('ofr_sort');
     if (sortEl) sortEl.value = String(row.sort_order != null ? row.sort_order : 0);
+    var activeEl = document.getElementById('ofr_active');
+    if (activeEl) activeEl.checked = parseInt(row.is_active, 10) === 1;
     if (typeof ocpSetAlwaysOn === 'function') {
         ocpSetAlwaysOn('ofr', parseInt(row.is_always_on, 10) === 1);
     }
@@ -226,8 +235,8 @@ async function saveOffer() {
         product_id: parseInt(document.getElementById('offer_product_id').value, 10),
         discount: parseFloat(document.getElementById('discount').value || '0')
     };
-    var sortEl = document.getElementById('ofr_sort');
-    if (sortEl) payload.sort_order = parseInt(sortEl.value, 10) || 0;
+    var activeEl = document.getElementById('ofr_active');
+    payload.is_active = (activeEl && activeEl.checked) ? 1 : 0;
     payload.is_always_on = (typeof ocpIsAlwaysOn === 'function' && ocpIsAlwaysOn('ofr')) ? 1 : 0;
     if (typeof ocpSchedulePayload === 'function') {
         Object.assign(payload, ocpSchedulePayload('ofr'));

@@ -26,9 +26,30 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 <div class="card">
     <h3>إضافة / تعديل</h3>
     <input type="hidden" id="cgp_id" value="0">
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:14px;">
+        <div style="max-width:120px;">
+            <label for="cgp_sort">الترتيب</label>
+            <input type="number" id="cgp_sort" class="admin-inp" value="0" readonly tabindex="-1" title="يُحدَّد تلقائياً" style="background:#f1f5f9;color:#64748b;cursor:not-allowed;text-align:center;">
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="cgp_active" checked> نشط
+        </label>
+    </div>
     <div class="form-grid">
+        <div>
+            <label for="cgp_name_ar">اسم العرض (عربي)</label>
+            <input type="text" id="cgp_name_ar" class="admin-inp" dir="auto" placeholder="مثال: هدية عند تجاوز المبلغ">
+        </div>
+        <div>
+            <label for="cgp_name_en">English</label>
+            <input type="text" id="cgp_name_en" class="admin-inp" dir="ltr" lang="en" placeholder="Free gift over threshold">
+        </div>
+    </div>
+    <div style="margin-top:8px;">
+        <button type="button" class="btn-secondary" onclick="cgpTranslateOfferFromAr()">ترجمة تلقائية من العربي</button>
+    </div>
+    <div class="form-grid" style="margin-top:12px;">
         <div><label>الحد الأدنى لمجموع السلة (د.ك) — 0 يعني بدون شرط مبلغ</label><input type="text" id="cgp_min" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="0"></div>
-        <div><label>الترتيب</label><input type="number" id="cgp_sort" value="0" style="max-width:120px;"></div>
         <?php $ocpFieldPrefix = 'cgp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
         <div style="grid-column:1/-1;">
             <label><strong>نوع الهدية</strong></label>
@@ -74,15 +95,12 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <label id="cgp_gift_charge_val_label">القيمة</label>
             <input type="number" id="cgp_gift_charge_val" class="admin-inp" min="0" step="0.0001" style="max-width:14rem;" dir="ltr" value="0">
         </div>
-        <div style="grid-column:1/-1;">
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;max-width:52rem;line-height:1.45;">
-                <input type="checkbox" id="cgp_reg" style="margin-top:4px;flex-shrink:0;">
-                <span><strong>للمسجّلين فقط</strong> — عند التفعيل لا يُطبَّق العرض إلا لحساب مفعّل.</span>
-            </label>
-        </div>
-        <div style="display:flex;align-items:flex-end;gap:8px;">
+        <div style="grid-column:1/-1;display:flex;flex-wrap:wrap;gap:20px;align-items:center;">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="cgp_active" checked> نشط
+                <input type="checkbox" id="cgp_reg"> <strong>للمسجّلين فقط</strong>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="checkbox" id="cgp_first_delivered"> <strong>أول طلب مُسلَّم</strong>
             </label>
         </div>
     </div>
@@ -99,6 +117,7 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <thead>
                 <tr>
                     <th>#</th>
+                    <th>الاسم</th>
                     <th>حد أدنى</th>
                     <th>النوع</th>
                     <th>التفاصيل</th>
@@ -140,6 +159,8 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 <script>
 <?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
 var CGP_PICK_ROWS = <?php echo $cgpPickJson !== false ? $cgpPickJson : '[]'; ?>;
+var cgpNameArTimer = null;
+var cgpNameEnTimer = null;
 
 function cgpPickMeta(pid) {
     var id = parseInt(pid, 10) || 0;
@@ -253,12 +274,15 @@ function cgpToggleGiftCharge() {
 
 function resetCartGiftPromotionForm() {
     document.getElementById('cgp_id').value = '0';
+    document.getElementById('cgp_name_ar').value = '';
+    document.getElementById('cgp_name_en').value = '';
     document.getElementById('cgp_min').value = '';
     document.getElementById('cgp_sort').value = '0';
     cgpRenderPool([]);
     cgpSetFixed(0);
     document.querySelector('input[name="cgp_kind"][value="choice"]').checked = true;
     document.getElementById('cgp_reg').checked = false;
+    document.getElementById('cgp_first_delivered').checked = false;
     document.getElementById('cgp_active').checked = true;
     ocpSetAlwaysOn('cgp', false);
     ocpDefaultScheduleDates('cgp');
@@ -270,6 +294,8 @@ function resetCartGiftPromotionForm() {
 
 function editCartGiftPromotion(row) {
     document.getElementById('cgp_id').value = String(row.id != null ? row.id : 0);
+    document.getElementById('cgp_name_ar').value = row.name_ar != null ? String(row.name_ar) : '';
+    document.getElementById('cgp_name_en').value = row.name_en != null ? String(row.name_en) : '';
     document.getElementById('cgp_min').value = row.min_subtotal != null ? String(row.min_subtotal) : '';
     document.getElementById('cgp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
     const kind = (row.gift_kind || 'choice') === 'fixed' ? 'fixed' : 'choice';
@@ -278,6 +304,7 @@ function editCartGiftPromotion(row) {
     cgpRenderPool(row.pool_product_ids || row.pool_variant_ids || []);
     cgpSetFixed(row.fixed_product_id || row.fixed_variant_id || 0);
     document.getElementById('cgp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
+    document.getElementById('cgp_first_delivered').checked = parseInt(row.first_delivered_order_only, 10) === 1;
     document.getElementById('cgp_active').checked = parseInt(row.is_active, 10) === 1;
     ocpSetAlwaysOn('cgp', parseInt(row.is_always_on, 10) === 1);
     ocpSetDmyFromIso('cgp_valid_from', row.valid_from);
@@ -297,6 +324,57 @@ function escCgp(s) {
         .replace(/</g, '&lt;')
         .replace(/"/g, '&quot;');
 }
+
+function cgpRowName(row) {
+    var ar = (row.name_ar != null ? String(row.name_ar) : '').trim();
+    if (ar !== '') return ar;
+    var en = (row.name_en != null ? String(row.name_en) : '').trim();
+    return en !== '' ? en : ('#' + row.id);
+}
+
+async function cgpTranslateNames(opts) {
+    var silent = !!(opts && opts.silent);
+    var forceFromArabic = !!(opts && opts.forceFromArabic);
+    var arEl = document.getElementById('cgp_name_ar');
+    var enEl = document.getElementById('cgp_name_en');
+    if (!arEl || !enEl) return;
+    try {
+        var res = await postJSON('/admin/api/translate/names.php', {
+            name_ar: arEl.value.trim(),
+            name_en: forceFromArabic ? '' : enEl.value.trim()
+        });
+        if (!res || !res.success) {
+            if (!silent) alert((res && res.message) ? res.message : 'فشل الترجمة');
+            return;
+        }
+        if (res.name_en != null) enEl.value = String(res.name_en);
+    } catch (e) {
+        if (!silent) alert('تعذر الاتصال بخدمة الترجمة');
+    }
+}
+
+function cgpScheduleNameFromAr() {
+    var arEl = document.getElementById('cgp_name_ar');
+    if (!arEl) return;
+    clearTimeout(cgpNameArTimer);
+    cgpNameArTimer = setTimeout(function () {
+        cgpTranslateNames({ silent: true, forceFromArabic: true });
+    }, 700);
+}
+
+function cgpScheduleNameFromEn() {
+    var enEl = document.getElementById('cgp_name_en');
+    if (!enEl || enEl.value.trim() === '') return;
+    clearTimeout(cgpNameEnTimer);
+    cgpNameEnTimer = setTimeout(function () {
+        cgpTranslateNames({ silent: true, forceFromArabic: false });
+    }, 600);
+}
+
+async function cgpTranslateOfferFromAr() {
+    await cgpTranslateNames({ silent: false, forceFromArabic: true });
+}
+window.cgpTranslateOfferFromAr = cgpTranslateOfferFromAr;
 
 async function loadCartGiftPromotions() {
     const res = await postJSON('/admin/api/cart_gift_promotions/manage.php', { action: 'list' });
@@ -320,14 +398,16 @@ async function loadCartGiftPromotions() {
         if (gck === 'percent_off') gcharge = 'خصم %';
         else if (gck === 'fixed_unit') gcharge = 'سعر ثابت';
         else if (gck === 'amount_off_unit') gcharge = 'خصم مبلغ';
+        var cgpScope = (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'جميع الزوّار') + (parseInt(r.first_delivered_order_only, 10) === 1 ? ' • أول طلب مُسلَّم' : '');
         const tr = document.createElement('tr');
         tr.innerHTML =
             '<td>' + escCgp(String(r.id)) + '</td>' +
+            '<td>' + escCgp(cgpRowName(r)) + '</td>' +
             '<td dir="ltr">' + escCgp(String(r.min_subtotal)) + '</td>' +
             '<td>' + kind + '</td>' +
             '<td style="max-width:18rem;">' + det + '</td>' +
             '<td>' + escCgp(gcharge) + '</td>' +
-            '<td>' + (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'جميع الزوّار') + '</td>' +
+            '<td>' + escCgp(cgpScope) + '</td>' +
             '<td dir="ltr">' + escCgp(ocpScheduleLabel(r)) + '</td>' +
             '<td>' + escCgp(ocpStatusLabel(r)) + '</td>' +
             '<td>' + escCgp(String(r.sort_order)) + '</td>' +
@@ -348,9 +428,11 @@ async function saveCartGiftPromotion() {
     const res = await postJSON('/admin/api/cart_gift_promotions/manage.php', {
         action: 'save',
         id: parseInt(document.getElementById('cgp_id').value, 10) || 0,
+        name_ar: document.getElementById('cgp_name_ar').value.trim(),
+        name_en: document.getElementById('cgp_name_en').value.trim(),
         min_subtotal: document.getElementById('cgp_min').value.trim(),
-        sort_order: parseInt(document.getElementById('cgp_sort').value, 10) || 0,
         requires_registered_account: document.getElementById('cgp_reg').checked ? 1 : 0,
+        first_delivered_order_only: document.getElementById('cgp_first_delivered').checked ? 1 : 0,
         is_active: document.getElementById('cgp_active').checked ? 1 : 0,
         is_always_on: ocpIsAlwaysOn('cgp') ? 1 : 0,
         gift_kind: kindEl ? kindEl.value : 'choice',
@@ -401,6 +483,12 @@ async function loadCartGiftAlwaysOnHistory() {
     });
 }
 
+(function () {
+    var arEl = document.getElementById('cgp_name_ar');
+    var enEl = document.getElementById('cgp_name_en');
+    if (arEl) arEl.addEventListener('input', cgpScheduleNameFromAr);
+    if (enEl) enEl.addEventListener('input', cgpScheduleNameFromEn);
+})();
 document.getElementById('cgp_pool_add_btn').addEventListener('click', function () {
     cgpOpenPick(function (row) { cgpAddPoolRow(row.product_id); });
 });

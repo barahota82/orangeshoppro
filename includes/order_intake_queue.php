@@ -470,6 +470,11 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     }
 
     $buyerRegistered = $sfaLink !== null && $sfaLink > 0;
+    $buyerAccountId = ($sfaLink !== null && $sfaLink > 0) ? (int) $sfaLink : null;
+    $buyerPhone = isset($data['phone']) ? trim((string) $data['phone']) : null;
+    if ($buyerPhone === '') {
+        $buyerPhone = null;
+    }
     $deliveryAreaId = isset($data['delivery_area_id']) ? (int) $data['delivery_area_id'] : 0;
     $deliveryBundle = $deliveryAreaId > 0
         ? orange_delivery_resolve_checkout_fee_bundle(
@@ -478,8 +483,8 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
             $buyerRegistered,
             $orderCountryId,
             null,
-            $sfaLink,
-            isset($data['phone']) ? trim((string) $data['phone']) : null
+            $buyerAccountId,
+            $buyerPhone
         )
         : [
             'base_fee' => 0.0,
@@ -499,11 +504,11 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     $offerPartition = orange_product_offer_partition_items($pdo, $validatedItems, $orderCountryId);
     $nonOfferItems = $offerPartition['non_offer_items'];
     $nonOfferSubtotal = max(0.0, round($subtotal - (float) $offerPartition['offer_items_value'], 4));
-    $comboPick = orange_cart_combo_best_match($pdo, $nonOfferItems, $buyerRegistered, $orderCountryId);
+    $comboPick = orange_cart_combo_best_match($pdo, $nonOfferItems, $buyerRegistered, $orderCountryId, $buyerAccountId, $buyerPhone);
     $comboDiscount = $comboPick !== null ? (float) $comboPick['discount'] : 0.0;
     $comboId = $comboPick !== null ? (int) $comboPick['id'] : null;
     $cartPromoBase = max(0.0, round($nonOfferSubtotal - $comboDiscount, 4));
-    $promoPick = orange_cart_promotion_resolve($pdo, $cartPromoBase, $buyerRegistered, $orderCountryId);
+    $promoPick = orange_cart_promotion_resolve($pdo, $cartPromoBase, $buyerRegistered, $orderCountryId, $buyerAccountId, $buyerPhone);
     $promoDiscount = $promoPick !== null ? (float) $promoPick['discount'] : 0.0;
     $promoId = $promoPick !== null ? (int) $promoPick['id'] : null;
     // عروض المنتج: خصم فعلي عند الدفع (السعر الأصلي على البند + بند خصم منفصل) — بديل لا يتراكم مع الكومبو/السلة.
@@ -514,7 +519,7 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     }
     $orderTotal = max(0.0, round($subtotal - $comboDiscount - $promoDiscount - $productOfferDiscount, 4));
 
-    $promoBundle = orange_storefront_build_promotional_gift_lines($pdo, $data, $validatedItems, $subtotal, $buyerRegistered, $orderCountryId);
+    $promoBundle = orange_storefront_build_promotional_gift_lines($pdo, $data, $validatedItems, $subtotal, $buyerRegistered, $orderCountryId, $buyerAccountId, $buyerPhone);
     $giftLine = $promoBundle['giftLine'];
     $giftPromoId = $promoBundle['giftPromoId'];
     $giftVariantId = $promoBundle['giftVariantId'];

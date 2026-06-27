@@ -64,11 +64,18 @@ try {
 
     if ($action === 'save') {
         $id = (int) ($data['id'] ?? 0);
-        $titleAr = trim((string) ($data['title_ar'] ?? ''));
-        $titleEn = trim((string) ($data['title_en'] ?? ''));
+        $titleAr = function_exists('mb_substr')
+            ? mb_substr(trim((string) ($data['title_ar'] ?? '')), 0, 191, 'UTF-8')
+            : substr(trim((string) ($data['title_ar'] ?? '')), 0, 191);
+        $titleEn = function_exists('mb_substr')
+            ? mb_substr(trim((string) ($data['title_en'] ?? '')), 0, 191, 'UTF-8')
+            : substr(trim((string) ($data['title_en'] ?? '')), 0, 191);
+        if ($titleAr === '') {
+            json_response(['success' => false, 'message' => 'اسم العرض بالعربي مطلوب'], 422);
+        }
         $comboPrice = ccp_money($data['combo_price'] ?? 0);
         $reqReg = !empty($data['requires_registered_account']) ? 1 : 0;
-        $sortOrder = (int) ($data['sort_order'] ?? 0);
+        $firstDeliveredOnly = !empty($data['first_delivered_order_only']) ? 1 : 0;
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $isAlwaysOn = !empty($data['is_always_on']) ? 1 : 0;
         $dateErr = null;
@@ -113,8 +120,9 @@ try {
 
         if ($id > 0) {
             orange_cart_promo_clear_auto_pause($pdo, 'cart_combo_promotions', $id);
+            // الترتيب تلقائي بالكامل: لا يُمَسّ عند التعديل.
             $st = $pdo->prepare(
-                'UPDATE cart_combo_promotions SET title_ar = ?, title_en = ?, components_json = ?, combo_price = ?, requires_registered_account = ?, sort_order = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
+                'UPDATE cart_combo_promotions SET title_ar = ?, title_en = ?, components_json = ?, combo_price = ?, requires_registered_account = ?, first_delivered_order_only = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
             );
             $st->execute([
                 $titleAr,
@@ -122,7 +130,7 @@ try {
                 $json,
                 $comboPrice,
                 $reqReg,
-                $sortOrder,
+                $firstDeliveredOnly,
                 $isActive,
                 $isAlwaysOn,
                 $bounds['valid_from'],
@@ -137,8 +145,15 @@ try {
                 orange_cart_promotion_admin_country_id($pdo)
             );
         } else {
+            // الترتيب تلقائي: التالي ضمن نفس الدولة.
+            $sortBind = orange_cart_promotion_sql_bind($pdo, 'cart_combo_promotions', '', $insertCountryId);
+            $stSort = $pdo->prepare(
+                'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cart_combo_promotions WHERE 1=1' . $sortBind['sql']
+            );
+            $stSort->execute($sortBind['params']);
+            $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
             $st = $pdo->prepare(
-                'INSERT INTO cart_combo_promotions (country_id, title_ar, title_en, components_json, combo_price, requires_registered_account, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+                'INSERT INTO cart_combo_promotions (country_id, title_ar, title_en, components_json, combo_price, requires_registered_account, first_delivered_order_only, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
             );
             $st->execute([
                 $insertCountryId,
@@ -147,6 +162,7 @@ try {
                 $json,
                 $comboPrice,
                 $reqReg,
+                $firstDeliveredOnly,
                 $sortOrder,
                 $isActive,
                 $isAlwaysOn,

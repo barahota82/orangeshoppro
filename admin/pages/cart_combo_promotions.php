@@ -27,11 +27,30 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 <div class="card">
     <h3>إضافة / تعديل</h3>
     <input type="hidden" id="ccp_id" value="0">
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:14px;">
+        <div style="max-width:120px;">
+            <label for="ccp_sort">الترتيب</label>
+            <input type="number" id="ccp_sort" class="admin-inp" value="0" readonly tabindex="-1" title="يُحدَّد تلقائياً" style="background:#f1f5f9;color:#64748b;cursor:not-allowed;text-align:center;">
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="ccp_active" checked> نشط
+        </label>
+    </div>
     <div class="form-grid">
-        <div style="grid-column:1/-1;"><label>عنوان داخلي (عربي) — اختياري</label><input type="text" id="ccp_title_ar" class="admin-inp" style="max-width:40rem;"></div>
-        <div style="grid-column:1/-1;"><label>عنوان داخلي (إنجليزي) — اختياري</label><input type="text" id="ccp_title_en" class="admin-inp" style="max-width:40rem;" dir="ltr" lang="en"></div>
+        <div>
+            <label for="ccp_title_ar">اسم العرض (عربي)</label>
+            <input type="text" id="ccp_title_ar" class="admin-inp" dir="auto" placeholder="مثال: كومبو نهاية الأسبوع">
+        </div>
+        <div>
+            <label for="ccp_title_en">English</label>
+            <input type="text" id="ccp_title_en" class="admin-inp" dir="ltr" lang="en" placeholder="Weekend combo">
+        </div>
+    </div>
+    <div style="margin-top:8px;">
+        <button type="button" class="btn-secondary" onclick="ccpTranslateOfferFromAr()">ترجمة تلقائية من العربي</button>
+    </div>
+    <div class="form-grid" style="margin-top:12px;">
         <div><label>سعر الحزمة الواحدة (د.ك)</label><input type="text" id="ccp_price" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="9.5"></div>
-        <div><label>الترتيب</label><input type="number" id="ccp_sort" value="0" style="max-width:120px;"></div>
         <?php $ocpFieldPrefix = 'ccp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
         <div style="grid-column:1/-1;">
             <label>منتجات الحزمة</label>
@@ -45,15 +64,12 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                 </table>
             </div>
         </div>
-        <div style="grid-column:1/-1;">
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;max-width:52rem;line-height:1.45;">
-                <input type="checkbox" id="ccp_reg" style="margin-top:4px;flex-shrink:0;">
-                <span><strong>للمسجّلين فقط</strong> — لا يُطبَّق إلا لحساب مفعّل (بريد مؤكد).</span>
-            </label>
-        </div>
-        <div style="display:flex;align-items:flex-end;gap:8px;">
+        <div style="grid-column:1/-1;display:flex;flex-wrap:wrap;gap:20px;align-items:center;">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="ccp_active" checked> نشط
+                <input type="checkbox" id="ccp_reg"> <strong>للمسجّلين فقط</strong>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="checkbox" id="ccp_first_delivered"> <strong>أول طلب مُسلَّم</strong>
             </label>
         </div>
     </div>
@@ -70,7 +86,7 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>عنوان</th>
+                    <th>الاسم</th>
                     <th>المكوّنات</th>
                     <th>سعر الحزمة</th>
                     <th>نطاق</th>
@@ -110,6 +126,8 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 <script>
 <?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
 var CCP_PICK_ROWS = <?php echo $ccpPickJson !== false ? $ccpPickJson : '[]'; ?>;
+var ccpNameArTimer = null;
+var ccpNameEnTimer = null;
 
 function ccpFmtComps(comps) {
     if (!comps || !comps.length) return '—';
@@ -171,6 +189,7 @@ function resetCartComboPromotionForm() {
     document.getElementById('ccp_sort').value = '0';
     ccpRenderComps([]);
     document.getElementById('ccp_reg').checked = false;
+    document.getElementById('ccp_first_delivered').checked = false;
     document.getElementById('ccp_active').checked = true;
     ocpSetAlwaysOn('ccp', false);
     ocpDefaultScheduleDates('ccp');
@@ -183,6 +202,7 @@ function editCartComboPromotion(row) {
     document.getElementById('ccp_price').value = row.combo_price != null ? String(row.combo_price) : '';
     document.getElementById('ccp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
     document.getElementById('ccp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
+    document.getElementById('ccp_first_delivered').checked = parseInt(row.first_delivered_order_only, 10) === 1;
     document.getElementById('ccp_active').checked = parseInt(row.is_active, 10) === 1;
     ocpSetAlwaysOn('ccp', parseInt(row.is_always_on, 10) === 1);
     ocpSetDmyFromIso('ccp_valid_from', row.valid_from);
@@ -198,24 +218,75 @@ function escCcp(s) {
         .replace(/"/g, '&quot;');
 }
 
+function ccpRowName(row) {
+    var ar = (row.title_ar != null ? String(row.title_ar) : '').trim();
+    if (ar !== '') return ar;
+    var en = (row.title_en != null ? String(row.title_en) : '').trim();
+    return en !== '' ? en : ('#' + row.id);
+}
+
+async function ccpTranslateNames(opts) {
+    var silent = !!(opts && opts.silent);
+    var forceFromArabic = !!(opts && opts.forceFromArabic);
+    var arEl = document.getElementById('ccp_title_ar');
+    var enEl = document.getElementById('ccp_title_en');
+    if (!arEl || !enEl) return;
+    try {
+        var res = await postJSON('/admin/api/translate/names.php', {
+            name_ar: arEl.value.trim(),
+            name_en: forceFromArabic ? '' : enEl.value.trim()
+        });
+        if (!res || !res.success) {
+            if (!silent) alert((res && res.message) ? res.message : 'فشل الترجمة');
+            return;
+        }
+        if (res.name_en != null) enEl.value = String(res.name_en);
+    } catch (e) {
+        if (!silent) alert('تعذر الاتصال بخدمة الترجمة');
+    }
+}
+
+function ccpScheduleNameFromAr() {
+    var arEl = document.getElementById('ccp_title_ar');
+    if (!arEl) return;
+    clearTimeout(ccpNameArTimer);
+    ccpNameArTimer = setTimeout(function () {
+        ccpTranslateNames({ silent: true, forceFromArabic: true });
+    }, 700);
+}
+
+function ccpScheduleNameFromEn() {
+    var enEl = document.getElementById('ccp_title_en');
+    if (!enEl || enEl.value.trim() === '') return;
+    clearTimeout(ccpNameEnTimer);
+    ccpNameEnTimer = setTimeout(function () {
+        ccpTranslateNames({ silent: true, forceFromArabic: false });
+    }, 600);
+}
+
+async function ccpTranslateOfferFromAr() {
+    await ccpTranslateNames({ silent: false, forceFromArabic: true });
+}
+window.ccpTranslateOfferFromAr = ccpTranslateOfferFromAr;
+
 async function loadCartComboPromotions() {
     var res = await postJSON('/admin/api/cart_combo_promotions/manage.php', { action: 'list' });
     var tb = document.getElementById('ccp_tbody');
     if (!res.success || !Array.isArray(res.data)) {
-        tb.innerHTML = '<tr><td colspan="8">تعذر التحميل</td></tr>';
+        tb.innerHTML = '<tr><td colspan="9">تعذر التحميل</td></tr>';
         return;
     }
     var rows = res.data;
     tb.innerHTML = '';
     rows.forEach(function (r) {
-        var title = (r.title_ar && String(r.title_ar).trim()) ? escCcp(String(r.title_ar)) : ('#' + r.id);
+        var scope = (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'الكل') + (parseInt(r.first_delivered_order_only, 10) === 1 ? ' • أول طلب مُسلَّم' : '');
         var tr = document.createElement('tr');
         tr.innerHTML =
             '<td>' + escCcp(String(r.id)) + '</td>' +
-            '<td>' + title + '</td>' +
+            '<td>' + escCcp(ccpRowName(r)) + '</td>' +
             '<td dir="ltr" style="font-family:monospace;font-size:0.85rem;">' + escCcp(ccpFmtComps(r.components)) + '</td>' +
             '<td dir="ltr">' + escCcp(String(r.combo_price)) + '</td>' +
-            '<td>' + (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'الكل') + '</td>' +
+            '<td>' + escCcp(scope) + '</td>' +
             '<td dir="ltr">' + escCcp(ocpScheduleLabel(r)) + '</td>' +
             '<td>' + escCcp(ocpStatusLabel(r)) + '</td>' +
             '<td>' + escCcp(String(r.sort_order)) + '</td>' +
@@ -240,8 +311,8 @@ async function saveCartComboPromotion() {
         title_ar: document.getElementById('ccp_title_ar').value,
         title_en: document.getElementById('ccp_title_en').value,
         combo_price: document.getElementById('ccp_price').value,
-        sort_order: parseInt(document.getElementById('ccp_sort').value, 10) || 0,
         requires_registered_account: document.getElementById('ccp_reg').checked ? 1 : 0,
+        first_delivered_order_only: document.getElementById('ccp_first_delivered').checked ? 1 : 0,
         is_active: document.getElementById('ccp_active').checked ? 1 : 0,
         is_always_on: ocpIsAlwaysOn('ccp') ? 1 : 0,
         valid_from: ocpGetIso('ccp_valid_from'),
@@ -288,6 +359,12 @@ async function loadCartComboAlwaysOnHistory() {
     });
 }
 
+(function () {
+    var arEl = document.getElementById('ccp_title_ar');
+    var enEl = document.getElementById('ccp_title_en');
+    if (arEl) arEl.addEventListener('input', ccpScheduleNameFromAr);
+    if (enEl) enEl.addEventListener('input', ccpScheduleNameFromEn);
+})();
 document.getElementById('ccp_add_product_btn').addEventListener('click', ccpOpenPick);
 ocpBindAlwaysOn('ccp');
 ocpDefaultScheduleDates('ccp');

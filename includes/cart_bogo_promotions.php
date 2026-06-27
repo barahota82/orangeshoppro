@@ -116,7 +116,7 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
     $cid = orange_cart_promotion_admin_country_id($pdo);
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $cid);
     $st = $pdo->prepare(
-        'SELECT id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids,
+        'SELECT id, name_ar, name_en, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, first_delivered_order_only, gift_kind, fixed_variant_id, pool_variant_ids,
                 gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active, is_always_on,
                 valid_from, valid_to, auto_paused_at, auto_paused_reason
          FROM cart_bogo_promotions WHERE 1=1' . $bind['sql'] . ' ORDER BY sort_order ASC, id ASC'
@@ -129,6 +129,8 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
 
         $out[] = [
             'id' => (int) $row['id'],
+            'name_ar' => (string) ($row['name_ar'] ?? ''),
+            'name_en' => (string) ($row['name_en'] ?? ''),
             'bogo_kind' => (string) ($row['bogo_kind'] ?? 'same_variant'),
             'category_id' => isset($row['category_id']) ? (int) $row['category_id'] : null,
             'min_buy_qty' => (int) ($row['min_buy_qty'] ?? 2),
@@ -137,6 +139,7 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
                 orange_cart_promo_parse_components_json($pdo, $row['buy_components_json'] ?? null)
             ),
             'requires_registered_account' => (int) ($row['requires_registered_account'] ?? 0),
+            'first_delivered_order_only' => (int) ($row['first_delivered_order_only'] ?? 0),
             'gift_kind' => (string) ($row['gift_kind'] ?? 'choice'),
             'fixed_product_id' => $fixPid > 0 ? $fixPid : null,
             'fixed_variant_id' => $fixPid > 0 ? $fixPid : null,
@@ -163,15 +166,21 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
  * @param list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $validatedItems
  * @return array<string,mixed>|null
  */
-function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems, bool $buyerRegistered, ?int $countryId = null): ?array
-{
+function orange_cart_bogo_promotion_select_rule(
+    PDO $pdo,
+    array $validatedItems,
+    bool $buyerRegistered,
+    ?int $countryId = null,
+    ?int $buyerAccountId = null,
+    ?string $buyerPhone = null
+): ?array {
     if (!orange_table_exists($pdo, 'cart_bogo_promotions') || count($validatedItems) === 0) {
         return null;
     }
     $cid = orange_cart_promotion_storefront_country_id($pdo, $countryId);
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $cid);
     $st = $pdo->prepare(
-        "SELECT id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids,
+        "SELECT id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, first_delivered_order_only, gift_kind, fixed_variant_id, pool_variant_ids,
                 gift_unit_charge_kind, gift_unit_charge_value, is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason
          FROM cart_bogo_promotions
          WHERE 1=1" . orange_cart_promo_schedule_sql('cart_bogo_promotions') . $bind['sql'] . "
@@ -183,6 +192,10 @@ function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems,
             continue;
         }
         if ((int) ($row['requires_registered_account'] ?? 0) === 1 && !$buyerRegistered) {
+            continue;
+        }
+        if ((int) ($row['first_delivered_order_only'] ?? 0) === 1
+            && !orange_cart_promo_buyer_first_delivered_ok($pdo, $buyerAccountId, $buyerPhone, $cid)) {
             continue;
         }
         if (!orange_cart_bogo_rule_matches_cart($pdo, $validatedItems, $row)) {

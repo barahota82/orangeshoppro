@@ -33,15 +33,21 @@ function orange_cart_combo_aggregate_variant_units(array $validatedItems): array
  *
  * @return array{id:int, discount:float, bundles:int}|null
  */
-function orange_cart_combo_best_match(PDO $pdo, array $validatedItems, bool $buyerRegistered, ?int $countryId = null): ?array
-{
+function orange_cart_combo_best_match(
+    PDO $pdo,
+    array $validatedItems,
+    bool $buyerRegistered,
+    ?int $countryId = null,
+    ?int $buyerAccountId = null,
+    ?string $buyerPhone = null
+): ?array {
     if (!orange_table_exists($pdo, 'cart_combo_promotions')) {
         return null;
     }
     $cid = orange_cart_promotion_storefront_country_id($pdo, $countryId);
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_combo_promotions', '', $cid);
     $st = $pdo->prepare(
-        'SELECT id, components_json, combo_price, requires_registered_account, is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason
+        'SELECT id, components_json, combo_price, requires_registered_account, first_delivered_order_only, is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason
          FROM cart_combo_promotions
          WHERE 1=1' . orange_cart_promo_schedule_sql('cart_combo_promotions') . $bind['sql'] . '
          ORDER BY sort_order ASC, id ASC'
@@ -55,6 +61,10 @@ function orange_cart_combo_best_match(PDO $pdo, array $validatedItems, bool $buy
             continue;
         }
         if ((int) ($row['requires_registered_account'] ?? 0) === 1 && !$buyerRegistered) {
+            continue;
+        }
+        if ((int) ($row['first_delivered_order_only'] ?? 0) === 1
+            && !orange_cart_promo_buyer_first_delivered_ok($pdo, $buyerAccountId, $buyerPhone, $cid)) {
             continue;
         }
         $comps = orange_cart_promo_parse_components_json($pdo, $row['components_json'] ?? null);
@@ -134,7 +144,8 @@ function orange_cart_combo_promotions_admin_list(PDO $pdo): array
     $cid = orange_cart_promotion_admin_country_id($pdo);
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_combo_promotions', '', $cid);
     $st = $pdo->prepare(
-        'SELECT id, title_ar, title_en, components_json, combo_price, requires_registered_account, sort_order, is_active,
+        'SELECT id, title_ar, title_en, components_json, combo_price, requires_registered_account,
+                first_delivered_order_only, sort_order, is_active,
                 is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason
          FROM cart_combo_promotions WHERE 1=1' . $bind['sql'] . ' ORDER BY sort_order ASC, id ASC'
     );
@@ -149,6 +160,7 @@ function orange_cart_combo_promotions_admin_list(PDO $pdo): array
             'components' => orange_cart_promo_components_with_labels($pdo, $comps),
             'combo_price' => (float) ($row['combo_price'] ?? 0),
             'requires_registered_account' => (int) ($row['requires_registered_account'] ?? 0),
+            'first_delivered_order_only' => (int) ($row['first_delivered_order_only'] ?? 0),
             'sort_order' => (int) ($row['sort_order'] ?? 0),
             'is_active' => (int) ($row['is_active'] ?? 0),
             'is_always_on' => (int) ($row['is_always_on'] ?? 0),

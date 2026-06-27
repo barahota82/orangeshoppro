@@ -24,20 +24,38 @@ $hasTable = orange_table_exists($pdo, 'cart_promotions');
 <div class="card">
     <h3>إضافة / تعديل</h3>
     <input type="hidden" id="cp_id" value="0">
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:14px;">
+        <div style="max-width:120px;">
+            <label for="cp_sort">الترتيب</label>
+            <input type="number" id="cp_sort" class="admin-inp" value="0" readonly tabindex="-1" title="يُحدَّد تلقائياً" style="background:#f1f5f9;color:#64748b;cursor:not-allowed;text-align:center;">
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="cp_active" checked> نشط
+        </label>
+    </div>
     <div class="form-grid">
+        <div>
+            <label for="cp_name_ar">اسم العرض (عربي)</label>
+            <input type="text" id="cp_name_ar" class="admin-inp" dir="auto" placeholder="مثال: خصم سلة نهاية الأسبوع">
+        </div>
+        <div>
+            <label for="cp_name_en">English</label>
+            <input type="text" id="cp_name_en" class="admin-inp" dir="ltr" lang="en" placeholder="Weekend cart discount">
+        </div>
+    </div>
+    <div style="margin-top:8px;">
+        <button type="button" class="btn-secondary" onclick="cpTranslateOfferFromAr()">ترجمة تلقائية من العربي</button>
+    </div>
+    <div class="form-grid" style="margin-top:12px;">
         <div><label>الحد الأدنى لمجموع السلة (د.ك)</label><input type="text" id="cp_min" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="10"></div>
         <div><label>مبلغ الخصم (د.ك)</label><input type="text" id="cp_disc" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="2"></div>
-        <div><label>الترتيب</label><input type="number" id="cp_sort" value="0" style="max-width:120px;"></div>
         <?php $ocpFieldPrefix = 'cp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
-        <div style="grid-column:1/-1;">
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;max-width:52rem;line-height:1.45;">
-                <input type="checkbox" id="cp_reg" style="margin-top:4px;flex-shrink:0;">
-                <span><strong>للمسجّلين فقط</strong> — عند تفعيلها لا يُطبَّق الخصم إلا لحساب مفعّل (بريد مؤكد). عند <strong>عدم</strong> التفعيل يكون العرض <strong>لجميع الزوّار</strong> (ضيف ومسجّل).</span>
-            </label>
-        </div>
-        <div style="display:flex;align-items:flex-end;gap:8px;">
+        <div style="grid-column:1/-1;display:flex;flex-wrap:wrap;gap:20px;align-items:center;">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="cp_active" checked> نشط
+                <input type="checkbox" id="cp_reg"> <strong>للمسجّلين فقط</strong>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="checkbox" id="cp_first_delivered"> <strong>أول طلب مُسلَّم</strong>
             </label>
         </div>
     </div>
@@ -54,6 +72,7 @@ $hasTable = orange_table_exists($pdo, 'cart_promotions');
             <thead>
                 <tr>
                     <th>#</th>
+                    <th>الاسم</th>
                     <th>حد أدنى</th>
                     <th>خصم</th>
                     <th>نطاق العرض</th>
@@ -91,12 +110,18 @@ $hasTable = orange_table_exists($pdo, 'cart_promotions');
 
 <script>
 <?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
+var cpNameArTimer = null;
+var cpNameEnTimer = null;
+
 function resetCartPromotionForm() {
     document.getElementById('cp_id').value = '0';
+    document.getElementById('cp_name_ar').value = '';
+    document.getElementById('cp_name_en').value = '';
     document.getElementById('cp_min').value = '';
     document.getElementById('cp_disc').value = '';
     document.getElementById('cp_sort').value = '0';
     document.getElementById('cp_reg').checked = false;
+    document.getElementById('cp_first_delivered').checked = false;
     document.getElementById('cp_active').checked = true;
     ocpSetAlwaysOn('cp', false);
     ocpDefaultScheduleDates('cp');
@@ -104,10 +129,13 @@ function resetCartPromotionForm() {
 
 function editCartPromotion(row) {
     document.getElementById('cp_id').value = String(row.id != null ? row.id : 0);
+    document.getElementById('cp_name_ar').value = row.name_ar != null ? String(row.name_ar) : '';
+    document.getElementById('cp_name_en').value = row.name_en != null ? String(row.name_en) : '';
     document.getElementById('cp_min').value = row.min_subtotal != null ? String(row.min_subtotal) : '';
     document.getElementById('cp_disc').value = row.discount_amount != null ? String(row.discount_amount) : '';
     document.getElementById('cp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
     document.getElementById('cp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
+    document.getElementById('cp_first_delivered').checked = parseInt(row.first_delivered_order_only, 10) === 1;
     document.getElementById('cp_active').checked = parseInt(row.is_active, 10) === 1;
     ocpSetAlwaysOn('cp', parseInt(row.is_always_on, 10) === 1);
     ocpSetDmyFromIso('cp_valid_from', row.valid_from);
@@ -122,6 +150,57 @@ function escCp(s) {
         .replace(/"/g, '&quot;');
 }
 
+function cpRowName(row) {
+    var ar = (row.name_ar != null ? String(row.name_ar) : '').trim();
+    if (ar !== '') return ar;
+    var en = (row.name_en != null ? String(row.name_en) : '').trim();
+    return en !== '' ? en : '—';
+}
+
+async function cpTranslateNames(opts) {
+    var silent = !!(opts && opts.silent);
+    var forceFromArabic = !!(opts && opts.forceFromArabic);
+    var arEl = document.getElementById('cp_name_ar');
+    var enEl = document.getElementById('cp_name_en');
+    if (!arEl || !enEl) return;
+    try {
+        var res = await postJSON('/admin/api/translate/names.php', {
+            name_ar: arEl.value.trim(),
+            name_en: forceFromArabic ? '' : enEl.value.trim()
+        });
+        if (!res || !res.success) {
+            if (!silent) alert((res && res.message) ? res.message : 'فشل الترجمة');
+            return;
+        }
+        if (res.name_en != null) enEl.value = String(res.name_en);
+    } catch (e) {
+        if (!silent) alert('تعذر الاتصال بخدمة الترجمة');
+    }
+}
+
+function cpScheduleNameFromAr() {
+    var arEl = document.getElementById('cp_name_ar');
+    if (!arEl) return;
+    clearTimeout(cpNameArTimer);
+    cpNameArTimer = setTimeout(function () {
+        cpTranslateNames({ silent: true, forceFromArabic: true });
+    }, 700);
+}
+
+function cpScheduleNameFromEn() {
+    var enEl = document.getElementById('cp_name_en');
+    if (!enEl || enEl.value.trim() === '') return;
+    clearTimeout(cpNameEnTimer);
+    cpNameEnTimer = setTimeout(function () {
+        cpTranslateNames({ silent: true, forceFromArabic: false });
+    }, 600);
+}
+
+async function cpTranslateOfferFromAr() {
+    await cpTranslateNames({ silent: false, forceFromArabic: true });
+}
+window.cpTranslateOfferFromAr = cpTranslateOfferFromAr;
+
 async function loadCartPromotions() {
     const res = await postJSON('/admin/api/cart_promotions/manage.php', { action: 'list' });
     if (!res.success) {
@@ -135,9 +214,10 @@ async function loadCartPromotions() {
         const tr = document.createElement('tr');
         tr.innerHTML =
             '<td>' + escCp(String(r.id)) + '</td>' +
+            '<td>' + escCp(cpRowName(r)) + '</td>' +
             '<td dir="ltr">' + escCp(String(r.min_subtotal)) + '</td>' +
             '<td dir="ltr">' + escCp(String(r.discount_amount)) + '</td>' +
-            '<td>' + (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'جميع الزوّار') + '</td>' +
+            '<td>' + (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'جميع الزوّار') + (parseInt(r.first_delivered_order_only, 10) === 1 ? ' • أول طلب مُسلَّم' : '') + '</td>' +
             '<td dir="ltr">' + escCp(ocpScheduleLabel(r)) + '</td>' +
             '<td>' + escCp(ocpStatusLabel(r)) + '</td>' +
             '<td>' + escCp(String(r.sort_order)) + '</td>' +
@@ -157,10 +237,12 @@ async function saveCartPromotion() {
     const res = await postJSON('/admin/api/cart_promotions/manage.php', {
         action: 'save',
         id: parseInt(document.getElementById('cp_id').value, 10) || 0,
+        name_ar: document.getElementById('cp_name_ar').value.trim(),
+        name_en: document.getElementById('cp_name_en').value.trim(),
         min_subtotal: document.getElementById('cp_min').value.trim(),
         discount_amount: document.getElementById('cp_disc').value.trim(),
-        sort_order: parseInt(document.getElementById('cp_sort').value, 10) || 0,
         requires_registered_account: document.getElementById('cp_reg').checked ? 1 : 0,
+        first_delivered_order_only: document.getElementById('cp_first_delivered').checked ? 1 : 0,
         is_active: document.getElementById('cp_active').checked ? 1 : 0,
         is_always_on: ocpIsAlwaysOn('cp') ? 1 : 0,
         valid_from: ocpGetIso('cp_valid_from'),
@@ -206,6 +288,12 @@ async function loadCartPromotionAlwaysOnHistory() {
     });
 }
 
+(function () {
+    var arEl = document.getElementById('cp_name_ar');
+    var enEl = document.getElementById('cp_name_en');
+    if (arEl) arEl.addEventListener('input', cpScheduleNameFromAr);
+    if (enEl) enEl.addEventListener('input', cpScheduleNameFromEn);
+})();
 ocpBindAlwaysOn('cp');
 ocpDefaultScheduleDates('cp');
 loadCartPromotions();

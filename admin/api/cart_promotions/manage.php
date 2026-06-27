@@ -20,6 +20,16 @@ function cp_money($v): float
     return $f >= 0 ? round($f, 4) : 0.0;
 }
 
+/**
+ * @param mixed $v
+ */
+function cp_str191($v): string
+{
+    $s = trim((string) $v);
+
+    return function_exists('mb_substr') ? mb_substr($s, 0, 191, 'UTF-8') : substr($s, 0, 191);
+}
+
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -48,10 +58,15 @@ try {
 
     if ($action === 'save') {
         $id = (int) ($data['id'] ?? 0);
+        $nameAr = cp_str191($data['name_ar'] ?? '');
+        $nameEn = cp_str191($data['name_en'] ?? '');
+        if ($nameAr === '') {
+            json_response(['success' => false, 'message' => 'اسم العرض بالعربي مطلوب'], 422);
+        }
         $minSub = cp_money($data['min_subtotal'] ?? 0);
         $disc = cp_money($data['discount_amount'] ?? 0);
         $reqReg = !empty($data['requires_registered_account']) ? 1 : 0;
-        $sortOrder = (int) ($data['sort_order'] ?? 0);
+        $firstDeliveredOnly = !empty($data['first_delivered_order_only']) ? 1 : 0;
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $isAlwaysOn = !empty($data['is_always_on']) ? 1 : 0;
         $dateErr = null;
@@ -83,14 +98,17 @@ try {
 
         if ($id > 0) {
             orange_cart_promo_clear_auto_pause($pdo, 'cart_promotions', $id);
+            // الترتيب تلقائي بالكامل: لا يُمَسّ عند التعديل (مثل عروض التوصيل).
             $st = $pdo->prepare(
-                'UPDATE cart_promotions SET min_subtotal = ?, discount_amount = ?, requires_registered_account = ?, sort_order = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
+                'UPDATE cart_promotions SET name_ar = ?, name_en = ?, min_subtotal = ?, discount_amount = ?, requires_registered_account = ?, first_delivered_order_only = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
             );
             $st->execute([
+                $nameAr,
+                $nameEn,
                 $minSub,
                 $disc,
                 $reqReg,
-                $sortOrder,
+                $firstDeliveredOnly,
                 $isActive,
                 $isAlwaysOn,
                 $bounds['valid_from'],
@@ -105,14 +123,24 @@ try {
                 orange_cart_promotion_admin_country_id($pdo)
             );
         } else {
+            // الترتيب تلقائي: التالي ضمن نفس الدولة (يتجاهل أي إدخال يدوي).
+            $sortBind = orange_cart_promotion_sql_bind($pdo, 'cart_promotions', '', $insertCountryId);
+            $stSort = $pdo->prepare(
+                'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cart_promotions WHERE 1=1' . $sortBind['sql']
+            );
+            $stSort->execute($sortBind['params']);
+            $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
             $st = $pdo->prepare(
-                'INSERT INTO cart_promotions (country_id, min_subtotal, discount_amount, requires_registered_account, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO cart_promotions (country_id, name_ar, name_en, min_subtotal, discount_amount, requires_registered_account, first_delivered_order_only, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $st->execute([
                 $insertCountryId,
+                $nameAr,
+                $nameEn,
                 $minSub,
                 $disc,
                 $reqReg,
+                $firstDeliveredOnly,
                 $sortOrder,
                 $isActive,
                 $isAlwaysOn,

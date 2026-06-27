@@ -28,9 +28,11 @@ function orange_storefront_build_promotional_gift_lines(
     array $validatedItems,
     float $subtotal,
     bool $buyerRegistered,
-    ?int $countryId = null
+    ?int $countryId = null,
+    ?int $buyerAccountId = null,
+    ?string $buyerPhone = null
 ): array {
-    $giftRule = orange_cart_gift_promotion_select_rule($pdo, $subtotal, $buyerRegistered, $countryId);
+    $giftRule = orange_cart_gift_promotion_select_rule($pdo, $subtotal, $buyerRegistered, $countryId, $buyerAccountId, $buyerPhone);
     if ($giftRule !== null) {
         if ($giftRule['gift_kind'] === 'fixed') {
             $fv = (int) ($giftRule['fixed_variant_id'] ?? 0);
@@ -102,7 +104,7 @@ function orange_storefront_build_promotional_gift_lines(
         $linesAfterSubtotalGift[] = $giftLine;
     }
 
-    $bogoRule = orange_cart_bogo_promotion_select_rule($pdo, $validatedItems, $buyerRegistered, $countryId);
+    $bogoRule = orange_cart_bogo_promotion_select_rule($pdo, $validatedItems, $buyerRegistered, $countryId, $buyerAccountId, $buyerPhone);
     if ($bogoRule !== null) {
         if ($bogoRule['gift_kind'] === 'fixed') {
             $bfv = (int) ($bogoRule['fixed_variant_id'] ?? 0);

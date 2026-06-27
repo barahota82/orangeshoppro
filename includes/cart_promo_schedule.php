@@ -7,6 +7,27 @@ require_once __DIR__ . '/cart_promotion_country.php';
 require_once __DIR__ . '/promo_always_on.php';
 
 /**
+ * أهليّة عرض سلة بشرط «أول طلب مُسلَّم»: نعيد استخدام نفس منطق عروض التوصيل
+ * (التعرّف على العميل بحساب أو هاتف، وألا يكون لديه طلب مُسلَّم سابق ضمن نفس الدولة).
+ * إن تعذّر التعرّف (لا حساب ولا هاتف) → غير مؤهَّل (fail-safe مالي، مطابق للتوصيل).
+ */
+function orange_cart_promo_buyer_first_delivered_ok(
+    PDO $pdo,
+    ?int $buyerAccountId,
+    ?string $buyerPhone,
+    ?int $countryId
+): bool {
+    if (!function_exists('orange_delivery_buyer_first_delivered_eligible')) {
+        require_once __DIR__ . '/delivery_areas.php';
+    }
+    if (!function_exists('orange_delivery_buyer_first_delivered_eligible')) {
+        return false;
+    }
+
+    return orange_delivery_buyer_first_delivered_eligible($pdo, $buyerAccountId, $buyerPhone, $countryId);
+}
+
+/**
  * جدول عرض سلة: جدولة تواريخ + إيقاف تلقائي عند نفاد مخزون منتجات العرض أو الهدية.
  *
  * @return list<string>

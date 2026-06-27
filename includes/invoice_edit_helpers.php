@@ -736,18 +736,23 @@ function orange_invoice_edit_compute_promos(
     array $adminRestores
 ): array {
     $buyerRegistered = false;
+    $buyerAccountId = null;
     if (orange_table_has_column($pdo, 'orders', 'storefront_account_id')) {
-        $buyerRegistered = (int) ($order['storefront_account_id'] ?? 0) > 0;
+        $accId = (int) ($order['storefront_account_id'] ?? 0);
+        $buyerRegistered = $accId > 0;
+        $buyerAccountId = $accId > 0 ? $accId : null;
     }
+    // هوية المشتري من الطلب نفسه لإبقاء إعادة احتساب «أول طلب مُسلَّم» متسقة عند التعديل (منع الانحراف).
+    $buyerPhone = isset($order['phone']) && trim((string) $order['phone']) !== '' ? trim((string) $order['phone']) : null;
     $countryId = (int) ($order['country_id'] ?? 0);
     $cid = $countryId > 0 ? $countryId : null;
 
-    $comboPick = orange_cart_combo_best_match($pdo, $paidValidated, $buyerRegistered, $cid);
+    $comboPick = orange_cart_combo_best_match($pdo, $paidValidated, $buyerRegistered, $cid, $buyerAccountId, $buyerPhone);
     $naturalComboDisc = $comboPick !== null ? (float) $comboPick['discount'] : 0.0;
     $naturalComboId = $comboPick !== null ? (int) $comboPick['id'] : null;
 
     $netAfterCombo = max(0.0, round($subtotal - $naturalComboDisc, 4));
-    $promoPick = orange_cart_promotion_resolve($pdo, $netAfterCombo, $buyerRegistered, $cid);
+    $promoPick = orange_cart_promotion_resolve($pdo, $netAfterCombo, $buyerRegistered, $cid, $buyerAccountId, $buyerPhone);
     $naturalPromoDisc = $promoPick !== null ? (float) $promoPick['discount'] : 0.0;
     $naturalPromoId = $promoPick !== null ? (int) $promoPick['id'] : null;
 
@@ -768,7 +773,9 @@ function orange_invoice_edit_compute_promos(
             $paidValidated,
             $subtotal,
             $buyerRegistered,
-            $cid
+            $cid,
+            $buyerAccountId,
+            $buyerPhone
         );
         $giftLine = $promoBundle['giftLine'];
         $giftPromoId = $promoBundle['giftPromoId'];
