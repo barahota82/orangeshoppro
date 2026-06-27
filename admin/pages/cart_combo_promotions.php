@@ -78,9 +78,19 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <h4 style="margin:0 0 10px;">السعر والفترة</h4>
             <div class="form-grid">
                 <div style="grid-column:1/-1;"><label>سعر الحزمة الواحدة (د.ك)</label><input type="text" id="ccp_price" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="9.5"></div>
+                <div>
+                    <label for="ccp_valid_from">بداية العرض <span dir="ltr">*</span></label>
+                    <input type="text" id="ccp_valid_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
+                </div>
+                <div>
+                    <label for="ccp_valid_to">نهاية العرض <span dir="ltr">*</span></label>
+                    <input type="text" id="ccp_valid_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
+                </div>
             </div>
-            <?php $ocpFieldPrefix = 'ccp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
-            <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:center;margin-top:10px;">
+            <div style="display:flex;flex-wrap:wrap;gap:18px 22px;align-items:center;margin-top:12px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="ccp_always_on"> <strong>التفعيل الدائم</strong>
+                </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
                     <input type="checkbox" id="ccp_reg"> <strong>للمسجّلين فقط</strong>
                 </label>
