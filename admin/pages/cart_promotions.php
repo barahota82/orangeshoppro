@@ -49,18 +49,32 @@ $hasTable = orange_table_exists($pdo, 'cart_promotions');
             <input type="checkbox" id="cp_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
         </label>
     </div>
-    <div class="form-grid" style="margin-top:12px;">
-        <div><label>الحد الأدنى لمجموع السلة (د.ك)</label><input type="text" id="cp_min" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="10"></div>
-        <div><label>مبلغ الخصم (د.ك)</label><input type="text" id="cp_disc" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="2"></div>
-        <?php $ocpFieldPrefix = 'cp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
-        <div style="grid-column:1/-1;display:flex;flex-wrap:wrap;gap:20px;align-items:center;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="cp_reg"> <strong>للمسجّلين فقط</strong>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="cp_first_delivered"> <strong>أول طلب مُسلَّم</strong>
-            </label>
+    <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;">
+        <div style="min-width:170px;">
+            <label for="cp_min">الحد الأدنى لمجموع السلة (د.ك)</label>
+            <input type="text" id="cp_min" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="10">
         </div>
+        <div style="min-width:140px;">
+            <label for="cp_disc">مبلغ الخصم (د.ك)</label>
+            <input type="text" id="cp_disc" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="2">
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" id="cp_always_on"> <strong>التفعيل الدائم</strong>
+        </label>
+        <div style="min-width:150px;">
+            <label for="cp_valid_from">بداية العرض <span dir="ltr">*</span></label>
+            <input type="text" id="cp_valid_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
+        </div>
+        <div style="min-width:150px;">
+            <label for="cp_valid_to">نهاية العرض <span dir="ltr">*</span></label>
+            <input type="text" id="cp_valid_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" id="cp_reg"> <strong>للمسجّلين فقط</strong>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" id="cp_first_delivered"> <strong>أول طلب مُسلَّم</strong>
+        </label>
     </div>
     <div class="admin-form-actions">
         <button type="button" onclick="saveCartPromotion()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ</button>
