@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/cart_promo_schedule.php';
 require_once __DIR__ . '/../../../includes/promo_always_on.php';
 require_once __DIR__ . '/../../../includes/currency.php';
+require_once __DIR__ . '/../../../includes/cart_promo_products.php';
 require_admin_api();
 
 try {
@@ -102,6 +103,8 @@ try {
         : substr(trim((string) ($data['name_en'] ?? '')), 0, 191);
     $showName = !empty($data['show_name_to_customer']) ? 1 : 0;
     $showOldPrice = !empty($data['show_old_price_to_customer']) ? 1 : 0;
+    $hasPromoTextCols = orange_table_has_column($pdo, 'offers', 'promo_text_ar');
+    $promoText = orange_cart_promo_sanitize_promo_texts($data);
 
     $offerId = (int) ($data['id'] ?? 0);
     if ($offerId > 0) {
@@ -135,6 +138,16 @@ try {
         if ($hasShowOldCol) {
             $sets[] = 'show_old_price_to_customer = ?';
             $vals[] = $showOldPrice;
+        }
+        if ($hasPromoTextCols) {
+            $sets[] = 'promo_text_ar = ?';
+            $sets[] = 'promo_text_en = ?';
+            $sets[] = 'promo_text_fil = ?';
+            $sets[] = 'promo_text_hi = ?';
+            $vals[] = $promoText['ar'];
+            $vals[] = $promoText['en'];
+            $vals[] = $promoText['fil'];
+            $vals[] = $promoText['hi'];
         }
         $sets[] = 'is_always_on = ?';
         $sets[] = 'valid_from = ?';
@@ -180,6 +193,16 @@ try {
     if ($hasShowOldCol) {
         $cols[] = 'show_old_price_to_customer';
         $vals[] = $showOldPrice;
+    }
+    if ($hasPromoTextCols) {
+        $cols[] = 'promo_text_ar';
+        $cols[] = 'promo_text_en';
+        $cols[] = 'promo_text_fil';
+        $cols[] = 'promo_text_hi';
+        $vals[] = $promoText['ar'];
+        $vals[] = $promoText['en'];
+        $vals[] = $promoText['fil'];
+        $vals[] = $promoText['hi'];
     }
     $cols[] = 'is_active';
     $cols[] = 'is_always_on';

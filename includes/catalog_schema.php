@@ -3176,6 +3176,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_promo_bogo_gift_customer_pick_v109($pdo);
     orange_catalog_migrate_storefront_promo_messages_offer_target_v110($pdo);
     orange_catalog_migrate_storefront_promo_messages_audience_v111($pdo);
+    orange_catalog_migrate_promo_inline_offer_text_v112($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3803,6 +3804,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_promo_bogo_gift_customer_pick_v109($pdo);
     orange_catalog_migrate_storefront_promo_messages_offer_target_v110($pdo);
     orange_catalog_migrate_storefront_promo_messages_audience_v111($pdo);
+    orange_catalog_migrate_promo_inline_offer_text_v112($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -8071,6 +8073,42 @@ function orange_catalog_migrate_storefront_promo_messages_audience_v111(PDO $pdo
             "ALTER TABLE storefront_promo_messages ADD COLUMN audience VARCHAR(16) NOT NULL DEFAULT 'all'"
         );
         orange_schema_invalidate_column_check('storefront_promo_messages', 'audience');
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v112 — نص تحفيزي مضمّن لكل عرض على شاشة العرض نفسها (قرار مالك 2026-06-28، الجزء 1):
+ *  - أعمدة promo_text_ar/promo_text_en/promo_text_fil/promo_text_hi (متعدد اللغات، NULL = لا نص)
+ *    لجداول العروض المرتكزة على منتج: offers, cart_combo_promotions, cart_bogo_promotions.
+ *  - النص المضمّن أولى من رسالة `offer_card` المركزية لنفس العرض في الواجهة.
+ * marker-gated + idempotent؛ يُستدعى من المسار الكامل والمسار السريع.
+ */
+function orange_catalog_migrate_promo_inline_offer_text_v112(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_promo_inline_offer_text_v112';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $tables = ['offers', 'cart_combo_promotions', 'cart_bogo_promotions'];
+    $cols = ['promo_text_ar', 'promo_text_en', 'promo_text_fil', 'promo_text_hi'];
+    foreach ($tables as $table) {
+        if (!orange_table_exists($pdo, $table)) {
+            continue;
+        }
+        foreach ($cols as $col) {
+            if (!orange_table_has_column($pdo, $table, $col)) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'ALTER TABLE ' . $table . ' ADD COLUMN ' . $col . ' VARCHAR(255) NULL DEFAULT NULL'
+                );
+                orange_schema_invalidate_column_check($table, $col);
+            }
+        }
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

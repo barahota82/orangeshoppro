@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/cart_promo_products.php';
+require_once __DIR__ . '/../partials/promo_offer_text.inc.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -99,6 +100,7 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <input type="checkbox" id="cbp_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
         </label>
     </div>
+    <?php orange_render_promo_offer_text_fields('cbp'); ?>
     <div class="form-grid">
         <div style="grid-column:1/-1;">
             <label><strong>شرط السلة</strong></label>
@@ -478,6 +480,7 @@ function resetCartBogoPromotionForm() {
     document.getElementById('cbp_id').value = '0';
     document.getElementById('cbp_name_ar').value = '';
     document.getElementById('cbp_name_en').value = '';
+    if (window.OrangePromoOfferText) OrangePromoOfferText.clear('cbp');
     document.getElementById('cbp_show_name').checked = false;
     var cbpShowOldReset = document.getElementById('cbp_show_old_price');
     if (cbpShowOldReset) cbpShowOldReset.checked = false;
@@ -508,6 +511,7 @@ function editCartBogoPromotion(row) {
     document.getElementById('cbp_id').value = String(row.id != null ? row.id : 0);
     document.getElementById('cbp_name_ar').value = row.name_ar != null ? String(row.name_ar) : '';
     document.getElementById('cbp_name_en').value = row.name_en != null ? String(row.name_en) : '';
+    if (window.OrangePromoOfferText) OrangePromoOfferText.fill('cbp', row);
     document.getElementById('cbp_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
     var cbpShowOldEl = document.getElementById('cbp_show_old_price');
     if (cbpShowOldEl) cbpShowOldEl.checked = parseInt(row.show_old_price_to_customer, 10) === 1;
@@ -715,6 +719,7 @@ async function saveCartBogoPromotion() {
     if (bogoKind === 'buy_bundle') {
         payload.buy_components = cbpBuyRows();
     }
+    if (window.OrangePromoOfferText) Object.assign(payload, OrangePromoOfferText.payload('cbp'));
     const res = await postJSON('/admin/api/cart_bogo_promotions/manage.php', payload);
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
     if (res.success) {

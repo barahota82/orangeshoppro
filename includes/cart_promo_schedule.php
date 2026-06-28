@@ -53,6 +53,35 @@ function orange_promo_customer_display_name(array $row, ?string $lang = null, st
 }
 
 /**
+ * نص تحفيزي مضمّن لكل عرض (متعدد اللغات promo_text_ar/en/fil/hi) لعرضه على بطاقة/صفحة العرض.
+ * لا علم تفعيل: وجود نص (بعد trim) = إظهار. اللغة المطلوبة مع احتياط للعربي ثم الإنجليزي.
+ *
+ * @param array<string,mixed> $row
+ */
+function orange_promo_customer_promo_text(array $row, ?string $lang = null, string $prefix = 'promo_text_'): string
+{
+    if ($lang === null) {
+        $lang = function_exists('current_lang') ? (string) current_lang() : 'ar';
+    }
+    $lang = strtolower(trim((string) $lang));
+    $ar = trim((string) ($row[$prefix . 'ar'] ?? ''));
+    $en = trim((string) ($row[$prefix . 'en'] ?? ''));
+    $fil = trim((string) ($row[$prefix . 'fil'] ?? ''));
+    $hi = trim((string) ($row[$prefix . 'hi'] ?? ''));
+    if ($lang === 'en') {
+        return $en !== '' ? $en : $ar;
+    }
+    if ($lang === 'fil') {
+        return $fil !== '' ? $fil : ($ar !== '' ? $ar : $en);
+    }
+    if ($lang === 'hi') {
+        return $hi !== '' ? $hi : ($ar !== '' ? $ar : $en);
+    }
+
+    return $ar !== '' ? $ar : $en;
+}
+
+/**
  * جدول عرض سلة: جدولة تواريخ + إيقاف تلقائي عند نفاد مخزون منتجات العرض أو الهدية.
  *
  * @return list<string>

@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/promo_always_on.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/product_offers.php';
 require_once __DIR__ . '/../../includes/currency.php';
+require_once __DIR__ . '/../partials/promo_offer_text.inc.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -89,6 +90,7 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
             <input type="checkbox" id="ofr_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
         </label>
     </div>
+    <?php orange_render_promo_offer_text_fields('ofr'); ?>
 
     <div class="ofr-split" style="margin-top:14px;">
         <!-- النصف الأيمن: المنتج وبياناته (مراجعة قبل تحديد الخصم) -->
@@ -354,6 +356,7 @@ function ofrResetForm() {
     document.getElementById('ofr_product_label').textContent = '— لم يُختر منتج —';
     document.getElementById('ofr_name_ar').value = '';
     document.getElementById('ofr_name_en').value = '';
+    if (window.OrangePromoOfferText) OrangePromoOfferText.clear('ofr');
     document.getElementById('ofr_show_name').checked = false;
     var showOldResetEl = document.getElementById('ofr_show_old_price');
     if (showOldResetEl) showOldResetEl.checked = false;
@@ -383,6 +386,7 @@ function ofrEdit(row) {
     ofrSelProduct.cost = (pickRow && pickRow.cost != null && pickRow.cost !== '') ? Number(pickRow.cost) : null;
     document.getElementById('ofr_name_ar').value = row.name_ar != null ? String(row.name_ar) : '';
     document.getElementById('ofr_name_en').value = row.name_en != null ? String(row.name_en) : '';
+    if (window.OrangePromoOfferText) OrangePromoOfferText.fill('ofr', row);
     document.getElementById('ofr_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
     var showOldEl = document.getElementById('ofr_show_old_price');
     if (showOldEl) showOldEl.checked = parseInt(row.show_old_price_to_customer, 10) === 1;
@@ -412,6 +416,7 @@ async function saveOffer() {
         show_name_to_customer: document.getElementById('ofr_show_name').checked ? 1 : 0,
         show_old_price_to_customer: (document.getElementById('ofr_show_old_price') && document.getElementById('ofr_show_old_price').checked) ? 1 : 0
     };
+    if (window.OrangePromoOfferText) Object.assign(payload, OrangePromoOfferText.payload('ofr'));
     var activeEl = document.getElementById('ofr_active');
     payload.is_active = (activeEl && activeEl.checked) ? 1 : 0;
     payload.is_always_on = (typeof ocpIsAlwaysOn === 'function' && ocpIsAlwaysOn('ofr')) ? 1 : 0;

@@ -122,10 +122,12 @@ function orange_storefront_active_combo_cards(PDO $pdo, ?int $countryId, string 
     $sortSql = orange_table_has_column($pdo, 'cart_combo_promotions', 'sort_order')
         ? ' ORDER BY sort_order ASC, id ASC'
         : ' ORDER BY id ASC';
+    $hasPromoText = orange_table_has_column($pdo, 'cart_combo_promotions', 'promo_text_ar');
+    $promoCols = $hasPromoText ? ', promo_text_ar, promo_text_en, promo_text_fil, promo_text_hi' : '';
     $st = $pdo->prepare(
         'SELECT id, title_ar, title_en, show_name_to_customer, show_old_price_to_customer,
                 components_json, combo_price, requires_registered_account, first_delivered_order_only,
-                is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason
+                is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason' . $promoCols . '
          FROM cart_combo_promotions
          WHERE 1=1' . orange_cart_promo_schedule_sql('cart_combo_promotions') . $bind['sql'] . $sortSql
     );
@@ -187,6 +189,7 @@ function orange_storefront_active_combo_cards(PDO $pdo, ?int $countryId, string 
             'components' => $components,
             'requires_registration' => (int) ($row['requires_registered_account'] ?? 0) === 1,
             'first_delivered_only' => (int) ($row['first_delivered_order_only'] ?? 0) === 1,
+            'promo_text' => orange_promo_customer_promo_text($row, $lang),
         ];
     }
 
@@ -210,11 +213,13 @@ function orange_storefront_active_bogo_cards(PDO $pdo, ?int $countryId, string $
         ? ' ORDER BY sort_order ASC, id ASC'
         : ' ORDER BY id ASC';
     $svCol = orange_table_has_column($pdo, 'cart_bogo_promotions', 'same_variant_product_id') ? ', same_variant_product_id' : '';
+    $hasPromoText = orange_table_has_column($pdo, 'cart_bogo_promotions', 'promo_text_ar');
+    $promoCols = $hasPromoText ? ', promo_text_ar, promo_text_en, promo_text_fil, promo_text_hi' : '';
     $st = $pdo->prepare(
         'SELECT id, name_ar, name_en, show_name_to_customer, show_old_price_to_customer, bogo_kind,
                 category_id, min_buy_qty, buy_components_json, gift_kind, fixed_variant_id, pool_variant_ids,
                 gift_unit_charge_kind, gift_unit_charge_value, requires_registered_account, first_delivered_order_only,
-                is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason' . $svCol . '
+                is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason' . $svCol . $promoCols . '
          FROM cart_bogo_promotions
          WHERE 1=1' . orange_cart_promo_schedule_sql('cart_bogo_promotions') . $bind['sql'] . $sortSql
     );
@@ -341,6 +346,7 @@ function orange_storefront_active_bogo_cards(PDO $pdo, ?int $countryId, string $
             'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),
             'requires_registration' => (int) ($row['requires_registered_account'] ?? 0) === 1,
             'first_delivered_only' => (int) ($row['first_delivered_order_only'] ?? 0) === 1,
+            'promo_text' => orange_promo_customer_promo_text($row, $lang),
         ];
     }
 
