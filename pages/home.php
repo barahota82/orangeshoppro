@@ -163,14 +163,23 @@ foreach ($offers as $op) {
  */
 require_once __DIR__ . '/../includes/storefront_offer_cards.php';
 $sfComboCards = orange_storefront_active_combo_cards($pdo, $sfHomeCountryId, $lang);
+$sfBogoCardsAll = orange_storefront_active_bogo_cards($pdo, $sfHomeCountryId, $lang);
+// في تاب العروض نعرض BOGO «حزمة شراء» فقط (لها صفحة عرض)؛ الأنواع الأخرى لاحقاً.
+$sfBogoBundleCards = array_values(array_filter(
+    $sfBogoCardsAll,
+    static fn (array $c): bool => (string) ($c['bogo_kind'] ?? '') === 'buy_bundle'
+));
 $sfOfferPageBase = storefront_public_path('/pages/offer.php');
-$sfComboHref = static function (int $offerId) use ($sfOfferPageBase, $channelSlug, $lang): string {
+$sfOfferHref = static function (string $type, int $offerId) use ($sfOfferPageBase, $channelSlug, $lang): string {
     return $sfOfferPageBase . '?' . http_build_query([
         'channel' => $channelSlug,
         'lang' => $lang,
-        'type' => 'combo',
+        'type' => $type,
         'id' => $offerId,
     ]);
+};
+$sfComboHref = static function (int $offerId) use ($sfOfferHref): string {
+    return $sfOfferHref('combo', $offerId);
 };
 
 /** @var list<array<string,mixed>> */
@@ -378,7 +387,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="storefront-browse-menu__body">
                     <button type="button" class="storefront-browse-menu__cta" data-apply-filter="all"><?php echo htmlspecialchars(t('storefront_menu_all_products'), ENT_QUOTES, 'UTF-8'); ?></button>
-                    <?php if ($offers !== [] || $sfComboCards !== []): ?>
+                    <?php if ($offers !== [] || $sfComboCards !== [] || $sfBogoBundleCards !== []): ?>
                     <button type="button" class="storefront-browse-menu__cta storefront-browse-menu__cta--secondary" data-apply-filter="offers"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></button>
                     <?php endif; ?>
 
@@ -469,7 +478,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
         </button>
         <div class="tabs-scroll" id="homeCategoryTabs">
             <button type="button" class="tab-btn active" data-tab-filter="all" onclick="filterProducts('all', this)"><?php echo htmlspecialchars(t('all'), ENT_QUOTES, 'UTF-8'); ?></button>
-            <?php if ($offers !== [] || $sfComboCards !== []): ?>
+            <?php if ($offers !== [] || $sfComboCards !== [] || $sfBogoBundleCards !== []): ?>
             <button type="button" class="tab-btn" data-tab-filter="offers" onclick="filterProducts('offers', this)"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></button>
             <?php endif; ?>
             <?php foreach ($categories as $cat): ?>
@@ -618,6 +627,45 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                         <?php endif; ?>
                     </div>
                     <a class="btn" href="<?php echo htmlspecialchars($sfComboHref($ccId), ENT_QUOTES, 'UTF-8'); ?>">
+                        <?php echo htmlspecialchars(t('offer_view'), ENT_QUOTES, 'UTF-8'); ?>
+                    </a>
+                </div>
+            </article>
+        <?php endforeach; ?>
+
+        <?php foreach ($sfBogoBundleCards as $bc): ?>
+            <?php
+            $bcId = (int) ($bc['offer_id'] ?? 0);
+            $bcBuy = is_array($bc['buy_components'] ?? null) ? $bc['buy_components'] : [];
+            $bcNames = [];
+            $bcBuyTotal = 0.0;
+            foreach ($bcBuy as $bcComp) {
+                $bcN = trim((string) ($bcComp['name'] ?? ''));
+                if ($bcN !== '') {
+                    $bcNames[] = $bcN;
+                }
+                $bcBuyTotal += (float) ($bcComp['price'] ?? 0) * max(1, (int) ($bcComp['qty'] ?? 1));
+            }
+            if ($bcBuy === []) {
+                continue;
+            }
+            $bcTitle = $bcNames !== [] ? implode(' + ', $bcNames) : t('offers');
+            $bcBadge = trim((string) ($bc['name'] ?? ''));
+            $bcImgRaw = (string) ($bcBuy[0]['main_image'] ?? '');
+            ?>
+            <article class="product-card product-card--offer product-card--bundle" data-filter="offers">
+                <div class="product-image-wrap">
+                    <img src="<?php echo htmlspecialchars(storefront_product_image_href($bcImgRaw), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($bcTitle, ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
+                    <?php if ($bcBadge !== ''): ?>
+                    <span class="offer-badge"><?php echo htmlspecialchars($bcBadge, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <?php endif; ?>
+                </div>
+                <div class="product-body">
+                    <h3><?php echo htmlspecialchars($bcTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <div class="price-row">
+                        <strong><?php echo number_format($bcBuyTotal, 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                    </div>
+                    <a class="btn" href="<?php echo htmlspecialchars($sfOfferHref('bogo', $bcId), ENT_QUOTES, 'UTF-8'); ?>">
                         <?php echo htmlspecialchars(t('offer_view'), ENT_QUOTES, 'UTF-8'); ?>
                     </a>
                 </div>

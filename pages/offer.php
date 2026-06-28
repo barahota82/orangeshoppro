@@ -23,15 +23,44 @@ $sfCurrencyUnit = orange_storefront_currency_unit($pdo, $sfCountryId);
 
 $offerType = isset($_GET['type']) ? strtolower(trim((string) $_GET['type'])) : 'combo';
 $offerId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$isCombo = $offerType === 'combo';
+$isBogo = $offerType === 'bogo';
 
 $homeUrl = storefront_url('home', $channelSlug, $lang);
 $cartUrl = storefront_url('cart', $channelSlug, $lang);
 
-// VS1: نوع الكومبو فقط (BOGO وبقية الأنواع في شرائح لاحقة).
+/**
+ * سعر وحدة هدية BOGO من سعر التجزئة وقاعدة التسعير (يطابق منطق
+ * orange_cart_promo_resolve_gift_unit_price_from_rule لكن من سعر معروف مسبقاً).
+ */
+$offerGiftChargePrice = static function (string $kind, float $value, float $retail): float {
+    switch ($kind) {
+        case 'free':
+            return 0.0;
+        case 'fixed_unit':
+            return max(0.0, round($value, 4));
+        case 'percent_off':
+            $pct = min(100.0, max(0.0, $value));
+            return max(0.0, round($retail * (1.0 - $pct / 100.0), 4));
+        case 'amount_off_unit':
+            return max(0.0, round($retail - max(0.0, $value), 4));
+        default:
+            return 0.0;
+    }
+};
+
+// جلب العرض: كومبو، أو BOGO من نوع «حزمة شراء» فقط في هذه الصفحة (الأنواع الأخرى لاحقاً).
 $card = null;
-if ($offerId > 0 && $offerType === 'combo') {
+if ($offerId > 0 && $isCombo) {
     foreach (orange_storefront_active_combo_cards($pdo, $sfCountryId, $lang) as $c) {
         if ((int) $c['offer_id'] === $offerId) {
+            $card = $c;
+            break;
+        }
+    }
+} elseif ($offerId > 0 && $isBogo) {
+    foreach (orange_storefront_active_bogo_cards($pdo, $sfCountryId, $lang) as $c) {
+        if ((int) $c['offer_id'] === $offerId && (string) ($c['bogo_kind'] ?? '') === 'buy_bundle') {
             $card = $c;
             break;
         }
@@ -58,20 +87,25 @@ if ($card === null) {
     exit;
 }
 
-// بناء بيانات المنتقي لكل مكوّن.
+// مكوّنات الشراء (الكومبو: components، BOGO: buy_components) → بناء منتقي لكل منها.
+$rawComponents = $isCombo ? ($card['components'] ?? []) : ($card['buy_components'] ?? []);
 $components = [];
-foreach (($card['components'] ?? []) as $comp) {
+$componentsTotal = 0.0;
+foreach ($rawComponents as $comp) {
     $pid = (int) ($comp['product_id'] ?? 0);
     if ($pid <= 0) {
         continue;
     }
     $view = orange_storefront_product_variant_view($pdo, $pid, $sfCountryId, $lang);
     $rawImg = (string) ($comp['main_image'] ?? '');
+    $qty = max(1, (int) ($comp['qty'] ?? 1));
+    $price = (float) ($comp['price'] ?? $view['price']);
+    $componentsTotal += $price * $qty;
     $components[] = [
         'product_id' => $pid,
-        'qty' => max(1, (int) ($comp['qty'] ?? 1)),
+        'qty' => $qty,
         'name' => $view['name'] !== '' ? $view['name'] : (string) ($comp['name'] ?? ''),
-        'price' => (float) ($comp['price'] ?? $view['price']),
+        'price' => $price,
         'image_display' => $rawImg !== '' ? storefront_product_image_href($rawImg) : $view['main_image'],
         'image_cart' => $rawImg,
         'has_colors' => (int) $view['has_colors'],
@@ -82,14 +116,54 @@ foreach (($card['components'] ?? []) as $comp) {
         'variants' => $view['variants'],
     ];
 }
+$componentsTotal = round($componentsTotal, 4);
 
 $offerName = (string) ($card['name'] ?? '');
-$bundlePrice = (float) ($card['bundle_price'] ?? 0);
-$componentsTotal = (float) ($card['components_total'] ?? 0);
-$showOldPrice = !empty($card['show_old_price']) && $componentsTotal > $bundlePrice + 1e-6;
 $requiresRegistration = !empty($card['requires_registration']);
 $buyerRegistered = current_storefront_account($pdo) !== null;
 $showRegisterTeaser = $requiresRegistration && !$buyerRegistered;
+
+// نموذج السعر: الكومبو سعر حزمة مخفّض؛ BOGO إجمالي الشراء (الفائدة هي الهدية).
+if ($isCombo) {
+    $bundlePrice = (float) ($card['bundle_price'] ?? 0);
+    $showOldPrice = !empty($card['show_old_price']) && $componentsTotal > $bundlePrice + 1e-6;
+    $priceLabel = t('offer_price_label');
+} else {
+    $bundlePrice = $componentsTotal;
+    $showOldPrice = false;
+    $priceLabel = t('offer_buy_total');
+}
+
+// هدية BOGO (عرض ساكن فقط؛ تُحقن تلقائياً على الخادم — لا تُضاف للسلة هنا).
+$gift = null;
+if ($isBogo) {
+    $giftKind = (string) ($card['gift_kind'] ?? 'choice');
+    $chargeKind = (string) ($card['gift_unit_charge_kind'] ?? 'free');
+    $chargeVal = (float) ($card['gift_unit_charge_value'] ?? 0);
+    if ($giftKind === 'fixed' && !empty($card['fixed_gift'])) {
+        $fg = $card['fixed_gift'];
+        $retail = (float) ($fg['price'] ?? 0);
+        $chargePrice = $offerGiftChargePrice($chargeKind, $chargeVal, $retail);
+        $gift = [
+            'kind' => 'fixed',
+            'name' => (string) ($fg['name'] ?? ''),
+            'image' => ($fg['main_image'] ?? '') !== '' ? storefront_product_image_href((string) $fg['main_image']) : '',
+            'retail' => $retail,
+            'charge' => $chargePrice,
+            'free' => $chargePrice <= 1e-6,
+            'show_old' => !empty($card['show_old_price']) && $retail > $chargePrice + 1e-6,
+        ];
+    } else {
+        $pool = [];
+        foreach (($card['gift_pool'] ?? []) as $pg) {
+            $pool[] = [
+                'name' => (string) ($pg['name'] ?? ''),
+                'image' => ($pg['main_image'] ?? '') !== '' ? storefront_product_image_href((string) $pg['main_image']) : '',
+            ];
+        }
+        $gift = ['kind' => 'choice', 'pool' => $pool];
+    }
+}
 
 $ORANGE_STOREFRONT_PAGE_TITLE = ($offerName !== '' ? $offerName : t('offers')) . ' | ' . t('storefront_brand');
 $ORANGE_STOREFRONT_META_DESCRIPTION = '';
@@ -101,7 +175,7 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
     $jsonFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
 }
 ?>
-<div class="container offer-page" data-offer-id="<?php echo (int) $card['offer_id']; ?>">
+<div class="container offer-page" data-offer-id="<?php echo (int) $card['offer_id']; ?>" data-offer-type="<?php echo htmlspecialchars($offerType, ENT_QUOTES, 'UTF-8'); ?>">
     <nav class="product-page-toolbar product-page-toolbar--dual">
         <a class="product-page__back" href="<?php echo htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?></a>
         <a class="product-page__close" href="<?php echo htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></a>
@@ -171,12 +245,54 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
         </div>
         <?php endforeach; ?>
     </div>
+
+    <?php if ($gift !== null): ?>
+    <div class="offer-gift">
+        <h2 class="offer-gift__title"><?php echo htmlspecialchars(t('offer_your_gift'), ENT_QUOTES, 'UTF-8'); ?></h2>
+        <?php if ($gift['kind'] === 'fixed'): ?>
+        <div class="offer-gift__item">
+            <div class="offer-gift__media">
+                <?php if ($gift['image'] !== ''): ?>
+                <img src="<?php echo htmlspecialchars((string) $gift['image'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars((string) $gift['name'], ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
+                <?php endif; ?>
+            </div>
+            <div class="offer-gift__body">
+                <h3 class="offer-gift__name"><?php echo htmlspecialchars((string) $gift['name'], ENT_QUOTES, 'UTF-8'); ?></h3>
+                <div class="price-row">
+                    <?php if (!empty($gift['free'])): ?>
+                    <strong class="offer-gift__free"><?php echo htmlspecialchars(t('offer_gift_free'), ENT_QUOTES, 'UTF-8'); ?></strong>
+                    <?php else: ?>
+                    <strong><?php echo number_format((float) $gift['charge'], 2); ?> <?php echo htmlspecialchars($sfCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                    <?php endif; ?>
+                    <?php if (!empty($gift['show_old'])): ?>
+                    <span class="old-price"><?php echo number_format((float) $gift['retail'], 2); ?> <?php echo htmlspecialchars($sfCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <?php else: ?>
+        <p class="offer-gift__choose-note"><?php echo htmlspecialchars(t('offer_gift_choose_in_cart'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <?php if (($gift['pool'] ?? []) !== []): ?>
+        <div class="offer-gift__pool">
+            <?php foreach ($gift['pool'] as $pg): ?>
+            <div class="offer-gift__pool-item">
+                <?php if (($pg['image'] ?? '') !== ''): ?>
+                <img src="<?php echo htmlspecialchars((string) $pg['image'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars((string) $pg['name'], ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
+                <?php endif; ?>
+                <span><?php echo htmlspecialchars((string) $pg['name'], ENT_QUOTES, 'UTF-8'); ?></span>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 </div>
 
-<div class="offer-sticky-bar" role="region" aria-label="<?php echo htmlspecialchars(t('offer_price_label'), ENT_QUOTES, 'UTF-8'); ?>">
+<div class="offer-sticky-bar" role="region" aria-label="<?php echo htmlspecialchars($priceLabel, ENT_QUOTES, 'UTF-8'); ?>">
     <div class="offer-sticky-bar__inner">
         <div class="offer-sticky-bar__price">
-            <span class="offer-sticky-bar__label"><?php echo htmlspecialchars(t('offer_price_label'), ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="offer-sticky-bar__label"><?php echo htmlspecialchars($priceLabel, ENT_QUOTES, 'UTF-8'); ?></span>
             <strong id="offerBundlePrice"><?php echo number_format($bundlePrice, 2); ?> <?php echo htmlspecialchars($sfCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
             <?php if ($showOldPrice): ?>
             <span class="old-price" id="offerOldPrice"><?php echo number_format($componentsTotal, 2); ?> <?php echo htmlspecialchars($sfCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
@@ -207,9 +323,7 @@ window.ORANGE_OFFER = {
     components: <?php echo json_encode($components, $jsonFlags); ?>,
     t: {
         pick_required: <?php echo json_encode(t('offer_pick_required'), $jsonFlags); ?>,
-        added: <?php echo json_encode(t('offer_added'), $jsonFlags); ?>,
-        select_color: <?php echo json_encode(t('offer_pick_required'), $jsonFlags); ?>,
-        select_size: <?php echo json_encode(t('offer_pick_required'), $jsonFlags); ?>
+        added: <?php echo json_encode(t('offer_added'), $jsonFlags); ?>
     }
 };
 </script>

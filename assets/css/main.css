@@ -1018,6 +1018,65 @@ body.storefront-browse-menu-lock {
     font-weight: 700;
     margin-inline-start: 0.35rem;
 }
+.offer-gift {
+    margin-top: 1.25rem;
+    padding: 1rem;
+    border: 1px dashed var(--primary);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--primary) 5%, var(--card));
+}
+.offer-gift__title {
+    margin: 0 0 0.75rem;
+    font-size: 1.1rem;
+    color: var(--primary);
+}
+.offer-gift__item {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+.offer-gift__media {
+    flex: 0 0 28%;
+    max-width: 140px;
+}
+.offer-gift__media img {
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+    display: block;
+}
+.offer-gift__name {
+    margin: 0 0 0.4rem;
+    font-size: 1rem;
+}
+.offer-gift__free {
+    color: var(--primary);
+}
+.offer-gift__choose-note {
+    margin: 0 0 0.6rem;
+    color: var(--muted, #6b7280);
+    font-size: 0.9rem;
+}
+.offer-gift__pool {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+.offer-gift__pool-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    width: 84px;
+    font-size: 0.78rem;
+    text-align: center;
+}
+.offer-gift__pool-item img {
+    width: 84px;
+    height: 84px;
+    object-fit: cover;
+    border-radius: 8px;
+}
 .offer-sticky-bar {
     position: fixed;
     inset-inline: 0;
