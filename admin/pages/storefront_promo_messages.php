@@ -12,6 +12,7 @@ orange_catalog_ensure_schema($pdo);
 $hasTable = orange_table_exists($pdo, 'storefront_promo_messages');
 $spmSlots = orange_storefront_promo_message_slots();
 $spmOfferTypes = orange_storefront_promo_message_offer_types();
+$spmAudiences = orange_storefront_promo_message_audiences();
 $spmAdminCid = (int) orange_cart_promotion_admin_country_id($pdo);
 $spmIsGlobal = $spmAdminCid <= 0;
 
@@ -79,6 +80,17 @@ foreach ($spmCountries as $c) {
             </select>
         </div>
         <?php endif; ?>
+    </div>
+    <div class="form-grid" id="spm_audience_wrap">
+        <div>
+            <label for="spm_audience">الجمهور</label>
+            <select id="spm_audience" class="admin-inp">
+                <?php foreach ($spmAudiences as $key => $label): ?>
+                <option value="<?php echo htmlspecialchars($key, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <p class="card-hint" style="margin:4px 0 0;">«لكل العملاء» تجذب الجميع للعرض؛ «للزوّار غير المسجّلين» للتحفيز على التسجيل فقط.</p>
+        </div>
     </div>
     <div class="form-grid" id="spm_offer_wrap" style="display:none;">
         <div>
@@ -148,6 +160,7 @@ foreach ($spmCountries as $c) {
 <?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
 var SPM_SLOTS = <?php echo json_encode($spmSlots, JSON_UNESCAPED_UNICODE); ?>;
 var SPM_OFFER_TYPES = <?php echo json_encode($spmOfferTypes, JSON_UNESCAPED_UNICODE); ?>;
+var SPM_AUDIENCES = <?php echo json_encode($spmAudiences, JSON_UNESCAPED_UNICODE); ?>;
 var SPM_COUNTRY_LABELS = <?php echo json_encode($spmCountryLabelJs, JSON_UNESCAPED_UNICODE); ?>;
 var SPM_IS_GLOBAL = <?php echo $spmIsGlobal ? 'true' : 'false'; ?>;
 var SPM_ROWS = [];
@@ -164,8 +177,14 @@ function escSpm(s) {
 function spmSyncOfferWrap() {
     var slotEl = document.getElementById('spm_slot');
     var wrap = document.getElementById('spm_offer_wrap');
-    if (!slotEl || !wrap) return;
-    wrap.style.display = (slotEl.value === 'offer_card') ? '' : 'none';
+    if (slotEl && wrap) {
+        wrap.style.display = (slotEl.value === 'offer_card') ? '' : 'none';
+    }
+    // خانة register_teaser للضيف بطبيعتها — نخفي مُنتقي الجمهور (يُثبَّت guest في الخادم).
+    var audWrap = document.getElementById('spm_audience_wrap');
+    if (slotEl && audWrap) {
+        audWrap.style.display = (slotEl.value === 'register_teaser') ? 'none' : '';
+    }
 }
 
 function spmComputeNextSort() {
@@ -234,6 +253,8 @@ function resetSpmForm() {
     if (otEl) otEl.selectedIndex = 0;
     var oiEl = document.getElementById('spm_offer_id');
     if (oiEl) oiEl.value = '';
+    var audEl = document.getElementById('spm_audience');
+    if (audEl) audEl.value = 'all';
     spmSyncOfferWrap();
     ocpSetAlwaysOn('spm', false);
     ocpDefaultScheduleDates('spm');
@@ -255,6 +276,8 @@ function editSpm(row) {
     if (otEl) otEl.value = row.offer_type ? String(row.offer_type) : (otEl.options[0] ? otEl.options[0].value : '');
     var oiEl = document.getElementById('spm_offer_id');
     if (oiEl) oiEl.value = (row.offer_id != null && parseInt(row.offer_id, 10) > 0) ? String(row.offer_id) : '';
+    var audEl = document.getElementById('spm_audience');
+    if (audEl) audEl.value = (row.audience && SPM_AUDIENCES[row.audience]) ? String(row.audience) : 'all';
     spmSyncOfferWrap();
     ocpSetAlwaysOn('spm', parseInt(row.is_always_on, 10) === 1);
     ocpSetDmyFromIso('spm_valid_from', row.valid_from);
@@ -282,6 +305,9 @@ async function loadSpm() {
         if (r.slot === 'offer_card' && r.offer_type && parseInt(r.offer_id, 10) > 0) {
             var otLabel = SPM_OFFER_TYPES[r.offer_type] ? SPM_OFFER_TYPES[r.offer_type] : r.offer_type;
             slotLabel += ' — ' + otLabel + ' #' + r.offer_id;
+        }
+        if (r.slot !== 'register_teaser' && r.audience === 'guest') {
+            slotLabel += ' · ' + (SPM_AUDIENCES.guest || 'للضيوف');
         }
         var tr = document.createElement('tr');
         tr.innerHTML =
@@ -327,6 +353,7 @@ async function saveSpm() {
         slot: document.getElementById('spm_slot').value,
         offer_type: (document.getElementById('spm_offer_type') || {}).value || '',
         offer_id: parseInt((document.getElementById('spm_offer_id') || {}).value, 10) || 0,
+        audience: (document.getElementById('spm_audience') || {}).value || 'all',
         country_id: cEl ? (parseInt(cEl.value, 10) || 0) : 0,
         text_ar: document.getElementById('spm_text_ar').value.trim(),
         text_en: document.getElementById('spm_text_en').value.trim(),

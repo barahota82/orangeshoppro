@@ -47,6 +47,41 @@ function orange_storefront_promo_message_offer_type_valid(string $type): bool
     return array_key_exists($type, orange_storefront_promo_message_offer_types());
 }
 
+/**
+ * جمهور الرسالة: «للكل» (الافتراضي — تظهر لأي عميل) أو «للضيوف فقط» (تحفيز التسجيل).
+ *
+ * @return array<string,string>
+ */
+function orange_storefront_promo_message_audiences(): array
+{
+    return [
+        'all' => 'لكل العملاء',
+        'guest' => 'للزوّار غير المسجّلين (تحفيز التسجيل)',
+    ];
+}
+
+function orange_storefront_promo_message_audience_valid(string $audience): bool
+{
+    return array_key_exists($audience, orange_storefront_promo_message_audiences());
+}
+
+/**
+ * شرط SQL لفلترة الجمهور حسب حالة تسجيل الزائر.
+ * عند الزائر المسجّل: تُخفى الرسائل الموجّهة «للضيوف فقط» (تبقى رسائل «للكل»).
+ * يُرجَع '' (بلا فلترة) إن كان الزائر ضيفاً/غير معروف أو العمود غير موجود — حفاظاً على التوافق.
+ */
+function orange_storefront_promo_audience_sql(PDO $pdo, ?bool $viewerRegistered): string
+{
+    if ($viewerRegistered !== true) {
+        return '';
+    }
+    if (!orange_table_has_column($pdo, 'storefront_promo_messages', 'audience')) {
+        return '';
+    }
+
+    return " AND (audience IS NULL OR audience = 'all')";
+}
+
 function orange_storefront_promo_message_slot_valid(string $slot): bool
 {
     return array_key_exists($slot, orange_storefront_promo_message_slots());
@@ -81,13 +116,15 @@ function orange_storefront_promo_message_for_slot(
     PDO $pdo,
     string $slot,
     ?int $countryId,
-    string $lang
+    string $lang,
+    ?bool $viewerRegistered = null
 ): string {
     if (!orange_storefront_promo_message_slot_valid($slot)
         || !orange_table_exists($pdo, 'storefront_promo_messages')) {
         return '';
     }
     $cid = ($countryId !== null && $countryId > 0) ? $countryId : 0;
+    $audienceSql = orange_storefront_promo_audience_sql($pdo, $viewerRegistered);
     $st = $pdo->prepare(
         'SELECT text_ar, text_en, text_fil, text_hi
          FROM storefront_promo_messages
@@ -97,7 +134,7 @@ function orange_storefront_promo_message_for_slot(
            AND (is_always_on = 1 OR (
                 (valid_from IS NULL OR valid_from <= NOW())
                 AND (valid_to IS NULL OR valid_to >= NOW())
-           ))
+           ))' . $audienceSql . '
          ORDER BY sort_order ASC, id ASC
          LIMIT 1'
     );
@@ -117,7 +154,7 @@ function orange_storefront_promo_message_for_slot(
  * @param list<string> $slots
  * @return array<string,string>
  */
-function orange_storefront_promo_messages_map(PDO $pdo, array $slots, ?int $countryId, string $lang): array
+function orange_storefront_promo_messages_map(PDO $pdo, array $slots, ?int $countryId, string $lang, ?bool $viewerRegistered = null): array
 {
     if (!orange_table_exists($pdo, 'storefront_promo_messages')) {
         return [];
@@ -136,6 +173,7 @@ function orange_storefront_promo_messages_map(PDO $pdo, array $slots, ?int $coun
     $placeholders = implode(', ', array_fill(0, count($valid), '?'));
     $params = $valid;
     $params[] = $cid;
+    $audienceSql = orange_storefront_promo_audience_sql($pdo, $viewerRegistered);
     $st = $pdo->prepare(
         'SELECT slot, text_ar, text_en, text_fil, text_hi
          FROM storefront_promo_messages
@@ -145,7 +183,7 @@ function orange_storefront_promo_messages_map(PDO $pdo, array $slots, ?int $coun
            AND (is_always_on = 1 OR (
                 (valid_from IS NULL OR valid_from <= NOW())
                 AND (valid_to IS NULL OR valid_to >= NOW())
-           ))
+           ))' . $audienceSql . '
          ORDER BY sort_order ASC, id ASC'
     );
     $st->execute($params);
@@ -176,7 +214,7 @@ function orange_storefront_promo_register_teaser(PDO $pdo, ?int $countryId, stri
  *
  * @return array<string,string>
  */
-function orange_storefront_promo_offer_card_map(PDO $pdo, ?int $countryId, string $lang): array
+function orange_storefront_promo_offer_card_map(PDO $pdo, ?int $countryId, string $lang, ?bool $viewerRegistered = null): array
 {
     if (!orange_table_exists($pdo, 'storefront_promo_messages')
         || !orange_table_has_column($pdo, 'storefront_promo_messages', 'offer_type')
@@ -184,6 +222,7 @@ function orange_storefront_promo_offer_card_map(PDO $pdo, ?int $countryId, strin
         return [];
     }
     $cid = ($countryId !== null && $countryId > 0) ? $countryId : 0;
+    $audienceSql = orange_storefront_promo_audience_sql($pdo, $viewerRegistered);
     $st = $pdo->prepare(
         'SELECT offer_type, offer_id, text_ar, text_en, text_fil, text_hi
          FROM storefront_promo_messages
@@ -195,7 +234,7 @@ function orange_storefront_promo_offer_card_map(PDO $pdo, ?int $countryId, strin
            AND (is_always_on = 1 OR (
                 (valid_from IS NULL OR valid_from <= NOW())
                 AND (valid_to IS NULL OR valid_to >= NOW())
-           ))
+           ))' . $audienceSql . '
          ORDER BY sort_order ASC, id ASC'
     );
     $st->execute(['offer_card', $cid]);
@@ -238,19 +277,23 @@ function orange_storefront_promo_messages_admin_list(PDO $pdo, ?int $countryId):
     $hasOfferCols = orange_table_has_column($pdo, 'storefront_promo_messages', 'offer_type')
         && orange_table_has_column($pdo, 'storefront_promo_messages', 'offer_id');
     $offerSel = $hasOfferCols ? ', offer_type, offer_id' : '';
+    $hasAudience = orange_table_has_column($pdo, 'storefront_promo_messages', 'audience');
+    $audienceSel = $hasAudience ? ', audience' : '';
     $st = $pdo->prepare(
         'SELECT id, country_id, slot, text_ar, text_en, text_fil, text_hi,
-                is_active, is_always_on, valid_from, valid_to, sort_order' . $offerSel . '
+                is_active, is_always_on, valid_from, valid_to, sort_order' . $offerSel . $audienceSel . '
          FROM storefront_promo_messages' . $countrySql . '
          ORDER BY slot ASC, sort_order ASC, id ASC'
     );
     $st->execute($params);
     $out = [];
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        $audienceVal = isset($row['audience']) && (string) $row['audience'] !== '' ? (string) $row['audience'] : 'all';
         $out[] = [
             'id' => (int) $row['id'],
             'country_id' => isset($row['country_id']) ? (int) $row['country_id'] : null,
             'slot' => (string) ($row['slot'] ?? ''),
+            'audience' => orange_storefront_promo_message_audience_valid($audienceVal) ? $audienceVal : 'all',
             'offer_type' => isset($row['offer_type']) ? (string) $row['offer_type'] : '',
             'offer_id' => isset($row['offer_id']) && $row['offer_id'] !== null ? (int) $row['offer_id'] : 0,
             'text_ar' => (string) ($row['text_ar'] ?? ''),

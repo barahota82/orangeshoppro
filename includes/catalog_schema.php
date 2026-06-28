@@ -3175,6 +3175,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_storefront_promo_messages_v108($pdo);
     orange_catalog_migrate_promo_bogo_gift_customer_pick_v109($pdo);
     orange_catalog_migrate_storefront_promo_messages_offer_target_v110($pdo);
+    orange_catalog_migrate_storefront_promo_messages_audience_v111($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3801,6 +3802,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_storefront_promo_messages_v108($pdo);
     orange_catalog_migrate_promo_bogo_gift_customer_pick_v109($pdo);
     orange_catalog_migrate_storefront_promo_messages_offer_target_v110($pdo);
+    orange_catalog_migrate_storefront_promo_messages_audience_v111($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -8041,6 +8043,34 @@ function orange_catalog_migrate_storefront_promo_messages_offer_target_v110(PDO 
             $pdo,
             'ALTER TABLE storefront_promo_messages ADD INDEX idx_spm_offer (offer_type, offer_id)'
         );
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v111 — جمهور الرسالة التحفيزية (قرار مالك 2026-06-28):
+ *  - عمود `audience` VARCHAR(16) NOT NULL DEFAULT 'all' على `storefront_promo_messages`.
+ *  - 'all' = تظهر لأي عميل (مسجّل أو ضيف) لجذبه للعرض؛ 'guest' = للزوّار غير المسجّلين فقط (تحفيز التسجيل).
+ *  - الافتراضي 'all' حفاظاً على سلوك الرسائل القائمة (كانت تظهر للكل).
+ * marker-gated + idempotent.
+ */
+function orange_catalog_migrate_storefront_promo_messages_audience_v111(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_storefront_promo_messages_audience_v111';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'storefront_promo_messages')
+        && !orange_table_has_column($pdo, 'storefront_promo_messages', 'audience')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE storefront_promo_messages ADD COLUMN audience VARCHAR(16) NOT NULL DEFAULT 'all'"
+        );
+        orange_schema_invalidate_column_check('storefront_promo_messages', 'audience');
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

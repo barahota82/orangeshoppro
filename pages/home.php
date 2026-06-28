@@ -163,13 +163,16 @@ foreach ($offers as $op) {
  */
 require_once __DIR__ . '/../includes/storefront_offer_cards.php';
 require_once __DIR__ . '/../includes/storefront_promo_messages.php';
+require_once __DIR__ . '/../includes/storefront_account.php';
 $sfComboCards = orange_storefront_active_combo_cards($pdo, $sfHomeCountryId, $lang);
 $sfBogoCardsAll = orange_storefront_active_bogo_cards($pdo, $sfHomeCountryId, $lang);
-$sfPromoMsgMap = orange_storefront_promo_messages_map($pdo, ['home_top', 'offers_top'], $sfHomeCountryId, $lang);
+// الجمهور: رسائل «للضيوف فقط» تُخفى عن العميل المسجّل (رسائل «للكل» تظهر للجميع).
+$sfHomeViewerRegistered = current_storefront_account($pdo) !== null;
+$sfPromoMsgMap = orange_storefront_promo_messages_map($pdo, ['home_top', 'offers_top'], $sfHomeCountryId, $lang, $sfHomeViewerRegistered);
 $sfMsgHomeTop = $sfPromoMsgMap['home_top'] ?? '';
 $sfMsgOffersTop = $sfPromoMsgMap['offers_top'] ?? '';
 // رسائل تحفيزية لبطاقات عروض محدّدة (المفتاح "type:id").
-$sfOfferPromoMap = orange_storefront_promo_offer_card_map($pdo, $sfHomeCountryId, $lang);
+$sfOfferPromoMap = orange_storefront_promo_offer_card_map($pdo, $sfHomeCountryId, $lang, $sfHomeViewerRegistered);
 // في تاب العروض نعرض BOGO ذات صفحة عرض: «حزمة شراء» و«نفس المنتج» بمنتج مستهدف
 // (كلاهما يملك buy_components صالحة). same_category بلا صفحة بعد.
 $sfBogoBundleCards = array_values(array_filter(

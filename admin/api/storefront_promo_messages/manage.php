@@ -59,6 +59,7 @@ try {
             'data' => orange_storefront_promo_messages_admin_list($pdo, $adminCid > 0 ? $adminCid : null),
             'slots' => orange_storefront_promo_message_slots(),
             'offer_types' => orange_storefront_promo_message_offer_types(),
+            'audiences' => orange_storefront_promo_message_audiences(),
         ]);
     }
 
@@ -113,6 +114,15 @@ try {
             $offerId = $offerIdRaw;
         }
 
+        // جمهور الرسالة: 'all' (تظهر للكل) أو 'guest' (للزوّار غير المسجّلين فقط).
+        // خانة register_teaser للضيف بطبيعتها (تجاوز نص «سجّل لفتح العرض») فتُثبَّت 'guest'.
+        if ($slot === 'register_teaser') {
+            $audience = 'guest';
+        } else {
+            $audienceRaw = trim((string) ($data['audience'] ?? 'all'));
+            $audience = orange_storefront_promo_message_audience_valid($audienceRaw) ? $audienceRaw : 'all';
+        }
+
         // نطاق الدولة: المشرف المقيّد بدولة لا ينشئ رسائل خارج نطاقه.
         $reqCountry = array_key_exists('country_id', $data) ? (int) $data['country_id'] : 0;
         if ($adminCid > 0) {
@@ -133,13 +143,14 @@ try {
             }
             $st = $pdo->prepare(
                 'UPDATE storefront_promo_messages
-                 SET country_id = ?, slot = ?, offer_type = ?, offer_id = ?, text_ar = ?, text_en = ?, text_fil = ?, text_hi = ?,
+                 SET country_id = ?, slot = ?, audience = ?, offer_type = ?, offer_id = ?, text_ar = ?, text_en = ?, text_fil = ?, text_hi = ?,
                      is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, sort_order = ?
                  WHERE id = ?'
             );
             $st->execute([
                 $countryToStore,
                 $slot,
+                $audience,
                 $offerType,
                 $offerId,
                 $textAr,
@@ -156,12 +167,13 @@ try {
         } else {
             $st = $pdo->prepare(
                 'INSERT INTO storefront_promo_messages
-                    (country_id, slot, offer_type, offer_id, text_ar, text_en, text_fil, text_hi, is_active, is_always_on, valid_from, valid_to, sort_order)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                    (country_id, slot, audience, offer_type, offer_id, text_ar, text_en, text_fil, text_hi, is_active, is_always_on, valid_from, valid_to, sort_order)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $st->execute([
                 $countryToStore,
                 $slot,
+                $audience,
                 $offerType,
                 $offerId,
                 $textAr,

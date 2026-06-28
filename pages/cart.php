@@ -24,7 +24,7 @@ if (!$cartSfLoggedIn) {
 }
 
 include __DIR__ . '/../includes/header.php';
-$cartTopPromoMsg = orange_storefront_promo_message_for_slot($pdoCartAcc, 'cart_top', orange_storefront_current_country_id($pdoCartAcc), $lang);
+$cartTopPromoMsg = orange_storefront_promo_message_for_slot($pdoCartAcc, 'cart_top', orange_storefront_current_country_id($pdoCartAcc), $lang, $cartSfLoggedIn);
 $orangeDeliveryAreaGroups = orange_delivery_areas_storefront_groups($pdoCartAcc, $lang);
 $orangeDeliveryAreasStorefront = orange_delivery_areas_flatten_groups($orangeDeliveryAreaGroups);
 
