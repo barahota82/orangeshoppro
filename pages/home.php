@@ -164,10 +164,14 @@ foreach ($offers as $op) {
 require_once __DIR__ . '/../includes/storefront_offer_cards.php';
 $sfComboCards = orange_storefront_active_combo_cards($pdo, $sfHomeCountryId, $lang);
 $sfBogoCardsAll = orange_storefront_active_bogo_cards($pdo, $sfHomeCountryId, $lang);
-// في تاب العروض نعرض BOGO «حزمة شراء» فقط (لها صفحة عرض)؛ الأنواع الأخرى لاحقاً.
+// في تاب العروض نعرض BOGO ذات صفحة عرض: «حزمة شراء» و«نفس المنتج» بمنتج مستهدف
+// (كلاهما يملك buy_components صالحة). same_category بلا صفحة بعد.
 $sfBogoBundleCards = array_values(array_filter(
     $sfBogoCardsAll,
-    static fn (array $c): bool => (string) ($c['bogo_kind'] ?? '') === 'buy_bundle'
+    static function (array $c): bool {
+        $k = (string) ($c['bogo_kind'] ?? '');
+        return ($k === 'buy_bundle' || $k === 'same_variant') && ($c['buy_components'] ?? []) !== [];
+    }
 ));
 $sfOfferPageBase = storefront_public_path('/pages/offer.php');
 $sfOfferHref = static function (string $type, int $offerId) use ($sfOfferPageBase, $channelSlug, $lang): string {

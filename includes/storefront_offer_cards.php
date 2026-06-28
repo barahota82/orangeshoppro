@@ -205,11 +205,12 @@ function orange_storefront_active_bogo_cards(PDO $pdo, ?int $countryId, string $
     $sortSql = orange_table_has_column($pdo, 'cart_bogo_promotions', 'sort_order')
         ? ' ORDER BY sort_order ASC, id ASC'
         : ' ORDER BY id ASC';
+    $svCol = orange_table_has_column($pdo, 'cart_bogo_promotions', 'same_variant_product_id') ? ', same_variant_product_id' : '';
     $st = $pdo->prepare(
         'SELECT id, name_ar, name_en, show_name_to_customer, show_old_price_to_customer, bogo_kind,
                 category_id, min_buy_qty, buy_components_json, gift_kind, fixed_variant_id, pool_variant_ids,
                 gift_unit_charge_kind, gift_unit_charge_value, requires_registered_account, first_delivered_order_only,
-                is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason
+                is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason' . $svCol . '
          FROM cart_bogo_promotions
          WHERE 1=1' . orange_cart_promo_schedule_sql('cart_bogo_promotions') . $bind['sql'] . $sortSql
     );
@@ -228,6 +229,13 @@ function orange_storefront_active_bogo_cards(PDO $pdo, ?int $countryId, string $
         $buyComps = $kind === 'buy_bundle'
             ? orange_cart_promo_parse_components_json($pdo, $row['buy_components_json'] ?? null)
             : [];
+        // same_variant بمنتج مستهدف: نصوغ «مكوّن شراء» واحداً بكمية الحد الأدنى لتعمل صفحة العرض.
+        if ($kind === 'same_variant') {
+            $svRaw = isset($row['same_variant_product_id']) ? (int) $row['same_variant_product_id'] : 0;
+            if ($svRaw > 0) {
+                $buyComps = [['product_id' => $svRaw, 'qty' => max(2, (int) ($row['min_buy_qty'] ?? 2))]];
+            }
+        }
         $giftKind = strtolower(trim((string) ($row['gift_kind'] ?? 'choice'))) === 'fixed' ? 'fixed' : 'choice';
         $fixedPid = 0;
         $poolPids = [];
@@ -283,7 +291,8 @@ function orange_storefront_active_bogo_cards(PDO $pdo, ?int $countryId, string $
         $giftPool = $resolveList($entry['pool_pids']);
 
         // تخطّي القاعدة إن انعدمت بياناتها المعروضة كلياً (منتجات محذوفة/غير نشطة).
-        if ($entry['kind'] === 'buy_bundle' && $buyComponents === []) {
+        // same_variant بلا منتج مستهدف = عرض تلقائي «أي منتج» بلا صفحة → لا بطاقة.
+        if (($entry['kind'] === 'buy_bundle' || $entry['kind'] === 'same_variant') && $buyComponents === []) {
             continue;
         }
         if ($entry['gift_kind'] === 'fixed' && $fixedGift === null && $entry['kind'] !== 'same_category') {

@@ -178,8 +178,13 @@ try {
         } else {
             $buyJson = null;
         }
+        $svPid = 0;
         if ($bogoKind === 'same_variant') {
             $catId = 0;
+            $svPid = (int) ($data['same_variant_product_id'] ?? 0);
+            if ($svPid < 0) {
+                $svPid = 0;
+            }
         }
 
         if ($giftKind === 'fixed') {
@@ -200,6 +205,9 @@ try {
             foreach ($buyComps as $bc) {
                 $productIds[] = (int) $bc['product_id'];
             }
+        }
+        if ($bogoKind === 'same_variant' && $svPid > 0) {
+            $productIds[] = $svPid;
         }
         if ($giftKind === 'fixed' && $fixedPid > 0) {
             $productIds[] = $fixedPid;
@@ -229,6 +237,7 @@ try {
         }
 
         $catSql = $bogoKind === 'same_category' && $catId > 0 ? $catId : null;
+        $svSql = $bogoKind === 'same_variant' && $svPid > 0 ? $svPid : null;
 
         try {
             $insertCountryId = orange_cart_promotion_prepare_admin_save($pdo, 'cart_bogo_promotions', $id);
@@ -240,7 +249,7 @@ try {
             orange_cart_promo_clear_auto_pause($pdo, 'cart_bogo_promotions', $id);
             // الترتيب تلقائي بالكامل: لا يُمَسّ عند التعديل.
             $st = $pdo->prepare(
-                'UPDATE cart_bogo_promotions SET name_ar = ?, name_en = ?, show_name_to_customer = ?, show_old_price_to_customer = ?, bogo_kind = ?, category_id = ?, min_buy_qty = ?, buy_components_json = ?, requires_registered_account = ?, first_delivered_order_only = ?, gift_kind = ?, fixed_variant_id = ?, pool_variant_ids = ?, gift_unit_charge_kind = ?, gift_unit_charge_value = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
+                'UPDATE cart_bogo_promotions SET name_ar = ?, name_en = ?, show_name_to_customer = ?, show_old_price_to_customer = ?, bogo_kind = ?, category_id = ?, same_variant_product_id = ?, min_buy_qty = ?, buy_components_json = ?, requires_registered_account = ?, first_delivered_order_only = ?, gift_kind = ?, fixed_variant_id = ?, pool_variant_ids = ?, gift_unit_charge_kind = ?, gift_unit_charge_value = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
             );
             $st->execute([
                 $nameAr,
@@ -249,6 +258,7 @@ try {
                 $showOldPrice,
                 $bogoKind,
                 $catSql,
+                $svSql,
                 $minBuy,
                 $buyJson,
                 $reqReg,
@@ -280,7 +290,7 @@ try {
             $stSort->execute($sortBind['params']);
             $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
             $st = $pdo->prepare(
-                'INSERT INTO cart_bogo_promotions (country_id, name_ar, name_en, show_name_to_customer, show_old_price_to_customer, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, first_delivered_order_only, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO cart_bogo_promotions (country_id, name_ar, name_en, show_name_to_customer, show_old_price_to_customer, bogo_kind, category_id, same_variant_product_id, min_buy_qty, buy_components_json, requires_registered_account, first_delivered_order_only, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $st->execute([
                 $insertCountryId,
@@ -290,6 +300,7 @@ try {
                 $showOldPrice,
                 $bogoKind,
                 $catSql,
+                $svSql,
                 $minBuy,
                 $buyJson,
                 $reqReg,

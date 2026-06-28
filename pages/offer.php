@@ -60,7 +60,10 @@ if ($offerId > 0 && $isCombo) {
     }
 } elseif ($offerId > 0 && $isBogo) {
     foreach (orange_storefront_active_bogo_cards($pdo, $sfCountryId, $lang) as $c) {
-        if ((int) $c['offer_id'] === $offerId && (string) ($c['bogo_kind'] ?? '') === 'buy_bundle') {
+        $ck = (string) ($c['bogo_kind'] ?? '');
+        if ((int) $c['offer_id'] === $offerId
+            && ($ck === 'buy_bundle' || $ck === 'same_variant')
+            && ($c['buy_components'] ?? []) !== []) {
             $card = $c;
             break;
         }

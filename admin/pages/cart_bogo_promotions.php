@@ -149,6 +149,16 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                 </table>
             </div>
         </div>
+        <div id="cbp_same_variant_wrap" style="grid-column:1/-1;display:none;">
+            <label>منتج العرض (اختياري لنوع «نفس المنتج»)</label>
+            <p class="page-subtitle" style="margin:6px 0 10px;line-height:1.45;">عند اختيار منتج محدّد، يُطبَّق العرض فقط عند شراء الكمية المطلوبة من <strong>هذا المنتج</strong>، وتظهر له بطاقة/صفحة عرض في تاب «العروض». إن تُرك فارغاً يُطبَّق على <strong>أي منتج</strong> يبلغ الحد الأدنى (بلا صفحة عرض).</p>
+            <div style="margin:6px 0 8px;">
+                <button type="button" class="btn-secondary" id="cbp_sv_pick_btn">اختيار منتج (دبل كليك من القائمة)</button>
+                <button type="button" class="btn-secondary" id="cbp_sv_clear_btn">مسح المنتج</button>
+            </div>
+            <p id="cbp_sv_label" class="page-subtitle" style="margin:0;">— أي منتج (بلا تحديد) —</p>
+            <input type="hidden" id="cbp_sv_pid" value="0">
+        </div>
         <div id="cbp_minbuy_wrap">
             <label>الحد الأدنى للكمية / عدد المنتجات المختلفة</label>
             <input type="number" id="cbp_minbuy" class="admin-inp" min="2" step="1" value="2" style="max-width:12rem;" dir="ltr">
@@ -393,6 +403,22 @@ function cbpToggleBogo() {
     document.getElementById('cbp_cat_wrap').style.display = v === 'same_category' ? 'block' : 'none';
     document.getElementById('cbp_buy_bundle_wrap').style.display = v === 'buy_bundle' ? 'block' : 'none';
     document.getElementById('cbp_minbuy_wrap').style.display = v === 'buy_bundle' ? 'none' : 'block';
+    var svWrap = document.getElementById('cbp_same_variant_wrap');
+    if (svWrap) svWrap.style.display = v === 'same_variant' ? 'block' : 'none';
+}
+
+function cbpSetSvProduct(pid) {
+    var id = parseInt(pid, 10) || 0;
+    var hid = document.getElementById('cbp_sv_pid');
+    if (hid) hid.value = String(id);
+    var lab = document.getElementById('cbp_sv_label');
+    if (!lab) return;
+    if (id <= 0) {
+        lab.textContent = '— أي منتج (بلا تحديد) —';
+        return;
+    }
+    var m = cbpPickMeta(id);
+    lab.textContent = (m.code ? m.code + ' — ' : '') + (m.name || ('منتج #' + id));
 }
 
 function cbpToggleGift() {
@@ -442,6 +468,7 @@ function resetCartBogoPromotionForm() {
     document.getElementById('cbp_cat').value = '';
     document.getElementById('cbp_minbuy').value = '2';
     document.getElementById('cbp_sort').value = String(cbpComputeNextSort());
+    cbpSetSvProduct(0);
     cbpRenderPool([]);
     cbpSetFixed(0);
     cbpRenderBuy([]);
@@ -476,6 +503,7 @@ function editCartBogoPromotion(row) {
     cbpToggleBogo();
     document.getElementById('cbp_cat').value =
         row.category_id != null && row.category_id !== '' ? String(row.category_id) : '';
+    cbpSetSvProduct(row.same_variant_product_id || 0);
     document.getElementById('cbp_minbuy').value = String(row.min_buy_qty != null ? row.min_buy_qty : 2);
     document.getElementById('cbp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
     const gk = (row.gift_kind || 'choice') === 'fixed' ? 'fixed' : 'choice';
@@ -645,6 +673,7 @@ async function saveCartBogoPromotion() {
         id: parseInt(document.getElementById('cbp_id').value, 10) || 0,
         bogo_kind: bogoKind,
         category_id: parseInt(document.getElementById('cbp_cat').value, 10) || 0,
+        same_variant_product_id: parseInt(document.getElementById('cbp_sv_pid').value, 10) || 0,
         name_ar: document.getElementById('cbp_name_ar').value.trim(),
         name_en: document.getElementById('cbp_name_en').value.trim(),
         show_name_to_customer: document.getElementById('cbp_show_name').checked ? 1 : 0,
@@ -717,6 +746,14 @@ document.getElementById('cbp_pool_add_btn').addEventListener('click', function (
 document.getElementById('cbp_fixed_pick_btn').addEventListener('click', function () {
     cbpOpenPick(function (row) { cbpSetFixed(row.product_id); });
 });
+(function () {
+    var svPick = document.getElementById('cbp_sv_pick_btn');
+    if (svPick) svPick.addEventListener('click', function () {
+        cbpOpenPick(function (row) { cbpSetSvProduct(row.product_id); });
+    });
+    var svClear = document.getElementById('cbp_sv_clear_btn');
+    if (svClear) svClear.addEventListener('click', function () { cbpSetSvProduct(0); });
+})();
 (function () {
     var arEl = document.getElementById('cbp_name_ar');
     var enEl = document.getElementById('cbp_name_en');
