@@ -283,6 +283,11 @@ foreach ($offersLazyRows as $p) {
         'title' => storefront_product_display_name($p),
         'oldPrice' => number_format((float) $p['price'], 2),
         'salePrice' => number_format((float) $p['price'] - (float) $p['discount'], 2),
+        'offerName' => orange_promo_customer_display_name([
+            'show_name_to_customer' => (int) ($p['offer_show_name'] ?? 0),
+            'name_ar' => (string) ($p['offer_name_ar'] ?? ''),
+            'name_en' => (string) ($p['offer_name_en'] ?? ''),
+        ], $lang),
         'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => $pid]),
         'vl' => $vlOff,
         'attrs' => $sfHomeCardAttrAttr($pid),
@@ -352,7 +357,9 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="storefront-browse-menu__body">
                     <button type="button" class="storefront-browse-menu__cta" data-apply-filter="all"><?php echo htmlspecialchars(t('storefront_menu_all_products'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <?php if ($offers !== []): ?>
                     <button type="button" class="storefront-browse-menu__cta storefront-browse-menu__cta--secondary" data-apply-filter="offers"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <?php endif; ?>
 
                     <?php foreach ($departments as $dep): ?>
                         <?php
@@ -441,7 +448,9 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
         </button>
         <div class="tabs-scroll" id="homeCategoryTabs">
             <button type="button" class="tab-btn active" data-tab-filter="all" onclick="filterProducts('all', this)"><?php echo htmlspecialchars(t('all'), ENT_QUOTES, 'UTF-8'); ?></button>
+            <?php if ($offers !== []): ?>
             <button type="button" class="tab-btn" data-tab-filter="offers" onclick="filterProducts('offers', this)"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></button>
+            <?php endif; ?>
             <?php foreach ($categories as $cat): ?>
                 <button type="button" class="tab-btn" data-tab-filter="cat-<?php echo (int) $cat['id']; ?>" onclick="filterProducts('cat-<?php echo (int) $cat['id']; ?>', this)">
                     <?php echo htmlspecialchars(storefront_catalog_label($cat, $lang), ENT_QUOTES, 'UTF-8'); ?>
@@ -503,21 +512,22 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
             $sfCardPidOff = (int) $p['id'];
             $sfCardAttrsOff = $sfHomeCardAttrAttr($sfCardPidOff);
             ?>
-            <article class="product-card" data-product-id="<?php echo $sfCardPidOff; ?>" data-filter="offers cat-<?php echo $sfHomeFilterCatalogId($p); ?><?php echo $storefrontExtraFilterSuffix($p); ?>"<?php echo $sfCardAttrsOff !== '' ? ' data-attrs="' . htmlspecialchars($sfCardAttrsOff, ENT_QUOTES, 'UTF-8') . '"' : ''; ?>>
+            <article class="product-card product-card--offer" data-product-id="<?php echo $sfCardPidOff; ?>" data-filter="offers cat-<?php echo $sfHomeFilterCatalogId($p); ?><?php echo $storefrontExtraFilterSuffix($p); ?>"<?php echo $sfCardAttrsOff !== '' ? ' data-attrs="' . htmlspecialchars($sfCardAttrsOff, ENT_QUOTES, 'UTF-8') . '"' : ''; ?>>
                 <div class="product-image-wrap">
                     <img src="<?php echo htmlspecialchars(storefront_product_image_href((string) ($p['main_image'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
                     <?php
-                    $sfOfferBadge = t('offers');
+                    /* سياسة: لا شارة افتراضية «عروض» — يظهر اسم العرض فقط إذا فعّله الأدمن (orange_promo_customer_display_name). */
                     $sfOfferCustomName = orange_promo_customer_display_name([
                         'show_name_to_customer' => (int) ($p['offer_show_name'] ?? 0),
                         'name_ar' => (string) ($p['offer_name_ar'] ?? ''),
                         'name_en' => (string) ($p['offer_name_en'] ?? ''),
                     ], $lang);
                     if ($sfOfferCustomName !== '') {
-                        $sfOfferBadge = $sfOfferCustomName;
+                        ?>
+                    <span class="offer-badge"><?php echo htmlspecialchars($sfOfferCustomName, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <?php
                     }
                     ?>
-                    <span class="offer-badge"><?php echo htmlspecialchars($sfOfferBadge, ENT_QUOTES, 'UTF-8'); ?></span>
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?></h3>
@@ -605,7 +615,6 @@ window.ORANGE_SF_GRID_LAZY_PRODUCTS = <?php echo json_encode($lazyForJs, $orange
 window.ORANGE_SF_GRID_LAZY_OFFERS = <?php echo json_encode($lazyOffersForJs, $orangeSfGridJsonFlags); ?>;
 window.ORANGE_SF_GRID_BATCH = <?php echo (int) $sfHomeGridScrollBatch; ?>;
 window.ORANGE_SF_GRID_VIEW_LABEL = <?php echo json_encode(t('view_product'), $orangeSfGridJsonFlags); ?>;
-window.ORANGE_SF_OFFERS_BADGE = <?php echo json_encode(t('offers'), $orangeSfGridJsonFlags); ?>;
 var ORANGE_SF_GRID_FILTER_KEY = 'orange_sf_grid_filter';
 var ORANGE_BROWSE_DETAILS_OPEN_KEY = 'orange_browse_details_open';
 var orangeSfActiveAttrFilters = {};
@@ -836,7 +845,7 @@ function orangeSfAppendOfferCard(item) {
         return;
     }
     var art = document.createElement('article');
-    art.className = 'product-card';
+    art.className = 'product-card product-card--offer';
     art.setAttribute('data-product-id', String(item.id));
     art.setAttribute('data-filter', item.df);
     if (item.attrs) {
@@ -850,10 +859,12 @@ function orangeSfAppendOfferCard(item) {
     img.loading = 'lazy';
     img.decoding = 'async';
     wrap.appendChild(img);
-    var badge = document.createElement('span');
-    badge.className = 'offer-badge';
-    badge.textContent = window.ORANGE_SF_OFFERS_BADGE || '';
-    wrap.appendChild(badge);
+    if (item.offerName) {
+        var badge = document.createElement('span');
+        badge.className = 'offer-badge';
+        badge.textContent = item.offerName;
+        wrap.appendChild(badge);
+    }
     var body = document.createElement('div');
     body.className = 'product-body';
     var h3 = document.createElement('h3');

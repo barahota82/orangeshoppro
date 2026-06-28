@@ -949,6 +949,13 @@ body.storefront-browse-menu-lock {
     outline-offset: -2px;
 }
 
+/* تمييز بصري ثابت لبطاقات العروض (لا اعتماد على hover) — لون العلامة الموحّد لكل الأنواع */
+.product-card--offer {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+    background: color-mix(in srgb, var(--primary) 6%, var(--card));
+}
+
 .product-card__preview-tag {
     position: absolute;
     top: 12px;
