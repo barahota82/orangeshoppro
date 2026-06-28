@@ -164,7 +164,11 @@ function orange_storefront_active_combo_cards(PDO $pdo, ?int $countryId, string 
             }
             $pinfo = $pmap[$pid];
             $componentsTotal += $pinfo['price'] * $qty;
-            $components[] = $pinfo + ['qty' => $qty];
+            $extra = ['qty' => $qty];
+            if (isset($c['allowed_colors']) && is_array($c['allowed_colors']) && count($c['allowed_colors']) > 0) {
+                $extra['allowed_colors'] = array_values(array_map('strval', $c['allowed_colors']));
+            }
+            $components[] = $pinfo + $extra;
         }
         if ($missing || $components === []) {
             continue;
@@ -295,7 +299,11 @@ function orange_storefront_active_bogo_cards(PDO $pdo, ?int $countryId, string $
         foreach ($entry['buy_comps'] as $c) {
             $pid = (int) $c['product_id'];
             if (isset($pmap[$pid])) {
-                $buyComponents[] = $pmap[$pid] + ['qty' => (int) $c['qty']];
+                $extraBuy = ['qty' => (int) $c['qty']];
+                if (isset($c['allowed_colors']) && is_array($c['allowed_colors']) && count($c['allowed_colors']) > 0) {
+                    $extraBuy['allowed_colors'] = array_values(array_map('strval', $c['allowed_colors']));
+                }
+                $buyComponents[] = $pmap[$pid] + $extraBuy;
             }
         }
         $fixedGift = ($entry['fixed_pid'] > 0 && isset($pmap[$entry['fixed_pid']])) ? $pmap[$entry['fixed_pid']] : null;

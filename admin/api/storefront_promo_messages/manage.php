@@ -58,6 +58,7 @@ try {
             'success' => true,
             'data' => orange_storefront_promo_messages_admin_list($pdo, $adminCid > 0 ? $adminCid : null),
             'slots' => orange_storefront_promo_message_slots(),
+            'offer_types' => orange_storefront_promo_message_offer_types(),
         ]);
     }
 
@@ -83,6 +84,35 @@ try {
             json_response(['success' => false, 'message' => 'تاريخ النهاية قبل البداية'], 422);
         }
 
+        // خانة «بطاقة عرض محدّد»: تتطلّب نوع عرض ورقمه؛ غير ذلك تُصفّر.
+        $offerType = null;
+        $offerId = null;
+        if ($slot === 'offer_card') {
+            $offerTypeRaw = trim((string) ($data['offer_type'] ?? ''));
+            $offerIdRaw = (int) ($data['offer_id'] ?? 0);
+            if (!orange_storefront_promo_message_offer_type_valid($offerTypeRaw)) {
+                json_response(['success' => false, 'message' => 'اختر نوع العرض لبطاقة عرض محدّد'], 422);
+            }
+            if ($offerIdRaw <= 0) {
+                json_response(['success' => false, 'message' => 'أدخل رقم العرض'], 422);
+            }
+            $offerTableMap = [
+                'product' => 'offers',
+                'combo' => 'cart_combo_promotions',
+                'bogo' => 'cart_bogo_promotions',
+            ];
+            $offerTable = $offerTableMap[$offerTypeRaw];
+            if (orange_table_exists($pdo, $offerTable)) {
+                $chkOffer = $pdo->prepare('SELECT id FROM ' . $offerTable . ' WHERE id = ? LIMIT 1');
+                $chkOffer->execute([$offerIdRaw]);
+                if (!$chkOffer->fetchColumn()) {
+                    json_response(['success' => false, 'message' => 'رقم العرض غير موجود للنوع المحدّد'], 422);
+                }
+            }
+            $offerType = $offerTypeRaw;
+            $offerId = $offerIdRaw;
+        }
+
         // نطاق الدولة: المشرف المقيّد بدولة لا ينشئ رسائل خارج نطاقه.
         $reqCountry = array_key_exists('country_id', $data) ? (int) $data['country_id'] : 0;
         if ($adminCid > 0) {
@@ -103,13 +133,15 @@ try {
             }
             $st = $pdo->prepare(
                 'UPDATE storefront_promo_messages
-                 SET country_id = ?, slot = ?, text_ar = ?, text_en = ?, text_fil = ?, text_hi = ?,
+                 SET country_id = ?, slot = ?, offer_type = ?, offer_id = ?, text_ar = ?, text_en = ?, text_fil = ?, text_hi = ?,
                      is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, sort_order = ?
                  WHERE id = ?'
             );
             $st->execute([
                 $countryToStore,
                 $slot,
+                $offerType,
+                $offerId,
                 $textAr,
                 $textEn,
                 $textFil,
@@ -124,12 +156,14 @@ try {
         } else {
             $st = $pdo->prepare(
                 'INSERT INTO storefront_promo_messages
-                    (country_id, slot, text_ar, text_en, text_fil, text_hi, is_active, is_always_on, valid_from, valid_to, sort_order)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                    (country_id, slot, offer_type, offer_id, text_ar, text_en, text_fil, text_hi, is_active, is_always_on, valid_from, valid_to, sort_order)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $st->execute([
                 $countryToStore,
                 $slot,
+                $offerType,
+                $offerId,
                 $textAr,
                 $textEn,
                 $textFil,

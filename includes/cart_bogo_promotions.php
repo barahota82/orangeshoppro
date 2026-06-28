@@ -122,10 +122,11 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
     $cid = orange_cart_promotion_admin_country_id($pdo);
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $cid);
     $svCol = orange_table_has_column($pdo, 'cart_bogo_promotions', 'same_variant_product_id') ? ', same_variant_product_id' : '';
+    $cpCol = orange_table_has_column($pdo, 'cart_bogo_promotions', 'gift_customer_picks_variant') ? ', gift_customer_picks_variant' : '';
     $st = $pdo->prepare(
         'SELECT id, name_ar, name_en, show_name_to_customer, show_old_price_to_customer, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, first_delivered_order_only, gift_kind, fixed_variant_id, pool_variant_ids,
                 gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active, is_always_on,
-                valid_from, valid_to, auto_paused_at, auto_paused_reason' . $svCol . '
+                valid_from, valid_to, auto_paused_at, auto_paused_reason' . $svCol . $cpCol . '
          FROM cart_bogo_promotions WHERE 1=1' . $bind['sql'] . ' ORDER BY sort_order ASC, id ASC'
     );
     $st->execute($bind['params']);
@@ -151,6 +152,7 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
             'requires_registered_account' => (int) ($row['requires_registered_account'] ?? 0),
             'first_delivered_order_only' => (int) ($row['first_delivered_order_only'] ?? 0),
             'gift_kind' => (string) ($row['gift_kind'] ?? 'choice'),
+            'gift_customer_picks_variant' => (int) ($row['gift_customer_picks_variant'] ?? 0),
             'fixed_product_id' => $fixPid > 0 ? $fixPid : null,
             'fixed_variant_id' => $fixPid > 0 ? $fixPid : null,
             'pool_product_ids' => orange_cart_promo_parse_product_pool($pdo, $row['pool_variant_ids'] ?? null),
@@ -190,9 +192,10 @@ function orange_cart_bogo_promotion_select_rule(
     $cid = orange_cart_promotion_storefront_country_id($pdo, $countryId);
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $cid);
     $svCol = orange_table_has_column($pdo, 'cart_bogo_promotions', 'same_variant_product_id') ? ', same_variant_product_id' : '';
+    $cpCol = orange_table_has_column($pdo, 'cart_bogo_promotions', 'gift_customer_picks_variant') ? ', gift_customer_picks_variant' : '';
     $st = $pdo->prepare(
         "SELECT id, name_ar, name_en, show_name_to_customer, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, first_delivered_order_only, gift_kind, fixed_variant_id, pool_variant_ids,
-                gift_unit_charge_kind, gift_unit_charge_value, is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason" . $svCol . "
+                gift_unit_charge_kind, gift_unit_charge_value, is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason" . $svCol . $cpCol . "
          FROM cart_bogo_promotions
          WHERE 1=1" . orange_cart_promo_schedule_sql('cart_bogo_promotions') . $bind['sql'] . "
          ORDER BY sort_order ASC, id ASC"
@@ -217,6 +220,15 @@ function orange_cart_bogo_promotion_select_rule(
         $fixedStored = isset($row['fixed_variant_id']) ? (int) $row['fixed_variant_id'] : 0;
         $fixedPid = $fixedStored > 0 ? orange_cart_promo_resolve_stored_product_id($pdo, $fixedStored) : 0;
         $pool = orange_cart_gift_parse_pool($pdo, $row['pool_variant_ids'] ?? null);
+        // قرار مالك 2026-06-28: هدية ثابتة + «العميل يختار المتغيّر» → تُعامَل كـ «اختيار»
+        // ببركة = منتج الهدية، فيمرّ معرّف المتغيّر الحقيقي عبر مسار الاختيار المُختبَر
+        // دون لمس منطق الهدية الثابتة التلقائي.
+        $customerPicksGiftVariant = (int) ($row['gift_customer_picks_variant'] ?? 0) === 1;
+        if ($gKind === 'fixed' && $customerPicksGiftVariant && $fixedPid > 0) {
+            $gKind = 'choice';
+            $pool = [$fixedPid];
+            $fixedPid = 0; // قاعدة «اختيار» نقيّة: لا حقول هدية ثابتة في المرشّح.
+        }
         if ($gKind === 'fixed' && $fixedPid <= 0) {
             continue;
         }

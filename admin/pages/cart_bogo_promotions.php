@@ -144,7 +144,7 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             </div>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>كود</th><th>المنتج</th><th>الكمية</th><th></th></tr></thead>
+                    <thead><tr><th>كود</th><th>المنتج</th><th>الكمية</th><th>ألوان مسموحة</th><th></th></tr></thead>
                     <tbody id="cbp_buy_body"></tbody>
                 </table>
             </div>
@@ -199,6 +199,11 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             </div>
             <p id="cbp_fixed_label" class="page-subtitle" style="margin:0;">— لم يُختر منتج —</p>
             <input type="hidden" id="cbp_fixed_pid" value="0">
+            <label style="display:flex;gap:8px;align-items:center;margin-top:10px;cursor:pointer;">
+                <input type="checkbox" id="cbp_gift_customer_picks">
+                <span>اترك للعميل اختيار متغيّر الهدية (اللون/المقاس) عند السلة</span>
+            </label>
+            <p class="page-subtitle" style="margin:4px 0 0;">عند التفعيل: يختار العميل متغيّر منتج الهدية بنفسه؛ وإلا يحدّده النظام تلقائياً.</p>
         </div>
         <div style="grid-column:1/-1;">
             <label for="cbp_gift_charge_kind"><strong>تسعير بند هدية BOGO (ب)</strong></label>
@@ -277,6 +282,7 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 <?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
+<?php require __DIR__ . '/../partials/promo_component_colors_js.inc.php'; ?>
 var CBP_CATEGORY_LABEL_MAP = <?php echo json_encode($cartBogoCategoryLabelJs, JSON_UNESCAPED_UNICODE); ?>;
 var CBP_PICK_ROWS = <?php echo $cbpPickJson !== false ? $cbpPickJson : '[]'; ?>;
 
@@ -314,7 +320,12 @@ function cbpBuyRows() {
         var pid = parseInt(tr.getAttribute('data-product-id'), 10) || 0;
         var qEl = tr.querySelector('.cbp-buy-qty');
         var q = qEl ? parseInt(qEl.value, 10) || 0 : 0;
-        if (pid > 0 && q > 0) out.push({ product_id: pid, qty: q });
+        if (pid > 0 && q > 0) {
+            var item = { product_id: pid, qty: q };
+            var ac = (window.OrangePromoColors) ? OrangePromoColors.selectedOf(tr) : [];
+            if (ac && ac.length) { item.allowed_colors = ac; }
+            out.push(item);
+        }
     });
     return out;
 }
@@ -329,8 +340,13 @@ function cbpAddBuyRow(c) {
         '<td dir="ltr">' + (c.code ? String(c.code) : ('P' + pid)) + '</td>' +
         '<td>' + (c.product_name ? String(c.product_name) : '') + '</td>' +
         '<td><input type="number" class="cbp-buy-qty admin-inp-qty" min="1" step="1" value="' + (parseInt(c.qty, 10) || 1) + '" style="width:5rem;"></td>' +
+        '<td class="cbp-colors-cell"></td>' +
         '<td><button type="button" class="btn-secondary cbp-rm">&times;</button></td>';
     tr.querySelector('.cbp-rm').addEventListener('click', function () { tr.remove(); });
+    var colCell = tr.querySelector('.cbp-colors-cell');
+    if (colCell && window.OrangePromoColors) {
+        OrangePromoColors.attach(tr, colCell, pid, Array.isArray(c.allowed_colors) ? c.allowed_colors : []);
+    }
     tb.appendChild(tr);
 }
 
@@ -471,6 +487,8 @@ function resetCartBogoPromotionForm() {
     cbpSetSvProduct(0);
     cbpRenderPool([]);
     cbpSetFixed(0);
+    var cbpCpReset = document.getElementById('cbp_gift_customer_picks');
+    if (cbpCpReset) cbpCpReset.checked = false;
     cbpRenderBuy([]);
     document.querySelector('input[name="cbp_bogo"][value="same_variant"]').checked = true;
     document.querySelector('input[name="cbp_gift"][value="choice"]').checked = true;
@@ -511,6 +529,8 @@ function editCartBogoPromotion(row) {
     cbpToggleGift();
     cbpRenderPool(row.pool_product_ids || row.pool_variant_ids || []);
     cbpSetFixed(row.fixed_product_id || row.fixed_variant_id || 0);
+    var cbpCpEl = document.getElementById('cbp_gift_customer_picks');
+    if (cbpCpEl) cbpCpEl.checked = parseInt(row.gift_customer_picks_variant, 10) === 1;
     document.getElementById('cbp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
     document.getElementById('cbp_first_delivered').checked = parseInt(row.first_delivered_order_only, 10) === 1;
     document.getElementById('cbp_active').checked = parseInt(row.is_active, 10) === 1;
@@ -684,6 +704,7 @@ async function saveCartBogoPromotion() {
         is_active: document.getElementById('cbp_active').checked ? 1 : 0,
         is_always_on: ocpIsAlwaysOn('cbp') ? 1 : 0,
         gift_kind: giftEl ? giftEl.value : 'choice',
+        gift_customer_picks_variant: (document.getElementById('cbp_gift_customer_picks') && document.getElementById('cbp_gift_customer_picks').checked) ? 1 : 0,
         fixed_product_id: parseInt(document.getElementById('cbp_fixed_pid').value, 10) || 0,
         pool_product_ids: cbpPoolRows(),
         gift_unit_charge_kind: document.getElementById('cbp_gift_charge_kind').value,

@@ -168,6 +168,8 @@ $sfBogoCardsAll = orange_storefront_active_bogo_cards($pdo, $sfHomeCountryId, $l
 $sfPromoMsgMap = orange_storefront_promo_messages_map($pdo, ['home_top', 'offers_top'], $sfHomeCountryId, $lang);
 $sfMsgHomeTop = $sfPromoMsgMap['home_top'] ?? '';
 $sfMsgOffersTop = $sfPromoMsgMap['offers_top'] ?? '';
+// رسائل تحفيزية لبطاقات عروض محدّدة (المفتاح "type:id").
+$sfOfferPromoMap = orange_storefront_promo_offer_card_map($pdo, $sfHomeCountryId, $lang);
 // في تاب العروض نعرض BOGO ذات صفحة عرض: «حزمة شراء» و«نفس المنتج» بمنتج مستهدف
 // (كلاهما يملك buy_components صالحة). same_category بلا صفحة بعد.
 $sfBogoBundleCards = array_values(array_filter(
@@ -334,6 +336,7 @@ foreach ($offersLazyRows as $p) {
         'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => $pid]),
         'vl' => $vlOff,
         'attrs' => $sfHomeCardAttrAttr($pid),
+        'promo' => $sfOfferPromoMap['product:' . (int) ($p['offer_id'] ?? 0)] ?? '',
     ];
 }
 
@@ -582,6 +585,9 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <?php $sfOPmsg = $sfOfferPromoMap['product:' . (int) ($p['offer_id'] ?? 0)] ?? ''; if ($sfOPmsg !== ''): ?>
+                    <p class="sf-offer-promo" role="status"><?php echo htmlspecialchars($sfOPmsg, ENT_QUOTES, 'UTF-8'); ?></p>
+                    <?php endif; ?>
                     <?php
                     $sfCvOff = $sfProductCardVariantLines[(int) $p['id']] ?? [];
                     if ($sfCvOff !== []) {
@@ -641,6 +647,9 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars($ccTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <?php $ccPromo = $sfOfferPromoMap['combo:' . $ccId] ?? ''; if ($ccPromo !== ''): ?>
+                    <p class="sf-offer-promo" role="status"><?php echo htmlspecialchars($ccPromo, ENT_QUOTES, 'UTF-8'); ?></p>
+                    <?php endif; ?>
                     <div class="price-row">
                         <strong><?php echo number_format($ccBundle, 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
                         <?php if ($ccShowOld): ?>
@@ -683,6 +692,9 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars($bcTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <?php $bcPromo = $sfOfferPromoMap['bogo:' . $bcId] ?? ''; if ($bcPromo !== ''): ?>
+                    <p class="sf-offer-promo" role="status"><?php echo htmlspecialchars($bcPromo, ENT_QUOTES, 'UTF-8'); ?></p>
+                    <?php endif; ?>
                     <div class="price-row">
                         <strong><?php echo number_format($bcBuyTotal, 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
                     </div>
@@ -716,6 +728,9 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars($kcTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <?php $kcPromo = $sfOfferPromoMap['bogo:' . $kcId] ?? ''; if ($kcPromo !== ''): ?>
+                    <p class="sf-offer-promo" role="status"><?php echo htmlspecialchars($kcPromo, ENT_QUOTES, 'UTF-8'); ?></p>
+                    <?php endif; ?>
                     <div class="price-row">
                         <span class="offer-cat-note"><?php echo htmlspecialchars(str_replace('{n}', (string) $kcN, t('offer_category_note')), ENT_QUOTES, 'UTF-8'); ?></span>
                     </div>
@@ -1050,6 +1065,13 @@ function orangeSfAppendOfferCard(item) {
     a.setAttribute('href', item.href);
     a.textContent = window.ORANGE_SF_GRID_VIEW_LABEL || '';
     body.appendChild(h3);
+    if (item.promo) {
+        var promoEl = document.createElement('p');
+        promoEl.className = 'sf-offer-promo';
+        promoEl.setAttribute('role', 'status');
+        promoEl.textContent = item.promo;
+        body.appendChild(promoEl);
+    }
     orangeSfAppendCardVariantMeta(body, item.vl || []);
     body.appendChild(pr);
     body.appendChild(a);

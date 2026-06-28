@@ -3173,6 +3173,8 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_promo_show_old_price_v106($pdo);
     orange_catalog_migrate_promo_bogo_same_variant_product_v107($pdo);
     orange_catalog_migrate_storefront_promo_messages_v108($pdo);
+    orange_catalog_migrate_promo_bogo_gift_customer_pick_v109($pdo);
+    orange_catalog_migrate_storefront_promo_messages_offer_target_v110($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3797,6 +3799,8 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_promo_show_old_price_v106($pdo);
     orange_catalog_migrate_promo_bogo_same_variant_product_v107($pdo);
     orange_catalog_migrate_storefront_promo_messages_v108($pdo);
+    orange_catalog_migrate_promo_bogo_gift_customer_pick_v109($pdo);
+    orange_catalog_migrate_storefront_promo_messages_offer_target_v110($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -7967,6 +7971,75 @@ function orange_catalog_migrate_storefront_promo_messages_v108(PDO $pdo): void
                 KEY idx_spm_slot_active (slot, is_active),
                 KEY idx_spm_country (country_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v109 — اختيار العميل لمتغيّر هدية BOGO (قرار مالك 2026-06-28):
+ *  - عمود `gift_customer_picks_variant` على `cart_bogo_promotions` (افتراضي 0).
+ *  - عند 1 لهدية ثابتة: تُحوَّل القاعدة وقت الاختيار إلى مسار «الاختيار» المُختبَر
+ *    (بركة = منتج الهدية) فيختار العميل اللون/المقاس ويُمرَّر معرّف المتغيّر الحقيقي
+ *    عبر مسار الطلب القائم — دون لمس منطق الهدية الثابتة التلقائي.
+ * marker-gated + idempotent؛ يُستدعى من المسار الكامل والمسار السريع.
+ */
+function orange_catalog_migrate_promo_bogo_gift_customer_pick_v109(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_promo_bogo_gift_customer_pick_v109';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'cart_bogo_promotions')
+        && !orange_table_has_column($pdo, 'cart_bogo_promotions', 'gift_customer_picks_variant')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE cart_bogo_promotions ADD COLUMN gift_customer_picks_variant TINYINT(1) NOT NULL DEFAULT 0'
+        );
+        orange_schema_invalidate_column_check('cart_bogo_promotions', 'gift_customer_picks_variant');
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v110 — توسعة الرسائل التحفيزية (قرار مالك 2026-06-28):
+ *  - عمودا offer_type/offer_id لربط رسالة بـ«بطاقة عرض محدّد» (خانة offer_card).
+ *  - خانة register_teaser لتجاوز نص تحفيز التسجيل في صفحات العروض.
+ * لا تتطلّب التوسعة عمليّاً سوى عمودين (الخانات الجديدة قِيَم نصية في عمود slot القائم).
+ * marker-gated + idempotent.
+ */
+function orange_catalog_migrate_storefront_promo_messages_offer_target_v110(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_storefront_promo_messages_offer_target_v110';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'storefront_promo_messages')) {
+        if (!orange_table_has_column($pdo, 'storefront_promo_messages', 'offer_type')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                "ALTER TABLE storefront_promo_messages ADD COLUMN offer_type VARCHAR(16) NULL DEFAULT NULL"
+            );
+            orange_schema_invalidate_column_check('storefront_promo_messages', 'offer_type');
+        }
+        if (!orange_table_has_column($pdo, 'storefront_promo_messages', 'offer_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE storefront_promo_messages ADD COLUMN offer_id INT UNSIGNED NULL DEFAULT NULL'
+            );
+            orange_schema_invalidate_column_check('storefront_promo_messages', 'offer_id');
+        }
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_promo_messages ADD INDEX idx_spm_offer (offer_type, offer_id)'
         );
     }
 

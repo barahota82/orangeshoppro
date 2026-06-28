@@ -91,6 +91,8 @@ function orange_cart_promo_parse_components(PDO $pdo, mixed $raw): array
     }
     /** @var array<int, int> $merged */
     $merged = [];
+    /** @var array<int, array{all:bool, keys:array<string,bool>}> $colorsByPid */
+    $colorsByPid = [];
     foreach ($raw as $row) {
         if (!is_array($row)) {
             continue;
@@ -107,13 +109,60 @@ function orange_cart_promo_parse_components(PDO $pdo, mixed $raw): array
             continue;
         }
         $merged[$pid] = ($merged[$pid] ?? 0) + $q;
+
+        // ألوان مسموحة (اختياري) — تقييد عرض على صفحة العرض فقط.
+        $allowed = orange_cart_promo_sanitize_allowed_colors($row['allowed_colors'] ?? null);
+        if (!isset($colorsByPid[$pid])) {
+            $colorsByPid[$pid] = ['all' => false, 'keys' => []];
+        }
+        if ($allowed === null || count($allowed) === 0) {
+            // مكوّن بلا تقييد = كل الألوان؛ يطغى على أي تقييد مكرّر لنفس المنتج.
+            $colorsByPid[$pid]['all'] = true;
+        } else {
+            foreach ($allowed as $key) {
+                $colorsByPid[$pid]['keys'][$key] = true;
+            }
+        }
     }
     $out = [];
     foreach ($merged as $pid => $q) {
-        $out[] = ['product_id' => $pid, 'qty' => $q];
+        $entry = ['product_id' => $pid, 'qty' => $q];
+        $meta = $colorsByPid[$pid] ?? ['all' => true, 'keys' => []];
+        if ($meta['all'] !== true && count($meta['keys']) > 0) {
+            $entry['allowed_colors'] = array_keys($meta['keys']);
+        }
+        $out[] = $entry;
     }
 
     return $out;
+}
+
+/**
+ * تنظيف قائمة مفاتيح الألوان المسموحة (سلاسل غير فارغة، بلا تكرار).
+ *
+ * @param mixed $raw
+ * @return list<string>|null  null = غير محدّد (كل الألوان)
+ */
+function orange_cart_promo_sanitize_allowed_colors(mixed $raw): ?array
+{
+    if (!is_array($raw)) {
+        return null;
+    }
+    $seen = [];
+    foreach ($raw as $x) {
+        $key = trim((string) $x);
+        if ($key === '') {
+            continue;
+        }
+        if (function_exists('mb_substr')) {
+            $key = mb_substr($key, 0, 191, 'UTF-8');
+        } else {
+            $key = substr($key, 0, 191);
+        }
+        $seen[$key] = true;
+    }
+
+    return array_keys($seen);
 }
 
 /**
@@ -376,12 +425,16 @@ function orange_cart_promo_components_with_labels(PDO $pdo, array $components): 
         if ($code === '') {
             $code = 'P' . $pid;
         }
-        $out[] = [
+        $entry = [
             'product_id' => $pid,
             'qty' => (int) ($c['qty'] ?? 0),
             'product_name' => trim((string) ($row['name'] ?? '')),
             'code' => $code,
         ];
+        if (isset($c['allowed_colors']) && is_array($c['allowed_colors']) && count($c['allowed_colors']) > 0) {
+            $entry['allowed_colors'] = array_values(array_map('strval', $c['allowed_colors']));
+        }
+        $out[] = $entry;
     }
 
     return $out;

@@ -61,7 +61,7 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             </div>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>كود</th><th>المنتج</th><th>الكمية</th><th></th></tr></thead>
+                    <thead><tr><th>كود</th><th>المنتج</th><th>الكمية</th><th>ألوان مسموحة</th><th></th></tr></thead>
                     <tbody id="ccp_comp_body"></tbody>
                 </table>
             </div>
@@ -165,6 +165,7 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 <?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
+<?php require __DIR__ . '/../partials/promo_component_colors_js.inc.php'; ?>
 var CCP_PICK_ROWS = <?php echo $ccpPickJson !== false ? $ccpPickJson : '[]'; ?>;
 var ccpNameArTimer = null;
 var ccpNameEnTimer = null;
@@ -251,7 +252,12 @@ function ccpCompRows() {
         var pid = parseInt(tr.getAttribute('data-product-id'), 10) || 0;
         var qEl = tr.querySelector('.ccp-qty');
         var q = qEl ? parseInt(qEl.value, 10) || 0 : 0;
-        if (pid > 0 && q > 0) out.push({ product_id: pid, qty: q });
+        if (pid > 0 && q > 0) {
+            var item = { product_id: pid, qty: q };
+            var ac = (window.OrangePromoColors) ? OrangePromoColors.selectedOf(tr) : [];
+            if (ac && ac.length) { item.allowed_colors = ac; }
+            out.push(item);
+        }
     });
     return out;
 }
@@ -275,10 +281,15 @@ function ccpAddCompRow(c) {
         '<td dir="ltr">' + (c.code ? String(c.code) : ('P' + pid)) + '</td>' +
         '<td>' + (c.product_name ? String(c.product_name) : '') + '</td>' +
         '<td><input type="number" class="ccp-qty admin-inp-qty" min="1" step="1" value="' + (parseInt(c.qty, 10) || 1) + '" style="width:5rem;"></td>' +
+        '<td class="ccp-colors-cell"></td>' +
         '<td><button type="button" class="btn-secondary ccp-rm">&times;</button></td>';
     tr.querySelector('.ccp-rm').addEventListener('click', function () { tr.remove(); ccpRenderFacts(); });
     var qtyEl = tr.querySelector('.ccp-qty');
     if (qtyEl) qtyEl.addEventListener('input', ccpRenderFacts);
+    var ccpColCell = tr.querySelector('.ccp-colors-cell');
+    if (ccpColCell && window.OrangePromoColors) {
+        OrangePromoColors.attach(tr, ccpColCell, pid, Array.isArray(c.allowed_colors) ? c.allowed_colors : []);
+    }
     tb.appendChild(tr);
     ccpRenderFacts();
 }

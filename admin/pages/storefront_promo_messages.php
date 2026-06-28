@@ -11,6 +11,7 @@ orange_catalog_ensure_schema($pdo);
 
 $hasTable = orange_table_exists($pdo, 'storefront_promo_messages');
 $spmSlots = orange_storefront_promo_message_slots();
+$spmOfferTypes = orange_storefront_promo_message_offer_types();
 $spmAdminCid = (int) orange_cart_promotion_admin_country_id($pdo);
 $spmIsGlobal = $spmAdminCid <= 0;
 
@@ -79,6 +80,21 @@ foreach ($spmCountries as $c) {
         </div>
         <?php endif; ?>
     </div>
+    <div class="form-grid" id="spm_offer_wrap" style="display:none;">
+        <div>
+            <label for="spm_offer_type">نوع العرض</label>
+            <select id="spm_offer_type" class="admin-inp">
+                <?php foreach ($spmOfferTypes as $key => $label): ?>
+                <option value="<?php echo htmlspecialchars($key, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label for="spm_offer_id">رقم العرض</label>
+            <input type="number" id="spm_offer_id" class="admin-inp" min="1" step="1" dir="ltr" placeholder="مثال: 12">
+            <p class="card-hint" style="margin:4px 0 0;">رقم العرض من شاشة عروض المنتج/الكومبو/BOGO المعنية.</p>
+        </div>
+    </div>
     <div class="form-grid">
         <div>
             <label for="spm_text_ar">النص (عربي)</label>
@@ -131,6 +147,7 @@ foreach ($spmCountries as $c) {
 <script>
 <?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
 var SPM_SLOTS = <?php echo json_encode($spmSlots, JSON_UNESCAPED_UNICODE); ?>;
+var SPM_OFFER_TYPES = <?php echo json_encode($spmOfferTypes, JSON_UNESCAPED_UNICODE); ?>;
 var SPM_COUNTRY_LABELS = <?php echo json_encode($spmCountryLabelJs, JSON_UNESCAPED_UNICODE); ?>;
 var SPM_IS_GLOBAL = <?php echo $spmIsGlobal ? 'true' : 'false'; ?>;
 var SPM_ROWS = [];
@@ -142,6 +159,13 @@ function escSpm(s) {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/"/g, '&quot;');
+}
+
+function spmSyncOfferWrap() {
+    var slotEl = document.getElementById('spm_slot');
+    var wrap = document.getElementById('spm_offer_wrap');
+    if (!slotEl || !wrap) return;
+    wrap.style.display = (slotEl.value === 'offer_card') ? '' : 'none';
 }
 
 function spmComputeNextSort() {
@@ -206,6 +230,11 @@ function resetSpmForm() {
     if (slotEl) slotEl.selectedIndex = 0;
     var cEl = document.getElementById('spm_country');
     if (cEl) cEl.value = '';
+    var otEl = document.getElementById('spm_offer_type');
+    if (otEl) otEl.selectedIndex = 0;
+    var oiEl = document.getElementById('spm_offer_id');
+    if (oiEl) oiEl.value = '';
+    spmSyncOfferWrap();
     ocpSetAlwaysOn('spm', false);
     ocpDefaultScheduleDates('spm');
 }
@@ -222,6 +251,11 @@ function editSpm(row) {
     if (slotEl) slotEl.value = String(row.slot || 'offers_top');
     var cEl = document.getElementById('spm_country');
     if (cEl) cEl.value = row.country_id != null && row.country_id !== '' ? String(row.country_id) : '';
+    var otEl = document.getElementById('spm_offer_type');
+    if (otEl) otEl.value = row.offer_type ? String(row.offer_type) : (otEl.options[0] ? otEl.options[0].value : '');
+    var oiEl = document.getElementById('spm_offer_id');
+    if (oiEl) oiEl.value = (row.offer_id != null && parseInt(row.offer_id, 10) > 0) ? String(row.offer_id) : '';
+    spmSyncOfferWrap();
     ocpSetAlwaysOn('spm', parseInt(row.is_always_on, 10) === 1);
     ocpSetDmyFromIso('spm_valid_from', row.valid_from);
     ocpSetDmyFromIso('spm_valid_to', row.valid_to);
@@ -245,6 +279,10 @@ async function loadSpm() {
     tb.innerHTML = '';
     SPM_ROWS.forEach(function (r) {
         var slotLabel = SPM_SLOTS[r.slot] ? SPM_SLOTS[r.slot] : r.slot;
+        if (r.slot === 'offer_card' && r.offer_type && parseInt(r.offer_id, 10) > 0) {
+            var otLabel = SPM_OFFER_TYPES[r.offer_type] ? SPM_OFFER_TYPES[r.offer_type] : r.offer_type;
+            slotLabel += ' — ' + otLabel + ' #' + r.offer_id;
+        }
         var tr = document.createElement('tr');
         tr.innerHTML =
             '<td>' + escSpm(r.id) + '</td>' +
@@ -287,6 +325,8 @@ async function saveSpm() {
         action: 'save',
         id: parseInt(document.getElementById('spm_id').value, 10) || 0,
         slot: document.getElementById('spm_slot').value,
+        offer_type: (document.getElementById('spm_offer_type') || {}).value || '',
+        offer_id: parseInt((document.getElementById('spm_offer_id') || {}).value, 10) || 0,
         country_id: cEl ? (parseInt(cEl.value, 10) || 0) : 0,
         text_ar: document.getElementById('spm_text_ar').value.trim(),
         text_en: document.getElementById('spm_text_en').value.trim(),
@@ -311,6 +351,9 @@ async function saveSpm() {
     var enEl = document.getElementById('spm_text_en');
     if (arEl) arEl.addEventListener('input', spmScheduleFromAr);
     if (enEl) enEl.addEventListener('input', spmScheduleFromEn);
+    var slotEl = document.getElementById('spm_slot');
+    if (slotEl) slotEl.addEventListener('change', spmSyncOfferWrap);
+    spmSyncOfferWrap();
     ocpBindAlwaysOn('spm');
     ocpDefaultScheduleDates('spm');
     loadSpm();

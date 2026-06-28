@@ -11,6 +11,7 @@ require_once __DIR__ . '/../includes/catalog_labels.php';
 require_once __DIR__ . '/../includes/storefront_account.php';
 require_once __DIR__ . '/../includes/storefront_offer_cards.php';
 require_once __DIR__ . '/../includes/storefront_variant_picker.php';
+require_once __DIR__ . '/../includes/storefront_promo_messages.php';
 
 $pdo = db();
 orange_catalog_ensure_storefront_page($pdo);
@@ -28,6 +29,12 @@ $isBogo = $offerType === 'bogo';
 
 $homeUrl = storefront_url('home', $channelSlug, $lang);
 $cartUrl = storefront_url('cart', $channelSlug, $lang);
+
+// رسالة تحفيزية لهذا العرض (إن خصّصها الأدمن) + تجاوز نص تحفيز التسجيل.
+$offerPromoMap = orange_storefront_promo_offer_card_map($pdo, $sfCountryId, $lang);
+$offerPromoText = $offerPromoMap[$offerType . ':' . $offerId] ?? '';
+$registerTeaserText = orange_storefront_promo_register_teaser($pdo, $sfCountryId, $lang);
+$offerRegisteredOnlyLabel = $registerTeaserText !== '' ? $registerTeaserText : t('offer_registered_only');
 
 /**
  * سعر وحدة هدية BOGO من سعر التجزئة وقاعدة التسعير (يطابق منطق
@@ -161,8 +168,11 @@ if ($isBogo && (string) ($card['bogo_kind'] ?? '') === 'same_category') {
         <p class="offer-head__cat"><strong><?php echo htmlspecialchars($catName, ENT_QUOTES, 'UTF-8'); ?></strong></p>
         <?php endif; ?>
         <p class="offer-head__includes"><?php echo htmlspecialchars(str_replace('{n}', (string) $minBuy, t('offer_category_note')), ENT_QUOTES, 'UTF-8'); ?></p>
+        <?php if ($offerPromoText !== ''): ?>
+        <p class="offer-head__promo" role="status"><?php echo htmlspecialchars($offerPromoText, ENT_QUOTES, 'UTF-8'); ?></p>
+        <?php endif; ?>
         <?php if ($showRegisterTeaser): ?>
-        <p class="offer-head__teaser" role="status"><?php echo htmlspecialchars(t('offer_registered_only'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <p class="offer-head__teaser" role="status"><?php echo htmlspecialchars($offerRegisteredOnlyLabel, ENT_QUOTES, 'UTF-8'); ?></p>
         <?php endif; ?>
     </div>
 
@@ -249,6 +259,35 @@ foreach ($rawComponents as $comp) {
     $qty = max(1, (int) ($comp['qty'] ?? 1));
     $price = (float) ($comp['price'] ?? $view['price']);
     $componentsTotal += $price * $qty;
+
+    // VS3ب: تقييد ألوان الأدمن للمكوّن (عرض فقط). نُبقي فقط الألوان/المتغيّرات المسموحة.
+    $compColors = $view['colors'];
+    $compVariants = $view['variants'];
+    $compTotalStock = (int) $view['total_stock'];
+    $allowedColors = (isset($comp['allowed_colors']) && is_array($comp['allowed_colors']))
+        ? array_values(array_filter(array_map('strval', $comp['allowed_colors']), static fn ($s) => $s !== ''))
+        : [];
+    if ((int) $view['has_colors'] === 1 && $allowedColors !== []) {
+        $allowSet = array_fill_keys($allowedColors, true);
+        $filteredColors = array_values(array_filter(
+            $view['colors'],
+            static fn ($col) => isset($allowSet[(string) ($col['key'] ?? '')])
+        ));
+        $filteredVariants = array_values(array_filter(
+            $view['variants'],
+            static fn ($v) => isset($allowSet[(string) ($v['color'] ?? '')])
+        ));
+        // لا نطبّق التقييد إن لم يطابق أي لون موجود (مفاتيح قديمة) تفادياً لكسر العرض.
+        if ($filteredColors !== []) {
+            $compColors = $filteredColors;
+            $compVariants = $filteredVariants;
+            $compTotalStock = 0;
+            foreach ($filteredVariants as $fv) {
+                $compTotalStock += (int) ($fv['stock_quantity'] ?? 0);
+            }
+        }
+    }
+
     $components[] = [
         'product_id' => $pid,
         'qty' => $qty,
@@ -258,10 +297,10 @@ foreach ($rawComponents as $comp) {
         'image_cart' => $rawImg,
         'has_colors' => (int) $view['has_colors'],
         'has_sizes' => (int) $view['has_sizes'],
-        'total_stock' => (int) $view['total_stock'],
-        'colors' => $view['colors'],
+        'total_stock' => $compTotalStock,
+        'colors' => $compColors,
         'sizes' => $view['sizes'],
-        'variants' => $view['variants'],
+        'variants' => $compVariants,
     ];
 }
 $componentsTotal = round($componentsTotal, 4);
@@ -306,8 +345,11 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
         <h1 class="offer-head__title"><?php echo htmlspecialchars($offerName, ENT_QUOTES, 'UTF-8'); ?></h1>
         <?php endif; ?>
         <p class="offer-head__includes"><?php echo htmlspecialchars(t('offer_includes'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <?php if ($offerPromoText !== ''): ?>
+        <p class="offer-head__promo" role="status"><?php echo htmlspecialchars($offerPromoText, ENT_QUOTES, 'UTF-8'); ?></p>
+        <?php endif; ?>
         <?php if ($showRegisterTeaser): ?>
-        <p class="offer-head__teaser" role="status"><?php echo htmlspecialchars(t('offer_registered_only'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <p class="offer-head__teaser" role="status"><?php echo htmlspecialchars($offerRegisteredOnlyLabel, ENT_QUOTES, 'UTF-8'); ?></p>
         <?php endif; ?>
     </div>
 

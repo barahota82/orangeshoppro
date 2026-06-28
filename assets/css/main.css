@@ -1033,6 +1033,29 @@ body.storefront-browse-menu-lock {
     margin: 0.25rem 0 0.5rem;
     color: var(--primary);
 }
+/* رسالة تحفيزية لعرض محدّد (بطاقة العرض + رأس صفحة العرض) */
+.offer-head__promo {
+    margin: 0.6rem 0 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--primary) 12%, var(--card, #fff));
+    border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+    color: var(--text, #111827);
+    font-weight: 600;
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+.sf-offer-promo {
+    margin: 0.35rem 0 0.5rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--primary) 10%, var(--card, #fff));
+    border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+    color: var(--text, #111827);
+    font-weight: 600;
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
 .offer-cat-note {
     font-size: 0.82rem;
     color: var(--muted, #6b7280);

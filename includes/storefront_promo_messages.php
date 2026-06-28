@@ -23,7 +23,28 @@ function orange_storefront_promo_message_slots(): array
         'offers_top' => 'أعلى تاب العروض',
         'home_top' => 'أعلى الصفحة الرئيسية',
         'cart_top' => 'أعلى صفحة السلة',
+        'offer_card' => 'بطاقة عرض محدّد (يلزم نوع العرض ورقمه)',
+        'register_teaser' => 'تجاوز نص تحفيز التسجيل في صفحات العروض',
     ];
+}
+
+/**
+ * أنواع العروض المدعومة لخانة «بطاقة عرض محدّد».
+ *
+ * @return array<string,string>
+ */
+function orange_storefront_promo_message_offer_types(): array
+{
+    return [
+        'product' => 'عرض منتج',
+        'combo' => 'عرض كومبو',
+        'bogo' => 'عرض اشترِ واحصل (BOGO)',
+    ];
+}
+
+function orange_storefront_promo_message_offer_type_valid(string $type): bool
+{
+    return array_key_exists($type, orange_storefront_promo_message_offer_types());
 }
 
 function orange_storefront_promo_message_slot_valid(string $slot): bool
@@ -141,6 +162,64 @@ function orange_storefront_promo_messages_map(PDO $pdo, array $slots, ?int $coun
 }
 
 /**
+ * نص تجاوز تحفيز التسجيل (خانة register_teaser) أو '' إن لا تجاوز فعّال.
+ * يستخدمه استدعاء الواجهة هكذا: $override !== '' ? $override : t('offer_registered_only').
+ */
+function orange_storefront_promo_register_teaser(PDO $pdo, ?int $countryId, string $lang): string
+{
+    return orange_storefront_promo_message_for_slot($pdo, 'register_teaser', $countryId, $lang);
+}
+
+/**
+ * خريطة الرسائل التحفيزية لبطاقات عروض محدّدة: المفتاح "type:id" => نص اللغة.
+ * استعلام واحد لكل الصفحة (المسار الساخن) — أول رسالة فعّالة لكل عرض.
+ *
+ * @return array<string,string>
+ */
+function orange_storefront_promo_offer_card_map(PDO $pdo, ?int $countryId, string $lang): array
+{
+    if (!orange_table_exists($pdo, 'storefront_promo_messages')
+        || !orange_table_has_column($pdo, 'storefront_promo_messages', 'offer_type')
+        || !orange_table_has_column($pdo, 'storefront_promo_messages', 'offer_id')) {
+        return [];
+    }
+    $cid = ($countryId !== null && $countryId > 0) ? $countryId : 0;
+    $st = $pdo->prepare(
+        'SELECT offer_type, offer_id, text_ar, text_en, text_fil, text_hi
+         FROM storefront_promo_messages
+         WHERE slot = ?
+           AND offer_type IS NOT NULL
+           AND offer_id IS NOT NULL
+           AND is_active = 1
+           AND (country_id IS NULL OR country_id = ?)
+           AND (is_always_on = 1 OR (
+                (valid_from IS NULL OR valid_from <= NOW())
+                AND (valid_to IS NULL OR valid_to >= NOW())
+           ))
+         ORDER BY sort_order ASC, id ASC'
+    );
+    $st->execute(['offer_card', $cid]);
+    $out = [];
+    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        $type = (string) ($row['offer_type'] ?? '');
+        $oid = (int) ($row['offer_id'] ?? 0);
+        if ($type === '' || $oid <= 0) {
+            continue;
+        }
+        $key = $type . ':' . $oid;
+        if (isset($out[$key])) {
+            continue; // أول رسالة لكل عرض فقط
+        }
+        $txt = orange_storefront_promo_message_pick_text($row, $lang);
+        if ($txt !== '') {
+            $out[$key] = $txt;
+        }
+    }
+
+    return $out;
+}
+
+/**
  * قائمة الأدمن (ضمن نطاق دولة المشرف الحالي: كل الدول + الدولة المختارة).
  *
  * @return list<array<string,mixed>>
@@ -156,9 +235,12 @@ function orange_storefront_promo_messages_admin_list(PDO $pdo, ?int $countryId):
         $countrySql = ' WHERE (country_id IS NULL OR country_id = ?)';
         $params[] = $countryId;
     }
+    $hasOfferCols = orange_table_has_column($pdo, 'storefront_promo_messages', 'offer_type')
+        && orange_table_has_column($pdo, 'storefront_promo_messages', 'offer_id');
+    $offerSel = $hasOfferCols ? ', offer_type, offer_id' : '';
     $st = $pdo->prepare(
         'SELECT id, country_id, slot, text_ar, text_en, text_fil, text_hi,
-                is_active, is_always_on, valid_from, valid_to, sort_order
+                is_active, is_always_on, valid_from, valid_to, sort_order' . $offerSel . '
          FROM storefront_promo_messages' . $countrySql . '
          ORDER BY slot ASC, sort_order ASC, id ASC'
     );
@@ -169,6 +251,8 @@ function orange_storefront_promo_messages_admin_list(PDO $pdo, ?int $countryId):
             'id' => (int) $row['id'],
             'country_id' => isset($row['country_id']) ? (int) $row['country_id'] : null,
             'slot' => (string) ($row['slot'] ?? ''),
+            'offer_type' => isset($row['offer_type']) ? (string) $row['offer_type'] : '',
+            'offer_id' => isset($row['offer_id']) && $row['offer_id'] !== null ? (int) $row['offer_id'] : 0,
             'text_ar' => (string) ($row['text_ar'] ?? ''),
             'text_en' => (string) ($row['text_en'] ?? ''),
             'text_fil' => (string) ($row['text_fil'] ?? ''),
