@@ -265,6 +265,17 @@ function orange_storefront_active_bogo_cards(PDO $pdo, ?int $countryId, string $
     }
     $pmap = orange_storefront_offer_product_display_map($pdo, $allProductIds);
 
+    $catIds = [];
+    foreach ($prepared as $entryCat) {
+        if ($entryCat['kind'] === 'same_category') {
+            $cidCat = (int) ($entryCat['row']['category_id'] ?? 0);
+            if ($cidCat > 0) {
+                $catIds[] = $cidCat;
+            }
+        }
+    }
+    $catNames = orange_storefront_offer_category_name_map($pdo, $catIds, $lang);
+
     $resolveList = static function (array $pids) use ($pmap): array {
         $out = [];
         foreach ($pids as $pid) {
@@ -295,9 +306,11 @@ function orange_storefront_active_bogo_cards(PDO $pdo, ?int $countryId, string $
         if (($entry['kind'] === 'buy_bundle' || $entry['kind'] === 'same_variant') && $buyComponents === []) {
             continue;
         }
-        if ($entry['gift_kind'] === 'fixed' && $fixedGift === null && $entry['kind'] !== 'same_category') {
+        $giftAvailable = $entry['gift_kind'] === 'fixed' ? ($fixedGift !== null) : ($giftPool !== []);
+        if (!$giftAvailable) {
             continue;
         }
+        $catIdVal = isset($row['category_id']) ? (int) $row['category_id'] : 0;
 
         $cards[] = [
             'type' => 'bogo',
@@ -310,7 +323,8 @@ function orange_storefront_active_bogo_cards(PDO $pdo, ?int $countryId, string $
             'show_old_price' => (int) ($row['show_old_price_to_customer'] ?? 0) === 1,
             'bogo_kind' => $entry['kind'],
             'min_buy_qty' => max(2, (int) ($row['min_buy_qty'] ?? 2)),
-            'category_id' => isset($row['category_id']) ? (int) $row['category_id'] : null,
+            'category_id' => $catIdVal > 0 ? $catIdVal : null,
+            'category_name' => $catIdVal > 0 ? ($catNames[$catIdVal] ?? '') : '',
             'buy_components' => $buyComponents,
             'gift_kind' => $entry['gift_kind'],
             'fixed_gift' => $fixedGift,
@@ -323,6 +337,97 @@ function orange_storefront_active_bogo_cards(PDO $pdo, ?int $countryId, string $
     }
 
     return $cards;
+}
+
+/**
+ * خريطة أسماء فئات الشجرة الموحّدة (مترجمة) لمجموعة معرّفات.
+ *
+ * @param list<int> $catIds
+ * @return array<int,string>
+ */
+function orange_storefront_offer_category_name_map(PDO $pdo, array $catIds, string $lang): array
+{
+    $ids = [];
+    foreach ($catIds as $cid) {
+        $cid = (int) $cid;
+        if ($cid > 0) {
+            $ids[$cid] = true;
+        }
+    }
+    $ids = array_keys($ids);
+    if ($ids === [] || !orange_table_exists($pdo, 'catalog_categories')) {
+        return [];
+    }
+    $cols = 'id, name_ar';
+    foreach (['name_en', 'name_fil', 'name_hi'] as $c) {
+        if (orange_table_has_column($pdo, 'catalog_categories', $c)) {
+            $cols .= ', ' . $c;
+        }
+    }
+    $placeholders = implode(', ', array_fill(0, count($ids), '?'));
+    $st = $pdo->prepare("SELECT $cols FROM catalog_categories WHERE id IN ($placeholders)");
+    $st->execute($ids);
+    $map = [];
+    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        $cid = (int) ($row['id'] ?? 0);
+        if ($cid <= 0) {
+            continue;
+        }
+        $name = '';
+        if ($lang === 'en' && !empty($row['name_en'])) {
+            $name = (string) $row['name_en'];
+        } elseif ($lang === 'fil' && !empty($row['name_fil'])) {
+            $name = (string) $row['name_fil'];
+        } elseif ($lang === 'hi' && !empty($row['name_hi'])) {
+            $name = (string) $row['name_hi'];
+        }
+        if ($name === '') {
+            $name = (string) ($row['name_ar'] ?? '');
+        }
+        $map[$cid] = $name;
+    }
+
+    return $map;
+}
+
+/**
+ * معرّفات المنتجات النشطة ضمن فئة الشجرة الموحّدة (للعرض في صفحة same_category).
+ *
+ * @return list<int>
+ */
+function orange_storefront_category_active_product_ids(PDO $pdo, int $catId, int $limit = 60): array
+{
+    if ($catId <= 0
+        || !orange_table_exists($pdo, 'products')
+        || !orange_table_exists($pdo, 'product_types')
+        || !orange_table_exists($pdo, 'catalog_subcategories')
+        || !orange_table_has_column($pdo, 'products', 'product_type_id')) {
+        return [];
+    }
+    $limit = max(1, min(200, $limit));
+    try {
+        $st = $pdo->prepare(
+            'SELECT p.id
+             FROM products p
+             INNER JOIN product_types pt ON pt.id = p.product_type_id
+             INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
+             WHERE ucs.catalog_category_id = ? AND p.is_active = 1
+             ORDER BY p.id DESC
+             LIMIT ' . $limit
+        );
+        $st->execute([$catId]);
+        $out = [];
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            $pid = (int) ($row['id'] ?? 0);
+            if ($pid > 0) {
+                $out[] = $pid;
+            }
+        }
+
+        return $out;
+    } catch (Throwable $e) {
+        return [];
+    }
 }
 
 /**

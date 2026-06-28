@@ -60,10 +60,15 @@ if ($offerId > 0 && $isCombo) {
     }
 } elseif ($offerId > 0 && $isBogo) {
     foreach (orange_storefront_active_bogo_cards($pdo, $sfCountryId, $lang) as $c) {
+        if ((int) $c['offer_id'] !== $offerId) {
+            continue;
+        }
         $ck = (string) ($c['bogo_kind'] ?? '');
-        if ((int) $c['offer_id'] === $offerId
-            && ($ck === 'buy_bundle' || $ck === 'same_variant')
-            && ($c['buy_components'] ?? []) !== []) {
+        if (($ck === 'buy_bundle' || $ck === 'same_variant') && ($c['buy_components'] ?? []) !== []) {
+            $card = $c;
+            break;
+        }
+        if ($ck === 'same_category' && (int) ($c['category_id'] ?? 0) > 0) {
             $card = $c;
             break;
         }
@@ -84,6 +89,146 @@ if ($card === null) {
         <p class="product-page__empty-msg"><?php echo htmlspecialchars(t('offer_not_found'), ENT_QUOTES, 'UTF-8'); ?></p>
         <a class="btn" href="<?php echo htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?></a>
     </div>
+</div>
+    <?php
+    include __DIR__ . '/../includes/footer.php';
+    exit;
+}
+
+// حساب بيانات هدية BOGO (مشترك بين مسار same_category ومسار المكوّنات).
+$offerBuildGift = static function (array $card) use ($pdo, $offerGiftChargePrice): ?array {
+    $giftKind = (string) ($card['gift_kind'] ?? 'choice');
+    $chargeKind = (string) ($card['gift_unit_charge_kind'] ?? 'free');
+    $chargeVal = (float) ($card['gift_unit_charge_value'] ?? 0);
+    if ($giftKind === 'fixed' && !empty($card['fixed_gift'])) {
+        $fg = $card['fixed_gift'];
+        $retail = (float) ($fg['price'] ?? 0);
+        $chargePrice = $offerGiftChargePrice($chargeKind, $chargeVal, $retail);
+        return [
+            'kind' => 'fixed',
+            'name' => (string) ($fg['name'] ?? ''),
+            'image' => ($fg['main_image'] ?? '') !== '' ? storefront_product_image_href((string) $fg['main_image']) : '',
+            'retail' => $retail,
+            'charge' => $chargePrice,
+            'free' => $chargePrice <= 1e-6,
+            'show_old' => !empty($card['show_old_price']) && $retail > $chargePrice + 1e-6,
+        ];
+    }
+    $pool = [];
+    foreach (($card['gift_pool'] ?? []) as $pg) {
+        $pool[] = [
+            'name' => (string) ($pg['name'] ?? ''),
+            'image' => ($pg['main_image'] ?? '') !== '' ? storefront_product_image_href((string) $pg['main_image']) : '',
+        ];
+    }
+    return ['kind' => 'choice', 'pool' => $pool];
+};
+
+// مسار «نفس الفئة»: قائمة منتجات الفئة (يُضيفها العميل عبر صفحات المنتج) + عرض الهدية.
+if ($isBogo && (string) ($card['bogo_kind'] ?? '') === 'same_category') {
+    $catId = (int) ($card['category_id'] ?? 0);
+    $catName = (string) ($card['category_name'] ?? '');
+    $minBuy = max(2, (int) ($card['min_buy_qty'] ?? 2));
+    $offerName = (string) ($card['name'] ?? '');
+    $requiresRegistration = !empty($card['requires_registration']);
+    $showRegisterTeaser = $requiresRegistration && current_storefront_account($pdo) === null;
+    $catGift = $offerBuildGift($card);
+
+    $catProductIds = orange_storefront_category_active_product_ids($pdo, $catId);
+    $catPmap = orange_storefront_offer_product_display_map($pdo, $catProductIds);
+    $catProducts = [];
+    foreach ($catProductIds as $cpId) {
+        if (isset($catPmap[$cpId])) {
+            $catProducts[] = $catPmap[$cpId];
+        }
+    }
+
+    $ORANGE_STOREFRONT_PAGE_TITLE = ($offerName !== '' ? $offerName : t('offers')) . ' | ' . t('storefront_brand');
+    $ORANGE_STOREFRONT_META_DESCRIPTION = '';
+    include __DIR__ . '/../includes/header.php';
+    ?>
+<div class="container offer-page offer-page--category" data-offer-id="<?php echo (int) $card['offer_id']; ?>">
+    <nav class="product-page-toolbar product-page-toolbar--dual">
+        <a class="product-page__back" href="<?php echo htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?></a>
+        <a class="product-page__close" href="<?php echo htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></a>
+    </nav>
+
+    <div class="offer-head">
+        <?php if ($offerName !== ''): ?>
+        <h1 class="offer-head__title"><?php echo htmlspecialchars($offerName, ENT_QUOTES, 'UTF-8'); ?></h1>
+        <?php endif; ?>
+        <?php if ($catName !== ''): ?>
+        <p class="offer-head__cat"><strong><?php echo htmlspecialchars($catName, ENT_QUOTES, 'UTF-8'); ?></strong></p>
+        <?php endif; ?>
+        <p class="offer-head__includes"><?php echo htmlspecialchars(str_replace('{n}', (string) $minBuy, t('offer_category_note')), ENT_QUOTES, 'UTF-8'); ?></p>
+        <?php if ($showRegisterTeaser): ?>
+        <p class="offer-head__teaser" role="status"><?php echo htmlspecialchars(t('offer_registered_only'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <?php endif; ?>
+    </div>
+
+    <?php if ($catGift !== null && $catGift['kind'] === 'fixed'): ?>
+    <div class="offer-gift">
+        <h2 class="offer-gift__title"><?php echo htmlspecialchars(t('offer_your_gift'), ENT_QUOTES, 'UTF-8'); ?></h2>
+        <div class="offer-gift__item">
+            <div class="offer-gift__media">
+                <?php if ($catGift['image'] !== ''): ?>
+                <img src="<?php echo htmlspecialchars((string) $catGift['image'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars((string) $catGift['name'], ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
+                <?php endif; ?>
+            </div>
+            <div class="offer-gift__body">
+                <h3 class="offer-gift__name"><?php echo htmlspecialchars((string) $catGift['name'], ENT_QUOTES, 'UTF-8'); ?></h3>
+                <div class="price-row">
+                    <?php if (!empty($catGift['free'])): ?>
+                    <strong class="offer-gift__free"><?php echo htmlspecialchars(t('offer_gift_free'), ENT_QUOTES, 'UTF-8'); ?></strong>
+                    <?php else: ?>
+                    <strong><?php echo number_format((float) $catGift['charge'], 2); ?> <?php echo htmlspecialchars($sfCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                    <?php endif; ?>
+                    <?php if (!empty($catGift['show_old'])): ?>
+                    <span class="old-price"><?php echo number_format((float) $catGift['retail'], 2); ?> <?php echo htmlspecialchars($sfCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php elseif ($catGift !== null && ($catGift['pool'] ?? []) !== []): ?>
+    <div class="offer-gift">
+        <h2 class="offer-gift__title"><?php echo htmlspecialchars(t('offer_your_gift'), ENT_QUOTES, 'UTF-8'); ?></h2>
+        <p class="offer-gift__choose-note"><?php echo htmlspecialchars(t('offer_gift_choose_in_cart'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <div class="offer-gift__pool">
+            <?php foreach ($catGift['pool'] as $pg): ?>
+            <div class="offer-gift__pool-item">
+                <?php if (($pg['image'] ?? '') !== ''): ?>
+                <img src="<?php echo htmlspecialchars((string) $pg['image'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars((string) $pg['name'], ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
+                <?php endif; ?>
+                <span><?php echo htmlspecialchars((string) $pg['name'], ENT_QUOTES, 'UTF-8'); ?></span>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($catProducts === []): ?>
+    <p class="offer-head__includes"><?php echo htmlspecialchars(t('offer_category_empty'), ENT_QUOTES, 'UTF-8'); ?></p>
+    <?php else: ?>
+    <div class="product-grid offer-category-grid">
+        <?php foreach ($catProducts as $cp): ?>
+        <article class="product-card">
+            <div class="product-image-wrap">
+                <img src="<?php echo htmlspecialchars(storefront_product_image_href((string) ($cp['main_image'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars((string) $cp['name'], ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
+            </div>
+            <div class="product-body">
+                <h3><?php echo htmlspecialchars((string) $cp['name'], ENT_QUOTES, 'UTF-8'); ?></h3>
+                <div class="price-row">
+                    <strong><?php echo number_format((float) ($cp['price'] ?? 0), 2); ?> <?php echo htmlspecialchars($sfCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                </div>
+                <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', $channelSlug, $lang, ['id' => (int) $cp['product_id']]), ENT_QUOTES, 'UTF-8'); ?>">
+                    <?php echo htmlspecialchars(t('view_product'), ENT_QUOTES, 'UTF-8'); ?>
+                </a>
+            </div>
+        </article>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
 </div>
     <?php
     include __DIR__ . '/../includes/footer.php';
@@ -138,35 +283,7 @@ if ($isCombo) {
 }
 
 // هدية BOGO (عرض ساكن فقط؛ تُحقن تلقائياً على الخادم — لا تُضاف للسلة هنا).
-$gift = null;
-if ($isBogo) {
-    $giftKind = (string) ($card['gift_kind'] ?? 'choice');
-    $chargeKind = (string) ($card['gift_unit_charge_kind'] ?? 'free');
-    $chargeVal = (float) ($card['gift_unit_charge_value'] ?? 0);
-    if ($giftKind === 'fixed' && !empty($card['fixed_gift'])) {
-        $fg = $card['fixed_gift'];
-        $retail = (float) ($fg['price'] ?? 0);
-        $chargePrice = $offerGiftChargePrice($chargeKind, $chargeVal, $retail);
-        $gift = [
-            'kind' => 'fixed',
-            'name' => (string) ($fg['name'] ?? ''),
-            'image' => ($fg['main_image'] ?? '') !== '' ? storefront_product_image_href((string) $fg['main_image']) : '',
-            'retail' => $retail,
-            'charge' => $chargePrice,
-            'free' => $chargePrice <= 1e-6,
-            'show_old' => !empty($card['show_old_price']) && $retail > $chargePrice + 1e-6,
-        ];
-    } else {
-        $pool = [];
-        foreach (($card['gift_pool'] ?? []) as $pg) {
-            $pool[] = [
-                'name' => (string) ($pg['name'] ?? ''),
-                'image' => ($pg['main_image'] ?? '') !== '' ? storefront_product_image_href((string) $pg['main_image']) : '',
-            ];
-        }
-        $gift = ['kind' => 'choice', 'pool' => $pool];
-    }
-}
+$gift = $isBogo ? $offerBuildGift($card) : null;
 
 $ORANGE_STOREFRONT_PAGE_TITLE = ($offerName !== '' ? $offerName : t('offers')) . ' | ' . t('storefront_brand');
 $ORANGE_STOREFRONT_META_DESCRIPTION = '';

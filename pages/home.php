@@ -173,6 +173,11 @@ $sfBogoBundleCards = array_values(array_filter(
         return ($k === 'buy_bundle' || $k === 'same_variant') && ($c['buy_components'] ?? []) !== [];
     }
 ));
+// بطاقات «نفس الفئة»: بطاقة لافتة تقود لصفحة عرض تسرد منتجات الفئة.
+$sfBogoCatCards = array_values(array_filter(
+    $sfBogoCardsAll,
+    static fn (array $c): bool => (string) ($c['bogo_kind'] ?? '') === 'same_category' && (int) ($c['category_id'] ?? 0) > 0
+));
 $sfOfferPageBase = storefront_public_path('/pages/offer.php');
 $sfOfferHref = static function (string $type, int $offerId) use ($sfOfferPageBase, $channelSlug, $lang): string {
     return $sfOfferPageBase . '?' . http_build_query([
@@ -391,7 +396,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="storefront-browse-menu__body">
                     <button type="button" class="storefront-browse-menu__cta" data-apply-filter="all"><?php echo htmlspecialchars(t('storefront_menu_all_products'), ENT_QUOTES, 'UTF-8'); ?></button>
-                    <?php if ($offers !== [] || $sfComboCards !== [] || $sfBogoBundleCards !== []): ?>
+                    <?php if ($offers !== [] || $sfComboCards !== [] || $sfBogoBundleCards !== [] || $sfBogoCatCards !== []): ?>
                     <button type="button" class="storefront-browse-menu__cta storefront-browse-menu__cta--secondary" data-apply-filter="offers"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></button>
                     <?php endif; ?>
 
@@ -482,7 +487,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
         </button>
         <div class="tabs-scroll" id="homeCategoryTabs">
             <button type="button" class="tab-btn active" data-tab-filter="all" onclick="filterProducts('all', this)"><?php echo htmlspecialchars(t('all'), ENT_QUOTES, 'UTF-8'); ?></button>
-            <?php if ($offers !== [] || $sfComboCards !== [] || $sfBogoBundleCards !== []): ?>
+            <?php if ($offers !== [] || $sfComboCards !== [] || $sfBogoBundleCards !== [] || $sfBogoCatCards !== []): ?>
             <button type="button" class="tab-btn" data-tab-filter="offers" onclick="filterProducts('offers', this)"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></button>
             <?php endif; ?>
             <?php foreach ($categories as $cat): ?>
@@ -670,6 +675,39 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                         <strong><?php echo number_format($bcBuyTotal, 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
                     </div>
                     <a class="btn" href="<?php echo htmlspecialchars($sfOfferHref('bogo', $bcId), ENT_QUOTES, 'UTF-8'); ?>">
+                        <?php echo htmlspecialchars(t('offer_view'), ENT_QUOTES, 'UTF-8'); ?>
+                    </a>
+                </div>
+            </article>
+        <?php endforeach; ?>
+
+        <?php foreach ($sfBogoCatCards as $kc): ?>
+            <?php
+            $kcId = (int) ($kc['offer_id'] ?? 0);
+            $kcBadge = trim((string) ($kc['name'] ?? ''));
+            $kcCat = trim((string) ($kc['category_name'] ?? ''));
+            $kcTitle = $kcBadge !== '' ? $kcBadge : ($kcCat !== '' ? $kcCat : t('offers'));
+            $kcGift = is_array($kc['fixed_gift'] ?? null) ? $kc['fixed_gift'] : null;
+            $kcImgRaw = $kcGift !== null ? (string) ($kcGift['main_image'] ?? '') : '';
+            $kcN = max(2, (int) ($kc['min_buy_qty'] ?? 2));
+            ?>
+            <article class="product-card product-card--offer product-card--bundle product-card--category-offer" data-filter="offers">
+                <div class="product-image-wrap">
+                    <?php if ($kcImgRaw !== ''): ?>
+                    <img src="<?php echo htmlspecialchars(storefront_product_image_href($kcImgRaw), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($kcTitle, ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
+                    <?php else: ?>
+                    <div class="product-image-wrap__placeholder" aria-hidden="true"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></div>
+                    <?php endif; ?>
+                    <?php if ($kcBadge !== ''): ?>
+                    <span class="offer-badge"><?php echo htmlspecialchars($kcBadge, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <?php endif; ?>
+                </div>
+                <div class="product-body">
+                    <h3><?php echo htmlspecialchars($kcTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <div class="price-row">
+                        <span class="offer-cat-note"><?php echo htmlspecialchars(str_replace('{n}', (string) $kcN, t('offer_category_note')), ENT_QUOTES, 'UTF-8'); ?></span>
+                    </div>
+                    <a class="btn" href="<?php echo htmlspecialchars($sfOfferHref('bogo', $kcId), ENT_QUOTES, 'UTF-8'); ?>">
                         <?php echo htmlspecialchars(t('offer_view'), ENT_QUOTES, 'UTF-8'); ?>
                     </a>
                 </div>

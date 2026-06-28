@@ -1018,6 +1018,21 @@ body.storefront-browse-menu-lock {
     font-weight: 700;
     margin-inline-start: 0.35rem;
 }
+.offer-head__cat {
+    margin: 0.25rem 0 0.5rem;
+    color: var(--primary);
+}
+.offer-cat-note {
+    font-size: 0.82rem;
+    color: var(--muted, #6b7280);
+    line-height: 1.45;
+}
+.offer-category-grid {
+    margin-top: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+}
 .offer-unit {
     padding: 0.5rem 0;
 }
