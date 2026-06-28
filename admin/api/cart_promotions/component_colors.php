@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
 require_once __DIR__ . '/../../../includes/storefront_variant_picker.php';
-require_admin_api('GET');
+require_admin_api();
 
 /*
  * يُعيد ألوان منتج (مفتاح اللون كما تستخدمه الواجهة + تسمية عرض) لاستخدامه في
