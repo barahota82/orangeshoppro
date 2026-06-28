@@ -155,6 +155,11 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
         </div>
         <?php $ocpFieldPrefix = 'cbp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
         <div style="grid-column:1/-1;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;" title="عند التفعيل يظهر سعر تجزئة الهدية مشطوباً بجوار سعرها المجاني/المخفّض للعميل (يتطلب الترخيص اللازم)">
+                <input type="checkbox" id="cbp_show_old_price"> <strong>إظهار السعر القديم</strong>
+            </label>
+        </div>
+        <div style="grid-column:1/-1;">
             <label><strong>نوع الهدية</strong></label>
             <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:6px;">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -432,6 +437,8 @@ function resetCartBogoPromotionForm() {
     document.getElementById('cbp_name_ar').value = '';
     document.getElementById('cbp_name_en').value = '';
     document.getElementById('cbp_show_name').checked = false;
+    var cbpShowOldReset = document.getElementById('cbp_show_old_price');
+    if (cbpShowOldReset) cbpShowOldReset.checked = false;
     document.getElementById('cbp_cat').value = '';
     document.getElementById('cbp_minbuy').value = '2';
     document.getElementById('cbp_sort').value = String(cbpComputeNextSort());
@@ -457,6 +464,8 @@ function editCartBogoPromotion(row) {
     document.getElementById('cbp_name_ar').value = row.name_ar != null ? String(row.name_ar) : '';
     document.getElementById('cbp_name_en').value = row.name_en != null ? String(row.name_en) : '';
     document.getElementById('cbp_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
+    var cbpShowOldEl = document.getElementById('cbp_show_old_price');
+    if (cbpShowOldEl) cbpShowOldEl.checked = parseInt(row.show_old_price_to_customer, 10) === 1;
     let bk = 'same_variant';
     if ((row.bogo_kind || '') === 'same_category') {
         bk = 'same_category';
@@ -639,6 +648,7 @@ async function saveCartBogoPromotion() {
         name_ar: document.getElementById('cbp_name_ar').value.trim(),
         name_en: document.getElementById('cbp_name_en').value.trim(),
         show_name_to_customer: document.getElementById('cbp_show_name').checked ? 1 : 0,
+        show_old_price_to_customer: (document.getElementById('cbp_show_old_price') && document.getElementById('cbp_show_old_price').checked) ? 1 : 0,
         min_buy_qty: parseInt(document.getElementById('cbp_minbuy').value, 10) || 2,
         requires_registered_account: document.getElementById('cbp_reg').checked ? 1 : 0,
         first_delivered_order_only: document.getElementById('cbp_first_delivered').checked ? 1 : 0,

@@ -116,7 +116,7 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
     $cid = orange_cart_promotion_admin_country_id($pdo);
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $cid);
     $st = $pdo->prepare(
-        'SELECT id, name_ar, name_en, show_name_to_customer, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, first_delivered_order_only, gift_kind, fixed_variant_id, pool_variant_ids,
+        'SELECT id, name_ar, name_en, show_name_to_customer, show_old_price_to_customer, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, first_delivered_order_only, gift_kind, fixed_variant_id, pool_variant_ids,
                 gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active, is_always_on,
                 valid_from, valid_to, auto_paused_at, auto_paused_reason
          FROM cart_bogo_promotions WHERE 1=1' . $bind['sql'] . ' ORDER BY sort_order ASC, id ASC'
@@ -132,6 +132,7 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
             'name_ar' => (string) ($row['name_ar'] ?? ''),
             'name_en' => (string) ($row['name_en'] ?? ''),
             'show_name_to_customer' => (int) ($row['show_name_to_customer'] ?? 0),
+            'show_old_price_to_customer' => (int) ($row['show_old_price_to_customer'] ?? 0),
             'bogo_kind' => (string) ($row['bogo_kind'] ?? 'same_variant'),
             'category_id' => isset($row['category_id']) ? (int) $row['category_id'] : null,
             'min_buy_qty' => (int) ($row['min_buy_qty'] ?? 2),
