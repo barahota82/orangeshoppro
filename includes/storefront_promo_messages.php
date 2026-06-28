@@ -1,0 +1,185 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * رسائل تحفيزية يتحكم بها المشرف العام (قرار مالك 2026-06-28).
+ *
+ * نظام مستقل تماماً عن منطق العروض/المطابقة/الطلبات: نص تحفيزي متعدّد اللغات
+ * يظهر في «خانة» مُسمّاة (slot) بالواجهة، بنطاق دولة اختياري وجدولة (دائم/فترة).
+ * الخانات أسماء ثابتة لضمان الأداء وسلامة الأماكن (لا أماكن عشوائية).
+ */
+
+require_once __DIR__ . '/catalog_schema.php';
+
+/**
+ * الخانات المُسمّاة المدعومة (المفتاح => تسمية عربية للأدمن).
+ *
+ * @return array<string,string>
+ */
+function orange_storefront_promo_message_slots(): array
+{
+    return [
+        'offers_top' => 'أعلى تاب العروض',
+        'home_top' => 'أعلى الصفحة الرئيسية',
+        'cart_top' => 'أعلى صفحة السلة',
+    ];
+}
+
+function orange_storefront_promo_message_slot_valid(string $slot): bool
+{
+    return array_key_exists($slot, orange_storefront_promo_message_slots());
+}
+
+/**
+ * اختيار نص اللغة مع احتياط للعربي.
+ *
+ * @param array<string,mixed> $row
+ */
+function orange_storefront_promo_message_pick_text(array $row, string $lang): string
+{
+    $map = [
+        'en' => 'text_en',
+        'fil' => 'text_fil',
+        'hi' => 'text_hi',
+    ];
+    if (isset($map[$lang])) {
+        $v = trim((string) ($row[$map[$lang]] ?? ''));
+        if ($v !== '') {
+            return $v;
+        }
+    }
+
+    return trim((string) ($row['text_ar'] ?? ''));
+}
+
+/**
+ * نص الرسالة الفعّالة لخانة مُسمّاة (أو '' إن لا شيء). نطاق الدولة: NULL=كل الدول.
+ */
+function orange_storefront_promo_message_for_slot(
+    PDO $pdo,
+    string $slot,
+    ?int $countryId,
+    string $lang
+): string {
+    if (!orange_storefront_promo_message_slot_valid($slot)
+        || !orange_table_exists($pdo, 'storefront_promo_messages')) {
+        return '';
+    }
+    $cid = ($countryId !== null && $countryId > 0) ? $countryId : 0;
+    $st = $pdo->prepare(
+        'SELECT text_ar, text_en, text_fil, text_hi
+         FROM storefront_promo_messages
+         WHERE slot = ?
+           AND is_active = 1
+           AND (country_id IS NULL OR country_id = ?)
+           AND (is_always_on = 1 OR (
+                (valid_from IS NULL OR valid_from <= NOW())
+                AND (valid_to IS NULL OR valid_to >= NOW())
+           ))
+         ORDER BY sort_order ASC, id ASC
+         LIMIT 1'
+    );
+    $st->execute([$slot, $cid]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return '';
+    }
+
+    return orange_storefront_promo_message_pick_text($row, $lang);
+}
+
+/**
+ * خريطة الرسائل الفعّالة (slot => نص اللغة) باستعلام واحد — لتفادي عدّة استعلامات
+ * على المسار الساخن (الصفحة الرئيسية). تختار أول رسالة لكل خانة وفق الترتيب.
+ *
+ * @param list<string> $slots
+ * @return array<string,string>
+ */
+function orange_storefront_promo_messages_map(PDO $pdo, array $slots, ?int $countryId, string $lang): array
+{
+    if (!orange_table_exists($pdo, 'storefront_promo_messages')) {
+        return [];
+    }
+    $valid = [];
+    foreach ($slots as $s) {
+        if (orange_storefront_promo_message_slot_valid((string) $s)) {
+            $valid[(string) $s] = true;
+        }
+    }
+    $valid = array_keys($valid);
+    if ($valid === []) {
+        return [];
+    }
+    $cid = ($countryId !== null && $countryId > 0) ? $countryId : 0;
+    $placeholders = implode(', ', array_fill(0, count($valid), '?'));
+    $params = $valid;
+    $params[] = $cid;
+    $st = $pdo->prepare(
+        'SELECT slot, text_ar, text_en, text_fil, text_hi
+         FROM storefront_promo_messages
+         WHERE slot IN (' . $placeholders . ')
+           AND is_active = 1
+           AND (country_id IS NULL OR country_id = ?)
+           AND (is_always_on = 1 OR (
+                (valid_from IS NULL OR valid_from <= NOW())
+                AND (valid_to IS NULL OR valid_to >= NOW())
+           ))
+         ORDER BY sort_order ASC, id ASC'
+    );
+    $st->execute($params);
+    $out = [];
+    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        $slot = (string) ($row['slot'] ?? '');
+        if ($slot === '' || isset($out[$slot])) {
+            continue; // أول رسالة لكل خانة فقط
+        }
+        $out[$slot] = orange_storefront_promo_message_pick_text($row, $lang);
+    }
+
+    return $out;
+}
+
+/**
+ * قائمة الأدمن (ضمن نطاق دولة المشرف الحالي: كل الدول + الدولة المختارة).
+ *
+ * @return list<array<string,mixed>>
+ */
+function orange_storefront_promo_messages_admin_list(PDO $pdo, ?int $countryId): array
+{
+    if (!orange_table_exists($pdo, 'storefront_promo_messages')) {
+        return [];
+    }
+    $params = [];
+    $countrySql = '';
+    if ($countryId !== null && $countryId > 0) {
+        $countrySql = ' WHERE (country_id IS NULL OR country_id = ?)';
+        $params[] = $countryId;
+    }
+    $st = $pdo->prepare(
+        'SELECT id, country_id, slot, text_ar, text_en, text_fil, text_hi,
+                is_active, is_always_on, valid_from, valid_to, sort_order
+         FROM storefront_promo_messages' . $countrySql . '
+         ORDER BY slot ASC, sort_order ASC, id ASC'
+    );
+    $st->execute($params);
+    $out = [];
+    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        $out[] = [
+            'id' => (int) $row['id'],
+            'country_id' => isset($row['country_id']) ? (int) $row['country_id'] : null,
+            'slot' => (string) ($row['slot'] ?? ''),
+            'text_ar' => (string) ($row['text_ar'] ?? ''),
+            'text_en' => (string) ($row['text_en'] ?? ''),
+            'text_fil' => (string) ($row['text_fil'] ?? ''),
+            'text_hi' => (string) ($row['text_hi'] ?? ''),
+            'is_active' => (int) ($row['is_active'] ?? 0),
+            'is_always_on' => (int) ($row['is_always_on'] ?? 0),
+            'valid_from' => (string) ($row['valid_from'] ?? ''),
+            'valid_to' => (string) ($row['valid_to'] ?? ''),
+            'sort_order' => (int) ($row['sort_order'] ?? 0),
+        ];
+    }
+
+    return $out;
+}

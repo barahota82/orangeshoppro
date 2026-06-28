@@ -173,6 +173,7 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'cart_gift_promotions', 'label' => 'عروض الهدايا'],
                         ['page' => 'cart_bogo_promotions', 'label' => 'عروض BOGO'],
                         ['page' => 'cart_combo_promotions', 'label' => 'عروض الكومبو'],
+                        ['page' => 'storefront_promo_messages', 'label' => 'الرسائل التحفيزية'],
                         ['page' => 'loyalty', 'label' => 'نظام الولاء (النقاط)'],
                         ['page' => 'cart_promo_health', 'label' => 'صحة العروض (مخزون)'],
                     ],

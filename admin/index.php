@@ -23,6 +23,7 @@ $allowed = [
     'cart_bogo_promotions',
     'cart_combo_promotions',
     'cart_promo_health',
+    'storefront_promo_messages',
     'loyalty',
     'departments',
     'unified_catalog_branches',

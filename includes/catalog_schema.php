@@ -3172,6 +3172,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_promo_show_name_to_customer_v105($pdo);
     orange_catalog_migrate_promo_show_old_price_v106($pdo);
     orange_catalog_migrate_promo_bogo_same_variant_product_v107($pdo);
+    orange_catalog_migrate_storefront_promo_messages_v108($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3795,6 +3796,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_promo_show_name_to_customer_v105($pdo);
     orange_catalog_migrate_promo_show_old_price_v106($pdo);
     orange_catalog_migrate_promo_bogo_same_variant_product_v107($pdo);
+    orange_catalog_migrate_storefront_promo_messages_v108($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -7924,6 +7926,48 @@ function orange_catalog_migrate_promo_bogo_same_variant_product_v107(PDO $pdo): 
             'ALTER TABLE cart_bogo_promotions ADD COLUMN same_variant_product_id INT UNSIGNED NULL DEFAULT NULL'
         );
         orange_schema_invalidate_column_check('cart_bogo_promotions', 'same_variant_product_id');
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v108 — رسائل تحفيزية يتحكم بها المشرف العام (قرار مالك 2026-06-28):
+ *  - جدول `storefront_promo_messages`: نص تحفيزي متعدّد اللغات يظهر في «خانة» مُسمّاة
+ *    (slot) بالواجهة (مثل أعلى تاب العروض)، بنطاق دولة اختياري وجدولة (دائم/فترة).
+ *  - لا يلمس منطق العروض/المطابقة/الطلبات — إضافة عرض بحتة آمنة.
+ * marker-gated + idempotent؛ يُستدعى من المسار الكامل والمسار السريع.
+ */
+function orange_catalog_migrate_storefront_promo_messages_v108(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_storefront_promo_messages_v108';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'storefront_promo_messages')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "CREATE TABLE IF NOT EXISTS storefront_promo_messages (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                country_id INT UNSIGNED NULL DEFAULT NULL,
+                slot VARCHAR(40) NOT NULL DEFAULT 'offers_top',
+                text_ar VARCHAR(500) NOT NULL DEFAULT '',
+                text_en VARCHAR(500) NOT NULL DEFAULT '',
+                text_fil VARCHAR(500) NOT NULL DEFAULT '',
+                text_hi VARCHAR(500) NOT NULL DEFAULT '',
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                is_always_on TINYINT(1) NOT NULL DEFAULT 0,
+                valid_from DATETIME NULL DEFAULT NULL,
+                valid_to DATETIME NULL DEFAULT NULL,
+                sort_order INT NOT NULL DEFAULT 0,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_spm_slot_active (slot, is_active),
+                KEY idx_spm_country (country_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

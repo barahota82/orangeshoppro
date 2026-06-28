@@ -162,8 +162,12 @@ foreach ($offers as $op) {
  * كبطاقات إطار العرض تربط بصفحة العرض الرأسية pages/offer.php (لا تُحقن في السلة هنا).
  */
 require_once __DIR__ . '/../includes/storefront_offer_cards.php';
+require_once __DIR__ . '/../includes/storefront_promo_messages.php';
 $sfComboCards = orange_storefront_active_combo_cards($pdo, $sfHomeCountryId, $lang);
 $sfBogoCardsAll = orange_storefront_active_bogo_cards($pdo, $sfHomeCountryId, $lang);
+$sfPromoMsgMap = orange_storefront_promo_messages_map($pdo, ['home_top', 'offers_top'], $sfHomeCountryId, $lang);
+$sfMsgHomeTop = $sfPromoMsgMap['home_top'] ?? '';
+$sfMsgOffersTop = $sfPromoMsgMap['offers_top'] ?? '';
 // في تاب العروض نعرض BOGO ذات صفحة عرض: «حزمة شراء» و«نفس المنتج» بمنتج مستهدف
 // (كلاهما يملك buy_components صالحة). same_category بلا صفحة بعد.
 $sfBogoBundleCards = array_values(array_filter(
@@ -381,6 +385,10 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
     </section>
     <?php endif; ?>
 
+    <?php if ($sfMsgHomeTop !== ''): ?>
+    <div class="sf-promo-msg sf-promo-msg--home" role="status"><?php echo htmlspecialchars($sfMsgHomeTop, ENT_QUOTES, 'UTF-8'); ?></div>
+    <?php endif; ?>
+
     <section class="tabs-section" dir="<?php echo htmlspecialchars($storefrontListDir, ENT_QUOTES, 'UTF-8'); ?>">
         <div class="storefront-browse-wrap">
         <button type="button" class="tabs-menu-open storefront-browse-menu-open" aria-expanded="false" aria-controls="storefrontBrowseMenuPanel" aria-haspopup="true">
@@ -500,6 +508,10 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
             <span class="tabs-nav-btn__icon" aria-hidden="true">›</span>
         </button>
     </section>
+
+    <?php if ($sfMsgOffersTop !== ''): ?>
+    <div class="sf-promo-msg sf-promo-msg--offers" role="status" data-msg-filter="offers" style="display:none;"><?php echo htmlspecialchars($sfMsgOffersTop, ENT_QUOTES, 'UTF-8'); ?></div>
+    <?php endif; ?>
 
     <section id="productsGrid" class="products-grid">
         <?php if ($sfPreviewActive && $sfPreviewDraftRow !== null): ?>
@@ -1339,6 +1351,10 @@ function applyGridFilterVisibility(filter) {
             catOk = tokens.indexOf(filter) !== -1;
         }
         card.style.display = (catOk && orangeSfCardMatchesAttrFilters(card)) ? '' : 'none';
+    });
+    // رسائل تحفيزية مربوطة بخانة تبويب (تظهر فقط عند تفعيل تبويبها).
+    document.querySelectorAll('[data-msg-filter]').forEach(function (el) {
+        el.style.display = (el.getAttribute('data-msg-filter') === filter) ? '' : 'none';
     });
 }
 function applyGridFilter(filter) {

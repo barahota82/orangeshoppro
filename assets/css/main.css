@@ -1018,6 +1018,17 @@ body.storefront-browse-menu-lock {
     font-weight: 700;
     margin-inline-start: 0.35rem;
 }
+.sf-promo-msg {
+    margin: 0.75rem 0;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--primary) 10%, var(--card, #fff));
+    border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+    color: var(--text, #111827);
+    font-weight: 600;
+    line-height: 1.5;
+    text-align: center;
+}
 .offer-head__cat {
     margin: 0.25rem 0 0.5rem;
     color: var(--primary);

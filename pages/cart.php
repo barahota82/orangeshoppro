@@ -8,6 +8,7 @@ require_once __DIR__ . '/../includes/countries.php';
 require_once __DIR__ . '/../includes/storefront_account.php';
 require_once __DIR__ . '/../includes/delivery_areas.php';
 require_once __DIR__ . '/../includes/storefront_payment_settings.php';
+require_once __DIR__ . '/../includes/storefront_promo_messages.php';
 
 $pdoCartAcc = db();
 orange_catalog_ensure_storefront_page($pdoCartAcc);
@@ -23,6 +24,7 @@ if (!$cartSfLoggedIn) {
 }
 
 include __DIR__ . '/../includes/header.php';
+$cartTopPromoMsg = orange_storefront_promo_message_for_slot($pdoCartAcc, 'cart_top', orange_storefront_current_country_id($pdoCartAcc), $lang);
 $orangeDeliveryAreaGroups = orange_delivery_areas_storefront_groups($pdoCartAcc, $lang);
 $orangeDeliveryAreasStorefront = orange_delivery_areas_flatten_groups($orangeDeliveryAreaGroups);
 
@@ -85,6 +87,9 @@ $cartTabAria = $cartSfLoggedIn
 $cartWaHref = storefront_whatsapp_href($channel, '');
 ?>
 <div class="container">
+    <?php if ($cartTopPromoMsg !== ''): ?>
+    <div class="sf-promo-msg sf-promo-msg--cart" role="status"><?php echo htmlspecialchars($cartTopPromoMsg, ENT_QUOTES, 'UTF-8'); ?></div>
+    <?php endif; ?>
     <div class="page-title-box cart-page-head">
         <h2><?php echo htmlspecialchars(t('cart'), ENT_QUOTES, 'UTF-8'); ?></h2>
         <a class="cart-page-close" href="<?php echo htmlspecialchars($cartHomeUrl, ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(t('cart_close'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></a>
