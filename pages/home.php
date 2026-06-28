@@ -156,6 +156,23 @@ foreach ($offers as $op) {
     $offerProductIds[(int) $op['id']] = true;
 }
 
+/*
+ * بطاقات عروض الكومبو في تاب «العروض» (شريحة 1ب): تُجلب عبر المساعد الموحّد
+ * (استعلامات مُجمَّعة، لا N+1 — راجع ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT) وتُعرَض
+ * كبطاقات إطار العرض تربط بصفحة العرض الرأسية pages/offer.php (لا تُحقن في السلة هنا).
+ */
+require_once __DIR__ . '/../includes/storefront_offer_cards.php';
+$sfComboCards = orange_storefront_active_combo_cards($pdo, $sfHomeCountryId, $lang);
+$sfOfferPageBase = storefront_public_path('/pages/offer.php');
+$sfComboHref = static function (int $offerId) use ($sfOfferPageBase, $channelSlug, $lang): string {
+    return $sfOfferPageBase . '?' . http_build_query([
+        'channel' => $channelSlug,
+        'lang' => $lang,
+        'type' => 'combo',
+        'id' => $offerId,
+    ]);
+};
+
 /** @var list<array<string,mixed>> */
 $productsNonOffer = [];
 foreach ($products as $p) {
@@ -361,7 +378,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="storefront-browse-menu__body">
                     <button type="button" class="storefront-browse-menu__cta" data-apply-filter="all"><?php echo htmlspecialchars(t('storefront_menu_all_products'), ENT_QUOTES, 'UTF-8'); ?></button>
-                    <?php if ($offers !== []): ?>
+                    <?php if ($offers !== [] || $sfComboCards !== []): ?>
                     <button type="button" class="storefront-browse-menu__cta storefront-browse-menu__cta--secondary" data-apply-filter="offers"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></button>
                     <?php endif; ?>
 
@@ -452,7 +469,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
         </button>
         <div class="tabs-scroll" id="homeCategoryTabs">
             <button type="button" class="tab-btn active" data-tab-filter="all" onclick="filterProducts('all', this)"><?php echo htmlspecialchars(t('all'), ENT_QUOTES, 'UTF-8'); ?></button>
-            <?php if ($offers !== []): ?>
+            <?php if ($offers !== [] || $sfComboCards !== []): ?>
             <button type="button" class="tab-btn" data-tab-filter="offers" onclick="filterProducts('offers', this)"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></button>
             <?php endif; ?>
             <?php foreach ($categories as $cat): ?>
@@ -562,6 +579,46 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                     </div>
                     <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]), ENT_QUOTES, 'UTF-8'); ?>">
                         <?php echo htmlspecialchars(t('view_product'), ENT_QUOTES, 'UTF-8'); ?>
+                    </a>
+                </div>
+            </article>
+        <?php endforeach; ?>
+
+        <?php foreach ($sfComboCards as $cc): ?>
+            <?php
+            $ccId = (int) ($cc['offer_id'] ?? 0);
+            $ccComponents = is_array($cc['components'] ?? null) ? $cc['components'] : [];
+            $ccNames = [];
+            foreach ($ccComponents as $ccComp) {
+                $ccN = trim((string) ($ccComp['name'] ?? ''));
+                if ($ccN !== '') {
+                    $ccNames[] = $ccN;
+                }
+            }
+            $ccTitle = $ccNames !== [] ? implode(' + ', $ccNames) : t('offers');
+            $ccBadge = trim((string) ($cc['name'] ?? ''));
+            $ccImgRaw = (string) ($ccComponents[0]['main_image'] ?? '');
+            $ccBundle = (float) ($cc['bundle_price'] ?? 0);
+            $ccTotal = (float) ($cc['components_total'] ?? 0);
+            $ccShowOld = !empty($cc['show_old_price']) && $ccTotal > $ccBundle + 1e-6;
+            ?>
+            <article class="product-card product-card--offer product-card--bundle" data-filter="offers">
+                <div class="product-image-wrap">
+                    <img src="<?php echo htmlspecialchars(storefront_product_image_href($ccImgRaw), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($ccTitle, ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
+                    <?php if ($ccBadge !== ''): ?>
+                    <span class="offer-badge"><?php echo htmlspecialchars($ccBadge, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <?php endif; ?>
+                </div>
+                <div class="product-body">
+                    <h3><?php echo htmlspecialchars($ccTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <div class="price-row">
+                        <strong><?php echo number_format($ccBundle, 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                        <?php if ($ccShowOld): ?>
+                        <span class="old-price"><?php echo number_format($ccTotal, 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <a class="btn" href="<?php echo htmlspecialchars($sfComboHref($ccId), ENT_QUOTES, 'UTF-8'); ?>">
+                        <?php echo htmlspecialchars(t('offer_view'), ENT_QUOTES, 'UTF-8'); ?>
                     </a>
                 </div>
             </article>
