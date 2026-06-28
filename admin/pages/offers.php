@@ -123,6 +123,13 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
                     </label>
                 </div>
                 <div>
+                    <label>&nbsp;</label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;height:38px;" title="عند التفعيل يظهر السعر القديم مشطوباً بجوار سعر العرض للعميل (يتطلب الترخيص اللازم)">
+                        <input type="checkbox" id="ofr_show_old_price">
+                        <span><strong>إظهار السعر القديم</strong></span>
+                    </label>
+                </div>
+                <div>
                     <label for="ofr_valid_from">بداية العرض <span dir="ltr">*</span></label>
                     <input type="text" id="ofr_valid_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
                 </div>
@@ -348,6 +355,8 @@ function ofrResetForm() {
     document.getElementById('ofr_name_ar').value = '';
     document.getElementById('ofr_name_en').value = '';
     document.getElementById('ofr_show_name').checked = false;
+    var showOldResetEl = document.getElementById('ofr_show_old_price');
+    if (showOldResetEl) showOldResetEl.checked = false;
     document.getElementById('discount').value = '';
     ofrSelProduct = { price: null, cost: null };
     ofrRenderFacts();
@@ -375,6 +384,8 @@ function ofrEdit(row) {
     document.getElementById('ofr_name_ar').value = row.name_ar != null ? String(row.name_ar) : '';
     document.getElementById('ofr_name_en').value = row.name_en != null ? String(row.name_en) : '';
     document.getElementById('ofr_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
+    var showOldEl = document.getElementById('ofr_show_old_price');
+    if (showOldEl) showOldEl.checked = parseInt(row.show_old_price_to_customer, 10) === 1;
     document.getElementById('discount').value = row.discount != null ? String(row.discount) : '';
     var sortEl = document.getElementById('ofr_sort');
     if (sortEl) sortEl.value = String(row.sort_order != null ? row.sort_order : 0);
@@ -398,7 +409,8 @@ async function saveOffer() {
         discount: parseFloat(document.getElementById('discount').value || '0'),
         name_ar: document.getElementById('ofr_name_ar').value.trim(),
         name_en: document.getElementById('ofr_name_en').value.trim(),
-        show_name_to_customer: document.getElementById('ofr_show_name').checked ? 1 : 0
+        show_name_to_customer: document.getElementById('ofr_show_name').checked ? 1 : 0,
+        show_old_price_to_customer: (document.getElementById('ofr_show_old_price') && document.getElementById('ofr_show_old_price').checked) ? 1 : 0
     };
     var activeEl = document.getElementById('ofr_active');
     payload.is_active = (activeEl && activeEl.checked) ? 1 : 0;

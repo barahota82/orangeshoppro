@@ -3170,6 +3170,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_loyalty_ledger_unique_ref_v103($pdo);
     orange_catalog_migrate_cart_promos_name_first_delivered_v104($pdo);
     orange_catalog_migrate_promo_show_name_to_customer_v105($pdo);
+    orange_catalog_migrate_promo_show_old_price_v106($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3791,6 +3792,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_loyalty_ledger_unique_ref_v103($pdo);
     orange_catalog_migrate_cart_promos_name_first_delivered_v104($pdo);
     orange_catalog_migrate_promo_show_name_to_customer_v105($pdo);
+    orange_catalog_migrate_promo_show_old_price_v106($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -7851,6 +7853,45 @@ function orange_catalog_migrate_promo_show_name_to_customer_v105(PDO $pdo): void
                     ADD COLUMN show_name_to_customer TINYINT(1) NOT NULL DEFAULT 0'
             );
             orange_schema_invalidate_column_check($table, 'show_name_to_customer');
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v106 — التحكّم بظهور السعر القديم المشطوب للعميل (قرار مالك 2026-06-28):
+ *  - علم `show_old_price_to_customer` (افتراضي 0 = مُغلق لأسباب الترخيص) لجداول العروض المرتكزة على منتج:
+ *    offers (عرض المنتج)، cart_combo_promotions (إجمالي المكوّنات مقابل سعر الحزمة)،
+ *    cart_bogo_promotions (سعر تجزئة الهدية مقابل المجاني/المخفّض).
+ *  - عند 0: لا يظهر السعر القديم. عند 1: يظهر القديم مشطوباً بجوار الجديد.
+ * marker-gated + idempotent؛ يُستدعى من المسار الكامل والمسار السريع (نفس درس v105).
+ */
+function orange_catalog_migrate_promo_show_old_price_v106(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_promo_show_old_price_to_customer_v106';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $tables = [
+        'offers',
+        'cart_combo_promotions',
+        'cart_bogo_promotions',
+    ];
+    foreach ($tables as $table) {
+        if (!orange_table_exists($pdo, $table)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $table, 'show_old_price_to_customer')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE ' . $table . '
+                    ADD COLUMN show_old_price_to_customer TINYINT(1) NOT NULL DEFAULT 0'
+            );
+            orange_schema_invalidate_column_check($table, 'show_old_price_to_customer');
         }
     }
 

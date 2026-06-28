@@ -93,6 +93,7 @@ try {
     $hasNameCols = orange_table_has_column($pdo, 'offers', 'name_ar')
         && orange_table_has_column($pdo, 'offers', 'name_en');
     $hasShowCol = orange_table_has_column($pdo, 'offers', 'show_name_to_customer');
+    $hasShowOldCol = orange_table_has_column($pdo, 'offers', 'show_old_price_to_customer');
     $nameAr = function_exists('mb_substr')
         ? mb_substr(trim((string) ($data['name_ar'] ?? '')), 0, 191, 'UTF-8')
         : substr(trim((string) ($data['name_ar'] ?? '')), 0, 191);
@@ -100,6 +101,7 @@ try {
         ? mb_substr(trim((string) ($data['name_en'] ?? '')), 0, 191, 'UTF-8')
         : substr(trim((string) ($data['name_en'] ?? '')), 0, 191);
     $showName = !empty($data['show_name_to_customer']) ? 1 : 0;
+    $showOldPrice = !empty($data['show_old_price_to_customer']) ? 1 : 0;
 
     $offerId = (int) ($data['id'] ?? 0);
     if ($offerId > 0) {
@@ -129,6 +131,10 @@ try {
         if ($hasShowCol) {
             $sets[] = 'show_name_to_customer = ?';
             $vals[] = $showName;
+        }
+        if ($hasShowOldCol) {
+            $sets[] = 'show_old_price_to_customer = ?';
+            $vals[] = $showOldPrice;
         }
         $sets[] = 'is_always_on = ?';
         $sets[] = 'valid_from = ?';
@@ -170,6 +176,10 @@ try {
     if ($hasShowCol) {
         $cols[] = 'show_name_to_customer';
         $vals[] = $showName;
+    }
+    if ($hasShowOldCol) {
+        $cols[] = 'show_old_price_to_customer';
+        $vals[] = $showOldPrice;
     }
     $cols[] = 'is_active';
     $cols[] = 'is_always_on';

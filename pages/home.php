@@ -83,8 +83,11 @@ if ($canUnifiedProductSql) {
     $offerNameSelect = orange_table_has_column($pdo, 'offers', 'show_name_to_customer')
         ? ', o.name_ar AS offer_name_ar, o.name_en AS offer_name_en, o.show_name_to_customer AS offer_show_name'
         : '';
+    $offerOldPriceSelect = orange_table_has_column($pdo, 'offers', 'show_old_price_to_customer')
+        ? ', o.show_old_price_to_customer AS offer_show_old_price'
+        : '';
     $offersSql = '
-    SELECT o.id AS offer_id, o.discount' . $offerNameSelect . ',
+    SELECT o.id AS offer_id, o.discount' . $offerNameSelect . $offerOldPriceSelect . ',
            p.*, ucs2.department_id AS uf_dept_id, ucc.id AS uf_cat_id, ucs.id AS uf_sub_id
     FROM offers o
     INNER JOIN products p ON p.id = o.product_id
@@ -283,6 +286,7 @@ foreach ($offersLazyRows as $p) {
         'title' => storefront_product_display_name($p),
         'oldPrice' => number_format((float) $p['price'], 2),
         'salePrice' => number_format((float) $p['price'] - (float) $p['discount'], 2),
+        'showOld' => (int) ($p['offer_show_old_price'] ?? 0) === 1,
         'offerName' => orange_promo_customer_display_name([
             'show_name_to_customer' => (int) ($p['offer_show_name'] ?? 0),
             'name_ar' => (string) ($p['offer_name_ar'] ?? ''),
@@ -552,7 +556,9 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                     ?>
                     <div class="price-row">
                         <strong><?php echo number_format((float) $p['price'] - (float) $p['discount'], 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                        <?php if ((int) ($p['offer_show_old_price'] ?? 0) === 1): ?>
                         <span class="old-price"><?php echo number_format((float) $p['price'], 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <?php endif; ?>
                     </div>
                     <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]), ENT_QUOTES, 'UTF-8'); ?>">
                         <?php echo htmlspecialchars(t('view_product'), ENT_QUOTES, 'UTF-8'); ?>
@@ -873,11 +879,13 @@ function orangeSfAppendOfferCard(item) {
     pr.className = 'price-row';
     var strong = document.createElement('strong');
     strong.textContent = item.salePrice + ' KD';
-    var oldSpan = document.createElement('span');
-    oldSpan.className = 'old-price';
-    oldSpan.textContent = item.oldPrice + ' KD';
     pr.appendChild(strong);
-    pr.appendChild(oldSpan);
+    if (item.showOld) {
+        var oldSpan = document.createElement('span');
+        oldSpan.className = 'old-price';
+        oldSpan.textContent = item.oldPrice + ' KD';
+        pr.appendChild(oldSpan);
+    }
     var a = document.createElement('a');
     a.className = 'btn';
     a.setAttribute('href', item.href);
