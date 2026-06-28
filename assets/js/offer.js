@@ -1,8 +1,9 @@
 /*
- * صفحة العرض (pages/offer.php) — المرحلة الأولى: كومبو.
- * منتقي لون/مقاس مستقل لكل مكوّن، شريط سفلي ثابت بسعر العرض وكمية واحدة،
- * وحقن مكوّنات العرض في سلة localStorage (نفس مفتاح/شكل بنود السلة) فيُطبَّق
- * خصم الكومبو تلقائياً في معاينة السلة وعند الطلب (لا «apply promo id»).
+ * صفحة العرض (pages/offer.php) — كومبو + BOGO حزمة شراء.
+ * كل مكوّن بكمية qty يتوسّع إلى qty «قطع»، ولكل قطعة منتقي لون/مقاس مستقل،
+ * فيمكن للعميل اختيار متغيّرات مختلفة لكل قطعة (مثلاً قميص أسود + قميص أبيض).
+ * تُحقن القطع في سلة localStorage (سطر لكل متغيّر)، فيُطبَّق خصم الكومبو/هدية
+ * BOGO تلقائياً في معاينة السلة وعند الطلب. هدية BOGO لا تُضاف هنا (يحقنها الخادم).
  */
 (function () {
     var OFFER = window.ORANGE_OFFER;
@@ -10,8 +11,14 @@
         return;
     }
 
-    var sel = OFFER.components.map(function () {
-        return { color: '', size: '' };
+    // sel[compIndex] = مصفوفة بطول qty من { color, size } لكل قطعة.
+    var sel = OFFER.components.map(function (c) {
+        var n = Math.max(1, parseInt(c.qty, 10) || 1);
+        var arr = [];
+        for (var i = 0; i < n; i++) {
+            arr.push({ color: '', size: '' });
+        }
+        return arr;
     });
 
     function cartKey() {
@@ -41,6 +48,12 @@
     function comp(idx) {
         return OFFER.components[idx];
     }
+    function compQty(idx) {
+        return Math.max(1, parseInt(comp(idx).qty, 10) || 1);
+    }
+    function hasVariantDims(c) {
+        return c.has_colors === 1 || c.has_sizes === 1;
+    }
     function variantInStock(idx, color, size) {
         var vs = comp(idx).variants || [];
         for (var i = 0; i < vs.length; i++) {
@@ -51,8 +64,8 @@
         }
         return false;
     }
-    function resolveVariant(idx) {
-        var s = sel[idx];
+    function resolveVariant(idx, unit) {
+        var s = sel[idx][unit] || { color: '', size: '' };
         var vs = comp(idx).variants || [];
         for (var i = 0; i < vs.length; i++) {
             var v = vs[i];
@@ -62,44 +75,64 @@
         }
         return null;
     }
-    function hasVariantDims(c) {
-        return c.has_colors === 1 || c.has_sizes === 1;
+    function variantStockById(idx, vid) {
+        var vs = comp(idx).variants || [];
+        for (var i = 0; i < vs.length; i++) {
+            if ((parseInt(vs[i].id, 10) || 0) === vid) {
+                return parseInt(vs[i].stock_quantity, 10) || 0;
+            }
+        }
+        return 0;
     }
-    function stockFor(idx) {
+    function unitSelected(idx, unit) {
         var c = comp(idx);
         if (!hasVariantDims(c)) {
-            return parseInt(c.total_stock, 10) || 0;
+            return true;
         }
-        var v = resolveVariant(idx);
-        return v ? (parseInt(v.stock_quantity, 10) || 0) : 0;
-    }
-    function compComplete(idx) {
-        var c = comp(idx);
-        if (!hasVariantDims(c)) {
-            return (parseInt(c.total_stock, 10) || 0) >= c.qty;
-        }
-        var s = sel[idx];
+        var s = sel[idx][unit] || {};
         if (c.has_colors === 1 && !s.color) {
             return false;
         }
         if (c.has_sizes === 1 && !s.size) {
             return false;
         }
-        var v = resolveVariant(idx);
-        return !!(v && (parseInt(v.stock_quantity, 10) || 0) >= c.qty);
+        return true;
     }
-    function maxBundlesFor(idx) {
-        var c = comp(idx);
-        var st = stockFor(idx);
-        return Math.floor(st / Math.max(1, c.qty));
-    }
-    function allComplete() {
+    function allSelected() {
         for (var i = 0; i < OFFER.components.length; i++) {
-            if (!compComplete(i)) {
-                return false;
+            for (var u = 0; u < compQty(i); u++) {
+                if (!unitSelected(i, u)) {
+                    return false;
+                }
             }
         }
         return true;
+    }
+    // أقصى عدد «حزم» يمكن إضافتها من مكوّن، مع جمع القطع التي تشترك بنفس المتغيّر.
+    function maxBundlesFor(idx) {
+        var c = comp(idx);
+        var q = compQty(idx);
+        if (!hasVariantDims(c)) {
+            return Math.floor((parseInt(c.total_stock, 10) || 0) / Math.max(1, q));
+        }
+        var need = {};
+        for (var u = 0; u < q; u++) {
+            var v = resolveVariant(idx, u);
+            if (!v) {
+                return 0;
+            }
+            var vid = parseInt(v.id, 10) || 0;
+            need[vid] = (need[vid] || 0) + 1;
+        }
+        var cap = Infinity;
+        for (var key in need) {
+            if (!Object.prototype.hasOwnProperty.call(need, key)) {
+                continue;
+            }
+            var stock = variantStockById(idx, parseInt(key, 10));
+            cap = Math.min(cap, Math.floor(stock / need[key]));
+        }
+        return (cap === Infinity) ? 0 : Math.max(0, cap);
     }
     function maxBundles() {
         var m = Infinity;
@@ -109,21 +142,25 @@
         return (m === Infinity) ? 0 : Math.max(0, m);
     }
 
-    function refreshSizes(idx) {
+    function unitRoot(idx, unit) {
+        return document.querySelector('.offer-component[data-comp-index="' + idx + '"] .offer-unit[data-unit-index="' + unit + '"]');
+    }
+    function refreshSizes(idx, unit) {
         var c = comp(idx);
         if (c.has_sizes !== 1) {
             return;
         }
-        var root = document.querySelector('.offer-component[data-comp-index="' + idx + '"]');
+        var root = unitRoot(idx, unit);
         if (!root) {
             return;
         }
         var hasColors = c.has_colors === 1;
+        var s = sel[idx][unit] || {};
         root.querySelectorAll('.size-chip').forEach(function (chip) {
             var sz = chip.getAttribute('data-size') || '';
             var avail;
-            if (hasColors && sel[idx].color) {
-                avail = variantInStock(idx, sel[idx].color, sz);
+            if (hasColors && s.color) {
+                avail = variantInStock(idx, s.color, sz);
             } else {
                 avail = (c.variants || []).some(function (v) {
                     return (v.size || '') === sz && (parseInt(v.stock_quantity, 10) || 0) > 0;
@@ -131,20 +168,20 @@
             }
             chip.disabled = !avail;
             chip.classList.toggle('chip--unavailable', !avail);
-            if (!avail && sel[idx].size === sz) {
-                sel[idx].size = '';
+            if (!avail && s.size === sz) {
+                s.size = '';
                 chip.classList.remove('active');
             }
         });
     }
 
     function recompute() {
-        var ok = allComplete();
+        var enabled = allSelected() && maxBundles() >= 1;
         var mb = maxBundles();
         var qtyInput = document.getElementById('offerQty');
         var addBtn = document.getElementById('offerAddBtn');
         var q = qtyInput ? Math.max(1, parseInt(qtyInput.value || '1', 10) || 1) : 1;
-        if (ok && mb >= 1) {
+        if (enabled) {
             if (q > mb) {
                 q = mb;
             }
@@ -155,7 +192,7 @@
             qtyInput.value = String(q);
         }
         if (addBtn) {
-            addBtn.disabled = !(ok && mb >= 1);
+            addBtn.disabled = !enabled;
         }
         var priceEl = document.getElementById('offerBundlePrice');
         if (priceEl) {
@@ -167,26 +204,26 @@
         }
     }
 
-    window.offerSelectColor = function (idx, btn) {
-        var root = document.querySelector('.offer-component[data-comp-index="' + idx + '"]');
+    window.offerSelectColor = function (idx, unit, btn) {
+        var root = unitRoot(idx, unit);
         if (root) {
             root.querySelectorAll('.color-chip').forEach(function (el) { el.classList.remove('active'); });
         }
         btn.classList.add('active');
-        sel[idx].color = btn.getAttribute('data-color') || '';
-        refreshSizes(idx);
+        sel[idx][unit].color = btn.getAttribute('data-color') || '';
+        refreshSizes(idx, unit);
         recompute();
     };
-    window.offerSelectSize = function (idx, btn) {
+    window.offerSelectSize = function (idx, unit, btn) {
         if (btn.disabled || btn.classList.contains('chip--unavailable')) {
             return;
         }
-        var root = document.querySelector('.offer-component[data-comp-index="' + idx + '"]');
+        var root = unitRoot(idx, unit);
         if (root) {
             root.querySelectorAll('.size-chip').forEach(function (el) { el.classList.remove('active'); });
         }
         btn.classList.add('active');
-        sel[idx].size = btn.getAttribute('data-size') || '';
+        sel[idx][unit].size = btn.getAttribute('data-size') || '';
         recompute();
     };
     window.offerIncQty = function () {
@@ -196,7 +233,7 @@
         }
         var mb = maxBundles();
         var q = (parseInt(i.value || '1', 10) || 1) + 1;
-        if (allComplete() && mb >= 1) {
+        if (allSelected() && mb >= 1) {
             i.value = String(Math.min(mb, q));
         }
         recompute();
@@ -234,9 +271,19 @@
         }
         return (a.color || '') === (b.color || '') && (a.size || '') === (b.size || '');
     }
+    function pushLine(cart, item, cap) {
+        for (var j = 0; j < cart.length; j++) {
+            if (cartLinesMatch(cart[j], item)) {
+                var next = (parseInt(cart[j].qty, 10) || 0) + item.qty;
+                cart[j].qty = cap > 0 ? Math.min(cap, next) : next;
+                return;
+            }
+        }
+        cart.push(item);
+    }
 
     window.addOfferToCart = function () {
-        if (!allComplete()) {
+        if (!allSelected()) {
             toast(OFFER.t.pick_required);
             return;
         }
@@ -245,35 +292,37 @@
             toast(OFFER.t.pick_required);
             return;
         }
-        var q = Math.max(1, Math.min(mb, parseInt(document.getElementById('offerQty').value || '1', 10) || 1));
+        var bundles = Math.max(1, Math.min(mb, parseInt(document.getElementById('offerQty').value || '1', 10) || 1));
         var cart = readCart();
         for (var i = 0; i < OFFER.components.length; i++) {
             var c = comp(i);
-            var v = resolveVariant(i);
-            var variantId = (v && v.id) ? parseInt(v.id, 10) : 0;
-            var lineQty = c.qty * q;
-            var cap = stockFor(i);
-            var item = {
-                id: c.product_id,
-                name: c.name,
-                price: c.price,
-                qty: lineQty,
-                color: sel[i].color,
-                size: sel[i].size,
-                variant_id: variantId,
-                image: c.image_cart
-            };
-            var merged = false;
-            for (var j = 0; j < cart.length; j++) {
-                if (cartLinesMatch(cart[j], item)) {
-                    var next = (parseInt(cart[j].qty, 10) || 0) + lineQty;
-                    cart[j].qty = cap > 0 ? Math.min(cap, next) : next;
-                    merged = true;
-                    break;
-                }
+            var q = compQty(i);
+            if (!hasVariantDims(c)) {
+                pushLine(cart, {
+                    id: c.product_id,
+                    name: c.name,
+                    price: c.price,
+                    qty: q * bundles,
+                    color: '',
+                    size: '',
+                    variant_id: 0,
+                    image: c.image_cart
+                }, parseInt(c.total_stock, 10) || 0);
+                continue;
             }
-            if (!merged) {
-                cart.push(item);
+            for (var u = 0; u < q; u++) {
+                var v = resolveVariant(i, u);
+                var vid = (v && v.id) ? parseInt(v.id, 10) : 0;
+                pushLine(cart, {
+                    id: c.product_id,
+                    name: c.name,
+                    price: c.price,
+                    qty: bundles,
+                    color: sel[i][u].color,
+                    size: sel[i][u].size,
+                    variant_id: vid,
+                    image: c.image_cart
+                }, vid > 0 ? variantStockById(i, vid) : 0);
             }
         }
         writeCart(cart);
@@ -286,7 +335,9 @@
 
     function init() {
         for (var i = 0; i < OFFER.components.length; i++) {
-            refreshSizes(i);
+            for (var u = 0; u < compQty(i); u++) {
+                refreshSizes(i, u);
+            }
         }
         var qi = document.getElementById('offerQty');
         if (qi) {

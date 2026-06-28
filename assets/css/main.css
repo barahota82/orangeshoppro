@@ -1018,6 +1018,19 @@ body.storefront-browse-menu-lock {
     font-weight: 700;
     margin-inline-start: 0.35rem;
 }
+.offer-unit {
+    padding: 0.5rem 0;
+}
+.offer-unit + .offer-unit {
+    border-top: 1px dashed var(--border, #e5e7eb);
+    margin-top: 0.5rem;
+}
+.offer-unit__label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--muted, #6b7280);
+    margin-bottom: 0.35rem;
+}
 .offer-gift {
     margin-top: 1.25rem;
     padding: 1rem;

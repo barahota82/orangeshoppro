@@ -192,7 +192,13 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
     </div>
 
     <div class="offer-components">
-        <?php foreach ($components as $ci => $comp): ?>
+        <?php
+        $offerUnitLabelTpl = t('offer_unit_label');
+        foreach ($components as $ci => $comp):
+            $compQty = (int) $comp['qty'];
+            $hasPicker = ((int) $comp['has_colors'] === 1 && $comp['colors'] !== [])
+                || ((int) $comp['has_sizes'] === 1 && $comp['sizes'] !== []);
+        ?>
         <div class="offer-component" data-comp-index="<?php echo (int) $ci; ?>">
             <div class="offer-component__media">
                 <?php if ($comp['image_display'] !== ''): ?>
@@ -202,44 +208,52 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
             <div class="offer-component__body">
                 <h3 class="offer-component__name">
                     <?php echo htmlspecialchars((string) $comp['name'], ENT_QUOTES, 'UTF-8'); ?>
-                    <?php if ((int) $comp['qty'] > 1): ?>
-                    <span class="offer-component__qty">&times;<?php echo (int) $comp['qty']; ?></span>
+                    <?php if ($compQty > 1): ?>
+                    <span class="offer-component__qty">&times;<?php echo $compQty; ?></span>
                     <?php endif; ?>
                 </h3>
 
-                <?php if ((int) $comp['has_colors'] === 1 && $comp['colors'] !== []): ?>
-                <div class="option-block">
-                    <label><?php echo htmlspecialchars(t('color'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <div class="chips">
-                        <?php foreach ($comp['colors'] as $col): ?>
-                        <button type="button" class="chip color-chip" data-color="<?php echo htmlspecialchars((string) $col['key'], ENT_QUOTES, 'UTF-8'); ?>" onclick="offerSelectColor(<?php echo (int) $ci; ?>, this)">
-                            <?php if (($col['color'] ?? '') !== ''): ?>
-                            <span class="chip-text chip-text--color"><?php echo htmlspecialchars((string) $col['color'], ENT_QUOTES, 'UTF-8'); ?></span>
-                            <?php endif; ?>
-                            <?php if (($col['pattern'] ?? '') !== ''): ?>
-                            <span class="chip-text chip-text--pattern"><?php echo htmlspecialchars((string) $col['pattern'], ENT_QUOTES, 'UTF-8'); ?></span>
-                            <?php endif; ?>
-                        </button>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-
-                <?php if ((int) $comp['has_sizes'] === 1 && $comp['sizes'] !== []): ?>
-                <div class="option-block">
-                    <label><?php echo htmlspecialchars(t('size'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <div class="chips">
-                        <?php foreach ($comp['sizes'] as $sz): ?>
-                        <button type="button" class="chip size-chip" data-size="<?php echo htmlspecialchars((string) $sz['key'], ENT_QUOTES, 'UTF-8'); ?>" onclick="offerSelectSize(<?php echo (int) $ci; ?>, this)">
-                            <?php echo htmlspecialchars((string) $sz['label'], ENT_QUOTES, 'UTF-8'); ?>
-                        </button>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-
                 <?php if ((int) $comp['total_stock'] <= 0): ?>
                 <div class="stock-out"><?php echo htmlspecialchars(t('out_of_stock'), ENT_QUOTES, 'UTF-8'); ?></div>
+                <?php else: ?>
+                    <?php for ($u = 0; $u < $compQty; $u++): ?>
+                    <div class="offer-unit" data-comp-index="<?php echo (int) $ci; ?>" data-unit-index="<?php echo $u; ?>">
+                        <?php if ($compQty > 1 && $hasPicker): ?>
+                        <div class="offer-unit__label"><?php echo htmlspecialchars(str_replace('{n}', (string) ($u + 1), $offerUnitLabelTpl), ENT_QUOTES, 'UTF-8'); ?></div>
+                        <?php endif; ?>
+
+                        <?php if ((int) $comp['has_colors'] === 1 && $comp['colors'] !== []): ?>
+                        <div class="option-block">
+                            <label><?php echo htmlspecialchars(t('color'), ENT_QUOTES, 'UTF-8'); ?></label>
+                            <div class="chips">
+                                <?php foreach ($comp['colors'] as $col): ?>
+                                <button type="button" class="chip color-chip" data-color="<?php echo htmlspecialchars((string) $col['key'], ENT_QUOTES, 'UTF-8'); ?>" onclick="offerSelectColor(<?php echo (int) $ci; ?>, <?php echo $u; ?>, this)">
+                                    <?php if (($col['color'] ?? '') !== ''): ?>
+                                    <span class="chip-text chip-text--color"><?php echo htmlspecialchars((string) $col['color'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                    <?php endif; ?>
+                                    <?php if (($col['pattern'] ?? '') !== ''): ?>
+                                    <span class="chip-text chip-text--pattern"><?php echo htmlspecialchars((string) $col['pattern'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                    <?php endif; ?>
+                                </button>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if ((int) $comp['has_sizes'] === 1 && $comp['sizes'] !== []): ?>
+                        <div class="option-block">
+                            <label><?php echo htmlspecialchars(t('size'), ENT_QUOTES, 'UTF-8'); ?></label>
+                            <div class="chips">
+                                <?php foreach ($comp['sizes'] as $sz): ?>
+                                <button type="button" class="chip size-chip" data-size="<?php echo htmlspecialchars((string) $sz['key'], ENT_QUOTES, 'UTF-8'); ?>" onclick="offerSelectSize(<?php echo (int) $ci; ?>, <?php echo $u; ?>, this)">
+                                    <?php echo htmlspecialchars((string) $sz['label'], ENT_QUOTES, 'UTF-8'); ?>
+                                </button>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <?php endfor; ?>
                 <?php endif; ?>
             </div>
         </div>
