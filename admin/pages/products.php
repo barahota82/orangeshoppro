@@ -575,11 +575,13 @@ $orangeAdminSfProductUrlPartsForJs = [
                         <div id="productUnifiedPriceField">
                             <label>السعر</label>
                             <input type="number" id="price" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr" placeholder="0" data-money-empty-when-zero>
+                            <small id="pricePerVariantHint" class="card-hint" style="display:none;margin-top:4px;color:#64748b;">السعر على مستوى المتغيّر — يُدخَل في جدول تبويب «المتغيرات والباركود».</small>
                         </div>
                         <div id="productUnifiedCostField">
                             <label>آخر تكلفة شراء (إرشادي)</label>
                             <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr" placeholder="0" data-money-empty-when-zero>
                             <small id="cost_gt_price_warn" class="card-hint" style="display:none;margin-top:4px;color:#b91c1c;font-weight:600;">التكلفة لا يمكن أن تكون أكبر من السعر.</small>
+                            <small id="costPerVariantHint" class="card-hint" style="display:none;margin-top:4px;color:#64748b;">التكلفة على مستوى المتغيّر — تُدخَل في جدول تبويب «المتغيرات والباركود».</small>
                         </div>
                     </div>
                 </div>
@@ -3586,11 +3588,17 @@ function orangeRelocatePricingIdentity() {
             bcLabel.textContent = 'الباركود الأب';
         }
     } else {
+        // الإرجاع إلى البيانات الأساسية: المرجع المُلتقَط (priceNext/codeNext) قد يكون قد
+        // انتقل بدوره إلى تبويب الألوان والمقاسات؛ وعندها يرمي insertBefore خطأ NotFoundError
+        // فتختفي الخانات. لذا نستخدم المرجع فقط إن كان ما يزال ابناً لنفس الأب، وإلا نُلحِق في
+        // النهاية (السعر ثم الكود بالترتيب الصحيح).
         if (home.priceParent) {
-            home.priceParent.insertBefore(priceBlock, home.priceNext || null);
+            const priceRef = (home.priceNext && home.priceNext.parentNode === home.priceParent) ? home.priceNext : null;
+            home.priceParent.insertBefore(priceBlock, priceRef);
         }
         if (home.codeParent) {
-            home.codeParent.insertBefore(codeBlock, home.codeNext || null);
+            const codeRef = (home.codeNext && home.codeNext.parentNode === home.codeParent) ? home.codeNext : null;
+            home.codeParent.insertBefore(codeBlock, codeRef);
         }
         if (panel) {
             panel.style.display = 'none';
@@ -3650,18 +3658,32 @@ function orangeOnUnifiedPricingChange() {
     const costField = document.getElementById('productUnifiedCostField');
     const priceInp = document.getElementById('price');
     const costInp = document.getElementById('cost');
+    // إبقاء خانتي السعر/التكلفة في الشبكة دائماً للحفاظ على محاذاة الأعمدة: السعر أسفل قائمة
+    // «نوع السعر» والتكلفة أسفل قائمة «نوع التكلفة». عند التسعير على مستوى المتغيّر نُخفي حقل
+    // الإدخال الموحّد فقط ونُظهر تلميحاً مكانه (إزالة الخانة كاملةً كانت تُزيح التكلفة أسفل عمود
+    // السعر عند اختلاف النوعين).
+    const priceHint = document.getElementById('pricePerVariantHint');
+    const costHint = document.getElementById('costPerVariantHint');
     if (priceField) {
-        priceField.style.display = showUnifiedPrice ? '' : 'none';
+        priceField.style.display = '';
     }
     if (costField) {
-        costField.style.display = showUnifiedCost ? '' : 'none';
+        costField.style.display = '';
     }
     // الحقل المخفي لا يجب أن يمنع الإرسال (required) ولا يبقى مطلوباً بصرياً.
     if (priceInp) {
+        priceInp.style.display = showUnifiedPrice ? '' : 'none';
         priceInp.required = showUnifiedPrice;
     }
     if (costInp) {
+        costInp.style.display = showUnifiedCost ? '' : 'none';
         costInp.required = showUnifiedCost;
+    }
+    if (priceHint) {
+        priceHint.style.display = showUnifiedPrice ? 'none' : '';
+    }
+    if (costHint) {
+        costHint.style.display = showUnifiedCost ? 'none' : '';
     }
     const basePrice = (function () { const v = parseFloat(document.getElementById('price') && document.getElementById('price').value || ''); return isFinite(v) ? v : ''; }());
     const baseCost = (function () { const v = parseFloat(document.getElementById('cost') && document.getElementById('cost').value || ''); return isFinite(v) ? v : ''; }());
