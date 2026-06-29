@@ -131,8 +131,12 @@ function orange_sales_invoice_company_load_items(PDO $pdo, int $orderId): array
             $sql .= ', p.barcode';
         }
     }
+    $hasVariantItemCode = $hasVariant && orange_table_has_column($pdo, 'product_variants', 'item_code');
     if ($hasVariant) {
         $sql .= ', pv.color AS v_color, pv.size AS v_size';
+        if ($hasVariantItemCode) {
+            $sql .= ', pv.item_code AS v_item_code';
+        }
     }
     $sql .= ' FROM order_items oi';
     if ($hasProductId) {
@@ -155,6 +159,10 @@ function orange_sales_invoice_company_load_items(PDO $pdo, int $orderId): array
         if ($productName === '' && $hasProductId) {
             $productName = (string) ($row['catalog_product_name'] ?? '');
         }
+        // كود المتغيّر إن وُجد، وإلا كود الأب — حتى تعرض المستندات الكود الصحيح للسطر دائماً.
+        $variantItemCode = $hasVariantItemCode ? trim((string) ($row['v_item_code'] ?? '')) : '';
+        $parentItemCode = $hasProductId && isset($row['item_code']) ? (string) $row['item_code'] : '';
+        $effectiveItemCode = $variantItemCode !== '' ? $variantItemCode : $parentItemCode;
         $out[] = [
             'id' => (int) ($row['id'] ?? 0),
             'product_id' => $pid,
@@ -168,7 +176,9 @@ function orange_sales_invoice_company_load_items(PDO $pdo, int $orderId): array
             'line_discount' => $hasLineDiscount ? (float) ($row['line_discount'] ?? 0) : 0.0,
             'line_net' => orange_order_item_line_net($row),
             'is_product_active' => !$hasProductId || (int) ($row['product_is_active'] ?? 1) === 1,
-            'item_code' => $hasProductId && isset($row['item_code']) ? (string) $row['item_code'] : '',
+            'item_code' => $effectiveItemCode,
+            'variant_item_code' => $variantItemCode,
+            'parent_item_code' => $parentItemCode,
             'barcode' => $hasProductId && isset($row['barcode']) ? (string) $row['barcode'] : '',
         ];
     }
@@ -346,7 +356,13 @@ function orange_sales_invoice_company_validate_items(PDO $pdo, array $itemsIn, i
         $size = isset($item['size']) ? trim((string) $item['size']) : '';
         $variant = null;
 
-        if ((int) ($product['has_colors'] ?? 0) === 1 || (int) ($product['has_sizes'] ?? 0) === 1) {
+        // الحارس يعتمد على عدد المتغيّرات الفعلي لا على علمَي has_colors/has_sizes:
+        // متغيّر واحد ⇒ يُربط السطر به تلقائياً؛ أكثر من واحد ⇒ يُلزم تحديد المتغيّر.
+        $variantCountStmt = $pdo->prepare('SELECT COUNT(*) FROM product_variants WHERE product_id = ?');
+        $variantCountStmt->execute([$pid]);
+        $variantCount = (int) $variantCountStmt->fetchColumn();
+
+        if ($variantCount > 0) {
             if ($variantIdIn > 0) {
                 $vStmt = $pdo->prepare(
                     'SELECT * FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1'
@@ -354,7 +370,7 @@ function orange_sales_invoice_company_validate_items(PDO $pdo, array $itemsIn, i
                 $vStmt->execute([$variantIdIn, $pid]);
                 $variant = $vStmt->fetch(PDO::FETCH_ASSOC);
             }
-            if (!$variant) {
+            if (!$variant && ($color !== '' || $size !== '')) {
                 $variantStmt = $pdo->prepare(
                     'SELECT * FROM product_variants
                      WHERE product_id = ? AND color = ? AND size = ?
@@ -363,8 +379,15 @@ function orange_sales_invoice_company_validate_items(PDO $pdo, array $itemsIn, i
                 $variantStmt->execute([$pid, $color, $size]);
                 $variant = $variantStmt->fetch(PDO::FETCH_ASSOC);
             }
+            if (!$variant && $variantCount === 1) {
+                $onlyStmt = $pdo->prepare(
+                    'SELECT * FROM product_variants WHERE product_id = ? ORDER BY id ASC LIMIT 1'
+                );
+                $onlyStmt->execute([$pid]);
+                $variant = $onlyStmt->fetch(PDO::FETCH_ASSOC);
+            }
             if (!$variant) {
-                throw new RuntimeException('لم يُعثر على متغير للمنتج: ' . ($product['name'] ?? $pid));
+                throw new RuntimeException('اختر المتغير (لون/مقاس) للمنتج: ' . ($product['name'] ?? $pid));
             }
             $variantIdIn = (int) ($variant['id'] ?? 0);
             $available = orange_warehouse_effective_variant_stock($pdo, $variantIdIn, $countryId);

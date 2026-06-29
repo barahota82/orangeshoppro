@@ -164,6 +164,12 @@ function orange_product_sync_variants_matrix(
     bool $hasSizes,
     ?int $sizeFamilyId
 ): void {
+    // منع الجذر: منتج بلا أبعاد (لا ألوان ولا مقاسات) ⇒ متغيّر واحد فقط،
+    // كي لا تنشأ صفوف متغيّرات مكرّرة بلا أبعاد تخالف «الفاتورة بكود المتغيّر».
+    if (!$hasColors && !$hasSizes && count($variantsIn) > 1) {
+        $variantsIn = [reset($variantsIn)];
+    }
+
     $cwMap = orange_product_ensure_colorways($pdo, $productId, $variantsIn, $hasColors);
     $productCountryId = orange_product_country_id($pdo, $productId);
     $productWarehouseId = orange_warehouse_default_id_for_country($pdo, $productCountryId);

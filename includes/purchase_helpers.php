@@ -73,8 +73,9 @@ function orange_purchase_resolve_variant_id(PDO $pdo, int $productId, int $reque
         throw new RuntimeException('لا توجد أصناف مخزون لهذا المنتج — أنشئ متغيرات من «المنتجات» أولًا');
     }
 
-    $multi = (int) $p['has_colors'] === 1 || (int) $p['has_sizes'] === 1;
-    if ($multi && count($ids) > 1) {
+    // الحارس يعتمد على عدد المتغيّرات الفعلي لا على علمَي has_colors/has_sizes
+    // (قد يُنشأ منتج بمتغيّرات متعددة وأعلام مطفأة عبر مسارات نسخ/استيراد، فلا نسمح بسطر بلا متغيّر محدّد).
+    if (count($ids) > 1) {
         throw new RuntimeException('اختر المتغير (لون/مقاس) لهذا المنتج في سطر الشراء');
     }
 

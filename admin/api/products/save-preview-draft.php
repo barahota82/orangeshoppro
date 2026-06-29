@@ -192,6 +192,10 @@ try {
         /* المتغيّرات — كمية المخزون المُدخلة تُحفظ كما هي (قرار المالك: المعاينة تُظهر الكمية المُدخلة). */
         $variantsIn = $data['variants'] ?? null;
         if (is_array($variantsIn) && count($variantsIn) > 0) {
+            // منع الجذر: منتج بلا أبعاد ⇒ متغيّر واحد فقط (يطابق سلوك الحفظ النهائي).
+            if (!$hasColors && !$hasSizes && count($variantsIn) > 1) {
+                $variantsIn = [reset($variantsIn)];
+            }
             $cwMap = orange_product_ensure_colorways($pdo, $draftId, $variantsIn, $hasColors);
             $variantStmt = $pdo->prepare(
                 'INSERT INTO product_variants (product_id, product_colorway_id, size_family_size_id, size, color, stock_quantity)

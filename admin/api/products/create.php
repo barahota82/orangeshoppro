@@ -159,6 +159,12 @@ try {
         }
     }
 
+    // منع الجذر: منتج بلا أبعاد (لا ألوان ولا مقاسات) ⇒ متغيّر واحد افتراضي فقط،
+    // كي لا تنشأ حالة (>1 متغيّر مع أعلام مطفأة) عبر حمولة قديمة/معدّلة تخالف «الفاتورة بكود المتغيّر».
+    if (!$hasColors && !$hasSizes && count($variantsIn) > 1) {
+        $variantsIn = [reset($variantsIn)];
+    }
+
     $pdo->beginTransaction();
 
     $normSku = static function ($raw): ?string {

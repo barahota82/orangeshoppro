@@ -1025,6 +1025,9 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 var s = item.size || '';
                 varEl.value = (c && s) ? (c + ' / ' + s) : (c || s || '');
             }
+            // الكود المخزّن للمتغيّر (أو الأب) حتى لا يظهر فارغاً عند تعطيل المتغيّر/المنتج.
+            var codeEl = tr.querySelector('.sv2-code');
+            if (codeEl) codeEl.value = item.variant_item_code || item.item_code || '';
         }
         var qEl = tr.querySelector('.sv2-qty');
         if (qEl) qEl.value = String(item.qty || 1);

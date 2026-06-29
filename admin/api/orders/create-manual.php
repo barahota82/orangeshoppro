@@ -144,8 +144,14 @@ try {
         $color = isset($item['color']) ? trim((string)$item['color']) : '';
         $size = isset($item['size']) ? trim((string)$item['size']) : '';
 
-        if ((int)$product['has_colors'] === 1 || (int)$product['has_sizes'] === 1) {
-            $variant = null;
+        // الحارس يعتمد على عدد المتغيّرات الفعلي لا على علمَي has_colors/has_sizes:
+        // متغيّر واحد ⇒ يُربط السطر به تلقائياً؛ أكثر من واحد ⇒ يُلزم تحديد المتغيّر.
+        $variant = null;
+        $variantCountStmt = $pdo->prepare('SELECT COUNT(*) FROM product_variants WHERE product_id = ?');
+        $variantCountStmt->execute([(int)$product['id']]);
+        $variantCount = (int) $variantCountStmt->fetchColumn();
+
+        if ($variantCount > 0) {
             if ($variantIdIn > 0) {
                 $vStmt = $pdo->prepare(
                     'SELECT * FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1'
@@ -153,7 +159,7 @@ try {
                 $vStmt->execute([$variantIdIn, (int)$product['id']]);
                 $variant = $vStmt->fetch(PDO::FETCH_ASSOC);
             }
-            if (!$variant) {
+            if (!$variant && ($color !== '' || $size !== '')) {
                 $variantStmt = $pdo->prepare(
                     'SELECT * FROM product_variants
                     WHERE product_id = ? AND color = ? AND size = ?
@@ -162,16 +168,21 @@ try {
                 $variantStmt->execute([(int)$product['id'], $color, $size]);
                 $variant = $variantStmt->fetch(PDO::FETCH_ASSOC);
             }
+            if (!$variant && $variantCount === 1) {
+                $onlyStmt = $pdo->prepare(
+                    'SELECT * FROM product_variants WHERE product_id = ? ORDER BY id ASC LIMIT 1'
+                );
+                $onlyStmt->execute([(int)$product['id']]);
+                $variant = $onlyStmt->fetch(PDO::FETCH_ASSOC);
+            }
             if (!$variant) {
-                throw new RuntimeException('لم يُعثر على متغير للمنتج: ' . $product['name']);
+                throw new RuntimeException('اختر المتغير (لون/مقاس) للمنتج: ' . $product['name']);
             }
             $variantId = (int) $variant['id'];
             $available = orange_warehouse_effective_variant_stock($pdo, $variantId, $orderCountryId);
             if ($available < $qty) {
                 throw new RuntimeException('مخزون غير كافٍ: ' . $product['name']);
             }
-        } else {
-            $variant = null;
         }
 
         $price = orange_variant_effective_price($product, $variant);
