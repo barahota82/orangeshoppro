@@ -89,17 +89,30 @@ try {
         $variantIdIn = (int) ($item['variant_id'] ?? 0);
         $variant = null;
 
-        if ((int) $product['has_colors'] === 1 || (int) $product['has_sizes'] === 1) {
+        // مطابقة منطق الإنشاء (create-manual.php): الربط حسب عدد المتغيّرات الفعلي،
+        // والسعر/التكلفة عبر COALESCE(variant, product) كي يطابق كشفُ العروض الفاتورةَ الفعلية.
+        $variantCountStmt = $pdo->prepare('SELECT COUNT(*) FROM product_variants WHERE product_id = ?');
+        $variantCountStmt->execute([$pid]);
+        $variantCount = (int) $variantCountStmt->fetchColumn();
+
+        if ($variantCount > 0) {
             if ($variantIdIn > 0) {
                 $vStmt = $pdo->prepare('SELECT * FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1');
                 $vStmt->execute([$variantIdIn, $pid]);
                 $variant = $vStmt->fetch(PDO::FETCH_ASSOC) ?: null;
             }
-            if (!$variant) {
+            if (!$variant && ($color !== '' || $size !== '')) {
                 $vStmt = $pdo->prepare(
                     'SELECT * FROM product_variants WHERE product_id = ? AND color = ? AND size = ? LIMIT 1'
                 );
                 $vStmt->execute([$pid, $color, $size]);
+                $variant = $vStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            }
+            if (!$variant && $variantCount === 1) {
+                $vStmt = $pdo->prepare(
+                    'SELECT * FROM product_variants WHERE product_id = ? ORDER BY id ASC LIMIT 1'
+                );
+                $vStmt->execute([$pid]);
                 $variant = $vStmt->fetch(PDO::FETCH_ASSOC) ?: null;
             }
             if (!$variant) {
@@ -107,7 +120,8 @@ try {
             }
         }
 
-        $price = (float) $product['price'];
+        $price = orange_variant_effective_price($product, $variant);
+        $cost = orange_variant_effective_cost($product, $variant);
         $subtotal += $price * $qty;
         $validatedItems[] = [
             'product' => $product,
@@ -116,7 +130,7 @@ try {
             'size' => $variant ? (string) $variant['size'] : $size,
             'variant_id' => $variant ? (int) $variant['id'] : 0,
             'price' => $price,
-            'cost' => (float) $product['cost'],
+            'cost' => $cost,
         ];
     }
 

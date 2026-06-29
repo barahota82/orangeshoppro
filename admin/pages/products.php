@@ -1502,7 +1502,6 @@ function orangeApplyProductBasicStepLocks() {
     const edit = orangeProductBasicRecordIsEdit();
     const deptOk = orangeProductBasicDeptOk();
     const typeOk = orangeProductBasicTypeOk();
-    const priceOk = orangeProductBasicPriceOk();
 
     const ptEl = document.getElementById('product_type_id');
     if (ptEl) {
@@ -1521,7 +1520,7 @@ function orangeApplyProductBasicStepLocks() {
     }
 
     document.querySelectorAll('#product_size_pick_panel button[onclick^="orangeSizePickSetAll"]').forEach(function (btn) {
-        btn.disabled = edit ? false : !priceOk;
+        btn.disabled = edit ? false : !typeOk;
     });
 
     onHasFlagsChange();
@@ -3390,7 +3389,7 @@ async function orangeProductRefreshAdvisoryGuideSelect(preserveId) {
         sel.value = '0';
         return;
     }
-    const allowTier = orangeProductBasicRecordIsEdit() || orangeProductBasicPriceOk();
+    const allowTier = orangeProductBasicRecordIsEdit() || orangeProductBasicTypeOk();
     const hs = orangeProductEffectiveHasSizes();
     if (!allowTier || !hs) {
         sel.disabled = true;
@@ -3447,7 +3446,9 @@ async function orangeProductRefreshAdvisoryGuideSelect(preserveId) {
 function onHasFlagsChange(options) {
     const hcEl = document.getElementById('has_colors');
     const hc = hcEl && hcEl.value === '1';
-    const allowSizeTier = orangeProductBasicRecordIsEdit() || orangeProductBasicPriceOk();
+    // اختيار الأبعاد (ألوان/مقاسات) يُفتح بعد اختيار «نوع المنتج» لا بعد كتابة السعر/التكلفة —
+    // لأن وجود الأبعاد هو ما ينقل السعر/التكلفة إلى تبويب المتغيّرات (تُكتب هناك على مستوى المتغيّر).
+    const allowSizeTier = orangeProductBasicRecordIsEdit() || orangeProductBasicTypeOk();
     const famSel = document.getElementById('size_family_id');
     if (famSel) {
         if (!allowSizeTier) {
@@ -4178,7 +4179,7 @@ function orangeRefreshSizePickPanel() {
     if (!panel || !mount) {
         return;
     }
-    const allowSz = orangeProductBasicRecordIsEdit() || orangeProductBasicPriceOk();
+    const allowSz = orangeProductBasicRecordIsEdit() || orangeProductBasicTypeOk();
     if (!allowSz) {
         panel.style.display = 'none';
         if (emptyNote) {
