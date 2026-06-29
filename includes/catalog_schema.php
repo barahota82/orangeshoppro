@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 105);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 112);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3176,6 +3176,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_promo_bogo_gift_customer_pick_v109($pdo);
     orange_catalog_migrate_storefront_promo_messages_offer_target_v110($pdo);
     orange_catalog_migrate_storefront_promo_messages_audience_v111($pdo);
+    orange_catalog_migrate_variant_pricing_identity_v112($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3803,6 +3804,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_promo_bogo_gift_customer_pick_v109($pdo);
     orange_catalog_migrate_storefront_promo_messages_offer_target_v110($pdo);
     orange_catalog_migrate_storefront_promo_messages_audience_v111($pdo);
+    orange_catalog_migrate_variant_pricing_identity_v112($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -8071,6 +8073,93 @@ function orange_catalog_migrate_storefront_promo_messages_audience_v111(PDO $pdo
             "ALTER TABLE storefront_promo_messages ADD COLUMN audience VARCHAR(16) NOT NULL DEFAULT 'all'"
         );
         orange_schema_invalidate_column_check('storefront_promo_messages', 'audience');
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v112 — التسعير والهوية على مستوى المتغيّر (قرار مالك 2026-06-29):
+ *  - product_variants.price / product_variants.cost (DECIMAL(10,2) NULL) لتخزين سعر/تكلفة لكل متغيّر.
+ *  - products.price_unified / products.cost_unified (TINYINT(1) DEFAULT 1) للتمييز بين «موحّد» و«حسب المتغيّر».
+ *  - offers.discount_type (VARCHAR(16) DEFAULT 'amount') لدعم خصم نسبة % أو مبلغ ثابت.
+ *  - backfill آمن لإعادة التشغيل: نسخ products.price/cost إلى صفوف المتغيّرات حيث القيمة NULL فقط
+ *    (المنتجات القائمة تبقى موحّدة بسعر/تكلفة الأب — توافق رجعي تام).
+ * marker-gated + idempotent؛ يُستدعى من المسار الكامل والمسار السريع (نفس درس v104/v111).
+ * ملاحظة: رقم v112 كان مستخدَماً سابقاً لترحيل promo_text الذي أُلغي وأُزيل؛ هذا الترحيل
+ * يستخدم marker وأعمدة مختلفة تماماً فلا تعارض (التتبّع بالـ marker لا برقم النسخة).
+ */
+function orange_catalog_migrate_variant_pricing_identity_v112(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_variant_pricing_identity_v112';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'product_variants')) {
+        if (!orange_table_has_column($pdo, 'product_variants', 'price')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE product_variants ADD COLUMN price DECIMAL(10,2) NULL DEFAULT NULL'
+            );
+            orange_schema_invalidate_column_check('product_variants', 'price');
+        }
+        if (!orange_table_has_column($pdo, 'product_variants', 'cost')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE product_variants ADD COLUMN cost DECIMAL(10,2) NULL DEFAULT NULL'
+            );
+            orange_schema_invalidate_column_check('product_variants', 'cost');
+        }
+    }
+
+    if (orange_table_exists($pdo, 'products')) {
+        if (!orange_table_has_column($pdo, 'products', 'price_unified')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE products ADD COLUMN price_unified TINYINT(1) NOT NULL DEFAULT 1'
+            );
+            orange_schema_invalidate_column_check('products', 'price_unified');
+        }
+        if (!orange_table_has_column($pdo, 'products', 'cost_unified')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE products ADD COLUMN cost_unified TINYINT(1) NOT NULL DEFAULT 1'
+            );
+            orange_schema_invalidate_column_check('products', 'cost_unified');
+        }
+    }
+
+    if (orange_table_exists($pdo, 'offers')
+        && !orange_table_has_column($pdo, 'offers', 'discount_type')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE offers ADD COLUMN discount_type VARCHAR(16) NOT NULL DEFAULT 'amount'"
+        );
+        orange_schema_invalidate_column_check('offers', 'discount_type');
+    }
+
+    // Backfill: نسخ سعر/تكلفة الأب إلى المتغيّرات حيث القيمة غير محدّدة (يملأ NULL فقط — آمن لإعادة التشغيل).
+    if (orange_table_exists($pdo, 'product_variants')
+        && orange_table_exists($pdo, 'products')
+        && orange_table_has_column($pdo, 'product_variants', 'price')
+        && orange_table_has_column($pdo, 'product_variants', 'cost')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE product_variants pv
+                JOIN products p ON p.id = pv.product_id
+                SET pv.price = p.price
+              WHERE pv.price IS NULL'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE product_variants pv
+                JOIN products p ON p.id = pv.product_id
+                SET pv.cost = p.cost
+              WHERE pv.cost IS NULL'
+        );
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);
