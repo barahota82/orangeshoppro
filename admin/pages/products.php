@@ -658,6 +658,7 @@ $orangeAdminSfProductUrlPartsForJs = [
         <div id="productTabPanelVariants" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnVariants" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">المتغيرات والباركود</h4>
+        <div id="variantSizeToolsSlot"></div>
         <div id="productVariantPricingPanel" class="card admin-nested-panel" style="display:none;margin-bottom:14px;">
             <h4 class="admin-nested-panel__title" style="margin-top:0;">التسعير والهوية</h4>
             <div class="form-grid" style="margin-bottom:8px;">
@@ -1252,9 +1253,6 @@ function orangeProductInvalidateVariantsReadyForSave() {
  * إلغاء مصفوفة التوليد السابقة وإجبار إعادة التوليد من المعطيات الجديدة.
  */
 function orangeProductClearGeneratedVariantsMatrixIfNeeded() {
-    if (!orangeProductWizardIsNew()) {
-        return;
-    }
     const box = document.getElementById('variantsBox');
     if (!box) {
         return;
@@ -1263,6 +1261,14 @@ function orangeProductClearGeneratedVariantsMatrixIfNeeded() {
         return;
     }
     box.innerHTML = '';
+    if (!orangeProductWizardIsNew()) {
+        // وضع التعديل: تغيّرت إعدادات الألوان/المقاسات فبطلت المصفوفة المحمّلة.
+        // نرفع علم «الأبعاد تغيّرت» ونمنع الحفظ حتى تُعاد المصفوفة، كي لا تبقى «أول لقطة»
+        // قديمة (مثل لون يظهر بمقاسات أُلغيت). يُظهر زرَّ «توليد المتغيرات» في التعديل.
+        window.ORANGE_PRODUCT_EDIT_DIMENSIONS_DIRTY = true;
+        window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = false;
+        orangeApplyProductWizardActionButtons();
+    }
 }
 
 /**
@@ -1485,9 +1491,18 @@ function orangeApplyProductWizardActionButtons() {
         return;
     }
     if (orangeProductBasicRecordIsEdit()) {
-        btnGen.style.display = 'none';
-        btnGen.disabled = true;
-        btnSave.disabled = false;
+        const dirty = window.ORANGE_PRODUCT_EDIT_DIMENSIONS_DIRTY === true;
+        if (!dirty) {
+            btnGen.style.display = 'none';
+            btnGen.disabled = true;
+            btnSave.disabled = false;
+            return;
+        }
+        // الأبعاد تغيّرت في التعديل: أظهر «توليد المتغيرات» وامنع الحفظ حتى يُعاد البناء.
+        btnGen.style.display = '';
+        const okEdit = orangeProductValidateWizardBeforeMatrix() === null;
+        btnGen.disabled = !okEdit;
+        btnSave.disabled = !(okEdit && !!window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE);
         return;
     }
     btnGen.style.display = '';
@@ -3575,7 +3590,31 @@ function orangeRelocatePricingIdentity() {
             bcLabel.textContent = 'الباركود';
         }
     }
+    orangeRelocateSizeToolsIntoVariantsTab();
     orangeOnUnifiedPricingChange();
+}
+
+/**
+ * ينقل أدوات المقاسات (منتقي مقاسات «بدون ألوان» + دليل المقاس الإرشادي) من البيانات
+ * الأساسية إلى داخل تبويب «المتغيرات والباركود»؛ نقلٌ لمرة واحدة (idempotent) بالاحتفاظ
+ * بنفس المعرّفات فتظل كل المعالجات تعمل. المالك: «اختيار المقاسات ودليل المقاس بتاب الألوان والمقاسات».
+ */
+function orangeRelocateSizeToolsIntoVariantsTab() {
+    const slot = document.getElementById('variantSizeToolsSlot');
+    if (!slot) {
+        return;
+    }
+    const guide = document.getElementById('product_basic_size_guide_wrap');
+    if (guide) {
+        const guideRow = guide.parentNode;
+        if (guideRow && guideRow !== slot && guideRow.parentNode !== slot) {
+            slot.appendChild(guideRow);
+        }
+    }
+    const pick = document.getElementById('product_size_pick_panel');
+    if (pick && pick.parentNode !== slot) {
+        slot.appendChild(pick);
+    }
 }
 
 /** يطبّق أعلام التوحيد على أعمدة السعر/التكلفة في مصفوفة المتغيّرات. */
@@ -4485,6 +4524,11 @@ function generateVariants() {
     if (orangeProductWizardIsNew()) {
         window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = true;
         orangeApplyProductWizardActionButtons();
+    } else if (window.ORANGE_PRODUCT_EDIT_DIMENSIONS_DIRTY === true) {
+        // إعادة بناء المصفوفة في التعديل بعد تغيير الأبعاد: رُفِع التقادم وسُمح بالحفظ.
+        window.ORANGE_PRODUCT_EDIT_DIMENSIONS_DIRTY = false;
+        window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = true;
+        orangeApplyProductWizardActionButtons();
     }
     productFormShowTab('variants');
     orangeScheduleProductCardPreviewRefresh();
@@ -4501,6 +4545,14 @@ async function saveProduct() {
     if (orangeProductWizardIsNew() && !window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE) {
         productFormShowTab('variants');
         alert('اضغط «توليد المتغيرات» أولاً بعد اكتمال البيانات، ثم احفظ.');
+        return;
+    }
+
+    if (!orangeProductWizardIsNew()
+        && window.ORANGE_PRODUCT_EDIT_DIMENSIONS_DIRTY === true
+        && !window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE) {
+        productFormShowTab('variants');
+        alert('غيّرت إعدادات الألوان/المقاسات: اضغط «توليد المتغيرات» لإعادة بناء الجدول قبل الحفظ.');
         return;
     }
 
