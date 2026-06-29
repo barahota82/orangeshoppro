@@ -213,6 +213,13 @@ function orange_product_sync_variants_matrix(
         'UPDATE product_variants SET product_colorway_id = ?, size_family_size_id = ?, size = ?, color = ? WHERE id = ? LIMIT 1'
     );
 
+    // سعر/تكلفة المتغيّر (Phase 1): تُثبَّت إن مرّرها الاستدعاء؛ COALESCE يبقي القيمة القائمة عند تمرير NULL.
+    $hasVarPriceCost = orange_table_has_column($pdo, 'product_variants', 'price')
+        && orange_table_has_column($pdo, 'product_variants', 'cost');
+    $updPriceCost = $hasVarPriceCost
+        ? $pdo->prepare('UPDATE product_variants SET price = COALESCE(?, price), cost = COALESCE(?, cost) WHERE id = ? LIMIT 1')
+        : null;
+
     foreach ($variantsIn as $variant) {
         $cwRowKey = orange_product_variant_cw_row_key($variant, $hasColors);
         $cwId = $cwMap[$cwRowKey] ?? null;
@@ -270,6 +277,17 @@ function orange_product_sync_variants_matrix(
             $newVid = (int) $pdo->lastInsertId();
             if ($useWarehouse && $newVid > 0) {
                 orange_warehouse_set_variant_quantity($pdo, $productWarehouseId, $newVid, 0);
+            }
+            $vid = $newVid;
+        }
+
+        if ($updPriceCost !== null && isset($vid) && $vid > 0) {
+            $rp = (array_key_exists('price', $variant) && $variant['price'] !== null && $variant['price'] !== '')
+                ? (float) $variant['price'] : null;
+            $rc = (array_key_exists('cost', $variant) && $variant['cost'] !== null && $variant['cost'] !== '')
+                ? (float) $variant['cost'] : null;
+            if ($rp !== null || $rc !== null) {
+                $updPriceCost->execute([$rp, $rc, $vid]);
             }
         }
     }

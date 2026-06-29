@@ -364,6 +364,67 @@ function orange_catalog_refresh_product_barcodes(PDO $pdo, int $productId): arra
 }
 
 /**
+ * يولّد كود المتغيّر تلقائياً = «كود الأب» + لاحقة تسلسلية رقمية ثابتة (كود الأب-NN)
+ * مرتّبة حسب id المتغيّر داخل المنتج. يُملأ فقط عند وجود كود أب غير فارغ ووجود عمود item_code.
+ * آمن لإعادة التشغيل (يعيد توليد نفس القيمة لنفس الترتيب). لا يُلمَس عند غياب كود الأب.
+ *
+ * @return int عدد المتغيّرات التي حُدّث كودها
+ */
+function orange_catalog_refresh_variant_item_codes(PDO $pdo, int $productId): int
+{
+    if ($productId <= 0
+        || ! orange_table_exists($pdo, 'products')
+        || ! orange_table_exists($pdo, 'product_variants')
+        || ! orange_table_has_column($pdo, 'product_variants', 'item_code')
+        || ! orange_table_has_column($pdo, 'products', 'item_code')) {
+        return 0;
+    }
+
+    try {
+        $st = $pdo->prepare('SELECT item_code FROM products WHERE id = ? LIMIT 1');
+        $st->execute([$productId]);
+        $parentCode = trim((string) $st->fetchColumn());
+    } catch (Throwable $e) {
+        return 0;
+    }
+    if ($parentCode === '') {
+        return 0;
+    }
+
+    try {
+        $v = $pdo->prepare('SELECT id FROM product_variants WHERE product_id = ? ORDER BY id ASC');
+        $v->execute([$productId]);
+        $ids = $v->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Throwable $e) {
+        return 0;
+    }
+    if (! is_array($ids) || count($ids) === 0) {
+        return 0;
+    }
+
+    $upd = $pdo->prepare('UPDATE product_variants SET item_code = ? WHERE id = ? LIMIT 1');
+    $n = 0;
+    $seq = 1;
+    foreach ($ids as $vid) {
+        $vid = (int) $vid;
+        if ($vid <= 0) {
+            continue;
+        }
+        $code = $parentCode . '-' . sprintf('%02d', $seq);
+        $code = function_exists('mb_substr') ? mb_substr($code, 0, 64, 'UTF-8') : substr($code, 0, 64);
+        try {
+            $upd->execute([$code, $vid]);
+            $n++;
+        } catch (Throwable $e) {
+            // تجاهل صفاً متعذّراً وأكمل الباقي
+        }
+        $seq++;
+    }
+
+    return $n;
+}
+
+/**
  * سلسلة LEFT JOIN لعرض صف فئة باسم مستعار `c` (name_ar / name_en) في استعلامات الأدمن عن المنتجات.
  * مصدر العرض الموحّد فقط: `c` = catalog_categories عبر product_type_id.
  * عند غياب بنية الشجرة الموحّدة الكاملة تُعاد قيم null دون الرجوع إلى taxonomy legacy.

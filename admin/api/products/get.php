@@ -52,12 +52,18 @@ try {
         }
 
         $barcodeCol = orange_table_has_column($pdo, 'product_variants', 'barcode') ? 'v.barcode AS variant_barcode' : 'NULL AS variant_barcode';
+        $vPriceCol = orange_table_has_column($pdo, 'product_variants', 'price') ? 'v.price AS variant_price' : 'NULL AS variant_price';
+        $vCostCol = orange_table_has_column($pdo, 'product_variants', 'cost') ? 'v.cost AS variant_cost' : 'NULL AS variant_cost';
+        $vItemCol = orange_table_has_column($pdo, 'product_variants', 'item_code') ? 'v.item_code AS variant_item_code' : 'NULL AS variant_item_code';
         $variantStmt = $pdo->prepare("
             SELECT v.id AS variant_id,
                    v.product_colorway_id,
                    v.size_family_size_id,
                    v.stock_quantity,
                    {$barcodeCol},
+                   {$vPriceCol},
+                   {$vCostCol},
+                   {$vItemCol},
                    COALESCE(cw.primary_color_id, 0) AS primary_color_id,
                    COALESCE(cw.secondary_color_id, 0) AS secondary_color_id,
                    COALESCE(cw.primary_pattern_id, 0) AS primary_pattern_id,

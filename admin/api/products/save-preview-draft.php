@@ -152,6 +152,8 @@ try {
             'item_code' => $normSku($data['item_code'] ?? ''),
             'barcode' => $normSku($data['barcode'] ?? ''),
             'country_id' => $previewCountryId,
+            'price_unified' => ((int) ($data['price_unified'] ?? 1) === 1) ? 1 : 0,
+            'cost_unified' => ((int) ($data['cost_unified'] ?? 1) === 1) ? 1 : 0,
         ];
         foreach ($optional as $col => $val) {
             if (orange_table_has_column($pdo, 'products', $col)) {
@@ -195,6 +197,15 @@ try {
                 'INSERT INTO product_variants (product_id, product_colorway_id, size_family_size_id, size, color, stock_quantity)
                  VALUES (?,?,?,?,?,?)'
             );
+            $dPriceUnified = ((int) ($data['price_unified'] ?? 1) === 1);
+            $dCostUnified = ((int) ($data['cost_unified'] ?? 1) === 1);
+            $dProductPrice = (float) ($data['price'] ?? 0);
+            $dProductCost = (float) ($data['cost'] ?? 0);
+            $dHasVarPriceCost = orange_table_has_column($pdo, 'product_variants', 'price')
+                && orange_table_has_column($pdo, 'product_variants', 'cost');
+            $dVarPCUpd = $dHasVarPriceCost
+                ? $pdo->prepare('UPDATE product_variants SET price = ?, cost = ? WHERE id = ? LIMIT 1')
+                : null;
             foreach ($variantsIn as $variant) {
                 try {
                     $p = (int) ($variant['primary_color_id'] ?? 0);
@@ -240,6 +251,16 @@ try {
                     $sizeLabel = orange_size_display_label($sizeRow);
 
                     $variantStmt->execute([$draftId, $colorwayId, $sizeFamilySizeId, $sizeLabel, $colorLabel, $stock]);
+                    $newDraftVid = (int) $pdo->lastInsertId();
+                    if ($dVarPCUpd !== null && $newDraftVid > 0) {
+                        $effPrice = $dPriceUnified
+                            ? $dProductPrice
+                            : ((array_key_exists('price', $variant) && $variant['price'] !== null && $variant['price'] !== '') ? (float) $variant['price'] : $dProductPrice);
+                        $effCost = $dCostUnified
+                            ? $dProductCost
+                            : ((array_key_exists('cost', $variant) && $variant['cost'] !== null && $variant['cost'] !== '') ? (float) $variant['cost'] : $dProductCost);
+                        $dVarPCUpd->execute([$effPrice, $effCost, $newDraftVid]);
+                    }
                 } catch (Throwable $ve) {
                     /* صف متغيّر معطوب لا يكسر المعاينة */
                     continue;

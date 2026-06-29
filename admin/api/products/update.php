@@ -101,6 +101,8 @@ try {
         $scope = 'none';
     }
     $hasColors = (int)($data['has_colors'] ?? 0) === 1;
+    $priceUnified = ((int) ($data['price_unified'] ?? 1) === 1);
+    $costUnified = ((int) ($data['cost_unified'] ?? 1) === 1);
 
     $schemeErr = orange_catalog_validate_size_family_matches_product_type(
         $pdo,
@@ -325,6 +327,14 @@ try {
         $barcodeUp,
         isset($data['is_active']) ? (int)$data['is_active'] : 1,
     );
+    if (orange_table_has_column($pdo, 'products', 'price_unified')) {
+        $setParts[] = 'price_unified = ?';
+        $execParams[] = $priceUnified ? 1 : 0;
+    }
+    if (orange_table_has_column($pdo, 'products', 'cost_unified')) {
+        $setParts[] = 'cost_unified = ?';
+        $execParams[] = $costUnified ? 1 : 0;
+    }
 
     $execParams[] = $productId;
 
@@ -363,6 +373,21 @@ try {
     }
 
     if ($variantsMaybe !== null && is_array($variantsMaybe)) {
+        // احسب سعر/تكلفة كل متغيّر حسب أعلام التوحيد قبل المزامنة (موحّد = قيمة الأب؛ متغيّر = قيمة الصف أو الأب احتياطاً).
+        $productPrice = (float) $data['price'];
+        $productCost = (float) $data['cost'];
+        foreach ($variantsMaybe as &$vRow) {
+            if (!is_array($vRow)) {
+                continue;
+            }
+            $vRow['price'] = $priceUnified
+                ? $productPrice
+                : ((array_key_exists('price', $vRow) && $vRow['price'] !== null && $vRow['price'] !== '') ? (float) $vRow['price'] : $productPrice);
+            $vRow['cost'] = $costUnified
+                ? $productCost
+                : ((array_key_exists('cost', $vRow) && $vRow['cost'] !== null && $vRow['cost'] !== '') ? (float) $vRow['cost'] : $productCost);
+        }
+        unset($vRow);
         orange_product_sync_variants_matrix(
             $pdo,
             $productId,
@@ -377,6 +402,12 @@ try {
 
     if (array_key_exists('catalog_attribute_values', $data)) {
         orange_catalog_save_product_attribute_values($pdo, $productId, $data['catalog_attribute_values']);
+    }
+
+    try {
+        orange_catalog_refresh_variant_item_codes($pdo, $productId);
+    } catch (Throwable $e) {
+        // كود المتغيّر تجميلي/تفصيلي — لا يفشل التحديث بسببه
     }
 
     $barcodeFinal = null;

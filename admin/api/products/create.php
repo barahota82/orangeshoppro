@@ -55,6 +55,8 @@ try {
 
     $hasColors = (int)($data['has_colors'] ?? 0) === 1;
     $isActiveSql = ((int) ($data['is_active'] ?? 1) === 1) ? 1 : 0;
+    $priceUnified = ((int) ($data['price_unified'] ?? 1) === 1);
+    $costUnified = ((int) ($data['cost_unified'] ?? 1) === 1);
 
     $sizeFamilyId = isset($data['size_family_id']) ? (int)$data['size_family_id'] : 0;
     if ($sizeFamilyId <= 0) {
@@ -289,6 +291,15 @@ try {
         $execParams[] = orange_admin_context_country_id($pdo);
     }
 
+    if (orange_table_has_column($pdo, 'products', 'price_unified')) {
+        $columnNames[] = 'price_unified';
+        $execParams[] = $priceUnified ? 1 : 0;
+    }
+    if (orange_table_has_column($pdo, 'products', 'cost_unified')) {
+        $columnNames[] = 'cost_unified';
+        $execParams[] = $costUnified ? 1 : 0;
+    }
+
     $columnNamesWithMeta = array_merge($columnNames, ['is_active', 'created_at']);
     $execParams[] = $isActiveSql;
     $placeholdersBody = implode(', ', array_fill(0, count($execParams), '?')) . ', NOW()';
@@ -320,6 +331,14 @@ try {
             product_id, product_colorway_id, size_family_size_id, size, color, stock_quantity
         ) VALUES (?,?,?,?,?,?)'
     );
+
+    $hasVarPriceCost = orange_table_has_column($pdo, 'product_variants', 'price')
+        && orange_table_has_column($pdo, 'product_variants', 'cost');
+    $varPriceCostUpd = $hasVarPriceCost
+        ? $pdo->prepare('UPDATE product_variants SET price = ?, cost = ? WHERE id = ? LIMIT 1')
+        : null;
+    $productPrice = (float) $data['price'];
+    $productCost = (float) $data['cost'];
 
     foreach ($variantsIn as $variant) {
         $p = isset($variant['primary_color_id']) ? (int) $variant['primary_color_id'] : 0;
@@ -386,6 +405,15 @@ try {
                 orange_warehouse_set_variant_quantity($pdo, $warehouseId, $newVid, 0);
             }
         }
+        if ($varPriceCostUpd !== null && $newVid > 0) {
+            $effPrice = $priceUnified
+                ? $productPrice
+                : ((array_key_exists('price', $variant) && $variant['price'] !== null && $variant['price'] !== '') ? (float) $variant['price'] : $productPrice);
+            $effCost = $costUnified
+                ? $productCost
+                : ((array_key_exists('cost', $variant) && $variant['cost'] !== null && $variant['cost'] !== '') ? (float) $variant['cost'] : $productCost);
+            $varPriceCostUpd->execute([$effPrice, $effCost, $newVid]);
+        }
     }
 
     $extraImages = $data['extra_images'] ?? null;
@@ -411,6 +439,12 @@ try {
 
     if (array_key_exists('catalog_attribute_values', $data)) {
         orange_catalog_save_product_attribute_values($pdo, $productId, $data['catalog_attribute_values']);
+    }
+
+    try {
+        orange_catalog_refresh_variant_item_codes($pdo, $productId);
+    } catch (Throwable $e) {
+        // كود المتغيّر تجميلي/تفصيلي — لا يفشل الحفظ بسببه
     }
 
     $barcodeFinal = null;
