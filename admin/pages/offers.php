@@ -104,7 +104,7 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
                 <div class="ofr-fact"><span>سعر البيع</span><b id="ofr_fact_price" dir="ltr">—</b></div>
                 <div class="ofr-fact ofr-fact-after"><span>السعر بعد الخصم</span><b id="ofr_fact_after" dir="ltr">—</b></div>
             </div>
-            <p id="ofr_below_cost_warn" style="display:none;margin:10px 0 0;color:#dc2626;font-weight:700;">⚠ السعر بعد الخصم أقل من التكلفة — غير مسموح بالحفظ.</p>
+            <p id="ofr_below_cost_warn" style="display:none;margin:10px 0 0;color:#dc2626;font-weight:700;">⚠ السعر بعد الخصم أقل من تكلفة أحد المتغيّرات — غير مسموح بالحفظ.</p>
         </div>
 
         <!-- النصف الأيسر: الخصم والفترة -->
@@ -112,7 +112,14 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
             <h4 style="margin:0 0 10px;">الخصم والفترة</h4>
             <div class="form-grid">
                 <div style="grid-column:1/-1;">
-                    <label for="discount">قيمة الخصم (<?php echo htmlspecialchars((string) ($offersMoney['unit'] ?? 'KWD'), ENT_QUOTES, 'UTF-8'); ?>)</label>
+                    <label for="ofr_discount_type">نوع الخصم</label>
+                    <select id="ofr_discount_type" class="admin-inp">
+                        <option value="amount">مبلغ ثابت (<?php echo htmlspecialchars((string) ($offersMoney['unit'] ?? 'KWD'), ENT_QUOTES, 'UTF-8'); ?>)</option>
+                        <option value="percent">نسبة مئوية %</option>
+                    </select>
+                </div>
+                <div style="grid-column:1/-1;">
+                    <label for="discount">قيمة الخصم (<span id="ofr_discount_unit_label"><?php echo htmlspecialchars((string) ($offersMoney['unit'] ?? 'KWD'), ENT_QUOTES, 'UTF-8'); ?></span>)</label>
                     <input type="number" id="discount" class="admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr">
                 </div>
                 <div>
@@ -170,7 +177,12 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
                 <tr>
                     <td><?php echo (int) $o['id']; ?></td>
                     <td><?php echo htmlspecialchars((string) $o['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td dir="ltr"><?php echo htmlspecialchars(orange_format_money_for_context($offersMoney, (float) $o['discount'], false), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td dir="ltr"><?php
+                        $ofrRowType = strtolower(trim((string) ($o['discount_type'] ?? 'amount')));
+                        echo $ofrRowType === 'percent'
+                            ? htmlspecialchars(rtrim(rtrim(number_format((float) $o['discount'], 2, '.', ''), '0'), '.') . '%', ENT_QUOTES, 'UTF-8')
+                            : htmlspecialchars(orange_format_money_for_context($offersMoney, (float) $o['discount'], false), ENT_QUOTES, 'UTF-8');
+                    ?></td>
                     <?php if ($hasSortCol): ?>
                     <td dir="ltr"><?php echo (int) ($o['sort_order'] ?? 0); ?></td>
                     <?php endif; ?>
@@ -248,11 +260,21 @@ function ofrComputeNextSort() {
 
 var OFR_MONEY_UNIT = <?php echo json_encode((string) ($offersMoney['unit'] ?? 'KWD'), JSON_UNESCAPED_UNICODE); ?>;
 var OFR_MONEY_DECIMALS = <?php echo (int) ($offersMoney['decimals'] ?? 3); ?>;
-var ofrSelProduct = { price: null, cost: null };
+var ofrSelProduct = { price: null, cost: null, guard: null };
 
 function ofrFmtMoney(v) {
     if (v == null || isNaN(v)) return '—';
     return Number(v).toFixed(OFR_MONEY_DECIMALS) + ' ' + OFR_MONEY_UNIT;
+}
+
+function ofrCurrentDiscountType() {
+    var el = document.getElementById('ofr_discount_type');
+    return (el && el.value === 'percent') ? 'percent' : 'amount';
+}
+
+function ofrUpdateDiscountUnitLabel() {
+    var lbl = document.getElementById('ofr_discount_unit_label');
+    if (lbl) lbl.textContent = ofrCurrentDiscountType() === 'percent' ? '%' : OFR_MONEY_UNIT;
 }
 
 function ofrSetProduct(row) {
@@ -261,10 +283,11 @@ function ofrSetProduct(row) {
     document.getElementById('ofr_product_label').textContent = code + (row.name || '');
     ofrSelProduct.price = (row.price != null && row.price !== '') ? Number(row.price) : null;
     ofrSelProduct.cost = (row.cost != null && row.cost !== '') ? Number(row.cost) : null;
+    ofrSelProduct.guard = (row.guard && typeof row.guard === 'object') ? row.guard : null;
     ofrRenderFacts();
 }
 
-// يحدّث التكلفة/سعر البيع/السعر بعد الخصم + تنبيه ما دون التكلفة. يُرجِع true إذا الحالة سليمة للحفظ.
+// يحدّث التكلفة/سعر البيع/السعر بعد الخصم + حارس التكلفة لكل متغيّر. يُرجِع true إذا الحالة سليمة للحفظ.
 function ofrRenderFacts() {
     var costEl = document.getElementById('ofr_fact_cost');
     var priceEl = document.getElementById('ofr_fact_price');
@@ -272,15 +295,39 @@ function ofrRenderFacts() {
     var warnEl = document.getElementById('ofr_below_cost_warn');
     var cost = ofrSelProduct.cost;
     var price = ofrSelProduct.price;
+    var guard = ofrSelProduct.guard;
     if (costEl) costEl.textContent = ofrFmtMoney(cost);
     if (priceEl) priceEl.textContent = ofrFmtMoney(price);
+    var type = ofrCurrentDiscountType();
     var discount = parseFloat(document.getElementById('discount').value || '0') || 0;
     var ok = true;
-    var after = null;
     if (price != null) {
-        after = price - discount;
-        if (afterEl) afterEl.textContent = ofrFmtMoney(after);
-        var below = (cost != null && cost > 0 && after < cost) || after <= 0;
+        // السعر بعد الخصم على سعر الأب (للعرض فقط) — حسب النوع.
+        var unitDisc = type === 'percent'
+            ? (price * Math.min(100, discount) / 100)
+            : Math.min(discount, price);
+        if (afterEl) afterEl.textContent = ofrFmtMoney(price - unitDisc);
+        // حارس لكل متغيّر: لا يصحّ أن ينزل سعر أي متغيّر بعد الخصم تحت تكلفته.
+        var below = false;
+        if (discount > 0) {
+            if (type === 'percent') {
+                if (discount > 100) {
+                    below = true;
+                } else {
+                    var ratio = (guard && guard.max_cost_ratio != null)
+                        ? Number(guard.max_cost_ratio)
+                        : ((cost != null && price > 0) ? (cost / price) : 0);
+                    var maxPct = Math.max(0, (1 - ratio) * 100);
+                    below = (discount > maxPct + 1e-9);
+                }
+            } else {
+                var maxAmt = (guard && guard.min_margin != null)
+                    ? Number(guard.min_margin)
+                    : ((cost != null) ? (price - cost) : price);
+                var minPrice = (guard && guard.min_price != null) ? Number(guard.min_price) : price;
+                below = (discount > maxAmt + 1e-9) || (discount >= minPrice);
+            }
+        }
         if (warnEl) warnEl.style.display = (discount > 0 && below) ? 'block' : 'none';
         if (discount > 0 && below) ok = false;
     } else {
@@ -352,7 +399,10 @@ function ofrResetForm() {
     var showOldResetEl = document.getElementById('ofr_show_old_price');
     if (showOldResetEl) showOldResetEl.checked = false;
     document.getElementById('discount').value = '';
-    ofrSelProduct = { price: null, cost: null };
+    var typeResetEl = document.getElementById('ofr_discount_type');
+    if (typeResetEl) typeResetEl.value = 'amount';
+    ofrUpdateDiscountUnitLabel();
+    ofrSelProduct = { price: null, cost: null, guard: null };
     ofrRenderFacts();
     var sortEl = document.getElementById('ofr_sort');
     if (sortEl) sortEl.value = String(ofrComputeNextSort());
@@ -375,6 +425,10 @@ function ofrEdit(row) {
     });
     ofrSelProduct.price = (pickRow && pickRow.price != null && pickRow.price !== '') ? Number(pickRow.price) : null;
     ofrSelProduct.cost = (pickRow && pickRow.cost != null && pickRow.cost !== '') ? Number(pickRow.cost) : null;
+    ofrSelProduct.guard = (pickRow && pickRow.guard && typeof pickRow.guard === 'object') ? pickRow.guard : null;
+    var typeEditEl = document.getElementById('ofr_discount_type');
+    if (typeEditEl) typeEditEl.value = (String(row.discount_type || 'amount') === 'percent') ? 'percent' : 'amount';
+    ofrUpdateDiscountUnitLabel();
     document.getElementById('ofr_name_ar').value = row.name_ar != null ? String(row.name_ar) : '';
     document.getElementById('ofr_name_en').value = row.name_en != null ? String(row.name_en) : '';
     document.getElementById('ofr_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
@@ -401,6 +455,7 @@ async function saveOffer() {
         id: parseInt(document.getElementById('ofr_id').value, 10) || 0,
         product_id: parseInt(document.getElementById('offer_product_id').value, 10),
         discount: parseFloat(document.getElementById('discount').value || '0'),
+        discount_type: ofrCurrentDiscountType(),
         name_ar: document.getElementById('ofr_name_ar').value.trim(),
         name_en: document.getElementById('ofr_name_en').value.trim(),
         show_name_to_customer: document.getElementById('ofr_show_name').checked ? 1 : 0,
@@ -424,8 +479,12 @@ async function saveOffer() {
         alert('قيمة الخصم يجب أن تكون أكبر من صفر');
         return;
     }
+    if (payload.discount_type === 'percent' && payload.discount > 100) {
+        alert('نسبة الخصم لا تتجاوز 100%');
+        return;
+    }
     if (!ofrRenderFacts()) {
-        alert('السعر بعد الخصم أقل من تكلفة المنتج (أو صفر/سالب) — قلّل قيمة الخصم قبل الحفظ.');
+        alert('السعر بعد الخصم أقل من تكلفة أحد المتغيّرات (أو صفر/سالب) — قلّل قيمة الخصم قبل الحفظ.');
         return;
     }
     var res = await postJSON('/admin/api/offers/save.php', payload);
@@ -440,6 +499,12 @@ async function saveOffer() {
     if (enEl) enEl.addEventListener('input', ofrScheduleNameFromEn);
     var discEl = document.getElementById('discount');
     if (discEl) discEl.addEventListener('input', ofrRenderFacts);
+    var typeEl = document.getElementById('ofr_discount_type');
+    if (typeEl) typeEl.addEventListener('change', function () {
+        ofrUpdateDiscountUnitLabel();
+        ofrRenderFacts();
+    });
+    ofrUpdateDiscountUnitLabel();
 })();
 if (typeof ocpDefaultScheduleDates === 'function') {
     ocpDefaultScheduleDates('ofr');

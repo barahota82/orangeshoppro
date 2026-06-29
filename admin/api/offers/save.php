@@ -38,37 +38,66 @@ try {
         json_response(['success' => false, 'message' => 'قيمة الخصم يجب أن تكون أكبر من صفر'], 422);
     }
 
-    // جلب سعر/تكلفة المنتج للتحقق من ألا يهبط السعر بعد الخصم تحت التكلفة (قرار مالك 2026-06-27).
-    $prodCols = 'id';
+    // نوع الخصم: مبلغ ثابت أو نسبة % (عمود offers.discount_type — مع توافق رجعي إن غاب).
+    $hasTypeCol = orange_table_has_column($pdo, 'offers', 'discount_type');
+    $discountType = ($hasTypeCol && strtolower(trim((string) ($data['discount_type'] ?? 'amount'))) === 'percent')
+        ? 'percent'
+        : 'amount';
+    if ($discountType === 'percent' && $discount > 100) {
+        json_response(['success' => false, 'message' => 'نسبة الخصم لا تتجاوز 100%'], 422);
+    }
+
+    // حارس التكلفة لكل متغيّر (قرار مالك 2026-06-27، وُسِّع للمتغيّرات 2026-06-29):
+    // لا يصحّ أن ينزل سعر أي متغيّر بعد الخصم تحت تكلفته الفعّالة، ولا أن يكون صفراً/سالباً.
     $hasPriceCol = orange_table_has_column($pdo, 'products', 'price');
     $hasCostCol = orange_table_has_column($pdo, 'products', 'cost');
-    if ($hasPriceCol) {
-        $prodCols .= ', price';
-    }
-    if ($hasCostCol) {
-        $prodCols .= ', cost';
-    }
-    $ch = $pdo->prepare('SELECT ' . $prodCols . ' FROM products WHERE id = ? AND is_active = 1 LIMIT 1');
+    $hasVarPrice = orange_table_has_column($pdo, 'product_variants', 'price');
+    $hasVarCost = orange_table_has_column($pdo, 'product_variants', 'cost');
+    $ch = $pdo->prepare(
+        'SELECT id, '
+        . ($hasPriceCol ? 'price' : '0 AS price') . ', '
+        . ($hasCostCol ? 'cost' : '0 AS cost')
+        . ' FROM products WHERE id = ? AND is_active = 1 LIMIT 1'
+    );
     $ch->execute([$pid]);
     $prodRow = $ch->fetch(PDO::FETCH_ASSOC);
     if (!$prodRow) {
         json_response(['success' => false, 'message' => 'المنتج غير موجود أو غير نشط'], 422);
     }
     if ($hasPriceCol) {
-        $prodPrice = round((float) ($prodRow['price'] ?? 0), $offersMoneyDecimals);
-        $prodCost = $hasCostCol ? round((float) ($prodRow['cost'] ?? 0), $offersMoneyDecimals) : 0.0;
-        if ($discount >= $prodPrice) {
-            json_response([
-                'success' => false,
-                'message' => 'قيمة الخصم تساوي سعر البيع أو تتجاوزه — السعر بعد الخصم لا يصحّ أن يكون صفراً أو سالباً.',
-            ], 422);
+        // أزواج (سعر، تكلفة) فعّالة: متغيّرات إن وُجدت (COALESCE(متغيّر، منتج))، وإلا مستوى المنتج.
+        $pairs = [];
+        if ($hasVarPrice) {
+            $vSql = 'SELECT COALESCE(pv.price, p.price) AS eff_price, '
+                . ($hasVarCost ? 'COALESCE(pv.cost, p.cost)' : 'p.cost') . ' AS eff_cost
+                FROM product_variants pv INNER JOIN products p ON p.id = pv.product_id
+                WHERE pv.product_id = ?';
+            $vst = $pdo->prepare($vSql);
+            $vst->execute([$pid]);
+            while ($vr = $vst->fetch(PDO::FETCH_ASSOC)) {
+                $pairs[] = [(float) $vr['eff_price'], $hasCostCol ? (float) $vr['eff_cost'] : 0.0];
+            }
         }
-        if ($hasCostCol && $prodCost > 0) {
-            $priceAfter = round($prodPrice - $discount, $offersMoneyDecimals);
-            if ($priceAfter < $prodCost) {
+        if ($pairs === []) {
+            $pairs[] = [(float) ($prodRow['price'] ?? 0), $hasCostCol ? (float) ($prodRow['cost'] ?? 0) : 0.0];
+        }
+        foreach ($pairs as $pair) {
+            $pp = round((float) $pair[0], $offersMoneyDecimals);
+            $pc = round((float) $pair[1], $offersMoneyDecimals);
+            $unitDisc = $discountType === 'percent'
+                ? round($pp * min(100.0, $discount) / 100.0, $offersMoneyDecimals)
+                : min($discount, $pp);
+            $after = round($pp - $unitDisc, $offersMoneyDecimals);
+            if ($after <= 0) {
                 json_response([
                     'success' => false,
-                    'message' => 'السعر بعد الخصم أقل من تكلفة المنتج الأساسية — غير مسموح. قلّل قيمة الخصم.',
+                    'message' => 'الخصم يجعل سعر أحد المتغيّرات صفراً أو سالباً — قلّل قيمة الخصم.',
+                ], 422);
+            }
+            if ($hasCostCol && $pc > 0 && $after < $pc) {
+                json_response([
+                    'success' => false,
+                    'message' => 'السعر بعد الخصم أقل من تكلفة أحد المتغيّرات — غير مسموح. قلّل قيمة الخصم.',
                 ], 422);
             }
         }
@@ -122,6 +151,10 @@ try {
         // الترتيب تلقائي بالكامل: لا يُمَسّ عند التعديل.
         $sets = ['product_id = ?', 'discount = ?', 'is_active = ?'];
         $vals = [$pid, $discount, $isActive];
+        if ($hasTypeCol) {
+            $sets[] = 'discount_type = ?';
+            $vals[] = $discountType;
+        }
         if ($hasNameCols) {
             $sets[] = 'name_ar = ?';
             $sets[] = 'name_en = ?';
@@ -161,6 +194,10 @@ try {
 
     $cols = ['product_id', 'discount'];
     $vals = [$pid, $discount];
+    if ($hasTypeCol) {
+        $cols[] = 'discount_type';
+        $vals[] = $discountType;
+    }
     if ($hasSort) {
         // الترتيب تلقائي: التالي في الجدول (offers بلا country_id بالتصميم).
         $sortOrder = (int) ($pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM offers')->fetchColumn() ?: 1);

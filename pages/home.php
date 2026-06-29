@@ -86,8 +86,11 @@ if ($canUnifiedProductSql) {
     $offerOldPriceSelect = orange_table_has_column($pdo, 'offers', 'show_old_price_to_customer')
         ? ', o.show_old_price_to_customer AS offer_show_old_price'
         : '';
+    $offerTypeSelect = orange_table_has_column($pdo, 'offers', 'discount_type')
+        ? ', o.discount_type AS discount_type'
+        : '';
     $offersSql = '
-    SELECT o.id AS offer_id, o.discount' . $offerNameSelect . $offerOldPriceSelect . ',
+    SELECT o.id AS offer_id, o.discount' . $offerNameSelect . $offerOldPriceSelect . $offerTypeSelect . ',
            p.*, ucs2.department_id AS uf_dept_id, ucc.id AS uf_cat_id, ucs.id AS uf_sub_id
     FROM offers o
     INNER JOIN products p ON p.id = o.product_id
@@ -112,6 +115,14 @@ $products = $productsStmt ? $productsStmt->fetchAll() : [];
 
 $offersStmt = $pdo->query($offersSql);
 $offers = $offersStmt ? $offersStmt->fetchAll() : [];
+
+/** خصم وحدة بطاقة العرض (مدرك للنسبة) على سعر الأب — للعرض فقط. */
+$sfOfferCardUnitDisc = static function (array $p): float {
+    return orange_product_offer_unit_discount_for_price(
+        ['discount' => (float) ($p['discount'] ?? 0), 'type' => (string) ($p['discount_type'] ?? 'amount')],
+        (float) ($p['price'] ?? 0)
+    );
+};
 
 /*
  * احتياط صورة الكارت: عند غياب الصورة العامة main_image، نستخدم أوّل صورة لون متاحة.
@@ -348,7 +359,7 @@ foreach ($offersLazyRows as $p) {
         'imgSrc' => storefront_product_image_href((string) ($p['main_image'] ?? '')),
         'title' => storefront_product_display_name($p),
         'oldPrice' => number_format((float) $p['price'], 2),
-        'salePrice' => number_format((float) $p['price'] - (float) $p['discount'], 2),
+        'salePrice' => number_format((float) $p['price'] - $sfOfferCardUnitDisc($p), 2),
         'showOld' => (int) ($p['offer_show_old_price'] ?? 0) === 1,
         'offerName' => orange_promo_customer_display_name([
             'show_name_to_customer' => (int) ($p['offer_show_name'] ?? 0),
@@ -630,7 +641,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                     }
                     ?>
                     <div class="price-row">
-                        <strong><?php echo number_format((float) $p['price'] - (float) $p['discount'], 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                        <strong><?php echo number_format((float) $p['price'] - $sfOfferCardUnitDisc($p), 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
                         <?php if ((int) ($p['offer_show_old_price'] ?? 0) === 1): ?>
                         <span class="old-price"><?php echo number_format((float) $p['price'], 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
                         <?php endif; ?>

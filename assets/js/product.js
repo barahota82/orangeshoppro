@@ -329,7 +329,15 @@ function orangeProductRefreshPriceDisplay() {
     const unit = p.currency_unit ? String(p.currency_unit) : '';
     const suffix = unit ? ' ' + unit : '';
     const base = orangeProductEffectiveUnitPrice(p);
-    const disc = Number(p.offer_discount) || 0;
+    // خصم العرض مدرك للنسبة ويُحسب على سعر المتغيّر المختار.
+    const offType = p.offer_discount_type || 'amount';
+    const offVal = Number(p.offer_discount_value);
+    let disc = 0;
+    if (!isNaN(offVal) && offVal > 0 && base > 0) {
+        disc = offType === 'percent'
+            ? (base * Math.min(100, offVal)) / 100
+            : Math.min(offVal, base);
+    }
     const after = Math.max(0, base - disc);
     strong.textContent = orangeProductFmtMoney(after) + suffix;
     const oldEl = document.getElementById('productPagePriceOld');

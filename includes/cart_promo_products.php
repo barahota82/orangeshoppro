@@ -32,6 +32,7 @@ function orange_cart_promo_admin_product_rows(PDO $pdo, ?int $countryId = null):
         "SELECT $cols FROM products p WHERE p.is_active = 1" . $countrySql . ' ORDER BY p.name ASC, p.id ASC'
     );
     $out = [];
+    $pids = [];
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
         $pid = (int) ($row['id'] ?? 0);
         if ($pid <= 0) {
@@ -47,6 +48,72 @@ function orange_cart_promo_admin_product_rows(PDO $pdo, ?int $countryId = null):
             'name' => trim((string) ($row['name'] ?? '')),
             'price' => $hasPrice ? (float) ($row['price'] ?? 0) : null,
             'cost' => $hasCost ? (float) ($row['cost'] ?? 0) : null,
+        ];
+        $pids[] = $pid;
+    }
+
+    // ملخص متغيّرات لكل منتج لحارس التكلفة (السعر/التكلفة الفعّالان COALESCE(متغيّر، منتج)).
+    $guardMap = orange_cart_promo_product_variant_guard_map($pdo, $pids);
+    foreach ($out as &$row) {
+        $g = $guardMap[$row['product_id']] ?? null;
+        // fallback لمستوى المنتج إن لم توجد صفوف متغيّرات.
+        $basePrice = $hasPrice ? (float) ($row['price'] ?? 0) : 0.0;
+        $baseCost = $hasCost ? (float) ($row['cost'] ?? 0) : 0.0;
+        if ($g === null) {
+            $g = [
+                'min_margin' => $basePrice - $baseCost,
+                'min_price' => $basePrice,
+                'max_cost_ratio' => $basePrice > 0 ? ($baseCost / $basePrice) : 0.0,
+            ];
+        }
+        $row['guard'] = $g;
+    }
+    unset($row);
+
+    return $out;
+}
+
+/**
+ * ملخص قيود حارس التكلفة لكل منتج عبر متغيّراته (سعر/تكلفة فعّالان COALESCE(متغيّر، منتج)).
+ * يُرجِع pid => {min_margin, min_price, max_cost_ratio} — لتقييد خصم العرض (مبلغ أو نسبة) على مستوى المتغيّر.
+ *
+ * @param list<int> $productIds
+ * @return array<int, array{min_margin:float,min_price:float,max_cost_ratio:float}>
+ */
+function orange_cart_promo_product_variant_guard_map(PDO $pdo, array $productIds): array
+{
+    $productIds = array_values(array_unique(array_map(static fn ($x): int => (int) $x, $productIds)));
+    if (
+        $productIds === []
+        || !orange_table_has_column($pdo, 'product_variants', 'price')
+        || !orange_table_has_column($pdo, 'product_variants', 'cost')
+    ) {
+        return [];
+    }
+    $ph = implode(',', array_fill(0, count($productIds), '?'));
+    $stmt = $pdo->prepare(
+        "SELECT pv.product_id AS pid,
+                MIN(COALESCE(pv.price, p.price) - COALESCE(pv.cost, p.cost)) AS min_margin,
+                MIN(COALESCE(pv.price, p.price)) AS min_price,
+                MAX(CASE WHEN COALESCE(pv.price, p.price) > 0
+                         THEN COALESCE(pv.cost, p.cost) / COALESCE(pv.price, p.price)
+                         ELSE 0 END) AS max_cost_ratio
+         FROM product_variants pv
+         INNER JOIN products p ON p.id = pv.product_id
+         WHERE pv.product_id IN ($ph)
+         GROUP BY pv.product_id"
+    );
+    $stmt->execute($productIds);
+    $out = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $pid = (int) ($row['pid'] ?? 0);
+        if ($pid <= 0) {
+            continue;
+        }
+        $out[$pid] = [
+            'min_margin' => (float) ($row['min_margin'] ?? 0),
+            'min_price' => (float) ($row['min_price'] ?? 0),
+            'max_cost_ratio' => (float) ($row['max_cost_ratio'] ?? 0),
         ];
     }
 

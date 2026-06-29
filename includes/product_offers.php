@@ -59,19 +59,33 @@ function orange_product_offer_sync_all_stock_pauses(PDO $pdo, ?int $countryId = 
 }
 
 /**
- * خصم الوحدة الفعّال لعرض منتج نشط (مبلغ ثابت يُخصم من سعر الوحدة) — 0 إن لا عرض ساري.
- * نفس شرط المتجر: نشط + ضمن المدة + غير موقوف + ضمن الدولة.
+ * يطبّع نوع خصم العرض إلى amount|percent (amount افتراضي).
  */
-function orange_product_offer_active_unit_discount(PDO $pdo, int $productId, ?int $countryId = null): float
+function orange_product_offer_normalize_discount_type(?string $type): string
+{
+    $t = strtolower(trim((string) $type));
+
+    return $t === 'percent' ? 'percent' : 'amount';
+}
+
+/**
+ * سجلّ العرض المفرد النشط لمنتج: ['discount'=>float, 'type'=>'amount'|'percent'] أو null إن لا عرض ساري.
+ * نفس شرط المتجر: نشط + ضمن المدة + غير موقوف + ضمن الدولة.
+ *
+ * @return array{discount:float,type:string}|null
+ */
+function orange_product_offer_active_record(PDO $pdo, int $productId, ?int $countryId = null): ?array
 {
     $table = orange_product_offer_table();
     if ($productId <= 0 || !orange_table_exists($pdo, $table)) {
-        return 0.0;
+        return null;
     }
     $scheduleSql = orange_table_has_column($pdo, $table, 'valid_from')
         ? orange_product_offer_storefront_sql('o')
         : '';
-    $sql = 'SELECT o.discount
+    $hasType = orange_table_has_column($pdo, $table, 'discount_type');
+    $typeSel = $hasType ? ', o.discount_type AS discount_type' : '';
+    $sql = 'SELECT o.discount' . $typeSel . '
             FROM ' . $table . ' o
             INNER JOIN products p ON p.id = o.product_id AND p.is_active = 1
             WHERE o.is_active = 1 AND o.product_id = ?' . $scheduleSql;
@@ -88,12 +102,52 @@ function orange_product_offer_active_unit_discount(PDO $pdo, int $productId, ?in
         . 'o.id ASC LIMIT 1';
     $st = $pdo->prepare($sql);
     $st->execute($params);
-    $disc = $st->fetchColumn();
-    if ($disc === false) {
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($row)) {
+        return null;
+    }
+
+    return [
+        'discount' => max(0.0, round((float) ($row['discount'] ?? 0), 4)),
+        'type' => $hasType ? orange_product_offer_normalize_discount_type((string) ($row['discount_type'] ?? 'amount')) : 'amount',
+    ];
+}
+
+/**
+ * خصم الوحدة الفعّال (مبلغ) لسجلّ عرض ضدّ سعر وحدة معطى — مدرك للنسبة، مقيّد بسعر الوحدة.
+ *
+ * @param array{discount:float,type:string}|null $record
+ */
+function orange_product_offer_unit_discount_for_price(?array $record, float $unitPrice): float
+{
+    if (!is_array($record) || $unitPrice <= 0.0001) {
+        return 0.0;
+    }
+    $disc = max(0.0, (float) ($record['discount'] ?? 0));
+    if ($disc <= 0.0001) {
+        return 0.0;
+    }
+    if (($record['type'] ?? 'amount') === 'percent') {
+        $pct = min(100.0, $disc);
+
+        return round($unitPrice * $pct / 100.0, 4);
+    }
+
+    return min(round($disc, 4), $unitPrice);
+}
+
+/**
+ * خصم الوحدة الفعّال لعرض منتج نشط — توافق رجعي (مبلغ ثابت فقط).
+ * النسبة تتطلّب سعر الوحدة؛ استخدم orange_product_offer_active_record + orange_product_offer_unit_discount_for_price.
+ */
+function orange_product_offer_active_unit_discount(PDO $pdo, int $productId, ?int $countryId = null): float
+{
+    $rec = orange_product_offer_active_record($pdo, $productId, $countryId);
+    if ($rec === null || ($rec['type'] ?? 'amount') !== 'amount') {
         return 0.0;
     }
 
-    return max(0.0, round((float) $disc, 4));
+    return max(0.0, (float) $rec['discount']);
 }
 
 /**
@@ -116,9 +170,9 @@ function orange_product_offer_total_discount_for_items(PDO $pdo, array $validate
             continue;
         }
         if (!array_key_exists($pid, $cache)) {
-            $cache[$pid] = orange_product_offer_active_unit_discount($pdo, $pid, $countryId);
+            $cache[$pid] = orange_product_offer_active_record($pdo, $pid, $countryId);
         }
-        $unitDisc = min($cache[$pid], $price);
+        $unitDisc = orange_product_offer_unit_discount_for_price($cache[$pid], $price);
         if ($unitDisc > 0.0001) {
             $total += round($unitDisc * $qty, 4);
         }
@@ -150,9 +204,9 @@ function orange_product_offer_partition_items(PDO $pdo, array $validatedItems, ?
         $unitDisc = 0.0;
         if (!$isGift && $pid > 0 && $qty > 0 && $price > 0.0001) {
             if (!array_key_exists($pid, $cache)) {
-                $cache[$pid] = orange_product_offer_active_unit_discount($pdo, $pid, $countryId);
+                $cache[$pid] = orange_product_offer_active_record($pdo, $pid, $countryId);
             }
-            $unitDisc = min($cache[$pid], $price);
+            $unitDisc = orange_product_offer_unit_discount_for_price($cache[$pid], $price);
         }
         if ($unitDisc > 0.0001) {
             $offerPids[$pid] = true;

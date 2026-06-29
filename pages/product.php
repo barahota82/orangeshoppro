@@ -249,9 +249,13 @@ $displayDesc = storefront_product_display_description($product);
 $homeUrl = storefront_url('home', $channelSlug, $lang);
 $needsVariantPick = ((int)$product['has_colors'] === 1 || (int)$product['has_sizes'] === 1);
 // خصم العرض المفرد النشط (إن وُجد) لعرض «قبل/بعد» على صفحة المنتج — لا يُحسب للمعاينة.
-$sfProductOfferDisc = $orangeProductPreview
-    ? 0.0
-    : orange_product_offer_active_unit_discount($pdo, (int) $product['id'], $sfProductCountryId);
+$sfProductOfferRec = $orangeProductPreview
+    ? null
+    : orange_product_offer_active_record($pdo, (int) $product['id'], $sfProductCountryId);
+$sfProductOfferType = (string) ($sfProductOfferRec['type'] ?? 'amount');
+$sfProductOfferValue = (float) ($sfProductOfferRec['discount'] ?? 0);
+// خصم الوحدة على سعر الأب (للعرض المبدئي قبل اختيار متغيّر)؛ JS يعيد الحساب لكل متغيّر.
+$sfProductOfferDisc = orange_product_offer_unit_discount_for_price($sfProductOfferRec, (float) $product['price']);
 $sfProductCurrencyUnit = orange_storefront_currency_unit($pdo);
 
 foreach ($variants as $v) {
@@ -740,6 +744,8 @@ window.CURRENT_PRODUCT = {
     name: <?php echo json_encode($displayName, JSON_UNESCAPED_UNICODE); ?>,
     price: <?php echo json_encode((float)$product['price']); ?>,
     offer_discount: <?php echo json_encode((float) $sfProductOfferDisc); ?>,
+    offer_discount_type: <?php echo json_encode($sfProductOfferType, JSON_UNESCAPED_UNICODE); ?>,
+    offer_discount_value: <?php echo json_encode((float) $sfProductOfferValue); ?>,
     currency_unit: <?php echo json_encode($sfProductCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
     image: <?php echo json_encode($product['main_image'], JSON_UNESCAPED_UNICODE); ?>,
     has_colors: <?php echo (int)$product['has_colors']; ?>,
