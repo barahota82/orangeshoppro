@@ -431,7 +431,7 @@ $orangeAdminSfProductUrlPartsForJs = [
 
         <div class="admin-product-tabs" role="tablist" aria-label="أقسام نموذج المنتج">
             <button type="button" class="admin-product-tab is-active" role="tab" id="productTabBtnBasic" aria-controls="productTabPanelBasic" aria-selected="true" data-product-tab="basic">البيانات الأساسية</button>
-            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnSizes" aria-controls="productTabPanelSizes" aria-selected="false" data-product-tab="sizes">الألوان</button>
+            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnSizes" aria-controls="productTabPanelSizes" aria-selected="false" data-product-tab="sizes">الألوان والمقاسات</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnImages" aria-controls="productTabPanelImages" aria-selected="false" data-product-tab="images">صور المنتج العامة</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnVariants" aria-controls="productTabPanelVariants" aria-selected="false" data-product-tab="variants">المتغيرات والباركود</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnAttributes" aria-controls="productTabPanelAttributes" aria-selected="false" data-product-tab="attributes">سمات المنتج</button>
@@ -558,8 +558,8 @@ $orangeAdminSfProductUrlPartsForJs = [
                 <div id="product_size_pick_panel" class="card admin-nested-panel" style="display:none;margin-top:12px;">
                     <h4 class="admin-nested-panel__title">مقاسات المنتج (بدون ألوان)</h4>
                     <p class="card-hint" style="margin:0 0 10px;font-size:13px;line-height:1.55;">
-                        عندما يكون المنتج <strong>بمقاسات فقط دون ألوان</strong>، حدّد المقاسات من العائلة التي اخترتها أعلاه ثم <strong>توليد المتغيرات</strong> من تبويب المتغيرات.
-                        إذا كان المنتج <strong>له ألوان</strong>، تُحدَّد المقاسات <strong>لكل صف لون</strong> من تبويب <strong>الألوان</strong>.
+                        عندما يكون المنتج <strong>بمقاسات فقط دون ألوان</strong>، حدّد المقاسات من العائلة التي اخترتها أعلاه ثم اضغط <strong>توليد المتغيرات</strong>.
+                        إذا كان المنتج <strong>له ألوان</strong>، تُحدَّد المقاسات <strong>لكل صف لون</strong> من قسم الألوان بهذا التبويب.
                     </p>
                     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;">
                         <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeSizePickSetAll(true)">تحديد الكل</button>
@@ -570,7 +570,7 @@ $orangeAdminSfProductUrlPartsForJs = [
                 </div>
 
                 <div id="productPricingPriceCost" class="product-pricing-identity-relocatable">
-                    <p id="pricingIdentityVariantNote" class="card-hint" style="display:none;margin:0 0 8px;padding:8px 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;color:#475569;font-size:12.5px;line-height:1.6;">التسعير والهوية على مستوى المتغيّر — تُحرَّر من تبويب <strong>«المتغيرات والباركود»</strong>؛ القيم هنا تمثّل <strong>السعر/التكلفة الموحّدين والكود الأب</strong>.</p>
+                    <p id="pricingIdentityVariantNote" class="card-hint" style="display:none;margin:0 0 8px;padding:8px 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;color:#475569;font-size:12.5px;line-height:1.6;">التسعير والهوية على مستوى المتغيّر — تُحرَّر <strong>أسفل قسم المتغيّرات</strong> بهذا التبويب؛ القيم هنا تمثّل <strong>السعر/التكلفة الموحّدين والكود الأب</strong>.</p>
                     <div class="form-grid product-form-basic-top3-inner">
                         <div>
                             <label>السعر</label>
@@ -3064,6 +3064,10 @@ function resetProductForm() {
 }
 
 function productFormShowTab(tab) {
+    // بعد دمج «المتغيرات والباركود» في تاب «الألوان والمقاسات»: أي تبديل برمجي إلى variants يفتح التاب الموحّد.
+    if (window.ORANGE_VARIANTS_TAB_MERGED && tab === 'variants') {
+        tab = 'sizes';
+    }
     const map = {
         basic: 'productTabPanelBasic',
         sizes: 'productTabPanelSizes',
@@ -3094,7 +3098,7 @@ function productFormShowTab(tab) {
         btn.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     orangeNormalizeProductTabPanelsNoGap();
-    if (key === 'variants') {
+    if (key === 'variants' || key === 'sizes') {
         orangeRefreshVariantReferenceThumbs();
     }
     if (key === 'cardpreview') {
@@ -3126,7 +3130,34 @@ function orangeNormalizeProductTabPanelsNoGap() {
     }
 }
 
+/**
+ * يدمج محتوى تبويب «المتغيرات والباركود» داخل تبويب «الألوان والمقاسات» وقت التشغيل
+ * (نقلٌ لمرة واحدة بالاحتفاظ بنفس المعرّفات فتبقى كل المعالجات والنقل اللاحق للسعر/التكلفة/الدليل
+ * يعمل بلا تغيير)، ويخفي زرّ التبويب المنفصل. المالك: «تاب واحد اسمه الألوان والمقاسات يضمّ كل شيء».
+ */
+function orangeUnifyVariantsIntoColorsTab() {
+    if (window.ORANGE_VARIANTS_TAB_MERGED) {
+        return;
+    }
+    const sizesPanel = document.getElementById('productTabPanelSizes');
+    const variantsPanel = document.getElementById('productTabPanelVariants');
+    if (!sizesPanel || !variantsPanel) {
+        return;
+    }
+    while (variantsPanel.firstChild) {
+        sizesPanel.appendChild(variantsPanel.firstChild);
+    }
+    const vbtn = document.getElementById('productTabBtnVariants');
+    if (vbtn) {
+        vbtn.style.display = 'none';
+    }
+    variantsPanel.setAttribute('hidden', 'hidden');
+    variantsPanel.style.display = 'none';
+    window.ORANGE_VARIANTS_TAB_MERGED = true;
+}
+
 (function initProductFormTabs() {
+    orangeUnifyVariantsIntoColorsTab();
     document.querySelectorAll('.admin-product-tab').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const t = btn.getAttribute('data-product-tab');
@@ -3135,6 +3166,14 @@ function orangeNormalizeProductTabPanelsNoGap() {
             }
         });
     });
+    // تغيير عائلة المقاسات (بما فيه «بلا مقاسات») يُعيد بناء مقاسات صفوف الألوان ويُعلِّم المصفوفة
+    // كي لا يبقى لون مقترناً بمقاسات أُلغيت (لقطة قديمة).
+    const famSelInit = document.getElementById('size_family_id');
+    if (famSelInit) {
+        famSelInit.addEventListener('change', function () {
+            onHasFlagsChange({ clearGeneratedMatrix: true });
+        });
+    }
 })();
 
 async function loadProductForEdit(id) {
@@ -3506,7 +3545,7 @@ function onHasFlagsChange(options) {
     if (cwh) {
         cwh.style.display = hs && hc && allowSizeTier ? 'block' : 'none';
     }
-    if (hs && hc && allowSizeTier) {
+    if (hc && allowSizeTier) {
         orangeRefreshAllColorwaySizePickers();
     }
     if (options && options.clearGeneratedMatrix) {
@@ -3878,11 +3917,12 @@ function orangeFillColorwayRowSizes(rowEl) {
 }
 
 function orangeRefreshAllColorwaySizePickers() {
-    const hs = orangeProductEffectiveHasSizes();
     const hc = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
-    if (!hs || !hc) {
+    if (!hc) {
         return;
     }
+    // عند إلغاء المقاسات (hs=false) يُفرّغ orangeFillColorwayRowSizes مقاسات كل صف لون،
+    // فلا يبقى لون مقترناً بمقاسات أُلغيت.
     document.querySelectorAll('#colorwaysBox .cw-row').forEach(function (row) {
         orangeFillColorwayRowSizes(row);
     });

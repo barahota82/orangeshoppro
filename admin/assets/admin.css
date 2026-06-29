@@ -2590,6 +2590,13 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     font-size: 14px;
     color: #334155;
 }
+/* منتج «بمقاسات فقط دون ألوان»: تُعرض المقاسات تحت بعضها (عموديًا) في تبويب الألوان والمقاسات. */
+#product_size_pick_checkboxes.product-size-pick-grid {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 8px;
+}
 
 .admin-variant-stock-readonly {
     color: #64748b;
