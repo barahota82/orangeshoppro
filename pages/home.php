@@ -86,11 +86,8 @@ if ($canUnifiedProductSql) {
     $offerOldPriceSelect = orange_table_has_column($pdo, 'offers', 'show_old_price_to_customer')
         ? ', o.show_old_price_to_customer AS offer_show_old_price'
         : '';
-    $offerPromoSelect = orange_table_has_column($pdo, 'offers', 'promo_text_ar')
-        ? ', o.promo_text_ar AS offer_promo_text_ar, o.promo_text_en AS offer_promo_text_en, o.promo_text_fil AS offer_promo_text_fil, o.promo_text_hi AS offer_promo_text_hi'
-        : '';
     $offersSql = '
-    SELECT o.id AS offer_id, o.discount' . $offerNameSelect . $offerOldPriceSelect . $offerPromoSelect . ',
+    SELECT o.id AS offer_id, o.discount' . $offerNameSelect . $offerOldPriceSelect . ',
            p.*, ucs2.department_id AS uf_dept_id, ucc.id AS uf_cat_id, ucs.id AS uf_sub_id
     FROM offers o
     INNER JOIN products p ON p.id = o.product_id
@@ -342,9 +339,7 @@ foreach ($offersLazyRows as $p) {
         'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => $pid]),
         'vl' => $vlOff,
         'attrs' => $sfHomeCardAttrAttr($pid),
-        'promo' => (orange_promo_customer_promo_text($p, $lang, 'offer_promo_text_') !== '')
-            ? orange_promo_customer_promo_text($p, $lang, 'offer_promo_text_')
-            : ($sfOfferPromoMap['product:' . (int) ($p['offer_id'] ?? 0)] ?? ''),
+        'promo' => $sfOfferPromoMap['product:' . (int) ($p['offer_id'] ?? 0)] ?? '',
     ];
 }
 
@@ -593,7 +588,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?></h3>
-                    <?php $sfOPmsg = orange_promo_customer_promo_text($p, $lang, 'offer_promo_text_'); if ($sfOPmsg === '') { $sfOPmsg = $sfOfferPromoMap['product:' . (int) ($p['offer_id'] ?? 0)] ?? ''; } if ($sfOPmsg !== ''): ?>
+                    <?php $sfOPmsg = $sfOfferPromoMap['product:' . (int) ($p['offer_id'] ?? 0)] ?? ''; if ($sfOPmsg !== ''): ?>
                     <p class="sf-offer-promo" role="status"><?php echo htmlspecialchars($sfOPmsg, ENT_QUOTES, 'UTF-8'); ?></p>
                     <?php endif; ?>
                     <?php
@@ -655,7 +650,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars($ccTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
-                    <?php $ccPromo = trim((string) ($cc['promo_text'] ?? '')); if ($ccPromo === '') { $ccPromo = $sfOfferPromoMap['combo:' . $ccId] ?? ''; } if ($ccPromo !== ''): ?>
+                    <?php $ccPromo = $sfOfferPromoMap['combo:' . $ccId] ?? ''; if ($ccPromo !== ''): ?>
                     <p class="sf-offer-promo" role="status"><?php echo htmlspecialchars($ccPromo, ENT_QUOTES, 'UTF-8'); ?></p>
                     <?php endif; ?>
                     <div class="price-row">
@@ -700,7 +695,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars($bcTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
-                    <?php $bcPromo = trim((string) ($bc['promo_text'] ?? '')); if ($bcPromo === '') { $bcPromo = $sfOfferPromoMap['bogo:' . $bcId] ?? ''; } if ($bcPromo !== ''): ?>
+                    <?php $bcPromo = $sfOfferPromoMap['bogo:' . $bcId] ?? ''; if ($bcPromo !== ''): ?>
                     <p class="sf-offer-promo" role="status"><?php echo htmlspecialchars($bcPromo, ENT_QUOTES, 'UTF-8'); ?></p>
                     <?php endif; ?>
                     <div class="price-row">
@@ -736,7 +731,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars($kcTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
-                    <?php $kcPromo = trim((string) ($kc['promo_text'] ?? '')); if ($kcPromo === '') { $kcPromo = $sfOfferPromoMap['bogo:' . $kcId] ?? ''; } if ($kcPromo !== ''): ?>
+                    <?php $kcPromo = $sfOfferPromoMap['bogo:' . $kcId] ?? ''; if ($kcPromo !== ''): ?>
                     <p class="sf-offer-promo" role="status"><?php echo htmlspecialchars($kcPromo, ENT_QUOTES, 'UTF-8'); ?></p>
                     <?php endif; ?>
                     <div class="price-row">

@@ -34,7 +34,6 @@ $cartUrl = storefront_url('cart', $channelSlug, $lang);
 // الجمهور: رسائل «للضيوف فقط» تُخفى عن العميل المسجّل (رسائل «للكل» تظهر للجميع).
 $offerViewerRegistered = current_storefront_account($pdo) !== null;
 $offerPromoMap = orange_storefront_promo_offer_card_map($pdo, $sfCountryId, $lang, $offerViewerRegistered);
-// نص مركزي (offer_card) كاحتياط؛ يُستبدَل بالنص المضمّن للعرض بعد تحميل البطاقة (أولوية المضمّن).
 $offerPromoText = $offerPromoMap[$offerType . ':' . $offerId] ?? '';
 $registerTeaserText = orange_storefront_promo_register_teaser($pdo, $sfCountryId, $lang);
 $offerRegisteredOnlyLabel = $registerTeaserText !== '' ? $registerTeaserText : t('offer_registered_only');
@@ -103,12 +102,6 @@ if ($card === null) {
     <?php
     include __DIR__ . '/../includes/footer.php';
     exit;
-}
-
-// أولوية النص التحفيزي المضمّن للعرض (شاشة العرض نفسها) على رسالة offer_card المركزية.
-$offerInlinePromo = trim((string) ($card['promo_text'] ?? ''));
-if ($offerInlinePromo !== '') {
-    $offerPromoText = $offerInlinePromo;
 }
 
 // حساب بيانات هدية BOGO (مشترك بين مسار same_category ومسار المكوّنات).

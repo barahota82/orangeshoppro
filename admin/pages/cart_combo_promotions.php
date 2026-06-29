@@ -5,7 +5,6 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/cart_promo_products.php';
 require_once __DIR__ . '/../../includes/offer_gl_link_card.php';
-require_once __DIR__ . '/../partials/promo_offer_text.inc.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -53,7 +52,6 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <input type="checkbox" id="ccp_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
         </label>
     </div>
-    <?php orange_render_promo_offer_text_fields('ccp'); ?>
     <div class="ccp-split" style="margin-top:14px;">
         <!-- النصف الأيمن: مكوّنات الحزمة + مراجعة التكلفة قبل تسعير الحزمة -->
         <div class="ccp-half">
@@ -307,7 +305,6 @@ function resetCartComboPromotionForm() {
     document.getElementById('ccp_id').value = '0';
     document.getElementById('ccp_title_ar').value = '';
     document.getElementById('ccp_title_en').value = '';
-    if (window.OrangePromoOfferText) OrangePromoOfferText.clear('ccp');
     document.getElementById('ccp_show_name').checked = false;
     var ccpShowOldReset = document.getElementById('ccp_show_old_price');
     if (ccpShowOldReset) ccpShowOldReset.checked = false;
@@ -326,7 +323,6 @@ function editCartComboPromotion(row) {
     document.getElementById('ccp_id').value = String(row.id != null ? row.id : 0);
     document.getElementById('ccp_title_ar').value = row.title_ar != null ? String(row.title_ar) : '';
     document.getElementById('ccp_title_en').value = row.title_en != null ? String(row.title_en) : '';
-    if (window.OrangePromoOfferText) OrangePromoOfferText.fill('ccp', row);
     document.getElementById('ccp_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
     var ccpShowOldEl = document.getElementById('ccp_show_old_price');
     if (ccpShowOldEl) ccpShowOldEl.checked = parseInt(row.show_old_price_to_customer, 10) === 1;
@@ -445,7 +441,7 @@ async function saveCartComboPromotion() {
         alert('سعر الحزمة أقل من إجمالي تكلفة مكوّناتها — ارفع سعر الحزمة قبل الحفظ.');
         return;
     }
-    var ccpPayload = {
+    var res = await postJSON('/admin/api/cart_combo_promotions/manage.php', {
         action: 'save',
         id: parseInt(document.getElementById('ccp_id').value, 10) || 0,
         title_ar: document.getElementById('ccp_title_ar').value,
@@ -460,9 +456,7 @@ async function saveCartComboPromotion() {
         valid_from: ocpGetIso('ccp_valid_from'),
         valid_to: ocpGetIso('ccp_valid_to'),
         components: ccpCompRows()
-    };
-    if (window.OrangePromoOfferText) Object.assign(ccpPayload, OrangePromoOfferText.payload('ccp'));
-    var res = await postJSON('/admin/api/cart_combo_promotions/manage.php', ccpPayload);
+    });
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
     if (res.success) {
         resetCartComboPromotionForm();

@@ -166,33 +166,6 @@ function orange_cart_promo_sanitize_allowed_colors(mixed $raw): ?array
 }
 
 /**
- * تنقية حقول النص التحفيزي المضمّن للعرض (أربع لغات) من مدخلات الأدمن.
- * تُعيد مصفوفة مفاتيحها ar/en/fil/hi (نص مقصوص إلى 255، فارغ مسموح).
- *
- * @param array<string,mixed> $data
- *
- * @return array{ar:string,en:string,fil:string,hi:string}
- */
-function orange_cart_promo_sanitize_promo_texts(array $data): array
-{
-    $clip = static function ($v): string {
-        $s = trim((string) $v);
-        if ($s === '') {
-            return '';
-        }
-
-        return function_exists('mb_substr') ? mb_substr($s, 0, 255, 'UTF-8') : substr($s, 0, 255);
-    };
-
-    return [
-        'ar' => $clip($data['promo_text_ar'] ?? ''),
-        'en' => $clip($data['promo_text_en'] ?? ''),
-        'fil' => $clip($data['promo_text_fil'] ?? ''),
-        'hi' => $clip($data['promo_text_hi'] ?? ''),
-    ];
-}
-
-/**
  * @return list<array{product_id:int,qty:int}>
  */
 function orange_cart_promo_parse_components_json(PDO $pdo, ?string $json): array
