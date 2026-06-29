@@ -12,6 +12,7 @@ require_once __DIR__ . '/../includes/countries.php';
 require_once __DIR__ . '/../includes/warehouses.php';
 require_once __DIR__ . '/../includes/stock_alerts.php';
 require_once __DIR__ . '/../includes/product_preview.php';
+require_once __DIR__ . '/../includes/product_offers.php';
 
 $pdo = db();
 orange_catalog_ensure_storefront_page($pdo);
@@ -247,6 +248,11 @@ $displayName = storefront_product_display_name($product);
 $displayDesc = storefront_product_display_description($product);
 $homeUrl = storefront_url('home', $channelSlug, $lang);
 $needsVariantPick = ((int)$product['has_colors'] === 1 || (int)$product['has_sizes'] === 1);
+// خصم العرض المفرد النشط (إن وُجد) لعرض «قبل/بعد» على صفحة المنتج — لا يُحسب للمعاينة.
+$sfProductOfferDisc = $orangeProductPreview
+    ? 0.0
+    : orange_product_offer_active_unit_discount($pdo, (int) $product['id'], $sfProductCountryId);
+$sfProductCurrencyUnit = orange_storefront_currency_unit($pdo);
 
 foreach ($variants as $v) {
     if ((int)$product['has_colors'] === 1) {
@@ -444,7 +450,14 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
 
         <div class="product-info">
             <h2 class="product-info__title"><?php echo htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'); ?></h2>
-            <div class="price-row product-info__price"><strong><?php echo number_format((float)$product['price'], 2); ?> <?php echo htmlspecialchars(orange_storefront_currency_unit($pdo), ENT_QUOTES, 'UTF-8'); ?></strong></div>
+            <?php
+            $sfPpBase = (float) $product['price'];
+            $sfPpAfter = max(0.0, $sfPpBase - (float) $sfProductOfferDisc);
+            ?>
+            <div class="price-row product-info__price">
+                <strong id="productPagePrice"><?php echo number_format($sfPpAfter, 2); ?> <?php echo htmlspecialchars($sfProductCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                <span class="old-price" id="productPagePriceOld"<?php echo ((float) $sfProductOfferDisc > 0) ? '' : ' hidden'; ?>><?php echo number_format($sfPpBase, 2); ?> <?php echo htmlspecialchars($sfProductCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
+            </div>
 
             <?php if ($totalStock > 0): ?>
             <div id="productStockBanner" class="stock-banner" role="status" aria-live="polite" hidden></div>
@@ -726,6 +739,8 @@ window.CURRENT_PRODUCT = {
     id: <?php echo (int)$product['id']; ?>,
     name: <?php echo json_encode($displayName, JSON_UNESCAPED_UNICODE); ?>,
     price: <?php echo json_encode((float)$product['price']); ?>,
+    offer_discount: <?php echo json_encode((float) $sfProductOfferDisc); ?>,
+    currency_unit: <?php echo json_encode($sfProductCurrencyUnit, JSON_UNESCAPED_UNICODE); ?>,
     image: <?php echo json_encode($product['main_image'], JSON_UNESCAPED_UNICODE); ?>,
     has_colors: <?php echo (int)$product['has_colors']; ?>,
     has_sizes: <?php echo (int)$product['has_sizes']; ?>,

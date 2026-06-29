@@ -1322,6 +1322,13 @@ body.storefront-browse-menu-lock {
     font-size: 0.9rem;
 }
 
+.price-from-label {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-inline-end: 4px;
+}
+
 .btn {
     display: inline-block;
     width: 100%;

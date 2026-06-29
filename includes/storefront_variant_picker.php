@@ -6,6 +6,7 @@ require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/catalog_labels.php';
 require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/upload_paths.php';
+require_once __DIR__ . '/variant_pricing.php';
 
 /**
  * عرض متغيّرات منتج للواجهة (ألوان/مقاسات/مخزون فعّال حسب الدولة) — مستخرَج من منطق
@@ -16,9 +17,10 @@ require_once __DIR__ . '/upload_paths.php';
  * @return array{
  *   product_id:int, name:string, price:float, main_image:string,
  *   has_colors:int, has_sizes:int, total_stock:int,
+ *   price_min:float, price_max:float,
  *   colors: list<array{key:string,color:string,pattern:string}>,
  *   sizes: list<array{key:string,label:string}>,
- *   variants: list<array{id:int,color:string,size:string,stock_quantity:int}>
+ *   variants: list<array{id:int,color:string,size:string,stock_quantity:int,price:float}>
  * }
  */
 function orange_storefront_product_variant_view(PDO $pdo, int $productId, int $countryId, string $lang): array
@@ -78,18 +80,28 @@ function orange_storefront_product_variant_view(PDO $pdo, int $productId, int $c
     $sizeSort = [];
     $totalStock = 0;
     $variants = [];
+    $priceMin = null;
+    $priceMax = null;
 
     foreach ($rows as $v) {
         $vid = (int) ($v['id'] ?? 0);
         $stock = $vid > 0 ? orange_warehouse_effective_variant_stock($pdo, $vid, $countryId) : 0;
         $color = trim((string) ($v['color'] ?? ''));
         $size = trim((string) ($v['size'] ?? ''));
+        $vPrice = orange_variant_effective_price($product, $v);
         $variants[] = [
             'id' => $vid,
             'color' => $color,
             'size' => $size,
             'stock_quantity' => $stock,
+            'price' => $vPrice,
         ];
+        if ($priceMin === null || $vPrice < $priceMin) {
+            $priceMin = $vPrice;
+        }
+        if ($priceMax === null || $vPrice > $priceMax) {
+            $priceMax = $vPrice;
+        }
         $totalStock += $stock;
 
         if ($hasColors === 1 && $color !== '' && !isset($colorMeta[$color])) {
@@ -162,10 +174,14 @@ function orange_storefront_product_variant_view(PDO $pdo, int $productId, int $c
         $sizes[] = ['key' => $sk, 'label' => $sizeLabel[$sk]];
     }
 
+    $basePrice = (float) ($product['price'] ?? 0);
+
     return [
         'product_id' => $productId,
         'name' => storefront_product_display_name($product),
-        'price' => (float) ($product['price'] ?? 0),
+        'price' => $basePrice,
+        'price_min' => $priceMin !== null ? (float) $priceMin : $basePrice,
+        'price_max' => $priceMax !== null ? (float) $priceMax : $basePrice,
         'main_image' => $mainImageHref,
         'has_colors' => $hasColors,
         'has_sizes' => $hasSizes,

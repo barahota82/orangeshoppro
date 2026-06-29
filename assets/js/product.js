@@ -299,6 +299,50 @@ function getEffectiveVariant(p) {
     return resolveSelectedVariant(p);
 }
 
+/* السعر الفعّال للوحدة قبل الخصم: سعر المتغيّر المختار إن وُجد، وإلا سعر المنتج (COALESCE). */
+function orangeProductEffectiveUnitPrice(p) {
+    let base = Number(p && p.price) || 0;
+    const v = getEffectiveVariant(p);
+    if (v && v.price !== null && v.price !== undefined && v.price !== '') {
+        const vp = Number(v.price);
+        if (!isNaN(vp)) {
+            base = vp;
+        }
+    }
+    return base;
+}
+
+function orangeProductFmtMoney(n) {
+    return (Number(n) || 0).toFixed(2);
+}
+
+/* يحدّث عرض السعر على صفحة المنتج (قبل/بعد الخصم) وفق المتغيّر المختار. */
+function orangeProductRefreshPriceDisplay() {
+    const p = window.CURRENT_PRODUCT;
+    if (!p) {
+        return;
+    }
+    const strong = document.getElementById('productPagePrice');
+    if (!strong) {
+        return;
+    }
+    const unit = p.currency_unit ? String(p.currency_unit) : '';
+    const suffix = unit ? ' ' + unit : '';
+    const base = orangeProductEffectiveUnitPrice(p);
+    const disc = Number(p.offer_discount) || 0;
+    const after = Math.max(0, base - disc);
+    strong.textContent = orangeProductFmtMoney(after) + suffix;
+    const oldEl = document.getElementById('productPagePriceOld');
+    if (oldEl) {
+        if (disc > 0) {
+            oldEl.textContent = orangeProductFmtMoney(base) + suffix;
+            oldEl.hidden = false;
+        } else {
+            oldEl.hidden = true;
+        }
+    }
+}
+
 function cartQuantityForLine(productId, variant) {
     if (!variant) {
         return 0;
@@ -363,6 +407,7 @@ function syncProductQtyLimits() {
     if (!p) {
         return;
     }
+    orangeProductRefreshPriceDisplay();
     const input = document.getElementById('qtyInput');
     const banner = document.getElementById('productStockBanner');
     const addBtn = document.querySelector('.product-add-cart-btn');
@@ -663,10 +708,11 @@ function addCurrentProductToCart() {
         }
     }
 
+    // سعر العرض في السلة = سعر المتغيّر الفعّال قبل الخصم (الخادم يعيد الحساب ويطبّق العروض بسلطته).
     const item = {
         id: p.id,
         name: p.name,
-        price: p.price,
+        price: orangeProductEffectiveUnitPrice(p),
         qty: qty,
         color: selectedColor,
         size: selectedSize,

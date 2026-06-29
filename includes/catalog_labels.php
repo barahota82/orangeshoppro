@@ -225,6 +225,47 @@ function orange_storefront_product_card_variant_line_map(PDO $pdo, array $produc
     return $out;
 }
 
+/**
+ * خريطة أدنى/أعلى سعر فعّال للمتغيّرات لكل منتج (لبطاقات «يبدأ من» عند تباين الأسعار).
+ *
+ * @param list<int> $productIds
+ * @return array<int, array{min:float,max:float,varies:bool}>
+ */
+function orange_storefront_product_variant_price_range_map(PDO $pdo, array $productIds): array
+{
+    $productIds = array_values(array_unique(array_map(static fn ($x): int => (int) $x, $productIds)));
+    if (
+        $productIds === []
+        || !function_exists('orange_table_has_column')
+        || !orange_table_has_column($pdo, 'product_variants', 'price')
+    ) {
+        return [];
+    }
+    $ph = implode(',', array_fill(0, count($productIds), '?'));
+    $stmt = $pdo->prepare(
+        "SELECT v.product_id AS pid,
+                MIN(COALESCE(v.price, p.price)) AS min_price,
+                MAX(COALESCE(v.price, p.price)) AS max_price
+         FROM product_variants v
+         INNER JOIN products p ON p.id = v.product_id
+         WHERE v.product_id IN ($ph)
+         GROUP BY v.product_id"
+    );
+    $stmt->execute($productIds);
+    $out = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $pid = (int) ($row['pid'] ?? 0);
+        if ($pid <= 0) {
+            continue;
+        }
+        $min = (float) ($row['min_price'] ?? 0);
+        $max = (float) ($row['max_price'] ?? 0);
+        $out[$pid] = ['min' => $min, 'max' => $max, 'varies' => ($max - $min) > 0.0001];
+    }
+
+    return $out;
+}
+
 function orange_size_display_label(?array $sizeRow, string $lang = 'ar'): string
 {
     if (!$sizeRow) {

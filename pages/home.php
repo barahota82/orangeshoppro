@@ -247,6 +247,23 @@ foreach ($offers as $hopRow) {
 /** @var array<int, array<string, string>> */
 $sfHomeProductAttrMap = orange_storefront_product_attr_map($pdo, array_keys($sfHomeAllProductIds));
 $sfHomeAttrFacets = orange_storefront_home_filterable_facets($pdo, $lang, $sfHomeCountryId);
+/** @var array<int, array{min:float,max:float,varies:bool}> أقل/أعلى سعر متغيّر لبطاقات «يبدأ من» */
+$sfHomePriceRange = orange_storefront_product_variant_price_range_map($pdo, array_keys($sfHomeAllProductIds));
+$sfFromLabel = match ($lang) {
+    'en' => 'From',
+    'fil' => 'Mula',
+    'hi' => 'From',
+    default => 'يبدأ من',
+};
+/** يُرجِع [سعر العرض، هل «يبدأ من»] لبطاقة منتج عادية حسب تباين أسعار المتغيّرات. */
+$sfHomeCardPrice = static function (array $p) use ($sfHomePriceRange): array {
+    $pr = $sfHomePriceRange[(int) ($p['id'] ?? 0)] ?? null;
+    if ($pr && !empty($pr['varies'])) {
+        return [(float) $pr['min'], true];
+    }
+
+    return [(float) ($p['price'] ?? 0), false];
+};
 
 $sfHomeCardAttrAttr = static function (int $pid) use ($sfHomeProductAttrMap): string {
     return orange_storefront_attr_data_attribute($sfHomeProductAttrMap[$pid] ?? []);
@@ -304,12 +321,14 @@ foreach ($productsLazyRows as $p) {
     foreach ($sfProductCardVariantLines[$pid] ?? [] as $ln) {
         $vl[] = ['c' => (string) $ln['color'], 'p' => (string) $ln['pattern']];
     }
+    [$sfLazyPriceVal, $sfLazyPriceFrom] = $sfHomeCardPrice($p);
     $lazyForJs[] = [
         'id' => $pid,
         'df' => 'all cat-' . $sfHomeFilterCatalogId($p) . $storefrontExtraFilterSuffix($p),
         'imgSrc' => storefront_product_image_href((string) ($p['main_image'] ?? '')),
         'title' => storefront_product_display_name($p),
-        'price' => number_format((float) $p['price'], 2),
+        'price' => number_format($sfLazyPriceVal, 2),
+        'priceFrom' => $sfLazyPriceFrom,
         'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => $pid]),
         'vl' => $vl,
         'attrs' => $sfHomeCardAttrAttr($pid),
@@ -774,8 +793,9 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                         <?php
                     }
                     ?>
+                    <?php [$sfCardPriceVal, $sfCardPriceFrom] = $sfHomeCardPrice($p); ?>
                     <div class="price-row">
-                        <strong><?php echo number_format((float) $p['price'], 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                        <strong><?php if ($sfCardPriceFrom): ?><span class="price-from-label"><?php echo htmlspecialchars($sfFromLabel, ENT_QUOTES, 'UTF-8'); ?></span> <?php endif; ?><?php echo number_format($sfCardPriceVal, 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
                     </div>
                     <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]), ENT_QUOTES, 'UTF-8'); ?>">
                         <?php echo htmlspecialchars(t('view_product'), ENT_QUOTES, 'UTF-8'); ?>
@@ -798,6 +818,7 @@ window.ORANGE_SF_GRID_LAZY_PRODUCTS = <?php echo json_encode($lazyForJs, $orange
 window.ORANGE_SF_GRID_LAZY_OFFERS = <?php echo json_encode($lazyOffersForJs, $orangeSfGridJsonFlags); ?>;
 window.ORANGE_SF_GRID_BATCH = <?php echo (int) $sfHomeGridScrollBatch; ?>;
 window.ORANGE_SF_GRID_VIEW_LABEL = <?php echo json_encode(t('view_product'), $orangeSfGridJsonFlags); ?>;
+window.ORANGE_SF_PRICE_FROM_LABEL = <?php echo json_encode($sfFromLabel, $orangeSfGridJsonFlags); ?>;
 var ORANGE_SF_GRID_FILTER_KEY = 'orange_sf_grid_filter';
 var ORANGE_BROWSE_DETAILS_OPEN_KEY = 'orange_browse_details_open';
 var orangeSfActiveAttrFilters = {};
@@ -1106,7 +1127,15 @@ function orangeSfAppendRegularCard(item) {
     var pr = document.createElement('div');
     pr.className = 'price-row';
     var strong = document.createElement('strong');
-    strong.textContent = item.price + ' KD';
+    if (item.priceFrom && window.ORANGE_SF_PRICE_FROM_LABEL) {
+        var fromSpan = document.createElement('span');
+        fromSpan.className = 'price-from-label';
+        fromSpan.textContent = window.ORANGE_SF_PRICE_FROM_LABEL;
+        strong.appendChild(fromSpan);
+        strong.appendChild(document.createTextNode(' ' + item.price + ' KD'));
+    } else {
+        strong.textContent = item.price + ' KD';
+    }
     pr.appendChild(strong);
     var a = document.createElement('a');
     a.className = 'btn';
