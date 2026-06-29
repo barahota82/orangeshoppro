@@ -570,13 +570,13 @@ $orangeAdminSfProductUrlPartsForJs = [
                 </div>
 
                 <div id="productPricingPriceCost" class="product-pricing-identity-relocatable">
-                    <p id="pricingIdentityVariantNote" class="card-hint" style="display:none;margin:0 0 8px;padding:8px 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;color:#475569;font-size:12.5px;line-height:1.6;">التسعير والهوية على مستوى المتغيّر — تُحرَّر <strong>أسفل قسم المتغيّرات</strong> بهذا التبويب؛ القيم هنا تمثّل <strong>السعر/التكلفة الموحّدين والكود الأب</strong>.</p>
+                    <p id="pricingIdentityVariantNote" class="card-hint" style="display:none;margin:0 0 8px;padding:8px 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;color:#475569;font-size:12.5px;line-height:1.6;">التسعير والهوية على مستوى المتغيّر — تُحرَّر هنا في تبويب <strong>«الألوان والمقاسات»</strong>؛ القيم تمثّل <strong>السعر/التكلفة الموحّدين والكود الأب</strong>، وتفاصيل كل متغيّر وباركوده في تبويب <strong>«المتغيرات والباركود»</strong>.</p>
                     <div class="form-grid product-form-basic-top3-inner">
-                        <div>
+                        <div id="productUnifiedPriceField">
                             <label>السعر</label>
                             <input type="number" id="price" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr" placeholder="0" data-money-empty-when-zero>
                         </div>
-                        <div>
+                        <div id="productUnifiedCostField">
                             <label>آخر تكلفة شراء (إرشادي)</label>
                             <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr" placeholder="0" data-money-empty-when-zero>
                             <small id="cost_gt_price_warn" class="card-hint" style="display:none;margin-top:4px;color:#b91c1c;font-weight:600;">التكلفة لا يمكن أن تكون أكبر من السعر.</small>
@@ -606,7 +606,7 @@ $orangeAdminSfProductUrlPartsForJs = [
 
         <div id="productTabPanelSizes" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnSizes" hidden>
         <div class="admin-product-section">
-        <h4 class="admin-product-subsection-title">الألوان</h4>
+        <h4 class="admin-product-subsection-title">الألوان والمقاسات</h4>
         <?php if ($colors === []): ?>
         <p style="margin:0 0 12px;padding:10px 12px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;color:#9a3412;font-size:13px;">قاموس <strong>الألوان</strong> فارغ — لن تظهر خيارات في خلطات اللون. أضف ألواناً من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=color_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس الألوان</a> قبل تفعيل «له ألوان؟».</p>
         <?php endif; ?>
@@ -621,6 +621,27 @@ $orangeAdminSfProductUrlPartsForJs = [
                 <button type="button" class="btn-secondary" onclick="addColorwayRow()">+ صف لون</button>
                 <button type="button" class="btn-secondary" onclick="removeColorwayRow()">- صف لون</button>
             </div>
+        </div>
+        <div id="variantSizeToolsSlot"></div>
+        <div id="productVariantPricingPanel" class="card admin-nested-panel" style="display:none;margin-bottom:14px;">
+            <h4 class="admin-nested-panel__title" style="margin-top:0;">التسعير والهوية</h4>
+            <div class="form-grid" style="margin-bottom:8px;">
+                <div>
+                    <label for="price_unified">السعر</label>
+                    <select id="price_unified" onchange="orangeOnUnifiedPricingChange()">
+                        <option value="1">موحّد لكل المتغيّرات</option>
+                        <option value="0">حسب كل متغيّر</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="cost_unified">التكلفة</label>
+                    <select id="cost_unified" onchange="orangeOnUnifiedPricingChange()">
+                        <option value="1">موحّدة لكل المتغيّرات</option>
+                        <option value="0">حسب كل متغيّر</option>
+                    </select>
+                </div>
+            </div>
+            <div id="pricingIdentitySlotVariants"></div>
         </div>
         </div>
         </div>
@@ -658,27 +679,7 @@ $orangeAdminSfProductUrlPartsForJs = [
         <div id="productTabPanelVariants" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnVariants" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">المتغيرات والباركود</h4>
-        <div id="variantSizeToolsSlot"></div>
-        <div id="productVariantPricingPanel" class="card admin-nested-panel" style="display:none;margin-bottom:14px;">
-            <h4 class="admin-nested-panel__title" style="margin-top:0;">التسعير والهوية</h4>
-            <div class="form-grid" style="margin-bottom:8px;">
-                <div>
-                    <label for="price_unified">السعر</label>
-                    <select id="price_unified" onchange="orangeOnUnifiedPricingChange()">
-                        <option value="1">موحّد لكل المتغيّرات</option>
-                        <option value="0">حسب كل متغيّر</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="cost_unified">التكلفة</label>
-                    <select id="cost_unified" onchange="orangeOnUnifiedPricingChange()">
-                        <option value="1">موحّدة لكل المتغيّرات</option>
-                        <option value="0">حسب كل متغيّر</option>
-                    </select>
-                </div>
-            </div>
-            <div id="pricingIdentitySlotVariants"></div>
-        </div>
+        <p class="card-hint" style="margin:0 0 12px;">توليد المتغيّرات وطباعة باركود/كود كل متغيّر. التسعير واختيار المقاسات ودليل المقاس في تبويب «الألوان والمقاسات».</p>
         <div id="variantsBox"></div>
         </div>
         </div>
@@ -1312,17 +1313,31 @@ function orangeProductValidateWizardBeforeMatrix() {
         return { tab: 'basic', message: 'يجب اختيار «نوع المنتج» قبل المتابعة.' };
     }
 
-    if (!orangeProductBasicPriceOk()) {
-        return { tab: 'basic', message: 'أدخل السعر والتكلفة (أرقام ≥ 0) قبل المتابعة.' };
-    }
-
     {
+        const puGate = document.getElementById('price_unified');
+        const cuGate = document.getElementById('cost_unified');
+        const priceUnifiedGate = !puGate || puGate.value === '1';
+        const costUnifiedGate = !cuGate || cuGate.value === '1';
+        // الخانة الموحّدة تظهر في تبويب «الألوان والمقاسات» عند وجود متغيّرات، وإلا في البيانات الأساسية.
+        const priceTab = orangeProductHasVariantDimension() ? 'sizes' : 'basic';
         const peChk = document.getElementById('price');
         const ceChk = document.getElementById('cost');
-        const pv = parseFloat(String((peChk && peChk.value) || '').trim().replace(',', '.'));
-        const cv = parseFloat(String((ceChk && ceChk.value) || '').trim().replace(',', '.'));
-        if (!isNaN(pv) && !isNaN(cv) && cv > pv) {
-            return { tab: 'basic', message: 'التكلفة لا يمكن أن تكون أكبر من السعر.' };
+        const psChk = peChk ? String(peChk.value || '').trim() : '';
+        const csChk = ceChk ? String(ceChk.value || '').trim() : '';
+        // السعر/التكلفة الموحّدان مطلوبان فقط عند «موحّد»؛ عند «حسب المتغيّر» يُحدَّدان من عمود كل سطر
+        // (يُفحَص اكتمالها عند الحفظ في orangeProductValidatePerVariantPricing).
+        if (priceUnifiedGate && (psChk === '' || !(parseFloat(psChk.replace(',', '.')) >= 0))) {
+            return { tab: priceTab, message: 'أدخل السعر الموحّد (رقم ≥ 0) قبل المتابعة.' };
+        }
+        if (costUnifiedGate && (csChk === '' || !(parseFloat(csChk.replace(',', '.')) >= 0))) {
+            return { tab: priceTab, message: 'أدخل التكلفة الموحّدة (رقم ≥ 0) قبل المتابعة.' };
+        }
+        if (priceUnifiedGate && costUnifiedGate) {
+            const pv = parseFloat(psChk.replace(',', '.'));
+            const cv = parseFloat(csChk.replace(',', '.'));
+            if (!isNaN(pv) && !isNaN(cv) && cv > pv) {
+                return { tab: priceTab, message: 'التكلفة لا يمكن أن تكون أكبر من السعر.' };
+            }
         }
     }
 
@@ -3064,10 +3079,6 @@ function resetProductForm() {
 }
 
 function productFormShowTab(tab) {
-    // بعد دمج «المتغيرات والباركود» في تاب «الألوان والمقاسات»: أي تبديل برمجي إلى variants يفتح التاب الموحّد.
-    if (window.ORANGE_VARIANTS_TAB_MERGED && tab === 'variants') {
-        tab = 'sizes';
-    }
     const map = {
         basic: 'productTabPanelBasic',
         sizes: 'productTabPanelSizes',
@@ -3098,7 +3109,7 @@ function productFormShowTab(tab) {
         btn.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     orangeNormalizeProductTabPanelsNoGap();
-    if (key === 'variants' || key === 'sizes') {
+    if (key === 'variants') {
         orangeRefreshVariantReferenceThumbs();
     }
     if (key === 'cardpreview') {
@@ -3130,34 +3141,7 @@ function orangeNormalizeProductTabPanelsNoGap() {
     }
 }
 
-/**
- * يدمج محتوى تبويب «المتغيرات والباركود» داخل تبويب «الألوان والمقاسات» وقت التشغيل
- * (نقلٌ لمرة واحدة بالاحتفاظ بنفس المعرّفات فتبقى كل المعالجات والنقل اللاحق للسعر/التكلفة/الدليل
- * يعمل بلا تغيير)، ويخفي زرّ التبويب المنفصل. المالك: «تاب واحد اسمه الألوان والمقاسات يضمّ كل شيء».
- */
-function orangeUnifyVariantsIntoColorsTab() {
-    if (window.ORANGE_VARIANTS_TAB_MERGED) {
-        return;
-    }
-    const sizesPanel = document.getElementById('productTabPanelSizes');
-    const variantsPanel = document.getElementById('productTabPanelVariants');
-    if (!sizesPanel || !variantsPanel) {
-        return;
-    }
-    while (variantsPanel.firstChild) {
-        sizesPanel.appendChild(variantsPanel.firstChild);
-    }
-    const vbtn = document.getElementById('productTabBtnVariants');
-    if (vbtn) {
-        vbtn.style.display = 'none';
-    }
-    variantsPanel.setAttribute('hidden', 'hidden');
-    variantsPanel.style.display = 'none';
-    window.ORANGE_VARIANTS_TAB_MERGED = true;
-}
-
 (function initProductFormTabs() {
-    orangeUnifyVariantsIntoColorsTab();
     document.querySelectorAll('.admin-product-tab').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const t = btn.getAttribute('data-product-tab');
@@ -3166,14 +3150,6 @@ function orangeUnifyVariantsIntoColorsTab() {
             }
         });
     });
-    // تغيير عائلة المقاسات (بما فيه «بلا مقاسات») يُعيد بناء مقاسات صفوف الألوان ويُعلِّم المصفوفة
-    // كي لا يبقى لون مقترناً بمقاسات أُلغيت (لقطة قديمة).
-    const famSelInit = document.getElementById('size_family_id');
-    if (famSelInit) {
-        famSelInit.addEventListener('change', function () {
-            onHasFlagsChange({ clearGeneratedMatrix: true });
-        });
-    }
 })();
 
 async function loadProductForEdit(id) {
@@ -3635,8 +3611,8 @@ function orangeRelocatePricingIdentity() {
 
 /**
  * ينقل أدوات المقاسات (منتقي مقاسات «بدون ألوان» + دليل المقاس الإرشادي) من البيانات
- * الأساسية إلى داخل تبويب «المتغيرات والباركود»؛ نقلٌ لمرة واحدة (idempotent) بالاحتفاظ
- * بنفس المعرّفات فتظل كل المعالجات تعمل. المالك: «اختيار المقاسات ودليل المقاس بتاب الألوان والمقاسات».
+ * الأساسية إلى داخل تبويب «الألوان والمقاسات» (الخانة #variantSizeToolsSlot)؛ نقلٌ لمرة واحدة
+ * (idempotent) بالاحتفاظ بنفس المعرّفات فتظل كل المعالجات تعمل. المالك: «اختيار المقاسات ودليل المقاس بتاب الألوان والمقاسات».
  */
 function orangeRelocateSizeToolsIntoVariantsTab() {
     const slot = document.getElementById('variantSizeToolsSlot');
@@ -3656,12 +3632,37 @@ function orangeRelocateSizeToolsIntoVariantsTab() {
     }
 }
 
-/** يطبّق أعلام التوحيد على أعمدة السعر/التكلفة في مصفوفة المتغيّرات. */
+/**
+ * يطبّق أعلام التوحيد على التسعير:
+ * - «موحّد»: تظهر خانة السعر/التكلفة الموحّدة في لوحة التسعير، وأعمدة السطر قراءة فقط تُملأ منها.
+ * - «حسب المتغيّر»: تختفي الخانة الموحّدة (يُحدَّد السعر/التكلفة من عمود كل سطر)، وأعمدة السطر قابلة للتحرير.
+ * للمنتج البسيط (بلا متغيّرات) تبقى الخانتان ظاهرتين دائماً (سعر/تكلفة المنتج نفسه).
+ */
 function orangeOnUnifiedPricingChange() {
     const puEl = document.getElementById('price_unified');
     const cuEl = document.getElementById('cost_unified');
     const priceUnified = !puEl || puEl.value === '1';
     const costUnified = !cuEl || cuEl.value === '1';
+    const hasVar = orangeProductHasVariantDimension();
+    const showUnifiedPrice = !hasVar || priceUnified;
+    const showUnifiedCost = !hasVar || costUnified;
+    const priceField = document.getElementById('productUnifiedPriceField');
+    const costField = document.getElementById('productUnifiedCostField');
+    const priceInp = document.getElementById('price');
+    const costInp = document.getElementById('cost');
+    if (priceField) {
+        priceField.style.display = showUnifiedPrice ? '' : 'none';
+    }
+    if (costField) {
+        costField.style.display = showUnifiedCost ? '' : 'none';
+    }
+    // الحقل المخفي لا يجب أن يمنع الإرسال (required) ولا يبقى مطلوباً بصرياً.
+    if (priceInp) {
+        priceInp.required = showUnifiedPrice;
+    }
+    if (costInp) {
+        costInp.required = showUnifiedCost;
+    }
     const basePrice = (function () { const v = parseFloat(document.getElementById('price') && document.getElementById('price').value || ''); return isFinite(v) ? v : ''; }());
     const baseCost = (function () { const v = parseFloat(document.getElementById('cost') && document.getElementById('cost').value || ''); return isFinite(v) ? v : ''; }());
     document.querySelectorAll('#variantsBox tbody tr').forEach((tr) => {
@@ -3736,6 +3737,56 @@ function orangeReadUnifiedFlags() {
         price_unified: (!puEl || puEl.value === '1') ? 1 : 0,
         cost_unified: (!cuEl || cuEl.value === '1') ? 1 : 0
     };
+}
+
+/**
+ * سعر/تكلفة الأب (products.price/cost) للحفظ:
+ * - «موحّد»: قيمة الخانة الموحّدة.
+ * - «حسب المتغيّر»: أدنى قيمة بين أسطر المتغيّرات («يبدأ من» في المتجر و fallback غير صفري).
+ */
+function orangeProductParentPriceForSave(variants) {
+    const flags = orangeReadUnifiedFlags();
+    const minRow = function (key) {
+        const arr = (variants || [])
+            .map(function (v) { return v[key]; })
+            .filter(function (n) { return typeof n === 'number' && isFinite(n); });
+        return arr.length ? Math.min.apply(null, arr) : null;
+    };
+    const pe = document.getElementById('price');
+    const ce = document.getElementById('cost');
+    const up = parseFloat((pe && pe.value) || '0') || 0;
+    const uc = parseFloat((ce && ce.value) || '0') || 0;
+    return {
+        price: flags.price_unified === 1 ? up : (minRow('price') != null ? minRow('price') : up),
+        cost: flags.cost_unified === 1 ? uc : (minRow('cost') != null ? minRow('cost') : uc)
+    };
+}
+
+/**
+ * تحقق اكتمال التسعير «حسب المتغيّر» قبل الحفظ: عند إلغاء التوحيد يجب أن يحمل كل سطر
+ * سعراً/تكلفةً صالحَين، وألا تتجاوز التكلفة السعر لأي متغيّر. يُرجِع رسالة الخطأ أو null.
+ */
+function orangeProductValidatePerVariantPricing() {
+    const flags = orangeReadUnifiedFlags();
+    if (flags.price_unified === 1 && flags.cost_unified === 1) {
+        return null;
+    }
+    const rows = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
+    for (let i = 0; i < rows.length; i++) {
+        const tr = rows[i];
+        const p = orangeReadVariantRowPrice(tr);
+        const c = orangeReadVariantRowCost(tr);
+        if (flags.price_unified === 0 && (p == null || p < 0)) {
+            return 'حدّد سعر كل متغيّر في جدول الألوان والمقاسات (التسعير حسب المتغيّر).';
+        }
+        if (flags.cost_unified === 0 && (c == null || c < 0)) {
+            return 'حدّد تكلفة كل متغيّر في جدول الألوان والمقاسات (التكلفة حسب المتغيّر).';
+        }
+        if (p != null && c != null && c > p) {
+            return 'التكلفة لا يمكن أن تكون أكبر من السعر في أحد المتغيّرات.';
+        }
+    }
+    return null;
 }
 
 function patternOptionsHtml() {
@@ -4596,6 +4647,13 @@ async function saveProduct() {
         return;
     }
 
+    const perVariantPricingErr = orangeProductValidatePerVariantPricing();
+    if (perVariantPricingErr) {
+        productFormShowTab('variants');
+        alert(perVariantPricingErr);
+        return;
+    }
+
     const recordId = parseInt(document.getElementById('product_record_id').value || '0', 10);
 
     if (recordId > 0) {
@@ -4677,6 +4735,7 @@ async function saveProduct() {
             }));
         }
         Object.assign(payload, orangeReadUnifiedFlags());
+        Object.assign(payload, orangeProductParentPriceForSave(payload.variants || []));
         const res = await postJSON('/admin/api/products/update.php', payload);
         alert(res.message || (res.success ? 'تم التحديث' : 'فشل'));
         if (res.success) {
@@ -4736,8 +4795,7 @@ async function saveProduct() {
 
             return n > 0 ? n : 0;
         }()),
-        price: parseFloat(document.getElementById('price').value || '0'),
-        cost: parseFloat(document.getElementById('cost').value || '0'),
+        ...orangeProductParentPriceForSave(variants),
         ...orangeReadUnifiedFlags(),
         main_image: document.getElementById('main_image').value.trim() || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES[0] ? window.PRODUCT_EXTRA_IMAGES[0] : ''),
         has_sizes: orangeProductEffectiveHasSizes() ? 1 : 0,
@@ -4811,8 +4869,7 @@ function orangeBuildProductPreviewPayload() {
         seo_meta_description_hi: val('seo_meta_description_hi'),
         category_id: parseInt(val('category_id'), 10) || 0,
         product_type_id: parseInt(val('product_type_id'), 10) || 0,
-        price: parseFloat(val('price') || '0') || 0,
-        cost: parseFloat(val('cost') || '0') || 0,
+        ...orangeProductParentPriceForSave(variants),
         ...orangeReadUnifiedFlags(),
         main_image: val('main_image') || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES[0] ? window.PRODUCT_EXTRA_IMAGES[0] : ''),
         has_sizes: orangeProductEffectiveHasSizes() ? 1 : 0,
@@ -5215,6 +5272,7 @@ if (orangePreviewRefreshNowBtn) {
             }
             if (id === 'price' || id === 'cost') {
                 orangeProductCostPriceLiveCheck();
+                orangeOnUnifiedPricingChange();
             }
             orangeApplyProductBasicStepLocks();
             if (id === 'name' || id === 'name_en' || id === 'name_fil' || id === 'name_hi' || id === 'price') {
