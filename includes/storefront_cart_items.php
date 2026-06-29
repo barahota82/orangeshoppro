@@ -7,6 +7,7 @@ require_once __DIR__ . '/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/countries.php';
 require_once __DIR__ . '/product_preview.php';
+require_once __DIR__ . '/variant_pricing.php';
 
 /**
  * التحقق من بنود السلة وحساب المجموع الفرعي. عند checkout استخدم lockVariants=true داخل معاملة.
@@ -119,8 +120,8 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
             $variantQtyAccumulated[$vId] = $alreadyRequested + $qty;
         }
 
-        $price = (float) $product['price'];
-        $cost = (float) $product['cost'];
+        $price = orange_variant_effective_price($product, $variant);
+        $cost = orange_variant_effective_cost($product, $variant);
         $lineTotal = $price * $qty;
         $subtotal += $lineTotal;
 

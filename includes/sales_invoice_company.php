@@ -12,6 +12,7 @@ require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/countries.php';
 require_once __DIR__ . '/document_sequences.php';
 require_once __DIR__ . '/invoice_ancillary_lines.php';
+require_once __DIR__ . '/variant_pricing.php';
 require_once __DIR__ . '/order_helpers.php';
 require_once __DIR__ . '/party_subledger.php';
 require_once __DIR__ . '/date_format.php';
@@ -372,8 +373,8 @@ function orange_sales_invoice_company_validate_items(PDO $pdo, array $itemsIn, i
             }
         }
 
-        $price = (float) ($product['price'] ?? 0);
-        $cost = (float) ($product['cost'] ?? 0);
+        $price = orange_variant_effective_price($product, $variant);
+        $cost = orange_variant_effective_cost($product, $variant);
         $lineNet = max(0.0, round($price * $qty - $lineDiscount, 4));
         $total += $lineNet;
 

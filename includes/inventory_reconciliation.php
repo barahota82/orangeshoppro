@@ -137,8 +137,12 @@ function orange_inventory_reconciliation_variant_unit_cost(PDO $pdo, int $varian
             return round((float) $cost, 4);
         }
     }
+    // احتياطي تراثي: تكلفة المتغيّر الإرشادية إن وُجدت، وإلا تكلفة المنتج.
+    $vCostExpr = orange_table_has_column($pdo, 'product_variants', 'cost')
+        ? 'COALESCE(pv.cost, p.cost)'
+        : 'p.cost';
     $st = $pdo->prepare(
-        'SELECT p.cost FROM product_variants pv INNER JOIN products p ON p.id = pv.product_id
+        'SELECT ' . $vCostExpr . ' FROM product_variants pv INNER JOIN products p ON p.id = pv.product_id
          WHERE pv.id = ? LIMIT 1'
     );
     $st->execute([$variantId]);

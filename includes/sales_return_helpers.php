@@ -22,12 +22,24 @@ function orange_sales_return_line_net(array $item): float
 }
 
 /**
- * تكلفة الوحدة للتكلفة: من الطلب أو من المنتج.
+ * تكلفة الوحدة للتكلفة: من الطلب، وإلا المصدر الموثوق COALESCE(تكلفة المتغيّر، تكلفة المنتج).
  */
-function orange_sales_return_resolve_unit_cost(PDO $pdo, int $productId, float $requestCost): float
+function orange_sales_return_resolve_unit_cost(PDO $pdo, int $productId, float $requestCost, int $variantId = 0): float
 {
     if ($requestCost >= 0 && $requestCost > 0.0001) {
         return round($requestCost, 4);
+    }
+    if ($variantId > 0 && orange_table_has_column($pdo, 'product_variants', 'cost')) {
+        $stv = $pdo->prepare(
+            'SELECT COALESCE(pv.cost, p.cost, 0) FROM product_variants pv
+             INNER JOIN products p ON p.id = pv.product_id
+             WHERE pv.id = ? AND pv.product_id = ? LIMIT 1'
+        );
+        $stv->execute([$variantId, $productId]);
+        $cv = $stv->fetchColumn();
+        if ($cv !== false && $cv !== null) {
+            return round(max(0.0, (float) $cv), 4);
+        }
     }
     $st = $pdo->prepare('SELECT COALESCE(cost, 0) FROM products WHERE id = ? LIMIT 1');
     $st->execute([$productId]);

@@ -9,6 +9,7 @@ require_once __DIR__ . '/cart_promotion_country.php';
 require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/cart_promo_products.php';
 require_once __DIR__ . '/cart_promo_schedule.php';
+require_once __DIR__ . '/variant_pricing.php';
 
 /**
  * أعلى سعر وحدة ممكن لهدية ترويجية في معاينة العربة (هدية مجموع سلة أو BOGO).
@@ -288,7 +289,7 @@ function orange_storefront_build_gift_order_line(
         'size' => (string) ($variant['size'] ?? ''),
         'variant_id' => $variantId,
         'price' => $unit,
-        'cost' => (float) ($product['cost'] ?? 0),
+        'cost' => orange_variant_effective_cost($product, $variant),
         'is_gift' => true,
     ];
 }

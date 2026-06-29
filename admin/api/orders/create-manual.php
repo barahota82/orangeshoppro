@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/order_helpers.php';
+require_once __DIR__ . '/../../../includes/variant_pricing.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
@@ -173,8 +174,8 @@ try {
             $variant = null;
         }
 
-        $price = (float)$product['price'];
-        $cost = (float)$product['cost'];
+        $price = orange_variant_effective_price($product, $variant);
+        $cost = orange_variant_effective_cost($product, $variant);
         $lineNet = max(0.0, round($price * $qty - $lineDiscount, 4));
         $total += $lineNet;
 

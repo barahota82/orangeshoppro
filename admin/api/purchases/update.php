@@ -68,6 +68,10 @@ function apply_purchase_items(PDO $pdo, int $purchaseId, array $items, int $coun
     $updProductCost = $hasProductsCost
         ? $pdo->prepare('UPDATE products SET cost = ? WHERE id = ?')
         : null;
+    $hasVariantCost = orange_table_has_column($pdo, 'product_variants', 'cost');
+    $updVariantCost = $hasVariantCost
+        ? $pdo->prepare('UPDATE product_variants SET cost = ? WHERE id = ?')
+        : null;
     $subtotal = 0.0;
     foreach ($items as $item) {
         $productId = (int)($item['product_id'] ?? 0);
@@ -136,6 +140,9 @@ function apply_purchase_items(PDO $pdo, int $purchaseId, array $items, int $coun
         );
         if ($updProductCost !== null) {
             $updProductCost->execute([$lineNetUnit, $productId]);
+        }
+        if ($updVariantCost !== null && $variantId > 0) {
+            $updVariantCost->execute([$lineNetUnit, $variantId]);
         }
     }
 

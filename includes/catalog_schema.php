@@ -6530,12 +6530,16 @@ function orange_catalog_migrate_inventory_cost_layers_v89(PDO $pdo): void
         && orange_table_exists($pdo, 'products')
     ) {
         $now = date('Y-m-d H:i:s');
+        // المصدر الموثوق: تكلفة المتغيّر الافتتاحية إن وُجدت، وإلا تكلفة المنتج.
+        $openCostExpr = orange_table_has_column($pdo, 'product_variants', 'cost')
+            ? 'COALESCE(pv.cost, p.cost, 0)'
+            : 'COALESCE(p.cost, 0)';
         $seed = $pdo->prepare(
             'INSERT INTO inventory_cost_layers
                 (country_id, warehouse_id, variant_id, source_type, source_id, layer_date,
                  qty_in, qty_remaining, unit_cost, note, created_at)
              SELECT w.country_id, wvs.warehouse_id, wvs.variant_id, \'opening\', NULL, ?,
-                    wvs.quantity, wvs.quantity, COALESCE(p.cost, 0), \'رصيد افتتاحي\', ?
+                    wvs.quantity, wvs.quantity, ' . $openCostExpr . ', \'رصيد افتتاحي\', ?
              FROM warehouse_variant_stock wvs
              INNER JOIN warehouses w ON w.id = wvs.warehouse_id
              INNER JOIN product_variants pv ON pv.id = wvs.variant_id

@@ -184,6 +184,11 @@ try {
     $updProductCost = $hasProductsCost
         ? $pdo->prepare('UPDATE products SET cost = ? WHERE id = ?')
         : null;
+    // «آخر تكلفة شراء» إرشادية على مستوى المتغيّر أيضاً (تغذّي fallback السعر/التكلفة الموثوق).
+    $hasVariantCost = orange_table_has_column($pdo, 'product_variants', 'cost');
+    $updVariantCost = $hasVariantCost
+        ? $pdo->prepare('UPDATE product_variants SET cost = ? WHERE id = ?')
+        : null;
 
     foreach ($items as $item) {
         $productId = (int)($item['product_id'] ?? 0);
@@ -265,6 +270,9 @@ try {
         // بطاقة الصنف: «آخر تكلفة شراء» إرشادية فقط (لا أثر تقييمي بعد م3).
         if ($updProductCost !== null) {
             $updProductCost->execute([$lineNetUnit, $productId]);
+        }
+        if ($updVariantCost !== null && $variantId > 0) {
+            $updVariantCost->execute([$lineNetUnit, $variantId]);
         }
     }
 

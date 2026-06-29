@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/purchase_doc_product_pick.php';
+require_once __DIR__ . '/variant_pricing.php';
 
 /**
  * صفوف اختيار الأصناف لفاتورة مبيعات شركة (INV-C) — سعر + مخزون.
@@ -33,6 +34,12 @@ function orange_sales_doc_product_pick_rows(PDO $pdo, int $countryId): array
     }
     if (orange_table_has_column($pdo, 'product_variants', 'barcode')) {
         $vCols .= ', pv.barcode';
+    }
+    if (orange_table_has_column($pdo, 'product_variants', 'price')) {
+        $vCols .= ', pv.price';
+    }
+    if (orange_table_has_column($pdo, 'product_variants', 'cost')) {
+        $vCols .= ', pv.cost';
     }
 
     $variants = $pdo->query(
@@ -88,6 +95,7 @@ function orange_sales_doc_product_pick_rows(PDO $pdo, int $countryId): array
         $pcode = trim((string) ($p['item_code'] ?? ''));
         $pbarcode = trim((string) ($p['barcode'] ?? ''));
         $price = (float) ($p['price'] ?? 0);
+        $pcost = (float) ($p['cost'] ?? 0);
         $vlist = $variantsByProduct[$pid] ?? [];
 
         if ($vlist === []) {
@@ -101,7 +109,7 @@ function orange_sales_doc_product_pick_rows(PDO $pdo, int $countryId): array
                 'name' => (string) ($p['name'] ?? ''),
                 'color' => '',
                 'size' => '',
-                'cost' => $price,
+                'cost' => $pcost,
                 'price' => $price,
                 'stock_available' => 0,
                 'stock_reserved' => 0,
@@ -133,8 +141,8 @@ function orange_sales_doc_product_pick_rows(PDO $pdo, int $countryId): array
                 'name' => (string) ($p['name'] ?? ''),
                 'color' => trim((string) ($v['color'] ?? '')),
                 'size' => trim((string) ($v['size'] ?? '')),
-                'cost' => $price,
-                'price' => $price,
+                'cost' => orange_variant_effective_cost($p, $v),
+                'price' => orange_variant_effective_price($p, $v),
                 'stock_available' => $avail,
                 'stock_reserved' => $res,
                 'stock_total' => $avail + $res,

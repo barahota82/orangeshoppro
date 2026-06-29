@@ -505,7 +505,15 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 
 **قاعدة المصدر الموثوق (الخادم):** السعر/التكلفة الفعّالان للمتغيّر = `COALESCE(product_variants.price, products.price)` و `COALESCE(product_variants.cost, products.cost)`؛ مع `price_unified`/`cost_unified` يتحكّمان بسلوك الأدمن والمزامنة. لا يُعتمد على سعر يُرسله العميل — التسعير من الخادم دائماً (مسار السلة/الطلب/الفاتورة).
 
-**حالة التنفيذ:** Phase 0 (المخطط/الترحيل) منفّذ؛ المراحل 1–5 (شاشة المنتج/الكتابة، مصدر السعر الموثوق، الواجهة، نوع خصم العرض، تشيك بوكس «تفصيلي») قيد التنفيذ المرحلي. **توافق رجعي:** المنتجات القائمة (price_unified=1، سعر المتغيّر = سعر الأب بعد backfill) تتصرّف تماماً كما قبل التغيير.
+**حالة التنفيذ:** Phase 0 (المخطط/الترحيل) + Phase 1a/1b (شاشة المنتج: كتابة/قراءة سعر وتكلفة المتغيّر، أعلام التوحيد، كود المتغيّر، واجهة إعادة الترتيب/النقل) + **Phase 2 (مصدر السعر/التكلفة الموثوق)** منفّذة. المراحل 3–5 (الواجهة «يبدأ من»/قبل-بعد، نوع خصم العرض %/مبلغ + حارس التكلفة، تشيك بوكس «تفصيلي» للمستندات/التقارير) قيد التنفيذ المرحلي. **توافق رجعي:** المنتجات القائمة (price_unified=1، سعر المتغيّر = سعر الأب بعد backfill) تتصرّف تماماً كما قبل التغيير.
+
+**تنفيذ (Phase 2 — قاعدة المصدر الموثوق):** دالّتان نقيّتان `orange_variant_effective_price()` / `orange_variant_effective_cost()` في `includes/variant_pricing.php` تطبّقان `COALESCE(متغيّر، منتج)` على صفوف محمّلة (متوافقة مع المخطط القديم). طُبِّقت في:
+- **مصدر بيع السعر/التكلفة (سلطة الخادم):** `includes/storefront_cart_items.php` (سلة/طلب أونلاين)، `admin/api/orders/create-manual.php` (فاتورة شركة يدوية)، `includes/sales_invoice_company.php` (تحقق/تعديل INV-C). العروض/الكومبو/السلة تبني على سعر السطر الفعّال تلقائياً.
+- **منتقيات المستندات:** `includes/sales_doc_product_pick.php` و `includes/purchase_doc_product_pick.php` تُرجعان سعر/تكلفة المتغيّر الفعّالين لكل صف (عمود `pv.price`/`pv.cost` يُضاف عند وجوده).
+- **تكلفة المشتريات:** `admin/api/purchases/create.php` و `update.php` يحدّثان «آخر تكلفة شراء» الإرشادية على `product_variants.cost` للمتغيّر المستلَم (إضافةً إلى `products.cost`).
+- **fallbacks التكلفة:** `includes/sales_return_helpers.php` (مردود المبيعات يفضّل تكلفة المتغيّر)، `includes/inventory_reconciliation.php` (تعاقب تكلفة المتغيّر قبل المنتج)، بذرة الرصيد الافتتاحي في `includes/catalog_schema.php` (`COALESCE(pv.cost, p.cost, 0)`).
+- **هدايا/BOGO:** `includes/cart_gift_promotions.php` (تكلفة سطر الهدية = تكلفة المتغيّر)، و`includes/cart_promo_gift_charge.php` (قيمة/خصم الهدية على سعر المتغيّر الفعّال).
+الطبقات التقييمية (FIFO `inventory_cost_layers`/`inventory_cost_consumptions` وCOGS عند التسليم) مفاتيحها `variant_id` أصلاً ولم تتغيّر؛ السطور المحفوظة (`order_items`/`purchase_items`/`*_return_items`) تحمل `variant_id` + لقطة السعر/التكلفة.
 
 
 نهاية المرجع.

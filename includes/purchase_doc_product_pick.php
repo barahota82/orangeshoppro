@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/variant_pricing.php';
+
 /**
  * صفوف اختيار الأصناف لفاتورة الشراء ومردود المشتريات — سطر لكل (صنف + لون + مقاس).
  *
@@ -29,6 +31,9 @@ function orange_purchase_doc_product_pick_rows(PDO $pdo, int $countryId): array
     }
     if (orange_table_has_column($pdo, 'product_variants', 'barcode')) {
         $vCols .= ', pv.barcode';
+    }
+    if (orange_table_has_column($pdo, 'product_variants', 'cost')) {
+        $vCols .= ', pv.cost';
     }
 
     $variants = $pdo->query(
@@ -100,7 +105,7 @@ function orange_purchase_doc_product_pick_rows(PDO $pdo, int $countryId): array
                 'name' => (string) ($p['name'] ?? ''),
                 'color' => trim((string) ($v['color'] ?? '')),
                 'size' => trim((string) ($v['size'] ?? '')),
-                'cost' => $cost,
+                'cost' => orange_variant_effective_cost($p, $v),
             ];
         }
     }

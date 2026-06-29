@@ -136,7 +136,7 @@ try {
         if ($net <= 0.0001) {
             throw new RuntimeException('صافي سطر المردود غير صالح (سعر/كمية/خصم)');
         }
-        $unitCost = orange_sales_return_resolve_unit_cost($pdo, $productId, (float) $line['cost']);
+        $unitCost = orange_sales_return_resolve_unit_cost($pdo, $productId, (float) $line['cost'], $variantId);
         $lineCost = round($unitCost * $qty, 4);
         $revenueTotal += $net;
         $cogsTotal += $lineCost;

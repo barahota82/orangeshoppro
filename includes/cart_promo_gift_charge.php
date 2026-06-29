@@ -13,8 +13,11 @@ function orange_cart_promo_gift_variant_retail_unit(PDO $pdo, int $variantId): f
     if ($variantId <= 0) {
         return 0.0;
     }
+    $priceExpr = orange_table_has_column($pdo, 'product_variants', 'price')
+        ? 'COALESCE(v.price, p.price)'
+        : 'p.price';
     $st = $pdo->prepare(
-        'SELECT p.price FROM products p
+        'SELECT ' . $priceExpr . ' AS price FROM products p
          INNER JOIN product_variants v ON v.product_id = p.id
          WHERE v.id = ? AND p.is_active = 1 LIMIT 1'
     );
@@ -48,8 +51,11 @@ function orange_cart_promo_resolve_gift_unit_price_from_rule(PDO $pdo, array $ru
     if ($kind === 'fixed_unit') {
         return max(0.0, round($val, 4));
     }
+    $priceExpr = orange_table_has_column($pdo, 'product_variants', 'price')
+        ? 'COALESCE(v.price, p.price)'
+        : 'p.price';
     $st = $pdo->prepare(
-        'SELECT p.id AS product_id, p.price FROM products p
+        'SELECT p.id AS product_id, ' . $priceExpr . ' AS price FROM products p
          INNER JOIN product_variants v ON v.product_id = p.id
          WHERE v.id = ? AND p.is_active = 1 LIMIT 1'
     );
