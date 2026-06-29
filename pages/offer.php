@@ -251,6 +251,7 @@ if ($isBogo && (string) ($card['bogo_kind'] ?? '') === 'same_category') {
 $rawComponents = $isCombo ? ($card['components'] ?? []) : ($card['buy_components'] ?? []);
 $components = [];
 $componentsTotal = 0.0;
+$componentsVaries = false;
 foreach ($rawComponents as $comp) {
     $pid = (int) ($comp['product_id'] ?? 0);
     if ($pid <= 0) {
@@ -261,6 +262,9 @@ foreach ($rawComponents as $comp) {
     $qty = max(1, (int) ($comp['qty'] ?? 1));
     $price = (float) ($comp['price'] ?? $view['price']);
     $componentsTotal += $price * $qty;
+    if (!empty($comp['price_varies'])) {
+        $componentsVaries = true;
+    }
 
     // VS3ب: تقييد ألوان الأدمن للمكوّن (عرض فقط). نُبقي فقط الألوان/المتغيّرات المسموحة.
     $compColors = $view['colors'];
@@ -307,6 +311,12 @@ foreach ($rawComponents as $comp) {
 }
 $componentsTotal = round($componentsTotal, 4);
 
+$offerFromLabel = match ($lang) {
+    'en' => 'From',
+    'fil' => 'Mula',
+    'hi' => 'From',
+    default => 'يبدأ من',
+};
 $offerName = (string) ($card['name'] ?? '');
 $requiresRegistration = !empty($card['requires_registration']);
 $buyerRegistered = current_storefront_account($pdo) !== null;
@@ -471,9 +481,9 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
     <div class="offer-sticky-bar__inner">
         <div class="offer-sticky-bar__price">
             <span class="offer-sticky-bar__label"><?php echo htmlspecialchars($priceLabel, ENT_QUOTES, 'UTF-8'); ?></span>
-            <strong id="offerBundlePrice"><?php echo number_format($bundlePrice, 2); ?> <?php echo htmlspecialchars($sfCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+            <strong id="offerBundlePrice"><?php if (!$isCombo && $componentsVaries): ?><span class="price-from-label"><?php echo htmlspecialchars($offerFromLabel, ENT_QUOTES, 'UTF-8'); ?></span> <?php endif; ?><?php echo number_format($bundlePrice, 2); ?> <?php echo htmlspecialchars($sfCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
             <?php if ($showOldPrice): ?>
-            <span class="old-price" id="offerOldPrice"><?php echo number_format($componentsTotal, 2); ?> <?php echo htmlspecialchars($sfCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="old-price" id="offerOldPrice"><?php if ($componentsVaries): ?><span class="price-from-label"><?php echo htmlspecialchars($offerFromLabel, ENT_QUOTES, 'UTF-8'); ?></span> <?php endif; ?><?php echo number_format($componentsTotal, 2); ?> <?php echo htmlspecialchars($sfCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
             <?php endif; ?>
         </div>
         <div class="offer-sticky-bar__qty qty-control">

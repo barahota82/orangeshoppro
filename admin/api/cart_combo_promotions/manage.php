@@ -112,17 +112,30 @@ try {
             json_response(['success' => false, 'message' => $chainErr], 422);
         }
 
-        // منع بيع الحزمة تحت التكلفة: سعر الحزمة الواحدة يجب ألا يقل عن إجمالي تكلفة مكوّناتها
-        // (تكلفة المنتج الأساسية products.cost × الكمية). قرار مالك 2026-06-27 — يسري على شاشات
-        // العروض التي تبيع منتجات (عروض المنتجات + الكومبو)؛ لا يسري على الهدية/BOGO (هدايا بسعر صفر).
+        // منع بيع الحزمة تحت التكلفة: سعر الحزمة الواحدة يجب ألا يقل عن إجمالي تكلفة مكوّناتها.
+        // التكلفة الفعّالة لكل متغيّر COALESCE(pv.cost, p.cost)، ونأخذ «أسوأ حالة» (أعلى تكلفة متغيّر)
+        // لكل منتج — اتساقاً مع حارس عرض المنتج لكل متغيّر (orange_cart_promo_product_variant_guard_map)
+        // فلا تُباع أي تركيبة متغيّرات تحت التكلفة. قرار مالك 2026-06-27 (+ تحديث لكل متغيّر 2026-06).
+        // لا يسري على الهدية/BOGO (هدايا بسعر صفر بطبيعتها).
         if (orange_table_has_column($pdo, 'products', 'cost')) {
             $uniquePids = array_values(array_unique($pids));
             $costPlaceholders = implode(',', array_fill(0, count($uniquePids), '?'));
-            $costStmt = $pdo->prepare('SELECT id, cost FROM products WHERE id IN (' . $costPlaceholders . ')');
+            $hasVarCost = orange_table_has_column($pdo, 'product_variants', 'cost');
+            if ($hasVarCost) {
+                $costStmt = $pdo->prepare(
+                    'SELECT p.id AS pid, MAX(COALESCE(pv.cost, p.cost)) AS c
+                     FROM products p
+                     LEFT JOIN product_variants pv ON pv.product_id = p.id
+                     WHERE p.id IN (' . $costPlaceholders . ')
+                     GROUP BY p.id'
+                );
+            } else {
+                $costStmt = $pdo->prepare('SELECT id AS pid, cost AS c FROM products WHERE id IN (' . $costPlaceholders . ')');
+            }
             $costStmt->execute($uniquePids);
             $costMap = [];
             foreach ($costStmt->fetchAll(PDO::FETCH_ASSOC) as $costRow) {
-                $costMap[(int) $costRow['id']] = (float) ($costRow['cost'] ?? 0);
+                $costMap[(int) $costRow['pid']] = (float) ($costRow['c'] ?? 0);
             }
             $totalCost = 0.0;
             foreach ($comps as $c) {
@@ -132,7 +145,7 @@ try {
             if ($totalCost > 0 && $comboPrice < $totalCost - 0.00001) {
                 json_response([
                     'success' => false,
-                    'message' => 'سعر الحزمة أقل من إجمالي تكلفة مكوّناتها الأساسية — غير مسموح. ارفع سعر الحزمة.',
+                    'message' => 'سعر الحزمة أقل من إجمالي تكلفة مكوّناتها (أعلى تكلفة متغيّر) — غير مسموح. ارفع سعر الحزمة.',
                 ], 422);
             }
         }

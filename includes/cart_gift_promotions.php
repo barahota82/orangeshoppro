@@ -241,6 +241,34 @@ function orange_cart_gift_promotion_pool_options(
 }
 
 /**
+ * يحلّ هدية «ثابتة» (مخزَّنة كرقم منتج بعد قرار 2026-05-20) إلى رقم متغيّر تمثيلي
+ * فعلي (أول خيار متاح في البركة). يُعيد 0 إن لم يتوفر أي متغيّر صالح/بمخزون.
+ * ضروري لأن باني سطر الهدية يتوقّع رقم متغيّر لا رقم منتج (تداخل المعرّفات يسبب صنفاً خاطئاً).
+ *
+ * @param list<array<string,mixed>> $validatedItems
+ */
+function orange_cart_promo_fixed_gift_resolve_variant_id(
+    PDO $pdo,
+    int $fixedProductId,
+    array $validatedItems,
+    ?int $countryId = null
+): int {
+    if ($fixedProductId <= 0) {
+        return 0;
+    }
+    foreach (
+        orange_cart_gift_promotion_pool_options($pdo, [$fixedProductId], $validatedItems, true, $countryId) as $opt
+    ) {
+        $vid = (int) ($opt['variant_id'] ?? 0);
+        if ($vid > 0) {
+            return $vid;
+        }
+    }
+
+    return 0;
+}
+
+/**
  * بند هدية للفاتورة والحجز (مجانية افتراضياً؛ يُمرَّر سعر الوحدة لعروض مثل BOGO الجزئية).
  *
  * @param list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $validatedItems

@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/storefront_promo_messages.php';
 require_once __DIR__ . '/../../includes/cart_promotion_country.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -13,8 +14,9 @@ $hasTable = orange_table_exists($pdo, 'storefront_promo_messages');
 $spmSlots = orange_storefront_promo_message_slots();
 $spmOfferTypes = orange_storefront_promo_message_offer_types();
 $spmAudiences = orange_storefront_promo_message_audiences();
-$spmAdminCid = (int) orange_cart_promotion_admin_country_id($pdo);
-$spmIsGlobal = $spmAdminCid <= 0;
+// المشرف المقيَّد بدولة (قفل الجلسة) لا يختار النطاق؛ المشرف العام (lock<=0) يختار «كل الدول» أو دولة بعينها.
+$spmLockedCid = (int) orange_admin_session_locked_country_id();
+$spmIsGlobal = $spmLockedCid <= 0;
 
 /** @var list<array{id:int,label:string}> */
 $spmCountries = [];

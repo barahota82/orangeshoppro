@@ -104,8 +104,9 @@ function orange_company_invoice_resolve_gift_line(
     }
     $pickVid = 0;
     if (($giftRule['gift_kind'] ?? '') === 'fixed') {
-        $pickVid = (int) ($giftRule['fixed_variant_id'] ?? 0);
-        if ($pickVid <= 0 || count(orange_cart_gift_promotion_pool_options($pdo, [$pickVid], $validatedItems, true, $countryId)) === 0) {
+        // المخزَّن رقم منتج؛ نحلّه إلى متغيّر تمثيلي حقيقي قبل التسعير/البناء.
+        $pickVid = orange_cart_promo_fixed_gift_resolve_variant_id($pdo, (int) ($giftRule['fixed_variant_id'] ?? 0), $validatedItems, $countryId);
+        if ($pickVid <= 0) {
             return null;
         }
     } else {
@@ -159,8 +160,9 @@ function orange_company_invoice_resolve_bogo_line(
     }
     $pickVid = 0;
     if (($bogoRule['gift_kind'] ?? '') === 'fixed') {
-        $pickVid = (int) ($bogoRule['fixed_variant_id'] ?? 0);
-        if ($pickVid <= 0 || count(orange_cart_gift_promotion_pool_options($pdo, [$pickVid], $linesIncludingGift, true, $countryId)) === 0) {
+        // المخزَّن رقم منتج؛ نحلّه إلى متغيّر تمثيلي حقيقي قبل التسعير/البناء.
+        $pickVid = orange_cart_promo_fixed_gift_resolve_variant_id($pdo, (int) ($bogoRule['fixed_variant_id'] ?? 0), $linesIncludingGift, $countryId);
+        if ($pickVid <= 0) {
             return null;
         }
     } else {

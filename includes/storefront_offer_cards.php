@@ -22,6 +22,7 @@ require_once __DIR__ . '/cart_promo_schedule.php';
 require_once __DIR__ . '/cart_promotion_country.php';
 require_once __DIR__ . '/cart_promo_products.php';
 require_once __DIR__ . '/promo_always_on.php';
+require_once __DIR__ . '/catalog_labels.php';
 
 /**
  * خريطة عرض المنتجات (اسم مترجم + سعر + تكلفة + صورة مع احتياط + ألوان) لمجموعة
@@ -84,14 +85,31 @@ function orange_storefront_offer_product_display_map(PDO $pdo, array $productIds
         if ($img === '') {
             $needImage[] = $pid;
         }
+        $parentPrice = $hasPrice ? (float) ($row['price'] ?? 0) : 0.0;
         $map[$pid] = [
             'product_id' => $pid,
             'name' => storefront_product_display_name($row),
-            'price' => $hasPrice ? (float) ($row['price'] ?? 0) : 0.0,
+            // افتراضياً سعر الأب؛ يُستبدَل أدناه بأدنى سعر متغيّر فعّال (يساوي الأب عند عدم التباين).
+            'price' => $parentPrice,
+            'price_max' => $parentPrice,
+            'price_varies' => false,
             'cost' => $hasCost ? (float) ($row['cost'] ?? 0) : 0.0,
             'main_image' => $img,
             'has_colors' => $hasColors ? (int) ($row['has_colors'] ?? 0) : 0,
         ];
+    }
+
+    // سعر «يبدأ من» الفعّال لكل منتج (COALESCE(سعر المتغيّر، سعر الأب)) لتفادي عرض سعر أب قديم
+    // على بطاقات الكومبو/BOGO عندما يكون لكل لون/مقاس سعر مختلف. لا تغيير للمنتجات بسعر موحّد.
+    if ($map !== [] && function_exists('orange_storefront_product_variant_price_range_map')) {
+        $rangeMap = orange_storefront_product_variant_price_range_map($pdo, array_keys($map));
+        foreach ($rangeMap as $pid => $pr) {
+            if (isset($map[$pid]) && is_array($pr)) {
+                $map[$pid]['price'] = (float) ($pr['min'] ?? $map[$pid]['price']);
+                $map[$pid]['price_max'] = (float) ($pr['max'] ?? $map[$pid]['price']);
+                $map[$pid]['price_varies'] = !empty($pr['varies']);
+            }
+        }
     }
 
     if ($needImage !== [] && function_exists('orange_product_first_colorway_image_map')) {
@@ -154,6 +172,7 @@ function orange_storefront_active_combo_cards(PDO $pdo, ?int $countryId, string 
         $row = $entry['row'];
         $components = [];
         $componentsTotal = 0.0;
+        $componentsTotalVaries = false;
         $missing = false;
         foreach ($entry['comps'] as $c) {
             $pid = (int) $c['product_id'];
@@ -164,6 +183,9 @@ function orange_storefront_active_combo_cards(PDO $pdo, ?int $countryId, string 
             }
             $pinfo = $pmap[$pid];
             $componentsTotal += $pinfo['price'] * $qty;
+            if (!empty($pinfo['price_varies'])) {
+                $componentsTotalVaries = true;
+            }
             $extra = ['qty' => $qty];
             if (isset($c['allowed_colors']) && is_array($c['allowed_colors']) && count($c['allowed_colors']) > 0) {
                 $extra['allowed_colors'] = array_values(array_map('strval', $c['allowed_colors']));
@@ -184,6 +206,7 @@ function orange_storefront_active_combo_cards(PDO $pdo, ?int $countryId, string 
             'show_old_price' => (int) ($row['show_old_price_to_customer'] ?? 0) === 1,
             'bundle_price' => (float) ($row['combo_price'] ?? 0),
             'components_total' => round($componentsTotal, 4),
+            'components_total_from' => $componentsTotalVaries,
             'components' => $components,
             'requires_registration' => (int) ($row['requires_registered_account'] ?? 0) === 1,
             'first_delivered_only' => (int) ($row['first_delivered_order_only'] ?? 0) === 1,

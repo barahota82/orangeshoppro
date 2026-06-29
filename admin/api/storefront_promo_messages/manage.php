@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/storefront_promo_messages.php';
 require_admin_api();
 
@@ -20,8 +21,9 @@ function spm_clip(string $s): string
 
 /**
  * تحويل تاريخ ISO اختياري إلى صيغة قاعدة أو null.
+ * $endOfDay=true: التاريخ المجرّد (يوم النهاية) يُغلق على 23:59:59 ليكون شاملاً (لا ينتهي قبل يوم).
  */
-function spm_iso_or_null(?string $v): ?string
+function spm_iso_or_null(?string $v, bool $endOfDay = false): ?string
 {
     $v = trim((string) $v);
     if ($v === '') {
@@ -29,7 +31,7 @@ function spm_iso_or_null(?string $v): ?string
     }
     $v = str_replace('T', ' ', $v);
     if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) {
-        return $v . ' 00:00:00';
+        return $v . ($endOfDay ? ' 23:59:59' : ' 00:00:00');
     }
     if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/', $v)) {
         return strlen($v) === 16 ? $v . ':00' : $v;
@@ -51,7 +53,8 @@ try {
         $data = $_POST;
     }
     $action = trim((string) ($data['action'] ?? 'list'));
-    $adminCid = (int) orange_cart_promotion_admin_country_id($pdo);
+    // المشرف المقيَّد بدولة (قفل الجلسة) محصور بدولته؛ المشرف العام (lock<=0) ينشئ «كل الدول» (NULL) أو دولة بعينها.
+    $adminCid = (int) orange_admin_session_locked_country_id();
 
     if ($action === 'list') {
         json_response([
@@ -80,7 +83,7 @@ try {
         $isAlwaysOn = !empty($data['is_always_on']) ? 1 : 0;
         $sortOrder = (int) ($data['sort_order'] ?? 0);
         $validFrom = $isAlwaysOn ? null : spm_iso_or_null((string) ($data['valid_from'] ?? ''));
-        $validTo = $isAlwaysOn ? null : spm_iso_or_null((string) ($data['valid_to'] ?? ''));
+        $validTo = $isAlwaysOn ? null : spm_iso_or_null((string) ($data['valid_to'] ?? ''), true);
         if (!$isAlwaysOn && $validFrom !== null && $validTo !== null && $validTo < $validFrom) {
             json_response(['success' => false, 'message' => 'تاريخ النهاية قبل البداية'], 422);
         }

@@ -116,11 +116,11 @@ $products = $productsStmt ? $productsStmt->fetchAll() : [];
 $offersStmt = $pdo->query($offersSql);
 $offers = $offersStmt ? $offersStmt->fetchAll() : [];
 
-/** خصم وحدة بطاقة العرض (مدرك للنسبة) على سعر الأب — للعرض فقط. */
-$sfOfferCardUnitDisc = static function (array $p): float {
+/** خصم وحدة بطاقة العرض (مدرك للنسبة) على سعر الوحدة المُمرَّر (أو سعر الأب افتراضياً) — للعرض فقط. */
+$sfOfferCardUnitDisc = static function (array $p, ?float $unitPrice = null): float {
     return orange_product_offer_unit_discount_for_price(
         ['discount' => (float) ($p['discount'] ?? 0), 'type' => (string) ($p['discount_type'] ?? 'amount')],
-        (float) ($p['price'] ?? 0)
+        $unitPrice !== null ? $unitPrice : (float) ($p['price'] ?? 0)
     );
 };
 
@@ -276,6 +276,16 @@ $sfHomeCardPrice = static function (array $p) use ($sfHomePriceRange): array {
     return [(float) ($p['price'] ?? 0), false];
 };
 
+/** سعر أساس بطاقة العرض المفرد: أدنى سعر متغيّر فعّال عند التباين (يبدأ من)، وإلا سعر الأب. */
+$sfOfferCardBase = static function (array $p) use ($sfHomePriceRange): array {
+    $pr = $sfHomePriceRange[(int) ($p['id'] ?? 0)] ?? null;
+    if ($pr && !empty($pr['varies'])) {
+        return [(float) $pr['min'], true];
+    }
+
+    return [(float) ($p['price'] ?? 0), false];
+};
+
 $sfHomeCardAttrAttr = static function (int $pid) use ($sfHomeProductAttrMap): string {
     return orange_storefront_attr_data_attribute($sfHomeProductAttrMap[$pid] ?? []);
 };
@@ -353,13 +363,15 @@ foreach ($offersLazyRows as $p) {
     foreach ($sfProductCardVariantLines[$pid] ?? [] as $ln) {
         $vlOff[] = ['c' => (string) $ln['color'], 'p' => (string) $ln['pattern']];
     }
+    [$sfOffLazyBase, $sfOffLazyFrom] = $sfOfferCardBase($p);
     $lazyOffersForJs[] = [
         'id' => $pid,
         'df' => 'offers cat-' . $sfHomeFilterCatalogId($p) . $storefrontExtraFilterSuffix($p),
         'imgSrc' => storefront_product_image_href((string) ($p['main_image'] ?? '')),
         'title' => storefront_product_display_name($p),
-        'oldPrice' => number_format((float) $p['price'], 2),
-        'salePrice' => number_format((float) $p['price'] - $sfOfferCardUnitDisc($p), 2),
+        'oldPrice' => number_format($sfOffLazyBase, 2),
+        'salePrice' => number_format($sfOffLazyBase - $sfOfferCardUnitDisc($p, $sfOffLazyBase), 2),
+        'priceFrom' => $sfOffLazyFrom,
         'showOld' => (int) ($p['offer_show_old_price'] ?? 0) === 1,
         'offerName' => orange_promo_customer_display_name([
             'show_name_to_customer' => (int) ($p['offer_show_name'] ?? 0),
@@ -640,10 +652,11 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                         <?php
                     }
                     ?>
+                    <?php [$sfOffBase, $sfOffFrom] = $sfOfferCardBase($p); ?>
                     <div class="price-row">
-                        <strong><?php echo number_format((float) $p['price'] - $sfOfferCardUnitDisc($p), 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                        <strong><?php if ($sfOffFrom): ?><span class="price-from-label"><?php echo htmlspecialchars($sfFromLabel, ENT_QUOTES, 'UTF-8'); ?></span> <?php endif; ?><?php echo number_format($sfOffBase - $sfOfferCardUnitDisc($p, $sfOffBase), 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
                         <?php if ((int) ($p['offer_show_old_price'] ?? 0) === 1): ?>
-                        <span class="old-price"><?php echo number_format((float) $p['price'], 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <span class="old-price"><?php echo number_format($sfOffBase, 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
                         <?php endif; ?>
                     </div>
                     <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]), ENT_QUOTES, 'UTF-8'); ?>">
@@ -686,7 +699,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                     <div class="price-row">
                         <strong><?php echo number_format($ccBundle, 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
                         <?php if ($ccShowOld): ?>
-                        <span class="old-price"><?php echo number_format($ccTotal, 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <span class="old-price"><?php if (!empty($cc['components_total_from'])): ?><span class="price-from-label"><?php echo htmlspecialchars($sfFromLabel, ENT_QUOTES, 'UTF-8'); ?></span> <?php endif; ?><?php echo number_format($ccTotal, 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
                         <?php endif; ?>
                     </div>
                     <a class="btn" href="<?php echo htmlspecialchars($sfComboHref($ccId), ENT_QUOTES, 'UTF-8'); ?>">
@@ -702,12 +715,16 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
             $bcBuy = is_array($bc['buy_components'] ?? null) ? $bc['buy_components'] : [];
             $bcNames = [];
             $bcBuyTotal = 0.0;
+            $bcBuyVaries = false;
             foreach ($bcBuy as $bcComp) {
                 $bcN = trim((string) ($bcComp['name'] ?? ''));
                 if ($bcN !== '') {
                     $bcNames[] = $bcN;
                 }
                 $bcBuyTotal += (float) ($bcComp['price'] ?? 0) * max(1, (int) ($bcComp['qty'] ?? 1));
+                if (!empty($bcComp['price_varies'])) {
+                    $bcBuyVaries = true;
+                }
             }
             if ($bcBuy === []) {
                 continue;
@@ -729,7 +746,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                     <p class="sf-offer-promo" role="status"><?php echo htmlspecialchars($bcPromo, ENT_QUOTES, 'UTF-8'); ?></p>
                     <?php endif; ?>
                     <div class="price-row">
-                        <strong><?php echo number_format($bcBuyTotal, 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
+                        <strong><?php if ($bcBuyVaries): ?><span class="price-from-label"><?php echo htmlspecialchars($sfFromLabel, ENT_QUOTES, 'UTF-8'); ?></span> <?php endif; ?><?php echo number_format($bcBuyTotal, 2); ?> <?php echo htmlspecialchars($sfHomeCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></strong>
                     </div>
                     <a class="btn" href="<?php echo htmlspecialchars($sfOfferHref('bogo', $bcId), ENT_QUOTES, 'UTF-8'); ?>">
                         <?php echo htmlspecialchars(t('offer_view'), ENT_QUOTES, 'UTF-8'); ?>
@@ -820,7 +837,8 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
 
 <script>
 <?php
-$orangeSfGridJsonFlags = JSON_UNESCAPED_UNICODE;
+// أعلام hex تمنع كسر وسم </script> من نصوص الأدمن (أسماء/رسائل تحفيزية) المضمّنة في JSON داخل <script>.
+$orangeSfGridJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
     $orangeSfGridJsonFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
 }
@@ -1087,12 +1105,28 @@ function orangeSfAppendOfferCard(item) {
     var pr = document.createElement('div');
     pr.className = 'price-row';
     var strong = document.createElement('strong');
-    strong.textContent = item.salePrice + ' KD';
+    if (item.priceFrom && window.ORANGE_SF_PRICE_FROM_LABEL) {
+        var offFromSpan = document.createElement('span');
+        offFromSpan.className = 'price-from-label';
+        offFromSpan.textContent = window.ORANGE_SF_PRICE_FROM_LABEL;
+        strong.appendChild(offFromSpan);
+        strong.appendChild(document.createTextNode(' ' + item.salePrice + ' KD'));
+    } else {
+        strong.textContent = item.salePrice + ' KD';
+    }
     pr.appendChild(strong);
     if (item.showOld) {
         var oldSpan = document.createElement('span');
         oldSpan.className = 'old-price';
-        oldSpan.textContent = item.oldPrice + ' KD';
+        if (item.priceFrom && window.ORANGE_SF_PRICE_FROM_LABEL) {
+            var oldFromSpan = document.createElement('span');
+            oldFromSpan.className = 'price-from-label';
+            oldFromSpan.textContent = window.ORANGE_SF_PRICE_FROM_LABEL;
+            oldSpan.appendChild(oldFromSpan);
+            oldSpan.appendChild(document.createTextNode(' ' + item.oldPrice + ' KD'));
+        } else {
+            oldSpan.textContent = item.oldPrice + ' KD';
+        }
         pr.appendChild(oldSpan);
     }
     var a = document.createElement('a');

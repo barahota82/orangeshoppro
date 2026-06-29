@@ -64,7 +64,13 @@ function orange_storefront_build_promotional_gift_lines(
     if ($giftRule !== null) {
         $pickVid = 0;
         if ($giftRule['gift_kind'] === 'fixed') {
-            $pickVid = (int) ($giftRule['fixed_variant_id'] ?? 0);
+            // المخزَّن رقم منتج؛ نحلّه إلى متغيّر تمثيلي حقيقي قبل التسعير/البناء.
+            $pickVid = orange_cart_promo_fixed_gift_resolve_variant_id(
+                $pdo,
+                (int) ($giftRule['fixed_variant_id'] ?? 0),
+                $validatedItems,
+                $countryId
+            );
         } else {
             $pickVid = (int) ($payload['gift_variant_id'] ?? 0);
             if ($pickVid <= 0) {
@@ -136,7 +142,13 @@ function orange_storefront_build_promotional_gift_lines(
     if ($bogoRule !== null) {
         $bogoPick = 0;
         if ($bogoRule['gift_kind'] === 'fixed') {
-            $bogoPick = (int) ($bogoRule['fixed_variant_id'] ?? 0);
+            // المخزَّن رقم منتج؛ نحلّه إلى متغيّر تمثيلي حقيقي قبل التسعير/البناء.
+            $bogoPick = orange_cart_promo_fixed_gift_resolve_variant_id(
+                $pdo,
+                (int) ($bogoRule['fixed_variant_id'] ?? 0),
+                $linesAfterSubtotalGift,
+                $countryId
+            );
         } else {
             $bogoPick = (int) ($payload['bogo_gift_variant_id'] ?? 0);
             if ($bogoPick <= 0) {
