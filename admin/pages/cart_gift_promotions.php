@@ -51,62 +51,91 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <input type="checkbox" id="cgp_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
         </label>
     </div>
-    <div class="form-grid" style="margin-top:12px;">
-        <div><label>الحد الأدنى لمجموع السلة (د.ك) — 0 يعني بدون شرط مبلغ</label><input type="text" id="cgp_min" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="0"></div>
-        <?php $ocpFieldPrefix = 'cgp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
-        <div style="grid-column:1/-1;">
-            <label><strong>نوع الهدية</strong></label>
-            <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:6px;">
+    <div class="cgp-split" style="margin-top:14px;">
+        <!-- النصف الأيمن: إعدادات الهدية -->
+        <div class="cgp-half">
+            <h4 style="margin:0 0 10px;">إعدادات الهدية</h4>
+            <div style="margin:0 0 12px;">
+                <label><strong>نوع الهدية</strong></label>
+                <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:6px;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="radio" name="cgp_kind" value="choice" checked onchange="cgpToggleKind()"> اختيار من مجموعة منتجات
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="radio" name="cgp_kind" value="fixed" onchange="cgpToggleKind()"> هدية ثابتة (منتج واحد)
+                    </label>
+                </div>
+            </div>
+            <div id="cgp_block_pool" style="margin:0 0 12px;">
+                <label>منتجات مجموعة الاختيار</label>
+                <div style="margin:6px 0 8px;">
+                    <button type="button" class="btn-secondary" id="cgp_pool_add_btn">إضافة منتج (دبل كليك من القائمة)</button>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>كود</th><th>المنتج</th><th></th></tr></thead>
+                        <tbody id="cgp_pool_body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="cgp_block_fixed" style="margin:0 0 12px;display:none;">
+                <label>منتج الهدية الثابتة</label>
+                <div style="margin:6px 0 8px;">
+                    <button type="button" class="btn-secondary" id="cgp_fixed_pick_btn">اختيار منتج (دبل كليك من القائمة)</button>
+                </div>
+                <p id="cgp_fixed_label" class="page-subtitle" style="margin:0;">— لم يُختر منتج —</p>
+                <input type="hidden" id="cgp_fixed_pid" value="0">
+            </div>
+            <div style="margin:0 0 12px;">
+                <label for="cgp_gift_charge_kind"><strong>تسعير بند الهدية</strong></label>
+                <select id="cgp_gift_charge_kind" class="admin-inp" style="max-width:28rem;margin-top:6px;" onchange="cgpToggleGiftCharge()">
+                    <option value="free">مجانية بالكامل (سطر هدية بسعر صفر)</option>
+                    <option value="percent_off">خصم نسبة من سعر التجزئة للوحدة</option>
+                    <option value="amount_off_unit">خصم مبلغ ثابت من سعر التجزئة للوحدة</option>
+                    <option value="fixed_unit">سعر بيع ثابت للوحدة (د.ك)</option>
+                </select>
+            </div>
+            <div id="cgp_gift_charge_val_wrap" style="display:none;">
+                <label id="cgp_gift_charge_val_label">القيمة</label>
+                <input type="number" id="cgp_gift_charge_val" class="admin-inp" min="0" step="0.0001" style="max-width:14rem;" dir="ltr" value="0">
+            </div>
+        </div>
+
+        <!-- النصف الأيسر: الحد والفترة -->
+        <div class="cgp-half">
+            <h4 style="margin:0 0 10px;">الحد والفترة</h4>
+            <div class="form-grid">
+                <div style="grid-column:1/-1;">
+                    <label>الحد الأدنى لمجموع السلة (د.ك) — 0 يعني بدون شرط مبلغ</label>
+                    <input type="text" id="cgp_min" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="0">
+                </div>
+                <div>
+                    <label for="cgp_valid_from">بداية العرض <span dir="ltr">*</span></label>
+                    <input type="text" id="cgp_valid_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
+                </div>
+                <div>
+                    <label for="cgp_valid_to">نهاية العرض <span dir="ltr">*</span></label>
+                    <input type="text" id="cgp_valid_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
+                </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:18px 22px;align-items:center;margin-top:12px;">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="radio" name="cgp_kind" value="choice" checked onchange="cgpToggleKind()"> اختيار من مجموعة منتجات
+                    <input type="checkbox" id="cgp_always_on"> <strong>التفعيل الدائم</strong>
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="radio" name="cgp_kind" value="fixed" onchange="cgpToggleKind()"> هدية ثابتة (منتج واحد)
+                    <input type="checkbox" id="cgp_reg"> <strong>للمسجّلين فقط</strong>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="cgp_first_delivered"> <strong>أول طلب مُسلَّم</strong>
                 </label>
             </div>
-        </div>
-        <div id="cgp_block_pool" style="grid-column:1/-1;">
-            <label>منتجات مجموعة الاختيار</label>
-            <div style="margin:6px 0 8px;">
-                <button type="button" class="btn-secondary" id="cgp_pool_add_btn">إضافة منتج (دبل كليك من القائمة)</button>
-            </div>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>كود</th><th>المنتج</th><th></th></tr></thead>
-                    <tbody id="cgp_pool_body"></tbody>
-                </table>
-            </div>
-        </div>
-        <div id="cgp_block_fixed" style="grid-column:1/-1;display:none;">
-            <label>منتج الهدية الثابتة</label>
-            <div style="margin:6px 0 8px;">
-                <button type="button" class="btn-secondary" id="cgp_fixed_pick_btn">اختيار منتج (دبل كليك من القائمة)</button>
-            </div>
-            <p id="cgp_fixed_label" class="page-subtitle" style="margin:0;">— لم يُختر منتج —</p>
-            <input type="hidden" id="cgp_fixed_pid" value="0">
-        </div>
-        <div style="grid-column:1/-1;">
-            <label for="cgp_gift_charge_kind"><strong>تسعير بند الهدية</strong></label>
-            <select id="cgp_gift_charge_kind" class="admin-inp" style="max-width:28rem;margin-top:6px;" onchange="cgpToggleGiftCharge()">
-                <option value="free">مجانية بالكامل (سطر هدية بسعر صفر)</option>
-                <option value="percent_off">خصم نسبة من سعر التجزئة للوحدة</option>
-                <option value="amount_off_unit">خصم مبلغ ثابت من سعر التجزئة للوحدة</option>
-                <option value="fixed_unit">سعر بيع ثابت للوحدة (د.ك)</option>
-            </select>
-        </div>
-        <div id="cgp_gift_charge_val_wrap" style="grid-column:1/-1;display:none;">
-            <label id="cgp_gift_charge_val_label">القيمة</label>
-            <input type="number" id="cgp_gift_charge_val" class="admin-inp" min="0" step="0.0001" style="max-width:14rem;" dir="ltr" value="0">
-        </div>
-        <div style="grid-column:1/-1;display:flex;flex-wrap:wrap;gap:20px;align-items:center;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="cgp_reg"> <strong>للمسجّلين فقط</strong>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="cgp_first_delivered"> <strong>أول طلب مُسلَّم</strong>
-            </label>
         </div>
     </div>
+    <style>
+    .cgp-split { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .cgp-half { border:1px solid #e2e8f0; border-radius:10px; padding:14px; background:#f8fafc; }
+    @media (max-width: 720px) { .cgp-split { grid-template-columns:1fr; } }
+    </style>
     <div class="admin-form-actions">
         <button type="button" onclick="saveCartGiftPromotion()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ</button>
         <button type="button" class="btn-secondary" onclick="resetCartGiftPromotionForm()">جديد</button>

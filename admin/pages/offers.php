@@ -111,23 +111,9 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
         <div class="ofr-half">
             <h4 style="margin:0 0 10px;">الخصم والفترة</h4>
             <div class="form-grid">
-                <div>
+                <div style="grid-column:1/-1;">
                     <label for="discount">قيمة الخصم (<?php echo htmlspecialchars((string) ($offersMoney['unit'] ?? 'KWD'), ENT_QUOTES, 'UTF-8'); ?>)</label>
                     <input type="number" id="discount" class="admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr">
-                </div>
-                <div>
-                    <label>&nbsp;</label>
-                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;height:38px;">
-                        <input type="checkbox" id="ofr_always_on">
-                        <span><strong>التفعيل الدائم</strong></span>
-                    </label>
-                </div>
-                <div>
-                    <label>&nbsp;</label>
-                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;height:38px;" title="عند التفعيل يظهر السعر القديم مشطوباً بجوار سعر العرض للعميل (يتطلب الترخيص اللازم)">
-                        <input type="checkbox" id="ofr_show_old_price">
-                        <span><strong>إظهار السعر القديم</strong></span>
-                    </label>
                 </div>
                 <div>
                     <label for="ofr_valid_from">بداية العرض <span dir="ltr">*</span></label>
@@ -137,6 +123,14 @@ $offerAlwaysHistory = orange_promo_always_on_history_list($pdo, 'offers', $offer
                     <label for="ofr_valid_to">نهاية العرض <span dir="ltr">*</span></label>
                     <input type="text" id="ofr_valid_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
                 </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:18px 22px;align-items:center;margin-top:12px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="ofr_always_on"> <strong>التفعيل الدائم</strong>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;" title="عند التفعيل يظهر السعر القديم مشطوباً بجوار سعر العرض للعميل (يتطلب الترخيص اللازم)">
+                    <input type="checkbox" id="ofr_show_old_price"> <strong>إظهار السعر القديم</strong>
+                </label>
             </div>
         </div>
     </div>

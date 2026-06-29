@@ -99,8 +99,11 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <input type="checkbox" id="cbp_show_name"> <strong>السماح بظهور الاسم للعميل</strong>
         </label>
     </div>
-    <div class="form-grid">
-        <div style="grid-column:1/-1;">
+    <div class="cbp-split">
+        <!-- النصف الأيمن: إعدادات العرض -->
+        <div class="cbp-half">
+            <h4 style="margin:0 0 10px;">إعدادات العرض</h4>
+        <div style="margin:0 0 12px;">
             <label><strong>شرط السلة</strong></label>
             <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:6px;">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -114,7 +117,7 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                 </label>
             </div>
         </div>
-        <div id="cbp_cat_wrap" style="grid-column:1/-1;display:none;">
+        <div id="cbp_cat_wrap" style="margin:0 0 12px;display:none;">
             <?php if ($cartBogoUnifiedCategoryHint && $cartBogoCatalogCategoryDropdown !== []): ?>
             <label for="cbp_cat">الفئة في الشجرة الموحّدة</label>
             <p class="page-subtitle" style="margin:6px 0 10px;line-height:1.45;"><strong>تصنيف موحّد:</strong> تُقيَّد قائمة منتجات السلة وفق ورقة نوع المنتج ومسار <code dir="ltr">catalog_categories.id</code> المختارة (وليس عمود الفئة القديم على المنتج).</p>
@@ -137,7 +140,7 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <input type="hidden" id="cbp_cat" value="0" aria-hidden="true">
             <?php endif; ?>
         </div>
-        <div id="cbp_buy_bundle_wrap" style="grid-column:1/-1;display:none;">
+        <div id="cbp_buy_bundle_wrap" style="margin:0 0 12px;display:none;">
             <label>منتجات حزمة الشراء</label>
             <div style="margin:6px 0 8px;">
                 <button type="button" class="btn-secondary" id="cbp_buy_add_btn">إضافة منتج (دبل كليك من القائمة)</button>
@@ -149,7 +152,7 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                 </table>
             </div>
         </div>
-        <div id="cbp_same_variant_wrap" style="grid-column:1/-1;display:none;">
+        <div id="cbp_same_variant_wrap" style="margin:0 0 12px;display:none;">
             <label>منتج العرض (اختياري لنوع «نفس المنتج»)</label>
             <p class="page-subtitle" style="margin:6px 0 10px;line-height:1.45;">عند اختيار منتج محدّد، يُطبَّق العرض فقط عند شراء الكمية المطلوبة من <strong>هذا المنتج</strong>، وتظهر له بطاقة/صفحة عرض في تاب «العروض». إن تُرك فارغاً يُطبَّق على <strong>أي منتج</strong> يبلغ الحد الأدنى (بلا صفحة عرض).</p>
             <div style="margin:6px 0 8px;">
@@ -159,17 +162,11 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <p id="cbp_sv_label" class="page-subtitle" style="margin:0;">— أي منتج (بلا تحديد) —</p>
             <input type="hidden" id="cbp_sv_pid" value="0">
         </div>
-        <div id="cbp_minbuy_wrap">
+        <div id="cbp_minbuy_wrap" style="margin:0 0 12px;">
             <label>الحد الأدنى للكمية / عدد المنتجات المختلفة</label>
             <input type="number" id="cbp_minbuy" class="admin-inp" min="2" step="1" value="2" style="max-width:12rem;" dir="ltr">
         </div>
-        <?php $ocpFieldPrefix = 'cbp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
-        <div style="grid-column:1/-1;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;" title="عند التفعيل يظهر سعر تجزئة الهدية مشطوباً بجوار سعرها المجاني/المخفّض للعميل (يتطلب الترخيص اللازم)">
-                <input type="checkbox" id="cbp_show_old_price"> <strong>إظهار السعر القديم</strong>
-            </label>
-        </div>
-        <div style="grid-column:1/-1;">
+        <div style="margin:0 0 12px;">
             <label><strong>نوع الهدية</strong></label>
             <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:6px;">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -180,7 +177,7 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                 </label>
             </div>
         </div>
-        <div id="cbp_block_pool" style="grid-column:1/-1;">
+        <div id="cbp_block_pool" style="margin:0 0 12px;">
             <label>منتجات مجموعة اختيار الهدية</label>
             <div style="margin:6px 0 8px;">
                 <button type="button" class="btn-secondary" id="cbp_pool_add_btn">إضافة منتج (دبل كليك من القائمة)</button>
@@ -192,7 +189,7 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                 </table>
             </div>
         </div>
-        <div id="cbp_block_fixed" style="grid-column:1/-1;display:none;">
+        <div id="cbp_block_fixed" style="margin:0 0 12px;display:none;">
             <label>منتج الهدية الثابتة</label>
             <div style="margin:6px 0 8px;">
                 <button type="button" class="btn-secondary" id="cbp_fixed_pick_btn">اختيار منتج (دبل كليك من القائمة)</button>
@@ -205,7 +202,7 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             </label>
             <p class="page-subtitle" style="margin:4px 0 0;">عند التفعيل: يختار العميل متغيّر منتج الهدية بنفسه؛ وإلا يحدّده النظام تلقائياً.</p>
         </div>
-        <div style="grid-column:1/-1;">
+        <div style="margin:0 0 12px;">
             <label for="cbp_gift_charge_kind"><strong>تسعير بند هدية BOGO (ب)</strong></label>
             <select id="cbp_gift_charge_kind" class="admin-inp" style="max-width:28rem;margin-top:6px;" onchange="cbpToggleGiftCharge()">
                 <option value="free">مجانية بالكامل (سطر هدية بسعر صفر)</option>
@@ -214,19 +211,46 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                 <option value="fixed_unit">سعر بيع ثابت للوحدة (د.ك)</option>
             </select>
         </div>
-        <div id="cbp_gift_charge_val_wrap" style="grid-column:1/-1;display:none;">
+        <div id="cbp_gift_charge_val_wrap" style="display:none;">
             <label id="cbp_gift_charge_val_label">القيمة</label>
             <input type="number" id="cbp_gift_charge_val" class="admin-inp" min="0" step="0.0001" style="max-width:14rem;" dir="ltr" value="0">
         </div>
-        <div style="grid-column:1/-1;display:flex;flex-wrap:wrap;gap:20px;align-items:center;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="cbp_reg"> <strong>للمسجّلين فقط</strong>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="cbp_first_delivered"> <strong>أول طلب مُسلَّم</strong>
-            </label>
+        </div>
+
+        <!-- النصف الأيسر: الفترة والأهلية -->
+        <div class="cbp-half">
+            <h4 style="margin:0 0 10px;">الفترة والأهلية</h4>
+            <div class="form-grid">
+                <div>
+                    <label for="cbp_valid_from">بداية العرض <span dir="ltr">*</span></label>
+                    <input type="text" id="cbp_valid_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
+                </div>
+                <div>
+                    <label for="cbp_valid_to">نهاية العرض <span dir="ltr">*</span></label>
+                    <input type="text" id="cbp_valid_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" required>
+                </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:18px 22px;align-items:center;margin-top:12px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="cbp_always_on"> <strong>التفعيل الدائم</strong>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;" title="عند التفعيل يظهر سعر تجزئة الهدية مشطوباً بجوار سعرها المجاني/المخفّض للعميل (يتطلب الترخيص اللازم)">
+                    <input type="checkbox" id="cbp_show_old_price"> <strong>إظهار السعر القديم</strong>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="cbp_reg"> <strong>للمسجّلين فقط</strong>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="cbp_first_delivered"> <strong>أول طلب مُسلَّم</strong>
+                </label>
+            </div>
         </div>
     </div>
+    <style>
+    .cbp-split { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .cbp-half { border:1px solid #e2e8f0; border-radius:10px; padding:14px; background:#f8fafc; }
+    @media (max-width: 720px) { .cbp-split { grid-template-columns:1fr; } }
+    </style>
     <div class="admin-form-actions">
         <button type="button" onclick="saveCartBogoPromotion()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ</button>
         <button type="button" class="btn-secondary" onclick="resetCartBogoPromotionForm()">جديد</button>
