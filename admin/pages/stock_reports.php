@@ -78,6 +78,8 @@ $depId = isset($_GET['dep']) ? max(0, (int) $_GET['dep']) : 0;
 $catId = isset($_GET['cat']) ? max(0, (int) $_GET['cat']) : 0;
 /* إخفاء الأصناف/المتغيّرات ذات الرصيد صفر (قائمة الأصناف/الأرصدة/التقييم). */
 $hideZero = isset($_GET['hz']) && (string) $_GET['hz'] === '1';
+/* الجرد التفصيلي: إظهار عمود كود المتغيّر + تكلفة المتغيّر + القيمة (قرار مالك: تشيك بوكس «تفصيلي»). */
+$balDetail = isset($_GET['bal_detail']) && (string) $_GET['bal_detail'] === '1';
 
 /* تقرير الجرد: فلتر المندوب (عهدة) بدل اختيار صنف واحد.
    فارغ = جرد المخزن (الرف) مخصوماً منه المحمّل للمناديب؛ مندوب محدّد = عهدة ذلك المندوب. */
@@ -296,9 +298,17 @@ try {
             $filterSql .= $depFilterSql;
             $params[] = $depFilterParam;
         }
-        $sql = 'SELECT p.id AS product_id, p.name AS product_name, p.cost AS cost,
+        // تكلفة الأرصدة بتكلفة المتغيّر الفعّالة (COALESCE(متغيّر، منتج)) — مصدر موثوق للتقييم.
+        $balCostExpr = orange_table_has_column($pdo, 'product_variants', 'cost')
+            ? 'COALESCE(pv.cost, p.cost, 0)'
+            : 'COALESCE(p.cost, 0)';
+        $balVariantCodeSel = orange_table_has_column($pdo, 'product_variants', 'item_code')
+            ? "COALESCE(NULLIF(TRIM(pv.item_code), ''), '')"
+            : "''";
+        $sql = 'SELECT p.id AS product_id, p.name AS product_name, ' . $balCostExpr . ' AS cost,
                        pv.id AS variant_id,
                        ' . $itemCodeExpr . ' AS item_code,
+                       ' . $balVariantCodeSel . ' AS variant_code,
                        COALESCE(c.name_ar, \'\') AS category_name,
                        ' . $grpSelectCols . ',
                        pv.color, pv.size, ' . $wq['expr'] . ' AS qty
@@ -334,6 +344,7 @@ try {
             $grandValue += $value;
             $rows[] = [
                 'item_code' => (string) $r['item_code'],
+                'variant_code' => (string) ($r['variant_code'] ?? ''),
                 'product_name' => (string) $r['product_name'],
                 'category_name' => (string) $r['category_name'],
                 'group_dep_name' => (string) ($r['group_dep_name'] ?? ''),
@@ -973,6 +984,14 @@ $reportTitle = $reports[$reportKey];
                 </label>
             </div>
         <?php endif; ?>
+        <?php if ($reportKey === 'balances'): ?>
+            <div style="display:flex;align-items:flex-end;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:600;" title="إظهار كود المتغيّر وتكلفته وقيمته">
+                    <input type="checkbox" name="bal_detail" value="1" onchange="this.form.submit()" <?php echo $balDetail ? 'checked' : ''; ?>>
+                    تفصيلي
+                </label>
+            </div>
+        <?php endif; ?>
         <?php if (in_array($reportKey, ['movements', 'move_summary'], true)): ?>
             <div>
                 <label for="sr_from">من تاريخ</label>
@@ -1083,10 +1102,16 @@ $reportTitle = $reports[$reportKey];
                     </tbody>
                     <tfoot><tr><th colspan="3">الإجمالي</th><th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th><th></th></tr></tfoot>
                 <?php elseif ($reportKey === 'balances'): ?>
-                    <?php $balAgentMode = ($agentId > 0); $balCols = $balAgentMode ? 7 : 8; ?>
+                    <?php
+                    $balAgentMode = ($agentId > 0);
+                    $balCols = ($balAgentMode ? 7 : 8) + ($balDetail ? 3 : 0);
+                    $balLeadCols = $balDetail ? 4 : 3;
+                    ?>
                     <thead>
                     <tr>
-                        <th class="sr-code-cell" rowspan="2">الكود</th><th rowspan="2">الصنف</th><th class="sr-col-variant" rowspan="2">اللون / المقاس</th>
+                        <th class="sr-code-cell" rowspan="2">الكود</th>
+                        <?php if ($balDetail): ?><th class="sr-code-cell" rowspan="2">كود المتغيّر</th><?php endif; ?>
+                        <th rowspan="2">الصنف</th><th class="sr-col-variant" rowspan="2">اللون / المقاس</th>
                         <?php if ($balAgentMode): ?>
                             <th class="gl-acc-stmt-col-num" rowspan="2">بعهدة المندوب</th>
                         <?php else: ?>
@@ -1094,6 +1119,7 @@ $reportTitle = $reports[$reportKey];
                         <?php endif; ?>
                         <th class="gl-acc-stmt-col-num" rowspan="2">الكمية الفعلية</th>
                         <th class="gl-acc-stmt-col-num" colspan="2">ناتج الجرد</th>
+                        <?php if ($balDetail): ?><th class="gl-acc-stmt-col-num" rowspan="2">التكلفة</th><th class="gl-acc-stmt-col-num" rowspan="2">القيمة</th><?php endif; ?>
                     </tr>
                     <tr>
                         <th class="gl-acc-stmt-col-num">زائد +</th><th class="gl-acc-stmt-col-num">ناقص −</th>
@@ -1108,6 +1134,7 @@ $reportTitle = $reports[$reportKey];
                             <?php endif; ?>
                             <tr>
                                 <td dir="ltr" class="sr-code-cell"><?php echo htmlspecialchars($r['item_code'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <?php if ($balDetail): ?><td dir="ltr" class="sr-code-cell"><?php echo htmlspecialchars($r['variant_code'] !== '' ? $r['variant_code'] : '—', ENT_QUOTES, 'UTF-8'); ?></td><?php endif; ?>
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="sr-col-variant"><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>
@@ -1117,16 +1144,21 @@ $reportTitle = $reports[$reportKey];
                                 <td class="gl-acc-stmt-col-num"></td>
                                 <td class="gl-acc-stmt-col-num"></td>
                                 <td class="gl-acc-stmt-col-num"></td>
+                                <?php if ($balDetail): ?>
+                                    <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo $reportFmtMoney((float) ($r['cost'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo $reportFmtMoney((float) ($r['value'] ?? 0)); ?></td>
+                                <?php endif; ?>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
                     <tfoot><tr>
-                        <th colspan="3">الإجمالي</th>
+                        <th colspan="<?php echo (int) $balLeadCols; ?>">الإجمالي</th>
                         <th class="gl-acc-stmt-col-num"><?php echo (int) $grandQty; ?></th>
                         <?php if (!$balAgentMode): ?><th class="gl-acc-stmt-col-num"><?php echo $grandReserved > 0 ? (int) $grandReserved : '—'; ?></th><?php endif; ?>
                         <th class="gl-acc-stmt-col-num"></th>
                         <th class="gl-acc-stmt-col-num"></th>
                         <th class="gl-acc-stmt-col-num"></th>
+                        <?php if ($balDetail): ?><th class="gl-acc-stmt-col-num"></th><th class="gl-acc-stmt-col-num" dir="ltr"><?php echo $reportFmtMoney((float) $grandValue); ?></th><?php endif; ?>
                     </tr></tfoot>
                 <?php elseif ($reportKey === 'valuation'): ?>
                     <?php $valCols = $valShowPrev ? 6 : 5; ?>
