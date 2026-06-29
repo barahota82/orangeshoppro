@@ -516,25 +516,14 @@ $orangeAdminSfProductUrlPartsForJs = [
                         <input type="text" id="name_hi" required>
                     </div>
                 </div>
-                <div class="form-grid form-grid-3 product-form-basic-top3-inner" style="margin-top:12px;">
-                    <div>
-                        <label>السعر</label>
-                        <input type="number" id="price" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr" placeholder="0" data-money-empty-when-zero>
-                    </div>
-                    <div>
-                        <label>آخر تكلفة شراء (إرشادي)</label>
-                        <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr" placeholder="0" data-money-empty-when-zero>
-                        <small id="cost_gt_price_warn" class="card-hint" style="display:none;margin-top:4px;color:#b91c1c;font-weight:600;">التكلفة لا يمكن أن تكون أكبر من السعر.</small>
-                    </div>
-                    <div class="product-basic-class-cell">
-                        <label for="product_is_active">حالة العرض</label>
-                        <select id="product_is_active">
-                            <option value="1">نشط</option>
-                            <option value="0">مخفي</option>
+                <div class="form-grid form-grid-3 product-basic-class-row product-form-basic-top3-inner" style="margin-top:12px;">
+                    <div class="product-basic-class-cell" id="product_basic_has_colors_wrap">
+                        <label for="has_colors">له ألوان ؟</label>
+                        <select id="has_colors" onchange="onHasFlagsChange({ clearGeneratedMatrix: true })">
+                            <option value="0">لا</option>
+                            <option value="1">نعم</option>
                         </select>
                     </div>
-                </div>
-                <div class="form-grid form-grid-3 product-basic-class-row product-form-basic-top3-inner" style="margin-top:12px;">
                     <div id="product_basic_size_family_wrap" class="product-basic-class-cell">
                         <label for="size_family_id">عائلة المقاسات</label>
                         <select id="size_family_id">
@@ -549,17 +538,19 @@ $orangeAdminSfProductUrlPartsForJs = [
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <div class="product-basic-class-cell">
+                        <label for="product_is_active">حالة العرض</label>
+                        <select id="product_is_active">
+                            <option value="1">نشط</option>
+                            <option value="0">مخفي</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-grid form-grid-3 product-basic-class-row product-form-basic-top3-inner" style="margin-top:12px;">
                     <div id="product_basic_size_guide_wrap" class="product-basic-class-cell">
                         <label for="sizing_advisory_guide_id">دليل المقاس الاسترشادي (عرض)</label>
                         <select id="sizing_advisory_guide_id" disabled>
                             <option value="0">بدون</option>
-                        </select>
-                    </div>
-                    <div class="product-basic-class-cell" id="product_basic_has_colors_wrap">
-                        <label for="has_colors">له ألوان ؟</label>
-                        <select id="has_colors" onchange="onHasFlagsChange({ clearGeneratedMatrix: true })">
-                            <option value="0">لا</option>
-                            <option value="1">نعم</option>
                         </select>
                     </div>
                 </div>
@@ -578,17 +569,31 @@ $orangeAdminSfProductUrlPartsForJs = [
                     <p id="product_size_pick_empty" style="display:none;margin:8px 0 0;color:#9a3412;font-size:13px;">لا توجد مقاسات نشطة في هذه العائلة — راجع <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.</p>
                 </div>
 
-                <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
+                <div id="productPricingPriceCost" class="product-pricing-identity-relocatable">
+                    <p id="pricingIdentityVariantNote" class="card-hint" style="display:none;margin:0 0 8px;padding:8px 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;color:#475569;font-size:12.5px;line-height:1.6;">التسعير والهوية على مستوى المتغيّر — تُحرَّر من تبويب <strong>«المتغيرات والباركود»</strong>؛ القيم هنا تمثّل <strong>السعر/التكلفة الموحّدين والكود الأب</strong>.</p>
+                    <div class="form-grid product-form-basic-top3-inner">
+                        <div>
+                            <label>السعر</label>
+                            <input type="number" id="price" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr" placeholder="0" data-money-empty-when-zero>
+                        </div>
+                        <div>
+                            <label>آخر تكلفة شراء (إرشادي)</label>
+                            <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr" placeholder="0" data-money-empty-when-zero>
+                            <small id="cost_gt_price_warn" class="card-hint" style="display:none;margin-top:4px;color:#b91c1c;font-weight:600;">التكلفة لا يمكن أن تكون أكبر من السعر.</small>
+                        </div>
+                    </div>
+                </div>
+                <div id="productPricingCodes" class="form-grid product-form-basic-top3-inner product-pricing-identity-relocatable" style="margin-top:12px;">
                     <div>
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
-                            <label for="product_item_code" style="margin:0;">كود الصنف</label>
+                            <label for="product_item_code" style="margin:0;"><span id="item_code_label_main">كود الصنف</span></label>
                             <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeCopyProductField('product_item_code')">نسخ</button>
                         </div>
                         <input type="text" id="product_item_code" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد عند الحفظ" readonly>
                     </div>
                     <div>
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
-                            <label for="product_barcode" style="margin:0;">الباركود</label>
+                            <label for="product_barcode" style="margin:0;"><span id="barcode_label_main">الباركود</span></label>
                             <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeCopyProductField('product_barcode')">نسخ</button>
                         </div>
                         <input type="text" id="product_barcode" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد بعد الحفظ" readonly>
@@ -653,6 +658,26 @@ $orangeAdminSfProductUrlPartsForJs = [
         <div id="productTabPanelVariants" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnVariants" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">المتغيرات والباركود</h4>
+        <div id="productVariantPricingPanel" class="card admin-nested-panel" style="display:none;margin-bottom:14px;">
+            <h4 class="admin-nested-panel__title" style="margin-top:0;">التسعير والهوية</h4>
+            <div class="form-grid" style="margin-bottom:8px;">
+                <div>
+                    <label for="price_unified">السعر</label>
+                    <select id="price_unified" onchange="orangeOnUnifiedPricingChange()">
+                        <option value="1">موحّد لكل المتغيّرات</option>
+                        <option value="0">حسب كل متغيّر</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="cost_unified">التكلفة</label>
+                    <select id="cost_unified" onchange="orangeOnUnifiedPricingChange()">
+                        <option value="1">موحّدة لكل المتغيّرات</option>
+                        <option value="0">حسب كل متغيّر</option>
+                    </select>
+                </div>
+            </div>
+            <div id="pricingIdentitySlotVariants"></div>
+        </div>
         <div id="variantsBox"></div>
         </div>
         </div>
@@ -793,6 +818,9 @@ $orangeAdminSfProductUrlPartsForJs = [
         </div>
 
         <style>
+        .admin-variants-matrix .td-vprice,.admin-variants-matrix .td-vcost{min-width:104px;}
+        .admin-variants-matrix .v-price,.admin-variants-matrix .v-cost{width:96px;text-align:left;}
+        .admin-variant-price-locked{background:#f1f5f9;color:#64748b;cursor:not-allowed;}
         .orange-mpv-modal{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;}
         .orange-mpv-modal[hidden]{display:none;}
         .orange-mpv-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.78);backdrop-filter:blur(2px);}
@@ -3182,6 +3210,14 @@ async function loadProductForEdit(id) {
         }
         document.getElementById('price').value = String(p.price != null ? p.price : '');
         document.getElementById('cost').value = String(p.cost != null ? p.cost : '');
+        const puSel = document.getElementById('price_unified');
+        if (puSel) {
+            puSel.value = (p.price_unified != null && parseInt(p.price_unified, 10) === 0) ? '0' : '1';
+        }
+        const cuSel = document.getElementById('cost_unified');
+        if (cuSel) {
+            cuSel.value = (p.cost_unified != null && parseInt(p.cost_unified, 10) === 0) ? '0' : '1';
+        }
         const picEl = document.getElementById('product_item_code');
         const pbcEl = document.getElementById('product_barcode');
         if (picEl) {
@@ -3222,6 +3258,7 @@ async function loadProductForEdit(id) {
             generateVariants();
             applyVariantStocksFromVm(vm);
             applyVariantBarcodesFromVm(vm);
+            applyVariantPricesFromVm(vm);
         }
         if (needMatrix && !document.querySelectorAll('#variantsBox tbody tr').length) {
             document.getElementById('variantsBox').innerHTML =
@@ -3231,6 +3268,7 @@ async function loadProductForEdit(id) {
             generateVariants();
             applyVariantStocksFromVm(vm);
             applyVariantBarcodesFromVm(vm);
+            applyVariantPricesFromVm(vm);
         }
         orangeApplyProductBasicStepLocks();
         orangeScheduleProductCardPreviewRefresh();
@@ -3458,8 +3496,167 @@ function onHasFlagsChange(options) {
     if (options && options.clearGeneratedMatrix) {
         orangeProductClearGeneratedVariantsMatrixIfNeeded();
     }
+    orangeRelocatePricingIdentity();
     orangeScheduleProductCardPreviewRefresh();
     orangeProductInvalidateVariantsReadyForSave();
+}
+
+/** هل للمنتج بُعد متغيّرات (لون أو عائلة مقاسات)؟ عندها ينتقل التسعير/الهوية لتبويب المتغيّرات. */
+function orangeProductHasVariantDimension() {
+    const hc = document.getElementById('has_colors');
+    const hasColors = hc && hc.value === '1';
+    return hasColors || orangeProductEffectiveHasSizes();
+}
+
+/**
+ * ينقل كتلتي «السعر/التكلفة» و«الكود/الباركود» بين البيانات الأساسية وتبويب المتغيّرات.
+ * عند وجود لون/مقاس: التسعير والهوية على مستوى المتغيّر فتُعرض داخل تبويب المتغيّرات،
+ * مع تسمية الكود/الباركود «الأب». وإلا تبقى في البيانات الأساسية باسم الكود/الباركود.
+ */
+function orangeRelocatePricingIdentity() {
+    const priceBlock = document.getElementById('productPricingPriceCost');
+    const codeBlock = document.getElementById('productPricingCodes');
+    const variantSlot = document.getElementById('pricingIdentitySlotVariants');
+    const panel = document.getElementById('productVariantPricingPanel');
+    if (!priceBlock || !codeBlock) {
+        return;
+    }
+    // التقاط الموطن الأصلي مرّة واحدة حتى نتمكن من الإرجاع لاحقاً.
+    if (!window.ORANGE_PRICING_HOME) {
+        window.ORANGE_PRICING_HOME = {
+            priceParent: priceBlock.parentNode,
+            priceNext: priceBlock.nextElementSibling,
+            codeParent: codeBlock.parentNode,
+            codeNext: codeBlock.nextElementSibling
+        };
+    }
+    const home = window.ORANGE_PRICING_HOME;
+    const hasVar = orangeProductHasVariantDimension();
+    const note = document.getElementById('pricingIdentityVariantNote');
+    const icLabel = document.getElementById('item_code_label_main');
+    const bcLabel = document.getElementById('barcode_label_main');
+    if (hasVar && variantSlot) {
+        if (priceBlock.parentNode !== variantSlot) {
+            variantSlot.appendChild(priceBlock);
+        }
+        if (codeBlock.parentNode !== variantSlot) {
+            variantSlot.appendChild(codeBlock);
+        }
+        if (panel) {
+            panel.style.display = 'block';
+        }
+        if (note) {
+            note.style.display = 'block';
+        }
+        if (icLabel) {
+            icLabel.textContent = 'الكود الأب';
+        }
+        if (bcLabel) {
+            bcLabel.textContent = 'الباركود الأب';
+        }
+    } else {
+        if (home.priceParent) {
+            home.priceParent.insertBefore(priceBlock, home.priceNext || null);
+        }
+        if (home.codeParent) {
+            home.codeParent.insertBefore(codeBlock, home.codeNext || null);
+        }
+        if (panel) {
+            panel.style.display = 'none';
+        }
+        if (note) {
+            note.style.display = 'none';
+        }
+        if (icLabel) {
+            icLabel.textContent = 'كود الصنف';
+        }
+        if (bcLabel) {
+            bcLabel.textContent = 'الباركود';
+        }
+    }
+    orangeOnUnifiedPricingChange();
+}
+
+/** يطبّق أعلام التوحيد على أعمدة السعر/التكلفة في مصفوفة المتغيّرات. */
+function orangeOnUnifiedPricingChange() {
+    const puEl = document.getElementById('price_unified');
+    const cuEl = document.getElementById('cost_unified');
+    const priceUnified = !puEl || puEl.value === '1';
+    const costUnified = !cuEl || cuEl.value === '1';
+    const basePrice = (function () { const v = parseFloat(document.getElementById('price') && document.getElementById('price').value || ''); return isFinite(v) ? v : ''; }());
+    const baseCost = (function () { const v = parseFloat(document.getElementById('cost') && document.getElementById('cost').value || ''); return isFinite(v) ? v : ''; }());
+    document.querySelectorAll('#variantsBox tbody tr').forEach((tr) => {
+        const pInp = tr.querySelector('.v-price');
+        const cInp = tr.querySelector('.v-cost');
+        if (pInp) {
+            if (priceUnified) {
+                pInp.value = basePrice;
+                pInp.readOnly = true;
+                pInp.classList.add('admin-variant-price-locked');
+            } else {
+                pInp.readOnly = false;
+                pInp.classList.remove('admin-variant-price-locked');
+            }
+        }
+        if (cInp) {
+            if (costUnified) {
+                cInp.value = baseCost;
+                cInp.readOnly = true;
+                cInp.classList.add('admin-variant-price-locked');
+            } else {
+                cInp.readOnly = false;
+                cInp.classList.remove('admin-variant-price-locked');
+            }
+        }
+    });
+}
+
+/** يعبّئ سعر/تكلفة كل صف من بيانات المتغيّرات المحمّلة عند التعديل. */
+function applyVariantPricesFromVm(vm) {
+    const priceMap = {};
+    const costMap = {};
+    (vm || []).forEach((r) => {
+        const k = adminVariantRowStockKey(r);
+        if (r.variant_price !== undefined && r.variant_price !== null && String(r.variant_price) !== '') {
+            priceMap[k] = parseFloat(r.variant_price);
+        }
+        if (r.variant_cost !== undefined && r.variant_cost !== null && String(r.variant_cost) !== '') {
+            costMap[k] = parseFloat(r.variant_cost);
+        }
+    });
+    document.querySelectorAll('#variantsBox tbody tr').forEach((tr) => {
+        const k = adminVariantTrStockKey(tr);
+        const pInp = tr.querySelector('.v-price');
+        const cInp = tr.querySelector('.v-cost');
+        if (pInp && Object.prototype.hasOwnProperty.call(priceMap, k) && isFinite(priceMap[k])) {
+            pInp.value = priceMap[k];
+        }
+        if (cInp && Object.prototype.hasOwnProperty.call(costMap, k) && isFinite(costMap[k])) {
+            cInp.value = costMap[k];
+        }
+    });
+}
+
+function orangeReadVariantRowPrice(tr) {
+    const e = tr.querySelector('.v-price');
+    const v = e ? parseFloat(e.value || '') : NaN;
+    return isFinite(v) ? v : null;
+}
+
+function orangeReadVariantRowCost(tr) {
+    const e = tr.querySelector('.v-cost');
+    const v = e ? parseFloat(e.value || '') : NaN;
+    return isFinite(v) ? v : null;
+}
+
+/** قيمتا أعلام التوحيد (1 = موحّد، 0 = حسب المتغيّر) للإرسال في الـ payload. */
+function orangeReadUnifiedFlags() {
+    const puEl = document.getElementById('price_unified');
+    const cuEl = document.getElementById('cost_unified');
+    return {
+        price_unified: (!puEl || puEl.value === '1') ? 1 : 0,
+        cost_unified: (!cuEl || cuEl.value === '1') ? 1 : 0
+    };
 }
 
 function patternOptionsHtml() {
@@ -4240,8 +4437,10 @@ function generateVariants() {
 
     let html = '<p class="admin-variants-lead"><strong>منتج بلا ألوان وبلا مقاسات:</strong> صف واحد = SKU واحد وباركود واحد بعد الحفظ. <strong>منتج بلون أو بمقاسات:</strong> كل صف يمثل نفس الصنف مع دمج لون ونمط اختياري × مقاس. عمود «صورة المرجع»: عند رفع صور لكل لون من تبويب الألوان تُعرض صورة ذلك اللون لكل صف؛ وإلا تُستخدم الصورة الرئيسية أو معرض الصور العام. <strong>الكميات:</strong> لا تُدخل من هنا — بعد الحفظ عالج المخزون من <a href="' + adminPublicPath('/admin/index.php?page=opening_stock_balances') + '">أرصدة أول المدة المخزنية</a> أو <a href="' + adminPublicPath('/admin/index.php?page=stock_adjustment_voucher') + '">قيد تسوية مخزون</a> أو من <a href="' + adminPublicPath('/admin/index.php?page=purchases') + '">استلام فاتورة شراء</a>.</p>';
     html += '<div class="table-wrap admin-table-wrap-elevated"><table class="admin-table admin-variants-matrix"><thead><tr>';
-    html += '<th class="col-ref-img">صورة المرجع</th><th>اللون</th><th>المقاس</th><th class="col-vbar">باركود المتغير (بعد الحفظ)</th><th class="col-stock">المخزون الحالي (عرض)</th>';
+    html += '<th class="col-ref-img">صورة المرجع</th><th>اللون</th><th>المقاس</th><th class="col-vprice">سعر البيع</th><th class="col-vcost">آخر تكلفة شراء</th><th class="col-vbar">باركود المتغير (بعد الحفظ)</th><th class="col-stock">المخزون الحالي (عرض)</th>';
     html += '</tr></thead><tbody>';
+    const defVPrice = (function () { const v = parseFloat(document.getElementById('price') && document.getElementById('price').value || ''); return isFinite(v) ? v : ''; }());
+    const defVCost = (function () { const v = parseFloat(document.getElementById('cost') && document.getElementById('cost').value || ''); return isFinite(v) ? v : ''; }());
     combos.forEach((c, idx) => {
         const sz = sizeLookupList.find(x => String(x.id) === String(c.size_family_size_id));
         const szLabel = sz ? (sz.label_ar || sz.label_en || ('#' + sz.id)) : '-';
@@ -4273,12 +4472,15 @@ function generateVariants() {
             <td class="td-ref-img">${thumbCell}</td>
             <td>${colorCell}</td>
             <td><span class="admin-variant-size-pill">${szLabel}</span><input type="hidden" class="v-zid" value="${c.size_family_size_id}"></td>
+            <td class="td-vprice"><input type="number" class="v-price admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="0" value="${defVPrice}"></td>
+            <td class="td-vcost"><input type="number" class="v-cost admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="0" value="${defVCost}"></td>
             <td class="td-vbar"><code class="v-barcode-display admin-variant-barcode-readonly" dir="ltr" lang="en">—</code> <button type="button" class="btn-secondary" style="font-size:11px;padding:2px 8px;" onclick="orangeCopyVariantBarcode(this)">نسخ</button></td>
             <td class="td-stock"><span class="v-stock-display admin-variant-stock-readonly" data-idx="${idx}">0</span><input type="hidden" class="v-stock" value="0" tabindex="-1" autocomplete="off"></td>
         </tr>`;
     });
     html += '</tbody></table></div>';
     box.innerHTML = html;
+    orangeOnUnifiedPricingChange();
     if (orangeProductWizardIsNew()) {
         window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = true;
         orangeApplyProductWizardActionButtons();
@@ -4376,9 +4578,12 @@ async function saveProduct() {
                 primary_pattern_id: parseInt((tr.querySelector('.v-pp') && tr.querySelector('.v-pp').value) || '0', 10) || 0,
                 secondary_pattern_id: parseInt((tr.querySelector('.v-sp') && tr.querySelector('.v-sp').value) || '0', 10) || 0,
                 size_family_size_id: parseInt(tr.querySelector('.v-zid').value, 10) || 0,
-                stock_quantity: parseInt(tr.querySelector('.v-stock').value || '0', 10)
+                stock_quantity: parseInt(tr.querySelector('.v-stock').value || '0', 10),
+                price: orangeReadVariantRowPrice(tr),
+                cost: orangeReadVariantRowCost(tr)
             }));
         }
+        Object.assign(payload, orangeReadUnifiedFlags());
         const res = await postJSON('/admin/api/products/update.php', payload);
         alert(res.message || (res.success ? 'تم التحديث' : 'فشل'));
         if (res.success) {
@@ -4406,7 +4611,9 @@ async function saveProduct() {
         primary_pattern_id: parseInt((tr.querySelector('.v-pp') && tr.querySelector('.v-pp').value) || '0', 10) || 0,
         secondary_pattern_id: parseInt((tr.querySelector('.v-sp') && tr.querySelector('.v-sp').value) || '0', 10) || 0,
         size_family_size_id: parseInt(tr.querySelector('.v-zid').value, 10) || 0,
-        stock_quantity: parseInt(tr.querySelector('.v-stock').value || '0', 10)
+        stock_quantity: parseInt(tr.querySelector('.v-stock').value || '0', 10),
+        price: orangeReadVariantRowPrice(tr),
+        cost: orangeReadVariantRowCost(tr)
     }));
 
     const payload = {
@@ -4438,6 +4645,7 @@ async function saveProduct() {
         }()),
         price: parseFloat(document.getElementById('price').value || '0'),
         cost: parseFloat(document.getElementById('cost').value || '0'),
+        ...orangeReadUnifiedFlags(),
         main_image: document.getElementById('main_image').value.trim() || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES[0] ? window.PRODUCT_EXTRA_IMAGES[0] : ''),
         has_sizes: orangeProductEffectiveHasSizes() ? 1 : 0,
         has_colors: parseInt(document.getElementById('has_colors').value, 10),
@@ -4483,7 +4691,9 @@ function orangeBuildProductPreviewPayload() {
         primary_pattern_id: parseInt((tr.querySelector('.v-pp') && tr.querySelector('.v-pp').value) || '0', 10) || 0,
         secondary_pattern_id: parseInt((tr.querySelector('.v-sp') && tr.querySelector('.v-sp').value) || '0', 10) || 0,
         size_family_size_id: parseInt((tr.querySelector('.v-zid') && tr.querySelector('.v-zid').value) || '0', 10) || 0,
-        stock_quantity: parseInt((tr.querySelector('.v-stock') && tr.querySelector('.v-stock').value) || '0', 10) || 0
+        stock_quantity: parseInt((tr.querySelector('.v-stock') && tr.querySelector('.v-stock').value) || '0', 10) || 0,
+        price: orangeReadVariantRowPrice(tr),
+        cost: orangeReadVariantRowCost(tr)
     }));
     // لم يتم التوليد الحقيقي بعد: احسب المتغيرات افتراضياً للمعاينة فقط (لا يؤثر على الشاشة ولا زر الحفظ).
     if (!variants.length) {
@@ -4510,6 +4720,7 @@ function orangeBuildProductPreviewPayload() {
         product_type_id: parseInt(val('product_type_id'), 10) || 0,
         price: parseFloat(val('price') || '0') || 0,
         cost: parseFloat(val('cost') || '0') || 0,
+        ...orangeReadUnifiedFlags(),
         main_image: val('main_image') || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES[0] ? window.PRODUCT_EXTRA_IMAGES[0] : ''),
         has_sizes: orangeProductEffectiveHasSizes() ? 1 : 0,
         has_colors: parseInt(val('has_colors'), 10) || 0,
