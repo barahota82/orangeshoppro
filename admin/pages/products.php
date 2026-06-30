@@ -826,12 +826,8 @@ $orangeAdminSfProductUrlPartsForJs = [
         .admin-variants-matrix .td-vprice,.admin-variants-matrix .td-vcost{min-width:104px;}
         .admin-variants-matrix .v-price,.admin-variants-matrix .v-cost{width:96px;text-align:left;}
         .admin-variant-price-locked{background:#f1f5f9;color:#64748b;cursor:not-allowed;}
-        /* #variantsBox صار حامل بيانات مخفياً؛ الإدخال يتم في خانات الكارت السطرية (لون×مقاس/صف لون/مقاس)، والباركود/المخزون في تبويب «المتغيرات والباركود». */
-        #variantsBox{display:none;}
-        .cw-size-item,.sp-item{display:flex;flex-direction:column;gap:4px;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;background:#fff;}
-        .cw-size-pricing,.cw-row-pricing,.sp-pricing{display:none;}
-        .cw-size-pricing.is-on,.cw-row-pricing.is-on,.sp-pricing.is-on{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px;}
-        .cw-size-price,.cw-size-cost,.cw-row-price,.cw-row-cost,.sp-price,.sp-cost{width:88px;}
+        /* جدول التسعير الحيّ (#variantsBox) أسفل «التسعير والهوية»: يُعرض اللون/المقاس/السعر/التكلفة فقط؛ صورة المرجع والباركود والمخزون مخفية (الباركود/المخزون في تبويب «المتغيرات والباركود»). إظهار/إخفاء الجدول ككلّ يُدار من JS. */
+        #variantsBox .col-ref-img,#variantsBox .td-ref-img,#variantsBox .col-vbar,#variantsBox .td-vbar,#variantsBox .col-stock,#variantsBox .td-stock{display:none;}
         .admin-card-inp-bad{border-color:#b91c1c !important;background:#fef2f2;}
         .orange-mpv-modal{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;}
         .orange-mpv-modal[hidden]{display:none;}
@@ -1237,35 +1233,33 @@ function orangeProductCostPriceLiveCheck() {
     warn.style.display = (!isNaN(pv) && !isNaN(cv) && cv > pv) ? 'block' : 'none';
 }
 
-/** تحذير حيّ على خانات الكارت السطرية: تلوين السعر/التكلفة إذا تجاوزت التكلفة السعر (لأي متغيّر، بما يشمل الحالات المختلطة). */
-function orangeProductCardCostPriceLiveCheck() {
-    const flags = orangeReadUnifiedFlags();
-    const parseNum = function (el) {
-        const v = parseFloat(String((el && el.value) || '').trim().replace(',', '.'));
-        return isFinite(v) ? v : null;
-    };
-    const up = parseNum(document.getElementById('price'));
-    const uc = parseNum(document.getElementById('cost'));
-    const mark = function (priceInp, costInp) {
-        const p = flags.price_unified === 1 ? up : parseNum(priceInp);
-        const c = flags.cost_unified === 1 ? uc : parseNum(costInp);
+/** تحذير حيّ على خلايا جدول التسعير: تلوين السعر/التكلفة لأي صف تتجاوز فيه التكلفة السعر. */
+function orangeProductVariantTableCostPriceLiveCheck() {
+    document.querySelectorAll('#variantsBox tbody tr').forEach(function (tr) {
+        const p = orangeReadVariantRowPrice(tr);
+        const c = orangeReadVariantRowCost(tr);
         const bad = (p != null && c != null && c > p);
-        if (priceInp) {
-            priceInp.classList.toggle('admin-card-inp-bad', bad);
+        const pe = tr.querySelector('.v-price');
+        const ce = tr.querySelector('.v-cost');
+        if (pe) {
+            pe.classList.toggle('admin-card-inp-bad', bad);
         }
-        if (costInp) {
-            costInp.classList.toggle('admin-card-inp-bad', bad);
+        if (ce) {
+            ce.classList.toggle('admin-card-inp-bad', bad);
         }
-    };
-    document.querySelectorAll('#colorwaysBox .cw-size-item').forEach(function (it) {
-        mark(it.querySelector('.cw-size-price'), it.querySelector('.cw-size-cost'));
     });
-    document.querySelectorAll('#colorwaysBox .cw-row-pricing').forEach(function (rb) {
-        mark(rb.querySelector('.cw-row-price'), rb.querySelector('.cw-row-cost'));
-    });
-    document.querySelectorAll('#product_size_pick_checkboxes .sp-item').forEach(function (it) {
-        mark(it.querySelector('.sp-price'), it.querySelector('.sp-cost'));
-    });
+}
+
+/** إظهار/إخفاء جدول التسعير: يظهر فقط عند وجود صفوف وأن يكون السعر أو التكلفة «حسب المتغيّر». */
+function orangeRefreshVariantPricingTableVisibility() {
+    const box = document.getElementById('variantsBox');
+    if (!box) {
+        return;
+    }
+    const flags = orangeReadUnifiedFlags();
+    const anyPV = flags.price_unified === 0 || flags.cost_unified === 0;
+    const hasRows = !!box.querySelector('tbody tr');
+    box.style.display = (anyPV && hasRows) ? '' : 'none';
 }
 
 /** منتج بسيط: بلا ألوان وبلا مقاسات — صف بيع واحد (باركود بعد الحفظ). */
@@ -1284,33 +1278,20 @@ function orangeProductWizardIsNew() {
 }
 
 function orangeProductInvalidateVariantsReadyForSave() {
+    // النموذج الحيّ: جاهزية الحفظ تتبع وجود صفوف في جدول التسعير الحيّ (لا تتطلّب ضغط زر).
     if (orangeProductWizardIsNew()) {
-        window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = false;
+        const box = document.getElementById('variantsBox');
+        window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = !!(box && box.querySelector('tbody tr'));
         orangeApplyProductWizardActionButtons();
     }
 }
 
 /**
- * عند تغيير إعدادات تكوين المتغيرات قبل الحفظ (ألوان/مقاسات) يجب
- * إلغاء مصفوفة التوليد السابقة وإجبار إعادة التوليد من المعطيات الجديدة.
+ * عند تغيير إعدادات تكوين المتغيرات (ألوان/مقاسات/أنماط/عائلة) يُعاد بناء جدول التسعير
+ * الحيّ فوراً مع الحفاظ على القيم المُدخَلة — بدل مسحه وإجبار إعادة التوليد يدوياً.
  */
 function orangeProductClearGeneratedVariantsMatrixIfNeeded() {
-    const box = document.getElementById('variantsBox');
-    if (!box) {
-        return;
-    }
-    if (!box.querySelector('tbody tr')) {
-        return;
-    }
-    box.innerHTML = '';
-    if (!orangeProductWizardIsNew()) {
-        // وضع التعديل: تغيّرت إعدادات الألوان/المقاسات فبطلت المصفوفة المحمّلة.
-        // نرفع علم «الأبعاد تغيّرت» ونمنع الحفظ حتى تُعاد المصفوفة، كي لا تبقى «أول لقطة»
-        // قديمة (مثل لون يظهر بمقاسات أُلغيت). يُظهر زرَّ «توليد المتغيرات» في التعديل.
-        window.ORANGE_PRODUCT_EDIT_DIMENSIONS_DIRTY = true;
-        window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = false;
-        orangeApplyProductWizardActionButtons();
-    }
+    generateVariants({ silent: true });
 }
 
 /**
@@ -3328,22 +3309,26 @@ async function loadProductForEdit(id) {
             hasSizesEff ||
             (vm && vm.length > 0);
         if (needMatrix) {
-            generateVariants();
+            generateVariants({ silent: true });
             applyVariantStocksFromVm(vm);
             applyVariantBarcodesFromVm(vm);
             applyVariantPricesFromVm(vm);
-            orangePopulateCardPricingFromMatrix();
+            orangeProductVariantTableCostPriceLiveCheck();
+            orangeRenderVariantBarcodeView();
+            orangeRefreshVariantPricingTableVisibility();
         }
         if (needMatrix && !document.querySelectorAll('#variantsBox tbody tr').length) {
             document.getElementById('variantsBox').innerHTML =
                 '<p class="admin-variants-edit-note">لم تُستخرج المتغيرات — راجع الشاشة ثم استخدم «توليد المتغيرات» وحفظ.</p>';
         }
         if (!document.querySelectorAll('#variantsBox tbody tr').length && orangeProductIsSimpleSkuMatrix()) {
-            generateVariants();
+            generateVariants({ silent: true });
             applyVariantStocksFromVm(vm);
             applyVariantBarcodesFromVm(vm);
             applyVariantPricesFromVm(vm);
-            orangePopulateCardPricingFromMatrix();
+            orangeProductVariantTableCostPriceLiveCheck();
+            orangeRenderVariantBarcodeView();
+            orangeRefreshVariantPricingTableVisibility();
         }
         orangeApplyProductBasicStepLocks();
         orangeScheduleProductCardPreviewRefresh();
@@ -3755,7 +3740,8 @@ function orangeOnUnifiedPricingChange() {
             }
         }
     });
-    orangeRefreshInlineVariantPricingVisibility();
+    orangeProductVariantTableCostPriceLiveCheck();
+    orangeRefreshVariantPricingTableVisibility();
 }
 
 /** يعبّئ سعر/تكلفة كل صف من بيانات المتغيّرات المحمّلة عند التعديل. */
@@ -3863,173 +3849,6 @@ function orangeProductValidatePerVariantPricing() {
         }
     }
     return null;
-}
-
-/**
- * إظهار/إخفاء خانات السعر/التكلفة السطرية داخل الكارت (لون×مقاس، أو صف لون، أو مقاس فقط):
- * تظهر فقط عند «حسب المتغيّر» (لكل بُعد على حدة) ولمقاس/لون محدَّد فعلاً.
- */
-function orangeRefreshInlineVariantPricingVisibility() {
-    const flags = orangeReadUnifiedFlags();
-    const pricePV = flags.price_unified === 0;
-    const costPV = flags.cost_unified === 0;
-    const anyPV = pricePV || costPV;
-    const hs = orangeProductEffectiveHasSizes();
-    const applyBlock = function (block, pr, co, on) {
-        if (block) {
-            block.classList.toggle('is-on', !!on);
-        }
-        if (pr) {
-            pr.style.display = (on && pricePV) ? '' : 'none';
-        }
-        if (co) {
-            co.style.display = (on && costPV) ? '' : 'none';
-        }
-    };
-    document.querySelectorAll('#colorwaysBox .cw-row').forEach(function (row) {
-        row.querySelectorAll('.cw-size-item').forEach(function (item) {
-            const cb = item.querySelector('.cw-size-cb');
-            applyBlock(
-                item.querySelector('.cw-size-pricing'),
-                item.querySelector('.cw-size-price'),
-                item.querySelector('.cw-size-cost'),
-                hs && cb && cb.checked && anyPV
-            );
-        });
-        const rb = row.querySelector('.cw-row-pricing');
-        applyBlock(
-            rb,
-            rb ? rb.querySelector('.cw-row-price') : null,
-            rb ? rb.querySelector('.cw-row-cost') : null,
-            !hs && anyPV
-        );
-    });
-    document.querySelectorAll('#product_size_pick_checkboxes .sp-item').forEach(function (item) {
-        const cb = item.querySelector('.product-size-pick-cb');
-        applyBlock(
-            item.querySelector('.sp-pricing'),
-            item.querySelector('.sp-price'),
-            item.querySelector('.sp-cost'),
-            cb && cb.checked && anyPV
-        );
-    });
-    orangeProductCardCostPriceLiveCheck();
-}
-
-/** خريطة سعر/تكلفة من خانات الكارت بمفتاح المتغيّر «لون:ثانوي:نمط:نمط:مقاس». */
-function orangeBuildCardPricingMap() {
-    const map = {};
-    document.querySelectorAll('#colorwaysBox .cw-row').forEach(function (row) {
-        const p = parseInt((row.querySelector('.cw-p') && row.querySelector('.cw-p').value) || '0', 10) || 0;
-        const s = parseInt((row.querySelector('.cw-s') && row.querySelector('.cw-s').value) || '0', 10) || 0;
-        const pp = parseInt((row.querySelector('.cw-pp') && row.querySelector('.cw-pp').value) || '0', 10) || 0;
-        const sp = parseInt((row.querySelector('.cw-sp') && row.querySelector('.cw-sp').value) || '0', 10) || 0;
-        if (!p) {
-            return;
-        }
-        const base = [p, s, pp, sp].join(':');
-        row.querySelectorAll('.cw-size-item').forEach(function (item) {
-            const sid = parseInt(item.getAttribute('data-sid') || '0', 10) || 0;
-            if (sid <= 0) {
-                return;
-            }
-            const pr = item.querySelector('.cw-size-price');
-            const co = item.querySelector('.cw-size-cost');
-            map[base + ':' + sid] = { price: pr ? pr.value : '', cost: co ? co.value : '' };
-        });
-        const rb = row.querySelector('.cw-row-pricing');
-        if (rb) {
-            const pr = rb.querySelector('.cw-row-price');
-            const co = rb.querySelector('.cw-row-cost');
-            map[base + ':0'] = { price: pr ? pr.value : '', cost: co ? co.value : '' };
-        }
-    });
-    document.querySelectorAll('#product_size_pick_checkboxes .sp-item').forEach(function (item) {
-        const sid = parseInt(item.getAttribute('data-sid') || '0', 10) || 0;
-        if (sid <= 0) {
-            return;
-        }
-        const pr = item.querySelector('.sp-price');
-        const co = item.querySelector('.sp-cost');
-        map['0:0:0:0:' + sid] = { price: pr ? pr.value : '', cost: co ? co.value : '' };
-    });
-    return map;
-}
-
-/** يكتب أسعار/تكاليف الكارت في صفوف المصفوفة المخفية (مصدر الحفظ) — للبُعد «حسب المتغيّر» فقط. */
-function orangeSyncCardPricingIntoMatrix() {
-    const flags = orangeReadUnifiedFlags();
-    const pricePV = flags.price_unified === 0;
-    const costPV = flags.cost_unified === 0;
-    if (!pricePV && !costPV) {
-        return;
-    }
-    const map = orangeBuildCardPricingMap();
-    document.querySelectorAll('#variantsBox tbody tr').forEach(function (tr) {
-        const rec = map[adminVariantTrStockKey(tr)];
-        if (!rec) {
-            return;
-        }
-        if (pricePV) {
-            const pInp = tr.querySelector('.v-price');
-            if (pInp) {
-                pInp.value = rec.price;
-            }
-        }
-        if (costPV) {
-            const cInp = tr.querySelector('.v-cost');
-            if (cInp) {
-                cInp.value = rec.cost;
-            }
-        }
-    });
-}
-
-/** يعبّئ خانات الكارت من صفوف المصفوفة (عند التعديل بعد applyVariantPricesFromVm). */
-function orangePopulateCardPricingFromMatrix() {
-    document.querySelectorAll('#variantsBox tbody tr').forEach(function (tr) {
-        const gv = function (sel) {
-            return parseInt((tr.querySelector(sel) && tr.querySelector(sel).value) || '0', 10) || 0;
-        };
-        const p = gv('.v-p');
-        const s = gv('.v-s');
-        const pp = gv('.v-pp');
-        const sp = gv('.v-sp');
-        const zid = gv('.v-zid');
-        const pVal = tr.querySelector('.v-price') ? tr.querySelector('.v-price').value : '';
-        const cVal = tr.querySelector('.v-cost') ? tr.querySelector('.v-cost').value : '';
-        const setPair = function (pr, co) {
-            if (pr) {
-                pr.value = pVal;
-            }
-            if (co) {
-                co.value = cVal;
-            }
-        };
-        if (p > 0) {
-            const row = adminFindColorwayRowByVariantIds(p, s, pp, sp);
-            if (!row) {
-                return;
-            }
-            if (zid > 0) {
-                const item = row.querySelector('.cw-size-item[data-sid="' + zid + '"]');
-                if (item) {
-                    setPair(item.querySelector('.cw-size-price'), item.querySelector('.cw-size-cost'));
-                }
-            } else {
-                const rb = row.querySelector('.cw-row-pricing');
-                if (rb) {
-                    setPair(rb.querySelector('.cw-row-price'), rb.querySelector('.cw-row-cost'));
-                }
-            }
-        } else if (zid > 0) {
-            const item = document.querySelector('#product_size_pick_checkboxes .sp-item[data-sid="' + zid + '"]');
-            if (item) {
-                setPair(item.querySelector('.sp-price'), item.querySelector('.sp-cost'));
-            }
-        }
-    });
-    orangeRefreshInlineVariantPricingVisibility();
 }
 
 function patternOptionsHtml() {
@@ -4172,14 +3991,12 @@ function orangeFillColorwayRowSizes(rowEl) {
     const hs = orangeProductEffectiveHasSizes();
     if (!hs) {
         mount.innerHTML = '';
-        orangeRefreshInlineVariantPricingVisibility();
         return;
     }
     const famSel = document.getElementById('size_family_id');
     const famId = famSel ? (parseInt(famSel.value, 10) || 0) : 0;
     if (!famId) {
         mount.innerHTML = '<p class="card-hint" style="margin:0;">اختر <strong>عائلة المقاسات</strong> من تبويب البيانات الأساسية أولاً.</p>';
-        orangeRefreshInlineVariantPricingVisibility();
         return;
     }
     const sizes = sizesForFamily(famId);
@@ -4196,9 +4013,6 @@ function orangeFillColorwayRowSizes(rowEl) {
         if (sid <= 0) {
             return;
         }
-        const item = document.createElement('div');
-        item.className = 'cw-size-item';
-        item.setAttribute('data-sid', String(sid));
         const wrap = document.createElement('label');
         wrap.className = 'product-size-pick-item cw-size-lb';
         const cb = document.createElement('input');
@@ -4210,21 +4024,9 @@ function orangeFillColorwayRowSizes(rowEl) {
         span.textContent = String(sz.label_ar || sz.label_en || ('#' + sid)).replace(/</g, '');
         wrap.appendChild(cb);
         wrap.appendChild(span);
-        item.appendChild(wrap);
-        // سعر/تكلفة هذا (اللون × المقاس) — تظهر عند تحديد المقاس و«حسب المتغيّر».
-        const pricing = document.createElement('div');
-        pricing.className = 'cw-size-pricing';
-        pricing.innerHTML =
-            '<input type="number" class="cw-size-price admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="سعر">' +
-            '<input type="number" class="cw-size-cost admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="تكلفة">';
-        item.appendChild(pricing);
-        cb.addEventListener('change', function () {
-            orangeRefreshInlineVariantPricingVisibility();
-        });
-        grid.appendChild(item);
+        grid.appendChild(wrap);
     });
     mount.appendChild(grid);
-    orangeRefreshInlineVariantPricingVisibility();
 }
 
 function orangeRefreshAllColorwaySizePickers() {
@@ -4338,11 +4140,6 @@ function addColorwayRow() {
             <div><label>نمط ثانوي (اختياري)</label><select class="cw-sp">${patternOptionsHtml()}</select></div>
         </div>
         <div class="cw-sizes-mount" style="margin-top:10px;width:100%;"></div>
-        <div class="cw-row-pricing">
-            <span class="card-hint" style="margin:0;">سعر/تكلفة هذا اللون:</span>
-            <input type="number" class="cw-row-price admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="سعر">
-            <input type="number" class="cw-row-cost admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="تكلفة">
-        </div>
         <div class="cw-row-gallery card-hint" style="margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;">
             <strong>صور هذا اللون (اختياري)</strong>
             <p style="margin:4px 0 8px;font-size:12px;color:#64748b;">تظهر في المتجر عند اختيار هذا اللون؛ إن تُركت فارغة يُستخدم معرض المنتج العام من تبويب «صور المنتج العامة».</p>
@@ -4659,9 +4456,6 @@ function orangeRefreshSizePickPanel() {
         if (sid <= 0) {
             return;
         }
-        const item = document.createElement('div');
-        item.className = 'sp-item';
-        item.setAttribute('data-sid', String(sid));
         const wrap = document.createElement('label');
         wrap.className = 'product-size-pick-item';
         wrap.style.display = 'inline-flex';
@@ -4678,22 +4472,12 @@ function orangeRefreshSizePickPanel() {
         span.textContent = t;
         wrap.appendChild(cb);
         wrap.appendChild(span);
-        item.appendChild(wrap);
-        // سعر/تكلفة هذا المقاس — تظهر عند تحديده و«حسب المتغيّر».
-        const pricing = document.createElement('div');
-        pricing.className = 'sp-pricing';
-        pricing.innerHTML =
-            '<input type="number" class="sp-price admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="سعر">' +
-            '<input type="number" class="sp-cost admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="تكلفة">';
-        item.appendChild(pricing);
-        mount.appendChild(item);
+        mount.appendChild(wrap);
         cb.addEventListener('change', function () {
             orangeProductClearGeneratedVariantsMatrixIfNeeded();
             orangeProductInvalidateVariantsReadyForSave();
-            orangeRefreshInlineVariantPricingVisibility();
         });
     });
-    orangeRefreshInlineVariantPricingVisibility();
 }
 
 function orangeApplySizePickFromVariantMatrix(vm) {
@@ -4868,28 +4652,62 @@ function orangeBuildPreviewVariantList() {
     });
 }
 
-function generateVariants() {
-    const wizErr = orangeProductValidateWizardBeforeMatrix();
-    if (wizErr) {
-        productFormShowTab(wizErr.tab);
-        alert(wizErr.message);
+/**
+ * يبني/يعيد بناء جدول التسعير لكل متغيّر (#variantsBox) — هو مصدر الحفظ.
+ * - opts.silent=true: بناء حيّ بلا تنبيهات ولا تبديل تبويب (يُستدعى عند أي تغيير اختيار).
+ * - يحفظ القيم المُدخَلة (سعر/تكلفة/باركود) عبر إعادة البناء بمفتاح المتغيّر.
+ * - زرّ «توليد المتغيرات» (غير صامت) يتحقق من اكتمال البيانات ويبدّل للتبويب.
+ */
+function generateVariants(opts) {
+    opts = opts || {};
+    const silent = opts.silent === true;
+    const box = document.getElementById('variantsBox');
+    if (!box) {
         return;
     }
-    assignMainImageFromGalleryIfEmpty();
-    const box = document.getElementById('variantsBox');
-    const computed = orangeComputeVariantCombos({ silent: false });
+    if (!silent) {
+        const wizErr = orangeProductValidateWizardBeforeMatrix();
+        if (wizErr) {
+            productFormShowTab(wizErr.tab);
+            alert(wizErr.message);
+            return;
+        }
+        assignMainImageFromGalleryIfEmpty();
+    }
+    // لقطة للقيم المُدخَلة للحفاظ عليها عبر إعادة البناء الحيّ (مفتاح: لون:ثانوي:نمط:نمط:مقاس).
+    const snap = {};
+    box.querySelectorAll('tbody tr').forEach(function (tr) {
+        const pe = tr.querySelector('.v-price');
+        const ce = tr.querySelector('.v-cost');
+        const be = tr.querySelector('.v-barcode-display');
+        const se = tr.querySelector('.v-stock');
+        const sd = tr.querySelector('.v-stock-display');
+        snap[adminVariantTrStockKey(tr)] = {
+            price: pe ? pe.value : '',
+            cost: ce ? ce.value : '',
+            barcode: be ? be.textContent : '',
+            stock: se ? se.value : '0',
+            stockDisp: sd ? sd.textContent : '0'
+        };
+    });
+    const computed = orangeComputeVariantCombos({ silent: silent });
     if (!computed) {
+        box.innerHTML = '';
+        if (orangeProductWizardIsNew()) {
+            window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = false;
+        }
+        orangeRefreshVariantPricingTableVisibility();
+        orangeRenderVariantBarcodeView();
+        orangeApplyProductWizardActionButtons();
         return;
     }
     const combos = computed.combos;
     const sizeLookupList = computed.sizeLookupList;
 
-    let html = '<p class="admin-variants-lead"><strong>منتج بلا ألوان وبلا مقاسات:</strong> صف واحد = SKU واحد وباركود واحد بعد الحفظ. <strong>منتج بلون أو بمقاسات:</strong> كل صف يمثل نفس الصنف مع دمج لون ونمط اختياري × مقاس. عمود «صورة المرجع»: عند رفع صور لكل لون من تبويب الألوان تُعرض صورة ذلك اللون لكل صف؛ وإلا تُستخدم الصورة الرئيسية أو معرض الصور العام. <strong>الكميات:</strong> لا تُدخل من هنا — بعد الحفظ عالج المخزون من <a href="' + adminPublicPath('/admin/index.php?page=opening_stock_balances') + '">أرصدة أول المدة المخزنية</a> أو <a href="' + adminPublicPath('/admin/index.php?page=stock_adjustment_voucher') + '">قيد تسوية مخزون</a> أو من <a href="' + adminPublicPath('/admin/index.php?page=purchases') + '">استلام فاتورة شراء</a>.</p>';
+    let html = '<p class="admin-variants-lead">جدول التسعير لكل متغيّر (لون × مقاس) — يتحدّث فوراً مع اختيار الألوان/المقاسات بالأعلى. العمود الموحّد يُعرض للقراءة فقط ويُؤخذ من «التسعير والهوية»؛ الكود/الباركود يُولَّدان بعد الحفظ ويظهران في تبويب «المتغيرات والباركود». <strong>الكميات لا تُدخل من هنا.</strong></p>';
     html += '<div class="table-wrap admin-table-wrap-elevated"><table class="admin-table admin-variants-matrix"><thead><tr>';
     html += '<th class="col-ref-img">صورة المرجع</th><th>اللون</th><th>المقاس</th><th class="col-vprice">سعر البيع</th><th class="col-vcost">آخر تكلفة شراء</th><th class="col-vbar">باركود المتغير (بعد الحفظ)</th><th class="col-stock">المخزون الحالي (عرض)</th>';
     html += '</tr></thead><tbody>';
-    const defVPrice = (function () { const v = parseFloat(document.getElementById('price') && document.getElementById('price').value || ''); return isFinite(v) ? v : ''; }());
-    const defVCost = (function () { const v = parseFloat(document.getElementById('cost') && document.getElementById('cost').value || ''); return isFinite(v) ? v : ''; }());
     combos.forEach((c, idx) => {
         const sz = sizeLookupList.find(x => String(x.id) === String(c.size_family_size_id));
         const szLabel = sz ? (sz.label_ar || sz.label_en || ('#' + sz.id)) : '-';
@@ -4917,31 +4735,41 @@ function generateVariants() {
             c.primary_pattern_id || 0,
             c.secondary_pattern_id || 0
         );
+        const key = [
+            parseInt(c.primary_color_id, 10) || 0,
+            parseInt(c.secondary_color_id, 10) || 0,
+            parseInt(c.primary_pattern_id, 10) || 0,
+            parseInt(c.secondary_pattern_id, 10) || 0,
+            parseInt(c.size_family_size_id, 10) || 0
+        ].join(':');
+        const prev = snap[key] || {};
+        const pVal = prev.price != null ? prev.price : '';
+        const cVal = prev.cost != null ? prev.cost : '';
+        const barVal = (prev.barcode && prev.barcode !== '—') ? prev.barcode : '—';
+        const stkVal = prev.stock != null ? prev.stock : '0';
+        const stkDisp = prev.stockDisp != null ? prev.stockDisp : '0';
         html += `<tr>
             <td class="td-ref-img">${thumbCell}</td>
             <td>${colorCell}</td>
             <td><span class="admin-variant-size-pill">${szLabel}</span><input type="hidden" class="v-zid" value="${c.size_family_size_id}"></td>
-            <td class="td-vprice"><input type="number" class="v-price admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="0" value="${defVPrice}"></td>
-            <td class="td-vcost"><input type="number" class="v-cost admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="0" value="${defVCost}"></td>
-            <td class="td-vbar"><code class="v-barcode-display admin-variant-barcode-readonly" dir="ltr" lang="en">—</code> <button type="button" class="btn-secondary" style="font-size:11px;padding:2px 8px;" onclick="orangeCopyVariantBarcode(this)">نسخ</button></td>
-            <td class="td-stock"><span class="v-stock-display admin-variant-stock-readonly" data-idx="${idx}">0</span><input type="hidden" class="v-stock" value="0" tabindex="-1" autocomplete="off"></td>
+            <td class="td-vprice"><input type="number" class="v-price admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="0" value="${pVal}"></td>
+            <td class="td-vcost"><input type="number" class="v-cost admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="0" value="${cVal}"></td>
+            <td class="td-vbar"><code class="v-barcode-display admin-variant-barcode-readonly" dir="ltr" lang="en">${barVal}</code> <button type="button" class="btn-secondary" style="font-size:11px;padding:2px 8px;" onclick="orangeCopyVariantBarcode(this)">نسخ</button></td>
+            <td class="td-stock"><span class="v-stock-display admin-variant-stock-readonly" data-idx="${idx}">${stkDisp}</span><input type="hidden" class="v-stock" value="${stkVal}" tabindex="-1" autocomplete="off"></td>
         </tr>`;
     });
     html += '</tbody></table></div>';
     box.innerHTML = html;
     orangeOnUnifiedPricingChange();
-    orangeSyncCardPricingIntoMatrix();
+    orangeProductVariantTableCostPriceLiveCheck();
+    orangeRefreshVariantPricingTableVisibility();
     orangeRenderVariantBarcodeView();
-    if (orangeProductWizardIsNew()) {
-        window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = true;
-        orangeApplyProductWizardActionButtons();
-    } else if (window.ORANGE_PRODUCT_EDIT_DIMENSIONS_DIRTY === true) {
-        // إعادة بناء المصفوفة في التعديل بعد تغيير الأبعاد: رُفِع التقادم وسُمح بالحفظ.
-        window.ORANGE_PRODUCT_EDIT_DIMENSIONS_DIRTY = false;
-        window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = true;
-        orangeApplyProductWizardActionButtons();
+    window.ORANGE_PRODUCT_EDIT_DIMENSIONS_DIRTY = false;
+    window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = true;
+    orangeApplyProductWizardActionButtons();
+    if (!silent) {
+        productFormShowTab('sizes');
     }
-    productFormShowTab('sizes');
     orangeScheduleProductCardPreviewRefresh();
 }
 
@@ -4967,7 +4795,6 @@ async function saveProduct() {
         return;
     }
 
-    orangeSyncCardPricingIntoMatrix();
     const perVariantPricingErr = orangeProductValidatePerVariantPricing();
     if (perVariantPricingErr) {
         productFormShowTab('sizes');
@@ -5030,7 +4857,7 @@ async function saveProduct() {
         const hcUp = parseInt(document.getElementById('has_colors').value, 10) === 1;
         let varRowsUp = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
         if (!varRowsUp.length && orangeProductIsSimpleSkuMatrix()) {
-            generateVariants();
+            generateVariants({ silent: true });
             varRowsUp = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
         }
         if ((hsUp || hcUp) && !varRowsUp.length) {
@@ -5157,7 +4984,6 @@ function orangeBuildProductPreviewPayload() {
         const el = document.getElementById(id);
         return el ? el.value.trim() : '';
     };
-    orangeSyncCardPricingIntoMatrix();
     let variants = Array.from(document.querySelectorAll('#variantsBox tbody tr')).map((tr) => ({
         primary_color_id: parseInt((tr.querySelector('.v-p') && tr.querySelector('.v-p').value) || '0', 10) || 0,
         secondary_color_id: parseInt((tr.querySelector('.v-s') && tr.querySelector('.v-s').value) || '0', 10) || 0,
@@ -5528,15 +5354,6 @@ if (orangeColorwaysBoxEl) {
             }
         }
     });
-    orangeColorwaysBoxEl.addEventListener('input', function (ev) {
-        const t = ev.target;
-        if (t && t.classList && (
-            t.classList.contains('cw-size-price') || t.classList.contains('cw-size-cost') ||
-            t.classList.contains('cw-row-price') || t.classList.contains('cw-row-cost')
-        )) {
-            orangeProductCardCostPriceLiveCheck();
-        }
-    });
     orangeColorwaysBoxEl.addEventListener('change', function (ev) {
         const t = ev.target;
         if (t && t.classList && t.classList.contains('cw-gallery-files') && t.files && t.files.length) {
@@ -5574,12 +5391,12 @@ if (orangeColorwaysBoxEl) {
         orangeApplyProductWizardActionButtons();
     });
 }
-const orangeSizePickPanelEl = document.getElementById('product_size_pick_checkboxes');
-if (orangeSizePickPanelEl) {
-    orangeSizePickPanelEl.addEventListener('input', function (ev) {
+const orangeVariantsBoxEl = document.getElementById('variantsBox');
+if (orangeVariantsBoxEl) {
+    orangeVariantsBoxEl.addEventListener('input', function (ev) {
         const t = ev.target;
-        if (t && t.classList && (t.classList.contains('sp-price') || t.classList.contains('sp-cost'))) {
-            orangeProductCardCostPriceLiveCheck();
+        if (t && t.classList && (t.classList.contains('v-price') || t.classList.contains('v-cost'))) {
+            orangeProductVariantTableCostPriceLiveCheck();
         }
     });
 }
@@ -5613,7 +5430,7 @@ if (orangePreviewRefreshNowBtn) {
             if (id === 'price' || id === 'cost') {
                 orangeProductCostPriceLiveCheck();
                 orangeOnUnifiedPricingChange();
-                orangeProductCardCostPriceLiveCheck();
+                orangeProductVariantTableCostPriceLiveCheck();
             }
             orangeApplyProductBasicStepLocks();
             if (id === 'name' || id === 'name_en' || id === 'name_fil' || id === 'name_hi' || id === 'price') {
