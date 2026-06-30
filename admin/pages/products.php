@@ -4296,7 +4296,7 @@ function addColorwayRow() {
             <div><label>نمط ثانوي (اختياري)</label><select class="cw-sp">${patternOptionsHtml()}</select></div>
         </div>
         <div class="cw-sizes-mount" style="margin-top:10px;width:100%;"></div>
-        <div class="cw-row-pricing" style="display:none;">
+        <div class="cw-row-pricing">
             <span class="card-hint" style="margin:0;">سعر/تكلفة هذا اللون:</span>
             <input type="number" class="cw-row-price admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="سعر">
             <input type="number" class="cw-row-cost admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="تكلفة">
