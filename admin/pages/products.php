@@ -832,6 +832,7 @@ $orangeAdminSfProductUrlPartsForJs = [
         .cw-size-pricing,.cw-row-pricing,.sp-pricing{display:none;}
         .cw-size-pricing.is-on,.cw-row-pricing.is-on,.sp-pricing.is-on{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px;}
         .cw-size-price,.cw-size-cost,.cw-row-price,.cw-row-cost,.sp-price,.sp-cost{width:88px;}
+        .admin-card-inp-bad{border-color:#b91c1c !important;background:#fef2f2;}
         .orange-mpv-modal{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;}
         .orange-mpv-modal[hidden]{display:none;}
         .orange-mpv-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.78);backdrop-filter:blur(2px);}
@@ -1234,6 +1235,37 @@ function orangeProductCostPriceLiveCheck() {
     const pv = parseFloat(String((pe && pe.value) || '').trim().replace(',', '.'));
     const cv = parseFloat(String((ce && ce.value) || '').trim().replace(',', '.'));
     warn.style.display = (!isNaN(pv) && !isNaN(cv) && cv > pv) ? 'block' : 'none';
+}
+
+/** تحذير حيّ على خانات الكارت السطرية: تلوين السعر/التكلفة إذا تجاوزت التكلفة السعر (لأي متغيّر، بما يشمل الحالات المختلطة). */
+function orangeProductCardCostPriceLiveCheck() {
+    const flags = orangeReadUnifiedFlags();
+    const parseNum = function (el) {
+        const v = parseFloat(String((el && el.value) || '').trim().replace(',', '.'));
+        return isFinite(v) ? v : null;
+    };
+    const up = parseNum(document.getElementById('price'));
+    const uc = parseNum(document.getElementById('cost'));
+    const mark = function (priceInp, costInp) {
+        const p = flags.price_unified === 1 ? up : parseNum(priceInp);
+        const c = flags.cost_unified === 1 ? uc : parseNum(costInp);
+        const bad = (p != null && c != null && c > p);
+        if (priceInp) {
+            priceInp.classList.toggle('admin-card-inp-bad', bad);
+        }
+        if (costInp) {
+            costInp.classList.toggle('admin-card-inp-bad', bad);
+        }
+    };
+    document.querySelectorAll('#colorwaysBox .cw-size-item').forEach(function (it) {
+        mark(it.querySelector('.cw-size-price'), it.querySelector('.cw-size-cost'));
+    });
+    document.querySelectorAll('#colorwaysBox .cw-row-pricing').forEach(function (rb) {
+        mark(rb.querySelector('.cw-row-price'), rb.querySelector('.cw-row-cost'));
+    });
+    document.querySelectorAll('#product_size_pick_checkboxes .sp-item').forEach(function (it) {
+        mark(it.querySelector('.sp-price'), it.querySelector('.sp-cost'));
+    });
 }
 
 /** منتج بسيط: بلا ألوان وبلا مقاسات — صف بيع واحد (باركود بعد الحفظ). */
@@ -3806,19 +3838,28 @@ function orangeProductValidatePerVariantPricing() {
     if (flags.price_unified === 1 && flags.cost_unified === 1) {
         return null;
     }
+    // القيمة الفعلية للبُعد الموحّد تُؤخَذ من خانة التسعير الموحّدة مباشرةً (لا من المصفوفة) حتى
+    // يصحّ فحص «التكلفة ≤ السعر» في الحالات المختلطة (سعر متغيّر + تكلفة موحّدة، أو العكس).
+    const parseNum = function (id) {
+        const el = document.getElementById(id);
+        const v = parseFloat(String((el && el.value) || '').trim().replace(',', '.'));
+        return isFinite(v) ? v : null;
+    };
+    const unifiedPrice = parseNum('price');
+    const unifiedCost = parseNum('cost');
     const rows = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
     for (let i = 0; i < rows.length; i++) {
         const tr = rows[i];
-        const p = orangeReadVariantRowPrice(tr);
-        const c = orangeReadVariantRowCost(tr);
+        const p = flags.price_unified === 1 ? unifiedPrice : orangeReadVariantRowPrice(tr);
+        const c = flags.cost_unified === 1 ? unifiedCost : orangeReadVariantRowCost(tr);
         if (flags.price_unified === 0 && (p == null || p < 0)) {
-            return 'حدّد سعر كل متغيّر في جدول الألوان والمقاسات (التسعير حسب المتغيّر).';
+            return 'حدّد سعر كل متغيّر في كارت الألوان والمقاسات (التسعير حسب المتغيّر).';
         }
         if (flags.cost_unified === 0 && (c == null || c < 0)) {
-            return 'حدّد تكلفة كل متغيّر في جدول الألوان والمقاسات (التكلفة حسب المتغيّر).';
+            return 'حدّد تكلفة كل متغيّر في كارت الألوان والمقاسات (التكلفة حسب المتغيّر).';
         }
         if (p != null && c != null && c > p) {
-            return 'التكلفة لا يمكن أن تكون أكبر من السعر في أحد المتغيّرات.';
+            return 'التكلفة لا يمكن أن تكون أكبر من السعر في أحد المتغيّرات (سواء كان السعر أو التكلفة موحّداً أو حسب المتغيّر).';
         }
     }
     return null;
@@ -3872,6 +3913,7 @@ function orangeRefreshInlineVariantPricingVisibility() {
             cb && cb.checked && anyPV
         );
     });
+    orangeProductCardCostPriceLiveCheck();
 }
 
 /** خريطة سعر/تكلفة من خانات الكارت بمفتاح المتغيّر «لون:ثانوي:نمط:نمط:مقاس». */
@@ -5486,6 +5528,15 @@ if (orangeColorwaysBoxEl) {
             }
         }
     });
+    orangeColorwaysBoxEl.addEventListener('input', function (ev) {
+        const t = ev.target;
+        if (t && t.classList && (
+            t.classList.contains('cw-size-price') || t.classList.contains('cw-size-cost') ||
+            t.classList.contains('cw-row-price') || t.classList.contains('cw-row-cost')
+        )) {
+            orangeProductCardCostPriceLiveCheck();
+        }
+    });
     orangeColorwaysBoxEl.addEventListener('change', function (ev) {
         const t = ev.target;
         if (t && t.classList && t.classList.contains('cw-gallery-files') && t.files && t.files.length) {
@@ -5523,6 +5574,15 @@ if (orangeColorwaysBoxEl) {
         orangeApplyProductWizardActionButtons();
     });
 }
+const orangeSizePickPanelEl = document.getElementById('product_size_pick_checkboxes');
+if (orangeSizePickPanelEl) {
+    orangeSizePickPanelEl.addEventListener('input', function (ev) {
+        const t = ev.target;
+        if (t && t.classList && (t.classList.contains('sp-price') || t.classList.contains('sp-cost'))) {
+            orangeProductCardCostPriceLiveCheck();
+        }
+    });
+}
 rebuildSubcategoryOptions(null);
 updateProductCatalogHint();
 
@@ -5553,6 +5613,7 @@ if (orangePreviewRefreshNowBtn) {
             if (id === 'price' || id === 'cost') {
                 orangeProductCostPriceLiveCheck();
                 orangeOnUnifiedPricingChange();
+                orangeProductCardCostPriceLiveCheck();
             }
             orangeApplyProductBasicStepLocks();
             if (id === 'name' || id === 'name_en' || id === 'name_fil' || id === 'name_hi' || id === 'price') {
