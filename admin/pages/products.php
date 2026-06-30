@@ -645,6 +645,7 @@ $orangeAdminSfProductUrlPartsForJs = [
             </div>
             <div id="pricingIdentitySlotVariants"></div>
         </div>
+        <div id="variantsBox" class="admin-product-variant-matrix-mount"></div>
         </div>
         </div>
 
@@ -681,8 +682,8 @@ $orangeAdminSfProductUrlPartsForJs = [
         <div id="productTabPanelVariants" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnVariants" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">المتغيرات والباركود</h4>
-        <p class="card-hint" style="margin:0 0 12px;">توليد المتغيّرات وطباعة باركود/كود كل متغيّر. التسعير واختيار المقاسات ودليل المقاس في تبويب «الألوان والمقاسات».</p>
-        <div id="variantsBox"></div>
+        <p class="card-hint" style="margin:0 0 12px;">عرض كود/باركود كل متغيّر والمخزون (للقراءة فقط، بعد الحفظ). <strong>توليد المتغيرات وإدخال السعر/التكلفة لكل متغيّر يتمّان في تبويب «الألوان والمقاسات».</strong></p>
+        <div id="variantBarcodeViewBox"></div>
         </div>
         </div>
 
@@ -825,6 +826,8 @@ $orangeAdminSfProductUrlPartsForJs = [
         .admin-variants-matrix .td-vprice,.admin-variants-matrix .td-vcost{min-width:104px;}
         .admin-variants-matrix .v-price,.admin-variants-matrix .v-cost{width:96px;text-align:left;}
         .admin-variant-price-locked{background:#f1f5f9;color:#64748b;cursor:not-allowed;}
+        /* مصفوفة الإدخال بتبويب «الألوان والمقاسات» تُظهر السعر/التكلفة فقط؛ الباركود/المخزون في تبويب «المتغيرات والباركود». */
+        #variantsBox .col-vbar,#variantsBox .td-vbar,#variantsBox .col-stock,#variantsBox .td-stock{display:none;}
         .orange-mpv-modal{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;}
         .orange-mpv-modal[hidden]{display:none;}
         .orange-mpv-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.78);backdrop-filter:blur(2px);}
@@ -3111,8 +3114,11 @@ function productFormShowTab(tab) {
         btn.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     orangeNormalizeProductTabPanelsNoGap();
-    if (key === 'variants') {
+    if (key === 'sizes') {
         orangeRefreshVariantReferenceThumbs();
+    }
+    if (key === 'variants') {
+        orangeRenderVariantBarcodeView();
     }
     if (key === 'cardpreview') {
         orangeRefreshProductCardPreview();
@@ -4289,6 +4295,7 @@ function applyVariantStocksFromVm(vm) {
             disp.textContent = String(map[k]);
         }
     });
+    orangeRenderVariantBarcodeView();
 }
 
 function applyVariantBarcodesFromVm(vm) {
@@ -4309,6 +4316,45 @@ function applyVariantBarcodesFromVm(vm) {
             disp.textContent = '—';
         }
     });
+    orangeRenderVariantBarcodeView();
+}
+
+/**
+ * مرآة قراءة-فقط لتبويب «المتغيرات والباركود»: اللون · المقاس · باركود المتغيّر · المخزون.
+ * المصدر الوحيد للحقيقة (الهوية + السعر/التكلفة + المخزون المخفي) يبقى #variantsBox في تبويب
+ * «الألوان والمقاسات»؛ هذه مجرّد عرض، فلا يقرأ منها منطق الحفظ/المعاينة (يستهدف #variantsBox فقط).
+ */
+function orangeRenderVariantBarcodeView() {
+    const mount = document.getElementById('variantBarcodeViewBox');
+    if (!mount) {
+        return;
+    }
+    const rows = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
+    if (!rows.length) {
+        mount.innerHTML = '<p class="card-hint" style="margin:0;">لا توجد متغيّرات بعد. حدّد الألوان/المقاسات واضغط «توليد المتغيرات»، وأدخِل السعر/التكلفة لكل متغيّر في تبويب «الألوان والمقاسات».</p>';
+        return;
+    }
+    let html = '<div class="table-wrap admin-table-wrap-elevated"><table class="admin-table admin-variants-matrix"><thead><tr>';
+    html += '<th>اللون</th><th>المقاس</th><th class="col-vbar">باركود المتغير (بعد الحفظ)</th><th class="col-stock">المخزون الحالي (عرض)</th>';
+    html += '</tr></thead><tbody>';
+    rows.forEach((tr) => {
+        const colorCell = tr.querySelector('.admin-variant-color-cell');
+        const sizePill = tr.querySelector('.admin-variant-size-pill');
+        const bcEl = tr.querySelector('.v-barcode-display');
+        const stEl = tr.querySelector('.v-stock-display');
+        const colorHtml = colorCell ? colorCell.outerHTML : '—';
+        const sizeHtml = sizePill ? sizePill.outerHTML : '—';
+        const bc = bcEl ? bcEl.textContent : '—';
+        const st = stEl ? stEl.textContent : '0';
+        html += '<tr>' +
+            '<td>' + colorHtml + '</td>' +
+            '<td>' + sizeHtml + '</td>' +
+            '<td class="td-vbar"><code class="v-barcode-display admin-variant-barcode-readonly" dir="ltr" lang="en">' + bc + '</code> <button type="button" class="btn-secondary" style="font-size:11px;padding:2px 8px;" onclick="orangeCopyVariantBarcode(this)">نسخ</button></td>' +
+            '<td class="td-stock"><span class="admin-variant-stock-readonly">' + st + '</span></td>' +
+            '</tr>';
+    });
+    html += '</tbody></table></div>';
+    mount.innerHTML = html;
 }
 
 function sizesForFamily(fid) {
@@ -4634,6 +4680,7 @@ function generateVariants() {
     html += '</tbody></table></div>';
     box.innerHTML = html;
     orangeOnUnifiedPricingChange();
+    orangeRenderVariantBarcodeView();
     if (orangeProductWizardIsNew()) {
         window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = true;
         orangeApplyProductWizardActionButtons();
@@ -4643,7 +4690,7 @@ function generateVariants() {
         window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = true;
         orangeApplyProductWizardActionButtons();
     }
-    productFormShowTab('variants');
+    productFormShowTab('sizes');
     orangeScheduleProductCardPreviewRefresh();
 }
 
@@ -4656,7 +4703,7 @@ async function saveProduct() {
     }
 
     if (orangeProductWizardIsNew() && !window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE) {
-        productFormShowTab('variants');
+        productFormShowTab('sizes');
         alert('اضغط «توليد المتغيرات» أولاً بعد اكتمال البيانات، ثم احفظ.');
         return;
     }
@@ -4664,14 +4711,14 @@ async function saveProduct() {
     if (!orangeProductWizardIsNew()
         && window.ORANGE_PRODUCT_EDIT_DIMENSIONS_DIRTY === true
         && !window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE) {
-        productFormShowTab('variants');
+        productFormShowTab('sizes');
         alert('غيّرت إعدادات الألوان/المقاسات: اضغط «توليد المتغيرات» لإعادة بناء الجدول قبل الحفظ.');
         return;
     }
 
     const perVariantPricingErr = orangeProductValidatePerVariantPricing();
     if (perVariantPricingErr) {
-        productFormShowTab('variants');
+        productFormShowTab('sizes');
         alert(perVariantPricingErr);
         return;
     }
@@ -4735,12 +4782,12 @@ async function saveProduct() {
             varRowsUp = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
         }
         if ((hsUp || hcUp) && !varRowsUp.length) {
-            productFormShowTab('variants');
+            productFormShowTab('sizes');
             alert('ولّد المتغيرات أو حمّل المصفوفة قبل التحديث');
             return;
         }
         if (orangeProductIsSimpleSkuMatrix() && !varRowsUp.length) {
-            productFormShowTab('variants');
+            productFormShowTab('sizes');
             alert('تعذر تجهيز صف البيع — استخدم «توليد جدول البيع / المتغيرات» ثم احفظ.');
             return;
         }
@@ -4774,7 +4821,7 @@ async function saveProduct() {
 
     const rows = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
     if (!rows.length) {
-        productFormShowTab('variants');
+        productFormShowTab('sizes');
         alert('ولّد المتغيرات أولاً');
         return;
     }
