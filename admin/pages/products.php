@@ -3532,6 +3532,14 @@ function onHasFlagsChange(options) {
     if (colorwaysSec) {
         colorwaysSec.style.display = hc && allowSizeTier ? 'block' : 'none';
     }
+    if (!hc) {
+        // عند إيقاف «له ألوان» نُفرّغ صفوف الألوان فعلياً (لا نكتفي بإخفاء القسم) حتى لا تبقى
+        // تشكيلة قديمة في الخلفية تعود للظهور عند إعادة تفعيل الألوان وتتسرّب إلى الحفظ/الجدول.
+        const cwBoxReset = document.getElementById('colorwaysBox');
+        if (cwBoxReset && cwBoxReset.querySelector('.cw-row')) {
+            cwBoxReset.innerHTML = '';
+        }
+    }
     if (hc && allowSizeTier && !document.querySelector('#colorwaysBox .cw-row')) {
         addColorwayRow();
     }

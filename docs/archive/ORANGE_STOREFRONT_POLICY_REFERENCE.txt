@@ -604,5 +604,6 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 - **العمود الموحّد:** قراءة-فقط ويُملأ حيّاً من خانة الموحّد بالأعلى عبر `orangeOnUnifiedPricingChange` (قفل + `admin-variant-price-locked`).
 - **أُزيلت** الخانات السطرية من الكارت ودوالها (`cw-size-pricing`/`cw-row-pricing`/`sp-pricing` و`orangeSyncCardPricingIntoMatrix`/`orangePopulateCardPricingFromMatrix`/`orangeRefreshInlineVariantPricingVisibility`/`orangeBuildCardPricingMap`)؛ الكارت صار للاختيار فقط.
 - **التحذير الحيّ** للتكلفة>السعر صار على خلايا الجدول (`orangeProductVariantTableCostPriceLiveCheck` + كلاس `admin-card-inp-bad`)، وقيد الحفظ `orangeProductValidatePerVariantPricing` يقرأ `.v-price`/`.v-cost` مباشرة (الأربع حالات والمختلطة).
+- **تنظيف الأبعاد عند التراجع (إصلاح 2026-07-01/ج):** عند إيقاف «له ألوان؟» يُفرّغ `onHasFlagsChange` صفوف `#colorwaysBox` فعلياً (وليس مجرد إخفاء `#colorwaysSection`) قبل إعادة بناء الجدول الحيّ — حتى لا تبقى تشكيلة لون قديمة في الخلفية تعود للظهور (وتتسرّب إلى الحفظ والجدول) عند إعادة تفعيل الألوان. الجانب «مقاسات فقط» محميّ أصلاً لأن `orangeRefreshSizePickPanel` يعيد بناء منتقي المقاسات من الصفر (بلا تحديد) عند أي تغيير عائلة. مصفوفة المتغيّرات/حمولة الألوان تُحسبان من الاختيار الحالي فقط (`orangeComputeVariantCombos`/`orangeCollectColorwayImagesPayload` محكومتان بـ `has_colors`).
 
 نهاية المرجع.
