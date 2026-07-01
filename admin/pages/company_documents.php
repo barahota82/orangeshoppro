@@ -72,7 +72,7 @@ $pdo = orange_admin_page_pdo();
 
 <div class="card">
     <h3 class="card-title">بحث وتصفية</h3>
-    <div class="form-grid form-grid-3" style="align-items:end;max-width:900px;">
+    <div class="form-grid cd-filter-row orange-doc-header-row" style="align-items:end;">
         <div>
             <label for="cd_q">بحث في العنوان / المرجع / الملاحظات / اسم الملف</label>
             <input type="text" id="cd_q" placeholder="اكتب للبحث">
@@ -96,9 +96,10 @@ $pdo = orange_admin_page_pdo();
                 <?php endforeach; ?>
             </select>
         </div>
-    </div>
-    <div class="actions" style="margin-top:12px;">
-        <button type="button" class="btn" id="cd_btn_search">تحديث القائمة</button>
+        <div class="orange-doc-header-row__action">
+            <span class="orange-doc-header-row__action-label" aria-hidden="true">.</span>
+            <button type="button" class="btn" id="cd_btn_search">تحديث القائمة</button>
+        </div>
     </div>
 </div>
 
@@ -127,6 +128,18 @@ $pdo = orange_admin_page_pdo();
         </table>
     </div>
 </div>
+
+<style>
+.form-grid.cd-filter-row {
+    grid-template-columns: minmax(320px, 3fr) minmax(130px, 1fr) minmax(130px, 1fr) auto;
+}
+.orange-doc-header-row.cd-filter-row .orange-doc-header-row__action .btn {
+    white-space: nowrap;
+    min-height: var(--input-min-h);
+    height: var(--input-min-h);
+    box-sizing: border-box;
+}
+</style>
 
 <script>
 (function () {
