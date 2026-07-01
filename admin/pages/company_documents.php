@@ -72,8 +72,8 @@ $pdo = orange_admin_page_pdo();
 
 <div class="card">
     <h3 class="card-title">بحث وتصفية</h3>
-    <div class="form-grid" style="align-items:end;max-width:900px;">
-        <div style="grid-column:1/-1;">
+    <div class="form-grid form-grid-3" style="align-items:end;max-width:900px;">
+        <div>
             <label for="cd_q">بحث في العنوان / المرجع / الملاحظات / اسم الملف</label>
             <input type="text" id="cd_q" placeholder="اكتب للبحث">
         </div>
@@ -96,9 +96,9 @@ $pdo = orange_admin_page_pdo();
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="actions" style="margin:0;">
-            <button type="button" class="btn" id="cd_btn_search">تحديث القائمة</button>
-        </div>
+    </div>
+    <div class="actions" style="margin-top:12px;">
+        <button type="button" class="btn" id="cd_btn_search">تحديث القائمة</button>
     </div>
 </div>
 
