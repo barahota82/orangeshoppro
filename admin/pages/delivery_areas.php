@@ -75,7 +75,7 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
 <?php endif; ?>
 
 <?php if ($hasGovTable): ?>
-<div class="card">
+<div class="card" id="dg_form_card">
     <h3>إضافة / تعديل محافظة</h3>
     <input type="hidden" id="dg_id" value="0">
     <input type="hidden" id="dg_country_id" value="<?php echo (int) $adminCountryId; ?>">
@@ -137,10 +137,45 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
             <ul class="gl-pick-modal__list" id="dg_company_pick_list"></ul>
         </div>
     </div>
-    <div class="admin-form-actions" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;">
+    <div class="admin-form-actions" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;align-items:center;">
         <button type="button" onclick="saveGovernorate()">حفظ المحافظة</button>
         <button type="button" class="btn-secondary" onclick="translateGovernorateFromAr()">ترجمة تلقائية من العربي</button>
         <button type="button" class="btn-secondary" onclick="resetGovernorateForm()">محافظة جديدة</button>
+        <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين المحافظات" style="margin-right:auto;">
+            <button type="button" class="btn-secondary jv-nav-btn" id="dg_nav_first" title="أول محافظة" aria-label="أول محافظة">&lt;&lt;</button>
+            <button type="button" class="btn-secondary jv-nav-btn" id="dg_nav_prev" title="المحافظة السابقة" aria-label="المحافظة السابقة">&lt;</button>
+            <button type="button" class="btn-secondary jv-nav-btn" id="dg_nav_next" title="المحافظة التالية" aria-label="المحافظة التالية">&gt;</button>
+            <button type="button" class="btn-secondary jv-nav-btn" id="dg_nav_last" title="آخر محافظة" aria-label="آخر محافظة">&gt;&gt;</button>
+            <button type="button" class="btn-secondary jv-nav-search" id="dg_btn_open_search" title="بحث عن محافظة لتعديلها">بحث</button>
+        </div>
+    </div>
+</div>
+
+<div id="dg_search_modal" class="dg-search-modal" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="dg_search_modal_title">
+    <div class="dg-search-modal__backdrop" id="dg_search_modal_backdrop" style="position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1200;"></div>
+    <div class="dg-search-modal__dialog" style="position:fixed;z-index:1201;top:6%;left:50%;transform:translateX(-50%);width:min(820px,94vw);max-height:86vh;overflow:auto;background:#fff;border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.28);padding:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;">
+            <h3 id="dg_search_modal_title" style="margin:0;">بحث عن محافظة لتعديلها</h3>
+            <button type="button" class="btn-secondary" id="dg_search_close">إغلاق</button>
+        </div>
+        <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+            <div><label for="dg_search_id_from">رقم المحافظة — من</label><input type="number" id="dg_search_id_from" class="admin-inp" min="1" step="1" dir="ltr" lang="en" autocomplete="off"></div>
+            <div><label for="dg_search_id_to">رقم المحافظة — إلى</label><input type="number" id="dg_search_id_to" class="admin-inp" min="1" step="1" dir="ltr" lang="en" autocomplete="off"></div>
+            <div style="grid-column:span 2;"><label for="dg_search_name">الاسم (عربي/إنجليزي)</label><input type="text" id="dg_search_name" class="admin-inp" autocomplete="off" dir="auto"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin:12px 0;flex-wrap:wrap;">
+            <button type="button" class="btn" id="dg_search_run">تنفيذ البحث</button>
+            <button type="button" class="btn-secondary" id="dg_search_clear">مسح الحقول</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>#</th><th>عربي</th><th>English</th><th>نشطة</th><th></th></tr>
+                </thead>
+                <tbody id="dg_search_results_tbody"></tbody>
+            </table>
+        </div>
+        <p id="dg_search_empty" style="display:none;color:#64748b;margin:10px 0 0;">لا نتائج مطابقة — عدّل معايير البحث.</p>
     </div>
 </div>
 
@@ -181,7 +216,7 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
 </div>
 <?php endif; ?>
 
-<div class="card">
+<div class="card" id="da_form_card">
     <h3>إضافة / تعديل منطقة توصيل</h3>
     <input type="hidden" id="da_id" value="0">
     <input type="hidden" id="da_country_id" value="<?php echo (int) $adminCountryId; ?>">
@@ -256,10 +291,46 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
         </div>
         <?php endif; ?>
     </div>
-    <div class="admin-form-actions" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;">
+    <div class="admin-form-actions" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;align-items:center;">
         <button type="button" onclick="saveDeliveryArea()" <?php echo !$hasAreasTable ? 'disabled' : ''; ?>>حفظ المنطقة</button>
         <button type="button" class="btn-secondary" onclick="translateDeliveryAreaFromAr()">ترجمة تلقائية من العربي</button>
         <button type="button" class="btn-secondary" onclick="resetDeliveryAreaForm()">منطقة جديدة</button>
+        <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين مناطق التوصيل" style="margin-right:auto;">
+            <button type="button" class="btn-secondary jv-nav-btn" id="da_nav_first" title="أول منطقة" aria-label="أول منطقة">&lt;&lt;</button>
+            <button type="button" class="btn-secondary jv-nav-btn" id="da_nav_prev" title="المنطقة السابقة" aria-label="المنطقة السابقة">&lt;</button>
+            <button type="button" class="btn-secondary jv-nav-btn" id="da_nav_next" title="المنطقة التالية" aria-label="المنطقة التالية">&gt;</button>
+            <button type="button" class="btn-secondary jv-nav-btn" id="da_nav_last" title="آخر منطقة" aria-label="آخر منطقة">&gt;&gt;</button>
+            <button type="button" class="btn-secondary jv-nav-search" id="da_btn_open_search" title="بحث عن منطقة لتعديلها">بحث</button>
+        </div>
+    </div>
+</div>
+
+<div id="da_search_modal" class="da-search-modal" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="da_search_modal_title">
+    <div class="da-search-modal__backdrop" id="da_search_modal_backdrop" style="position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1200;"></div>
+    <div class="da-search-modal__dialog" style="position:fixed;z-index:1201;top:6%;left:50%;transform:translateX(-50%);width:min(880px,94vw);max-height:86vh;overflow:auto;background:#fff;border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.28);padding:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;">
+            <h3 id="da_search_modal_title" style="margin:0;">بحث عن منطقة لتعديلها</h3>
+            <button type="button" class="btn-secondary" id="da_search_close">إغلاق</button>
+        </div>
+        <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+            <div><label for="da_search_id_from">رقم المنطقة — من</label><input type="number" id="da_search_id_from" class="admin-inp" min="1" step="1" dir="ltr" lang="en" autocomplete="off"></div>
+            <div><label for="da_search_id_to">رقم المنطقة — إلى</label><input type="number" id="da_search_id_to" class="admin-inp" min="1" step="1" dir="ltr" lang="en" autocomplete="off"></div>
+            <div><label for="da_search_gov">المحافظة</label><input type="text" id="da_search_gov" class="admin-inp" autocomplete="off" dir="auto"></div>
+            <div style="grid-column:span 2;"><label for="da_search_name">الاسم (عربي/إنجليزي)</label><input type="text" id="da_search_name" class="admin-inp" autocomplete="off" dir="auto"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin:12px 0;flex-wrap:wrap;">
+            <button type="button" class="btn" id="da_search_run">تنفيذ البحث</button>
+            <button type="button" class="btn-secondary" id="da_search_clear">مسح الحقول</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>#</th><th>المحافظة</th><th>عربي</th><th>English</th><th>منطقة توصيل</th><th></th></tr>
+                </thead>
+                <tbody id="da_search_results_tbody"></tbody>
+            </table>
+        </div>
+        <p id="da_search_empty" style="display:none;color:#64748b;margin:10px 0 0;">لا نتائج مطابقة — عدّل معايير البحث.</p>
     </div>
 </div>
 
@@ -587,6 +658,8 @@ var daMoneyDecimals = <?php echo (int) $daMoneyDecimals; ?>;
 var daMoneyZero = <?php echo json_encode($daMoneyZero, JSON_UNESCAPED_UNICODE); ?>;
 var daAreaDefaultFee = <?php echo json_encode((float) ($daPolicy['default_delivery_fee'] ?? 0), JSON_UNESCAPED_UNICODE); ?>;
 var dgCompanies = <?php echo json_encode(array_values($daDeliveryCompanies), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var dgFormDirty = false;
+var daFormDirty = false;
 
 function dgCompanyNoneLabel() { return 'لا يوجد شركة توصيل'; }
 
@@ -936,6 +1009,7 @@ function resetGovernorateForm() {
     var ca = document.getElementById('dg_cost_apply_all');
     if (ca) ca.checked = false;
     refreshDgSortPreview();
+    dgFormDirty = false;
 }
 
 function editGovernorate(row) {
@@ -951,6 +1025,7 @@ function editGovernorate(row) {
     if (fa) fa.checked = false;
     var ca = document.getElementById('dg_cost_apply_all');
     if (ca) ca.checked = false;
+    dgFormDirty = false;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1099,6 +1174,7 @@ function resetDeliveryAreaForm() {
     daSyncListAllCheckbox();
     refreshDaSortPreview();
     renderDeliveryAreasTable();
+    daFormDirty = false;
 }
 
 function editDeliveryArea(row) {
@@ -1128,6 +1204,7 @@ function editDeliveryArea(row) {
     }
     daSyncListAllCheckbox();
     refreshDaSortPreview();
+    daFormDirty = false;
     document.querySelector('.da-area-form-grid').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -1427,6 +1504,225 @@ function daGovComboClose() {
         var pm = document.getElementById('dg_company_pick_modal');
         if (pm && !pm.hidden) dgCompanyPickerClose();
     });
+})();
+
+/* ===== تنقّل + بحث للمحافظات (نمط سند القيد) ===== */
+(function dgNavSearch() {
+    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function norm(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+    function rows() { var r = (daGovernoratesCache || []).slice(); r.sort(function (a, b) { return (parseInt(a.id, 10) || 0) - (parseInt(b.id, 10) || 0); }); return r; }
+    function currentId() { var el = document.getElementById('dg_id'); return el ? (parseInt(String(el.value || '0'), 10) || 0) : 0; }
+    function confirmLeaveIfDirty() {
+        if (!dgFormDirty) { return true; }
+        return confirm('لديك تغييرات غير محفوظة في المحافظة الحالية. الانتقال سيتجاهلها. هل تريد المتابعة؟');
+    }
+    function goToId(id) {
+        if (!id || id <= 0) { return; }
+        if (!confirmLeaveIfDirty()) { return; }
+        var row = rows().find(function (r) { return (parseInt(r.id, 10) || 0) === id; });
+        if (row) { editGovernorate(row); dgFormDirty = false; }
+    }
+    function navGo(where) {
+        var R = rows();
+        if (!R.length) { alert('لا توجد محافظات محفوظة بعد.'); return; }
+        var cur = currentId();
+        var idx = -1;
+        for (var i = 0; i < R.length; i++) { if ((parseInt(R[i].id, 10) || 0) === cur) { idx = i; break; } }
+        var target = 0;
+        if (where === 'first') { target = parseInt(R[0].id, 10) || 0; }
+        else if (where === 'last') { target = parseInt(R[R.length - 1].id, 10) || 0; }
+        else if (where === 'next') {
+            if (idx < 0) { target = parseInt(R[0].id, 10) || 0; }
+            else if (idx >= R.length - 1) { alert('لا توجد محافظة لاحقة — هذه آخر محافظة.'); return; }
+            else { target = parseInt(R[idx + 1].id, 10) || 0; }
+        } else if (where === 'prev') {
+            if (idx < 0) { target = parseInt(R[R.length - 1].id, 10) || 0; }
+            else if (idx <= 0) { alert('لا توجد محافظة أسبق — هذه أول محافظة.'); return; }
+            else { target = parseInt(R[idx - 1].id, 10) || 0; }
+        }
+        goToId(target);
+    }
+    [['dg_nav_first', 'first'], ['dg_nav_prev', 'prev'], ['dg_nav_next', 'next'], ['dg_nav_last', 'last']].forEach(function (pair) {
+        var b = document.getElementById(pair[0]);
+        if (b) { b.addEventListener('click', function () { navGo(pair[1]); }); }
+    });
+    var card = document.getElementById('dg_form_card');
+    if (card) {
+        card.addEventListener('input', function (ev) {
+            if (ev.target && (ev.target.id === 'dg_sort_order' || ev.target.id === 'dg_company_pick_q')) { return; }
+            dgFormDirty = true;
+        });
+    }
+    var modal = document.getElementById('dg_search_modal');
+    function resetFields() {
+        ['dg_search_id_from', 'dg_search_id_to', 'dg_search_name'].forEach(function (id) { var el = document.getElementById(id); if (el) { el.value = ''; } });
+        var tb = document.getElementById('dg_search_results_tbody'); if (tb) { tb.innerHTML = ''; }
+        var e = document.getElementById('dg_search_empty'); if (e) { e.style.display = 'none'; }
+    }
+    function runSearch() {
+        var idFrom = parseInt(String((document.getElementById('dg_search_id_from') || {}).value || '0'), 10) || 0;
+        var idTo = parseInt(String((document.getElementById('dg_search_id_to') || {}).value || '0'), 10) || 0;
+        var name = norm((document.getElementById('dg_search_name') || {}).value);
+        var out = rows().filter(function (r) {
+            var id = parseInt(r.id, 10) || 0;
+            if (idFrom > 0 && id < idFrom) { return false; }
+            if (idTo > 0 && id > idTo) { return false; }
+            if (name) { var hay = norm(r.name_ar) + ' ' + norm(r.name_en); if (hay.indexOf(name) === -1) { return false; } }
+            return true;
+        });
+        var tb = document.getElementById('dg_search_results_tbody');
+        var emptyNote = document.getElementById('dg_search_empty');
+        if (!tb) { return; }
+        tb.innerHTML = '';
+        if (!out.length) { if (emptyNote) { emptyNote.style.display = 'block'; } return; }
+        if (emptyNote) { emptyNote.style.display = 'none'; }
+        out.slice(0, 300).forEach(function (r) {
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td>' + (parseInt(r.id, 10) || 0) + '</td>' +
+                '<td>' + esc(r.name_ar) + '</td>' +
+                '<td dir="ltr">' + esc(r.name_en) + '</td>' +
+                '<td>' + (parseInt(r.is_active, 10) === 1 ? 'نعم' : 'لا') + '</td>' +
+                '<td><button type="button" class="btn-secondary dg-search-pick" data-id="' + (parseInt(r.id, 10) || 0) + '">تعديل</button></td>';
+            tb.appendChild(tr);
+        });
+    }
+    function openModal() { if (!modal) { return; } modal.style.display = 'block'; modal.setAttribute('aria-hidden', 'false'); runSearch(); var f = document.getElementById('dg_search_name'); if (f) { try { f.focus(); } catch (e) {} } }
+    function closeModal() { if (!modal) { return; } modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true'); resetFields(); }
+    var openBtn = document.getElementById('dg_btn_open_search'); if (openBtn) { openBtn.addEventListener('click', openModal); }
+    var closeBtn = document.getElementById('dg_search_close'); if (closeBtn) { closeBtn.addEventListener('click', closeModal); }
+    var backdrop = document.getElementById('dg_search_modal_backdrop'); if (backdrop) { backdrop.addEventListener('click', closeModal); }
+    var runBtn = document.getElementById('dg_search_run'); if (runBtn) { runBtn.addEventListener('click', runSearch); }
+    var clearBtn = document.getElementById('dg_search_clear'); if (clearBtn) { clearBtn.addEventListener('click', function () { resetFields(); runSearch(); }); }
+    ['dg_search_name', 'dg_search_id_from', 'dg_search_id_to'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) { el.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); runSearch(); } }); }
+    });
+    var tbodyEl = document.getElementById('dg_search_results_tbody');
+    if (tbodyEl) {
+        tbodyEl.addEventListener('click', function (ev) {
+            var btn = ev.target && ev.target.closest ? ev.target.closest('.dg-search-pick') : null;
+            if (!btn) { return; }
+            var id = parseInt(String(btn.getAttribute('data-id') || '0'), 10) || 0;
+            if (id <= 0) { return; }
+            if (!confirmLeaveIfDirty()) { return; }
+            closeModal();
+            goToId(id);
+        });
+    }
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && modal && modal.style.display === 'block') { closeModal(); } });
+})();
+
+/* ===== تنقّل + بحث لمناطق التوصيل (نمط سند القيد) ===== */
+(function daNavSearch() {
+    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function norm(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+    function rows() { var r = (daDeliveryAreasCache || []).slice(); r.sort(function (a, b) { return (parseInt(a.id, 10) || 0) - (parseInt(b.id, 10) || 0); }); return r; }
+    function currentId() { var el = document.getElementById('da_id'); return el ? (parseInt(String(el.value || '0'), 10) || 0) : 0; }
+    function confirmLeaveIfDirty() {
+        if (!daFormDirty) { return true; }
+        return confirm('لديك تغييرات غير محفوظة في المنطقة الحالية. الانتقال سيتجاهلها. هل تريد المتابعة؟');
+    }
+    function goToId(id) {
+        if (!id || id <= 0) { return; }
+        if (!confirmLeaveIfDirty()) { return; }
+        var row = rows().find(function (r) { return (parseInt(r.id, 10) || 0) === id; });
+        if (row) { editDeliveryArea(row); daFormDirty = false; }
+    }
+    function navGo(where) {
+        var R = rows();
+        if (!R.length) { alert('لا توجد مناطق محفوظة بعد.'); return; }
+        var cur = currentId();
+        var idx = -1;
+        for (var i = 0; i < R.length; i++) { if ((parseInt(R[i].id, 10) || 0) === cur) { idx = i; break; } }
+        var target = 0;
+        if (where === 'first') { target = parseInt(R[0].id, 10) || 0; }
+        else if (where === 'last') { target = parseInt(R[R.length - 1].id, 10) || 0; }
+        else if (where === 'next') {
+            if (idx < 0) { target = parseInt(R[0].id, 10) || 0; }
+            else if (idx >= R.length - 1) { alert('لا توجد منطقة لاحقة — هذه آخر منطقة.'); return; }
+            else { target = parseInt(R[idx + 1].id, 10) || 0; }
+        } else if (where === 'prev') {
+            if (idx < 0) { target = parseInt(R[R.length - 1].id, 10) || 0; }
+            else if (idx <= 0) { alert('لا توجد منطقة أسبق — هذه أول منطقة.'); return; }
+            else { target = parseInt(R[idx - 1].id, 10) || 0; }
+        }
+        goToId(target);
+    }
+    [['da_nav_first', 'first'], ['da_nav_prev', 'prev'], ['da_nav_next', 'next'], ['da_nav_last', 'last']].forEach(function (pair) {
+        var b = document.getElementById(pair[0]);
+        if (b) { b.addEventListener('click', function () { navGo(pair[1]); }); }
+    });
+    var card = document.getElementById('da_form_card');
+    if (card) {
+        card.addEventListener('input', function (ev) {
+            if (ev.target && (ev.target.id === 'da_sort_order' || ev.target.id === 'da_gov_combo_q')) { return; }
+            daFormDirty = true;
+        });
+    }
+    var modal = document.getElementById('da_search_modal');
+    function resetFields() {
+        ['da_search_id_from', 'da_search_id_to', 'da_search_gov', 'da_search_name'].forEach(function (id) { var el = document.getElementById(id); if (el) { el.value = ''; } });
+        var tb = document.getElementById('da_search_results_tbody'); if (tb) { tb.innerHTML = ''; }
+        var e = document.getElementById('da_search_empty'); if (e) { e.style.display = 'none'; }
+    }
+    function runSearch() {
+        var idFrom = parseInt(String((document.getElementById('da_search_id_from') || {}).value || '0'), 10) || 0;
+        var idTo = parseInt(String((document.getElementById('da_search_id_to') || {}).value || '0'), 10) || 0;
+        var gov = norm((document.getElementById('da_search_gov') || {}).value);
+        var name = norm((document.getElementById('da_search_name') || {}).value);
+        var out = rows().filter(function (r) {
+            var id = parseInt(r.id, 10) || 0;
+            if (idFrom > 0 && id < idFrom) { return false; }
+            if (idTo > 0 && id > idTo) { return false; }
+            if (gov) { var gh = norm(r.governorate_name_ar) + ' ' + norm(r.governorate_name_en); if (gh.indexOf(gov) === -1) { return false; } }
+            if (name) { var hay = norm(r.name_ar) + ' ' + norm(r.name_en); if (hay.indexOf(name) === -1) { return false; } }
+            return true;
+        });
+        var tb = document.getElementById('da_search_results_tbody');
+        var emptyNote = document.getElementById('da_search_empty');
+        if (!tb) { return; }
+        tb.innerHTML = '';
+        if (!out.length) { if (emptyNote) { emptyNote.style.display = 'block'; } return; }
+        if (emptyNote) { emptyNote.style.display = 'none'; }
+        out.slice(0, 300).forEach(function (r) {
+            var tr = document.createElement('tr');
+            var canDeliver = parseInt(r.is_active, 10) === 1;
+            var deliverTxt = canDeliver ? 'منطقة توصيل' : 'غير متاحة للتوصيل';
+            tr.innerHTML =
+                '<td>' + (parseInt(r.id, 10) || 0) + '</td>' +
+                '<td>' + esc(r.governorate_name_ar || r.governorate_name_en || '—') + '</td>' +
+                '<td>' + esc(r.name_ar) + '</td>' +
+                '<td dir="ltr">' + esc(r.name_en) + '</td>' +
+                '<td>' + deliverTxt + '</td>' +
+                '<td><button type="button" class="btn-secondary da-search-pick" data-id="' + (parseInt(r.id, 10) || 0) + '">تعديل</button></td>';
+            tb.appendChild(tr);
+        });
+    }
+    function openModal() { if (!modal) { return; } modal.style.display = 'block'; modal.setAttribute('aria-hidden', 'false'); runSearch(); var f = document.getElementById('da_search_name'); if (f) { try { f.focus(); } catch (e) {} } }
+    function closeModal() { if (!modal) { return; } modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true'); resetFields(); }
+    var openBtn = document.getElementById('da_btn_open_search'); if (openBtn) { openBtn.addEventListener('click', openModal); }
+    var closeBtn = document.getElementById('da_search_close'); if (closeBtn) { closeBtn.addEventListener('click', closeModal); }
+    var backdrop = document.getElementById('da_search_modal_backdrop'); if (backdrop) { backdrop.addEventListener('click', closeModal); }
+    var runBtn = document.getElementById('da_search_run'); if (runBtn) { runBtn.addEventListener('click', runSearch); }
+    var clearBtn = document.getElementById('da_search_clear'); if (clearBtn) { clearBtn.addEventListener('click', function () { resetFields(); runSearch(); }); }
+    ['da_search_gov', 'da_search_name', 'da_search_id_from', 'da_search_id_to'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) { el.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); runSearch(); } }); }
+    });
+    var tbodyEl = document.getElementById('da_search_results_tbody');
+    if (tbodyEl) {
+        tbodyEl.addEventListener('click', function (ev) {
+            var btn = ev.target && ev.target.closest ? ev.target.closest('.da-search-pick') : null;
+            if (!btn) { return; }
+            var id = parseInt(String(btn.getAttribute('data-id') || '0'), 10) || 0;
+            if (id <= 0) { return; }
+            if (!confirmLeaveIfDirty()) { return; }
+            closeModal();
+            goToId(id);
+        });
+    }
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && modal && modal.style.display === 'block') { closeModal(); } });
 })();
 
 (async function daInit() {
