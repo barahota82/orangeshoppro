@@ -25,6 +25,7 @@ orange_admin_render_mega_section_index(
         'channels' => 'قنوات البيع للعملاء.',
         'delivery_areas' => 'محافظات ومناطق التوصيل.',
         'storefront_hero' => 'بانر الصفحة الرئيسية للمتجر.',
+        'storefront_promo_messages' => 'الرسائل التحفيزية في واجهة المتجر.',
         'storefront_merge_requests' => 'طلبات دمج هاتف التسجيل.',
     ]
 );

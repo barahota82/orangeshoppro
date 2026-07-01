@@ -371,7 +371,6 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                         ['page' => 'cart_combo_promotions', 'href' => '/admin/index.php?page=cart_combo_promotions', 'label' => 'عروض الكومبو', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'loyalty', 'href' => '/admin/index.php?page=loyalty', 'label' => 'ولاء العملاء (النقاط)', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'cart_promo_health', 'href' => '/admin/index.php?page=cart_promo_health', 'label' => 'صحة العروض (مخزون)', 'class' => 'admin-nav-sub', 'sub' => true],
-                        ['page' => 'storefront_promo_messages', 'href' => '/admin/index.php?page=storefront_promo_messages', 'label' => 'الرسائل التحفيزية', 'class' => 'admin-nav-sub', 'sub' => true],
                     ],
                 ],
                 [
@@ -470,6 +469,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                         ['page' => 'channels', 'href' => '/admin/index.php?page=channels', 'label' => 'قنوات العملاء', 'class' => '', 'sub' => false],
                         ['page' => 'delivery_areas', 'href' => '/admin/index.php?page=delivery_areas', 'label' => 'محافظات ومناطق التوصيل', 'class' => '', 'sub' => false],
                         ['page' => 'storefront_hero', 'href' => '/admin/index.php?page=storefront_hero', 'label' => 'بانر الصفحة الرئيسية', 'class' => '', 'sub' => false],
+                        ['page' => 'storefront_promo_messages', 'href' => '/admin/index.php?page=storefront_promo_messages', 'label' => 'الرسائل التحفيزية', 'class' => '', 'sub' => false],
                         ['page' => 'storefront_merge_requests', 'href' => '/admin/index.php?page=storefront_merge_requests', 'label' => 'دمج هاتف التسجيل', 'class' => '', 'sub' => false],
                     ],
                 ],
