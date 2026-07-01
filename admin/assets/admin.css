@@ -2174,7 +2174,7 @@ td.admin-ops-cell {
 .admin-intake-toolbar {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: flex-end;
     gap: 10px 12px;
     margin-bottom: 12px;
 }
