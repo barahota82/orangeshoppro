@@ -78,10 +78,11 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                 </div>
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>كود</th><th>المنتج</th><th>نوع التسعير</th><th>القيمة</th><th></th></tr></thead>
+                        <thead><tr><th>كود</th><th>المنتج</th><th title="إرشادي للأدمن — لا يظهر للعميل">التكلفة</th><th>نوع التسعير</th><th>القيمة</th><th></th></tr></thead>
                         <tbody id="cgp_pool_body"></tbody>
                     </table>
                 </div>
+                <p class="page-subtitle" style="margin:6px 0 0;">التكلفة من بطاقة المنتج (إرشادية للأدمن فقط — لا تُعرض في الواجهة).</p>
             </div>
             <div id="cgp_block_fixed" style="margin:0 0 12px;display:none;">
                 <label>منتج الهدية الثابتة</label>
@@ -306,7 +307,20 @@ function cgpPickMeta(pid) {
             return CGP_PICK_ROWS[i];
         }
     }
-    return { product_id: id, code: 'P' + id, name: '' };
+    return { product_id: id, code: 'P' + id, name: '', cost: null };
+}
+
+function cgpFmtMoney(n) {
+    var x = parseFloat(n);
+    if (!isFinite(x)) return '—';
+    return x.toFixed(3);
+}
+
+function cgpMetaCostHtml(m) {
+    if (!m || m.cost == null || m.cost === '') {
+        return '<span class="page-subtitle">—</span>';
+    }
+    return '<span dir="ltr">' + cgpFmtMoney(m.cost) + '</span>';
 }
 
 function cgpFmtPoolIds(ids) {
@@ -346,6 +360,7 @@ function cgpAddPoolRow(pid, chargeKind, chargeValue) {
     tr.innerHTML =
         '<td dir="ltr">' + (m.code ? String(m.code) : ('P' + id)) + '</td>' +
         '<td>' + (m.name ? String(m.name) : '') + '</td>' +
+        '<td>' + cgpMetaCostHtml(m) + '</td>' +
         '<td><select class="admin-inp cgp-pool-charge-kind">' + cgpChargeSelectHtml(ck) + '</select></td>' +
         '<td><span class="cgp-pool-charge-val-wrap"><input type="number" class="admin-inp cgp-pool-charge-val" min="0" step="0.0001" dir="ltr" value="' + cv + '"></span></td>' +
         '<td><button type="button" class="btn-secondary cgp-rm">&times;</button></td>';
