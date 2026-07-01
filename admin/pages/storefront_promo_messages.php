@@ -68,9 +68,7 @@ foreach ($spmCountries as $c) {
                 <?php endforeach; ?>
             </select>
         </div>
-    </div>
-    <div class="form-grid" id="spm_audience_wrap">
-        <div>
+        <div id="spm_audience_wrap">
             <label for="spm_audience">الجمهور</label>
             <select id="spm_audience" class="admin-inp">
                 <?php foreach ($spmAudiences as $key => $label): ?>
