@@ -100,18 +100,9 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                     <option value="amount_off_unit">خصم مبلغ ثابت من سعر التجزئة للوحدة</option>
                     <option value="fixed_unit">سعر بيع ثابت للوحدة (د.ك)</option>
                 </select>
-                <div id="cgp_fixed_pricing_facts" style="display:none;margin-top:10px;max-width:32rem;">
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                        <div id="cgp_fixed_charge_val_wrap">
-                            <label id="cgp_fixed_charge_val_label">القيمة</label>
-                            <input type="number" id="cgp_fixed_charge_val" class="admin-inp" min="0" step="0.0001" style="margin-top:6px;width:100%;" dir="ltr" value="0">
-                        </div>
-                        <div>
-                            <label for="cgp_fixed_cost_ro">التكلفة (إرشادي)</label>
-                            <input type="text" id="cgp_fixed_cost_ro" class="admin-inp" readonly tabindex="-1" style="margin-top:6px;width:100%;background:#f1f5f9;color:#64748b;cursor:not-allowed;" dir="ltr" value="—">
-                        </div>
-                    </div>
-                    <p class="page-subtitle" style="margin:6px 0 0;">للقراءة فقط — لا تُعرض للعميل.</p>
+                <div id="cgp_fixed_charge_val_wrap" style="display:none;margin-top:8px;">
+                    <label id="cgp_fixed_charge_val_label">القيمة</label>
+                    <input type="number" id="cgp_fixed_charge_val" class="admin-inp" min="0" step="0.0001" style="max-width:14rem;" dir="ltr" value="0">
                 </div>
             </div>
         </div>
@@ -409,12 +400,10 @@ function cgpSetFixed(pid) {
     if (!lab) return;
     if (id <= 0) {
         lab.textContent = '— لم يُختر منتج —';
-        cgpSyncFixedPricingFacts();
         return;
     }
     var m = cgpPickMeta(id);
     lab.textContent = (m.code ? m.code + ' — ' : '') + (m.name || ('منتج #' + id));
-    cgpToggleFixedCharge();
 }
 
 function cgpOpenPick(onPick) {
@@ -433,19 +422,6 @@ function cgpToggleKind() {
     if (maxWrap) maxWrap.style.display = isFixed ? 'none' : 'block';
 }
 
-function cgpSyncFixedPricingFacts() {
-    const facts = document.getElementById('cgp_fixed_pricing_facts');
-    const costInp = document.getElementById('cgp_fixed_cost_ro');
-    const pid = parseInt(document.getElementById('cgp_fixed_pid').value, 10) || 0;
-    const m = cgpPickMeta(pid);
-    if (facts) {
-        facts.style.display = pid > 0 ? 'block' : 'none';
-    }
-    if (costInp) {
-        costInp.value = pid > 0 && m.cost != null && m.cost !== '' ? cgpFmtMoney(m.cost) : '—';
-    }
-}
-
 function cgpToggleFixedCharge() {
     const sel = document.getElementById('cgp_fixed_charge_kind');
     const k = sel ? sel.value : 'free';
@@ -454,21 +430,10 @@ function cgpToggleFixedCharge() {
     const inp = document.getElementById('cgp_fixed_charge_val');
     if (!wrap || !lab || !inp) return;
     if (k === 'free') {
-        lab.textContent = 'مبلغ الدفع (د.ك)';
+        wrap.style.display = 'none';
         inp.value = '0';
-        inp.readOnly = true;
-        inp.tabIndex = -1;
-        inp.style.background = '#f1f5f9';
-        inp.style.color = '#64748b';
-        inp.style.cursor = 'not-allowed';
-        cgpSyncFixedPricingFacts();
         return;
     }
-    inp.readOnly = false;
-    inp.tabIndex = 0;
-    inp.style.background = '';
-    inp.style.color = '';
-    inp.style.cursor = '';
     wrap.style.display = 'block';
     if (k === 'percent_off') {
         lab.textContent = 'نسبة الخصم (0–100)';
@@ -483,7 +448,6 @@ function cgpToggleFixedCharge() {
         inp.removeAttribute('max');
         inp.step = '0.0001';
     }
-    cgpSyncFixedPricingFacts();
 }
 
 function cgpCollectGiftPoolItems() {
