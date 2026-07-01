@@ -71,9 +71,14 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                 <div style="margin:6px 0 8px;">
                     <button type="button" class="btn-secondary" id="cgp_pool_add_btn">إضافة منتج (دبل كليك من القائمة)</button>
                 </div>
+                <div id="cgp_max_pick_wrap" style="margin:0 0 10px;max-width:16rem;">
+                    <label for="cgp_max_pick">عدد الهدايا القابلة للاختيار</label>
+                    <input type="number" id="cgp_max_pick" class="admin-inp" min="1" step="1" value="1" style="margin-top:6px;">
+                    <p class="page-subtitle" style="margin:4px 0 0;">لا يتجاوز عدد المنتجات في المجموعة.</p>
+                </div>
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>كود</th><th>المنتج</th><th></th></tr></thead>
+                        <thead><tr><th>كود</th><th>المنتج</th><th>نوع التسعير</th><th>القيمة</th><th></th></tr></thead>
                         <tbody id="cgp_pool_body"></tbody>
                     </table>
                 </div>
@@ -86,18 +91,18 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                 <p id="cgp_fixed_label" class="page-subtitle" style="margin:0;">— لم يُختر منتج —</p>
                 <input type="hidden" id="cgp_fixed_pid" value="0">
             </div>
-            <div style="margin:0 0 12px;">
-                <label for="cgp_gift_charge_kind"><strong>تسعير بند الهدية</strong></label>
-                <select id="cgp_gift_charge_kind" class="admin-inp" style="max-width:28rem;margin-top:6px;" onchange="cgpToggleGiftCharge()">
+            <div id="cgp_block_fixed_charge" style="margin:0 0 12px;display:none;">
+                <label for="cgp_fixed_charge_kind"><strong>تسعير الهدية</strong></label>
+                <select id="cgp_fixed_charge_kind" class="admin-inp" style="max-width:28rem;margin-top:6px;" onchange="cgpToggleFixedCharge()">
                     <option value="free">مجانية بالكامل (سطر هدية بسعر صفر)</option>
                     <option value="percent_off">خصم نسبة من سعر التجزئة للوحدة</option>
                     <option value="amount_off_unit">خصم مبلغ ثابت من سعر التجزئة للوحدة</option>
                     <option value="fixed_unit">سعر بيع ثابت للوحدة (د.ك)</option>
                 </select>
-            </div>
-            <div id="cgp_gift_charge_val_wrap" style="display:none;">
-                <label id="cgp_gift_charge_val_label">القيمة</label>
-                <input type="number" id="cgp_gift_charge_val" class="admin-inp" min="0" step="0.0001" style="max-width:14rem;" dir="ltr" value="0">
+                <div id="cgp_fixed_charge_val_wrap" style="display:none;margin-top:8px;">
+                    <label id="cgp_fixed_charge_val_label">القيمة</label>
+                    <input type="number" id="cgp_fixed_charge_val" class="admin-inp" min="0" step="0.0001" style="max-width:14rem;" dir="ltr" value="0">
+                </div>
             </div>
         </div>
 
@@ -121,6 +126,9 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <div style="display:flex;flex-wrap:wrap;gap:18px 22px;align-items:center;margin-top:12px;">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
                     <input type="checkbox" id="cgp_always_on"> <strong>التفعيل الدائم</strong>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;" title="عند التفعيل يظهر سعر تجزئة الهدية مشطوباً بجوار سعرها المجاني/المخفّض للعميل (يتطلب الترخيص اللازم)">
+                    <input type="checkbox" id="cgp_show_old_price"> <strong>إظهار السعر القديم</strong>
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
                     <input type="checkbox" id="cgp_reg"> <strong>للمسجّلين فقط</strong>
@@ -194,6 +202,93 @@ var CGP_PICK_ROWS = <?php echo $cgpPickJson !== false ? $cgpPickJson : '[]'; ?>;
 var cgpNameArTimer = null;
 var cgpNameEnTimer = null;
 var CGP_ROWS = [];
+var CGP_CHARGE_LABELS = {
+    free: 'مجاني',
+    percent_off: 'خصم %',
+    fixed_unit: 'سعر ثابت',
+    amount_off_unit: 'خصم مبلغ'
+};
+
+function cgpChargeSelectHtml(selected) {
+    selected = String(selected || 'free').toLowerCase();
+    var opts = [
+        ['free', 'مجاني بالكامل'],
+        ['percent_off', 'خصم نسبة %'],
+        ['amount_off_unit', 'خصم مبلغ من التجزئة'],
+        ['fixed_unit', 'سعر بيع ثابت (د.ك)']
+    ];
+    var html = '';
+    opts.forEach(function (o) {
+        html += '<option value="' + o[0] + '"' + (selected === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+    });
+    return html;
+}
+
+function cgpPricingMapFromRow(row) {
+    var map = {};
+    var items = Array.isArray(row.gift_pool_items) ? row.gift_pool_items : [];
+    if (!items.length && row.gift_pool_config) {
+        try {
+            var cfg = JSON.parse(row.gift_pool_config);
+            items = (cfg && cfg.items) ? cfg.items : [];
+        } catch (e) { items = []; }
+    }
+    items.forEach(function (it) {
+        var pid = parseInt(it.product_id, 10) || 0;
+        if (pid > 0) map[pid] = it;
+    });
+    if (!Object.keys(map).length) {
+        var k = (row.gift_unit_charge_kind || 'free').toLowerCase();
+        var v = row.gift_unit_charge_value != null ? row.gift_unit_charge_value : 0;
+        var ids = (row.gift_kind || '') === 'fixed'
+            ? [row.fixed_product_id || row.fixed_variant_id].filter(Boolean)
+            : (row.pool_product_ids || row.pool_variant_ids || []);
+        ids.forEach(function (pid) {
+            var n = parseInt(pid, 10) || 0;
+            if (n > 0) map[n] = { product_id: n, charge_kind: k, charge_value: v };
+        });
+    }
+    return map;
+}
+
+function cgpFmtPricingSummary(r) {
+    var items = Array.isArray(r.gift_pool_items) ? r.gift_pool_items : [];
+    if (!items.length) {
+        var gck = (r.gift_unit_charge_kind || 'free').toLowerCase();
+        return CGP_CHARGE_LABELS[gck] || gck;
+    }
+    var kinds = {};
+    items.forEach(function (it) {
+        kinds[(it.charge_kind || 'free').toLowerCase()] = true;
+    });
+    var keys = Object.keys(kinds);
+    if (keys.length === 1) {
+        return CGP_CHARGE_LABELS[keys[0]] || keys[0];
+    }
+    return 'متعدد (' + items.length + ')';
+}
+
+function cgpSyncPoolRowChargeUI(tr) {
+    if (!tr) return;
+    var sel = tr.querySelector('.cgp-pool-charge-kind');
+    var wrap = tr.querySelector('.cgp-pool-charge-val-wrap');
+    var inp = tr.querySelector('.cgp-pool-charge-val');
+    if (!sel || !wrap || !inp) return;
+    var k = sel.value;
+    if (k === 'free') {
+        wrap.style.display = 'none';
+        inp.value = '0';
+        return;
+    }
+    wrap.style.display = '';
+    if (k === 'percent_off') {
+        inp.max = '100';
+        inp.step = '0.01';
+    } else {
+        inp.removeAttribute('max');
+        inp.step = '0.0001';
+    }
+}
 
 function cgpComputeNextSort() {
     var max = 0;
@@ -233,7 +328,7 @@ function cgpPoolRows() {
     return out;
 }
 
-function cgpAddPoolRow(pid) {
+function cgpAddPoolRow(pid, chargeKind, chargeValue) {
     var id = parseInt(pid, 10) || 0;
     if (id <= 0) return;
     var tb = document.getElementById('cgp_pool_body');
@@ -244,21 +339,43 @@ function cgpAddPoolRow(pid) {
     });
     if (dup) return;
     var m = cgpPickMeta(id);
+    var ck = (chargeKind || 'free').toLowerCase();
+    var cv = chargeValue != null && chargeValue !== '' ? String(chargeValue) : '0';
     var tr = document.createElement('tr');
     tr.setAttribute('data-product-id', String(id));
     tr.innerHTML =
         '<td dir="ltr">' + (m.code ? String(m.code) : ('P' + id)) + '</td>' +
         '<td>' + (m.name ? String(m.name) : '') + '</td>' +
+        '<td><select class="admin-inp cgp-pool-charge-kind">' + cgpChargeSelectHtml(ck) + '</select></td>' +
+        '<td><span class="cgp-pool-charge-val-wrap"><input type="number" class="admin-inp cgp-pool-charge-val" min="0" step="0.0001" dir="ltr" value="' + cv + '"></span></td>' +
         '<td><button type="button" class="btn-secondary cgp-rm">&times;</button></td>';
-    tr.querySelector('.cgp-rm').addEventListener('click', function () { tr.remove(); });
+    tr.querySelector('.cgp-rm').addEventListener('click', function () { tr.remove(); cgpClampMaxPick(); });
+    tr.querySelector('.cgp-pool-charge-kind').addEventListener('change', function () { cgpSyncPoolRowChargeUI(tr); });
     tb.appendChild(tr);
+    cgpSyncPoolRowChargeUI(tr);
+    cgpClampMaxPick();
 }
 
-function cgpRenderPool(ids) {
+function cgpClampMaxPick() {
+    var inp = document.getElementById('cgp_max_pick');
+    if (!inp) return;
+    var poolCount = cgpPoolRows().length;
+    var cur = parseInt(inp.value, 10) || 1;
+    if (poolCount > 0 && cur > poolCount) inp.value = String(poolCount);
+    inp.max = poolCount > 0 ? String(poolCount) : '';
+}
+
+function cgpRenderPool(ids, pricingMap) {
     var tb = document.getElementById('cgp_pool_body');
     if (!tb) return;
     tb.innerHTML = '';
-    (ids || []).forEach(function (pid) { cgpAddPoolRow(pid); });
+    var map = pricingMap || {};
+    (ids || []).forEach(function (pid) {
+        var n = parseInt(pid, 10) || 0;
+        var it = map[n] || {};
+        cgpAddPoolRow(n, it.charge_kind || 'free', it.charge_value != null ? it.charge_value : 0);
+    });
+    cgpClampMaxPick();
 }
 
 function cgpSetFixed(pid) {
@@ -284,14 +401,18 @@ function cgpToggleKind() {
     const isFixed = fixed && fixed.value === 'fixed';
     document.getElementById('cgp_block_fixed').style.display = isFixed ? 'block' : 'none';
     document.getElementById('cgp_block_pool').style.display = isFixed ? 'none' : 'block';
+    var fixedCharge = document.getElementById('cgp_block_fixed_charge');
+    if (fixedCharge) fixedCharge.style.display = isFixed ? 'block' : 'none';
+    var maxWrap = document.getElementById('cgp_max_pick_wrap');
+    if (maxWrap) maxWrap.style.display = isFixed ? 'none' : 'block';
 }
 
-function cgpToggleGiftCharge() {
-    const sel = document.getElementById('cgp_gift_charge_kind');
+function cgpToggleFixedCharge() {
+    const sel = document.getElementById('cgp_fixed_charge_kind');
     const k = sel ? sel.value : 'free';
-    const wrap = document.getElementById('cgp_gift_charge_val_wrap');
-    const lab = document.getElementById('cgp_gift_charge_val_label');
-    const inp = document.getElementById('cgp_gift_charge_val');
+    const wrap = document.getElementById('cgp_fixed_charge_val_wrap');
+    const lab = document.getElementById('cgp_fixed_charge_val_label');
+    const inp = document.getElementById('cgp_fixed_charge_val');
     if (!wrap || !lab || !inp) return;
     if (k === 'free') {
         wrap.style.display = 'none';
@@ -314,11 +435,40 @@ function cgpToggleGiftCharge() {
     }
 }
 
+function cgpCollectGiftPoolItems() {
+    var kindEl = document.querySelector('input[name="cgp_kind"]:checked');
+    var isFixed = kindEl && kindEl.value === 'fixed';
+    if (isFixed) {
+        var pid = parseInt(document.getElementById('cgp_fixed_pid').value, 10) || 0;
+        if (pid <= 0) return [];
+        var fk = document.getElementById('cgp_fixed_charge_kind').value;
+        var fv = parseFloat(document.getElementById('cgp_fixed_charge_val').value) || 0;
+        return [{ product_id: pid, charge_kind: fk, charge_value: fv }];
+    }
+    var items = [];
+    var tb = document.getElementById('cgp_pool_body');
+    if (!tb) return items;
+    tb.querySelectorAll('tr').forEach(function (tr) {
+        var pid = parseInt(tr.getAttribute('data-product-id'), 10) || 0;
+        if (pid <= 0) return;
+        var sel = tr.querySelector('.cgp-pool-charge-kind');
+        var inp = tr.querySelector('.cgp-pool-charge-val');
+        items.push({
+            product_id: pid,
+            charge_kind: sel ? sel.value : 'free',
+            charge_value: inp ? (parseFloat(inp.value) || 0) : 0
+        });
+    });
+    return items;
+}
+
 function resetCartGiftPromotionForm() {
     document.getElementById('cgp_id').value = '0';
     document.getElementById('cgp_name_ar').value = '';
     document.getElementById('cgp_name_en').value = '';
     document.getElementById('cgp_show_name').checked = false;
+    var showOld = document.getElementById('cgp_show_old_price');
+    if (showOld) showOld.checked = false;
     document.getElementById('cgp_min').value = '';
     document.getElementById('cgp_sort').value = String(cgpComputeNextSort());
     cgpRenderPool([]);
@@ -327,12 +477,14 @@ function resetCartGiftPromotionForm() {
     document.getElementById('cgp_reg').checked = false;
     document.getElementById('cgp_first_delivered').checked = false;
     document.getElementById('cgp_active').checked = true;
+    var maxPick = document.getElementById('cgp_max_pick');
+    if (maxPick) maxPick.value = '1';
     ocpSetAlwaysOn('cgp', false);
     ocpDefaultScheduleDates('cgp');
-    document.getElementById('cgp_gift_charge_kind').value = 'free';
-    document.getElementById('cgp_gift_charge_val').value = '0';
+    document.getElementById('cgp_fixed_charge_kind').value = 'free';
+    document.getElementById('cgp_fixed_charge_val').value = '0';
     cgpToggleKind();
-    cgpToggleGiftCharge();
+    cgpToggleFixedCharge();
 }
 
 function editCartGiftPromotion(row) {
@@ -340,25 +492,34 @@ function editCartGiftPromotion(row) {
     document.getElementById('cgp_name_ar').value = row.name_ar != null ? String(row.name_ar) : '';
     document.getElementById('cgp_name_en').value = row.name_en != null ? String(row.name_en) : '';
     document.getElementById('cgp_show_name').checked = parseInt(row.show_name_to_customer, 10) === 1;
+    var showOldEl = document.getElementById('cgp_show_old_price');
+    if (showOldEl) showOldEl.checked = parseInt(row.show_old_price_to_customer, 10) === 1;
     document.getElementById('cgp_min').value = row.min_subtotal != null ? String(row.min_subtotal) : '';
     document.getElementById('cgp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
     const kind = (row.gift_kind || 'choice') === 'fixed' ? 'fixed' : 'choice';
     document.querySelector('input[name="cgp_kind"][value="' + kind + '"]').checked = true;
     cgpToggleKind();
-    cgpRenderPool(row.pool_product_ids || row.pool_variant_ids || []);
+    var pricingMap = cgpPricingMapFromRow(row);
+    cgpRenderPool(row.pool_product_ids || row.pool_variant_ids || [], pricingMap);
+    var maxPickEl = document.getElementById('cgp_max_pick');
+    if (maxPickEl) maxPickEl.value = String(Math.max(1, parseInt(row.max_gifts_pickable, 10) || 1));
     cgpSetFixed(row.fixed_product_id || row.fixed_variant_id || 0);
+    var fixedPid = parseInt(row.fixed_product_id || row.fixed_variant_id || 0, 10) || 0;
+    var fixedIt = pricingMap[fixedPid] || {};
+    var gck = (fixedIt.charge_kind || row.gift_unit_charge_kind || 'free').toLowerCase();
+    var allowed = { free: 1, percent_off: 1, fixed_unit: 1, amount_off_unit: 1 };
+    document.getElementById('cgp_fixed_charge_kind').value = allowed[gck] ? gck : 'free';
+    document.getElementById('cgp_fixed_charge_val').value =
+        fixedIt.charge_value != null && fixedIt.charge_value !== ''
+            ? String(fixedIt.charge_value)
+            : (row.gift_unit_charge_value != null && row.gift_unit_charge_value !== '' ? String(row.gift_unit_charge_value) : '0');
+    cgpToggleFixedCharge();
     document.getElementById('cgp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
     document.getElementById('cgp_first_delivered').checked = parseInt(row.first_delivered_order_only, 10) === 1;
     document.getElementById('cgp_active').checked = parseInt(row.is_active, 10) === 1;
     ocpSetAlwaysOn('cgp', parseInt(row.is_always_on, 10) === 1);
     ocpSetDmyFromIso('cgp_valid_from', row.valid_from);
     ocpSetDmyFromIso('cgp_valid_to', row.valid_to);
-    var gck = (row.gift_unit_charge_kind || 'free').toLowerCase();
-    var allowed = { free: 1, percent_off: 1, fixed_unit: 1, amount_off_unit: 1 };
-    document.getElementById('cgp_gift_charge_kind').value = allowed[gck] ? gck : 'free';
-    document.getElementById('cgp_gift_charge_val').value =
-        row.gift_unit_charge_value != null && row.gift_unit_charge_value !== '' ? String(row.gift_unit_charge_value) : '0';
-    cgpToggleGiftCharge();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -438,11 +599,10 @@ async function loadCartGiftPromotions() {
         } else {
             det = escCgp(cgpFmtPoolIds(r.pool_product_ids || r.pool_variant_ids || []));
         }
-        var gcharge = 'مجانية';
-        var gck = (r.gift_unit_charge_kind || 'free').toLowerCase();
-        if (gck === 'percent_off') gcharge = 'خصم %';
-        else if (gck === 'fixed_unit') gcharge = 'سعر ثابت';
-        else if (gck === 'amount_off_unit') gcharge = 'خصم مبلغ';
+        var gcharge = cgpFmtPricingSummary(r);
+        var pickNote = (r.gift_kind || '') === 'choice' && parseInt(r.max_gifts_pickable, 10) > 1
+            ? ' • اختيار ' + parseInt(r.max_gifts_pickable, 10)
+            : '';
         var cgpScope = (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'جميع الزوّار') + (parseInt(r.first_delivered_order_only, 10) === 1 ? ' • أول طلب مُسلَّم' : '');
         const tr = document.createElement('tr');
         tr.innerHTML =
@@ -451,7 +611,7 @@ async function loadCartGiftPromotions() {
             '<td dir="ltr">' + escCgp(String(r.min_subtotal)) + '</td>' +
             '<td>' + kind + '</td>' +
             '<td style="max-width:18rem;">' + det + '</td>' +
-            '<td>' + escCgp(gcharge) + '</td>' +
+            '<td>' + escCgp(gcharge + pickNote) + '</td>' +
             '<td>' + escCgp(cgpScope) + '</td>' +
             '<td dir="ltr">' + escCgp(ocpScheduleLabel(r)) + '</td>' +
             '<td>' + escCgp(ocpStatusLabel(r)) + '</td>' +
@@ -487,8 +647,9 @@ async function saveCartGiftPromotion() {
         gift_kind: kindEl ? kindEl.value : 'choice',
         fixed_product_id: parseInt(document.getElementById('cgp_fixed_pid').value, 10) || 0,
         pool_product_ids: cgpPoolRows(),
-        gift_unit_charge_kind: document.getElementById('cgp_gift_charge_kind').value,
-        gift_unit_charge_value: parseFloat(document.getElementById('cgp_gift_charge_val').value) || 0,
+        show_old_price_to_customer: (document.getElementById('cgp_show_old_price') && document.getElementById('cgp_show_old_price').checked) ? 1 : 0,
+        max_gifts_pickable: parseInt(document.getElementById('cgp_max_pick').value, 10) || 1,
+        gift_pool_items: cgpCollectGiftPoolItems(),
         valid_from: ocpGetIso('cgp_valid_from'),
         valid_to: ocpGetIso('cgp_valid_to')
     });
@@ -539,13 +700,15 @@ async function loadCartGiftAlwaysOnHistory() {
     if (enEl) enEl.addEventListener('input', cgpScheduleNameFromEn);
 })();
 document.getElementById('cgp_pool_add_btn').addEventListener('click', function () {
-    cgpOpenPick(function (row) { cgpAddPoolRow(row.product_id); });
+    cgpOpenPick(function (row) { cgpAddPoolRow(row.product_id, 'free', 0); });
 });
 document.getElementById('cgp_fixed_pick_btn').addEventListener('click', function () {
     cgpOpenPick(function (row) { cgpSetFixed(row.product_id); });
 });
+var cgpMaxPickEl = document.getElementById('cgp_max_pick');
+if (cgpMaxPickEl) cgpMaxPickEl.addEventListener('input', cgpClampMaxPick);
 cgpToggleKind();
-cgpToggleGiftCharge();
+cgpToggleFixedCharge();
 ocpBindAlwaysOn('cgp');
 ocpDefaultScheduleDates('cgp');
 loadCartGiftPromotions();

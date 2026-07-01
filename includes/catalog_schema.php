@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 112);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 113);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3177,6 +3177,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_storefront_promo_messages_offer_target_v110($pdo);
     orange_catalog_migrate_storefront_promo_messages_audience_v111($pdo);
     orange_catalog_migrate_variant_pricing_identity_v112($pdo);
+    orange_catalog_migrate_cart_gift_storefront_v113($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3805,6 +3806,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_storefront_promo_messages_offer_target_v110($pdo);
     orange_catalog_migrate_storefront_promo_messages_audience_v111($pdo);
     orange_catalog_migrate_variant_pricing_identity_v112($pdo);
+    orange_catalog_migrate_cart_gift_storefront_v113($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -8221,6 +8223,91 @@ function orange_catalog_migrate_cart_promos_name_first_delivered_v104(PDO $pdo):
             );
             orange_schema_invalidate_column_check($table, 'first_delivered_order_only');
         }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v113 — واجهة هدية مجموع السلة في العربة (مرحلة 1 — ORANGE_CART_GIFT_STOREFRONT_ROLLOUT_PHASES):
+ *  - cart_gift_promotions: show_old_price_to_customer, max_gifts_pickable, gift_pool_config (TEXT JSON)
+ *  - orders: cart_gift_selections_json (TEXT JSON — اختيارات متعددة لاحقاً)
+ *  - backfill gift_pool_config من gift_unit_charge_kind/value + pool/fixed (سلوك مطابق للقواعد القديمة)
+ * marker-gated + idempotent؛ المسار الكامل والسريع.
+ */
+function orange_catalog_migrate_cart_gift_storefront_v113(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/cart_gift_pool_config.php';
+
+    $marker = 'php_cart_gift_storefront_v113';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'cart_gift_promotions')) {
+        if (!orange_table_has_column($pdo, 'cart_gift_promotions', 'show_old_price_to_customer')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE cart_gift_promotions
+                    ADD COLUMN show_old_price_to_customer TINYINT(1) NOT NULL DEFAULT 0'
+            );
+            orange_schema_invalidate_column_check('cart_gift_promotions', 'show_old_price_to_customer');
+        }
+        if (!orange_table_has_column($pdo, 'cart_gift_promotions', 'max_gifts_pickable')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE cart_gift_promotions
+                    ADD COLUMN max_gifts_pickable INT UNSIGNED NOT NULL DEFAULT 1'
+            );
+            orange_schema_invalidate_column_check('cart_gift_promotions', 'max_gifts_pickable');
+        }
+        if (!orange_table_has_column($pdo, 'cart_gift_promotions', 'gift_pool_config')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE cart_gift_promotions ADD COLUMN gift_pool_config TEXT NULL'
+            );
+            orange_schema_invalidate_column_check('cart_gift_promotions', 'gift_pool_config');
+        }
+
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE cart_gift_promotions SET max_gifts_pickable = 1 WHERE max_gifts_pickable IS NULL OR max_gifts_pickable < 1'
+        );
+
+        $st = $pdo->query(
+            'SELECT id, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, gift_pool_config
+             FROM cart_gift_promotions'
+        );
+        if ($st) {
+            $upd = $pdo->prepare('UPDATE cart_gift_promotions SET gift_pool_config = ? WHERE id = ? LIMIT 1');
+            while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+                $cfgRaw = isset($row['gift_pool_config']) ? trim((string) $row['gift_pool_config']) : '';
+                if ($cfgRaw !== '') {
+                    $parsed = orange_cart_gift_pool_config_decode($cfgRaw);
+                    if (count($parsed['items']) > 0) {
+                        continue;
+                    }
+                }
+                $items = orange_cart_gift_pool_config_build_items_from_legacy_rule($pdo, $row);
+                if (count($items) === 0) {
+                    continue;
+                }
+                $upd->execute([
+                    orange_cart_gift_pool_config_encode($items),
+                    (int) ($row['id'] ?? 0),
+                ]);
+            }
+        }
+    }
+
+    if (orange_table_exists($pdo, 'orders')
+        && !orange_table_has_column($pdo, 'orders', 'cart_gift_selections_json')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orders ADD COLUMN cart_gift_selections_json TEXT NULL DEFAULT NULL'
+        );
+        orange_schema_invalidate_column_check('orders', 'cart_gift_selections_json');
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

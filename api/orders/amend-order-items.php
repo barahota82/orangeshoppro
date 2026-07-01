@@ -94,9 +94,11 @@ try {
         $orderTotal = max(0.0, round($subtotal - $comboDiscount - $promoDiscount - $productOfferDiscount, 4));
 
         $promoBundle = orange_storefront_build_promotional_gift_lines($pdo, $data, $validatedItems, $subtotal, $buyerRegistered, $amendCountryArg, $buyerAccountId, $buyerPhone);
+        $giftLines = $promoBundle['giftLines'] ?? [];
         $giftLine = $promoBundle['giftLine'];
         $giftPromoId = $promoBundle['giftPromoId'];
         $giftVariantId = $promoBundle['giftVariantId'];
+        $giftSelectionsJson = $promoBundle['giftSelectionsJson'] ?? null;
         $bogoLine = $promoBundle['bogoLine'];
         $bogoPromoId = $promoBundle['bogoPromoId'];
         $bogoGiftVariantId = $promoBundle['bogoGiftVariantId'];
@@ -105,9 +107,10 @@ try {
         $linesForStock = $promoBundle['linesForStock'];
 
         $giftLinesCharge = 0.0;
-        if ($giftLine !== null) {
-            $giftLinesCharge += round((float) ($giftLine['price'] ?? 0) * (int) ($giftLine['qty'] ?? 1) - $giftDiscount, 4);
+        foreach ($giftLines as $gl) {
+            $giftLinesCharge += round((float) ($gl['price'] ?? 0) * (int) ($gl['qty'] ?? 1), 4);
         }
+        $giftLinesCharge = round(max(0.0, $giftLinesCharge - $giftDiscount), 4);
         if ($bogoLine !== null) {
             $giftLinesCharge += round((float) ($bogoLine['price'] ?? 0) * (int) ($bogoLine['qty'] ?? 1) - $bogoDiscount, 4);
         }
@@ -147,6 +150,10 @@ try {
         if (orange_table_has_column($pdo, 'orders', 'cart_gift_discount')) {
             $setParts[] = 'cart_gift_discount = ?';
             $updParams[] = $giftDiscount > 0 ? $giftDiscount : 0.0;
+        }
+        if (orange_table_has_column($pdo, 'orders', 'cart_gift_selections_json')) {
+            $setParts[] = 'cart_gift_selections_json = ?';
+            $updParams[] = is_string($giftSelectionsJson) && $giftSelectionsJson !== '' ? $giftSelectionsJson : null;
         }
         if (orange_table_has_column($pdo, 'orders', 'cart_bogo_discount')) {
             $setParts[] = 'cart_bogo_discount = ?';

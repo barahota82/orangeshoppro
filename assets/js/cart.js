@@ -1219,6 +1219,426 @@ function orangeCancelCheckoutPreview() {
     orangeUpdateGiftBogoRegisterUnlockTeaser(false, false, false);
     orangeUpdateCartGiftPromotionUI(null);
     orangeUpdateCartBogoPromotionUI(null);
+    window.__orangeGiftPromoId = 0;
+    window.__orangeGiftSelectionStateMap = null;
+    try {
+        window.__orangeCheckoutGiftSelections = [];
+        window.__orangeCheckoutGiftVariantId = 0;
+    } catch (eGiftReset) {}
+}
+
+window.__orangeGiftPromoId = 0;
+window.__orangeGiftSelectionStateMap = null;
+
+function orangeGiftCardKey(card) {
+    const pid = parseInt(String(card && card.product_id), 10) || 0;
+    if (pid > 0) {
+        return 'p' + String(pid);
+    }
+    const vid = parseInt(String(card && card.variant_id), 10) || 0;
+    return vid > 0 ? 'v' + String(vid) : '';
+}
+
+function orangeGiftCardsFromPromotion(gift) {
+    if (!gift || typeof gift !== 'object') {
+        return [];
+    }
+    if (gift.gift_kind === 'fixed' && gift.fixed_product && typeof gift.fixed_product === 'object') {
+        return [gift.fixed_product];
+    }
+    return Array.isArray(gift.pool) ? gift.pool : [];
+}
+
+function orangeGiftVariantInfo(card, variantId) {
+    const variants = Array.isArray(card.variants) ? card.variants : [];
+    const vid = parseInt(String(variantId), 10) || 0;
+    let found = null;
+    variants.forEach(function (v) {
+        if (parseInt(String(v.variant_id), 10) === vid) {
+            found = v;
+        }
+    });
+    if (!found && variants.length) {
+        found = variants[0];
+    }
+    if (found) {
+        return {
+            variant_id: parseInt(String(found.variant_id), 10) || 0,
+            retail_unit: parseFloat(found.retail_unit) || 0,
+            charge_unit: parseFloat(found.charge_unit) || 0,
+            is_fully_free: !!found.is_fully_free,
+            color: String(found.color || ''),
+            size: String(found.size || ''),
+        };
+    }
+    return {
+        variant_id: parseInt(String(card.variant_id), 10) || 0,
+        retail_unit: parseFloat(card.retail_unit) || 0,
+        charge_unit: parseFloat(card.charge_unit) || 0,
+        is_fully_free: !!card.is_fully_free,
+        color: String(card.color || ''),
+        size: String(card.size || ''),
+    };
+}
+
+function orangeGiftInitStateFromGift(gift) {
+    const map = {};
+    const selections = Array.isArray(gift.gift_selections) ? gift.gift_selections : [];
+    orangeGiftCardsFromPromotion(gift).forEach(function (card) {
+        const key = orangeGiftCardKey(card);
+        if (!key) {
+            return;
+        }
+        const pid = parseInt(String(card.product_id), 10) || 0;
+        let sel = null;
+        selections.forEach(function (s) {
+            const sp = parseInt(String(s.product_id), 10) || 0;
+            const sv = parseInt(String(s.variant_id), 10) || 0;
+            if ((pid > 0 && sp === pid) || (sv > 0 && sv === parseInt(String(card.variant_id), 10))) {
+                sel = s;
+            }
+        });
+        map[key] = {
+            variant_id: sel
+                ? parseInt(String(sel.variant_id), 10) || parseInt(String(card.variant_id), 10) || 0
+                : parseInt(String(card.variant_id), 10) || 0,
+            accepted: sel ? !!sel.accepted : !!card.selected,
+            declined: sel ? !!sel.declined : false,
+        };
+    });
+    return map;
+}
+
+function orangeGiftEnsureStateMap(gift) {
+    const promoId = parseInt(String(gift && gift.id), 10) || 0;
+    if (window.__orangeGiftPromoId !== promoId) {
+        window.__orangeGiftPromoId = promoId;
+        window.__orangeGiftSelectionStateMap = orangeGiftInitStateFromGift(gift);
+    } else if (!window.__orangeGiftSelectionStateMap || typeof window.__orangeGiftSelectionStateMap !== 'object') {
+        window.__orangeGiftSelectionStateMap = orangeGiftInitStateFromGift(gift);
+    }
+    return window.__orangeGiftSelectionStateMap;
+}
+
+function orangeGiftCountAccepted(map) {
+    let n = 0;
+    Object.keys(map || {}).forEach(function (k) {
+        const st = map[k];
+        if (st && st.accepted && !st.declined) {
+            n++;
+        }
+    });
+    return n;
+}
+
+function orangeGiftBuildSelectionsForApi(gift) {
+    if (!gift || typeof gift !== 'object') {
+        return [];
+    }
+    const map = orangeGiftEnsureStateMap(gift);
+    const out = [];
+    orangeGiftCardsFromPromotion(gift).forEach(function (card) {
+        const key = orangeGiftCardKey(card);
+        const st = map[key];
+        if (!st) {
+            return;
+        }
+        const info = orangeGiftVariantInfo(card, st.variant_id);
+        const vid = parseInt(String(info.variant_id), 10) || 0;
+        if (vid <= 0) {
+            return;
+        }
+        out.push({
+            product_id: parseInt(String(card.product_id), 10) || 0,
+            variant_id: vid,
+            accepted: !!st.accepted,
+            declined: !!st.declined,
+        });
+    });
+    return out;
+}
+
+function orangeGiftSyncCheckoutGlobals(gift) {
+    const selections = orangeGiftBuildSelectionsForApi(gift);
+    try {
+        window.__orangeCheckoutGiftSelections = selections;
+        let legacyVid = 0;
+        selections.forEach(function (s) {
+            if (!legacyVid && s.accepted && !s.declined && s.variant_id > 0) {
+                legacyVid = s.variant_id;
+            }
+        });
+        if (!legacyVid && gift && gift.gift_kind === 'fixed') {
+            legacyVid = parseInt(String(gift.fixed_variant_id), 10) || 0;
+        }
+        window.__orangeCheckoutGiftVariantId = legacyVid;
+    } catch (eSync) {}
+    return selections;
+}
+
+function orangeGiftFormatPriceHtml(retail, charge, showOld, T) {
+    const freeLbl = T.cart_gift_price_free || 'Free';
+    const r = parseFloat(retail) || 0;
+    const c = parseFloat(charge) || 0;
+    if (c <= 0.00001) {
+        if (showOld && r > 0.00001) {
+            return (
+                '<span class="cart-gift-card__price-old"><s>' +
+                formatMoney(r) +
+                '</s></span> <span class="cart-gift-card__price-free">' +
+                escCartHtml(freeLbl) +
+                '</span>'
+            );
+        }
+        return '<span class="cart-gift-card__price-free">' + escCartHtml(freeLbl) + '</span>';
+    }
+    if (showOld && r > c + 0.00001) {
+        return (
+            '<span class="cart-gift-card__price-old"><s>' +
+            formatMoney(r) +
+            '</s></span> <span class="cart-gift-card__price-charge">' +
+            formatMoney(c) +
+            '</span>'
+        );
+    }
+    return '<span class="cart-gift-card__price-charge">' + formatMoney(c) + '</span>';
+}
+
+function orangeGiftVariantSelectHtml(card, selectedVid) {
+    const variants = Array.isArray(card.variants) ? card.variants : [];
+    if (variants.length <= 1) {
+        return '';
+    }
+    let html = '';
+    variants.forEach(function (v) {
+        const vid = parseInt(String(v.variant_id), 10) || 0;
+        if (!vid) {
+            return;
+        }
+        const parts = [];
+        if (v.color) {
+            parts.push(String(v.color));
+        }
+        if (v.size) {
+            parts.push(String(v.size));
+        }
+        const lab = parts.length ? parts.join(' · ') : '#' + String(vid);
+        html +=
+            '<option value="' +
+            String(vid) +
+            '"' +
+            (vid === selectedVid ? ' selected' : '') +
+            '>' +
+            escCartHtml(lab) +
+            '</option>';
+    });
+    return html;
+}
+
+function orangeGiftCardHtml(card, state, gift, map, T) {
+    const key = orangeGiftCardKey(card);
+    const info = orangeGiftVariantInfo(card, state.variant_id);
+    const showOld = !!gift.show_old_price;
+    const requiresDecline = !!card.requires_decline && !info.is_fully_free;
+    const img = card.image_url ? String(card.image_url) : '';
+    const pname = String(card.product_name || '').trim();
+    const purl = card.product_url ? String(card.product_url) : '';
+    const detailsLbl = T.cart_gift_product_details || 'Product details';
+    const acceptLbl = T.cart_gift_accept || 'Accept gift';
+    const declineLbl = T.cart_gift_decline || 'No thanks';
+    const variantLbl = T.cart_gift_variant_label || T.color || 'Variant';
+    const maxPick = Math.max(1, parseInt(String(gift.max_gifts_pickable), 10) || 1);
+    const acceptedCount = orangeGiftCountAccepted(map);
+    const canAccept =
+        !!state.accepted || gift.gift_kind !== 'choice' || acceptedCount < maxPick;
+    let cls = 'cart-gift-card';
+    if (state.accepted) {
+        cls += ' cart-gift-card--accepted';
+    }
+    if (state.declined) {
+        cls += ' cart-gift-card--declined';
+    }
+    const varOpts = orangeGiftVariantSelectHtml(card, info.variant_id);
+    let variantBlock = '';
+    if (varOpts) {
+        variantBlock =
+            '<label class="cart-gift-card__variant-label"><span>' +
+            escCartHtml(variantLbl) +
+            '</span><select class="cart-gift-card__variant" data-gift-variant data-gift-key="' +
+            escCartAttr(key) +
+            '">' +
+            varOpts +
+            '</select></label>';
+    }
+    let imgInner = img
+        ? '<img class="cart-gift-card__img" src="' +
+          escCartAttr(img) +
+          '" alt="' +
+          escCartAttr(pname) +
+          '" loading="lazy" decoding="async">'
+        : '<div class="cart-gift-card__img cart-gift-card__img--placeholder"></div>';
+    let imgBlock = purl
+        ? '<a class="cart-gift-card__img-link" href="' + escCartAttr(purl) + '">' + imgInner + '</a>'
+        : '<div class="cart-gift-card__img-wrap">' + imgInner + '</div>';
+    let actions =
+        '<button type="button" class="btn btn-secondary cart-gift-card__btn cart-gift-card__btn--accept"' +
+        (canAccept ? '' : ' disabled') +
+        ' data-gift-action="accept" data-gift-key="' +
+        escCartAttr(key) +
+        '">' +
+        escCartHtml(acceptLbl) +
+        '</button>';
+    if (requiresDecline) {
+        actions +=
+            '<button type="button" class="btn btn-ghost cart-gift-card__btn cart-gift-card__btn--decline" data-gift-action="decline" data-gift-key="' +
+            escCartAttr(key) +
+            '">' +
+            escCartHtml(declineLbl) +
+            '</button>';
+    }
+    return (
+        '<article class="' +
+        cls +
+        '" data-gift-card data-gift-key="' +
+        escCartAttr(key) +
+        '">' +
+        imgBlock +
+        '<div class="cart-gift-card__body">' +
+        '<h4 class="cart-gift-card__name">' +
+        escCartHtml(pname) +
+        '</h4>' +
+        '<div class="cart-gift-card__price">' +
+        orangeGiftFormatPriceHtml(info.retail_unit, info.charge_unit, showOld, T) +
+        '</div>' +
+        variantBlock +
+        (purl
+            ? '<a class="cart-gift-card__details" href="' +
+              escCartAttr(purl) +
+              '">' +
+              escCartHtml(detailsLbl) +
+              '</a>'
+            : '') +
+        '<div class="cart-gift-card__actions">' +
+        actions +
+        '</div></div></article>'
+    );
+}
+
+function orangeGiftBindCardEvents(inner) {
+    if (!inner || inner.dataset.giftCardsBound === '1') {
+        return;
+    }
+    inner.dataset.giftCardsBound = '1';
+    inner.addEventListener('click', function (ev) {
+        const btn = ev.target && ev.target.closest ? ev.target.closest('[data-gift-action]') : null;
+        if (!btn || btn.disabled) {
+            return;
+        }
+        const key = btn.getAttribute('data-gift-key') || '';
+        const action = btn.getAttribute('data-gift-action') || '';
+        const liveGift = window.__orangeLastGiftPromotion;
+        if (!liveGift || !key || !action) {
+            return;
+        }
+        const map = orangeGiftEnsureStateMap(liveGift);
+        const st = map[key];
+        if (!st) {
+            return;
+        }
+        const maxPick = Math.max(1, parseInt(String(liveGift.max_gifts_pickable), 10) || 1);
+        if (action === 'accept') {
+            if (
+                liveGift.gift_kind === 'choice' &&
+                orangeGiftCountAccepted(map) >= maxPick &&
+                !st.accepted
+            ) {
+                return;
+            }
+            st.accepted = true;
+            st.declined = false;
+        } else if (action === 'decline') {
+            st.accepted = false;
+            st.declined = true;
+        }
+        orangeGiftSyncCheckoutGlobals(liveGift);
+        orangeUpdateCartGiftPromotionUI(liveGift);
+        orangeScheduleCheckoutPreview();
+    });
+    inner.addEventListener('change', function (ev) {
+        const sel = ev.target;
+        if (!sel || !sel.matches || !sel.matches('[data-gift-variant]')) {
+            return;
+        }
+        const key = sel.getAttribute('data-gift-key') || '';
+        const liveGift = window.__orangeLastGiftPromotion;
+        if (!liveGift || !key) {
+            return;
+        }
+        const map = orangeGiftEnsureStateMap(liveGift);
+        const st = map[key];
+        if (!st) {
+            return;
+        }
+        st.variant_id = parseInt(String(sel.value), 10) || 0;
+        orangeGiftSyncCheckoutGlobals(liveGift);
+        orangeUpdateCartGiftPromotionUI(liveGift);
+        orangeScheduleCheckoutPreview();
+    });
+}
+
+function orangeGiftCheckoutGuard(gift) {
+    if (!gift || gift.id == null) {
+        return null;
+    }
+    const T = window.APP_T || {};
+    const selections = orangeGiftBuildSelectionsForApi(gift);
+    const accepted = selections.filter(function (s) {
+        return s.accepted && !s.declined;
+    });
+    if (gift.gift_kind === 'choice') {
+        if (!accepted.length) {
+            return T.checkout_gift_pick_required || '';
+        }
+        return null;
+    }
+    if (gift.gift_kind === 'fixed') {
+        const card = gift.fixed_product;
+        if (card && card.requires_decline) {
+            const decided = selections.some(function (s) {
+                return s.accepted || s.declined;
+            });
+            if (!decided) {
+                return T.checkout_gift_pick_required || '';
+            }
+            if (
+                !accepted.length &&
+                !selections.some(function (s) {
+                    return s.declined;
+                })
+            ) {
+                return T.checkout_gift_pick_required || '';
+            }
+        }
+    }
+    return null;
+}
+
+function orangeGiftApplyToPayload(payload, gift) {
+    if (!gift || gift.id == null) {
+        return;
+    }
+    const selections = orangeGiftBuildSelectionsForApi(gift);
+    if (selections.length) {
+        payload.gift_selections = selections;
+    }
+    const accepted = selections.filter(function (s) {
+        return s.accepted && !s.declined;
+    });
+    if (accepted.length) {
+        payload.gift_variant_id = accepted[0].variant_id;
+    } else if (gift.gift_kind === 'fixed' && gift.fixed_variant_id) {
+        payload.gift_variant_id = parseInt(String(gift.fixed_variant_id), 10) || 0;
+    }
 }
 
 function orangeUpdateCartGiftPromotionUI(gift) {
@@ -1235,8 +1655,12 @@ function orangeUpdateCartGiftPromotionUI(gift) {
     if (!gift || typeof gift !== 'object' || gift.id == null) {
         wrap.hidden = true;
         inner.innerHTML = '';
+        inner.dataset.giftCardsBound = '';
+        window.__orangeGiftPromoId = 0;
+        window.__orangeGiftSelectionStateMap = null;
         try {
             window.__orangeCheckoutGiftVariantId = 0;
+            window.__orangeCheckoutGiftSelections = [];
         } catch (eZ) {}
         return;
     }
@@ -1244,93 +1668,40 @@ function orangeUpdateCartGiftPromotionUI(gift) {
     const title = (typeof gift.display_name === 'string' && gift.display_name.trim() !== '')
         ? gift.display_name.trim()
         : (T.cart_gift_promo_title || '');
-    if (gift.gift_kind === 'fixed' && gift.fixed_variant_id) {
-        try {
-            window.__orangeCheckoutGiftVariantId = parseInt(String(gift.fixed_variant_id), 10) || 0;
-        } catch (eF) {
-            window.__orangeCheckoutGiftVariantId = 0;
-        }
-        const note = T.cart_gift_included_fixed || '';
-        wrap.hidden = false;
-        inner.innerHTML =
-            '<div class="cart-gift-promo__title">' +
-            escCartHtml(title) +
-            '</div><p class="cart-gift-promo__note">' +
-            escCartHtml(note) +
-            '</p>';
-        return;
-    }
-    const pool = Array.isArray(gift.pool) ? gift.pool : [];
-    if (!pool.length) {
+    const cards = orangeGiftCardsFromPromotion(gift);
+    if (!cards.length) {
         wrap.hidden = true;
         inner.innerHTML = '';
-        try {
-            window.__orangeCheckoutGiftVariantId = 0;
-        } catch (eP) {}
         return;
     }
-    let opts = '';
-    pool.forEach(function (p) {
-        const vid = parseInt(String(p.variant_id), 10) || 0;
-        if (!vid) {
-            return;
-        }
-        const parts = [String(p.product_name || '').trim()];
-        if (p.color) {
-            parts.push(String(p.color));
-        }
-        if (p.size) {
-            parts.push(String(p.size));
-        }
-        const lab = parts.filter(Boolean).join(' · ');
-        opts +=
-            '<option value="' +
-            String(vid) +
-            '">' +
-            escCartHtml(lab) +
-            '</option>';
+    const map = orangeGiftEnsureStateMap(gift);
+    orangeGiftSyncCheckoutGlobals(gift);
+    let hint = '';
+    const maxPick = Math.max(1, parseInt(String(gift.max_gifts_pickable), 10) || 1);
+    if (gift.gift_kind === 'choice' && maxPick > 1) {
+        const hintTpl = T.cart_gift_pick_max_hint || 'You may choose up to {n} gifts.';
+        hint = hintTpl.replace('{n}', String(maxPick));
+    } else if (gift.gift_kind === 'choice') {
+        hint = T.cart_gift_pick_label || '';
+    }
+    let cardsHtml = '';
+    cards.forEach(function (card) {
+        const key = orangeGiftCardKey(card);
+        const st = map[key] || {
+            variant_id: parseInt(String(card.variant_id), 10) || 0,
+            accepted: false,
+            declined: false,
+        };
+        cardsHtml += orangeGiftCardHtml(card, st, gift, map, T);
     });
-    if (!opts) {
-        wrap.hidden = true;
-        inner.innerHTML = '';
-        try {
-            window.__orangeCheckoutGiftVariantId = 0;
-        } catch (eE) {}
-        return;
-    }
     wrap.hidden = false;
-    const lbl = T.cart_gift_pick_label || '';
     inner.innerHTML =
-        '<div class="cart-gift-promo__title">' +
-        escCartHtml(title) +
-        '</div><label class="cart-gift-promo__label"><span>' +
-        escCartHtml(lbl) +
-        '</span><select id="cartGiftVariantSelect" class="cart-gift-promo__select">' +
-        opts +
-        '</select></label>';
-    const sel = document.getElementById('cartGiftVariantSelect');
-    if (sel) {
-        if (pool.length === 1) {
-            try {
-                window.__orangeCheckoutGiftVariantId = parseInt(String(pool[0].variant_id), 10) || 0;
-            } catch (e1) {
-                window.__orangeCheckoutGiftVariantId = 0;
-            }
-        } else {
-            try {
-                window.__orangeCheckoutGiftVariantId = parseInt(String(sel.value), 10) || 0;
-            } catch (e2) {
-                window.__orangeCheckoutGiftVariantId = 0;
-            }
-        }
-        sel.addEventListener('change', function () {
-            try {
-                window.__orangeCheckoutGiftVariantId = parseInt(String(sel.value), 10) || 0;
-            } catch (e3) {
-                window.__orangeCheckoutGiftVariantId = 0;
-            }
-        });
-    }
+        (title ? '<div class="cart-gift-promo__title">' + escCartHtml(title) + '</div>' : '') +
+        (hint ? '<p class="cart-gift-promo__hint">' + escCartHtml(hint) + '</p>' : '') +
+        '<div class="cart-gift-cards">' +
+        cardsHtml +
+        '</div>';
+    orangeGiftBindCardEvents(inner);
 }
 
 function orangeUpdateCartBogoPromotionUI(bogo) {
@@ -2142,6 +2513,15 @@ async function orangeRunCheckoutPreview() {
         lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
     };
     try {
+        const gpPreview = window.__orangeLastGiftPromotion;
+        if (gpPreview && gpPreview.id != null) {
+            const giftSels = orangeGiftBuildSelectionsForApi(gpPreview);
+            if (giftSels.length) {
+                payload.gift_selections = giftSels;
+            }
+        }
+    } catch (eGiftPreview) {}
+    try {
         const response = await fetch(storefrontApiUrl('/api/cart/checkout-preview.php'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2793,19 +3173,12 @@ async function sendOrderNow() {
         };
         try {
             const gp = window.__orangeLastGiftPromotion;
-            if (gp && gp.gift_kind === 'choice') {
-                const vid = parseInt(String(window.__orangeCheckoutGiftVariantId || 0), 10) || 0;
-                if (!vid) {
-                    orangeShowToast(
-                        (window.APP_T && window.APP_T.checkout_gift_pick_required) || '',
-                        3600
-                    );
-                    return;
-                }
-                payloadAm.gift_variant_id = vid;
-            } else if (gp && gp.gift_kind === 'fixed' && gp.fixed_variant_id) {
-                payloadAm.gift_variant_id = parseInt(String(gp.fixed_variant_id), 10) || 0;
+            const giftErr = orangeGiftCheckoutGuard(gp);
+            if (giftErr) {
+                orangeShowToast(giftErr, 3600);
+                return;
             }
+            orangeGiftApplyToPayload(payloadAm, gp);
         } catch (eAmGift) {}
         try {
             const bp = window.__orangeLastBogoPromotion;
@@ -2951,19 +3324,12 @@ async function sendOrderNow() {
 
     try {
         const gp = window.__orangeLastGiftPromotion;
-        if (gp && gp.gift_kind === 'choice') {
-            const vid = parseInt(String(window.__orangeCheckoutGiftVariantId || 0), 10) || 0;
-            if (!vid) {
-                orangeShowToast(
-                    (window.APP_T && window.APP_T.checkout_gift_pick_required) || '',
-                    3600
-                );
-                return;
-            }
-            payload.gift_variant_id = vid;
-        } else if (gp && gp.gift_kind === 'fixed' && gp.fixed_variant_id) {
-            payload.gift_variant_id = parseInt(String(gp.fixed_variant_id), 10) || 0;
+        const giftErr = orangeGiftCheckoutGuard(gp);
+        if (giftErr) {
+            orangeShowToast(giftErr, 3600);
+            return;
         }
+        orangeGiftApplyToPayload(payload, gp);
     } catch (eGift) {}
 
     try {

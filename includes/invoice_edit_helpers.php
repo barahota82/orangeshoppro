@@ -81,6 +81,40 @@ function orange_invoice_edit_read_stored_restores(array $order): array
     return orange_invoice_edit_decode_admin_restores(is_array($decoded) ? $decoded : []);
 }
 
+/**
+ * @return list<int>
+ */
+function orange_invoice_edit_gift_variant_ids(PDO $pdo, array $order): array
+{
+    $ids = [];
+    if (orange_table_has_column($pdo, 'orders', 'cart_gift_selections_json')) {
+        $raw = trim((string) ($order['cart_gift_selections_json'] ?? ''));
+        if ($raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $sel) {
+                    if (!is_array($sel)) {
+                        continue;
+                    }
+                    if (empty($sel['accepted']) || !empty($sel['declined'])) {
+                        continue;
+                    }
+                    $vid = (int) ($sel['variant_id'] ?? 0);
+                    if ($vid > 0) {
+                        $ids[$vid] = true;
+                    }
+                }
+            }
+        }
+    }
+    $legacy = (int) ($order['cart_gift_variant_id'] ?? 0);
+    if ($legacy > 0) {
+        $ids[$legacy] = true;
+    }
+
+    return array_keys($ids);
+}
+
 function orange_invoice_edit_is_gift_line(PDO $pdo, array $item, array $order): bool
 {
     $price = (float) ($item['price'] ?? 0);
@@ -91,8 +125,8 @@ function orange_invoice_edit_is_gift_line(PDO $pdo, array $item, array $order): 
     if ($vid <= 0) {
         return false;
     }
-    if (orange_table_has_column($pdo, 'orders', 'cart_gift_variant_id')) {
-        if ($vid === (int) ($order['cart_gift_variant_id'] ?? 0)) {
+    foreach (orange_invoice_edit_gift_variant_ids($pdo, $order) as $giftVid) {
+        if ($vid === (int) $giftVid) {
             return true;
         }
     }
@@ -680,20 +714,29 @@ function orange_invoice_edit_prior_snapshot(PDO $pdo, array $order, array $allIt
     }
 
     $giftPromoId = (int) ($order['cart_gift_promotion_id'] ?? 0);
-    $giftVid = (int) ($order['cart_gift_variant_id'] ?? 0);
-    if ($giftPromoId > 0 && $giftVid > 0) {
-        $label = 'هدية';
+    if ($giftPromoId > 0) {
+        $giftNames = [];
         foreach ($allItems as $item) {
-            if (!orange_invoice_edit_is_bogo_gift_line($pdo, $item, $order)
-                && (int) ($item['variant_id'] ?? 0) === $giftVid) {
-                $label = 'هدية: ' . (string) ($item['product_name'] ?? '');
-                break;
+            if (orange_invoice_edit_is_bogo_gift_line($pdo, $item, $order)) {
+                continue;
             }
+            if (orange_invoice_edit_is_gift_line($pdo, $item, $order)) {
+                $nm = trim((string) ($item['product_name'] ?? ''));
+                if ($nm !== '') {
+                    $giftNames[] = $nm;
+                }
+            }
+        }
+        $label = $giftNames !== [] ? 'هدية: ' . implode('، ', $giftNames) : 'هدية';
+        $primaryVid = (int) ($order['cart_gift_variant_id'] ?? 0);
+        if ($primaryVid <= 0) {
+            $vids = orange_invoice_edit_gift_variant_ids($pdo, $order);
+            $primaryVid = $vids !== [] ? (int) $vids[0] : 0;
         }
         $snap['gift'] = [
             'kind' => 'gift',
             'id' => $giftPromoId,
-            'variant_id' => $giftVid,
+            'variant_id' => $primaryVid,
             'label' => $label,
             'condition_text' => orange_invoice_edit_gift_condition_text($pdo, $giftPromoId),
         ];
@@ -760,9 +803,21 @@ function orange_invoice_edit_compute_promos(
         'gift_variant_id' => (int) ($order['cart_gift_variant_id'] ?? 0),
         'bogo_gift_variant_id' => (int) ($order['cart_bogo_gift_variant_id'] ?? 0),
     ];
+    if (orange_table_has_column($pdo, 'orders', 'cart_gift_selections_json')) {
+        $rawSel = trim((string) ($order['cart_gift_selections_json'] ?? ''));
+        if ($rawSel !== '') {
+            $decodedSel = json_decode($rawSel, true);
+            if (is_array($decodedSel)) {
+                $payload['gift_selections'] = $decodedSel;
+            }
+        }
+    }
+    $giftLines = [];
     $giftLine = null;
     $giftPromoId = null;
     $giftVariantId = null;
+    $giftSelectionsJson = null;
+    $giftDiscount = 0.0;
     $bogoLine = null;
     $bogoPromoId = null;
     $bogoGiftVariantId = null;
@@ -777,9 +832,12 @@ function orange_invoice_edit_compute_promos(
             $buyerAccountId,
             $buyerPhone
         );
+        $giftLines = $promoBundle['giftLines'] ?? [];
         $giftLine = $promoBundle['giftLine'];
         $giftPromoId = $promoBundle['giftPromoId'];
         $giftVariantId = $promoBundle['giftVariantId'];
+        $giftSelectionsJson = $promoBundle['giftSelectionsJson'] ?? null;
+        $giftDiscount = round((float) ($promoBundle['giftDiscount'] ?? 0), 4);
         $bogoLine = $promoBundle['bogoLine'];
         $bogoPromoId = $promoBundle['bogoPromoId'];
         $bogoGiftVariantId = $promoBundle['bogoGiftVariantId'];
@@ -791,9 +849,12 @@ function orange_invoice_edit_compute_promos(
     $finalComboDisc = $naturalComboDisc;
     $finalPromoId = $naturalPromoId;
     $finalPromoDisc = $naturalPromoDisc;
+    $finalGiftLines = $giftLines;
     $finalGiftLine = $giftLine;
     $finalGiftPromoId = $giftPromoId;
     $finalGiftVariantId = $giftVariantId;
+    $finalGiftSelectionsJson = $giftSelectionsJson;
+    $finalGiftDiscount = $giftDiscount;
     $finalBogoLine = $bogoLine;
     $finalBogoPromoId = $bogoPromoId;
     $finalBogoGiftVariantId = $bogoGiftVariantId;
@@ -806,13 +867,16 @@ function orange_invoice_edit_compute_promos(
         $finalPromoId = (int) $priorSnap['cart_promotion']['id'];
         $finalPromoDisc = (float) $priorSnap['cart_promotion']['discount'];
     }
-    if ($finalGiftLine === null && $priorSnap['gift'] !== null && in_array('gift', $adminRestores, true)) {
+    if ($finalGiftLines === [] && $priorSnap['gift'] !== null && in_array('gift', $adminRestores, true)) {
         $pv = (int) ($priorSnap['gift']['variant_id'] ?? 0);
         if ($pv > 0) {
             try {
-                $finalGiftLine = orange_storefront_build_gift_order_line($pdo, $pv, $paidValidated, true, 0.0);
+                $restored = orange_storefront_build_gift_order_line($pdo, $pv, $paidValidated, true, 0.0);
+                $finalGiftLines = [$restored];
+                $finalGiftLine = $restored;
                 $finalGiftPromoId = (int) $priorSnap['gift']['id'];
                 $finalGiftVariantId = $pv;
+                $finalGiftSelectionsJson = null;
             } catch (Throwable $e) {
                 // ignore
             }
@@ -854,14 +918,14 @@ function orange_invoice_edit_compute_promos(
         $hasNatural = match ($kind) {
             'combo' => $naturalComboId !== null && $naturalComboDisc > 0.00001,
             'cart_promotion' => $naturalPromoId !== null && $naturalPromoDisc > 0.00001,
-            'gift' => $giftLine !== null,
+            'gift' => $giftLines !== [],
             'bogo' => $bogoLine !== null,
             default => false,
         };
         $hasFinal = match ($kind) {
             'combo' => $finalComboId !== null && $finalComboDisc > 0.00001,
             'cart_promotion' => $finalPromoId !== null && $finalPromoDisc > 0.00001,
-            'gift' => $finalGiftLine !== null,
+            'gift' => $finalGiftLines !== [],
             'bogo' => $finalBogoLine !== null,
             default => false,
         };
@@ -879,8 +943,18 @@ function orange_invoice_edit_compute_promos(
             } elseif ($kind === 'cart_promotion') {
                 $row['label'] = 'خصم السلة: −' . number_format($finalPromoDisc, 3);
                 $row['discount'] = $finalPromoDisc;
-            } elseif ($kind === 'gift' && is_array($finalGiftLine)) {
-                $row['label'] = 'هدية: ' . (string) ($finalGiftLine['product']['name'] ?? '');
+            } elseif ($kind === 'gift' && $finalGiftLines !== []) {
+                $names = [];
+                foreach ($finalGiftLines as $gl) {
+                    if (!is_array($gl)) {
+                        continue;
+                    }
+                    $nm = trim((string) ($gl['product']['name'] ?? ''));
+                    if ($nm !== '') {
+                        $names[] = $nm;
+                    }
+                }
+                $row['label'] = $names !== [] ? 'هدية: ' . implode('، ', $names) : 'هدية';
             } elseif ($kind === 'bogo' && is_array($finalBogoLine)) {
                 $row['label'] = 'BOGO: ' . (string) ($finalBogoLine['product']['name'] ?? '');
             }
@@ -902,9 +976,12 @@ function orange_invoice_edit_compute_promos(
         'combo_discount' => $finalComboDisc,
         'promo_id' => $finalPromoId,
         'promo_discount' => $finalPromoDisc,
+        'giftLines' => $finalGiftLines,
         'giftLine' => $finalGiftLine,
         'giftPromoId' => $finalGiftPromoId,
         'giftVariantId' => $finalGiftVariantId,
+        'giftSelectionsJson' => $finalGiftSelectionsJson,
+        'giftDiscount' => $finalGiftDiscount,
         'bogoLine' => $finalBogoLine,
         'bogoPromoId' => $finalBogoPromoId,
         'bogoGiftVariantId' => $finalBogoGiftVariantId,
@@ -973,7 +1050,7 @@ function orange_invoice_edit_preview(PDO $pdo, int $orderId, array $changes, arr
             'subtotal' => $computed['subtotal'],
             'combo_discount' => $computed['combo_discount'],
             'cart_promotion_discount' => $computed['promo_discount'],
-            'has_gift' => $computed['giftLine'] !== null,
+            'has_gift' => ($computed['giftLines'] ?? []) !== [] || $computed['giftLine'] !== null,
             'has_bogo' => $computed['bogoLine'] !== null,
         ],
     ];
@@ -1063,8 +1140,12 @@ function orange_invoice_edit_apply(PDO $pdo, int $orderId, array $changes, bool 
 
     $computed = orange_invoice_edit_compute_promos($pdo, $order, $paidValidated, $subtotal, $priorSnap, $adminRestores);
 
-    if ($computed['giftLine'] !== null) {
-        orange_storefront_insert_order_items_for_order($pdo, $orderId, [$computed['giftLine']]);
+    $giftLinesToInsert = $computed['giftLines'] ?? [];
+    if ($giftLinesToInsert === [] && $computed['giftLine'] !== null) {
+        $giftLinesToInsert = [$computed['giftLine']];
+    }
+    if ($giftLinesToInsert !== []) {
+        orange_storefront_insert_order_items_for_order($pdo, $orderId, $giftLinesToInsert);
     }
     if ($computed['bogoLine'] !== null) {
         orange_storefront_insert_order_items_for_order($pdo, $orderId, [$computed['bogoLine']]);
@@ -1077,6 +1158,8 @@ function orange_invoice_edit_apply(PDO $pdo, int $orderId, array $changes, bool 
     $promoDiscount = (float) $computed['promo_discount'];
     $giftPromoId = $computed['giftPromoId'];
     $giftVariantId = $computed['giftVariantId'];
+    $giftSelectionsJson = $computed['giftSelectionsJson'] ?? null;
+    $giftDiscount = (float) ($computed['giftDiscount'] ?? 0.0);
     $bogoPromoId = $computed['bogoPromoId'];
     $bogoGiftVariantId = $computed['bogoGiftVariantId'];
 
@@ -1099,6 +1182,14 @@ function orange_invoice_edit_apply(PDO $pdo, int $orderId, array $changes, bool 
         $setParts[] = 'cart_gift_variant_id = ?';
         $updParams[] = $giftPromoId !== null && $giftPromoId > 0 ? $giftPromoId : null;
         $updParams[] = $giftVariantId !== null && $giftVariantId > 0 ? $giftVariantId : null;
+    }
+    if (orange_table_has_column($pdo, 'orders', 'cart_gift_discount')) {
+        $setParts[] = 'cart_gift_discount = ?';
+        $updParams[] = $giftDiscount > 0 ? $giftDiscount : 0.0;
+    }
+    if (orange_table_has_column($pdo, 'orders', 'cart_gift_selections_json')) {
+        $setParts[] = 'cart_gift_selections_json = ?';
+        $updParams[] = is_string($giftSelectionsJson) && $giftSelectionsJson !== '' ? $giftSelectionsJson : null;
     }
     if (orange_table_has_column($pdo, 'orders', 'cart_bogo_promotion_id')) {
         $setParts[] = 'cart_bogo_promotion_id = ?';
@@ -1147,7 +1238,7 @@ function orange_invoice_edit_apply(PDO $pdo, int $orderId, array $changes, bool 
             'subtotal' => $subtotal,
             'combo_discount' => $comboDiscount,
             'cart_promotion_discount' => $promoDiscount,
-            'has_gift' => $computed['giftLine'] !== null,
+            'has_gift' => ($computed['giftLines'] ?? []) !== [] || $computed['giftLine'] !== null,
             'has_bogo' => $computed['bogoLine'] !== null,
         ],
         'active' => $computed['active'],

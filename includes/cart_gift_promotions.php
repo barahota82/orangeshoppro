@@ -10,6 +10,7 @@ require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/cart_promo_products.php';
 require_once __DIR__ . '/cart_promo_schedule.php';
 require_once __DIR__ . '/variant_pricing.php';
+require_once __DIR__ . '/cart_gift_pool_config.php';
 
 /**
  * أعلى سعر وحدة ممكن لهدية ترويجية في معاينة العربة (هدية مجموع سلة أو BOGO).
@@ -18,6 +19,12 @@ require_once __DIR__ . '/variant_pricing.php';
  */
 function orange_cart_promo_preview_gift_max_unit_charge(PDO $pdo, array $rule, array $ctxValidatedItems): float
 {
+    if (($rule['promo_type'] ?? '') === 'threshold_gift') {
+        require_once __DIR__ . '/cart_gift_storefront.php';
+
+        return orange_cart_gift_threshold_preview_max_unit_charge($pdo, $rule, $ctxValidatedItems);
+    }
+
     $kind = strtolower(trim((string) ($rule['gift_unit_charge_kind'] ?? 'free')));
     if ($kind === '' || $kind === 'free') {
         return 0.0;
@@ -76,10 +83,20 @@ function orange_cart_gift_promotions_admin_list(PDO $pdo): array
     }
     $cid = orange_cart_promotion_admin_country_id($pdo);
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_gift_promotions', '', $cid);
+    $extraCols = '';
+    if (orange_table_has_column($pdo, 'cart_gift_promotions', 'show_old_price_to_customer')) {
+        $extraCols .= ', show_old_price_to_customer';
+    }
+    if (orange_table_has_column($pdo, 'cart_gift_promotions', 'max_gifts_pickable')) {
+        $extraCols .= ', max_gifts_pickable';
+    }
+    if (orange_table_has_column($pdo, 'cart_gift_promotions', 'gift_pool_config')) {
+        $extraCols .= ', gift_pool_config';
+    }
     $st = $pdo->prepare(
         'SELECT id, name_ar, name_en, show_name_to_customer, min_subtotal, requires_registered_account, first_delivered_order_only, gift_kind, fixed_variant_id, pool_variant_ids,
                 gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active, is_always_on,
-                valid_from, valid_to, auto_paused_at, auto_paused_reason
+                valid_from, valid_to, auto_paused_at, auto_paused_reason' . $extraCols . '
          FROM cart_gift_promotions WHERE 1=1' . $bind['sql'] . ' ORDER BY sort_order ASC, id ASC'
     );
     $st->execute($bind['params']);
@@ -104,6 +121,10 @@ function orange_cart_gift_promotions_admin_list(PDO $pdo): array
             'pool_variant_ids' => $poolPids,
             'gift_unit_charge_kind' => (string) ($row['gift_unit_charge_kind'] ?? 'free'),
             'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),
+            'show_old_price_to_customer' => (int) ($row['show_old_price_to_customer'] ?? 0),
+            'max_gifts_pickable' => max(1, (int) ($row['max_gifts_pickable'] ?? 1)),
+            'gift_pool_config' => isset($row['gift_pool_config']) ? (string) $row['gift_pool_config'] : null,
+            'gift_pool_items' => orange_cart_gift_pool_config_decode(isset($row['gift_pool_config']) ? (string) $row['gift_pool_config'] : null)['items'],
             'sort_order' => (int) ($row['sort_order'] ?? 0),
             'is_active' => (int) ($row['is_active'] ?? 0),
             'is_always_on' => (int) ($row['is_always_on'] ?? 0),
@@ -135,10 +156,20 @@ function orange_cart_gift_promotion_select_rule(
     }
     $cid = orange_cart_promotion_storefront_country_id($pdo, $countryId);
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_gift_promotions', '', $cid);
+    $extraCols = '';
+    if (orange_table_has_column($pdo, 'cart_gift_promotions', 'show_old_price_to_customer')) {
+        $extraCols .= ', show_old_price_to_customer';
+    }
+    if (orange_table_has_column($pdo, 'cart_gift_promotions', 'max_gifts_pickable')) {
+        $extraCols .= ', max_gifts_pickable';
+    }
+    if (orange_table_has_column($pdo, 'cart_gift_promotions', 'gift_pool_config')) {
+        $extraCols .= ', gift_pool_config';
+    }
     $st = $pdo->prepare(
         "SELECT id, name_ar, name_en, show_name_to_customer, min_subtotal, requires_registered_account, first_delivered_order_only, gift_kind, fixed_variant_id, pool_variant_ids,
                 gift_unit_charge_kind, gift_unit_charge_value, is_active, is_always_on, valid_from, valid_to,
-                auto_paused_at, auto_paused_reason
+                auto_paused_at, auto_paused_reason" . $extraCols . "
          FROM cart_gift_promotions
          WHERE 1=1" . orange_cart_promo_schedule_sql('cart_gift_promotions') . $bind['sql'] . "
          ORDER BY min_subtotal DESC, id DESC"
@@ -178,6 +209,7 @@ function orange_cart_gift_promotion_select_rule(
 
         $candidate = [
             'id' => (int) $row['id'],
+            'promo_type' => 'threshold_gift',
             'gift_kind' => $kind,
             'fixed_product_id' => $fixedPid > 0 ? $fixedPid : null,
             'fixed_variant_id' => $fixedPid > 0 ? $fixedPid : null,
@@ -185,6 +217,10 @@ function orange_cart_gift_promotion_select_rule(
             'pool_variant_ids' => $pool,
             'gift_unit_charge_kind' => $gcKind,
             'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),
+            'show_name_to_customer' => (int) ($row['show_name_to_customer'] ?? 0),
+            'show_old_price_to_customer' => (int) ($row['show_old_price_to_customer'] ?? 0),
+            'max_gifts_pickable' => max(1, (int) ($row['max_gifts_pickable'] ?? 1)),
+            'gift_pool_config' => isset($row['gift_pool_config']) ? (string) $row['gift_pool_config'] : null,
             'display_name' => orange_promo_customer_display_name($row),
         ];
         if (!orange_cart_promo_maybe_pause_rule_if_no_stock($pdo, 'cart_gift_promotions', $candidate, [], $countryId)) {

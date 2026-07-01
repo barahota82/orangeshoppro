@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/storefront_cart_items.php';
 require_once __DIR__ . '/../../includes/cart_promotions.php';
 require_once __DIR__ . '/../../includes/cart_gift_promotions.php';
+require_once __DIR__ . '/../../includes/cart_gift_storefront.php';
 require_once __DIR__ . '/../../includes/cart_bogo_promotions.php';
 require_once __DIR__ . '/../../includes/cart_combo_promotions.php';
 require_once __DIR__ . '/../../includes/product_offers.php';
@@ -59,35 +60,7 @@ try {
     $giftPayload = null;
     $giftRule = orange_cart_gift_promotion_select_rule($pdo, $subtotal, $buyerReg, $storefrontCountryId, $buyerAccountId, $buyerPhone);
     if ($giftRule !== null) {
-        if ($giftRule['gift_kind'] === 'fixed') {
-            $fv = (int) ($giftRule['fixed_variant_id'] ?? 0);
-            $opts = $fv > 0
-                ? orange_cart_gift_promotion_pool_options($pdo, [$fv], $validatedItems, false)
-                : [];
-            if (count($opts) > 0) {
-                $giftPayload = [
-                    'id' => $giftRule['id'],
-                    'gift_kind' => 'fixed',
-                    'fixed_variant_id' => $fv,
-                    'pool' => [],
-                ];
-            }
-        } else {
-            $pool = orange_cart_gift_promotion_pool_options(
-                $pdo,
-                $giftRule['pool_variant_ids'],
-                $validatedItems,
-                false
-            );
-            if (count($pool) > 0) {
-                $giftPayload = [
-                    'id' => $giftRule['id'],
-                    'gift_kind' => 'choice',
-                    'fixed_variant_id' => null,
-                    'pool' => $pool,
-                ];
-            }
-        }
+        $giftPayload = orange_cart_gift_storefront_payload($pdo, $giftRule, $validatedItems, $storefrontCountryId, $data);
     }
 
     $bogoPayload = null;
@@ -141,11 +114,11 @@ try {
 
     $thresholdGiftChargePreview = 0.0;
     if ($giftRule !== null && $giftPayload !== null) {
-        $thresholdGiftChargePreview = orange_cart_promo_preview_gift_max_unit_charge($pdo, $giftRule, $validatedItems);
-        $giftPayload['gift_unit_charge_kind'] = (string) ($giftRule['gift_unit_charge_kind'] ?? 'free');
-        $giftPayload['gift_unit_charge_value'] = (float) ($giftRule['gift_unit_charge_value'] ?? 0);
-        $giftPayload['preview_max_gift_unit_charge'] = $thresholdGiftChargePreview;
-        $giftPayload['display_name'] = (string) ($giftRule['display_name'] ?? '');
+        $thresholdGiftChargePreview = (float) (
+            $giftPayload['gift_charge_preview']
+            ?? $giftPayload['preview_max_gift_unit_charge']
+            ?? 0
+        );
     }
 
     $bogoGiftChargePreview = 0.0;

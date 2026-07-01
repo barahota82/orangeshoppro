@@ -1,0 +1,179 @@
+ORANGE — خطة مراحل: واجهة هدية مجموع السلة في العربة (cart_gift_promotions)
+================================================================================
+Archive: docs/archive/ORANGE_CART_GIFT_STOREFRONT_ROLLOUT_PHASES.txt
+سياسة المالك (س4 (2)): docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt — قرارات 2026-07-01 + ملحق عرض السعر
+كود حالي: includes/cart_gift_promotions.php · assets/js/cart.js · api/cart/checkout-preview.php
+Last updated: 2026-07-01
+
+**قرار المالك (2026-07-01):** التنفيذ = **أكثر من مرحلة واحدة** → يُوثَّق هنا؛ **لا دفعة كود** لكل المراحل دفعة واحدة دون توجيه «نفّذ المرحلة X».
+
+**قرارات محسومة (ملخّص):**
+1. **`max_gifts_pickable`** — كم هدية يختارها العميل من الم pool.
+2. **تسعير per-product** (مجاني | نسبة | مبلغ off | سعر ثابت) — لكل منتج في الم pool **وللهدية الثابتة**؛ إلغاء `gift_unit_charge_kind` واحد للقاعدة في السلوك الجديد (ترحيل القواعد القديمة).
+3. **لون/مقاس — هجين:** منتقي في السلة + رابط «تفاصيل المنتج» اختياري.
+4. **`show_old_price_to_customer`** على `cart_gift_promotions` (بعد «التفعيل الدائم»، افتراضي 0): **OFF** = مبلغ الدفع فقط؛ **ON** = ~~تجزئة~~ + مبلغ الدفع. **لا** cost و**لا** «سعر تكلفة» و**لا** label «سعر مميز» للعميل.
+5. **«لا شكراً»** للهدية **غير المجانية بالكامل** فقط.
+6. **عرض الهدية كمنتج:** صورة، اسم، سعر، رابط، متغيّر، موافقة/رفض.
+
+**للوكلاء:** بعد إغلاق أي مرحلة حدّث جدول «0) ملخص الحالة» و«آخر commit»؛ لا تُعِد كتابة فقرات سياسة س4 — أضف/حدّث «تنفيذ» فقط عند الإغلاق النهائي. احترم `docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt` (checkout-preview خفيف، لا N+1 في pool).
+
+================================================================================
+0) ملخص الحالة
+================================================================================
+
+| المرحلة | العنوان                                           | الحالة    | ملاحظة |
+|---------|----------------------------------------------------|-----------|--------|
+| 0       | تثبيت السياسة + ملف المراحل                        | **مغلق**  | 2026-07-01 |
+| 1       | ترحيل DB + ترحيل تسعير قديم → JSON                | **مغلق**  | v113 · `includes/cart_gift_pool_config.php` |
+| 2       | منطق خادم: تسعير per-product + pool غني           | **مغلق**  | `includes/cart_gift_storefront.php` |
+| 3       | أدمن: pool بتسعير + max_gifts + show_old_price    | **مغلق**  | 2026-07-01 |
+| 4       | API معاينة العربة (checkout-preview)              | **مغلق**  | 2026-07-01 |
+| 5       | واجهة السلة (بطاقات + منتقي + موافقة/رفض)        | **مغلق**  | 2026-07-01 |
+| 6       | الطلب: create-order + amend + بنود متعددة         | **مغلق**  | 2026-07-01 |
+| 7       | ترجمات + QA + تحديث «تنفيذ» في POLICY_REFERENCE   | **مغلق**  | 2026-07-01 |
+
+**آخر commit:** — (مراحل 0–7 مغلقة برمجياً؛ رفع `git pull` على السيرفر للاختبار اليدوي)
+
+**اعتماديات:** جدولة/مخزون العروض (مراحل 1–10 مغلقة في `ORANGE_CART_PROMO_SCHEDULE_ROLLOUT_PHASES.txt`)؛ `show_old_price_to_customer` على offers/combo/BOGO (v106) — **نسخ نفس نمط** checkbox لـ `cart_gift_promotions`.
+
+================================================================================
+1) المرحلة 1 — ترحيل DB + ترحيل بيانات
+================================================================================
+STATUS: **CLOSED** (2026-07-01)
+
+| #    | المهمة | الحالة |
+|------|--------|--------|
+| 1.1  | ترحيل marker-gated في `includes/catalog_schema.php`: `show_old_price_to_customer TINYINT(1) NOT NULL DEFAULT 0` على `cart_gift_promotions` | done |
+| 1.2  | عمود `max_gifts_pickable INT UNSIGNED NOT NULL DEFAULT 1` (≥1) | done |
+| 1.3  | عمود `gift_pool_config JSON NULL` — لكل `product_id`: `{ charge_kind, charge_value }` + للهدية الثابتة نفس الحقول في JSON أو صف واحد | done |
+| 1.4  | (اختياري للتدقيق) `cart_gift_selections_json JSON NULL` على `orders` — اختيارات متعددة + declined paid | done |
+| 1.5  | **ترحيل القواعد القديمة:** لكل صف قائم — انسخ `gift_unit_charge_kind/value` إلى كل منتج في `pool_variant_ids` + الهدية الثابتة في `gift_pool_config` | done |
+| 1.6  | الإبقاء على أعمدة `gift_unit_charge_*` **للتوافق الرجعي** لكن **لا تُستخدم** في المسار الجديد بعد المرحلة 2 | done |
+
+**معيار الإغلاق:** `git pull` على السيرفر يضيف الأعمدة؛ قواعد قديمة تُقرأ بسلوك مطابق لليوم بعد ترحيل 1.5.
+
+================================================================================
+2) المرحلة 2 — منطق خادم (PHP)
+================================================================================
+STATUS: **CLOSED** (2026-07-01)
+
+| #    | المهمة | الحالة |
+|------|--------|--------|
+| 2.1  | `orange_cart_gift_resolve_product_charge` — per-product من `gift_pool_config` | done |
+| 2.2  | `orange_cart_gift_resolve_unit_price` في مسار هدية مجموع السلة (`storefront_checkout_promo_lines.php`) | done |
+| 2.3  | `orange_cart_gift_storefront_pool_products` — retail/charge/image/url/variants[] | done |
+| 2.4  | `orange_cart_gift_threshold_preview_max_unit_charge` — أقصى charge per-product | done |
+| 2.5  | `orange_cart_gift_storefront_payload` + `checkout-preview.php` | done |
+
+**معيار الإغلاق:** unit smoke عبر `checkout-preview` يُرجع retail + charge per pool item (حتى قبل UI).
+
+================================================================================
+3) المرحلة 3 — شاشة الأدمن
+================================================================================
+STATUS: **CLOSED** (2026-07-01)
+
+| #    | المهمة | الحالة |
+|------|--------|--------|
+| 3.1  | `admin/pages/cart_gift_promotions.php` — جدول pool: منتج + نوع تسعير + قيمة **لكل صف** (إزالة/إخفاء «تسعير بند واحد للقاعدة») | done |
+| 3.2  | هدية ثابتة — نفس حقول التسعير per-product | done |
+| 3.3  | حقل **«عدد الهدايا القابلة للاختيار»** (`max_gifts_pickable`) | done |
+| 3.4  | checkbox **«إظهار السعر القديم»** بعد «التفعيل الدائم» (نفس BOGO: `cbp_show_old_price`) | done |
+| 3.5  | `admin/api/cart_gift_promotions/manage.php` — حفظ/قراءة JSON + الأعمدة الجديدة + تحقق (max ≥ 1، charge_kind مسموح) | done |
+
+**معيار الإغلاق:** حفظ قاعدة pool mix (مجاني + مدفوع) + show_old_price + max 2 من 5 يعمل من الأدمن.
+
+================================================================================
+4) المرحلة 4 — API معاينة العربة
+================================================================================
+STATUS: **CLOSED** (2026-07-01)
+
+| #    | المهمة | الحالة |
+|------|--------|--------|
+| 4.1  | `api/cart/checkout-preview.php` — `gift_promotion` غني: `max_gifts_pickable`, `show_old_price`, `pool[]` كامل، `fixed` كبطاقة منتج | done |
+| 4.2  | حالة اختيار العميل: `gift_selections[]` (variant_id, product_id, accepted, declined) — من POST body أو session | done |
+| 4.3  | إجمالي العربة + `preview_max_gift_unit_charge` per-product | done |
+| 4.4  | احترام `show_name_to_customer` + `display_name` كما اليوم | done |
+
+**معيار الإغلاق:** curl/Postman على checkout-preview يعيد JSON كامل بلا واجهة.
+
+================================================================================
+5) المرحلة 5 — واجهة السلة (JS + CSS)
+================================================================================
+STATUS: **CLOSED** (2026-07-01)
+
+| #    | المهمة | الحالة |
+|------|--------|--------|
+| 5.1  | استبدال `orangeUpdateCartGiftPromotionUI` — بطاقات منتج (صورة، اسم، سعر، رابط) | done |
+| 5.2  | **عرض السعر:** OFF → مبلغ الدفع فقط؛ ON → `<s>retail</s> charge`؛ مجاني → «مجاناً» أو ~~retail~~ مجاناً | done |
+| 5.3  | منتقي لون/مقاس داخل البطاقة + رابط «تفاصيل المنتج» → `pages/product.php` | done |
+| 5.4  | pool: بطاقات + اختيار حتى `max_gifts_pickable` | done |
+| 5.5  | زر **موافقة** للمجاني؛ **موافقة + «لا شكراً»** للمدفوع | done |
+| 5.6  | fixed: بطاقة واحدة + منتقي + موافقة (بدون رفض إن مجاني) | done |
+| 5.7  | CSS في `assets/css/main.css` — `.cart-gift-card` (متسق مع BOGO/offer دون كسر أداء) | done |
+| 5.8  | إرسال الاختيار مع `sendOrderNow` / amend payloads + `checkout-preview` (`gift_selections`) | done |
+
+**معيار الإغلاق:** عميل يرى هدية كمنتج في `/pages/cart.php`؛ totals تتحدث بعد الموافقة.
+
+================================================================================
+6) المرحلة 6 — إنشاء/تعديل الطلب
+================================================================================
+STATUS: **CLOSED** (2026-07-01)
+
+| #    | المهمة | الحالة |
+|------|--------|--------|
+| 6.1  | `includes/storefront_checkout_promo_lines.php` — عدة هدايا؛ declined paid لا تُضاف؛ per-product charge | done |
+| 6.2  | `api/orders/create-order.php` — payload `gift_selections` أو توسيع `gift_variant_id` | done |
+| 6.3  | `api/orders/amend-order-items.php` — نفس المنطق | done |
+| 6.4  | `includes/order_intake_queue.php` — `cart_gift_discount` مجمّع؛ `cart_gift_selections_json` إن وُجد | done |
+| 6.5  | `includes/invoice_edit_helpers.php` — تعديل طلب + عرض هدية | done |
+| 6.6  | حجز مخزون لكل هدية مقبولة (كما اليوم `is_gift`) | done |
+
+**معيار الإغلاق:** طلب بـ 2 هدايا من pool + رفض هدية مدفوعة → فاتورة/بنود صحيحة.
+
+================================================================================
+7) المرحلة 7 — ترجمات + QA + أرشيف تنفيذ
+================================================================================
+STATUS: **CLOSED** (2026-07-01)
+
+| #    | المهمة | الحالة |
+|------|--------|--------|
+| 7.1  | `config.php` / مفاتيح `APP_T` — إزالة افتراض «مجانية» حيث charge ≠ 0؛ نصوص موافقة/لا شكراً/اختر هدية | done |
+| 7.2  | QA: fixed مجاني + fixed مدفوع + pool mix + max_gifts=2 + show_old ON/OFF + registered-only + gift_stock pause | done |
+| 7.3  | QA: لا cost على الواجهة؛ amend-order؛ subtotal threshold | done |
+| 7.4  | تحديث «تنفيذ (حالي)» س4 (2) في `ORANGE_STOREFRONT_POLICY_REFERENCE.txt` بمسارات الكود | done |
+| 7.5  | إغلاق جدول «0) ملخص الحالة» هنا — كل المراحل **مغلق** | done |
+
+**QA (7.2–7.3 — تحقق كود، اختبار يدوي على السيرفر):**
+| سيناريو | مسار التحقق |
+|---------|-------------|
+| fixed مجاني / fixed مدفوع / pool mix | `orange_cart_gift_storefront_pool_products` + `orange_storefront_build_threshold_gift_bundle` — per-product `charge_unit` |
+| max_gifts=2 | `max_gifts_pickable` في الأدمن + `orange_cart_gift_storefront_resolve_selections` + `cart.js` `orangeGiftCountAccepted` |
+| show_old ON/OFF | `show_old_price_to_customer` → `orangeGiftFormatPriceHtml` |
+| registered-only teaser | `orange_cart_gift_register_unlock_teaser_applies` + `checkout-preview` |
+| gift_stock pause | `orange_cart_gift_promotion_select_rule` + `cart_promo_schedule` (لا عرض عند نفاد كل الهدايا) |
+| لا cost للعميل | pool JSON: `retail_unit`/`charge_unit` فقط — **لا** `cost` في `cart_gift_storefront.php` |
+| amend-order | `api/orders/amend-order-items.php` + `gift_selections` |
+| min_subtotal | `orange_cart_gift_promotion_select_rule($pdo, $subtotal, …)` |
+
+================================================================================
+8) ترتيب التنفيذ الموصى به
+================================================================================
+
+```
+1 → 2 → 3   (أساس بيانات + منطق + أدmin)
+     ↓
+4 → 5       (معاينة + واجهة — يمكن اختبار end-to-end UI)
+     ↓
+6 → 7       (طلب حقيقي + QA)
+```
+
+**أمر البدء للوكيل:** «نفّذ المرحلة 1» ثم «نفّذ المرحلة 2» … — **مرحلة واحدة في كل جلسة** ما لم يوجّه المالك دمجاً صريحاً.
+
+================================================================================
+9) مخاطر / قيود
+================================================================================
+
+- **أداء:** pool كبير → pagination أو حد أقصى منتجات في الأدmin؛ جلب صور/أسعار في استعلام واحد.
+- **توافق رجعي:** طلبات قديمة بـ `cart_gift_variant_id` واحد تبقى صالحة.
+- **قانوني:** افتراض `show_old_price_to_customer = 0` على قواعد جديدة.
+- **BOGO:** لا تغيير في مسار BOGO إلا إذا طلب المالك لاحقاً per-product هناك أيضاً.
