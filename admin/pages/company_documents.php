@@ -18,13 +18,13 @@ $pdo = orange_admin_page_pdo();
 
 <div class="card">
     <h3 class="card-title">رفع مستند</h3>
-    <div class="cd-upload-fields" style="max-width:900px;display:flex;flex-direction:column;gap:12px;">
+    <div class="cd-upload-fields" style="display:flex;flex-direction:column;gap:12px;">
         <div>
             <label for="cd_file">الملف</label>
             <input type="file" id="cd_file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx,.xls,.xlsx">
             <p class="card-hint" style="margin:0.25rem 0 0;">حتى 40 ميجابايت — PDF، صور، Word، Excel، نص.</p>
         </div>
-        <div class="form-grid form-grid-3">
+        <div class="form-grid cd-upload-row1 orange-doc-header-row">
             <div>
                 <label for="cd_title">عنوان المستند <span style="color:#c00;">*</span></label>
                 <input type="text" id="cd_title" placeholder="مثال: عقد إيجار المستودع 2026">
@@ -41,8 +41,6 @@ $pdo = orange_admin_page_pdo();
                 <label for="cd_ref">رقم مرجعي / إشاري</label>
                 <input type="text" id="cd_ref" placeholder="اختياري">
             </div>
-        </div>
-        <div class="form-grid form-grid-3">
             <div>
                 <label for="cd_date">تاريخ المستند</label>
                 <input type="text" id="cd_date" class="admin-inp orange-inp-dmy" value="<?php echo htmlspecialchars($cdDefaultDocDate, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off">
@@ -130,6 +128,15 @@ $pdo = orange_admin_page_pdo();
 </div>
 
 <style>
+.form-grid.cd-upload-row1 {
+    grid-template-columns:
+        minmax(150px, 1.5fr)
+        minmax(110px, 1fr)
+        minmax(100px, 0.95fr)
+        minmax(96px, 0.75fr)
+        minmax(110px, 1fr)
+        minmax(100px, 0.95fr);
+}
 .form-grid.cd-filter-row {
     grid-template-columns: minmax(320px, 3fr) minmax(130px, 1fr) minmax(130px, 1fr) auto;
 }
