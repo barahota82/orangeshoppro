@@ -94,12 +94,6 @@ $pdo = orange_admin_page_pdo();
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="orange-doc-header-row__action">
-            <span class="orange-doc-header-row__action-label" aria-hidden="true">.</span>
-            <button type="button" class="btn" id="cd_btn_search">تحديث القائمة</button>
-        </div>
-    </div>
-    <div class="form-grid cd-filter-row2 orange-doc-header-row" style="align-items:end;margin-top:12px;">
         <div>
             <label for="cd_f_from">من تاريخ</label>
             <input type="text" id="cd_f_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" placeholder="اختياري">
@@ -107,6 +101,10 @@ $pdo = orange_admin_page_pdo();
         <div>
             <label for="cd_f_to">إلى تاريخ</label>
             <input type="text" id="cd_f_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" placeholder="اختياري">
+        </div>
+        <div class="orange-doc-header-row__action">
+            <span class="orange-doc-header-row__action-label" aria-hidden="true">.</span>
+            <button type="button" class="btn" id="cd_btn_search">تحديث القائمة</button>
         </div>
     </div>
 </div>
@@ -148,11 +146,13 @@ $pdo = orange_admin_page_pdo();
         minmax(100px, 0.95fr);
 }
 .form-grid.cd-filter-row {
-    grid-template-columns: minmax(320px, 3fr) minmax(130px, 1fr) minmax(130px, 1fr) auto;
-}
-.form-grid.cd-filter-row2 {
-    grid-template-columns: minmax(118px, 0.75fr) minmax(118px, 0.75fr);
-    max-width: 420px;
+    grid-template-columns:
+        minmax(240px, 2.2fr)
+        minmax(120px, 1fr)
+        minmax(120px, 1fr)
+        minmax(118px, 0.85fr)
+        minmax(118px, 0.85fr)
+        auto;
 }
 .orange-doc-header-row.cd-filter-row .orange-doc-header-row__action .btn {
     white-space: nowrap;
