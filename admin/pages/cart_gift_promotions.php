@@ -82,7 +82,6 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                         <tbody id="cgp_pool_body"></tbody>
                     </table>
                 </div>
-                <p class="page-subtitle" style="margin:6px 0 0;">التكلفة من بطاقة المنتج (إرشادية للأدمن فقط — لا تُعرض في الواجهة).</p>
             </div>
             <div id="cgp_block_fixed" style="margin:0 0 12px;display:none;">
                 <label>منتج الهدية الثابتة</label>
@@ -114,7 +113,6 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                         <input type="text" id="cgp_fixed_cost_ro" class="admin-inp cgp-readonly-inp" readonly tabindex="-1" style="margin-top:6px;width:100%;max-width:none;" dir="ltr" value="—">
                     </div>
                 </div>
-                <p class="page-subtitle" style="margin:6px 0 0;max-width:48rem;">مبلغ البيع والتكلفة للقراءة فقط — لا تُعرض للعميل. مبلغ البيع يُحسب من أقل سعر تجزئة فعّال للمنتج.</p>
             </div>
         </div>
 
@@ -534,7 +532,7 @@ function cgpToggleFixedCharge() {
         inp.removeAttribute('max');
         inp.step = '0.0001';
     } else {
-        lab.textContent = 'مبلغ مخصوم من سعر الوحدة (د.ك)';
+        lab.textContent = 'المبلغ المخصوم من السعر (د.ك)';
         inp.removeAttribute('max');
         inp.step = '0.0001';
     }
