@@ -330,13 +330,7 @@ try {
             }
             $fixedPid = 0;
             $poolJson = orange_cart_promo_encode_product_pool_json($poolIds);
-            $maxGiftsPickable = max(1, (int) ($data['max_gifts_pickable'] ?? 1));
-            if ($maxGiftsPickable > count($poolIds)) {
-                json_response([
-                    'success' => false,
-                    'message' => 'عدد الهدايا القابلة للاختيار لا يمكن أن يتجاوز عدد المنتجات في المجموعة (' . count($poolIds) . ')',
-                ], 422);
-            }
+            $maxGiftsPickable = 1;
         }
 
         $productIds = [];

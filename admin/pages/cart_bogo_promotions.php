@@ -182,11 +182,6 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <div style="margin:6px 0 8px;">
                 <button type="button" class="btn-secondary" id="cbp_pool_add_btn">إضافة منتج (دبل كليك من القائمة)</button>
             </div>
-            <div id="cbp_max_pick_wrap" style="margin:0 0 10px;max-width:16rem;">
-                <label for="cbp_max_pick">عدد الهدايا القابلة للاختيار</label>
-                <input type="number" id="cbp_max_pick" class="admin-inp" min="1" step="1" value="1" style="margin-top:6px;">
-                <p class="page-subtitle" style="margin:4px 0 0;">لا يتجاوز عدد المنتجات في المجموعة.</p>
-            </div>
             <div class="table-wrap">
                 <table>
                     <thead><tr><th>كود</th><th>المنتج</th><th title="إرشادي للأدمن — لا يظهر للعميل">التكلفة</th><th>نوع التسعير</th><th>القيمة</th><th></th></tr></thead>
@@ -463,15 +458,6 @@ function cbpSyncPoolRowChargeUI(tr) {
     }
 }
 
-function cbpClampMaxPick() {
-    var inp = document.getElementById('cbp_max_pick');
-    if (!inp) return;
-    var poolCount = cbpPoolRows().length;
-    var cur = parseInt(inp.value, 10) || 1;
-    if (poolCount > 0 && cur > poolCount) inp.value = String(poolCount);
-    inp.max = poolCount > 0 ? String(poolCount) : '';
-}
-
 function cbpFmtComps(comps) {
     if (!comps || !comps.length) return '—';
     return comps.map(function (c) {
@@ -566,11 +552,10 @@ function cbpAddPoolRow(pid, chargeKind, chargeValue) {
         '<td><select class="admin-inp cbp-pool-charge-kind">' + cbpChargeSelectHtml(ck) + '</select></td>' +
         '<td><span class="cbp-pool-charge-val-wrap"><input type="number" class="admin-inp cbp-pool-charge-val" min="0" step="0.0001" dir="ltr" value="' + cv + '"></span></td>' +
         '<td><button type="button" class="btn-secondary cbp-rm">&times;</button></td>';
-    tr.querySelector('.cbp-rm').addEventListener('click', function () { tr.remove(); cbpClampMaxPick(); });
+    tr.querySelector('.cbp-rm').addEventListener('click', function () { tr.remove(); });
     tr.querySelector('.cbp-pool-charge-kind').addEventListener('change', function () { cbpSyncPoolRowChargeUI(tr); });
     tb.appendChild(tr);
     cbpSyncPoolRowChargeUI(tr);
-    cbpClampMaxPick();
 }
 
 function cbpRenderPool(ids, pricingMap) {
@@ -583,7 +568,6 @@ function cbpRenderPool(ids, pricingMap) {
         var it = map[n] || {};
         cbpAddPoolRow(n, it.charge_kind || 'free', it.charge_value != null ? it.charge_value : 0);
     });
-    cbpClampMaxPick();
 }
 
 function cbpSetFixed(pid) {
@@ -740,8 +724,6 @@ function cbpToggleGift() {
     document.getElementById('cbp_block_pool').style.display = isFixed ? 'none' : 'block';
     var fixedCharge = document.getElementById('cbp_block_fixed_charge');
     if (fixedCharge) fixedCharge.style.display = isFixed ? 'block' : 'none';
-    var maxWrap = document.getElementById('cbp_max_pick_wrap');
-    if (maxWrap) maxWrap.style.display = isFixed ? 'none' : 'block';
 }
 
 
@@ -766,8 +748,6 @@ function resetCartBogoPromotionForm() {
     document.getElementById('cbp_reg').checked = false;
     document.getElementById('cbp_first_delivered').checked = false;
     document.getElementById('cbp_active').checked = true;
-    var maxPick = document.getElementById('cbp_max_pick');
-    if (maxPick) maxPick.value = '1';
     ocpSetAlwaysOn('cbp', false);
     ocpDefaultScheduleDates('cbp');
     document.getElementById('cbp_fixed_charge_kind').value = 'free';
@@ -802,8 +782,6 @@ function editCartBogoPromotion(row) {
     cbpToggleGift();
     var pricingMap = cbpPricingMapFromRow(row);
     cbpRenderPool(row.pool_product_ids || row.pool_variant_ids || [], pricingMap);
-    var maxPickEl = document.getElementById('cbp_max_pick');
-    if (maxPickEl) maxPickEl.value = String(Math.max(1, parseInt(row.max_gifts_pickable, 10) || 1));
     cbpSetFixed(row.fixed_product_id || row.fixed_variant_id || 0);
     var fixedPid = parseInt(row.fixed_product_id || row.fixed_variant_id || 0, 10) || 0;
     var fixedIt = pricingMap[fixedPid] || {};
@@ -979,7 +957,6 @@ async function saveCartBogoPromotion() {
         gift_customer_picks_variant: (document.getElementById('cbp_gift_customer_picks') && document.getElementById('cbp_gift_customer_picks').checked) ? 1 : 0,
         fixed_product_id: parseInt(document.getElementById('cbp_fixed_pid').value, 10) || 0,
         pool_product_ids: cbpPoolRows(),
-        max_gifts_pickable: parseInt(document.getElementById('cbp_max_pick').value, 10) || 1,
         gift_pool_items: cbpCollectGiftPoolItems(),
         valid_from: ocpGetIso('cbp_valid_from'),
         valid_to: ocpGetIso('cbp_valid_to')
@@ -1056,8 +1033,6 @@ document.getElementById('cbp_fixed_pick_btn').addEventListener('click', function
 cbpToggleBogo();
 cbpToggleGift();
 cbpToggleFixedCharge();
-var cbpMaxPickEl = document.getElementById('cbp_max_pick');
-if (cbpMaxPickEl) cbpMaxPickEl.addEventListener('input', cbpClampMaxPick);
 var cbpFixedChargeValEl = document.getElementById('cbp_fixed_charge_val');
 if (cbpFixedChargeValEl) cbpFixedChargeValEl.addEventListener('input', cbpUpdateFixedSaleField);
 ocpBindAlwaysOn('cbp');
