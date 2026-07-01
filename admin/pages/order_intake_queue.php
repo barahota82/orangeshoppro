@@ -144,16 +144,8 @@ $statusLabel = [
 ];
 ?>
 <div class="page-title">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
-        <div>
-            <h1>طابور طلبات الموقع</h1>
-            <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
-        </div>
-        <div class="actions">
-            <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/api/order_intake/export-csv.php?status=' . rawurlencode($statusFilter)), ENT_QUOTES, 'UTF-8'); ?>">تصدير CSV</a>
-            <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
-        </div>
-    </div>
+    <h1>طابور طلبات الموقع</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <div class="party-registry-stats" style="margin-bottom:16px;">
@@ -237,7 +229,9 @@ $statusLabel = [
                 echo '<a class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '" href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') . '</a>';
             }
             ?>
+            <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/api/order_intake/export-excel.php?status=' . rawurlencode($statusFilter)), ENT_QUOTES, 'UTF-8'); ?>">تصدير Excel</a>
         </div>
+        <a class="btn-secondary" style="margin-inline-start:auto;" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
     </div>
 
     <?php if (!orange_table_exists($pdo, 'order_intake_queue')): ?>

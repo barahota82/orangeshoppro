@@ -434,7 +434,7 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
 
 **الوضع الحالي (تدقيق 2026-06-05):**
 - **طباعة:** موجودة في **كل** التقارير/المستندات تقريباً (`window.print()` + CSS طباعة + هيدر شركة). **حفظ PDF يتم من نافذة الطباعة** (Save as PDF) — لا نقص جوهري.
-- **CSV:** موجود فقط في 3 شاشات: `admin/api/order_intake/export-csv.php` (طابور الطلبات) · `admin/pages/partner_reports.php` (`?export=csv`) · `admin/pages/sales_returns_report.php` (`?export=csv`).
+- **CSV:** موجود فقط في: `admin/pages/partner_reports.php` (`?export=csv`) · `admin/pages/sales_returns_report.php` (`?export=csv`). **[محدَّث 2026-07-01]** طابور طلبات الموقع تحوّل من CSV إلى **Excel xlsx حقيقي** عبر `admin/api/order_intake/export-excel.php` (`orange_report_xls_output`) — وحُذف `export-csv.php` — تنفيذاً لقرار توحيد التصدير على Excel (2026-06-06).
 - **Excel:** **لا يوجد** أصلاً. هذا هو النقص الحقيقي.
 
 **الاتفاق/التوصية المعتمدة للتنفيذ (أي وكيل ينفّذ بها ما لم يعترض المالك):**

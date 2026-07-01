@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 /**
- * تصدير طابور طلبات الموقع كـ CSV (UTF-8 مع BOM لبرنامج Excel).
+ * تصدير طابور طلبات الموقع إلى **Excel xlsx حقيقي** (النمط الموحّد عبر includes/report_export.php).
+ * يحترم تصفية الحالة الحالية، والصلاحية، ونطاق الدولة للمشرف.
  */
 
 require_once __DIR__ . '/../../../config.php';
@@ -11,6 +12,8 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../../includes/order_intake_queue.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/company_settings.php';
+require_once __DIR__ . '/../../../includes/report_export.php';
 require_admin_api();
 
 try {
@@ -53,41 +56,19 @@ try {
     $st->execute($params);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-    $fname = 'order_intake_queue_' . date('Y-m-d_His');
-    if ($status !== 'all') {
-        $fname .= '_' . $status;
-    }
-    $fname .= '.csv';
+    $statusLabel = [
+        'pending' => 'قيد الانتظار',
+        'failed' => 'فاشل',
+        'completed' => 'مكتمل',
+    ];
+    $statusFilterLabel = [
+        'all' => 'الكل',
+        'pending' => 'معلّقة',
+        'failed' => 'فاشلة',
+        'completed' => 'مكتملة',
+    ];
 
-    if (!headers_sent()) {
-        header('Content-Type: text/csv; charset=UTF-8');
-        header('Content-Disposition: attachment; filename="' . $fname . '"');
-        header('Cache-Control: no-store');
-    }
-
-    $out = fopen('php://output', 'w');
-    if ($out === false) {
-        json_response(['success' => false, 'message' => 'تعذّر فتح المخرجات'], 500);
-    }
-
-    fwrite($out, "\xEF\xBB\xBF");
-
-    fputcsv($out, [
-        'id',
-        'status',
-        'public_token',
-        'order_id',
-        'order_number',
-        'attempts',
-        'created_at',
-        'updated_at',
-        'error_message',
-        'customer_name',
-        'phone',
-        'channel_id',
-        'items_count',
-    ]);
-
+    $xlsRows = [];
     foreach ($rows as $r) {
         $j = json_decode((string) ($r['payload_json'] ?? ''), true);
         $name = is_array($j) ? trim((string) ($j['name'] ?? '')) : '';
@@ -97,13 +78,14 @@ try {
         if (is_array($j) && isset($j['items']) && is_array($j['items'])) {
             $itemsCnt = (string) count($j['items']);
         }
-        fputcsv($out, [
-            (string) ($r['id'] ?? ''),
-            (string) ($r['status'] ?? ''),
+        $stCode = (string) ($r['status'] ?? '');
+        $xlsRows[] = [
+            (int) ($r['id'] ?? 0),
+            $statusLabel[$stCode] ?? $stCode,
             (string) ($r['public_token'] ?? ''),
-            (string) ($r['order_id'] ?? ''),
+            (int) ($r['order_id'] ?? 0),
             (string) ($r['order_number'] ?? ''),
-            (string) ($r['attempts'] ?? ''),
+            (int) ($r['attempts'] ?? 0),
             (string) ($r['created_at'] ?? ''),
             (string) ($r['updated_at'] ?? ''),
             (string) ($r['error_message'] ?? ''),
@@ -111,11 +93,22 @@ try {
             $phone,
             $ch,
             $itemsCnt,
-        ]);
+        ];
     }
 
-    fclose($out);
-    audit_log('order_intake_export_csv', 'تصدير طابور طلبات الموقع CSV — ' . count($rows) . ' صف، تصفية: ' . $status, 'order_intake_queue', 0);
+    $subtitle = 'التصفية: ' . ($statusFilterLabel[$status] ?? 'الكل') . ' — عدد الصفوف: ' . count($rows);
+
+    audit_log('order_intake_export_excel', 'تصدير طابور طلبات الموقع Excel — ' . count($rows) . ' صف، تصفية: ' . $status, 'order_intake_queue', 0);
+
+    orange_report_xls_output(
+        'طابور طلبات الموقع',
+        'طابور طلبات الموقع',
+        orange_company_settings_name_ar($pdo),
+        $subtitle,
+        ['المعرّف', 'الحالة', 'الرمز العام', 'معرّف الطلب', 'رقم الطلب', 'محاولات', 'أنشئ', 'آخر تحديث', 'خطأ / تفاصيل', 'اسم العميل', 'الهاتف', 'القناة', 'عدد الأصناف'],
+        $xlsRows,
+        [0, 3, 5, 12]
+    );
     exit;
 } catch (Throwable $e) {
     if (!headers_sent()) {
