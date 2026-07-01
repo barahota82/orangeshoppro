@@ -21,7 +21,7 @@ $auCountries = orange_countries_admin_list($dbAu);
 </div>
 
 <div class="grid-2">
-    <div class="card">
+    <div class="card" id="au_form_card">
         <h3 class="card-title">مستخدم جديد / تعديل</h3>
         <input type="hidden" id="au_id" value="0">
         <div class="form-grid">
@@ -56,9 +56,16 @@ $auCountries = orange_countries_admin_list($dbAu);
                 </select>
             </div>
         </div>
-        <div class="actions" style="margin-top:12px;">
+        <div class="actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
             <button type="button" onclick="saveAdmin()">حفظ المستخدم</button>
             <button type="button" class="btn-secondary" onclick="resetAdminForm()">جديد</button>
+            <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين المستخدمين" style="margin-right:auto;">
+                <button type="button" class="btn-secondary jv-nav-btn" id="au_nav_first" title="أول مستخدم" aria-label="أول مستخدم">&lt;&lt;</button>
+                <button type="button" class="btn-secondary jv-nav-btn" id="au_nav_prev" title="المستخدم السابق" aria-label="المستخدم السابق">&lt;</button>
+                <button type="button" class="btn-secondary jv-nav-btn" id="au_nav_next" title="المستخدم التالي" aria-label="المستخدم التالي">&gt;</button>
+                <button type="button" class="btn-secondary jv-nav-btn" id="au_nav_last" title="آخر مستخدم" aria-label="آخر مستخدم">&gt;&gt;</button>
+                <button type="button" class="btn-secondary jv-nav-search" id="au_btn_open_search" title="بحث عن مستخدم لتعديله">بحث</button>
+            </div>
         </div>
     </div>
     <div class="card">
@@ -70,6 +77,35 @@ $auCountries = orange_countries_admin_list($dbAu);
             </table>
         </div>
         <p class="card-hint">بعد الحفظ: اضغط «اختيار» بجانب المستخدم لتحميل بياناته — أو حدّد الصلاحيات في الأسفل قبل/بعد الحفظ.</p>
+    </div>
+</div>
+
+<div id="au_search_modal" class="au-search-modal" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="au_search_modal_title">
+    <div class="au-search-modal__backdrop" id="au_search_modal_backdrop" style="position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1200;"></div>
+    <div class="au-search-modal__dialog" style="position:fixed;z-index:1201;top:6%;left:50%;transform:translateX(-50%);width:min(860px,94vw);max-height:86vh;overflow:auto;background:#fff;border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.28);padding:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;">
+            <h3 id="au_search_modal_title" style="margin:0;">بحث عن مستخدم لتعديله</h3>
+            <button type="button" class="btn-secondary" id="au_search_close">إغلاق</button>
+        </div>
+        <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+            <div><label for="au_search_id_from">رقم المستخدم — من</label><input type="number" id="au_search_id_from" class="admin-inp" min="1" step="1" dir="ltr" lang="en" autocomplete="off"></div>
+            <div><label for="au_search_id_to">رقم المستخدم — إلى</label><input type="number" id="au_search_id_to" class="admin-inp" min="1" step="1" dir="ltr" lang="en" autocomplete="off"></div>
+            <div><label for="au_search_user">اسم الدخول</label><input type="text" id="au_search_user" class="admin-inp" autocomplete="off" dir="ltr" lang="en"></div>
+            <div style="grid-column:span 2;"><label for="au_search_name">الاسم الظاهر</label><input type="text" id="au_search_name" class="admin-inp" autocomplete="off" dir="auto"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin:12px 0;flex-wrap:wrap;">
+            <button type="button" class="btn" id="au_search_run">تنفيذ البحث</button>
+            <button type="button" class="btn-secondary" id="au_search_clear">مسح الحقول</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>#</th><th>الدخول</th><th>الاسم</th><th>الدولة</th><th>مشرف</th><th></th></tr>
+                </thead>
+                <tbody id="au_search_results_tbody"></tbody>
+            </table>
+        </div>
+        <p id="au_search_empty" style="display:none;color:#64748b;margin:10px 0 0;">لا نتائج مطابقة — عدّل معايير البحث.</p>
     </div>
 </div>
 
@@ -101,6 +137,8 @@ $auCountries = orange_countries_admin_list($dbAu);
 <script>
 var AU_PERM_TREE = <?php echo json_encode($auPermTree, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 var AU_PAGE_ACTIONS = <?php echo json_encode($auPageActions, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
+var auAdminsCache = [];
+var auFormDirty = false;
 
 function auPermActionsForPage(page) {
     var a = AU_PAGE_ACTIONS[page];
@@ -550,6 +588,7 @@ function resetAdminForm() {
         auCountry.disabled = false;
     }
     renderPermMatrix(0, {}, false);
+    auFormDirty = false;
 }
 
 function loadAdmins() {
@@ -567,6 +606,7 @@ function loadAdmins() {
             tb.appendChild(tr);
         });
         window.__permByAdmin = r.permissions_by_admin || {};
+        auAdminsCache = r.admins || [];
         if (r.permission_tree) AU_PERM_TREE = r.permission_tree;
         if (r.page_actions) AU_PAGE_ACTIONS = r.page_actions;
     }).catch(function (e) { alert(e.message || String(e)); });
@@ -595,6 +635,7 @@ function pickAdmin(id) {
         } else {
             renderPermMatrix(id, pm, false);
         }
+        auFormDirty = false;
     });
 }
 
@@ -635,6 +676,7 @@ function saveAdmin() {
             document.getElementById('au_id').value = String(newId);
         }
         document.getElementById('au_pass').value = '';
+        auFormDirty = false;
         if (!payload.is_superuser && newId > 0) {
             var matrix = collectPermMatrix();
             var hasAny = Object.keys(matrix).some(function (k) {
@@ -675,6 +717,112 @@ function savePermissions() {
         alert(e.message || String(e));
     });
 }
+
+/* ===== تنقّل + بحث بين المستخدمين (نمط سند القيد) ===== */
+(function auNavSearch() {
+    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function norm(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+    function rows() { var r = (auAdminsCache || []).slice(); r.sort(function (a, b) { return (parseInt(a.id, 10) || 0) - (parseInt(b.id, 10) || 0); }); return r; }
+    function currentId() { var el = document.getElementById('au_id'); return el ? (parseInt(String(el.value || '0'), 10) || 0) : 0; }
+    function confirmLeaveIfDirty() {
+        if (!auFormDirty) { return true; }
+        return confirm('لديك تغييرات غير محفوظة في المستخدم الحالي. الانتقال سيتجاهلها. هل تريد المتابعة؟');
+    }
+    function goToId(id) {
+        if (!id || id <= 0) { return; }
+        if (!confirmLeaveIfDirty()) { return; }
+        pickAdmin(id);
+        auFormDirty = false;
+    }
+    function navGo(where) {
+        var R = rows();
+        if (!R.length) { alert('لا يوجد مستخدمون بعد.'); return; }
+        var cur = currentId();
+        var idx = -1;
+        for (var i = 0; i < R.length; i++) { if ((parseInt(R[i].id, 10) || 0) === cur) { idx = i; break; } }
+        var target = 0;
+        if (where === 'first') { target = parseInt(R[0].id, 10) || 0; }
+        else if (where === 'last') { target = parseInt(R[R.length - 1].id, 10) || 0; }
+        else if (where === 'next') {
+            if (idx < 0) { target = parseInt(R[0].id, 10) || 0; }
+            else if (idx >= R.length - 1) { alert('لا يوجد مستخدم لاحق — هذا آخر مستخدم.'); return; }
+            else { target = parseInt(R[idx + 1].id, 10) || 0; }
+        } else if (where === 'prev') {
+            if (idx < 0) { target = parseInt(R[R.length - 1].id, 10) || 0; }
+            else if (idx <= 0) { alert('لا يوجد مستخدم أسبق — هذا أول مستخدم.'); return; }
+            else { target = parseInt(R[idx - 1].id, 10) || 0; }
+        }
+        goToId(target);
+    }
+    [['au_nav_first', 'first'], ['au_nav_prev', 'prev'], ['au_nav_next', 'next'], ['au_nav_last', 'last']].forEach(function (pair) {
+        var b = document.getElementById(pair[0]);
+        if (b) { b.addEventListener('click', function () { navGo(pair[1]); }); }
+    });
+    var card = document.getElementById('au_form_card');
+    if (card) { card.addEventListener('input', function () { auFormDirty = true; }); }
+
+    var modal = document.getElementById('au_search_modal');
+    function resetFields() {
+        ['au_search_id_from', 'au_search_id_to', 'au_search_user', 'au_search_name'].forEach(function (id) { var el = document.getElementById(id); if (el) { el.value = ''; } });
+        var tb = document.getElementById('au_search_results_tbody'); if (tb) { tb.innerHTML = ''; }
+        var e = document.getElementById('au_search_empty'); if (e) { e.style.display = 'none'; }
+    }
+    function runSearch() {
+        var idFrom = parseInt(String((document.getElementById('au_search_id_from') || {}).value || '0'), 10) || 0;
+        var idTo = parseInt(String((document.getElementById('au_search_id_to') || {}).value || '0'), 10) || 0;
+        var user = norm((document.getElementById('au_search_user') || {}).value);
+        var name = norm((document.getElementById('au_search_name') || {}).value);
+        var out = rows().filter(function (r) {
+            var id = parseInt(r.id, 10) || 0;
+            if (idFrom > 0 && id < idFrom) { return false; }
+            if (idTo > 0 && id > idTo) { return false; }
+            if (user && norm(r.username).indexOf(user) === -1) { return false; }
+            if (name && norm(r.display_name).indexOf(name) === -1) { return false; }
+            return true;
+        });
+        var tb = document.getElementById('au_search_results_tbody');
+        var emptyNote = document.getElementById('au_search_empty');
+        if (!tb) { return; }
+        tb.innerHTML = '';
+        if (!out.length) { if (emptyNote) { emptyNote.style.display = 'block'; } return; }
+        if (emptyNote) { emptyNote.style.display = 'none'; }
+        out.slice(0, 300).forEach(function (r) {
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td>' + (parseInt(r.id, 10) || 0) + '</td>' +
+                '<td dir="ltr">' + esc(r.username) + '</td>' +
+                '<td>' + esc(r.display_name || '') + '</td>' +
+                '<td>' + esc(r.country_label || '—') + '</td>' +
+                '<td>' + (parseInt(r.is_superuser, 10) === 1 ? 'نعم' : '') + '</td>' +
+                '<td><button type="button" class="btn-secondary au-search-pick" data-id="' + (parseInt(r.id, 10) || 0) + '">اختيار</button></td>';
+            tb.appendChild(tr);
+        });
+    }
+    function openModal() { if (!modal) { return; } modal.style.display = 'block'; modal.setAttribute('aria-hidden', 'false'); runSearch(); var f = document.getElementById('au_search_name'); if (f) { try { f.focus(); } catch (e) {} } }
+    function closeModal() { if (!modal) { return; } modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true'); resetFields(); }
+    var openBtn = document.getElementById('au_btn_open_search'); if (openBtn) { openBtn.addEventListener('click', openModal); }
+    var closeBtn = document.getElementById('au_search_close'); if (closeBtn) { closeBtn.addEventListener('click', closeModal); }
+    var backdrop = document.getElementById('au_search_modal_backdrop'); if (backdrop) { backdrop.addEventListener('click', closeModal); }
+    var runBtn = document.getElementById('au_search_run'); if (runBtn) { runBtn.addEventListener('click', runSearch); }
+    var clearBtn = document.getElementById('au_search_clear'); if (clearBtn) { clearBtn.addEventListener('click', function () { resetFields(); runSearch(); }); }
+    ['au_search_user', 'au_search_name', 'au_search_id_from', 'au_search_id_to'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) { el.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); runSearch(); } }); }
+    });
+    var tbodyEl = document.getElementById('au_search_results_tbody');
+    if (tbodyEl) {
+        tbodyEl.addEventListener('click', function (ev) {
+            var btn = ev.target && ev.target.closest ? ev.target.closest('.au-search-pick') : null;
+            if (!btn) { return; }
+            var id = parseInt(String(btn.getAttribute('data-id') || '0'), 10) || 0;
+            if (id <= 0) { return; }
+            if (!confirmLeaveIfDirty()) { return; }
+            closeModal();
+            goToId(id);
+        });
+    }
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && modal && modal.style.display === 'block') { closeModal(); } });
+})();
 
 auBindSuperToggle();
 auPermBindMatrixEvents();
