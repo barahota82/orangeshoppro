@@ -10,15 +10,16 @@ require_once __DIR__ . '/cart_combo_promotions.php';
 require_once __DIR__ . '/cart_promo_products.php';
 require_once __DIR__ . '/cart_promotion_country.php';
 require_once __DIR__ . '/cart_promo_schedule.php';
+require_once __DIR__ . '/cart_gift_pool_config.php';
 
 /**
- * سعر وحدة بند هدية BOGO بعد تطبيق سياسة التسعير الجزئي (مجاني / نسبة من التجزئة / سعر ثابت / خصم مبلغ من التجزئة).
+ * سعر وحدة بند هدية BOGO بعد تطبيق سياسة التسعير (لكل منتج عبر gift_pool_config أو legacy).
  *
  * @param array<string,mixed> $rule صف قاعدة أو مصفوفة مُرجعة من orange_cart_bogo_promotion_select_rule
  */
 function orange_cart_bogo_resolve_gift_unit_price(PDO $pdo, array $rule, int $variantId): float
 {
-    return orange_cart_promo_resolve_gift_unit_price_from_rule($pdo, $rule, $variantId);
+    return orange_cart_gift_resolve_product_charge($pdo, $rule, 0, $variantId);
 }
 
 /**
@@ -123,10 +124,17 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $cid);
     $svCol = orange_table_has_column($pdo, 'cart_bogo_promotions', 'same_variant_product_id') ? ', same_variant_product_id' : '';
     $cpCol = orange_table_has_column($pdo, 'cart_bogo_promotions', 'gift_customer_picks_variant') ? ', gift_customer_picks_variant' : '';
+    $extraCols = '';
+    if (orange_table_has_column($pdo, 'cart_bogo_promotions', 'max_gifts_pickable')) {
+        $extraCols .= ', max_gifts_pickable';
+    }
+    if (orange_table_has_column($pdo, 'cart_bogo_promotions', 'gift_pool_config')) {
+        $extraCols .= ', gift_pool_config';
+    }
     $st = $pdo->prepare(
         'SELECT id, name_ar, name_en, show_name_to_customer, show_old_price_to_customer, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, first_delivered_order_only, gift_kind, fixed_variant_id, pool_variant_ids,
                 gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active, is_always_on,
-                valid_from, valid_to, auto_paused_at, auto_paused_reason' . $svCol . $cpCol . '
+                valid_from, valid_to, auto_paused_at, auto_paused_reason' . $svCol . $cpCol . $extraCols . '
          FROM cart_bogo_promotions WHERE 1=1' . $bind['sql'] . ' ORDER BY sort_order ASC, id ASC'
     );
     $st->execute($bind['params']);
@@ -159,6 +167,9 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
             'pool_variant_ids' => orange_cart_promo_parse_product_pool($pdo, $row['pool_variant_ids'] ?? null),
             'gift_unit_charge_kind' => (string) ($row['gift_unit_charge_kind'] ?? 'free'),
             'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),
+            'max_gifts_pickable' => max(1, (int) ($row['max_gifts_pickable'] ?? 1)),
+            'gift_pool_config' => isset($row['gift_pool_config']) ? (string) $row['gift_pool_config'] : null,
+            'gift_pool_items' => orange_cart_gift_pool_config_decode(isset($row['gift_pool_config']) ? (string) $row['gift_pool_config'] : null)['items'],
             'sort_order' => (int) ($row['sort_order'] ?? 0),
             'is_active' => (int) ($row['is_active'] ?? 0),
             'is_always_on' => (int) ($row['is_always_on'] ?? 0),
@@ -193,9 +204,13 @@ function orange_cart_bogo_promotion_select_rule(
     $bind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $cid);
     $svCol = orange_table_has_column($pdo, 'cart_bogo_promotions', 'same_variant_product_id') ? ', same_variant_product_id' : '';
     $cpCol = orange_table_has_column($pdo, 'cart_bogo_promotions', 'gift_customer_picks_variant') ? ', gift_customer_picks_variant' : '';
+    $extraCols = '';
+    if (orange_table_has_column($pdo, 'cart_bogo_promotions', 'gift_pool_config')) {
+        $extraCols .= ', gift_pool_config';
+    }
     $st = $pdo->prepare(
         "SELECT id, name_ar, name_en, show_name_to_customer, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, first_delivered_order_only, gift_kind, fixed_variant_id, pool_variant_ids,
-                gift_unit_charge_kind, gift_unit_charge_value, is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason" . $svCol . $cpCol . "
+                gift_unit_charge_kind, gift_unit_charge_value, is_active, is_always_on, valid_from, valid_to, auto_paused_at, auto_paused_reason" . $svCol . $cpCol . $extraCols . "
          FROM cart_bogo_promotions
          WHERE 1=1" . orange_cart_promo_schedule_sql('cart_bogo_promotions') . $bind['sql'] . "
          ORDER BY sort_order ASC, id ASC"
@@ -253,6 +268,7 @@ function orange_cart_bogo_promotion_select_rule(
             'pool_variant_ids' => $pool,
             'gift_unit_charge_kind' => $gcKind,
             'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),
+            'gift_pool_config' => isset($row['gift_pool_config']) ? (string) $row['gift_pool_config'] : null,
             'display_name' => orange_promo_customer_display_name($row),
         ];
         $pauseRow = array_merge($row, ['id' => (int) $row['id']]);

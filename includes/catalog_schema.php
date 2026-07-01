@@ -3178,6 +3178,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_storefront_promo_messages_audience_v111($pdo);
     orange_catalog_migrate_variant_pricing_identity_v112($pdo);
     orange_catalog_migrate_cart_gift_storefront_v113($pdo);
+    orange_catalog_migrate_cart_bogo_gift_pool_v114($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3807,6 +3808,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_storefront_promo_messages_audience_v111($pdo);
     orange_catalog_migrate_variant_pricing_identity_v112($pdo);
     orange_catalog_migrate_cart_gift_storefront_v113($pdo);
+    orange_catalog_migrate_cart_bogo_gift_pool_v114($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -8308,6 +8310,71 @@ function orange_catalog_migrate_cart_gift_storefront_v113(PDO $pdo): void
             'ALTER TABLE orders ADD COLUMN cart_gift_selections_json TEXT NULL DEFAULT NULL'
         );
         orange_schema_invalidate_column_check('orders', 'cart_gift_selections_json');
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v114 — تسعير هدية BOGO لكل منتج (gift_pool_config + max_gifts_pickable) — مطابق لإعدادات هدية مجموع السلة.
+ * marker-gated + idempotent؛ backfill من gift_unit_charge_kind/value + pool/fixed.
+ */
+function orange_catalog_migrate_cart_bogo_gift_pool_v114(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/cart_gift_pool_config.php';
+
+    $marker = 'php_cart_bogo_gift_pool_v114';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'cart_bogo_promotions')) {
+        if (!orange_table_has_column($pdo, 'cart_bogo_promotions', 'max_gifts_pickable')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE cart_bogo_promotions
+                    ADD COLUMN max_gifts_pickable INT UNSIGNED NOT NULL DEFAULT 1'
+            );
+            orange_schema_invalidate_column_check('cart_bogo_promotions', 'max_gifts_pickable');
+        }
+        if (!orange_table_has_column($pdo, 'cart_bogo_promotions', 'gift_pool_config')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE cart_bogo_promotions ADD COLUMN gift_pool_config TEXT NULL'
+            );
+            orange_schema_invalidate_column_check('cart_bogo_promotions', 'gift_pool_config');
+        }
+
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE cart_bogo_promotions SET max_gifts_pickable = 1 WHERE max_gifts_pickable IS NULL OR max_gifts_pickable < 1'
+        );
+
+        $st = $pdo->query(
+            'SELECT id, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, gift_pool_config
+             FROM cart_bogo_promotions'
+        );
+        if ($st) {
+            $upd = $pdo->prepare('UPDATE cart_bogo_promotions SET gift_pool_config = ? WHERE id = ? LIMIT 1');
+            while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+                $cfgRaw = isset($row['gift_pool_config']) ? trim((string) $row['gift_pool_config']) : '';
+                if ($cfgRaw !== '') {
+                    $parsed = orange_cart_gift_pool_config_decode($cfgRaw);
+                    if (count($parsed['items']) > 0) {
+                        continue;
+                    }
+                }
+                $items = orange_cart_gift_pool_config_build_items_from_legacy_rule($pdo, $row);
+                if (count($items) === 0) {
+                    continue;
+                }
+                $upd->execute([
+                    orange_cart_gift_pool_config_encode($items),
+                    (int) ($row['id'] ?? 0),
+                ]);
+            }
+        }
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

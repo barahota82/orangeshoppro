@@ -39,7 +39,7 @@ function orange_cart_promo_preview_gift_max_unit_charge(PDO $pdo, array $rule, a
             return 0.0;
         }
 
-        return orange_cart_promo_resolve_gift_unit_price_from_rule($pdo, $rule, $fv);
+        return orange_cart_gift_resolve_product_charge($pdo, $rule, 0, $fv);
     }
     $pool = $rule['pool_variant_ids'] ?? [];
     if (!is_array($pool) || count($pool) === 0) {
@@ -55,7 +55,7 @@ function orange_cart_promo_preview_gift_max_unit_charge(PDO $pdo, array $rule, a
         if ($vid <= 0) {
             continue;
         }
-        $p = orange_cart_promo_resolve_gift_unit_price_from_rule($pdo, $rule, $vid);
+        $p = orange_cart_gift_resolve_product_charge($pdo, $rule, 0, $vid);
         if ($p > $max) {
             $max = $p;
         }

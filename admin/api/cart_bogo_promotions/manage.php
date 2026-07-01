@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../includes/cart_gift_promotions.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/cart_bogo_promotions.php';
 require_once __DIR__ . '/../../../includes/cart_promo_products.php';
+require_once __DIR__ . '/../../../includes/cart_gift_pool_config.php';
 require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
 require_once __DIR__ . '/../../../includes/cart_promo_schedule.php';
 require_once __DIR__ . '/../../../includes/promo_always_on.php';
@@ -62,6 +63,134 @@ function cbp_parse_pool_input(string $raw): array
     }
 
     return array_keys($ids);
+}
+
+/**
+ * @param mixed $raw
+ *
+ * @return list<array{product_id:int,charge_kind:string,charge_value:float}>
+ */
+function cbp_parse_gift_pool_items_input($raw): array
+{
+    if (!is_array($raw)) {
+        return [];
+    }
+    $out = [];
+    foreach ($raw as $it) {
+        if (!is_array($it)) {
+            continue;
+        }
+        $pid = (int) ($it['product_id'] ?? 0);
+        if ($pid <= 0) {
+            continue;
+        }
+        $kind = orange_cart_gift_pool_config_normalize_charge_kind((string) ($it['charge_kind'] ?? 'free'));
+        $val = round(max(0.0, (float) ($it['charge_value'] ?? 0)), 4);
+        if ($kind === 'free') {
+            $val = 0.0;
+        }
+        if ($kind === 'percent_off' && ($val < 0 || $val > 100)) {
+            continue;
+        }
+        if (($kind === 'fixed_unit' || $kind === 'amount_off_unit') && $val < 0) {
+            continue;
+        }
+        $out[] = [
+            'product_id' => $pid,
+            'charge_kind' => $kind,
+            'charge_value' => $val,
+        ];
+    }
+
+    return $out;
+}
+
+/**
+ * @param list<array{product_id:int,charge_kind:string,charge_value:float}> $items
+ *
+ * @return array{0:string,1:float}
+ */
+function cbp_legacy_charge_from_pool_items(array $items): array
+{
+    if ($items === []) {
+        return ['free', 0.0];
+    }
+    $first = $items[0];
+    $kind = (string) ($first['charge_kind'] ?? 'free');
+    $val = (float) ($first['charge_value'] ?? 0);
+    foreach ($items as $it) {
+        if ((string) ($it['charge_kind'] ?? '') !== $kind) {
+            return ['free', 0.0];
+        }
+        if (abs((float) ($it['charge_value'] ?? 0) - $val) > 0.0001) {
+            return ['free', 0.0];
+        }
+    }
+
+    return [orange_cart_gift_pool_config_normalize_charge_kind($kind), round(max(0.0, $val), 4)];
+}
+
+/**
+ * @param list<array{product_id:int,charge_kind:string,charge_value:float}> $items
+ */
+function cbp_validate_gift_pool_items(array $items): ?string
+{
+    if ($items === []) {
+        return 'أضف تسعيراً لكل منتج في الهدية';
+    }
+    foreach ($items as $it) {
+        $kind = (string) ($it['charge_kind'] ?? 'free');
+        $val = (float) ($it['charge_value'] ?? 0);
+        if ($kind === 'percent_off' && ($val < 0 || $val > 100)) {
+            return 'نسبة الخصم على أحد منتجات الهدية يجب أن تكون بين 0 و 100';
+        }
+        if (($kind === 'fixed_unit' || $kind === 'amount_off_unit') && $val < 0) {
+            return 'قيمة التسعير على أحد منتجات الهدية لا يمكن أن تكون سالبة';
+        }
+    }
+
+    return null;
+}
+
+/**
+ * @return list<array{product_id:int,charge_kind:string,charge_value:float}>
+ */
+function cbp_build_gift_pool_items_from_save(
+    array $data,
+    string $giftKind,
+    int $fixedPid,
+    array $productIds,
+    string $fallbackKind,
+    float $fallbackVal
+): array {
+    $parsed = cbp_parse_gift_pool_items_input($data['gift_pool_items'] ?? null);
+    $byPid = [];
+    foreach ($parsed as $it) {
+        $byPid[(int) $it['product_id']] = $it;
+    }
+
+    $targetIds = $giftKind === 'fixed'
+        ? ($fixedPid > 0 ? [$fixedPid] : [])
+        : $productIds;
+
+    $items = [];
+    foreach ($targetIds as $pid) {
+        $pid = (int) $pid;
+        if ($pid <= 0) {
+            continue;
+        }
+        if (isset($byPid[$pid])) {
+            $items[] = $byPid[$pid];
+            continue;
+        }
+        $items[] = [
+            'product_id' => $pid,
+            'charge_kind' => orange_cart_gift_pool_config_normalize_charge_kind($fallbackKind),
+            'charge_value' => $fallbackKind === 'free' ? 0.0 : round(max(0.0, $fallbackVal), 4),
+        ];
+    }
+
+    return $items;
 }
 
 try {
@@ -194,12 +323,20 @@ try {
                 json_response(['success' => false, 'message' => 'اختر منتجاً للهدية الثابتة'], 422);
             }
             $poolJson = null;
+            $maxGiftsPickable = 1;
         } else {
             if (count($poolIds) === 0) {
                 json_response(['success' => false, 'message' => 'أضف منتجاً واحداً على الأقل لمجموعة اختيار الهدية'], 422);
             }
             $fixedPid = 0;
             $poolJson = orange_cart_promo_encode_product_pool_json($poolIds);
+            $maxGiftsPickable = max(1, (int) ($data['max_gifts_pickable'] ?? 1));
+            if ($maxGiftsPickable > count($poolIds)) {
+                json_response([
+                    'success' => false,
+                    'message' => 'عدد الهدايا القابلة للاختيار لا يمكن أن يتجاوز عدد المنتجات في المجموعة (' . count($poolIds) . ')',
+                ], 422);
+            }
         }
 
         $productIds = [];
@@ -226,17 +363,23 @@ try {
 
         $gcRaw = strtolower(trim((string) ($data['gift_unit_charge_kind'] ?? 'free')));
         $allowedGc = ['free', 'percent_off', 'fixed_unit', 'amount_off_unit'];
-        $giftChargeKind = in_array($gcRaw, $allowedGc, true) ? $gcRaw : 'free';
-        $giftChargeVal = (float) ($data['gift_unit_charge_value'] ?? 0);
-        if ($giftChargeKind === 'free') {
-            $giftChargeVal = 0.0;
+        $fallbackKind = in_array($gcRaw, $allowedGc, true) ? $gcRaw : 'free';
+        $fallbackVal = (float) ($data['gift_unit_charge_value'] ?? 0);
+
+        $poolItems = cbp_build_gift_pool_items_from_save(
+            $data,
+            $giftKind,
+            $fixedPid,
+            $poolIds,
+            $fallbackKind,
+            $fallbackVal
+        );
+        $poolItemsErr = cbp_validate_gift_pool_items($poolItems);
+        if ($poolItemsErr !== null) {
+            json_response(['success' => false, 'message' => $poolItemsErr], 422);
         }
-        if ($giftChargeKind === 'percent_off' && ($giftChargeVal < 0 || $giftChargeVal > 100)) {
-            json_response(['success' => false, 'message' => 'نسبة الخصم على هدية BOGO يجب أن تكون بين 0 و 100'], 422);
-        }
-        if (($giftChargeKind === 'fixed_unit' || $giftChargeKind === 'amount_off_unit') && $giftChargeVal < 0) {
-            json_response(['success' => false, 'message' => 'قيمة التسعير الجزئي لهدية BOGO لا يمكن أن تكون سالبة'], 422);
-        }
+        $giftPoolConfigJson = orange_cart_gift_pool_config_encode($poolItems);
+        [$giftChargeKind, $giftChargeVal] = cbp_legacy_charge_from_pool_items($poolItems);
 
         $catSql = $bogoKind === 'same_category' && $catId > 0 ? $catId : null;
         $svSql = $bogoKind === 'same_variant' && $svPid > 0 ? $svPid : null;
@@ -247,13 +390,37 @@ try {
             json_response(['success' => false, 'message' => $e->getMessage()], 403);
         }
 
+        $hasPoolCfg = orange_table_has_column($pdo, 'cart_bogo_promotions', 'gift_pool_config');
+        $hasMaxPick = orange_table_has_column($pdo, 'cart_bogo_promotions', 'max_gifts_pickable');
+
         if ($id > 0) {
             orange_cart_promo_clear_auto_pause($pdo, 'cart_bogo_promotions', $id);
-            // الترتيب تلقائي بالكامل: لا يُمَسّ عند التعديل.
-            $st = $pdo->prepare(
-                'UPDATE cart_bogo_promotions SET name_ar = ?, name_en = ?, show_name_to_customer = ?, show_old_price_to_customer = ?, bogo_kind = ?, category_id = ?, same_variant_product_id = ?, min_buy_qty = ?, buy_components_json = ?, requires_registered_account = ?, first_delivered_order_only = ?, gift_kind = ?, gift_customer_picks_variant = ?, fixed_variant_id = ?, pool_variant_ids = ?, gift_unit_charge_kind = ?, gift_unit_charge_value = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
-            );
-            $st->execute([
+            $sets = [
+                'name_ar = ?',
+                'name_en = ?',
+                'show_name_to_customer = ?',
+                'show_old_price_to_customer = ?',
+                'bogo_kind = ?',
+                'category_id = ?',
+                'same_variant_product_id = ?',
+                'min_buy_qty = ?',
+                'buy_components_json = ?',
+                'requires_registered_account = ?',
+                'first_delivered_order_only = ?',
+                'gift_kind = ?',
+                'gift_customer_picks_variant = ?',
+                'fixed_variant_id = ?',
+                'pool_variant_ids = ?',
+                'gift_unit_charge_kind = ?',
+                'gift_unit_charge_value = ?',
+                'is_active = ?',
+                'is_always_on = ?',
+                'valid_from = ?',
+                'valid_to = ?',
+                'auto_paused_at = NULL',
+                'auto_paused_reason = NULL',
+            ];
+            $params = [
                 $nameAr,
                 $nameEn,
                 $showNameToCustomer,
@@ -275,8 +442,20 @@ try {
                 $isAlwaysOn,
                 $bounds['valid_from'],
                 $bounds['valid_to'],
-                $id,
-            ]);
+            ];
+            if ($hasPoolCfg) {
+                $sets[] = 'gift_pool_config = ?';
+                $params[] = $giftPoolConfigJson;
+            }
+            if ($hasMaxPick) {
+                $sets[] = 'max_gifts_pickable = ?';
+                $params[] = $maxGiftsPickable;
+            }
+            $params[] = $id;
+            $st = $pdo->prepare(
+                'UPDATE cart_bogo_promotions SET ' . implode(', ', $sets) . ' WHERE id = ?'
+            );
+            $st->execute($params);
             orange_promo_always_on_sync_history(
                 $pdo,
                 'cart_bogo_promotions',
@@ -285,17 +464,20 @@ try {
                 orange_cart_promotion_admin_country_id($pdo)
             );
         } else {
-            // الترتيب تلقائي: التالي ضمن نفس الدولة.
             $sortBind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $insertCountryId);
             $stSort = $pdo->prepare(
                 'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cart_bogo_promotions WHERE 1=1' . $sortBind['sql']
             );
             $stSort->execute($sortBind['params']);
             $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
-            $st = $pdo->prepare(
-                'INSERT INTO cart_bogo_promotions (country_id, name_ar, name_en, show_name_to_customer, show_old_price_to_customer, bogo_kind, category_id, same_variant_product_id, min_buy_qty, buy_components_json, requires_registered_account, first_delivered_order_only, gift_kind, gift_customer_picks_variant, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-            );
-            $st->execute([
+            $cols = [
+                'country_id', 'name_ar', 'name_en', 'show_name_to_customer', 'show_old_price_to_customer',
+                'bogo_kind', 'category_id', 'same_variant_product_id', 'min_buy_qty', 'buy_components_json',
+                'requires_registered_account', 'first_delivered_order_only', 'gift_kind', 'gift_customer_picks_variant',
+                'fixed_variant_id', 'pool_variant_ids', 'gift_unit_charge_kind', 'gift_unit_charge_value',
+                'sort_order', 'is_active', 'is_always_on', 'valid_from', 'valid_to',
+            ];
+            $params = [
                 $insertCountryId,
                 $nameAr,
                 $nameEn,
@@ -319,7 +501,20 @@ try {
                 $isAlwaysOn,
                 $bounds['valid_from'],
                 $bounds['valid_to'],
-            ]);
+            ];
+            if ($hasPoolCfg) {
+                $cols[] = 'gift_pool_config';
+                $params[] = $giftPoolConfigJson;
+            }
+            if ($hasMaxPick) {
+                $cols[] = 'max_gifts_pickable';
+                $params[] = $maxGiftsPickable;
+            }
+            $ph = implode(',', array_fill(0, count($cols), '?'));
+            $st = $pdo->prepare(
+                'INSERT INTO cart_bogo_promotions (' . implode(', ', $cols) . ') VALUES (' . $ph . ')'
+            );
+            $st->execute($params);
             $newId = (int) $pdo->lastInsertId();
             orange_promo_always_on_sync_history(
                 $pdo,
