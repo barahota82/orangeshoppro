@@ -65,7 +65,7 @@ $nextSort = $hasTable && $adminCountryId > 0 ? orange_delivery_agents_next_sort_
         <button type="button" onclick="saveDeliveryAgent()">حفظ</button>
         <button type="button" class="btn-secondary" onclick="translateDeliveryAgent({ forceFromArabic: true })">ترجمة تلقائية من العربي</button>
         <button type="button" class="btn-secondary" onclick="resetDeliveryAgentForm()">مندوب جديد</button>
-        <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين المناديب" style="margin-inline-start:auto;">
+        <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين المناديب" style="margin-right:auto;">
             <button type="button" class="btn-secondary jv-nav-btn" id="dag_nav_first" title="أول مندوب" aria-label="أول مندوب">&lt;&lt;</button>
             <button type="button" class="btn-secondary jv-nav-btn" id="dag_nav_prev" title="المندوب السابق" aria-label="المندوب السابق">&lt;</button>
             <button type="button" class="btn-secondary jv-nav-btn" id="dag_nav_next" title="المندوب التالي" aria-label="المندوب التالي">&gt;</button>
