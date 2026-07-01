@@ -133,7 +133,7 @@ $pdo = orange_admin_page_pdo();
         minmax(150px, 1.5fr)
         minmax(110px, 1fr)
         minmax(100px, 0.95fr)
-        minmax(96px, 0.75fr)
+        minmax(118px, 0.9fr)
         minmax(110px, 1fr)
         minmax(100px, 0.95fr);
 }
