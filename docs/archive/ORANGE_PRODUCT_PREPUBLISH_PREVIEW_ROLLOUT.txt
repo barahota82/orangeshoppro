@@ -302,4 +302,20 @@ Resolved: preview model (session, not channel); TTL = 24h + lazy + optional main
 ملاحظات: حالة بلا حدّ معروف (المعاينة/`max=null`) ⇒ القائمة تعرض 1..10 افتراضياً والكتابة اليدوية حرّة؛
 زرّا «−/+» يبقيان كما هما (القصّ على الحد عند «+» سلوك طبيعي للزيادة التدريجية).
 
+== إصلاح v2.5 — إخفاء صفوف ظِلّ المعاينة عن تقارير المخزن (ثغرة 2026-07-01) ==
+
+العرَض (بلاغ المالك): بلا تسجيل أي منتج، أظهر تقرير «قائمة الأصناف» في «تقارير المخزن» صنفاً
+موقوفاً برصيد صفر (كود مثل P5، عدد متغيّرات = 2). السبب: آلية «معاينة قبل النشر»
+(`admin/api/products/save-preview-draft.php`) تُدرج صفّاً حقيقياً في جدول `products`
+(is_active=0، is_preview_draft=1) مع متغيّراته لعرض المعاينة للأدمن — وهذا مقصود ومخفيّ عن
+العميل وعن قائمة منتجات الأدمن (عبر `orange_preview_hide_sql`). لكن **`admin/pages/stock_reports.php`
+لم يكن يطبّق هذا الاستثناء**، وتقارير items/movements/move_summary تستخدم `WHERE 1=1`
+(بلا `p.is_active=1`) فتسرّبت المسودّة إليها (بينما balances/valuation/low/stagnant كانت محميّة
+ضمنياً بشرط `p.is_active=1`).
+
+التنفيذ: في `admin/pages/stock_reports.php` أُضيف `require_once includes/product_preview.php`
+وأُلحق `orange_preview_hide_sql($pdo, 'p')` بمتغيّر `$productCountrySql` المستخدَم في كل استعلامات
+التقارير السبعة — فتُستبعد صفوف المسودّة من كل تقارير المخزن. صفّ المسودّة نفسه يُعاد استخدامه/يُحذف
+تلقائياً (تصفّح بلا منتج) أو ينتهي بعد 24 ساعة (`orange_preview_purge_expired` / `scripts/maintenance_preview_drafts.php`).
+
 نهاية الخطة.

@@ -16,6 +16,7 @@ require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/inventory_cost_layers.php';
+require_once __DIR__ . '/../../includes/product_preview.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
@@ -158,6 +159,9 @@ $reportFmtMoney = static function (float $v) use ($reportMoney): string {
     return orange_accounting_report_format_amount($v, $reportMoney);
 };
 $productCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $srCountryId);
+/* استبعاد صفوف ظِلّ المعاينة (is_preview_draft=1) من كل تقارير المخزن — ليست منتجات محفوظة.
+   تقارير items/movements/move_summary تستخدم WHERE 1=1 (بلا is_active=1) فكانت تُسرّب المسودّة. */
+$productCountrySql .= orange_preview_hide_sql($pdo, 'p');
 $catJoin = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', null);
 $itemCodeExpr = $hasItemCode ? "COALESCE(NULLIF(TRIM(p.item_code), ''), CONCAT('P', p.id))" : "CONCAT('P', p.id)";
 
