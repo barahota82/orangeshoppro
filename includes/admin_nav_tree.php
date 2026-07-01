@@ -213,6 +213,7 @@ function orange_admin_permission_mega_sections(): array
                     'pages' => [
                         ['page' => 'channels', 'label' => 'قنوات العملاء'],
                         ['page' => 'delivery_areas', 'label' => 'محافظات ومناطق التوصيل'],
+                        ['page' => 'product_display_order', 'label' => 'ترتيب عرض المنتجات'],
                         ['page' => 'storefront_hero', 'label' => 'بانر الصفحة الرئيسية'],
                         ['page' => 'storefront_promo_messages', 'label' => 'الرسائل التحفيزية'],
                         ['page' => 'storefront_merge_requests', 'label' => 'دمج هاتف التسجيل'],

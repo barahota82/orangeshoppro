@@ -12,6 +12,7 @@ $allowed = [
     'company_settings',
     'bank_accounts',
     'payment_review',
+    'product_display_order',
     'storefront_hero',
     'storefront_merge_requests',
     'countries',
