@@ -75,7 +75,6 @@ foreach ($spmCountries as $c) {
                 <option value="<?php echo htmlspecialchars($key, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php endforeach; ?>
             </select>
-            <p class="card-hint" style="margin:4px 0 0;">«لكل العملاء» تجذب الجميع للعرض؛ «للزوّار غير المسجّلين» للتحفيز على التسجيل فقط.</p>
         </div>
     </div>
     <div class="form-grid" id="spm_offer_wrap" style="display:none;">
