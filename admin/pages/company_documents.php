@@ -99,6 +99,16 @@ $pdo = orange_admin_page_pdo();
             <button type="button" class="btn" id="cd_btn_search">تحديث القائمة</button>
         </div>
     </div>
+    <div class="form-grid cd-filter-row2 orange-doc-header-row" style="align-items:end;margin-top:12px;">
+        <div>
+            <label for="cd_f_from">من تاريخ</label>
+            <input type="text" id="cd_f_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" placeholder="اختياري">
+        </div>
+        <div>
+            <label for="cd_f_to">إلى تاريخ</label>
+            <input type="text" id="cd_f_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off" placeholder="اختياري">
+        </div>
+    </div>
 </div>
 
 <div class="card">
@@ -140,6 +150,10 @@ $pdo = orange_admin_page_pdo();
 .form-grid.cd-filter-row {
     grid-template-columns: minmax(320px, 3fr) minmax(130px, 1fr) minmax(130px, 1fr) auto;
 }
+.form-grid.cd-filter-row2 {
+    grid-template-columns: minmax(118px, 0.75fr) minmax(118px, 0.75fr);
+    max-width: 420px;
+}
 .orange-doc-header-row.cd-filter-row .orange-doc-header-row__action .btn {
     white-space: nowrap;
     min-height: var(--input-min-h);
@@ -166,8 +180,15 @@ $pdo = orange_admin_page_pdo();
         var q = document.getElementById('cd_q').value.trim();
         var docType = document.getElementById('cd_f_type').value;
         var entityTable = document.getElementById('cd_f_entity').value;
+        var dateFrom = document.getElementById('cd_f_from').value.trim();
+        var dateTo = document.getElementById('cd_f_to').value.trim();
         var res = await postJSON('/admin/api/company_documents/list.php', {
-            q: q, doc_type: docType, entity_table: entityTable, limit: 200
+            q: q,
+            doc_type: docType,
+            entity_table: entityTable,
+            date_from: dateFrom,
+            date_to: dateTo,
+            limit: 200
         });
         var tb = document.getElementById('cd_tbody');
         var hint = document.getElementById('cd_total_hint');

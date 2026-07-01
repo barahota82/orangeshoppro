@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/company_documents.php';
+require_once __DIR__ . '/../../../includes/date_format.php';
 require_admin_api();
 
 try {
@@ -18,6 +19,19 @@ try {
     $q = trim((string) ($data['q'] ?? ''));
     $docType = trim((string) ($data['doc_type'] ?? ''));
     $entityTable = trim((string) ($data['entity_table'] ?? ''));
+    $dateFromRaw = trim((string) ($data['date_from'] ?? ''));
+    $dateToRaw = trim((string) ($data['date_to'] ?? ''));
+    $dateFrom = $dateFromRaw !== '' ? orange_parse_admin_date_to_ymd($dateFromRaw) : '';
+    $dateTo = $dateToRaw !== '' ? orange_parse_admin_date_to_ymd($dateToRaw) : '';
+    if ($dateFromRaw !== '' && $dateFrom === '') {
+        json_response(['success' => false, 'message' => 'تاريخ «من» غير صالح'], 400);
+    }
+    if ($dateToRaw !== '' && $dateTo === '') {
+        json_response(['success' => false, 'message' => 'تاريخ «إلى» غير صالح'], 400);
+    }
+    if ($dateFrom !== '' && $dateTo !== '' && $dateFrom > $dateTo) {
+        json_response(['success' => false, 'message' => 'تاريخ «من» بعد تاريخ «إلى»'], 400);
+    }
     $limit = (int) ($data['limit'] ?? 100);
     if ($limit < 1) {
         $limit = 1;
@@ -44,6 +58,14 @@ try {
         $sql .= ' AND d.entity_table = ?';
         $params[] = $entityTable;
     }
+    if ($dateFrom !== '') {
+        $sql .= ' AND d.doc_date >= ?';
+        $params[] = $dateFrom;
+    }
+    if ($dateTo !== '') {
+        $sql .= ' AND d.doc_date <= ?';
+        $params[] = $dateTo;
+    }
 
     $cntSql = 'SELECT COUNT(*) FROM orange_company_documents d WHERE 1=1';
     $cntParams = [];
@@ -59,6 +81,14 @@ try {
     if ($entityTable !== '') {
         $cntSql .= ' AND d.entity_table = ?';
         $cntParams[] = $entityTable;
+    }
+    if ($dateFrom !== '') {
+        $cntSql .= ' AND d.doc_date >= ?';
+        $cntParams[] = $dateFrom;
+    }
+    if ($dateTo !== '') {
+        $cntSql .= ' AND d.doc_date <= ?';
+        $cntParams[] = $dateTo;
     }
 
     $stc = $pdo->prepare($cntSql);
