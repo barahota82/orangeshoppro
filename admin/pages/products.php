@@ -634,7 +634,6 @@ usort($productNavRows, static function ($a, $b) {
         <div id="productTabPanelVariants" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnVariants" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">المتغيرات والباركود</h4>
-        <p class="card-hint" style="margin:0 0 12px;">عرض كود/باركود كل متغيّر والمخزون (للقراءة فقط، بعد الحفظ). <strong>توليد المتغيرات وإدخال السعر/التكلفة لكل متغيّر يتمّان في تبويب «الألوان والمقاسات».</strong></p>
         <div id="variantBarcodeViewBox"></div>
         </div>
         </div>
