@@ -104,41 +104,9 @@ $nextSort = $hasTable && $adminCountryId > 0 ? orange_delivery_agents_next_sort_
     </div>
 </div>
 
-<div class="card">
-    <h3>قائمة المناديب</h3>
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>الاسم</th>
-                    <th>English</th>
-                    <th>الهاتف</th>
-                    <th>الحالة</th>
-                    <th>ترتيب</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody id="dag_tbody">
-                <?php foreach ($agents as $row): ?>
-                <?php
-                $aid = (int) ($row['id'] ?? 0);
-                $st = (string) ($row['status'] ?? 'active');
-                ?>
-                <tr>
-                    <td><?php echo $aid; ?></td>
-                    <td><?php echo htmlspecialchars((string) ($row['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td dir="ltr"><?php echo htmlspecialchars((string) ($row['name_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td dir="ltr"><?php echo htmlspecialchars((string) ($row['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo htmlspecialchars($statusLabels[$st] ?? $st, ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
-                    <td><button type="button" class="btn-secondary" data-dag-edit="<?php echo $aid; ?>">تعديل</button></td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
+<?php /* كارت «قائمة المناديب» أُزيل (قرار مالك 2026-07-01): استُبدل بأزرار التنقّل + نافذة «بحث»
+   أعلى كارت الإضافة/التعديل — تعرض النافذة كل المناديب عند فتحها وتُتيح التعديل مباشرة،
+   ويبقى dagAgentsJson محمّلاً كمصدر للبحث/التنقّل من جهة العميل (نطاق الدولة الحالي). */ ?>
 
 <script>
 const dagAgentsJson = <?php echo json_encode($agents, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
@@ -183,17 +151,6 @@ function dagScrollToForm() {
         setTimeout(function () { nameEl.focus(); }, 350);
     }
 }
-
-document.querySelectorAll('[data-dag-edit]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-        var id = parseInt(btn.getAttribute('data-dag-edit'), 10);
-        var row = dagAgentsJson.find(function (r) { return parseInt(r.id, 10) === id; });
-        if (row) {
-            fillDeliveryAgentForm(row);
-            dagScrollToForm();
-        }
-    });
-});
 
 let dagTranslateTimer = null;
 async function translateDeliveryAgent(opts) {
