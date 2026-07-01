@@ -100,17 +100,21 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                     <option value="amount_off_unit">خصم مبلغ ثابت من سعر التجزئة للوحدة</option>
                     <option value="fixed_unit">سعر بيع ثابت للوحدة (د.ك)</option>
                 </select>
-                <div id="cgp_fixed_charge_val_wrap" style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:32rem;">
+                <div id="cgp_fixed_charge_val_wrap" style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:48rem;">
                     <div>
                         <label id="cgp_fixed_charge_val_label">القيمة</label>
                         <input type="number" id="cgp_fixed_charge_val" class="admin-inp" min="0" step="0.0001" style="margin-top:6px;width:100%;max-width:none;" dir="ltr" value="0">
+                    </div>
+                    <div id="cgp_fixed_sale_ro_wrap" style="display:none;">
+                        <label for="cgp_fixed_sale_ro">مبلغ البيع (د.ك)</label>
+                        <input type="text" id="cgp_fixed_sale_ro" class="admin-inp cgp-readonly-inp" readonly tabindex="-1" style="margin-top:6px;width:100%;max-width:none;" dir="ltr" value="—">
                     </div>
                     <div>
                         <label for="cgp_fixed_cost_ro">التكلفة (إرشادي)</label>
                         <input type="text" id="cgp_fixed_cost_ro" class="admin-inp cgp-readonly-inp" readonly tabindex="-1" style="margin-top:6px;width:100%;max-width:none;" dir="ltr" value="—">
                     </div>
                 </div>
-                <p class="page-subtitle" style="margin:6px 0 0;max-width:32rem;">التكلفة للقراءة فقط — لا تُعرض للعميل.</p>
+                <p class="page-subtitle" style="margin:6px 0 0;max-width:48rem;">مبلغ البيع والتكلفة للقراءة فقط — لا تُعرض للعميل. مبلغ البيع يُحسب من أقل سعر تجزئة فعّال للمنتج.</p>
             </div>
         </div>
 
@@ -315,7 +319,34 @@ function cgpPickMeta(pid) {
             return CGP_PICK_ROWS[i];
         }
     }
-    return { product_id: id, code: 'P' + id, name: '', cost: null };
+    return { product_id: id, code: 'P' + id, name: '', price: null, cost: null, guard: null };
+}
+
+function cgpFixedRetailUnit(pid) {
+    var id = parseInt(pid, 10) || 0;
+    if (id <= 0) return null;
+    var m = cgpPickMeta(id);
+    if (m.guard && m.guard.min_price != null && isFinite(parseFloat(m.guard.min_price))) {
+        return Math.max(0, parseFloat(m.guard.min_price));
+    }
+    if (m.price != null && m.price !== '' && isFinite(parseFloat(m.price))) {
+        return Math.max(0, parseFloat(m.price));
+    }
+    return null;
+}
+
+function cgpCalcGiftChargeUnit(retail, kind, val) {
+    if (kind === 'free') return 0;
+    if (kind === 'fixed_unit') return Math.max(0, val);
+    retail = Math.max(0, Math.round(retail * 10000) / 10000);
+    if (kind === 'percent_off') {
+        var pct = Math.min(100, Math.max(0, val));
+        return Math.max(0, Math.round(retail * (1 - pct / 100) * 10000) / 10000);
+    }
+    if (kind === 'amount_off_unit') {
+        return Math.max(0, Math.round((retail - Math.max(0, val)) * 10000) / 10000);
+    }
+    return 0;
 }
 
 function cgpFmtMoney(n) {
@@ -408,12 +439,12 @@ function cgpSetFixed(pid) {
     if (!lab) return;
     if (id <= 0) {
         lab.textContent = '— لم يُختر منتج —';
-        cgpUpdateFixedCostField();
+        cgpUpdateFixedPreviewFields();
         return;
     }
     var m = cgpPickMeta(id);
     lab.textContent = (m.code ? m.code + ' — ' : '') + (m.name || ('منتج #' + id));
-    cgpUpdateFixedCostField();
+    cgpUpdateFixedPreviewFields();
 }
 
 function cgpUpdateFixedCostField() {
@@ -422,6 +453,33 @@ function cgpUpdateFixedCostField() {
     var pid = parseInt(document.getElementById('cgp_fixed_pid').value, 10) || 0;
     var m = cgpPickMeta(pid);
     costInp.value = pid > 0 && m.cost != null && m.cost !== '' ? cgpFmtMoney(m.cost) : '—';
+}
+
+function cgpUpdateFixedSaleField() {
+    var saleWrap = document.getElementById('cgp_fixed_sale_ro_wrap');
+    var saleInp = document.getElementById('cgp_fixed_sale_ro');
+    var sel = document.getElementById('cgp_fixed_charge_kind');
+    var wrap = document.getElementById('cgp_fixed_charge_val_wrap');
+    if (!saleWrap || !saleInp || !sel) return;
+    var k = sel.value;
+    var show = k === 'percent_off' || k === 'amount_off_unit';
+    saleWrap.style.display = show ? '' : 'none';
+    if (wrap) wrap.style.gridTemplateColumns = show ? '1fr 1fr 1fr' : '1fr 1fr';
+    if (!show) return;
+    var pid = parseInt(document.getElementById('cgp_fixed_pid').value, 10) || 0;
+    var retail = cgpFixedRetailUnit(pid);
+    var valInp = document.getElementById('cgp_fixed_charge_val');
+    var val = valInp ? (parseFloat(valInp.value) || 0) : 0;
+    if (retail == null) {
+        saleInp.value = '—';
+        return;
+    }
+    saleInp.value = cgpFmtMoney(cgpCalcGiftChargeUnit(retail, k, val));
+}
+
+function cgpUpdateFixedPreviewFields() {
+    cgpUpdateFixedCostField();
+    cgpUpdateFixedSaleField();
 }
 
 function cgpSetFixedChargeInputReadonly(inp, readonly) {
@@ -459,7 +517,7 @@ function cgpToggleFixedCharge() {
     const inp = document.getElementById('cgp_fixed_charge_val');
     if (!wrap || !lab || !inp) return;
     wrap.style.display = 'grid';
-    cgpUpdateFixedCostField();
+    cgpUpdateFixedPreviewFields();
     if (k === 'free') {
         lab.textContent = 'مبلغ الدفع (د.ك)';
         inp.value = '0';
@@ -754,6 +812,8 @@ document.getElementById('cgp_fixed_pick_btn').addEventListener('click', function
 });
 var cgpMaxPickEl = document.getElementById('cgp_max_pick');
 if (cgpMaxPickEl) cgpMaxPickEl.addEventListener('input', cgpClampMaxPick);
+var cgpFixedChargeValEl = document.getElementById('cgp_fixed_charge_val');
+if (cgpFixedChargeValEl) cgpFixedChargeValEl.addEventListener('input', cgpUpdateFixedSaleField);
 cgpToggleKind();
 cgpToggleFixedCharge();
 ocpBindAlwaysOn('cgp');
