@@ -217,106 +217,20 @@ $unifiedProductList = $catalogNavUnified
     && orange_table_exists($pdo, 'catalog_sections')
     && orange_table_has_column($pdo, 'catalog_categories', 'catalog_section_id');
 
-if ($unifiedProductList) {
-    $catJ = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', 'pt');
-    $products = $pdo->query(
-        'SELECT p.*, c.name_ar AS category_name, c.id AS catalog_category_display_id,
-            cs_pl.department_id AS category_department_id,
-            d.name_ar AS department_name_ar, d.name_en AS department_name_en,
-            pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join
-        FROM products p
-        LEFT JOIN product_types pt ON pt.id = p.product_type_id'
-        . $catJ . '
-        LEFT JOIN catalog_sections cs_pl ON cs_pl.id = c.catalog_section_id
-        LEFT JOIN departments d ON d.id = cs_pl.department_id
-        WHERE 1=1' . $productsCountrySql . '
-        ORDER BY p.sort_order ASC, p.id ASC'
-    )->fetchAll(PDO::FETCH_ASSOC);
-} elseif (
-    $catalogNavUnified
-    && $hasProductTypesTable
-    && orange_table_has_column($pdo, 'products', 'product_type_id')
-    && orange_table_exists($pdo, 'catalog_subcategories')
-    && orange_table_exists($pdo, 'catalog_categories')
-) {
-    /* شجرة موحّدة مفعّلة لكن غياب قسم/عمود قسم — عرض فئة الكتالوج بدون ربط قسم */
-    $catJ = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', 'pt');
-    $products = $pdo->query(
-        'SELECT p.*, c.name_ar AS category_name, c.id AS catalog_category_display_id,
-            NULL AS category_department_id, NULL AS department_name_ar, NULL AS department_name_en,
-            pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join
-        FROM products p
-        LEFT JOIN product_types pt ON pt.id = p.product_type_id'
-        . $catJ . '
-        WHERE 1=1' . $productsCountrySql . '
-        ORDER BY p.sort_order ASC, p.id ASC'
-    )->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    /* غير مسار القائمة الكامل الموحّد: لا استعلام على جداول categories/subcategories التراثية */
-    if ($hasProductTypesTable) {
-        $products = $pdo->query(
-            'SELECT p.*, NULL AS category_name, NULL AS catalog_category_display_id,
-            NULL AS category_department_id, NULL AS department_name_ar, NULL AS department_name_en,
-            pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join
-            FROM products p
-            LEFT JOIN product_types pt ON pt.id = p.product_type_id
-            WHERE 1=1' . $productsCountrySql . '
-            ORDER BY p.sort_order ASC, p.id ASC'
-        )->fetchAll(PDO::FETCH_ASSOC);
-    } else {
-        $products = $pdo->query(
-            'SELECT p.*, NULL AS category_name, NULL AS catalog_category_display_id,
-            NULL AS category_department_id, NULL AS department_name_ar, NULL AS department_name_en
-            FROM products p
-            WHERE 1=1' . $productsCountrySql . '
-            ORDER BY p.sort_order ASC, p.id ASC'
-        )->fetchAll(PDO::FETCH_ASSOC);
-    }
-}
-
-if (
-    isset($products) && is_array($products) && $products !== []
-    && orange_table_has_column($pdo, 'products', 'sizing_advisory_guide_id')
-    && orange_table_exists($pdo, 'advisory_sizing_guides')
-) {
-    $advGuideIds = [];
-    foreach ($products as $pr) {
-        if (!is_array($pr)) {
-            continue;
-        }
-        $gid = (int) ($pr['sizing_advisory_guide_id'] ?? 0);
-        if ($gid > 0) {
-            $advGuideIds[$gid] = true;
-        }
-    }
-    $advGuideLabelMap = [];
-    if ($advGuideIds !== []) {
-        $idList = array_keys($advGuideIds);
-        $in = implode(',', array_map(static function ($x) {
-            return (string) (int) $x;
-        }, $idList));
-        try {
-            $gl = $pdo->query(
-                "SELECT id, name_ar FROM advisory_sizing_guides WHERE id IN ($in)"
-            )->fetchAll(PDO::FETCH_ASSOC);
-            foreach (is_array($gl) ? $gl : [] as $gr) {
-                if (!is_array($gr) || !isset($gr['id'])) {
-                    continue;
-                }
-                $advGuideLabelMap[(int) $gr['id']] = trim((string) ($gr['name_ar'] ?? ''));
-            }
-        } catch (Throwable $e) {
-            $advGuideLabelMap = [];
-        }
-    }
-    foreach ($products as $k => $pr) {
-        if (!is_array($pr)) {
-            continue;
-        }
-        $gid = (int) ($pr['sizing_advisory_guide_id'] ?? 0);
-        $products[$k]['_advisory_guide_label'] = $gid > 0 ? ($advGuideLabelMap[$gid] ?? ('#' . $gid)) : '';
-    }
-}
+/*
+ * استعلام خفيف للبحث/التنقّل فقط (قرار مالك 2026-07-01/هـ): بعد إزالة كارت «قائمة المنتجات»
+ * لم يعُد يلزم جلب الوصلات (قسم/فئة/نوع/دليل) ولا كل الأعمدة — فقط ما يلزم البحث والتنقّل،
+ * فيبقى التحميل سريعاً حتى مع آلاف المنتجات. يستبعد صفوف ظِلّ المعاينة عبر $productsCountrySql.
+ */
+$navCodeSel = orange_table_has_column($pdo, 'products', 'item_code') ? 'p.item_code' : "'' AS item_code";
+$navBarcodeSel = orange_table_has_column($pdo, 'products', 'barcode') ? 'p.barcode' : "'' AS barcode";
+$navNameEnSel = orange_table_has_column($pdo, 'products', 'name_en') ? 'p.name_en' : "'' AS name_en";
+$products = $pdo->query(
+    'SELECT p.id, p.name, ' . $navNameEnSel . ', ' . $navCodeSel . ', ' . $navBarcodeSel . ', p.is_active
+     FROM products p
+     WHERE 1=1' . $productsCountrySql . '
+     ORDER BY p.id ASC'
+)->fetchAll(PDO::FETCH_ASSOC);
 
 try {
     $hasDepartmentsTable = (bool) $pdo->query("SHOW TABLES LIKE 'departments'")->fetchColumn();
@@ -397,7 +311,7 @@ $orangeAdminSfProductUrlPartsForJs = [
 
 <?php if ($catalogNavUnified && $unifiedActiveProductsMissingPt > 0): ?>
 <div class="card" style="margin-bottom:12px;background:#fff7ed;border-color:#fdba74;">
-    <p style="margin:0;color:#9a3412;line-height:1.55;"><strong>تنبيه الشجرة الموحّدة:</strong> يوجد <strong><?php echo (int) $unifiedActiveProductsMissingPt; ?></strong> منتج <strong>نشط</strong> بلا <code>product_type_id</code> صالح. وفق السياسة يجب ربط كل منتج بـ <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">نوع منتج</a> في الشجرة قبل الاعتماد الكامل؛ راجع الصفوف في الجدول أدناه.</p>
+    <p style="margin:0;color:#9a3412;line-height:1.55;"><strong>تنبيه الشجرة الموحّدة:</strong> يوجد <strong><?php echo (int) $unifiedActiveProductsMissingPt; ?></strong> منتج <strong>نشط</strong> بلا <code>product_type_id</code> صالح. وفق السياسة يجب ربط كل منتج بـ <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">نوع منتج</a> في الشجرة قبل الاعتماد الكامل؛ استخدم «بحث» أعلى الكارت للوصول إلى تلك المنتجات وتصحيحها.</p>
 </div>
 <?php endif; ?>
 
@@ -433,15 +347,15 @@ usort($productNavRows, static function ($a, $b) {
 <div class="card">
     <div class="product-form-head" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
         <h3 id="productFormTitle" style="margin:0;">إضافة / تعديل منتج</h3>
-        <div class="product-voucher-nav-btns" role="group" aria-label="تنقل بين المنتجات" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-            <button type="button" class="btn-secondary" id="prod_nav_first" title="أول منتج" aria-label="أول منتج">&lt;&lt;</button>
-            <button type="button" class="btn-secondary" id="prod_nav_prev" title="المنتج السابق (تنازلي بالرقم)" aria-label="المنتج السابق">&lt;</button>
-            <button type="button" class="btn-secondary" id="prod_nav_next" title="المنتج التالي (تصاعدي بالرقم)" aria-label="المنتج التالي">&gt;</button>
-            <button type="button" class="btn-secondary" id="prod_nav_last" title="آخر منتج" aria-label="آخر منتج">&gt;&gt;</button>
-            <button type="button" class="btn-secondary" id="prod_btn_open_search" title="بحث عن منتج لتعديله">بحث</button>
+        <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين المنتجات">
+            <button type="button" class="btn-secondary jv-nav-btn" id="prod_nav_first" title="أول منتج" aria-label="أول منتج">&lt;&lt;</button>
+            <button type="button" class="btn-secondary jv-nav-btn" id="prod_nav_prev" title="المنتج السابق (تنازلي بالرقم)" aria-label="المنتج السابق">&lt;</button>
+            <button type="button" class="btn-secondary jv-nav-btn" id="prod_nav_next" title="المنتج التالي (تصاعدي بالرقم)" aria-label="المنتج التالي">&gt;</button>
+            <button type="button" class="btn-secondary jv-nav-btn" id="prod_nav_last" title="آخر منتج" aria-label="آخر منتج">&gt;&gt;</button>
+            <button type="button" class="btn-secondary jv-nav-search" id="prod_btn_open_search" title="بحث عن منتج لتعديله">بحث</button>
         </div>
     </div>
-    <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=opening_stock_balances'), ENT_QUOTES, 'UTF-8'); ?>">أرصدة أول المدة المخزنية</a>.</p>
+    <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. كميات الألوان والمقاسات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=opening_stock_balances'), ENT_QUOTES, 'UTF-8'); ?>">أرصدة أول المدة المخزنية</a>.</p>
     <form id="productForm">
         <style id="orangeProductsTabsNoGapFix">
             #productForm > .admin-product-tab-panels {
@@ -467,7 +381,7 @@ usort($productNavRows, static function ($a, $b) {
         <input type="hidden" id="category_id" value="">
         <input type="hidden" id="subcategory_id" value="">
 
-        <div class="admin-product-tabs" role="tablist" aria-label="أقسام نموذج المنتج">
+        <div class="admin-product-tabs" role="tablist" aria-label="أقسام نموذج المنتج" style="margin-top:10px;">
             <button type="button" class="admin-product-tab is-active" role="tab" id="productTabBtnBasic" aria-controls="productTabPanelBasic" aria-selected="true" data-product-tab="basic">البيانات الأساسية</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnSizes" aria-controls="productTabPanelSizes" aria-selected="false" data-product-tab="sizes">الألوان والمقاسات</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnImages" aria-controls="productTabPanelImages" aria-selected="false" data-product-tab="images">صور المنتج العامة</button>
@@ -928,117 +842,9 @@ usort($productNavRows, static function ($a, $b) {
     </div>
 </div>
 
-<div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-        <h3 style="margin:0;">قائمة المنتجات</h3>
-        <div class="actions">
-            <button type="button" class="btn" onclick="saveProductsOrder()">حفظ الترتيب</button>
-        </div>
-    </div>
-    <?php if ($hasDepartmentsTable && $hasCategoryDepartment && $departmentsForProducts !== []): ?>
-    <div class="form-grid" style="margin-bottom:12px;max-width:420px;">
-        <div>
-            <label for="productTableDeptFilter">تصفية الجدول حسب القسم</label>
-            <select id="productTableDeptFilter">
-                <option value="">كل الأقسام</option>
-                <?php foreach ($departmentsForProducts as $dep): ?>
-                    <option value="<?php echo (int) $dep['id']; ?>"><?php echo htmlspecialchars((string) ($dep['name_ar'] ?: $dep['name_en'])); ?></option>
-                <?php endforeach; ?>
-                <option value="0">بدون قسم</option>
-            </select>
-        </div>
-    </div>
-    <?php endif; ?>
-    <div class="table-wrap cat-dep-list-wrap" data-list="products">
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>الترتيب</th>
-                    <th>الاسم</th>
-                    <th>القسم</th>
-                    <th>الفئة</th>
-                    <th title="رقم القسم من الفئة · رقم الفئة — للمطابقة مع المتجر دون لبس (مثلاً 1-3 وليس 13)">مرجع قسم-فئة</th>
-                    <?php if ($hasProductTypesTable): ?>
-                    <th>نوع (موحّد)</th>
-                    <?php endif; ?>
-                    <th>دليل استرشادي</th>
-                    <th>السعر</th>
-                    <th>آخر تكلفة شراء</th>
-                    <th>الحالة</th>
-                    <th class="prod-ops-col">إجراءات</th>
-                </tr>
-            </thead>
-            <tbody id="productsTbody">
-                <?php foreach ($products as $p): ?>
-                <?php
-                $pDeptId = isset($p['category_department_id']) && $p['category_department_id'] !== null
-                    ? (int) $p['category_department_id'] : 0;
-                $pCatId = isset($p['catalog_category_display_id']) ? (int) $p['catalog_category_display_id'] : 0;
-                $pDeptLabel = (string) ($p['department_name_ar'] ?: $p['department_name_en'] ?: '');
-                if ($pDeptLabel === '') {
-                    $pDeptLabel = '—';
-                }
-                $deptCatRef = $pDeptId . '-' . $pCatId;
-                ?>
-                <?php
-                $pPtId = isset($p['product_type_id']) && $p['product_type_id'] !== null ? (int) $p['product_type_id'] : 0;
-                $pPtCell = '';
-                $pPtStyle = '';
-                if ($hasProductTypesTable) {
-                    if ($pPtId <= 0) {
-                        $pPtCell = htmlspecialchars(
-                            'ناقص — يُصلح بتعديل المنتج',
-                            ENT_QUOTES,
-                            'UTF-8'
-                        );
-                        $pPtStyle = ' style="background:#fef2f2;color:#991b1b;font-weight:600;"';
-                    } else {
-                        $pPtLabel = trim((string) ($p['pt_name_ar_join'] ?? ''))
-                            ?: trim((string) ($p['pt_name_en_join'] ?? ''))
-                            ?: trim((string) ($p['pt_slug_join'] ?? ''));
-                        $pPtCell = htmlspecialchars($pPtLabel !== '' ? $pPtLabel : ('#' . $pPtId), ENT_QUOTES, 'UTF-8')
-                            . ' <span style="color:#64748b;font-size:12px;">(#' . $pPtId . ')</span>';
-                    }
-                }
-                ?>
-                <tr data-id="<?php echo (int)$p['id']; ?>" data-dept-id="<?php echo $pDeptId; ?>" data-category-id="<?php echo $pCatId; ?>"<?php echo $hasProductTypesTable ? ' data-product-type-id="' . $pPtId . '"' : ''; ?>>
-                    <td><?php echo (int)$p['id']; ?></td>
-                    <td><?php echo (int)($p['sort_order'] ?? 0); ?></td>
-                    <td><?php echo htmlspecialchars($p['name']); ?></td>
-                    <td><?php echo htmlspecialchars($pDeptLabel); ?><?php echo $pDeptId > 0 ? ' <span style="color:#64748b;font-size:12px;">(#' . $pDeptId . ')</span>' : ''; ?></td>
-                    <td><?php echo htmlspecialchars($p['category_name'] ?: '-'); ?><?php echo $pCatId > 0 ? ' <span style="color:#64748b;font-size:12px;">(#' . $pCatId . ')</span>' : ''; ?></td>
-                    <td><code style="font-size:13px;"><?php echo htmlspecialchars($deptCatRef, ENT_QUOTES, 'UTF-8'); ?></code></td>
-                    <?php if ($hasProductTypesTable): ?>
-                    <td<?php echo $pPtStyle !== '' ? $pPtStyle : ''; ?>><?php echo $pPtCell; ?></td>
-                    <?php endif; ?>
-                    <td><?php
-                    $agl = trim((string) ($p['_advisory_guide_label'] ?? ''));
-                    echo htmlspecialchars($agl !== '' ? $agl : 'بدون', ENT_QUOTES, 'UTF-8');
-                    ?></td>
-                    <td><?php echo number_format((float) $p['price'], $prodMoney['decimals']); ?></td>
-                    <td><?php echo number_format((float) $p['cost'], $prodMoney['decimals']); ?></td>
-                    <td><?php echo (int)$p['is_active'] === 1 ? 'نشط' : 'مخفي'; ?></td>
-                    <td class="prod-row-ops">
-                        <div class="prod-ops-wrap">
-                            <div class="prod-ops-arrows">
-                                <button type="button" class="btn-secondary prod-btn-reorder" onclick="moveProductRow(this,'up')" aria-label="أعلى">↑</button>
-                                <button type="button" class="btn-secondary prod-btn-reorder" onclick="moveProductRow(this,'down')" aria-label="أسفل">↓</button>
-                            </div>
-                            <div class="prod-ops-main">
-                                <button type="button" class="btn-secondary" onclick="loadProductForEdit(<?php echo (int)$p['id']; ?>)">تعديل</button>
-                                <button type="button" class="prod-btn-toggle" onclick="toggleProductActive(<?php echo (int)$p['id']; ?>, <?php echo (int)$p['is_active']; ?>)">
-                                    <?php echo (int)$p['is_active'] === 1 ? 'إخفاء' : 'إظهار'; ?>
-                                </button>
-                            </div>
-                        </div>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
+<?php /* كارت «قائمة المنتجات» أُزيل (قرار مالك 2026-07-01/هـ): استُبدل بالبحث/التنقّل أعلى الكارت،
+   وخُفِّف استعلام المنتجات إلى الحد الأدنى (id/كود/باركود/اسم/حالة) لتسريع التحميل مع آلاف المنتجات.
+   أداة إعادة ترتيب المنتجات ستُضاف لاحقاً كشاشة/أداة خفيفة منفصلة. */ ?>
 
 <script>
 window.ORANGE_PUBLIC_BASE_PATH = <?php echo json_encode(PUBLIC_BASE_PATH === '' ? '' : rtrim(PUBLIC_BASE_PATH, '/'), JSON_UNESCAPED_UNICODE); ?>;
