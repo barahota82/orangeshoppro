@@ -41,7 +41,7 @@ foreach ($spmCountries as $c) {
 ?>
 <div class="page-title">
     <h1>الرسائل التحفيزية للواجهة</h1>
-    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?> — نصوص تحفيزية تظهر في خانات مُسمّاة بالواجهة (بجدولة) دون تعديل أكواد.</p>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <?php if (!$hasTable): ?>
