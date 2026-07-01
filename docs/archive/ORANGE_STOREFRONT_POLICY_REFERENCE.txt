@@ -604,6 +604,12 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 - **العمود الموحّد:** قراءة-فقط ويُملأ حيّاً من خانة الموحّد بالأعلى عبر `orangeOnUnifiedPricingChange` (قفل + `admin-variant-price-locked`).
 - **أُزيلت** الخانات السطرية من الكارت ودوالها (`cw-size-pricing`/`cw-row-pricing`/`sp-pricing` و`orangeSyncCardPricingIntoMatrix`/`orangePopulateCardPricingFromMatrix`/`orangeRefreshInlineVariantPricingVisibility`/`orangeBuildCardPricingMap`)؛ الكارت صار للاختيار فقط.
 - **التحذير الحيّ** للتكلفة>السعر صار على خلايا الجدول (`orangeProductVariantTableCostPriceLiveCheck` + كلاس `admin-card-inp-bad`)، وقيد الحفظ `orangeProductValidatePerVariantPricing` يقرأ `.v-price`/`.v-cost` مباشرة (الأربع حالات والمختلطة).
+**قرار مالك (2026-07-01/د) — بحث وتنقّل بين المنتجات في كارت «إضافة / تعديل منتج» (على نمط شاشة سند القيد):**
+على نفس سطر عنوان الكارت (`admin/pages/products.php`) أُضيفت — يسار العنوان — مجموعة أزرار تنقّل `<< < > >>` (`prod_nav_first/prev/next/last`) وزرّ **«بحث»** (`prod_btn_open_search`) يفتح نافذة بحث (`#prod_search_modal`) بحقول: رقم من/إلى + الكود + الباركود + الاسم (عربي/إنجليزي)، مع جدول نتائج وزرّ «تعديل» لكل صف يحمّل المنتج عبر `loadProductForEdit`.
+- **مصدر البيانات:** مصفوفة `$productNavRows` (PHP) مبنيّة من `$products` (يستبعد `is_preview_draft` أصلاً) — بلا استعلام إضافي — وتُمرَّر لـ JS كـ `NAV_ROWS` مرتّبة بالـID تصاعدياً؛ البحث تصفية عميل فورية.
+- **سلوك التنقّل = مطابق لسند القيد (الخيار A):** الأسهم مفعّلة دائماً؛ بلا منتج محمّل: «تالي» يفتح أول منتج و«سابق» يفتح آخر منتج؛ عند الحافّة تنبيه «لا يوجد منتج لاحق/أسبق». المرجع السلوكي: `admin/api/journal/manage.php` (`nav_manual`).
+- **حماية التغييرات غير المحفوظة:** علم `window.ORANGE_PRODUCT_FORM_DIRTY` يُضبط عند إدخال المستخدم في `#productForm`، ويُمسح بعد `loadProductForEdit`/`resetProductForm` (والحفظ يُعيد تحميل الصفحة). التنقّل/اختيار نتيجة بحث يطلب تأكيداً إن كانت هناك تغييرات غير محفوظة.
+
 - **تنظيف الأبعاد عند التراجع (إصلاح 2026-07-01/ج):** عند إيقاف «له ألوان؟» يُفرّغ `onHasFlagsChange` صفوف `#colorwaysBox` فعلياً (وليس مجرد إخفاء `#colorwaysSection`) قبل إعادة بناء الجدول الحيّ — حتى لا تبقى تشكيلة لون قديمة في الخلفية تعود للظهور (وتتسرّب إلى الحفظ والجدول) عند إعادة تفعيل الألوان. الجانب «مقاسات فقط» محميّ أصلاً لأن `orangeRefreshSizePickPanel` يعيد بناء منتقي المقاسات من الصفر (بلا تحديد) عند أي تغيير عائلة. مصفوفة المتغيّرات/حمولة الألوان تُحسبان من الاختيار الحالي فقط (`orangeComputeVariantCombos`/`orangeCollectColorwayImagesPayload` محكومتان بـ `has_colors`).
 
 نهاية المرجع.

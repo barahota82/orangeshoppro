@@ -401,8 +401,46 @@ $orangeAdminSfProductUrlPartsForJs = [
 </div>
 <?php endif; ?>
 
+<?php
+/* بيانات التنقّل/البحث بين المنتجات (كارت التعديل): مرتّبة بالـID تصاعدياً، مستبعِدة صفوف
+   ظِلّ المعاينة (مصدرها $products الذي يستبعدها أصلاً). لا استعلام إضافي. */
+$productNavRows = [];
+foreach ($products as $pNavRow) {
+    if (!is_array($pNavRow)) {
+        continue;
+    }
+    $pNavId = (int) ($pNavRow['id'] ?? 0);
+    if ($pNavId <= 0) {
+        continue;
+    }
+    $pNavCode = trim((string) ($pNavRow['item_code'] ?? ''));
+    if ($pNavCode === '') {
+        $pNavCode = 'P' . $pNavId;
+    }
+    $productNavRows[] = [
+        'id' => $pNavId,
+        'code' => $pNavCode,
+        'barcode' => trim((string) ($pNavRow['barcode'] ?? '')),
+        'name' => (string) ($pNavRow['name'] ?? ''),
+        'name_en' => (string) ($pNavRow['name_en'] ?? ''),
+        'is_active' => !empty($pNavRow['is_active']),
+    ];
+}
+usort($productNavRows, static function ($a, $b) {
+    return $a['id'] <=> $b['id'];
+});
+?>
 <div class="card">
-    <h3 id="productFormTitle">إضافة / تعديل منتج</h3>
+    <div class="product-form-head" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <h3 id="productFormTitle" style="margin:0;">إضافة / تعديل منتج</h3>
+        <div class="product-voucher-nav-btns" role="group" aria-label="تنقل بين المنتجات" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <button type="button" class="btn-secondary" id="prod_nav_first" title="أول منتج" aria-label="أول منتج">&lt;&lt;</button>
+            <button type="button" class="btn-secondary" id="prod_nav_prev" title="المنتج السابق (تنازلي بالرقم)" aria-label="المنتج السابق">&lt;</button>
+            <button type="button" class="btn-secondary" id="prod_nav_next" title="المنتج التالي (تصاعدي بالرقم)" aria-label="المنتج التالي">&gt;</button>
+            <button type="button" class="btn-secondary" id="prod_nav_last" title="آخر منتج" aria-label="آخر منتج">&gt;&gt;</button>
+            <button type="button" class="btn-secondary" id="prod_btn_open_search" title="بحث عن منتج لتعديله">بحث</button>
+        </div>
+    </div>
     <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=opening_stock_balances'), ENT_QUOTES, 'UTF-8'); ?>">أرصدة أول المدة المخزنية</a>.</p>
     <form id="productForm">
         <style id="orangeProductsTabsNoGapFix">
@@ -858,6 +896,36 @@ $orangeAdminSfProductUrlPartsForJs = [
             </div>
         </div>
     </form>
+</div>
+
+<div id="prod_search_modal" class="prod-search-modal" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="prod_search_modal_title">
+    <div class="prod-search-modal__backdrop" id="prod_search_modal_backdrop" style="position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1200;"></div>
+    <div class="prod-search-modal__dialog" style="position:fixed;z-index:1201;top:5%;left:50%;transform:translateX(-50%);width:min(940px,94vw);max-height:88vh;overflow:auto;background:#fff;border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.28);padding:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;">
+            <h3 id="prod_search_modal_title" style="margin:0;">بحث عن منتج لتعديله</h3>
+            <button type="button" class="btn-secondary" id="prod_search_close">إغلاق</button>
+        </div>
+        <div class="form-grid form-grid-3" style="gap:10px;">
+            <div><label for="prod_search_id_from">رقم المنتج — من</label><input type="number" id="prod_search_id_from" class="admin-inp" min="1" step="1" dir="ltr" lang="en" autocomplete="off"></div>
+            <div><label for="prod_search_id_to">رقم المنتج — إلى</label><input type="number" id="prod_search_id_to" class="admin-inp" min="1" step="1" dir="ltr" lang="en" autocomplete="off"></div>
+            <div><label for="prod_search_code">الكود</label><input type="text" id="prod_search_code" class="admin-inp" autocomplete="off" dir="ltr" lang="en"></div>
+            <div><label for="prod_search_barcode">الباركود</label><input type="text" id="prod_search_barcode" class="admin-inp" autocomplete="off" dir="ltr" lang="en"></div>
+            <div style="grid-column:span 2;"><label for="prod_search_name">الاسم (عربي/إنجليزي)</label><input type="text" id="prod_search_name" class="admin-inp" autocomplete="off" dir="auto"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin:12px 0;flex-wrap:wrap;">
+            <button type="button" class="btn" id="prod_search_run">تنفيذ البحث</button>
+            <button type="button" class="btn-secondary" id="prod_search_clear">مسح الحقول</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>#</th><th>الكود</th><th>الباركود</th><th>الاسم</th><th>الحالة</th><th></th></tr>
+                </thead>
+                <tbody id="prod_search_results_tbody"></tbody>
+            </table>
+        </div>
+        <p id="prod_search_empty" style="display:none;color:#64748b;margin:10px 0 0;">لا نتائج مطابقة — عدّل معايير البحث.</p>
+    </div>
 </div>
 
 <div class="card">
@@ -3016,6 +3084,7 @@ function setProductFormEditMode(isEdit) {
 
 function resetProductForm() {
     document.getElementById('product_record_id').value = '0';
+    window.ORANGE_PRODUCT_FORM_DIRTY = false;
     window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = false;
     setProductFormEditMode(false);
     document.getElementById('name').value = '';
@@ -3340,6 +3409,7 @@ async function loadProductForEdit(id) {
             sortRO.tabIndex = -1;
         }
         productFormShowTab('basic');
+        window.ORANGE_PRODUCT_FORM_DIRTY = false;
         document.getElementById('productForm').scrollIntoView({ behavior: 'smooth' });
     } catch (e) {
         alert('فشل التحميل');
@@ -5596,5 +5666,185 @@ orangeScheduleProductCardPreviewRefresh();
     });
     refreshSeoEffectivePreview();
     window.orangeRefreshSeoEffectivePreview = refreshSeoEffectivePreview;
+})();
+
+/* ===== بحث وتنقّل بين المنتجات في كارت «إضافة / تعديل منتج» (على نمط شاشة سند القيد) ===== */
+(function orangeProductNavSearch() {
+    var NAV_ROWS = <?php echo json_encode($productNavRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?> || [];
+    /* مرتّبة تصاعدياً بالـID من الخادم؛ نضمن الترتيب احتياطاً. */
+    NAV_ROWS.sort(function (a, b) { return (a.id || 0) - (b.id || 0); });
+
+    window.ORANGE_PRODUCT_FORM_DIRTY = window.ORANGE_PRODUCT_FORM_DIRTY || false;
+
+    function currentId() {
+        var el = document.getElementById('product_record_id');
+        return el ? (parseInt(String(el.value || '0'), 10) || 0) : 0;
+    }
+    function indexOfId(id) {
+        for (var i = 0; i < NAV_ROWS.length; i++) {
+            if ((NAV_ROWS[i].id || 0) === id) { return i; }
+        }
+        return -1;
+    }
+    function confirmLeaveIfDirty() {
+        if (!window.ORANGE_PRODUCT_FORM_DIRTY) { return true; }
+        return confirm('لديك تغييرات غير محفوظة في المنتج الحالي. الانتقال سيتجاهلها. هل تريد المتابعة؟');
+    }
+    function goToId(id) {
+        if (!id || id <= 0) { return; }
+        if (!confirmLeaveIfDirty()) { return; }
+        if (typeof loadProductForEdit === 'function') {
+            loadProductForEdit(id);
+        }
+    }
+
+    /* خيار A (مطابق لسند القيد): الأسهم مفعّلة دائماً؛ بلا منتج محمّل: تالي=أول، سابق=آخر. */
+    function navGo(where) {
+        if (!NAV_ROWS.length) {
+            alert('لا توجد منتجات محفوظة بعد.');
+            return;
+        }
+        var cur = currentId();
+        var idx = cur > 0 ? indexOfId(cur) : -1;
+        var target = 0;
+        if (where === 'first') {
+            target = NAV_ROWS[0].id;
+        } else if (where === 'last') {
+            target = NAV_ROWS[NAV_ROWS.length - 1].id;
+        } else if (where === 'next') {
+            if (idx < 0) {
+                target = NAV_ROWS[0].id;
+            } else if (idx >= NAV_ROWS.length - 1) {
+                alert('لا يوجد منتج لاحق — هذا آخر منتج.');
+                return;
+            } else {
+                target = NAV_ROWS[idx + 1].id;
+            }
+        } else if (where === 'prev') {
+            if (idx < 0) {
+                target = NAV_ROWS[NAV_ROWS.length - 1].id;
+            } else if (idx <= 0) {
+                alert('لا يوجد منتج أسبق — هذا أول منتج.');
+                return;
+            } else {
+                target = NAV_ROWS[idx - 1].id;
+            }
+        }
+        goToId(target);
+    }
+
+    [['prod_nav_first', 'first'], ['prod_nav_prev', 'prev'], ['prod_nav_next', 'next'], ['prod_nav_last', 'last']].forEach(function (pair) {
+        var b = document.getElementById(pair[0]);
+        if (b) { b.addEventListener('click', function () { navGo(pair[1]); }); }
+    });
+
+    /* علم «تغييرات غير محفوظة»: يُضبط عند إدخال المستخدم داخل النموذج (الضبط البرمجي عبر value لا يُطلق input). */
+    var formEl = document.getElementById('productForm');
+    if (formEl) {
+        formEl.addEventListener('input', function () { window.ORANGE_PRODUCT_FORM_DIRTY = true; });
+    }
+
+    /* ===== نافذة البحث ===== */
+    var modal = document.getElementById('prod_search_modal');
+    function openModal() {
+        if (!modal) { return; }
+        modal.style.display = 'block';
+        modal.setAttribute('aria-hidden', 'false');
+        runSearch();
+        var f = document.getElementById('prod_search_name');
+        if (f) { try { f.focus(); } catch (e) {} }
+    }
+    function closeModal() {
+        if (!modal) { return; }
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    }
+    function norm(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function runSearch() {
+        var idFrom = parseInt(String((document.getElementById('prod_search_id_from') || {}).value || '0'), 10) || 0;
+        var idTo = parseInt(String((document.getElementById('prod_search_id_to') || {}).value || '0'), 10) || 0;
+        var code = norm((document.getElementById('prod_search_code') || {}).value);
+        var barcode = norm((document.getElementById('prod_search_barcode') || {}).value);
+        var name = norm((document.getElementById('prod_search_name') || {}).value);
+        var out = NAV_ROWS.filter(function (r) {
+            var id = r.id || 0;
+            if (idFrom > 0 && id < idFrom) { return false; }
+            if (idTo > 0 && id > idTo) { return false; }
+            if (code && norm(r.code).indexOf(code) === -1) { return false; }
+            if (barcode && norm(r.barcode).indexOf(barcode) === -1) { return false; }
+            if (name) {
+                var hay = norm(r.name) + ' ' + norm(r.name_en);
+                if (hay.indexOf(name) === -1) { return false; }
+            }
+            return true;
+        });
+        var tb = document.getElementById('prod_search_results_tbody');
+        var emptyNote = document.getElementById('prod_search_empty');
+        if (!tb) { return; }
+        tb.innerHTML = '';
+        if (!out.length) {
+            if (emptyNote) { emptyNote.style.display = 'block'; }
+            return;
+        }
+        if (emptyNote) { emptyNote.style.display = 'none'; }
+        out.slice(0, 300).forEach(function (r) {
+            var tr = document.createElement('tr');
+            var statusTxt = r.is_active ? 'نشط' : 'موقوف';
+            tr.innerHTML =
+                '<td>' + (r.id || 0) + '</td>' +
+                '<td dir="ltr">' + esc(r.code) + '</td>' +
+                '<td dir="ltr">' + esc(r.barcode) + '</td>' +
+                '<td>' + esc(r.name || r.name_en) + '</td>' +
+                '<td>' + statusTxt + '</td>' +
+                '<td><button type="button" class="btn-secondary prod-search-pick" data-id="' + (r.id || 0) + '">تعديل</button></td>';
+            tb.appendChild(tr);
+        });
+    }
+
+    var openBtn = document.getElementById('prod_btn_open_search');
+    if (openBtn) { openBtn.addEventListener('click', openModal); }
+    var closeBtn = document.getElementById('prod_search_close');
+    if (closeBtn) { closeBtn.addEventListener('click', closeModal); }
+    var backdrop = document.getElementById('prod_search_modal_backdrop');
+    if (backdrop) { backdrop.addEventListener('click', closeModal); }
+    var runBtn = document.getElementById('prod_search_run');
+    if (runBtn) { runBtn.addEventListener('click', runSearch); }
+    var clearBtn = document.getElementById('prod_search_clear');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            ['prod_search_id_from', 'prod_search_id_to', 'prod_search_code', 'prod_search_barcode', 'prod_search_name'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) { el.value = ''; }
+            });
+            runSearch();
+        });
+    }
+    ['prod_search_code', 'prod_search_barcode', 'prod_search_name', 'prod_search_id_from', 'prod_search_id_to'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('keydown', function (ev) {
+                if (ev.key === 'Enter') { ev.preventDefault(); runSearch(); }
+            });
+        }
+    });
+    var tbodyEl = document.getElementById('prod_search_results_tbody');
+    if (tbodyEl) {
+        tbodyEl.addEventListener('click', function (ev) {
+            var btn = ev.target && ev.target.closest ? ev.target.closest('.prod-search-pick') : null;
+            if (!btn) { return; }
+            var id = parseInt(String(btn.getAttribute('data-id') || '0'), 10) || 0;
+            if (id <= 0) { return; }
+            if (!confirmLeaveIfDirty()) { return; }
+            closeModal();
+            if (typeof loadProductForEdit === 'function') { loadProductForEdit(id); }
+        });
+    }
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape' && modal && modal.style.display === 'block') { closeModal(); }
+    });
 })();
 </script>
