@@ -363,10 +363,21 @@ let dagFormDirty = false;
         var f = document.getElementById('dag_search_name');
         if (f) { try { f.focus(); } catch (e) {} }
     }
+    function resetSearchFields() {
+        ['dag_search_id_from', 'dag_search_id_to', 'dag_search_phone', 'dag_search_name'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) { el.value = ''; }
+        });
+        var tb = document.getElementById('dag_search_results_tbody');
+        if (tb) { tb.innerHTML = ''; }
+        var emptyNote = document.getElementById('dag_search_empty');
+        if (emptyNote) { emptyNote.style.display = 'none'; }
+    }
     function closeModal() {
         if (!modal) { return; }
         modal.style.display = 'none';
         modal.setAttribute('aria-hidden', 'true');
+        resetSearchFields();
     }
     var openBtn = document.getElementById('dag_btn_open_search');
     if (openBtn) { openBtn.addEventListener('click', openModal); }
