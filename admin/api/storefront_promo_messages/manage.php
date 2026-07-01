@@ -53,13 +53,13 @@ try {
         $data = $_POST;
     }
     $action = trim((string) ($data['action'] ?? 'list'));
-    // المشرف المقيَّد بدولة (قفل الجلسة) محصور بدولته؛ المشرف العام (lock<=0) ينشئ «كل الدول» (NULL) أو دولة بعينها.
-    $adminCid = (int) orange_admin_session_locked_country_id();
+    // الشاشة تتبع سياق الدولة (السوق الحالي) كبقية الشاشات — لا مفهوم «كل الدول».
+    $ctxCid = orange_cart_promotion_admin_country_id($pdo);
 
     if ($action === 'list') {
         json_response([
             'success' => true,
-            'data' => orange_storefront_promo_messages_admin_list($pdo, $adminCid > 0 ? $adminCid : null),
+            'data' => orange_storefront_promo_messages_admin_list($pdo, $ctxCid > 0 ? $ctxCid : null),
             'slots' => orange_storefront_promo_message_slots(),
             'offer_types' => orange_storefront_promo_message_offer_types(),
             'audiences' => orange_storefront_promo_message_audiences(),
@@ -81,7 +81,6 @@ try {
         $textHi = spm_clip((string) ($data['text_hi'] ?? ''));
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $isAlwaysOn = !empty($data['is_always_on']) ? 1 : 0;
-        $sortOrder = (int) ($data['sort_order'] ?? 0);
         $validFrom = $isAlwaysOn ? null : spm_iso_or_null((string) ($data['valid_from'] ?? ''));
         $validTo = $isAlwaysOn ? null : spm_iso_or_null((string) ($data['valid_to'] ?? ''), true);
         if (!$isAlwaysOn && $validFrom !== null && $validTo !== null && $validTo < $validFrom) {
@@ -126,28 +125,26 @@ try {
             $audience = orange_storefront_promo_message_audience_valid($audienceRaw) ? $audienceRaw : 'all';
         }
 
-        // نطاق الدولة: المشرف المقيّد بدولة لا ينشئ رسائل خارج نطاقه.
-        $reqCountry = array_key_exists('country_id', $data) ? (int) $data['country_id'] : 0;
-        if ($adminCid > 0) {
-            $countryToStore = $adminCid;
-        } else {
-            $countryToStore = $reqCountry > 0 ? $reqCountry : null;
-        }
+        // نطاق الدولة: يُخزَّن دائماً على دولة السياق الحالية (لا يُقبل country_id من الطلب).
+        $countryToStore = $ctxCid > 0 ? $ctxCid : null;
 
         if ($id > 0) {
-            // التأكد أن السجل ضمن نطاق المشرف.
-            if ($adminCid > 0) {
-                $chk = $pdo->prepare('SELECT country_id FROM storefront_promo_messages WHERE id = ? LIMIT 1');
-                $chk->execute([$id]);
-                $existing = $chk->fetch(PDO::FETCH_ASSOC);
-                if (!$existing || ((int) ($existing['country_id'] ?? 0) !== $adminCid)) {
-                    json_response(['success' => false, 'message' => 'لا تملك صلاحية تعديل هذا السجل'], 403);
-                }
+            // التأكد أن السجل ضمن دولة السياق (أو صف قديم بلا دولة يُهاجَر إليها).
+            $chk = $pdo->prepare('SELECT country_id FROM storefront_promo_messages WHERE id = ? LIMIT 1');
+            $chk->execute([$id]);
+            $existing = $chk->fetch(PDO::FETCH_ASSOC);
+            if (!$existing) {
+                json_response(['success' => false, 'message' => 'السجل غير موجود'], 404);
             }
+            $exCid = (int) ($existing['country_id'] ?? 0);
+            if ($exCid !== 0 && $ctxCid > 0 && $exCid !== $ctxCid) {
+                json_response(['success' => false, 'message' => 'هذا السجل يخص دولة أخرى'], 403);
+            }
+            // الترتيب تلقائي: لا يتغيّر عند التعديل (يبقى موضع الصف كما هو).
             $st = $pdo->prepare(
                 'UPDATE storefront_promo_messages
                  SET country_id = ?, slot = ?, audience = ?, offer_type = ?, offer_id = ?, text_ar = ?, text_en = ?, text_fil = ?, text_hi = ?,
-                     is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, sort_order = ?
+                     is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?
                  WHERE id = ?'
             );
             $st->execute([
@@ -164,10 +161,18 @@ try {
                 $isAlwaysOn,
                 $validFrom,
                 $validTo,
-                $sortOrder,
                 $id,
             ]);
         } else {
+            // الترتيب تلقائي: يبدأ من 1 ويزيد 1 لكل رسالة جديدة ضمن دولة السياق.
+            $sortStmt = $pdo->prepare(
+                'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM storefront_promo_messages WHERE (country_id IS NULL OR country_id = ?)'
+            );
+            $sortStmt->execute([$ctxCid > 0 ? $ctxCid : 0]);
+            $sortOrder = (int) $sortStmt->fetchColumn();
+            if ($sortOrder < 1) {
+                $sortOrder = 1;
+            }
             $st = $pdo->prepare(
                 'INSERT INTO storefront_promo_messages
                     (country_id, slot, audience, offer_type, offer_id, text_ar, text_en, text_fil, text_hi, is_active, is_always_on, valid_from, valid_to, sort_order)
@@ -199,12 +204,13 @@ try {
         if ($id <= 0) {
             json_response(['success' => false, 'message' => 'معرّف غير صالح'], 422);
         }
-        if ($adminCid > 0) {
-            $chk = $pdo->prepare('SELECT country_id FROM storefront_promo_messages WHERE id = ? LIMIT 1');
-            $chk->execute([$id]);
-            $existing = $chk->fetch(PDO::FETCH_ASSOC);
-            if (!$existing || ((int) ($existing['country_id'] ?? 0) !== $adminCid)) {
-                json_response(['success' => false, 'message' => 'لا تملك صلاحية حذف هذا السجل'], 403);
+        $chk = $pdo->prepare('SELECT country_id FROM storefront_promo_messages WHERE id = ? LIMIT 1');
+        $chk->execute([$id]);
+        $existing = $chk->fetch(PDO::FETCH_ASSOC);
+        if ($existing) {
+            $exCid = (int) ($existing['country_id'] ?? 0);
+            if ($exCid !== 0 && $ctxCid > 0 && $exCid !== $ctxCid) {
+                json_response(['success' => false, 'message' => 'هذا السجل يخص دولة أخرى'], 403);
             }
         }
         $st = $pdo->prepare('DELETE FROM storefront_promo_messages WHERE id = ?');

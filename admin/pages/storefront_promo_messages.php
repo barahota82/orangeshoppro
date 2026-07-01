@@ -41,7 +41,7 @@ foreach ($spmCountries as $c) {
 ?>
 <div class="page-title">
     <h1>الرسائل التحفيزية للواجهة</h1>
-    <p class="card-hint" style="margin:0.35rem 0 0;">نصوص تحفيزية يتحكّم بها المشرف وتظهر في خانات مُسمّاة بالواجهة (بنطاق دولة وجدولة) دون تعديل أكواد.</p>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?> — نصوص تحفيزية تظهر في خانات مُسمّاة بالواجهة (بجدولة) دون تعديل أكواد.</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -53,11 +53,8 @@ foreach ($spmCountries as $c) {
 <div class="card">
     <h3>إضافة / تعديل</h3>
     <input type="hidden" id="spm_id" value="0">
+    <input type="hidden" id="spm_sort" value="0">
     <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:14px;">
-        <div style="max-width:140px;">
-            <label for="spm_sort">الترتيب</label>
-            <input type="number" id="spm_sort" class="admin-inp" value="0" step="1" style="text-align:center;">
-        </div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="spm_active" checked> نشط
         </label>
@@ -71,17 +68,6 @@ foreach ($spmCountries as $c) {
                 <?php endforeach; ?>
             </select>
         </div>
-        <?php if ($spmIsGlobal): ?>
-        <div>
-            <label for="spm_country">الدولة</label>
-            <select id="spm_country" class="admin-inp">
-                <option value="">كل الدول</option>
-                <?php foreach ($spmCountries as $c): ?>
-                <option value="<?php echo (int) $c['id']; ?>"><?php echo htmlspecialchars($c['label'], ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <?php endif; ?>
     </div>
     <div class="form-grid" id="spm_audience_wrap">
         <div>
@@ -146,7 +132,6 @@ foreach ($spmCountries as $c) {
                     <th>#</th>
                     <th>الخانة</th>
                     <th>النص (عربي)</th>
-                    <th>الدولة</th>
                     <th>الفترة</th>
                     <th>الحالة</th>
                     <th>ترتيب</th>
@@ -316,7 +301,6 @@ async function loadSpm() {
             '<td>' + escSpm(r.id) + '</td>' +
             '<td>' + escSpm(slotLabel) + '</td>' +
             '<td>' + escSpm(r.text_ar) + '</td>' +
-            '<td>' + escSpm(spmCountryLabel(r.country_id)) + '</td>' +
             '<td dir="ltr">' + escSpm(ocpScheduleLabel(r)) + '</td>' +
             '<td>' + escSpm(ocpStatusLabel(r)) + '</td>' +
             '<td>' + escSpm(r.sort_order) + '</td>' +
