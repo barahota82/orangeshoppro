@@ -45,7 +45,6 @@ $hasCountryDefaultCol = orange_channels_has_country_default_column($pdo);
     <h1>الواجهات (قنوات العملاء)</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars(orange_admin_page_country_label($pdo), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
-<p style="margin:0.6rem 0 0;"><a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=channel_analytics'), ENT_QUOTES, 'UTF-8'); ?>">تحليل أداء القنوات (مبيعات، أكثر منتج، ترتيب النشاط)</a></p>
 
 <div class="card">
     <h3><?php echo $editRow ? 'تعديل واجهة' : 'إضافة واجهة'; ?></h3>
@@ -113,6 +112,7 @@ $hasCountryDefaultCol = orange_channels_has_country_default_column($pdo);
         <?php if ($editRow): ?>
             <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=channels'), ENT_QUOTES, 'UTF-8'); ?>">إلغاء التعديل</a>
         <?php endif; ?>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=channel_analytics'), ENT_QUOTES, 'UTF-8'); ?>" style="margin-right:auto;">تحليل أداء القنوات (مبيعات، أكثر منتج، ترتيب النشاط)</a>
     </div>
 </div>
 

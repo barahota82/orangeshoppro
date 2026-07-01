@@ -11,7 +11,6 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $hasAreasTable = orange_table_exists($pdo, 'delivery_areas');
 $hasGovTable = orange_delivery_governorates_table_exists($pdo);
-$adminCountries = orange_countries_admin_list($pdo);
 $adminCountryId = orange_admin_context_country_id($pdo);
 $adminCountryRow = orange_country_row_by_id($pdo, $adminCountryId, false);
 $activeAreasCount = $hasAreasTable ? orange_delivery_areas_count_active($pdo, $adminCountryId) : 0;
@@ -54,23 +53,6 @@ $daDeliveryCompanies = ($hasGovCompanyCol && $adminCountryId > 0)
 <?php if (!$hasAreasTable): ?>
 <div class="card">
     <div class="alert-error">جدول <code>delivery_areas</code> غير جاهز.</div>
-</div>
-<?php endif; ?>
-
-<?php if (count($adminCountries) > 0): ?>
-<div class="card">
-    <h3>الدولة</h3>
-    <label for="da_admin_country">الدولة</label>
-    <select id="da_admin_country" onchange="daSwitchAdminCountry(this.value)" style="max-width:320px;">
-        <?php foreach ($adminCountries as $cRow): ?>
-            <?php
-            $cid = (int) ($cRow['id'] ?? 0);
-            $code = htmlspecialchars((string) ($cRow['code'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $label = htmlspecialchars(trim((string) ($cRow['name_ar'] ?? '') . ' (' . (string) ($cRow['code'] ?? '') . ')'), ENT_QUOTES, 'UTF-8');
-            ?>
-        <option value="<?php echo $code; ?>"<?php echo $cid === $adminCountryId ? ' selected' : ''; ?>><?php echo $label; ?></option>
-        <?php endforeach; ?>
-    </select>
 </div>
 <?php endif; ?>
 
@@ -931,14 +913,6 @@ function refreshDaSortPreview() {
 
 function daCountryId() {
     return parseInt(document.getElementById('da_country_id').value, 10) || 0;
-}
-
-function daSwitchAdminCountry(code) {
-    if (!code) return;
-    var u = new URL(window.location.href);
-    u.searchParams.set('page', 'delivery_areas');
-    u.searchParams.set('admin_country', String(code));
-    window.location.href = u.pathname + '?' + u.searchParams.toString();
 }
 
 function escHtml(s) {

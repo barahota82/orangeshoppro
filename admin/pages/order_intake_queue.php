@@ -229,7 +229,7 @@ $statusLabel = [
                 echo '<a class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '" href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') . '</a>';
             }
             ?>
-            <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/api/order_intake/export-excel.php?status=' . rawurlencode($statusFilter)), ENT_QUOTES, 'UTF-8'); ?>">تصدير Excel</a>
+            <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/api/order_intake/export-excel.php?status=' . rawurlencode($statusFilter)), ENT_QUOTES, 'UTF-8'); ?>">Excel</a>
         </div>
         <a class="btn-secondary" style="margin-inline-start:auto;" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
     </div>

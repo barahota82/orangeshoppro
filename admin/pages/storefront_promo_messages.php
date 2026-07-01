@@ -92,7 +92,7 @@ foreach ($spmCountries as $c) {
             <p class="card-hint" style="margin:4px 0 0;">رقم العرض من شاشة عروض المنتج/الكومبو/BOGO المعنية.</p>
         </div>
     </div>
-    <div class="form-grid">
+    <div class="form-grid" style="margin-top:1rem;">
         <div>
             <label for="spm_text_ar">النص (عربي)</label>
             <textarea id="spm_text_ar" class="admin-inp" rows="2" dir="auto" maxlength="500" placeholder="مثال: خصومات العيد الآن — لا تفوّت العروض!"></textarea>

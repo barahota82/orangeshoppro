@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
+require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/report_export.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -72,6 +74,75 @@ if ($hasAuditTable) {
     $rowsSt->execute($whereParams);
     $rows = $rowsSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
+
+if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $hasAuditTable) {
+    $exportSql = $hasAdmins
+        ? 'SELECT l.id, l.created_at, l.admin_id, l.action, l.message, l.entity_table, l.entity_id,
+                a.username AS admin_username
+                FROM orange_admin_audit_log l
+                LEFT JOIN admins a ON a.id = l.admin_id
+                ' . $whereSql . '
+                ORDER BY l.id DESC
+                LIMIT 8000'
+        : 'SELECT l.id, l.created_at, l.admin_id, l.action, l.message, l.entity_table, l.entity_id,
+                NULL AS admin_username
+                FROM orange_admin_audit_log l
+                ' . $whereSql . '
+                ORDER BY l.id DESC
+                LIMIT 8000';
+    $exportSt = $pdo->prepare($exportSql);
+    $exportSt->execute($whereParams);
+    $exportRows = $exportSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $subtitleParts = [];
+    if ($fromYmd !== '') {
+        $subtitleParts[] = 'من ' . orange_format_date_dmY($fromYmd);
+    }
+    if ($toYmd !== '') {
+        $subtitleParts[] = 'إلى ' . orange_format_date_dmY($toYmd);
+    }
+    if ($adminFilterId > 0) {
+        foreach ($adminOptions as $aOpt) {
+            if ((int) ($aOpt['id'] ?? 0) === $adminFilterId) {
+                $u = trim((string) ($aOpt['username'] ?? ''));
+                $subtitleParts[] = 'المستخدم: ' . ($u !== '' ? $u : ('#' . $adminFilterId));
+                break;
+            }
+        }
+    }
+    $subtitle = $subtitleParts !== [] ? implode(' — ', $subtitleParts) . ' — عدد الصفوف: ' . count($exportRows) : 'عدد الصفوف: ' . count($exportRows);
+
+    $xlsRows = [];
+    foreach ($exportRows as $r) {
+        $u = trim((string) ($r['admin_username'] ?? ''));
+        if ($u === '') {
+            $aid = isset($r['admin_id']) ? (int) $r['admin_id'] : 0;
+            $u = $aid > 0 ? '#' . $aid : '—';
+        }
+        $et = (string) ($r['entity_table'] ?? '');
+        $ei = (string) ($r['entity_id'] ?? '');
+        $entity = $et !== '' ? $et . ($ei !== '' ? ' #' . $ei : '') : '—';
+        $xlsRows[] = [
+            (int) ($r['id'] ?? 0),
+            orange_format_datetime_dmY_hi((string) ($r['created_at'] ?? '')),
+            $u,
+            (string) ($r['action'] ?? ''),
+            (string) ($r['message'] ?? ''),
+            $entity,
+        ];
+    }
+
+    orange_report_xls_output(
+        'سجل النشاط',
+        'سجل النشاط',
+        orange_company_settings_name_ar($pdo),
+        $subtitle,
+        ['#', 'الوقت', 'المستخدم', 'الإجراء', 'الوصف', 'الكيان'],
+        $xlsRows,
+        [0]
+    );
+    exit;
+}
 ?>
 <div class="page-title">
     <h1>سجل النشاط</h1>
@@ -113,6 +184,13 @@ if ($hasAuditTable) {
         </div>
         <div class="logs-filter-actions">
             <button type="submit">بحث</button>
+            <?php
+            $logsXlsQ = $_GET;
+            $logsXlsQ['page'] = 'logs';
+            $logsXlsQ['export'] = 'xls';
+            $logsXlsHref = storefront_public_path('/admin/index.php') . '?' . http_build_query($logsXlsQ);
+            ?>
+            <a class="btn-secondary" data-server-export href="<?php echo htmlspecialchars($logsXlsHref, ENT_QUOTES, 'UTF-8'); ?>">Excel</a>
             <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=logs'), ENT_QUOTES, 'UTF-8'); ?>">إعادة ضبط</a>
         </div>
     </form>
