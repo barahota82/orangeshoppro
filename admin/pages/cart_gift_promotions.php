@@ -534,7 +534,7 @@ function cgpToggleFixedCharge() {
         inp.removeAttribute('max');
         inp.step = '0.0001';
     } else {
-        lab.textContent = 'المبلغ المخصوم من سعر التجزئة للوحدة (د.ك)';
+        lab.textContent = 'مبلغ مخصوم من سعر الوحدة (د.ك)';
         inp.removeAttribute('max');
         inp.step = '0.0001';
     }
