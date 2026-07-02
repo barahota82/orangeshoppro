@@ -213,7 +213,25 @@ try {
 
         orange_storefront_insert_order_items_for_order($pdo, $orderId, $linesForStock);
 
-        orange_order_apply_pending_stock_reservation($pdo, $orderNumber, $linesForStock);
+        require_once __DIR__ . '/../../includes/countries.php';
+        $stockCountryId = isset($order['country_id']) ? (int) $order['country_id'] : 0;
+        $stockWarehouseId = isset($order['warehouse_id']) ? (int) $order['warehouse_id'] : 0;
+        if ($stockCountryId <= 0 && isset($order['channel_id'])) {
+            $stockCountryId = orange_country_id_for_channel($pdo, (int) $order['channel_id']);
+        }
+        if ($stockCountryId <= 0) {
+            $stockCountryId = orange_storefront_current_country_id($pdo);
+        }
+        if ($stockWarehouseId <= 0) {
+            $stockWarehouseId = orange_warehouse_default_id_for_country($pdo, $stockCountryId);
+        }
+        orange_order_apply_pending_stock_reservation(
+            $pdo,
+            $orderNumber,
+            $linesForStock,
+            $stockCountryId > 0 ? $stockCountryId : null,
+            $stockWarehouseId > 0 ? $stockWarehouseId : null
+        );
 
         $pdo->commit();
     } catch (Throwable $e) {

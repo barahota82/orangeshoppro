@@ -484,6 +484,9 @@ function orange_bank_reconciliation_close(
             $voucherId > 0 ? $voucherId : null,
             $id,
         ]);
+        if ($upd->rowCount() === 0) {
+            throw new RuntimeException('تعذّر إقفال التسوية.');
+        }
 
         $pdo->commit();
     } catch (Throwable $e) {

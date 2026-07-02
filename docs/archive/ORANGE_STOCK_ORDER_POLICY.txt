@@ -143,4 +143,20 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
      * `api/auth/verify-checkout-email-otp.php` (تحقق OTP، حد محاولات، تسجيل دخول جلسة، مسح حالة OTP بعد النجاح).
      * `pages/cart.php` + `assets/js/cart.js`: زر إرسال OTP يدوي، إدخال/تحقق OTP، إعادة إرسال، تجاهل تسجيل الدخول، ثم إعادة حساب `checkout-preview` فور نجاح التحقق لضمان ظهور مزايا المسجّل بنفس إجمالي التنفيذ.
 
+16) حذف المنتج مقابل تعطيله (قرار مالك نهائي — ISSUE-03 — 2026-07-01)
+   - **حذف نهائي (hard delete):** مسموح **فقط** لمنتج catalog **جديد** بلا أي أثر تجاري أو تاريخي.
+   - **تعطيل (إخفاء من المتجر):** المسار **الاعتيادي** — `admin/api/products/toggle.php` → `products.is_active = 0` (الواجهة تستعمله من `admin/pages/products.php`). **لا** يُغيّر `delete.php` حالة `is_active` تلقائياً عند الرفض.
+   - **يُمنع الحذف النهائي** إن وُجد أيّ من: `order_items` · `purchase_items` · `purchase_return_items` · `sales_return_items` · `stock_movements` (product_id أو variant_id) · `warehouse_variant_stock` بكمية ≠ 0 · `inventory_cost_layers` · `inventory_cost_consumptions` · `inventory_reconciliation_line` · `stock_adjustment_voucher_line` · أعمدة هدايا الطلب `orders.cart_gift_variant_id` / `cart_bogo_gift_variant_id` لمتغيّرات هذا المنتج.
+   - **عند المنع:** `admin/api/products/delete.php` يُرجِع **422** برسالة واضحة: عطّل المنتج (`is_active = 0`) بدلاً من الحذف — **دون** تعديل `is_active`.
+   - **ممنوع:** `DELETE FROM stock_movements` ضمن مسار حذف المنتج — السجل التاريخي للمخزون يبقى.
+   - **إن سُمح الحذف:** يُزال catalog-only فقط: `offers` · `product_channels` · `product_images` · `product_attribute_values` · `product_colorway_images` · `product_colorways` · `warehouse_variant_stock` (صفوف المتغيّرات) · `product_variants` · `products` — **لا** طلبات/مشتريات/مردودات/FIFO/GL.
+   - **تنفيذ:** `includes/product_delete_policy.php` (فحص) + `admin/api/products/delete.php`.
+
+17) إكمال الطلب المزدوج المتزامن — ISSUE-05 (قرار مالك — مؤكَّد، مؤجَّل — 2026-07-01)
+   - **المشكلة (مؤكَّدة):** طلبَا «تم التسليم» (`completed`) متزامنان على نفس `orders.id` يمكن أن يمرّا كلاهما حارس `orange_order_stock_fulfillment_already_done()` (قراءات بلا قفل) فيُنفَّذ `orange_complete_order_fulfillment()` مرتين — خصم مخزون مزدوج (`delivered_order`) و/أو استهلاك FIFO مزدوج؛ أشدّه على الطلبات **بلا** حجز `pending_order` (مسار يدوي/أدمن).
+   - **المسارات المتأثرة:** `admin/api/orders/update-status.php` · `admin/api/orders/update.php` · `admin/api/orders/bulk-update-status.php` → `orange_complete_order_fulfillment()` في `includes/order_fulfillment.php`.
+   - **الإصلاح الم minimal المقترَح (FOR UPDATE على صف الطلب فقط):** **مرفوض كـ patch معزول** — يُ serializes إكمالاً مزدوجاً لكنه يعكس ترتيب القفل الحالي لمسارات **تعديل/إلغاء** الحجز: amend/cancel تُقفل `warehouse_variant_stock` (وتحرّر الحجز) **قبل** `UPDATE orders`، بينما الإكمال سيقفل `orders` **قبل** مخزون/FIFO — خطر **deadlock (1213)** عند تداخل amend/cancel مع complete على نفس الطلب (مثلاً `approved` + تعديل عميل + تسليم أدمن).
+   - **قرار معماري:** الإصلاح **الآمن** يتطلّب **توحيد ترتيب القفل** عبر مسارات الإكمال + التعديل + الإلغاء (ويفضّل ترتيباً ثابتاً على `orders.id` في التحديث الجماعي) — **لا** `SELECT … FOR UPDATE` على `orders` في نقاط الإكمال وحدها دون ذلك.
+   - **الحالة:** **مؤجَّل** حتى جلسة «lock-order harmonization» مخطَّطة؛ **لا تنفيذ** ISSUE-05 في الريبو قبلها.
+
 Agreed with project owner for Orange implementation.

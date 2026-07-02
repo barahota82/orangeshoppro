@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/order_stock.php';
 require_once __DIR__ . '/../../includes/phone_validation.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
+require_once __DIR__ . '/../../includes/loyalty.php';
 
 try {
     $pdo = db();
@@ -54,6 +55,9 @@ try {
     $pdo->beginTransaction();
 
     orange_order_release_pending_stock_reservation($pdo, $order);
+    if (in_array($st, ['pending', 'approved', 'on_the_way'], true)) {
+        orange_loyalty_restore_for_order($pdo, (int) $order['id']);
+    }
 
     $pdo->prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?")
         ->execute([(int)$order['id']]);

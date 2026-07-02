@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../includes/order_fulfillment.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/loyalty.php';
 require_admin_api();
 
 try {
@@ -62,6 +63,7 @@ try {
         && in_array($prevStatus, ['pending', 'approved', 'on_the_way'], true)
     ) {
         orange_order_release_pending_stock_reservation($pdo, $order);
+        orange_loyalty_restore_for_order($pdo, $id);
     }
 
     $completedAtSql = '';

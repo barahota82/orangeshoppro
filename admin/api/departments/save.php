@@ -68,21 +68,29 @@ try {
         }
     }
 
-    if ($hasNameFil && $hasNameHi) {
-        $stmt = $pdo->prepare(
-            'INSERT INTO departments (name_en, name_ar, name_fil, name_hi, slug, is_active, sort_order) VALUES (?, ?, ?, ?, ?, 1, ?)'
-        );
-        $stmt->execute([$nameEn, $nameAr, $nameFil, $nameHi, $candidate, $sort]);
-    } else {
-        $stmt = $pdo->prepare(
-            'INSERT INTO departments (name_en, name_ar, slug, is_active, sort_order) VALUES (?, ?, ?, 1, ?)'
-        );
-        $stmt->execute([$nameEn, $nameAr, $candidate, $sort]);
-    }
+    $pdo->beginTransaction();
+    try {
+        if ($hasNameFil && $hasNameHi) {
+            $insertSql = 'INSERT INTO departments (name_en, name_ar, name_fil, name_hi, slug, is_active, sort_order) VALUES (?, ?, ?, ?, ?, 1, ?)';
+            $insertParams = [$nameEn, $nameAr, $nameFil, $nameHi, $candidate, $sort];
+        } else {
+            $insertSql = 'INSERT INTO departments (name_en, name_ar, slug, is_active, sort_order) VALUES (?, ?, ?, 1, ?)';
+            $insertParams = [$nameEn, $nameAr, $candidate, $sort];
+        }
+        $stmt = $pdo->prepare($insertSql);
+        $stmt->execute($insertParams);
 
-    $newId = (int) $pdo->lastInsertId();
-    if ($newId > 0) {
-        orange_department_countries_seed_inactive_all($pdo, $newId);
+        $newId = (int) $pdo->lastInsertId();
+        if ($newId > 0) {
+            orange_department_countries_seed_inactive_all($pdo, $newId);
+        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
     }
 
     json_response(['success' => true, 'message' => 'تم حفظ القسم', 'slug' => $candidate]);

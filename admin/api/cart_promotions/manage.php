@@ -97,67 +97,77 @@ try {
             json_response(['success' => false, 'message' => $e->getMessage()], 403);
         }
 
-        if ($id > 0) {
-            orange_cart_promo_clear_auto_pause($pdo, 'cart_promotions', $id);
-            // الترتيب تلقائي بالكامل: لا يُمَسّ عند التعديل (مثل عروض التوصيل).
-            $st = $pdo->prepare(
-                'UPDATE cart_promotions SET name_ar = ?, name_en = ?, show_name_to_customer = ?, min_subtotal = ?, discount_amount = ?, requires_registered_account = ?, first_delivered_order_only = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
-            );
-            $st->execute([
-                $nameAr,
-                $nameEn,
-                $showNameToCustomer,
-                $minSub,
-                $disc,
-                $reqReg,
-                $firstDeliveredOnly,
-                $isActive,
-                $isAlwaysOn,
-                $bounds['valid_from'],
-                $bounds['valid_to'],
-                $id,
-            ]);
-            orange_promo_always_on_sync_history(
-                $pdo,
-                'cart_promotions',
-                $id,
-                $isAlwaysOn,
-                orange_cart_promotion_admin_country_id($pdo)
-            );
-        } else {
-            // الترتيب تلقائي: التالي ضمن نفس الدولة (يتجاهل أي إدخال يدوي).
-            $sortBind = orange_cart_promotion_sql_bind($pdo, 'cart_promotions', '', $insertCountryId);
-            $stSort = $pdo->prepare(
-                'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cart_promotions WHERE 1=1' . $sortBind['sql']
-            );
-            $stSort->execute($sortBind['params']);
-            $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
-            $st = $pdo->prepare(
-                'INSERT INTO cart_promotions (country_id, name_ar, name_en, show_name_to_customer, min_subtotal, discount_amount, requires_registered_account, first_delivered_order_only, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-            );
-            $st->execute([
-                $insertCountryId,
-                $nameAr,
-                $nameEn,
-                $showNameToCustomer,
-                $minSub,
-                $disc,
-                $reqReg,
-                $firstDeliveredOnly,
-                $sortOrder,
-                $isActive,
-                $isAlwaysOn,
-                $bounds['valid_from'],
-                $bounds['valid_to'],
-            ]);
-            $newId = (int) $pdo->lastInsertId();
-            orange_promo_always_on_sync_history(
-                $pdo,
-                'cart_promotions',
-                $newId,
-                $isAlwaysOn,
-                $insertCountryId > 0 ? $insertCountryId : orange_cart_promotion_admin_country_id($pdo)
-            );
+        $pdo->beginTransaction();
+        try {
+            if ($id > 0) {
+                orange_cart_promo_clear_auto_pause($pdo, 'cart_promotions', $id);
+                // الترتيب تلقائي بالكامل: لا يُمَسّ عند التعديل (مثل عروض التوصيل).
+                $st = $pdo->prepare(
+                    'UPDATE cart_promotions SET name_ar = ?, name_en = ?, show_name_to_customer = ?, min_subtotal = ?, discount_amount = ?, requires_registered_account = ?, first_delivered_order_only = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
+                );
+                $st->execute([
+                    $nameAr,
+                    $nameEn,
+                    $showNameToCustomer,
+                    $minSub,
+                    $disc,
+                    $reqReg,
+                    $firstDeliveredOnly,
+                    $isActive,
+                    $isAlwaysOn,
+                    $bounds['valid_from'],
+                    $bounds['valid_to'],
+                    $id,
+                ]);
+                orange_promo_always_on_sync_history(
+                    $pdo,
+                    'cart_promotions',
+                    $id,
+                    $isAlwaysOn,
+                    orange_cart_promotion_admin_country_id($pdo)
+                );
+            } else {
+                // الترتيب تلقائي: التالي ضمن نفس الدولة (يتجاهل أي إدخال يدوي).
+                $sortBind = orange_cart_promotion_sql_bind($pdo, 'cart_promotions', '', $insertCountryId);
+                $stSort = $pdo->prepare(
+                    'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cart_promotions WHERE 1=1' . $sortBind['sql']
+                );
+                $stSort->execute($sortBind['params']);
+                $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
+                $st = $pdo->prepare(
+                    'INSERT INTO cart_promotions (country_id, name_ar, name_en, show_name_to_customer, min_subtotal, discount_amount, requires_registered_account, first_delivered_order_only, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                );
+                $st->execute([
+                    $insertCountryId,
+                    $nameAr,
+                    $nameEn,
+                    $showNameToCustomer,
+                    $minSub,
+                    $disc,
+                    $reqReg,
+                    $firstDeliveredOnly,
+                    $sortOrder,
+                    $isActive,
+                    $isAlwaysOn,
+                    $bounds['valid_from'],
+                    $bounds['valid_to'],
+                ]);
+                $newId = (int) $pdo->lastInsertId();
+                orange_promo_always_on_sync_history(
+                    $pdo,
+                    'cart_promotions',
+                    $newId,
+                    $isAlwaysOn,
+                    $insertCountryId > 0 ? $insertCountryId : orange_cart_promotion_admin_country_id($pdo)
+                );
+            }
+
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
         }
 
         json_response(['success' => true, 'message' => 'تم حفظ عرض السلة']);

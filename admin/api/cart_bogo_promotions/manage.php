@@ -387,136 +387,146 @@ try {
         $hasPoolCfg = orange_table_has_column($pdo, 'cart_bogo_promotions', 'gift_pool_config');
         $hasMaxPick = orange_table_has_column($pdo, 'cart_bogo_promotions', 'max_gifts_pickable');
 
-        if ($id > 0) {
-            orange_cart_promo_clear_auto_pause($pdo, 'cart_bogo_promotions', $id);
-            $sets = [
-                'name_ar = ?',
-                'name_en = ?',
-                'show_name_to_customer = ?',
-                'show_old_price_to_customer = ?',
-                'bogo_kind = ?',
-                'category_id = ?',
-                'same_variant_product_id = ?',
-                'min_buy_qty = ?',
-                'buy_components_json = ?',
-                'requires_registered_account = ?',
-                'first_delivered_order_only = ?',
-                'gift_kind = ?',
-                'gift_customer_picks_variant = ?',
-                'fixed_variant_id = ?',
-                'pool_variant_ids = ?',
-                'gift_unit_charge_kind = ?',
-                'gift_unit_charge_value = ?',
-                'is_active = ?',
-                'is_always_on = ?',
-                'valid_from = ?',
-                'valid_to = ?',
-                'auto_paused_at = NULL',
-                'auto_paused_reason = NULL',
-            ];
-            $params = [
-                $nameAr,
-                $nameEn,
-                $showNameToCustomer,
-                $showOldPrice,
-                $bogoKind,
-                $catSql,
-                $svSql,
-                $minBuy,
-                $buyJson,
-                $reqReg,
-                $firstDeliveredOnly,
-                $giftKind,
-                $customerPicksVariant,
-                $giftKind === 'fixed' ? $fixedVid : null,
-                $giftKind === 'choice' ? $poolJson : null,
-                $giftChargeKind,
-                $giftChargeVal,
-                $isActive,
-                $isAlwaysOn,
-                $bounds['valid_from'],
-                $bounds['valid_to'],
-            ];
-            if ($hasPoolCfg) {
-                $sets[] = 'gift_pool_config = ?';
-                $params[] = $giftPoolConfigJson;
+        $pdo->beginTransaction();
+        try {
+            if ($id > 0) {
+                orange_cart_promo_clear_auto_pause($pdo, 'cart_bogo_promotions', $id);
+                $sets = [
+                    'name_ar = ?',
+                    'name_en = ?',
+                    'show_name_to_customer = ?',
+                    'show_old_price_to_customer = ?',
+                    'bogo_kind = ?',
+                    'category_id = ?',
+                    'same_variant_product_id = ?',
+                    'min_buy_qty = ?',
+                    'buy_components_json = ?',
+                    'requires_registered_account = ?',
+                    'first_delivered_order_only = ?',
+                    'gift_kind = ?',
+                    'gift_customer_picks_variant = ?',
+                    'fixed_variant_id = ?',
+                    'pool_variant_ids = ?',
+                    'gift_unit_charge_kind = ?',
+                    'gift_unit_charge_value = ?',
+                    'is_active = ?',
+                    'is_always_on = ?',
+                    'valid_from = ?',
+                    'valid_to = ?',
+                    'auto_paused_at = NULL',
+                    'auto_paused_reason = NULL',
+                ];
+                $params = [
+                    $nameAr,
+                    $nameEn,
+                    $showNameToCustomer,
+                    $showOldPrice,
+                    $bogoKind,
+                    $catSql,
+                    $svSql,
+                    $minBuy,
+                    $buyJson,
+                    $reqReg,
+                    $firstDeliveredOnly,
+                    $giftKind,
+                    $customerPicksVariant,
+                    $giftKind === 'fixed' ? $fixedVid : null,
+                    $giftKind === 'choice' ? $poolJson : null,
+                    $giftChargeKind,
+                    $giftChargeVal,
+                    $isActive,
+                    $isAlwaysOn,
+                    $bounds['valid_from'],
+                    $bounds['valid_to'],
+                ];
+                if ($hasPoolCfg) {
+                    $sets[] = 'gift_pool_config = ?';
+                    $params[] = $giftPoolConfigJson;
+                }
+                if ($hasMaxPick) {
+                    $sets[] = 'max_gifts_pickable = ?';
+                    $params[] = $maxGiftsPickable;
+                }
+                $params[] = $id;
+                $st = $pdo->prepare(
+                    'UPDATE cart_bogo_promotions SET ' . implode(', ', $sets) . ' WHERE id = ?'
+                );
+                $st->execute($params);
+                orange_promo_always_on_sync_history(
+                    $pdo,
+                    'cart_bogo_promotions',
+                    $id,
+                    $isAlwaysOn,
+                    orange_cart_promotion_admin_country_id($pdo)
+                );
+            } else {
+                $sortBind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $insertCountryId);
+                $stSort = $pdo->prepare(
+                    'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cart_bogo_promotions WHERE 1=1' . $sortBind['sql']
+                );
+                $stSort->execute($sortBind['params']);
+                $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
+                $cols = [
+                    'country_id', 'name_ar', 'name_en', 'show_name_to_customer', 'show_old_price_to_customer',
+                    'bogo_kind', 'category_id', 'same_variant_product_id', 'min_buy_qty', 'buy_components_json',
+                    'requires_registered_account', 'first_delivered_order_only', 'gift_kind', 'gift_customer_picks_variant',
+                    'fixed_variant_id', 'pool_variant_ids', 'gift_unit_charge_kind', 'gift_unit_charge_value',
+                    'sort_order', 'is_active', 'is_always_on', 'valid_from', 'valid_to',
+                ];
+                $params = [
+                    $insertCountryId,
+                    $nameAr,
+                    $nameEn,
+                    $showNameToCustomer,
+                    $showOldPrice,
+                    $bogoKind,
+                    $catSql,
+                    $svSql,
+                    $minBuy,
+                    $buyJson,
+                    $reqReg,
+                    $firstDeliveredOnly,
+                    $giftKind,
+                    $customerPicksVariant,
+                    $giftKind === 'fixed' ? $fixedVid : null,
+                    $giftKind === 'choice' ? $poolJson : null,
+                    $giftChargeKind,
+                    $giftChargeVal,
+                    $sortOrder,
+                    $isActive,
+                    $isAlwaysOn,
+                    $bounds['valid_from'],
+                    $bounds['valid_to'],
+                ];
+                if ($hasPoolCfg) {
+                    $cols[] = 'gift_pool_config';
+                    $params[] = $giftPoolConfigJson;
+                }
+                if ($hasMaxPick) {
+                    $cols[] = 'max_gifts_pickable';
+                    $params[] = $maxGiftsPickable;
+                }
+                $ph = implode(',', array_fill(0, count($cols), '?'));
+                $st = $pdo->prepare(
+                    'INSERT INTO cart_bogo_promotions (' . implode(', ', $cols) . ') VALUES (' . $ph . ')'
+                );
+                $st->execute($params);
+                $newId = (int) $pdo->lastInsertId();
+                orange_promo_always_on_sync_history(
+                    $pdo,
+                    'cart_bogo_promotions',
+                    $newId,
+                    $isAlwaysOn,
+                    $insertCountryId > 0 ? $insertCountryId : orange_cart_promotion_admin_country_id($pdo)
+                );
             }
-            if ($hasMaxPick) {
-                $sets[] = 'max_gifts_pickable = ?';
-                $params[] = $maxGiftsPickable;
+
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
             }
-            $params[] = $id;
-            $st = $pdo->prepare(
-                'UPDATE cart_bogo_promotions SET ' . implode(', ', $sets) . ' WHERE id = ?'
-            );
-            $st->execute($params);
-            orange_promo_always_on_sync_history(
-                $pdo,
-                'cart_bogo_promotions',
-                $id,
-                $isAlwaysOn,
-                orange_cart_promotion_admin_country_id($pdo)
-            );
-        } else {
-            $sortBind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $insertCountryId);
-            $stSort = $pdo->prepare(
-                'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cart_bogo_promotions WHERE 1=1' . $sortBind['sql']
-            );
-            $stSort->execute($sortBind['params']);
-            $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
-            $cols = [
-                'country_id', 'name_ar', 'name_en', 'show_name_to_customer', 'show_old_price_to_customer',
-                'bogo_kind', 'category_id', 'same_variant_product_id', 'min_buy_qty', 'buy_components_json',
-                'requires_registered_account', 'first_delivered_order_only', 'gift_kind', 'gift_customer_picks_variant',
-                'fixed_variant_id', 'pool_variant_ids', 'gift_unit_charge_kind', 'gift_unit_charge_value',
-                'sort_order', 'is_active', 'is_always_on', 'valid_from', 'valid_to',
-            ];
-            $params = [
-                $insertCountryId,
-                $nameAr,
-                $nameEn,
-                $showNameToCustomer,
-                $showOldPrice,
-                $bogoKind,
-                $catSql,
-                $svSql,
-                $minBuy,
-                $buyJson,
-                $reqReg,
-                $firstDeliveredOnly,
-                $giftKind,
-                $customerPicksVariant,
-                $giftKind === 'fixed' ? $fixedVid : null,
-                $giftKind === 'choice' ? $poolJson : null,
-                $giftChargeKind,
-                $giftChargeVal,
-                $sortOrder,
-                $isActive,
-                $isAlwaysOn,
-                $bounds['valid_from'],
-                $bounds['valid_to'],
-            ];
-            if ($hasPoolCfg) {
-                $cols[] = 'gift_pool_config';
-                $params[] = $giftPoolConfigJson;
-            }
-            if ($hasMaxPick) {
-                $cols[] = 'max_gifts_pickable';
-                $params[] = $maxGiftsPickable;
-            }
-            $ph = implode(',', array_fill(0, count($cols), '?'));
-            $st = $pdo->prepare(
-                'INSERT INTO cart_bogo_promotions (' . implode(', ', $cols) . ') VALUES (' . $ph . ')'
-            );
-            $st->execute($params);
-            $newId = (int) $pdo->lastInsertId();
-            orange_promo_always_on_sync_history(
-                $pdo,
-                'cart_bogo_promotions',
-                $newId,
-                $isAlwaysOn,
-                $insertCountryId > 0 ? $insertCountryId : orange_cart_promotion_admin_country_id($pdo)
-            );
+            throw $e;
         }
 
         json_response(['success' => true, 'message' => 'تم حفظ عرض BOGO']);

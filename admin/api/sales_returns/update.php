@@ -83,7 +83,7 @@ function apply_sales_return_items(
         if ($net <= 0.0001) {
             throw new RuntimeException('صافي سطر المردود غير صالح');
         }
-        $unitCost = orange_sales_return_resolve_unit_cost($pdo, $productId, (float) $line['cost']);
+        $unitCost = orange_sales_return_resolve_unit_cost($pdo, $productId, (float) $line['cost'], $variantId);
         $lineCost = round($unitCost * $qty, 4);
         $revenueTotal += $net;
         $cogsTotal += $lineCost;

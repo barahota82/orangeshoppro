@@ -158,69 +158,79 @@ try {
             json_response(['success' => false, 'message' => $e->getMessage()], 403);
         }
 
-        if ($id > 0) {
-            orange_cart_promo_clear_auto_pause($pdo, 'cart_combo_promotions', $id);
-            // الترتيب تلقائي بالكامل: لا يُمَسّ عند التعديل.
-            $st = $pdo->prepare(
-                'UPDATE cart_combo_promotions SET title_ar = ?, title_en = ?, show_name_to_customer = ?, show_old_price_to_customer = ?, components_json = ?, combo_price = ?, requires_registered_account = ?, first_delivered_order_only = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
-            );
-            $st->execute([
-                $titleAr,
-                $titleEn,
-                $showNameToCustomer,
-                $showOldPrice,
-                $json,
-                $comboPrice,
-                $reqReg,
-                $firstDeliveredOnly,
-                $isActive,
-                $isAlwaysOn,
-                $bounds['valid_from'],
-                $bounds['valid_to'],
-                $id,
-            ]);
-            orange_promo_always_on_sync_history(
-                $pdo,
-                'cart_combo_promotions',
-                $id,
-                $isAlwaysOn,
-                orange_cart_promotion_admin_country_id($pdo)
-            );
-        } else {
-            // الترتيب تلقائي: التالي ضمن نفس الدولة.
-            $sortBind = orange_cart_promotion_sql_bind($pdo, 'cart_combo_promotions', '', $insertCountryId);
-            $stSort = $pdo->prepare(
-                'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cart_combo_promotions WHERE 1=1' . $sortBind['sql']
-            );
-            $stSort->execute($sortBind['params']);
-            $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
-            $st = $pdo->prepare(
-                'INSERT INTO cart_combo_promotions (country_id, title_ar, title_en, show_name_to_customer, show_old_price_to_customer, components_json, combo_price, requires_registered_account, first_delivered_order_only, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
-            );
-            $st->execute([
-                $insertCountryId,
-                $titleAr,
-                $titleEn,
-                $showNameToCustomer,
-                $showOldPrice,
-                $json,
-                $comboPrice,
-                $reqReg,
-                $firstDeliveredOnly,
-                $sortOrder,
-                $isActive,
-                $isAlwaysOn,
-                $bounds['valid_from'],
-                $bounds['valid_to'],
-            ]);
-            $newId = (int) $pdo->lastInsertId();
-            orange_promo_always_on_sync_history(
-                $pdo,
-                'cart_combo_promotions',
-                $newId,
-                $isAlwaysOn,
-                $insertCountryId > 0 ? $insertCountryId : orange_cart_promotion_admin_country_id($pdo)
-            );
+        $pdo->beginTransaction();
+        try {
+            if ($id > 0) {
+                orange_cart_promo_clear_auto_pause($pdo, 'cart_combo_promotions', $id);
+                // الترتيب تلقائي بالكامل: لا يُمَسّ عند التعديل.
+                $st = $pdo->prepare(
+                    'UPDATE cart_combo_promotions SET title_ar = ?, title_en = ?, show_name_to_customer = ?, show_old_price_to_customer = ?, components_json = ?, combo_price = ?, requires_registered_account = ?, first_delivered_order_only = ?, is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
+                );
+                $st->execute([
+                    $titleAr,
+                    $titleEn,
+                    $showNameToCustomer,
+                    $showOldPrice,
+                    $json,
+                    $comboPrice,
+                    $reqReg,
+                    $firstDeliveredOnly,
+                    $isActive,
+                    $isAlwaysOn,
+                    $bounds['valid_from'],
+                    $bounds['valid_to'],
+                    $id,
+                ]);
+                orange_promo_always_on_sync_history(
+                    $pdo,
+                    'cart_combo_promotions',
+                    $id,
+                    $isAlwaysOn,
+                    orange_cart_promotion_admin_country_id($pdo)
+                );
+            } else {
+                // الترتيب تلقائي: التالي ضمن نفس الدولة.
+                $sortBind = orange_cart_promotion_sql_bind($pdo, 'cart_combo_promotions', '', $insertCountryId);
+                $stSort = $pdo->prepare(
+                    'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cart_combo_promotions WHERE 1=1' . $sortBind['sql']
+                );
+                $stSort->execute($sortBind['params']);
+                $sortOrder = (int) ($stSort->fetchColumn() ?: 1);
+                $st = $pdo->prepare(
+                    'INSERT INTO cart_combo_promotions (country_id, title_ar, title_en, show_name_to_customer, show_old_price_to_customer, components_json, combo_price, requires_registered_account, first_delivered_order_only, sort_order, is_active, is_always_on, valid_from, valid_to) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                );
+                $st->execute([
+                    $insertCountryId,
+                    $titleAr,
+                    $titleEn,
+                    $showNameToCustomer,
+                    $showOldPrice,
+                    $json,
+                    $comboPrice,
+                    $reqReg,
+                    $firstDeliveredOnly,
+                    $sortOrder,
+                    $isActive,
+                    $isAlwaysOn,
+                    $bounds['valid_from'],
+                    $bounds['valid_to'],
+                ]);
+                $newId = (int) $pdo->lastInsertId();
+                orange_promo_always_on_sync_history(
+                    $pdo,
+                    'cart_combo_promotions',
+                    $newId,
+                    $isAlwaysOn,
+                    $insertCountryId > 0 ? $insertCountryId : orange_cart_promotion_admin_country_id($pdo)
+                );
+            }
+
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
         }
 
         json_response(['success' => true, 'message' => 'تم حفظ عرض الكومبو']);
