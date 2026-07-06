@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  =============================================================================
+  ORANGE DEPLOY FRAGMENT — PR-SEC-06 Batch 1
+  Sensitive uploads static access blocking (IIS / Plesk)
+  =============================================================================
+
+  THIS FILE IS NOT ACTIVE by itself.
+  It is a version-controlled template only. Direct HTTP access is blocked on
+  production only after an operator merges these rules into the LIVE site
+  web.config on Plesk/IIS (same physical folder as config.php / index.php).
+
+  Do NOT copy this file over live web.config.
+  Do NOT commit live web.config (repo .gitignore policy).
+  Do NOT place web.config files inside uploads/ — merge at site root only.
+
+  PUBLIC paths intentionally NOT blocked (storefront / print must keep working):
+    uploads/products/
+    uploads/channels/
+    uploads/company/
+
+  SENSITIVE paths blocked by this fragment:
+    uploads/payment_proofs/
+    uploads/company_docs/
+    uploads/customers/
+    uploads/suppliers/
+    uploads/stocktake/   (includes uploads/stocktake/_drafts/)
+
+  Merge: copy the five <rule> elements below into the existing
+  <configuration><system.webServer><rewrite><rules> block of live web.config
+  (see docs/archive/ORANGE_UPLOADS_ACCESS_CONTROL_RUNBOOK.md).
+  Place these rules BEFORE generic storefront rewrite rules so stopProcessing
+  applies. If the site has no rewrite section yet, merge the entire
+  <system.webServer> block from web.config.example first, then add these rules.
+
+  Subfolder deploy (PUBLIC_BASE_PATH, e.g. /shop): adjust each match url to
+  include the prefix, e.g. ^shop/uploads/payment_proofs(/.*)?$
+  =============================================================================
+-->
+<configuration>
+  <system.webServer>
+    <rewrite>
+      <rules>
+        <rule name="OrangeDenyUploadsPaymentProofs" stopProcessing="true">
+          <match url="^uploads/payment_proofs(/.*)?$" ignoreCase="true" />
+          <action type="CustomResponse" statusCode="404" statusReason="Not Found" statusDescription="Not Found" />
+        </rule>
+        <rule name="OrangeDenyUploadsCompanyDocs" stopProcessing="true">
+          <match url="^uploads/company_docs(/.*)?$" ignoreCase="true" />
+          <action type="CustomResponse" statusCode="404" statusReason="Not Found" statusDescription="Not Found" />
+        </rule>
+        <rule name="OrangeDenyUploadsCustomers" stopProcessing="true">
+          <match url="^uploads/customers(/.*)?$" ignoreCase="true" />
+          <action type="CustomResponse" statusCode="404" statusReason="Not Found" statusDescription="Not Found" />
+        </rule>
+        <rule name="OrangeDenyUploadsSuppliers" stopProcessing="true">
+          <match url="^uploads/suppliers(/.*)?$" ignoreCase="true" />
+          <action type="CustomResponse" statusCode="404" statusReason="Not Found" statusDescription="Not Found" />
+        </rule>
+        <rule name="OrangeDenyUploadsStocktake" stopProcessing="true">
+          <match url="^uploads/stocktake(/.*)?$" ignoreCase="true" />
+          <action type="CustomResponse" statusCode="404" statusReason="Not Found" statusDescription="Not Found" />
+        </rule>
+      </rules>
+    </rewrite>
+  </system.webServer>
+</configuration>

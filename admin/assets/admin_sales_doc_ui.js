@@ -114,8 +114,27 @@
             done();
             return;
         }
-        var url = '/admin/api/doc-token/ensure.php?doc_kind=' + encodeURIComponent(docKind) + '&doc_id=' + id;
-        fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' })
+        var fetchHeaders = { Accept: 'application/json', 'Content-Type': 'application/json' };
+        if (typeof global.orangeAdminCountryHeaders === 'function') {
+            fetchHeaders = global.orangeAdminCountryHeaders(fetchHeaders);
+        } else {
+            try {
+                var countryMeta = document.querySelector('meta[name="orange-admin-country"]');
+                if (countryMeta) {
+                    var countryCode = String(countryMeta.getAttribute('content') || '').trim();
+                    if (countryCode) {
+                        fetchHeaders['X-Orange-Admin-Country'] = countryCode;
+                    }
+                }
+            } catch (eMeta) { /* ignore */ }
+        }
+        fetch('/admin/api/doc-token/ensure.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: fetchHeaders,
+            cache: 'no-store',
+            body: JSON.stringify({ doc_kind: docKind, doc_id: id })
+        })
             .then(function (r) { return r.json(); })
             .then(function (res) {
                 if (res && res.success && res.url) {

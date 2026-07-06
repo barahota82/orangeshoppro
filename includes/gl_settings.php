@@ -1291,8 +1291,7 @@ function orange_gl_api_catch_json(Throwable $e, string $userMessage): void
     if ($s !== null) {
         $payload['suggest_admin'] = $s;
     }
-    $debug = getenv('ORANGE_API_DEBUG');
-    if ($debug === '1' || $debug === 'true') {
+    if (orange_api_debug_may_expose_to_client()) {
         $payload['debug'] = $e->getMessage();
     }
     json_response($payload, 500);

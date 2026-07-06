@@ -102,12 +102,18 @@ try {
         $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
         foreach ($rows as &$r) {
             $r['payment_status_label'] = orange_payment_status_label((string) ($r['payment_status'] ?? ''));
-            $txn = $pdo->prepare('SELECT provider_ref, proof_file, amount FROM payment_transactions WHERE order_id = ? ORDER BY id DESC LIMIT 1');
+            $txn = $pdo->prepare('SELECT id, provider_ref, proof_file, amount FROM payment_transactions WHERE order_id = ? ORDER BY id DESC LIMIT 1');
             $txn->execute([(int) $r['id']]);
             $t = $txn->fetch(PDO::FETCH_ASSOC) ?: [];
             $r['last_reference'] = (string) ($t['provider_ref'] ?? '');
             $pf = trim((string) ($t['proof_file'] ?? ''));
-            $r['proof_url'] = $pf !== '' ? storefront_public_path('/uploads/payment_proofs/' . rawurlencode($pf)) : '';
+            $txnId = (int) ($t['id'] ?? 0);
+            if ($pf !== '' && $txnId > 0) {
+                $proofParams = 'order_id=' . (int) $r['id'] . '&txn_id=' . $txnId;
+                $r['proof_url'] = storefront_public_path('/admin/api/payments/proof-download.php?' . $proofParams);
+            } else {
+                $r['proof_url'] = '';
+            }
         }
         unset($r);
         json_response(['success' => true, 'results' => $rows]);

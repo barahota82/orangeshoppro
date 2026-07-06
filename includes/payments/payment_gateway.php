@@ -145,39 +145,72 @@ function orange_payment_gateway_settle(PDO $pdo, int $orderId, ?int $countryId, 
     if ($orderId <= 0 || ($verify['status'] ?? '') !== 'paid') {
         return ['ok' => false, 'already' => false, 'message' => 'غير مدفوع'];
     }
+
+    orange_payments_ensure_schema($pdo);
+
     $amount = round((float) ($verify['amount'] ?? 0), 4);
     $txnUuid = orange_payment_gateway_txn_uuid($provider, $providerRef);
+    $currency = (string) ($verify['currency'] ?? '');
+    $rawPayload = json_encode($verify['raw'] ?? [], JSON_UNESCAPED_UNICODE);
 
-    $sel = $pdo->prepare('SELECT id, status FROM payment_transactions WHERE txn_uuid = ? LIMIT 1');
-    $sel->execute([$txnUuid]);
-    $existing = $sel->fetch(PDO::FETCH_ASSOC) ?: [];
-    $alreadyPaid = $existing && ($existing['status'] ?? '') === 'paid';
+    $pdo->beginTransaction();
+    try {
+        $orderSt = $pdo->prepare('SELECT id, payment_status FROM orders WHERE id = ? FOR UPDATE');
+        $orderSt->execute([$orderId]);
+        $orderRow = $orderSt->fetch(PDO::FETCH_ASSOC);
+        if (!$orderRow) {
+            $pdo->rollBack();
 
-    orange_payment_record_transaction($pdo, [
-        'order_id' => $orderId,
-        'country_id' => $countryId,
-        'method' => 'gateway',
-        'provider' => $provider,
-        'amount' => $amount,
-        'currency' => (string) ($verify['currency'] ?? ''),
-        'status' => 'paid',
-        'provider_ref' => $providerRef,
-        'txn_uuid' => $txnUuid,
-        'raw_payload' => json_encode($verify['raw'] ?? [], JSON_UNESCAPED_UNICODE),
-    ]);
-    /* لو كانت الحركة سابقاً غير paid، حدّثها (record_transaction لا يحدّث الموجود). */
-    if ($existing && !$alreadyPaid) {
-        $pdo->prepare('UPDATE payment_transactions SET status = ?, amount = ? WHERE txn_uuid = ?')
-            ->execute(['paid', $amount, $txnUuid]);
+            return ['ok' => false, 'already' => false, 'message' => 'غير مدفوع'];
+        }
+
+        $txnSt = $pdo->prepare('SELECT id, status FROM payment_transactions WHERE txn_uuid = ? FOR UPDATE');
+        $txnSt->execute([$txnUuid]);
+        $existing = $txnSt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $txnPaid = $existing && ($existing['status'] ?? '') === 'paid';
+        $orderPaid = ($orderRow['payment_status'] ?? '') === 'paid';
+
+        if ($txnPaid && $orderPaid) {
+            $pdo->commit();
+
+            return ['ok' => true, 'already' => true, 'message' => 'مؤكَّد مسبقاً'];
+        }
+
+        if (!$existing) {
+            orange_payment_record_transaction($pdo, [
+                'order_id' => $orderId,
+                'country_id' => $countryId,
+                'method' => 'gateway',
+                'provider' => $provider,
+                'amount' => $amount,
+                'currency' => $currency,
+                'status' => 'paid',
+                'provider_ref' => $providerRef,
+                'txn_uuid' => $txnUuid,
+                'raw_payload' => $rawPayload,
+            ]);
+        } elseif (!$txnPaid) {
+            $pdo->prepare(
+                'UPDATE payment_transactions SET status = ?, amount = ?, currency = ?, raw_payload = ? WHERE txn_uuid = ?'
+            )->execute(['paid', $amount, $currency, $rawPayload, $txnUuid]);
+        }
+
+        if (!$orderPaid) {
+            orange_payment_set_order_status($pdo, $orderId, 'paid', 'gateway', $amount > 0 ? $amount : null);
+            orange_payment_post_receipt_gl_hook($pdo, $orderId, $amount, $countryId, 'gateway');
+        }
+
+        $pdo->commit();
+
+        return ['ok' => true, 'already' => false, 'message' => 'تم تأكيد الدفع'];
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        throw $e;
     }
-
-    if (!$alreadyPaid) {
-        orange_payment_set_order_status($pdo, $orderId, 'paid', 'gateway', $amount > 0 ? $amount : null);
-        /* نقطة ربط GL (تُوصَّل بقرار حساب التحصيل per دولة — راجع ORANGE_ONLINE_PAYMENT_READINESS). */
-        orange_payment_post_receipt_gl_hook($pdo, $orderId, $amount, $countryId, 'gateway');
-    }
-
-    return ['ok' => true, 'already' => $alreadyPaid, 'message' => $alreadyPaid ? 'مؤكَّد مسبقاً' : 'تم تأكيد الدفع'];
 }
 
 /** تحميل موصِّل المزوّد. يعيد اسم البادئة أو null. */

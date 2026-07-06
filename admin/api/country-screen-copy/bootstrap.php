@@ -77,8 +77,5 @@ try {
         'log' => $log,
     ]);
 } catch (Throwable $e) {
-    if (function_exists('error_log')) {
-        error_log('[orange] country-screen-copy bootstrap: ' . $e->getMessage());
-    }
-    json_response(['success' => false, 'message' => $e->getMessage()], 500);
+    orange_admin_api_catch($e, 'تعذر تهيئة نسخ الشاشة');
 }

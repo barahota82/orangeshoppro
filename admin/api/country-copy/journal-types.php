@@ -29,8 +29,5 @@ try {
     $status = $result['success'] ? 200 : 422;
     json_response(array_merge(['success' => $result['success']], $result), $status);
 } catch (Throwable $e) {
-    if (function_exists('error_log')) {
-        error_log('[orange] country-copy journal-types: ' . $e->getMessage());
-    }
-    json_response(['success' => false, 'message' => $e->getMessage()], 500);
+    orange_admin_api_catch($e, 'تعذر نسخ أنواع اليوميات');
 }

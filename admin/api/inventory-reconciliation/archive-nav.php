@@ -33,5 +33,5 @@ try {
         'id' => $targetId,
     ]);
 } catch (Throwable $e) {
-    json_response(['success' => false, 'message' => $e->getMessage()], 500);
+    orange_admin_api_catch($e, 'تعذر التنقل في أرشيف الجرد');
 }

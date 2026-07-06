@@ -188,6 +188,5 @@ try {
 
     echo json_encode(['success' => true, 'labels' => $labels, 'products' => $products, 'lang' => $lang], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    api_error($e, t('api_request_failed'));
 }

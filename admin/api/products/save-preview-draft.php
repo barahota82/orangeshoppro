@@ -192,83 +192,101 @@ try {
         /* المتغيّرات — كمية المخزون المُدخلة تُحفظ كما هي (قرار المالك: المعاينة تُظهر الكمية المُدخلة). */
         $variantsIn = $data['variants'] ?? null;
         if (is_array($variantsIn) && count($variantsIn) > 0) {
-            // منع الجذر: منتج بلا أبعاد ⇒ متغيّر واحد فقط (يطابق سلوك الحفظ النهائي).
-            if (!$hasColors && !$hasSizes && count($variantsIn) > 1) {
-                $variantsIn = [reset($variantsIn)];
-            }
-            $cwMap = orange_product_ensure_colorways($pdo, $draftId, $variantsIn, $hasColors);
-            $variantStmt = $pdo->prepare(
-                'INSERT INTO product_variants (product_id, product_colorway_id, size_family_size_id, size, color, stock_quantity)
-                 VALUES (?,?,?,?,?,?)'
-            );
-            $dPriceUnified = ((int) ($data['price_unified'] ?? 1) === 1);
-            $dCostUnified = ((int) ($data['cost_unified'] ?? 1) === 1);
-            $dProductPrice = (float) ($data['price'] ?? 0);
-            $dProductCost = (float) ($data['cost'] ?? 0);
-            $dHasVarPriceCost = orange_table_has_column($pdo, 'product_variants', 'price')
-                && orange_table_has_column($pdo, 'product_variants', 'cost');
-            $dVarPCUpd = $dHasVarPriceCost
-                ? $pdo->prepare('UPDATE product_variants SET price = ?, cost = ? WHERE id = ? LIMIT 1')
-                : null;
-            foreach ($variantsIn as $variant) {
-                try {
-                    $p = (int) ($variant['primary_color_id'] ?? 0);
-                    $s = (int) ($variant['secondary_color_id'] ?? 0);
-                    $pp = (int) ($variant['primary_pattern_id'] ?? 0);
-                    $sp = (int) ($variant['secondary_pattern_id'] ?? 0);
-                    $szId = (int) ($variant['size_family_size_id'] ?? 0);
-                    $stock = max(0, (int) ($variant['stock_quantity'] ?? 0));
+            try {
+                // منع الجذر: منتج بلا أبعاد ⇒ متغيّر واحد فقط (يطابق سلوك الحفظ النهائي).
+                if (!$hasColors && !$hasSizes && count($variantsIn) > 1) {
+                    $variantsIn = [reset($variantsIn)];
+                }
 
-                    if (! $hasColors) {
-                        $cwKey = '-';
-                    } else {
-                        $p = $p > 0 ? $p : null;
-                        $s = $s > 0 ? $s : null;
-                        $pp = $pp > 0 ? $pp : null;
-                        $sp = $sp > 0 ? $sp : null;
-                        $cwKey = ($p ?? 0) . ':' . ($s ?? 0) . ':' . ($pp ?? 0) . ':' . ($sp ?? 0);
-                    }
-                    $colorwayId = $cwMap[$cwKey] ?? null;
-                    if ($colorwayId === null) {
+                // مقاس غير صالح ⇒ بلا مقاس (متساهل — لا يكسر المعاينة).
+                foreach ($variantsIn as &$previewVariantRow) {
+                    if (!is_array($previewVariantRow)) {
                         continue;
                     }
-
-                    $sizeFamilySizeId = ($hasSizes && $szId > 0) ? $szId : null;
-                    $sizeRow = null;
-                    if ($sizeFamilySizeId !== null && $sizeFamilyId !== null) {
-                        $szStmt = $pdo->prepare('SELECT * FROM size_family_sizes WHERE id = ? AND size_family_id = ? LIMIT 1');
-                        $szStmt->execute([$sizeFamilySizeId, $sizeFamilyId]);
-                        $sizeRow = $szStmt->fetch(PDO::FETCH_ASSOC) ?: null;
-                        if (! $sizeRow) {
-                            $sizeFamilySizeId = null;
+                    $previewSzId = (int) ($previewVariantRow['size_family_size_id'] ?? 0);
+                    if ($hasSizes && $previewSzId > 0 && $sizeFamilyId !== null) {
+                        $previewSzStmt = $pdo->prepare(
+                            'SELECT id FROM size_family_sizes WHERE id = ? AND size_family_id = ? LIMIT 1'
+                        );
+                        $previewSzStmt->execute([$previewSzId, $sizeFamilyId]);
+                        if (!$previewSzStmt->fetchColumn()) {
+                            unset($previewVariantRow['size_family_size_id']);
                         }
                     }
-
-                    $colorLabel = orange_colorway_display_label(
-                        $pdo,
-                        $hasColors ? $p : null,
-                        $hasColors ? $s : null,
-                        $hasColors ? $pp : null,
-                        $hasColors ? $sp : null,
-                        'ar'
-                    );
-                    $sizeLabel = orange_size_display_label($sizeRow);
-
-                    $variantStmt->execute([$draftId, $colorwayId, $sizeFamilySizeId, $sizeLabel, $colorLabel, $stock]);
-                    $newDraftVid = (int) $pdo->lastInsertId();
-                    if ($dVarPCUpd !== null && $newDraftVid > 0) {
-                        $effPrice = $dPriceUnified
-                            ? $dProductPrice
-                            : ((array_key_exists('price', $variant) && $variant['price'] !== null && $variant['price'] !== '') ? (float) $variant['price'] : $dProductPrice);
-                        $effCost = $dCostUnified
-                            ? $dProductCost
-                            : ((array_key_exists('cost', $variant) && $variant['cost'] !== null && $variant['cost'] !== '') ? (float) $variant['cost'] : $dProductCost);
-                        $dVarPCUpd->execute([$effPrice, $effCost, $newDraftVid]);
-                    }
-                } catch (Throwable $ve) {
-                    /* صف متغيّر معطوب لا يكسر المعاينة */
-                    continue;
                 }
+                unset($previewVariantRow);
+
+                // صف واحد لكل هوية مصفوفة — آخر صف في الحمولة يفوز عند التكرار.
+                $dedupedPreviewVariants = [];
+                $previewStockByFp = [];
+                foreach ($variantsIn as $previewVariantRow) {
+                    if (!is_array($previewVariantRow)) {
+                        continue;
+                    }
+                    $previewCwKey = orange_product_variant_cw_row_key($previewVariantRow, $hasColors);
+                    $previewSzRaw = isset($previewVariantRow['size_family_size_id']) ? (int) $previewVariantRow['size_family_size_id'] : 0;
+                    $previewMatrixFp = ($hasColors ? $previewCwKey : '-') . '|' . ($hasSizes && $previewSzRaw > 0 ? (string) $previewSzRaw : '0');
+                    $dedupedPreviewVariants[(string) $previewMatrixFp] = $previewVariantRow;
+                    $previewStockByFp[(string) $previewMatrixFp] = max(0, (int) ($previewVariantRow['stock_quantity'] ?? 0));
+                }
+                $variantsIn = array_values($dedupedPreviewVariants);
+
+                $dPriceUnified = ((int) ($data['price_unified'] ?? 1) === 1);
+                $dCostUnified = ((int) ($data['cost_unified'] ?? 1) === 1);
+                $dProductPrice = (float) ($data['price'] ?? 0);
+                $dProductCost = (float) ($data['cost'] ?? 0);
+                foreach ($variantsIn as &$previewVariantRow) {
+                    if (!is_array($previewVariantRow)) {
+                        continue;
+                    }
+                    $previewVariantRow['price'] = $dPriceUnified
+                        ? $dProductPrice
+                        : ((array_key_exists('price', $previewVariantRow) && $previewVariantRow['price'] !== null && $previewVariantRow['price'] !== '')
+                            ? (float) $previewVariantRow['price'] : $dProductPrice);
+                    $previewVariantRow['cost'] = $dCostUnified
+                        ? $dProductCost
+                        : ((array_key_exists('cost', $previewVariantRow) && $previewVariantRow['cost'] !== null && $previewVariantRow['cost'] !== '')
+                            ? (float) $previewVariantRow['cost'] : $dProductCost);
+                }
+                unset($previewVariantRow);
+
+                orange_product_sync_variants_matrix(
+                    $pdo,
+                    $draftId,
+                    $variantsIn,
+                    $hasColors,
+                    $hasSizes,
+                    $sizeFamilyId
+                );
+
+                // matrix sync يُدخل stock_quantity=0 — نُعيد كميات المعاينة المُدخلة على product_variants.
+                if ($previewStockByFp !== []) {
+                    $previewVarLst = $pdo->prepare(
+                        'SELECT v.id, v.size_family_size_id,
+                                cw.primary_color_id, cw.secondary_color_id, cw.primary_pattern_id, cw.secondary_pattern_id
+                         FROM product_variants v
+                         LEFT JOIN product_colorways cw ON cw.id = v.product_colorway_id
+                         WHERE v.product_id = ?'
+                    );
+                    $previewVarLst->execute([$draftId]);
+                    $previewStockUpd = $pdo->prepare(
+                        'UPDATE product_variants SET stock_quantity = ? WHERE id = ? LIMIT 1'
+                    );
+                    while ($previewVarRow = $previewVarLst->fetch(PDO::FETCH_ASSOC)) {
+                        if (!is_array($previewVarRow)) {
+                            continue;
+                        }
+                        $previewCwKeyDb = orange_product_db_row_colorway_key($previewVarRow, $hasColors);
+                        $previewSid = isset($previewVarRow['size_family_size_id']) && $previewVarRow['size_family_size_id'] !== null
+                            ? (int) $previewVarRow['size_family_size_id'] : 0;
+                        $previewFpDb = $previewCwKeyDb . '|' . $previewSid;
+                        if (array_key_exists($previewFpDb, $previewStockByFp)) {
+                            $previewStockUpd->execute([$previewStockByFp[$previewFpDb], (int) $previewVarRow['id']]);
+                        }
+                    }
+                }
+            } catch (Throwable $ve) {
+                /* صف متغيّر معطوب لا يكسر المعاينة */
             }
         }
 

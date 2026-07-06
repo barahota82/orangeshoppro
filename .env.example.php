@@ -20,6 +20,16 @@ return [
     // اختياري: مرجع يدوي أو من الـ CI يظهر في /admin/api/system/deploy-check.php
     // 'ORANGE_BUILD_REF' => 'main-abc1234',
 
+    // اختياري: مسار سجل العمليات الحرجة (JSON lines — فشل audit_log، إلخ). خارج جذر الموقع.
+    // الافتراضي: مجلد orange_logs بجانب المشروع، مثلاً D:\orange_logs\operational.log
+    // 'ORANGE_OPERATIONAL_LOG_PATH' => 'D:\\orange_logs\\operational.log',
+
+    // اختياري — PR-SEC-02: حدود محاولات تسجيل دخول الأدمن (أساس DB؛ غير موصول بـ admin/login.php بعد).
+    // 'ORANGE_ADMIN_LOGIN_MAX_ATTEMPTS_USERNAME' => 5,
+    // 'ORANGE_ADMIN_LOGIN_MAX_ATTEMPTS_IP' => 30,
+    // 'ORANGE_ADMIN_LOGIN_WINDOW_SECONDS' => 900,
+    // 'ORANGE_ADMIN_LOGIN_LOCK_SECONDS' => 900,
+
     // اختياري: تقليل كاش HTML أثناء التطوير (1 أو true)
     // 'DISABLE_HTML_CACHE' => true,
 

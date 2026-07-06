@@ -29,6 +29,8 @@ date_default_timezone_set('Asia/Kuwait');
 
 require_once __DIR__ . '/includes/date_format.php';
 
+orange_error_boundary_register_once();
+
 /*
 |--------------------------------------------------------------------------
 | Database Config
@@ -2792,6 +2794,155 @@ function storefront_tagline_cycle_messages(): array {
     return orange_storefront_header_tagline_cycle_resolved(db());
 }
 
+function orange_error_boundary_register_once(): void
+{
+    static $registered = false;
+    if ($registered || defined('ORANGE_ERROR_BOUNDARY_REGISTERED')) {
+        return;
+    }
+    $registered = true;
+    define('ORANGE_ERROR_BOUNDARY_REGISTERED', true);
+
+    @ini_set('display_errors', '0');
+    @ini_set('display_startup_errors', '0');
+    @ini_set('log_errors', '1');
+
+    set_exception_handler('orange_uncaught_exception_handler');
+    register_shutdown_function('orange_fatal_shutdown_handler');
+}
+
+function orange_error_boundary_is_json_request(): bool
+{
+    if (PHP_SAPI === 'cli') {
+        return false;
+    }
+
+    $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    if (str_contains($script, '/api/') || str_contains($script, '/admin/api/')) {
+        return true;
+    }
+
+    $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+    if ($accept !== '' && str_contains($accept, 'application/json')) {
+        return true;
+    }
+
+    $contentType = strtolower((string) ($_SERVER['CONTENT_TYPE'] ?? ''));
+    if ($contentType !== '' && str_contains($contentType, 'application/json')) {
+        return true;
+    }
+
+    return false;
+}
+
+function orange_error_boundary_generic_json_message(): string
+{
+    $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    if (str_contains($script, '/admin/api/')) {
+        return 'حدث خطأ غير متوقع';
+    }
+    if (function_exists('t')) {
+        return t('api_request_failed');
+    }
+
+    return 'Request failed';
+}
+
+function orange_error_boundary_log_throwable(Throwable $e, string $context): void
+{
+    if (!function_exists('error_log')) {
+        return;
+    }
+    error_log(
+        '[orange] ' . $context . ': ' . $e->getMessage()
+        . ' @ ' . $e->getFile() . ':' . $e->getLine()
+    );
+}
+
+function orange_error_boundary_emit_client_response(int $httpCode = 500): void
+{
+    if (defined('ORANGE_ERROR_BOUNDARY_CLIENT_SENT')) {
+        return;
+    }
+    define('ORANGE_ERROR_BOUNDARY_CLIENT_SENT', true);
+
+    if (PHP_SAPI === 'cli') {
+        if (defined('STDERR')) {
+            fwrite(STDERR, "Unexpected error.\n");
+        }
+        exit(1);
+    }
+
+    if (orange_error_boundary_is_json_request()) {
+        $payload = [
+            'success' => false,
+            'code' => 'server_error',
+            'message' => orange_error_boundary_generic_json_message(),
+        ];
+        if (!headers_sent()) {
+            http_response_code($httpCode);
+            header('Content-Type: application/json; charset=utf-8');
+        }
+        $flags = JSON_UNESCAPED_UNICODE;
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+        echo json_encode($payload, $flags);
+        exit;
+    }
+
+    $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    if (str_ends_with($script, '/health.php')) {
+        if (!headers_sent()) {
+            http_response_code($httpCode);
+            header('Content-Type: text/plain; charset=UTF-8');
+        }
+        echo "ERROR\n";
+        exit;
+    }
+
+    if (!headers_sent()) {
+        http_response_code($httpCode);
+        header('Content-Type: text/html; charset=UTF-8');
+    }
+    echo '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>خطأ</title></head>'
+        . '<body style="font-family:Cairo,sans-serif;padding:2rem;"><p>حدث خطأ غير متوقع. يرجى المحاولة لاحقاً.</p></body></html>';
+    exit;
+}
+
+function orange_uncaught_exception_handler(Throwable $e): void
+{
+    orange_error_boundary_log_throwable($e, 'uncaught');
+    orange_error_boundary_emit_client_response(500);
+}
+
+function orange_fatal_shutdown_handler(): void
+{
+    if (defined('ORANGE_ERROR_BOUNDARY_CLIENT_SENT')) {
+        return;
+    }
+
+    $err = error_get_last();
+    if ($err === null) {
+        return;
+    }
+
+    $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR];
+    if (!in_array((int) ($err['type'] ?? 0), $fatalTypes, true)) {
+        return;
+    }
+
+    if (function_exists('error_log')) {
+        error_log(
+            '[orange] fatal: ' . (string) ($err['message'] ?? 'fatal')
+            . ' @ ' . (string) ($err['file'] ?? '')
+            . ':' . (string) ($err['line'] ?? '0')
+        );
+    }
+
+    orange_error_boundary_emit_client_response(500);
+}
+
 function json_response($data, int $httpCode = 200): void {
     http_response_code($httpCode);
     header('Content-Type: application/json; charset=utf-8');
@@ -2811,6 +2962,7 @@ function json_response($data, int $httpCode = 200): void {
  */
 function audit_log(string $action, string $message, string $entityTable = '', $entityId = null): void
 {
+    $adminId = null;
     if (function_exists('error_log') && filter_var(getenv('ORANGE_AUDIT_LOG') ?: '', FILTER_VALIDATE_BOOLEAN)) {
         error_log('[orange audit] ' . $action . ' | ' . $message . ' | ' . $entityTable . ' | ' . (string) $entityId);
     }
@@ -2824,7 +2976,6 @@ function audit_log(string $action, string $message, string $entityTable = '', $e
         if (!orange_table_exists($pdo, 'orange_admin_audit_log')) {
             return;
         }
-        $adminId = null;
         if (function_exists('current_admin')) {
             $c = current_admin();
             if ($c && !empty($c['id'])) {
@@ -2849,12 +3000,43 @@ function audit_log(string $action, string $message, string $entityTable = '', $e
         if (function_exists('error_log')) {
             error_log('[orange audit_log] ' . $e->getMessage());
         }
+        require_once __DIR__ . '/includes/orange_operational_log.php';
+        orange_operational_log(
+            'audit_log_failed',
+            'Admin audit log insert failed',
+            [
+                'action' => $action,
+                'entity_table' => $entityTable,
+                'entity_id' => $entityId === null || $entityId === '' ? null : (string) $entityId,
+                'admin_id' => $adminId,
+                'error' => $e->getMessage(),
+                'exception_class' => $e::class,
+            ],
+            'error'
+        );
     }
 }
 
 /**
  * رد موحّد للأخطاء في واجهات JSON (لا يترك جسم الاستجابة فارغاً).
  */
+function orange_api_debug_may_expose_to_client(): bool
+{
+    global $env;
+    $envArr = is_array($env ?? null) ? $env : [];
+    $productionVal = $envArr['ORANGE_PRODUCTION'] ?? true;
+    $isExplicitNonProduction = $productionVal === false
+        || $productionVal === 0
+        || $productionVal === '0'
+        || strtolower((string) $productionVal) === 'false';
+    if (!$isExplicitNonProduction) {
+        return false;
+    }
+    $debug = getenv('ORANGE_API_DEBUG');
+
+    return $debug === '1' || $debug === 'true';
+}
+
 function api_error(Throwable $e, string $userMessage): void
 {
     if (function_exists('error_log')) {
@@ -2868,8 +3050,7 @@ function api_error(Throwable $e, string $userMessage): void
         'code' => 'server_error',
         'message' => $userMessage,
     ];
-    $debug = getenv('ORANGE_API_DEBUG');
-    if ($debug === '1' || $debug === 'true') {
+    if (orange_api_debug_may_expose_to_client()) {
         $payload['debug'] = $e->getMessage();
     }
     json_response($payload, 500);
@@ -2911,6 +3092,8 @@ function admin_login(int $adminId): void {
     try {
         $pdo = db();
         require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/admin_login_rate_limit.php';
+        orange_catalog_ensure_schema($pdo);
         if (orange_table_exists($pdo, 'admins') && orange_table_has_column($pdo, 'admins', 'country_id')) {
             $st = $pdo->prepare('SELECT country_id, is_superuser FROM admins WHERE id = ? AND is_active = 1 LIMIT 1');
             $st->execute([$adminId]);
@@ -2920,9 +3103,15 @@ function admin_login(int $adminId): void {
                 orange_admin_sync_session_country_lock($row);
             }
         }
+        $userSt = $pdo->prepare('SELECT username FROM admins WHERE id = ? AND is_active = 1 LIMIT 1');
+        $userSt->execute([$adminId]);
+        $userRow = $userSt->fetch(PDO::FETCH_ASSOC);
+        if (is_array($userRow) && trim((string) ($userRow['username'] ?? '')) !== '') {
+            orange_admin_login_rate_limit_clear($pdo, (string) $userRow['username']);
+        }
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
-            error_log('[orange] admin_login country_lock: ' . $e->getMessage());
+            error_log('[orange] admin_login post-login sync: ' . $e->getMessage());
         }
     }
 }

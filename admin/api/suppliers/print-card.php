@@ -10,10 +10,13 @@ require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/company_settings.php';
 
-require_admin_page();
+require_once __DIR__ . '/../../../includes/admin_permissions.php';
+
+$admin = require_admin_page();
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+orange_admin_require_page($admin, $pdo, 'suppliers');
 
 $supplierId = (int) ($_GET['supplier_id'] ?? 0);
 if ($supplierId <= 0) {

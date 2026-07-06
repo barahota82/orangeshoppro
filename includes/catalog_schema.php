@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 113);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 118);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3179,6 +3179,10 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_variant_pricing_identity_v112($pdo);
     orange_catalog_migrate_cart_gift_storefront_v113($pdo);
     orange_catalog_migrate_cart_bogo_gift_pool_v114($pdo);
+    orange_catalog_migrate_admin_login_throttle_v115($pdo);
+    orange_catalog_migrate_stock_ledger_referential_integrity_v116($pdo);
+    orange_catalog_migrate_inventory_cost_referential_integrity_v117($pdo);
+    orange_catalog_migrate_variant_deletion_referential_integrity_v118($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3809,6 +3813,10 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_variant_pricing_identity_v112($pdo);
     orange_catalog_migrate_cart_gift_storefront_v113($pdo);
     orange_catalog_migrate_cart_bogo_gift_pool_v114($pdo);
+    orange_catalog_migrate_admin_login_throttle_v115($pdo);
+    orange_catalog_migrate_stock_ledger_referential_integrity_v116($pdo);
+    orange_catalog_migrate_inventory_cost_referential_integrity_v117($pdo);
+    orange_catalog_migrate_variant_deletion_referential_integrity_v118($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -3947,6 +3955,9 @@ function orange_catalog_schema_web_version_catchup(PDO $pdo, int $dbVersion): vo
 function orange_schema_check_and_bootstrap(PDO $pdo): void
 {
     orange_catalog_ensure_country_id_columns_once($pdo);
+    orange_catalog_migrate_stock_ledger_referential_integrity_v116($pdo);
+    orange_catalog_migrate_inventory_cost_referential_integrity_v117($pdo);
+    orange_catalog_migrate_variant_deletion_referential_integrity_v118($pdo);
 
     static $gateOk = false;
     if ($gateOk) {
@@ -8378,4 +8389,777 @@ function orange_catalog_migrate_cart_bogo_gift_pool_v114(PDO $pdo): void
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v115 — PR-SEC-02: admin login throttle persistence (username + IP scopes).
+ * marker-gated + idempotent؛ المسار الكامل والسريع.
+ */
+function orange_catalog_migrate_admin_login_throttle_v115(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_admin_login_throttle_v115';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'orange_admin_login_throttle')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE orange_admin_login_throttle (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                scope_type VARCHAR(16) NOT NULL,
+                scope_key VARCHAR(128) NOT NULL,
+                failed_count INT UNSIGNED NOT NULL DEFAULT 0,
+                window_started_at DATETIME NOT NULL,
+                locked_until DATETIME NULL DEFAULT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_orange_admin_login_throttle_scope (scope_type, scope_key),
+                KEY idx_orange_admin_login_throttle_locked_until (locked_until)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+        orange_schema_invalidate_table_exists('orange_admin_login_throttle');
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function orange_catalog_schema_column_fk_metadata(PDO $pdo, string $table, string $column): ?array
+{
+    try {
+        $st = $pdo->prepare(
+            'SELECT COLUMN_TYPE, DATA_TYPE, IS_NULLABLE
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
+             LIMIT 1'
+        );
+        $st->execute([$table, $column]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : null;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+/**
+ * @param array<string, mixed>|null $childMeta
+ * @param array<string, mixed>|null $parentMeta
+ */
+function orange_catalog_schema_fk_column_types_compatible(?array $childMeta, ?array $parentMeta): bool
+{
+    if ($childMeta === null || $parentMeta === null) {
+        return false;
+    }
+    $childData = strtolower(trim((string) ($childMeta['DATA_TYPE'] ?? '')));
+    $parentData = strtolower(trim((string) ($parentMeta['DATA_TYPE'] ?? '')));
+    if ($childData === '' || $childData !== $parentData) {
+        return false;
+    }
+    $childType = strtolower((string) ($childMeta['COLUMN_TYPE'] ?? ''));
+    $parentType = strtolower((string) ($parentMeta['COLUMN_TYPE'] ?? ''));
+    $childUnsigned = str_contains($childType, 'unsigned');
+    $parentUnsigned = str_contains($parentType, 'unsigned');
+
+    return $childUnsigned === $parentUnsigned;
+}
+
+function orange_catalog_migrate_stock_ledger_fk_v116_log(string $event, string $message, array $context = []): void
+{
+    if (function_exists('error_log')) {
+        error_log('[orange] stock_ledger_fk_v116: ' . $message);
+    }
+    if (function_exists('orange_schema_migration_operational_log')) {
+        orange_schema_migration_operational_log($event, $message, $context, 'warn');
+    }
+}
+
+/**
+ * v116 — PR-DB-01: warehouse_variant_stock + stock_movements warehouse FK integrity (hybrid per-FK).
+ * Constraint existence is primary truth; per-FK markers are bookkeeping only.
+ */
+function orange_catalog_migrate_stock_ledger_referential_integrity_v116(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/acc10_schema.php';
+
+    static $skipLogged = [];
+
+    $steps = [
+        [
+            'constraint' => 'orange_fk_wvs_warehouse',
+            'marker' => 'php_stock_ledger_fk_wvs_warehouse_v116',
+            'child_table' => 'warehouse_variant_stock',
+            'child_column' => 'warehouse_id',
+            'parent_table' => 'warehouses',
+            'parent_column' => 'id',
+            'orphan_sql' => 'SELECT COUNT(*) FROM warehouse_variant_stock wvs LEFT JOIN warehouses w ON w.id = wvs.warehouse_id WHERE w.id IS NULL',
+            'alter_sql' => 'ALTER TABLE warehouse_variant_stock ADD CONSTRAINT orange_fk_wvs_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouses (id)',
+        ],
+        [
+            'constraint' => 'orange_fk_wvs_variant',
+            'marker' => 'php_stock_ledger_fk_wvs_variant_v116',
+            'child_table' => 'warehouse_variant_stock',
+            'child_column' => 'variant_id',
+            'parent_table' => 'product_variants',
+            'parent_column' => 'id',
+            'orphan_sql' => 'SELECT COUNT(*) FROM warehouse_variant_stock wvs LEFT JOIN product_variants pv ON pv.id = wvs.variant_id WHERE pv.id IS NULL',
+            'alter_sql' => 'ALTER TABLE warehouse_variant_stock ADD CONSTRAINT orange_fk_wvs_variant FOREIGN KEY (variant_id) REFERENCES product_variants (id)',
+        ],
+        [
+            'constraint' => 'orange_fk_stock_movements_warehouse',
+            'marker' => 'php_stock_ledger_fk_stock_movements_warehouse_v116',
+            'child_table' => 'stock_movements',
+            'child_column' => 'warehouse_id',
+            'parent_table' => 'warehouses',
+            'parent_column' => 'id',
+            'orphan_sql' => 'SELECT COUNT(*) FROM stock_movements sm LEFT JOIN warehouses w ON w.id = sm.warehouse_id WHERE sm.warehouse_id IS NOT NULL AND w.id IS NULL',
+            'alter_sql' => 'ALTER TABLE stock_movements ADD CONSTRAINT orange_fk_stock_movements_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouses (id)',
+        ],
+    ];
+
+    foreach ($steps as $step) {
+        $constraint = (string) ($step['constraint'] ?? '');
+        $marker = (string) ($step['marker'] ?? '');
+        $childTable = (string) ($step['child_table'] ?? '');
+        $childColumn = (string) ($step['child_column'] ?? '');
+        $parentTable = (string) ($step['parent_table'] ?? '');
+        $parentColumn = (string) ($step['parent_column'] ?? '');
+        $orphanSql = (string) ($step['orphan_sql'] ?? '');
+        $alterSql = (string) ($step['alter_sql'] ?? '');
+
+        if ($constraint === '' || $childTable === '' || $alterSql === '') {
+            continue;
+        }
+
+        if (orange_schema_fk_exists($pdo, $childTable, $constraint)) {
+            if ($marker !== '') {
+                orange_catalog_schema_insert_migration_marker($pdo, $marker);
+            }
+            continue;
+        }
+
+        if (!orange_table_exists($pdo, $childTable) || !orange_table_exists($pdo, $parentTable)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $childTable, $childColumn)
+            || !orange_table_has_column($pdo, $parentTable, $parentColumn)) {
+            if (!isset($skipLogged[$constraint . ':columns'])) {
+                $skipLogged[$constraint . ':columns'] = true;
+                orange_catalog_migrate_stock_ledger_fk_v116_log(
+                    'stock_ledger_fk_v116_missing_column',
+                    'Skipped FK because required column is missing',
+                    [
+                        'constraint' => $constraint,
+                        'child_table' => $childTable,
+                        'child_column' => $childColumn,
+                        'parent_table' => $parentTable,
+                        'parent_column' => $parentColumn,
+                    ]
+                );
+            }
+            continue;
+        }
+
+        $childMeta = orange_catalog_schema_column_fk_metadata($pdo, $childTable, $childColumn);
+        $parentMeta = orange_catalog_schema_column_fk_metadata($pdo, $parentTable, $parentColumn);
+        if (!orange_catalog_schema_fk_column_types_compatible($childMeta, $parentMeta)) {
+            if (!isset($skipLogged[$constraint . ':types'])) {
+                $skipLogged[$constraint . ':types'] = true;
+                orange_catalog_migrate_stock_ledger_fk_v116_log(
+                    'stock_ledger_fk_v116_type_incompatible',
+                    'Skipped FK because child/parent column types are not FK-compatible',
+                    [
+                        'constraint' => $constraint,
+                        'child_table' => $childTable,
+                        'child_column' => $childColumn,
+                        'child_column_type' => is_array($childMeta) ? (string) ($childMeta['COLUMN_TYPE'] ?? '') : '',
+                        'parent_table' => $parentTable,
+                        'parent_column' => $parentColumn,
+                        'parent_column_type' => is_array($parentMeta) ? (string) ($parentMeta['COLUMN_TYPE'] ?? '') : '',
+                    ]
+                );
+            }
+            continue;
+        }
+
+        try {
+            $orphanCount = (int) $pdo->query($orphanSql)->fetchColumn();
+        } catch (Throwable $e) {
+            if (!isset($skipLogged[$constraint . ':orphan_query'])) {
+                $skipLogged[$constraint . ':orphan_query'] = true;
+                orange_catalog_migrate_stock_ledger_fk_v116_log(
+                    'stock_ledger_fk_v116_orphan_audit_failed',
+                    'Skipped FK because orphan audit query failed',
+                    [
+                        'constraint' => $constraint,
+                        'error' => $e->getMessage(),
+                    ]
+                );
+            }
+            continue;
+        }
+
+        if ($orphanCount > 0) {
+            if (!isset($skipLogged[$constraint . ':orphans'])) {
+                $skipLogged[$constraint . ':orphans'] = true;
+                orange_catalog_migrate_stock_ledger_fk_v116_log(
+                    'stock_ledger_fk_v116_orphans',
+                    'Skipped FK because orphan rows exist',
+                    [
+                        'constraint' => $constraint,
+                        'orphan_count' => $orphanCount,
+                    ]
+                );
+            }
+            continue;
+        }
+
+        orange_catalog_safe_exec($pdo, $alterSql);
+
+        if (!orange_schema_fk_exists($pdo, $childTable, $constraint)) {
+            if (!isset($skipLogged[$constraint . ':ddl'])) {
+                $skipLogged[$constraint . ':ddl'] = true;
+                orange_catalog_migrate_stock_ledger_fk_v116_log(
+                    'stock_ledger_fk_v116_add_failed',
+                    'FK ADD did not result in a visible constraint',
+                    ['constraint' => $constraint]
+                );
+            }
+            continue;
+        }
+
+        if ($marker !== '') {
+            orange_catalog_schema_insert_migration_marker($pdo, $marker);
+        }
+    }
+
+    if (orange_schema_fk_exists($pdo, 'warehouse_variant_stock', 'orange_fk_wvs_warehouse')
+        && orange_schema_fk_exists($pdo, 'warehouse_variant_stock', 'orange_fk_wvs_variant')
+        && orange_schema_fk_exists($pdo, 'stock_movements', 'orange_fk_stock_movements_warehouse')) {
+        orange_catalog_schema_insert_migration_marker($pdo, 'php_stock_ledger_referential_integrity_v116_complete');
+    }
+}
+
+function orange_catalog_migrate_inventory_cost_fk_v117_log(string $event, string $message, array $context = []): void
+{
+    if (function_exists('error_log')) {
+        error_log('[orange] inventory_cost_fk_v117: ' . $message);
+    }
+    if (function_exists('orange_schema_migration_operational_log')) {
+        orange_schema_migration_operational_log($event, $message, $context, 'warn');
+    }
+}
+
+/**
+ * v117 — PR-DB-02: inventory_cost_layers + inventory_cost_consumptions FK integrity (hybrid per-FK).
+ * Constraint existence is primary truth; per-FK markers are bookkeeping only.
+ */
+function orange_catalog_migrate_inventory_cost_referential_integrity_v117(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/acc10_schema.php';
+
+    static $skipLogged = [];
+
+    $steps = [
+        [
+            'constraint' => 'orange_fk_icl_warehouse',
+            'marker' => 'php_inventory_cost_fk_icl_warehouse_v117',
+            'child_table' => 'inventory_cost_layers',
+            'child_column' => 'warehouse_id',
+            'parent_table' => 'warehouses',
+            'parent_column' => 'id',
+            'orphan_sql' => 'SELECT COUNT(*) FROM inventory_cost_layers icl LEFT JOIN warehouses w ON w.id = icl.warehouse_id WHERE w.id IS NULL',
+            'alter_sql' => 'ALTER TABLE inventory_cost_layers ADD CONSTRAINT orange_fk_icl_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouses (id)',
+        ],
+        [
+            'constraint' => 'orange_fk_icl_variant',
+            'marker' => 'php_inventory_cost_fk_icl_variant_v117',
+            'child_table' => 'inventory_cost_layers',
+            'child_column' => 'variant_id',
+            'parent_table' => 'product_variants',
+            'parent_column' => 'id',
+            'orphan_sql' => 'SELECT COUNT(*) FROM inventory_cost_layers icl LEFT JOIN product_variants pv ON pv.id = icl.variant_id WHERE pv.id IS NULL',
+            'alter_sql' => 'ALTER TABLE inventory_cost_layers ADD CONSTRAINT orange_fk_icl_variant FOREIGN KEY (variant_id) REFERENCES product_variants (id)',
+        ],
+        [
+            'constraint' => 'orange_fk_icc_layer',
+            'marker' => 'php_inventory_cost_fk_icc_layer_v117',
+            'child_table' => 'inventory_cost_consumptions',
+            'child_column' => 'layer_id',
+            'parent_table' => 'inventory_cost_layers',
+            'parent_column' => 'id',
+            'orphan_sql' => 'SELECT COUNT(*) FROM inventory_cost_consumptions icc LEFT JOIN inventory_cost_layers icl ON icl.id = icc.layer_id WHERE icl.id IS NULL',
+            'alter_sql' => 'ALTER TABLE inventory_cost_consumptions ADD CONSTRAINT orange_fk_icc_layer FOREIGN KEY (layer_id) REFERENCES inventory_cost_layers (id)',
+        ],
+        [
+            'constraint' => 'orange_fk_icc_warehouse',
+            'marker' => 'php_inventory_cost_fk_icc_warehouse_v117',
+            'child_table' => 'inventory_cost_consumptions',
+            'child_column' => 'warehouse_id',
+            'parent_table' => 'warehouses',
+            'parent_column' => 'id',
+            'orphan_sql' => 'SELECT COUNT(*) FROM inventory_cost_consumptions icc LEFT JOIN warehouses w ON w.id = icc.warehouse_id WHERE w.id IS NULL',
+            'alter_sql' => 'ALTER TABLE inventory_cost_consumptions ADD CONSTRAINT orange_fk_icc_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouses (id)',
+        ],
+        [
+            'constraint' => 'orange_fk_icc_variant',
+            'marker' => 'php_inventory_cost_fk_icc_variant_v117',
+            'child_table' => 'inventory_cost_consumptions',
+            'child_column' => 'variant_id',
+            'parent_table' => 'product_variants',
+            'parent_column' => 'id',
+            'orphan_sql' => 'SELECT COUNT(*) FROM inventory_cost_consumptions icc LEFT JOIN product_variants pv ON pv.id = icc.variant_id WHERE pv.id IS NULL',
+            'alter_sql' => 'ALTER TABLE inventory_cost_consumptions ADD CONSTRAINT orange_fk_icc_variant FOREIGN KEY (variant_id) REFERENCES product_variants (id)',
+        ],
+    ];
+
+    foreach ($steps as $step) {
+        $constraint = (string) ($step['constraint'] ?? '');
+        $marker = (string) ($step['marker'] ?? '');
+        $childTable = (string) ($step['child_table'] ?? '');
+        $childColumn = (string) ($step['child_column'] ?? '');
+        $parentTable = (string) ($step['parent_table'] ?? '');
+        $parentColumn = (string) ($step['parent_column'] ?? '');
+        $orphanSql = (string) ($step['orphan_sql'] ?? '');
+        $alterSql = (string) ($step['alter_sql'] ?? '');
+
+        if ($constraint === '' || $childTable === '' || $alterSql === '') {
+            continue;
+        }
+
+        if (orange_schema_fk_exists($pdo, $childTable, $constraint)) {
+            if ($marker !== '') {
+                orange_catalog_schema_insert_migration_marker($pdo, $marker);
+            }
+            continue;
+        }
+
+        if (!orange_table_exists($pdo, $childTable) || !orange_table_exists($pdo, $parentTable)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $childTable, $childColumn)
+            || !orange_table_has_column($pdo, $parentTable, $parentColumn)) {
+            if (!isset($skipLogged[$constraint . ':columns'])) {
+                $skipLogged[$constraint . ':columns'] = true;
+                orange_catalog_migrate_inventory_cost_fk_v117_log(
+                    'inventory_cost_fk_v117_missing_column',
+                    'Skipped FK because required column is missing',
+                    [
+                        'constraint' => $constraint,
+                        'child_table' => $childTable,
+                        'child_column' => $childColumn,
+                        'parent_table' => $parentTable,
+                        'parent_column' => $parentColumn,
+                    ]
+                );
+            }
+            continue;
+        }
+
+        $childMeta = orange_catalog_schema_column_fk_metadata($pdo, $childTable, $childColumn);
+        $parentMeta = orange_catalog_schema_column_fk_metadata($pdo, $parentTable, $parentColumn);
+        if (!orange_catalog_schema_fk_column_types_compatible($childMeta, $parentMeta)) {
+            if (!isset($skipLogged[$constraint . ':types'])) {
+                $skipLogged[$constraint . ':types'] = true;
+                orange_catalog_migrate_inventory_cost_fk_v117_log(
+                    'inventory_cost_fk_v117_type_incompatible',
+                    'Skipped FK because child/parent column types are not FK-compatible',
+                    [
+                        'constraint' => $constraint,
+                        'child_table' => $childTable,
+                        'child_column' => $childColumn,
+                        'child_column_type' => is_array($childMeta) ? (string) ($childMeta['COLUMN_TYPE'] ?? '') : '',
+                        'parent_table' => $parentTable,
+                        'parent_column' => $parentColumn,
+                        'parent_column_type' => is_array($parentMeta) ? (string) ($parentMeta['COLUMN_TYPE'] ?? '') : '',
+                    ]
+                );
+            }
+            continue;
+        }
+
+        try {
+            $orphanCount = (int) $pdo->query($orphanSql)->fetchColumn();
+        } catch (Throwable $e) {
+            if (!isset($skipLogged[$constraint . ':orphan_query'])) {
+                $skipLogged[$constraint . ':orphan_query'] = true;
+                orange_catalog_migrate_inventory_cost_fk_v117_log(
+                    'inventory_cost_fk_v117_orphan_audit_failed',
+                    'Skipped FK because orphan audit query failed',
+                    [
+                        'constraint' => $constraint,
+                        'error' => $e->getMessage(),
+                    ]
+                );
+            }
+            continue;
+        }
+
+        if ($orphanCount > 0) {
+            if (!isset($skipLogged[$constraint . ':orphans'])) {
+                $skipLogged[$constraint . ':orphans'] = true;
+                orange_catalog_migrate_inventory_cost_fk_v117_log(
+                    'inventory_cost_fk_v117_orphans',
+                    'Skipped FK because orphan rows exist',
+                    [
+                        'constraint' => $constraint,
+                        'orphan_count' => $orphanCount,
+                    ]
+                );
+            }
+            continue;
+        }
+
+        orange_catalog_safe_exec($pdo, $alterSql);
+
+        if (!orange_schema_fk_exists($pdo, $childTable, $constraint)) {
+            if (!isset($skipLogged[$constraint . ':ddl'])) {
+                $skipLogged[$constraint . ':ddl'] = true;
+                orange_catalog_migrate_inventory_cost_fk_v117_log(
+                    'inventory_cost_fk_v117_add_failed',
+                    'FK ADD did not result in a visible constraint',
+                    ['constraint' => $constraint]
+                );
+            }
+            continue;
+        }
+
+        if ($marker !== '') {
+            orange_catalog_schema_insert_migration_marker($pdo, $marker);
+        }
+    }
+
+    if (orange_schema_fk_exists($pdo, 'inventory_cost_layers', 'orange_fk_icl_warehouse')
+        && orange_schema_fk_exists($pdo, 'inventory_cost_layers', 'orange_fk_icl_variant')
+        && orange_schema_fk_exists($pdo, 'inventory_cost_consumptions', 'orange_fk_icc_layer')
+        && orange_schema_fk_exists($pdo, 'inventory_cost_consumptions', 'orange_fk_icc_warehouse')
+        && orange_schema_fk_exists($pdo, 'inventory_cost_consumptions', 'orange_fk_icc_variant')) {
+        orange_catalog_schema_insert_migration_marker($pdo, 'php_inventory_cost_referential_integrity_v117_complete');
+    }
+}
+
+/**
+ * @return array{CONSTRAINT_NAME: string, DELETE_RULE: string}|null
+ */
+function orange_catalog_schema_product_variants_product_fk_metadata(PDO $pdo): ?array
+{
+    try {
+        $st = $pdo->query(
+            "SELECT rc.CONSTRAINT_NAME, rc.DELETE_RULE
+             FROM information_schema.REFERENTIAL_CONSTRAINTS rc
+             INNER JOIN information_schema.KEY_COLUMN_USAGE kcu
+               ON rc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA
+              AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+              AND rc.TABLE_NAME = kcu.TABLE_NAME
+             WHERE rc.CONSTRAINT_SCHEMA = DATABASE()
+               AND rc.TABLE_NAME = 'product_variants'
+               AND kcu.COLUMN_NAME = 'product_id'
+               AND kcu.REFERENCED_TABLE_NAME = 'products'
+               AND kcu.REFERENCED_COLUMN_NAME = 'id'
+             LIMIT 1"
+        );
+        $row = $st ? $st->fetch(PDO::FETCH_ASSOC) : false;
+
+        return is_array($row) ? $row : null;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+function orange_catalog_schema_product_variants_product_fk_delete_rule_acceptable(?array $meta): bool
+{
+    if ($meta === null) {
+        return false;
+    }
+    $rule = strtoupper(trim((string) ($meta['DELETE_RULE'] ?? '')));
+
+    return $rule === 'RESTRICT' || $rule === 'NO ACTION';
+}
+
+function orange_catalog_migrate_variant_deletion_fk_v118_log(string $event, string $message, array $context = []): void
+{
+    if (function_exists('error_log')) {
+        error_log('[orange] variant_deletion_fk_v118: ' . $message);
+    }
+    if (function_exists('orange_schema_migration_operational_log')) {
+        orange_schema_migration_operational_log($event, $message, $context, 'warn');
+    }
+}
+
+function orange_catalog_migrate_variant_deletion_step_b_product_fk_cascade_repair_v118(PDO $pdo): void
+{
+    static $skipLogged = [];
+
+    if (!orange_table_exists($pdo, 'product_variants') || !orange_table_exists($pdo, 'products')) {
+        return;
+    }
+    if (!orange_table_has_column($pdo, 'product_variants', 'product_id')) {
+        return;
+    }
+
+    $meta = orange_catalog_schema_product_variants_product_fk_metadata($pdo);
+    if ($meta === null) {
+        return;
+    }
+
+    $deleteRule = strtoupper(trim((string) ($meta['DELETE_RULE'] ?? '')));
+    $constraintName = trim((string) ($meta['CONSTRAINT_NAME'] ?? ''));
+
+    if (orange_catalog_schema_product_variants_product_fk_delete_rule_acceptable($meta)) {
+        orange_catalog_schema_insert_migration_marker($pdo, 'php_variant_deletion_fk_product_variants_product_cascade_repair_v118');
+
+        return;
+    }
+
+    if ($deleteRule !== 'CASCADE') {
+        return;
+    }
+
+    if ($constraintName === '' || !preg_match('/^[A-Za-z0-9_]+$/', $constraintName)) {
+        if (!isset($skipLogged['step_b:invalid_name'])) {
+            $skipLogged['step_b:invalid_name'] = true;
+            orange_catalog_migrate_variant_deletion_fk_v118_log(
+                'variant_deletion_fk_v118_cascade_repair_invalid_name',
+                'Skipped CASCADE repair because constraint name is missing or invalid',
+                ['delete_rule' => $deleteRule]
+            );
+        }
+
+        return;
+    }
+
+    if (!orange_schema_fk_exists($pdo, 'product_variants', $constraintName)) {
+        if (!isset($skipLogged['step_b:missing_before_drop'])) {
+            $skipLogged['step_b:missing_before_drop'] = true;
+            orange_catalog_migrate_variant_deletion_fk_v118_log(
+                'variant_deletion_fk_v118_cascade_repair_missing',
+                'Skipped CASCADE repair because constraint no longer exists before DROP',
+                ['constraint' => $constraintName]
+            );
+        }
+
+        return;
+    }
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'ALTER TABLE product_variants DROP FOREIGN KEY `' . $constraintName . '`'
+    );
+    orange_catalog_safe_exec(
+        $pdo,
+        'ALTER TABLE product_variants ADD CONSTRAINT orange_fk_product_variants_product FOREIGN KEY (product_id) REFERENCES products (id)'
+    );
+
+    $metaAfter = orange_catalog_schema_product_variants_product_fk_metadata($pdo);
+    if (!orange_catalog_schema_product_variants_product_fk_delete_rule_acceptable($metaAfter)) {
+        if (!isset($skipLogged['step_b:repair_failed'])) {
+            $skipLogged['step_b:repair_failed'] = true;
+            orange_catalog_migrate_variant_deletion_fk_v118_log(
+                'variant_deletion_fk_v118_cascade_repair_failed',
+                'CASCADE repair did not yield RESTRICT/NO ACTION DELETE_RULE',
+                [
+                    'prior_constraint' => $constraintName,
+                    'delete_rule_after' => is_array($metaAfter) ? (string) ($metaAfter['DELETE_RULE'] ?? '') : '',
+                ]
+            );
+        }
+
+        return;
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, 'php_variant_deletion_fk_product_variants_product_cascade_repair_v118');
+}
+
+/**
+ * v118 — PR-DB-03: variant deletion referential integrity (parent FK repair + hybrid ADD FKs).
+ * Constraint existence / DELETE_RULE metadata is primary truth; markers are bookkeeping only.
+ */
+function orange_catalog_migrate_variant_deletion_referential_integrity_v118(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/acc10_schema.php';
+
+    static $skipLogged = [];
+
+    orange_catalog_migrate_variant_deletion_step_b_product_fk_cascade_repair_v118($pdo);
+
+    $steps = [
+        [
+            'constraint' => 'orange_fk_product_variants_product',
+            'marker' => 'php_variant_deletion_fk_product_variants_product_v118',
+            'child_table' => 'product_variants',
+            'child_column' => 'product_id',
+            'parent_table' => 'products',
+            'parent_column' => 'id',
+            'orphan_sql' => 'SELECT COUNT(*) FROM product_variants pv LEFT JOIN products p ON p.id = pv.product_id WHERE p.id IS NULL',
+            'alter_sql' => 'ALTER TABLE product_variants ADD CONSTRAINT orange_fk_product_variants_product FOREIGN KEY (product_id) REFERENCES products (id)',
+            'metadata_acceptable' => true,
+        ],
+        [
+            'constraint' => 'orange_fk_stock_movements_variant',
+            'marker' => 'php_variant_deletion_fk_stock_movements_variant_v118',
+            'child_table' => 'stock_movements',
+            'child_column' => 'variant_id',
+            'parent_table' => 'product_variants',
+            'parent_column' => 'id',
+            'orphan_sql' => 'SELECT COUNT(*) FROM stock_movements sm LEFT JOIN product_variants pv ON pv.id = sm.variant_id WHERE sm.variant_id IS NOT NULL AND pv.id IS NULL',
+            'alter_sql' => 'ALTER TABLE stock_movements ADD CONSTRAINT orange_fk_stock_movements_variant FOREIGN KEY (variant_id) REFERENCES product_variants (id)',
+            'metadata_acceptable' => false,
+        ],
+    ];
+
+    foreach ($steps as $step) {
+        $constraint = (string) ($step['constraint'] ?? '');
+        $marker = (string) ($step['marker'] ?? '');
+        $childTable = (string) ($step['child_table'] ?? '');
+        $childColumn = (string) ($step['child_column'] ?? '');
+        $parentTable = (string) ($step['parent_table'] ?? '');
+        $parentColumn = (string) ($step['parent_column'] ?? '');
+        $orphanSql = (string) ($step['orphan_sql'] ?? '');
+        $alterSql = (string) ($step['alter_sql'] ?? '');
+        $metadataAcceptable = !empty($step['metadata_acceptable']);
+
+        if ($constraint === '' || $childTable === '' || $alterSql === '') {
+            continue;
+        }
+
+        if (orange_schema_fk_exists($pdo, $childTable, $constraint)) {
+            if ($marker !== '') {
+                orange_catalog_schema_insert_migration_marker($pdo, $marker);
+            }
+            continue;
+        }
+
+        if ($metadataAcceptable
+            && $childTable === 'product_variants'
+            && $childColumn === 'product_id'
+            && orange_catalog_schema_product_variants_product_fk_delete_rule_acceptable(
+                orange_catalog_schema_product_variants_product_fk_metadata($pdo)
+            )) {
+            if ($marker !== '') {
+                orange_catalog_schema_insert_migration_marker($pdo, $marker);
+            }
+            continue;
+        }
+
+        if (!orange_table_exists($pdo, $childTable) || !orange_table_exists($pdo, $parentTable)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $childTable, $childColumn)
+            || !orange_table_has_column($pdo, $parentTable, $parentColumn)) {
+            if (!isset($skipLogged[$constraint . ':columns'])) {
+                $skipLogged[$constraint . ':columns'] = true;
+                orange_catalog_migrate_variant_deletion_fk_v118_log(
+                    'variant_deletion_fk_v118_missing_column',
+                    'Skipped FK because required column is missing',
+                    [
+                        'constraint' => $constraint,
+                        'child_table' => $childTable,
+                        'child_column' => $childColumn,
+                        'parent_table' => $parentTable,
+                        'parent_column' => $parentColumn,
+                    ]
+                );
+            }
+            continue;
+        }
+
+        $childMeta = orange_catalog_schema_column_fk_metadata($pdo, $childTable, $childColumn);
+        $parentMeta = orange_catalog_schema_column_fk_metadata($pdo, $parentTable, $parentColumn);
+        if (!orange_catalog_schema_fk_column_types_compatible($childMeta, $parentMeta)) {
+            if (!isset($skipLogged[$constraint . ':types'])) {
+                $skipLogged[$constraint . ':types'] = true;
+                orange_catalog_migrate_variant_deletion_fk_v118_log(
+                    'variant_deletion_fk_v118_type_incompatible',
+                    'Skipped FK because child/parent column types are not FK-compatible',
+                    [
+                        'constraint' => $constraint,
+                        'child_table' => $childTable,
+                        'child_column' => $childColumn,
+                        'child_column_type' => is_array($childMeta) ? (string) ($childMeta['COLUMN_TYPE'] ?? '') : '',
+                        'parent_table' => $parentTable,
+                        'parent_column' => $parentColumn,
+                        'parent_column_type' => is_array($parentMeta) ? (string) ($parentMeta['COLUMN_TYPE'] ?? '') : '',
+                    ]
+                );
+            }
+            continue;
+        }
+
+        try {
+            $orphanCount = (int) $pdo->query($orphanSql)->fetchColumn();
+        } catch (Throwable $e) {
+            if (!isset($skipLogged[$constraint . ':orphan_query'])) {
+                $skipLogged[$constraint . ':orphan_query'] = true;
+                orange_catalog_migrate_variant_deletion_fk_v118_log(
+                    'variant_deletion_fk_v118_orphan_audit_failed',
+                    'Skipped FK because orphan audit query failed',
+                    [
+                        'constraint' => $constraint,
+                        'error' => $e->getMessage(),
+                    ]
+                );
+            }
+            continue;
+        }
+
+        if ($orphanCount > 0) {
+            if (!isset($skipLogged[$constraint . ':orphans'])) {
+                $skipLogged[$constraint . ':orphans'] = true;
+                orange_catalog_migrate_variant_deletion_fk_v118_log(
+                    'variant_deletion_fk_v118_orphans',
+                    'Skipped FK because orphan rows exist',
+                    [
+                        'constraint' => $constraint,
+                        'orphan_count' => $orphanCount,
+                    ]
+                );
+            }
+            continue;
+        }
+
+        orange_catalog_safe_exec($pdo, $alterSql);
+
+        if (!orange_schema_fk_exists($pdo, $childTable, $constraint)) {
+            if (!isset($skipLogged[$constraint . ':ddl'])) {
+                $skipLogged[$constraint . ':ddl'] = true;
+                orange_catalog_migrate_variant_deletion_fk_v118_log(
+                    'variant_deletion_fk_v118_add_failed',
+                    'FK ADD did not result in a visible constraint',
+                    ['constraint' => $constraint]
+                );
+            }
+            continue;
+        }
+
+        if ($marker !== '') {
+            orange_catalog_schema_insert_migration_marker($pdo, $marker);
+        }
+    }
+
+    $productFkOk = orange_schema_fk_exists($pdo, 'product_variants', 'orange_fk_product_variants_product')
+        || orange_catalog_schema_product_variants_product_fk_delete_rule_acceptable(
+            orange_catalog_schema_product_variants_product_fk_metadata($pdo)
+        );
+    $stockMovementsVariantOk = true;
+    if (orange_table_exists($pdo, 'stock_movements')
+        && orange_table_has_column($pdo, 'stock_movements', 'variant_id')) {
+        $stockMovementsVariantOk = orange_schema_fk_exists($pdo, 'stock_movements', 'orange_fk_stock_movements_variant');
+    }
+    $cascadeRepairOk = orange_schema_migration_already_applied(
+        $pdo,
+        'php_variant_deletion_fk_product_variants_product_cascade_repair_v118'
+    ) || orange_catalog_schema_product_variants_product_fk_metadata($pdo) === null;
+
+    if ($productFkOk && $stockMovementsVariantOk && $cascadeRepairOk) {
+        orange_catalog_schema_insert_migration_marker($pdo, 'php_variant_deletion_referential_integrity_v118_complete');
+    }
 }

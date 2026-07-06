@@ -8,6 +8,7 @@ declare(strict_types=1);
  */
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/schema_migrations.php';
 require_admin_api();
 
 try {
@@ -49,6 +50,7 @@ try {
             'includes_gl_pending_movements' => $mt($pathGlPendingInc),
             'admin_assets_admin_js' => $mt($pathAdminJs),
         ],
+        'migration_operational' => orange_schema_migration_operational_status($pdo),
         'hint' => 'بعد النشر: file_edit_lock_page و includes_gl_pending_movements يجب أن تكون true. جدول orange_gl_pending_movements legacy اختياري. Optional: ORANGE_BUILD_REF في .env.php.',
     ]);
 } catch (Throwable $e) {

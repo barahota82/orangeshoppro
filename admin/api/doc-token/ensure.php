@@ -7,8 +7,13 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/document_public_token.php';
 require_admin_api();
 
-$docKind = trim((string) ($_REQUEST['doc_kind'] ?? ''));
-$docId = (int) ($_REQUEST['doc_id'] ?? 0);
+if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
+    json_response(['success' => false, 'message' => 'Method not allowed'], 405);
+}
+
+$data = get_json_input();
+$docKind = trim((string) ($data['doc_kind'] ?? $_POST['doc_kind'] ?? ''));
+$docId = (int) ($data['doc_id'] ?? $_POST['doc_id'] ?? 0);
 
 if (! orange_doc_public_token_kind_valid($docKind) || $docId <= 0) {
     json_response(['success' => false, 'message' => 'نوع المستند أو معرّفه غير صالح'], 422);

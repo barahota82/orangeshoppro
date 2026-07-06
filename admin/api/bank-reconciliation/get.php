@@ -26,5 +26,5 @@ try {
 
     json_response(['success' => true, 'reconciliation' => $rec]);
 } catch (Throwable $e) {
-    json_response(['success' => false, 'message' => $e->getMessage()], 500);
+    orange_admin_api_catch($e, 'تعذر تحميل تسوية البنك');
 }

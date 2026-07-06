@@ -81,6 +81,15 @@ function orange_schema_migration_failure_record(PDO $pdo, string $filename, stri
     } catch (Throwable $e) {
         // تتبّع الفشل ثانوي — لا نُسقط الطلب إن تعذّر التسجيل.
     }
+
+    orange_schema_migration_operational_log(
+        'schema_migration_failed',
+        'Numbered schema migration failed',
+        [
+            'filename' => $filename,
+            'error' => mb_substr($error, 0, 500),
+        ]
+    );
 }
 
 function orange_schema_migration_failure_clear(PDO $pdo, string $filename): void
@@ -91,6 +100,96 @@ function orange_schema_migration_failure_clear(PDO $pdo, string $filename): void
     } catch (Throwable $e) {
         // تجاهل
     }
+}
+
+function orange_schema_migration_operational_log(
+    string $event,
+    string $message,
+    array $context = [],
+    string $level = 'error'
+): void {
+    static $loaded = false;
+    if (!$loaded) {
+        require_once dirname(__DIR__) . '/includes/orange_operational_log.php';
+        $loaded = true;
+    }
+    orange_operational_log($event, $message, $context, $level);
+}
+
+/**
+ * Read-only migration failure / cooldown status for admin deploy-check and gated health.php.
+ *
+ * @return array{
+ *     cooldown_seconds: int,
+ *     has_failures: bool,
+ *     failure_count: int,
+ *     in_cooldown_count: int,
+ *     failures: list<array{
+ *         filename: string,
+ *         attempts: int,
+ *         last_attempt_at: string|null,
+ *         in_cooldown: bool,
+ *         last_error: string|null
+ *     }>
+ * }
+ */
+function orange_schema_migration_operational_status(PDO $pdo, int $cooldownSeconds = 1800): array
+{
+    $cooldownSeconds = max(60, $cooldownSeconds);
+    $status = [
+        'cooldown_seconds' => $cooldownSeconds,
+        'has_failures' => false,
+        'failure_count' => 0,
+        'in_cooldown_count' => 0,
+        'failures' => [],
+    ];
+
+    try {
+        if (!function_exists('orange_table_exists') || !orange_table_exists($pdo, 'orange_schema_migration_failures')) {
+            return $status;
+        }
+
+        $st = $pdo->query(
+            'SELECT filename, attempts, last_error, last_attempt_at,
+                    (last_attempt_at > (NOW() - INTERVAL ' . (int) $cooldownSeconds . ' SECOND)) AS in_cooldown
+             FROM orange_schema_migration_failures
+             ORDER BY last_attempt_at DESC
+             LIMIT 50'
+        );
+        if (!$st) {
+            return $status;
+        }
+
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $inCooldown = (int) ($row['in_cooldown'] ?? 0) === 1;
+            $lastError = isset($row['last_error']) ? trim((string) $row['last_error']) : '';
+            if ($lastError !== '') {
+                $lastError = mb_substr($lastError, 0, 300);
+            } else {
+                $lastError = null;
+            }
+            $status['failures'][] = [
+                'filename' => (string) ($row['filename'] ?? ''),
+                'attempts' => (int) ($row['attempts'] ?? 0),
+                'last_attempt_at' => isset($row['last_attempt_at']) ? (string) $row['last_attempt_at'] : null,
+                'in_cooldown' => $inCooldown,
+                'last_error' => $lastError,
+            ];
+            if ($inCooldown) {
+                $status['in_cooldown_count']++;
+            }
+        }
+
+        $status['failure_count'] = count($status['failures']);
+        $status['has_failures'] = $status['failure_count'] > 0;
+    } catch (Throwable $e) {
+        return $status;
+    }
+
+    return $status;
 }
 
 /**
@@ -172,6 +271,19 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
         }
         if (isset($recentFailures[$base])) {
             // فشل مؤخراً — مؤجَّل حتى انقضاء التهدئة (لا تكرار كل طلب).
+            static $cooldownSkipLogged = [];
+            if (!isset($cooldownSkipLogged[$base])) {
+                $cooldownSkipLogged[$base] = true;
+                orange_schema_migration_operational_log(
+                    'schema_migration_cooldown_skip',
+                    'Migration skipped during web cooldown',
+                    [
+                        'filename' => $base,
+                        'cooldown_seconds' => 1800,
+                    ],
+                    'warn'
+                );
+            }
             continue;
         }
 

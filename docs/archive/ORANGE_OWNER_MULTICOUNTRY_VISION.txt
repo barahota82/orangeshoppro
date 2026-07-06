@@ -190,7 +190,7 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 والتطبيق وقت التشغيل مفلترتان عبر `products.country_id`). **ثغرة أُغلقت:** كان `orange_admin_assert_entity_country
 ($pdo,'offers',$offerId)` على التعديل **كوداً ميتاً** (`offers` ليست في قائمة الكيانات المسموحة + لا عمود
 `country_id`) — استُبدِل بجلب `product_id` للعرض القائم وassert دولة منتجه قبل `UPDATE` (admin/api/offers/save.php)
-لمنع إعادة توجيه عرض يخص دولة أخرى. لا توجد مسارات `delete`/`toggle` لهذه الجداول (الحذف عبر تتالي حذف المنتج).
+لمنع إعادة توجيه عرض يخص دولة أخرى. لا توجد مسارات `delete`/`toggle` لهذه الجداول (`offers`/`product_channels` تُزال ضمن **حذف منتج مسموح** فقط — انظر ORANGE_STOCK_ORDER_POLICY §16؛ المنتجات ذات السجل التجاري **تُعطَّل** `is_active=0` ولا تُحذف).
 
 **تنفيذ (13 — مرحلة 12 — assert تشغيلي):** **`channels/save`** (assert + قفل **`country_id`** لسياق الأدمن)؛ **`orders/create-manual`** (قناة + منتجات + عميل آجل)؛ **`delivery_areas/manage`** (assert على تعديل محافظة/منطقة)؛ **`sales_returns/update`** و**`purchase_returns/update`** (assert عميل/طلب/مورد/شراء + منتجات البنود).
 

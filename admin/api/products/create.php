@@ -330,97 +330,42 @@ try {
         }
     }
 
-    $cwMap = orange_product_ensure_colorways($pdo, $productId, $variantsIn, $hasColors);
+    // صف واحد لكل هوية مصفوفة (colorway|size) — آخر صف في الحمولة يفوز عند التكرار.
+    $dedupedVariants = [];
+    foreach ($variantsIn as $variantRow) {
+        if (!is_array($variantRow)) {
+            continue;
+        }
+        $cwRowKey = orange_product_variant_cw_row_key($variantRow, $hasColors);
+        $szIdRaw = isset($variantRow['size_family_size_id']) ? (int) $variantRow['size_family_size_id'] : 0;
+        $matrixFp = ($hasColors ? $cwRowKey : '-') . '|' . ($hasSizes && $szIdRaw > 0 ? (string) $szIdRaw : '0');
+        $dedupedVariants[(string) $matrixFp] = $variantRow;
+    }
+    $variantsIn = array_values($dedupedVariants);
 
-    $variantStmt = $pdo->prepare(
-        'INSERT INTO product_variants (
-            product_id, product_colorway_id, size_family_size_id, size, color, stock_quantity
-        ) VALUES (?,?,?,?,?,?)'
-    );
-
-    $hasVarPriceCost = orange_table_has_column($pdo, 'product_variants', 'price')
-        && orange_table_has_column($pdo, 'product_variants', 'cost');
-    $varPriceCostUpd = $hasVarPriceCost
-        ? $pdo->prepare('UPDATE product_variants SET price = ?, cost = ? WHERE id = ? LIMIT 1')
-        : null;
     $productPrice = (float) $data['price'];
     $productCost = (float) $data['cost'];
-
-    foreach ($variantsIn as $variant) {
-        $p = isset($variant['primary_color_id']) ? (int) $variant['primary_color_id'] : 0;
-        $s = isset($variant['secondary_color_id']) ? (int) $variant['secondary_color_id'] : 0;
-        $pp = isset($variant['primary_pattern_id']) ? (int) $variant['primary_pattern_id'] : 0;
-        $sp = isset($variant['secondary_pattern_id']) ? (int) $variant['secondary_pattern_id'] : 0;
-        $szId = isset($variant['size_family_size_id']) ? (int) $variant['size_family_size_id'] : 0;
-        /* الكمية تُضبط من شاشة المخزون أو استلام المشتريات — لا من نموذج المنتج */
-        $stock = 0;
-
-        if (!$hasColors) {
-            $cwKey = '-';
-        } else {
-            $p = $p > 0 ? $p : null;
-            $s = $s > 0 ? $s : null;
-            $pp = $pp > 0 ? $pp : null;
-            $sp = $sp > 0 ? $sp : null;
-            $cwKey = ($p ?? 0) . ':' . ($s ?? 0) . ':' . ($pp ?? 0) . ':' . ($sp ?? 0);
+    foreach ($variantsIn as &$vRow) {
+        if (!is_array($vRow)) {
+            continue;
         }
-
-        $colorwayId = $cwMap[$cwKey] ?? null;
-        if ($colorwayId === null) {
-            throw new RuntimeException('Missing colorway mapping');
-        }
-
-        $sizeFamilySizeId = $hasSizes && $szId > 0 ? $szId : null;
-
-        $sizeRow = null;
-        if ($sizeFamilySizeId !== null) {
-            $szStmt = $pdo->prepare(
-                'SELECT * FROM size_family_sizes WHERE id = ? AND size_family_id = ? LIMIT 1'
-            );
-            $szStmt->execute([$sizeFamilySizeId, $sizeFamilyId]);
-            $sizeRow = $szStmt->fetch(PDO::FETCH_ASSOC) ?: null;
-            if (!$sizeRow) {
-                throw new RuntimeException('Invalid size for selected family');
-            }
-        }
-
-        $colorLabel = orange_colorway_display_label(
-            $pdo,
-            $hasColors ? $p : null,
-            $hasColors ? $s : null,
-            $hasColors ? $pp : null,
-            $hasColors ? $sp : null,
-            'ar'
-        );
-        $sizeLabel = orange_size_display_label($sizeRow);
-
-        $variantStmt->execute([
-            $productId,
-            $colorwayId,
-            $sizeFamilySizeId,
-            $sizeLabel,
-            $colorLabel,
-            $stock,
-        ]);
-
-        $newVid = (int) $pdo->lastInsertId();
-        if ($newVid > 0) {
-            $productCountryId = orange_product_country_id($pdo, $productId);
-            $warehouseId = orange_warehouse_default_id_for_country($pdo, $productCountryId);
-            if ($warehouseId > 0 && orange_warehouses_table_exists($pdo)) {
-                orange_warehouse_set_variant_quantity($pdo, $warehouseId, $newVid, 0);
-            }
-        }
-        if ($varPriceCostUpd !== null && $newVid > 0) {
-            $effPrice = $priceUnified
-                ? $productPrice
-                : ((array_key_exists('price', $variant) && $variant['price'] !== null && $variant['price'] !== '') ? (float) $variant['price'] : $productPrice);
-            $effCost = $costUnified
-                ? $productCost
-                : ((array_key_exists('cost', $variant) && $variant['cost'] !== null && $variant['cost'] !== '') ? (float) $variant['cost'] : $productCost);
-            $varPriceCostUpd->execute([$effPrice, $effCost, $newVid]);
-        }
+        $vRow['price'] = $priceUnified
+            ? $productPrice
+            : ((array_key_exists('price', $vRow) && $vRow['price'] !== null && $vRow['price'] !== '') ? (float) $vRow['price'] : $productPrice);
+        $vRow['cost'] = $costUnified
+            ? $productCost
+            : ((array_key_exists('cost', $vRow) && $vRow['cost'] !== null && $vRow['cost'] !== '') ? (float) $vRow['cost'] : $productCost);
     }
+    unset($vRow);
+
+    orange_product_sync_variants_matrix(
+        $pdo,
+        $productId,
+        $variantsIn,
+        $hasColors,
+        $hasSizes,
+        $sizeFamilyId
+    );
 
     $extraImages = $data['extra_images'] ?? null;
     if (is_array($extraImages)) {

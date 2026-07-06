@@ -196,6 +196,54 @@ ORANGE — التصنيف الموحّد (Unified Taxonomy) + مخطط ERD + ت�
 - **هرَم المقاس الأربعة** لا يكون «شجرة واجهة ثانية»؛ يُكمَّل بتعيين **`products.size_family_id`** وفتح **`product_variants`** وفق مخطّط مختار وفق هذه القواعد.
 
 --------------------------------------------------------------------
+## Orange Entity Lifecycle Policy
+Owner Decision
+Orange follows a Preservation Lifecycle Model.
+Business history always takes precedence over physical deletion.
+The following rules are mandatory.
+### Product Tree
+Departments
+Sections
+Categories
+Subcategories
+Product Types
+Any future catalog tree node
+Rule:
+A parent node must never be hard deleted while child nodes exist.
+A parent node must never be hard deleted while products exist beneath it.
+Only completely empty nodes may be hard deleted.
+Otherwise the node must become inactive or hidden.
+------------------------------------------------------------
+### Product Variants
+The same lifecycle applies to every product variant.
+This includes:
+- Colors
+- Sizes
+- Color / Size combinations
+- Future variant dimensions
+Removing a color or size from the Variant Matrix must never remove historical business data.
+If the variant has ANY footprint, it must never be hard deleted.
+Business footprint includes (but is not limited to):
+- Orders
+- Purchases
+- Sales Returns
+- Purchase Returns
+- Warehouse Variant Stock
+- Stock Movements
+- Inventory Cost Layers
+- Inventory Cost Consumptions
+- Accounting references
+- Any future business references
+Such variants must instead become inactive / hidden while preserving historical integrity.
+------------------------------------------------------------
+### General Principle
+Orange preserves business history.
+Whenever preserving historical business data conflicts with deleting catalog entities,
+historical preservation always wins.
+------------------------------------------------------------
+This is an Owner Policy.
+It is mandatory for all future catalog development.
+--------------------------------------------------------------------
 
 سابعاً-مكرر — كود الصنف الرقمي (item_code) — قرار المالك 2026-06-16
 --------------------------------------------------------------------

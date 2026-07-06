@@ -49,6 +49,30 @@ try {
     echo 'SCHEMA_REVISION_ERROR: ' . $e->getMessage() . "\n";
 }
 
+try {
+    require_once __DIR__ . '/includes/schema_migrations.php';
+    $pdoMigrationOps = db();
+    $migrationOps = orange_schema_migration_operational_status($pdoMigrationOps);
+    echo 'migration_cooldown_seconds=' . (int) ($migrationOps['cooldown_seconds'] ?? 1800) . "\n";
+    echo 'migration_failure_count=' . (int) ($migrationOps['failure_count'] ?? 0) . "\n";
+    echo 'migration_in_cooldown_count=' . (int) ($migrationOps['in_cooldown_count'] ?? 0) . "\n";
+    echo 'migration_has_failures=' . (!empty($migrationOps['has_failures']) ? '1' : '0') . "\n";
+    foreach ($migrationOps['failures'] ?? [] as $migrationFailureRow) {
+        if (!is_array($migrationFailureRow)) {
+            continue;
+        }
+        echo 'migration_failure='
+            . (string) ($migrationFailureRow['filename'] ?? '')
+            . '|attempts=' . (int) ($migrationFailureRow['attempts'] ?? 0)
+            . '|in_cooldown=' . (!empty($migrationFailureRow['in_cooldown']) ? '1' : '0')
+            . '|last_attempt_at=' . (string) ($migrationFailureRow['last_attempt_at'] ?? '')
+            . "\n";
+    }
+    echo "MIGRATION_OPS_OK\n";
+} catch (Throwable $e) {
+    echo "MIGRATION_OPS_ERROR\n";
+}
+
 $rollout = isset($_GET['rollout']) ? trim((string) $_GET['rollout']) : '';
 if ($rollout === 'unified-phase1') {
     try {

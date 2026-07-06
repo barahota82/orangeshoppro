@@ -17,21 +17,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_login'])) {
 
     if ($username !== '' && $password !== '') {
         $pdo = db();
-        $stmt = $pdo->prepare("SELECT * FROM admins WHERE username = ? AND is_active = 1 LIMIT 1");
-        $stmt->execute([$username]);
-        $admin = $stmt->fetch();
+        require_once __DIR__ . '/../includes/catalog_schema.php';
+        require_once __DIR__ . '/../includes/admin_login_rate_limit.php';
+        orange_catalog_ensure_schema($pdo);
 
-        $hash = isset($admin['password_hash']) ? (string) $admin['password_hash'] : '';
-        if ($admin && $hash !== '' && password_verify($password, $hash)) {
-            admin_login((int)$admin['id']);
-            header('Location: ' . storefront_public_path('/admin/index.php?page=dashboard'));
-            exit;
-        }
-
-        if ($admin && ($hash === '' || !str_starts_with($hash, '$2'))) {
-            $error = 'حساب المشرف غير مهيأ: عمود password_hash فارغ أو ليس بصيغة bcrypt. حدّثه من phpMyAdmin (قيمة password_hash من PHP) أو من شاشة المستخدمين بعد دخول مشرف عام.';
-        } else {
+        $rateLimit = orange_admin_login_rate_limit_check($pdo, $username);
+        if (empty($rateLimit['allowed'])) {
             $error = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+        } else {
+            $stmt = $pdo->prepare("SELECT * FROM admins WHERE username = ? AND is_active = 1 LIMIT 1");
+            $stmt->execute([$username]);
+            $admin = $stmt->fetch();
+
+            $hash = isset($admin['password_hash']) ? (string) $admin['password_hash'] : '';
+            if ($admin && $hash !== '' && password_verify($password, $hash)) {
+                admin_login((int)$admin['id']);
+                header('Location: ' . storefront_public_path('/admin/index.php?page=dashboard'));
+                exit;
+            }
+
+            if ($admin && ($hash === '' || !str_starts_with($hash, '$2'))) {
+                $error = 'حساب المشرف غير مهيأ: عمود password_hash فارغ أو ليس بصيغة bcrypt. حدّثه من phpMyAdmin (قيمة password_hash من PHP) أو من شاشة المستخدمين بعد دخول مشرف عام.';
+            } else {
+                orange_admin_login_rate_limit_record_failure($pdo, $username);
+                $error = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+            }
         }
     } else {
         $error = 'يرجى إدخال البيانات';

@@ -14,8 +14,19 @@ try {
     $pdo = db();
     orange_payments_ensure_schema($pdo);
     $cid = (int) orange_admin_context_country_id($pdo);
+    $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
     $data = get_json_input();
-    $action = (string) ($data['action'] ?? $_GET['action'] ?? 'list');
+
+    if ($method === 'GET') {
+        $action = (string) ($_GET['action'] ?? 'list');
+        if ($action !== 'list') {
+            json_response(['success' => false, 'message' => 'Method not allowed'], 405);
+        }
+    } elseif ($method === 'POST') {
+        $action = (string) ($data['action'] ?? 'list');
+    } else {
+        json_response(['success' => false, 'message' => 'Method not allowed'], 405);
+    }
 
     if ($action === 'list') {
         $gwProvider = orange_payment_gateway_default_provider();

@@ -31,8 +31,5 @@ try {
 
     json_response($preview);
 } catch (Throwable $e) {
-    if (function_exists('error_log')) {
-        error_log('[orange] country-screen-copy preview: ' . $e->getMessage());
-    }
-    json_response(['success' => false, 'message' => $e->getMessage()], 500);
+    orange_admin_api_catch($e, 'تعذر معاينة نسخ الشاشة');
 }
