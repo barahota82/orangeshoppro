@@ -8,8 +8,7 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/country_provision.php';
 require_once __DIR__ . '/../../includes/admin_password_policy.php';
 
-$pdo = db();
-orange_catalog_ensure_schema($pdo);
+$pdo = orange_admin_page_pdo();
 $countries = orange_countries_admin_list($pdo);
 $hasTable = orange_table_exists($pdo, 'countries');
 $editId = isset($_GET['edit']) ? (int) $_GET['edit'] : 0;

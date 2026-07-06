@@ -351,6 +351,34 @@ Payment settlement must become atomic before online gateway payments are enabled
   - Existing duplicate rows were not modified.
   - No data modification.
 
+**PR-DB-10 Partial Scope**
+
+- **Title:** Go-Live Filter Indexes
+- **Status:** Implemented
+- **Approved**
+- **Implementation Notes:**
+  - Runtime schema revision updated to 119.
+  - Runtime migration v119 added.
+  - Added index:
+    delivery_areas.country_id
+    Index:
+    idx_delivery_areas_country_id
+  - Added index:
+    inventory_reconciliation.delivery_agent_id
+    Index:
+    idx_inv_recon_delivery_agent_id
+  - Index existence verified using INFORMATION_SCHEMA.STATISTICS.
+  - Per-index migration markers implemented.
+  - Optional aggregate marker implemented.
+  - Registered before APCu gate inside orange_schema_check_and_bootstrap().
+  - Registered in ensure_schema_core().
+  - Registered in ensure_schema_fast_path_slice().
+  - No runtime_light_hooks dependency.
+  - No schema changes outside approved scope.
+  - No business logic changes.
+  - No manual SQL required.
+  - No data modification.
+
 ---
 
 ## 3. Security Engineering Review Results
@@ -544,10 +572,19 @@ Security
 
 - PR-SEC-01B (Batch 2) — Future logout hardening
 
-Database
+Database Implementation Status
 
-- Partial PR-DB-10 if still required
-- Any explicitly approved remaining Database work
+Production Go-Live Database Work:
+
+Completed
+
+Remaining Future / Architecture Work:
+
+- PR-DB-04 (Lifecycle Decision)
+- PR-DB-05 (Lifecycle Decision)
+- PR-DB-07 (Architecture Decision)
+- PR-DB-08 (Architecture Decision)
+- PR-DB-09 (Architecture Decision)
 
 Performance
 
@@ -576,11 +613,11 @@ Production Go-Live Verification
 
 ## 7. Next Session
 
-Continue Database Implementation.
+Continue the Production Readiness Implementation Roadmap.
 
-Next implementation:
+Next implementation group:
 
-PR-DB-10 partial scope, if still required by the checkpoint.
+Performance.
 
 ---
 

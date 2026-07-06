@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 118);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 119);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3180,9 +3180,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_cart_gift_storefront_v113($pdo);
     orange_catalog_migrate_cart_bogo_gift_pool_v114($pdo);
     orange_catalog_migrate_admin_login_throttle_v115($pdo);
-    orange_catalog_migrate_stock_ledger_referential_integrity_v116($pdo);
-    orange_catalog_migrate_inventory_cost_referential_integrity_v117($pdo);
-    orange_catalog_migrate_variant_deletion_referential_integrity_v118($pdo);
+    orange_catalog_migrate_pre_apcu_integrity_v116_through_v119($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3814,9 +3812,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_cart_gift_storefront_v113($pdo);
     orange_catalog_migrate_cart_bogo_gift_pool_v114($pdo);
     orange_catalog_migrate_admin_login_throttle_v115($pdo);
-    orange_catalog_migrate_stock_ledger_referential_integrity_v116($pdo);
-    orange_catalog_migrate_inventory_cost_referential_integrity_v117($pdo);
-    orange_catalog_migrate_variant_deletion_referential_integrity_v118($pdo);
+    orange_catalog_migrate_pre_apcu_integrity_v116_through_v119($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -3950,14 +3946,62 @@ function orange_catalog_schema_web_version_catchup(PDO $pdo, int $dbVersion): vo
 }
 
 /**
+ * Fast steady-state probe: all four PR-DB go-live aggregate markers present (orange_schema_migrations only).
+ */
+function orange_catalog_schema_integrity_migrations_v116_v119_aggregate_complete(PDO $pdo): bool
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return (bool) $cached;
+    }
+
+    require_once __DIR__ . '/schema_migrations.php';
+    orange_schema_migrations_ensure_table($pdo);
+
+    $markers = [
+        'php_stock_ledger_referential_integrity_v116_complete',
+        'php_inventory_cost_referential_integrity_v117_complete',
+        'php_variant_deletion_referential_integrity_v118_complete',
+        'php_filter_column_indexes_go_live_v119_complete',
+    ];
+    $placeholders = implode(', ', array_fill(0, count($markers), '?'));
+    $st = $pdo->prepare(
+        'SELECT COUNT(*) FROM orange_schema_migrations WHERE filename IN (' . $placeholders . ')'
+    );
+    $st->execute($markers);
+    $cached = ((int) $st->fetchColumn()) === count($markers);
+
+    return (bool) $cached;
+}
+
+/**
+ * Pre-APCu orchestrator for v116–v119: cheap when aggregate complete; full migrations when not.
+ */
+function orange_catalog_migrate_pre_apcu_integrity_v116_through_v119(PDO $pdo): void
+{
+    static $ranThisRequest = false;
+    if ($ranThisRequest) {
+        return;
+    }
+    $ranThisRequest = true;
+
+    if (orange_catalog_schema_integrity_migrations_v116_v119_aggregate_complete($pdo)) {
+        return;
+    }
+
+    orange_catalog_migrate_stock_ledger_referential_integrity_v116($pdo);
+    orange_catalog_migrate_inventory_cost_referential_integrity_v117($pdo);
+    orange_catalog_migrate_variant_deletion_referential_integrity_v118($pdo);
+    orange_catalog_migrate_filter_column_indexes_go_live_v119($pdo);
+}
+
+/**
  * بوابة نشر الويب: قراءة إصدار القاعدة، سلسلة ###.sql عند الحاجة، ثم النواة؛ اختياري APCu ووضع متدهور عند الفشل (إعدادات).
  */
 function orange_schema_check_and_bootstrap(PDO $pdo): void
 {
     orange_catalog_ensure_country_id_columns_once($pdo);
-    orange_catalog_migrate_stock_ledger_referential_integrity_v116($pdo);
-    orange_catalog_migrate_inventory_cost_referential_integrity_v117($pdo);
-    orange_catalog_migrate_variant_deletion_referential_integrity_v118($pdo);
+    orange_catalog_migrate_pre_apcu_integrity_v116_through_v119($pdo);
 
     static $gateOk = false;
     if ($gateOk) {
@@ -9161,5 +9205,116 @@ function orange_catalog_migrate_variant_deletion_referential_integrity_v118(PDO 
 
     if ($productFkOk && $stockMovementsVariantOk && $cascadeRepairOk) {
         orange_catalog_schema_insert_migration_marker($pdo, 'php_variant_deletion_referential_integrity_v118_complete');
+    }
+}
+
+function orange_catalog_migrate_filter_column_indexes_v119_log(string $event, string $message, array $context = []): void
+{
+    if (function_exists('error_log')) {
+        error_log('[orange] filter_column_indexes_v119: ' . $message);
+    }
+    if (function_exists('orange_schema_migration_operational_log')) {
+        orange_schema_migration_operational_log($event, $message, $context, 'warn');
+    }
+}
+
+/**
+ * v119 — PR-DB-10 (partial go-live): missing filter indexes on hot admin/checkout paths.
+ * Index existence in INFORMATION_SCHEMA.STATISTICS is primary truth; markers are bookkeeping only.
+ */
+function orange_catalog_migrate_filter_column_indexes_go_live_v119(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    static $skipLogged = [];
+
+    $indexExists = static function (string $table, string $indexName) use ($pdo): bool {
+        $st = $pdo->prepare(
+            'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ?
+               AND INDEX_NAME = ?
+             LIMIT 1'
+        );
+        $st->execute([$table, $indexName]);
+
+        return (bool) $st->fetchColumn();
+    };
+
+    $steps = [
+        [
+            'table' => 'delivery_areas',
+            'column' => 'country_id',
+            'index' => 'idx_delivery_areas_country_id',
+            'marker' => 'php_filter_idx_delivery_areas_country_id_v119',
+            'create_sql' => 'CREATE INDEX idx_delivery_areas_country_id ON delivery_areas (country_id)',
+        ],
+        [
+            'table' => 'inventory_reconciliation',
+            'column' => 'delivery_agent_id',
+            'index' => 'idx_inv_recon_delivery_agent_id',
+            'marker' => 'php_filter_idx_inv_recon_delivery_agent_id_v119',
+            'create_sql' => 'CREATE INDEX idx_inv_recon_delivery_agent_id ON inventory_reconciliation (delivery_agent_id)',
+        ],
+    ];
+
+    $indexesOk = [];
+
+    foreach ($steps as $step) {
+        $table = (string) ($step['table'] ?? '');
+        $column = (string) ($step['column'] ?? '');
+        $indexName = (string) ($step['index'] ?? '');
+        $marker = (string) ($step['marker'] ?? '');
+        $createSql = (string) ($step['create_sql'] ?? '');
+
+        if ($table === '' || $column === '' || $indexName === '' || $createSql === '') {
+            continue;
+        }
+
+        if (!orange_table_exists($pdo, $table) || !orange_table_has_column($pdo, $table, $column)) {
+            $indexesOk[$indexName] = false;
+            continue;
+        }
+
+        if ($indexExists($table, $indexName)) {
+            if ($marker !== '') {
+                orange_catalog_schema_insert_migration_marker($pdo, $marker);
+            }
+            $indexesOk[$indexName] = true;
+
+            continue;
+        }
+
+        orange_catalog_safe_exec($pdo, $createSql);
+
+        if ($indexExists($table, $indexName)) {
+            if ($marker !== '') {
+                orange_catalog_schema_insert_migration_marker($pdo, $marker);
+            }
+            $indexesOk[$indexName] = true;
+
+            continue;
+        }
+
+        $indexesOk[$indexName] = false;
+        $logKey = $table . ':' . $indexName;
+        if (!isset($skipLogged[$logKey])) {
+            $skipLogged[$logKey] = true;
+            orange_catalog_migrate_filter_column_indexes_v119_log(
+                'filter_column_indexes_v119_add_failed',
+                'CREATE INDEX did not yield expected index',
+                [
+                    'table' => $table,
+                    'column' => $column,
+                    'index' => $indexName,
+                ]
+            );
+        }
+    }
+
+    $deliveryAreasOk = !empty($indexesOk['idx_delivery_areas_country_id']);
+    $invReconAgentOk = !empty($indexesOk['idx_inv_recon_delivery_agent_id']);
+    if ($deliveryAreasOk && $invReconAgentOk) {
+        orange_catalog_schema_insert_migration_marker($pdo, 'php_filter_column_indexes_go_live_v119_complete');
     }
 }
