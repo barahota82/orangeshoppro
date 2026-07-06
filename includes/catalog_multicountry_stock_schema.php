@@ -19,7 +19,7 @@ function orange_catalog_multicountry_stock_ensure_schema(PDO $pdo): void
     orange_catalog_migrate_country_market_codes_v42($pdo);
     orange_catalog_migrate_country_warehouses_v44($pdo);
     orange_catalog_migrate_country_scope_v45($pdo);
-    orange_catalog_ensure_country_id_columns($pdo);
+    orange_catalog_ensure_country_id_columns_once($pdo);
     orange_catalog_multicountry_stock_seed_market_countries($pdo);
     orange_catalog_multicountry_stock_ensure_indexes($pdo);
 }

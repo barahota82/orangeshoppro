@@ -4834,15 +4834,10 @@ function orange_catalog_country_gl_accounts_v49_satisfied(PDO $pdo): bool
         || orange_table_has_column($pdo, 'accounts', 'country_id');
 }
 
-/**
- * ربط السجلات القديمة (country_id NULL/0) بدولة الكويت — بعد إضافة العمود.
- */
-function orange_catalog_backfill_kuwait_country_ids(PDO $pdo, int $kwId): void
+/** @return list<string> Historical Kuwait country_id backfill scope (18 tables). */
+function orange_catalog_kuwait_country_id_backfill_table_list(): array
 {
-    if ($kwId <= 0) {
-        return;
-    }
-    $tables = [
+    return [
         'customers', 'suppliers', 'purchases', 'products',
         'journal_vouchers', 'channels', 'delivery_areas',
         'cart_promotions', 'cart_gift_promotions', 'cart_bogo_promotions', 'cart_combo_promotions',
@@ -4850,7 +4845,87 @@ function orange_catalog_backfill_kuwait_country_ids(PDO $pdo, int $kwId): void
         'orange_gl_account_settings', 'orange_gl_setting_alloc',
         'orders', 'stock_movements', 'accounts',
     ];
-    foreach ($tables as $tbl) {
+}
+
+function orange_catalog_kuwait_country_id_backfill_has_pending_rows(PDO $pdo, int $kwId): bool
+{
+    if ($kwId <= 0) {
+        return false;
+    }
+    foreach (orange_catalog_kuwait_country_id_backfill_table_list() as $tbl) {
+        if (!orange_table_exists($pdo, $tbl) || !orange_table_has_column($pdo, $tbl, 'country_id')) {
+            continue;
+        }
+        try {
+            $st = $pdo->query(
+                'SELECT 1 FROM ' . $tbl . ' WHERE country_id IS NULL OR country_id = 0 LIMIT 1'
+            );
+            if ($st && $st->fetchColumn()) {
+                return true;
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] kuwait country_id backfill probe ' . $tbl . ': ' . $e->getMessage());
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Steady-state gate: php_kuwait_country_id_backfill_complete in orange_schema_migrations only.
+ * Historical/permanent — future country_id columns/tables use targeted migrations; never invalidate.
+ */
+function orange_catalog_kuwait_country_id_backfill_steady_state(PDO $pdo): bool
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return (bool) $cached;
+    }
+
+    require_once __DIR__ . '/schema_migrations.php';
+    orange_schema_migrations_ensure_table($pdo);
+    $cached = orange_schema_migration_already_applied($pdo, 'php_kuwait_country_id_backfill_complete');
+
+    return (bool) $cached;
+}
+
+function orange_catalog_kuwait_country_id_backfill_record_complete(PDO $pdo): void
+{
+    orange_catalog_schema_insert_migration_marker($pdo, 'php_kuwait_country_id_backfill_complete');
+}
+
+/**
+ * ربط السجلات القديمة (country_id NULL/0) بدولة الكويت — بعد إضافة العمود.
+ */
+function orange_catalog_backfill_kuwait_country_ids(PDO $pdo, int $kwId): void
+{
+    static $ranThisRequest = false;
+
+    if ($kwId <= 0) {
+        return;
+    }
+
+    /*
+     * Historical/permanent marker php_kuwait_country_id_backfill_complete.
+     * Future country_id columns/tables: targeted migration backfill only — do not invalidate this marker.
+     */
+    if (orange_catalog_kuwait_country_id_backfill_steady_state($pdo)) {
+        return;
+    }
+    if ($ranThisRequest) {
+        return;
+    }
+    $ranThisRequest = true;
+
+    if (!orange_catalog_kuwait_country_id_backfill_has_pending_rows($pdo, $kwId)) {
+        orange_catalog_kuwait_country_id_backfill_record_complete($pdo);
+
+        return;
+    }
+
+    foreach (orange_catalog_kuwait_country_id_backfill_table_list() as $tbl) {
         if (!orange_table_exists($pdo, $tbl) || !orange_table_has_column($pdo, $tbl, 'country_id')) {
             continue;
         }
@@ -4859,6 +4934,10 @@ function orange_catalog_backfill_kuwait_country_ids(PDO $pdo, int $kwId): void
             'UPDATE ' . $tbl . ' SET country_id = ' . (int) $kwId
             . ' WHERE country_id IS NULL OR country_id = 0'
         );
+    }
+
+    if (!orange_catalog_kuwait_country_id_backfill_has_pending_rows($pdo, $kwId)) {
+        orange_catalog_kuwait_country_id_backfill_record_complete($pdo);
     }
 }
 
