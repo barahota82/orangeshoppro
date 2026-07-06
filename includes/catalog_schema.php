@@ -9228,6 +9228,42 @@ function orange_catalog_migrate_filter_column_indexes_go_live_v119(PDO $pdo): vo
 
     static $skipLogged = [];
 
+    /*
+     * inventory_reconciliation is completed by the ACC10 schema helper later in
+     * the full core. v119 can run earlier on web catch-up paths, so create only
+     * the minimum table/column needed for this filter index and leave the rest of
+     * ACC10 to its normal helper.
+     */
+    if (!orange_table_exists($pdo, 'inventory_reconciliation')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE inventory_reconciliation (
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                warehouse_id INT UNSIGNED NOT NULL,
+                status VARCHAR(16) NOT NULL DEFAULT \'draft\',
+                counted_at DATE NULL DEFAULT NULL,
+                notes VARCHAR(512) NULL DEFAULT NULL,
+                journal_voucher_id INT NULL,
+                country_id INT UNSIGNED NULL DEFAULT NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                approved_at DATETIME NULL DEFAULT NULL,
+                PRIMARY KEY (id),
+                KEY idx_inv_recon_wh (warehouse_id, status),
+                KEY idx_inv_recon_country (country_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+        orange_schema_invalidate_table_exists('inventory_reconciliation');
+    }
+    orange_schema_invalidate_column_check('inventory_reconciliation', 'delivery_agent_id');
+    if (orange_table_exists($pdo, 'inventory_reconciliation')
+        && !orange_table_has_column($pdo, 'inventory_reconciliation', 'delivery_agent_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE inventory_reconciliation ADD COLUMN delivery_agent_id INT UNSIGNED NULL DEFAULT NULL'
+        );
+        orange_schema_invalidate_column_check('inventory_reconciliation', 'delivery_agent_id');
+    }
+
     $indexExists = static function (string $table, string $indexName) use ($pdo): bool {
         $st = $pdo->prepare(
             'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
