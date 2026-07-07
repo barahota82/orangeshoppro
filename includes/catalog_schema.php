@@ -4021,6 +4021,12 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
     }
 
     $okFlagPath = trim((string) (getenv('ORANGE_SCHEMA_OK_FLAG_PATH') ?: ''));
+    if ($okFlagPath === '') {
+        global $env;
+        if (is_array($env ?? null)) {
+            $okFlagPath = trim((string) ($env['ORANGE_SCHEMA_OK_FLAG_PATH'] ?? ''));
+        }
+    }
     if ($okFlagPath !== '' && is_readable($okFlagPath)) {
         $fc = @file_get_contents($okFlagPath);
         if ($fc !== false) {
