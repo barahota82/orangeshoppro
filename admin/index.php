@@ -115,6 +115,16 @@ if (!in_array($page, $allowed, true)) {
 if ($__orangeAdminProfileReq !== null) {
     $GLOBALS['orangeAdminProfileFinishPage'] = $page;
 }
+$__orangeAdminProfileView = '';
+if ($page === 'partner_reports') {
+    $__orangeAdminProfileViewRaw = isset($_GET['view']) ? strtolower(trim((string) $_GET['view'])) : '';
+    if (in_array($__orangeAdminProfileViewRaw, ['customers', 'suppliers'], true)) {
+        $__orangeAdminProfileView = $__orangeAdminProfileViewRaw;
+    }
+}
+if ($__orangeAdminProfileReq !== null) {
+    $GLOBALS['orangeAdminProfileFinishView'] = $__orangeAdminProfileView;
+}
 
 $pdo = db();
 $GLOBALS['orangeAdminPdo'] = $pdo;
@@ -190,14 +200,4 @@ if (!is_readable($pageFile)) {
     }
 }
 include __DIR__ . '/partials/footer.php';
-$__orangeAdminProfileView = '';
-if ($page === 'partner_reports') {
-    $__orangeAdminProfileViewRaw = isset($_GET['view']) ? strtolower(trim((string) $_GET['view'])) : '';
-    if (in_array($__orangeAdminProfileViewRaw, ['customers', 'suppliers'], true)) {
-        $__orangeAdminProfileView = $__orangeAdminProfileViewRaw;
-    }
-}
-if ($__orangeAdminProfileReq !== null) {
-    $GLOBALS['orangeAdminProfileFinishView'] = $__orangeAdminProfileView;
-}
 orange_admin_profile_request_finish($page, $__orangeAdminProfileView, $__orangeAdminProfileReq);
