@@ -143,6 +143,90 @@ function orange_multicountry_backfill_warehouse_variant_stock_rows(PDO $pdo): vo
     );
 }
 
+/**
+ * صيانة runtime خفيفة — مخزن افتراضي لكل دولة نشطة (منتجات/قنوات/دول مفعّلة لاحقاً).
+ */
+function orange_multicountry_runtime_maintain_default_warehouses(PDO $pdo): void
+{
+    if (!orange_table_exists($pdo, 'warehouses')) {
+        return;
+    }
+    foreach (orange_catalog_active_country_ids($pdo) as $countryId) {
+        orange_warehouse_ensure_default_for_country($pdo, $countryId);
+    }
+}
+
+/**
+ * صيانة runtime خفيفة — صفوف warehouse_variant_stock الناقصة فقط (probe ثم INSERT عند الحاجة).
+ */
+function orange_multicountry_runtime_maintain_missing_wvs_rows(PDO $pdo): void
+{
+    static $ranThisRequest = false;
+    if ($ranThisRequest) {
+        return;
+    }
+    $ranThisRequest = true;
+
+    if (!orange_table_exists($pdo, 'warehouse_variant_stock')
+        || !orange_table_exists($pdo, 'product_variants')
+        || !orange_table_exists($pdo, 'warehouses')
+        || !orange_table_exists($pdo, 'products')) {
+        return;
+    }
+
+    try {
+        $probe = $pdo->query(
+            'SELECT 1
+             FROM product_variants pv
+             INNER JOIN products p ON p.id = pv.product_id
+             INNER JOIN warehouses w ON w.country_id = p.country_id AND w.is_default = 1
+             LEFT JOIN warehouse_variant_stock wvs
+               ON wvs.warehouse_id = w.id AND wvs.variant_id = pv.id
+             WHERE p.country_id IS NOT NULL AND p.country_id > 0
+               AND wvs.variant_id IS NULL
+             LIMIT 1'
+        );
+        if (!$probe || !(bool) $probe->fetchColumn()) {
+            return;
+        }
+        orange_multicountry_backfill_warehouse_variant_stock_rows($pdo);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_multicountry_runtime_maintain_missing_wvs_rows: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * صيانة runtime خفيفة — أسواق المرحلة 2 المفعّلة: provision idempotent + مخزن افتراضي.
+ */
+function orange_multicountry_runtime_maintain_phase2_active_markets(PDO $pdo): void
+{
+    if (!orange_table_exists($pdo, 'countries') || !orange_table_exists($pdo, 'warehouses')) {
+        return;
+    }
+
+    $sourceId = orange_countries_default_id($pdo);
+    foreach (orange_multicountry_phase2_market_codes() as $code) {
+        $countryId = orange_multicountry_country_id_for_market($pdo, $code);
+        if ($countryId <= 0) {
+            continue;
+        }
+        $countryRow = orange_country_row_by_id($pdo, $countryId, false);
+        if ($countryRow === null || empty($countryRow['is_active'])) {
+            continue;
+        }
+        try {
+            orange_country_provision_runtime($pdo, $countryId, $sourceId > 0 ? $sourceId : null);
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] multicountry phase2 maintain provision ' . $code . ': ' . $e->getMessage());
+            }
+        }
+        orange_warehouse_ensure_default_for_country($pdo, $countryId);
+    }
+}
+
 function orange_multicountry_market_variants_missing_wvs(PDO $pdo, int $countryId): int
 {
     if ($countryId <= 0
@@ -248,15 +332,19 @@ function orange_multicountry_stock_gap_report(PDO $pdo): array
  */
 function orange_multicountry_ensure_stock_scoped_phase1(PDO $pdo): void
 {
-    require_once __DIR__ . '/catalog_multicountry_stock_schema.php';
-    orange_catalog_multicountry_stock_ensure_schema($pdo);
+    if (!orange_table_exists($pdo, 'warehouses') || !orange_table_exists($pdo, 'products')) {
+        return;
+    }
+
+    orange_multicountry_runtime_maintain_default_warehouses($pdo);
+    orange_multicountry_runtime_maintain_missing_wvs_rows($pdo);
 
     if (orange_catalog_migration_step_applied($pdo, ORANGE_MC_STOCK_SCOPED_STEP)) {
         return;
     }
-    if (!orange_table_exists($pdo, 'warehouses') || !orange_table_exists($pdo, 'products')) {
-        return;
-    }
+
+    require_once __DIR__ . '/catalog_multicountry_stock_schema.php';
+    orange_catalog_multicountry_stock_ensure_schema($pdo);
 
     orange_catalog_backfill_products_country_id($pdo);
 
@@ -401,12 +489,19 @@ function orange_multicountry_stock_phase2_gap_report(PDO $pdo): array
  */
 function orange_multicountry_ensure_operational_phase2(PDO $pdo): void
 {
-    require_once __DIR__ . '/catalog_multicountry_stock_schema.php';
-    orange_catalog_multicountry_stock_ensure_schema($pdo);
-
     if (!orange_table_exists($pdo, 'countries') || !orange_table_exists($pdo, 'warehouses')) {
         return;
     }
+
+    orange_multicountry_runtime_maintain_phase2_active_markets($pdo);
+    orange_multicountry_runtime_maintain_missing_wvs_rows($pdo);
+
+    if (orange_catalog_migration_step_applied($pdo, ORANGE_MC_STOCK_OPERATIONAL_STEP)) {
+        return;
+    }
+
+    require_once __DIR__ . '/catalog_multicountry_stock_schema.php';
+    orange_catalog_multicountry_stock_ensure_schema($pdo);
 
     orange_multicountry_normalize_legacy_country_codes($pdo);
     orange_multicountry_ensure_phase2_market_countries($pdo);
@@ -418,33 +513,11 @@ function orange_multicountry_ensure_operational_phase2(PDO $pdo): void
         orange_catalog_ensure_department_countries_scaffold($pdo);
     }
 
-    $sourceId = orange_countries_default_id($pdo);
-    foreach (orange_multicountry_phase2_market_codes() as $code) {
-        $countryId = orange_multicountry_country_id_for_market($pdo, $code);
-        if ($countryId <= 0) {
-            continue;
-        }
-        $countryRow = orange_country_row_by_id($pdo, $countryId, false);
-        if ($countryRow === null || empty($countryRow['is_active'])) {
-            continue;
-        }
-        try {
-            orange_country_provision_runtime($pdo, $countryId, $sourceId > 0 ? $sourceId : null);
-        } catch (Throwable $e) {
-            if (function_exists('error_log')) {
-                error_log('[orange] multicountry phase2 provision ' . $code . ': ' . $e->getMessage());
-            }
-        }
-        orange_warehouse_ensure_default_for_country($pdo, $countryId);
-    }
+    orange_multicountry_runtime_maintain_phase2_active_markets($pdo);
 
     require_once __DIR__ . '/product_channels.php';
     orange_product_channels_ensure_missing_links($pdo);
     orange_multicountry_backfill_warehouse_variant_stock_rows($pdo);
-
-    if (orange_catalog_migration_step_applied($pdo, ORANGE_MC_STOCK_OPERATIONAL_STEP)) {
-        return;
-    }
 
     $rep = orange_multicountry_stock_phase2_gap_report($pdo);
     if (!empty($rep['ready'])) {
