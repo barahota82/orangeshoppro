@@ -163,10 +163,9 @@ if (!is_readable($pageFile)) {
     echo '<div class="card"><p class="muted">الصفحة غير موجودة: '
         . htmlspecialchars($page, ENT_QUOTES, 'UTF-8') . '</p></div>';
 } else {
+    $__orangeAdminProfilePageT0 = orange_admin_profile_hrtime_start();
     try {
-        $__orangeAdminProfilePageT0 = orange_admin_profile_hrtime_start();
         include $pageFile;
-        orange_admin_profile_hrtime_record('page_body', $__orangeAdminProfilePageT0);
     } catch (Throwable $adminPageError) {
         if (function_exists('error_log')) {
             error_log(
@@ -184,6 +183,8 @@ if (!is_readable($pageFile)) {
         echo '<p class="muted" style="font-size:0.85rem;margin-bottom:0;">'
             . htmlspecialchars($page, ENT_QUOTES, 'UTF-8') . '</p>';
         echo '</div>';
+    } finally {
+        orange_admin_profile_hrtime_record('page_body', $__orangeAdminProfilePageT0);
     }
 }
 include __DIR__ . '/partials/footer.php';

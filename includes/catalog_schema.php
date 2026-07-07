@@ -648,7 +648,10 @@ function orange_admin_profile_enabled(): bool
             $raw = $env['ORANGE_ADMIN_PROFILE'] ?? '';
         }
     }
-    $enabled = ($raw === true || $raw === 1 || $raw === '1');
+    $enabled = $raw === true
+        || $raw === 1
+        || $raw === '1'
+        || strtolower(trim((string) $raw)) === 'true';
 
     return $enabled;
 }
