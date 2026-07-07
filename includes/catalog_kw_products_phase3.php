@@ -75,6 +75,208 @@ function orange_catalog_kw_products_phase3_gap_counts(PDO $pdo, int $countryId):
     return $out;
 }
 
+function orange_catalog_kw_products_phase3_step_key(int $countryId): string
+{
+    return 'kw_catalog_products_phase3_v1_c' . max(0, $countryId);
+}
+
+function orange_catalog_kw_products_phase3_probe_missing_product_type(PDO $pdo, int $countryId): bool
+{
+    if (
+        $countryId <= 0
+        || !orange_table_exists($pdo, 'products')
+        || !orange_table_has_column($pdo, 'products', 'product_type_id')
+        || !orange_table_exists($pdo, 'product_types')
+    ) {
+        return false;
+    }
+
+    $countrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $countryId);
+    $depSql = orange_department_country_active_sql($pdo, 'd', $countryId);
+
+    try {
+        $st = $pdo->query(
+            'SELECT 1 FROM products p
+             WHERE p.is_active = 1' . $countrySql . '
+               AND (
+                   p.product_type_id IS NULL OR p.product_type_id <= 0
+                   OR NOT EXISTS (
+                       SELECT 1 FROM product_types pt
+                       INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
+                       INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
+                       INNER JOIN catalog_sections cs ON cs.id = ucc.catalog_section_id AND cs.is_active = 1
+                       INNER JOIN departments d ON d.id = cs.department_id AND (' . $depSql . ')
+                       WHERE pt.id = p.product_type_id AND pt.is_active = 1
+                   )
+               )
+             LIMIT 1'
+        );
+
+        return $st !== false && (bool) $st->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function orange_catalog_kw_products_phase3_probe_missing_variants(PDO $pdo, int $countryId): bool
+{
+    if ($countryId <= 0 || !orange_table_exists($pdo, 'products') || !orange_table_exists($pdo, 'product_variants')) {
+        return false;
+    }
+
+    $countrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $countryId);
+
+    try {
+        $st = $pdo->query(
+            'SELECT 1 FROM products p
+             WHERE p.is_active = 1' . $countrySql . '
+               AND (COALESCE(p.has_colors, 0) = 0 AND COALESCE(p.has_sizes, 0) = 0)
+               AND NOT EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id)
+             LIMIT 1'
+        );
+
+        return $st !== false && (bool) $st->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function orange_catalog_kw_products_phase3_probe_missing_attributes(PDO $pdo, int $countryId): bool
+{
+    if (
+        $countryId <= 0
+        || !orange_table_exists($pdo, 'products')
+        || !orange_table_exists($pdo, 'product_attribute_values')
+        || !orange_table_exists($pdo, 'catalog_attributes')
+    ) {
+        return false;
+    }
+
+    try {
+        $attrSt = $pdo->query('SELECT 1 FROM catalog_attributes WHERE is_active = 1 LIMIT 1');
+        if (!$attrSt || !(bool) $attrSt->fetchColumn()) {
+            return false;
+        }
+    } catch (Throwable $e) {
+        return false;
+    }
+
+    $countrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $countryId);
+
+    try {
+        $st = $pdo->query(
+            'SELECT 1 FROM products p
+             WHERE p.is_active = 1' . $countrySql . '
+               AND p.product_type_id IS NOT NULL AND p.product_type_id > 0
+               AND NOT EXISTS (SELECT 1 FROM product_attribute_values pav WHERE pav.product_id = p.id)
+               AND EXISTS (
+                   SELECT 1 FROM products p2
+                   INNER JOIN product_attribute_values pav2 ON pav2.product_id = p2.id
+                   WHERE p2.product_type_id = p.product_type_id AND p2.id <> p.id
+               )
+             LIMIT 1'
+        );
+
+        return $st !== false && (bool) $st->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function orange_catalog_kw_products_phase3_probe_missing_size_family(PDO $pdo, int $countryId): bool
+{
+    if (
+        $countryId <= 0
+        || !orange_table_exists($pdo, 'products')
+        || !orange_table_exists($pdo, 'product_types')
+        || !orange_table_has_column($pdo, 'products', 'size_family_id')
+        || !orange_table_has_column($pdo, 'product_types', 'expected_commercial_kind_key')
+    ) {
+        return false;
+    }
+
+    $countrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $countryId);
+
+    try {
+        $st = $pdo->query(
+            'SELECT 1
+             FROM products p
+             INNER JOIN product_types pt ON pt.id = p.product_type_id AND pt.is_active = 1
+             WHERE p.is_active = 1' . $countrySql . '
+               AND COALESCE(p.has_sizes, 0) = 1
+               AND (p.size_family_id IS NULL OR p.size_family_id <= 0)
+               AND pt.expected_commercial_kind_key <> \'\'
+               AND pt.expected_sizing_category_key <> \'\'
+             LIMIT 1'
+        );
+
+        return $st !== false && (bool) $st->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+/**
+ * @param array{product_type_fixed:int,size_families:int,variants:int,attributes_copied:int,gaps:array<string,int>} $stats
+ */
+function orange_catalog_kw_runtime_maintain_products_phase3(PDO $pdo, int $countryId, array &$stats): void
+{
+    if (orange_catalog_kw_products_phase3_probe_missing_product_type($pdo, $countryId)) {
+        $stats['product_type_fixed'] += orange_catalog_backfill_kw_product_type_ids($pdo, $countryId);
+    }
+    if (orange_catalog_kw_products_phase3_probe_missing_size_family($pdo, $countryId)) {
+        $stats['size_families'] += orange_catalog_backfill_kw_product_size_families($pdo, $countryId);
+    }
+    if (orange_catalog_kw_products_phase3_probe_missing_variants($pdo, $countryId)) {
+        $stats['variants'] += orange_catalog_ensure_kw_default_product_variants($pdo, $countryId);
+    }
+    if (orange_catalog_kw_products_phase3_probe_missing_attributes($pdo, $countryId)) {
+        $stats['attributes_copied'] += orange_catalog_copy_kw_product_attributes_from_type_template($pdo, $countryId);
+    }
+}
+
+/**
+ * @param array{product_type_fixed:int,size_families:int,variants:int,attributes_copied:int,gaps:array<string,int>} $stats
+ * @return array{product_type_fixed:int,size_families:int,variants:int,attributes_copied:int,gaps:array<string,int>}
+ */
+function orange_catalog_kw_products_phase3_historical_bootstrap_for_country(PDO $pdo, int $countryId, array $stats): array
+{
+    $gapsBefore = orange_catalog_kw_products_phase3_gap_counts($pdo, $countryId);
+    $stats['gaps'] = $gapsBefore;
+
+    if ($gapsBefore['missing_product_type'] > 0) {
+        $stats['product_type_fixed'] = orange_catalog_backfill_kw_product_type_ids($pdo, $countryId);
+    }
+    $stats['size_families'] = orange_catalog_backfill_kw_product_size_families($pdo, $countryId);
+    if ($gapsBefore['missing_variants'] > 0) {
+        $stats['variants'] = orange_catalog_ensure_kw_default_product_variants($pdo, $countryId);
+    }
+    if ($gapsBefore['missing_attributes'] > 0) {
+        $stats['attributes_copied'] = orange_catalog_copy_kw_product_attributes_from_type_template($pdo, $countryId);
+    }
+
+    $stats['gaps'] = orange_catalog_kw_products_phase3_gap_counts($pdo, $countryId);
+
+    if (($stats['gaps']['missing_product_type'] ?? 1) === 0
+        && ($stats['gaps']['missing_variants'] ?? 1) === 0
+        && ($stats['gaps']['missing_attributes'] ?? 1) === 0) {
+        orange_catalog_migration_step_record($pdo, orange_catalog_kw_products_phase3_step_key($countryId));
+    }
+
+    if ($stats['product_type_fixed'] > 0 || $stats['variants'] > 0 || $stats['attributes_copied'] > 0) {
+        if (function_exists('error_log')) {
+            error_log(
+                '[orange] kw products phase3: pt=' . $stats['product_type_fixed']
+                . ' sf=' . $stats['size_families']
+                . ' var=' . $stats['variants']
+                . ' attr=' . $stats['attributes_copied']
+            );
+        }
+    }
+
+    return $stats;
+}
+
 function orange_catalog_backfill_kw_product_type_ids(PDO $pdo, int $countryId): int
 {
     if ($countryId <= 0 || !orange_table_has_column($pdo, 'products', 'product_type_id')) {
@@ -382,32 +584,11 @@ function orange_catalog_ensure_kw_products_phase3_for_country(PDO $pdo, int $cou
         return $stats;
     }
 
-    $gapsBefore = orange_catalog_kw_products_phase3_gap_counts($pdo, $countryId);
-    $stats['gaps'] = $gapsBefore;
+    orange_catalog_kw_runtime_maintain_products_phase3($pdo, $countryId, $stats);
 
-    if ($gapsBefore['missing_product_type'] > 0) {
-        $stats['product_type_fixed'] = orange_catalog_backfill_kw_product_type_ids($pdo, $countryId);
-    }
-    $stats['size_families'] = orange_catalog_backfill_kw_product_size_families($pdo, $countryId);
-    if ($gapsBefore['missing_variants'] > 0) {
-        $stats['variants'] = orange_catalog_ensure_kw_default_product_variants($pdo, $countryId);
-    }
-    if ($gapsBefore['missing_attributes'] > 0) {
-        $stats['attributes_copied'] = orange_catalog_copy_kw_product_attributes_from_type_template($pdo, $countryId);
+    if (orange_catalog_migration_step_applied($pdo, orange_catalog_kw_products_phase3_step_key($countryId))) {
+        return $stats;
     }
 
-    $stats['gaps'] = orange_catalog_kw_products_phase3_gap_counts($pdo, $countryId);
-
-    if ($stats['product_type_fixed'] > 0 || $stats['variants'] > 0 || $stats['attributes_copied'] > 0) {
-        if (function_exists('error_log')) {
-            error_log(
-                '[orange] kw products phase3: pt=' . $stats['product_type_fixed']
-                . ' sf=' . $stats['size_families']
-                . ' var=' . $stats['variants']
-                . ' attr=' . $stats['attributes_copied']
-            );
-        }
-    }
-
-    return $stats;
+    return orange_catalog_kw_products_phase3_historical_bootstrap_for_country($pdo, $countryId, $stats);
 }
