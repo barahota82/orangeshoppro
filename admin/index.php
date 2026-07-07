@@ -3,7 +3,10 @@ require_once __DIR__ . '/../config.php';
 orange_send_html_no_cache_headers();
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/admin_permissions.php';
+$__orangeAdminProfileReq = orange_admin_profile_request_begin();
+$__orangeAdminProfileAuthT0 = orange_admin_profile_hrtime_start();
 $admin = require_admin_page();
+orange_admin_profile_hrtime_record('auth', $__orangeAdminProfileAuthT0);
 $page = $_GET['page'] ?? 'dashboard';
 
 $allowed = [
@@ -152,14 +155,18 @@ if (isset($_GET['export']) && (string) $_GET['export'] !== '') {
     }
 }
 
+$__orangeAdminProfileHeaderT0 = orange_admin_profile_hrtime_start();
 include __DIR__ . '/partials/header.php';
+orange_admin_profile_hrtime_record('header_render', $__orangeAdminProfileHeaderT0);
 $pageFile = __DIR__ . '/pages/' . $page . '.php';
 if (!is_readable($pageFile)) {
     echo '<div class="card"><p class="muted">الصفحة غير موجودة: '
         . htmlspecialchars($page, ENT_QUOTES, 'UTF-8') . '</p></div>';
 } else {
     try {
+        $__orangeAdminProfilePageT0 = orange_admin_profile_hrtime_start();
         include $pageFile;
+        orange_admin_profile_hrtime_record('page_body', $__orangeAdminProfilePageT0);
     } catch (Throwable $adminPageError) {
         if (function_exists('error_log')) {
             error_log(
@@ -180,3 +187,11 @@ if (!is_readable($pageFile)) {
     }
 }
 include __DIR__ . '/partials/footer.php';
+$__orangeAdminProfileView = '';
+if ($page === 'partner_reports') {
+    $__orangeAdminProfileViewRaw = isset($_GET['view']) ? strtolower(trim((string) $_GET['view'])) : '';
+    if (in_array($__orangeAdminProfileViewRaw, ['customers', 'suppliers'], true)) {
+        $__orangeAdminProfileView = $__orangeAdminProfileViewRaw;
+    }
+}
+orange_admin_profile_request_finish($page, $__orangeAdminProfileView, $__orangeAdminProfileReq);

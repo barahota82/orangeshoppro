@@ -634,6 +634,111 @@ function orange_catalog_is_admin_http_request(): bool
     return str_contains($uri, '/admin/') || str_contains($script, '/admin/');
 }
 
+/** @internal — ضبط مؤقت لأداء الأدمن؛ معطّل افتراضياً (ORANGE_ADMIN_PROFILE في .env.php). */
+function orange_admin_profile_enabled(): bool
+{
+    static $enabled = null;
+    if ($enabled !== null) {
+        return $enabled;
+    }
+    $raw = getenv('ORANGE_ADMIN_PROFILE');
+    if ($raw === false || $raw === '') {
+        global $env;
+        if (is_array($env ?? null)) {
+            $raw = $env['ORANGE_ADMIN_PROFILE'] ?? '';
+        }
+    }
+    $enabled = ($raw === true || $raw === 1 || $raw === '1');
+
+    return $enabled;
+}
+
+/** @internal */
+function orange_admin_profile_log_path(): string
+{
+    static $path = null;
+    if ($path !== null) {
+        return $path;
+    }
+    $raw = getenv('ORANGE_ADMIN_PROFILE_LOG_PATH');
+    if ($raw === false || $raw === '') {
+        global $env;
+        if (is_array($env ?? null)) {
+            $raw = trim((string) ($env['ORANGE_ADMIN_PROFILE_LOG_PATH'] ?? ''));
+        }
+    }
+    $path = is_string($raw) ? trim($raw) : '';
+
+    return $path;
+}
+
+/** @return int|null hrtime(true) start, or null when profiling off / non-admin HTTP. */
+function orange_admin_profile_hrtime_start(): ?int
+{
+    if (!orange_admin_profile_enabled() || !orange_catalog_is_admin_http_request()) {
+        return null;
+    }
+
+    return hrtime(true);
+}
+
+/** @param int|null $startNs from orange_admin_profile_hrtime_start() */
+function orange_admin_profile_hrtime_record(string $key, ?int $startNs): void
+{
+    if ($startNs === null) {
+        return;
+    }
+    if (!isset($GLOBALS['orangeAdminProfileSpans']) || !is_array($GLOBALS['orangeAdminProfileSpans'])) {
+        $GLOBALS['orangeAdminProfileSpans'] = [];
+    }
+    $ms = (hrtime(true) - $startNs) / 1_000_000;
+    $GLOBALS['orangeAdminProfileSpans'][$key] = ($GLOBALS['orangeAdminProfileSpans'][$key] ?? 0.0) + $ms;
+}
+
+/** @return int|null request start hrtime, or null when profiling off. */
+function orange_admin_profile_request_begin(): ?int
+{
+    if (!orange_admin_profile_enabled() || !orange_catalog_is_admin_http_request()) {
+        return null;
+    }
+    $GLOBALS['orangeAdminProfileSpans'] = [];
+
+    return hrtime(true);
+}
+
+function orange_admin_profile_request_finish(string $page, string $view, ?int $requestStartNs): void
+{
+    if ($requestStartNs === null) {
+        return;
+    }
+    $spans = is_array($GLOBALS['orangeAdminProfileSpans'] ?? null) ? $GLOBALS['orangeAdminProfileSpans'] : [];
+    $requestTotalMs = (hrtime(true) - $requestStartNs) / 1_000_000;
+    $pageSafe = preg_replace('/[^\w-]/', '', $page) ?? '';
+    $viewSafe = preg_replace('/[^\w-]/', '', $view) ?? '';
+    if ($pageSafe === '') {
+        $pageSafe = 'unknown';
+    }
+    $fmt = static function (string $k) use ($spans): string {
+        return sprintf('%.2f', (float) ($spans[$k] ?? 0.0));
+    };
+    $line = date('c')
+        . "\tpage=" . $pageSafe
+        . "\tview=" . $viewSafe
+        . "\tauth_ms=" . $fmt('auth')
+        . "\tschema_bootstrap_ms=" . $fmt('schema_bootstrap')
+        . "\truntime_light_hooks_ms=" . $fmt('runtime_light_hooks')
+        . "\tensure_schema_total_ms=" . $fmt('ensure_schema_total')
+        . "\theader_render_ms=" . $fmt('header_render')
+        . "\tpage_body_ms=" . $fmt('page_body')
+        . "\trequest_total_ms=" . sprintf('%.2f', $requestTotalMs);
+    $logPath = orange_admin_profile_log_path();
+    if ($logPath !== '') {
+        @file_put_contents($logPath, $line . "\n", FILE_APPEND | LOCK_EX);
+    } elseif (function_exists('error_log')) {
+        error_log('[orange admin profile] ' . $line);
+    }
+}
+
 /**
  * صفحات المتجر والقنوات (pages/* عبر storefront-dispatch): bootstrap خفيف + بوابة المخطط فقط.
  * لا runtime_light_hooks ولا إعادة ترقيم id — تلك على CLI أو الأدمن.
@@ -4000,15 +4105,20 @@ function orange_catalog_migrate_pre_apcu_integrity_v116_through_v119(PDO $pdo): 
  */
 function orange_schema_check_and_bootstrap(PDO $pdo): void
 {
+    $__orangeAdminProfileSchemaT0 = orange_admin_profile_hrtime_start();
     orange_catalog_ensure_country_id_columns_once($pdo);
     orange_catalog_migrate_pre_apcu_integrity_v116_through_v119($pdo);
 
     static $gateOk = false;
     if ($gateOk) {
+        orange_admin_profile_hrtime_record('schema_bootstrap', $__orangeAdminProfileSchemaT0);
+
         return;
     }
     static $bootstrapFailedDegraded = false;
     if ($bootstrapFailedDegraded) {
+        orange_admin_profile_hrtime_record('schema_bootstrap', $__orangeAdminProfileSchemaT0);
+
         return;
     }
 
@@ -4016,6 +4126,7 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
     $apcuKey = 'orange_schema_gate_' . (string) ORANGE_SCHEMA_CODE_VERSION;
     if ($apcuTtl > 0 && function_exists('apcu_fetch') && apcu_fetch($apcuKey)) {
         $gateOk = true;
+        orange_admin_profile_hrtime_record('schema_bootstrap', $__orangeAdminProfileSchemaT0);
 
         return;
     }
@@ -4034,6 +4145,7 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
             $line = trim((string) ($parts[0] ?? ''));
             if ($line === (string) ORANGE_SCHEMA_CODE_VERSION) {
                 $gateOk = true;
+                orange_admin_profile_hrtime_record('schema_bootstrap', $__orangeAdminProfileSchemaT0);
 
                 return;
             }
@@ -4088,16 +4200,19 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
                 define('ORANGE_SCHEMA_DEGRADED', true);
             }
             $bootstrapFailedDegraded = true;
+            orange_admin_profile_hrtime_record('schema_bootstrap', $__orangeAdminProfileSchemaT0);
 
             return;
         }
         throw $e;
     }
+    orange_admin_profile_hrtime_record('schema_bootstrap', $__orangeAdminProfileSchemaT0);
 }
 
 /** @see orange_schema_check_and_bootstrap — نقطة الدخول العامة لكل الاستدعاءات القائمة. */
 function orange_catalog_ensure_schema(PDO $pdo): void
 {
+    $__orangeAdminProfileEnsureSchemaT0 = orange_admin_profile_hrtime_start();
     if (PHP_SAPI === 'cli') {
         try {
             orange_catalog_migrate_db_id_renumber_phases($pdo);
@@ -4111,6 +4226,7 @@ function orange_catalog_ensure_schema(PDO $pdo): void
     if (PHP_SAPI === 'cli' || orange_catalog_is_admin_http_request()) {
         orange_catalog_runtime_light_hooks($pdo);
     }
+    orange_admin_profile_hrtime_record('ensure_schema_total', $__orangeAdminProfileEnsureSchemaT0);
 }
 
 /**
@@ -4124,6 +4240,7 @@ function orange_catalog_runtime_light_hooks(PDO $pdo): void
     }
     $ran = true;
 
+    $__orangeAdminProfileHooksT0 = orange_admin_profile_hrtime_start();
     try {
         require_once __DIR__ . '/catalog_multicountry_runtime.php';
         orange_catalog_ensure_multicountry_phase4($pdo);
@@ -4148,6 +4265,8 @@ function orange_catalog_runtime_light_hooks(PDO $pdo): void
         if (function_exists('error_log')) {
             error_log('[orange] orange_catalog_runtime_light_hooks: ' . $e->getMessage());
         }
+    } finally {
+        orange_admin_profile_hrtime_record('runtime_light_hooks', $__orangeAdminProfileHooksT0);
     }
 }
 
