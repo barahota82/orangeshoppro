@@ -216,6 +216,13 @@ function orange_multicountry_runtime_maintain_phase2_active_markets(PDO $pdo): v
         if ($countryRow === null || empty($countryRow['is_active'])) {
             continue;
         }
+        $status = orange_country_provision_status($pdo, $countryId);
+        $needsProvision = empty($status['warehouse'])
+            || (int) ($status['channels_count'] ?? 0) <= 0
+            || (int) ($status['products_count'] ?? 0) <= 0;
+        if (!$needsProvision) {
+            continue;
+        }
         try {
             orange_country_provision_runtime($pdo, $countryId, $sourceId > 0 ? $sourceId : null);
         } catch (Throwable $e) {
