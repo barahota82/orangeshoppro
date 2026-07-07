@@ -637,10 +637,8 @@ function orange_catalog_is_admin_http_request(): bool
 /** @internal — ضبط مؤقت لأداء الأدمن؛ معطّل افتراضياً (ORANGE_ADMIN_PROFILE في .env.php). */
 function orange_admin_profile_enabled(): bool
 {
+    static $cacheKey = null;
     static $enabled = null;
-    if ($enabled !== null) {
-        return $enabled;
-    }
     $raw = getenv('ORANGE_ADMIN_PROFILE');
     if ($raw === false || $raw === '') {
         global $env;
@@ -648,7 +646,25 @@ function orange_admin_profile_enabled(): bool
             $raw = $env['ORANGE_ADMIN_PROFILE'] ?? '';
         }
     }
-    $enabled = ($raw === true || $raw === 1 || $raw === '1');
+    $key = is_bool($raw)
+        ? ($raw ? 'bool:1' : 'bool:0')
+        : 'raw:' . strtolower(trim((string) $raw));
+    if ($cacheKey === $key && $enabled !== null) {
+        return $enabled;
+    }
+    $cacheKey = $key;
+    if ($raw === true || $raw === 1 || $raw === '1') {
+        $enabled = true;
+
+        return $enabled;
+    }
+    if ($raw === false || $raw === 0 || $raw === '0' || $raw === '') {
+        $enabled = false;
+
+        return $enabled;
+    }
+    $parsed = filter_var($raw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    $enabled = $parsed === true;
 
     return $enabled;
 }
@@ -656,10 +672,8 @@ function orange_admin_profile_enabled(): bool
 /** @internal */
 function orange_admin_profile_log_path(): string
 {
+    static $cacheKey = null;
     static $path = null;
-    if ($path !== null) {
-        return $path;
-    }
     $raw = getenv('ORANGE_ADMIN_PROFILE_LOG_PATH');
     if ($raw === false || $raw === '') {
         global $env;
@@ -667,7 +681,12 @@ function orange_admin_profile_log_path(): string
             $raw = trim((string) ($env['ORANGE_ADMIN_PROFILE_LOG_PATH'] ?? ''));
         }
     }
-    $path = is_string($raw) ? trim($raw) : '';
+    $resolved = is_string($raw) ? trim($raw) : '';
+    if ($cacheKey === $resolved && $path !== null) {
+        return $path;
+    }
+    $cacheKey = $resolved;
+    $path = $resolved;
 
     return $path;
 }
@@ -702,8 +721,30 @@ function orange_admin_profile_request_begin(): ?int
         return null;
     }
     $GLOBALS['orangeAdminProfileSpans'] = [];
+    $startNs = hrtime(true);
+    $GLOBALS['orangeAdminProfileRequestStartNs'] = $startNs;
+    $GLOBALS['orangeAdminProfileFinishPage'] = 'unknown';
+    $GLOBALS['orangeAdminProfileFinishView'] = '';
+    $GLOBALS['orangeAdminProfileFinishDone'] = false;
+    if (empty($GLOBALS['orangeAdminProfileShutdownRegistered'])) {
+        $GLOBALS['orangeAdminProfileShutdownRegistered'] = true;
+        register_shutdown_function(static function (): void {
+            if (!empty($GLOBALS['orangeAdminProfileFinishDone'])) {
+                return;
+            }
+            $requestStartNs = $GLOBALS['orangeAdminProfileRequestStartNs'] ?? null;
+            if (!is_int($requestStartNs)) {
+                return;
+            }
+            orange_admin_profile_request_finish(
+                (string) ($GLOBALS['orangeAdminProfileFinishPage'] ?? 'unknown'),
+                (string) ($GLOBALS['orangeAdminProfileFinishView'] ?? ''),
+                $requestStartNs
+            );
+        });
+    }
 
-    return hrtime(true);
+    return $startNs;
 }
 
 function orange_admin_profile_request_finish(string $page, string $view, ?int $requestStartNs): void
@@ -711,6 +752,10 @@ function orange_admin_profile_request_finish(string $page, string $view, ?int $r
     if ($requestStartNs === null) {
         return;
     }
+    if (!empty($GLOBALS['orangeAdminProfileFinishDone'])) {
+        return;
+    }
+    $GLOBALS['orangeAdminProfileFinishDone'] = true;
     $spans = is_array($GLOBALS['orangeAdminProfileSpans'] ?? null) ? $GLOBALS['orangeAdminProfileSpans'] : [];
     $requestTotalMs = (hrtime(true) - $requestStartNs) / 1_000_000;
     $pageSafe = preg_replace('/[^\w-]/', '', $page) ?? '';
@@ -733,7 +778,10 @@ function orange_admin_profile_request_finish(string $page, string $view, ?int $r
         . "\trequest_total_ms=" . sprintf('%.2f', $requestTotalMs);
     $logPath = orange_admin_profile_log_path();
     if ($logPath !== '') {
-        @file_put_contents($logPath, $line . "\n", FILE_APPEND | LOCK_EX);
+        $written = @file_put_contents($logPath, $line . "\n", FILE_APPEND | LOCK_EX);
+        if ($written === false && function_exists('error_log')) {
+            error_log('[orange admin profile] failed to write log file: ' . $logPath);
+        }
     } elseif (function_exists('error_log')) {
         error_log('[orange admin profile] ' . $line);
     }

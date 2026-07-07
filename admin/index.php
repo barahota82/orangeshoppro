@@ -112,6 +112,9 @@ $allowed = [
 if (!in_array($page, $allowed, true)) {
     $page = 'dashboard';
 }
+if ($__orangeAdminProfileReq !== null) {
+    $GLOBALS['orangeAdminProfileFinishPage'] = $page;
+}
 
 $pdo = db();
 $GLOBALS['orangeAdminPdo'] = $pdo;
@@ -193,5 +196,8 @@ if ($page === 'partner_reports') {
     if (in_array($__orangeAdminProfileViewRaw, ['customers', 'suppliers'], true)) {
         $__orangeAdminProfileView = $__orangeAdminProfileViewRaw;
     }
+}
+if ($__orangeAdminProfileReq !== null) {
+    $GLOBALS['orangeAdminProfileFinishView'] = $__orangeAdminProfileView;
 }
 orange_admin_profile_request_finish($page, $__orangeAdminProfileView, $__orangeAdminProfileReq);
