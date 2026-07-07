@@ -330,6 +330,7 @@ async function loadCartPromotionAlwaysOnHistory() {
 })();
 ocpBindAlwaysOn('cp');
 ocpDefaultScheduleDates('cp');
+resetCartPromotionForm();
 loadCartPromotions();
 loadCartPromotionAlwaysOnHistory();
 </script>

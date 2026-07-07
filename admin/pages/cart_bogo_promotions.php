@@ -1039,6 +1039,7 @@ ocpBindAlwaysOn('cbp');
 ocpDefaultScheduleDates('cbp');
 cbpRenderBuy([]);
 cbpRenderPool([]);
+resetCartBogoPromotionForm();
 loadCartBogoPromotions();
 loadCartBogoAlwaysOnHistory();
 </script>

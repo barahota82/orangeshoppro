@@ -816,6 +816,7 @@ cgpToggleKind();
 cgpToggleFixedCharge();
 ocpBindAlwaysOn('cgp');
 ocpDefaultScheduleDates('cgp');
+resetCartGiftPromotionForm();
 loadCartGiftPromotions();
 loadCartGiftAlwaysOnHistory();
 </script>

@@ -510,6 +510,7 @@ document.getElementById('ccp_add_product_btn').addEventListener('click', ccpOpen
 })();
 ocpBindAlwaysOn('ccp');
 ocpDefaultScheduleDates('ccp');
+resetCartComboPromotionForm();
 loadCartComboPromotions();
 loadCartComboAlwaysOnHistory();
 </script>
