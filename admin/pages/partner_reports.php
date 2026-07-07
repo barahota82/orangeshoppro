@@ -22,6 +22,8 @@ $prLogo = (string) ($prCompany['logo_url'] ?? '');
 $prPrintDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
 $includeAging = isset($_GET['aging']) && $_GET['aging'] === '1';
+$prHideZero = isset($_GET['hide_zero']) && $_GET['hide_zero'] === '1';
+$prAbnormalOnly = isset($_GET['abnormal_only']) && $_GET['abnormal_only'] === '1';
 $partnerViewRaw = isset($_GET['view']) ? strtolower(trim((string) $_GET['view'])) : '';
 if (!in_array($partnerViewRaw, ['customers', 'suppliers'], true)) {
     $redirectQ = $_GET;
@@ -33,10 +35,16 @@ if (!in_array($partnerViewRaw, ['customers', 'suppliers'], true)) {
 $partnerView = $partnerViewRaw;
 $showPartnerCustomers = $partnerView === 'customers';
 $showPartnerSuppliers = $partnerView === 'suppliers';
-$partnerReportsUrl = static function (array $extra = []) use ($partnerView, $includeAging): string {
+$partnerReportsUrl = static function (array $extra = []) use ($partnerView, $includeAging, $prHideZero, $prAbnormalOnly): string {
     $q = ['page' => 'partner_reports', 'view' => $partnerView];
     if ($includeAging) {
         $q['aging'] = '1';
+    }
+    if ($prHideZero) {
+        $q['hide_zero'] = '1';
+    }
+    if ($prAbnormalOnly) {
+        $q['abnormal_only'] = '1';
     }
     foreach ($extra as $k => $v) {
         if ($v === null || $v === '') {
@@ -49,6 +57,32 @@ $partnerReportsUrl = static function (array $extra = []) use ($partnerView, $inc
     return storefront_public_path('/admin/index.php?' . http_build_query($q));
 };
 $report = orange_partner_summary_report($pdo, $includeAging);
+
+$prBalanceIsZero = static function (float $balance): bool {
+    return abs($balance) <= 0.0001;
+};
+$prCustomerRowVisible = static function (array $row) use ($prHideZero, $prAbnormalOnly, $prBalanceIsZero): bool {
+    $balance = (float) ($row['balance'] ?? 0);
+    if ($prHideZero && $prBalanceIsZero($balance)) {
+        return false;
+    }
+    if ($prAbnormalOnly && $balance >= -0.0001) {
+        return false;
+    }
+
+    return true;
+};
+$prSupplierRowVisible = static function (array $row) use ($prHideZero, $prAbnormalOnly, $prBalanceIsZero): bool {
+    $balance = (float) ($row['balance'] ?? 0);
+    if ($prHideZero && $prBalanceIsZero($balance)) {
+        return false;
+    }
+    if ($prAbnormalOnly && $balance >= -0.0001) {
+        return false;
+    }
+
+    return true;
+};
 
 $years = orange_fiscal_years_list($pdo);
 $fyId = isset($_GET['fy']) ? (int) $_GET['fy'] : 0;
@@ -131,14 +165,14 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
     </div>
     <p class="card-hint muted" style="margin-top:10px;">اعتباراً من <?php echo htmlspecialchars($report['as_of'], ENT_QUOTES, 'UTF-8'); ?></p>
 
-    <?php if ($reconcile !== null): ?>
-    <form method="get" class="form-grid orange-doc-header-row" style="max-width:420px;margin-top:14px;">
+    <?php if ($years !== []): ?>
+    <form method="get" class="orange-doc-header-row" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px;margin-top:14px;">
         <input type="hidden" name="page" value="partner_reports">
         <input type="hidden" name="view" value="<?php echo htmlspecialchars($partnerView, ENT_QUOTES, 'UTF-8'); ?>">
         <?php if ($includeAging): ?><input type="hidden" name="aging" value="1"><?php endif; ?>
         <div>
             <label for="fy_sel">السنة المالية</label>
-            <select name="fy" id="fy_sel" onchange="this.form.submit()">
+            <select name="fy" id="fy_sel" class="admin-inp" onchange="this.form.submit()">
                 <?php foreach ($years as $y): ?>
                     <option value="<?php echo (int) $y['id']; ?>"<?php echo (int) $y['id'] === $fyId ? ' selected' : ''; ?>>
                         <?php echo htmlspecialchars((string) ($y['label_ar'] ?? $y['id']), ENT_QUOTES, 'UTF-8'); ?>
@@ -146,7 +180,17 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
                 <?php endforeach; ?>
             </select>
         </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;margin:0;">
+            <input type="checkbox" name="hide_zero" value="1"<?php echo $prHideZero ? ' checked' : ''; ?> onchange="this.form.submit()">
+            إخفاء الأرصدة الصفرية
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;margin:0;">
+            <input type="checkbox" name="abnormal_only" value="1"<?php echo $prAbnormalOnly ? ' checked' : ''; ?> onchange="this.form.submit()">
+            إظهار الأرصدة غير الطبيعية فقط
+        </label>
     </form>
+    <?php endif; ?>
+    <?php if ($reconcile !== null): ?>
     <div class="table-wrap admin-fy-table-wrap" style="margin-top:12px;">
         <table class="admin-fy-table">
             <thead>
@@ -172,7 +216,7 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
             </tbody>
         </table>
     </div>
-    <?php else: ?>
+    <?php elseif ($years === []): ?>
     <p class="muted" style="margin-top:14px;">لا توجد سنة مالية أو السندات غير مفعّلة — عرّف سنة من «السنوات المالية».</p>
     <?php endif; ?>
 </div>
@@ -191,6 +235,7 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
             </thead>
             <tbody>
                 <?php foreach ($report['customers'] as $c): ?>
+                    <?php if (!$prCustomerRowVisible($c)) { continue; } ?>
                     <tr>
                         <td><?php echo (int) $c['id']; ?></td>
                         <td><?php echo htmlspecialchars((string) $c['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
@@ -227,6 +272,7 @@ $prRenderFooter = static function () use ($prPrintDatetime): void {
             </thead>
             <tbody>
                 <?php foreach ($report['suppliers'] as $s): ?>
+                    <?php if (!$prSupplierRowVisible($s)) { continue; } ?>
                     <tr>
                         <td><?php echo (int) $s['id']; ?></td>
                         <td><?php echo htmlspecialchars((string) $s['name'], ENT_QUOTES, 'UTF-8'); ?></td>
