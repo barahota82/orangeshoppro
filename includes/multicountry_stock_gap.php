@@ -207,6 +207,7 @@ function orange_multicountry_runtime_maintain_phase2_active_markets(PDO $pdo): v
     }
 
     $sourceId = orange_countries_default_id($pdo);
+    $stepApplied = orange_catalog_migration_step_applied($pdo, ORANGE_MC_STOCK_OPERATIONAL_STEP);
     foreach (orange_multicountry_phase2_market_codes() as $code) {
         $countryId = orange_multicountry_country_id_for_market($pdo, $code);
         if ($countryId <= 0) {
@@ -220,7 +221,7 @@ function orange_multicountry_runtime_maintain_phase2_active_markets(PDO $pdo): v
         $needsProvision = empty($status['warehouse'])
             || (int) ($status['channels_count'] ?? 0) <= 0
             || (int) ($status['products_count'] ?? 0) <= 0;
-        if (!$needsProvision) {
+        if ($stepApplied && !$needsProvision) {
             continue;
         }
         try {
