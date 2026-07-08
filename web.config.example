@@ -37,15 +37,9 @@
         <add name="RESPONSE_Cache-Control" />
       </allowedServerVariables>
       <rules>
-        <rule name="OrangeStaticCacheAssets" stopProcessing="true">
-          <match url=".*\.(css|js|png|jpg|jpeg|gif|webp|svg|woff|woff2|ttf|otf)$" ignoreCase="true" />
-          <action type="None" />
-          <serverVariables>
-            <set name="RESPONSE_Cache-Control" value="public, max-age=2592000" />
-          </serverVariables>
-        </rule>
         <!-- PR-SEC-06: block direct HTTP to sensitive uploads (authorized PHP download endpoints still work).
              Public paths NOT blocked: uploads/products/, uploads/channels/, uploads/company/
+             Keep these rules before OrangeStaticCacheAssets and any catch-all rewrite.
              Subfolder site (PUBLIC_BASE_PATH): prefix match url, e.g. ^shop/uploads/payment_proofs(/.*)?$ -->
         <rule name="OrangeDenyUploadsPaymentProofs" stopProcessing="true">
           <match url="^uploads/payment_proofs(/.*)?$" ignoreCase="true" />
@@ -66,6 +60,13 @@
         <rule name="OrangeDenyUploadsStocktake" stopProcessing="true">
           <match url="^uploads/stocktake(/.*)?$" ignoreCase="true" />
           <action type="CustomResponse" statusCode="404" statusReason="Not Found" statusDescription="Not Found" />
+        </rule>
+        <rule name="OrangeStaticCacheAssets" stopProcessing="true">
+          <match url=".*\.(css|js|png|jpg|jpeg|gif|webp|svg|woff|woff2|ttf|otf)$" ignoreCase="true" />
+          <action type="None" />
+          <serverVariables>
+            <set name="RESPONSE_Cache-Control" value="public, max-age=2592000" />
+          </serverVariables>
         </rule>
         <!--
           /{path_segment} / {path_segment}-ar / … /cart /track /signup /signin /verify-email /product/123
