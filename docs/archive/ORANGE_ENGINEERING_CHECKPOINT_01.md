@@ -15,6 +15,7 @@
 - Security Review — **Review Status:** Complete; **Implementation Status:** Incomplete for items requiring resolution before Production Go-Live.
 - Database Review — **Review Status:** Complete; **Implementation Status:** Incomplete for items requiring resolution before Production Go-Live.
 - Performance Review — **Review Status:** Complete.
+- Performance Production Go-Live — **Implementation Status:** Completed / Approved.
 - Configuration Review — **Review Status:** Complete.
 - Backup & Recovery Review — **Review Status:** Complete.
 - Deployment Review — **Review Status:** Complete.
@@ -379,6 +380,53 @@ Payment settlement must become atomic before online gateway payments are enabled
   - No manual SQL required.
   - No data modification.
 
+**Performance PR-01**
+
+- **Title:** Multicountry Runtime Steady-State Gating (stock scoped + operational phase2)
+- **Status:** Implemented
+- **Approved**
+- **Implementation Notes:**
+  - Historical mass bootstrap gated per `orange_catalog_data_migration_log` markers `multicountry_stock_scoped_v1` and `multicountry_stock_operational_v1`.
+  - Lightweight runtime maintenance always runs (default warehouses, missing WVS rows, phase2 active markets) — probe-first, PR-01 pattern.
+  - Code: `includes/multicountry_stock_gap.php` (`orange_multicountry_ensure_stock_scoped_phase1`, `orange_multicountry_ensure_operational_phase2`).
+  - No schema revision bump.
+  - No business logic changes.
+
+**Performance PR-02**
+
+- **Title:** KW Catalog Bootstrap Steady-State Gating (product types + products phase3)
+- **Status:** Implemented
+- **Approved**
+- **Implementation Notes:**
+  - Per-country historical bootstrap gated via markers `kw_catalog_product_types_v1_c{countryId}` and `kw_catalog_products_phase3_v1_c{countryId}` in `orange_catalog_data_migration_log`.
+  - Lightweight probe-first runtime maintenance always runs (new subcategories/types, sizing backfill, product_type_id, variants, template attributes, size_family_id).
+  - Historical path retains full COUNT/gap probes until marker recorded.
+  - Code: `includes/catalog_kw_product_types_seed.php`, `includes/catalog_kw_products_phase3.php`.
+  - No schema revision bump.
+  - No business logic changes.
+
+**Performance Production Go-Live — supporting hotfixes (Completed / Approved)**
+
+- **v116–v119 pre-APCu steady-state gate:** `orange_catalog_migrate_pre_apcu_integrity_v116_through_v119()` aggregate marker skip before APCu/schema gate (`includes/catalog_schema.php`).
+- **Kuwait `country_id` backfill gate:** marker `php_kuwait_country_id_backfill_complete`; probe-first before 18-table historical UPDATE loop (`orange_catalog_backfill_kuwait_country_ids()`).
+- **`ORANGE_SCHEMA_OK_FLAG_PATH` `.env.php` fallback:** when `getenv()` is empty, path read from server-only `$env['ORANGE_SCHEMA_OK_FLAG_PATH']` in `orange_schema_check_and_bootstrap()`.
+
+**Temporary admin profiling — cleanup (Completed)**
+
+- Temporary `ORANGE_ADMIN_PROFILE` / `ORANGE_ADMIN_PROFILE_LOG_PATH` instrumentation fully removed from repository (`admin/index.php`, `includes/catalog_schema.php`); commit `1dd2b8b2`.
+
+**Admin runtime performance outcome (owner-verified approximate, Production Go-Live scope)**
+
+- Admin page navigation improved from **approximately 3 minutes** to **approximately 2 seconds** after steady-state gating of: v116–v119 integrity migrations, Kuwait backfill, Multicountry Runtime PR-01, and KW Catalog Runtime PR-02.
+- **Runtime self-healing preserved:** probe-first maintenance remains on every admin request for incremental catalog/stock gaps; markers gate **historical mass bootstrap only**, not ongoing repair.
+
+**Production deployment configuration — `ORANGE_SCHEMA_OK_FLAG_PATH`**
+
+- **Scope:** Server-only Production deployment configuration (not committed to Git).
+- **Purpose:** Optional skip of heavy schema bootstrap gate after successful deploy when file line 1 equals `ORANGE_SCHEMA_CODE_VERSION` (currently **119**).
+- **Set in:** server `.env.php` key `ORANGE_SCHEMA_OK_FLAG_PATH` → absolute path outside web root (e.g. Plesk private folder).
+- **Related:** optional `ORANGE_SCHEMA_APCU_GATE_SECONDS` (environment); schema revision unchanged at **119**.
+
 ---
 
 ## 3. Security Engineering Review Results
@@ -588,7 +636,17 @@ Remaining Future / Architecture Work:
 
 Performance
 
-- Remaining approved Performance implementations
+Production Go-Live Performance Work:
+
+Completed
+
+Future / Optimization (not Production Go-Live):
+
+- Phase4 — `orange_catalog_ensure_multicountry_phase4()` in `orange_catalog_runtime_light_hooks()`
+- Product Channels — `orange_product_channels_ensure_missing_links()`
+- Legacy Closure — `orange_catalog_ensure_legacy_closure_phase5()`
+- Polish — `orange_catalog_ensure_polish_phase6()`
+- Payments runtime optimization — `orange_payments_ensure_schema()` in runtime hooks path
 
 Configuration
 
@@ -617,7 +675,7 @@ Continue the Production Readiness Implementation Roadmap.
 
 Next implementation group:
 
-Performance.
+Production Go-Live Verification and Deployment activation (Configuration / Deployment remaining items; PR-SEC-06 live IIS web.config fragment). Future runtime performance work is **Future / Optimization** only — see §6 Performance.
 
 ---
 
@@ -637,14 +695,13 @@ Any future AI agent must read these files before continuing:
 
 ## 9. Next Work
 
-The next review track is Performance Review.
+Performance Production Go-Live implementation track: **Completed / Approved** (PR-01, PR-02, and supporting steady-state hotfixes — see «Production Readiness Implementation Progress»).
 
-Not started yet:
+Remaining review tracks with open implementation or verification (not Performance Production Go-Live):
 
-- Performance Review
-- Configuration Review
-- Backup & Recovery Review
-- Deployment Review
+- Configuration Review — implementation items remain
+- Deployment Review — implementation items remain (includes PR-SEC-06 IIS fragment activation on live server)
+- Production Go-Live Verification — pending
 
 ---
 
@@ -654,6 +711,6 @@ Not started yet:
 
 - **Review Status:** Completed
 - **Decision Status:** Completed
-- **Implementation Status:** Not Started
+- **Implementation Status:** Performance Production Go-Live — Completed / Approved; other tracks — see §6 Remaining Work
 - **Verification Status:** Pending
 - **Release Status:** Not Ready
