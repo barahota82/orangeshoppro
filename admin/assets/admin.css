@@ -56,6 +56,9 @@
     --font-display: "Outfit", "Cairo", sans-serif;
 }
 * { box-sizing: border-box; }
+html {
+    scrollbar-gutter: stable;
+}
 body {
     margin: 0;
     font-family: var(--font-ui);
