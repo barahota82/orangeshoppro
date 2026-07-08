@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../includes/cart_combo_promotions.php';
 require_once __DIR__ . '/../../includes/product_offers.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
+require_once __DIR__ . '/../../includes/storefront_api_errors.php';
 
 try {
     $pdo = db();
@@ -232,7 +233,7 @@ try {
         'loyalty' => $loyalty,
     ]);
 } catch (RuntimeException $e) {
-    json_response(['success' => false, 'code' => 'preview_failed', 'message' => $e->getMessage()], 422);
+    orange_storefront_api_json_runtime_error($e, 'checkout-preview', 'preview_failed');
 } catch (Throwable $e) {
     api_error($e, t('api_request_failed'));
 }

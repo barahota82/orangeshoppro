@@ -17,32 +17,14 @@ require_once __DIR__ . '/countries.php';
 require_once __DIR__ . '/currency.php';
 require_once __DIR__ . '/storefront_payment_settings.php';
 require_once __DIR__ . '/warehouses.php';
-
-function orange_order_intake_snip_message(string $msg, int $max = 500): string
-{
-    if (function_exists('mb_substr')) {
-        return mb_substr($msg, 0, $max, 'UTF-8');
-    }
-
-    return substr($msg, 0, $max);
-}
+require_once __DIR__ . '/storefront_api_errors.php';
 
 /**
- * نص خطأ آمن لحقل order_intake_queue.error_message (لا يُخزَّن نص PDO/SQL).
+ * نص خطأ آمن لحقل order_intake_queue.error_message (code:… فقط — لا نص PDO/SQL ولا getMessage).
  */
 function orange_order_intake_error_for_queue(Throwable $e): string
 {
-    if ($e instanceof RuntimeException) {
-        return orange_order_intake_snip_message($e->getMessage());
-    }
-    if (function_exists('error_log')) {
-        error_log(
-            '[orange] order_intake checkout: ' . $e->getMessage()
-            . ' @ ' . $e->getFile() . ':' . $e->getLine()
-        );
-    }
-
-    return 'تعذر إتمام الطلب. يرجى المحاولة لاحقاً أو التواصل مع المتجر.';
+    return orange_storefront_order_intake_error_for_queue($e);
 }
 
 /**
@@ -415,19 +397,19 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
 
     $emailCheck = trim((string) ($data['email'] ?? ''));
     if ($emailCheck !== '' && !filter_var($emailCheck, FILTER_VALIDATE_EMAIL)) {
-        throw new RuntimeException(function_exists('t') ? t('checkout_invalid_email') : 'Invalid email.');
+        orange_storefront_throw_customer('checkout_invalid_email', 'Invalid email in checkout payload');
     }
     $data['email'] = $emailCheck;
 
     $pcParsed = orange_storefront_parse_api_phone_country((string) ($data['phone_country'] ?? ''));
     if (!$pcParsed['full_intl'] && $pcParsed['dial'] === '') {
-        throw new RuntimeException(function_exists('t') ? t('phone_country_required') : 'Country code required.');
+        orange_storefront_throw_customer('phone_country_required', 'phone_country missing in checkout');
     }
     $phoneRawIn = trim((string) ($data['phone'] ?? ''));
     $dialForNational = $pcParsed['full_intl'] ? null : $pcParsed['dial'];
     $phoneNorm = orange_normalize_customer_phone($phoneRawIn, $dialForNational, $pcParsed['full_intl']);
     if ($phoneNorm === null) {
-        throw new RuntimeException(function_exists('t') ? t('checkout_invalid_phone') : 'Invalid phone.');
+        orange_storefront_throw_customer('checkout_invalid_phone', 'phone normalization failed');
     }
     $data['phone'] = $phoneNorm;
     $data['phone_country'] = $pcParsed['full_intl'] ? '' : $pcParsed['dial'];
@@ -436,14 +418,14 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     $data['phone_national'] = $partsStore['national'];
 
     if (!is_array($data['items']) || count($data['items']) === 0) {
-        throw new RuntimeException('Cart items are required');
+        orange_storefront_throw_customer('checkout_cart_items_required', 'Cart items are required');
     }
 
     $channelStmt = $pdo->prepare('SELECT * FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
     $channelStmt->execute([(int) $data['channel_id']]);
     $channel = $channelStmt->fetch(PDO::FETCH_ASSOC);
     if (!$channel) {
-        throw new RuntimeException('Invalid channel');
+        orange_storefront_throw_customer('checkout_invalid_channel', 'channel_id=' . (int) $data['channel_id']);
     }
 
     $orderCountryId = orange_country_id_for_channel($pdo, (int) $data['channel_id']);
@@ -899,7 +881,7 @@ function orange_order_intake_process_next(PDO $pdo, bool $respectAdminCountry = 
         $pdo->exec('SAVEPOINT orange_intake_sp');
         try {
             if (!is_array($payload)) {
-                throw new RuntimeException('Invalid queue payload');
+                orange_storefront_throw_customer('checkout_failed_generic', 'Invalid queue payload qid=' . $qid);
             }
             $out = orange_storefront_execute_checkout_payload($pdo, $payload);
             $pdo->exec('RELEASE SAVEPOINT orange_intake_sp');

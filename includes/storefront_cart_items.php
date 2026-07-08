@@ -8,6 +8,7 @@ require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/countries.php';
 require_once __DIR__ . '/product_preview.php';
 require_once __DIR__ . '/variant_pricing.php';
+require_once __DIR__ . '/storefront_api_errors.php';
 
 /**
  * التحقق من بنود السلة وحساب المجموع الفرعي. عند checkout استخدم lockVariants=true داخل معاملة.
@@ -18,7 +19,7 @@ require_once __DIR__ . '/variant_pricing.php';
 function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool $lockVariants): array
 {
     if (!is_array($items) || count($items) === 0) {
-        throw new RuntimeException('Cart items are required');
+        orange_storefront_throw_customer('checkout_cart_items_required', 'Cart items are required');
     }
 
     $lockSql = $lockVariants ? ' FOR UPDATE' : '';
@@ -49,17 +50,26 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
         $product = $productStmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$product) {
-            throw new RuntimeException('Product not found: ' . (int) $item['id']);
+            orange_storefront_throw_customer(
+                'product_not_found',
+                'Product not found: ' . (int) $item['id']
+            );
         }
         if (!$isPreviewDraftItem) {
             if (
                 orange_table_has_column($pdo, 'products', 'country_id')
                 && (int) ($product['country_id'] ?? 0) !== $stockCountryId
             ) {
-                throw new RuntimeException(function_exists('t') ? t('product_not_found') : 'Product not available');
+                orange_storefront_throw_customer(
+                    'product_not_found',
+                    'Product country mismatch id=' . (int) $product['id']
+                );
             }
             if (!orange_storefront_product_in_active_unified_chain($pdo, (int) $product['id'])) {
-                throw new RuntimeException(function_exists('t') ? t('product_not_found') : 'Product not available');
+                orange_storefront_throw_customer(
+                    'product_not_found',
+                    'Product inactive in unified chain id=' . (int) $product['id']
+                );
             }
         }
 
@@ -88,7 +98,10 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
             }
 
             if (!$variant) {
-                throw new RuntimeException('Variant not found for product: ' . $product['name']);
+                orange_storefront_throw_customer(
+                    'product_not_found',
+                    'Variant not found product_id=' . (int) $product['id'] . ' variant_id=' . $variantIdIn
+                );
             }
 
             $vId = (int) $variant['id'];
@@ -97,7 +110,10 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
                 ? PHP_INT_MAX
                 : orange_warehouse_effective_variant_stock($pdo, $vId, $stockCountryId);
             if ($available < $alreadyRequested + $qty) {
-                throw new RuntimeException('Insufficient stock for product: ' . $product['name']);
+                orange_storefront_throw_customer(
+                    'out_of_stock',
+                    'Insufficient stock variant_id=' . $vId . ' available=' . $available
+                );
             }
             $variantQtyAccumulated[$vId] = $alreadyRequested + $qty;
         } else {
@@ -107,7 +123,10 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
             $vStmt->execute([(int) $product['id']]);
             $variant = $vStmt->fetch(PDO::FETCH_ASSOC);
             if (!$variant) {
-                throw new RuntimeException('Variant not found for product: ' . $product['name']);
+                orange_storefront_throw_customer(
+                    'product_not_found',
+                    'Default variant missing product_id=' . (int) $product['id']
+                );
             }
             $vId = (int) $variant['id'];
             $alreadyRequested = $variantQtyAccumulated[$vId] ?? 0;
@@ -115,7 +134,10 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
                 ? PHP_INT_MAX
                 : orange_warehouse_effective_variant_stock($pdo, $vId, $stockCountryId);
             if ($available < $alreadyRequested + $qty) {
-                throw new RuntimeException('Insufficient stock for product: ' . $product['name']);
+                orange_storefront_throw_customer(
+                    'out_of_stock',
+                    'Insufficient stock variant_id=' . $vId . ' available=' . $available
+                );
             }
             $variantQtyAccumulated[$vId] = $alreadyRequested + $qty;
         }

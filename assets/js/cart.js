@@ -574,6 +574,37 @@ function orangeShowToast(message, durationMs) {
 
 window.orangeShowToast = orangeShowToast;
 
+function orangeCheckoutApiMessageLooksInternal(msg) {
+    const s = String(msg || '').trim();
+    if (!s) {
+        return true;
+    }
+    if (/SQLSTATE|PDO|Stack trace|@ .*\.php|Duplicate entry/i.test(s)) {
+        return true;
+    }
+    if (/Product not found:\s*\d/i.test(s)) {
+        return true;
+    }
+    if (/Variant not found for product:|Insufficient stock for product:/i.test(s)) {
+        return true;
+    }
+    if (/Invalid queue payload|Could not encode checkout payload|code:/i.test(s)) {
+        return true;
+    }
+    return false;
+}
+
+function orangeCheckoutApiSafeMessage(result) {
+    if (!result || typeof result !== 'object') {
+        return '';
+    }
+    const msg = result.message ? String(result.message).trim() : '';
+    if (!msg || orangeCheckoutApiMessageLooksInternal(msg)) {
+        return '';
+    }
+    return msg;
+}
+
 function orangeCheckoutApiMessage(result) {
     const T = window.APP_T || {};
     if (!result || typeof result !== 'object') {
@@ -652,12 +683,19 @@ function orangeCheckoutApiMessage(result) {
     if (c === 'intake_not_found' && T.intake_not_found) {
         return T.intake_not_found;
     }
+    if (c === 'out_of_stock' && T.out_of_stock) {
+        return T.out_of_stock;
+    }
+    if (c === 'no_more_stock_for_cart' && T.no_more_stock_for_cart) {
+        return T.no_more_stock_for_cart;
+    }
     if (c === 'queue_timeout' && T.checkout_queue_timeout) {
         return T.checkout_queue_timeout;
     }
     if (c === 'processing_failed') {
-        if (result.message && String(result.message).trim() !== '') {
-            return String(result.message);
+        const safe = orangeCheckoutApiSafeMessage(result);
+        if (safe) {
+            return safe;
         }
         return T.checkout_failed_generic || '';
     }
@@ -681,8 +719,16 @@ function orangeCheckoutApiMessage(result) {
         return T.customer_amend_not_allowed;
     }
     if (c === 'amend_failed') {
-        if (result.message && String(result.message).trim() !== '') {
-            return String(result.message);
+        const safe = orangeCheckoutApiSafeMessage(result);
+        if (safe) {
+            return safe;
+        }
+        return T.checkout_failed_generic || '';
+    }
+    if (c === 'preview_failed') {
+        const safe = orangeCheckoutApiSafeMessage(result);
+        if (safe) {
+            return safe;
         }
         return T.checkout_failed_generic || '';
     }
@@ -705,13 +751,11 @@ function orangeCheckoutApiMessage(result) {
         return T.storefront_merge_apply_err;
     }
     if (c === 'server_error') {
-        if (result.message && String(result.message).trim() !== '') {
-            return String(result.message);
-        }
         return T.api_request_failed || T.checkout_internal_error || T.checkout_failed_generic || '';
     }
-    if (result.message && String(result.message).trim() !== '') {
-        return String(result.message);
+    const safeFallback = orangeCheckoutApiSafeMessage(result);
+    if (safeFallback) {
+        return safeFallback;
     }
     return '';
 }

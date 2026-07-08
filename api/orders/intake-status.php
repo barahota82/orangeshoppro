@@ -9,6 +9,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/order_intake_queue.php';
+require_once __DIR__ . '/../../includes/storefront_api_errors.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
 
 try {
@@ -131,9 +132,10 @@ try {
         }
     } elseif ($row['status'] === 'failed') {
         $out['success'] = false;
-        $out['code'] = 'processing_failed';
         $failMsg = trim((string) ($row['error_message'] ?? ''));
-        $out['message'] = $failMsg !== '' ? $failMsg : t('checkout_failed_generic');
+        $failParsed = orange_storefront_queue_error_to_customer($failMsg);
+        $out['code'] = $failParsed['code'];
+        $out['message'] = $failParsed['message'];
     }
 
     json_response($out);

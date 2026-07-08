@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/phone_validation.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
+require_once __DIR__ . '/../../includes/storefront_api_errors.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/product_preview.php';
 
@@ -59,11 +60,7 @@ try {
     try {
         orange_storefront_normalize_delivery_area_payload($pdo, $data, $langCo);
     } catch (RuntimeException $e) {
-        json_response([
-            'success' => false,
-            'code' => 'invalid_delivery_area',
-            'message' => $e->getMessage(),
-        ], 422);
+        orange_storefront_api_json_runtime_error($e, 'create-order delivery area');
     }
 
     require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
@@ -181,10 +178,11 @@ try {
         }
         if ($me['status'] === 'failed') {
             $failMsg = trim((string) ($me['error_message'] ?? ''));
+            $failParsed = orange_storefront_queue_error_to_customer($failMsg);
             json_response([
                 'success' => false,
-                'code' => 'processing_failed',
-                'message' => $failMsg !== '' ? $failMsg : t('checkout_failed_generic'),
+                'code' => $failParsed['code'],
+                'message' => $failParsed['message'],
                 'intake_token' => $publicToken,
             ], 500);
         }

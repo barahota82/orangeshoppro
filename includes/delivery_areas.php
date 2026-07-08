@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/storefront_api_errors.php';
 
 function orange_delivery_governorates_table_exists(PDO $pdo): bool
 {
@@ -1379,11 +1380,11 @@ function orange_storefront_normalize_delivery_area_payload(PDO $pdo, array &$dat
 
     $id = (int) ($data['delivery_area_id'] ?? 0);
     if ($id <= 0) {
-        throw new RuntimeException(function_exists('t') ? t('checkout_delivery_area_required') : 'Delivery area required');
+        orange_storefront_throw_customer('checkout_delivery_area_required', 'delivery_area_id missing');
     }
     $row = orange_delivery_area_row_active($pdo, $id, $countryId);
     if ($row === null) {
-        throw new RuntimeException(function_exists('t') ? t('checkout_delivery_area_required') : 'Invalid delivery area');
+        orange_storefront_throw_customer('checkout_delivery_area_required', 'delivery_area_id=' . $id);
     }
     $data['delivery_area_id'] = $id;
     $data['area'] = orange_delivery_area_label_from_row($row, $lang);

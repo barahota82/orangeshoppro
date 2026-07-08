@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../includes/cart_promotions.php';
 require_once __DIR__ . '/../../includes/cart_combo_promotions.php';
 require_once __DIR__ . '/../../includes/storefront_checkout_promo_lines.php';
 require_once __DIR__ . '/../../includes/order_intake_queue.php';
+require_once __DIR__ . '/../../includes/storefront_api_errors.php';
 
 try {
     $pdo = db();
@@ -305,7 +306,7 @@ try {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    json_response(['success' => false, 'code' => 'amend_failed', 'message' => $e->getMessage()], 422);
+    orange_storefront_api_json_runtime_error($e, 'amend-order-items', 'amend_failed');
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
