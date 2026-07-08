@@ -44,6 +44,29 @@
             <set name="RESPONSE_Cache-Control" value="public, max-age=2592000" />
           </serverVariables>
         </rule>
+        <!-- PR-SEC-06: block direct HTTP to sensitive uploads (authorized PHP download endpoints still work).
+             Public paths NOT blocked: uploads/products/, uploads/channels/, uploads/company/
+             Subfolder site (PUBLIC_BASE_PATH): prefix match url, e.g. ^shop/uploads/payment_proofs(/.*)?$ -->
+        <rule name="OrangeDenyUploadsPaymentProofs" stopProcessing="true">
+          <match url="^uploads/payment_proofs(/.*)?$" ignoreCase="true" />
+          <action type="CustomResponse" statusCode="404" statusReason="Not Found" statusDescription="Not Found" />
+        </rule>
+        <rule name="OrangeDenyUploadsCompanyDocs" stopProcessing="true">
+          <match url="^uploads/company_docs(/.*)?$" ignoreCase="true" />
+          <action type="CustomResponse" statusCode="404" statusReason="Not Found" statusDescription="Not Found" />
+        </rule>
+        <rule name="OrangeDenyUploadsCustomers" stopProcessing="true">
+          <match url="^uploads/customers(/.*)?$" ignoreCase="true" />
+          <action type="CustomResponse" statusCode="404" statusReason="Not Found" statusDescription="Not Found" />
+        </rule>
+        <rule name="OrangeDenyUploadsSuppliers" stopProcessing="true">
+          <match url="^uploads/suppliers(/.*)?$" ignoreCase="true" />
+          <action type="CustomResponse" statusCode="404" statusReason="Not Found" statusDescription="Not Found" />
+        </rule>
+        <rule name="OrangeDenyUploadsStocktake" stopProcessing="true">
+          <match url="^uploads/stocktake(/.*)?$" ignoreCase="true" />
+          <action type="CustomResponse" statusCode="404" statusReason="Not Found" statusDescription="Not Found" />
+        </rule>
         <!--
           /{path_segment} / {path_segment}-ar / … /cart /track /signup /signin /verify-email /product/123
           يُحل path_segment من قاعدة البيانات (لوحة الإدارة → الواجهات).

@@ -64,7 +64,7 @@ Direct anonymous `GET` to these URLs must return **404** (or equivalent deny) af
 
 2. Open live `web.config` at the **site physical root** (same folder as `config.php`, `index.php`).
 
-3. Open `deploy/iis/uploads-sensitive-deny.web.config.fragment.xml` from the deployed code tree.
+3. Open `deploy/iis/uploads-sensitive-deny.web.config.fragment.xml` from the deployed code tree (or use the same five `OrangeDenyUploads*` rules already in `web.config.example`).
 
 4. Copy the **five** `<rule name="OrangeDenyUploads...">` elements from the fragment into the existing:
    ```xml
