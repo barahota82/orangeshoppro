@@ -827,7 +827,16 @@ function savePermissions() {
 auBindSuperToggle();
 auPermBindMatrixEvents();
 renderPermMatrix(0, {}, false);
-loadAdmins();
+(function auBootLoadAdmins() {
+    function boot() {
+        loadAdmins();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();
 </script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_password_policy.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
