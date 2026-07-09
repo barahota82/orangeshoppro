@@ -87,6 +87,17 @@ if (orange_table_exists($pdo, 'customers')) {
     }
 }
 
+$prefillCustomerId = 0;
+$prefillCustomerRaw = (int) ($_GET['customer_id'] ?? 0);
+if ($prefillCustomerRaw > 0) {
+    foreach ($sv2CustomerPickRows as $row) {
+        if ((int) ($row['id'] ?? 0) === $prefillCustomerRaw) {
+            $prefillCustomerId = $prefillCustomerRaw;
+            break;
+        }
+    }
+}
+
 $prefillOrderId = (int) ($_GET['order_id'] ?? 0);
 /** الشاشة نشطة دائماً (مثل المشتريات) — غياب المنتجات/القنوات تنبيه فقط عند البحث عن صنف */
 $sv2Ready = true;
@@ -335,7 +346,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         </div>
         <div>
             <label for="sv2_customer_name">اسم العميل</label>
-            <input type="text" id="sv2_customer_name" required placeholder="اسم العميل">
+            <input type="text" id="sv2_customer_name" class="admin-inp-readonly" readonly disabled tabindex="-1" placeholder="يُعبأ تلقائياً">
         </div>
         <div>
             <label for="sv2_customer_balance">رصيد الذمم</label>
@@ -652,6 +663,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
 (function () {
     var SV2_PICK_ROWS = <?php echo json_encode($sv2PickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var SV2_CUSTOMER_PICK_ROWS = <?php echo json_encode($sv2CustomerPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+    var SV2_PREFILL_CUSTOMER = <?php echo (int) $prefillCustomerId; ?>;
     var SV2_PREFILL_ORDER_ID = <?php echo (int) $prefillOrderId; ?>;
     var SV2_READY = <?php echo $sv2Ready ? 'true' : 'false'; ?>;
     var SV2_PRINT_TUNING = <?php echo orange_admin_invoice_print_tuning_mode() ? 'true' : 'false'; ?>;
@@ -2094,7 +2106,11 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         }
 
         sv2SetViewMode(false);
-        if (SV2_PREFILL_ORDER_ID > 0) sv2LoadInvoice(SV2_PREFILL_ORDER_ID);
+        if (SV2_PREFILL_ORDER_ID > 0) {
+            sv2LoadInvoice(SV2_PREFILL_ORDER_ID);
+        } else if (SV2_PREFILL_CUSTOMER > 0) {
+            selectCustomer(SV2_PREFILL_CUSTOMER);
+        }
     }
 
     if (document.readyState === 'loading') {
