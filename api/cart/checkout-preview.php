@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../includes/product_offers.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 require_once __DIR__ . '/../../includes/storefront_api_errors.php';
+require_once __DIR__ . '/../../includes/loyalty.php';
 
 try {
     $pdo = db();
@@ -176,7 +177,6 @@ try {
     $total = max(0.0, round($merchandiseNet + $deliveryFee, 4));
 
     // نظام الولاء: عرض الرصيد القابل للاستخدام وتطبيق الاستبدال المطلوب (للحساب المسجَّل فقط).
-    require_once __DIR__ . '/../../includes/loyalty.php';
     $loyalty = ['active' => false];
     if ($buyerReg && orange_loyalty_is_active($pdo, $storefrontCountryId)) {
         $accPhone = trim((string) ($acc['customer_phone'] ?? ''));
