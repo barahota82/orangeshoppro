@@ -190,12 +190,32 @@ function orange_sales_return_channel_from_order(array $order): string
 }
 
 /**
+ * @throws RuntimeException
+ */
+function orange_sales_return_lock_reference_order(PDO $pdo, int $orderId): void
+{
+    if ($orderId <= 0) {
+        return;
+    }
+
+    $st = $pdo->prepare('SELECT id FROM orders WHERE id = ? LIMIT 1 FOR UPDATE');
+    $st->execute([$orderId]);
+    if (!$st->fetch()) {
+        throw new RuntimeException('الطلب المرجعي غير موجود');
+    }
+}
+
+/**
  * @param list<array{product_id:int,variant_id?:int,qty:int}> $items
  *
  * @throws RuntimeException
  */
-function orange_sales_return_assert_qty_against_order(PDO $pdo, int $orderId, array $items): void
-{
+function orange_sales_return_assert_qty_against_order(
+    PDO $pdo,
+    int $orderId,
+    array $items,
+    ?int $excludeReturnId = null
+): void {
     if ($orderId <= 0 || $items === []) {
         return;
     }
@@ -205,7 +225,7 @@ function orange_sales_return_assert_qty_against_order(PDO $pdo, int $orderId, ar
         throw new RuntimeException('الطلب المرجعي بلا أصناف');
     }
 
-    $returned = orange_sales_return_returned_qty_map($pdo, $orderId);
+    $returned = orange_sales_return_returned_qty_map($pdo, $orderId, $excludeReturnId);
     $requested = [];
 
     foreach ($items as $item) {

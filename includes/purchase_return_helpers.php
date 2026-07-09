@@ -151,12 +151,32 @@ function orange_purchase_return_parse_discount_amount(string $discountRaw, float
 }
 
 /**
+ * @throws RuntimeException
+ */
+function orange_purchase_return_lock_reference_purchase(PDO $pdo, int $purchaseId): void
+{
+    if ($purchaseId <= 0) {
+        return;
+    }
+
+    $st = $pdo->prepare('SELECT id FROM purchases WHERE id = ? LIMIT 1 FOR UPDATE');
+    $st->execute([$purchaseId]);
+    if (!$st->fetch()) {
+        throw new RuntimeException('فاتورة الشراء المرجعية غير موجودة');
+    }
+}
+
+/**
  * @param list<array{product_id:int,variant_id?:int,qty:int}> $items
  *
  * @throws RuntimeException
  */
-function orange_purchase_return_assert_qty_against_purchase(PDO $pdo, int $purchaseId, array $items): void
-{
+function orange_purchase_return_assert_qty_against_purchase(
+    PDO $pdo,
+    int $purchaseId,
+    array $items,
+    ?int $excludeReturnId = null
+): void {
     if ($purchaseId <= 0 || $items === []) {
         return;
     }
@@ -166,7 +186,7 @@ function orange_purchase_return_assert_qty_against_purchase(PDO $pdo, int $purch
         throw new RuntimeException('فاتورة الشراء المرجعية بلا أصناف');
     }
 
-    $returned = orange_purchase_return_returned_qty_map($pdo, $purchaseId);
+    $returned = orange_purchase_return_returned_qty_map($pdo, $purchaseId, $excludeReturnId);
     $requested = [];
 
     foreach ($items as $item) {

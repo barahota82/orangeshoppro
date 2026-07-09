@@ -187,7 +187,25 @@ try {
         ], 422);
     }
 
+    $preUpdateOrderIdOpt = 0;
+    $preUpdateItems = [];
+    if ($action !== 'delete') {
+        $preUpdateOrderIdOpt = (int) ($data['order_id'] ?? (int) ($row['order_id'] ?? 0));
+        $preUpdateItems = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
+    }
+
     $pdo->beginTransaction();
+
+    if ($action !== 'delete' && $preUpdateOrderIdOpt > 0 && $preUpdateItems !== []) {
+        try {
+            orange_sales_return_lock_reference_order($pdo, $preUpdateOrderIdOpt);
+            orange_sales_return_assert_qty_against_order($pdo, $preUpdateOrderIdOpt, $preUpdateItems, $returnId);
+        } catch (RuntimeException $e) {
+            $pdo->rollBack();
+            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
     reverse_sales_return_stock($pdo, $returnId);
     // FIFO م3: حذف طبقات هذا المردود (تُعاد بناءً على البنود الجديدة، أو تبقى محذوفة عند الحذف).
     orange_inventory_cost_layers_delete_for_source($pdo, 'sale_return', $returnId);

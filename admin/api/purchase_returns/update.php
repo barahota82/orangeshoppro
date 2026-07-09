@@ -177,7 +177,25 @@ try {
         ], 422);
     }
 
+    $preUpdatePurchaseIdOpt = 0;
+    $preUpdateItems = [];
+    if ($action !== 'delete') {
+        $preUpdatePurchaseIdOpt = (int) ($data['purchase_id'] ?? (int) ($row['purchase_id'] ?? 0));
+        $preUpdateItems = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
+    }
+
     $pdo->beginTransaction();
+
+    if ($action !== 'delete' && $preUpdatePurchaseIdOpt > 0 && $preUpdateItems !== []) {
+        try {
+            orange_purchase_return_lock_reference_purchase($pdo, $preUpdatePurchaseIdOpt);
+            orange_purchase_return_assert_qty_against_purchase($pdo, $preUpdatePurchaseIdOpt, $preUpdateItems, $returnId);
+        } catch (RuntimeException $e) {
+            $pdo->rollBack();
+            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
     // FIFO م2: مخزن/مرجع الشراء للمردود القائم (لاسترجاع الطبقات عند العكس).
     $existingRefPurchaseId = (int) ($row['purchase_id'] ?? 0);
     $reverseCountryId = orange_admin_context_country_id($pdo);

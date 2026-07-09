@@ -148,6 +148,7 @@ try {
     $cogsTotal = round($cogsTotal, 4);
 
     if ($orderIdOpt > 0) {
+        orange_sales_return_lock_reference_order($pdo, $orderIdOpt);
         orange_sales_return_assert_qty_against_order($pdo, $orderIdOpt, $normalizedItems);
     }
 

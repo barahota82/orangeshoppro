@@ -82,6 +82,9 @@ try {
     $hasRetSubtotal = orange_table_has_column($pdo, 'purchase_returns', 'subtotal');
 
     try {
+        if ($purchaseIdOpt > 0) {
+            orange_purchase_return_lock_reference_purchase($pdo, $purchaseIdOpt);
+        }
         orange_purchase_return_assert_qty_against_purchase($pdo, $purchaseIdOpt, $items);
     } catch (RuntimeException $e) {
         $pdo->rollBack();
