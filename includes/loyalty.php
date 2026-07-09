@@ -8,6 +8,76 @@ require_once __DIR__ . '/journal_voucher.php';
 require_once __DIR__ . '/gl_pending_movements.php';
 
 /**
+ * صافي قيمة البضاعة لأساس كسب/استبدال الولاء (قرار مالك — بضاعة بعد خصومات المنتج فقط).
+ * productLinesSum = Σ صافي بنود المنتجات (قبل خصومات الطلب على مستوى الفاتورة).
+ */
+function orange_loyalty_merchandise_net_base(
+    float $productLinesSum,
+    float $comboDiscount = 0.0,
+    float $cartPromotionDiscount = 0.0,
+    float $productOfferDiscount = 0.0,
+    float $giftPromotionDiscount = 0.0,
+    float $bogoPromotionDiscount = 0.0
+): float {
+    $goodsGross = round(max(0.0, $productLinesSum), 4);
+    $promoTotal = round(
+        max(0.0, $comboDiscount)
+        + max(0.0, $cartPromotionDiscount)
+        + max(0.0, $productOfferDiscount)
+        + max(0.0, $giftPromotionDiscount)
+        + max(0.0, $bogoPromotionDiscount),
+        4
+    );
+    if ($promoTotal > $goodsGross) {
+        $promoTotal = $goodsGross;
+    }
+
+    return max(0.0, round($goodsGross - $promoTotal, 4));
+}
+
+/**
+ * مسار الواجهة قبل إدراج الطلب: subtotal − خصومات السلة/العروض + صافي رسوم منتجات الهدايا/BOGO.
+ */
+function orange_loyalty_merchandise_net_from_storefront_totals(
+    float $cartSubtotal,
+    float $comboDiscount = 0.0,
+    float $cartPromotionDiscount = 0.0,
+    float $productOfferDiscount = 0.0,
+    float $giftProductNetCharge = 0.0
+): float {
+    $cartMerch = max(0.0, round(
+        $cartSubtotal - $comboDiscount - $cartPromotionDiscount - $productOfferDiscount,
+        4
+    ));
+
+    return max(0.0, round($cartMerch + max(0.0, $giftProductNetCharge), 4));
+}
+
+/**
+ * @param list<array<string, mixed>> $orderItems
+ */
+function orange_loyalty_merchandise_net_from_order(PDO $pdo, array $order, array $orderItems): float
+{
+    require_once __DIR__ . '/order_helpers.php';
+    $productLinesSum = 0.0;
+    foreach ($orderItems as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $productLinesSum += orange_order_item_line_net($item);
+    }
+
+    return orange_loyalty_merchandise_net_base(
+        round($productLinesSum, 4),
+        (float) ($order['cart_combo_discount'] ?? 0),
+        (float) ($order['cart_promotion_discount'] ?? 0),
+        (float) ($order['product_offer_discount'] ?? 0),
+        (float) ($order['cart_gift_discount'] ?? 0),
+        (float) ($order['cart_bogo_discount'] ?? 0)
+    );
+}
+
+/**
  * نظام ولاء العميل (نموذج التزام مؤجّل — الأدق محاسبياً):
  * - كسب عند التسليم بنسبة ثابتة على صافي المبيعات؛ قيد: مدين «مصروفات برنامج الولاء» / دائن «التزامات نقاط الولاء».
  * - استبدال عند الدفع كبند فاتورة يخصم من «التزامات نقاط الولاء» (يقلّل ما يدفعه العميل) — يستهلك الطبقات FIFO.

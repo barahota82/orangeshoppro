@@ -165,7 +165,15 @@ try {
             ];
         }
     }
-    $total = max(0.0, round($total + $thresholdGiftChargePreview + $bogoGiftChargePreview + $deliveryFee, 4));
+    $giftProductNetCharge = round($thresholdGiftChargePreview + $bogoGiftChargePreview, 4);
+    $merchandiseNet = orange_loyalty_merchandise_net_from_storefront_totals(
+        $subtotal,
+        $comboDiscount,
+        $promoDiscount,
+        $productOfferDiscount,
+        $giftProductNetCharge
+    );
+    $total = max(0.0, round($merchandiseNet + $deliveryFee, 4));
 
     // نظام الولاء: عرض الرصيد القابل للاستخدام وتطبيق الاستبدال المطلوب (للحساب المسجَّل فقط).
     require_once __DIR__ . '/../../includes/loyalty.php';
@@ -184,7 +192,7 @@ try {
             $custId = (int) ($cs->fetchColumn() ?: 0);
         }
         if ($custId > 0) {
-            $payableBefore = $total;
+            $payableBefore = $merchandiseNet;
             $info = orange_loyalty_redeemable($pdo, $custId, $storefrontCountryId, $payableBefore);
             $sLoy = orange_loyalty_settings($pdo, $storefrontCountryId);
             $pv = $sLoy !== null ? (float) $sLoy['point_value'] : 0.0;
@@ -204,10 +212,9 @@ try {
                 if ($appliedPts <= 0 || $appliedVal <= 0.0001) {
                     $appliedPts = 0;
                     $appliedVal = 0.0;
-                } else {
-                    $total = max(0.0, round($total - $appliedVal, 4));
                 }
             }
+            $total = max(0.0, round($merchandiseNet + $deliveryFee - $appliedVal, 4));
             $loyalty = [
                 'active' => true,
                 'balance' => (int) $info['balance'],

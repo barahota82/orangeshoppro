@@ -830,11 +830,12 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
     // مصروف التوصيل الذي تتحمّله الشركة (تكلفة الشركة per المنطقة) — قيد مستقل عن إيراد التوصيل.
     orange_order_post_delivery_expense_gl($pdo, $order, $ofGlCountryId, $isOnline);
 
-    // كسب نقاط الولاء عند التسليم على صافي مبيعات البضاعة (بنود الطلب، باستثناء التوصيل) — مرّة واحدة.
+    // كسب نقاط الولاء عند التسليم على صافي قيمة البضاعة بعد خصومات المنتج (بلا توصيل) — مرّة واحدة.
     require_once __DIR__ . '/loyalty.php';
     $orderForLoyalty = $order;
     $orderForLoyalty['customer_id'] = $customerIdForAr;
-    orange_loyalty_earn_for_order($pdo, $orderForLoyalty, $ofGlCountryId, $orderSalesNet);
+    $loyaltyMerchandiseNet = orange_loyalty_merchandise_net_from_order($pdo, $order, $items);
+    orange_loyalty_earn_for_order($pdo, $orderForLoyalty, $ofGlCountryId, $loyaltyMerchandiseNet);
 
     // المهمة 2: ترقية عنوان الطلب إلى «الحالي» للعميل + إضافته لسجل العناوين عند تأكيد الاستلام
     // (إنشاء القيد المحاسبي) — لا عند إنشاء الطلب. مرّة واحدة لكل طلب (UNIQUE order_id).

@@ -524,7 +524,15 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $giftLinesCharge += round((float) ($bogoLine['price'] ?? 0) * (int) ($bogoLine['qty'] ?? 1) - $bogoDiscount, 4);
     }
     $giftLinesCharge = round(max(0.0, $giftLinesCharge), 4);
-    $orderTotal = max(0.0, round($orderTotal + $giftLinesCharge + $deliveryFee, 4));
+    require_once __DIR__ . '/loyalty.php';
+    $merchandiseNet = orange_loyalty_merchandise_net_from_storefront_totals(
+        $subtotal,
+        $comboDiscount,
+        $promoDiscount,
+        $productOfferDiscount,
+        $giftLinesCharge
+    );
+    $orderTotal = max(0.0, round($merchandiseNet + $deliveryFee, 4));
 
     $customerRowId = orange_storefront_upsert_customer_from_checkout(
         $pdo,
@@ -543,9 +551,8 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     // استبدال نقاط الولاء (للحساب المسجَّل فقط): يقلّل المبلغ المستحق؛ الاستهلاك FIFO بعد إدراج الطلب.
     $loyaltyRedeemPoints = 0;
     $loyaltyRedeemValue = 0.0;
-    $loyaltyPayableBeforeRedeem = $orderTotal;
+    $loyaltyPayableBeforeRedeem = $merchandiseNet;
     if ($buyerRegistered && $customerRowId !== null && $customerRowId > 0) {
-        require_once __DIR__ . '/loyalty.php';
         $redeemReq = (int) ($data['redeem_points'] ?? 0);
         if ($redeemReq > 0 && orange_loyalty_is_active($pdo, $orderCountryId)) {
             // معاينة مقفولة (FOR UPDATE): القيمة بأسعار الطبقات FIFO، وتُطابق ما سيُطبَّق لاحقاً
@@ -555,7 +562,7 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
                 (int) $customerRowId,
                 $orderCountryId,
                 $redeemReq,
-                $orderTotal
+                $merchandiseNet
             );
             $loyaltyRedeemPoints = (int) $prev['points'];
             $loyaltyRedeemValue = round((float) $prev['value'], 4);
@@ -563,7 +570,7 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
                 $loyaltyRedeemPoints = 0;
                 $loyaltyRedeemValue = 0.0;
             } else {
-                $orderTotal = max(0.0, round($orderTotal - $loyaltyRedeemValue, 4));
+                $orderTotal = max(0.0, round($merchandiseNet + $deliveryFee - $loyaltyRedeemValue, 4));
             }
         }
     }

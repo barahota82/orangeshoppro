@@ -291,12 +291,15 @@ try {
         $giftRetailTotal += (float) ($gl['price'] ?? 0) * (int) ($gl['qty'] ?? 1);
     }
     $giftRetailTotal = round($giftRetailTotal, 4);
-    $goodsGross = round($total + $giftRetailTotal, 4);
-    $totalPromo = round($comboDiscount + $promoDiscount + $productOfferDiscount + $giftDiscount + $bogoDiscount, 4);
-    if ($totalPromo > $goodsGross) {
-        $totalPromo = $goodsGross;
-    }
-    $goodsAfterPromo = max(0.0, round($goodsGross - $totalPromo, 4));
+    require_once __DIR__ . '/../../../includes/loyalty.php';
+    $goodsAfterPromo = orange_loyalty_merchandise_net_base(
+        round($total + $giftRetailTotal, 4),
+        $comboDiscount,
+        $promoDiscount,
+        $productOfferDiscount,
+        $giftDiscount,
+        $bogoDiscount
+    );
 
     // استبدال نقاط الولاء (يحدّده المحاسب)؛ مقيَّد بالرصيد القابل للاستخدام؛ الترحيل بعد إدراج الطلب.
     $loyaltyRedeemPoints = 0;
