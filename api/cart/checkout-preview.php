@@ -165,7 +165,8 @@ try {
             ];
         }
     }
-    $total = max(0.0, round($total + $thresholdGiftChargePreview + $bogoGiftChargePreview + $deliveryFee, 4));
+    $loyaltyRedeemableBase = max(0.0, round($total + $thresholdGiftChargePreview + $bogoGiftChargePreview, 4));
+    $total = max(0.0, round($loyaltyRedeemableBase + $deliveryFee, 4));
 
     // نظام الولاء: عرض الرصيد القابل للاستخدام وتطبيق الاستبدال المطلوب (للحساب المسجَّل فقط).
     require_once __DIR__ . '/../../includes/loyalty.php';
@@ -184,7 +185,7 @@ try {
             $custId = (int) ($cs->fetchColumn() ?: 0);
         }
         if ($custId > 0) {
-            $payableBefore = $total;
+            $payableBefore = $loyaltyRedeemableBase;
             $info = orange_loyalty_redeemable($pdo, $custId, $storefrontCountryId, $payableBefore);
             $sLoy = orange_loyalty_settings($pdo, $storefrontCountryId);
             $pv = $sLoy !== null ? (float) $sLoy['point_value'] : 0.0;
