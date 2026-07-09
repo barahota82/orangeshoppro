@@ -58,6 +58,12 @@ if (orange_table_exists($pdo, 'customers')) {
     if (orange_table_has_column($pdo, 'customers', 'address')) {
         $custPickCols .= ', address';
     }
+    if (orange_table_has_column($pdo, 'customers', 'phone_country_dial')) {
+        $custPickCols .= ', phone_country_dial';
+    }
+    if (orange_table_has_column($pdo, 'customers', 'phone_national')) {
+        $custPickCols .= ', phone_national';
+    }
     $customers = $pdo->query(
         'SELECT ' . $custPickCols . ' FROM customers WHERE 1=1'
         . $sv2CustomersCountrySql . ' ORDER BY name_ar ASC'
@@ -80,6 +86,8 @@ if (orange_table_exists($pdo, 'customers')) {
             'code' => $customerCode,
             'name' => trim((string) ($c['name_ar'] ?? '')),
             'phone' => trim((string) ($c['phone'] ?? '')),
+            'phone_country_dial' => trim((string) ($c['phone_country_dial'] ?? '')),
+            'phone_national' => trim((string) ($c['phone_national'] ?? '')),
             'area' => trim((string) ($c['area'] ?? '')),
             'address' => trim((string) ($c['address'] ?? '')),
             'balance' => round((float) ($custBal[$cid] ?? 0.0), $adminCurrencyDecimals),
@@ -737,6 +745,53 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         if (addrEl && source.address != null) addrEl.value = String(source.address || '');
     }
 
+    function sv2SplitPhoneForForm(row) {
+        if (!row) {
+            return { country: '', phone: '' };
+        }
+        if (window.orangeAdminPhoneCountry) {
+            return window.orangeAdminPhoneCountry.splitPhoneForForm(
+                row.phone || '',
+                row.phone_country_dial || '',
+                row.phone_national || '',
+                true
+            );
+        }
+        return { country: '', phone: String(row.phone || '').trim() };
+    }
+
+    function applyCustomerPhoneFields(source, opts) {
+        opts = opts || {};
+        if (opts.keepPhone) {
+            return;
+        }
+        var ccEl = document.getElementById('sv2_phone_country');
+        var phoneEl = document.getElementById('sv2_phone');
+        if (!source) {
+            if (phoneEl) {
+                phoneEl.value = '';
+            }
+            if (ccEl && window.orangeAdminPhoneCountry) {
+                window.orangeAdminPhoneCountry.setInputByDial(
+                    ccEl,
+                    window.orangeAdminPhoneCountry.defaultCountryDial(),
+                    false
+                );
+            }
+            return;
+        }
+        var split = sv2SplitPhoneForForm(source);
+        if (ccEl && window.orangeAdminPhoneCountry) {
+            var ccSet = split.country && split.country !== ''
+                ? split.country
+                : window.orangeAdminPhoneCountry.defaultCountryDial();
+            window.orangeAdminPhoneCountry.setInputByDial(ccEl, ccSet, false);
+        }
+        if (phoneEl) {
+            phoneEl.value = split.phone || '';
+        }
+    }
+
     function selectCustomer(id, opts) {
         opts = opts || {};
         var row = customerById(id);
@@ -751,6 +806,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             if (balEl) balEl.value = '';
             if (idEl) idEl.value = '0';
             if (!opts.keepDelivery) applyCustomerDeliveryFields(null, opts);
+            applyCustomerPhoneFields(null, opts);
             return;
         }
         currentCustomerId = parseInt(String(row.id), 10) || 0;
@@ -759,6 +815,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         if (balEl) balEl.value = fmt3(row.balance || 0);
         if (idEl) idEl.value = String(currentCustomerId);
         applyCustomerDeliveryFields(row, opts);
+        applyCustomerPhoneFields(row, opts);
         if (typeof sv2ScheduleOfferDetect === 'function') sv2ScheduleOfferDetect();
     }
 
@@ -777,7 +834,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             if (balEl && cust.current_balance != null) balEl.value = fmt3(cust.current_balance);
             applyCustomerDeliveryFields(cust);
         } else {
-            selectCustomer(0, { keepName: true, keepDelivery: true });
+            selectCustomer(0, { keepName: true, keepDelivery: true, keepPhone: true });
             var codeEl2 = document.getElementById('sv2_customer_code');
             if (codeEl2) codeEl2.value = '';
             var nameEl2 = document.getElementById('sv2_customer_name');
@@ -831,8 +888,6 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             li.textContent = (r.code ? r.code + ' — ' : '') + r.name + (r.phone ? ' (' + r.phone + ')' : '') + ' [رصيد ' + fmt3(r.balance) + ']';
             li.addEventListener('dblclick', function () {
                 selectCustomer(r.id);
-                var phoneEl = document.getElementById('sv2_phone');
-                if (phoneEl && r.phone && !phoneEl.value.trim()) phoneEl.value = r.phone;
                 customerPickerClose();
             });
             li.addEventListener('keydown', function (ev) {
