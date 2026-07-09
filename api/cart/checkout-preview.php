@@ -189,11 +189,24 @@ try {
             $sLoy = orange_loyalty_settings($pdo, $storefrontCountryId);
             $pv = $sLoy !== null ? (float) $sLoy['point_value'] : 0.0;
             $reqPts = (int) ($data['redeem_points'] ?? 0);
-            $appliedPts = $reqPts > 0 ? min($reqPts, (int) $info['points']) : 0;
+            $appliedPts = 0;
             $appliedVal = 0.0;
-            if ($appliedPts > 0 && $pv > 0) {
-                $appliedVal = round(min($appliedPts * $pv, $payableBefore), 4);
-                $total = max(0.0, round($total - $appliedVal, 4));
+            if ($reqPts > 0) {
+                $prev = orange_loyalty_redemption_value_preview(
+                    $pdo,
+                    $custId,
+                    $storefrontCountryId,
+                    $reqPts,
+                    $payableBefore
+                );
+                $appliedPts = (int) $prev['points'];
+                $appliedVal = round((float) $prev['value'], 4);
+                if ($appliedPts <= 0 || $appliedVal <= 0.0001) {
+                    $appliedPts = 0;
+                    $appliedVal = 0.0;
+                } else {
+                    $total = max(0.0, round($total - $appliedVal, 4));
+                }
             }
             $loyalty = [
                 'active' => true,

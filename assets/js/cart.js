@@ -1227,7 +1227,7 @@ function orangeUpdateLoyaltyRedeemUI(loyalty) {
     const lblBalance = (T.loyalty_balance_label || 'رصيد نقاطك') + ': ' + balance;
     let lblUse = T.loyalty_use_points_label || 'استخدم نقاطي في هذا الطلب';
     if (redeemablePoints > 0) {
-        lblUse += ' (' + redeemablePoints + ' = ' + formatMoney(redeemablePoints * (Number(loyalty.point_value) || 0)) + ')';
+        lblUse += ' (' + redeemablePoints + ' = ' + formatMoney(Number(loyalty.redeemable_value) || 0) + ')';
     }
     let appliedHtml = '';
     if (appliedValue > 0) {
