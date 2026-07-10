@@ -12,6 +12,7 @@ require_once __DIR__ . '/journal_voucher.php';
 require_once __DIR__ . '/gl_pending_movements.php';
 require_once __DIR__ . '/party_subledger.php';
 require_once __DIR__ . '/party_allocations.php';
+require_once __DIR__ . '/edit_lock.php';
 
 function orange_gl_voucher_slots_ready(PDO $pdo): bool
 {
@@ -250,6 +251,28 @@ function orange_gl_voucher_slot_assert_may_rebuild(PDO $pdo, int $voucherId, ?ar
 }
 
 /**
+ * Block V2 rebuild when the source business document is locked in the edit-lock registry.
+ *
+ * @param array{doc_kind:string,entity_id:int,country_id?:int|null} $spec
+ *
+ * @throws RuntimeException
+ */
+function orange_gl_voucher_slot_assert_document_unlocked(PDO $pdo, array $spec): void
+{
+    $docKind = trim((string) ($spec['doc_kind'] ?? ''));
+    $entityId = (int) ($spec['entity_id'] ?? 0);
+    if ($docKind === '' || $entityId <= 0) {
+        return;
+    }
+    $countryId = isset($spec['country_id']) && (int) $spec['country_id'] > 0
+        ? (int) $spec['country_id']
+        : null;
+    if (orange_edit_lock_is_locked($pdo, $docKind, $entityId, $countryId)) {
+        throw new RuntimeException('المستند مقفول — فك القفل أولاً قبل إعادة بناء القيد.');
+    }
+}
+
+/**
  * Replace journal lines inside an existing voucher without changing identity columns.
  *
  * @param array{voucher_date?:string,description?:string,country_id?:int} $allowedHeaderPatch
@@ -457,13 +480,14 @@ function orange_gl_voucher_slot_create(
         $header['country_id'] = $spec['country_id'];
     }
 
-    $vid = orange_voucher_post($pdo, $header, $lines);
-
+    orange_catalog_ensure_schema($pdo);
     $ownTx = !$pdo->inTransaction();
     if ($ownTx) {
         $pdo->beginTransaction();
     }
+    $vid = 0;
     try {
+        $vid = orange_voucher_post($pdo, $header, $lines);
         orange_gl_voucher_slot_register($pdo, $spec, $vid);
         orange_gl_party_subledger_replace_for_voucher($pdo, $vid, $afterPostJson);
         if ($ownTx) {
@@ -500,7 +524,11 @@ function orange_gl_voucher_slot_rebuild(
     if ($slot === null || (int) ($slot['journal_voucher_id'] ?? 0) <= 0) {
         throw new RuntimeException('خانة GL غير مسجّلة — استخدم الإنشاء الأول.');
     }
+    if ($spec['country_id'] === null && (int) ($slot['country_id'] ?? 0) > 0) {
+        $spec['country_id'] = (int) $slot['country_id'];
+    }
     $vid = (int) $slot['journal_voucher_id'];
+    orange_gl_voucher_slot_assert_document_unlocked($pdo, $spec);
 
     $ownTx = !$pdo->inTransaction();
     if ($ownTx) {
