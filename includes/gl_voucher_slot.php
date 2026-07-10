@@ -964,7 +964,7 @@ function orange_gl_sales_return_immediate_post_all_slots(
             $afterJson
         );
 
-        $exActive = [];
+        $exGroups = [];
         $counterAccountId = (int) ($glRev['credit'] ?? 0);
         foreach ($extraRows as $jr) {
             $accId = (int) ($jr['account_id'] ?? 0);
@@ -986,7 +986,31 @@ function orange_gl_sales_return_immediate_post_all_slots(
             if ($exDebit === $exCredit || $exAmount <= 0.0001) {
                 continue;
             }
-            $exActive[] = $accId;
+            if (!isset($exGroups[$accId])) {
+                $exGroups[$accId] = [
+                    'memo' => $memo,
+                    'lines' => [],
+                ];
+            }
+            $exGroups[$accId]['lines'][] = [
+                'account_id' => $exDebit,
+                'debit' => $exAmount,
+                'credit' => 0.0,
+                'memo' => 'مردود — ' . $memo,
+            ];
+            $exGroups[$accId]['lines'][] = [
+                'account_id' => $exCredit,
+                'debit' => 0.0,
+                'credit' => $exAmount,
+                'memo' => 'مردود — ' . $memo,
+            ];
+        }
+        foreach ($exGroups as $accId => $group) {
+            $memo = trim((string) ($group['memo'] ?? 'بند مردود'));
+            $lines = isset($group['lines']) && is_array($group['lines']) ? $group['lines'] : [];
+            if ($lines === []) {
+                continue;
+            }
             $exSlot = [
                 'doc_kind' => 'sales_return',
                 'entity_id' => $returnId,
@@ -1005,18 +1029,15 @@ function orange_gl_sales_return_immediate_post_all_slots(
             if ($revJtId > 0) {
                 $exHeader['journal_type_id'] = $revJtId;
             }
-            orange_gl_voucher_immediate_post_simple_for_slot(
+            orange_gl_voucher_post_or_rebuild_for_slot(
                 $pdo,
                 $exSlot,
                 $exHeader,
-                $exDebit,
-                $exCredit,
-                $exAmount,
-                'مردود — ' . $memo,
+                $lines,
                 null
             );
         }
-        orange_gl_sales_return_retire_removed_ex_slots($pdo, $returnId, $exActive, $countryId);
+        orange_gl_sales_return_retire_removed_ex_slots($pdo, $returnId, array_keys($exGroups), $countryId);
     } else {
         orange_gl_voucher_slot_void_registered($pdo, 'sales_return', $returnId, 'sale');
         orange_gl_sales_return_retire_removed_ex_slots($pdo, $returnId, [], $countryId);

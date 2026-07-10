@@ -934,7 +934,18 @@ function orange_loyalty_reverse_clawback_for_return(PDO $pdo, int $returnId): vo
         $cid > 0 ? $cid : null,
         'loyalty-return-clawback'
     );
-    if ($v !== null && !orange_table_exists($pdo, 'orange_gl_voucher_slots')) {
+    if (orange_table_exists($pdo, 'orange_gl_voucher_slots')) {
+        require_once __DIR__ . '/gl_voucher_slot.php';
+        $slotSpec = [
+            'doc_kind' => 'sales_return',
+            'entity_id' => $returnId,
+            'slot_key' => 'loyalty-return-clawback',
+            'entry_type' => 'loyalty_return_clawback',
+            'country_id' => $cid > 0 ? $cid : null,
+        ];
+        orange_gl_voucher_slot_adopt_legacy($pdo, $slotSpec, $cid > 0 ? $cid : null);
+        orange_gl_voucher_slot_void_registered($pdo, 'sales_return', $returnId, 'loyalty-return-clawback');
+    } elseif ($v !== null) {
         orange_voucher_delete_by_reference($pdo, (string) ($v['reference'] ?? ''), $cid > 0 ? $cid : null);
     }
     if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
