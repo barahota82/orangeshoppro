@@ -3,8 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Accounting Lifecycle V2 — Phase 0 Core Engine (slot registry + in-place rebuild).
- * Infrastructure only: not wired into document API paths until Phase 1+.
+ * Accounting Lifecycle V2 — slot registry + in-place rebuild (Phase 0 core, Phase 1A wiring helpers).
  */
 
 require_once __DIR__ . '/catalog_schema.php';
@@ -26,6 +25,9 @@ function orange_gl_voucher_slot_pending_suffix(string $slotKey): string
     $sk = trim($slotKey);
     if ($sk === '' || strtolower($sk) === 'main') {
         return '';
+    }
+    if (preg_match('/^sale-ex-(\d+)$/i', $sk, $m)) {
+        return 'sale-EX' . $m[1];
     }
 
     return $sk;
@@ -219,6 +221,24 @@ function orange_gl_voucher_slot_register(PDO $pdo, array $slotSpec, int $journal
         $jtId,
         $journalVoucherId,
     ]);
+}
+
+/**
+ * Clear is_void so a retired slot voucher may be reposted on a later edit.
+ */
+function orange_gl_voucher_slot_clear_void_for_rebuild(PDO $pdo, int $voucherId): void
+{
+    if ($voucherId <= 0 || !orange_table_has_column($pdo, 'journal_vouchers', 'is_void')) {
+        return;
+    }
+    $hasVoidedAt = orange_table_has_column($pdo, 'journal_vouchers', 'voided_at');
+    if ($hasVoidedAt) {
+        $pdo->prepare(
+            'UPDATE journal_vouchers SET is_void = 0, voided_at = NULL WHERE id = ? AND is_void = 1'
+        )->execute([$voucherId]);
+    } else {
+        $pdo->prepare('UPDATE journal_vouchers SET is_void = 0 WHERE id = ? AND is_void = 1')->execute([$voucherId]);
+    }
 }
 
 /**
@@ -507,6 +527,7 @@ function orange_gl_voucher_slot_rebuild(
         $pdo->beginTransaction();
     }
     try {
+        orange_gl_voucher_slot_clear_void_for_rebuild($pdo, $vid);
         orange_gl_voucher_slot_assert_may_rebuild($pdo, $vid);
         orange_voucher_rebuild_automatic($pdo, $vid, $headerPatch, $lines);
         orange_gl_party_subledger_replace_for_voucher($pdo, $vid, $afterPostJson);
@@ -544,6 +565,10 @@ function orange_gl_voucher_post_or_rebuild_for_slot(
     ?string $afterPostJson
 ): int {
     $spec = orange_gl_voucher_slot_normalize_spec($slotSpec);
+    $adoptCountryId = isset($spec['country_id']) && (int) $spec['country_id'] > 0
+        ? (int) $spec['country_id']
+        : null;
+    orange_gl_voucher_slot_adopt_legacy($pdo, $slotSpec, $adoptCountryId);
     $slot = orange_gl_voucher_slot_find($pdo, $spec['doc_kind'], $spec['entity_id'], $spec['slot_key']);
     if ($slot !== null && (int) ($slot['journal_voucher_id'] ?? 0) > 0) {
         $headerPatch = [
@@ -560,4 +585,475 @@ function orange_gl_voucher_post_or_rebuild_for_slot(
     }
 
     return orange_gl_voucher_slot_create($pdo, $spec, $header, $lines, $afterPostJson);
+}
+
+/**
+ * @return list<array{account_id:int,debit:float,credit:float,memo:string}>
+ */
+function orange_gl_posting_bundle_to_lines(array $glB, float $amount): array
+{
+    if (!empty($glB['is_multi']) && !empty($glB['lines']) && is_array($glB['lines'])) {
+        return $glB['lines'];
+    }
+    $amount = round($amount, 4);
+    $memo = trim((string) ($glB['voucher_description'] ?? 'قيد تلقائي'));
+
+    return [
+        [
+            'account_id' => (int) ($glB['debit'] ?? 0),
+            'debit' => $amount,
+            'credit' => 0.0,
+            'memo' => $memo,
+        ],
+        [
+            'account_id' => (int) ($glB['credit'] ?? 0),
+            'debit' => 0.0,
+            'credit' => $amount,
+            'memo' => $memo,
+        ],
+    ];
+}
+
+/**
+ * Exact pending-queue source_key → voucher (no party_subledger fallback).
+ *
+ * @return array<string, mixed>|null
+ */
+function orange_gl_voucher_find_by_pending_source_key(PDO $pdo, string $sourceKey): ?array
+{
+    orange_catalog_ensure_schema($pdo);
+    $key = trim($sourceKey);
+    if ($key === '' || !orange_table_exists($pdo, 'orange_gl_pending_movements')) {
+        return null;
+    }
+    $st = $pdo->prepare(
+        'SELECT journal_voucher_id FROM orange_gl_pending_movements
+         WHERE reference = ? AND journal_voucher_id IS NOT NULL AND journal_voucher_id > 0
+         ORDER BY id DESC LIMIT 1'
+    );
+    $st->execute([$key]);
+    $vid = (int) $st->fetchColumn();
+    if ($vid <= 0) {
+        return null;
+    }
+
+    return orange_voucher_by_id($pdo, $vid);
+}
+
+/**
+ * Adopt an existing posted voucher into the slot registry when lookup is unambiguous.
+ */
+function orange_gl_voucher_slot_adopt_legacy(PDO $pdo, array $slotSpec, ?int $countryId = null): bool
+{
+    if (!orange_gl_voucher_slots_ready($pdo)) {
+        return false;
+    }
+    try {
+        $spec = orange_gl_voucher_slot_normalize_spec($slotSpec);
+    } catch (InvalidArgumentException) {
+        return false;
+    }
+    if ($countryId === null && isset($spec['country_id']) && $spec['country_id'] !== null) {
+        $countryId = (int) $spec['country_id'];
+        if ($countryId <= 0) {
+            $countryId = null;
+        }
+    }
+    if (orange_gl_voucher_slot_find($pdo, $spec['doc_kind'], $spec['entity_id'], $spec['slot_key']) !== null) {
+        return true;
+    }
+
+    $v = null;
+    if (preg_match('/^sale-ex-(\d+)$/i', $spec['slot_key'], $exMatch)) {
+        // EX slots: exact pending source_key only — never party_subledger LIMIT 1 (would match main sale).
+        $exAccId = (int) $exMatch[1];
+        if ($exAccId <= 0) {
+            return false;
+        }
+        $sourceKey = orange_gl_voucher_slot_source_key($spec['doc_kind'], $spec['entity_id'], $spec['slot_key']);
+        $v = orange_gl_voucher_find_by_pending_source_key($pdo, $sourceKey);
+        if ($v === null) {
+            return false;
+        }
+        $saleSlot = orange_gl_voucher_slot_find($pdo, $spec['doc_kind'], $spec['entity_id'], 'sale');
+        if ($saleSlot !== null && (int) ($saleSlot['journal_voucher_id'] ?? 0) === (int) ($v['id'] ?? 0)) {
+            return false;
+        }
+    } else {
+        $lookupSuffix = orange_gl_voucher_slot_pending_suffix($spec['slot_key']);
+        $v = orange_voucher_find_by_document(
+            $pdo,
+            $spec['doc_kind'],
+            $spec['entity_id'],
+            $spec['entry_type'],
+            $countryId,
+            $lookupSuffix
+        );
+    }
+    if ($v === null) {
+        return false;
+    }
+    orange_gl_voucher_slot_register($pdo, $spec, (int) ($v['id'] ?? 0));
+
+    return true;
+}
+
+/**
+ * Void a registered slot in place (preserve voucher id / serial / reference).
+ */
+function orange_gl_voucher_slot_void_registered(
+    PDO $pdo,
+    string $docKind,
+    int $entityId,
+    string $slotKey
+): void {
+    if (!orange_gl_voucher_slots_ready($pdo) || $entityId <= 0) {
+        return;
+    }
+    $slot = orange_gl_voucher_slot_find($pdo, $docKind, $entityId, $slotKey);
+    if ($slot === null || (int) ($slot['journal_voucher_id'] ?? 0) <= 0) {
+        return;
+    }
+    $vid = (int) $slot['journal_voucher_id'];
+    $vRow = orange_voucher_by_id($pdo, $vid);
+    if ($vRow !== null
+        && orange_table_has_column($pdo, 'journal_vouchers', 'is_void')
+        && (int) ($vRow['is_void'] ?? 0) === 1) {
+        return;
+    }
+    orange_gl_voucher_slot_assert_may_rebuild($pdo, $vid, $vRow);
+    orange_gl_party_subledger_replace_for_voucher($pdo, $vid, null);
+    $pdo->prepare('DELETE FROM journal_lines WHERE voucher_id = ?')->execute([$vid]);
+    if (orange_table_has_column($pdo, 'journal_vouchers', 'is_void')) {
+        $hasVoidedAt = orange_table_has_column($pdo, 'journal_vouchers', 'voided_at');
+        if ($hasVoidedAt) {
+            $pdo->prepare('UPDATE journal_vouchers SET is_void = 1, voided_at = NOW() WHERE id = ?')
+                ->execute([$vid]);
+        } else {
+            $pdo->prepare('UPDATE journal_vouchers SET is_void = 1 WHERE id = ?')->execute([$vid]);
+        }
+    }
+    if (orange_table_has_column($pdo, 'orange_gl_voucher_slots', 'updated_at')) {
+        $pdo->prepare('UPDATE orange_gl_voucher_slots SET updated_at = NOW() WHERE id = ?')
+            ->execute([(int) ($slot['id'] ?? 0)]);
+    }
+}
+
+/**
+ * Hard-delete a registered slot voucher (actual document delete policy — not edit/rebuild).
+ *
+ * @throws RuntimeException when fiscal period is closed
+ */
+function orange_gl_voucher_slot_delete_registered_voucher(PDO $pdo, int $voucherId): void
+{
+    if ($voucherId <= 0 || !orange_journal_vouchers_ready($pdo)) {
+        return;
+    }
+    $v = orange_voucher_by_id($pdo, $voucherId);
+    if ($v === null) {
+        return;
+    }
+    if (orange_fiscal_is_closed_for_voucher($pdo, $v)) {
+        $ref = trim((string) ($v['reference'] ?? ''));
+        $msg = 'لا يمكن حذف سند في سنة مالية مغلقة.';
+        if ($ref !== '') {
+            $msg .= ' (' . $ref . ')';
+        }
+        throw new RuntimeException($msg);
+    }
+    orange_gl_party_subledger_replace_for_voucher($pdo, $voucherId, null);
+    $pdo->prepare('DELETE FROM journal_lines WHERE voucher_id = ?')->execute([$voucherId]);
+    $pdo->prepare('DELETE FROM journal_vouchers WHERE id = ?')->execute([$voucherId]);
+}
+
+/**
+ * Delete all registered slot vouchers and slot rows for a source document (delete path only).
+ *
+ * @throws RuntimeException when fiscal period blocks voucher deletion
+ */
+function orange_gl_voucher_slot_delete_document_accounting(PDO $pdo, string $docKind, int $entityId): void
+{
+    if (!orange_gl_voucher_slots_ready($pdo) || $entityId <= 0) {
+        return;
+    }
+    $dk = orange_gl_voucher_slot_pending_ref_type($docKind);
+    foreach (orange_gl_voucher_slot_list_for_document($pdo, $docKind, $entityId) as $slot) {
+        $vid = (int) ($slot['journal_voucher_id'] ?? 0);
+        if ($vid > 0) {
+            orange_gl_voucher_slot_delete_registered_voucher($pdo, $vid);
+        }
+    }
+    $pdo->prepare('DELETE FROM orange_gl_voucher_slots WHERE doc_kind = ? AND entity_id = ?')
+        ->execute([$dk, $entityId]);
+}
+
+/**
+ * Immediate GL post/rebuild for a posting bundle through the slot engine (non-pending path).
+ *
+ * @param array{doc_kind:string,entity_id:int,slot_key?:string,entry_type:string,country_id?:int,journal_type_id?:int} $slotSpec
+ * @param array<string, mixed> $header
+ * @param array<string, mixed> $glB
+ */
+function orange_gl_voucher_immediate_post_bundle_for_slot(
+    PDO $pdo,
+    array $slotSpec,
+    array $header,
+    array $glB,
+    float $amount,
+    ?string $afterPostJson
+): int {
+    $lines = orange_gl_posting_bundle_to_lines($glB, $amount);
+
+    return orange_gl_voucher_post_or_rebuild_for_slot($pdo, $slotSpec, $header, $lines, $afterPostJson);
+}
+
+/**
+ * Immediate GL post/rebuild for a two-line automatic entry through the slot engine.
+ *
+ * @param array{doc_kind:string,entity_id:int,slot_key?:string,entry_type:string,country_id?:int,journal_type_id?:int} $slotSpec
+ * @param array<string, mixed> $header
+ */
+function orange_gl_voucher_immediate_post_simple_for_slot(
+    PDO $pdo,
+    array $slotSpec,
+    array $header,
+    int $debitAccountId,
+    int $creditAccountId,
+    float $amount,
+    string $description,
+    ?string $afterPostJson
+): int {
+    $amount = round($amount, 4);
+    $desc = trim($description);
+    $lines = [
+        ['account_id' => $debitAccountId, 'debit' => $amount, 'credit' => 0.0, 'memo' => $desc],
+        ['account_id' => $creditAccountId, 'debit' => 0.0, 'credit' => $amount, 'memo' => $desc],
+    ];
+
+    return orange_gl_voucher_post_or_rebuild_for_slot($pdo, $slotSpec, $header, $lines, $afterPostJson);
+}
+
+/**
+ * Retire dynamic sales-return EX slots that are no longer active (void in place, no renumber).
+ *
+ * @param list<int> $activeAccountIds
+ */
+function orange_gl_sales_return_retire_removed_ex_slots(
+    PDO $pdo,
+    int $returnId,
+    array $activeAccountIds,
+    ?int $countryId = null
+): void {
+    if ($returnId <= 0) {
+        return;
+    }
+    $active = [];
+    foreach ($activeAccountIds as $accRaw) {
+        $accId = (int) $accRaw;
+        if ($accId > 0) {
+            $active[$accId] = true;
+        }
+    }
+    foreach (orange_gl_voucher_slot_list_for_document($pdo, 'sales_return', $returnId) as $slot) {
+        $sk = (string) ($slot['slot_key'] ?? '');
+        if (!preg_match('/^sale-ex-(\d+)$/i', $sk, $m)) {
+            continue;
+        }
+        $accId = (int) $m[1];
+        if (!isset($active[$accId])) {
+            orange_gl_voucher_slot_void_registered($pdo, 'sales_return', $returnId, $sk);
+        }
+    }
+    if (!orange_table_exists($pdo, 'orange_gl_pending_movements')) {
+        return;
+    }
+    $like = orange_gl_pending_source_key('sales_return', $returnId, 'sale') . '-EX%';
+    $st = $pdo->prepare(
+        'SELECT DISTINCT reference, journal_voucher_id FROM orange_gl_pending_movements
+         WHERE reference LIKE ? AND journal_voucher_id IS NOT NULL AND journal_voucher_id > 0'
+    );
+    $st->execute([$like]);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $ref = (string) ($row['reference'] ?? '');
+        if (!preg_match('/-EX(\d+)$/i', $ref, $m)) {
+            continue;
+        }
+        $accId = (int) $m[1];
+        if (isset($active[$accId])) {
+            continue;
+        }
+        $slotKey = 'sale-ex-' . $accId;
+        if (orange_gl_voucher_slot_find($pdo, 'sales_return', $returnId, $slotKey) !== null) {
+            continue;
+        }
+        $vid = (int) ($row['journal_voucher_id'] ?? 0);
+        if ($vid <= 0) {
+            continue;
+        }
+        $slotSpec = [
+            'doc_kind' => 'sales_return',
+            'entity_id' => $returnId,
+            'slot_key' => $slotKey,
+            'entry_type' => 'order_return_sale',
+            'country_id' => $countryId,
+        ];
+        orange_gl_voucher_slot_adopt_legacy($pdo, $slotSpec, $countryId);
+        orange_gl_voucher_slot_void_registered($pdo, 'sales_return', $returnId, $slotKey);
+    }
+}
+
+/**
+ * Phase 1A — immediate post/rebuild for all sales-return voucher slots (non-pending path).
+ *
+ * @param array<string, mixed> $glRev from orange_gl_sales_return_revenue_bundle()
+ * @param list<array<string, mixed>> $extraRows from orange_invoice_ancillary_extra_lines_journal_rows()
+ */
+function orange_gl_sales_return_immediate_post_all_slots(
+    PDO $pdo,
+    int $returnId,
+    string $channel,
+    float $revenueTotal,
+    float $cogsTotal,
+    array $glRev,
+    array $extraRows,
+    float $customerRefundTotal,
+    string $postingAt,
+    string $documentEnteredAt,
+    ?int $countryId
+): void {
+    require_once __DIR__ . '/sales_gl_accounts.php';
+    require_once __DIR__ . '/journal_types.php';
+
+    $revJtCode = $channel === 'credit' ? 'SRR' : ($channel === 'online' ? 'OSR' : 'SCR');
+    $cogsJtCode = $channel === 'credit' ? 'CGR' : ($channel === 'online' ? 'COR' : 'CSR');
+    $revJtId = orange_journal_type_id_by_code($pdo, $revJtCode, $countryId);
+    $cogsJtId = orange_journal_type_id_by_code($pdo, $cogsJtCode, $countryId);
+
+    if ($revenueTotal > 0.0001) {
+        $afterPost = $glRev['after_post'] ?? null;
+        if ($afterPost !== null && is_array($afterPost) && isset($afterPost['party_subledger'])) {
+            $afterPost['party_subledger']['credit'] = round($customerRefundTotal, 4);
+        }
+        $afterJson = $afterPost !== null
+            ? json_encode($afterPost, JSON_UNESCAPED_UNICODE)
+            : null;
+        $saleSlot = [
+            'doc_kind' => 'sales_return',
+            'entity_id' => $returnId,
+            'slot_key' => 'sale',
+            'entry_type' => 'order_return_sale',
+            'country_id' => $countryId,
+            'journal_type_id' => $revJtId > 0 ? $revJtId : null,
+        ];
+        $saleHeader = [
+            'voucher_date' => $postingAt,
+            'document_entered_at' => $documentEnteredAt,
+            'description' => $glRev['voucher_description'],
+            'entry_type' => 'order_return_sale',
+            'country_id' => $countryId,
+        ];
+        if ($revJtId > 0) {
+            $saleHeader['journal_type_id'] = $revJtId;
+        }
+        orange_gl_voucher_immediate_post_bundle_for_slot(
+            $pdo,
+            $saleSlot,
+            $saleHeader,
+            $glRev,
+            $revenueTotal,
+            $afterJson
+        );
+
+        $exActive = [];
+        $counterAccountId = (int) ($glRev['credit'] ?? 0);
+        foreach ($extraRows as $jr) {
+            $accId = (int) ($jr['account_id'] ?? 0);
+            $memo = trim((string) ($jr['memo'] ?? 'بند مردود'));
+            if ($accId <= 0 || $counterAccountId <= 0) {
+                continue;
+            }
+            if ((float) ($jr['credit'] ?? 0) > 0.0001) {
+                $exDebit = $accId;
+                $exCredit = $counterAccountId;
+                $exAmount = round((float) $jr['credit'], 4);
+            } elseif ((float) ($jr['debit'] ?? 0) > 0.0001) {
+                $exDebit = $counterAccountId;
+                $exCredit = $accId;
+                $exAmount = round((float) $jr['debit'], 4);
+            } else {
+                continue;
+            }
+            if ($exDebit === $exCredit || $exAmount <= 0.0001) {
+                continue;
+            }
+            $exActive[] = $accId;
+            $exSlot = [
+                'doc_kind' => 'sales_return',
+                'entity_id' => $returnId,
+                'slot_key' => 'sale-ex-' . $accId,
+                'entry_type' => 'order_return_sale',
+                'country_id' => $countryId,
+                'journal_type_id' => $revJtId > 0 ? $revJtId : null,
+            ];
+            $exHeader = [
+                'voucher_date' => $postingAt,
+                'document_entered_at' => $documentEnteredAt,
+                'description' => 'مردود — ' . $memo,
+                'entry_type' => 'order_return_sale',
+                'country_id' => $countryId,
+            ];
+            if ($revJtId > 0) {
+                $exHeader['journal_type_id'] = $revJtId;
+            }
+            orange_gl_voucher_immediate_post_simple_for_slot(
+                $pdo,
+                $exSlot,
+                $exHeader,
+                $exDebit,
+                $exCredit,
+                $exAmount,
+                'مردود — ' . $memo,
+                null
+            );
+        }
+        orange_gl_sales_return_retire_removed_ex_slots($pdo, $returnId, $exActive, $countryId);
+    } else {
+        orange_gl_voucher_slot_void_registered($pdo, 'sales_return', $returnId, 'sale');
+        orange_gl_sales_return_retire_removed_ex_slots($pdo, $returnId, [], $countryId);
+    }
+
+    if ($cogsTotal > 0.0001) {
+        $glCogs = orange_gl_sales_return_cogs_accounts($pdo, $channel);
+        $cogsDesc = 'مردود تكلفة مبيعات — مستند مردود';
+        $cogsSlot = [
+            'doc_kind' => 'sales_return',
+            'entity_id' => $returnId,
+            'slot_key' => 'cogs',
+            'entry_type' => 'order_return_cogs',
+            'country_id' => $countryId,
+            'journal_type_id' => $cogsJtId > 0 ? $cogsJtId : null,
+        ];
+        $cogsHeader = [
+            'voucher_date' => $postingAt,
+            'document_entered_at' => $documentEnteredAt,
+            'description' => $cogsDesc,
+            'entry_type' => 'order_return_cogs',
+            'country_id' => $countryId,
+        ];
+        if ($cogsJtId > 0) {
+            $cogsHeader['journal_type_id'] = $cogsJtId;
+        }
+        orange_gl_voucher_immediate_post_simple_for_slot(
+            $pdo,
+            $cogsSlot,
+            $cogsHeader,
+            (int) $glCogs['debit'],
+            (int) $glCogs['credit'],
+            $cogsTotal,
+            $cogsDesc,
+            null
+        );
+    } else {
+        orange_gl_voucher_slot_void_registered($pdo, 'sales_return', $returnId, 'cogs');
+    }
 }

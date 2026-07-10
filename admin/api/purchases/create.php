@@ -13,6 +13,8 @@ require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
+require_once __DIR__ . '/../../../includes/gl_voucher_slot.php';
+require_once __DIR__ . '/../../../includes/journal_types.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
@@ -333,29 +335,33 @@ try {
             ]);
         }
     } else {
-        if ($glB['is_multi']) {
-            $vid = orange_voucher_post($pdo, [
-                'voucher_date' => $postingAt,
-                'document_entered_at' => $now,
-                'description' => $glB['voucher_description'],
-                'entry_type' => 'purchase',
-                'country_id' => $purchaseCountryId,
-            ], $glB['lines']);
-            orange_gl_apply_voucher_after_post_hooks($pdo, $vid, $afterJson);
-        } else {
-            orange_journal_insert_line($pdo, [
-                'date' => $postingAt,
-                'account_debit' => $glB['debit'],
-                'account_credit' => $glB['credit'],
-                'amount' => $payableTotal,
-                'description' => $glB['voucher_description'],
-                'entry_type' => 'purchase',
-            ]);
-
-            if ($glB['legacy_ap_subledger']) {
-                orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $payableTotal);
-            }
+        $pinJtId = orange_journal_type_id_by_code($pdo, 'PIN', $purchaseCountryId);
+        $slotSpec = [
+            'doc_kind' => 'purchase',
+            'entity_id' => $purchaseId,
+            'slot_key' => 'main',
+            'entry_type' => 'purchase',
+            'country_id' => $purchaseCountryId,
+            'journal_type_id' => $pinJtId > 0 ? $pinJtId : null,
+        ];
+        $vHeader = [
+            'voucher_date' => $postingAt,
+            'document_entered_at' => $now,
+            'description' => $glB['voucher_description'],
+            'entry_type' => 'purchase',
+            'country_id' => $purchaseCountryId,
+        ];
+        if ($pinJtId > 0) {
+            $vHeader['journal_type_id'] = $pinJtId;
         }
+        orange_gl_voucher_immediate_post_bundle_for_slot(
+            $pdo,
+            $slotSpec,
+            $vHeader,
+            $glB,
+            $payableTotal,
+            $afterJson
+        );
     }
 
     $pdo->commit();

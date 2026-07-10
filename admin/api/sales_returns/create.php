@@ -21,6 +21,7 @@ require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
 require_once __DIR__ . '/../../../includes/inventory_cost_layers.php';
 require_once __DIR__ . '/../../../includes/loyalty.php';
+require_once __DIR__ . '/../../../includes/gl_voucher_slot.php';
 require_admin_api();
 
 try {
@@ -284,12 +285,12 @@ try {
     $pendingRev = orange_gl_pending_source_key('sales_return', $returnId, 'sale');
     $pendingCogs = orange_gl_pending_source_key('sales_return', $returnId, 'cogs');
 
-    if ($revenueTotal > 0.0001) {
-        $glRev = orange_gl_sales_return_revenue_bundle($pdo, $channel, $customerId, $returnId, $revenueTotal);
-        $afterJson = $glRev['after_post'] !== null
-            ? json_encode($glRev['after_post'], JSON_UNESCAPED_UNICODE)
-            : null;
-        if (orange_gl_use_pending_queue($pdo)) {
+    if (orange_gl_use_pending_queue($pdo)) {
+        if ($revenueTotal > 0.0001) {
+            $glRev = orange_gl_sales_return_revenue_bundle($pdo, $channel, $customerId, $returnId, $revenueTotal);
+            $afterJson = $glRev['after_post'] !== null
+                ? json_encode($glRev['after_post'], JSON_UNESCAPED_UNICODE)
+                : null;
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingRev,
                 'source_label' => $retNum,
@@ -302,42 +303,26 @@ try {
                 'entry_type' => 'order_return_sale',
                 'after_post_json' => $afterJson,
             ]);
-        } else {
-            orange_journal_insert_line($pdo, [
-                'date' => $postingAt,
-                'account_debit' => $glRev['debit'],
-                'account_credit' => $glRev['credit'],
-                'amount' => $revenueTotal,
-                'description' => $glRev['voucher_description'],
-                'entry_type' => 'order_return_sale',
-            ]);
-            if ($glRev['legacy_ar_subledger']) {
-                orange_sales_return_record_ar_subledger($pdo, $returnId, $customerId, $channel, $customerRefundTotal);
-            }
-        }
-
-        /* بنود إضافية (VAT/شحن/خصم) — أسطر GL عكسية مقابل حساب النقد/الذمة نفسه. */
-        foreach ($extraRows as $jr) {
-            $accId = (int) ($jr['account_id'] ?? 0);
-            $memo = trim((string) ($jr['memo'] ?? 'بند مردود'));
-            if ($accId <= 0) {
-                continue;
-            }
-            if ((float) ($jr['credit'] ?? 0) > 0.0001) {
-                $exDebit = $accId;
-                $exCredit = (int) $glRev['credit'];
-                $exAmount = round((float) $jr['credit'], 4);
-            } elseif ((float) ($jr['debit'] ?? 0) > 0.0001) {
-                $exDebit = (int) $glRev['credit'];
-                $exCredit = $accId;
-                $exAmount = round((float) $jr['debit'], 4);
-            } else {
-                continue;
-            }
-            if ($exDebit === $exCredit || $exAmount <= 0.0001) {
-                continue;
-            }
-            if (orange_gl_use_pending_queue($pdo)) {
+            foreach ($extraRows as $jr) {
+                $accId = (int) ($jr['account_id'] ?? 0);
+                $memo = trim((string) ($jr['memo'] ?? 'بند مردود'));
+                if ($accId <= 0) {
+                    continue;
+                }
+                if ((float) ($jr['credit'] ?? 0) > 0.0001) {
+                    $exDebit = $accId;
+                    $exCredit = (int) $glRev['credit'];
+                    $exAmount = round((float) $jr['credit'], 4);
+                } elseif ((float) ($jr['debit'] ?? 0) > 0.0001) {
+                    $exDebit = (int) $glRev['credit'];
+                    $exCredit = $accId;
+                    $exAmount = round((float) $jr['debit'], 4);
+                } else {
+                    continue;
+                }
+                if ($exDebit === $exCredit || $exAmount <= 0.0001) {
+                    continue;
+                }
                 orange_gl_pending_enqueue_simple($pdo, [
                     'reference' => $pendingRev . '-EX' . $accId,
                     'source_label' => $retNum,
@@ -349,23 +334,11 @@ try {
                     'description' => 'مردود — ' . $memo,
                     'entry_type' => 'order_return_sale',
                 ]);
-            } else {
-                orange_journal_insert_line($pdo, [
-                    'date' => $postingAt,
-                    'account_debit' => $exDebit,
-                    'account_credit' => $exCredit,
-                    'amount' => $exAmount,
-                    'description' => 'مردود — ' . $memo,
-                    'entry_type' => 'order_return_sale',
-                ]);
             }
         }
-    }
-
-    if ($cogsTotal > 0.0001) {
-        $glCogs = orange_gl_sales_return_cogs_accounts($pdo, $channel);
-        $cogsDesc = 'مردود تكلفة مبيعات — مستند مردود';
-        if (orange_gl_use_pending_queue($pdo)) {
+        if ($cogsTotal > 0.0001) {
+            $glCogs = orange_gl_sales_return_cogs_accounts($pdo, $channel);
+            $cogsDesc = 'مردود تكلفة مبيعات — مستند مردود';
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingCogs,
                 'source_label' => $retNum,
@@ -377,16 +350,32 @@ try {
                 'description' => $cogsDesc,
                 'entry_type' => 'order_return_cogs',
             ]);
-        } else {
-            orange_journal_insert_line($pdo, [
-                'date' => $postingAt,
-                'account_debit' => $glCogs['debit'],
-                'account_credit' => $glCogs['credit'],
-                'amount' => $cogsTotal,
-                'description' => $cogsDesc,
-                'entry_type' => 'order_return_cogs',
-            ]);
         }
+    } else {
+        $glRev = $revenueTotal > 0.0001
+            ? orange_gl_sales_return_revenue_bundle($pdo, $channel, $customerId, $returnId, $revenueTotal)
+            : [
+                'is_multi' => false,
+                'lines' => [],
+                'debit' => 0,
+                'credit' => 0,
+                'voucher_description' => '',
+                'after_post' => null,
+                'legacy_ar_subledger' => false,
+            ];
+        orange_gl_sales_return_immediate_post_all_slots(
+            $pdo,
+            $returnId,
+            $channel,
+            $revenueTotal,
+            $cogsTotal,
+            $glRev,
+            $extraRows,
+            $customerRefundTotal,
+            $postingAt,
+            $now,
+            $returnCountryId > 0 ? $returnCountryId : null
+        );
     }
 
     $pdo->commit();

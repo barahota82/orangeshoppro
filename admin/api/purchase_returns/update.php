@@ -12,6 +12,8 @@ require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/purchase_return_helpers.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
+require_once __DIR__ . '/../../../includes/gl_voucher_slot.php';
+require_once __DIR__ . '/../../../includes/journal_types.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
@@ -209,6 +211,7 @@ try {
     $pdo->prepare('DELETE FROM purchase_return_items WHERE purchase_return_id = ?')->execute([$returnId]);
 
     if ($action === 'delete') {
+        orange_gl_voucher_slot_delete_document_accounting($pdo, 'purchase_return', $returnId);
         orange_purchase_return_remove_accounting($pdo, $returnId);
         orange_gl_pending_remove_by_reference($pdo, orange_gl_pending_source_key('purchase_return', $returnId));
         $pdo->prepare('DELETE FROM purchase_returns WHERE id = ?')->execute([$returnId]);
@@ -321,9 +324,6 @@ try {
     $pdo->prepare('UPDATE purchase_returns SET ' . implode(', ', $setCols) . ' WHERE id = ?')
         ->execute($params);
 
-    orange_purchase_return_remove_accounting($pdo, $returnId);
-    orange_gl_pending_remove_by_reference($pdo, orange_gl_pending_source_key('purchase_return', $returnId));
-
     $returnCountryId = orange_admin_context_country_id($pdo);
     if ($purchaseIdOpt > 0 && orange_table_has_country_id($pdo, 'purchases')) {
         $pc = $pdo->prepare('SELECT country_id FROM purchases WHERE id = ? LIMIT 1');
@@ -357,6 +357,8 @@ try {
         : null;
 
     if (orange_gl_use_pending_queue($pdo)) {
+        orange_purchase_return_remove_accounting($pdo, $returnId);
+        orange_gl_pending_remove_by_reference($pdo, orange_gl_pending_source_key('purchase_return', $returnId));
         if ($glB['is_multi']) {
             orange_gl_pending_enqueue_multi(
                 $pdo,
@@ -384,28 +386,33 @@ try {
             ]);
         }
     } else {
-        if ($glB['is_multi']) {
-            $vid = orange_voucher_post($pdo, [
-                'voucher_date' => $now,
-                'document_entered_at' => $now,
-                'description' => $glB['voucher_description'],
-                'entry_type' => 'purchase_return',
-                'country_id' => $returnCountryId,
-            ], $glB['lines']);
-            orange_gl_apply_voucher_after_post_hooks($pdo, $vid, $afterJson);
-        } else {
-            orange_journal_insert_line($pdo, [
-                'date' => $now,
-                'account_debit' => $glB['debit'],
-                'account_credit' => $glB['credit'],
-                'amount' => $newTotal,
-                'description' => $glB['voucher_description'],
-                'entry_type' => 'purchase_return',
-            ]);
-            if ($glB['legacy_ap_subledger']) {
-                orange_purchase_return_record_ap_subledger($pdo, $returnId, $supplierId, $type, $newTotal);
-            }
+        $pdnJtId = orange_journal_type_id_by_code($pdo, 'PDN', $returnCountryId);
+        $slotSpec = [
+            'doc_kind' => 'purchase_return',
+            'entity_id' => $returnId,
+            'slot_key' => 'main',
+            'entry_type' => 'purchase_return',
+            'country_id' => $returnCountryId,
+            'journal_type_id' => $pdnJtId > 0 ? $pdnJtId : null,
+        ];
+        $vHeader = [
+            'voucher_date' => $now,
+            'document_entered_at' => $now,
+            'description' => $glB['voucher_description'],
+            'entry_type' => 'purchase_return',
+            'country_id' => $returnCountryId,
+        ];
+        if ($pdnJtId > 0) {
+            $vHeader['journal_type_id'] = $pdnJtId;
         }
+        orange_gl_voucher_immediate_post_bundle_for_slot(
+            $pdo,
+            $slotSpec,
+            $vHeader,
+            $glB,
+            $newTotal,
+            $afterJson
+        );
     }
 
     $pdo->commit();

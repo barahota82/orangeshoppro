@@ -792,18 +792,48 @@ function orange_loyalty_clawback_for_return(
                 $debitId = (int) $ruleAcc['debit'];
                 $creditId = (int) $ruleAcc['credit'];
             }
-            orange_loyalty_post_simple_gl(
-                $pdo,
-                $debitId,
-                $creditId,
-                $availValue,
-                $cid,
-                'قيد استرداد نقاط ولاء (متاحة) — مردود مبيعات',
-                'loyalty_return_clawback',
-                'sales_return',
-                $returnId,
-                'loyalty-return-clawback'
-            );
+            if (orange_gl_use_pending_queue($pdo)) {
+                orange_loyalty_post_simple_gl(
+                    $pdo,
+                    $debitId,
+                    $creditId,
+                    $availValue,
+                    $cid,
+                    'قيد استرداد نقاط ولاء (متاحة) — مردود مبيعات',
+                    'loyalty_return_clawback',
+                    'sales_return',
+                    $returnId,
+                    'loyalty-return-clawback'
+                );
+            } else {
+                require_once __DIR__ . '/gl_voucher_slot.php';
+                $nowClaw = date('Y-m-d H:i:s');
+                $afterJson = orange_gl_after_post_json_with_country(null, $cid);
+                $clawSlot = [
+                    'doc_kind' => 'sales_return',
+                    'entity_id' => $returnId,
+                    'slot_key' => 'loyalty-return-clawback',
+                    'entry_type' => 'loyalty_return_clawback',
+                    'country_id' => $cid > 0 ? $cid : null,
+                ];
+                $clawHeader = [
+                    'voucher_date' => $nowClaw,
+                    'document_entered_at' => $nowClaw,
+                    'description' => 'قيد استرداد نقاط ولاء (متاحة) — مردود مبيعات',
+                    'entry_type' => 'loyalty_return_clawback',
+                    'country_id' => $cid > 0 ? $cid : null,
+                ];
+                orange_gl_voucher_immediate_post_simple_for_slot(
+                    $pdo,
+                    $clawSlot,
+                    $clawHeader,
+                    $debitId,
+                    $creditId,
+                    $availValue,
+                    'قيد استرداد نقاط ولاء (متاحة) — مردود مبيعات',
+                    $afterJson
+                );
+            }
         } else {
             $clawAvail = 0;
         }
@@ -840,6 +870,11 @@ function orange_loyalty_clawback_for_return(
             return $zero; // سُجِّل بالفعل لمردود متزامن.
         }
         throw $e;
+    }
+
+    if ($availValue <= 0.0001 && !orange_gl_use_pending_queue($pdo) && orange_table_exists($pdo, 'orange_gl_voucher_slots')) {
+        require_once __DIR__ . '/gl_voucher_slot.php';
+        orange_gl_voucher_slot_void_registered($pdo, 'sales_return', $returnId, 'loyalty-return-clawback');
     }
 
     return [
@@ -899,7 +934,7 @@ function orange_loyalty_reverse_clawback_for_return(PDO $pdo, int $returnId): vo
         $cid > 0 ? $cid : null,
         'loyalty-return-clawback'
     );
-    if ($v !== null) {
+    if ($v !== null && !orange_table_exists($pdo, 'orange_gl_voucher_slots')) {
         orange_voucher_delete_by_reference($pdo, (string) ($v['reference'] ?? ''), $cid > 0 ? $cid : null);
     }
     if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
