@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 119);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 120);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3181,6 +3181,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_cart_bogo_gift_pool_v114($pdo);
     orange_catalog_migrate_admin_login_throttle_v115($pdo);
     orange_catalog_migrate_pre_apcu_integrity_v116_through_v119($pdo);
+    orange_catalog_migrate_gl_voucher_slots_v120($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3813,6 +3814,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_cart_bogo_gift_pool_v114($pdo);
     orange_catalog_migrate_admin_login_throttle_v115($pdo);
     orange_catalog_migrate_pre_apcu_integrity_v116_through_v119($pdo);
+    orange_catalog_migrate_gl_voucher_slots_v120($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -9402,4 +9404,44 @@ function orange_catalog_migrate_filter_column_indexes_go_live_v119(PDO $pdo): vo
     if ($deliveryAreasOk && $invReconAgentOk) {
         orange_catalog_schema_insert_migration_marker($pdo, 'php_filter_column_indexes_go_live_v119_complete');
     }
+}
+
+/**
+ * v120 — Accounting Lifecycle V2 Phase 0: canonical slot registry (orange_gl_voucher_slots).
+ * Maps (doc_kind, entity_id, slot_key) → journal_voucher_id for in-place rebuild identity preservation.
+ */
+function orange_catalog_migrate_gl_voucher_slots_v120(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_gl_voucher_slots_v120';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'orange_gl_voucher_slots')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE orange_gl_voucher_slots (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                country_id INT NULL,
+                doc_kind VARCHAR(32) NOT NULL,
+                entity_id INT UNSIGNED NOT NULL,
+                slot_key VARCHAR(64) NOT NULL,
+                source_key VARCHAR(128) NOT NULL,
+                entry_type VARCHAR(64) NOT NULL,
+                journal_type_id INT NULL,
+                journal_voucher_id INT UNSIGNED NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_gl_slot_doc (doc_kind, entity_id, slot_key),
+                UNIQUE KEY uq_gl_slot_source (source_key),
+                UNIQUE KEY uq_gl_slot_voucher (journal_voucher_id),
+                KEY idx_gl_slot_entity (doc_kind, entity_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+        orange_schema_invalidate_table_exists('orange_gl_voucher_slots');
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
 }

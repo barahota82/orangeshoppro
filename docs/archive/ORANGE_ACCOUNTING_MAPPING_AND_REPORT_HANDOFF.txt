@@ -5,10 +5,163 @@ ORANGE — أرشيف منهج التصنيف المحاسبي والتقاري�
 آخر تحديث: 2026-06-15 (سند تعديل الرصيد: معالجة على مستوى السند بشبكة مدين/دائن مرنة + نوع يومية مستقل «قيد تسوية مخزون» SAJ + نقل الشاشة للحسابات؛ + جعل الجرد تقريراً فقط؛ القسم أدناه)
 آخر تحديث: 2026-06-21 (SAJ ربح/خسارة في القسم ٢ — نمط PIN/PDN؛ مفاتيح stock_adjustment_gain/loss + الحل الثالث + LYE/LYX)
 آخر تحديث: 2026-06-27 (القيود الأوتوماتيكية تُعكَس وتُعاد بناؤها بالخلفية عند تعديل/حذف المستند + منع التعديل بتسمية القيد المغلق — القسم أدناه)
+آخر تحديث: 2026-07-09 (سياسة مالك دائمة: Voucher Identity Preservation Policy V2 — القسم أدناه)
+آخر تحديث: 2026-07-09 (Accounting Lifecycle V2 — Phase 0 Approved Architecture / orange_gl_voucher_slots — القسم أدناه)
+آخر تحديث: 2026-07-10 (V2 Phase 0 — Core Engine مُنفَّذ في الكود؛ rev 120 — القسم أدناه)
+
+================================================================================
+قرار مالك نهائي (2026-07-09): Voucher Identity Preservation Policy (V2)
+================================================================================
+**حالة:** سياسة مالك **دائمة** — مرجع تنفيذ V2 (لم يُنفَّذ بعد في الكود؛ التنفيذ الحالي قد
+يحذف السند ويُنشئ رقم قيد جديد — انظر «تنفيذ» أدناه والقسم 2026-06-27).
+
+**المبدأ (Owner decision):**
+Whenever an automatically-generated accounting document is rebuilt because its business
+source document was edited, the **accounting voucher identity must be preserved**.
+
+**Preserve (must not change on rebuild):**
+- `journal_vouchers.id`
+- `voucher_serial`
+- voucher `reference` / voucher number
+- document link (registry / `src:` slot / `party_subledger` ref_type+ref_id as applicable)
+- party subledger link (same voucher_id; lines replayed in place)
+- fiscal year linkage (`fiscal_year_id` — while period remains open)
+
+**May be rebuilt (contents only):**
+- `journal_lines` (full replace inside the same voucher)
+- debit / credit amounts per line
+- line memos / descriptions
+- voucher header description (where business-justified)
+- ancillary / contra lines **inside** the same voucher slot (or same registered EX slot)
+
+**Forbidden on rebuild (when preconditions below hold):**
+- **Never** `DELETE FROM journal_vouchers` and create a **new** voucher number for the same
+  logical auto-document slot.
+- **Never** allocate a new `voucher_serial` or new auto `reference` for that slot.
+
+**Preconditions (all required for in-place rebuild):**
+- Fiscal period / year is **open** (`orange_fiscal_is_closed_for_voucher` = false).
+- Voucher / document is **not locked** (`orange_edit_lock_assert_may_mutate` passes).
+- Source business document is **editable** (same gates as today’s remove+repost paths).
+- Voucher does **not** belong to a closed fiscal period.
+
+**If a precondition fails:** block edit with existing locked-voucher messaging (2026-06-27) —
+do not silently renumber.
+
+**Audit policy (Owner decision):**
+- Voucher **identity** must remain unchanged across accounting rebuilds.
+- The rebuild updates **voucher contents only** (lines/amounts/descriptions/ancillary).
+- The **business document modification** is itself the audit reason for the accounting update.
+- **No** manual «reason for change» field is required from the user.
+
+**Migration scope — Phase 1 (first implementation target):**
+- Purchase Invoice (`entry_type=purchase`, PIN)
+- Purchase Return (`purchase_return`, PDN)
+- Sales Return (`order_return_sale`, `order_return_cogs`, ancillary EX slots, `loyalty_return_clawback`)
+- Company Sales Invoice **INV-C** (document edit path that today calls
+  `orange_sales_invoice_company_remove_forward_accounting` + repost)
+
+**Migration scope — Phase 2:**
+- Delivery Sale (`order_delivery_sale`, CSI/SIN/OSI)
+- Delivery COGS (`order_delivery_cogs`, CGC/CGT/CGO)
+- Delivery Expense (`order_delivery_expense`)
+- Loyalty Earn (`loyalty_earn`, LYE)
+- Loyalty Return Clawback (`loyalty_return_clawback`)
+
+**Excluded from this policy (append-only or separate lifecycle — no in-place rebuild required):**
+- **Online Sales Invoice (INV-O)** — GL not rebuilt on INV-O edit; correction via Sales Return
+  (GAP-SALE-DOC-01 / `orange_sales_invoice_online_apply_update`).
+- Customer Receipt (`customer_receipt`, CRR)
+- Supplier Payment (`supplier_payment`, SPR)
+- Manual Journals (`admin/api/journal/manage.php` — already update-in-place via
+  `orange_voucher_update_multiline`)
+- Approved Stock Adjustments (`stock_adjustment`, SAJ — locked after approve)
+- Loyalty Expiry (`loyalty_expire`, LYX — one-way batch)
+- Bank Reconciliation close variance (`general` / `bank_recon_{id}`)
+- Gateway Settlement (GL hook not active; when enabled — append-only settlement events)
+
+**تنفيذ (V2 — مخطَّط؛ غير مُطبَّق في الكود حتى تاريخ الأرشفة):**
+- **الهدف:** استبدال نمط «حذف السند + `orange_voucher_post` برقم جديد» بـ **تحديث محتوى
+  السند** عبر `orange_voucher_update_multiline()` (أو ما يعادله) + سجل ثابت
+  `(doc_kind, entity_id, slot_key) → journal_voucher_id`.
+- **مسارات اليوم (مرجع للترحيل):** `orange_voucher_delete_by_reference` +
+  `*_remove_accounting` في `includes/journal_voucher.php`،
+  `orange_sales_invoice_company_remove_forward_accounting`،
+  `admin/api/purchases/update.php`، `admin/api/purchase_returns/update.php`،
+  `admin/api/sales_returns/update.php`، `admin/api/sales-invoices/update.php`.
+- **نموذج موجود مسبقاً:** `orange_voucher_update_multiline()` (قيود يدوية)؛
+  `orange_year_end_close_replace_lines()` (مسودة YEC).
+- **طابور GL:** عند `orange_gl_use_pending_queue()` — ربط `src:…` بـ `journal_voucher_id`
+  دائم؛ لا إعادة ترقيم عند إعادة بناء المستند.
+- **اقرأ مع:** القسم 2026-06-27 (بوابات القفل/السنة)،
+  `docs/archive/ORANGE_EDIT_LOCK_POLICY.txt`،
+  `docs/archive/ORANGE_GL_MOVEMENTS_AND_POSTING_POLICY.txt` (§2 — repost in place).
+
+================================================================================
+Accounting Lifecycle V2 — Phase 0 Approved Architecture (2026-07-09)
+================================================================================
+**حالة:** **Phase 0 — Implemented in code, not yet activated on production** (قرار هندسي معتمد؛
+النواة (`includes/gl_voucher_slot.php` + `orange_gl_voucher_slots`) **في المستودع**؛ **لم يُفعَّل
+بعد** على الإنتاج حتى `git pull` + ترحيل rev **120** + تحديث `ORANGE_SCHEMA_OK_FLAG_PATH` إن وُجد).
+**Phase 1+ (ربط مستندات الأعمال) — لم يُنفَّذ.**
+
+**قرارات هندسية معتمدة (Owner-approved engineering decisions):**
+
+1. **Voucher Identity Preservation V2** will use a **canonical slot mapping** — every logical
+   auto-voucher slot for a source business document maps to exactly one `journal_vouchers.id`
+   for the life of that document (while editable per V2 preconditions).
+
+2. The **existing architecture was fully evaluated and officially exhausted** (Phase -1):
+   `journal_vouchers`, `journal_lines`, `party_subledger`, `ref_type`/`ref_id`, `entry_type`,
+   `journal_type_id`, `orange_voucher_find_by_document()`, `orange_voucher_list_by_document()`,
+   `orange_gl_pending_movements.reference` / `src:` keys, legacy references (`PUR-{id}`,
+   `SR-{id}`, `ORDER-{number}`, …), and existing `after_post` hooks **do not** — alone or in
+   combination — provide a reliable permanent `(document, logical slot) → voucher_id` mapping
+   under default immediate posting, multi-voucher orders, or paths without party subledger.
+
+3. A **dedicated canonical mapping is required** — V2 cannot be implemented by lookup heuristics
+   or delete-and-recreate alone.
+
+**Approved implementation approach:**
+
+4. Table **`orange_gl_voucher_slots`** is now an **approved architectural component** of Orange.
+
+5. **Purpose:** provide a **permanent mapping** between:
+   - **(document, logical slot)** — `(doc_kind, entity_id, slot_key)` / canonical `source_key`
+     (`src:…` compatible with `orange_gl_pending_source_key()`)
+   - and **`journal_vouchers.id`**
+   so voucher **identity** (`id`, `voucher_serial`, `reference`, fiscal year linkage, party
+   subledger `voucher_id`) is **preserved during rebuild**; only lines, amounts, descriptions,
+   and ancillary/contra **inside the same slot** may change.
+
+6. This architecture **replaces the delete-and-recreate lifecycle** for V2-in-scope documents
+   (see V2 policy §Migration scope Phase 1 / Phase 2 above) with **in-place rebuild** via the
+   Core Engine (`orange_gl_voucher_post_or_rebuild_for_slot` and related helpers — planned).
+
+7. **Phase 0 Core Engine — implemented in repo (2026-07-10).** Not wired to business documents.
+
+**Status:** Phase 0 implemented in code | Not deployed/activated on production | Phase 1 not started
+
+8. **Phase 0 (Core Engine) — done in code:** DDL `orange_gl_voucher_slots` (rev **120**),
+   `includes/gl_voucher_slot.php` (slot find/register/create/rebuild/post_or_rebuild,
+   `orange_voucher_rebuild_automatic`, party subledger replace). **No document API** calls the
+   engine yet — Phase 1a+ remains pending.
+
+**تنفيذ (Phase 0 — مُطبَّق في الكود 2026-07-10؛ غير مُفعَّل على الإنتاج حتى النشر + rev 120):**
+- **ترحيل:** `orange_catalog_migrate_gl_voucher_slots_v120()` — marker `php_gl_voucher_slots_v120`؛
+  idempotent (`CREATE TABLE` + marker gate)؛ مُستدعى من `orange_catalog_ensure_schema_core()` و
+  `orange_catalog_ensure_schema_fast_path_slice()`.
+- **ثابت:** `ORANGE_CATALOG_SCHEMA_PHP_REVISION` = **120** (`ORANGE_SCHEMA_CODE_VERSION` يتبعه).
+- **جدول:** `orange_gl_voucher_slots` — `(doc_kind, entity_id, slot_key) → journal_voucher_id`
+  + `source_key` + `entry_type` (+ `journal_type_id` frozen at first post).
+- **نواة:** `includes/gl_voucher_slot.php` — **لا** ربط بعد بمسارات purchase/PR/SR/INV-C/loyalty/pending.
+- **اقرأ مع:** القسم «Voucher Identity Preservation Policy (V2)» أعلاه؛ Phase -1 (استنفاد البنية).
 
 ================================================================================
 قرار مالك نهائي (2026-06-27): القيود الأوتوماتيكية تُعكَس وتُعاد بناؤها بالخلفية عند تعديل/حذف المستند + منع التعديل بتسمية القيد المغلق
 ================================================================================
+**ملاحظة (2026-07-09):** منطق «إعادة بناء القيد بالخلفية» يبقى؛ **V2** يحدّد أن إعادة البناء
+**تحافظ على هوية السند** (id/serial/reference) ولا تُنشئ رقماً جديداً — انظر القسم أعلاه.
 - **المبدأ:** القيود المحاسبية الأوتوماتيكية (لا يلمسها المحاسب يدوياً) يجب أن «تظهر بالخلفية» عند تعديل
   أو حذف المستند المصدر، فتُعكَس بالكامل وتُعاد بناؤها على القيم الجديدة دون أي خطوة يدوية — لأن
   أخطاءها يصعب اكتشافها (لا دخل للمحاسب بها). يشمل ذلك المبيعات/الطلبات ومردودها، والمشتريات ومردودها،
