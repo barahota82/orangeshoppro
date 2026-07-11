@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/backup_environment.php';
 require_once __DIR__ . '/backup_full.php';
 require_once __DIR__ . '/backup_manifest.php';
+require_once __DIR__ . '/backup_pdo_export.php';
 
 /**
  * @var resource|null
@@ -417,21 +418,26 @@ function orange_backup_latest_snapshot_name(string $backupRoot): ?string
 }
 
 /**
+ * @param callable(string):void $createRawSqlDump
+ * @param list<string> $exporterWarnings
  * @return array{ok:bool,backend:string,message:string,snapshot:?string}
  */
-function orange_backup_run_via_php(string $projectRoot, string $backupRoot, string $logFile, ?array $env = null): array
-{
+function orange_backup_run_php_native_snapshot(
+    string $projectRoot,
+    string $backupRoot,
+    string $logFile,
+    ?array $env,
+    string $backendName,
+    string $backupEngineVersion,
+    array $exporterWarnings,
+    callable $createRawSqlDump
+): array {
     $env ??= orange_backup_load_env_array($projectRoot);
-    $detected = orange_backup_detect_mysqldump($env);
-    $mysqldumpPath = $detected['path'];
-    if ($mysqldumpPath === null || !orange_backup_can_proc_open()) {
-        $reason = $detected['error'] ?? 'PHP mysqldump backend unavailable.';
-        return ['ok' => false, 'backend' => 'php_mysqldump', 'message' => $reason, 'snapshot' => null];
-    }
 
     if (!orange_backup_has_gzip_support() || !orange_backup_has_ziparchive_support()) {
-        return ['ok' => false, 'backend' => 'php_mysqldump', 'message' => 'gzip or ZipArchive support is unavailable.', 'snapshot' => null];
+        return ['ok' => false, 'backend' => $backendName, 'message' => 'gzip or ZipArchive support is unavailable.', 'snapshot' => null];
     }
+
     require_once $projectRoot . DIRECTORY_SEPARATOR . 'config.php';
     require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'catalog_schema.php';
 
@@ -460,9 +466,8 @@ function orange_backup_run_via_php(string $projectRoot, string $backupRoot, stri
         throw new RuntimeException('Cannot create temporary backup workspace.');
     }
 
-    $defaultsFile = null;
     try {
-        orange_backup_runner_log($logFile, 'Running PHP native backup backend.');
+        orange_backup_runner_log($logFile, 'Running PHP native backup backend: ' . $backendName);
         orange_backup_runner_log($logFile, 'Database target: host=' . $db['host'] . ' name=' . $db['name'] . ' user=' . $db['user']);
 
         $rawSqlFile = $tempWorkDir . DIRECTORY_SEPARATOR . $db['name'] . '.sql';
@@ -471,11 +476,11 @@ function orange_backup_run_via_php(string $projectRoot, string $backupRoot, stri
         $uploadsArchiveName = 'uploads.zip';
         $uploadsArchiveFile = $tempWorkDir . DIRECTORY_SEPARATOR . $uploadsArchiveName;
 
-        $defaultsFile = orange_backup_create_mysqldump_defaults_file($tempWorkDir, $db['host'], $db['user'], $db['pass']);
-        orange_backup_runner_log($logFile, 'Running mysqldump...');
-        orange_backup_run_mysqldump($mysqldumpPath, $defaultsFile, $db['name'], $rawSqlFile);
-        @unlink($defaultsFile);
-        $defaultsFile = null;
+        $createRawSqlDump($rawSqlFile);
+
+        if (!is_file($rawSqlFile) || filesize($rawSqlFile) < ORANGE_BACKUP_PDO_MIN_DUMP_BYTES) {
+            throw new RuntimeException('Database SQL export is missing or too small.');
+        }
 
         orange_backup_gzip_file($rawSqlFile, $compressedDumpFile);
         @unlink($rawSqlFile);
@@ -498,6 +503,9 @@ function orange_backup_run_via_php(string $projectRoot, string $backupRoot, stri
             'metadata' => $metadata,
             'metadata_ok' => true,
             'env' => $env,
+            'export_backend' => $backendName,
+            'backup_engine_version' => $backupEngineVersion,
+            'exporter_warnings' => $exporterWarnings,
         ]);
         if (($result['package_status'] ?? 'failed') === 'failed') {
             throw new RuntimeException('Package finalization failed.');
@@ -513,14 +521,11 @@ function orange_backup_run_via_php(string $projectRoot, string $backupRoot, stri
 
         return [
             'ok' => true,
-            'backend' => 'php_mysqldump',
-            'message' => 'PHP mysqldump backup completed successfully.',
+            'backend' => $backendName,
+            'message' => 'PHP ' . $backendName . ' backup completed successfully.',
             'snapshot' => $snapshotName,
         ];
     } catch (Throwable $e) {
-        if ($defaultsFile !== null && is_file($defaultsFile)) {
-            @unlink($defaultsFile);
-        }
         if ($tempWorkDir !== '' && is_dir($tempWorkDir)) {
             orange_backup_remove_dir($tempWorkDir);
             orange_backup_runner_log($logFile, 'Removed incomplete temporary backup workspace.', 'WARN');
@@ -528,13 +533,86 @@ function orange_backup_run_via_php(string $projectRoot, string $backupRoot, stri
 
         return [
             'ok' => false,
-            'backend' => 'php_mysqldump',
+            'backend' => $backendName,
             'message' => $e->getMessage(),
             'snapshot' => null,
         ];
     }
 }
 
+/**
+ * @return array{ok:bool,backend:string,message:string,snapshot:?string}
+ */
+function orange_backup_run_via_php_mysqldump(string $projectRoot, string $backupRoot, string $logFile, ?array $env = null): array
+{
+    $env ??= orange_backup_load_env_array($projectRoot);
+    $detected = orange_backup_detect_mysqldump($env);
+    $mysqldumpPath = $detected['path'];
+    if ($mysqldumpPath === null || !orange_backup_can_proc_open()) {
+        $reason = $detected['error'] ?? 'PHP mysqldump backend unavailable.';
+
+        return ['ok' => false, 'backend' => 'php_mysqldump', 'message' => $reason, 'snapshot' => null];
+    }
+
+    $db = orange_backup_load_db_settings($projectRoot);
+
+    return orange_backup_run_php_native_snapshot(
+        $projectRoot,
+        $backupRoot,
+        $logFile,
+        $env,
+        'php_mysqldump',
+        'mysqldump',
+        [],
+        static function (string $rawSqlFile) use ($projectRoot, $logFile, $mysqldumpPath, $db): void {
+            $defaultsFile = orange_backup_create_mysqldump_defaults_file(dirname($rawSqlFile), $db['host'], $db['user'], $db['pass']);
+            try {
+                orange_backup_runner_log($logFile, 'Running mysqldump...');
+                orange_backup_run_mysqldump($mysqldumpPath, $defaultsFile, $db['name'], $rawSqlFile);
+            } finally {
+                if (is_file($defaultsFile)) {
+                    @unlink($defaultsFile);
+                }
+            }
+        }
+    );
+}
+
+/**
+ * @return array{ok:bool,backend:string,message:string,snapshot:?string}
+ */
+function orange_backup_run_via_pdo(string $projectRoot, string $backupRoot, string $logFile, ?array $env = null): array
+{
+    $env ??= orange_backup_load_env_array($projectRoot);
+    $detected = orange_backup_detect_mysqldump($env);
+    if ($detected['path'] !== null) {
+        return ['ok' => false, 'backend' => 'php_pdo', 'message' => 'PDO fallback skipped because mysqldump is available.', 'snapshot' => null];
+    }
+
+    require_once $projectRoot . DIRECTORY_SEPARATOR . 'config.php';
+    require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'catalog_schema.php';
+    $pdo = db();
+    orange_catalog_ensure_schema($pdo);
+    $dbName = defined('DB_NAME') ? (string) DB_NAME : orange_backup_load_db_settings($projectRoot)['name'];
+    $preflight = orange_backup_pdo_export_preflight($pdo, $dbName);
+    if (!$preflight['ready']) {
+        return ['ok' => false, 'backend' => 'php_pdo', 'message' => (string) ($preflight['error'] ?? 'PDO fallback unavailable.'), 'snapshot' => null];
+    }
+
+    return orange_backup_run_php_native_snapshot(
+        $projectRoot,
+        $backupRoot,
+        $logFile,
+        $env,
+        'php_pdo',
+        ORANGE_BACKUP_PDO_EXPORTER_VERSION,
+        $preflight['warnings'],
+        static function (string $rawSqlFile) use ($pdo, $dbName, $logFile): void {
+            orange_backup_runner_log($logFile, 'Running PDO SQL export fallback...');
+            orange_backup_pdo_export_database($pdo, $dbName, $rawSqlFile);
+        }
+    );
+}
 /**
  * @return array{ok:bool,exit_code:int,backend:?string,message:string,snapshot:?string,log_file:string}
  */
@@ -582,9 +660,12 @@ function orange_backup_run_full(string $projectRoot, ?string $backupRootOverride
 
         orange_backup_runner_log($logFile, 'Selected backend=' . $backend);
         $env = orange_backup_load_env_array($projectRoot);
-        $result = $backend === 'powershell'
-            ? orange_backup_run_via_powershell($projectRoot, $backupRoot, $logFile, $env)
-            : orange_backup_run_via_php($projectRoot, $backupRoot, $logFile, $env);
+        $result = match ($backend) {
+            'powershell' => orange_backup_run_via_powershell($projectRoot, $backupRoot, $logFile, $env),
+            'php_mysqldump' => orange_backup_run_via_php_mysqldump($projectRoot, $backupRoot, $logFile, $env),
+            'php_pdo' => orange_backup_run_via_pdo($projectRoot, $backupRoot, $logFile, $env),
+            default => ['ok' => false, 'backend' => (string) $backend, 'message' => 'Unsupported backup backend.', 'snapshot' => null],
+        };
 
         if (!$result['ok']) {
             orange_backup_runner_log($logFile, $result['message'], 'ERROR');

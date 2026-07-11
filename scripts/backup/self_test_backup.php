@@ -20,6 +20,7 @@ require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARAT
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_full.php';
 
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_environment.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_pdo_export.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_runner.php';
 
 $failures = 0;
@@ -155,6 +156,7 @@ $requiredFields = [
     'configured_mysqldump_path_present',
     'mysqldump_detection_source',
     'powershell_detection_source',
+    'pdo_fallback_ready',
     'selected_backend',
     'can_run_full_backup',
     'blockers',
@@ -176,12 +178,61 @@ self_test($invalidDump['source'] !== 'none', 'configured mysqldump path preferre
 // proc_open unavailable blocks execution
 if (!orange_backup_can_proc_open()) {
     $blockerText = implode(' ', $envReport['blockers'] ?? []);
-    self_test(empty($envReport['can_run_full_backup']), 'proc_open unavailable marks can_run_full_backup=false');
-    self_test(str_contains($blockerText, 'proc_open'), 'proc_open unavailable listed in blockers');
+    if (($envReport['selected_backend'] ?? '') === 'php_pdo') {
+        self_test(!empty($envReport['can_run_full_backup']), 'php_pdo backend can run without proc_open');
+    } else {
+        self_test(empty($envReport['can_run_full_backup']), 'proc_open unavailable marks can_run_full_backup=false');
+        self_test(str_contains($blockerText, 'proc_open'), 'proc_open unavailable listed in blockers');
+    }
 }
 
-// No PDO backend exists
-self_test(!function_exists('orange_backup_run_via_pdo') && !function_exists('orange_backup_detect_pdo'), 'no PDO backend exists');
+// PDO fallback detection exists
+self_test(function_exists('orange_backup_pdo_export_database'), 'PDO export fallback exists');
+
+// Backend priority: PDO only when mysqldump absent
+$pdoOnlyEnv = orange_backup_detect_mysqldump(['ORANGE_MYSQLDUMP_PATH' => 'Z:\\missing\\mysqldump.exe']);
+self_test(($pdoOnlyEnv['path'] ?? null) === null, 'PDO fallback scenario keeps mysqldump unavailable');
+
+// PDO literal escaping
+$pdoLiteral = new PDO('sqlite::memory:');
+self_test(orange_backup_pdo_sql_literal($pdoLiteral, null, 'varchar') === 'NULL', 'PDO literal NULL');
+self_test(orange_backup_pdo_sql_literal($pdoLiteral, "line\n\tquote'", 'varchar') !== '', 'PDO literal escaped text');
+self_test(orange_backup_pdo_sql_literal($pdoLiteral, "\x01\x02", 'blob') === '0x0102', 'PDO literal binary hex');
+
+// PDO export format validation
+$pdoFormatFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_pdo_format_' . bin2hex(random_bytes(4)) . '.sql';
+file_put_contents($pdoFormatFile, implode("\n", [
+    'SET NAMES utf8mb4;',
+    'SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;',
+    'SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE=\'NO_AUTO_VALUE_ON_ZERO\';',
+    'CREATE TABLE `demo` (`id` int NOT NULL AUTO_INCREMENT, PRIMARY KEY (`id`));',
+    'SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;',
+]));
+try {
+    orange_backup_pdo_validate_export_format($pdoFormatFile, 1);
+    self_test(true, 'PDO export format self-check');
+} catch (Throwable) {
+    self_test(false, 'PDO export format self-check');
+}
+@unlink($pdoFormatFile);
+
+// Live DB PDO export self-test when database is reachable
+if (!empty($envReport['database_connected']) && is_file($projectRoot . DIRECTORY_SEPARATOR . '.env.php')) {
+    require_once $projectRoot . DIRECTORY_SEPARATOR . 'config.php';
+    $pdoLive = db();
+    $dbName = defined('DB_NAME') ? (string) DB_NAME : '';
+    if ($dbName !== '') {
+        $pdoSelf = orange_backup_pdo_export_self_test($pdoLive, $dbName);
+        self_test(($pdoSelf['failed'] ?? 1) === 0, 'PDO export live self-test');
+    }
+}
+
+// Backend selection includes PDO when available
+if ($backend === null && !empty($envReport['pdo_fallback_ready'])) {
+    self_test(false, 'pdo_fallback_ready true but backend null');
+} elseif ($backend === 'php_pdo') {
+    self_test(!empty($envReport['can_run_full_backup']), 'php_pdo backend enables can_run_full_backup');
+}
 
 // Lock prevents concurrent backup (same process pid marked active)
 $lockRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_bak_lock_' . bin2hex(random_bytes(4));
@@ -198,7 +249,7 @@ $backend = orange_backup_select_backend($projectRoot);
 if ($backend === null) {
     self_test(empty($envReport['can_run_full_backup']), 'backend unavailable marks can_run_full_backup=false');
 } else {
-    self_test(in_array($backend, ['powershell', 'php_mysqldump'], true), 'backend selection returns supported backend');
+    self_test(in_array($backend, ['powershell', 'php_mysqldump', 'php_pdo'], true), 'backend selection returns supported backend');
     echo "INFO: backend available on this machine ({$backend})\n";
 }
 

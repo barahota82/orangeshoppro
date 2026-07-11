@@ -808,6 +808,7 @@ function orange_backup_collect_environment_report(string $projectRoot): array
     $databaseConnected = false;
     $schemaRevision = null;
     $databaseError = null;
+    $pdo = null;
     if (is_file($projectRoot . DIRECTORY_SEPARATOR . '.env.php')) {
         try {
             require_once $projectRoot . DIRECTORY_SEPARATOR . 'config.php';
@@ -828,16 +829,33 @@ function orange_backup_collect_environment_report(string $projectRoot): array
     $extensionSupport = orange_backup_extension_support_flags();
     $gzipSupported = $extensionSupport['gzip'];
     $ziparchiveSupported = $extensionSupport['zip'];
-    $phpReady = $mysqldumpPath !== null
+    $phpMysqldumpReady = $mysqldumpPath !== null
         && $gzipSupported
         && $ziparchiveSupported
         && orange_backup_can_proc_open();
 
+    $pdoFallbackReady = false;
+    $pdoFallbackError = null;
+    $pdoFallbackWarnings = [];
+    if ($databaseConnected && $gzipSupported && $ziparchiveSupported && $mysqldumpPath === null && $pdo instanceof PDO) {
+        try {
+            require_once __DIR__ . DIRECTORY_SEPARATOR . 'backup_pdo_export.php';
+            $pdoPreflight = orange_backup_pdo_export_preflight($pdo, defined('DB_NAME') ? (string) DB_NAME : '');
+            $pdoFallbackReady = (bool) ($pdoPreflight['ready'] ?? false);
+            $pdoFallbackError = $pdoPreflight['error'] ?? null;
+            $pdoFallbackWarnings = is_array($pdoPreflight['warnings'] ?? null) ? $pdoPreflight['warnings'] : [];
+        } catch (Throwable $e) {
+            $pdoFallbackError = $e->getMessage();
+        }
+    }
+
     $selectedBackend = null;
     if ($powershellReady) {
         $selectedBackend = 'powershell';
-    } elseif ($phpReady) {
+    } elseif ($phpMysqldumpReady) {
         $selectedBackend = 'php_mysqldump';
+    } elseif ($pdoFallbackReady) {
+        $selectedBackend = 'php_pdo';
     }
 
     $warnings = [];
@@ -859,17 +877,26 @@ function orange_backup_collect_environment_report(string $projectRoot): array
     if (!$databaseConnected) {
         $blockers[] = 'Database connectivity failed' . ($databaseError ? (': ' . $databaseError) : '');
     }
-    if (!orange_backup_can_proc_open() && $selectedBackend !== 'powershell') {
+    if (!orange_backup_can_proc_open() && !in_array($selectedBackend, ['powershell', 'php_pdo'], true)) {
         $blockers[] = 'proc_open is unavailable; PHP mysqldump backend cannot run.';
     }
-    if ($mysqldumpDetected['error']) {
+    if ($mysqldumpDetected['error'] && $selectedBackend !== 'php_pdo') {
         $blockers[] = $mysqldumpDetected['error'];
+    } elseif ($mysqldumpDetected['error']) {
+        $warnings[] = $mysqldumpDetected['error'];
     }
     if ($powershellDetected['error']) {
         $warnings[] = $powershellDetected['error'];
     }
     if ($selectedBackend === null) {
-        $blockers[] = 'No executable backup backend is available (PowerShell optional; PHP mysqldump requires proc_open).';
+        if ($pdoFallbackError !== null) {
+            $blockers[] = $pdoFallbackError;
+        } else {
+            $blockers[] = 'No executable backup backend is available (PowerShell, PHP mysqldump, or PDO fallback).';
+        }
+    }
+    if ($pdoFallbackWarnings !== []) {
+        $warnings = array_merge($warnings, $pdoFallbackWarnings);
     }
     if (!$gzipSupported || !$ziparchiveSupported) {
         $blockers[] = 'PHP gzip and ZipArchive extensions are required for full backup packaging.';
@@ -910,6 +937,8 @@ function orange_backup_collect_environment_report(string $projectRoot): array
         'powershell_ready' => $powershellReady,
         'mysqldump_available' => $mysqldumpPath !== null,
         'mysqldump_path' => $mysqldumpPath,
+        'pdo_fallback_ready' => $pdoFallbackReady,
+        'pdo_fallback_error' => $pdoFallbackError,
         'gzip_supported' => $gzipSupported,
         'ziparchive_supported' => $ziparchiveSupported,
         'uploads_path' => $uploadsPath,

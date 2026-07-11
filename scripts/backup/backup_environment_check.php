@@ -109,6 +109,8 @@ try {
         'mysqldump_suggested_env_path=' . ($report['mysqldump_suggested_env_path'] ?? ''),
         'mysqldump_available=' . $bool(!empty($report['mysqldump_available'])),
         'mysqldump_path=' . ($report['mysqldump_path'] ?? ''),
+        'pdo_fallback_ready=' . $bool(!empty($report['pdo_fallback_ready'])),
+        'pdo_fallback_error=' . ($report['pdo_fallback_error'] ?? ''),
         'powershell_detection_source=' . ($report['powershell_detection_source'] ?? ''),
         'powershell_available=' . $bool(!empty($report['powershell_available'])),
         'powershell_path=' . ($report['powershell_path'] ?? ''),

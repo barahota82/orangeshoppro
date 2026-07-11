@@ -117,6 +117,10 @@ function orange_backup_full_finalize_workspace(array $options): array
     /** @var array<string, mixed> $metadata */
     $metadata = $options['metadata'] ?? [];
     $metadataOk = (bool) ($options['metadata_ok'] ?? false);
+    $exportBackend = trim((string) ($options['export_backend'] ?? ''));
+    $backupEngineVersion = trim((string) ($options['backup_engine_version'] ?? ''));
+    /** @var list<string> $exporterWarnings */
+    $exporterWarnings = is_array($options['exporter_warnings'] ?? null) ? $options['exporter_warnings'] : [];
 
     $warnings = [];
     $failureReasons = [];
@@ -163,6 +167,9 @@ function orange_backup_full_finalize_workspace(array $options): array
 
     if (!$metadataOk) {
         $warnings[] = 'Metadata collection unavailable; schema/table counts may be incomplete.';
+    }
+    if ($exporterWarnings !== []) {
+        $warnings = array_values(array_unique(array_merge($warnings, $exporterWarnings)));
     }
 
     $dumpSha256 = '';
@@ -214,6 +221,12 @@ function orange_backup_full_finalize_workspace(array $options): array
         'health_report_file' => ORANGE_BACKUP_HEALTH_FILE,
         'checksums_file' => ORANGE_BACKUP_CHECKSUMS_FILE,
     ];
+    if ($exportBackend !== '') {
+        $manifest['export_backend'] = $exportBackend;
+    }
+    if ($backupEngineVersion !== '') {
+        $manifest['backup_engine_version'] = $backupEngineVersion;
+    }
 
     $secretViolations = orange_backup_manifest_secret_violations($manifest);
     if ($secretViolations !== []) {
@@ -244,6 +257,12 @@ function orange_backup_full_finalize_workspace(array $options): array
         'failure_reasons' => $failureReasons,
         'package_status' => 'healthy',
     ];
+    if ($exportBackend !== '') {
+        $health['export_backend'] = $exportBackend;
+    }
+    if ($backupEngineVersion !== '') {
+        $health['backup_engine_version'] = $backupEngineVersion;
+    }
 
     orange_backup_write_json($workspace . DIRECTORY_SEPARATOR . ORANGE_BACKUP_HEALTH_FILE, $health);
 
