@@ -384,19 +384,19 @@ function Read-OrangeBackupRootFromEnv {
         return $FallbackBackupRoot
     }
 
-    $metaScript = Join-Path $ProjectRoot 'scripts\backup\backup_metadata.php'
-    if (-not (Test-Path -LiteralPath $metaScript)) {
+    $resolveScript = Join-Path $ProjectRoot 'scripts\backup\resolve_backup_root.php'
+    if (-not (Test-Path -LiteralPath $resolveScript)) {
         return $FallbackBackupRoot
     }
 
     try {
-        $json = & $phpExe $metaScript ('--project-root=' + $ProjectRoot) 2>$null
+        $json = & $phpExe $resolveScript ('--project-root=' + $ProjectRoot) 2>$null
         if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($json)) {
             return $FallbackBackupRoot
         }
         $parsed = $json | ConvertFrom-Json
-        if ($parsed.backup_root_resolved -and -not [string]::IsNullOrWhiteSpace([string]$parsed.backup_root_resolved)) {
-            return [string]$parsed.backup_root_resolved
+        if ($parsed.backup_root -and -not [string]::IsNullOrWhiteSpace([string]$parsed.backup_root)) {
+            return [string]$parsed.backup_root
         }
     }
     catch {

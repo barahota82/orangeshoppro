@@ -58,7 +58,6 @@ if (is_file($envPath)) {
     require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'catalog_schema.php';
     try {
         $pdo = db();
-        orange_catalog_ensure_schema($pdo);
         $metadata = orange_backup_collect_safe_metadata($pdo, $projectRoot, $env);
         $metadataOk = true;
     } catch (Throwable $e) {
