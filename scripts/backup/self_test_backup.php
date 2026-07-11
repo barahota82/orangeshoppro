@@ -227,6 +227,8 @@ if (!empty($envReport['database_connected']) && is_file($projectRoot . DIRECTORY
     }
 }
 
+$backend = orange_backup_select_backend($projectRoot);
+
 // Backend selection includes PDO when available
 if ($backend === null && !empty($envReport['pdo_fallback_ready'])) {
     self_test(false, 'pdo_fallback_ready true but backend null');
@@ -245,7 +247,6 @@ orange_backup_release_lock();
 orange_backup_remove_dir($lockRoot);
 
 // Backend unavailable => clear failure signal
-$backend = orange_backup_select_backend($projectRoot);
 if ($backend === null) {
     self_test(empty($envReport['can_run_full_backup']), 'backend unavailable marks can_run_full_backup=false');
 } else {
