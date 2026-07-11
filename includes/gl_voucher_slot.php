@@ -1444,5 +1444,5 @@ function orange_order_delivery_immediate_post_all_slots(PDO $pdo, array $ctx): v
     if ($loyaltyMerchandiseNet <= 0.0001) {
         $loyaltyMerchandiseNet = orange_loyalty_merchandise_net_from_order($pdo, $order, $items);
     }
-    orange_loyalty_earn_for_order($pdo, $orderForLoyalty, $ofGlCountryId, $loyaltyMerchandiseNet);
+    orange_loyalty_earn_for_order($pdo, $orderForLoyalty, $ofGlCountryId, $loyaltyMerchandiseNet, $postingAt, $now);
 }

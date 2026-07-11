@@ -9460,6 +9460,10 @@ function orange_catalog_migrate_order_items_gl_slot_v121(PDO $pdo): void
         return;
     }
 
+    if (!orange_table_exists($pdo, 'order_items')) {
+        return;
+    }
+
     if (orange_table_exists($pdo, 'order_items')
         && !orange_table_has_column($pdo, 'order_items', 'gl_slot')) {
         orange_catalog_safe_exec(
@@ -9469,10 +9473,13 @@ function orange_catalog_migrate_order_items_gl_slot_v121(PDO $pdo): void
         orange_schema_invalidate_column_check('order_items', 'gl_slot');
     }
 
-    if (orange_table_exists($pdo, 'order_items')
-        && orange_table_has_column($pdo, 'order_items', 'gl_slot')) {
+    if (!orange_table_has_column($pdo, 'order_items', 'gl_slot')) {
+        return;
+    }
+
+    if (orange_table_has_column($pdo, 'order_items', 'gl_slot')) {
         $orderIds = $pdo->query(
-            'SELECT DISTINCT order_id FROM order_items WHERE gl_slot IS NULL ORDER BY order_id ASC'
+            'SELECT DISTINCT order_id FROM order_items WHERE gl_slot IS NULL OR gl_slot = 0 ORDER BY order_id ASC'
         );
         if ($orderIds) {
             foreach ($orderIds->fetchAll(PDO::FETCH_COLUMN) ?: [] as $orderIdRaw) {
@@ -9480,11 +9487,15 @@ function orange_catalog_migrate_order_items_gl_slot_v121(PDO $pdo): void
                 if ($orderId <= 0) {
                     continue;
                 }
+                $slotSt = $pdo->prepare(
+                    'SELECT COALESCE(MAX(gl_slot), 0) FROM order_items WHERE order_id = ? AND gl_slot > 0'
+                );
+                $slotSt->execute([$orderId]);
+                $slot = (int) $slotSt->fetchColumn();
                 $stItems = $pdo->prepare(
-                    'SELECT id FROM order_items WHERE order_id = ? AND gl_slot IS NULL ORDER BY id ASC'
+                    'SELECT id FROM order_items WHERE order_id = ? AND (gl_slot IS NULL OR gl_slot = 0) ORDER BY id ASC'
                 );
                 $stItems->execute([$orderId]);
-                $slot = 0;
                 $upd = $pdo->prepare('UPDATE order_items SET gl_slot = ? WHERE id = ? AND order_id = ?');
                 foreach ($stItems->fetchAll(PDO::FETCH_COLUMN) ?: [] as $itemIdRaw) {
                     $itemId = (int) $itemIdRaw;
@@ -9496,19 +9507,56 @@ function orange_catalog_migrate_order_items_gl_slot_v121(PDO $pdo): void
                 }
             }
         }
-        orange_catalog_safe_exec(
-            $pdo,
-            'UPDATE order_items SET gl_slot = 1 WHERE gl_slot IS NULL OR gl_slot = 0'
+
+        $nullSt = $pdo->query('SELECT COUNT(*) FROM order_items WHERE gl_slot IS NULL OR gl_slot = 0');
+        if ($nullSt && (int) $nullSt->fetchColumn() > 0) {
+            return;
+        }
+
+        $dupeSt = $pdo->query(
+            'SELECT order_id, gl_slot, COUNT(*) c
+             FROM order_items
+             WHERE gl_slot > 0
+             GROUP BY order_id, gl_slot
+             HAVING c > 1
+             LIMIT 1'
         );
+        if ($dupeSt && $dupeSt->fetch(PDO::FETCH_ASSOC)) {
+            error_log('[orange] catalog_schema: duplicate order_items.gl_slot detected; v121 marker not applied');
+
+            return;
+        }
+
         orange_catalog_safe_exec(
             $pdo,
             'ALTER TABLE order_items MODIFY COLUMN gl_slot INT UNSIGNED NOT NULL'
         );
         orange_schema_invalidate_column_check('order_items', 'gl_slot');
-        orange_catalog_safe_exec(
-            $pdo,
-            'ALTER TABLE order_items ADD UNIQUE KEY uq_order_items_order_gl_slot (order_id, gl_slot)'
+        $nullableSt = $pdo->query(
+            "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_items' AND COLUMN_NAME = 'gl_slot'
+             LIMIT 1"
         );
+        $nullableRow = $nullableSt ? $nullableSt->fetch(PDO::FETCH_ASSOC) : null;
+        if (!is_array($nullableRow) || strtoupper((string) ($nullableRow['IS_NULLABLE'] ?? '')) !== 'NO') {
+            return;
+        }
+
+        $idxSt = $pdo->prepare(
+            'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1'
+        );
+        $idxSt->execute(['order_items', 'uq_order_items_order_gl_slot']);
+        if (!$idxSt->fetchColumn()) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE order_items ADD UNIQUE KEY uq_order_items_order_gl_slot (order_id, gl_slot)'
+            );
+            $idxSt->execute(['order_items', 'uq_order_items_order_gl_slot']);
+            if (!$idxSt->fetchColumn()) {
+                return;
+            }
+        }
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

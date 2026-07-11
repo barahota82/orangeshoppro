@@ -788,8 +788,21 @@ function orange_sales_invoice_company_register_edit_lock(PDO $pdo, int $orderId,
     $ref = $inv !== '' ? $inv : orange_sales_invoice_company_reference($pdo, $orderId, $order);
     $vid = null;
     if (orange_journal_vouchers_ready($pdo)) {
+        require_once __DIR__ . '/gl_voucher_slot.php';
+        if (orange_gl_voucher_slots_ready($pdo)) {
+            foreach (orange_gl_voucher_slot_list_for_document($pdo, 'order', $orderId) as $slotRow) {
+                $slotKey = (string) ($slotRow['slot_key'] ?? '');
+                if ($slotKey === 'sale-agg' || preg_match('/^sale-\d+$/', $slotKey)) {
+                    $candidateVid = (int) ($slotRow['journal_voucher_id'] ?? 0);
+                    if ($candidateVid > 0) {
+                        $vid = $candidateVid;
+                        break;
+                    }
+                }
+            }
+        }
         $orderNumber = trim((string) ($order['order_number'] ?? ''));
-        if ($orderNumber !== '') {
+        if ($vid === null && $orderNumber !== '') {
             $refs = orange_gl_voucher_select_references_like(
                 $pdo,
                 'ORDER-' . $orderNumber . '-S-%',

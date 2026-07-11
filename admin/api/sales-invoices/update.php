@@ -18,6 +18,7 @@ require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../../includes/gl_voucher_slot.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/sales_doc_channel.php';
 require_admin_api();
@@ -55,14 +56,38 @@ try {
     }
 
     $orderNumber = trim((string) ($order['order_number'] ?? ''));
-    if ($orderNumber !== '' && orange_order_fulfillment_vouchers_exist($pdo, $orderNumber, $orderCountryId > 0 ? $orderCountryId : null)) {
-        $invCountryArg = $orderCountryId > 0 ? $orderCountryId : null;
+    $invCountryArg = $orderCountryId > 0 ? $orderCountryId : null;
+    $lockedInvLabel = null;
+    if (orange_gl_voucher_slots_ready($pdo)) {
+        foreach (orange_gl_voucher_slot_list_for_document($pdo, 'order', $orderId) as $slotRow) {
+            $slotKey = (string) ($slotRow['slot_key'] ?? '');
+            if ($slotKey === 'sale-agg' || preg_match('/^sale-\d+$/', $slotKey)) {
+                $slotLabel = 'قيد المبيعات';
+            } elseif (preg_match('/^cogs-\d+$/', $slotKey)) {
+                $slotLabel = 'قيد تكلفة المبيعات';
+            } elseif ($slotKey === 'delivery-expense') {
+                $slotLabel = 'قيد مصروف التوصيل';
+            } elseif ($slotKey === 'loyalty-earn') {
+                $slotLabel = 'قيد كسب نقاط الولاء';
+            } else {
+                continue;
+            }
+            $voucherId = (int) ($slotRow['journal_voucher_id'] ?? 0);
+            $voucherRow = $voucherId > 0 ? orange_voucher_by_id($pdo, $voucherId) : null;
+            if ($voucherRow && orange_accounting_is_locked($pdo, $voucherRow)) {
+                $lockedInvLabel = $slotLabel . ' (' . (string) ($voucherRow['reference'] ?? $voucherId) . ')';
+                break;
+            }
+        }
+    }
+    if ($lockedInvLabel === null
+        && $orderNumber !== ''
+        && orange_order_fulfillment_vouchers_exist($pdo, $orderNumber, $invCountryArg)) {
         // قيود المبيعات/التكلفة قد تكون متعددة (سند لكل سطر) → نفحص كل المراجع بالنمط ونُسمّي المغلق.
         $patternLabels = [
             'ORDER-' . $orderNumber . '-S-%' => 'قيد المبيعات',
             'ORDER-' . $orderNumber . '-C-%' => 'قيد تكلفة المبيعات',
         ];
-        $lockedInvLabel = null;
         foreach ($patternLabels as $pat => $patLabel) {
             foreach (orange_gl_voucher_select_references_like($pdo, $pat, $invCountryArg) as $ref) {
                 $v = orange_voucher_by_reference($pdo, (string) $ref, $invCountryArg);
@@ -85,13 +110,13 @@ try {
                 $invCountryArg
             );
         }
-        if ($lockedInvLabel !== null) {
-            json_response([
-                'success' => false,
-                'message' => 'لا يمكن التعديل قبل فكّ القيد المغلق: ' . $lockedInvLabel,
-                'suggest_admin' => orange_gl_suggest_admin_fiscal_years_screen(),
-            ], 422);
-        }
+    }
+    if ($lockedInvLabel !== null) {
+        json_response([
+            'success' => false,
+            'message' => 'لا يمكن التعديل قبل فكّ القيد المغلق: ' . $lockedInvLabel,
+            'suggest_admin' => orange_gl_suggest_admin_fiscal_years_screen(),
+        ], 422);
     }
 
     if ($action === 'delete') {

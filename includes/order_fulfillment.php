@@ -457,6 +457,39 @@ function orange_order_guard_status_transition(string $prevStatus, string $newSta
     }
 }
 
+function orange_order_delivery_pending_rebuild_clear(PDO $pdo, int $orderId): void
+{
+    if ($orderId <= 0 || !orange_table_exists($pdo, 'orange_gl_pending_movements')) {
+        return;
+    }
+
+    $conditions = [
+        ['reference LIKE ?', orange_gl_pending_source_key('order', $orderId, 'sale') . '-%'],
+        ['reference LIKE ?', orange_gl_pending_source_key('order', $orderId, 'cogs') . '-%'],
+        ['reference = ?', orange_gl_pending_source_key('order', $orderId, 'delivery-expense')],
+        ['reference = ?', orange_gl_pending_source_key('order', $orderId, 'loyalty-earn')],
+    ];
+    $where = implode(' OR ', array_map(static fn(array $row): string => $row[0], $conditions));
+    $params = array_map(static fn(array $row): string => $row[1], $conditions);
+
+    $conflict = $pdo->prepare(
+        'SELECT reference FROM orange_gl_pending_movements
+         WHERE (' . $where . ") AND status <> 'pending'
+         LIMIT 1"
+    );
+    $conflict->execute($params);
+    $blockedReference = trim((string) ($conflict->fetchColumn() ?: ''));
+    if ($blockedReference !== '') {
+        throw new RuntimeException('لا يمكن إعادة بناء قيد معلّق تم ترحيله أو إبطاله: ' . $blockedReference);
+    }
+
+    $del = $pdo->prepare(
+        'DELETE FROM orange_gl_pending_movements
+         WHERE (' . $where . ") AND status = 'pending'"
+    );
+    $del->execute($params);
+}
+
 /**
  * GL + party_subledger for a completed order — §13.5 «إنشاء القيود» (outside gl_posting queue).
  * Caller must ensure stock fulfillment already ran (orange_complete_order_fulfillment).
@@ -490,6 +523,8 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId, array $op
                 return;
             }
         }
+    } elseif ($usePending) {
+        orange_order_delivery_pending_rebuild_clear($pdo, $orderId);
     }
 
     $itemsStmt = $pdo->prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY gl_slot ASC, id ASC');
@@ -883,7 +918,15 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId, array $op
     $orderForLoyalty = $order;
     $orderForLoyalty['customer_id'] = $customerIdForAr;
     $loyaltyMerchandiseNet = orange_loyalty_merchandise_net_from_order($pdo, $order, $items);
-    orange_loyalty_earn_for_order($pdo, $orderForLoyalty, $ofGlCountryId, $loyaltyMerchandiseNet);
+    $loyaltyPostingAt = orange_order_delivery_posting_datetime($order, $isOnline);
+    orange_loyalty_earn_for_order(
+        $pdo,
+        $orderForLoyalty,
+        $ofGlCountryId,
+        $loyaltyMerchandiseNet,
+        $loyaltyPostingAt,
+        date('Y-m-d H:i:s')
+    );
 
     // المهمة 2: ترقية عنوان الطلب إلى «الحالي» للعميل + إضافته لسجل العناوين عند تأكيد الاستلام
     // (إنشاء القيد المحاسبي) — لا عند إنشاء الطلب. مرّة واحدة لكل طلب (UNIQUE order_id).
