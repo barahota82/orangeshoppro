@@ -33,6 +33,7 @@ $lines = [
     'gzip_supported=' . (!empty($report['gzip_supported']) ? 'yes' : 'no'),
     'ziparchive_supported=' . (!empty($report['ziparchive_supported']) ? 'yes' : 'no'),
     'proc_open_available=' . (!empty($report['proc_open_available']) ? 'yes' : 'no'),
+    'exec_available=' . (!empty($report['exec_available']) ? 'yes' : 'no'),
     'shell_exec_available=' . (!empty($report['shell_exec_available']) ? 'yes' : 'no'),
     'uploads_path=' . ($report['uploads_path'] ?? ''),
     'uploads_readable=' . (!empty($report['uploads_readable']) ? 'yes' : 'no'),
