@@ -9456,11 +9456,34 @@ function orange_catalog_migrate_order_items_gl_slot_v121(PDO $pdo): void
     require_once __DIR__ . '/schema_migrations.php';
 
     $marker = 'php_order_items_gl_slot_v121';
-    if (orange_schema_migration_already_applied($pdo, $marker)) {
+
+    if (!orange_table_exists($pdo, 'order_items')) {
         return;
     }
 
-    if (!orange_table_exists($pdo, 'order_items')) {
+    $indexExists = static function () use ($pdo): bool {
+        $st = $pdo->prepare(
+            'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1'
+        );
+        $st->execute(['order_items', 'uq_order_items_order_gl_slot']);
+
+        return (bool) $st->fetchColumn();
+    };
+    $columnNotNull = static function () use ($pdo): bool {
+        if (!orange_table_has_column($pdo, 'order_items', 'gl_slot')) {
+            return false;
+        }
+        $st = $pdo->query(
+            "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_items' AND COLUMN_NAME = 'gl_slot'
+             LIMIT 1"
+        );
+        $row = $st ? $st->fetch(PDO::FETCH_ASSOC) : null;
+
+        return is_array($row) && strtoupper((string) ($row['IS_NULLABLE'] ?? '')) === 'NO';
+    };
+    if (orange_schema_migration_already_applied($pdo, $marker) && $columnNotNull() && $indexExists()) {
         return;
     }
 
@@ -9542,18 +9565,12 @@ function orange_catalog_migrate_order_items_gl_slot_v121(PDO $pdo): void
             return;
         }
 
-        $idxSt = $pdo->prepare(
-            'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1'
-        );
-        $idxSt->execute(['order_items', 'uq_order_items_order_gl_slot']);
-        if (!$idxSt->fetchColumn()) {
+        if (!$indexExists()) {
             orange_catalog_safe_exec(
                 $pdo,
                 'ALTER TABLE order_items ADD UNIQUE KEY uq_order_items_order_gl_slot (order_id, gl_slot)'
             );
-            $idxSt->execute(['order_items', 'uq_order_items_order_gl_slot']);
-            if (!$idxSt->fetchColumn()) {
+            if (!$indexExists()) {
                 return;
             }
         }
