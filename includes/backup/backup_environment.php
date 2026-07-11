@@ -145,9 +145,13 @@ function orange_backup_tool_probe_runnable(string $path, array $probeCommand): b
         return false;
     }
 
-    $result = orange_backup_run_command_capture($probeCommand, 15);
+    try {
+        $result = orange_backup_run_command_capture($probeCommand, 15);
 
-    return $result['exit_code'] === 0;
+        return $result['exit_code'] === 0;
+    } catch (Throwable) {
+        return false;
+    }
 }
 
 function orange_backup_mysqldump_probe_runnable(string $path): bool
@@ -333,7 +337,76 @@ function orange_backup_has_gzip_support(): bool
 
 function orange_backup_has_ziparchive_support(): bool
 {
-    return class_exists(ZipArchive::class);
+    return class_exists('ZipArchive');
+}
+
+function orange_backup_debug_enabled(array $env): bool
+{
+    if (!array_key_exists('ORANGE_DEBUG', $env)) {
+        return false;
+    }
+    $value = $env['ORANGE_DEBUG'];
+
+    return $value === true
+        || $value === 1
+        || $value === '1'
+        || (is_string($value) && strtolower($value) === 'true');
+}
+
+function orange_backup_cli_error_log_path(string $projectRoot, array $env): string
+{
+    try {
+        if (orange_backup_root_configured($env)) {
+            $root = orange_backup_resolve_root($env);
+            $logsDir = orange_backup_path_inside_root($root, 'logs');
+            if (!is_dir($logsDir)) {
+                @mkdir($logsDir, 0775, true);
+            }
+
+            return $logsDir . DIRECTORY_SEPARATOR . 'backup_cli_errors.log';
+        }
+    } catch (Throwable) {
+    }
+
+    $fallbackDir = $projectRoot . DIRECTORY_SEPARATOR . 'logs';
+    if (!is_dir($fallbackDir)) {
+        @mkdir($fallbackDir, 0775, true);
+    }
+
+    return $fallbackDir . DIRECTORY_SEPARATOR . 'backup_cli_errors.log';
+}
+
+function orange_backup_cli_render_error(Throwable $e, string $projectRoot, array $env, string $scriptLabel): void
+{
+    $detail = sprintf(
+        "exception=%s\nmessage=%s\nfile=%s\nline=%d\nstack_trace=%s\n",
+        get_class($e),
+        $e->getMessage(),
+        $e->getFile(),
+        $e->getLine(),
+        $e->getTraceAsString()
+    );
+    $logPath = orange_backup_cli_error_log_path($projectRoot, $env);
+    @file_put_contents(
+        $logPath,
+        '[' . gmdate('c') . "] {$scriptLabel}\n{$detail}\n",
+        FILE_APPEND | LOCK_EX
+    );
+
+    $stream = defined('STDERR') ? STDERR : fopen('php://stderr', 'wb');
+    if ($stream === false) {
+        return;
+    }
+
+    if (orange_backup_debug_enabled($env)) {
+        fwrite($stream, $detail);
+    } else {
+        fwrite($stream, "Backup CLI error in {$scriptLabel}. See log: {$logPath}\n");
+    }
+
+    if (!defined('STDERR')) {
+        fclose($stream);
+    }
 }
 
 /**
@@ -372,58 +445,66 @@ function orange_backup_load_db_settings(string $projectRoot): array
  */
 function orange_backup_run_command_capture(array $command, ?int $timeoutSeconds = null): array
 {
-    if (!orange_backup_can_proc_open()) {
-        if (!orange_backup_can_shell_exec()) {
-            return ['exit_code' => 127, 'stdout' => '', 'stderr' => 'No command execution functions available.'];
+    try {
+        if (!orange_backup_can_proc_open()) {
+            if (!orange_backup_can_shell_exec()) {
+                return ['exit_code' => 127, 'stdout' => '', 'stderr' => 'No command execution functions available.'];
+            }
+            $escaped = array_map(static fn (string $part): string => escapeshellarg($part), $command);
+            $output = shell_exec(implode(' ', $escaped) . ' 2>&1');
+
+            return [
+                'exit_code' => 0,
+                'stdout' => is_string($output) ? $output : '',
+                'stderr' => '',
+            ];
         }
-        $escaped = array_map(static fn (string $part): string => escapeshellarg($part), $command);
-        $output = shell_exec(implode(' ', $escaped) . ' 2>&1');
+
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $process = proc_open($command, $descriptors, $pipes);
+        if (!is_resource($process)) {
+            return ['exit_code' => 127, 'stdout' => '', 'stderr' => 'proc_open failed.'];
+        }
+        fclose($pipes[0]);
+        stream_set_blocking($pipes[1], false);
+        stream_set_blocking($pipes[2], false);
+        $stdout = '';
+        $stderr = '';
+        $started = time();
+        while (true) {
+            $stdout .= (string) stream_get_contents($pipes[1]);
+            $stderr .= (string) stream_get_contents($pipes[2]);
+            $status = proc_get_status($process);
+            if (!$status['running']) {
+                break;
+            }
+            if ($timeoutSeconds !== null && (time() - $started) > $timeoutSeconds) {
+                proc_terminate($process);
+                $stderr .= 'Command timed out.';
+                break;
+            }
+            usleep(100000);
+        }
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($process);
 
         return [
-            'exit_code' => 0,
-            'stdout' => is_string($output) ? $output : '',
-            'stderr' => '',
+            'exit_code' => $exitCode,
+            'stdout' => $stdout,
+            'stderr' => $stderr,
+        ];
+    } catch (Throwable $e) {
+        return [
+            'exit_code' => 127,
+            'stdout' => '',
+            'stderr' => $e->getMessage(),
         ];
     }
-
-    $descriptors = [
-        0 => ['pipe', 'r'],
-        1 => ['pipe', 'w'],
-        2 => ['pipe', 'w'],
-    ];
-    $process = proc_open($command, $descriptors, $pipes);
-    if (!is_resource($process)) {
-        return ['exit_code' => 127, 'stdout' => '', 'stderr' => 'proc_open failed.'];
-    }
-    fclose($pipes[0]);
-    stream_set_blocking($pipes[1], false);
-    stream_set_blocking($pipes[2], false);
-    $stdout = '';
-    $stderr = '';
-    $started = time();
-    while (true) {
-        $stdout .= (string) stream_get_contents($pipes[1]);
-        $stderr .= (string) stream_get_contents($pipes[2]);
-        $status = proc_get_status($process);
-        if (!$status['running']) {
-            break;
-        }
-        if ($timeoutSeconds !== null && (time() - $started) > $timeoutSeconds) {
-            proc_terminate($process);
-            $stderr .= 'Command timed out.';
-            break;
-        }
-        usleep(100000);
-    }
-    fclose($pipes[1]);
-    fclose($pipes[2]);
-    $exitCode = proc_close($process);
-
-    return [
-        'exit_code' => $exitCode,
-        'stdout' => $stdout,
-        'stderr' => $stderr,
-    ];
 }
 
 function orange_backup_process_alive(int $pid): bool
