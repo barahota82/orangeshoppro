@@ -41,6 +41,25 @@ try {
         'project_root=' . ($report['project_root'] ?? ''),
         'orange_backup_root_configured=' . $bool(!empty($report['orange_backup_root_configured'])),
         'backup_root_candidate=' . ($report['backup_root_candidate'] ?? ''),
+    ];
+
+    $probe = orange_backup_probe_directory_path((string) ($report['backup_root_candidate'] ?? ''));
+    if ($probe !== []) {
+        $probeLines = [
+            'backup_root_probe_configured_path=' . ($probe['configured_path'] ?? ''),
+            'backup_root_probe_normalized_path=' . ($probe['normalized_path'] ?? ''),
+            'backup_root_probe_realpath=' . ($probe['realpath'] ?? ''),
+            'backup_root_probe_realpath_ok=' . (!empty($probe['realpath_ok']) ? 'yes' : 'no'),
+            'backup_root_probe_is_dir_configured=' . (!empty($probe['is_dir_configured']) ? 'yes' : 'no'),
+            'backup_root_probe_is_dir_normalized=' . (!empty($probe['is_dir_normalized']) ? 'yes' : 'no'),
+            'backup_root_probe_file_exists_configured=' . (!empty($probe['file_exists_configured']) ? 'yes' : 'no'),
+            'backup_root_probe_dirname_configured=' . ($probe['dirname_configured'] ?? ''),
+            'backup_root_probe_getcwd=' . ($probe['getcwd'] ?? ''),
+        ];
+        $lines = array_merge($lines, $probeLines);
+    }
+
+    $lines = array_merge($lines, [
         'backup_root=' . ($report['backup_root'] ?? ''),
         'backup_root_writable=' . $bool(!empty($report['backup_root_writable'])),
         'backup_root_error=' . ($report['backup_root_error'] ?? ''),
@@ -62,7 +81,7 @@ try {
         'schema_revision=' . ($report['schema_revision'] ?? ''),
         'selected_backend=' . ($report['selected_backend'] ?? ''),
         'can_run_full_backup=' . $bool(!empty($report['can_run_full_backup'])),
-    ];
+    ]);
 
     foreach ($lines as $line) {
         echo $line . PHP_EOL;

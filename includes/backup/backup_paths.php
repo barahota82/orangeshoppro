@@ -20,6 +20,44 @@ function orange_backup_project_root(): string
     return $root;
 }
 
+function orange_backup_normalize_directory_path(string $path): string
+{
+    $path = trim($path);
+    if ($path === '') {
+        return '';
+    }
+
+    $normalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
+
+    return rtrim($normalized, DIRECTORY_SEPARATOR);
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_backup_probe_directory_path(string $path): array
+{
+    $configured = trim($path);
+    $normalized = orange_backup_normalize_directory_path($configured);
+    $realpath = @realpath($configured);
+    if ($realpath === false && $normalized !== '' && $normalized !== $configured) {
+        $realpath = @realpath($normalized);
+    }
+
+    return [
+        'configured_path' => $configured,
+        'normalized_path' => $normalized,
+        'realpath' => $realpath !== false ? $realpath : '',
+        'realpath_ok' => $realpath !== false,
+        'is_dir_configured' => $configured !== '' && is_dir($configured),
+        'is_dir_normalized' => $normalized !== '' && is_dir($normalized),
+        'file_exists_configured' => $configured !== '' && file_exists($configured),
+        'dirname_configured' => $configured !== '' ? dirname($configured) : '',
+        'getcwd' => getcwd() !== false ? getcwd() : '',
+        'open_basedir' => ini_get('open_basedir') ?: '',
+    ];
+}
+
 /**
  * @param array<string, mixed> $env
  */
@@ -53,12 +91,21 @@ function orange_backup_resolve_root(array $env, ?string $cliOverride = null): st
 
     $resolved = realpath($candidate);
     if ($resolved === false) {
-        if (!@mkdir($candidate, 0775, true) && !is_dir($candidate)) {
-            throw new RuntimeException('ORANGE_BACKUP_ROOT is not writable or cannot be created: ' . $candidate);
+        if (!is_dir($candidate)) {
+            if (!@mkdir($candidate, 0775, true) && !is_dir($candidate)) {
+                throw new RuntimeException('ORANGE_BACKUP_ROOT is not writable or cannot be created: ' . $candidate);
+            }
         }
         $resolved = realpath($candidate);
     }
-    if ($resolved === false || !is_dir($resolved)) {
+    if ($resolved === false) {
+        if (is_dir($candidate)) {
+            $resolved = orange_backup_normalize_directory_path($candidate);
+        } else {
+            throw new RuntimeException('ORANGE_BACKUP_ROOT is not a directory: ' . $candidate);
+        }
+    }
+    if (!is_dir($resolved)) {
         throw new RuntimeException('ORANGE_BACKUP_ROOT is not a directory: ' . $candidate);
     }
     if (!is_writable($resolved)) {
