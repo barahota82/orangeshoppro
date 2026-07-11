@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Creates a timestamped, compressed backup of the MySQL/MariaDB database and the
-    uploads/ directory. Writes a manifest and log. Applies retention only after a
+    uploads/ directory.     Writes manifest.json, health.json, checksums.sha256, and log. Applies retention only after a
     fully successful run. Does not restore.
 
     Reads DB_HOST and DB_NAME from config.php and DB_USER / DB_PASS from .env.php
@@ -326,6 +326,114 @@ function Compress-FileToGzip {
     }
 }
 
+function Get-FileSha256Hex {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "Cannot hash missing file: $Path"
+    }
+
+    $hash = Get-FileHash -LiteralPath $Path -Algorithm SHA256
+    return $hash.Hash.ToLowerInvariant()
+}
+
+function Resolve-OrangeBackupRootSafe {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$BackupRoot
+    )
+
+    $phpExe = Get-PhpExecutable
+    if ($phpExe) {
+        $resolveScript = Join-Path $ProjectRoot 'scripts\backup\resolve_backup_root.php'
+        if (Test-Path -LiteralPath $resolveScript) {
+            $json = & $phpExe $resolveScript ('--project-root=' + $ProjectRoot) ('--override=' + $BackupRoot) 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                throw "BackupRoot safety validation failed: $json"
+            }
+            $parsed = $json | ConvertFrom-Json
+            if ($parsed.backup_root) {
+                return Resolve-ExistingDirectory -Path ([string]$parsed.backup_root) -Label 'BackupRoot'
+            }
+        }
+    }
+
+    $resolved = Resolve-ExistingDirectory -Path $BackupRoot -Label 'BackupRoot'
+    $projectNorm = [System.IO.Path]::GetFullPath($ProjectRoot)
+    if ($resolved.StartsWith($projectNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "BackupRoot must not be inside the web project root: $resolved"
+    }
+
+    return $resolved
+}
+
+function Read-OrangeBackupRootFromEnv {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectRoot,
+        [string]$FallbackBackupRoot
+    )
+
+    $phpExe = Get-PhpExecutable
+    if (-not $phpExe) {
+        return $FallbackBackupRoot
+    }
+
+    $metaScript = Join-Path $ProjectRoot 'scripts\backup\backup_metadata.php'
+    if (-not (Test-Path -LiteralPath $metaScript)) {
+        return $FallbackBackupRoot
+    }
+
+    try {
+        $json = & $phpExe $metaScript ('--project-root=' + $ProjectRoot) 2>$null
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($json)) {
+            return $FallbackBackupRoot
+        }
+        $parsed = $json | ConvertFrom-Json
+        if ($parsed.backup_root_resolved -and -not [string]::IsNullOrWhiteSpace([string]$parsed.backup_root_resolved)) {
+            return [string]$parsed.backup_root_resolved
+        }
+    }
+    catch {
+        return $FallbackBackupRoot
+    }
+
+    return $FallbackBackupRoot
+}
+
+function Get-OrangeBackupMetadata {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectRoot
+    )
+
+    $phpExe = Get-PhpExecutable
+    if (-not $phpExe) {
+        return $null
+    }
+
+    $metaScript = Join-Path $ProjectRoot 'scripts\backup\backup_metadata.php'
+    if (-not (Test-Path -LiteralPath $metaScript)) {
+        return $null
+    }
+
+    try {
+        $json = & $phpExe $metaScript ('--project-root=' + $ProjectRoot) 2>$null
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($json)) {
+            return $null
+        }
+        return ($json | ConvertFrom-Json)
+    }
+    catch {
+        return $null
+    }
+}
+
 function Get-GitCommitHash {
     param([string]$ProjectRoot)
 
@@ -436,6 +544,8 @@ try {
     if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
         $ProjectRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
     }
+    $ProjectRoot = Resolve-ExistingDirectory -Path $ProjectRoot -Label 'ProjectRoot'
+
     if ([string]::IsNullOrWhiteSpace($BackupRoot)) {
         $parentDrive = Split-Path $ProjectRoot -Qualifier
         if ($parentDrive) {
@@ -446,8 +556,8 @@ try {
         }
     }
 
-    $ProjectRoot = Resolve-ExistingDirectory -Path $ProjectRoot -Label 'ProjectRoot'
-    $BackupRoot = Resolve-ExistingDirectory -Path $BackupRoot -Label 'BackupRoot'
+    $BackupRoot = Read-OrangeBackupRootFromEnv -ProjectRoot $ProjectRoot -FallbackBackupRoot $BackupRoot
+    $BackupRoot = Resolve-OrangeBackupRootSafe -ProjectRoot $ProjectRoot -BackupRoot $BackupRoot
 
     $logsDir = Resolve-BackupRootInside -BackupRoot $BackupRoot -RelativePath 'logs'
     $snapshotsDir = Resolve-BackupRootInside -BackupRoot $BackupRoot -RelativePath 'snapshots'
@@ -520,6 +630,11 @@ try {
     Remove-Item -LiteralPath $rawSqlFile -Force
     Write-Log ("Compressed database dump -> {0}" -f $dumpFileName)
 
+    if ($clientDefaultsFile -and (Test-Path -LiteralPath $clientDefaultsFile)) {
+        Remove-Item -LiteralPath $clientDefaultsFile -Force -ErrorAction SilentlyContinue
+        $clientDefaultsFile = $null
+    }
+
     Write-Log 'Archiving uploads directory...'
     Compress-Archive -LiteralPath $uploadsDir -DestinationPath $uploadsArchiveFile -CompressionLevel Optimal -Force
     if (-not (Test-Path -LiteralPath $uploadsArchiveFile)) {
@@ -527,23 +642,28 @@ try {
     }
     Write-Log ("Uploads archive OK -> {0}" -f $uploadsArchiveName)
 
-    $gitCommit = Get-GitCommitHash -ProjectRoot $ProjectRoot
-    $timestampIso = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ssK')
-    $manifest = [ordered]@{
-        timestamp         = $timestampIso
-        project_root      = $ProjectRoot
-        db_name           = $db.Name
-        dump_file         = $dumpFileName
-        uploads_archive   = $uploadsArchiveName
-        git_commit        = $gitCommit
-        backup_script     = 'scripts/backup/orange_backup.ps1'
-        retention_daily   = $RetentionDaily
-        retention_weekly  = $RetentionWeekly
-        retention_monthly = $RetentionMonthly
+    Write-Log 'Finalizing package (manifest, health.json, checksums.sha256)...'
+    $phpExe = Get-PhpExecutable
+    if (-not $phpExe) {
+        throw 'PHP CLI is required to finalize backup packages (manifest, health, checksums).'
     }
-    $manifestPath = Join-Path $tempWorkDir 'manifest.json'
-    $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
-    Write-Log 'Manifest written.'
+
+    $finalizeScript = Join-Path $ProjectRoot 'scripts\backup\finalize_full_backup.php'
+    if (-not (Test-Path -LiteralPath $finalizeScript)) {
+        throw "Missing finalize script: $finalizeScript"
+    }
+
+    $finalizeOutput = & $phpExe $finalizeScript `
+        ('--project-root=' + $ProjectRoot) `
+        ('--workspace=' + $tempWorkDir) `
+        ('--backup-root=' + $BackupRoot) `
+        ('--dump-file=' + $dumpFileName) `
+        ('--uploads-file=' + $uploadsArchiveName) 2>&1
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Package finalization failed (exit $LASTEXITCODE): $finalizeOutput"
+    }
+    Write-Log ("Package finalized: {0}" -f ($finalizeOutput | Out-String).Trim())
 
     Rename-Item -LiteralPath $tempWorkDir -NewName $snapshotName
     $tempWorkDir = $null
