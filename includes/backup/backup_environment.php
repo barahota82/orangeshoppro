@@ -120,24 +120,134 @@ function orange_backup_powershell_known_paths(): array
 }
 
 /**
+ * Plesk Obsidian default on physical Windows servers: C:\Program Files (x86)\Plesk\
+ *
+ * @return list<string>
+ */
+function orange_backup_plesk_base_directories(): array
+{
+    $bases = [];
+    foreach (['plesk_dir', 'PLESK_DIR'] as $envKey) {
+        $value = getenv($envKey);
+        if (is_string($value) && trim($value) !== '') {
+            $bases[] = rtrim(str_replace('/', '\\', trim($value)), '\\');
+        }
+    }
+
+    $bases = array_merge($bases, [
+        'C:\\Program Files (x86)\\Plesk',
+        'C:\\Program Files (x86)\\Parallels\\Plesk',
+        'C:\\Program Files\\Plesk',
+        'C:\\Program Files\\Parallels\\Plesk',
+    ]);
+
+    return array_values(array_unique($bases));
+}
+
+/**
+ * Default installation paths for mysqldump.exe on Plesk Obsidian / Windows hosts.
+ *
  * @return list<string>
  */
 function orange_backup_mysqldump_known_paths(): array
 {
-    return [
+    $paths = [];
+    foreach (orange_backup_plesk_base_directories() as $base) {
+        foreach (['MySQL', 'MySql', 'Mysql'] as $mysqlDir) {
+            $paths[] = $base . '\\' . $mysqlDir . '\\bin\\mysqldump.exe';
+        }
+        $paths[] = $base . '\\Databases\\MySQL\\bin\\mysqldump.exe';
+        $paths[] = $base . '\\Databases\\MariaDB\\bin\\mysqldump.exe';
+    }
+
+    $paths = array_merge($paths, [
+        'C:\\Program Files\\MariaDB 11.5\\bin\\mysqldump.exe',
         'C:\\Program Files\\MariaDB 11.4\\bin\\mysqldump.exe',
         'C:\\Program Files\\MariaDB 11.3\\bin\\mysqldump.exe',
+        'C:\\Program Files\\MariaDB 11.2\\bin\\mysqldump.exe',
         'C:\\Program Files\\MariaDB 10.11\\bin\\mysqldump.exe',
+        'C:\\Program Files\\MariaDB 10.10\\bin\\mysqldump.exe',
         'C:\\Program Files\\MariaDB 10.6\\bin\\mysqldump.exe',
+        'C:\\Program Files\\MariaDB 10.5\\bin\\mysqldump.exe',
+        'C:\\Program Files\\MariaDB 10.4\\bin\\mysqldump.exe',
         'C:\\Program Files\\MariaDB\\bin\\mysqldump.exe',
+        'C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin\\mysqldump.exe',
         'C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysqldump.exe',
         'C:\\Program Files\\MySQL\\MySQL Server 5.7\\bin\\mysqldump.exe',
-        'C:\\Program Files (x86)\\Plesk\\MySQL\\bin\\mysqldump.exe',
-        'C:\\Program Files (x86)\\Plesk\\Databases\\MySQL\\bin\\mysqldump.exe',
-        'C:\\Program Files (x86)\\Parallels\\Plesk\\MySQL\\bin\\mysqldump.exe',
-        'C:\\Program Files\\Parallels\\Plesk\\MySQL\\bin\\mysqldump.exe',
-        'C:\\Program Files (x86)\\Parallels\\Plesk\\Databases\\MySQL\\bin\\mysqldump.exe',
-    ];
+    ]);
+
+    return array_values(array_unique($paths));
+}
+
+function orange_backup_mysqldump_default_env_path(): string
+{
+    $bases = orange_backup_plesk_base_directories();
+
+    return ($bases[0] ?? 'C:\\Program Files (x86)\\Plesk') . '\\MySQL\\bin\\mysqldump.exe';
+}
+
+/**
+ * @param list<array{path:string,status:string}> $attempted
+ */
+function orange_backup_mysqldump_suggested_env_path(array $attempted): string
+{
+    foreach ($attempted as $entry) {
+        $status = $entry['status'] ?? '';
+        if (in_array($status, ['probe_failed', 'shell_visible_probe_failed', 'shell_visible', 'where_probe_failed', 'where_not_accessible'], true)) {
+            return (string) ($entry['path'] ?? '');
+        }
+    }
+
+    return orange_backup_mysqldump_default_env_path();
+}
+
+/**
+ * @param list<array{path:string,status:string}> $attempted
+ */
+function orange_backup_format_mysqldump_attempts(array $attempted): string
+{
+    if ($attempted === []) {
+        return '';
+    }
+    $parts = [];
+    foreach ($attempted as $entry) {
+        $parts[] = ($entry['path'] ?? '') . '[' . ($entry['status'] ?? '') . ']';
+    }
+
+    return implode(' | ', $parts);
+}
+
+function orange_backup_windows_path_visible_via_shell(string $path): bool
+{
+    if (DIRECTORY_SEPARATOR !== '\\' || !orange_backup_can_proc_open()) {
+        return false;
+    }
+
+    try {
+        $line = 'if exist ' . escapeshellarg($path) . ' echo yes';
+        $result = orange_backup_run_command_capture(['cmd.exe', '/c', $line], 10);
+
+        return str_contains(strtolower($result['stdout']), 'yes');
+    } catch (Throwable) {
+        return false;
+    }
+}
+
+function orange_backup_tool_path_accessible(string $path): bool
+{
+    if (orange_backup_tool_path_exists($path)) {
+        return true;
+    }
+
+    return orange_backup_windows_path_visible_via_shell($path);
+}
+
+/**
+ * @param list<array{path:string,status:string}> $attempted
+ */
+function orange_backup_record_mysqldump_attempt(array &$attempted, string $path, string $status): void
+{
+    $attempted[] = ['path' => $path, 'status' => $status];
 }
 
 function orange_backup_tool_path_exists(string $path): bool
@@ -150,7 +260,7 @@ function orange_backup_tool_probe_runnable(string $path, array $probeCommand): b
     if (!orange_backup_can_proc_open()) {
         return false;
     }
-    if (!orange_backup_tool_path_exists($path)) {
+    if (!orange_backup_tool_path_accessible($path)) {
         return false;
     }
 
@@ -180,66 +290,141 @@ function orange_backup_powershell_probe_runnable(string $path): bool
 }
 
 /**
- * @return array{path:?string,source:string,error:?string}
+ * @return array{
+ *   path:?string,
+ *   source:string,
+ *   error:?string,
+ *   attempted:list<array{path:string,status:string}>,
+ *   suggested_env_path:?string
+ * }
  */
 function orange_backup_detect_mysqldump(array $env): array
 {
+    $attempted = [];
     $configured = orange_backup_env_trimmed($env, ORANGE_BACKUP_ENV_MYSQLDUMP);
     if ($configured !== '') {
         $path = orange_backup_normalize_tool_path($configured);
-        if (!orange_backup_tool_path_exists($path)) {
+        if (!orange_backup_tool_path_accessible($path)) {
+            orange_backup_record_mysqldump_attempt($attempted, $path, 'configured_not_found');
+
             return [
                 'path' => null,
                 'source' => 'configured_invalid',
                 'error' => ORANGE_BACKUP_ENV_MYSQLDUMP . ' is set but the file was not found.',
+                'attempted' => $attempted,
+                'suggested_env_path' => orange_backup_mysqldump_default_env_path(),
             ];
         }
         if (!orange_backup_can_proc_open()) {
+            orange_backup_record_mysqldump_attempt($attempted, $path, 'configured_proc_open_unavailable');
+
             return [
                 'path' => null,
                 'source' => 'configured_not_executable',
                 'error' => ORANGE_BACKUP_ENV_MYSQLDUMP . ' is set but proc_open is unavailable for mysqldump execution.',
+                'attempted' => $attempted,
+                'suggested_env_path' => $path,
             ];
         }
         if (!orange_backup_mysqldump_probe_runnable($path)) {
+            orange_backup_record_mysqldump_attempt($attempted, $path, 'configured_probe_failed');
+
             return [
                 'path' => null,
                 'source' => 'configured_not_executable',
                 'error' => ORANGE_BACKUP_ENV_MYSQLDUMP . ' is set but mysqldump could not be executed by PHP.',
+                'attempted' => $attempted,
+                'suggested_env_path' => $path,
             ];
         }
 
-        return ['path' => $path, 'source' => 'configured', 'error' => null];
-    }
-
-    foreach (orange_backup_mysqldump_known_paths() as $candidate) {
-        $path = orange_backup_normalize_tool_path($candidate);
-        if (!orange_backup_tool_path_exists($path)) {
-            continue;
-        }
-        if (!orange_backup_can_proc_open()) {
-            return [
-                'path' => null,
-                'source' => 'known_path_requires_proc_open',
-                'error' => 'mysqldump was found at a known path but proc_open is unavailable.',
-            ];
-        }
-        if (orange_backup_mysqldump_probe_runnable($path)) {
-            return ['path' => $path, 'source' => 'known_path', 'error' => null];
-        }
+        return [
+            'path' => $path,
+            'source' => 'configured',
+            'error' => null,
+            'attempted' => $attempted,
+            'suggested_env_path' => null,
+        ];
     }
 
     if (orange_backup_can_execute_commands()) {
         $which = orange_backup_run_command_capture(['where.exe', 'mysqldump'], 15);
         if ($which['exit_code'] === 0) {
-            $line = trim(explode("\n", str_replace("\r", '', $which['stdout'] ?? ''))[0] ?? '');
-            if ($line !== '') {
-                $path = orange_backup_normalize_tool_path($line);
-                if (orange_backup_can_proc_open() && orange_backup_mysqldump_probe_runnable($path)) {
-                    return ['path' => $path, 'source' => 'where', 'error' => null];
+            $lines = preg_split('/\R/', str_replace("\r", '', (string) ($which['stdout'] ?? ''))) ?: [];
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '') {
+                    continue;
                 }
+                $path = orange_backup_normalize_tool_path($line);
+                if (!orange_backup_tool_path_accessible($path)) {
+                    orange_backup_record_mysqldump_attempt($attempted, $path, 'where_not_accessible');
+                    continue;
+                }
+                if (!orange_backup_can_proc_open()) {
+                    orange_backup_record_mysqldump_attempt($attempted, $path, 'where_proc_open_unavailable');
+
+                    return [
+                        'path' => null,
+                        'source' => 'known_path_requires_proc_open',
+                        'error' => 'mysqldump was found via where.exe but proc_open is unavailable.',
+                        'attempted' => $attempted,
+                        'suggested_env_path' => $path,
+                    ];
+                }
+                if (orange_backup_mysqldump_probe_runnable($path)) {
+                    return [
+                        'path' => $path,
+                        'source' => 'where',
+                        'error' => null,
+                        'attempted' => $attempted,
+                        'suggested_env_path' => null,
+                    ];
+                }
+                orange_backup_record_mysqldump_attempt($attempted, $path, 'where_probe_failed');
             }
+        } else {
+            orange_backup_record_mysqldump_attempt($attempted, 'where.exe mysqldump', 'not_in_path');
         }
+    }
+
+    foreach (orange_backup_mysqldump_known_paths() as $candidate) {
+        $path = orange_backup_normalize_tool_path($candidate);
+        $phpVisible = orange_backup_tool_path_exists($path);
+        $shellVisible = !$phpVisible && orange_backup_windows_path_visible_via_shell($path);
+        if (!$phpVisible && !$shellVisible) {
+            orange_backup_record_mysqldump_attempt($attempted, $path, 'not_found');
+            continue;
+        }
+        if (!orange_backup_can_proc_open()) {
+            orange_backup_record_mysqldump_attempt(
+                $attempted,
+                $path,
+                $shellVisible && !$phpVisible ? 'shell_visible_proc_open_unavailable' : 'proc_open_unavailable'
+            );
+
+            return [
+                'path' => null,
+                'source' => 'known_path_requires_proc_open',
+                'error' => 'mysqldump was found at a known path but proc_open is unavailable.',
+                'attempted' => $attempted,
+                'suggested_env_path' => $path,
+            ];
+        }
+        if (orange_backup_mysqldump_probe_runnable($path)) {
+            return [
+                'path' => $path,
+                'source' => 'known_path',
+                'error' => null,
+                'attempted' => $attempted,
+                'suggested_env_path' => null,
+            ];
+        }
+        orange_backup_record_mysqldump_attempt(
+            $attempted,
+            $path,
+            $shellVisible && !$phpVisible ? 'shell_visible_probe_failed' : 'probe_failed'
+        );
     }
 
     if (!orange_backup_can_proc_open()) {
@@ -247,13 +432,24 @@ function orange_backup_detect_mysqldump(array $env): array
             'path' => null,
             'source' => 'none',
             'error' => 'mysqldump backend requires proc_open; it is disabled for this PHP profile.',
+            'attempted' => $attempted,
+            'suggested_env_path' => orange_backup_mysqldump_suggested_env_path($attempted),
         ];
     }
+
+    $suggested = orange_backup_mysqldump_suggested_env_path($attempted);
 
     return [
         'path' => null,
         'source' => 'none',
-        'error' => 'mysqldump was not found. Set ' . ORANGE_BACKUP_ENV_MYSQLDUMP . ' in .env.php.',
+        'error' => 'mysqldump was not found. Set '
+            . ORANGE_BACKUP_ENV_MYSQLDUMP
+            . ' in .env.php to: '
+            . $suggested
+            . '. Attempted paths: '
+            . orange_backup_format_mysqldump_attempts($attempted),
+        'attempted' => $attempted,
+        'suggested_env_path' => $suggested,
     ];
 }
 
@@ -705,6 +901,8 @@ function orange_backup_collect_environment_report(string $projectRoot): array
         'configured_mysqldump_path_present' => orange_backup_env_trimmed($env, ORANGE_BACKUP_ENV_MYSQLDUMP) !== '',
         'configured_powershell_path_present' => orange_backup_env_trimmed($env, ORANGE_BACKUP_ENV_POWERSHELL) !== '',
         'mysqldump_detection_source' => $mysqldumpDetected['source'],
+        'mysqldump_attempted_paths' => orange_backup_format_mysqldump_attempts($mysqldumpDetected['attempted'] ?? []),
+        'mysqldump_suggested_env_path' => $mysqldumpDetected['suggested_env_path'] ?? '',
         'powershell_detection_source' => $powershellDetected['source'],
         'powershell_available' => $powershellPath !== null,
         'powershell_path' => $powershellPath,
