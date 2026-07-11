@@ -336,12 +336,12 @@ function orange_backup_pdo_validate_export_format(string $sqlFile, int $tableCou
         'SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS',
     ];
     foreach ($required as $needle) {
-        if (!str_contains($head, $needle) && !str_contains((string) file_get_contents($sqlFile), $needle)) {
+        if (!str_contains($head, $needle) && !orange_backup_pdo_file_contains($sqlFile, $needle)) {
             throw new RuntimeException('PDO export validation failed: missing ' . $needle);
         }
     }
 
-    if ($tableCount > 0 && !preg_match('/CREATE TABLE `/', (string) file_get_contents($sqlFile))) {
+    if ($tableCount > 0 && !orange_backup_pdo_file_contains($sqlFile, 'CREATE TABLE `')) {
         throw new RuntimeException('PDO export validation failed: CREATE TABLE missing.');
     }
 }
@@ -382,4 +382,36 @@ function orange_backup_pdo_export_self_test(PDO $pdo, string $databaseName): arr
     $assert(orange_backup_pdo_sql_literal($literalPdo, "\x00\xFF", 'blob') === '0x00ff');
 
     return ['passed' => $passed, 'failed' => $failed];
+}
+
+function orange_backup_pdo_file_contains(string $path, string $needle): bool
+{
+    if ($needle === '') {
+        return true;
+    }
+
+    $handle = fopen($path, 'rb');
+    if ($handle === false) {
+        return false;
+    }
+
+    $carry = '';
+    $carryLength = max(0, strlen($needle) - 1);
+    try {
+        while (!feof($handle)) {
+            $chunk = fread($handle, 1024 * 128);
+            if ($chunk === false) {
+                return false;
+            }
+            $buffer = $carry . $chunk;
+            if (str_contains($buffer, $needle)) {
+                return true;
+            }
+            $carry = $carryLength > 0 ? substr($buffer, -$carryLength) : '';
+        }
+    } finally {
+        fclose($handle);
+    }
+
+    return false;
 }
