@@ -220,7 +220,7 @@ function orange_backup_detect_mysqldump(array $env): array
         }
     }
 
-    if (orange_backup_can_execute_commands()) {
+    if (DIRECTORY_SEPARATOR === '\\' && orange_backup_can_execute_commands()) {
         $which = orange_backup_run_command_capture(['where.exe', 'mysqldump'], 15);
         if ($which['exit_code'] === 0) {
             $line = trim(explode("\n", str_replace("\r", '', $which['stdout'] ?? ''))[0] ?? '');
@@ -294,7 +294,7 @@ function orange_backup_detect_powershell(array $env): array
         }
     }
 
-    if (orange_backup_can_execute_commands()) {
+    if (DIRECTORY_SEPARATOR === '\\' && orange_backup_can_execute_commands()) {
         foreach (['powershell.exe', 'pwsh.exe'] as $binary) {
             $which = orange_backup_run_command_capture(['where.exe', $binary], 15);
             if ($which['exit_code'] !== 0) {
@@ -624,7 +624,7 @@ function orange_backup_collect_environment_report(string $projectRoot): array
     if ($selectedBackend === null) {
         $blockers[] = 'No executable backup backend is available (PowerShell optional; PHP mysqldump requires proc_open).';
     }
-    if (!$orange_backup_has_gzip_support() || !orange_backup_has_ziparchive_support()) {
+    if (!orange_backup_has_gzip_support() || !orange_backup_has_ziparchive_support()) {
         $blockers[] = 'PHP gzip and ZipArchive extensions are required for full backup packaging.';
     }
 
