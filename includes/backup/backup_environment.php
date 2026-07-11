@@ -199,7 +199,7 @@ function orange_backup_run_command_capture(array $command, ?int $timeoutSeconds 
         1 => ['pipe', 'w'],
         2 => ['pipe', 'w'],
     ];
-    $process = proc_open($command, $descriptors, $pipes);
+    $process = @proc_open($command, $descriptors, $pipes);
     if (!is_resource($process)) {
         return ['exit_code' => 127, 'stdout' => '', 'stderr' => 'proc_open failed.'];
     }

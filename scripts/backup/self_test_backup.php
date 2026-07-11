@@ -146,7 +146,12 @@ self_test(!is_dir($tmp), 'temporary-folder cleanup');
 
 // Environment diagnostic structure
 $envReport = orange_backup_collect_environment_report($projectRoot);
-self_test(isset($envReport['php_version'], $envReport['can_run_full_backup'], $envReport['selected_backend']), 'environment diagnostic fields present');
+self_test(
+    array_key_exists('php_version', $envReport)
+        && array_key_exists('can_run_full_backup', $envReport)
+        && array_key_exists('selected_backend', $envReport),
+    'environment diagnostic fields present'
+);
 self_test(is_array($envReport['blockers'] ?? null), 'environment diagnostic blockers list present');
 
 // Lock prevents concurrent backup (same process pid marked active)
