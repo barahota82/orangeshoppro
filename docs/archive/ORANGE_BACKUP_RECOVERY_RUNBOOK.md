@@ -2,8 +2,28 @@
 
 **Document type:** Engineering archive — operational runbook  
 **Scope:** PR-BAK-01, PR-BAK-02 — backup and pre-migration snapshot foundation  
-**Implementation:** `scripts/backup/orange_backup.ps1` (Windows / Plesk / MariaDB)  
+**Implementation:** `scripts/backup/run_full_backup.php` (primary — Plesk Scheduled Tasks) and `scripts/backup/orange_backup.ps1` (optional — RDP/command line)  
 **Phase 1A (current):** Full disaster backup only — database + uploads + manifest + checksums + health report
+
+---
+
+## Plesk scheduled backup (primary)
+
+| Setting | Value |
+|---------|-------|
+| Task type | **Run a PHP script** |
+| Script path | `scripts/backup/run_full_backup.php` |
+| First test | **Run Now** (manual) after `git pull` |
+| Schedule | Daily at off-peak **UTC** time |
+| Notification | **Errors only** |
+
+Pre-flight (read-only):
+
+```powershell
+php D:\orange\scripts\backup\backup_environment_check.php
+```
+
+The PHP entry point handles locking, backend selection, logging under `{BackupRoot}/logs/`, and delegates to PowerShell when available.
 
 ---
 
@@ -16,7 +36,11 @@ Orange production data consists of:
 
 Both must be backed up together. A database-only backup without `uploads/` is **incomplete** for disaster recovery and pre-deploy rollback planning.
 
-Approved backup tool path: **`scripts/backup/orange_backup.ps1`**.  
+Approved backup entry points:
+
+- **Primary:** `scripts/backup/run_full_backup.php` (Plesk Scheduled Tasks)
+- **Optional:** `scripts/backup/orange_backup.ps1` (operators with RDP/command access)
+
 Backup storage: **`ORANGE_BACKUP_ROOT`** in server-only `.env.php` (default convention `{drive}:\orange_backups`). Backups must **not** live inside the Git repository or public web root.
 
 ---
@@ -25,7 +49,8 @@ Backup storage: **`ORANGE_BACKUP_ROOT`** in server-only `.env.php` (default conv
 
 A **daily automated backup** is required for any production or production-like environment.
 
-- Schedule via **Windows Task Scheduler** (see `scripts/backup/README.md`).
+- Schedule via **Plesk Scheduled Tasks** → Run a PHP script → `scripts/backup/run_full_backup.php` (see above).
+- Alternative: **Windows Task Scheduler** with `orange_backup.ps1` when RDP/command access is available (`scripts/backup/README.md`).
 - Each run must produce a timestamped snapshot under `{BackupRoot}/snapshots/` with:
   - compressed database dump (`{db_name}.sql.gz`),
   - `uploads.zip`,
@@ -150,8 +175,7 @@ The following are **not part of Phase 1A** and must not be assumed available:
 
 ```powershell
 php D:\orange\scripts\backup\self_test_backup.php
-php D:\orange\scripts\backup\resolve_backup_root.php --project-root=D:\orange
-php D:\orange\scripts\backup\backup_metadata.php --project-root=D:\orange
+php D:\orange\scripts\backup\backup_environment_check.php
 php D:\orange\scripts\backup\verify_full_backup.php --package=D:\orange_backups\snapshots\yyyy-MM-dd_HHmmss
 ```
 
@@ -169,7 +193,9 @@ php D:\orange\scripts\backup\verify_full_backup.php --package=D:\orange_backups\
 
 | Item | Status |
 |------|--------|
-| Automated full backup script in repository | Implemented (`scripts/backup/orange_backup.ps1`) |
+| Automated full backup script in repository | Implemented (`run_full_backup.php` + `orange_backup.ps1`) |
+| Plesk PHP scheduled-task entry point | Implemented (`run_full_backup.php`) |
+| Environment diagnostics CLI | Implemented (`backup_environment_check.php`) |
 | Manifest + checksums + health report | Implemented (Phase 1A) |
 | Package verifier CLI | Implemented (`verify_full_backup.php`) |
 | Pre-migration snapshot procedure documented | This runbook + README |

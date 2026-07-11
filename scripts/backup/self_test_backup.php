@@ -19,6 +19,9 @@ require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARAT
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_full.php';
 
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_environment.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_runner.php';
+
 $failures = 0;
 
 function self_test(bool $ok, string $label): void
@@ -140,5 +143,35 @@ self_test(!$corruptResult['ok'], 'corrupted checksum rejected');
 // Temporary-folder cleanup behavior
 orange_backup_remove_dir($tmp);
 self_test(!is_dir($tmp), 'temporary-folder cleanup');
+
+// Environment diagnostic structure
+$envReport = orange_backup_collect_environment_report($projectRoot);
+self_test(isset($envReport['php_version'], $envReport['can_run_full_backup'], $envReport['selected_backend']), 'environment diagnostic fields present');
+self_test(is_array($envReport['blockers'] ?? null), 'environment diagnostic blockers list present');
+
+// Lock prevents concurrent backup (same process pid marked active)
+$lockRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_bak_lock_' . bin2hex(random_bytes(4));
+mkdir($lockRoot);
+$firstLock = orange_backup_acquire_lock($lockRoot);
+self_test($firstLock['acquired'], 'lock acquire first caller');
+$secondLock = orange_backup_acquire_lock($lockRoot);
+self_test(!$secondLock['acquired'], 'lock prevents concurrent backup');
+orange_backup_release_lock();
+orange_backup_remove_dir($lockRoot);
+
+// Backend unavailable => clear failure signal
+$backend = orange_backup_select_backend($projectRoot);
+if ($backend === null) {
+    self_test(empty($envReport['can_run_full_backup']), 'backend unavailable marks can_run_full_backup=false');
+} else {
+    self_test(in_array($backend, ['powershell', 'php'], true), 'backend selection returns supported backend');
+    echo "INFO: backend available on this machine ({$backend})\n";
+}
+
+// PowerShell delegation path exists when powershell_ready
+if (!empty($envReport['powershell_ready'])) {
+    $psScript = $projectRoot . '/scripts/backup/orange_backup.ps1';
+    self_test(is_file($psScript), 'powershell backend script present');
+}
 
 exit($failures > 0 ? 1 : 0);

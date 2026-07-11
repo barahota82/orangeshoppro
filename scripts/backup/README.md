@@ -3,6 +3,41 @@
 Phase 1A scope: **full database + full uploads backup only**.  
 **Not in this phase:** Country Recovery Package (CRP), table registry, staging restore, production merge, admin backup module, restore APIs.
 
+**Primary entry point (Plesk):** `scripts/backup/run_full_backup.php`  
+**Optional lower-level entry point (RDP / command line):** `scripts/backup/orange_backup.ps1`
+
+---
+
+## Plesk Scheduled Tasks (recommended)
+
+Use Plesk **Scheduled Tasks** when RDP or interactive PowerShell is not available.
+
+| Setting | Value |
+|---------|-------|
+| **Task type** | Run a PHP script |
+| **Script path** | `scripts/backup/run_full_backup.php` |
+| **First manual test** | Click **Run Now** after deploy |
+| **Recommended schedule** | Daily at an off-peak UTC time (e.g. `03:00 UTC`) |
+| **Notification** | Errors only |
+
+The PHP entry point:
+
+- resolves the project root automatically from the script location,
+- validates `ORANGE_BACKUP_ROOT` via `backup_paths.php`,
+- acquires a lock file to prevent concurrent runs,
+- selects the safest backend (PowerShell when available, otherwise PHP-native mysqldump + gzip + ZipArchive),
+- writes logs under `{BackupRoot}/logs/run_full_backup_*.log`,
+- never prints database credentials,
+- exits `0` on success, non-zero on failure (`2` when another backup is already running).
+
+**Before scheduling:** run the read-only environment check:
+
+```powershell
+php D:\orange\scripts\backup\backup_environment_check.php
+```
+
+Exit code must be `0` (`can_run_full_backup=yes`).
+
 ---
 
 ## Full Disaster Backup (`orange_backup.ps1`)
@@ -118,23 +153,20 @@ Verifies: safe package path, manifest structure, `package_type=full_disaster`, r
 
 ```powershell
 php D:\orange\scripts\backup\self_test_backup.php
+php D:\orange\scripts\backup\backup_environment_check.php
 php D:\orange\scripts\backup\resolve_backup_root.php --project-root=D:\orange
 php D:\orange\scripts\backup\backup_metadata.php --project-root=D:\orange
 ```
 
 ---
 
-## Prerequisites
+## Manual full backup (PHP entry point)
 
-- Windows Server with **Plesk** (or equivalent) hosting Orange.
-- **MariaDB/MySQL** client tools (`mysqldump.exe`) installed and reachable.
-- **PHP CLI required** for package finalization (manifest, health, checksums).
-- `.env.php` present in the project root (same folder as `config.php`).
-- Write access to a dedicated backup folder outside the web root.
+```powershell
+php D:\orange\scripts\backup\run_full_backup.php
+```
 
----
-
-## Manual full backup
+## Manual full backup (PowerShell — optional)
 
 From PowerShell (run as a user that can read the project, `.env.php`, and `uploads/`):
 
@@ -144,7 +176,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\orange\scripts\backup\ora
   -BackupRoot D:\orange_backups
 ```
 
-Optional parameters:
+---
+
+## Prerequisites
+
+- Windows Server with **Plesk** (or equivalent) hosting Orange.
+- **MariaDB/MySQL** client tools (`mysqldump.exe`) installed and reachable.
+- **PHP CLI** for scheduled tasks and package finalization.
+- `.env.php` present in the project root (same folder as `config.php`).
+- Write access to a dedicated backup folder outside the web root.
+
+---
+
+## Manual full backup (PowerShell details)
 
 | Parameter | Default | Purpose |
 |-----------|---------|---------|
@@ -159,7 +203,11 @@ On success the script exits `0`. On failure it exits non-zero, leaves prior snap
 
 ---
 
-## Schedule daily backup (Windows Task Scheduler)
+## Schedule daily backup (Plesk — recommended)
+
+See **Plesk Scheduled Tasks** section above.
+
+## Schedule daily backup (Windows Task Scheduler — optional)
 
 1. Open **Task Scheduler** → **Create Task**.
 2. **General:** name e.g. `Orange Daily Backup`; run whether user is logged on or not; use an account with read access to the site and backup folder.
