@@ -1242,8 +1242,14 @@ function orange_order_delivery_retire_removed_line_slots(
         'SELECT DISTINCT reference, journal_voucher_id FROM orange_gl_pending_movements
          WHERE reference LIKE ? AND journal_voucher_id IS NOT NULL AND journal_voucher_id > 0'
     );
-    $st->execute([orange_gl_pending_source_key('order', $orderId, 'sale') . '-%']);
-    foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+    $legacyRows = [];
+    foreach (['sale', 'cogs'] as $legacyKind) {
+        $st->execute([orange_gl_pending_source_key('order', $orderId, $legacyKind) . '-%']);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $legacyRows[] = $row;
+        }
+    }
+    foreach ($legacyRows as $row) {
         $ref = (string) ($row['reference'] ?? '');
         if (!preg_match('/:sale-(\d+)$/i', $ref, $m) && !preg_match('/:cogs-(\d+)$/i', $ref, $m)) {
             continue;
@@ -1438,5 +1444,5 @@ function orange_order_delivery_immediate_post_all_slots(PDO $pdo, array $ctx): v
     if ($loyaltyMerchandiseNet <= 0.0001) {
         $loyaltyMerchandiseNet = orange_loyalty_merchandise_net_from_order($pdo, $order, $items);
     }
-    orange_loyalty_earn_for_order($pdo, $orderForLoyalty, $ofGlCountryId, $loyaltyMerchandiseNet);
+    orange_loyalty_earn_for_order($pdo, $orderForLoyalty, $ofGlCountryId, $loyaltyMerchandiseNet, $postingAt, $now);
 }

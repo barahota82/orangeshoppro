@@ -604,11 +604,11 @@ function orange_sales_invoice_company_sync_items(PDO $pdo, int $orderId, array $
         throw new RuntimeException('عمود gl_slot غير جاهز في order_items.');
     }
 
-    $stExisting = $pdo->prepare('SELECT gl_slot FROM order_items WHERE order_id = ? FOR UPDATE');
+    $stExisting = $pdo->prepare('SELECT id, gl_slot FROM order_items WHERE order_id = ? FOR UPDATE');
     $stExisting->execute([$orderId]);
     $existingSlots = [];
-    foreach ($stExisting->fetchAll(PDO::FETCH_COLUMN) ?: [] as $slotRaw) {
-        $slot = (int) $slotRaw;
+    foreach ($stExisting->fetchAll(PDO::FETCH_ASSOC) ?: [] as $existingRow) {
+        $slot = (int) ($existingRow['gl_slot'] ?? 0);
         if ($slot > 0) {
             $existingSlots[$slot] = true;
         }
@@ -620,6 +620,9 @@ function orange_sales_invoice_company_sync_items(PDO $pdo, int $orderId, array $
         if ($glSlot > 0) {
             if (!isset($existingSlots[$glSlot])) {
                 throw new RuntimeException('gl_slot غير صالح للسطر: ' . $glSlot);
+            }
+            if (isset($incomingSlots[$glSlot])) {
+                throw new RuntimeException('gl_slot مكرر في أسطر الفاتورة: ' . $glSlot);
             }
             $incomingSlots[$glSlot] = true;
         }
@@ -700,11 +703,41 @@ function orange_sales_invoice_company_sync_items(PDO $pdo, int $orderId, array $
         $incomingSlots[$newSlot] = true;
     }
 
+    $removedSlots = [];
     foreach (array_keys($existingSlots) as $existingSlot) {
-        if (!isset($incomingSlots[(int) $existingSlot])) {
-            $pdo->prepare('DELETE FROM order_items WHERE order_id = ? AND gl_slot = ?')
-                ->execute([$orderId, (int) $existingSlot]);
+        $existingSlot = (int) $existingSlot;
+        if (!isset($incomingSlots[$existingSlot])) {
+            $removedSlots[] = $existingSlot;
         }
+    }
+
+    if ($removedSlots !== []) {
+        require_once __DIR__ . '/gl_voucher_slot.php';
+        $countryId = null;
+        if (orange_table_has_column($pdo, 'orders', 'country_id')) {
+            $countrySt = $pdo->prepare('SELECT country_id FROM orders WHERE id = ? LIMIT 1');
+            $countrySt->execute([$orderId]);
+            $countryRaw = (int) ($countrySt->fetchColumn() ?: 0);
+            $countryId = $countryRaw > 0 ? $countryRaw : null;
+        }
+        foreach ($removedSlots as $removedSlot) {
+            foreach (['sale' => 'order_delivery_sale', 'cogs' => 'order_delivery_cogs'] as $slotKind => $entryType) {
+                $slotKey = $slotKind . '-' . $removedSlot;
+                orange_gl_voucher_slot_adopt_legacy_order_line($pdo, [
+                    'doc_kind' => 'order',
+                    'entity_id' => $orderId,
+                    'slot_key' => $slotKey,
+                    'entry_type' => $entryType,
+                    'country_id' => $countryId,
+                ], $countryId, $removedSlot);
+                orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, $slotKey);
+            }
+        }
+    }
+
+    foreach ($removedSlots as $removedSlot) {
+        $pdo->prepare('DELETE FROM order_items WHERE order_id = ? AND gl_slot = ?')
+            ->execute([$orderId, $removedSlot]);
     }
 
     $activeGlSlots = array_keys($incomingSlots);
@@ -755,8 +788,21 @@ function orange_sales_invoice_company_register_edit_lock(PDO $pdo, int $orderId,
     $ref = $inv !== '' ? $inv : orange_sales_invoice_company_reference($pdo, $orderId, $order);
     $vid = null;
     if (orange_journal_vouchers_ready($pdo)) {
+        require_once __DIR__ . '/gl_voucher_slot.php';
+        if (orange_gl_voucher_slots_ready($pdo)) {
+            foreach (orange_gl_voucher_slot_list_for_document($pdo, 'order', $orderId) as $slotRow) {
+                $slotKey = (string) ($slotRow['slot_key'] ?? '');
+                if ($slotKey === 'sale-agg' || preg_match('/^sale-\d+$/', $slotKey)) {
+                    $candidateVid = (int) ($slotRow['journal_voucher_id'] ?? 0);
+                    if ($candidateVid > 0) {
+                        $vid = $candidateVid;
+                        break;
+                    }
+                }
+            }
+        }
         $orderNumber = trim((string) ($order['order_number'] ?? ''));
-        if ($orderNumber !== '') {
+        if ($vid === null && $orderNumber !== '') {
             $refs = orange_gl_voucher_select_references_like(
                 $pdo,
                 'ORDER-' . $orderNumber . '-S-%',

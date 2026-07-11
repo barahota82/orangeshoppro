@@ -162,12 +162,16 @@ function orange_loyalty_post_simple_gl(
     string $entryType,
     string $refType,
     int $refId,
-    string $pendingSuffix
+    string $pendingSuffix,
+    ?string $voucherDate = null,
+    ?string $documentEnteredAt = null
 ): void {
     if ($amount <= 0.0001 || $debitId <= 0 || $creditId <= 0) {
         return;
     }
     $now = date('Y-m-d H:i:s');
+    $voucherDate = trim((string) ($voucherDate ?? '')) !== '' ? (string) $voucherDate : $now;
+    $documentEnteredAt = trim((string) ($documentEnteredAt ?? '')) !== '' ? (string) $documentEnteredAt : $voucherDate;
     $amount = round($amount, 4);
     $lines = [
         ['account_id' => $debitId, 'debit' => $amount, 'credit' => 0.0, 'memo' => $desc],
@@ -181,8 +185,8 @@ function orange_loyalty_post_simple_gl(
             $lines,
             $key,
             strtoupper($refType) . '-' . $refId,
-            $now,
-            $now,
+            $voucherDate,
+            $voucherDate,
             $desc,
             $entryType,
             $afterJson
@@ -191,8 +195,8 @@ function orange_loyalty_post_simple_gl(
         return;
     }
     orange_voucher_post($pdo, [
-        'voucher_date' => $now,
-        'document_entered_at' => $now,
+        'voucher_date' => $voucherDate,
+        'document_entered_at' => $documentEnteredAt,
         'description' => $desc,
         'entry_type' => $entryType,
         'journal_type_id' => null,
@@ -217,7 +221,14 @@ function orange_loyalty_earn_retire_slot_if_immediate(PDO $pdo, int $orderId): v
 /**
  * كسب نقاط عند تسليم الطلب — مرّة واحدة لكل طلب.
  */
-function orange_loyalty_earn_for_order(PDO $pdo, array $order, int $countryId, float $netSales): void
+function orange_loyalty_earn_for_order(
+    PDO $pdo,
+    array $order,
+    int $countryId,
+    float $netSales,
+    ?string $voucherDate = null,
+    ?string $documentEnteredAt = null
+): void
 {
     $orderId = (int) ($order['id'] ?? 0);
     if (!orange_loyalty_tables_ready($pdo) || $netSales <= 0.0001) {
@@ -307,6 +318,9 @@ function orange_loyalty_earn_for_order(PDO $pdo, array $order, int $countryId, f
 
     $desc = 'قيد كسب نقاط ولاء — تسليم الطلب';
     $afterJson = orange_gl_after_post_json_with_country(null, $countryId);
+    $now = date('Y-m-d H:i:s');
+    $voucherDate = trim((string) ($voucherDate ?? '')) !== '' ? (string) $voucherDate : $now;
+    $documentEnteredAt = trim((string) ($documentEnteredAt ?? '')) !== '' ? (string) $documentEnteredAt : $voucherDate;
     if (orange_gl_use_pending_queue($pdo)) {
         orange_loyalty_post_simple_gl(
             $pdo,
@@ -318,7 +332,9 @@ function orange_loyalty_earn_for_order(PDO $pdo, array $order, int $countryId, f
             'loyalty_earn',
             'order',
             $orderId,
-            'loyalty-earn'
+            'loyalty-earn',
+            $voucherDate,
+            $documentEnteredAt
         );
 
         return;
@@ -336,8 +352,8 @@ function orange_loyalty_earn_for_order(PDO $pdo, array $order, int $countryId, f
         'journal_type_id' => $earnJtId > 0 ? $earnJtId : null,
     ];
     $earnHeader = [
-        'voucher_date' => date('Y-m-d H:i:s'),
-        'document_entered_at' => date('Y-m-d H:i:s'),
+        'voucher_date' => $voucherDate,
+        'document_entered_at' => $documentEnteredAt,
         'description' => $desc,
         'entry_type' => 'loyalty_earn',
         'country_id' => $countryId,
