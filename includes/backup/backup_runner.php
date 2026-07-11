@@ -342,9 +342,11 @@ function orange_backup_apply_retention(
 /**
  * @return array{ok:bool,backend:string,message:string,snapshot:?string}
  */
-function orange_backup_run_via_powershell(string $projectRoot, string $backupRoot, string $logFile): array
+function orange_backup_run_via_powershell(string $projectRoot, string $backupRoot, string $logFile, ?array $env = null): array
 {
-    $psPath = orange_backup_find_powershell();
+    $env ??= orange_backup_load_env_array($projectRoot);
+    $detected = orange_backup_detect_powershell($env);
+    $psPath = $detected['path'];
     $psScript = $projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'orange_backup.ps1';
     if ($psPath === null || !is_file($psScript)) {
         return ['ok' => false, 'backend' => 'powershell', 'message' => 'PowerShell backend unavailable.', 'snapshot' => null];
@@ -417,14 +419,19 @@ function orange_backup_latest_snapshot_name(string $backupRoot): ?string
 /**
  * @return array{ok:bool,backend:string,message:string,snapshot:?string}
  */
-function orange_backup_run_via_php(string $projectRoot, string $backupRoot, string $logFile): array
+function orange_backup_run_via_php(string $projectRoot, string $backupRoot, string $logFile, ?array $env = null): array
 {
-    $mysqldumpPath = orange_backup_find_mysqldump();
-    if ($mysqldumpPath === null || !orange_backup_has_gzip_support() || !orange_backup_has_ziparchive_support()) {
-        return ['ok' => false, 'backend' => 'php', 'message' => 'PHP backend prerequisites missing.', 'snapshot' => null];
+    $env ??= orange_backup_load_env_array($projectRoot);
+    $detected = orange_backup_detect_mysqldump($env);
+    $mysqldumpPath = $detected['path'];
+    if ($mysqldumpPath === null || !orange_backup_can_proc_open()) {
+        $reason = $detected['error'] ?? 'PHP mysqldump backend unavailable.';
+        return ['ok' => false, 'backend' => 'php_mysqldump', 'message' => $reason, 'snapshot' => null];
     }
 
-    $env = orange_backup_load_env_array($projectRoot);
+    if (!orange_backup_has_gzip_support() || !orange_backup_has_ziparchive_support()) {
+        return ['ok' => false, 'backend' => 'php_mysqldump', 'message' => 'gzip or ZipArchive support is unavailable.', 'snapshot' => null];
+    }
     require_once $projectRoot . DIRECTORY_SEPARATOR . 'config.php';
     require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'catalog_schema.php';
 
@@ -506,8 +513,8 @@ function orange_backup_run_via_php(string $projectRoot, string $backupRoot, stri
 
         return [
             'ok' => true,
-            'backend' => 'php',
-            'message' => 'PHP native backup completed successfully.',
+            'backend' => 'php_mysqldump',
+            'message' => 'PHP mysqldump backup completed successfully.',
             'snapshot' => $snapshotName,
         ];
     } catch (Throwable $e) {
@@ -521,7 +528,7 @@ function orange_backup_run_via_php(string $projectRoot, string $backupRoot, stri
 
         return [
             'ok' => false,
-            'backend' => 'php',
+            'backend' => 'php_mysqldump',
             'message' => $e->getMessage(),
             'snapshot' => null,
         ];
@@ -566,15 +573,18 @@ function orange_backup_run_full(string $projectRoot, ?string $backupRootOverride
             orange_backup_runner_log($logFile, $message, $level);
         });
 
-        $backend = orange_backup_select_backend($projectRoot);
+        $report = orange_backup_collect_environment_report($projectRoot);
+        $backend = $report['selected_backend'] ?? null;
         if ($backend === null) {
-            throw new RuntimeException('No backup backend available on this server.');
+            $blockers = implode(' | ', $report['blockers'] ?? ['No backup backend available on this server.']);
+            throw new RuntimeException($blockers);
         }
 
         orange_backup_runner_log($logFile, 'Selected backend=' . $backend);
+        $env = orange_backup_load_env_array($projectRoot);
         $result = $backend === 'powershell'
-            ? orange_backup_run_via_powershell($projectRoot, $backupRoot, $logFile)
-            : orange_backup_run_via_php($projectRoot, $backupRoot, $logFile);
+            ? orange_backup_run_via_powershell($projectRoot, $backupRoot, $logFile, $env)
+            : orange_backup_run_via_php($projectRoot, $backupRoot, $logFile, $env);
 
         if (!$result['ok']) {
             orange_backup_runner_log($logFile, $result['message'], 'ERROR');

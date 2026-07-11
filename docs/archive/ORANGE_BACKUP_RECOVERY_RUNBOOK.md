@@ -23,7 +23,16 @@ Pre-flight (read-only):
 php D:\orange\scripts\backup\backup_environment_check.php
 ```
 
-The PHP entry point handles locking, backend selection, logging under `{BackupRoot}/logs/`, and delegates to PowerShell when available.
+The PHP entry point handles locking, backend selection, logging under `{BackupRoot}/logs/`, and delegates to PowerShell only when explicitly executable; otherwise it uses **PHP + mysqldump via `proc_open`**.
+
+**Required server-only `.env.php` keys (Plesk example):**
+
+```php
+'ORANGE_BACKUP_ROOT' => 'C:\\inetpub\\vhosts\\clickstorekw.com\\private\\orange_backups',
+'ORANGE_MYSQLDUMP_PATH' => 'C:\\Program Files (x86)\\Plesk\\MySQL\\bin\\mysqldump.exe',
+```
+
+Create the BackupRoot folder outside `httpdocs`, grant write permission to the scheduled-task PHP user, and verify `proc_open` is enabled. If `proc_open` is disabled, the scheduled task **must fail** — there is no PDO fallback in Phase 1A.
 
 ---
 
@@ -41,7 +50,7 @@ Approved backup entry points:
 - **Primary:** `scripts/backup/run_full_backup.php` (Plesk Scheduled Tasks)
 - **Optional:** `scripts/backup/orange_backup.ps1` (operators with RDP/command access)
 
-Backup storage: **`ORANGE_BACKUP_ROOT`** in server-only `.env.php` (default convention `{drive}:\orange_backups`). Backups must **not** live inside the Git repository or public web root.
+Backup storage: **`ORANGE_BACKUP_ROOT`** in server-only `.env.php` (**mandatory on Plesk**). Also set **`ORANGE_MYSQLDUMP_PATH`** to the host `mysqldump.exe` path. Backups must **not** live inside the Git repository or public web root.
 
 ---
 

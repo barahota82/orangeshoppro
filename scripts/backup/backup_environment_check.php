@@ -19,31 +19,44 @@ require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARAT
 
 $report = orange_backup_collect_environment_report($projectRoot);
 
+$bool = static fn (bool $value): string => $value ? 'yes' : 'no';
+
 $lines = [
     'php_version=' . ($report['php_version'] ?? ''),
     'php_sapi=' . ($report['php_sapi'] ?? ''),
     'project_root=' . ($report['project_root'] ?? ''),
+    'orange_backup_root_configured=' . $bool(!empty($report['orange_backup_root_configured'])),
+    'backup_root_candidate=' . ($report['backup_root_candidate'] ?? ''),
     'backup_root=' . ($report['backup_root'] ?? ''),
-    'backup_root_writable=' . (!empty($report['backup_root_writable']) ? 'yes' : 'no'),
-    'powershell_available=' . (!empty($report['powershell_available']) ? 'yes' : 'no'),
-    'powershell_path=' . ($report['powershell_path'] ?? ''),
-    'powershell_ready=' . (!empty($report['powershell_ready']) ? 'yes' : 'no'),
-    'mysqldump_available=' . (!empty($report['mysqldump_available']) ? 'yes' : 'no'),
+    'backup_root_writable=' . $bool(!empty($report['backup_root_writable'])),
+    'backup_root_error=' . ($report['backup_root_error'] ?? ''),
+    'open_basedir=' . ($report['open_basedir'] ?? ''),
+    'proc_open_available=' . $bool(!empty($report['proc_open_available'])),
+    'shell_exec_available=' . $bool(!empty($report['shell_exec_available'])),
+    'configured_mysqldump_path_present=' . $bool(!empty($report['configured_mysqldump_path_present'])),
+    'configured_powershell_path_present=' . $bool(!empty($report['configured_powershell_path_present'])),
+    'mysqldump_detection_source=' . ($report['mysqldump_detection_source'] ?? ''),
+    'powershell_detection_source=' . ($report['powershell_detection_source'] ?? ''),
+    'mysqldump_available=' . $bool(!empty($report['mysqldump_available'])),
     'mysqldump_path=' . ($report['mysqldump_path'] ?? ''),
-    'gzip_supported=' . (!empty($report['gzip_supported']) ? 'yes' : 'no'),
-    'ziparchive_supported=' . (!empty($report['ziparchive_supported']) ? 'yes' : 'no'),
-    'proc_open_available=' . (!empty($report['proc_open_available']) ? 'yes' : 'no'),
-    'shell_exec_available=' . (!empty($report['shell_exec_available']) ? 'yes' : 'no'),
-    'uploads_path=' . ($report['uploads_path'] ?? ''),
-    'uploads_readable=' . (!empty($report['uploads_readable']) ? 'yes' : 'no'),
-    'database_connected=' . (!empty($report['database_connected']) ? 'yes' : 'no'),
+    'powershell_available=' . $bool(!empty($report['powershell_available'])),
+    'powershell_path=' . ($report['powershell_path'] ?? ''),
+    'gzip_supported=' . $bool(!empty($report['gzip_supported'])),
+    'ziparchive_supported=' . $bool(!empty($report['ziparchive_supported'])),
+    'uploads_readable=' . $bool(!empty($report['uploads_readable'])),
+    'database_connected=' . $bool(!empty($report['database_connected'])),
     'schema_revision=' . ($report['schema_revision'] ?? ''),
     'selected_backend=' . ($report['selected_backend'] ?? ''),
-    'can_run_full_backup=' . (!empty($report['can_run_full_backup']) ? 'yes' : 'no'),
+    'can_run_full_backup=' . $bool(!empty($report['can_run_full_backup'])),
 ];
 
 foreach ($lines as $line) {
     echo $line . PHP_EOL;
+}
+
+$warnings = $report['warnings'] ?? [];
+if (is_array($warnings) && $warnings !== []) {
+    echo 'warnings=' . implode(' | ', $warnings) . PHP_EOL;
 }
 
 $blockers = $report['blockers'] ?? [];

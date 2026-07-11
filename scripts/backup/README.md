@@ -25,7 +25,7 @@ The PHP entry point:
 - resolves the project root automatically from the script location,
 - validates `ORANGE_BACKUP_ROOT` via `backup_paths.php`,
 - acquires a lock file to prevent concurrent runs,
-- selects the safest backend (PowerShell when available, otherwise PHP-native mysqldump + gzip + ZipArchive),
+- selects the safest backend (PowerShell when explicitly executable, otherwise PHP mysqldump via `proc_open`),
 - writes logs under `{BackupRoot}/logs/run_full_backup_*.log`,
 - never prints database credentials,
 - exits `0` on success, non-zero on failure (`2` when another backup is already running).
@@ -63,13 +63,30 @@ Each successful run writes:
 
 ---
 
-## Safe storage (`ORANGE_BACKUP_ROOT`)
+## Safe storage and Plesk configuration (`.env.php`)
 
-Set in server-only `.env.php` (never commit):
+**On Plesk production, set these keys in server-only `.env.php` (never commit):**
 
 ```php
-'ORANGE_BACKUP_ROOT' => 'D:\\orange_backups',
+'ORANGE_BACKUP_ROOT' => 'C:\\inetpub\\vhosts\\clickstorekw.com\\private\\orange_backups',
+'ORANGE_MYSQLDUMP_PATH' => 'C:\\Program Files (x86)\\Plesk\\MySQL\\bin\\mysqldump.exe',
+// optional — only if you want PowerShell delegation from PHP:
+// 'ORANGE_BACKUP_POWERSHELL_PATH' => 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
 ```
+
+| Key | Required on Plesk | Purpose |
+|-----|-------------------|---------|
+| `ORANGE_BACKUP_ROOT` | **Yes** | Writable folder **outside** the site / `httpdocs` / Git repo |
+| `ORANGE_MYSQLDUMP_PATH` | **Strongly recommended** | Exact host path to `mysqldump.exe` when auto-discovery fails |
+| `ORANGE_BACKUP_POWERSHELL_PATH` | No | Optional explicit PowerShell path for delegation |
+
+**Owner setup before first backup:**
+
+1. Create `private\orange_backups` (or equivalent) **outside** `orangeshoppro.com` / `httpdocs`.
+2. Grant the **Plesk scheduled-task PHP identity** write permission on that folder.
+3. Locate `mysqldump.exe` on the host (Plesk / MariaDB bin path) and set `ORANGE_MYSQLDUMP_PATH`.
+4. Confirm **`proc_open` is enabled** for the PHP CLI profile used by scheduled tasks. If disabled, the task **must fail** — do not expect success.
+5. Run `backup_environment_check.php` until `can_run_full_backup=yes`.
 
 Rules enforced by `includes/backup/backup_paths.php`:
 
@@ -80,7 +97,9 @@ Rules enforced by `includes/backup/backup_paths.php`:
 | No traversal | Rejects `..` in configured paths |
 | No empty override | Rejects explicitly empty `ORANGE_BACKUP_ROOT` |
 | Writable | Directory must exist (or be creatable) and be writable |
-| No hardcoded production paths in Git | Default `{drive}:\orange_backups` is computed at runtime only |
+| Explicit tool paths | `ORANGE_MYSQLDUMP_PATH` preferred; optional `ORANGE_BACKUP_POWERSHELL_PATH` |
+| `proc_open` required | PHP mysqldump backend fails closed when `proc_open` is disabled |
+| No hardcoded production paths in Git | Example paths live in `.env.php` on the server only |
 
 PowerShell `-BackupRoot` still works; when PHP CLI is available, `resolve_backup_root.php` validates the resolved path.
 

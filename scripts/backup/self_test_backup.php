@@ -146,8 +146,42 @@ self_test(!is_dir($tmp), 'temporary-folder cleanup');
 
 // Environment diagnostic structure
 $envReport = orange_backup_collect_environment_report($projectRoot);
-self_test(isset($envReport['php_version'], $envReport['can_run_full_backup'], $envReport['selected_backend']), 'environment diagnostic fields present');
-self_test(is_array($envReport['blockers'] ?? null), 'environment diagnostic blockers list present');
+$requiredFields = [
+    'orange_backup_root_configured',
+    'backup_root_candidate',
+    'backup_root_error',
+    'open_basedir',
+    'proc_open_available',
+    'configured_mysqldump_path_present',
+    'mysqldump_detection_source',
+    'powershell_detection_source',
+    'selected_backend',
+    'can_run_full_backup',
+    'blockers',
+];
+foreach ($requiredFields as $field) {
+    self_test(array_key_exists($field, $envReport), "environment report includes {$field}");
+}
+if (empty($envReport['backup_root'])) {
+    self_test(!empty($envReport['backup_root_error']), 'backup_root_error surfaced when backup_root unresolved');
+}
+
+// Invalid configured mysqldump path rejected
+$invalidDump = orange_backup_detect_mysqldump(['ORANGE_MYSQLDUMP_PATH' => 'Z:\\missing\\mysqldump.exe']);
+self_test($invalidDump['source'] === 'configured_invalid', 'invalid configured mysqldump path rejected');
+
+// Configured path takes precedence over discovery order (invalid configured => configured_invalid, not none)
+self_test($invalidDump['source'] !== 'none', 'configured mysqldump path preferred over auto-discovery');
+
+// proc_open unavailable blocks execution
+if (!orange_backup_can_proc_open()) {
+    $blockerText = implode(' ', $envReport['blockers'] ?? []);
+    self_test(empty($envReport['can_run_full_backup']), 'proc_open unavailable marks can_run_full_backup=false');
+    self_test(str_contains($blockerText, 'proc_open'), 'proc_open unavailable listed in blockers');
+}
+
+// No PDO backend exists
+self_test(!function_exists('orange_backup_run_via_pdo') && !function_exists('orange_backup_detect_pdo'), 'no PDO backend exists');
 
 // Lock prevents concurrent backup (same process pid marked active)
 $lockRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_bak_lock_' . bin2hex(random_bytes(4));
@@ -164,7 +198,7 @@ $backend = orange_backup_select_backend($projectRoot);
 if ($backend === null) {
     self_test(empty($envReport['can_run_full_backup']), 'backend unavailable marks can_run_full_backup=false');
 } else {
-    self_test(in_array($backend, ['powershell', 'php'], true), 'backend selection returns supported backend');
+    self_test(in_array($backend, ['powershell', 'php_mysqldump'], true), 'backend selection returns supported backend');
     echo "INFO: backend available on this machine ({$backend})\n";
 }
 

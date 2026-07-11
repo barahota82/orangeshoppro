@@ -58,9 +58,11 @@ return [
     // ثوانٍ APCu لتخطي بوابة الترحيل بعد نجاح (0 أو عدم التعيين = معطّل). متغير بيئة السيرفر ORANGE_SCHEMA_APCU_GATE_SECONDS
     // علم ملف اختياري: المسار في متغير بيئة ORANGE_SCHEMA_OK_FLAG_PATH؛ السطر الأول = رقم ORANGE_SCHEMA_CODE_VERSION بعد نشر ناجح.
 
-    // اختياري: مسار النسخ الاحتياطي خارج جذر الموقع (Phase 1A — Full Disaster Backup).
-    // يجب ألا يكون داخل httpdocs أو مجلد uploads. مثال: D:\orange_backups
-    // 'ORANGE_BACKUP_ROOT' => 'D:\\orange_backups',
+    // اختياري: Phase 1A — Full Disaster Backup (إلزامي على Plesk production).
+    // أنشئ المجلد خارج httpdocs/مجلد الموقع. مثال Plesk:
+    // 'ORANGE_BACKUP_ROOT' => 'C:\\inetpub\\vhosts\\clickstorekw.com\\private\\orange_backups',
+    // 'ORANGE_MYSQLDUMP_PATH' => 'C:\\Program Files (x86)\\Plesk\\MySQL\\bin\\mysqldump.exe',
+    // 'ORANGE_BACKUP_POWERSHELL_PATH' => 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
 
     // ==================================================================
     // بوابة الدفع الإلكتروني (المرحلة 2) — أسرار السيرفر فقط، لا تُرفع لـ Git.
