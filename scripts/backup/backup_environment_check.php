@@ -26,6 +26,10 @@ if (is_file($envPath)) {
 
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_environment.php';
 
+if (in_array('--self-test-extensions', $_SERVER['argv'] ?? [], true)) {
+    exit(orange_backup_extension_checks_self_test() ? 0 : 1);
+}
+
 try {
     $report = orange_backup_collect_environment_report($projectRoot);
 

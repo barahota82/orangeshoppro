@@ -68,7 +68,16 @@ function orange_backup_function_usable(string $name): bool
     if (!function_exists($name)) {
         return false;
     }
-    $disabled = array_filter(array_map('trim', explode(',', (string) ini_get('disable_functions'))));
+    $disabled = [];
+    $rawDisabled = ini_get('disable_functions');
+    if (is_string($rawDisabled) && $rawDisabled !== '') {
+        foreach (explode(',', $rawDisabled) as $part) {
+            $part = trim($part);
+            if ($part !== '') {
+                $disabled[] = $part;
+            }
+        }
+    }
 
     return !in_array($name, $disabled, true);
 }
@@ -332,12 +341,51 @@ function orange_backup_find_powershell(?array $env = null): ?string
 
 function orange_backup_has_gzip_support(): bool
 {
+    if (!extension_loaded('zlib')) {
+        return false;
+    }
+
     return function_exists('gzopen') && function_exists('gzwrite');
 }
 
 function orange_backup_has_ziparchive_support(): bool
 {
-    return class_exists('ZipArchive');
+    if (!extension_loaded('zip')) {
+        return false;
+    }
+
+    try {
+        return class_exists('ZipArchive', false);
+    } catch (Throwable) {
+        return false;
+    }
+}
+
+/**
+ * @return array{gzip:bool,zip:bool}
+ */
+function orange_backup_extension_support_flags(): array
+{
+    return [
+        'gzip' => orange_backup_has_gzip_support(),
+        'zip' => orange_backup_has_ziparchive_support(),
+    ];
+}
+
+/**
+ * Plesk-safe regression check: extension probes must not throw when mysqldump is absent.
+ */
+function orange_backup_extension_checks_self_test(): bool
+{
+    $env = ['ORANGE_MYSQLDUMP_PATH' => 'Z:\\missing\\mysqldump-for-self-test.exe'];
+    $detected = orange_backup_detect_mysqldump($env);
+    if (($detected['path'] ?? null) !== null) {
+        return false;
+    }
+
+    $flags = orange_backup_extension_support_flags();
+
+    return is_bool($flags['gzip']) && is_bool($flags['zip']);
 }
 
 function orange_backup_debug_enabled(array $env): bool
@@ -581,9 +629,12 @@ function orange_backup_collect_environment_report(string $projectRoot): array
     $powershellReady = $powershellPath !== null
         && is_file($psScript)
         && orange_backup_can_execute_commands();
+    $extensionSupport = orange_backup_extension_support_flags();
+    $gzipSupported = $extensionSupport['gzip'];
+    $ziparchiveSupported = $extensionSupport['zip'];
     $phpReady = $mysqldumpPath !== null
-        && orange_backup_has_gzip_support()
-        && orange_backup_has_ziparchive_support()
+        && $gzipSupported
+        && $ziparchiveSupported
         && orange_backup_can_proc_open();
 
     $selectedBackend = null;
@@ -624,7 +675,7 @@ function orange_backup_collect_environment_report(string $projectRoot): array
     if ($selectedBackend === null) {
         $blockers[] = 'No executable backup backend is available (PowerShell optional; PHP mysqldump requires proc_open).';
     }
-    if (!$orange_backup_has_gzip_support() || !orange_backup_has_ziparchive_support()) {
+    if (!$gzipSupported || !$ziparchiveSupported) {
         $blockers[] = 'PHP gzip and ZipArchive extensions are required for full backup packaging.';
     }
 
@@ -661,8 +712,8 @@ function orange_backup_collect_environment_report(string $projectRoot): array
         'powershell_ready' => $powershellReady,
         'mysqldump_available' => $mysqldumpPath !== null,
         'mysqldump_path' => $mysqldumpPath,
-        'gzip_supported' => orange_backup_has_gzip_support(),
-        'ziparchive_supported' => orange_backup_has_ziparchive_support(),
+        'gzip_supported' => $gzipSupported,
+        'ziparchive_supported' => $ziparchiveSupported,
         'uploads_path' => $uploadsPath,
         'uploads_readable' => is_dir($uploadsPath) && is_readable($uploadsPath),
         'database_connected' => $databaseConnected,
