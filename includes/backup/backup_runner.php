@@ -36,47 +36,22 @@ function orange_backup_acquire_lock(string $backupRoot): array
     global $orangeBackupLockHandle;
 
     $path = orange_backup_lock_path($backupRoot);
-    if (is_file($path)) {
-        $raw = file_get_contents($path);
-        $meta = is_string($raw) ? json_decode($raw, true) : null;
-        $pid = is_array($meta) ? (int) ($meta['pid'] ?? 0) : 0;
-        $startedAt = is_array($meta) ? (string) ($meta['started_at'] ?? '') : '';
-        $ageSeconds = 0;
-        if ($startedAt !== '') {
-            $startedTs = strtotime($startedAt);
-            if ($startedTs !== false) {
-                $ageSeconds = time() - $startedTs;
-            }
-        } elseif (is_file($path)) {
-            $mtime = filemtime($path);
-            if ($mtime !== false) {
-                $ageSeconds = time() - $mtime;
-            }
-        }
-
-        $stale = $ageSeconds >= ORANGE_BACKUP_LOCK_STALE_SECONDS;
-        $pidAlive = $pid > 0 && orange_backup_process_alive($pid);
-        if (!$pidAlive || $stale) {
-            @unlink($path);
-        } else {
-            return [
-                'acquired' => false,
-                'reason' => 'Another backup is already running (pid ' . $pid . ').',
-                'path' => $path,
-            ];
-        }
-    }
-
     $handle = @fopen($path, 'c+b');
     if ($handle === false) {
         throw new RuntimeException('Cannot open lock file: ' . $path);
     }
     if (!flock($handle, LOCK_EX | LOCK_NB)) {
+        $raw = file_get_contents($path);
+        $meta = is_string($raw) ? json_decode($raw, true) : null;
+        $pid = is_array($meta) ? (int) ($meta['pid'] ?? 0) : 0;
+        $reason = $pid > 0
+            ? 'Another backup is already running (pid ' . $pid . ').'
+            : 'Another backup holds the lock file.';
         fclose($handle);
 
         return [
             'acquired' => false,
-            'reason' => 'Another backup holds the lock file.',
+            'reason' => $reason,
             'path' => $path,
         ];
     }
@@ -213,6 +188,7 @@ function orange_backup_create_mysqldump_defaults_file(string $directory, string 
     if (file_put_contents($file, $content) === false) {
         throw new RuntimeException('Cannot write temporary mysqldump defaults file.');
     }
+    @chmod($file, 0600);
 
     return $file;
 }
@@ -307,9 +283,13 @@ function orange_backup_apply_retention(
         }
     }
 
+    $baseMonthStart = strtotime('first day of this month midnight', $now);
     for ($monthOffset = 0; $monthOffset < max(1, $retentionMonthly); $monthOffset++) {
-        $monthStart = strtotime('first day of -' . $monthOffset . ' month midnight', $now);
-        $monthEnd = strtotime('first day of -' . ($monthOffset - 1) . ' month midnight', $now);
+        if ($baseMonthStart === false) {
+            continue;
+        }
+        $monthStart = strtotime('-' . $monthOffset . ' months', $baseMonthStart);
+        $monthEnd = $monthStart !== false ? strtotime('+1 month', $monthStart) : false;
         if ($monthStart === false || $monthEnd === false) {
             continue;
         }
@@ -456,7 +436,7 @@ function orange_backup_run_via_php(string $projectRoot, string $backupRoot, stri
     $defaultsFile = null;
     try {
         orange_backup_runner_log($logFile, 'Running PHP native backup backend.');
-        orange_backup_runner_log($logFile, 'Database target: host=' . $db['host'] . ' name=' . $db['name'] . ' user=' . $db['user']);
+        orange_backup_runner_log($logFile, 'Database target: host=' . $db['host'] . ' name=' . $db['name']);
 
         $rawSqlFile = $tempWorkDir . DIRECTORY_SEPARATOR . $db['name'] . '.sql';
         $dumpFileName = $db['name'] . '.sql.gz';
@@ -481,7 +461,6 @@ function orange_backup_run_via_php(string $projectRoot, string $backupRoot, stri
         }
 
         $pdo = db();
-        orange_catalog_ensure_schema($pdo);
         $metadata = orange_backup_collect_safe_metadata($pdo, $projectRoot, $env);
         $result = orange_backup_full_finalize_workspace([
             'workspace' => $tempWorkDir,

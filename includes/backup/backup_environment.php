@@ -37,6 +37,11 @@ function orange_backup_can_shell_exec(): bool
     return orange_backup_function_usable('shell_exec');
 }
 
+function orange_backup_can_exec(): bool
+{
+    return orange_backup_function_usable('exec');
+}
+
 function orange_backup_can_proc_open(): bool
 {
     return orange_backup_function_usable('proc_open');
@@ -44,7 +49,7 @@ function orange_backup_can_proc_open(): bool
 
 function orange_backup_can_execute_commands(): bool
 {
-    return orange_backup_can_proc_open() || orange_backup_can_shell_exec();
+    return orange_backup_can_proc_open() || orange_backup_can_exec();
 }
 
 /**
@@ -174,15 +179,17 @@ function orange_backup_load_db_settings(string $projectRoot): array
 function orange_backup_run_command_capture(array $command, ?int $timeoutSeconds = null): array
 {
     if (!orange_backup_can_proc_open()) {
-        if (!orange_backup_can_shell_exec()) {
+        if (!orange_backup_can_exec()) {
             return ['exit_code' => 127, 'stdout' => '', 'stderr' => 'No command execution functions available.'];
         }
         $escaped = array_map(static fn (string $part): string => escapeshellarg($part), $command);
-        $output = shell_exec(implode(' ', $escaped) . ' 2>&1');
+        $lines = [];
+        $exitCode = 127;
+        exec(implode(' ', $escaped) . ' 2>&1', $lines, $exitCode);
 
         return [
-            'exit_code' => 0,
-            'stdout' => is_string($output) ? $output : '',
+            'exit_code' => $exitCode,
+            'stdout' => $lines !== [] ? implode("\n", $lines) . "\n" : '',
             'stderr' => '',
         ];
     }
@@ -192,7 +199,7 @@ function orange_backup_run_command_capture(array $command, ?int $timeoutSeconds 
         1 => ['pipe', 'w'],
         2 => ['pipe', 'w'],
     ];
-    $process = proc_open($command, $descriptors, $pipes);
+    $process = @proc_open($command, $descriptors, $pipes);
     if (!is_resource($process)) {
         return ['exit_code' => 127, 'stdout' => '', 'stderr' => 'proc_open failed.'];
     }
@@ -276,12 +283,17 @@ function orange_backup_collect_environment_report(string $projectRoot): array
     if (is_file($projectRoot . DIRECTORY_SEPARATOR . '.env.php')) {
         try {
             require_once $projectRoot . DIRECTORY_SEPARATOR . 'config.php';
-            require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'catalog_schema.php';
             require_once __DIR__ . DIRECTORY_SEPARATOR . 'backup_full.php';
+            $catalogSchemaPath = $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'catalog_schema.php';
+            if (is_file($catalogSchemaPath)) {
+                require_once $catalogSchemaPath;
+            }
             $pdo = db();
-            orange_catalog_ensure_schema($pdo);
             $databaseConnected = true;
-            $schemaRevision = orange_backup_schema_revision_live($pdo) ?: ORANGE_CATALOG_SCHEMA_PHP_REVISION;
+            $schemaRevision = orange_backup_schema_revision_live($pdo);
+            if ($schemaRevision <= 0 && defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
+                $schemaRevision = ORANGE_CATALOG_SCHEMA_PHP_REVISION;
+            }
         } catch (Throwable $e) {
             $databaseError = $e->getMessage();
         }
@@ -339,6 +351,7 @@ function orange_backup_collect_environment_report(string $projectRoot): array
         'gzip_supported' => orange_backup_has_gzip_support(),
         'ziparchive_supported' => orange_backup_has_ziparchive_support(),
         'proc_open_available' => orange_backup_can_proc_open(),
+        'exec_available' => orange_backup_can_exec(),
         'shell_exec_available' => orange_backup_can_shell_exec(),
         'uploads_path' => $uploadsPath,
         'uploads_readable' => is_dir($uploadsPath) && is_readable($uploadsPath),
