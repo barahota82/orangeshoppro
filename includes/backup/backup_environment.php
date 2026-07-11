@@ -543,7 +543,7 @@ function orange_backup_collect_environment_report(string $projectRoot): array
     if ($selectedBackend === null) {
         $blockers[] = 'No executable backup backend is available (PowerShell optional; PHP mysqldump requires proc_open).';
     }
-    if (!$orange_backup_has_gzip_support() || !orange_backup_has_ziparchive_support()) {
+    if (!orange_backup_has_gzip_support() || !orange_backup_has_ziparchive_support()) {
         $blockers[] = 'PHP gzip and ZipArchive extensions are required for full backup packaging.';
     }
 
