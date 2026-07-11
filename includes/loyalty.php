@@ -201,19 +201,39 @@ function orange_loyalty_post_simple_gl(
 }
 
 /**
+ * Retire loyalty-earn slot when earn no longer applies (immediate / slot path only).
+ */
+function orange_loyalty_earn_retire_slot_if_immediate(PDO $pdo, int $orderId): void
+{
+    if ($orderId <= 0 || orange_gl_use_pending_queue($pdo)) {
+        return;
+    }
+    require_once __DIR__ . '/gl_voucher_slot.php';
+    if (orange_gl_voucher_slots_ready($pdo)) {
+        orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, 'loyalty-earn');
+    }
+}
+
+/**
  * كسب نقاط عند تسليم الطلب — مرّة واحدة لكل طلب.
  */
 function orange_loyalty_earn_for_order(PDO $pdo, array $order, int $countryId, float $netSales): void
 {
+    $orderId = (int) ($order['id'] ?? 0);
     if (!orange_loyalty_tables_ready($pdo) || $netSales <= 0.0001) {
+        orange_loyalty_earn_retire_slot_if_immediate($pdo, $orderId);
+
         return;
     }
     $customerId = (int) ($order['customer_id'] ?? 0);
-    $orderId = (int) ($order['id'] ?? 0);
     if ($customerId <= 0 || $orderId <= 0) {
+        orange_loyalty_earn_retire_slot_if_immediate($pdo, $orderId);
+
         return;
     }
     if (!orange_loyalty_is_active($pdo, $countryId)) {
+        orange_loyalty_earn_retire_slot_if_immediate($pdo, $orderId);
+
         return;
     }
     // عدم التكرار: لا كسب إن وُجد قيد كسب لنفس الطلب.
@@ -234,6 +254,8 @@ function orange_loyalty_earn_for_order(PDO $pdo, array $order, int $countryId, f
     $expiryMonths = (int) $s['expiry_months'];
     $points = (int) floor($netSales * $earnRate);
     if ($points <= 0) {
+        orange_loyalty_earn_retire_slot_if_immediate($pdo, $orderId);
+
         return;
     }
     $expiresAt = $expiryMonths > 0
@@ -274,17 +296,64 @@ function orange_loyalty_earn_for_order(PDO $pdo, array $order, int $countryId, f
         $debitId = (int) $ruleAcc['debit'];
         $creditId = (int) $ruleAcc['credit'];
     }
-    orange_loyalty_post_simple_gl(
+    if ($debitId <= 0 || $creditId <= 0) {
+        if (!orange_gl_use_pending_queue($pdo)) {
+            require_once __DIR__ . '/gl_voucher_slot.php';
+            orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, 'loyalty-earn');
+        }
+
+        return;
+    }
+
+    $desc = 'قيد كسب نقاط ولاء — تسليم الطلب';
+    $afterJson = orange_gl_after_post_json_with_country(null, $countryId);
+    if (orange_gl_use_pending_queue($pdo)) {
+        orange_loyalty_post_simple_gl(
+            $pdo,
+            $debitId,
+            $creditId,
+            $value,
+            $countryId,
+            $desc,
+            'loyalty_earn',
+            'order',
+            $orderId,
+            'loyalty-earn'
+        );
+
+        return;
+    }
+
+    require_once __DIR__ . '/gl_voucher_slot.php';
+    require_once __DIR__ . '/journal_types.php';
+    $earnJtId = orange_journal_type_id_by_code($pdo, 'LYE', $countryId);
+    $earnSlot = [
+        'doc_kind' => 'order',
+        'entity_id' => $orderId,
+        'slot_key' => 'loyalty-earn',
+        'entry_type' => 'loyalty_earn',
+        'country_id' => $countryId > 0 ? $countryId : null,
+        'journal_type_id' => $earnJtId > 0 ? $earnJtId : null,
+    ];
+    $earnHeader = [
+        'voucher_date' => date('Y-m-d H:i:s'),
+        'document_entered_at' => date('Y-m-d H:i:s'),
+        'description' => $desc,
+        'entry_type' => 'loyalty_earn',
+        'country_id' => $countryId,
+    ];
+    if ($earnJtId > 0) {
+        $earnHeader['journal_type_id'] = $earnJtId;
+    }
+    orange_gl_voucher_immediate_post_simple_for_slot(
         $pdo,
+        $earnSlot,
+        $earnHeader,
         $debitId,
         $creditId,
         $value,
-        $countryId,
-        'قيد كسب نقاط ولاء — تسليم الطلب',
-        'loyalty_earn',
-        'order',
-        $orderId,
-        'loyalty-earn'
+        $desc,
+        $afterJson
     );
 }
 
@@ -330,10 +399,15 @@ function orange_loyalty_reverse_earn_for_order(PDO $pdo, int $orderId): void
         return;
     }
 
-    // حذف قيد الكسب (السند المُرحَّل عبر الطابور + صف الطابور).
-    $v = orange_voucher_find_by_document($pdo, 'order', $orderId, 'loyalty_earn', $cid > 0 ? $cid : null, 'loyalty-earn');
-    if ($v !== null) {
-        orange_voucher_delete_by_reference($pdo, (string) ($v['reference'] ?? ''), $cid > 0 ? $cid : null);
+    // عكس قيد الكسب: void in-place على مسار السlots؛ حذف legacy عند غياب الجدول.
+    require_once __DIR__ . '/gl_voucher_slot.php';
+    if (orange_gl_voucher_slots_ready($pdo) && !orange_gl_use_pending_queue($pdo)) {
+        orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, 'loyalty-earn');
+    } elseif (!orange_gl_voucher_slots_ready($pdo)) {
+        $v = orange_voucher_find_by_document($pdo, 'order', $orderId, 'loyalty_earn', $cid > 0 ? $cid : null, 'loyalty-earn');
+        if ($v !== null) {
+            orange_voucher_delete_by_reference($pdo, (string) ($v['reference'] ?? ''), $cid > 0 ? $cid : null);
+        }
     }
     if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
         $pdo->prepare('DELETE FROM orange_gl_pending_movements WHERE reference = ?')

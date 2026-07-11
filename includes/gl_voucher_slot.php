@@ -679,6 +679,14 @@ function orange_gl_voucher_slot_adopt_legacy(PDO $pdo, array $slotSpec, ?int $co
         if ($saleSlot !== null && (int) ($saleSlot['journal_voucher_id'] ?? 0) === (int) ($v['id'] ?? 0)) {
             return false;
         }
+    } elseif (strtolower($spec['doc_kind']) === 'order'
+        && preg_match('/^(sale|cogs)-(\d+)$/i', $spec['slot_key'], $orderLineMatch)) {
+        return orange_gl_voucher_slot_adopt_legacy_order_line(
+            $pdo,
+            $slotSpec,
+            $countryId,
+            (int) $orderLineMatch[2]
+        );
     } else {
         $lookupSuffix = orange_gl_voucher_slot_pending_suffix($spec['slot_key']);
         $v = orange_voucher_find_by_document(
@@ -1056,4 +1064,379 @@ function orange_gl_sales_return_immediate_post_all_slots(
     } else {
         orange_gl_voucher_slot_void_registered($pdo, 'sales_return', $returnId, 'cogs');
     }
+}
+
+/**
+ * Phase 1B — whether any delivery slot is registered for this order (immediate idempotency).
+ */
+function orange_order_delivery_slots_exist(PDO $pdo, int $orderId): bool
+{
+    if ($orderId <= 0 || !orange_gl_voucher_slots_ready($pdo)) {
+        return false;
+    }
+    foreach (orange_gl_voucher_slot_list_for_document($pdo, 'order', $orderId) as $slot) {
+        $sk = (string) ($slot['slot_key'] ?? '');
+        $isDelivery = $sk === 'sale-agg'
+            || $sk === 'delivery-expense'
+            || $sk === 'loyalty-earn'
+            || preg_match('/^(sale|cogs)-\d+$/i', $sk);
+        if (!$isDelivery) {
+            continue;
+        }
+        if ((int) ($slot['journal_voucher_id'] ?? 0) > 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Adopt a legacy order delivery line voucher (item-id suffix / ORDER-* reference) into sale-{gl_slot} / cogs-{gl_slot}.
+ */
+function orange_gl_voucher_slot_adopt_legacy_order_line(
+    PDO $pdo,
+    array $slotSpec,
+    ?int $countryId,
+    int $glSlot
+): bool {
+    if ($glSlot <= 0 || !orange_gl_voucher_slots_ready($pdo)) {
+        return false;
+    }
+    try {
+        $spec = orange_gl_voucher_slot_normalize_spec($slotSpec);
+    } catch (InvalidArgumentException) {
+        return false;
+    }
+    if (strtolower($spec['doc_kind']) !== 'order') {
+        return false;
+    }
+    if (orange_gl_voucher_slot_find($pdo, $spec['doc_kind'], $spec['entity_id'], $spec['slot_key']) !== null) {
+        return true;
+    }
+
+    $orderId = (int) $spec['entity_id'];
+    $slotPrefix = '';
+    if (preg_match('/^(sale|cogs)-(\d+)$/i', $spec['slot_key'], $skMatch)) {
+        $slotPrefix = strtolower($skMatch[1]);
+        if ((int) $skMatch[2] !== $glSlot) {
+            return false;
+        }
+    } else {
+        return false;
+    }
+
+    $v = orange_gl_voucher_find_by_pending_source_key($pdo, $spec['source_key']);
+    if ($v === null) {
+        require_once __DIR__ . '/order_item_gl_slot.php';
+        $itemMap = orange_order_item_gl_slot_map_by_item_id($pdo, $orderId);
+        foreach ($itemMap as $itemId => $mappedSlot) {
+            if ((int) $mappedSlot !== $glSlot) {
+                continue;
+            }
+            $legacySuffix = $slotPrefix . '-' . (int) $itemId;
+            $legacyKey = orange_gl_voucher_slot_source_key($spec['doc_kind'], $orderId, $legacySuffix);
+            $v = orange_gl_voucher_find_by_pending_source_key($pdo, $legacyKey);
+            if ($v !== null) {
+                break;
+            }
+            $v = orange_voucher_find_by_document(
+                $pdo,
+                'order',
+                $orderId,
+                $spec['entry_type'],
+                $countryId,
+                $legacySuffix
+            );
+            if ($v !== null) {
+                break;
+            }
+        }
+    }
+
+    if ($v === null) {
+        $orderNumber = '';
+        if (orange_table_exists($pdo, 'orders')) {
+            $st = $pdo->prepare('SELECT order_number FROM orders WHERE id = ? LIMIT 1');
+            $st->execute([$orderId]);
+            $orderNumber = trim((string) ($st->fetchColumn() ?: ''));
+        }
+        if ($orderNumber !== '') {
+            require_once __DIR__ . '/order_item_gl_slot.php';
+            $itemMap = orange_order_item_gl_slot_map_by_item_id($pdo, $orderId);
+            foreach ($itemMap as $itemId => $mappedSlot) {
+                if ((int) $mappedSlot !== $glSlot) {
+                    continue;
+                }
+                $legacyRef = 'ORDER-' . $orderNumber . '-' . ($slotPrefix === 'sale' ? 'S' : 'C') . '-' . (int) $itemId;
+                $v = orange_voucher_by_reference($pdo, $legacyRef, $countryId);
+                if ($v !== null) {
+                    break;
+                }
+            }
+        }
+    }
+
+    if ($v === null) {
+        return false;
+    }
+
+    orange_gl_voucher_slot_register($pdo, $spec, (int) ($v['id'] ?? 0));
+
+    return true;
+}
+
+/**
+ * Void per-line delivery slots no longer active; handle aggregate ↔ per-line mode switch.
+ *
+ * @param list<int> $activeGlSlots
+ */
+function orange_order_delivery_retire_removed_line_slots(
+    PDO $pdo,
+    int $orderId,
+    array $activeGlSlots,
+    bool $aggregateMode
+): void {
+    if ($orderId <= 0) {
+        return;
+    }
+    $active = [];
+    foreach ($activeGlSlots as $slotRaw) {
+        $n = (int) $slotRaw;
+        if ($n > 0) {
+            $active[$n] = true;
+        }
+    }
+
+    foreach (orange_gl_voucher_slot_list_for_document($pdo, 'order', $orderId) as $slot) {
+        $sk = (string) ($slot['slot_key'] ?? '');
+        if ($aggregateMode) {
+            if (preg_match('/^sale-\d+$/i', $sk)) {
+                orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, $sk);
+                continue;
+            }
+            if (preg_match('/^cogs-(\d+)$/i', $sk, $mAggCogs)) {
+                $glSlotAgg = (int) $mAggCogs[1];
+                if (!isset($active[$glSlotAgg])) {
+                    orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, $sk);
+                }
+            }
+            continue;
+        }
+        if ($sk === 'sale-agg') {
+            orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, $sk);
+            continue;
+        }
+        if (preg_match('/^(sale|cogs)-(\d+)$/i', $sk, $m)) {
+            $glSlot = (int) $m[2];
+            if (!isset($active[$glSlot])) {
+                orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, $sk);
+            }
+        }
+    }
+
+    if (!orange_table_exists($pdo, 'orange_gl_pending_movements')) {
+        return;
+    }
+    $st = $pdo->prepare(
+        'SELECT DISTINCT reference, journal_voucher_id FROM orange_gl_pending_movements
+         WHERE reference LIKE ? AND journal_voucher_id IS NOT NULL AND journal_voucher_id > 0'
+    );
+    $st->execute([orange_gl_pending_source_key('order', $orderId, 'sale') . '-%']);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $ref = (string) ($row['reference'] ?? '');
+        if (!preg_match('/:sale-(\d+)$/i', $ref, $m) && !preg_match('/:cogs-(\d+)$/i', $ref, $m)) {
+            continue;
+        }
+        $glSlot = (int) $m[1];
+        if (isset($active[$glSlot])) {
+            continue;
+        }
+        $slotKind = str_contains($ref, ':cogs-') ? 'cogs' : 'sale';
+        if ($aggregateMode && $slotKind === 'sale') {
+            continue;
+        }
+        $slotKey = $slotKind . '-' . $glSlot;
+        if (orange_gl_voucher_slot_find($pdo, 'order', $orderId, $slotKey) !== null) {
+            continue;
+        }
+        $entryType = $slotKind === 'cogs' ? 'order_delivery_cogs' : 'order_delivery_sale';
+        $slotSpec = [
+            'doc_kind' => 'order',
+            'entity_id' => $orderId,
+            'slot_key' => $slotKey,
+            'entry_type' => $entryType,
+        ];
+        orange_gl_voucher_slot_adopt_legacy_order_line($pdo, $slotSpec, null, $glSlot);
+        orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, $slotKey);
+    }
+}
+
+/**
+ * Phase 1B — immediate post/rebuild for all order delivery voucher slots (non-pending path).
+ *
+ * @param array<string, mixed> $ctx prepared by orange_post_order_delivery_accounting()
+ */
+function orange_order_delivery_immediate_post_all_slots(PDO $pdo, array $ctx): void
+{
+    require_once __DIR__ . '/order_item_gl_slot.php';
+    require_once __DIR__ . '/order_fulfillment.php';
+    require_once __DIR__ . '/inventory_cost_layers.php';
+    require_once __DIR__ . '/journal_types.php';
+    require_once __DIR__ . '/sales_gl_accounts.php';
+    require_once __DIR__ . '/delivery_areas.php';
+    require_once __DIR__ . '/supplier_payable_account.php';
+    require_once __DIR__ . '/loyalty.php';
+
+    $order = $ctx['order'] ?? [];
+    $orderId = (int) ($order['id'] ?? 0);
+    if ($orderId <= 0) {
+        return;
+    }
+
+    $items = is_array($ctx['items'] ?? null) ? $ctx['items'] : [];
+    $extraLines = is_array($ctx['extra_lines'] ?? null) ? $ctx['extra_lines'] : [];
+    $ofGlCountryId = (int) ($ctx['country_id'] ?? 0);
+    $isCredit = !empty($ctx['is_credit']);
+    $isOnline = !empty($ctx['is_online']);
+    $aggregateSalesGl = !empty($ctx['aggregate_sales_gl']);
+    $orderSalesNet = round((float) ($ctx['order_sales_net'] ?? 0), 4);
+    $customerIdForAr = (int) ($ctx['customer_id_for_ar'] ?? 0);
+    $revenueRule = $ctx['revenue_rule'] ?? null;
+    $debitReceivable = (int) ($ctx['debit_receivable'] ?? 0);
+    $salesId = (int) ($ctx['sales_id'] ?? 0);
+    $saleJtId = (int) ($ctx['sale_jt_id'] ?? 0);
+    $cogsJtId = (int) ($ctx['cogs_jt_id'] ?? 0);
+    $cogsDebitId = (int) ($ctx['cogs_debit_id'] ?? 0);
+    $cogsCreditId = (int) ($ctx['cogs_credit_id'] ?? 0);
+    $postingAt = (string) ($ctx['posting_at'] ?? date('Y-m-d H:i:s'));
+    $now = (string) ($ctx['document_entered_at'] ?? date('Y-m-d H:i:s'));
+    $activeGlSlots = is_array($ctx['active_gl_slots'] ?? null) ? $ctx['active_gl_slots'] : [];
+
+    $saleDesc = $isOnline
+        ? 'قيد مبيعات أونلاين — تسليم'
+        : ($isCredit ? 'قيد مبيعات آجل — تسليم' : 'قيد مبيعات نقدي — تسليم');
+    $cogsDesc = $isOnline
+        ? 'قيد تكلفة مبيعات أونلاين — تسليم'
+        : ($isCredit ? 'قيد تكلفة مبيعات آجل — تسليم' : 'قيد تكلفة مبيعات نقدي — تسليم');
+
+    if ($aggregateSalesGl && $orderSalesNet > 0.0001) {
+        orange_order_post_delivery_sale_gl_amount(
+            $pdo,
+            $order,
+            $orderSalesNet,
+            $extraLines,
+            $customerIdForAr,
+            $ofGlCountryId,
+            $isCredit,
+            $isOnline,
+            is_array($revenueRule) ? $revenueRule : null,
+            $debitReceivable,
+            $salesId,
+            $saleJtId,
+            $saleDesc,
+            'agg'
+        );
+    } elseif (!$aggregateSalesGl) {
+        orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, 'sale-agg');
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $glSlot = (int) ($item['gl_slot'] ?? 0);
+            orange_order_item_assert_gl_slot($glSlot);
+            $salesAmount = orange_order_item_line_net($item);
+            if ($salesAmount <= 0.0001) {
+                orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, 'sale-' . $glSlot);
+                continue;
+            }
+            orange_order_post_delivery_sale_gl_amount(
+                $pdo,
+                $order,
+                $salesAmount,
+                [],
+                $customerIdForAr,
+                $ofGlCountryId,
+                $isCredit,
+                $isOnline,
+                is_array($revenueRule) ? $revenueRule : null,
+                $debitReceivable,
+                $salesId,
+                $saleJtId,
+                $saleDesc,
+                (string) $glSlot
+            );
+        }
+    } else {
+        orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, 'sale-agg');
+    }
+
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $glSlot = (int) ($item['gl_slot'] ?? 0);
+        orange_order_item_assert_gl_slot($glSlot);
+        $variant = orange_order_resolve_variant_from_item($pdo, $item);
+        if ($variant) {
+            $itemIdCogs = isset($item['id']) ? (int) $item['id'] : 0;
+            $lineQtyCogs = (int) ($item['qty'] ?? 0);
+            $consCogs = orange_inventory_cost_layers_consumption_cost($pdo, 'order', $itemIdCogs);
+            $costAmount = (float) $consCogs['cost'];
+            $shortCogs = $lineQtyCogs - (int) $consCogs['qty'];
+            if ($shortCogs > 0) {
+                $costAmount += (float) ($item['cost'] ?? 0) * $shortCogs;
+            }
+            $costAmount = round($costAmount, 4);
+        } else {
+            $costAmount = 0.0;
+        }
+
+        $cogsSlotKey = 'cogs-' . $glSlot;
+        if ($costAmount > 0.0001) {
+            $cogsSlot = [
+                'doc_kind' => 'order',
+                'entity_id' => $orderId,
+                'slot_key' => $cogsSlotKey,
+                'entry_type' => 'order_delivery_cogs',
+                'country_id' => $ofGlCountryId > 0 ? $ofGlCountryId : null,
+                'journal_type_id' => $cogsJtId > 0 ? $cogsJtId : null,
+            ];
+            $cogsHeader = [
+                'voucher_date' => $postingAt,
+                'document_entered_at' => $now,
+                'description' => $cogsDesc,
+                'entry_type' => 'order_delivery_cogs',
+                'country_id' => $ofGlCountryId,
+            ];
+            if ($cogsJtId > 0) {
+                $cogsHeader['journal_type_id'] = $cogsJtId;
+            }
+            $afterJson = orange_gl_after_post_json_with_country(null, $ofGlCountryId);
+            orange_gl_voucher_immediate_post_simple_for_slot(
+                $pdo,
+                $cogsSlot,
+                $cogsHeader,
+                $cogsDebitId,
+                $cogsCreditId,
+                $costAmount,
+                $cogsDesc,
+                $afterJson
+            );
+        } else {
+            orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, $cogsSlotKey);
+        }
+    }
+
+    orange_order_delivery_retire_removed_line_slots($pdo, $orderId, $activeGlSlots, $aggregateSalesGl);
+
+    orange_order_post_delivery_expense_gl($pdo, $order, $ofGlCountryId, $isOnline);
+
+    $orderForLoyalty = $order;
+    $orderForLoyalty['customer_id'] = $customerIdForAr;
+    $loyaltyMerchandiseNet = (float) ($ctx['loyalty_merchandise_net'] ?? 0);
+    if ($loyaltyMerchandiseNet <= 0.0001) {
+        $loyaltyMerchandiseNet = orange_loyalty_merchandise_net_from_order($pdo, $order, $items);
+    }
+    orange_loyalty_earn_for_order($pdo, $orderForLoyalty, $ofGlCountryId, $loyaltyMerchandiseNet);
 }

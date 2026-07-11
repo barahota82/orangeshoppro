@@ -904,7 +904,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         return '<td class="pur-col-idx"></td>'
             + '<td><input type="text" class="sv2-code admin-inp" placeholder="كود أو باركود" dir="ltr" lang="en" autocomplete="off" style="width:100%;" title="امسح الباركود أو دبل كليك للبحث">'
             + '<input type="hidden" class="sv2-product-id" value="">'
-            + '<input type="hidden" class="sv2-variant-id" value="0"></td>'
+            + '<input type="hidden" class="sv2-variant-id" value="0">'
+            + '<input type="hidden" class="sv2-gl-slot" value="0"></td>'
             + '<td><input type="text" class="sv2-name admin-inp-readonly" readonly disabled tabindex="-1" placeholder="—"></td>'
             + '<td><input type="text" class="sv2-var-label admin-inp-readonly" readonly disabled tabindex="-1" placeholder="—"></td>'
             + '<td><input type="number" class="sv2-qty admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>'
@@ -931,6 +932,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         if (qEl) qEl.value = '1';
         var dEl = tr.querySelector('.sv2-discount');
         if (dEl) dEl.value = '';
+        var gsEl = tr.querySelector('.sv2-gl-slot');
+        if (gsEl) gsEl.value = '0';
     }
 
     function removeLine(btn) {
@@ -1105,6 +1108,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             var ld = parseFloat(item.line_discount || 0) || 0;
             dEl.value = fmt3(ld);
         }
+        var gsEl = tr.querySelector('.sv2-gl-slot');
+        if (gsEl) gsEl.value = String(item.gl_slot || 0);
     }
 
     function recalcAll() {
@@ -1647,6 +1652,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             if (pid <= 0 || q < 1) return;
             var o = { product_id: pid, qty: q };
             if (vid > 0) o.variant_id = vid;
+            var gs = parseInt((r.querySelector('.sv2-gl-slot') || {}).value, 10) || 0;
+            if (gs > 0) o.gl_slot = gs;
             out.push(o);
         });
         return out;
@@ -1913,6 +1920,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             }
             var o = { product_id: pid, qty: q, line_discount: discAmt };
             if (vid) o.variant_id = vid;
+            var gsSave = parseInt((r.querySelector('.sv2-gl-slot') || {}).value, 10) || 0;
+            if (gsSave > 0) o.gl_slot = gsSave;
             items.push(o);
         });
         if (sv2DiscError) { alert(sv2DiscError); return; }

@@ -201,9 +201,6 @@ try {
     }
     orange_fiscal_require_open_for_posting($pdo, $documentDate, $orderCountryId);
 
-    orange_sales_invoice_company_remove_forward_accounting($pdo, array_merge($order, ['id' => $orderId]), $orderCountryId);
-    $pdo->prepare('DELETE FROM order_items WHERE order_id = ?')->execute([$orderId]);
-
     $sets = [
         'customer_name = ?',
         'phone = ?',
@@ -242,6 +239,8 @@ try {
     $params[] = $orderId;
     $pdo->prepare('UPDATE orders SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
 
+    orange_sales_invoice_company_sync_items($pdo, $orderId, $validatedItems);
+
     $profile = [
         'area' => $area,
         'address' => $address,
@@ -263,8 +262,6 @@ try {
     if ($customerId > 0 && orange_table_has_column($pdo, 'orders', 'customer_id')) {
         $pdo->prepare('UPDATE orders SET customer_id = ? WHERE id = ?')->execute([$customerId, $orderId]);
     }
-
-    orange_sales_invoice_company_insert_items($pdo, $orderId, $validatedItems);
 
     $extraInput = orange_invoice_ancillary_merge_auto_vat(
         $pdo,

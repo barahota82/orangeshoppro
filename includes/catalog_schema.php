@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 120);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 121);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3182,6 +3182,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_admin_login_throttle_v115($pdo);
     orange_catalog_migrate_pre_apcu_integrity_v116_through_v119($pdo);
     orange_catalog_migrate_gl_voucher_slots_v120($pdo);
+    orange_catalog_migrate_order_items_gl_slot_v121($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3815,6 +3816,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_admin_login_throttle_v115($pdo);
     orange_catalog_migrate_pre_apcu_integrity_v116_through_v119($pdo);
     orange_catalog_migrate_gl_voucher_slots_v120($pdo);
+    orange_catalog_migrate_order_items_gl_slot_v121($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -9441,6 +9443,72 @@ function orange_catalog_migrate_gl_voucher_slots_v120(PDO $pdo): void
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
         orange_schema_invalidate_table_exists('orange_gl_voucher_slots');
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v121 — Phase 1B: stable order line GL identity (order_items.gl_slot).
+ */
+function orange_catalog_migrate_order_items_gl_slot_v121(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_order_items_gl_slot_v121';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'order_items')
+        && !orange_table_has_column($pdo, 'order_items', 'gl_slot')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE order_items ADD COLUMN gl_slot INT UNSIGNED NULL DEFAULT NULL AFTER order_id'
+        );
+        orange_schema_invalidate_column_check('order_items', 'gl_slot');
+    }
+
+    if (orange_table_exists($pdo, 'order_items')
+        && orange_table_has_column($pdo, 'order_items', 'gl_slot')) {
+        $orderIds = $pdo->query(
+            'SELECT DISTINCT order_id FROM order_items WHERE gl_slot IS NULL ORDER BY order_id ASC'
+        );
+        if ($orderIds) {
+            foreach ($orderIds->fetchAll(PDO::FETCH_COLUMN) ?: [] as $orderIdRaw) {
+                $orderId = (int) $orderIdRaw;
+                if ($orderId <= 0) {
+                    continue;
+                }
+                $stItems = $pdo->prepare(
+                    'SELECT id FROM order_items WHERE order_id = ? AND gl_slot IS NULL ORDER BY id ASC'
+                );
+                $stItems->execute([$orderId]);
+                $slot = 0;
+                $upd = $pdo->prepare('UPDATE order_items SET gl_slot = ? WHERE id = ? AND order_id = ?');
+                foreach ($stItems->fetchAll(PDO::FETCH_COLUMN) ?: [] as $itemIdRaw) {
+                    $itemId = (int) $itemIdRaw;
+                    if ($itemId <= 0) {
+                        continue;
+                    }
+                    ++$slot;
+                    $upd->execute([$slot, $itemId, $orderId]);
+                }
+            }
+        }
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE order_items SET gl_slot = 1 WHERE gl_slot IS NULL OR gl_slot = 0'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE order_items MODIFY COLUMN gl_slot INT UNSIGNED NOT NULL'
+        );
+        orange_schema_invalidate_column_check('order_items', 'gl_slot');
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE order_items ADD UNIQUE KEY uq_order_items_order_gl_slot (order_id, gl_slot)'
+        );
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

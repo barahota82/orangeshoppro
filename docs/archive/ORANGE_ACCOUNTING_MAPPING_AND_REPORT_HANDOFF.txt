@@ -8,6 +8,7 @@ ORANGE — أرشيف منهج التصنيف المحاسبي والتقاري�
 آخر تحديث: 2026-07-09 (سياسة مالك دائمة: Voucher Identity Preservation Policy V2 — القسم أدناه)
 آخر تحديث: 2026-07-09 (Accounting Lifecycle V2 — Phase 0 Approved Architecture / orange_gl_voucher_slots — القسم أدناه)
 آخر تحديث: 2026-07-10 (V2 Phase 0 — Core Engine مُنفَّذ في الكود؛ rev 120 — القسم أدناه)
+آخر تحديث: 2026-07-11 (V2 Phase 1B — INV-C delivery slots + order_items.gl_slot؛ rev 121 — القسم أدناه)
 
 ================================================================================
 قرار مالك نهائي (2026-07-09): Voucher Identity Preservation Policy (V2)
@@ -156,6 +157,48 @@ Accounting Lifecycle V2 — Phase 0 Approved Architecture (2026-07-09)
   + `source_key` + `entry_type` (+ `journal_type_id` frozen at first post).
 - **نواة:** `includes/gl_voucher_slot.php` — **لا** ربط بعد بمسارات purchase/PR/SR/INV-C/loyalty/pending.
 - **اقرأ مع:** القسم «Voucher Identity Preservation Policy (V2)» أعلاه؛ Phase -1 (استنفاد البنية).
+
+================================================================================
+Accounting Lifecycle V2 — Phase 1B (INV-C delivery slots) — 2026-07-11
+================================================================================
+**حالة:** **Phase 1B — Implemented in code, not yet production-activated** (rev **121** +
+`order_items.gl_slot` + مسار rebuild لـ INV-C؛ **لم يُفعَّل** على الإنتاج حتى `git pull` +
+ترحيل rev **121**).
+
+**نطاق Phase 1B (INV-C فقط):**
+- Delivery Sale (`sale-{gl_slot}` / `sale-agg`)
+- Delivery COGS (`cogs-{gl_slot}`)
+- Delivery Expense (`delivery-expense`)
+- Loyalty Earn (`loyalty-earn`)
+- **Loyalty Redemption:** بلا slot منفصل — يبقى داخل قيد البيع (ancillary / sale-agg).
+- **Loyalty Expiry:** append-only — **خارج** V2.
+- **Loyalty Return Clawback:** Phase 1A — **بدون تعديل**.
+
+**تنفيذ (Phase 1B — مُطبَّق في الكود 2026-07-11):**
+- **ترحيل v121:** `orange_catalog_migrate_order_items_gl_slot_v121()` — marker
+  `php_order_items_gl_slot_v121`؛ عمود `order_items.gl_slot INT UNSIGNED NOT NULL`؛ backfill
+  per `order_id` ORDER BY `id` ASC → `1..N`؛ `UNIQUE (order_id, gl_slot)`؛
+  `ORANGE_CATALOG_SCHEMA_PHP_REVISION` = **121**؛ مُستدعى من
+  `orange_catalog_ensure_schema_core()` و `orange_catalog_ensure_schema_fast_path_slice()`.
+- **هوية السطر:** `includes/order_item_gl_slot.php` — `orange_order_item_allocate_gl_slot()`
+  (MAX+1؛ لا إعادة استخدام slots مُستَرَدة).
+- **مزامنة البنود:** `orange_sales_invoice_company_sync_items()` — UPDATE by `gl_slot`؛ INSERT
+  بslot جديد؛ DELETE للسطر المُزال (void slots للقيود المرتبطة؛ لا delete/reinsert كامل).
+- **مسار التعديل INV-C:** `admin/api/sales-invoices/update.php` — **بدون**
+  `orange_sales_invoice_company_remove_forward_accounting()`؛
+  `orange_sales_invoice_company_repost_fulfillment()` →
+  `orange_post_order_delivery_accounting(..., ['rebuild' => true])`.
+- **فوري (immediate):** `orange_order_delivery_immediate_post_all_slots()` في
+  `includes/gl_voucher_slot.php` — ترتيب rebuild: عكس كسب الولاء (إن أمكن) → Sale → COGS →
+  Delivery Expense → Loyalty Earn → إنهاء slots/أوضاع sale قديمة.
+- **مصدر المفاتيح:** `src:order:{orderId}:sale-{gl_slot}` / `cogs-{gl_slot}` / `sale-agg` /
+  `delivery-expense` / `loyalty-earn` — **لا** `order_items.id` كهوية slot.
+- **جسر legacy:** `orange_gl_voucher_slot_adopt_legacy_order_line()` — pending/source_key
+  الدقيق أو item-id عند unambiguous؛ لا LIMIT 1 عبر عدة سندات.
+- **واجهة/API:** `admin/pages/company_sales_invoice.php` — round-trip `gl_slot` (hidden field)؛
+  `admin/api/orders/create-manual.php` — تخصيص gl_slot عند الإنشاء.
+- **لم يُمس:** INV-O، Pending Queue lifecycle، Phase 1A (Purchase/PR/SR)، Loyalty Expiry،
+  Loyalty Return Clawback، Phase 2 (غير مُعلَن مكتمل).
 
 ================================================================================
 قرار مالك نهائي (2026-06-27): القيود الأوتوماتيكية تُعكَس وتُعاد بناؤها بالخلفية عند تعديل/حذف المستند + منع التعديل بتسمية القيد المغلق

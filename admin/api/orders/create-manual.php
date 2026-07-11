@@ -439,6 +439,8 @@ try {
 
     $orderId = (int)$pdo->lastInsertId();
 
+    require_once __DIR__ . '/../../../includes/order_item_gl_slot.php';
+
     $colsStmt = $pdo->query(
         "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_items'"
@@ -447,8 +449,13 @@ try {
     $oiCols = is_array($oiCols) ? $oiCols : [];
     $hasVariantCol = in_array('variant_id', $oiCols, true);
     $hasLineDiscountCol = in_array('line_discount', $oiCols, true);
+    $hasGlSlotCol = in_array('gl_slot', $oiCols, true);
 
-    $insertCols = ['order_id', 'product_id'];
+    $insertCols = ['order_id'];
+    if ($hasGlSlotCol) {
+        $insertCols[] = 'gl_slot';
+    }
+    $insertCols[] = 'product_id';
     if ($hasVariantCol) {
         $insertCols[] = 'variant_id';
     }
@@ -463,6 +470,9 @@ try {
 
     foreach ($validatedItems as $row) {
         $bind = [$orderId];
+        if ($hasGlSlotCol) {
+            $bind[] = orange_order_item_allocate_gl_slot($pdo, $orderId);
+        }
         $bind[] = (int) $row['product']['id'];
         if ($hasVariantCol) {
             $bind[] = (int) ($row['variant_id'] ?? 0) ?: null;
@@ -479,9 +489,11 @@ try {
         $itemStmt->execute($bind);
     }
 
-    // أسطر الهدية/BOGO (بنود مجانية/مخفّضة مُسعَّرة بالتجزئة)؛ يخصمها بند contra ترويجي لاحقاً.
     foreach ($giftStockLines as $row) {
         $bind = [$orderId];
+        if ($hasGlSlotCol) {
+            $bind[] = orange_order_item_allocate_gl_slot($pdo, $orderId);
+        }
         $bind[] = (int) $row['product']['id'];
         if ($hasVariantCol) {
             $bind[] = (int) ($row['variant_id'] ?? 0) ?: null;

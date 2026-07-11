@@ -150,40 +150,34 @@ function orange_order_post_delivery_sale_gl_amount(
 
             return;
         }
-        $vCashSale = orange_voucher_post($pdo, [
+        require_once __DIR__ . '/gl_voucher_slot.php';
+        $saleSlotKey = $salePendingSuffix === 'agg' ? 'sale-agg' : ('sale-' . $salePendingSuffix);
+        $saleSlot = [
+            'doc_kind' => 'order',
+            'entity_id' => $orderId,
+            'slot_key' => $saleSlotKey,
+            'entry_type' => 'order_delivery_sale',
+            'country_id' => $ofGlCountryId > 0 ? $ofGlCountryId : null,
+            'journal_type_id' => $saleJtId > 0 ? $saleJtId : null,
+        ];
+        $saleHeader = [
             'voucher_date' => $postingAt,
             'document_entered_at' => $now,
             'description' => $glB['voucher_description'],
             'entry_type' => 'order_delivery_sale',
-            'journal_type_id' => $saleJtId > 0 ? $saleJtId : null,
             'country_id' => $ofGlCountryId,
-        ], $glB['lines']);
-        if ($customerIdForAr > 0 && is_int($vCashSale) && $vCashSale > 0) {
-            $cashSaleMemoDirect = $isOnline ? 'مبيعات أونلاين — تسليم' : 'مبيعات نقدي — تسليم';
-            $cashCollectMemoDirect = $isOnline ? 'تحصيل أونلاين فوري — تسليم' : 'تحصيل نقدي فوري — تسليم';
-            orange_party_subledger_record(
-                $pdo,
-                'customer',
-                $customerIdForAr,
-                $vCashSale,
-                $receivableTotal,
-                0.0,
-                'order',
-                $orderId,
-                $cashSaleMemoDirect
-            );
-            orange_party_subledger_record(
-                $pdo,
-                'customer',
-                $customerIdForAr,
-                $vCashSale,
-                0.0,
-                $receivableTotal,
-                'order',
-                $orderId,
-                $cashCollectMemoDirect
-            );
+        ];
+        if ($saleJtId > 0) {
+            $saleHeader['journal_type_id'] = $saleJtId;
         }
+        orange_gl_voucher_immediate_post_bundle_for_slot(
+            $pdo,
+            $saleSlot,
+            $saleHeader,
+            $glB,
+            $receivableTotal,
+            $afterJson
+        );
 
         return;
     }
@@ -247,44 +241,34 @@ function orange_order_post_delivery_sale_gl_amount(
         return;
     }
 
-    if ($glB['is_multi']) {
-        $vSale = orange_voucher_post($pdo, [
-            'voucher_date' => $postingAt,
-            'document_entered_at' => $now,
-            'description' => $glB['voucher_description'],
-            'entry_type' => 'order_delivery_sale',
-            'journal_type_id' => $saleJtId > 0 ? $saleJtId : null,
-            'country_id' => $ofGlCountryId,
-        ], $glB['lines']);
-        orange_gl_apply_voucher_after_post_hooks($pdo, $vSale, $afterJson);
-
-        return;
-    }
-
-    $vSale = orange_voucher_post($pdo, [
+    require_once __DIR__ . '/gl_voucher_slot.php';
+    $saleSlotKey = $salePendingSuffix === 'agg' ? 'sale-agg' : ('sale-' . $salePendingSuffix);
+    $saleSlot = [
+        'doc_kind' => 'order',
+        'entity_id' => $orderId,
+        'slot_key' => $saleSlotKey,
+        'entry_type' => 'order_delivery_sale',
+        'country_id' => $ofGlCountryId > 0 ? $ofGlCountryId : null,
+        'journal_type_id' => $saleJtId > 0 ? $saleJtId : null,
+    ];
+    $saleHeader = [
         'voucher_date' => $postingAt,
         'document_entered_at' => $now,
         'description' => $glB['voucher_description'],
         'entry_type' => 'order_delivery_sale',
-        'journal_type_id' => $saleJtId > 0 ? $saleJtId : null,
         'country_id' => $ofGlCountryId,
-    ], [
-        ['account_id' => (int) $glB['debit'], 'debit' => $receivableTotal, 'credit' => 0.0, 'memo' => $saleDesc],
-        ['account_id' => (int) $glB['credit'], 'debit' => 0.0, 'credit' => $salesAmount, 'memo' => $saleDesc],
-    ]);
-    if ($isCredit && $customerIdForAr > 0 && is_int($vSale) && $vSale > 0) {
-        orange_party_subledger_record(
-            $pdo,
-            'customer',
-            $customerIdForAr,
-            $vSale,
-            $receivableTotal,
-            0,
-            'order',
-            $orderId,
-            'مبيعات آجل — تسليم'
-        );
+    ];
+    if ($saleJtId > 0) {
+        $saleHeader['journal_type_id'] = $saleJtId;
     }
+    orange_gl_voucher_immediate_post_bundle_for_slot(
+        $pdo,
+        $saleSlot,
+        $saleHeader,
+        $glB,
+        $receivableTotal,
+        $afterJson
+    );
 }
 
 /**
@@ -477,9 +461,13 @@ function orange_order_guard_status_transition(string $prevStatus, string $newSta
  * GL + party_subledger for a completed order — §13.5 «إنشاء القيود» (outside gl_posting queue).
  * Caller must ensure stock fulfillment already ran (orange_complete_order_fulfillment).
  */
-function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
+function orange_post_order_delivery_accounting(PDO $pdo, int $orderId, array $options = []): void
 {
     orange_catalog_ensure_schema($pdo);
+    require_once __DIR__ . '/order_item_gl_slot.php';
+
+    $rebuild = !empty($options['rebuild']);
+    $usePending = orange_gl_use_pending_queue($pdo);
 
     $orderStmt = $pdo->prepare('SELECT * FROM orders WHERE id = ? LIMIT 1');
     $orderStmt->execute([$orderId]);
@@ -492,13 +480,31 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
     $stockCtx = orange_warehouse_context_for_order($pdo, $order);
     $ofGlCountryId = (int) ($stockCtx['country_id'] ?? 0);
 
-    if ($orderNumber !== '' && orange_order_forward_delivery_accounting_exists($pdo, $orderNumber, $ofGlCountryId > 0 ? $ofGlCountryId : null)) {
-        return;
+    if (!$rebuild) {
+        if ($orderNumber !== '' && orange_order_forward_delivery_accounting_exists($pdo, $orderNumber, $ofGlCountryId > 0 ? $ofGlCountryId : null)) {
+            return;
+        }
+        if (!$usePending) {
+            require_once __DIR__ . '/gl_voucher_slot.php';
+            if (orange_order_delivery_slots_exist($pdo, $orderId)) {
+                return;
+            }
+        }
     }
 
-    $itemsStmt = $pdo->prepare('SELECT * FROM order_items WHERE order_id = ?');
+    $itemsStmt = $pdo->prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY gl_slot ASC, id ASC');
     $itemsStmt->execute([$orderId]);
     $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!orange_order_item_gl_slot_ready($pdo)) {
+        throw new RuntimeException('عمود gl_slot غير جاهز في order_items.');
+    }
+    $activeGlSlots = [];
+    foreach ($items as $itemRow) {
+        $glSlot = (int) ($itemRow['gl_slot'] ?? 0);
+        orange_order_item_assert_gl_slot($glSlot);
+        $activeGlSlots[] = $glSlot;
+    }
 
     $paymentTerms = 'cash';
     if (orange_table_has_column($pdo, 'orders', 'payment_terms')) {
@@ -572,6 +578,47 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
     }
     $orderSalesNet = round($orderSalesNet, 4);
 
+    $postingAt = orange_order_delivery_posting_datetime($order, $isOnline);
+    $now = date('Y-m-d H:i:s');
+    $loyaltyMerchandiseNet = 0.0;
+    require_once __DIR__ . '/loyalty.php';
+    $loyaltyMerchandiseNet = orange_loyalty_merchandise_net_from_order($pdo, $order, $items);
+
+    if (!$usePending) {
+        if ($rebuild) {
+            orange_loyalty_reverse_earn_for_order($pdo, $orderId);
+        }
+        require_once __DIR__ . '/gl_voucher_slot.php';
+        orange_order_delivery_immediate_post_all_slots($pdo, [
+            'order' => $order,
+            'items' => $items,
+            'extra_lines' => $extraLines,
+            'country_id' => $ofGlCountryId,
+            'is_credit' => $isCredit,
+            'is_online' => $isOnline,
+            'aggregate_sales_gl' => $aggregateSalesGl,
+            'order_sales_net' => $orderSalesNet,
+            'customer_id_for_ar' => $customerIdForAr,
+            'revenue_rule' => $revenueRule,
+            'debit_receivable' => $debitReceivable,
+            'sales_id' => $salesId,
+            'sale_jt_id' => $saleJtId,
+            'cogs_jt_id' => $cogsJtId,
+            'cogs_debit_id' => $cogsDebitId,
+            'cogs_credit_id' => $cogsCreditId,
+            'posting_at' => $postingAt,
+            'document_entered_at' => $now,
+            'active_gl_slots' => $activeGlSlots,
+            'loyalty_merchandise_net' => $loyaltyMerchandiseNet,
+        ]);
+        require_once __DIR__ . '/customer_addresses.php';
+        $orderForAddress = $order;
+        $orderForAddress['customer_id'] = $customerIdForAr;
+        orange_customer_address_promote_from_order($pdo, $orderForAddress, $postingAt);
+
+        return;
+    }
+
     foreach ($items as $idx => $item) {
         $variant = orange_order_resolve_variant_from_item($pdo, $item);
         $salesAmount = orange_order_item_line_net($item);
@@ -593,7 +640,8 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
 
         $now = date('Y-m-d H:i:s');
         $postingAt = orange_order_delivery_posting_datetime($order, $isOnline);
-        $lineKey = isset($item['id']) ? (string) (int) $item['id'] : (string) $idx;
+        $lineKey = (string) (int) ($item['gl_slot'] ?? 0);
+        orange_order_item_assert_gl_slot((int) $lineKey);
         $salePendingKey = orange_gl_pending_source_key('order', (int) $order['id'], 'sale-' . $lineKey);
         $cogsPendingKey = orange_gl_pending_source_key('order', (int) $order['id'], 'cogs-' . $lineKey);
         $saleDesc = $isOnline
@@ -860,7 +908,18 @@ function orange_order_post_delivery_expense_gl(PDO $pdo, array $order, int $ofGl
 
     $orderId = (int) ($order['id'] ?? 0);
     $deliveryAreaId = (int) ($order['delivery_area_id'] ?? 0);
+    $usePending = orange_gl_use_pending_queue($pdo);
+    $voidExpenseSlot = static function () use ($pdo, $orderId, $usePending): void {
+        if ($orderId <= 0 || $usePending) {
+            return;
+        }
+        require_once __DIR__ . '/gl_voucher_slot.php';
+        orange_gl_voucher_slot_void_registered($pdo, 'order', $orderId, 'delivery-expense');
+    };
+
     if ($orderId <= 0 || $deliveryAreaId <= 0 || !orange_delivery_areas_has_company_cost_column($pdo)) {
+        $voidExpenseSlot();
+
         return;
     }
     $st = $pdo->prepare('SELECT company_delivery_cost FROM delivery_areas WHERE id = ? LIMIT 1');
@@ -868,11 +927,15 @@ function orange_order_post_delivery_expense_gl(PDO $pdo, array $order, int $ofGl
     $rawCost = $st->fetchColumn();
     $cost = ($rawCost === false || $rawCost === null) ? 0.0 : round(max(0.0, (float) $rawCost), 4);
     if ($cost <= 0.0001) {
+        $voidExpenseSlot();
+
         return;
     }
 
     $expenseId = orange_gl_account_id_optional($pdo, 'delivery_expense', $ofGlCountryId);
     if ($expenseId === null || (int) $expenseId <= 0) {
+        $voidExpenseSlot();
+
         return;
     }
     $expenseId = (int) $expenseId;
@@ -901,6 +964,8 @@ function orange_order_post_delivery_expense_gl(PDO $pdo, array $order, int $ofGl
         $supplierForSub = 0;
     }
     if ($creditId <= 0) {
+        $voidExpenseSlot();
+
         return;
     }
 
@@ -950,27 +1015,22 @@ function orange_order_post_delivery_expense_gl(PDO $pdo, array $order, int $ofGl
         return;
     }
 
-    $vExp = orange_voucher_post($pdo, [
+    require_once __DIR__ . '/gl_voucher_slot.php';
+    $expSlot = [
+        'doc_kind' => 'order',
+        'entity_id' => $orderId,
+        'slot_key' => 'delivery-expense',
+        'entry_type' => 'order_delivery_expense',
+        'country_id' => $ofGlCountryId > 0 ? $ofGlCountryId : null,
+    ];
+    $expHeader = [
         'voucher_date' => $postingAt,
         'document_entered_at' => $now,
         'description' => $desc,
         'entry_type' => 'order_delivery_expense',
-        'journal_type_id' => null,
         'country_id' => $ofGlCountryId,
-    ], $lines);
-    if ($supplierForSub > 0 && is_int($vExp) && $vExp > 0) {
-        orange_party_subledger_record(
-            $pdo,
-            'supplier',
-            $supplierForSub,
-            $vExp,
-            0.0,
-            $cost,
-            'order',
-            $orderId,
-            'مستحق توصيل — تسليم الطلب'
-        );
-    }
+    ];
+    orange_gl_voucher_post_or_rebuild_for_slot($pdo, $expSlot, $expHeader, $lines, $afterJson);
 }
 
 /**

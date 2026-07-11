@@ -165,6 +165,9 @@ function orange_sales_invoice_company_load_items(PDO $pdo, int $orderId): array
         $effectiveItemCode = $variantItemCode !== '' ? $variantItemCode : $parentItemCode;
         $out[] = [
             'id' => (int) ($row['id'] ?? 0),
+            'gl_slot' => orange_table_has_column($pdo, 'order_items', 'gl_slot')
+                ? (int) ($row['gl_slot'] ?? 0)
+                : 0,
             'product_id' => $pid,
             'variant_id' => $vid,
             'product_name' => $productName,
@@ -328,6 +331,7 @@ function orange_sales_invoice_company_validate_items(PDO $pdo, array $itemsIn, i
             continue;
         }
         $lineDiscount = (float) ($item['line_discount'] ?? 0);
+        $glSlot = isset($item['gl_slot']) ? (int) $item['gl_slot'] : 0;
         $pid = isset($item['product_id']) ? (int) $item['product_id'] : 0;
         if ($pid <= 0) {
             throw new RuntimeException('يُقبل فقط بيع منتجات مسجّلة في «المنتجات» — لا بند نصي أو سعر يدوي بدون صنف');
@@ -410,6 +414,7 @@ function orange_sales_invoice_company_validate_items(PDO $pdo, array $itemsIn, i
             'price' => $price,
             'cost' => $cost,
             'line_discount' => $lineDiscount,
+            'gl_slot' => $glSlot,
         ];
     }
 
@@ -423,6 +428,7 @@ function orange_sales_invoice_company_validate_items(PDO $pdo, array $itemsIn, i
 function orange_sales_invoice_company_restore_stock_for_edit(PDO $pdo, int $orderId, array $order): void
 {
     require_once __DIR__ . '/order_fulfillment.php';
+    require_once __DIR__ . '/inventory_cost_layers.php';
 
     $orderNumber = trim((string) ($order['order_number'] ?? ''));
     if ($orderNumber === '') {
@@ -440,6 +446,11 @@ function orange_sales_invoice_company_restore_stock_for_edit(PDO $pdo, int $orde
     $stockRef = orange_order_stock_reference($orderNumber);
 
     foreach ($items as $item) {
+        $itemId = isset($item['id']) ? (int) $item['id'] : 0;
+        if ($itemId > 0) {
+            orange_inventory_cost_layers_restore_consumption($pdo, 'order', $itemId);
+        }
+
         $variant = orange_order_resolve_variant_from_item($pdo, $item);
         $qty = (int) ($item['qty'] ?? 0);
         if (!$variant || $qty <= 0) {
@@ -524,6 +535,8 @@ function orange_sales_invoice_company_remove_forward_accounting(PDO $pdo, array 
  */
 function orange_sales_invoice_company_insert_items(PDO $pdo, int $orderId, array $validatedItems): void
 {
+    require_once __DIR__ . '/order_item_gl_slot.php';
+
     $colsStmt = $pdo->query(
         "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_items'"
@@ -532,8 +545,13 @@ function orange_sales_invoice_company_insert_items(PDO $pdo, int $orderId, array
     $oiCols = is_array($oiCols) ? $oiCols : [];
     $hasVariantCol = in_array('variant_id', $oiCols, true);
     $hasLineDiscountCol = in_array('line_discount', $oiCols, true);
+    $hasGlSlotCol = in_array('gl_slot', $oiCols, true);
 
-    $insertCols = ['order_id', 'product_id'];
+    $insertCols = ['order_id'];
+    if ($hasGlSlotCol) {
+        $insertCols[] = 'gl_slot';
+    }
+    $insertCols[] = 'product_id';
     if ($hasVariantCol) {
         $insertCols[] = 'variant_id';
     }
@@ -548,7 +566,11 @@ function orange_sales_invoice_company_insert_items(PDO $pdo, int $orderId, array
 
     foreach ($validatedItems as $row) {
         $product = $row['product'];
-        $bind = [$orderId, (int) ($product['id'] ?? 0)];
+        $bind = [$orderId];
+        if ($hasGlSlotCol) {
+            $bind[] = orange_order_item_allocate_gl_slot($pdo, $orderId);
+        }
+        $bind[] = (int) ($product['id'] ?? 0);
         if ($hasVariantCol) {
             $bind[] = (int) ($row['variant_id'] ?? 0) ?: null;
         }
@@ -565,6 +587,132 @@ function orange_sales_invoice_company_insert_items(PDO $pdo, int $orderId, array
     }
 }
 
+/**
+ * Upsert INV-C lines by stable gl_slot (preserve identity for unchanged business lines).
+ *
+ * @param list<array<string,mixed>> $validatedItems from orange_sales_invoice_company_validate_items
+ * @return array{active_gl_slots:list<int>}
+ */
+function orange_sales_invoice_company_sync_items(PDO $pdo, int $orderId, array $validatedItems): array
+{
+    require_once __DIR__ . '/order_item_gl_slot.php';
+
+    if ($orderId <= 0) {
+        throw new RuntimeException('معرف الفاتورة مطلوب');
+    }
+    if (!orange_order_item_gl_slot_ready($pdo)) {
+        throw new RuntimeException('عمود gl_slot غير جاهز في order_items.');
+    }
+
+    $stExisting = $pdo->prepare('SELECT gl_slot FROM order_items WHERE order_id = ? FOR UPDATE');
+    $stExisting->execute([$orderId]);
+    $existingSlots = [];
+    foreach ($stExisting->fetchAll(PDO::FETCH_COLUMN) ?: [] as $slotRaw) {
+        $slot = (int) $slotRaw;
+        if ($slot > 0) {
+            $existingSlots[$slot] = true;
+        }
+    }
+
+    $incomingSlots = [];
+    foreach ($validatedItems as $row) {
+        $glSlot = (int) ($row['gl_slot'] ?? 0);
+        if ($glSlot > 0) {
+            if (!isset($existingSlots[$glSlot])) {
+                throw new RuntimeException('gl_slot غير صالح للسطر: ' . $glSlot);
+            }
+            $incomingSlots[$glSlot] = true;
+        }
+    }
+
+    $colsStmt = $pdo->query(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_items'"
+    );
+    $oiCols = $colsStmt ? $colsStmt->fetchAll(PDO::FETCH_COLUMN) : [];
+    $oiCols = is_array($oiCols) ? $oiCols : [];
+    $hasVariantCol = in_array('variant_id', $oiCols, true);
+    $hasLineDiscountCol = in_array('line_discount', $oiCols, true);
+
+    $insertCols = ['order_id', 'gl_slot', 'product_id'];
+    if ($hasVariantCol) {
+        $insertCols[] = 'variant_id';
+    }
+    $insertCols = array_merge($insertCols, ['product_name', 'color', 'size', 'qty', 'price', 'cost']);
+    if ($hasLineDiscountCol) {
+        $insertCols[] = 'line_discount';
+    }
+    $insertPlaceholders = implode(',', array_fill(0, count($insertCols), '?'));
+    $insertStmt = $pdo->prepare(
+        'INSERT INTO order_items (' . implode(',', $insertCols) . ') VALUES (' . $insertPlaceholders . ')'
+    );
+
+    foreach ($validatedItems as $row) {
+        $product = $row['product'];
+        $glSlot = (int) ($row['gl_slot'] ?? 0);
+        $productId = (int) ($product['id'] ?? 0);
+        $variantId = (int) ($row['variant_id'] ?? 0) ?: null;
+        $productName = (string) ($product['name'] ?? '');
+        $color = (string) ($row['color'] ?? '');
+        $size = (string) ($row['size'] ?? '');
+        $qty = (int) ($row['qty'] ?? 0);
+        $price = (float) ($row['price'] ?? 0);
+        $cost = (float) ($row['cost'] ?? 0);
+        $lineDiscount = (float) ($row['line_discount'] ?? 0);
+
+        if ($glSlot > 0) {
+            $sets = [
+                'product_id = ?',
+                'product_name = ?',
+                'color = ?',
+                'size = ?',
+                'qty = ?',
+                'price = ?',
+                'cost = ?',
+            ];
+            $params = [$productId, $productName, $color, $size, $qty, $price, $cost];
+            if ($hasVariantCol) {
+                array_unshift($sets, 'variant_id = ?');
+                array_unshift($params, $variantId);
+            }
+            if ($hasLineDiscountCol) {
+                $sets[] = 'line_discount = ?';
+                $params[] = $lineDiscount;
+            }
+            $params[] = $orderId;
+            $params[] = $glSlot;
+            $pdo->prepare(
+                'UPDATE order_items SET ' . implode(', ', $sets) . ' WHERE order_id = ? AND gl_slot = ?'
+            )->execute($params);
+            continue;
+        }
+
+        $newSlot = orange_order_item_allocate_gl_slot($pdo, $orderId);
+        $bind = [$orderId, $newSlot, $productId];
+        if ($hasVariantCol) {
+            $bind[] = $variantId;
+        }
+        $bind = array_merge($bind, [$productName, $color, $size, $qty, $price, $cost]);
+        if ($hasLineDiscountCol) {
+            $bind[] = $lineDiscount;
+        }
+        $insertStmt->execute($bind);
+        $incomingSlots[$newSlot] = true;
+    }
+
+    foreach (array_keys($existingSlots) as $existingSlot) {
+        if (!isset($incomingSlots[(int) $existingSlot])) {
+            $pdo->prepare('DELETE FROM order_items WHERE order_id = ? AND gl_slot = ?')
+                ->execute([$orderId, (int) $existingSlot]);
+        }
+    }
+
+    $activeGlSlots = array_keys($incomingSlots);
+    sort($activeGlSlots, SORT_NUMERIC);
+
+    return ['active_gl_slots' => $activeGlSlots];
+}
+
 function orange_sales_invoice_company_repost_fulfillment(PDO $pdo, int $orderId): array
 {
     require_once __DIR__ . '/order_fulfillment.php';
@@ -576,7 +724,7 @@ function orange_sales_invoice_company_repost_fulfillment(PDO $pdo, int $orderId)
     $ordSt->execute([$orderId]);
     $orderRow = $ordSt->fetch(PDO::FETCH_ASSOC) ?: [];
     orange_order_assign_inv_c_if_needed($pdo, $orderId, $orderRow);
-    orange_post_order_delivery_accounting($pdo, $orderId);
+    orange_post_order_delivery_accounting($pdo, $orderId, ['rebuild' => true]);
 
     $ofCountryId = (int) ($orderRow['country_id'] ?? 0);
     if ($ofCountryId <= 0) {
