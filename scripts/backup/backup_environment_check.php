@@ -7,11 +7,47 @@ declare(strict_types=1);
  *
  * Usage:
  *   php scripts/backup/backup_environment_check.php
+ *   php scripts/backup/backup_environment_check.php --output=C:\temp\backup_environment.txt
  */
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
     exit('CLI only');
+}
+
+/**
+ * @param list<string> $argv
+ */
+function backup_environment_check_parse_output_path(array $argv): ?string
+{
+    foreach ($argv as $arg) {
+        if (!is_string($arg) || !str_starts_with($arg, '--output=')) {
+            continue;
+        }
+        $path = trim(substr($arg, strlen('--output=')));
+
+        return $path !== '' ? $path : null;
+    }
+
+    return null;
+}
+
+/**
+ * @param list<string> $lines
+ */
+function backup_environment_check_write_report_file(string $path, array $lines): void
+{
+    $dir = dirname($path);
+    if ($dir !== '' && $dir !== '.' && !is_dir($dir)) {
+        if (!@mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException('Cannot create output directory: ' . $dir);
+        }
+    }
+
+    $content = implode(PHP_EOL, $lines) . PHP_EOL;
+    if (file_put_contents($path, $content) === false) {
+        throw new RuntimeException('Cannot write output file: ' . $path);
+    }
 }
 
 $projectRoot = dirname(__DIR__, 2);
@@ -83,18 +119,23 @@ try {
         'can_run_full_backup=' . $bool(!empty($report['can_run_full_backup'])),
     ]);
 
-    foreach ($lines as $line) {
-        echo $line . PHP_EOL;
-    }
-
     $warnings = $report['warnings'] ?? [];
     if (is_array($warnings) && $warnings !== []) {
-        echo 'warnings=' . implode(' | ', $warnings) . PHP_EOL;
+        $lines[] = 'warnings=' . implode(' | ', $warnings);
     }
 
     $blockers = $report['blockers'] ?? [];
     if (is_array($blockers) && $blockers !== []) {
-        echo 'blockers=' . implode(' | ', $blockers) . PHP_EOL;
+        $lines[] = 'blockers=' . implode(' | ', $blockers);
+    }
+
+    foreach ($lines as $line) {
+        echo $line . PHP_EOL;
+    }
+
+    $outputPath = backup_environment_check_parse_output_path($_SERVER['argv'] ?? []);
+    if ($outputPath !== null) {
+        backup_environment_check_write_report_file($outputPath, $lines);
     }
 
     exit(!empty($report['can_run_full_backup']) ? 0 : 1);
