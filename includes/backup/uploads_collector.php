@@ -40,6 +40,7 @@ function orange_country_uploads_collect(string $projectRoot, int $countryId, arr
     $files = [];
     $issues = [];
     $missing = 0;
+    $seenFiles = [];
 
     foreach ($candidates as $candidate) {
         $relative = orange_country_uploads_normalize_relative((string) $candidate['relative_path']);
@@ -48,20 +49,30 @@ function orange_country_uploads_collect(string $projectRoot, int $countryId, arr
             $missing++;
             continue;
         }
-        $abs = orange_country_uploads_resolve_absolute($projectRoot, $relative);
-        if ($abs === null) {
-            $issues[] = ((string) ($candidate['severity'] ?? 'warning')) . ':missing upload file: ' . $relative;
-            $missing++;
+        $resolvedFiles = orange_country_uploads_resolve_candidate_files($projectRoot, $relative);
+        if ($resolvedFiles === []) {
+            $severity = (string) ($candidate['severity'] ?? 'warning');
+            if ($severity !== 'informational') {
+                $issues[] = $severity . ':missing upload file: ' . $relative;
+                $missing++;
+            }
             continue;
         }
-        $files[] = [
-            'relative_path' => $relative,
-            'sha256' => hash_file('sha256', $abs) ?: '',
-            'size_bytes' => (int) filesize($abs),
-            'source_table' => (string) ($candidate['source_table'] ?? ''),
-            'source_id' => (string) ($candidate['source_id'] ?? ''),
-            'severity' => (string) ($candidate['severity'] ?? 'warning'),
-        ];
+        foreach ($resolvedFiles as $resolved) {
+            $fileRelative = $resolved['relative_path'];
+            if (isset($seenFiles[$fileRelative])) {
+                continue;
+            }
+            $seenFiles[$fileRelative] = true;
+            $files[] = [
+                'relative_path' => $fileRelative,
+                'sha256' => hash_file('sha256', $resolved['absolute_path']) ?: '',
+                'size_bytes' => (int) filesize($resolved['absolute_path']),
+                'source_table' => (string) ($candidate['source_table'] ?? ''),
+                'source_id' => (string) ($candidate['source_id'] ?? ''),
+                'severity' => (string) ($candidate['severity'] ?? 'warning'),
+            ];
+        }
     }
 
     return [
@@ -150,7 +161,10 @@ function orange_country_uploads_discover_candidates(array $exportedRows, int $co
     foreach ($exportedRows['company_settings'] ?? [] as $row) {
         $logo = trim((string) ($row['company_logo'] ?? ''));
         if ($logo !== '') {
-            $add($logo, 'company_settings', (string) ($row['id'] ?? ''), 'warning');
+            $logoPath = str_starts_with($logo, 'uploads/') || str_starts_with($logo, '/uploads/')
+                ? $logo
+                : 'uploads/company/' . ltrim($logo, '/');
+            $add($logoPath, 'company_settings', (string) ($row['id'] ?? ''), 'warning');
         }
     }
 
@@ -211,6 +225,84 @@ function orange_country_uploads_resolve_absolute(string $projectRoot, string $re
     }
 
     return $real;
+}
+
+/**
+ * @return list<array{relative_path:string,absolute_path:string}>
+ */
+function orange_country_uploads_resolve_candidate_files(string $projectRoot, string $relativePath): array
+{
+    if (str_contains($relativePath, '..')) {
+        return [];
+    }
+    $uploadsRoot = realpath($projectRoot . DIRECTORY_SEPARATOR . 'uploads');
+    if ($uploadsRoot === false) {
+        return [];
+    }
+
+    $abs = $projectRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+    $real = realpath($abs);
+    if ($real === false) {
+        return [];
+    }
+
+    if (is_file($real)) {
+        $relative = orange_country_uploads_relative_from_absolute($projectRoot, $real);
+        if ($relative === null || !orange_country_uploads_is_allowlisted($relative)) {
+            return [];
+        }
+
+        return [['relative_path' => $relative, 'absolute_path' => $real]];
+    }
+
+    if (!is_dir($real)) {
+        return [];
+    }
+
+    $normDir = str_replace('\\', '/', strtolower(rtrim($real, '\\/')));
+    $normUploads = str_replace('\\', '/', strtolower(rtrim($uploadsRoot, '\\/')));
+    if ($normDir !== $normUploads && !str_starts_with($normDir, $normUploads . '/')) {
+        return [];
+    }
+
+    $files = [];
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($real, FilesystemIterator::SKIP_DOTS)
+    );
+    foreach ($iterator as $fileInfo) {
+        if (!$fileInfo instanceof SplFileInfo || !$fileInfo->isFile()) {
+            continue;
+        }
+        $fileReal = $fileInfo->getRealPath();
+        if (!is_string($fileReal) || $fileReal === '') {
+            continue;
+        }
+        $relative = orange_country_uploads_relative_from_absolute($projectRoot, $fileReal);
+        if ($relative === null || !orange_country_uploads_is_allowlisted($relative)) {
+            continue;
+        }
+        $files[] = ['relative_path' => $relative, 'absolute_path' => $fileReal];
+    }
+    usort($files, static fn (array $a, array $b): int => strcmp($a['relative_path'], $b['relative_path']));
+
+    return $files;
+}
+
+function orange_country_uploads_relative_from_absolute(string $projectRoot, string $absolutePath): ?string
+{
+    $projectReal = realpath($projectRoot);
+    if ($projectReal === false) {
+        return null;
+    }
+    $normProject = str_replace('\\', '/', rtrim($projectReal, '\\/'));
+    $normFile = str_replace('\\', '/', $absolutePath);
+    if (!str_starts_with($normFile, $normProject . '/')) {
+        return null;
+    }
+    $relative = substr($normFile, strlen($normProject) + 1);
+    $relative = orange_country_uploads_normalize_relative($relative);
+
+    return $relative !== '' ? $relative : null;
 }
 
 /**

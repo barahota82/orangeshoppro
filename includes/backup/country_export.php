@@ -52,8 +52,9 @@ function orange_country_export_run(PDO $pdo, array $options): array
     $countryCode = $country['code'] !== '' ? $country['code'] : ('c' . $countryId);
     $timestamp = date('Y-m-d_His');
     $finalDir = $outputOverride !== ''
-        ? $outputOverride
+        ? orange_country_export_resolve_output_path($outputOverride)
         : $backupRoot . DIRECTORY_SEPARATOR . 'country_packages' . DIRECTORY_SEPARATOR . $countryCode . DIRECTORY_SEPARATOR . $timestamp;
+    orange_country_export_assert_safe_package_destination($finalDir);
     $tempDir = dirname($finalDir) . DIRECTORY_SEPARATOR . '.tmp_' . basename($finalDir) . '_' . bin2hex(random_bytes(4));
 
     if (is_dir($finalDir)) {
@@ -110,9 +111,7 @@ function orange_country_export_run(PDO $pdo, array $options): array
                 $sqlDir
             );
             $rowCounts[$tableName] = $result['row_count'];
-            if ($result['ids'] !== []) {
-                $idSnapshot[$tableName] = $result['ids'];
-            }
+            $idSnapshot[$tableName] = $result['ids'];
             if ($result['rows'] !== []) {
                 $exportedRows[$tableName] = $result['rows'];
             }
@@ -237,6 +236,40 @@ function orange_country_export_run(PDO $pdo, array $options): array
         orange_backup_remove_dir($tempDir);
         throw $e;
     }
+}
+
+function orange_country_export_resolve_output_path(string $outputPath): string
+{
+    $outputPath = trim($outputPath);
+    if ($outputPath === '') {
+        throw new RuntimeException('Output path must not be empty.');
+    }
+    if (str_contains($outputPath, '..')) {
+        throw new RuntimeException('Output path must not contain path traversal (..).');
+    }
+
+    $isAbsolute = str_starts_with($outputPath, DIRECTORY_SEPARATOR)
+        || preg_match('/^[A-Za-z]:[\\\\\\/]/', $outputPath) === 1
+        || str_starts_with($outputPath, '\\\\')
+        || str_starts_with($outputPath, '//');
+    if (!$isAbsolute) {
+        $cwd = getcwd();
+        if ($cwd === false) {
+            throw new RuntimeException('Cannot resolve relative output path.');
+        }
+        $outputPath = $cwd . DIRECTORY_SEPARATOR . $outputPath;
+    }
+
+    return rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $outputPath), DIRECTORY_SEPARATOR);
+}
+
+function orange_country_export_assert_safe_package_destination(string $finalDir): void
+{
+    $normalized = str_replace('\\', '/', $finalDir);
+    if (preg_match('#(^|/)(httpdocs|public_html|wwwroot)(/|$)#i', $normalized)) {
+        throw new RuntimeException('Country package output must not be inside a public web root.');
+    }
+    orange_backup_assert_outside_web_root($finalDir);
 }
 
 function orange_country_export_write_session_file(string $path, bool $preamble): void
