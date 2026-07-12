@@ -27,11 +27,27 @@ function orange_recovery_read_json_file(string $path, string $label): array
     try {
         /** @var array<string, mixed> $decoded */
         $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($decoded) || !str_starts_with(ltrim($raw), '{')) {
+            return ['ok' => false, 'data' => null, 'errors' => [$label . ' must contain a JSON object']];
+        }
 
         return ['ok' => true, 'data' => $decoded, 'errors' => []];
     } catch (Throwable $e) {
         return ['ok' => false, 'data' => null, 'errors' => ['Invalid JSON in ' . $label . ': ' . $e->getMessage()]];
     }
+}
+
+function orange_recovery_sql_without_trailing_comments(string $sqlText): string
+{
+    $trimmed = rtrim($sqlText);
+    do {
+        $previous = $trimmed;
+        $trimmed = preg_replace('/(?:^|\R)\s*(?:--|#)[^\r\n]*\s*$/', '', $trimmed) ?? $trimmed;
+        $trimmed = preg_replace('/\/\*.*?\*\/\s*$/s', '', $trimmed) ?? $trimmed;
+        $trimmed = rtrim($trimmed);
+    } while ($trimmed !== $previous);
+
+    return $trimmed;
 }
 
 /**
@@ -51,7 +67,7 @@ function orange_recovery_validate_sql_text(string $sqlText, string $label): arra
     }
     $createCount = preg_match_all('/^\s*CREATE\s+TABLE\b/im', $sqlText) ?: 0;
     $insertCount = preg_match_all('/^\s*INSERT\s+INTO\b/im', $sqlText) ?: 0;
-    $trimmed = rtrim($sqlText);
+    $trimmed = orange_recovery_sql_without_trailing_comments($sqlText);
     if (
         $trimmed !== ''
         && !str_ends_with($trimmed, ';')
