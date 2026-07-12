@@ -33,6 +33,9 @@ function retention_self_test(bool $ok, string $label): void
 
 retention_self_test(orange_backup_retention_days([]) === 30, 'retention default = 30 when config key missing');
 retention_self_test(orange_backup_retention_days(['ORANGE_BACKUP_RETENTION_DAYS' => 45]) === 45, 'retention override from env');
+retention_self_test(orange_backup_retention_days(['ORANGE_BACKUP_RETENTION_DAYS' => '45']) === 45, 'retention override accepts numeric strings');
+retention_self_test(orange_backup_retention_days(['ORANGE_BACKUP_RETENTION_DAYS' => 'abc']) === 30, 'invalid retention override falls back to default');
+retention_self_test(orange_backup_retention_days(['ORANGE_BACKUP_RETENTION_DAYS' => 0]) === 30, 'non-positive retention override falls back to default');
 retention_self_test(!orange_backup_retention_age_exceeds(30 * 86400, 30), 'package exactly 30 days kept');
 retention_self_test(orange_backup_retention_age_exceeds((30 * 86400) + 1, 30), 'package older than 30 days eligible');
 retention_self_test(orange_backup_retention_is_temp_dir_name('._work_abc'), 'temp workspace name detected');
@@ -114,39 +117,39 @@ $writeHealthyCrp = static function (string $dir): void {
 };
 
 $oldHealthyFull = $snapshotsDir . DIRECTORY_SEPARATOR . '2020-01-01_010000';
-$newFailedFull = $snapshotsDir . DIRECTORY_SEPARATOR . '2026-07-01_010000';
+$oldFailedFull = $snapshotsDir . DIRECTORY_SEPARATOR . '2020-02-01_010000';
 $exactThirtyName = date('Y-m-d_His', time() - (30 * 86400));
 $exactThirtyFull = $snapshotsDir . DIRECTORY_SEPARATOR . $exactThirtyName;
 mkdir($oldHealthyFull);
-mkdir($newFailedFull);
+mkdir($oldFailedFull);
 mkdir($exactThirtyFull);
 $writeHealthyFull($oldHealthyFull);
-orange_backup_write_json($newFailedFull . DIRECTORY_SEPARATOR . 'health.json', [
+orange_backup_write_json($oldFailedFull . DIRECTORY_SEPARATOR . 'health.json', [
     'package_type' => 'full_disaster',
     'package_status' => 'failed',
 ]);
 $writeHealthyFull($exactThirtyFull);
 
 $oldHealthyCrp = $countryDir . DIRECTORY_SEPARATOR . '2020-01-01_010000';
-$newFailedCrp = $countryDir . DIRECTORY_SEPARATOR . '2026-07-01_010000';
+$oldFailedCrp = $countryDir . DIRECTORY_SEPARATOR . '2020-02-01_010000';
 mkdir($oldHealthyCrp);
-mkdir($newFailedCrp);
+mkdir($oldFailedCrp);
 $writeHealthyCrp($oldHealthyCrp);
-orange_backup_write_json($newFailedCrp . DIRECTORY_SEPARATOR . 'health.json', [
+orange_backup_write_json($oldFailedCrp . DIRECTORY_SEPARATOR . 'health.json', [
     'package_type' => 'country_recovery',
     'package_status' => 'failed',
 ]);
 
 $fullResult = orange_backup_retention_apply_full_snapshots($root, $snapshotsDir, $exactThirtyName, 30);
 retention_self_test(is_dir($exactThirtyFull), 'newest healthy full snapshot preserved');
-retention_self_test(!is_dir($newFailedFull), 'unhealthy full snapshot not protected');
+retention_self_test(!is_dir($oldFailedFull), 'expired unhealthy full snapshot not protected');
 retention_self_test(is_dir($exactThirtyFull), 'exactly 30-day full snapshot kept');
 retention_self_test(!is_dir($oldHealthyFull), 'package older than 30 days deleted when newer healthy exists');
 retention_self_test(is_dir($snapshotsDir . DIRECTORY_SEPARATOR . '._work_active'), 'current temp workspace never deleted');
 
 $crpResult = orange_backup_retention_apply_country_packages($root, 'zztest', null, 30);
 retention_self_test(is_dir($oldHealthyCrp), 'newest healthy CRP per country preserved when no newer healthy exists');
-retention_self_test(!is_dir($newFailedCrp), 'unhealthy CRP not protected');
+retention_self_test(!is_dir($oldFailedCrp), 'expired unhealthy CRP not protected');
 
 $deletedFullNames = array_map(static fn (array $row): string => (string) ($row['name'] ?? ''), $fullResult['deleted']);
 retention_self_test($deletedFullNames !== [] || count($fullResult['kept']) > 0, 'full retention produced decisions');

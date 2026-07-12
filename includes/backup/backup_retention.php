@@ -12,7 +12,14 @@ const ORANGE_BACKUP_RETENTION_FAMILY_CRP = 'country_recovery';
 
 function orange_backup_retention_days(array $env): int
 {
-    return max(1, (int) ($env[ORANGE_BACKUP_RETENTION_ENV_DAYS] ?? ORANGE_BACKUP_RETENTION_DEFAULT_DAYS));
+    $rawDays = $env[ORANGE_BACKUP_RETENTION_ENV_DAYS] ?? ORANGE_BACKUP_RETENTION_DEFAULT_DAYS;
+    if (!is_int($rawDays) && !(is_string($rawDays) && preg_match('/^\d+$/', trim($rawDays)))) {
+        return ORANGE_BACKUP_RETENTION_DEFAULT_DAYS;
+    }
+
+    $days = (int) $rawDays;
+
+    return $days > 0 ? $days : ORANGE_BACKUP_RETENTION_DEFAULT_DAYS;
 }
 
 function orange_backup_retention_is_temp_dir_name(string $name): bool

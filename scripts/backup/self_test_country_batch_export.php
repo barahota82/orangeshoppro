@@ -36,6 +36,9 @@ crp_batch_self_test(!preg_match('/country[_-]?id\s*=\s*[1-9]\d*/i', $batchSource
 crp_batch_self_test(!preg_match('/--country-id=/', $cliSource), 'batch CLI does not accept hardcoded country-id flag');
 crp_batch_self_test(in_array('customers', orange_crp_batch_historical_data_tables(), true), 'historical data tables include customers');
 crp_batch_self_test(in_array('inventory_cost_layers', orange_crp_batch_historical_data_tables(), true), 'historical data tables include inventory/FIFO layers');
+crp_batch_self_test(orange_country_export_safe_country_code('KW', 7) === 'kw', 'country code sanitizer preserves uppercase codes as lowercase');
+crp_batch_self_test(orange_country_export_safe_country_code('../KW test', 7) === 'kwtest', 'country code sanitizer removes path separators and spaces');
+crp_batch_self_test(orange_country_export_safe_country_code('---', 7) === 'c7', 'country code sanitizer falls back when code has no safe characters');
 
 crp_batch_self_test(orange_crp_batch_compute_exit_code([]) === 0, 'all success exit code 0');
 crp_batch_self_test(orange_crp_batch_compute_exit_code([['id' => 99]]) === 1, 'any failure exit code non-zero');
