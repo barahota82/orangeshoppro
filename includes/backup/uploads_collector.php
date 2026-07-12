@@ -150,7 +150,7 @@ function orange_country_uploads_discover_candidates(array $exportedRows, int $co
     foreach ($exportedRows['company_settings'] ?? [] as $row) {
         $logo = trim((string) ($row['company_logo'] ?? ''));
         if ($logo !== '') {
-            $add($logo, 'company_settings', (string) ($row['id'] ?? ''), 'warning');
+            $add('uploads/company/' . basename($logo), 'company_settings', (string) ($row['id'] ?? ''), 'warning');
         }
     }
 

@@ -106,6 +106,13 @@ crp_self_test(abs(0.05) > ORANGE_COUNTRY_EXPORT_TRIAL_BALANCE_TOLERANCE, 'trial 
 // Upload path allowlist + traversal block
 crp_self_test(orange_country_uploads_is_allowlisted('uploads/products/x.jpg'), 'upload allowlist products');
 crp_self_test(!orange_country_uploads_is_allowlisted('uploads/../secrets.txt'), 'upload traversal blocked');
+$logoCandidates = orange_country_uploads_discover_candidates(
+    ['company_settings' => [['id' => 1, 'company_logo' => 'company-logo.webp']]],
+    1
+);
+$logoPaths = array_map(static fn (array $c): string => (string) ($c['relative_path'] ?? ''), $logoCandidates);
+crp_self_test(in_array('uploads/company/company-logo.webp', $logoPaths, true), 'company logo resolves to uploads/company/');
+crp_self_test(!in_array('uploads/products/company-logo.webp', $logoPaths, true), 'company logo never resolves to uploads/products/');
 $uploadIssues = orange_country_uploads_collect($projectRoot, 1, [
     'products' => [['id' => 1, 'main_image' => 'missing-file.webp']],
 ]);
