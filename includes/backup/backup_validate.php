@@ -321,6 +321,37 @@ function orange_country_export_build_health(array $healthInput): array
     ];
 }
 
+function orange_country_export_sql_chunk_contains_forbidden_insert(string $sqlFile, string $tableName): bool
+{
+    $handle = fopen($sqlFile, 'rb');
+    if ($handle === false) {
+        throw new RuntimeException('Cannot read SQL chunk: ' . $sqlFile);
+    }
+
+    $needle = strtolower('INSERT INTO `' . $tableName . '`');
+    $needleCarryLength = max(strlen($needle) - 1, 0);
+    $carry = '';
+
+    while (!feof($handle)) {
+        $chunk = fread($handle, 8192);
+        if ($chunk === false) {
+            fclose($handle);
+            throw new RuntimeException('Cannot read SQL chunk: ' . $sqlFile);
+        }
+
+        $haystack = strtolower($carry . $chunk);
+        if (str_contains($haystack, $needle)) {
+            fclose($handle);
+            return true;
+        }
+
+        $carry = $needleCarryLength > 0 ? substr($haystack, -$needleCarryLength) : '';
+    }
+
+    fclose($handle);
+    return false;
+}
+
 /**
  * @return array{ok:bool,errors:list<string>,warnings:list<string>,manifest:?array<string,mixed>}
  */
@@ -362,9 +393,8 @@ function orange_country_export_verify_package(string $packageRoot): array
             $errors[] = 'sql/ directory has no .sql chunks';
         }
         foreach ($sqlFiles as $sqlFile) {
-            $content = (string) file_get_contents($sqlFile);
             foreach (ORANGE_COUNTRY_EXPORT_FORBIDDEN_SQL_TABLES as $forbidden) {
-                if (preg_match('/INSERT INTO `' . preg_quote($forbidden, '/') . '`/i', $content)) {
+                if (orange_country_export_sql_chunk_contains_forbidden_insert($sqlFile, $forbidden)) {
                     $errors[] = 'Forbidden global table data in SQL: ' . $forbidden;
                 }
             }

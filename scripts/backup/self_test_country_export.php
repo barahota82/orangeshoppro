@@ -91,7 +91,7 @@ $parentQuery = orange_country_export_build_parent_rows_query('order_items', [
     'parent_table' => 'orders',
     'foreign_key' => 'order_id',
 ], $idSnapshot);
-crp_self_test(str_contains($parentQuery['sql'], 'order_id IN'), 'dependent row extraction query');
+crp_self_test(str_contains($parentQuery['sql'], '`order_id` IN'), 'dependent row extraction query');
 $emptyParentQuery = orange_country_export_build_parent_rows_query('order_items', [
     'type' => 'parent_rows',
     'parent_table' => 'orders',
@@ -107,7 +107,7 @@ crp_self_test(abs(0.05) > ORANGE_COUNTRY_EXPORT_TRIAL_BALANCE_TOLERANCE, 'trial 
 crp_self_test(orange_country_uploads_is_allowlisted('uploads/products/x.jpg'), 'upload allowlist products');
 crp_self_test(!orange_country_uploads_is_allowlisted('uploads/../secrets.txt'), 'upload traversal blocked');
 $uploadIssues = orange_country_uploads_collect($projectRoot, 1, [
-    'products' => [['id' => 1, 'main_image' => 'missing-file.webp']],
+    'product_colorway_images' => [['id' => 1, 'image_path' => 'missing-file.webp']],
 ]);
 $classified = orange_country_export_classify_upload_issues($uploadIssues['issues']);
 crp_self_test(($classified['package_status'] ?? '') === 'healthy' || ($classified['package_status'] ?? '') === 'warning', 'warning upload missing does not auto-fail when non-critical');
@@ -174,6 +174,13 @@ crp_self_test($verifyOk['ok'], 'mock CRP package verifies');
 file_put_contents($pkg . DIRECTORY_SEPARATOR . 'checksums.sha256', str_repeat('a', 64) . "  manifest.json\n");
 $verifyBad = orange_country_export_verify_package($pkg);
 crp_self_test(!$verifyBad['ok'], 'corrupted checksum rejection');
+
+$forbiddenSql = $tmpParent . DIRECTORY_SEPARATOR . 'forbidden_boundary.sql';
+file_put_contents($forbiddenSql, str_repeat('x', 8190) . 'INSERT INTO `countries` VALUES (1);');
+crp_self_test(
+    orange_country_export_sql_chunk_contains_forbidden_insert($forbiddenSql, 'countries'),
+    'streaming forbidden global INSERT detection across chunk boundary'
+);
 
 orange_backup_remove_dir($tmpParent);
 
