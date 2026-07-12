@@ -12,13 +12,20 @@ Phase 1A scope: **full database + full uploads backup only**.
 
 Use Plesk **Scheduled Tasks** when RDP or interactive PowerShell is not available.
 
-| Setting | Value |
-|---------|-------|
-| **Task type** | Run a PHP script |
-| **Script path** | `scripts/backup/run_full_backup.php` |
-| **First manual test** | Click **Run Now** after deploy |
-| **Recommended schedule** | Daily at an off-peak UTC time (e.g. `03:00 UTC`) |
-| **Notification** | Errors only |
+| Task | Setting | Value |
+|------|---------|-------|
+| **Full Disaster Backup** | Task type | Run a PHP script |
+| | Script path | `scripts/backup/run_full_backup.php` |
+| | Recommended schedule | Daily at **03:00 UTC** |
+| | Notification | Errors only |
+| **Automatic Country Packages (Phase 1B.3)** | Task type | Run a PHP script |
+| | Script path | `scripts/backup/export_all_recoverable_countries.php` |
+| | Recommended schedule | Daily **after** full backup (e.g. **03:30 UTC**) |
+| | Notification | Errors only |
+
+The country batch task **discovers eligible countries on every run** — adding or activating a new country requires **no** Scheduled Task edit.
+
+**First manual test:** Click **Run Now** after deploy for each task.
 
 The PHP entry point:
 
@@ -70,6 +77,10 @@ Each successful run writes:
 ```php
 'ORANGE_BACKUP_ROOT' => 'C:\\inetpub\\vhosts\\clickstorekw.com\\private\\orange_backups',
 'ORANGE_MYSQLDUMP_PATH' => 'C:\\Program Files (x86)\\Plesk\\MySQL\\bin\\mysqldump.exe',
+// optional CRP batch retention (defaults: daily 7, weekly 4, monthly 6):
+// 'ORANGE_CRP_RETENTION_DAILY' => 7,
+// 'ORANGE_CRP_RETENTION_WEEKLY' => 4,
+// 'ORANGE_CRP_RETENTION_MONTHLY' => 6,
 // optional — only if you want PowerShell delegation from PHP:
 // 'ORANGE_BACKUP_POWERSHELL_PATH' => 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
 ```
@@ -345,3 +356,52 @@ files/uploads_country.zip
 - Critical referenced uploads missing → export fails closed
 
 **Health `package_status`:** `healthy` | `warning` | `failed` (generation aborts on `failed`).
+
+---
+
+## Automatic Country Package batch — Phase 1B.3 (export only)
+
+Discovers **recoverable countries dynamically** from the `countries` table and exports one Country Recovery Package per selected country. **Read-only** against production — no restore, merge, admin UI, or schema changes.
+
+| Artifact | Purpose |
+|----------|---------|
+| `scripts/backup/export_all_recoverable_countries.php` | CLI / Plesk batch entry point |
+| `includes/backup/country_batch_export.php` | Discovery, lock, retention, batch orchestration |
+| `scripts/backup/self_test_country_batch_export.php` | Batch self-tests |
+
+```powershell
+php D:\orange\scripts\backup\export_all_recoverable_countries.php
+php D:\orange\scripts\backup\self_test_country_batch_export.php
+```
+
+**Country discovery (every run):**
+
+- **Selected:** country is **active** (`is_active=1`), **or** inactive but has historical data in country-scoped headers (`purchases`, `purchase_returns`, `orders`, `sales_returns`, `journal_vouchers`, `stock_movements`, `customers`, `suppliers`).
+- **Skipped:** inactive with no rows in those tables (empty/template countries).
+- **Never hardcoded** — no fixed country IDs or codes in the batch script.
+
+**Batch behavior:**
+
+- One global lock (`locks/orange_crp_batch.lock`) prevents concurrent batch runs.
+- Countries processed **one at a time** via `orange_country_export_run()` (no duplicated CRP logic).
+- If one country fails: temp package cleaned up, batch **continues**, final exit code **non-zero**, Plesk Errors-only notification fires.
+- Logs: `{BackupRoot}/logs/export_all_countries_*.log`
+
+**CRP retention (per country, after each successful export):**
+
+| Key (`.env.php`) | Default |
+|------------------|---------|
+| `ORANGE_CRP_RETENTION_DAILY` | 7 |
+| `ORANGE_CRP_RETENTION_WEEKLY` | 4 |
+| `ORANGE_CRP_RETENTION_MONTHLY` | 6 |
+
+Retention runs independently under `{BackupRoot}/country_packages/{country_code}/`. The **newest verified healthy** package for each country is **never deleted**.
+
+**Plesk Scheduled Task (country batch):**
+
+| Setting | Value |
+|---------|-------|
+| Task type | Run a PHP script |
+| Script path | `scripts/backup/export_all_recoverable_countries.php` |
+| Schedule | Daily after full backup (e.g. **03:30 UTC**) |
+| Notification | Errors only |

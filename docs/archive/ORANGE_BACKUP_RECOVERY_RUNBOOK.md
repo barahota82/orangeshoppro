@@ -9,13 +9,18 @@
 
 ## Plesk scheduled backup (primary)
 
-| Setting | Value |
-|---------|-------|
-| Task type | **Run a PHP script** |
-| Script path | `scripts/backup/run_full_backup.php` |
-| First test | **Run Now** (manual) after `git pull` |
-| Schedule | Daily at off-peak **UTC** time |
-| Notification | **Errors only** |
+| Task | Setting | Value |
+|------|---------|-------|
+| **Full Disaster Backup** | Task type | **Run a PHP script** |
+| | Script path | `scripts/backup/run_full_backup.php` |
+| | Schedule | Daily at **03:00 UTC** (off-peak) |
+| | Notification | **Errors only** |
+| **Automatic Country Packages (1B.3)** | Task type | **Run a PHP script** |
+| | Script path | `scripts/backup/export_all_recoverable_countries.php` |
+| | Schedule | Daily **after** full backup (e.g. **03:30 UTC**) |
+| | Notification | **Errors only** |
+
+The country batch task discovers eligible countries on **every run** — no Scheduled Task edit when countries are added or activated.
 
 Pre-flight (read-only):
 
@@ -30,6 +35,10 @@ The PHP entry point handles locking, backend selection, logging under `{BackupRo
 ```php
 'ORANGE_BACKUP_ROOT' => 'C:\\inetpub\\vhosts\\clickstorekw.com\\private\\orange_backups',
 'ORANGE_MYSQLDUMP_PATH' => 'C:\\Program Files (x86)\\Plesk\\MySQL\\bin\\mysqldump.exe',
+// optional CRP batch retention (defaults: daily 7, weekly 4, monthly 6):
+// 'ORANGE_CRP_RETENTION_DAILY' => 7,
+// 'ORANGE_CRP_RETENTION_WEEKLY' => 4,
+// 'ORANGE_CRP_RETENTION_MONTHLY' => 6,
 ```
 
 Create the BackupRoot folder outside `httpdocs`, grant write permission to the scheduled-task PHP user, and verify `proc_open` is enabled. If `proc_open` is disabled, the scheduled task **must fail** — there is no PDO fallback in Phase 1A.
@@ -189,6 +198,33 @@ Restore must be **tested on a non-production clone** before relying on it for pr
 
 ---
 
+## Phase 1B.3 — Automatic Country Package batch (implemented)
+
+| Item | Status |
+|------|--------|
+| Batch CLI (`export_all_recoverable_countries.php`) | **Implemented** |
+| Dynamic country discovery | **Implemented** — active OR inactive with historical data |
+| Per-country retention | **Implemented** — configurable via `.env.php` |
+| Staging restore / production merge | **Not implemented — Phase 2** |
+| Admin backup module | **Not implemented — Phase 3** |
+
+**Discovery rule (every run, no hardcoded country IDs):**
+
+1. Read all rows from `countries`.
+2. **Export** when `is_active=1`, **or** when inactive but any country-scoped header table has rows for that `country_id`: `purchases`, `purchase_returns`, `orders`, `sales_returns`, `journal_vouchers`, `stock_movements`, `customers`, `suppliers`.
+3. **Skip** inactive countries with no rows in those tables (empty/template).
+
+**Failure policy:** one country failure does not finalize a partial package for that country; batch continues; exit code non-zero; log lists succeeded and failed countries.
+
+**Retention:** independent per `{BackupRoot}/country_packages/{country_code}/`; defaults daily 7 / weekly 4 / monthly 6; newest **verified healthy** package never deleted.
+
+```powershell
+php D:\orange\scripts\backup\export_all_recoverable_countries.php
+php D:\orange\scripts\backup\self_test_country_batch_export.php
+```
+
+---
+
 ## Deferred — Phase 2 and later
 
 The following are **not part of Phase 1A / 1B** and must not be assumed available:
@@ -205,6 +241,7 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 ```powershell
 php D:\orange\scripts\backup\self_test_backup.php
 php D:\orange\scripts\backup\self_test_country_export.php
+php D:\orange\scripts\backup\self_test_country_batch_export.php
 php D:\orange\scripts\backup\backup_environment_check.php
 php D:\orange\scripts\backup\validate_registry.php --offline
 php D:\orange\scripts\backup\export_country.php --country-id=1
