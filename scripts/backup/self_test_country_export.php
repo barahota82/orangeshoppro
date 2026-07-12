@@ -68,7 +68,7 @@ $parentQuery = orange_country_export_build_parent_rows_query('order_items', [
     'parent_table' => 'orders',
     'foreign_key' => 'order_id',
 ], $idSnapshot);
-crp_self_test(str_contains($parentQuery['sql'], 'order_id IN'), 'dependent row extraction query');
+crp_self_test(str_contains($parentQuery['sql'], '`order_id` IN'), 'dependent row extraction query');
 
 // Trial balance tolerance
 crp_self_test(abs(0.005) <= ORANGE_COUNTRY_EXPORT_TRIAL_BALANCE_TOLERANCE, 'trial balance tolerance configured');
