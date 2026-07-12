@@ -237,31 +237,28 @@ function orange_country_export_compute_inventory_summary(PDO $pdo, int $countryI
 
 /**
  * @param list<string> $uploadIssues
- * @return array{package_status:string,failure_reasons:list<string>,warnings:list<string>}
+ * @return array{package_status:string,failure_reasons:list<string>,warnings:list<string>,maintenance_notes:list<string>}
  */
 function orange_country_export_classify_upload_issues(array $uploadIssues): array
 {
     $failureReasons = [];
     $warnings = [];
+    $maintenanceNotes = [];
     foreach ($uploadIssues as $issue) {
         if (str_starts_with($issue, 'critical:')) {
             $failureReasons[] = substr($issue, strlen('critical:'));
         } elseif (str_starts_with($issue, 'warning:')) {
             $warnings[] = substr($issue, strlen('warning:'));
+        } elseif (str_starts_with($issue, 'informational:')) {
+            $maintenanceNotes[] = substr($issue, strlen('informational:'));
         }
     }
 
-    $status = 'healthy';
-    if ($failureReasons !== []) {
-        $status = 'failed';
-    } elseif ($warnings !== []) {
-        $status = 'warning';
-    }
-
     return [
-        'package_status' => $status,
+        'package_status' => $failureReasons !== [] ? 'failed' : 'healthy',
         'failure_reasons' => $failureReasons,
         'warnings' => $warnings,
+        'maintenance_notes' => $maintenanceNotes,
     ];
 }
 
@@ -283,13 +280,12 @@ function orange_country_export_build_health(array $healthInput): array
         $validationWarnings,
         $uploadClass['warnings']
     )));
+    $maintenanceNotes = array_values(array_unique(array_merge(
+        is_array($healthInput['maintenance_notes'] ?? null) ? $healthInput['maintenance_notes'] : [],
+        $uploadClass['maintenance_notes']
+    )));
 
-    $packageStatus = 'healthy';
-    if ($failureReasons !== []) {
-        $packageStatus = 'failed';
-    } elseif ($warnings !== []) {
-        $packageStatus = 'warning';
-    }
+    $packageStatus = $failureReasons !== [] ? 'failed' : 'healthy';
 
     return [
         'package_type' => 'country_recovery',
@@ -317,7 +313,7 @@ function orange_country_export_build_health(array $healthInput): array
         ],
         'failure_reasons' => $failureReasons,
         'warnings' => $warnings,
-        'maintenance_notes' => is_array($healthInput['maintenance_notes'] ?? null) ? $healthInput['maintenance_notes'] : [],
+        'maintenance_notes' => $maintenanceNotes,
     ];
 }
 

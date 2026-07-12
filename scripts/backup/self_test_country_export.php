@@ -110,7 +110,23 @@ $uploadIssues = orange_country_uploads_collect($projectRoot, 1, [
     'products' => [['id' => 1, 'main_image' => 'missing-file.webp']],
 ]);
 $classified = orange_country_export_classify_upload_issues($uploadIssues['issues']);
-crp_self_test(($classified['package_status'] ?? '') === 'healthy' || ($classified['package_status'] ?? '') === 'warning', 'warning upload missing does not auto-fail when non-critical');
+crp_self_test(($classified['package_status'] ?? '') === 'healthy', 'warning upload missing does not downgrade package_status');
+crp_self_test(($classified['warnings'] ?? []) !== [], 'warning upload issues remain in warnings[]');
+$informationalClass = orange_country_export_classify_upload_issues(['informational:optional folder absent: uploads/customers/1/']);
+crp_self_test(($informationalClass['maintenance_notes'] ?? []) !== [], 'informational upload issues go to maintenance_notes[]');
+crp_self_test(($informationalClass['package_status'] ?? '') === 'healthy', 'informational items do not downgrade package_status');
+$healthHealthy = orange_country_export_build_health([
+    'country_id' => 1,
+    'country_code' => 'kw',
+    'country_label' => 'Kuwait',
+    'schema_revision' => 121,
+    'registry_version' => '1.0',
+    'upload_issues' => ['warning:missing upload file: uploads/products/optional.webp'],
+    'validation_errors' => [],
+    'validation_warnings' => [],
+]);
+crp_self_test(($healthHealthy['package_status'] ?? '') === 'healthy', 'successful export metadata stays healthy with warnings');
+crp_self_test(($healthHealthy['failure_reasons'] ?? []) === [], 'failure_reasons empty when only warnings present');
 
 // Critical upload missing classification
 $criticalIssues = ['critical:missing upload file: uploads/products/required.webp'];
