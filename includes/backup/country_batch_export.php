@@ -81,6 +81,13 @@ function orange_crp_batch_historical_data_probe_specs(PDO $pdo): array
             && orange_table_exists($pdo, 'orders')
             && orange_table_has_column($pdo, 'orders', 'country_id')
         ) {
+            if (
+                !orange_table_has_column($pdo, 'sales_returns', 'customer_id')
+                || !orange_table_exists($pdo, 'customers')
+                || !orange_table_has_column($pdo, 'customers', 'country_id')
+            ) {
+                throw new RuntimeException('Country history probe requires customers.country_id for sales_returns fallback ownership.');
+            }
             $specs[] = [
                 'key' => 'sales_returns',
                 'sql' => 'SELECT 1 FROM sales_returns sr'
