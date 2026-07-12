@@ -13,7 +13,7 @@ const ORANGE_CRP_BATCH_LOCK_RELATIVE = 'locks/orange_crp_batch.lock';
 $orangeCrpBatchLockHandle = null;
 
 /**
- * Country-scoped header tables used to detect recoverable inactive countries.
+ * Country-scoped tables used for inactive-country history detection labels.
  *
  * @return list<string>
  */
@@ -29,7 +29,168 @@ function orange_crp_batch_historical_data_tables(): array
         'journal_vouchers',
         'stock_movements',
         'inventory_cost_layers',
+        'inventory_cost_consumptions',
     ];
+}
+
+/**
+ * @return list<array{key:string,sql:string,param_count:int}>
+ */
+function orange_crp_batch_historical_data_probe_specs(PDO $pdo): array
+{
+    require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'catalog_schema.php';
+
+    $specs = [];
+
+    foreach (['customers', 'suppliers', 'purchases', 'orders', 'journal_vouchers', 'inventory_cost_layers'] as $tableName) {
+        if (!orange_table_exists($pdo, $tableName)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $tableName, 'country_id')) {
+            throw new RuntimeException(
+                'Country history probe misconfigured: expected country_id on ' . $tableName . ' but column is missing.'
+            );
+        }
+        $specs[] = orange_crp_batch_make_country_id_probe($tableName);
+    }
+
+    if (orange_table_exists($pdo, 'purchase_returns')) {
+        if (!orange_table_exists($pdo, 'purchases') || !orange_table_has_column($pdo, 'purchases', 'country_id')) {
+            throw new RuntimeException('Country history probe requires purchases.country_id for purchase_returns ownership.');
+        }
+        if (!orange_table_exists($pdo, 'suppliers') || !orange_table_has_column($pdo, 'suppliers', 'country_id')) {
+            throw new RuntimeException('Country history probe requires suppliers.country_id for purchase_returns ownership.');
+        }
+        $specs[] = [
+            'key' => 'purchase_returns',
+            'sql' => 'SELECT 1 FROM purchase_returns pr'
+                . ' LEFT JOIN purchases p ON p.id = pr.purchase_id'
+                . ' LEFT JOIN suppliers s ON s.id = pr.supplier_id'
+                . ' WHERE (p.id IS NOT NULL AND p.country_id = ?)'
+                . ' OR (p.id IS NULL AND s.country_id = ?)'
+                . ' LIMIT 1',
+            'param_count' => 2,
+        ];
+    }
+
+    if (orange_table_exists($pdo, 'sales_returns')) {
+        if (orange_table_has_column($pdo, 'sales_returns', 'country_id')) {
+            $specs[] = orange_crp_batch_make_country_id_probe('sales_returns');
+        } elseif (
+            orange_table_has_column($pdo, 'sales_returns', 'order_id')
+            && orange_table_exists($pdo, 'orders')
+            && orange_table_has_column($pdo, 'orders', 'country_id')
+        ) {
+            $specs[] = [
+                'key' => 'sales_returns',
+                'sql' => 'SELECT 1 FROM sales_returns sr'
+                    . ' LEFT JOIN orders o ON o.id = sr.order_id'
+                    . ' LEFT JOIN customers c ON c.id = sr.customer_id'
+                    . ' WHERE (o.id IS NOT NULL AND o.country_id = ?)'
+                    . ' OR (o.id IS NULL AND c.country_id = ?)'
+                    . ' LIMIT 1',
+                'param_count' => 2,
+            ];
+        } else {
+            throw new RuntimeException(
+                'Country history probe cannot resolve sales_returns ownership (missing country_id and parent path).'
+            );
+        }
+    }
+
+    if (orange_table_exists($pdo, 'stock_movements')) {
+        if (orange_table_has_column($pdo, 'stock_movements', 'country_id')) {
+            $specs[] = orange_crp_batch_make_country_id_probe('stock_movements');
+        } elseif (
+            orange_table_has_column($pdo, 'stock_movements', 'warehouse_id')
+            && orange_table_exists($pdo, 'warehouses')
+            && orange_table_has_column($pdo, 'warehouses', 'country_id')
+        ) {
+            $specs[] = [
+                'key' => 'stock_movements',
+                'sql' => 'SELECT 1 FROM stock_movements sm'
+                    . ' INNER JOIN warehouses w ON w.id = sm.warehouse_id'
+                    . ' WHERE w.country_id = ?'
+                    . ' LIMIT 1',
+                'param_count' => 1,
+            ];
+        } else {
+            throw new RuntimeException(
+                'Country history probe cannot resolve stock_movements ownership (missing country_id and warehouse path).'
+            );
+        }
+    }
+
+    if (orange_table_exists($pdo, 'inventory_cost_consumptions')) {
+        if (!orange_table_exists($pdo, 'inventory_cost_layers') || !orange_table_has_column($pdo, 'inventory_cost_layers', 'country_id')) {
+            throw new RuntimeException(
+                'Country history probe requires inventory_cost_layers.country_id for inventory_cost_consumptions ownership.'
+            );
+        }
+        $specs[] = [
+            'key' => 'inventory_cost_consumptions',
+            'sql' => 'SELECT 1 FROM inventory_cost_consumptions icc'
+                . ' INNER JOIN inventory_cost_layers icl ON icl.id = icc.layer_id'
+                . ' WHERE icl.country_id = ?'
+                . ' LIMIT 1',
+            'param_count' => 1,
+        ];
+    }
+
+    return $specs;
+}
+
+/**
+ * @return array{key:string,sql:string,param_count:int}
+ */
+function orange_crp_batch_make_country_id_probe(string $tableName): array
+{
+    return [
+        'key' => $tableName,
+        'sql' => 'SELECT 1 FROM `' . str_replace('`', '``', $tableName) . '` WHERE country_id = ? LIMIT 1',
+        'param_count' => 1,
+    ];
+}
+
+/**
+ * @param array{key:string,sql:string,param_count:int} $spec
+ * @return list<int>
+ */
+function orange_crp_batch_historical_probe_params(array $spec, int $countryId): array
+{
+    orange_crp_batch_validate_historical_probe_spec($spec);
+
+    return array_fill(0, (int) $spec['param_count'], $countryId);
+}
+
+/**
+ * @param array{key?:string,sql?:string,param_count?:int} $spec
+ */
+function orange_crp_batch_validate_historical_probe_spec(array $spec): void
+{
+    $key = trim((string) ($spec['key'] ?? ''));
+    $sql = trim((string) ($spec['sql'] ?? ''));
+    $paramCount = (int) ($spec['param_count'] ?? -1);
+    if ($key === '' || $sql === '' || $paramCount < 1) {
+        throw new RuntimeException('Malformed country history probe spec for key=' . ($key !== '' ? $key : '?'));
+    }
+}
+
+function orange_crp_batch_country_has_historical_data(PDO $pdo, int $countryId): bool
+{
+    foreach (orange_crp_batch_historical_data_probe_specs($pdo) as $spec) {
+        orange_crp_batch_validate_historical_probe_spec($spec);
+        $st = $pdo->prepare($spec['sql']);
+        if ($st === false) {
+            throw new RuntimeException('Cannot prepare country history probe for ' . $spec['key'] . '.');
+        }
+        $st->execute(orange_crp_batch_historical_probe_params($spec, $countryId));
+        if ($st->fetchColumn() !== false) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function orange_crp_batch_lock_path(string $backupRoot): string
@@ -172,49 +333,6 @@ function orange_crp_batch_load_countries(PDO $pdo): array
     }
 
     return $countries;
-}
-
-function orange_crp_batch_country_has_fifo_consumptions(PDO $pdo, int $countryId): bool
-{
-    require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'catalog_schema.php';
-    if (!orange_table_exists($pdo, 'inventory_cost_consumptions') || !orange_table_exists($pdo, 'inventory_cost_layers')) {
-        return false;
-    }
-
-    $st = $pdo->prepare(
-        'SELECT 1
-         FROM inventory_cost_consumptions icc
-         INNER JOIN inventory_cost_layers icl ON icl.id = icc.layer_id
-         WHERE icl.country_id = ?
-         LIMIT 1'
-    );
-    if ($st === false) {
-        return false;
-    }
-    $st->execute([$countryId]);
-
-    return $st->fetchColumn() !== false;
-}
-
-function orange_crp_batch_country_has_historical_data(PDO $pdo, int $countryId): bool
-{
-    require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'catalog_schema.php';
-
-    foreach (orange_crp_batch_historical_data_tables() as $tableName) {
-        if (!orange_table_exists($pdo, $tableName)) {
-            continue;
-        }
-        $st = $pdo->prepare('SELECT 1 FROM `' . str_replace('`', '``', $tableName) . '` WHERE country_id = ? LIMIT 1');
-        if ($st === false) {
-            continue;
-        }
-        $st->execute([$countryId]);
-        if ($st->fetchColumn() !== false) {
-            return true;
-        }
-    }
-
-    return orange_crp_batch_country_has_fifo_consumptions($pdo, $countryId);
 }
 
 /**

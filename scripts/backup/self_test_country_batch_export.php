@@ -35,7 +35,40 @@ $cliSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'sc
 crp_batch_self_test(!preg_match('/country[_-]?id\s*=\s*[1-9]\d*/i', $batchSource), 'no hardcoded country IDs in batch library');
 crp_batch_self_test(!preg_match('/--country-id=/', $cliSource), 'batch CLI does not accept hardcoded country-id flag');
 crp_batch_self_test(in_array('customers', orange_crp_batch_historical_data_tables(), true), 'historical data tables include customers');
-crp_batch_self_test(in_array('inventory_cost_layers', orange_crp_batch_historical_data_tables(), true), 'historical data tables include inventory/FIFO layers');
+crp_batch_self_test(in_array('inventory_cost_consumptions', orange_crp_batch_historical_data_tables(), true), 'historical data tables include inventory/FIFO consumptions');
+
+$directProbe = orange_crp_batch_make_country_id_probe('orders');
+crp_batch_self_test($directProbe['key'] === 'orders', 'direct country_id probe key');
+crp_batch_self_test(str_contains($directProbe['sql'], 'orders') && str_contains($directProbe['sql'], 'country_id = ?'), 'direct country_id probe SQL');
+
+$indirectProbe = [
+    'key' => 'inventory_cost_consumptions',
+    'sql' => 'SELECT 1 FROM inventory_cost_consumptions icc INNER JOIN inventory_cost_layers icl ON icl.id = icc.layer_id WHERE icl.country_id = ? LIMIT 1',
+    'param_count' => 1,
+];
+crp_batch_self_test(
+    orange_crp_batch_historical_probe_params($indirectProbe, 7) === [7],
+    'indirect country ownership probe params'
+);
+crp_batch_self_test(
+    orange_crp_batch_historical_probe_params([
+        'key' => 'purchase_returns',
+        'sql' => 'SELECT 1 FROM purchase_returns pr LEFT JOIN purchases p ON p.id = pr.purchase_id LEFT JOIN suppliers s ON s.id = pr.supplier_id WHERE (p.id IS NOT NULL AND p.country_id = ?) OR (p.id IS NULL AND s.country_id = ?) LIMIT 1',
+        'param_count' => 2,
+    ], 3) === [3, 3],
+    'parent-table ownership probe uses two country params'
+);
+
+crp_batch_self_test(!preg_match('/FROM purchase_returns[^\\n]*WHERE country_id/s', $batchSource), 'purchase_returns never queried with direct country_id');
+crp_batch_self_test(str_contains($batchSource, 'inventory_cost_consumptions icc'), 'inventory_cost_consumptions resolved via inventory_cost_layers parent');
+
+$malformedFailed = false;
+try {
+    orange_crp_batch_validate_historical_probe_spec(['key' => 'bad', 'sql' => '', 'param_count' => 0]);
+} catch (RuntimeException $e) {
+    $malformedFailed = str_contains($e->getMessage(), 'Malformed country history probe spec');
+}
+crp_batch_self_test($malformedFailed, 'malformed ownership probe spec fails clearly');
 
 crp_batch_self_test(orange_crp_batch_compute_exit_code([]) === 0, 'all success exit code 0');
 crp_batch_self_test(orange_crp_batch_compute_exit_code([['id' => 99]]) === 1, 'any failure exit code non-zero');
@@ -49,6 +82,10 @@ if (is_file($projectRoot . DIRECTORY_SEPARATOR . '.env.php')) {
         $pdo = db();
         orange_catalog_ensure_schema($pdo);
         $liveDiscovery = orange_crp_batch_discover_countries($pdo);
+        $probeSpecs = orange_crp_batch_historical_data_probe_specs($pdo);
+        crp_batch_self_test($probeSpecs !== [], 'historical probe specs build from live schema');
+        $probeKeys = array_map(static fn (array $spec): string => (string) ($spec['key'] ?? ''), $probeSpecs);
+        crp_batch_self_test(in_array('purchase_returns', $probeKeys, true) || !orange_table_exists($pdo, 'purchase_returns'), 'purchase_returns probe registered when table exists');
         crp_batch_self_test($liveDiscovery['discovered'] !== [], 'discovery reads countries from DB dynamically');
         $sawActiveSelected = false;
         $sawInactiveHistoricalSelected = false;
