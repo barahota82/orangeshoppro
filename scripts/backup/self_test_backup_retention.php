@@ -33,6 +33,9 @@ function retention_self_test(bool $ok, string $label): void
 
 retention_self_test(orange_backup_retention_days([]) === 30, 'retention default = 30 when config key missing');
 retention_self_test(orange_backup_retention_days(['ORANGE_BACKUP_RETENTION_DAYS' => 45]) === 45, 'retention override from env');
+retention_self_test(orange_backup_retention_days(['ORANGE_BACKUP_RETENTION_DAYS' => '45']) === 45, 'retention override accepts numeric strings');
+retention_self_test(orange_backup_retention_days(['ORANGE_BACKUP_RETENTION_DAYS' => 'abc']) === 30, 'invalid retention override falls back to default');
+retention_self_test(orange_backup_retention_days(['ORANGE_BACKUP_RETENTION_DAYS' => 0]) === 30, 'non-positive retention override falls back to default');
 retention_self_test(!orange_backup_retention_age_exceeds(30 * 86400, 30), 'package exactly 30 days kept');
 retention_self_test(orange_backup_retention_age_exceeds((30 * 86400) + 1, 30), 'package older than 30 days eligible');
 retention_self_test(orange_backup_retention_is_temp_dir_name('._work_abc'), 'temp workspace name detected');
