@@ -231,6 +231,27 @@ php D:\orange\scripts\backup\self_test_backup_retention.php
 
 ---
 
+## Phase 1C — Disaster Recovery Validation (implemented)
+
+| Item | Status |
+|------|--------|
+| DRV CLI (`validate_backup_recoverability.php`) | **Implemented** |
+| Full + CRP package support | **Implemented** |
+| `recovery_validation.json` report | **Implemented** (sibling file beside package) |
+| Restore / merge / admin UI | **Not implemented** |
+
+```powershell
+php D:\orange\scripts\backup\validate_backup_recoverability.php --package=D:\orange_backups\snapshots\yyyy-MM-dd_HHmmss
+php D:\orange\scripts\backup\validate_backup_recoverability.php --package=D:\orange_backups\country_packages\kw\yyyy-MM-dd_HHmmss
+php D:\orange\scripts\backup\self_test_recovery_validation.php
+```
+
+**Recovery score:** 100 perfect · 90–99 informational · 70–89 recoverable with warnings · below 70 fail.
+
+**Pass/Fail:** exit code `0` when score ≥ 70; exit code `1` when score < 70. Validation is **read-only** — no database, uploads, package, or filesystem changes inside the validated snapshot.
+
+---
+
 ## Deferred — Phase 2 and later
 
 The following are **not part of Phase 1A / 1B** and must not be assumed available:
@@ -249,7 +270,9 @@ php D:\orange\scripts\backup\self_test_backup.php
 php D:\orange\scripts\backup\self_test_backup_retention.php
 php D:\orange\scripts\backup\self_test_country_export.php
 php D:\orange\scripts\backup\self_test_country_batch_export.php
+php D:\orange\scripts\backup\self_test_recovery_validation.php
 php D:\orange\scripts\backup\backup_environment_check.php
+php D:\orange\scripts\backup\validate_backup_recoverability.php --package=D:\orange_backups\snapshots\yyyy-MM-dd_HHmmss
 php D:\orange\scripts\backup\validate_registry.php --offline
 php D:\orange\scripts\backup\export_country.php --country-id=1
 php D:\orange\scripts\backup\verify_country_package.php --package=D:\orange_backups\country_packages\kw\yyyy-MM-dd_HHmmss

@@ -182,6 +182,7 @@ Verifies: safe package path, manifest structure, `package_type=full_disaster`, r
 
 ```powershell
 php D:\orange\scripts\backup\self_test_backup.php
+php D:\orange\scripts\backup\self_test_recovery_validation.php
 php D:\orange\scripts\backup\backup_environment_check.php
 php D:\orange\scripts\backup\resolve_backup_root.php --project-root=D:\orange
 php D:\orange\scripts\backup\backup_metadata.php --project-root=D:\orange
@@ -424,3 +425,47 @@ Retention uses the shared **30-day** policy (`ORANGE_BACKUP_RETENTION_DAYS`, def
 | Arguments | *(empty)* |
 | Schedule | Daily **03:30 UTC** (after full backup) |
 | Notification | Errors only |
+
+---
+
+## Disaster Recovery Validation (DRV) — Phase 1C (validation only)
+
+Deterministic **read-only** recoverability validation for finalized backup packages. **No restore, merge, admin UI, or schema changes.**
+
+| Artifact | Purpose |
+|----------|---------|
+| `scripts/backup/validate_backup_recoverability.php` | CLI entry point |
+| `includes/backup/recovery_validation.php` | Validation engine |
+| `scripts/backup/self_test_recovery_validation.php` | DRV self-tests |
+
+```powershell
+php D:\orange\scripts\backup\validate_backup_recoverability.php --package=D:\orange_backups\snapshots\yyyy-MM-dd_HHmmss
+php D:\orange\scripts\backup\validate_backup_recoverability.php --package=D:\orange_backups\country_packages\kw\yyyy-MM-dd_HHmmss
+php D:\orange\scripts\backup\self_test_recovery_validation.php
+```
+
+**Supported package types:** `full_disaster`, `country_recovery`
+
+**Validation stages (read-only):**
+
+1. Package path resolution
+2. Manifest JSON + required metadata (`package_version`, `schema_revision`, export backend; CRP `registry_version`)
+3. Health JSON + semantic checks (`failure_reasons`, trial balance, cross-country, critical uploads)
+4. Checksums (`checksums.sha256`)
+5. Required files (type-specific)
+6. SQL integrity (gzip for full dump; CRP `sql/*.sql` chunks) — CREATE/INSERT counts, UTF-8, truncation detection
+7. Upload ZIP integrity (opens, no traversal entries)
+8. CRP extras: `dependency_graph.json`, `id_snapshot.json`, registry alignment
+
+**Output:** `{packageBasename}.recovery_validation.json` written **beside** the package folder (package directory is never modified).
+
+**Recovery score:**
+
+| Score | Meaning |
+|-------|---------|
+| **100** | Perfect — no errors or warnings |
+| **90–99** | Minor informational notes only |
+| **70–89** | Recoverable with warnings |
+| **Below 70** | Fail |
+
+**Pass/Fail policy:** CLI exit code `0` when `recovery_score >= 70`; exit code `1` when below 70. `overall_result` is `pass`, `warning`, or `fail`.
