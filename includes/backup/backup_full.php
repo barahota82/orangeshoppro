@@ -121,8 +121,11 @@ function orange_backup_full_finalize_workspace(array $options): array
     $backupEngineVersion = trim((string) ($options['backup_engine_version'] ?? ''));
     /** @var list<string> $exporterWarnings */
     $exporterWarnings = is_array($options['exporter_warnings'] ?? null) ? $options['exporter_warnings'] : [];
+    /** @var list<string> $exporterMaintenanceNotes */
+    $exporterMaintenanceNotes = is_array($options['exporter_maintenance_notes'] ?? null) ? $options['exporter_maintenance_notes'] : [];
 
     $warnings = [];
+    $maintenanceNotes = array_values(array_unique($exporterMaintenanceNotes));
     $failureReasons = [];
     $generatedAt = gmdate('c');
 
@@ -263,6 +266,9 @@ function orange_backup_full_finalize_workspace(array $options): array
     if ($backupEngineVersion !== '') {
         $health['backup_engine_version'] = $backupEngineVersion;
     }
+    if ($maintenanceNotes !== []) {
+        $health['maintenance_notes'] = $maintenanceNotes;
+    }
 
     orange_backup_write_json($workspace . DIRECTORY_SEPARATOR . ORANGE_BACKUP_HEALTH_FILE, $health);
 
@@ -281,13 +287,14 @@ function orange_backup_full_finalize_workspace(array $options): array
     $packageStatus = 'healthy';
     if ($failureReasons !== []) {
         $packageStatus = 'failed';
-    } elseif ($warnings !== []) {
-        $packageStatus = 'warning';
     }
 
     $health['package_status'] = $packageStatus;
     $health['failure_reasons'] = array_values(array_unique($failureReasons));
     $health['warnings'] = $warnings;
+    if ($maintenanceNotes !== []) {
+        $health['maintenance_notes'] = $maintenanceNotes;
+    }
     $health['package_file_inventory'] = orange_backup_collect_package_files($workspace);
     $health['package_file_inventory'] = array_values(array_filter(
         $health['package_file_inventory'],
@@ -312,12 +319,11 @@ function orange_backup_full_finalize_workspace(array $options): array
         orange_backup_write_json($workspace . DIRECTORY_SEPARATOR . ORANGE_BACKUP_HEALTH_FILE, $health);
     }
 
-    $backupStatus = match ($packageStatus) {
-        'healthy' => 'success',
-        'warning' => 'warning',
-        default => 'failed',
-    };
+    $backupStatus = $packageStatus === 'healthy' ? 'success' : 'failed';
     $manifest['backup_status'] = $backupStatus;
+    if ($maintenanceNotes !== []) {
+        $manifest['maintenance_notes'] = $maintenanceNotes;
+    }
     orange_backup_write_json($workspace . DIRECTORY_SEPARATOR . ORANGE_BACKUP_MANIFEST_FILE, $manifest);
 
     orange_backup_write_checksums($workspace, array_values(array_unique(array_merge([$dumpFile, $uploadsFile], [

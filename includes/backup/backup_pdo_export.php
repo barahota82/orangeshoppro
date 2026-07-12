@@ -45,11 +45,12 @@ function orange_backup_pdo_list_routines(PDO $pdo, string $databaseName): array
 }
 
 /**
- * @return array{ready:bool,error:?string,warnings:list<string>}
+ * @return array{ready:bool,error:?string,warnings:list<string>,maintenance_notes:list<string>}
  */
 function orange_backup_pdo_export_preflight(PDO $pdo, string $databaseName): array
 {
     $warnings = [];
+    $maintenanceNotes = [];
     $maintenanceAllowlist = array_fill_keys(
         array_map(static fn (string $name): string => strtolower($name), orange_backup_pdo_maintenance_routine_names()),
         true
@@ -77,13 +78,15 @@ function orange_backup_pdo_export_preflight(PDO $pdo, string $databaseName): arr
             'error' => 'PDO export cannot safely include non-maintenance routines (found ' . count($runtimeRoutines) . '): '
                 . implode(', ', $labels) . '. Use mysqldump/PowerShell or add maintenance-only allowlist entries.',
             'warnings' => $warnings,
+            'maintenance_notes' => $maintenanceNotes,
         ];
     }
 
-    if ($ignoredMaintenance !== []) {
-        $warnings[] = 'PDO export ignores maintenance-only routines (not Orange runtime): '
-            . implode(', ', $ignoredMaintenance);
+    foreach ($ignoredMaintenance as $routineName) {
+        $maintenanceNotes[] = 'maintenance-only routine ignored: ' . $routineName;
     }
+
+    $maintenanceNotes[] = 'PDO export does not include routines, triggers, or events.';
 
     foreach ([
         'TRIGGER' => 'SELECT COUNT(*) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = ?',
@@ -97,13 +100,12 @@ function orange_backup_pdo_export_preflight(PDO $pdo, string $databaseName): arr
                 'ready' => false,
                 'error' => 'PDO export cannot safely include ' . strtolower($label) . 's (found ' . $count . '). Use mysqldump/PowerShell or remove unsupported objects.',
                 'warnings' => $warnings,
+                'maintenance_notes' => $maintenanceNotes,
             ];
         }
     }
 
-    $warnings[] = 'PDO export does not include routines, triggers, or events.';
-
-    return ['ready' => true, 'error' => null, 'warnings' => $warnings];
+    return ['ready' => true, 'error' => null, 'warnings' => $warnings, 'maintenance_notes' => $maintenanceNotes];
 }
 
 /**
@@ -289,7 +291,7 @@ function orange_backup_pdo_end_snapshot(PDO $pdo, bool $commit): void
 }
 
 /**
- * @return array{warnings:list<string>,table_count:int,row_count:int}
+ * @return array{warnings:list<string>,maintenance_notes:list<string>,table_count:int,row_count:int}
  */
 function orange_backup_pdo_export_database(PDO $pdo, string $databaseName, string $outputSqlFile): array
 {
@@ -372,6 +374,7 @@ function orange_backup_pdo_export_database(PDO $pdo, string $databaseName, strin
 
         return [
             'warnings' => $preflight['warnings'],
+            'maintenance_notes' => $preflight['maintenance_notes'],
             'table_count' => count($tables),
             'row_count' => $rowCount,
         ];

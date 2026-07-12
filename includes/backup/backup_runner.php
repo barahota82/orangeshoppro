@@ -420,6 +420,7 @@ function orange_backup_latest_snapshot_name(string $backupRoot): ?string
 /**
  * @param callable(string):void $createRawSqlDump
  * @param list<string> $exporterWarnings
+ * @param list<string> $exporterMaintenanceNotes
  * @return array{ok:bool,backend:string,message:string,snapshot:?string}
  */
 function orange_backup_run_php_native_snapshot(
@@ -430,7 +431,8 @@ function orange_backup_run_php_native_snapshot(
     string $backendName,
     string $backupEngineVersion,
     array $exporterWarnings,
-    callable $createRawSqlDump
+    callable $createRawSqlDump,
+    array $exporterMaintenanceNotes = []
 ): array {
     $env ??= orange_backup_load_env_array($projectRoot);
 
@@ -506,6 +508,7 @@ function orange_backup_run_php_native_snapshot(
             'export_backend' => $backendName,
             'backup_engine_version' => $backupEngineVersion,
             'exporter_warnings' => $exporterWarnings,
+            'exporter_maintenance_notes' => $exporterMaintenanceNotes,
         ]);
         if (($result['package_status'] ?? 'failed') === 'failed') {
             throw new RuntimeException('Package finalization failed.');
@@ -610,7 +613,8 @@ function orange_backup_run_via_pdo(string $projectRoot, string $backupRoot, stri
         static function (string $rawSqlFile) use ($pdo, $dbName, $logFile): void {
             orange_backup_runner_log($logFile, 'Running PDO SQL export fallback...');
             orange_backup_pdo_export_database($pdo, $dbName, $rawSqlFile);
-        }
+        },
+        is_array($preflight['maintenance_notes'] ?? null) ? $preflight['maintenance_notes'] : []
     );
 }
 /**
