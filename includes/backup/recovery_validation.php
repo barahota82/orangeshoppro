@@ -27,6 +27,9 @@ function orange_recovery_read_json_file(string $path, string $label): array
     try {
         /** @var array<string, mixed> $decoded */
         $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($decoded) || !str_starts_with(ltrim($raw), '{')) {
+            return ['ok' => false, 'data' => null, 'errors' => [$label . ' must contain a JSON object']];
+        }
 
         return ['ok' => true, 'data' => $decoded, 'errors' => []];
     } catch (Throwable $e) {
@@ -34,41 +37,124 @@ function orange_recovery_read_json_file(string $path, string $label): array
     }
 }
 
+function orange_recovery_sql_without_trailing_comments(string $sqlText): string
+{
+    $trimmed = rtrim($sqlText);
+    do {
+        $previous = $trimmed;
+        $trimmed = preg_replace('/(?:^|\R)\s*(?:--|#)[^\r\n]*\s*$/', '', $trimmed) ?? $trimmed;
+        $trimmed = preg_replace('/\/\*.*?\*\/\s*$/s', '', $trimmed) ?? $trimmed;
+        $trimmed = rtrim($trimmed);
+    } while ($trimmed !== $previous);
+
+    return $trimmed;
+}
+
+/**
+ * @return array{
+ *   errors:list<string>,
+ *   warnings:list<string>,
+ *   create_table_count:int,
+ *   insert_count:int,
+ *   has_content:bool,
+ *   has_sql_statement:bool,
+ *   tail:string
+ * }
+ */
+function orange_recovery_sql_analysis_state(): array
+{
+    return [
+        'errors' => [],
+        'warnings' => [],
+        'create_table_count' => 0,
+        'insert_count' => 0,
+        'has_content' => false,
+        'has_sql_statement' => false,
+        'tail' => '',
+    ];
+}
+
+/**
+ * @param array{
+ *   errors:list<string>,
+ *   warnings:list<string>,
+ *   create_table_count:int,
+ *   insert_count:int,
+ *   has_content:bool,
+ *   has_sql_statement:bool,
+ *   tail:string
+ * } $state
+ */
+function orange_recovery_sql_analysis_add_chunk(array &$state, string $chunk, string $label): void
+{
+    if ($chunk === '') {
+        return;
+    }
+    $state['has_content'] = true;
+    if (!mb_check_encoding($chunk, 'UTF-8')) {
+        $state['errors'][] = $label . ': SQL is not valid UTF-8';
+    }
+    $state['create_table_count'] += preg_match_all('/^\s*CREATE\s+TABLE\b/im', $chunk) ?: 0;
+    $state['insert_count'] += preg_match_all('/^\s*INSERT\s+INTO\b/im', $chunk) ?: 0;
+    if (preg_match('/\b(INSERT|CREATE|ALTER|UPDATE|DELETE|DROP)\b/i', $chunk) === 1) {
+        $state['has_sql_statement'] = true;
+    }
+    if (preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $chunk) === 1) {
+        $state['errors'][] = $label . ': SQL contains binary/control characters';
+    }
+    $state['tail'] .= $chunk;
+    if (strlen($state['tail']) > 1048576) {
+        $state['tail'] = substr($state['tail'], -1048576);
+    }
+}
+
+/**
+ * @param array{
+ *   errors:list<string>,
+ *   warnings:list<string>,
+ *   create_table_count:int,
+ *   insert_count:int,
+ *   has_content:bool,
+ *   has_sql_statement:bool,
+ *   tail:string
+ * } $state
+ * @return array{errors:list<string>,warnings:list<string>,create_table_count:int,insert_count:int}
+ */
+function orange_recovery_sql_analysis_finish(array $state, string $label): array
+{
+    $errors = array_values(array_unique($state['errors']));
+    $warnings = array_values(array_unique($state['warnings']));
+    if (!$state['has_content']) {
+        $warnings[] = $label . ': SQL payload is empty';
+
+        return ['errors' => $errors, 'warnings' => $warnings, 'create_table_count' => 0, 'insert_count' => 0];
+    }
+    $trimmed = orange_recovery_sql_without_trailing_comments($state['tail']);
+    if (
+        $trimmed !== ''
+        && !str_ends_with($trimmed, ';')
+        && $state['has_sql_statement']
+    ) {
+        $errors[] = $label . ': SQL appears truncated (missing terminal semicolon on final statement)';
+    }
+
+    return [
+        'errors' => array_values(array_unique($errors)),
+        'warnings' => $warnings,
+        'create_table_count' => $state['create_table_count'],
+        'insert_count' => $state['insert_count'],
+    ];
+}
+
 /**
  * @return array{errors:list<string>,warnings:list<string>,create_table_count:int,insert_count:int}
  */
 function orange_recovery_validate_sql_text(string $sqlText, string $label): array
 {
-    $errors = [];
-    $warnings = [];
-    if ($sqlText === '') {
-        $warnings[] = $label . ': SQL payload is empty';
+    $state = orange_recovery_sql_analysis_state();
+    orange_recovery_sql_analysis_add_chunk($state, $sqlText, $label);
 
-        return ['errors' => $errors, 'warnings' => $warnings, 'create_table_count' => 0, 'insert_count' => 0];
-    }
-    if (!mb_check_encoding($sqlText, 'UTF-8')) {
-        $errors[] = $label . ': SQL is not valid UTF-8';
-    }
-    $createCount = preg_match_all('/^\s*CREATE\s+TABLE\b/im', $sqlText) ?: 0;
-    $insertCount = preg_match_all('/^\s*INSERT\s+INTO\b/im', $sqlText) ?: 0;
-    $trimmed = rtrim($sqlText);
-    if (
-        $trimmed !== ''
-        && !str_ends_with($trimmed, ';')
-        && preg_match('/\b(INSERT|CREATE|ALTER|UPDATE|DELETE|DROP)\b/i', $trimmed) === 1
-    ) {
-        $errors[] = $label . ': SQL appears truncated (missing terminal semicolon on final statement)';
-    }
-    if (preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $sqlText) === 1) {
-        $errors[] = $label . ': SQL contains binary/control characters';
-    }
-
-    return [
-        'errors' => $errors,
-        'warnings' => $warnings,
-        'create_table_count' => $createCount,
-        'insert_count' => $insertCount,
-    ];
+    return orange_recovery_sql_analysis_finish($state, $label);
 }
 
 /**
@@ -86,18 +172,20 @@ function orange_recovery_validate_gzip_sql_file(string $path, string $label): ar
     if ($handle === false) {
         return ['ok' => false, 'errors' => [$label . ': gzip integrity check failed (cannot open)'], 'warnings' => [], 'create_table_count' => 0, 'insert_count' => 0];
     }
-    $content = '';
+    $state = orange_recovery_sql_analysis_state();
     while (!gzeof($handle)) {
-        $chunk = gzread($handle, 65536);
-        if ($chunk === false) {
+        $chunk = gzgets($handle);
+        if ($chunk === false && !gzeof($handle)) {
             gzclose($handle);
 
             return ['ok' => false, 'errors' => [$label . ': gzip integrity check failed (corrupt stream)'], 'warnings' => [], 'create_table_count' => 0, 'insert_count' => 0];
         }
-        $content .= $chunk;
+        if ($chunk !== false) {
+            orange_recovery_sql_analysis_add_chunk($state, $chunk, $label);
+        }
     }
     gzclose($handle);
-    $analysis = orange_recovery_validate_sql_text($content, $label);
+    $analysis = orange_recovery_sql_analysis_finish($state, $label);
 
     return [
         'ok' => $analysis['errors'] === [],
@@ -126,12 +214,21 @@ function orange_recovery_validate_sql_files(array $sqlFiles, string $labelPrefix
             $errors[] = $labelPrefix . ': missing SQL file ' . basename($sqlFile);
             continue;
         }
-        $content = file_get_contents($sqlFile);
-        if ($content === false) {
+        $handle = fopen($sqlFile, 'rb');
+        if ($handle === false) {
             $errors[] = $labelPrefix . ': cannot read SQL file ' . basename($sqlFile);
             continue;
         }
-        $analysis = orange_recovery_validate_sql_text($content, $labelPrefix . '/' . basename($sqlFile));
+        $fileLabel = $labelPrefix . '/' . basename($sqlFile);
+        $state = orange_recovery_sql_analysis_state();
+        while (($line = fgets($handle)) !== false) {
+            orange_recovery_sql_analysis_add_chunk($state, $line, $fileLabel);
+        }
+        if (!feof($handle)) {
+            $state['errors'][] = $fileLabel . ': cannot read SQL file';
+        }
+        fclose($handle);
+        $analysis = orange_recovery_sql_analysis_finish($state, $fileLabel);
         $errors = array_merge($errors, $analysis['errors']);
         $warnings = array_merge($warnings, $analysis['warnings']);
         $createTotal += $analysis['create_table_count'];

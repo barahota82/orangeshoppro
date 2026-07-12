@@ -175,6 +175,12 @@ file_put_contents($badJsonDir . DIRECTORY_SEPARATOR . 'manifest.json', '{not-jso
 $badJsonReport = orange_recovery_validate_package($badJsonDir);
 drv_self_test(($badJsonReport['recovery_score'] ?? 100) < 70, 'bad JSON fails');
 
+$nonObjectJsonDir = $root['dir'] . DIRECTORY_SEPARATOR . 'non_object_json';
+mkdir($nonObjectJsonDir);
+file_put_contents($nonObjectJsonDir . DIRECTORY_SEPARATOR . 'manifest.json', '[]');
+$nonObjectJsonReport = orange_recovery_validate_package($nonObjectJsonDir);
+drv_self_test(($nonObjectJsonReport['recovery_score'] ?? 100) < 70, 'non-object JSON fails without fatal');
+
 $missingHealthDir = $root['dir'] . DIRECTORY_SEPARATOR . 'missing_health';
 mkdir($missingHealthDir);
 drv_write_full_package($missingHealthDir);
@@ -211,6 +217,23 @@ if (is_array($manifestData)) {
 orange_backup_write_checksums($truncatedDir, ['orange_db.sql.gz', 'uploads.zip', 'manifest.json', 'health.json']);
 $truncatedReport = orange_recovery_validate_package($truncatedDir);
 drv_self_test(($truncatedReport['recovery_score'] ?? 100) < 70, 'truncated SQL fails');
+
+$commentedSqlDir = $root['dir'] . DIRECTORY_SEPARATOR . 'commented_sql';
+mkdir($commentedSqlDir);
+drv_write_full_package($commentedSqlDir);
+$commentedDump = $commentedSqlDir . DIRECTORY_SEPARATOR . 'orange_db.sql.gz';
+$out = gzopen($commentedDump, 'wb9');
+gzwrite($out, "CREATE TABLE demo (id INT PRIMARY KEY);\nINSERT INTO demo VALUES (1);\n-- Dump completed on 2026-07-12\n");
+gzclose($out);
+$manifestPath = $commentedSqlDir . DIRECTORY_SEPARATOR . 'manifest.json';
+$manifestData = json_decode((string) file_get_contents($manifestPath), true);
+if (is_array($manifestData)) {
+    $manifestData['dump_sha256'] = orange_backup_sha256_file($commentedDump);
+    orange_backup_write_json($manifestPath, $manifestData);
+}
+orange_backup_write_checksums($commentedSqlDir, ['orange_db.sql.gz', 'uploads.zip', 'manifest.json', 'health.json']);
+$commentedSqlReport = orange_recovery_validate_package($commentedSqlDir);
+drv_self_test(($commentedSqlReport['recovery_score'] ?? 0) === 100, 'trailing SQL dump comment is accepted');
 
 $brokenZipDir = $root['dir'] . DIRECTORY_SEPARATOR . 'broken_zip';
 mkdir($brokenZipDir);
