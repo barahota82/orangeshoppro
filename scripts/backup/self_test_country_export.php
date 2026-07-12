@@ -59,6 +59,8 @@ $idSnapshot = ['orders' => [1, 2]];
 $depMeta = ['parent_dependency' => ['table' => 'orders', 'foreign_key' => 'order_id', 'nullable' => false]];
 $orphanErrors = orange_country_export_validate_orphan_fk('order_items', $depMeta, ['id' => 9, 'order_id' => 99], $idSnapshot);
 crp_self_test($orphanErrors !== [], 'missing required child / orphan FK rejection');
+$parentEmptyErrors = orange_country_export_validate_parent_dependency('order_items', $depMeta + ['integrity_critical' => true], ['orders' => []]);
+crp_self_test($parentEmptyErrors === [], 'empty processed parent table allowed');
 
 // Parent rows query extraction
 $parentQuery = orange_country_export_build_parent_rows_query('order_items', [
@@ -76,7 +78,7 @@ crp_self_test(abs(0.05) > ORANGE_COUNTRY_EXPORT_TRIAL_BALANCE_TOLERANCE, 'trial 
 crp_self_test(orange_country_uploads_is_allowlisted('uploads/products/x.jpg'), 'upload allowlist products');
 crp_self_test(!orange_country_uploads_is_allowlisted('uploads/../secrets.txt'), 'upload traversal blocked');
 $uploadIssues = orange_country_uploads_collect($projectRoot, 1, [
-    'products' => [['id' => 1, 'main_image' => 'missing-file.webp']],
+    'product_colorway_images' => [['id' => 1, 'image_path' => 'missing-file.webp']],
 ]);
 $classified = orange_country_export_classify_upload_issues($uploadIssues['issues']);
 crp_self_test(($classified['package_status'] ?? '') === 'healthy' || ($classified['package_status'] ?? '') === 'warning', 'warning upload missing does not auto-fail when non-critical');
@@ -85,6 +87,28 @@ crp_self_test(($classified['package_status'] ?? '') === 'healthy' || ($classifie
 $criticalIssues = ['critical:missing upload file: uploads/products/required.webp'];
 $criticalClass = orange_country_export_classify_upload_issues($criticalIssues);
 crp_self_test(($criticalClass['package_status'] ?? '') === 'failed', 'critical upload missing rejection');
+
+$uploadTmpRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_crp_uploads_' . bin2hex(random_bytes(4));
+mkdir($uploadTmpRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'customers' . DIRECTORY_SEPARATOR . '7', 0775, true);
+file_put_contents($uploadTmpRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'customers' . DIRECTORY_SEPARATOR . '7' . DIRECTORY_SEPARATOR . 'doc.pdf', 'pdf');
+$dirCollect = orange_country_uploads_collect($uploadTmpRoot, 1, [
+    'customers' => [['id' => 7]],
+]);
+crp_self_test(($dirCollect['collected'] ?? 0) === 1, 'customer attachment directory files collected');
+mkdir($uploadTmpRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'company', 0775, true);
+file_put_contents($uploadTmpRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'company' . DIRECTORY_SEPARATOR . 'logo.png', 'png');
+$logoCollect = orange_country_uploads_collect($uploadTmpRoot, 1, [
+    'company_settings' => [['id' => 1, 'company_logo' => 'logo.png']],
+]);
+crp_self_test(($logoCollect['collected'] ?? 0) === 1 && ($logoCollect['files'][0]['relative_path'] ?? '') === 'uploads/company/logo.png', 'company logo filename resolves to uploads/company');
+orange_backup_remove_dir($uploadTmpRoot);
+
+try {
+    orange_country_export_assert_safe_package_destination($projectRoot . DIRECTORY_SEPARATOR . 'tmp_crp_package');
+    crp_self_test(false, 'output path inside project rejected');
+} catch (Throwable) {
+    crp_self_test(true, 'output path inside project rejected');
+}
 
 // Atomic cleanup on failure
 $tmpParent = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_crp_selftest_' . bin2hex(random_bytes(4));
@@ -143,6 +167,11 @@ crp_self_test($verifyOk['ok'], 'mock CRP package verifies');
 file_put_contents($pkg . DIRECTORY_SEPARATOR . 'checksums.sha256', str_repeat('a', 64) . "  manifest.json\n");
 $verifyBad = orange_country_export_verify_package($pkg);
 crp_self_test(!$verifyBad['ok'], 'corrupted checksum rejection');
+
+$forbiddenSql = $tmpParent . DIRECTORY_SEPARATOR . 'forbidden.sql';
+file_put_contents($forbiddenSql, str_repeat('-', 9000) . "\nINSERT INTO `countries` (`id`) VALUES (1);\n");
+$forbiddenFound = orange_country_export_sql_forbidden_tables_in_file($forbiddenSql, ORANGE_COUNTRY_EXPORT_FORBIDDEN_SQL_TABLES);
+crp_self_test(in_array('countries', $forbiddenFound, true), 'streaming forbidden SQL table detection');
 
 orange_backup_remove_dir($tmpParent);
 

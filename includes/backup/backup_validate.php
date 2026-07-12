@@ -86,9 +86,9 @@ function orange_country_export_validate_parent_dependency(
     if ($parentTable === '') {
         return ['Invalid parent_dependency on ' . $tableName];
     }
-    if (!isset($idSnapshot[$parentTable]) || $idSnapshot[$parentTable] === []) {
+    if (!array_key_exists($parentTable, $idSnapshot)) {
         if (!$nullable && (bool) ($meta['integrity_critical'] ?? false)) {
-            $errors[] = 'Missing exported parent rows for ' . $tableName . ' -> ' . $parentTable;
+            $errors[] = 'Parent table was not exported before ' . $tableName . ' -> ' . $parentTable;
         }
     }
 
@@ -324,6 +324,43 @@ function orange_country_export_build_health(array $healthInput): array
 }
 
 /**
+ * @param list<string> $forbiddenTables
+ * @return list<string>
+ */
+function orange_country_export_sql_forbidden_tables_in_file(string $sqlFile, array $forbiddenTables): array
+{
+    $handle = fopen($sqlFile, 'rb');
+    if ($handle === false) {
+        return [];
+    }
+
+    $found = [];
+    $tail = '';
+    try {
+        while (!feof($handle)) {
+            $chunk = fread($handle, 8192);
+            if ($chunk === false || $chunk === '') {
+                break;
+            }
+            $scan = $tail . $chunk;
+            foreach ($forbiddenTables as $tableName) {
+                if (isset($found[$tableName])) {
+                    continue;
+                }
+                if (preg_match('/INSERT\s+INTO\s+`' . preg_quote($tableName, '/') . '`/i', $scan)) {
+                    $found[$tableName] = true;
+                }
+            }
+            $tail = substr($scan, -128);
+        }
+    } finally {
+        fclose($handle);
+    }
+
+    return array_keys($found);
+}
+
+/**
  * @return array{ok:bool,errors:list<string>,warnings:list<string>,manifest:?array<string,mixed>}
  */
 function orange_country_export_verify_package(string $packageRoot): array
@@ -364,11 +401,8 @@ function orange_country_export_verify_package(string $packageRoot): array
             $errors[] = 'sql/ directory has no .sql chunks';
         }
         foreach ($sqlFiles as $sqlFile) {
-            $content = (string) file_get_contents($sqlFile);
-            foreach (ORANGE_COUNTRY_EXPORT_FORBIDDEN_SQL_TABLES as $forbidden) {
-                if (preg_match('/INSERT INTO `' . preg_quote($forbidden, '/') . '`/i', $content)) {
-                    $errors[] = 'Forbidden global table data in SQL: ' . $forbidden;
-                }
+            foreach (orange_country_export_sql_forbidden_tables_in_file($sqlFile, ORANGE_COUNTRY_EXPORT_FORBIDDEN_SQL_TABLES) as $forbidden) {
+                $errors[] = 'Forbidden global table data in SQL: ' . $forbidden;
             }
         }
     }
