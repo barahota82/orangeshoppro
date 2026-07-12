@@ -199,6 +199,16 @@ self_test(orange_backup_pdo_sql_literal($pdoLiteral, null, 'varchar') === 'NULL'
 self_test(orange_backup_pdo_sql_literal($pdoLiteral, "line\n\tquote'", 'varchar') !== '', 'PDO literal escaped text');
 self_test(orange_backup_pdo_sql_literal($pdoLiteral, "\x01\x02", 'blob') === '0x0102', 'PDO literal binary hex');
 self_test(in_array('check_empty_tables_id_starts_at_one', orange_backup_pdo_maintenance_routine_names(), true), 'maintenance routine allowlist includes check_empty_tables_id_starts_at_one');
+$routinePartition = orange_backup_pdo_partition_routines_for_export([
+    ['name' => 'CHECK_EMPTY_TABLES_ID_STARTS_AT_ONE', 'type' => 'PROCEDURE'],
+    ['name' => 'orange_runtime_routine', 'type' => 'FUNCTION'],
+]);
+self_test($routinePartition['ignored'] === ['CHECK_EMPTY_TABLES_ID_STARTS_AT_ONE'], 'maintenance routine allowlist is case-insensitive');
+self_test(
+    count($routinePartition['runtime']) === 1
+        && ($routinePartition['runtime'][0]['name'] ?? '') === 'orange_runtime_routine',
+    'non-maintenance routines still block PDO export'
+);
 
 // PDO export format validation
 $pdoFormatFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_pdo_format_' . bin2hex(random_bytes(4)) . '.sql';
@@ -207,6 +217,7 @@ file_put_contents($pdoFormatFile, implode("\n", [
     'SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;',
     'SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE=\'NO_AUTO_VALUE_ON_ZERO\';',
     'CREATE TABLE `demo` (`id` int NOT NULL AUTO_INCREMENT, PRIMARY KEY (`id`));',
+    str_repeat("-- filler to exercise streamed validation\n", 200),
     'SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;',
 ]));
 try {
@@ -229,6 +240,7 @@ if (!empty($envReport['database_connected']) && is_file($projectRoot . DIRECTORY
 }
 
 // Backend selection includes PDO when available
+$backend = orange_backup_select_backend($projectRoot);
 if ($backend === null && !empty($envReport['pdo_fallback_ready'])) {
     self_test(false, 'pdo_fallback_ready true but backend null');
 } elseif ($backend === 'php_pdo') {
@@ -246,7 +258,6 @@ orange_backup_release_lock();
 orange_backup_remove_dir($lockRoot);
 
 // Backend unavailable => clear failure signal
-$backend = orange_backup_select_backend($projectRoot);
 if ($backend === null) {
     self_test(empty($envReport['can_run_full_backup']), 'backend unavailable marks can_run_full_backup=false');
 } else {
