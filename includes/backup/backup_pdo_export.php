@@ -45,11 +45,11 @@ function orange_backup_pdo_list_routines(PDO $pdo, string $databaseName): array
 }
 
 /**
- * @return array{ready:bool,error:?string,warnings:list<string>}
+ * @param list<array{name:string,type:string}> $routines
+ * @return array{ignored:list<string>,runtime:list<array{name:string,type:string}>}
  */
-function orange_backup_pdo_export_preflight(PDO $pdo, string $databaseName): array
+function orange_backup_pdo_partition_routines_for_export(array $routines): array
 {
-    $warnings = [];
     $maintenanceAllowlist = array_fill_keys(
         array_map(static fn (string $name): string => strtolower($name), orange_backup_pdo_maintenance_routine_names()),
         true
@@ -57,14 +57,36 @@ function orange_backup_pdo_export_preflight(PDO $pdo, string $databaseName): arr
 
     $ignoredMaintenance = [];
     $runtimeRoutines = [];
-    foreach (orange_backup_pdo_list_routines($pdo, $databaseName) as $routine) {
-        $key = strtolower($routine['name']);
-        if (isset($maintenanceAllowlist[$key])) {
-            $ignoredMaintenance[] = $routine['name'];
+    foreach ($routines as $routine) {
+        $name = trim((string) ($routine['name'] ?? ''));
+        if ($name === '') {
             continue;
         }
-        $runtimeRoutines[] = $routine;
+        $key = strtolower($name);
+        if (isset($maintenanceAllowlist[$key])) {
+            $ignoredMaintenance[] = $name;
+            continue;
+        }
+        $runtimeRoutines[] = [
+            'name' => $name,
+            'type' => (string) ($routine['type'] ?? ''),
+        ];
     }
+
+    return ['ignored' => $ignoredMaintenance, 'runtime' => $runtimeRoutines];
+}
+
+/**
+ * @return array{ready:bool,error:?string,warnings:list<string>}
+ */
+function orange_backup_pdo_export_preflight(PDO $pdo, string $databaseName): array
+{
+    $warnings = [];
+    $routinePartition = orange_backup_pdo_partition_routines_for_export(
+        orange_backup_pdo_list_routines($pdo, $databaseName)
+    );
+    $ignoredMaintenance = $routinePartition['ignored'];
+    $runtimeRoutines = $routinePartition['runtime'];
 
     if ($runtimeRoutines !== []) {
         $labels = array_map(
@@ -407,14 +429,46 @@ function orange_backup_pdo_validate_export_format(string $sqlFile, int $tableCou
         'SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS',
     ];
     foreach ($required as $needle) {
-        if (!str_contains($head, $needle) && !str_contains((string) file_get_contents($sqlFile), $needle)) {
+        if (!str_contains($head, $needle) && !orange_backup_pdo_file_contains($sqlFile, $needle)) {
             throw new RuntimeException('PDO export validation failed: missing ' . $needle);
         }
     }
 
-    if ($tableCount > 0 && !preg_match('/CREATE TABLE `/', (string) file_get_contents($sqlFile))) {
+    if ($tableCount > 0 && !str_contains($head, 'CREATE TABLE `') && !orange_backup_pdo_file_contains($sqlFile, 'CREATE TABLE `')) {
         throw new RuntimeException('PDO export validation failed: CREATE TABLE missing.');
     }
+}
+
+function orange_backup_pdo_file_contains(string $filePath, string $needle): bool
+{
+    if ($needle === '') {
+        return true;
+    }
+
+    $handle = fopen($filePath, 'rb');
+    if ($handle === false) {
+        throw new RuntimeException('PDO export validation failed: cannot read file.');
+    }
+
+    $overlap = '';
+    $overlapLength = max(0, strlen($needle) - 1);
+    try {
+        while (!feof($handle)) {
+            $chunk = fread($handle, 8192);
+            if ($chunk === false) {
+                throw new RuntimeException('PDO export validation failed: file read failed.');
+            }
+            $haystack = $overlap . $chunk;
+            if (str_contains($haystack, $needle)) {
+                return true;
+            }
+            $overlap = $overlapLength > 0 ? substr($haystack, -$overlapLength) : '';
+        }
+    } finally {
+        fclose($handle);
+    }
+
+    return false;
 }
 
 /**
