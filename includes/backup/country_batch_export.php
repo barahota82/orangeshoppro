@@ -159,13 +159,13 @@ function orange_crp_batch_load_countries(PDO $pdo): array
         if ($id <= 0) {
             continue;
         }
-        $code = strtolower(trim((string) ($row['code'] ?? '')));
+        $code = orange_country_export_safe_country_code((string) ($row['code'] ?? ''), $id);
         $ar = trim((string) ($row['name_ar'] ?? ''));
         $en = trim((string) ($row['name_en'] ?? ''));
         $label = $en !== '' ? $en : $ar;
         $countries[] = [
             'id' => $id,
-            'code' => $code !== '' ? $code : ('c' . $id),
+            'code' => $code,
             'label' => $label !== '' ? $label : $code,
             'is_active' => (int) ($row['is_active'] ?? 0) === 1,
         ];
