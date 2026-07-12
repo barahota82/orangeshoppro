@@ -60,6 +60,31 @@ $depMeta = ['parent_dependency' => ['table' => 'orders', 'foreign_key' => 'order
 $orphanErrors = orange_country_export_validate_orphan_fk('order_items', $depMeta, ['id' => 9, 'order_id' => 99], $idSnapshot);
 crp_self_test($orphanErrors !== [], 'missing required child / orphan FK rejection');
 
+// Empty parent ID list is valid (zero orders → zero order_items)
+$orderItemsMeta = [
+    'parent_dependency' => ['table' => 'orders', 'foreign_key' => 'order_id', 'nullable' => false],
+    'integrity_critical' => true,
+];
+crp_self_test(
+    orange_country_export_validate_parent_dependency('order_items', $orderItemsMeta, ['orders' => []]) === [],
+    'empty parent and child tables valid'
+);
+crp_self_test(
+    orange_country_export_validate_parent_dependency('order_items', $orderItemsMeta, ['orders' => [1, 2]]) === [],
+    'populated parent with child dependency valid'
+);
+crp_self_test(
+    orange_country_export_validate_parent_dependency('order_items', $orderItemsMeta, []) !== [],
+    'unmaterialized parent rejected'
+);
+crp_self_test(
+    orange_country_export_validate_parent_dependency('order_items', [
+        'parent_dependency' => ['table' => '', 'foreign_key' => 'order_id'],
+        'integrity_critical' => true,
+    ], ['orders' => []]) !== [],
+    'malformed parent metadata rejected'
+);
+
 // Parent rows query extraction
 $parentQuery = orange_country_export_build_parent_rows_query('order_items', [
     'type' => 'parent_rows',
@@ -67,6 +92,12 @@ $parentQuery = orange_country_export_build_parent_rows_query('order_items', [
     'foreign_key' => 'order_id',
 ], $idSnapshot);
 crp_self_test(str_contains($parentQuery['sql'], 'order_id IN'), 'dependent row extraction query');
+$emptyParentQuery = orange_country_export_build_parent_rows_query('order_items', [
+    'type' => 'parent_rows',
+    'parent_table' => 'orders',
+    'foreign_key' => 'order_id',
+], ['orders' => []]);
+crp_self_test(str_contains($emptyParentQuery['sql'], '1=0'), 'empty parent produces zero-row child query');
 
 // Trial balance tolerance
 crp_self_test(abs(0.005) <= ORANGE_COUNTRY_EXPORT_TRIAL_BALANCE_TOLERANCE, 'trial balance tolerance configured');

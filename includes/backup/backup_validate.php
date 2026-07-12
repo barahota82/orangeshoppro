@@ -68,7 +68,7 @@ function orange_country_export_validate_registry_runtime(PDO $pdo, array $regist
 }
 
 /**
- * @param array<string, list<int>> $idSnapshot
+ * @param array<string, list<int>> $idSnapshot exported parent tables (empty list = zero rows, still valid)
  * @return list<string>
  */
 function orange_country_export_validate_parent_dependency(
@@ -76,23 +76,21 @@ function orange_country_export_validate_parent_dependency(
     array $meta,
     array $idSnapshot
 ): array {
-    $errors = [];
     $parent = $meta['parent_dependency'] ?? null;
     if (!is_array($parent)) {
         return [];
     }
     $parentTable = (string) ($parent['table'] ?? '');
-    $nullable = (bool) ($parent['nullable'] ?? false);
     if ($parentTable === '') {
         return ['Invalid parent_dependency on ' . $tableName];
     }
-    if (!isset($idSnapshot[$parentTable]) || $idSnapshot[$parentTable] === []) {
-        if (!$nullable && (bool) ($meta['integrity_critical'] ?? false)) {
-            $errors[] = 'Missing exported parent rows for ' . $tableName . ' -> ' . $parentTable;
-        }
+    // Parent must be materialized in idSnapshot before child export (export_order).
+    // An empty ID list means zero parent rows — valid; child exports zero rows.
+    if (!array_key_exists($parentTable, $idSnapshot)) {
+        return ['Parent table not materialized before child export: ' . $tableName . ' -> ' . $parentTable];
     }
 
-    return $errors;
+    return [];
 }
 
 /**

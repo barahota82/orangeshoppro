@@ -110,9 +110,7 @@ function orange_country_export_run(PDO $pdo, array $options): array
                 $sqlDir
             );
             $rowCounts[$tableName] = $result['row_count'];
-            if ($result['ids'] !== []) {
-                $idSnapshot[$tableName] = $result['ids'];
-            }
+            $idSnapshot[$tableName] = $result['ids'];
             if ($result['rows'] !== []) {
                 $exportedRows[$tableName] = $result['rows'];
             }
