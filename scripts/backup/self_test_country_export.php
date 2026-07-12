@@ -107,7 +107,7 @@ crp_self_test(abs(0.05) > ORANGE_COUNTRY_EXPORT_TRIAL_BALANCE_TOLERANCE, 'trial 
 crp_self_test(orange_country_uploads_is_allowlisted('uploads/products/x.jpg'), 'upload allowlist products');
 crp_self_test(!orange_country_uploads_is_allowlisted('uploads/../secrets.txt'), 'upload traversal blocked');
 $uploadIssues = orange_country_uploads_collect($projectRoot, 1, [
-    'products' => [['id' => 1, 'main_image' => 'missing-file.webp']],
+    'product_colorway_images' => [['id' => 1, 'image_path' => 'missing-file.webp']],
 ]);
 $classified = orange_country_export_classify_upload_issues($uploadIssues['issues']);
 crp_self_test(($classified['package_status'] ?? '') === 'healthy', 'warning upload missing does not downgrade package_status');
