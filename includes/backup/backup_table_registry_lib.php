@@ -285,3 +285,57 @@ function orange_backup_registry_summarize(array $tables): array
 
     return $summary;
 }
+
+/**
+ * @return array{
+ *   registry_version:string,
+ *   schema_revision:int,
+ *   tables:array<string, array<string, mixed>>,
+ *   table_count?:int,
+ *   ownership_summary?:array<string,int>
+ * }
+ */
+function orange_backup_registry_load(?string $projectRoot = null): array
+{
+    $path = orange_backup_registry_path($projectRoot);
+    if (!is_file($path)) {
+        throw new RuntimeException('Missing backup table registry: ' . $path);
+    }
+    $raw = file_get_contents($path);
+    if ($raw === false) {
+        throw new RuntimeException('Cannot read backup table registry.');
+    }
+    $data = json_decode($raw, true);
+    if (!is_array($data) || !isset($data['tables']) || !is_array($data['tables'])) {
+        throw new RuntimeException('Invalid backup table registry JSON.');
+    }
+
+    return $data;
+}
+
+/**
+ * @return list<array{table:string,meta:array<string,mixed>}>
+ */
+function orange_backup_registry_exportable_tables(array $registry): array
+{
+    /** @var array<string, array<string, mixed>> $tables */
+    $tables = $registry['tables'];
+    $exportable = [];
+    foreach ($tables as $tableName => $meta) {
+        $type = (string) ($meta['ownership_type'] ?? '');
+        if ($type === 'country_owned' || $type === 'dependent') {
+            $exportable[] = ['table' => $tableName, 'meta' => $meta];
+        }
+    }
+    usort($exportable, static function (array $a, array $b): int {
+        $ao = (int) ($a['meta']['export_order'] ?? 0);
+        $bo = (int) ($b['meta']['export_order'] ?? 0);
+        if ($ao === $bo) {
+            return strcmp($a['table'], $b['table']);
+        }
+
+        return $ao <=> $bo;
+    });
+
+    return $exportable;
+}

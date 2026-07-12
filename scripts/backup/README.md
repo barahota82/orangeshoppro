@@ -273,7 +273,7 @@ Copy each successful snapshot (or the entire `{BackupRoot}/snapshots/` tree) to 
 
 `docs/archive/ORANGE_BACKUP_RECOVERY_RUNBOOK.md`
 
-Country Recovery Package export/restore is **Phase 1B** (export not yet implemented).
+Country Recovery Package export/restore: **export implemented (Phase 1B.2)**; restore still deferred.
 
 ---
 
@@ -299,3 +299,49 @@ php D:\orange\scripts\backup\validate_registry.php
 ```
 
 After schema changes: update definitions, bump `ORANGE_CATALOG_SCHEMA_PHP_REVISION`, rebuild registry, commit both PHP and generated JSON.
+
+---
+
+## Country Recovery Package export — Phase 1B.2 (export only)
+
+Exports **one country** into a self-contained recovery package. **Read-only** against production — no staging restore, merge, admin UI, or restore API.
+
+| Artifact | Purpose |
+|----------|---------|
+| `scripts/backup/export_country.php` | CLI entry point |
+| `scripts/backup/verify_country_package.php` | Read-only package verification |
+| `includes/backup/country_export.php` | Export engine (registry-driven) |
+| `includes/backup/backup_validate.php` | Cross-country / orphan / trial balance validation |
+| `includes/backup/uploads_collector.php` | Country-scoped uploads archive |
+
+```powershell
+php D:\orange\scripts\backup\export_country.php --country-id=1
+php D:\orange\scripts\backup\export_country.php --country-id=1 --output=D:\orange_backups\country_packages\kw\manual_run
+php D:\orange\scripts\backup\verify_country_package.php --package=D:\orange_backups\country_packages\kw\2026-07-12_120000
+php D:\orange\scripts\backup\self_test_country_export.php
+```
+
+**Package layout** (`{BackupRoot}/country_packages/{country_code}/{timestamp}/`):
+
+```text
+manifest.json
+health.json
+checksums.sha256
+dependency_graph.json
+table_inventory.json
+id_snapshot.json
+sql/000_session_preamble.sql
+sql/{order}_{table}.sql
+sql/999_session_postamble.sql
+files/uploads_country.zip
+```
+
+**Limitations (Phase 1B.2):**
+
+- Export only — **never import directly to production**
+- Global / excluded_ephemeral registry tables are **not** exported
+- Phase 2 staging restore and production merge **not implemented**
+- Trial balance must balance within tolerance or export fails closed
+- Critical referenced uploads missing → export fails closed
+
+**Health `package_status`:** `healthy` | `warning` | `failed` (generation aborts on `failed`).
