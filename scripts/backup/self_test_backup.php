@@ -198,6 +198,7 @@ $pdoLiteral = new PDO('sqlite::memory:');
 self_test(orange_backup_pdo_sql_literal($pdoLiteral, null, 'varchar') === 'NULL', 'PDO literal NULL');
 self_test(orange_backup_pdo_sql_literal($pdoLiteral, "line\n\tquote'", 'varchar') !== '', 'PDO literal escaped text');
 self_test(orange_backup_pdo_sql_literal($pdoLiteral, "\x01\x02", 'blob') === '0x0102', 'PDO literal binary hex');
+self_test(in_array('check_empty_tables_id_starts_at_one', orange_backup_pdo_maintenance_routine_names(), true), 'maintenance routine allowlist includes check_empty_tables_id_starts_at_one');
 
 // PDO export format validation
 $pdoFormatFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_pdo_format_' . bin2hex(random_bytes(4)) . '.sql';

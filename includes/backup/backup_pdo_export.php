@@ -7,14 +7,85 @@ const ORANGE_BACKUP_PDO_INSERT_CHUNK_ROWS = 100;
 const ORANGE_BACKUP_PDO_MIN_DUMP_BYTES = 64;
 
 /**
+ * Maintenance/audit routines outside Orange runtime — ignored by PDO preflight/export.
+ *
+ * @return list<string>
+ */
+function orange_backup_pdo_maintenance_routine_names(): array
+{
+    return [
+        'check_empty_tables_id_starts_at_one',
+    ];
+}
+
+/**
+ * @return list<array{name:string,type:string}>
+ */
+function orange_backup_pdo_list_routines(PDO $pdo, string $databaseName): array
+{
+    $st = $pdo->prepare(
+        'SELECT ROUTINE_NAME, ROUTINE_TYPE FROM information_schema.ROUTINES
+         WHERE ROUTINE_SCHEMA = ?
+         ORDER BY ROUTINE_NAME ASC'
+    );
+    $st->execute([$databaseName]);
+    $routines = [];
+    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        $name = (string) ($row['ROUTINE_NAME'] ?? '');
+        if ($name === '') {
+            continue;
+        }
+        $routines[] = [
+            'name' => $name,
+            'type' => (string) ($row['ROUTINE_TYPE'] ?? ''),
+        ];
+    }
+
+    return $routines;
+}
+
+/**
  * @return array{ready:bool,error:?string,warnings:list<string>}
  */
 function orange_backup_pdo_export_preflight(PDO $pdo, string $databaseName): array
 {
     $warnings = [];
+    $maintenanceAllowlist = array_fill_keys(
+        array_map(static fn (string $name): string => strtolower($name), orange_backup_pdo_maintenance_routine_names()),
+        true
+    );
+
+    $ignoredMaintenance = [];
+    $runtimeRoutines = [];
+    foreach (orange_backup_pdo_list_routines($pdo, $databaseName) as $routine) {
+        $key = strtolower($routine['name']);
+        if (isset($maintenanceAllowlist[$key])) {
+            $ignoredMaintenance[] = $routine['name'];
+            continue;
+        }
+        $runtimeRoutines[] = $routine;
+    }
+
+    if ($runtimeRoutines !== []) {
+        $labels = array_map(
+            static fn (array $routine): string => $routine['name'] . ' (' . $routine['type'] . ')',
+            $runtimeRoutines
+        );
+
+        return [
+            'ready' => false,
+            'error' => 'PDO export cannot safely include non-maintenance routines (found ' . count($runtimeRoutines) . '): '
+                . implode(', ', $labels) . '. Use mysqldump/PowerShell or add maintenance-only allowlist entries.',
+            'warnings' => $warnings,
+        ];
+    }
+
+    if ($ignoredMaintenance !== []) {
+        $warnings[] = 'PDO export ignores maintenance-only routines (not Orange runtime): '
+            . implode(', ', $ignoredMaintenance);
+    }
 
     foreach ([
-        'ROUTINE' => 'SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = ?',
         'TRIGGER' => 'SELECT COUNT(*) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = ?',
         'EVENT' => 'SELECT COUNT(*) FROM information_schema.EVENTS WHERE EVENT_SCHEMA = ?',
     ] as $label => $sql) {
