@@ -91,7 +91,10 @@ $parentQuery = orange_country_export_build_parent_rows_query('order_items', [
     'parent_table' => 'orders',
     'foreign_key' => 'order_id',
 ], $idSnapshot);
-crp_self_test(str_contains($parentQuery['sql'], 'order_id IN'), 'dependent row extraction query');
+crp_self_test(
+    str_contains($parentQuery['sql'], '`order_id` IN') && $parentQuery['params'] === [1, 2],
+    'dependent row extraction query'
+);
 $emptyParentQuery = orange_country_export_build_parent_rows_query('order_items', [
     'type' => 'parent_rows',
     'parent_table' => 'orders',
