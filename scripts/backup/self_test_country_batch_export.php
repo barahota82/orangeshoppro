@@ -54,12 +54,16 @@ $custom = orange_crp_batch_retention_config([
     'ORANGE_CRP_RETENTION_MONTHLY' => 3,
 ]);
 crp_batch_self_test($custom['daily'] === 10, 'retention daily from env');
+crp_batch_self_test(orange_country_export_safe_country_code('../KW Backup', 7) === 'kwbackup', 'country package code is filesystem safe');
+crp_batch_self_test(orange_country_export_safe_country_code('   ', 7) === 'c7', 'empty country package code falls back to id');
 
 // Retention never deletes newest verified healthy package
 $retentionRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_crp_batch_ret_' . bin2hex(random_bytes(4));
 $countryDir = $retentionRoot . DIRECTORY_SEPARATOR . 'country_packages' . DIRECTORY_SEPARATOR . 'zztest';
-$oldHealthy = $countryDir . DIRECTORY_SEPARATOR . '2020-01-01_010000';
-$newFailed = $countryDir . DIRECTORY_SEPARATOR . '2026-07-01_010000';
+$oldHealthyName = gmdate('Y-m-d_His', strtotime('-30 days') ?: (time() - 2592000));
+$newFailedName = gmdate('Y-m-d_His', strtotime('-20 days') ?: (time() - 1728000));
+$oldHealthy = $countryDir . DIRECTORY_SEPARATOR . $oldHealthyName;
+$newFailed = $countryDir . DIRECTORY_SEPARATOR . $newFailedName;
 mkdir($oldHealthy, 0775, true);
 mkdir($newFailed, 0775, true);
 $writeHealthyPackage = static function (string $dir): void {
@@ -107,10 +111,10 @@ orange_backup_write_json($newFailed . DIRECTORY_SEPARATOR . 'health.json', [
     'package_type' => 'country_recovery',
     'package_status' => 'failed',
 ]);
-touch($oldHealthy, strtotime('2020-01-01 01:00:00'));
-touch($newFailed, strtotime('2026-07-01 01:00:00'));
-crp_batch_self_test(orange_crp_batch_find_newest_healthy_package_name($countryDir) === '2020-01-01_010000', 'newest verified healthy is older package when newer failed');
-orange_crp_batch_apply_retention($retentionRoot, 'zztest', '2026-07-01_010000', 1, 1, 1);
+touch($oldHealthy, strtotime('-30 days') ?: (time() - 2592000));
+touch($newFailed, strtotime('-20 days') ?: (time() - 1728000));
+crp_batch_self_test(orange_crp_batch_find_newest_healthy_package_name($countryDir) === $oldHealthyName, 'newest verified healthy is older package when newer failed');
+orange_crp_batch_apply_retention($retentionRoot, 'zztest', null, 1, 1, 1);
 crp_batch_self_test(is_dir($oldHealthy), 'retention kept oldest verified healthy package');
 crp_batch_self_test(!is_dir($newFailed), 'retention removed unprotected failed newer package');
 orange_backup_remove_dir($retentionRoot);
