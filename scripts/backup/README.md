@@ -273,4 +273,29 @@ Copy each successful snapshot (or the entire `{BackupRoot}/snapshots/` tree) to 
 
 `docs/archive/ORANGE_BACKUP_RECOVERY_RUNBOOK.md`
 
-Country Recovery Package export/restore is **deferred to Phase 1B**.
+Country Recovery Package export/restore is **Phase 1B** (export not yet implemented).
+
+---
+
+## Country Backup Inventory — Phase 1B.1 (registry only)
+
+Authoritative table classification for future Country Recovery Package export. **No export, restore, or SQL generation in this phase.**
+
+| Artifact | Purpose |
+|----------|---------|
+| `includes/backup/backup_table_registry_definitions.php` | **Single source of truth** — ownership, orders, extraction rules |
+| `scripts/backup/build_table_registry.php` | Regenerates `config/backup_table_registry.json` (never hand-edit) |
+| `scripts/backup/validate_registry.php` | Fails on missing/unknown tables, incomplete metadata, schema revision mismatch |
+| `config/backup_table_registry.json` | Generated inventory (117 tables @ schema revision 121) |
+
+**Ownership types:** `global`, `country_owned`, `dependent`, `excluded_ephemeral`
+
+**Per-table metadata:** `ownership_type`, `export_order`, `delete_order`, `restore_order`, `extraction_rule`, `parent_dependency`, `uploads_linked`, `integrity_critical`
+
+```powershell
+php D:\orange\scripts\backup\build_table_registry.php --verify-dump
+php D:\orange\scripts\backup\validate_registry.php --offline
+php D:\orange\scripts\backup\validate_registry.php
+```
+
+After schema changes: update definitions, bump `ORANGE_CATALOG_SCHEMA_PHP_REVISION`, rebuild registry, commit both PHP and generated JSON.
