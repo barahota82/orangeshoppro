@@ -412,7 +412,7 @@ function orange_backup_verify_full_package(string $packagePath): array
     }
 
     if (!isset($manifest['schema_revision']) || $manifest['schema_revision'] === null || $manifest['schema_revision'] === '') {
-        $errors[] = 'manifest.schema_revision is missing.';
+        $warnings[] = 'manifest.schema_revision is missing; metadata collection may be incomplete.';
     }
 
     $requiredManifestKeys = [

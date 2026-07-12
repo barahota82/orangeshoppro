@@ -141,6 +141,29 @@ file_put_contents($corruptDir . DIRECTORY_SEPARATOR . 'checksums.sha256', str_re
 $corruptResult = orange_backup_verify_full_package($corruptDir);
 self_test(!$corruptResult['ok'], 'corrupted checksum rejected');
 
+// Metadata-only warnings should not turn an otherwise complete package into a failed verification.
+$metadataWarningDir = $tmp . DIRECTORY_SEPARATOR . 'metadata_warning_pkg';
+mkdir($metadataWarningDir);
+file_put_contents($metadataWarningDir . DIRECTORY_SEPARATOR . 'dump.sql.gz', str_repeat('d', 128));
+file_put_contents($metadataWarningDir . DIRECTORY_SEPARATOR . 'uploads.zip', str_repeat('u', 128));
+$metadataWarningResult = orange_backup_full_finalize_workspace([
+    'workspace' => $metadataWarningDir,
+    'backup_root' => $tmp,
+    'dump_file' => 'dump.sql.gz',
+    'uploads_file' => 'uploads.zip',
+    'metadata' => [],
+    'metadata_ok' => false,
+    'exporter_maintenance_notes' => ['maintenance-only routine ignored: check_empty_tables_id_starts_at_one'],
+]);
+$metadataWarningVerify = orange_backup_verify_full_package($metadataWarningDir);
+self_test(($metadataWarningResult['manifest']['backup_status'] ?? '') === 'success', 'metadata warnings keep manifest success');
+self_test(($metadataWarningResult['health']['package_status'] ?? '') === 'healthy', 'metadata warnings keep package healthy');
+self_test($metadataWarningVerify['ok'], 'metadata-warning package verifies');
+self_test(
+    str_contains(implode(' | ', $metadataWarningVerify['warnings']), 'manifest.schema_revision is missing'),
+    'metadata-warning package verifier reports warning'
+);
+
 // Temporary-folder cleanup behavior
 orange_backup_remove_dir($tmp);
 self_test(!is_dir($tmp), 'temporary-folder cleanup');
@@ -229,6 +252,7 @@ if (!empty($envReport['database_connected']) && is_file($projectRoot . DIRECTORY
 }
 
 // Backend selection includes PDO when available
+$backend = orange_backup_select_backend($projectRoot);
 if ($backend === null && !empty($envReport['pdo_fallback_ready'])) {
     self_test(false, 'pdo_fallback_ready true but backend null');
 } elseif ($backend === 'php_pdo') {
@@ -246,7 +270,6 @@ orange_backup_release_lock();
 orange_backup_remove_dir($lockRoot);
 
 // Backend unavailable => clear failure signal
-$backend = orange_backup_select_backend($projectRoot);
 if ($backend === null) {
     self_test(empty($envReport['can_run_full_backup']), 'backend unavailable marks can_run_full_backup=false');
 } else {
