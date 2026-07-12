@@ -63,6 +63,8 @@ return [
     // 'ORANGE_BACKUP_ROOT' => 'C:\\inetpub\\vhosts\\clickstorekw.com\\private\\orange_backups',
     // 'ORANGE_MYSQLDUMP_PATH' => 'C:\\Program Files (x86)\\Plesk\\MySQL\\bin\\mysqldump.exe',
     // 'ORANGE_BACKUP_POWERSHELL_PATH' => 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+    // اختياري — مدة الاحتفاظ بالنسخ الاحتياطية (أيام). الافتراضي 30 عند غياب المفتاح.
+    // 'ORANGE_BACKUP_RETENTION_DAYS' => 30,
 
     // ==================================================================
     // بوابة الدفع الإلكتروني (المرحلة 2) — أسرار السيرفر فقط، لا تُرفع لـ Git.

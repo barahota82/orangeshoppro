@@ -77,10 +77,8 @@ Each successful run writes:
 ```php
 'ORANGE_BACKUP_ROOT' => 'C:\\inetpub\\vhosts\\clickstorekw.com\\private\\orange_backups',
 'ORANGE_MYSQLDUMP_PATH' => 'C:\\Program Files (x86)\\Plesk\\MySQL\\bin\\mysqldump.exe',
-// optional CRP batch retention (defaults: daily 7, weekly 4, monthly 6):
-// 'ORANGE_CRP_RETENTION_DAILY' => 7,
-// 'ORANGE_CRP_RETENTION_WEEKLY' => 4,
-// 'ORANGE_CRP_RETENTION_MONTHLY' => 6,
+// optional — retention window in days (default 30 when key is missing):
+// 'ORANGE_BACKUP_RETENTION_DAYS' => 30,
 // optional — only if you want PowerShell delegation from PHP:
 // 'ORANGE_BACKUP_POWERSHELL_PATH' => 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
 ```
@@ -90,6 +88,7 @@ Each successful run writes:
 | `ORANGE_BACKUP_ROOT` | **Yes** | Writable folder **outside** the site / `httpdocs` / Git repo |
 | `ORANGE_MYSQLDUMP_PATH` | **Strongly recommended** | Exact host path to `mysqldump.exe` when auto-discovery fails |
 | `ORANGE_BACKUP_POWERSHELL_PATH` | No | Optional explicit PowerShell path for delegation |
+| `ORANGE_BACKUP_RETENTION_DAYS` | No | Retention window for full snapshots and CRP packages (default **30**) |
 
 **Owner setup before first backup:**
 
@@ -266,9 +265,34 @@ See **Plesk Scheduled Tasks** section above.
 
 ---
 
-## Retention
+## Retention (30-day policy — Phase 1B.3)
 
-Retention runs **only after a fully successful backup**. The script never deletes files outside `-BackupRoot`. Expired snapshots under `{BackupRoot}/snapshots/` may be removed according to daily / weekly / monthly rules.
+Shared helper: `includes/backup/backup_retention.php`
+
+| Key (`.env.php`) | Default |
+|------------------|---------|
+| `ORANGE_BACKUP_RETENTION_DAYS` | **30** |
+
+Applies to:
+
+- **Full Disaster Backup:** `{BackupRoot}/snapshots/{timestamp}/` — runs only after the new snapshot is finalized **and verified**.
+- **Country Recovery Packages:** `{BackupRoot}/country_packages/{country_code}/{timestamp}/` — runs after batch exports complete and each successful package is verified.
+
+Rules:
+
+- Delete only **finalized** package directories **older than** the retention window.
+- Never delete temp/work dirs (`._work_*`, `.tmp_*`).
+- Never delete the package currently being created.
+- Never delete the **newest verified healthy** package (global for full backup; per country for CRP).
+- If no newer verified healthy replacement exists, preserve the old healthy package even when older than 30 days.
+- Verify every deletion path stays inside `ORANGE_BACKUP_ROOT`; symlinks/junctions outside BackupRoot are blocked.
+- Log every kept/deleted package with reason; deletion failures are logged but do not corrupt new packages.
+
+```powershell
+php D:\orange\scripts\backup\self_test_backup_retention.php
+```
+
+**Note:** The optional PowerShell script (`orange_backup.ps1`) still accepts legacy `-RetentionDaily/-RetentionWeekly/-RetentionMonthly` parameters. The **Plesk PHP path** uses the unified 30-day policy above.
 
 ---
 
@@ -366,8 +390,10 @@ Discovers **recoverable countries dynamically** from the `countries` table and e
 | Artifact | Purpose |
 |----------|---------|
 | `scripts/backup/export_all_recoverable_countries.php` | CLI / Plesk batch entry point |
-| `includes/backup/country_batch_export.php` | Discovery, lock, retention, batch orchestration |
+| `includes/backup/country_batch_export.php` | Discovery, lock, batch orchestration |
+| `includes/backup/backup_retention.php` | Shared 30-day retention for full + CRP |
 | `scripts/backup/self_test_country_batch_export.php` | Batch self-tests |
+| `scripts/backup/self_test_backup_retention.php` | Retention self-tests |
 
 ```powershell
 php D:\orange\scripts\backup\export_all_recoverable_countries.php
@@ -376,26 +402,18 @@ php D:\orange\scripts\backup\self_test_country_batch_export.php
 
 **Country discovery (every run):**
 
-- **Selected:** country is **active** (`is_active=1`), **or** inactive but has historical data in country-scoped headers (`purchases`, `purchase_returns`, `orders`, `sales_returns`, `journal_vouchers`, `stock_movements`, `customers`, `suppliers`).
+- **Selected:** country is **active** (`is_active=1`), **or** inactive but has historical data in country-scoped headers (`customers`, `suppliers`, `purchases`, `purchase_returns`, `orders`, `sales_returns`, `journal_vouchers`, `stock_movements`, `inventory_cost_layers`, or FIFO consumptions via `inventory_cost_consumptions`).
 - **Skipped:** inactive with no rows in those tables (empty/template countries).
 - **Never hardcoded** — no fixed country IDs or codes in the batch script.
 
 **Batch behavior:**
 
 - One global lock (`locks/orange_crp_batch.lock`) prevents concurrent batch runs.
-- Countries processed **one at a time** via `orange_country_export_run()` (no duplicated CRP logic).
+- Countries processed **one at a time** via `orange_country_export_run()`; each finalized package is **verified** before retention.
 - If one country fails: temp package cleaned up, batch **continues**, final exit code **non-zero**, Plesk Errors-only notification fires.
-- Logs: `{BackupRoot}/logs/export_all_countries_*.log`
+- Logs: `{BackupRoot}/logs/export_all_countries_*.log` (includes `started_at`, `finished_at`, country results, retention kept/deleted)
 
-**CRP retention (per country, after each successful export):**
-
-| Key (`.env.php`) | Default |
-|------------------|---------|
-| `ORANGE_CRP_RETENTION_DAILY` | 7 |
-| `ORANGE_CRP_RETENTION_WEEKLY` | 4 |
-| `ORANGE_CRP_RETENTION_MONTHLY` | 6 |
-
-Retention runs independently under `{BackupRoot}/country_packages/{country_code}/`. The **newest verified healthy** package for each country is **never deleted**.
+Retention uses the shared **30-day** policy (`ORANGE_BACKUP_RETENTION_DAYS`, default 30) independently per `{BackupRoot}/country_packages/{country_code}/`. The **newest verified healthy** package for each country is **never deleted**.
 
 **Plesk Scheduled Task (country batch):**
 
@@ -403,5 +421,6 @@ Retention runs independently under `{BackupRoot}/country_packages/{country_code}
 |---------|-------|
 | Task type | Run a PHP script |
 | Script path | `scripts/backup/export_all_recoverable_countries.php` |
-| Schedule | Daily after full backup (e.g. **03:30 UTC**) |
+| Arguments | *(empty)* |
+| Schedule | Daily **03:30 UTC** (after full backup) |
 | Notification | Errors only |

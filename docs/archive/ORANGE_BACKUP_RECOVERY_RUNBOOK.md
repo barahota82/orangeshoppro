@@ -35,10 +35,8 @@ The PHP entry point handles locking, backend selection, logging under `{BackupRo
 ```php
 'ORANGE_BACKUP_ROOT' => 'C:\\inetpub\\vhosts\\clickstorekw.com\\private\\orange_backups',
 'ORANGE_MYSQLDUMP_PATH' => 'C:\\Program Files (x86)\\Plesk\\MySQL\\bin\\mysqldump.exe',
-// optional CRP batch retention (defaults: daily 7, weekly 4, monthly 6):
-// 'ORANGE_CRP_RETENTION_DAILY' => 7,
-// 'ORANGE_CRP_RETENTION_WEEKLY' => 4,
-// 'ORANGE_CRP_RETENTION_MONTHLY' => 6,
+// optional — retention window in days (default 30 when key is missing):
+// 'ORANGE_BACKUP_RETENTION_DAYS' => 30,
 ```
 
 Create the BackupRoot folder outside `httpdocs`, grant write permission to the scheduled-task PHP user, and verify `proc_open` is enabled. If `proc_open` is disabled, the scheduled task **must fail** — there is no PDO fallback in Phase 1A.
@@ -78,13 +76,20 @@ A **daily automated backup** is required for any production or production-like e
   - log entry under `{BackupRoot}/logs/`.
 - Failed runs must be investigated before the next deploy or migration. The script exits non-zero on failure and does not delete existing snapshots when a new backup fails.
 
-Retention (configurable on the script):
+Retention (**30-day policy — Phase 1B.3**, shared helper `includes/backup/backup_retention.php`):
 
-- **Daily:** keep snapshots from the last N calendar days (`-RetentionDaily`, default 7).
-- **Weekly:** keep the newest snapshot per ISO week for W weeks (`-RetentionWeekly`, default 4).
-- **Monthly:** keep the newest snapshot per calendar month for M months (`-RetentionMonthly`, default 6).
+| Key (`.env.php`) | Default |
+|------------------|---------|
+| `ORANGE_BACKUP_RETENTION_DAYS` | **30** |
 
-Retention cleanup runs **only after a successful backup** and **only inside `-BackupRoot`**.
+Applies independently to:
+
+- `{BackupRoot}/snapshots/{timestamp}/` (full disaster backup — after finalize + verify)
+- `{BackupRoot}/country_packages/{country_code}/{timestamp}/` (CRP — after batch exports + verify)
+
+Rules: delete only finalized packages **older than** the retention window; never delete temp/work dirs; never delete the newest **verified healthy** package (global for full, per country for CRP); preserve the last verified healthy package when no newer healthy replacement exists; block paths outside BackupRoot/symlinks; log kept/deleted with reason.
+
+Retention cleanup runs **only after** successful finalize + verify and **only inside** `ORANGE_BACKUP_ROOT`.
 
 ---
 
@@ -211,16 +216,17 @@ Restore must be **tested on a non-production clone** before relying on it for pr
 **Discovery rule (every run, no hardcoded country IDs):**
 
 1. Read all rows from `countries`.
-2. **Export** when `is_active=1`, **or** when inactive but any country-scoped header table has rows for that `country_id`: `purchases`, `purchase_returns`, `orders`, `sales_returns`, `journal_vouchers`, `stock_movements`, `customers`, `suppliers`.
+2. **Export** when `is_active=1`, **or** when inactive but any country-scoped header table has rows for that `country_id`: `customers`, `suppliers`, `purchases`, `purchase_returns`, `orders`, `sales_returns`, `journal_vouchers`, `stock_movements`, `inventory_cost_layers`, or FIFO consumptions linked via `inventory_cost_consumptions`.
 3. **Skip** inactive countries with no rows in those tables (empty/template).
 
-**Failure policy:** one country failure does not finalize a partial package for that country; batch continues; exit code non-zero; log lists succeeded and failed countries.
+**Failure policy:** one country failure does not finalize a partial package; batch continues; exit code non-zero; log lists succeeded and failed countries.
 
-**Retention:** independent per `{BackupRoot}/country_packages/{country_code}/`; defaults daily 7 / weekly 4 / monthly 6; newest **verified healthy** package never deleted.
+**Retention:** shared 30-day policy via `ORANGE_BACKUP_RETENTION_DAYS` (default 30); per `{BackupRoot}/country_packages/{country_code}/`; newest **verified healthy** package never deleted.
 
 ```powershell
 php D:\orange\scripts\backup\export_all_recoverable_countries.php
 php D:\orange\scripts\backup\self_test_country_batch_export.php
+php D:\orange\scripts\backup\self_test_backup_retention.php
 ```
 
 ---
@@ -240,6 +246,7 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 
 ```powershell
 php D:\orange\scripts\backup\self_test_backup.php
+php D:\orange\scripts\backup\self_test_backup_retention.php
 php D:\orange\scripts\backup\self_test_country_export.php
 php D:\orange\scripts\backup\self_test_country_batch_export.php
 php D:\orange\scripts\backup\backup_environment_check.php

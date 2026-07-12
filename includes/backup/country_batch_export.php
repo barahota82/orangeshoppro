@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/backup_environment.php';
 require_once __DIR__ . '/backup_runner.php';
+require_once __DIR__ . '/backup_retention.php';
 require_once __DIR__ . '/country_export.php';
 
 const ORANGE_CRP_BATCH_LOCK_RELATIVE = 'locks/orange_crp_batch.lock';
-
-const ORANGE_CRP_BATCH_ENV_RETENTION_DAILY = 'ORANGE_CRP_RETENTION_DAILY';
-const ORANGE_CRP_BATCH_ENV_RETENTION_WEEKLY = 'ORANGE_CRP_RETENTION_WEEKLY';
-const ORANGE_CRP_BATCH_ENV_RETENTION_MONTHLY = 'ORANGE_CRP_RETENTION_MONTHLY';
 
 /** @var resource|null */
 $orangeCrpBatchLockHandle = null;
@@ -23,26 +20,15 @@ $orangeCrpBatchLockHandle = null;
 function orange_crp_batch_historical_data_tables(): array
 {
     return [
+        'customers',
+        'suppliers',
         'purchases',
         'purchase_returns',
         'orders',
         'sales_returns',
         'journal_vouchers',
         'stock_movements',
-        'customers',
-        'suppliers',
-    ];
-}
-
-/**
- * @return array{daily:int,weekly:int,monthly:int}
- */
-function orange_crp_batch_retention_config(array $env): array
-{
-    return [
-        'daily' => max(1, (int) ($env[ORANGE_CRP_BATCH_ENV_RETENTION_DAILY] ?? 7)),
-        'weekly' => max(1, (int) ($env[ORANGE_CRP_BATCH_ENV_RETENTION_WEEKLY] ?? 4)),
-        'monthly' => max(1, (int) ($env[ORANGE_CRP_BATCH_ENV_RETENTION_MONTHLY] ?? 6)),
+        'inventory_cost_layers',
     ];
 }
 
@@ -188,6 +174,28 @@ function orange_crp_batch_load_countries(PDO $pdo): array
     return $countries;
 }
 
+function orange_crp_batch_country_has_fifo_consumptions(PDO $pdo, int $countryId): bool
+{
+    require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'catalog_schema.php';
+    if (!orange_table_exists($pdo, 'inventory_cost_consumptions') || !orange_table_exists($pdo, 'inventory_cost_layers')) {
+        return false;
+    }
+
+    $st = $pdo->prepare(
+        'SELECT 1
+         FROM inventory_cost_consumptions icc
+         INNER JOIN inventory_cost_layers icl ON icl.id = icc.layer_id
+         WHERE icl.country_id = ?
+         LIMIT 1'
+    );
+    if ($st === false) {
+        return false;
+    }
+    $st->execute([$countryId]);
+
+    return $st->fetchColumn() !== false;
+}
+
 function orange_crp_batch_country_has_historical_data(PDO $pdo, int $countryId): bool
 {
     require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'catalog_schema.php';
@@ -206,7 +214,7 @@ function orange_crp_batch_country_has_historical_data(PDO $pdo, int $countryId):
         }
     }
 
-    return false;
+    return orange_crp_batch_country_has_fifo_consumptions($pdo, $countryId);
 }
 
 /**
@@ -254,160 +262,6 @@ function orange_crp_batch_discover_countries(PDO $pdo): array
     ];
 }
 
-function orange_crp_batch_package_is_healthy(string $packageDir): bool
-{
-    if (!is_dir($packageDir)) {
-        return false;
-    }
-    $healthPath = $packageDir . DIRECTORY_SEPARATOR . 'health.json';
-    if (!is_file($healthPath)) {
-        return false;
-    }
-    $health = json_decode((string) file_get_contents($healthPath), true);
-    if (!is_array($health)) {
-        return false;
-    }
-    if (($health['package_status'] ?? '') !== 'healthy') {
-        return false;
-    }
-
-    $verify = orange_country_export_verify_package($packageDir);
-
-    return $verify['ok'];
-}
-
-/**
- * @return list<array{name:string,path:string,mtime:int}>
- */
-function orange_crp_batch_list_package_dirs(string $countryPackagesDir): array
-{
-    if (!is_dir($countryPackagesDir)) {
-        return [];
-    }
-
-    $dirs = [];
-    foreach (scandir($countryPackagesDir) ?: [] as $entry) {
-        if ($entry === '.' || $entry === '..') {
-            continue;
-        }
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}_\d{6}$/', $entry)) {
-            continue;
-        }
-        $full = $countryPackagesDir . DIRECTORY_SEPARATOR . $entry;
-        if (is_dir($full)) {
-            $dirs[] = [
-                'name' => $entry,
-                'path' => $full,
-                'mtime' => filemtime($full) ?: time(),
-            ];
-        }
-    }
-
-    usort($dirs, static fn (array $a, array $b): int => strcmp($b['name'], $a['name']));
-
-    return $dirs;
-}
-
-function orange_crp_batch_find_newest_healthy_package_name(string $countryPackagesDir): ?string
-{
-    foreach (orange_crp_batch_list_package_dirs($countryPackagesDir) as $dir) {
-        if (orange_crp_batch_package_is_healthy($dir['path'])) {
-            return $dir['name'];
-        }
-    }
-
-    return null;
-}
-
-function orange_crp_batch_apply_retention(
-    string $backupRoot,
-    string $countryCode,
-    ?string $currentPackageName,
-    int $retentionDaily = 7,
-    int $retentionWeekly = 4,
-    int $retentionMonthly = 6
-): void {
-    $countryPackagesDir = orange_backup_path_inside_root(
-        $backupRoot,
-        'country_packages' . DIRECTORY_SEPARATOR . $countryCode
-    );
-    $allDirs = orange_crp_batch_list_package_dirs($countryPackagesDir);
-    if ($allDirs === []) {
-        return;
-    }
-
-    $keep = [];
-    if ($currentPackageName !== null && $currentPackageName !== '') {
-        $keep[$currentPackageName] = true;
-    }
-
-    $newestHealthy = orange_crp_batch_find_newest_healthy_package_name($countryPackagesDir);
-    if ($newestHealthy !== null) {
-        $keep[$newestHealthy] = true;
-    }
-
-    $now = time();
-    $dailyCutoff = strtotime('-' . max(1, $retentionDaily) . ' days', $now);
-    if ($dailyCutoff !== false) {
-        foreach ($allDirs as $dir) {
-            if ($dir['mtime'] >= $dailyCutoff) {
-                $keep[$dir['name']] = true;
-            }
-        }
-    }
-
-    for ($weekOffset = 0; $weekOffset < max(1, $retentionWeekly); $weekOffset++) {
-        $weekStart = strtotime('-' . ($weekOffset * 7) . ' days midnight', $now);
-        if ($weekStart === false) {
-            continue;
-        }
-        $weekStart = strtotime('monday this week midnight', $weekStart) ?: $weekStart;
-        $weekEnd = strtotime('+7 days', $weekStart) ?: ($weekStart + 604800);
-        $newest = null;
-        foreach ($allDirs as $dir) {
-            if ($dir['mtime'] >= $weekStart && $dir['mtime'] < $weekEnd) {
-                if ($newest === null || $dir['mtime'] > $newest['mtime']) {
-                    $newest = $dir;
-                }
-            }
-        }
-        if ($newest !== null) {
-            $keep[$newest['name']] = true;
-        }
-    }
-
-    for ($monthOffset = 0; $monthOffset < max(1, $retentionMonthly); $monthOffset++) {
-        $monthStart = strtotime('first day of -' . $monthOffset . ' month midnight', $now);
-        $monthEnd = strtotime('first day of -' . ($monthOffset - 1) . ' month midnight', $now);
-        if ($monthStart === false || $monthEnd === false) {
-            continue;
-        }
-        $newest = null;
-        foreach ($allDirs as $dir) {
-            if ($dir['mtime'] >= $monthStart && $dir['mtime'] < $monthEnd) {
-                if ($newest === null || $dir['mtime'] > $newest['mtime']) {
-                    $newest = $dir;
-                }
-            }
-        }
-        if ($newest !== null) {
-            $keep[$newest['name']] = true;
-        }
-    }
-
-    $rootNorm = strtolower(rtrim(str_replace('\\', '/', realpath($backupRoot) ?: $backupRoot), '/'));
-    foreach ($allDirs as $dir) {
-        if (isset($keep[$dir['name']])) {
-            continue;
-        }
-        $pathNorm = strtolower(str_replace('\\', '/', $dir['path']));
-        if (!str_starts_with($pathNorm, $rootNorm . '/')) {
-            throw new RuntimeException('CRP retention safety check failed.');
-        }
-        orange_backup_remove_dir($dir['path']);
-    }
-}
-
 /**
  * @param list<array<string,mixed>> $failed
  */
@@ -430,11 +284,14 @@ function orange_crp_batch_compute_exit_code(array $failed, bool $lockFailed = fa
  *   exit_code:int,
  *   message:string,
  *   log_file:string,
+ *   started_at:string,
+ *   finished_at:string,
  *   discovered:list<array<string,mixed>>,
  *   selected:list<array<string,mixed>>,
  *   skipped:list<array<string,mixed>>,
  *   succeeded:list<array<string,mixed>>,
- *   failed:list<array<string,mixed>>
+ *   failed:list<array<string,mixed>>,
+ *   retention:list<array<string,mixed>>
  * }
  */
 function orange_crp_batch_export_all(PDO $pdo, string $projectRoot, array $options = []): array
@@ -443,9 +300,11 @@ function orange_crp_batch_export_all(PDO $pdo, string $projectRoot, array $optio
         throw new RuntimeException('Country batch export is CLI-only.');
     }
 
+    $startedAt = gmdate('c');
     $projectRoot = realpath($projectRoot) ?: $projectRoot;
     $env = orange_backup_load_env_array($projectRoot);
     $backupRoot = orange_backup_resolve_root($env, isset($options['backup_root']) ? (string) $options['backup_root'] : null);
+    $retentionDays = orange_backup_retention_days($env);
 
     $logsDir = orange_backup_path_inside_root($backupRoot, 'logs');
     if (!is_dir($logsDir) && !@mkdir($logsDir, 0775, true) && !is_dir($logsDir)) {
@@ -459,8 +318,10 @@ function orange_crp_batch_export_all(PDO $pdo, string $projectRoot, array $optio
     };
 
     orange_backup_runner_log($logFile, 'Orange country package batch export started.');
+    orange_backup_runner_log($logFile, 'started_at=' . $startedAt);
     orange_backup_runner_log($logFile, 'ProjectRoot=' . $projectRoot);
     orange_backup_runner_log($logFile, 'BackupRoot=' . $backupRoot);
+    orange_backup_runner_log($logFile, 'retention_days=' . $retentionDays);
 
     $discovery = orange_crp_batch_discover_countries($pdo);
     $discovered = $discovery['discovered'];
@@ -468,9 +329,32 @@ function orange_crp_batch_export_all(PDO $pdo, string $projectRoot, array $optio
     $skipped = $discovery['skipped'];
 
     orange_backup_runner_log($logFile, 'Countries discovered=' . count($discovered));
-    orange_backup_runner_log($logFile, 'Countries selected=' . count($selected));
-    orange_backup_runner_log($logFile, 'Countries skipped=' . count($skipped));
+    foreach ($discovered as $entry) {
+        orange_backup_runner_log(
+            $logFile,
+            sprintf(
+                'Discovered country id=%d code=%s active=%s',
+                (int) ($entry['id'] ?? 0),
+                (string) ($entry['code'] ?? ''),
+                !empty($entry['is_active']) ? 'yes' : 'no'
+            )
+        );
+    }
 
+    orange_backup_runner_log($logFile, 'Countries selected=' . count($selected));
+    foreach ($selected as $entry) {
+        orange_backup_runner_log(
+            $logFile,
+            sprintf(
+                'Selected country id=%d code=%s reason=%s',
+                (int) ($entry['id'] ?? 0),
+                (string) ($entry['code'] ?? ''),
+                (string) ($entry['selection_reason'] ?? '')
+            )
+        );
+    }
+
+    orange_backup_runner_log($logFile, 'Countries skipped=' . count($skipped));
     foreach ($skipped as $entry) {
         orange_backup_runner_log(
             $logFile,
@@ -486,23 +370,29 @@ function orange_crp_batch_export_all(PDO $pdo, string $projectRoot, array $optio
     $lock = orange_crp_batch_acquire_lock($backupRoot);
     if (!$lock['acquired']) {
         orange_backup_runner_log($logFile, $lock['reason'], 'ERROR');
+        $finishedAt = gmdate('c');
+        orange_backup_runner_log($logFile, 'finished_at=' . $finishedAt);
 
         return [
             'ok' => false,
             'exit_code' => orange_crp_batch_compute_exit_code([], true),
             'message' => $lock['reason'],
             'log_file' => $logFile,
+            'started_at' => $startedAt,
+            'finished_at' => $finishedAt,
             'discovered' => $discovered,
             'selected' => $selected,
             'skipped' => $skipped,
             'succeeded' => [],
             'failed' => [],
+            'retention' => [],
         ];
     }
 
-    $retention = orange_crp_batch_retention_config($env);
     $succeeded = [];
     $failed = [];
+    $currentPackagesByCountry = [];
+    $retentionSummary = [];
 
     try {
         foreach ($selected as $country) {
@@ -524,25 +414,34 @@ function orange_crp_batch_export_all(PDO $pdo, string $projectRoot, array $optio
                 }
 
                 $packagePath = (string) ($result['package_path'] ?? '');
-                $packageName = $packagePath !== '' ? basename($packagePath) : '';
-                orange_backup_runner_log($logFile, 'Country export success id=' . $countryId . ' code=' . $countryCode . ' package=' . $packagePath);
-
-                if ($packageName !== '') {
-                    orange_crp_batch_apply_retention(
-                        $backupRoot,
-                        $countryCode,
-                        $packageName,
-                        $retention['daily'],
-                        $retention['weekly'],
-                        $retention['monthly']
-                    );
+                if ($packagePath === '' || !is_dir($packagePath)) {
+                    throw new RuntimeException('Country export did not produce a finalized package path.');
                 }
 
+                $verify = orange_country_export_verify_package($packagePath);
+                if (!$verify['ok']) {
+                    throw new RuntimeException('Country package verification failed: ' . implode('; ', $verify['errors']));
+                }
+
+                $packageName = basename($packagePath);
+                $packageStatus = (string) (($result['manifest']['package_status'] ?? '') !== ''
+                    ? $result['manifest']['package_status']
+                    : ($verify['manifest']['package_status'] ?? 'healthy'));
+                orange_backup_runner_log(
+                    $logFile,
+                    'Country export success id=' . $countryId
+                    . ' code=' . $countryCode
+                    . ' package=' . $packagePath
+                    . ' package_status=' . $packageStatus
+                );
+
+                $currentPackagesByCountry[$countryCode] = $packageName;
                 $succeeded[] = [
                     'id' => $countryId,
                     'code' => $countryCode,
                     'label' => (string) ($country['label'] ?? ''),
                     'package_path' => $packagePath,
+                    'package_status' => $packageStatus,
                     'selection_reason' => (string) ($country['selection_reason'] ?? ''),
                 ];
             } catch (Throwable $e) {
@@ -560,6 +459,24 @@ function orange_crp_batch_export_all(PDO $pdo, string $projectRoot, array $optio
                 ];
             }
         }
+
+        orange_backup_runner_log($logFile, 'Applying country package retention after batch exports.');
+        $retentionResults = orange_backup_retention_apply_all_country_packages(
+            $backupRoot,
+            $currentPackagesByCountry,
+            $retentionDays,
+            static function (string $message, string $level = 'INFO') use ($logFile): void {
+                orange_backup_runner_log($logFile, $message, $level);
+            }
+        );
+        foreach ($retentionResults as $countryCode => $result) {
+            $retentionSummary[] = [
+                'country_code' => $countryCode,
+                'kept' => count($result['kept'] ?? []),
+                'deleted' => count($result['deleted'] ?? []),
+                'errors' => $result['errors'] ?? [],
+            ];
+        }
     } finally {
         orange_crp_batch_release_lock();
     }
@@ -569,21 +486,26 @@ function orange_crp_batch_export_all(PDO $pdo, string $projectRoot, array $optio
     $summary = $batchOk
         ? 'Country package batch completed successfully.'
         : 'Country package batch completed with failures.';
+    $finishedAt = gmdate('c');
 
     orange_backup_runner_log($logFile, 'Countries succeeded=' . count($succeeded));
     orange_backup_runner_log($logFile, 'Countries failed=' . count($failed));
     orange_backup_runner_log($logFile, $summary, $batchOk ? 'INFO' : 'ERROR');
+    orange_backup_runner_log($logFile, 'finished_at=' . $finishedAt);
 
     return [
         'ok' => $batchOk,
         'exit_code' => $exitCode,
         'message' => $summary,
         'log_file' => $logFile,
+        'started_at' => $startedAt,
+        'finished_at' => $finishedAt,
         'discovered' => $discovered,
         'selected' => $selected,
         'skipped' => $skipped,
         'succeeded' => $succeeded,
         'failed' => $failed,
+        'retention' => $retentionSummary,
     ];
 }
 
@@ -595,6 +517,8 @@ function orange_crp_batch_print_summary(array $result): void
     echo '=== Country Recovery Package Batch Summary ===' . PHP_EOL;
     echo 'batch_status=' . (($result['ok'] ?? false) ? 'success' : 'failed') . PHP_EOL;
     echo 'exit_code=' . (int) ($result['exit_code'] ?? 1) . PHP_EOL;
+    echo 'started_at=' . (string) ($result['started_at'] ?? '') . PHP_EOL;
+    echo 'finished_at=' . (string) ($result['finished_at'] ?? '') . PHP_EOL;
     echo 'log_file=' . (string) ($result['log_file'] ?? '') . PHP_EOL;
     echo 'countries_discovered=' . count($result['discovered'] ?? []) . PHP_EOL;
     echo 'countries_selected=' . count($result['selected'] ?? []) . PHP_EOL;
@@ -613,10 +537,11 @@ function orange_crp_batch_print_summary(array $result): void
 
     foreach ($result['succeeded'] ?? [] as $entry) {
         echo sprintf(
-            'success id=%d code=%s package_path=%s' . PHP_EOL,
+            'success id=%d code=%s package_path=%s package_status=%s' . PHP_EOL,
             (int) ($entry['id'] ?? 0),
             (string) ($entry['code'] ?? ''),
-            (string) ($entry['package_path'] ?? '')
+            (string) ($entry['package_path'] ?? ''),
+            (string) ($entry['package_status'] ?? '')
         );
     }
 
@@ -626,6 +551,16 @@ function orange_crp_batch_print_summary(array $result): void
             (int) ($entry['id'] ?? 0),
             (string) ($entry['code'] ?? ''),
             (string) ($entry['error'] ?? '')
+        );
+    }
+
+    foreach ($result['retention'] ?? [] as $entry) {
+        echo sprintf(
+            'retention country=%s kept=%d deleted=%d errors=%d' . PHP_EOL,
+            (string) ($entry['country_code'] ?? ''),
+            (int) ($entry['kept'] ?? 0),
+            (int) ($entry['deleted'] ?? 0),
+            count($entry['errors'] ?? [])
         );
     }
 

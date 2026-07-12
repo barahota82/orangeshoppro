@@ -6,6 +6,7 @@ require_once __DIR__ . '/backup_environment.php';
 require_once __DIR__ . '/backup_full.php';
 require_once __DIR__ . '/backup_manifest.php';
 require_once __DIR__ . '/backup_pdo_export.php';
+require_once __DIR__ . '/backup_retention.php';
 
 /**
  * @var resource|null
@@ -256,87 +257,22 @@ function orange_backup_apply_retention(
     string $currentSnapshotName,
     int $retentionDaily = 7,
     int $retentionWeekly = 4,
-    int $retentionMonthly = 6
+    int $retentionMonthly = 6,
+    ?callable $logger = null
 ): void {
-    $allDirs = [];
-    foreach (scandir($snapshotsDir) ?: [] as $entry) {
-        if ($entry === '.' || $entry === '..') {
-            continue;
+    unset($retentionDaily, $retentionWeekly, $retentionMonthly);
+    $env = orange_backup_load_env_array(orange_backup_project_root());
+    $retentionResult = orange_backup_retention_apply_full_snapshots(
+        $backupRoot,
+        $snapshotsDir,
+        $currentSnapshotName,
+        orange_backup_retention_days($env),
+        $logger
+    );
+    if (($retentionResult['errors'] ?? []) !== [] && $logger !== null) {
+        foreach ($retentionResult['errors'] as $error) {
+            $logger((string) $error, 'ERROR');
         }
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}_\d{6}$/', $entry)) {
-            continue;
-        }
-        $full = $snapshotsDir . DIRECTORY_SEPARATOR . $entry;
-        if (is_dir($full)) {
-            $mtime = filemtime($full) ?: time();
-            $allDirs[] = ['name' => $entry, 'path' => $full, 'mtime' => $mtime];
-        }
-    }
-    if ($allDirs === []) {
-        return;
-    }
-
-    $keep = [$currentSnapshotName => true];
-    $now = time();
-
-    $dailyCutoff = strtotime('-' . max(1, $retentionDaily) . ' days', $now);
-    if ($dailyCutoff !== false) {
-        foreach ($allDirs as $dir) {
-            if ($dir['mtime'] >= $dailyCutoff) {
-                $keep[$dir['name']] = true;
-            }
-        }
-    }
-
-    for ($weekOffset = 0; $weekOffset < max(1, $retentionWeekly); $weekOffset++) {
-        $weekStart = strtotime('-' . ($weekOffset * 7) . ' days midnight', $now);
-        if ($weekStart === false) {
-            continue;
-        }
-        $weekStart = strtotime('monday this week midnight', $weekStart) ?: $weekStart;
-        $weekEnd = strtotime('+7 days', $weekStart) ?: ($weekStart + 604800);
-        $newest = null;
-        foreach ($allDirs as $dir) {
-            if ($dir['mtime'] >= $weekStart && $dir['mtime'] < $weekEnd) {
-                if ($newest === null || $dir['mtime'] > $newest['mtime']) {
-                    $newest = $dir;
-                }
-            }
-        }
-        if ($newest !== null) {
-            $keep[$newest['name']] = true;
-        }
-    }
-
-    for ($monthOffset = 0; $monthOffset < max(1, $retentionMonthly); $monthOffset++) {
-        $monthStart = strtotime('first day of -' . $monthOffset . ' month midnight', $now);
-        $monthEnd = strtotime('first day of -' . ($monthOffset - 1) . ' month midnight', $now);
-        if ($monthStart === false || $monthEnd === false) {
-            continue;
-        }
-        $newest = null;
-        foreach ($allDirs as $dir) {
-            if ($dir['mtime'] >= $monthStart && $dir['mtime'] < $monthEnd) {
-                if ($newest === null || $dir['mtime'] > $newest['mtime']) {
-                    $newest = $dir;
-                }
-            }
-        }
-        if ($newest !== null) {
-            $keep[$newest['name']] = true;
-        }
-    }
-
-    $rootNorm = strtolower(rtrim(str_replace('\\', '/', realpath($backupRoot) ?: $backupRoot), '/'));
-    foreach ($allDirs as $dir) {
-        if (isset($keep[$dir['name']])) {
-            continue;
-        }
-        $pathNorm = strtolower(str_replace('\\', '/', $dir['path']));
-        if (!str_starts_with($pathNorm, $rootNorm . '/')) {
-            throw new RuntimeException('Retention safety check failed.');
-        }
-        orange_backup_remove_dir($dir['path']);
     }
 }
 
@@ -519,7 +455,22 @@ function orange_backup_run_php_native_snapshot(
         }
         $tempWorkDir = '';
 
-        orange_backup_apply_retention($backupRoot, $snapshotsDir, $snapshotName);
+        $verifyFull = orange_backup_verify_full_package($finalSnapshotDir);
+        if (!$verifyFull['ok']) {
+            throw new RuntimeException('Post-finalize full backup verification failed: ' . implode('; ', $verifyFull['errors']));
+        }
+
+        orange_backup_apply_retention(
+            $backupRoot,
+            $snapshotsDir,
+            $snapshotName,
+            7,
+            4,
+            6,
+            static function (string $message, string $level = 'INFO') use ($logFile): void {
+                orange_backup_runner_log($logFile, $message, $level);
+            }
+        );
         orange_backup_runner_log($logFile, 'Backup snapshot ready: ' . $finalSnapshotDir);
 
         return [
