@@ -173,13 +173,13 @@ function orange_crp_batch_load_countries(PDO $pdo): array
         if ($id <= 0) {
             continue;
         }
-        $code = strtolower(trim((string) ($row['code'] ?? '')));
+        $code = orange_country_export_safe_country_code((string) ($row['code'] ?? ''), $id);
         $ar = trim((string) ($row['name_ar'] ?? ''));
         $en = trim((string) ($row['name_en'] ?? ''));
         $label = $en !== '' ? $en : $ar;
         $countries[] = [
             'id' => $id,
-            'code' => $code !== '' ? $code : ('c' . $id),
+            'code' => $code,
             'label' => $label !== '' ? $label : $code,
             'is_active' => (int) ($row['is_active'] ?? 0) === 1,
         ];
@@ -194,6 +194,9 @@ function orange_crp_batch_country_has_historical_data(PDO $pdo, int $countryId):
 
     foreach (orange_crp_batch_historical_data_tables() as $tableName) {
         if (!orange_table_exists($pdo, $tableName)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $tableName, 'country_id')) {
             continue;
         }
         $st = $pdo->prepare('SELECT 1 FROM `' . str_replace('`', '``', $tableName) . '` WHERE country_id = ? LIMIT 1');
@@ -327,6 +330,7 @@ function orange_crp_batch_apply_retention(
     int $retentionWeekly = 4,
     int $retentionMonthly = 6
 ): void {
+    $countryCode = orange_country_export_safe_country_code($countryCode);
     $countryPackagesDir = orange_backup_path_inside_root(
         $backupRoot,
         'country_packages' . DIRECTORY_SEPARATOR . $countryCode

@@ -19,6 +19,14 @@ const ORANGE_COUNTRY_EXPORT_FORBIDDEN_SQL_TABLES = [
     'logs',
 ];
 
+function orange_country_export_safe_country_code(string $raw, int $countryId = 0): string
+{
+    $lower = strtolower(trim($raw));
+    $safe = (string) (preg_replace('/[^a-z0-9]/', '', $lower) ?? '');
+
+    return $safe !== '' ? $safe : ($countryId > 0 ? 'c' . $countryId : 'country');
+}
+
 /**
  * @return array{id:int,code:string,label:string}
  */
@@ -41,7 +49,7 @@ function orange_country_export_load_country(PDO $pdo, int $countryId): array
 
     return [
         'id' => (int) $row['id'],
-        'code' => strtolower(trim((string) ($row['code'] ?? ''))),
+        'code' => orange_country_export_safe_country_code((string) ($row['code'] ?? ''), $countryId),
         'label' => $label !== '' ? $label : ('country_' . $countryId),
     ];
 }
