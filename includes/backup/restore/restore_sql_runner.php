@@ -54,7 +54,7 @@ function orange_restore_sql_runner_import_gzip(
             $buffer .= $chunk;
 
             while (true) {
-                $split = orange_restore_sql_runner_split_next_statement($buffer);
+                $split = orange_restore_sql_runner_split_next_statement($buffer, true);
                 if ($split === null) {
                     break;
                 }
@@ -82,10 +82,7 @@ function orange_restore_sql_runner_import_gzip(
             }
         }
 
-        $tail = trim($buffer);
-        if ($tail !== '' && !orange_restore_sql_is_comment_only($tail)) {
-            throw new RuntimeException('SQL import ended with incomplete statement in gzip stream.');
-        }
+        orange_restore_sql_runner_assert_final_tail_complete($buffer, 'gzip stream');
     } catch (Throwable $e) {
         gzclose($handle);
 
@@ -125,52 +122,63 @@ function orange_restore_sql_runner_import_sql_file(
         return ['ok' => false, 'statements_executed' => 0, 'bytes_read' => 0, 'error' => 'SQL file missing: ' . $sqlPath];
     }
 
+    $handle = @fopen($sqlPath, 'rb');
+    if ($handle === false) {
+        return ['ok' => false, 'statements_executed' => 0, 'bytes_read' => 0, 'error' => 'Cannot open SQL file: ' . $sqlPath];
+    }
+
     $log ??= static function (string $message): void {
         orange_restore_log($message);
     };
 
-    $sqlContent = file_get_contents($sqlPath);
-    if ($sqlContent === false) {
-        return ['ok' => false, 'statements_executed' => 0, 'bytes_read' => 0, 'error' => 'Cannot read SQL file: ' . $sqlPath];
-    }
-
-    $bytesRead = strlen($sqlContent);
     $log('SQL import chunk... START (' . basename($sqlPath) . ')');
     orange_restore_sql_assert_session_database($pdo, $stagingDb);
 
     $statementsExecuted = 0;
-    $buffer = $sqlContent;
+    $bytesRead = 0;
+    $buffer = '';
 
     try {
-        while (true) {
-            $split = orange_restore_sql_runner_split_next_statement($buffer);
-            if ($split === null) {
-                break;
+        while (!feof($handle)) {
+            $chunk = fread($handle, 65536);
+            if ($chunk === false) {
+                throw new RuntimeException('Cannot read SQL file: ' . basename($sqlPath));
             }
-            $buffer = $split['remainder'];
-            $statement = trim($split['statement']);
-            if ($statement === '' || orange_restore_sql_is_comment_only($statement)) {
+            if ($chunk === '') {
                 continue;
             }
+            $bytesRead += strlen($chunk);
+            $buffer .= $chunk;
 
-            orange_restore_sql_assert_session_database($pdo, $stagingDb);
-            orange_restore_sql_validate_statement_for_staging($statement, $stagingDb, $productionDb);
+            while (true) {
+                $split = orange_restore_sql_runner_split_next_statement($buffer, true);
+                if ($split === null) {
+                    break;
+                }
+                $buffer = $split['remainder'];
+                $statement = trim($split['statement']);
+                if ($statement === '' || orange_restore_sql_is_comment_only($statement)) {
+                    continue;
+                }
 
-            try {
-                $pdo->exec($statement);
-            } catch (Throwable $e) {
-                throw new RuntimeException('SQL import failed in ' . basename($sqlPath) . ': ' . $e->getMessage());
+                orange_restore_sql_assert_session_database($pdo, $stagingDb);
+                orange_restore_sql_validate_statement_for_staging($statement, $stagingDb, $productionDb);
+
+                try {
+                    $pdo->exec($statement);
+                } catch (Throwable $e) {
+                    throw new RuntimeException('SQL import failed in ' . basename($sqlPath) . ': ' . $e->getMessage());
+                }
+
+                orange_restore_sql_assert_session_database($pdo, $stagingDb);
+                $statementsExecuted++;
             }
-
-            orange_restore_sql_assert_session_database($pdo, $stagingDb);
-            $statementsExecuted++;
         }
 
-        $tail = trim($buffer);
-        if ($tail !== '' && !orange_restore_sql_is_comment_only($tail)) {
-            throw new RuntimeException('SQL chunk ended with incomplete statement: ' . basename($sqlPath));
-        }
+        orange_restore_sql_runner_assert_final_tail_complete($buffer, basename($sqlPath));
     } catch (Throwable $e) {
+        fclose($handle);
+
         return [
             'ok' => false,
             'statements_executed' => $statementsExecuted,
@@ -178,6 +186,7 @@ function orange_restore_sql_runner_import_sql_file(
             'error' => $e->getMessage(),
         ];
     }
+    fclose($handle);
 
     orange_restore_sql_assert_session_database($pdo, $stagingDb);
     $log('SQL import chunk... OK (' . basename($sqlPath) . ', statements=' . (string) $statementsExecuted . ')');
@@ -242,10 +251,22 @@ function orange_restore_sql_runner_import_country_chunks(
     ];
 }
 
+function orange_restore_sql_runner_assert_final_tail_complete(string $buffer, string $sourceLabel): void
+{
+    $tail = trim($buffer);
+    if ($tail === '' || orange_restore_sql_is_comment_only($tail)) {
+        return;
+    }
+
+    orange_restore_sql_runner_split_next_statement($buffer, false);
+
+    throw new RuntimeException('SQL import ended with incomplete statement in ' . $sourceLabel . '.');
+}
+
 /**
  * @return array{statement:string,remainder:string}|null
  */
-function orange_restore_sql_runner_split_next_statement(string $buffer): ?array
+function orange_restore_sql_runner_split_next_statement(string $buffer, bool $allowIncompleteTail = false): ?array
 {
     $len = strlen($buffer);
     $inSingle = false;
@@ -333,6 +354,10 @@ function orange_restore_sql_runner_split_next_statement(string $buffer): ?array
     }
 
     if ($inSingle || $inDouble || $inBlockComment) {
+        if ($allowIncompleteTail) {
+            return null;
+        }
+
         throw new RuntimeException('SQL stream contains unterminated string or comment.');
     }
 

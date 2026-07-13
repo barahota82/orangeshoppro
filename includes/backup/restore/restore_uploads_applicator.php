@@ -62,15 +62,23 @@ function orange_restore_uploads_applicator_extract(string $zipPath, string $targ
             if (!is_dir($parent) && !@mkdir($parent, 0775, true) && !is_dir($parent)) {
                 throw new RuntimeException('Cannot create parent directory for zip entry: ' . $name);
             }
-            $contents = $zip->getFromIndex($i);
-            if ($contents === false) {
-                throw new RuntimeException('Cannot read zip entry: ' . $name);
+            $in = $zip->getStream($name);
+            if ($in === false) {
+                throw new RuntimeException('Cannot open zip entry stream: ' . $name);
             }
-            if (file_put_contents($dest, $contents) === false) {
+            $out = @fopen($dest, 'wb');
+            if ($out === false) {
+                fclose($in);
                 throw new RuntimeException('Cannot write zip entry: ' . $name);
             }
+            $copied = stream_copy_to_stream($in, $out);
+            fclose($in);
+            fclose($out);
+            if ($copied === false) {
+                throw new RuntimeException('Cannot stream zip entry: ' . $name);
+            }
             $filesExtracted++;
-            $bytesExtracted += strlen($contents);
+            $bytesExtracted += (int) $copied;
         }
     } catch (Throwable $e) {
         $zip->close();

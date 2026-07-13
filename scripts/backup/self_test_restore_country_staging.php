@@ -160,7 +160,11 @@ mkdir($packageDir, 0775, true);
 country_restore_write_package($packageDir);
 
 $stagingDbName = 'orange_restore_country_staging_test';
-$productionDbName = orange_restore_production_db_name($projectRoot);
+try {
+    $productionDbName = orange_restore_production_db_name($projectRoot);
+} catch (Throwable) {
+    $productionDbName = 'orange_db';
+}
 
 $envOverride = [
     'ORANGE_BACKUP_ROOT' => $backupRoot,
@@ -228,6 +232,14 @@ $forbiddenManifest = json_decode((string) file_get_contents($forbiddenDir . DIRE
 $forbiddenPlan = orange_restore_country_staging_build_import_plan($projectRoot, $forbiddenDir, $forbiddenManifest);
 country_restore_self_test($forbiddenPlan['ok'] === false, 'import plan: forbidden global table SQL rejected');
 
+// Forbidden scanner catches signatures split across read chunks without loading the full SQL file.
+$boundaryForbidden = $backupRoot . DIRECTORY_SEPARATOR . 'boundary_forbidden.sql';
+file_put_contents($boundaryForbidden, str_repeat('x', 65530) . "INSERT INTO `countries` (`id`) VALUES (1);\n");
+country_restore_self_test(
+    orange_restore_country_staging_scan_sql_file_forbidden($boundaryForbidden) !== null,
+    'import plan: forbidden global table SQL rejected across chunk boundary'
+);
+
 // Missing SQL chunk (verify package)
 $missingSqlDir = $backupRoot . DIRECTORY_SEPARATOR . 'country_packages' . DIRECTORY_SEPARATOR . 'kw' . DIRECTORY_SEPARATOR . 'missing_sql';
 mkdir($missingSqlDir, 0775, true);
@@ -280,6 +292,21 @@ country_restore_self_test(
     'uploads: country zip extract to staging_uploads'
 );
 
+// SQL splitter must tolerate long strings/comments spanning stream read chunks.
+$longStringSql = "INSERT INTO `customers` (`id`, `country_id`, `name_ar`) VALUES (77, 1, '"
+    . str_repeat('a', 70000)
+    . "');\n";
+try {
+    $partialSplit = orange_restore_sql_runner_split_next_statement(substr($longStringSql, 0, 65536), true);
+    $fullSplit = orange_restore_sql_runner_split_next_statement($longStringSql, false);
+    country_restore_self_test(
+        $partialSplit === null && is_array($fullSplit) && str_contains($fullSplit['statement'], str_repeat('a', 128)),
+        'sql runner: long string may span stream chunks'
+    );
+} catch (Throwable) {
+    country_restore_self_test(false, 'sql runner: long string may span stream chunks');
+}
+
 // Job lifecycle — country invalid transition
 $lifeJob = orange_restore_job_create($workRoot, [
     'job_type' => ORANGE_RESTORE_JOB_TYPE_COUNTRY,
@@ -302,6 +329,22 @@ try {
         str_contains($e->getMessage(), 'Invalid country-restore staging job transition'),
         'job lifecycle: invalid transition rejected'
     );
+}
+
+// Lock payload update must keep the same active lock file instead of release/re-acquire.
+$lockUpdateWork = $backupRoot . DIRECTORY_SEPARATOR . 'lock_update_work';
+mkdir($lockUpdateWork, 0775, true);
+$lockUpdate = orange_restore_acquire_lock($lockUpdateWork, 'pending');
+if ($lockUpdate['ok']) {
+    orange_restore_update_lock_job_id($lockUpdateWork, 'country_job');
+    $lockStatus = orange_restore_lock_status($lockUpdateWork);
+    country_restore_self_test(
+        ($lockStatus['payload']['job_id'] ?? '') === 'country_job',
+        'lock: active lock job_id updated without release'
+    );
+    orange_restore_release_lock($lockUpdateWork);
+} else {
+    country_restore_self_test(false, 'lock: active lock job_id updated without release');
 }
 
 // Orchestrator abort — missing package

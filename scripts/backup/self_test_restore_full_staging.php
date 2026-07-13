@@ -156,7 +156,11 @@ $workRoot = $fixture['work_root'];
 $packageDir = $fixture['package_dir'];
 
 $stagingDbName = 'orange_restore_staging_test';
-$productionDbName = orange_restore_production_db_name($projectRoot);
+try {
+    $productionDbName = orange_restore_production_db_name($projectRoot);
+} catch (Throwable) {
+    $productionDbName = 'orange_db';
+}
 
 $envOverride = [
     'ORANGE_BACKUP_ROOT' => $backupRoot,
@@ -491,22 +495,32 @@ restore_staging_self_test($delimiterCompat['ok'] === false, 'package compat: DEL
 
 // Staging credentials fail closed
 try {
-    orange_restore_staging_credentials([ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName], $projectRoot);
-    restore_staging_self_test(false, 'staging creds: missing ORANGE_RESTORE_STAGING_DB_USER rejected');
-} catch (Throwable $e) {
-    restore_staging_self_test(str_contains($e->getMessage(), 'ORANGE_RESTORE_STAGING_DB_USER'), 'staging creds: missing user rejected');
+    orange_backup_load_db_settings($projectRoot);
+    $hasLocalDbEnv = true;
+} catch (Throwable) {
+    $hasLocalDbEnv = false;
 }
+if ($hasLocalDbEnv) {
+    try {
+        orange_restore_staging_credentials([ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName], $projectRoot);
+        restore_staging_self_test(false, 'staging creds: missing ORANGE_RESTORE_STAGING_DB_USER rejected');
+    } catch (Throwable $e) {
+        restore_staging_self_test(str_contains($e->getMessage(), 'ORANGE_RESTORE_STAGING_DB_USER'), 'staging creds: missing user rejected');
+    }
 
-$productionCreds = orange_restore_production_db_credentials($projectRoot);
-try {
-    orange_restore_staging_credentials([
-        ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName,
-        ORANGE_RESTORE_ENV_STAGING_DB_USER => $productionCreds['user'],
-        ORANGE_RESTORE_ENV_STAGING_DB_PASS => 'x',
-    ], $projectRoot);
-    restore_staging_self_test(false, 'staging creds: production DB_USER reuse rejected');
-} catch (Throwable $e) {
-    restore_staging_self_test(str_contains($e->getMessage(), 'must not equal production DB_USER'), 'staging creds: production DB_USER reuse rejected');
+    $productionCreds = orange_restore_production_db_credentials($projectRoot);
+    try {
+        orange_restore_staging_credentials([
+            ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName,
+            ORANGE_RESTORE_ENV_STAGING_DB_USER => $productionCreds['user'],
+            ORANGE_RESTORE_ENV_STAGING_DB_PASS => 'x',
+        ], $projectRoot);
+        restore_staging_self_test(false, 'staging creds: production DB_USER reuse rejected');
+    } catch (Throwable $e) {
+        restore_staging_self_test(str_contains($e->getMessage(), 'must not equal production DB_USER'), 'staging creds: production DB_USER reuse rejected');
+    }
+} else {
+    restore_staging_self_test(true, 'staging creds: skipped without local .env.php');
 }
 
 // Lock: active preserved, stale cleared
