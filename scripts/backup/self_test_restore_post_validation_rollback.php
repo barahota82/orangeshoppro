@@ -154,13 +154,54 @@ function pvrb_create_anchor(string $backupRoot, string $suffix = ''): array
 {
     $anchorDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'anchor' . $suffix . '_' . bin2hex(random_bytes(2));
     mkdir($anchorDir, 0775, true);
-    pvrb_write_file($anchorDir . DIRECTORY_SEPARATOR . 'dump.sql.gz', 'fake-dump');
+
+    $dumpSql = "-- Orange Phase 1A PDO SQL export\n"
+        . "CREATE TABLE `pvrb_anchor` (`id` INT NOT NULL);\n"
+        . "INSERT INTO `pvrb_anchor` (`id`) VALUES (1);\n"
+        . "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;\n";
+    $dumpGz = gzencode($dumpSql);
+    if ($dumpGz === false) {
+        throw new RuntimeException('Cannot create test gzip dump.');
+    }
+    pvrb_write_file($anchorDir . DIRECTORY_SEPARATOR . 'dump.sql.gz', $dumpGz);
+
+    if (!class_exists('ZipArchive')) {
+        throw new RuntimeException('ZipArchive extension is required for restore rollback self-test anchor.');
+    }
+    $zip = new ZipArchive();
+    $zipPath = $anchorDir . DIRECTORY_SEPARATOR . 'uploads.zip';
+    if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        throw new RuntimeException('Cannot create test uploads.zip.');
+    }
+    $zip->addFromString('products/test.txt', 'fixture');
+    $zip->close();
+
+    orange_backup_write_json($anchorDir . DIRECTORY_SEPARATOR . 'health.json', [
+        'package_status' => 'healthy',
+        'failure_reasons' => [],
+        'warnings' => [],
+        'maintenance_notes' => [],
+    ]);
+
+    $dumpPath = $anchorDir . DIRECTORY_SEPARATOR . 'dump.sql.gz';
+    $uploadsPath = $anchorDir . DIRECTORY_SEPARATOR . 'uploads.zip';
     orange_backup_write_json($anchorDir . DIRECTORY_SEPARATOR . 'manifest.json', [
         'package_type' => 'full_disaster',
+        'package_version' => 'self-test',
+        'generated_at' => gmdate('c'),
+        'schema_revision' => 121,
         'dump_file' => 'dump.sql.gz',
-        'dump_sha256' => str_repeat('d', 64),
+        'uploads_file' => 'uploads.zip',
+        'dump_sha256' => hash_file('sha256', $dumpPath),
+        'uploads_sha256' => hash_file('sha256', $uploadsPath),
+        'dump_size_bytes' => filesize($dumpPath),
+        'uploads_size_bytes' => filesize($uploadsPath),
+        'backup_status' => 'healthy',
+        'health_report_file' => 'health.json',
+        'checksums_file' => 'checksums.sha256',
+        'export_backend' => 'php_pdo',
     ]);
-    orange_backup_write_checksums($anchorDir, ['manifest.json', 'dump.sql.gz']);
+    orange_backup_write_checksums($anchorDir, ['manifest.json', 'dump.sql.gz', 'uploads.zip', 'health.json']);
     $checksum = orange_backup_sha256_file($anchorDir . DIRECTORY_SEPARATOR . 'checksums.sha256');
 
     return ['path' => $anchorDir, 'checksum' => $checksum];
@@ -177,6 +218,11 @@ function pvrb_seed_uploads_cutover_complete_job(string $entryStatus = ORANGE_RES
 
     $projectRoot = $backupRoot . DIRECTORY_SEPARATOR . 'project';
     mkdir($projectRoot);
+    pvrb_write_file($projectRoot . DIRECTORY_SEPARATOR . 'config.php', "<?php\n"
+        . "if (!defined('DB_HOST')) { define('DB_HOST', 'localhost'); }\n"
+        . "if (!defined('DB_NAME')) { define('DB_NAME', 'orange_db'); }\n");
+    pvrb_write_file($projectRoot . DIRECTORY_SEPARATOR . '.env.php', "<?php\n"
+        . "return ['DB_USER' => 'orange_restore_test', 'DB_PASS' => ''];\n");
 
     $packageDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'pkg_' . bin2hex(random_bytes(2));
     mkdir($packageDir, 0775, true);
@@ -199,6 +245,9 @@ function pvrb_seed_uploads_cutover_complete_job(string $entryStatus = ORANGE_RES
     ]);
     $jobId = (string) $job['job_id'];
 
+    orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_VALIDATED, [
+        'result' => 'package_validated',
+    ]);
     orange_restore_job_record_fresh_backup_anchor($workRoot, $jobId, $anchor['path'], $anchor['checksum']);
 
     $stagingUploadsDir = orange_restore_staging_uploads_directory($workRoot, $jobId);
@@ -571,6 +620,40 @@ pvrb_self_test(($jobDbFail['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_ROLLBA
 pvrb_self_test(($maintDbFail['active'] ?? false) === true, 'rollback: DB failure keeps maintenance active');
 orange_restore_release_lock($dbFail['workRoot']);
 pvrb_rmdir($dbFail['backupRoot']);
+
+// --- rollback: rollback_failed can retry from persisted checkpoint ---
+$retryFailed = pvrb_seed_uploads_cutover_complete_job(ORANGE_RESTORE_JOB_STATUS_ROLLBACK_FAILED);
+$jobRetryFailed = orange_restore_job_read($retryFailed['workRoot'], $retryFailed['jobId']);
+$jobRetryFailed['rollback_checkpoint'] = ORANGE_RESTORE_ROLLBACK_CHECKPOINT_DATABASE_COMPLETE;
+orange_restore_job_write($retryFailed['workRoot'], $jobRetryFailed);
+pvrb_prepare_runtime($retryFailed);
+$retryUploadsCalled = false;
+$resultRetryFailed = orange_restore_merge_rollback_run([
+    'project_root' => $retryFailed['projectRoot'],
+    'work_root' => $retryFailed['workRoot'],
+    'job_id' => $retryFailed['jobId'],
+    'admin_id' => 1,
+    'password' => 'correct-pass',
+    'confirmation_phrase' => 'ROLLBACK',
+    'env_override' => $retryFailed['env'],
+    'admin_pdo_override' => $retryFailed['adminPdo'],
+    'db_import_override' => static function (): void {
+        throw new RuntimeException('DB must not re-run when retrying rollback_failed at database_complete checkpoint.');
+    },
+    'uploads_rollback_override' => static function () use (&$retryUploadsCalled): void {
+        $retryUploadsCalled = true;
+    },
+    'rollback_postcheck_override' => static fn (): array => [
+        'ok' => true,
+        'hard_failures' => [],
+        'warnings' => [],
+        'overall_result' => 'pass',
+    ],
+]);
+pvrb_self_test($retryUploadsCalled, 'rollback: rollback_failed retry resumes from checkpoint');
+pvrb_self_test(($resultRetryFailed['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_ROLLED_BACK, 'rollback: rollback_failed retry -> rolled_back');
+orange_restore_release_lock($retryFailed['workRoot']);
+pvrb_rmdir($retryFailed['backupRoot']);
 
 // --- rollback: crash after DB before uploads (resume checkpoint) ---
 $crashUploads = pvrb_seed_uploads_cutover_complete_job(ORANGE_RESTORE_JOB_STATUS_ROLLBACK_IN_PROGRESS);

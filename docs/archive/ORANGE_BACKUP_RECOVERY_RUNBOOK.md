@@ -573,15 +573,20 @@ php D:\orange\scripts\backup\restore_full_post_validate.php --job=JOB_ID --admin
 
 **Entry:** `uploads_cutover_complete` only. Requires global restore lock + maintenance active and owned by job.
 
-**State path:** `uploads_cutover_complete` → `production_merged` → `post_validation_passed` → maintenance off → `completed`.
-Hard failure → `failed_post_merge` (maintenance stays active). No direct jump to `completed`.
+**State path:** `uploads_cutover_complete` → `production_merged` → validation report persisted → maintenance off → `completed`
+(`post_validation_passed_at` recorded on the job). Hard failure before maintenance-off → `failed_post_merge`
+(maintenance stays active).
 
 **Reports:** `production_post_validation.json`, `final_restore_report.json` under `{restore_work}/{job_id}/`.
 
 ### Manual rollback CLI
 
 ```powershell
-php D:\orange\scripts\backup\restore_full_rollback.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=ROLLBACK
+# Option A: stdin (keeps password out of process list and shell history)
+$env:ORANGE_RESTORE_ROLLBACK_PASSWORD | php D:\orange\scripts\backup\restore_full_rollback.php --job=JOB_ID --admin-id=N --password-stdin --confirm=ROLLBACK
+
+# Option B: named environment variable (default: ORANGE_RESTORE_OPERATOR_PASSWORD)
+php D:\orange\scripts\backup\restore_full_rollback.php --job=JOB_ID --admin-id=N --password-env=ORANGE_RESTORE_OPERATOR_PASSWORD --confirm=ROLLBACK
 ```
 
 **Policy:** Super Admin + `backup_restore_full` + password re-auth + exact phrase `ROLLBACK`. **Only** this job's
@@ -594,7 +599,7 @@ Stage-3 fresh full disaster backup (`fresh_backup_path` + `fresh_backup_checksum
 against `pre_merge_uploads_snapshot` when pre-merge rename unavailable.
 
 **Checkpoints:** `rollback_precheck_passed` → `rollback_database_*` → `rollback_uploads_*` → `rollback_validation_passed` → `rolled_back`.
-On failure → `rollback_failed`; maintenance remains active.
+On failure → `rollback_failed`; maintenance remains active; retry is allowed with fresh re-auth and resumes from the persisted checkpoint.
 
 **Self-test:**
 
