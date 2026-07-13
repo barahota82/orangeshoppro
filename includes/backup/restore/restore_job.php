@@ -15,6 +15,9 @@ const ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED = 'staging_validated';
 const ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL = 'awaiting_owner_approval';
 const ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE = 'approved_for_merge';
 const ORANGE_RESTORE_JOB_STATUS_MERGE_PRECHECK_PASSED = 'merge_precheck_passed';
+const ORANGE_RESTORE_JOB_STATUS_MERGE_STARTED = 'merge_started';
+const ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE = 'database_cutover_complete';
+const ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE = 'failed_merge';
 const ORANGE_RESTORE_JOB_STATUS_MERGE_APPROVED = 'merge_approved';
 const ORANGE_RESTORE_JOB_STATUS_MERGED = 'production_merged';
 const ORANGE_RESTORE_JOB_STATUS_COMPLETED = 'completed';
@@ -35,6 +38,9 @@ function orange_restore_job_allowed_statuses(): array
         ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL,
         ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE,
         ORANGE_RESTORE_JOB_STATUS_MERGE_PRECHECK_PASSED,
+        ORANGE_RESTORE_JOB_STATUS_MERGE_STARTED,
+        ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE,
+        ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE,
         ORANGE_RESTORE_JOB_STATUS_MERGE_APPROVED,
         ORANGE_RESTORE_JOB_STATUS_MERGED,
         ORANGE_RESTORE_JOB_STATUS_COMPLETED,
@@ -115,6 +121,14 @@ function orange_restore_job_create(string $workRoot, array $input): array
         'merge_precheck_passed_at' => '',
         'merge_precheck_production_db' => '',
         'merge_precheck_staging_db' => '',
+        'merge_db_export_path' => '',
+        'merge_db_export_checksum' => '',
+        'merge_db_export_table_count' => 0,
+        'merge_db_export_row_count' => 0,
+        'merge_started_at' => '',
+        'database_cutover_started_at' => '',
+        'database_cutover_completed_at' => '',
+        'database_cutover_statement_count' => 0,
     ];
 
     orange_restore_job_write($workRoot, $job);
@@ -266,6 +280,93 @@ function orange_restore_job_merge_foundation_transition(
     orange_restore_job_write($workRoot, $job);
 
     return $job;
+}
+
+/**
+ * Phase 2D.2 database cutover transitions (no uploads/post-validation states).
+ *
+ * @return array<string, list<string>>
+ */
+function orange_restore_job_db_cutover_transition_map(): array
+{
+    return [
+        ORANGE_RESTORE_JOB_STATUS_MERGE_PRECHECK_PASSED => [
+            ORANGE_RESTORE_JOB_STATUS_MERGE_STARTED,
+        ],
+        ORANGE_RESTORE_JOB_STATUS_MERGE_STARTED => [
+            ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE,
+            ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE,
+        ],
+    ];
+}
+
+function orange_restore_job_assert_db_cutover_transition(string $fromStatus, string $toStatus): void
+{
+    if ($toStatus === ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE) {
+        if ($fromStatus === ORANGE_RESTORE_JOB_STATUS_MERGE_STARTED) {
+            return;
+        }
+    }
+
+    $allowed = orange_restore_job_db_cutover_transition_map()[$fromStatus] ?? [];
+    if (!in_array($toStatus, $allowed, true)) {
+        throw new RuntimeException(
+            'Invalid database cutover job transition: ' . $fromStatus . ' -> ' . $toStatus
+        );
+    }
+}
+
+/**
+ * @param array<string, mixed> $patch
+ * @return array<string, mixed>
+ */
+function orange_restore_job_db_cutover_transition(
+    string $workRoot,
+    string $jobId,
+    string $newStatus,
+    array $patch = []
+): array {
+    if (!in_array($newStatus, orange_restore_job_allowed_statuses(), true)) {
+        throw new RuntimeException('Invalid restore job status: ' . $newStatus);
+    }
+
+    $job = orange_restore_job_read($workRoot, $jobId);
+    $currentStatus = (string) ($job['status'] ?? '');
+    orange_restore_job_assert_db_cutover_transition($currentStatus, $newStatus);
+
+    $job['status'] = $newStatus;
+    foreach ($patch as $key => $value) {
+        $job[(string) $key] = $value;
+    }
+    orange_restore_job_write($workRoot, $job);
+
+    return $job;
+}
+
+/**
+ * @param array<string, mixed> $patch
+ * @return array<string, mixed>
+ */
+function orange_restore_job_mark_failed_merge(
+    string $workRoot,
+    string $jobId,
+    string $stageFailed,
+    string $errorSummary,
+    array $patch = []
+): array {
+    $job = orange_restore_job_read($workRoot, $jobId);
+    $currentStatus = (string) ($job['status'] ?? '');
+    if ($currentStatus !== ORANGE_RESTORE_JOB_STATUS_MERGE_STARTED) {
+        throw new RuntimeException(
+            'failed_merge is only allowed from merge_started (current=' . $currentStatus . ').'
+        );
+    }
+
+    return orange_restore_job_db_cutover_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE, array_merge([
+        'stage_failed' => $stageFailed,
+        'error_summary' => $errorSummary,
+        'result' => 'failed_merge',
+    ], $patch));
 }
 
 function orange_restore_job_assert_full_staging_transition(string $fromStatus, string $toStatus): void

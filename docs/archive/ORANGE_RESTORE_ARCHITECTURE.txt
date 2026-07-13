@@ -75,7 +75,8 @@ Phase 2B.1 — Full restore → staging CLI only (IMPLEMENTED)
 Phase 2B.2 — Country restore → staging CLI only (IMPLEMENTED)
 Phase 2C — Approval + staging validation gate CLI (IMPLEMENTED)
 Phase 2D.1 — Full production merge foundation (IMPLEMENTED — precheck + maintenance + production identity only)
-Phase 2D.1 — Full production merge cutover CLI (ARCHITECTURE APPROVED — not implemented)
+Phase 2D.2 — Production database cutover CLI (IMPLEMENTED — DB only, no uploads)
+Phase 2D.1 — Full production merge uploads/rollback/post-validation (ARCHITECTURE APPROVED — not implemented)
 Phase 2D.2 — Country production merge CLI
 Phase 2E — End-to-end orchestration CLI (manual steps, not scheduled)
 Phase 3 — Admin UI wrapper (no business logic)
@@ -236,17 +237,53 @@ Self-test:
 
 **Failure policy:** Any gate failure aborts immediately; audit `merge_precheck_failed`; never touches production.
 
-**NOT in 2D.1 foundation:** Database cutover, uploads cutover, rollback execution, production
-post-validation, merge CLI (`restore_full_merge.php`), Admin UI, restore APIs, job states beyond
-`merge_precheck_passed`, schema changes.
+**NOT in 2D.1 foundation:** Uploads cutover, rollback execution, production
+post-validation, full merge CLI (`restore_full_merge.php`), Admin UI, restore APIs, schema changes.
 
 ================================================================================
-Phase 2D.1 — Full production merge cutover (ARCHITECTURE APPROVED — NOT IMPLEMENTED)
+Phase 2D.2 deliverables (production database cutover only — no uploads/rollback/post-validation)
 ================================================================================
 
-**Status:** Architecture approved in principle (2026-07-13). **Foundation (precheck + maintenance +
-production identity) is implemented.** **No merge cutover code, merge CLI, or production writes
-exist yet.** Implementation gate for cutover: this section + owner policy §11–§12.
+**Status:** Implemented (2026-07-13). Engine version `2D.2-db-cutover`. Schema revision **121**
+unchanged. **Production DB cutover only** — uploads untouched, no rollback execution, no post-validation.
+
+CLI entry:
+  scripts/backup/restore_full_database_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
+
+Modules:
+  includes/backup/restore/restore_merge_staging_export.php
+  includes/backup/restore/restore_merge_db_cutover.php
+  includes/backup/restore/restore_orchestrator.php (database cutover wrapper)
+  includes/backup/restore/restore_job.php (states merge_started, database_cutover_complete, failed_merge)
+  includes/backup/restore/restore_sql_runner.php (import_gzip_to_target)
+  includes/backup/restore/restore_production_target.php (production_wipe)
+  includes/backup/restore/restore_merge_precheck.php (cutover gate revalidation)
+
+Self-test:
+  scripts/backup/self_test_restore_database_cutover.php
+
+**Prerequisites:** Job `merge_precheck_passed`; global restore lock held by current PID/job;
+maintenance mode **active and verified** for this job.
+
+**Workflow:**
+1. Re-run cutover gates (checksums, identities, merge credentials, approval window, lock, maintenance verify)
+2. Merge-time re-authentication (Super Admin + backup_restore_full + password + phrase `RESTORE`)
+3. Export validated staging DB → `{restore_work}/{job_id}/merge_db_export.sql.gz` (php_pdo, verified before production mutation)
+4. Transition `merge_started` → production schema wipe (merge credentials only) → stream import export artifact
+5. Success → `database_cutover_complete`; failure after wipe → `failed_merge` (maintenance stays active; rollback anchor preserved; no auto-rollback/retry)
+
+**Audit (append-only, stage merge_db_cutover):** staging_export_started, staging_export_completed,
+database_cutover_started, database_cutover_complete, database_cutover_failed
+
+**NOT in 2D.2:** Uploads cutover, rollback execution, production post-validation, Admin UI, restore APIs,
+automatic restore, states beyond database_cutover_complete (except failed_merge).
+
+================================================================================
+Phase 2D.1 — Full production merge remaining cutover (ARCHITECTURE APPROVED — NOT IMPLEMENTED)
+================================================================================
+
+**Status:** Database cutover (2D.2) is **implemented**. **Uploads cutover, rollback execution,
+post-validation, and full end-to-end merge CLI remain not implemented.**
 
 **Goal:** Promote a job in `approved_for_merge` to production (`production_merged` →
 post-validation → `completed`) using CLI-first orchestration only. Country merge remains

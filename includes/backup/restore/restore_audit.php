@@ -102,3 +102,13 @@ function orange_restore_audit_merge_event(array $job, string $event, string $res
         'merge_event' => $event,
     ], $extra));
 }
+
+/**
+ * @param array<string, mixed> $extra
+ */
+function orange_restore_audit_db_cutover_event(array $job, string $event, string $result, array $extra = []): array
+{
+    return orange_restore_audit_from_job($job, 'merge_db_cutover', $result, array_merge([
+        'db_cutover_event' => $event,
+    ], $extra));
+}

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/restore_staging_target.php';
+require_once __DIR__ . '/restore_production_target.php';
 
 /**
  * Assert the MySQL session is connected to the configured staging database.
@@ -10,6 +11,27 @@ require_once __DIR__ . '/restore_staging_target.php';
 function orange_restore_sql_assert_session_database(PDO $pdo, string $stagingDb): void
 {
     orange_restore_staging_assert_safe_target($pdo, $stagingDb);
+}
+
+/**
+ * Assert the MySQL session is connected to the expected target schema (production cutover).
+ */
+function orange_restore_sql_assert_target_database(PDO $pdo, string $expectedDb): void
+{
+    orange_restore_production_assert_identity($pdo, $expectedDb);
+}
+
+/**
+ * Validate a SQL statement before import into a target schema. Fail closed — never rewrite.
+ *
+ * @throws RuntimeException
+ */
+function orange_restore_sql_validate_statement_for_target(
+    string $sql,
+    string $targetDb,
+    string $forbiddenOtherDb
+): void {
+    orange_restore_sql_validate_statement_for_staging($sql, $targetDb, $forbiddenOtherDb);
 }
 
 /**

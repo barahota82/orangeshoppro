@@ -244,3 +244,114 @@ function orange_restore_merge_precheck_run(array $options): array
         throw $e;
     }
 }
+
+/**
+ * Re-run critical checksum/identity gates immediately before database cutover.
+ *
+ * @param array{
+ *   project_root:string,
+ *   work_root:string,
+ *   job:array<string,mixed>,
+ *   env:array<string,mixed>,
+ *   backup_root:string,
+ *   merge_pdo_override?:?PDO,
+ *   staging_pdo_override?:?PDO
+ * } $options
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_cutover_revalidate_gates(array $options): array
+{
+    $projectRoot = (string) ($options['project_root'] ?? '');
+    $workRoot = (string) ($options['work_root'] ?? '');
+    $backupRoot = (string) ($options['backup_root'] ?? '');
+    /** @var array<string, mixed> $job */
+    $job = is_array($options['job'] ?? null) ? $options['job'] : [];
+    /** @var array<string, mixed> $env */
+    $env = is_array($options['env'] ?? null) ? $options['env'] : [];
+
+    orange_restore_orchestrator_assert_approval_window_open($job);
+
+    if (!(bool) ($job['production_merge_approved'] ?? false)) {
+        throw new RuntimeException('Job production_merge_approved flag is false.');
+    }
+    if ((string) ($job['owner_approval_at'] ?? '') === '') {
+        throw new RuntimeException('Owner approval timestamp is missing.');
+    }
+    if ((string) ($job['approval_token_consumed_at'] ?? '') === '') {
+        throw new RuntimeException('Approval token has not been consumed.');
+    }
+    if ((string) ($job['approval_token_hash'] ?? '') === '') {
+        throw new RuntimeException('Approval token hash is missing on job.');
+    }
+
+    /** @var array<string, mixed> $binding */
+    $binding = is_array($job['approval_token_binding'] ?? null) ? $job['approval_token_binding'] : [];
+    orange_restore_merge_precheck_assert_binding_checksums($job, $binding);
+
+    orange_restore_orchestrator_assert_rollback_anchor($job);
+
+    orange_restore_orchestrator_verify_live_package_checksum($backupRoot, $job);
+
+    $liveAnchorChecksum = orange_restore_merge_precheck_live_rollback_checksum(
+        (string) ($job['fresh_backup_path'] ?? '')
+    );
+    if (!hash_equals((string) ($job['fresh_backup_checksum'] ?? ''), $liveAnchorChecksum)) {
+        throw new RuntimeException('Rollback anchor checksum mismatch (job vs live anchor package).');
+    }
+    if (!hash_equals((string) ($binding['rollback_anchor_checksum'] ?? ''), $liveAnchorChecksum)) {
+        throw new RuntimeException('Rollback anchor checksum mismatch (binding vs live anchor package).');
+    }
+
+    $stagingGate = orange_restore_validation_adapter_staging_gate($workRoot, $job);
+    if (!$stagingGate['ok']) {
+        throw new RuntimeException(
+            'Staging validation gate failed: ' . implode('; ', $stagingGate['errors'])
+        );
+    }
+
+    $liveManifestChecksum = (string) ($stagingGate['manifest_checksum'] ?? '');
+    if (!hash_equals((string) ($binding['staging_restore_manifest_checksum'] ?? ''), $liveManifestChecksum)) {
+        throw new RuntimeException('Staging manifest checksum mismatch (binding vs live manifest).');
+    }
+
+    $productionDb = orange_restore_production_db_name($projectRoot);
+    $stagingDb = orange_restore_staging_db_name($env, $projectRoot);
+    if (strcasecmp($productionDb, $stagingDb) === 0) {
+        throw new RuntimeException('Production and staging database names must differ.');
+    }
+
+    orange_restore_merge_credentials($env, $projectRoot);
+
+    $mergePdo = $options['merge_pdo_override'] ?? null;
+    $productionTarget = orange_restore_production_verify_target(
+        $projectRoot,
+        $env,
+        $mergePdo instanceof PDO ? $mergePdo : null
+    );
+
+    $stagingPdo = $options['staging_pdo_override'] ?? null;
+    if ($stagingPdo instanceof PDO) {
+        orange_restore_staging_assert_safe_target($stagingPdo, $stagingDb);
+        orange_restore_staging_assert_no_production_privileges($stagingPdo, $stagingDb, $productionDb);
+        $stagingIdentity = [
+            'staging_db' => $stagingDb,
+            'session_database' => (string) ($stagingPdo->query('SELECT DATABASE()')->fetchColumn() ?: ''),
+        ];
+    } else {
+        $stagingIdentity = orange_restore_staging_confirm_target($projectRoot, $env);
+    }
+
+    if (strcasecmp((string) ($stagingIdentity['staging_db'] ?? ''), $productionDb) === 0) {
+        throw new RuntimeException('Staging DB identity equals production DB name.');
+    }
+
+    return [
+        'production_db' => $productionDb,
+        'staging_db' => $stagingDb,
+        'production_target' => $productionTarget,
+        'staging_identity' => $stagingIdentity,
+        'staging_gate' => $stagingGate,
+        'rollback_anchor_checksum' => $liveAnchorChecksum,
+        'staging_restore_manifest_checksum' => $liveManifestChecksum,
+    ];
+}
