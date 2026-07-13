@@ -9,6 +9,9 @@ require_once __DIR__ . '/../country_export.php';
 require_once __DIR__ . '/../backup_table_registry_lib.php';
 require_once __DIR__ . '/restore_staging_target.php';
 require_once __DIR__ . '/restore_job.php';
+require_once __DIR__ . '/restore_production_target.php';
+require_once __DIR__ . '/restore_merge_precheck.php';
+require_once __DIR__ . '/restore_uploads_fs.php';
 
 /**
  * Package verify + DRV pre-check (read-only). Abort caller on failure.

@@ -559,10 +559,57 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.3 section
 
 ---
 
-## Phase 2D.1 — Remaining Full Production Merge (rollback / post-validation — NOT IMPLEMENTED)
+## Phase 2D.4 — Production Post-Validation + Manual Rollback (IMPLEMENTED)
 
-**Status:** Database cutover (Phase 2D.2) and uploads cutover (Phase 2D.3) are **implemented**.
-Rollback execution and production post-validation remain **not implemented**.
+**Status:** Implemented (2026-07-13). Engine `2D.4-post-validation-rollback`. Schema revision **121** unchanged.
+**Post-validation and explicit manual rollback only** — no Country Production Merge, no end-to-end wrapper,
+no Admin UI, no restore APIs, no automatic/scheduled restore.
+
+### Post-validation CLI
+
+```powershell
+php D:\orange\scripts\backup\restore_full_post_validate.php --job=JOB_ID --admin-id=N
+```
+
+**Entry:** `uploads_cutover_complete` only. Requires global restore lock + maintenance active and owned by job.
+
+**State path:** `uploads_cutover_complete` → `production_merged` → `post_validation_passed` → maintenance off → `completed`.
+Hard failure → `failed_post_merge` (maintenance stays active). No direct jump to `completed`.
+
+**Reports:** `production_post_validation.json`, `final_restore_report.json` under `{restore_work}/{job_id}/`.
+
+### Manual rollback CLI
+
+```powershell
+php D:\orange\scripts\backup\restore_full_rollback.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=ROLLBACK
+```
+
+**Policy:** Super Admin + `backup_restore_full` + password re-auth + exact phrase `ROLLBACK`. **Only** this job's
+Stage-3 fresh full disaster backup (`fresh_backup_path` + `fresh_backup_checksum` on job). No older backup selection.
+
+**Eligible states:** `failed_merge`, `failed_post_merge`, `database_cutover_complete`, uploads partial states,
+`uploads_cutover_complete`, `production_merged`, `rollback_in_progress` (resume). **Not** `completed` or `rolled_back`.
+
+**Uploads rollback order:** (A) `uploads_pre_merge_{job_id}` rename reversal, or (B) anchor uploads zip verified
+against `pre_merge_uploads_snapshot` when pre-merge rename unavailable.
+
+**Checkpoints:** `rollback_precheck_passed` → `rollback_database_*` → `rollback_uploads_*` → `rollback_validation_passed` → `rolled_back`.
+On failure → `rollback_failed`; maintenance remains active.
+
+**Self-test:**
+
+```powershell
+php D:\orange\scripts\backup\self_test_restore_post_validation_rollback.php
+```
+
+Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.4 section)
+
+---
+
+## Phase 2D.1 — Remaining Full Production Merge (end-to-end wrapper — NOT IMPLEMENTED)
+
+**Status:** Database cutover (Phase 2D.2), uploads cutover (Phase 2D.3), and post-validation + manual rollback
+(Phase 2D.4) are **implemented**. **Full end-to-end merge CLI wrapper and Country Production Merge remain not implemented.**
 
 **Scope:** Remaining full-disaster merge steps after `uploads_cutover_complete`.
 
@@ -618,7 +665,8 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 | Production merge foundation (precheck + maintenance + identity) | **Phase 2D.1 foundation implemented** |
 | Production database cutover (DB only) | **Phase 2D.2 implemented** |
 | Production uploads cutover (uploads only) | **Phase 2D.3 implemented** |
-| Production merge rollback + post-validation | Phase 2D.1 remaining — **not implemented** |
+| Production merge post-validation + manual rollback | **Phase 2D.4 implemented** |
+| Full end-to-end merge CLI wrapper + Country Production Merge | Phase 2D+ — **not implemented** |
 | Full production merge credentials (`ORANGE_RESTORE_MERGE_DB_*`) | **Owner policy §11 — required (foundation + cutover)** |
 | Uploads same-volume gate | **Owner policy §12 — required when 2D.1 implemented** |
 | Owner approval gate (`approved_for_merge`) | **Phase 2C implemented** |

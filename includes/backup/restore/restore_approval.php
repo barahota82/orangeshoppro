@@ -7,6 +7,7 @@ require_once __DIR__ . '/restore_paths.php';
 require_once __DIR__ . '/../backup_manifest.php';
 
 const ORANGE_RESTORE_CONFIRMATION_FULL = 'RESTORE';
+const ORANGE_RESTORE_CONFIRMATION_ROLLBACK = 'ROLLBACK';
 
 function orange_restore_confirmation_phrase(string $jobType, string $countryCode = ''): string
 {
@@ -27,6 +28,11 @@ function orange_restore_validate_confirmation_phrase(string $jobType, string $ty
     $expected = orange_restore_confirmation_phrase($jobType, $countryCode);
 
     return hash_equals($expected, trim($typed));
+}
+
+function orange_restore_validate_rollback_phrase(string $typed): bool
+{
+    return hash_equals(ORANGE_RESTORE_CONFIRMATION_ROLLBACK, trim($typed));
 }
 
 /**

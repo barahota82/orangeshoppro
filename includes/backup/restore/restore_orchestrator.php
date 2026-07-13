@@ -52,6 +52,20 @@ function orange_restore_orchestrator_job_status_report(string $workRoot, string 
         $approvalStatus = 'uploads_second_rename_pending';
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE) {
         $approvalStatus = 'uploads_cutover_complete';
+    } elseif ($status === ORANGE_RESTORE_JOB_STATUS_MERGED) {
+        $approvalStatus = 'production_merged';
+    } elseif ($status === ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED) {
+        $approvalStatus = 'post_validation_passed';
+    } elseif ($status === ORANGE_RESTORE_JOB_STATUS_FAILED_POST_MERGE) {
+        $approvalStatus = 'failed_post_merge';
+    } elseif ($status === ORANGE_RESTORE_JOB_STATUS_ROLLBACK_IN_PROGRESS) {
+        $approvalStatus = 'rollback_in_progress';
+    } elseif ($status === ORANGE_RESTORE_JOB_STATUS_ROLLED_BACK) {
+        $approvalStatus = 'rolled_back';
+    } elseif ($status === ORANGE_RESTORE_JOB_STATUS_ROLLBACK_FAILED) {
+        $approvalStatus = 'rollback_failed';
+    } elseif ($status === ORANGE_RESTORE_JOB_STATUS_COMPLETED) {
+        $approvalStatus = 'completed';
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE) {
         $approvalStatus = 'failed_merge';
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_CANCELLED) {
@@ -608,6 +622,8 @@ function orange_restore_orchestrator_merge_maintenance_verify(string $workRoot, 
 
 require_once __DIR__ . '/restore_merge_db_cutover.php';
 require_once __DIR__ . '/restore_merge_uploads_cutover.php';
+require_once __DIR__ . '/restore_merge_post_validation.php';
+require_once __DIR__ . '/restore_merge_rollback.php';
 
 /**
  * Phase 2D.2 — production database cutover (no uploads cutover).
@@ -629,4 +645,26 @@ function orange_restore_orchestrator_database_cutover(array $options): array
 function orange_restore_orchestrator_uploads_cutover(array $options): array
 {
     return orange_restore_merge_uploads_cutover_run($options);
+}
+
+/**
+ * Phase 2D.4 — production post-validation (no rollback).
+ *
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function orange_restore_orchestrator_post_validation(array $options): array
+{
+    return orange_restore_merge_post_validation_run($options);
+}
+
+/**
+ * Phase 2D.4 — manual production rollback (job-scoped anchor only).
+ *
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function orange_restore_orchestrator_rollback(array $options): array
+{
+    return orange_restore_merge_rollback_run($options);
 }

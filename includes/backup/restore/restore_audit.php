@@ -122,3 +122,23 @@ function orange_restore_audit_uploads_cutover_event(array $job, string $event, s
         'uploads_cutover_event' => $event,
     ], $extra));
 }
+
+/**
+ * @param array<string, mixed> $extra
+ */
+function orange_restore_audit_post_validation_event(array $job, string $event, string $result, array $extra = []): array
+{
+    return orange_restore_audit_from_job($job, 'merge_post_validation', $result, array_merge([
+        'post_validation_event' => $event,
+    ], $extra));
+}
+
+/**
+ * @param array<string, mixed> $extra
+ */
+function orange_restore_audit_rollback_event(array $job, string $event, string $result, array $extra = []): array
+{
+    return orange_restore_audit_from_job($job, 'merge_rollback', $result, array_merge([
+        'rollback_event' => $event,
+    ], $extra));
+}

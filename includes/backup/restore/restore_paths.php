@@ -8,7 +8,10 @@ const ORANGE_RESTORE_WORK_DIRNAME = 'restore_work';
 const ORANGE_RESTORE_LOCK_FILENAME = '.restore.lock';
 const ORANGE_RESTORE_JOB_FILENAME = 'job.json';
 const ORANGE_RESTORE_AUDIT_FILENAME = 'audit.jsonl';
-const ORANGE_RESTORE_ENGINE_VERSION = '2D.3-uploads-cutover-crash-recovery';
+const ORANGE_RESTORE_ENGINE_VERSION = '2D.4-post-validation-rollback';
+const ORANGE_RESTORE_PRODUCTION_POST_VALIDATION_FILE = 'production_post_validation.json';
+const ORANGE_RESTORE_FINAL_RESTORE_REPORT_FILE = 'final_restore_report.json';
+const ORANGE_RESTORE_ROLLBACK_CONFIRMATION_PHRASE = 'ROLLBACK';
 const ORANGE_RESTORE_UPLOADS_NEXT_DIRNAME = 'uploads_next';
 const ORANGE_RESTORE_UPLOADS_NEXT_MANIFEST_FILENAME = 'uploads_next_manifest.json';
 const ORANGE_RESTORE_PRE_MERGE_UPLOADS_SNAPSHOT_DIRNAME = 'pre_merge_uploads_snapshot';
@@ -171,4 +174,14 @@ function orange_restore_resolve_package_path(string $backupRoot, string $package
     }
 
     return $resolved;
+}
+
+function orange_restore_production_post_validation_report_path(string $workRoot, string $jobId): string
+{
+    return orange_restore_job_directory($workRoot, $jobId) . DIRECTORY_SEPARATOR . ORANGE_RESTORE_PRODUCTION_POST_VALIDATION_FILE;
+}
+
+function orange_restore_final_restore_report_path(string $workRoot, string $jobId): string
+{
+    return orange_restore_job_directory($workRoot, $jobId) . DIRECTORY_SEPARATOR . ORANGE_RESTORE_FINAL_RESTORE_REPORT_FILE;
 }

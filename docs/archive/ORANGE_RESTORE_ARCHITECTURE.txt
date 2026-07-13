@@ -318,11 +318,77 @@ uploads_cutover_started, uploads_cutover_complete, uploads_cutover_failed
 building `uploads_next` (operator/pre-phase prepares it), schema changes, production DB writes.
 
 ================================================================================
+Phase 2D.4 deliverables (production post-validation + manual rollback only)
+================================================================================
+
+**Status:** Implemented (2026-07-13). Engine version `2D.4-post-validation-rollback`. Schema revision **121**
+unchanged. **Post-validation and manual rollback only** — no Country Production Merge, no end-to-end wrapper,
+no Admin UI, no restore APIs, no automatic/scheduled restore.
+
+CLI entries:
+  scripts/backup/restore_full_post_validate.php --job=JOB_ID --admin-id=N
+  scripts/backup/restore_full_rollback.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=ROLLBACK
+
+Modules:
+  includes/backup/restore/restore_merge_post_validation.php
+  includes/backup/restore/restore_merge_rollback.php
+  includes/backup/restore/restore_validation_adapter_production.php
+  includes/backup/restore/restore_orchestrator.php (post-validation + rollback wrappers)
+  includes/backup/restore/restore_job.php (post_validation_passed, failed_post_merge, rollback_* states)
+  includes/backup/restore/restore_paths.php (production_post_validation.json, final_restore_report.json)
+  includes/backup/restore/restore_audit.php (post-validation + rollback audit events)
+  includes/backup/restore/restore_approval.php (ROLLBACK confirmation phrase)
+
+Self-test:
+  scripts/backup/self_test_restore_post_validation_rollback.php
+
+**Post-validation entry:** `uploads_cutover_complete` only. Global restore lock + maintenance active and
+owned by current job. Maintenance **must not** be disabled until all hard gates pass.
+
+**State path:** uploads_cutover_complete → production_merged → post_validation_passed → (maintenance off) → completed.
+Hard failure from uploads_cutover_complete or production_merged → failed_post_merge (maintenance stays active).
+No direct transition to completed.
+
+**Production validation gates (hard / warning / informational):**
+Hard failures block completion — production DB connectivity, SELECT DATABASE() identity, production≠staging DB,
+schema revision exact match, table count vs staging manifest, critical row counts vs staging, admins readable,
+≥1 Super Admin, GL debit/credit within 0.01, orphan FK checks, cross-country integrity, stock movement integrity,
+warehouse_variant_stock consistency, FIFO layer integrity, no forbidden negative quantities, uploads tree exists,
+required referenced uploads on disk, live uploads checksum vs uploads_next manifest, no staging identity leak,
+package/staging/rollback bindings unchanged. Informational: maintenance verified during validation.
+
+**Reports (no secrets):** `{restore_work}/{job_id}/production_post_validation.json`,
+`final_restore_report.json` — job/package/anchor identity, schema revision, table/critical counts, GL/inventory/uploads
+results, hard failures, warnings, overall_result, timestamps, duration.
+
+**Rollback policy:** Manual only. Super Admin + backup_restore_full + password re-auth + exact phrase `ROLLBACK`.
+Source = **this job's Stage-3 fresh full disaster backup only** (`fresh_backup_path` + checksum on job;
+`rollback_anchor_job_only=true`). Forbidden: operator-selected older backup, latest-backup lookup, arbitrary package,
+another job's anchor. Entry states: failed_merge, failed_post_merge, database_cutover_complete,
+uploads_first_rename_complete, uploads_second_rename_pending, uploads_cutover_complete, production_merged,
+rollback_in_progress (resume). Not from completed or rolled_back.
+
+**Rollback execution:** DB — merge credentials, wipe production schema, import anchor dump only, production identity
+fence. Uploads — prefer `uploads_pre_merge_{job_id}` rename reversal; else anchor uploads zip verified against
+pre_merge_uploads_snapshot when present. Both DB + uploads before rolled_back. Maintenance stays active on
+rollback_failed; disabled only after rollback post-validation passes.
+
+**Rollback checkpoints (persisted on job):** rollback_precheck_passed, rollback_database_pending,
+rollback_database_complete, rollback_uploads_pending, rollback_uploads_complete, rollback_validation_passed, rolled_back.
+
+**Audit (append-only):** production_post_validation_started/passed/failed, maintenance_disabled, restore_completed;
+rollback_precheck_started/passed, rollback_started, rollback_database_started/completed, rollback_uploads_started/completed,
+rollback_validation_started/passed/failed, rollback_completed, rollback_failed.
+
+**NOT in 2D.4:** Country Production Merge, end-to-end restore wrapper, Admin UI, restore APIs, automatic/scheduled
+restore, schema changes.
+
+================================================================================
 Phase 2D.1 — Full production merge remaining cutover (ARCHITECTURE APPROVED — PARTIAL)
 ================================================================================
 
-**Status:** Database cutover (2D.2) and **uploads cutover (2D.3)** are **implemented**. **Rollback execution,
-post-validation, and full end-to-end merge CLI remain not implemented.**
+**Status:** Database cutover (2D.2), uploads cutover (2D.3), and **post-validation + manual rollback (2D.4)** are
+**implemented**. **Full end-to-end merge CLI wrapper and Country Production Merge remain not implemented.**
 
 **Goal:** Promote a job in `approved_for_merge` to production (`production_merged` →
 post-validation → `completed`) using CLI-first orchestration only. Country merge remains
