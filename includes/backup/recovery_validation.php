@@ -5,12 +5,66 @@ declare(strict_types=1);
 require_once __DIR__ . '/backup_full.php';
 require_once __DIR__ . '/backup_validate.php';
 
-const ORANGE_RECOVERY_VALIDATION_ENGINE_VERSION = '1.0';
+const ORANGE_RECOVERY_VALIDATION_ENGINE_VERSION = '1.1';
 const ORANGE_RECOVERY_VALIDATION_REPORT_FILE = 'recovery_validation.json';
 const ORANGE_RECOVERY_VALIDATION_EXPECTED_SCHEMA_REVISION = 121;
 const ORANGE_RECOVERY_VALIDATION_EXPECTED_REGISTRY_VERSION = '1.0';
 const ORANGE_RECOVERY_VALIDATION_PACKAGE_TYPE_FULL = 'full_disaster';
 const ORANGE_RECOVERY_VALIDATION_PACKAGE_TYPE_CRP = 'country_recovery';
+const ORANGE_RECOVERY_VALIDATION_GZIP_HEAD_BYTES = 65536;
+const ORANGE_RECOVERY_VALIDATION_GZIP_TAIL_BYTES = 262144;
+const ORANGE_RECOVERY_VALIDATION_TIMEOUT_MANIFEST = 15;
+const ORANGE_RECOVERY_VALIDATION_TIMEOUT_HEALTH = 15;
+const ORANGE_RECOVERY_VALIDATION_TIMEOUT_CHECKSUMS = 300;
+const ORANGE_RECOVERY_VALIDATION_TIMEOUT_GZIP_SQL = 120;
+const ORANGE_RECOVERY_VALIDATION_TIMEOUT_ZIP = 60;
+const ORANGE_RECOVERY_VALIDATION_TIMEOUT_CRP_SQL = 90;
+const ORANGE_RECOVERY_VALIDATION_FULL_DUMP_POSTAMBLE = 'SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;';
+
+function orange_recovery_validation_log(string $message): void
+{
+    if (PHP_SAPI !== 'cli') {
+        return;
+    }
+    fwrite(STDOUT, $message . PHP_EOL);
+    if (function_exists('fflush')) {
+        fflush(STDOUT);
+    }
+}
+
+function orange_recovery_validation_deadline(int $timeoutSeconds): float
+{
+    return microtime(true) + max(1, $timeoutSeconds);
+}
+
+function orange_recovery_validation_timeout_error(float $deadline, string $stage): ?string
+{
+    if (microtime(true) <= $deadline) {
+        return null;
+    }
+
+    return $stage . ': validation stage timed out';
+}
+
+function orange_recovery_validation_begin_stage(string $stage, int $timeoutSeconds): float
+{
+    orange_recovery_validation_log($stage . '...');
+    if (PHP_SAPI === 'cli') {
+        @set_time_limit(max(30, $timeoutSeconds + 10));
+    }
+
+    return orange_recovery_validation_deadline($timeoutSeconds);
+}
+
+function orange_recovery_validation_end_stage(string $stage, bool $ok, ?string $detail = null): void
+{
+    if ($detail !== null && $detail !== '') {
+        orange_recovery_validation_log($stage . '... ' . ($ok ? 'OK' : 'FAIL') . ' (' . $detail . ')');
+
+        return;
+    }
+    orange_recovery_validation_log($stage . '... ' . ($ok ? 'OK' : 'FAIL'));
+}
 
 /**
  * @return array{ok:bool,data:?array<string,mixed>,errors:list<string>}
@@ -260,47 +314,163 @@ function orange_recovery_validate_sql_text(string $sqlText, string $label): arra
 }
 
 /**
- * @return array{ok:bool,errors:list<string>,warnings:list<string>,create_table_count:int,insert_count:int}
+ * Stream-decompress gzip SQL for full disaster packages.
+ * Validates integrity using head/tail windows only — never loads multi-GB dumps into memory.
+ *
+ * @return array{ok:bool,errors:list<string>,warnings:list<string>,create_table_count:int,insert_count:int,decompressed_bytes:int}
  */
-function orange_recovery_validate_gzip_sql_file(string $path, string $label): array
+function orange_recovery_validate_gzip_sql_file(string $path, string $label, ?float $deadline = null): array
 {
     if (!is_file($path)) {
-        return ['ok' => false, 'errors' => [$label . ': gzip SQL file missing'], 'warnings' => [], 'create_table_count' => 0, 'insert_count' => 0];
+        return ['ok' => false, 'errors' => [$label . ': gzip SQL file missing'], 'warnings' => [], 'create_table_count' => 0, 'insert_count' => 0, 'decompressed_bytes' => 0];
     }
     if (!function_exists('gzopen')) {
-        return ['ok' => false, 'errors' => [$label . ': gzopen unavailable'], 'warnings' => [], 'create_table_count' => 0, 'insert_count' => 0];
+        return ['ok' => false, 'errors' => [$label . ': gzopen unavailable'], 'warnings' => [], 'create_table_count' => 0, 'insert_count' => 0, 'decompressed_bytes' => 0];
     }
+    if ($deadline === null) {
+        $deadline = orange_recovery_validation_deadline(ORANGE_RECOVERY_VALIDATION_TIMEOUT_GZIP_SQL);
+    }
+
     $handle = @gzopen($path, 'rb');
     if ($handle === false) {
-        return ['ok' => false, 'errors' => [$label . ': gzip integrity check failed (cannot open)'], 'warnings' => [], 'create_table_count' => 0, 'insert_count' => 0];
+        return ['ok' => false, 'errors' => [$label . ': gzip integrity check failed (cannot open)'], 'warnings' => [], 'create_table_count' => 0, 'insert_count' => 0, 'decompressed_bytes' => 0];
     }
-    $content = '';
+
+    $head = '';
+    $tail = '';
+    $createCount = 0;
+    $insertCount = 0;
+    $totalBytes = 0;
+    $errors = [];
+    $warnings = [];
+
     while (!gzeof($handle)) {
+        $timeoutError = orange_recovery_validation_timeout_error($deadline, $label . ' gzip stream');
+        if ($timeoutError !== null) {
+            gzclose($handle);
+
+            return ['ok' => false, 'errors' => [$timeoutError], 'warnings' => $warnings, 'create_table_count' => $createCount, 'insert_count' => $insertCount, 'decompressed_bytes' => $totalBytes];
+        }
+
         $chunk = gzread($handle, 65536);
         if ($chunk === false) {
             gzclose($handle);
 
-            return ['ok' => false, 'errors' => [$label . ': gzip integrity check failed (corrupt stream)'], 'warnings' => [], 'create_table_count' => 0, 'insert_count' => 0];
+            return ['ok' => false, 'errors' => [$label . ': gzip integrity check failed (corrupt stream)'], 'warnings' => $warnings, 'create_table_count' => $createCount, 'insert_count' => $insertCount, 'decompressed_bytes' => $totalBytes];
         }
-        $content .= $chunk;
+        if ($chunk === '') {
+            continue;
+        }
+
+        if (preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $chunk) === 1) {
+            gzclose($handle);
+
+            return ['ok' => false, 'errors' => [$label . ': SQL contains binary/control characters'], 'warnings' => $warnings, 'create_table_count' => $createCount, 'insert_count' => $insertCount, 'decompressed_bytes' => $totalBytes];
+        }
+
+        $chunkLen = strlen($chunk);
+        $totalBytes += $chunkLen;
+        $createCount += preg_match_all('/^\s*CREATE\s+TABLE\b/im', $chunk) ?: 0;
+        $insertCount += preg_match_all('/^\s*INSERT\s+INTO\b/im', $chunk) ?: 0;
+
+        if (strlen($head) < ORANGE_RECOVERY_VALIDATION_GZIP_HEAD_BYTES) {
+            $head .= substr($chunk, 0, ORANGE_RECOVERY_VALIDATION_GZIP_HEAD_BYTES - strlen($head));
+        }
+
+        $tail = strlen($tail) + $chunkLen > ORANGE_RECOVERY_VALIDATION_GZIP_TAIL_BYTES
+            ? substr($tail . $chunk, -ORANGE_RECOVERY_VALIDATION_GZIP_TAIL_BYTES)
+            : $tail . $chunk;
     }
     gzclose($handle);
-    $analysis = orange_recovery_validate_sql_text($content, $label);
+
+    if ($totalBytes === 0) {
+        $warnings[] = $label . ': SQL payload is empty';
+
+        return ['ok' => true, 'errors' => [], 'warnings' => $warnings, 'create_table_count' => 0, 'insert_count' => 0, 'decompressed_bytes' => 0];
+    }
+
+    if (!mb_check_encoding($head, 'UTF-8') || !mb_check_encoding($tail, 'UTF-8')) {
+        $errors[] = $label . ': SQL is not valid UTF-8';
+    }
+
+    if (
+        $head !== ''
+        && preg_match('/CREATE\s+TABLE|INSERT\s+INTO|-- Orange Phase 1A PDO SQL export/mi', $head) !== 1
+    ) {
+        $warnings[] = $label . ': SQL head missing expected export markers';
+    }
+
+    $completenessError = null;
+    if (str_contains($tail, ORANGE_RECOVERY_VALIDATION_FULL_DUMP_POSTAMBLE)) {
+        $completenessError = orange_recovery_validate_sql_completeness($tail, $label);
+    } else {
+        $completenessError = orange_recovery_validate_sql_completeness($tail, $label);
+        if ($completenessError === null) {
+            $warnings[] = $label . ': SQL tail missing PDO export postamble marker';
+        }
+    }
+    if ($completenessError !== null) {
+        $errors[] = $label . ': ' . $completenessError;
+    }
 
     return [
-        'ok' => $analysis['errors'] === [],
-        'errors' => $analysis['errors'],
-        'warnings' => $analysis['warnings'],
-        'create_table_count' => $analysis['create_table_count'],
-        'insert_count' => $analysis['insert_count'],
+        'ok' => $errors === [],
+        'errors' => $errors,
+        'warnings' => $warnings,
+        'create_table_count' => $createCount,
+        'insert_count' => $insertCount,
+        'decompressed_bytes' => $totalBytes,
     ];
+}
+
+/**
+ * @return array{ok:bool,errors:list<string>}
+ */
+function orange_recovery_validate_checksums(string $packageRoot, float $deadline): array
+{
+    $checksumFile = $packageRoot . DIRECTORY_SEPARATOR . 'checksums.sha256';
+    if (!is_file($checksumFile)) {
+        return ['ok' => false, 'errors' => ['Missing checksums.sha256']];
+    }
+    $errors = [];
+    $lines = file($checksumFile, FILE_IGNORE_NEW_LINES);
+    if ($lines === false) {
+        return ['ok' => false, 'errors' => ['Cannot read checksums.sha256']];
+    }
+    foreach ($lines as $line) {
+        $timeoutError = orange_recovery_validation_timeout_error($deadline, 'Checksums');
+        if ($timeoutError !== null) {
+            return ['ok' => false, 'errors' => [$timeoutError]];
+        }
+        $line = trim((string) $line);
+        if ($line === '') {
+            continue;
+        }
+        if (!preg_match('/^([a-f0-9]{64})\s{2}(.+)$/', $line, $m)) {
+            $errors[] = 'Invalid checksum line: ' . $line;
+            continue;
+        }
+        $expected = $m[1];
+        $rel = $m[2];
+        $abs = $packageRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel);
+        if (!is_file($abs)) {
+            $errors[] = 'Missing file referenced in checksums: ' . $rel;
+            continue;
+        }
+        $actual = orange_backup_sha256_file($abs);
+        if (!hash_equals($expected, $actual)) {
+            $errors[] = 'Checksum mismatch: ' . $rel;
+        }
+    }
+
+    return ['ok' => $errors === [], 'errors' => $errors];
 }
 
 /**
  * @param list<string> $sqlFiles
  * @return array{ok:bool,errors:list<string>,warnings:list<string>,create_table_count:int,insert_count:int}
  */
-function orange_recovery_validate_sql_files(array $sqlFiles, string $labelPrefix): array
+function orange_recovery_validate_sql_files(array $sqlFiles, string $labelPrefix, ?float $deadline = null): array
 {
     $errors = [];
     $warnings = [];
@@ -309,7 +479,15 @@ function orange_recovery_validate_sql_files(array $sqlFiles, string $labelPrefix
     if ($sqlFiles === []) {
         return ['ok' => false, 'errors' => [$labelPrefix . ': no SQL files found'], 'warnings' => [], 'create_table_count' => 0, 'insert_count' => 0];
     }
+    if ($deadline === null) {
+        $deadline = orange_recovery_validation_deadline(ORANGE_RECOVERY_VALIDATION_TIMEOUT_CRP_SQL);
+    }
     foreach ($sqlFiles as $sqlFile) {
+        $timeoutError = orange_recovery_validation_timeout_error($deadline, $labelPrefix . ' SQL files');
+        if ($timeoutError !== null) {
+            $errors[] = $timeoutError;
+            break;
+        }
         if (!is_file($sqlFile)) {
             $errors[] = $labelPrefix . ': missing SQL file ' . basename($sqlFile);
             continue;
@@ -338,10 +516,13 @@ function orange_recovery_validate_sql_files(array $sqlFiles, string $labelPrefix
 /**
  * @return array{ok:bool,errors:list<string>,warnings:list<string>,entry_count:int}
  */
-function orange_recovery_validate_zip_archive(string $zipPath, string $label): array
+function orange_recovery_validate_zip_archive(string $zipPath, string $label, ?float $deadline = null): array
 {
     $errors = [];
     $warnings = [];
+    if ($deadline === null) {
+        $deadline = orange_recovery_validation_deadline(ORANGE_RECOVERY_VALIDATION_TIMEOUT_ZIP);
+    }
     if (!is_file($zipPath)) {
         return ['ok' => false, 'errors' => [$label . ': ZIP file missing'], 'warnings' => [], 'entry_count' => 0];
     }
@@ -355,6 +536,12 @@ function orange_recovery_validate_zip_archive(string $zipPath, string $label): a
     }
     $entryCount = $zip->numFiles;
     for ($i = 0; $i < $entryCount; $i++) {
+        $timeoutError = orange_recovery_validation_timeout_error($deadline, $label . ' ZIP');
+        if ($timeoutError !== null) {
+            $zip->close();
+
+            return ['ok' => false, 'errors' => [$timeoutError], 'warnings' => $warnings, 'entry_count' => $entryCount];
+        }
         $name = (string) $zip->getNameIndex($i);
         if ($name === '') {
             continue;
@@ -480,8 +667,12 @@ function orange_recovery_compute_score(array $errors, array $warnings): array
  */
 function orange_recovery_validate_package(string $packagePath): array
 {
+    orange_recovery_validation_log('DRV validation START');
+
     $resolved = realpath($packagePath);
     if ($resolved === false || !is_dir($resolved)) {
+        orange_recovery_validation_end_stage('Package path', false);
+
         return orange_recovery_build_report('', 'unknown', null, null, [
             'errors' => ['Package path does not exist or is not a directory.'],
             'warnings' => [],
@@ -500,7 +691,10 @@ function orange_recovery_validate_package(string $packagePath): array
     $dependencyGraphValid = false;
     $registryValid = false;
 
+    $manifestDeadline = orange_recovery_validation_begin_stage('Manifest', ORANGE_RECOVERY_VALIDATION_TIMEOUT_MANIFEST);
     $manifestRead = orange_recovery_read_json_file($resolved . DIRECTORY_SEPARATOR . 'manifest.json', 'manifest.json');
+    orange_recovery_validation_end_stage('Manifest', $manifestRead['ok']);
+    orange_recovery_validation_timeout_error($manifestDeadline, 'Manifest');
     if (!$manifestRead['ok']) {
         return orange_recovery_build_report($resolved, 'unknown', null, null, [
             'errors' => $manifestRead['errors'],
@@ -535,10 +729,12 @@ function orange_recovery_validate_package(string $packagePath): array
         $errors = array_merge($errors, $secretViolations);
     }
 
+    $healthDeadline = orange_recovery_validation_begin_stage('Health', ORANGE_RECOVERY_VALIDATION_TIMEOUT_HEALTH);
     $healthRead = orange_recovery_read_json_file($resolved . DIRECTORY_SEPARATOR . 'health.json', 'health.json');
     $healthSemantics = ['errors' => [], 'warnings' => []];
     if (!$healthRead['ok']) {
         $errors = array_merge($errors, $healthRead['errors']);
+        orange_recovery_validation_end_stage('Health', false);
     } else {
         /** @var array<string, mixed> $health */
         $health = $healthRead['data'];
@@ -546,46 +742,75 @@ function orange_recovery_validate_package(string $packagePath): array
         $healthSemantics = orange_recovery_validate_health_semantics($health, $manifest, $packageType);
         $errors = array_merge($errors, $healthSemantics['errors']);
         $warnings = array_merge($warnings, $healthSemantics['warnings']);
+        orange_recovery_validation_end_stage('Health', $healthSemantics['errors'] === []);
     }
+    orange_recovery_validation_timeout_error($healthDeadline, 'Health');
 
-    $checksumVerify = orange_backup_verify_checksums($resolved);
+    $checksumDeadline = orange_recovery_validation_begin_stage('Checksums', ORANGE_RECOVERY_VALIDATION_TIMEOUT_CHECKSUMS);
+    $checksumVerify = orange_recovery_validate_checksums($resolved, $checksumDeadline);
     $checksumsValid = $checksumVerify['ok'];
     if (!$checksumVerify['ok']) {
         $errors = array_merge($errors, $checksumVerify['errors']);
     }
+    orange_recovery_validation_end_stage('Checksums', $checksumVerify['ok']);
 
     if ($packageType === ORANGE_RECOVERY_VALIDATION_PACKAGE_TYPE_FULL) {
+        $baseDeadline = orange_recovery_validation_begin_stage('Full package verify', ORANGE_RECOVERY_VALIDATION_TIMEOUT_MANIFEST);
         $baseVerify = orange_backup_verify_full_package($resolved);
         if (!$baseVerify['ok']) {
             $errors = array_merge($errors, $baseVerify['errors']);
         }
         $warnings = array_merge($warnings, $baseVerify['warnings']);
+        orange_recovery_validation_end_stage('Full package verify', $baseVerify['ok']);
+
         $dumpFile = (string) ($manifest['dump_file'] ?? '');
         $uploadsFile = (string) ($manifest['uploads_file'] ?? '');
         if ($dumpFile !== '') {
-            $gzipResult = orange_recovery_validate_gzip_sql_file($resolved . DIRECTORY_SEPARATOR . $dumpFile, 'full SQL dump');
+            $sqlDeadline = orange_recovery_validation_begin_stage('SQL dump', ORANGE_RECOVERY_VALIDATION_TIMEOUT_GZIP_SQL);
+            $gzipResult = orange_recovery_validate_gzip_sql_file(
+                $resolved . DIRECTORY_SEPARATOR . $dumpFile,
+                'full SQL dump',
+                $sqlDeadline
+            );
             $sqlValid = $gzipResult['ok'];
             $errors = array_merge($errors, $gzipResult['errors']);
             $warnings = array_merge($warnings, $gzipResult['warnings']);
+            orange_recovery_validation_end_stage(
+                'SQL dump',
+                $gzipResult['ok'],
+                'decompressed_bytes=' . (string) ($gzipResult['decompressed_bytes'] ?? 0)
+            );
         } else {
             $errors[] = 'manifest.dump_file missing';
+            orange_recovery_validation_log('SQL dump... FAIL (missing manifest.dump_file)');
         }
         if ($uploadsFile !== '') {
-            $zipResult = orange_recovery_validate_zip_archive($resolved . DIRECTORY_SEPARATOR . $uploadsFile, 'full uploads archive');
+            $zipDeadline = orange_recovery_validation_begin_stage('Uploads ZIP', ORANGE_RECOVERY_VALIDATION_TIMEOUT_ZIP);
+            $zipResult = orange_recovery_validate_zip_archive(
+                $resolved . DIRECTORY_SEPARATOR . $uploadsFile,
+                'full uploads archive',
+                $zipDeadline
+            );
             $uploadsValid = $zipResult['ok'];
             $errors = array_merge($errors, $zipResult['errors']);
             $warnings = array_merge($warnings, $zipResult['warnings']);
+            orange_recovery_validation_end_stage('Uploads ZIP', $zipResult['ok'], 'entries=' . (string) ($zipResult['entry_count'] ?? 0));
         } else {
             $errors[] = 'manifest.uploads_file missing';
+            orange_recovery_validation_log('Uploads ZIP... FAIL (missing manifest.uploads_file)');
         }
         $dependencyGraphValid = true;
         $registryValid = true;
     } elseif ($packageType === ORANGE_RECOVERY_VALIDATION_PACKAGE_TYPE_CRP) {
+        $baseDeadline = orange_recovery_validation_begin_stage('CRP package verify', ORANGE_RECOVERY_VALIDATION_TIMEOUT_MANIFEST);
         $baseVerify = orange_country_export_verify_package($resolved);
         if (!$baseVerify['ok']) {
             $errors = array_merge($errors, $baseVerify['errors']);
         }
         $warnings = array_merge($warnings, $baseVerify['warnings']);
+        orange_recovery_validation_end_stage('CRP package verify', $baseVerify['ok']);
+        orange_recovery_validation_timeout_error($baseDeadline, 'CRP package verify');
+
         $registryVersion = trim((string) ($manifest['registry_version'] ?? ''));
         if ($registryVersion === '') {
             $errors[] = 'manifest.registry_version missing (CRP)';
@@ -595,28 +820,45 @@ function orange_recovery_validate_package(string $packagePath): array
         } else {
             $registryValid = true;
         }
+        $dependencyDeadline = orange_recovery_validation_begin_stage('Dependency graph', ORANGE_RECOVERY_VALIDATION_TIMEOUT_MANIFEST);
         $dependencyRead = orange_recovery_read_json_file($resolved . DIRECTORY_SEPARATOR . 'dependency_graph.json', 'dependency_graph.json');
         if (!$dependencyRead['ok']) {
             $errors = array_merge($errors, $dependencyRead['errors']);
+            orange_recovery_validation_end_stage('Dependency graph', false);
         } else {
             $dependencyGraphValid = true;
+            orange_recovery_validation_end_stage('Dependency graph', true);
         }
+        orange_recovery_validation_timeout_error($dependencyDeadline, 'Dependency graph');
+
+        $idSnapshotDeadline = orange_recovery_validation_begin_stage('ID snapshot', ORANGE_RECOVERY_VALIDATION_TIMEOUT_MANIFEST);
         $idSnapshotRead = orange_recovery_read_json_file($resolved . DIRECTORY_SEPARATOR . 'id_snapshot.json', 'id_snapshot.json');
         if (!$idSnapshotRead['ok']) {
             $errors = array_merge($errors, $idSnapshotRead['errors']);
+            orange_recovery_validation_end_stage('ID snapshot', false);
         } elseif ((int) ($idSnapshotRead['data']['country_id'] ?? -1) !== (int) ($manifest['country_id'] ?? -2)) {
             $errors[] = 'id_snapshot.country_id mismatch with manifest';
+            orange_recovery_validation_end_stage('ID snapshot', false);
+        } else {
+            orange_recovery_validation_end_stage('ID snapshot', true);
         }
+        orange_recovery_validation_timeout_error($idSnapshotDeadline, 'ID snapshot');
+
         $sqlFiles = glob($resolved . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR . '*.sql') ?: [];
-        $sqlResult = orange_recovery_validate_sql_files($sqlFiles, 'CRP SQL');
+        $sqlDeadline = orange_recovery_validation_begin_stage('CRP SQL', ORANGE_RECOVERY_VALIDATION_TIMEOUT_CRP_SQL);
+        $sqlResult = orange_recovery_validate_sql_files($sqlFiles, 'CRP SQL', $sqlDeadline);
         $sqlValid = $sqlResult['ok'];
         $errors = array_merge($errors, $sqlResult['errors']);
         $warnings = array_merge($warnings, $sqlResult['warnings']);
+        orange_recovery_validation_end_stage('CRP SQL', $sqlResult['ok'], 'files=' . (string) count($sqlFiles));
+
+        $zipDeadline = orange_recovery_validation_begin_stage('CRP uploads ZIP', ORANGE_RECOVERY_VALIDATION_TIMEOUT_ZIP);
         $uploadZip = $resolved . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip';
-        $zipResult = orange_recovery_validate_zip_archive($uploadZip, 'CRP uploads archive');
+        $zipResult = orange_recovery_validate_zip_archive($uploadZip, 'CRP uploads archive', $zipDeadline);
         $uploadsValid = $zipResult['ok'];
         $errors = array_merge($errors, $zipResult['errors']);
         $warnings = array_merge($warnings, $zipResult['warnings']);
+        orange_recovery_validation_end_stage('CRP uploads ZIP', $zipResult['ok'], 'entries=' . (string) ($zipResult['entry_count'] ?? 0));
     }
 
     $errors = array_values(array_unique($errors));
@@ -626,6 +868,8 @@ function orange_recovery_validate_package(string $packagePath): array
         static fn (string $e): bool => str_contains($e, 'manifest')
     );
     $healthValid = $healthRead['ok'] && $healthSemantics['errors'] === [];
+
+    orange_recovery_validation_log('DRV validation END');
 
     return orange_recovery_build_report($resolved, $packageType, $manifest, $health, [
         'errors' => $errors,

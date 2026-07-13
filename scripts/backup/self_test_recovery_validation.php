@@ -47,7 +47,12 @@ function drv_temp_dir(): array
  */
 function drv_write_full_package(string $dir, array $overrides = []): void
 {
-    $sql = "CREATE TABLE demo (id INT PRIMARY KEY);\nINSERT INTO demo VALUES (1);\n";
+    $sql = "-- Orange Phase 1A PDO SQL export\n"
+        . "CREATE TABLE demo (id INT PRIMARY KEY);\n"
+        . "INSERT INTO demo VALUES (1);\n"
+        . "SET TIME_ZONE=@OLD_TIME_ZONE;\n"
+        . "SET SQL_MODE=@OLD_SQL_MODE;\n"
+        . "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;\n";
     $dumpPath = $dir . DIRECTORY_SEPARATOR . 'orange_db.sql.gz';
     $out = gzopen($dumpPath, 'wb9');
     gzwrite($out, $sql);
@@ -319,5 +324,24 @@ $crpInfoScore = orange_recovery_compute_score([], [
     'informational: routine maintenance note',
 ]);
 drv_self_test(($crpInfoScore['recovery_score'] ?? 0) >= 90, 'informational upload notes score band');
+
+$streamDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_drv_stream_' . bin2hex(random_bytes(4));
+mkdir($streamDir);
+$streamGz = $streamDir . DIRECTORY_SEPARATOR . 'large.sql.gz';
+$streamOut = gzopen($streamGz, 'wb9');
+$streamPayload = "-- Orange Phase 1A PDO SQL export\n";
+for ($i = 0; $i < 5000; $i++) {
+    $streamPayload .= "INSERT INTO demo VALUES (" . $i . ");\n";
+}
+$streamPayload .= "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;\n";
+gzwrite($streamOut, $streamPayload);
+gzclose($streamOut);
+$streamStart = microtime(true);
+$streamResult = orange_recovery_validate_gzip_sql_file($streamGz, 'stream SQL dump');
+$streamElapsed = microtime(true) - $streamStart;
+drv_self_test(($streamResult['ok'] ?? false) === true, 'gzip SQL streaming validation passes large dump');
+drv_self_test($streamElapsed < 5.0, 'gzip SQL streaming validation completes within 5 seconds');
+@unlink($streamGz);
+@rmdir($streamDir);
 
 exit($failures > 0 ? 1 : 0);
