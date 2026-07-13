@@ -809,7 +809,19 @@ function orange_restore_validation_adapter_production_required_uploads_check(
     $checked = 0;
     $referencedPaths = [];
 
-    $registry = orange_backup_registry_load($projectRoot);
+    try {
+        $registry = orange_backup_registry_load($projectRoot);
+    } catch (Throwable $e) {
+        return [
+            'ok' => false,
+            'verifiable' => false,
+            'no_uploads_required' => false,
+            'checked' => 0,
+            'missing' => [],
+            'warnings' => [],
+            'scan_errors' => ['Cannot load uploads registry: ' . $e->getMessage()],
+        ];
+    }
     $registryTables = is_array($registry['tables'] ?? null) ? $registry['tables'] : [];
     $uploadLinkedTables = [];
     foreach ($registryTables as $tableName => $meta) {
@@ -840,7 +852,7 @@ function orange_restore_validation_adapter_production_required_uploads_check(
 
     foreach ($uploadLinkedTables as $tableName) {
         if (!in_array($tableName, $productionTables, true)) {
-            $scanErrors[] = 'uploads-linked table missing from production: ' . $tableName;
+            $warnings[] = 'uploads-linked table absent from production schema, skipped: ' . $tableName;
             continue;
         }
 
