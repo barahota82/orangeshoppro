@@ -522,12 +522,49 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.2 section
 
 ---
 
-## Phase 2D.1 — Remaining Full Production Merge (uploads / rollback / post-validation — NOT IMPLEMENTED)
+## Phase 2D.3 — Production Uploads Cutover (IMPLEMENTED — uploads only)
 
-**Status:** Database cutover (Phase 2D.2) is **implemented**. Uploads cutover, rollback execution,
-and production post-validation remain **not implemented**.
+**Status:** Implemented (2026-07-13). Engine `2D.3-uploads-cutover`. Schema revision **121** unchanged.
 
-**Scope:** Remaining full-disaster merge steps after `database_cutover_complete`.
+**Scope:** Production **uploads** cutover only from job state `database_cutover_complete`.
+**No production DB writes, no rollback execution, no post-validation.**
+
+**Prerequisites (operator):**
+1. Job in `database_cutover_complete` (Phase 2D.2 database cutover completed)
+2. Global restore lock acquired by the cutover CLI process for this job
+3. Maintenance mode enabled and owned by this job
+4. `uploads_next/` prepared at project root, verified (`uploads_next_manifest.json` in job dir, `verified=true`, tree checksum matches staging uploads)
+
+**CLI:**
+
+```powershell
+php D:\orange\scripts\backup\restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N
+```
+
+**Pipeline:** pre-cutover gate revalidation → same-volume check → pre-merge uploads snapshot (checksum manifest) → verify snapshot → atomic directory renames (`uploads` → `uploads_pre_merge_{job}` ; `uploads_next` → `uploads`) → `uploads_cutover_complete`
+
+**Failure policy:**
+- Before any rename: production uploads unchanged; job stays `database_cutover_complete`
+- After first rename succeeds but second fails: job → `failed_merge`; maintenance remains active; pre-merge snapshot preserved; no automatic rollback/retry; production DB untouched
+
+**Audit (append-only):** `uploads_snapshot_started`, `uploads_snapshot_completed`, `uploads_cutover_started`, `uploads_cutover_complete`, `uploads_cutover_failed`
+
+**Self-test:**
+
+```powershell
+php D:\orange\scripts\backup\self_test_restore_uploads_cutover.php
+```
+
+Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.3 section)
+
+---
+
+## Phase 2D.1 — Remaining Full Production Merge (rollback / post-validation — NOT IMPLEMENTED)
+
+**Status:** Database cutover (Phase 2D.2) and uploads cutover (Phase 2D.3) are **implemented**.
+Rollback execution and production post-validation remain **not implemented**.
+
+**Scope:** Remaining full-disaster merge steps after `uploads_cutover_complete`.
 
 **Selected strategies (approved):**
 - **Database:** Validated staging export → controlled production replace (export staging DB to job artifact, then wipe + stream-import into production with 2B.1 SQL safety)
@@ -580,7 +617,8 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 |------|----------------|
 | Production merge foundation (precheck + maintenance + identity) | **Phase 2D.1 foundation implemented** |
 | Production database cutover (DB only) | **Phase 2D.2 implemented** |
-| Production merge uploads cutover + rollback + post-validation | Phase 2D.1 remaining — **not implemented** |
+| Production uploads cutover (uploads only) | **Phase 2D.3 implemented** |
+| Production merge rollback + post-validation | Phase 2D.1 remaining — **not implemented** |
 | Full production merge credentials (`ORANGE_RESTORE_MERGE_DB_*`) | **Owner policy §11 — required (foundation + cutover)** |
 | Uploads same-volume gate | **Owner policy §12 — required when 2D.1 implemented** |
 | Owner approval gate (`approved_for_merge`) | **Phase 2C implemented** |
@@ -604,6 +642,7 @@ php D:\orange\scripts\backup\self_test_restore_country_staging.php
 php D:\orange\scripts\backup\self_test_restore_approval.php
 php D:\orange\scripts\backup\self_test_restore_merge_foundation.php
 php D:\orange\scripts\backup\self_test_restore_database_cutover.php
+php D:\orange\scripts\backup\self_test_restore_uploads_cutover.php
 php D:\orange\scripts\backup\backup_environment_check.php
 php D:\orange\scripts\backup\validate_backup_recoverability.php --package=D:\orange_backups\snapshots\yyyy-MM-dd_HHmmss
 php D:\orange\scripts\backup\validate_registry.php --offline

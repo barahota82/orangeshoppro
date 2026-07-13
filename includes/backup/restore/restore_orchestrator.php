@@ -42,6 +42,8 @@ function orange_restore_orchestrator_job_status_report(string $workRoot, string 
         $approvalStatus = 'merge_started';
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE) {
         $approvalStatus = 'database_cutover_complete';
+    } elseif ($status === ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE) {
+        $approvalStatus = 'uploads_cutover_complete';
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE) {
         $approvalStatus = 'failed_merge';
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_CANCELLED) {
@@ -597,6 +599,7 @@ function orange_restore_orchestrator_merge_maintenance_verify(string $workRoot, 
 }
 
 require_once __DIR__ . '/restore_merge_db_cutover.php';
+require_once __DIR__ . '/restore_merge_uploads_cutover.php';
 
 /**
  * Phase 2D.2 — production database cutover (no uploads cutover).
@@ -607,4 +610,15 @@ require_once __DIR__ . '/restore_merge_db_cutover.php';
 function orange_restore_orchestrator_database_cutover(array $options): array
 {
     return orange_restore_merge_db_cutover_run($options);
+}
+
+/**
+ * Phase 2D.3 — production uploads cutover (no DB writes, no rollback, no post-validation).
+ *
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function orange_restore_orchestrator_uploads_cutover(array $options): array
+{
+    return orange_restore_merge_uploads_cutover_run($options);
 }

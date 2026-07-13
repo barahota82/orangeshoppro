@@ -279,10 +279,49 @@ database_cutover_started, database_cutover_complete, database_cutover_failed
 automatic restore, states beyond database_cutover_complete (except failed_merge).
 
 ================================================================================
-Phase 2D.1 — Full production merge remaining cutover (ARCHITECTURE APPROVED — NOT IMPLEMENTED)
+Phase 2D.3 deliverables (production uploads cutover only — no rollback/post-validation)
 ================================================================================
 
-**Status:** Database cutover (2D.2) is **implemented**. **Uploads cutover, rollback execution,
+**Status:** Implemented (2026-07-13). Engine version `2D.3-uploads-cutover`. Schema revision **121**
+unchanged. **Production uploads cutover only** — production database untouched, no rollback execution,
+no post-validation.
+
+CLI entry:
+  scripts/backup/restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N
+
+Modules:
+  includes/backup/restore/restore_merge_uploads_cutover.php
+  includes/backup/restore/restore_orchestrator.php (uploads cutover wrapper)
+  includes/backup/restore/restore_job.php (states uploads_cutover_complete, failed_merge from database_cutover_complete)
+  includes/backup/restore/restore_paths.php (uploads_next / pre_merge snapshot paths)
+
+Self-test:
+  scripts/backup/self_test_restore_uploads_cutover.php
+
+**Prerequisites:** Job `database_cutover_complete`; global restore lock held by current PID/job;
+maintenance mode **active and verified** for this job; `uploads_next/` prepared and verified under
+project root (same volume as live `uploads/`); `uploads_next_manifest.json` in job directory with
+`verified=true`, matching staging uploads tree checksum.
+
+**Workflow:**
+1. Re-verify cutover gates (lock, maintenance, rollback anchor, package checksum, uploads_next manifest)
+2. Same-volume check (`uploads/` vs `uploads_next/`) — abort fail-closed if not atomic-rename-safe
+3. Pre-merge uploads snapshot → `{restore_work}/{job_id}/pre_merge_uploads_snapshot/` (path, counts, checksum manifest)
+4. Verify snapshot against live `uploads/` before any rename
+5. Atomic directory renames only: `uploads` → `uploads_pre_merge_{job_id}` ; `uploads_next` → `uploads`
+6. Success → `uploads_cutover_complete`; failure after first rename → `failed_merge` (maintenance stays active; snapshot preserved; no auto-rollback/retry)
+
+**Audit (append-only, stage merge_uploads_cutover):** uploads_snapshot_started, uploads_snapshot_completed,
+uploads_cutover_started, uploads_cutover_complete, uploads_cutover_failed
+
+**NOT in 2D.3:** Rollback execution, production post-validation, Admin UI, restore APIs, automatic restore,
+building `uploads_next` (operator/pre-phase prepares it), schema changes, production DB writes.
+
+================================================================================
+Phase 2D.1 — Full production merge remaining cutover (ARCHITECTURE APPROVED — PARTIAL)
+================================================================================
+
+**Status:** Database cutover (2D.2) and **uploads cutover (2D.3)** are **implemented**. **Rollback execution,
 post-validation, and full end-to-end merge CLI remain not implemented.**
 
 **Goal:** Promote a job in `approved_for_merge` to production (`production_merged` →

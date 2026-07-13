@@ -297,7 +297,7 @@ function orange_restore_merge_db_cutover_run(array $options): array
             'uploads_touched' => false,
         ]));
 
-        $job = orange_restore_job_mark_failed_merge(
+        $job = orange_restore_job_mark_failed_merge_db_only(
             $workRoot,
             $jobId,
             'database_cutover',
