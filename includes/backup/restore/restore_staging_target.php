@@ -154,11 +154,13 @@ function orange_restore_staging_validate_grant_lines(array $grantLines, string $
         if ($grant === '') {
             continue;
         }
+
+        $isNoopGlobalUsageGrant = preg_match('/^\s*GRANT\s+USAGE\s+ON\s+\*\.\*\s+TO\b/i', $grant) === 1;
         if (
             stripos($grant, ' ON ' . $productionNeedle . '.') !== false
             || stripos($grant, ' ON ' . $productionNeedle . '.*') !== false
             || preg_match($productionPattern, $grant) === 1
-            || stripos($grant, ' ON *.*') !== false
+            || (!$isNoopGlobalUsageGrant && stripos($grant, ' ON *.*') !== false)
         ) {
             throw new RuntimeException(
                 'Staging DB user has detectable privilege on production schema ('

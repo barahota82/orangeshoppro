@@ -422,6 +422,17 @@ try {
     );
 }
 
+$usageGrantOk = true;
+try {
+    orange_restore_staging_validate_grant_lines(
+        ["GRANT USAGE ON *.* TO 'restore_staging'@'localhost'"],
+        $productionDbName
+    );
+} catch (Throwable) {
+    $usageGrantOk = false;
+}
+restore_staging_self_test($usageGrantOk, 'privilege fence: no-op global USAGE grant accepted');
+
 try {
     orange_restore_staging_validate_grant_lines(
         ["GRANT SELECT ON `{$productionDbName}`.* TO 'restore_staging'@'localhost'"],
