@@ -170,6 +170,30 @@ function orange_restore_job_assert_full_staging_transition(string $fromStatus, s
 }
 
 /**
+ * Country restore → staging uses the same lifecycle gates as full disaster staging.
+ *
+ * @return array<string, list<string>>
+ */
+function orange_restore_job_country_staging_transition_map(): array
+{
+    return orange_restore_job_full_staging_transition_map();
+}
+
+function orange_restore_job_assert_country_staging_transition(string $fromStatus, string $toStatus): void
+{
+    if ($toStatus === ORANGE_RESTORE_JOB_STATUS_FAILED || $toStatus === ORANGE_RESTORE_JOB_STATUS_CANCELLED) {
+        return;
+    }
+
+    $allowed = orange_restore_job_country_staging_transition_map()[$fromStatus] ?? [];
+    if (!in_array($toStatus, $allowed, true)) {
+        throw new RuntimeException(
+            'Invalid country-restore staging job transition: ' . $fromStatus . ' -> ' . $toStatus
+        );
+    }
+}
+
+/**
  * @param array<string, mixed> $patch
  * @return array<string, mixed>
  */
@@ -182,6 +206,8 @@ function orange_restore_job_transition(string $workRoot, string $jobId, string $
     $currentStatus = (string) ($job['status'] ?? '');
     if (($job['job_type'] ?? '') === ORANGE_RESTORE_JOB_TYPE_FULL) {
         orange_restore_job_assert_full_staging_transition($currentStatus, $newStatus);
+    } elseif (($job['job_type'] ?? '') === ORANGE_RESTORE_JOB_TYPE_COUNTRY) {
+        orange_restore_job_assert_country_staging_transition($currentStatus, $newStatus);
     }
     $job['status'] = $newStatus;
     foreach ($patch as $key => $value) {

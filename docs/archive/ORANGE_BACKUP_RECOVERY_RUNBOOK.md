@@ -286,8 +286,9 @@ php D:\orange\scripts\backup\self_test_recovery_validation.php
 | Approval + re-auth contracts | **Implemented** (no execution) |
 | Permissions `backup_restore_full` / `backup_restore_country` | **Implemented** (Super Admin + dedicated permission) |
 | Staging restore (full → staging) | **Implemented — Phase 2B.1 CLI only** |
+| Staging restore (country → staging) | **Implemented — Phase 2B.2 CLI only** |
 | Production merge | **Not implemented — Phase 2D** |
-| Country restore | **Not implemented — Phase 2B.2** |
+| Country restore | **Staging only — Phase 2B.2; merge Phase 2D.2** |
 | Admin restore UI | **Not implemented — Phase 3** |
 | DB table `restore_audit_log` | **Deferred** — first phase with actual restore ops |
 
@@ -360,13 +361,49 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2B.1 section
 
 ---
 
-## Deferred — Phase 2B+ and Phase 3
+## Phase 2B.2 — Country Recovery Restore → STAGING (CLI only)
+
+**Scope:** Restore a verified Country Recovery Package (CRP) into an **isolated staging database** and staging uploads under the restore work directory. **No production writes. No merge. No Admin UI.**
+
+**Package path:** `{ORANGE_BACKUP_ROOT}/country_packages/{country_code}/{timestamp}`
+
+**Prerequisites:** Same staging keys as Phase 2B.1 (`ORANGE_RESTORE_STAGING_DB`, `ORANGE_RESTORE_STAGING_DB_USER`, `ORANGE_RESTORE_STAGING_DB_PASS`).
+
+**Workflow:**
+
+1. Operator selects CRP path under `country_packages/{country_code}/{timestamp}`.
+2. CLI runs **CRP package verify** + **Phase 1C DRV** — abort unless `overall_result=pass`.
+3. CLI validates live **registry version** matches package and **dependency_graph.json** matches registry edges.
+4. CLI creates a **fresh full disaster backup** (Stage 3, mandatory) and records rollback anchor on the job — **no bypass flag.**
+5. CLI confirms staging target (dedicated credentials, privilege fence).
+6. CLI clears **only CRP tables** (registry `delete_order`) in staging, imports `sql/*.sql` chunks in **restore_order**, extracts `files/uploads_country.zip` to `{restore_work}/{job_id}/staging_uploads`.
+7. CLI runs **country staging post-validation** (ID preservation + row counts vs `id_snapshot.json` / `table_inventory.json`).
+8. Job status becomes `awaiting_owner_approval` — **production merge is not part of 2B.2.**
+
+**Command:**
+
+```powershell
+php D:\orange\scripts\backup\restore_country_to_staging.php --package=D:\orange_backups\country_packages\kw\yyyy-MM-dd_HHmmss
+```
+
+**Failure policy:** Production unchanged. `staging_dirty=true` after staging mutation. Rollback anchor preserved when Stage 3 succeeded. No automatic retry.
+
+**Self-test:**
+
+```powershell
+php D:\orange\scripts\backup\self_test_restore_country_staging.php
+```
+
+Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2B.2 section)
+
+---
+
+## Deferred — Phase 2C+ and Phase 3
 
 The following are **not part of Phase 1A / 1B** and must not be assumed available:
 
 | Item | Target phase |
 |------|----------------|
-| Country restore → staging | Phase 2B.2 |
 | Production merge | Phase 2D (gated by `ORANGE_RESTORE_OWNER_POLICY.txt`) |
 | Admin backup/restore UI wrapper | Phase 3 |
 | Dedicated permissions `backup_restore_full` / `backup_restore_country` | **Phase 2A implemented** |
@@ -383,6 +420,8 @@ php D:\orange\scripts\backup\self_test_backup_retention.php
 php D:\orange\scripts\backup\self_test_country_export.php
 php D:\orange\scripts\backup\self_test_country_batch_export.php
 php D:\orange\scripts\backup\self_test_recovery_validation.php
+php D:\orange\scripts\backup\self_test_restore_full_staging.php
+php D:\orange\scripts\backup\self_test_restore_country_staging.php
 php D:\orange\scripts\backup\backup_environment_check.php
 php D:\orange\scripts\backup\validate_backup_recoverability.php --package=D:\orange_backups\snapshots\yyyy-MM-dd_HHmmss
 php D:\orange\scripts\backup\validate_registry.php --offline

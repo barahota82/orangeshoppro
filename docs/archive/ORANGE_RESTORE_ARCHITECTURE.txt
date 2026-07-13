@@ -72,7 +72,7 @@ Phase 2A — Restore foundation (IMPLEMENTED — schema-free)
 - NO restore execution, NO DB audit table, NO staging, NO merge
 
 Phase 2B.1 — Full restore → staging CLI only (IMPLEMENTED)
-Phase 2B.2 — Country restore → staging CLI only
+Phase 2B.2 — Country restore → staging CLI only (IMPLEMENTED)
 Phase 2C — Approval + staging validation gate CLI
 Phase 2D.1 — Full production merge CLI
 Phase 2D.2 — Country production merge CLI
@@ -120,6 +120,41 @@ Self-test:
 - On any failure after staging wipe/import begins: `staging_dirty=true` on job, rollback anchor preserved if Stage 3 succeeded, exact `stage_failed` recorded, no automatic retry
 
 **NOT in 2B.1:** Country restore, production merge, Admin UI, restore APIs, automatic/scheduled restore, mysqldump routine import.
+
+================================================================================
+Phase 2B.2 deliverables (country recovery → staging only — no merge, no production)
+================================================================================
+
+CLI entry:
+  scripts/backup/restore_country_to_staging.php --package=PATH
+
+Orchestrator + modules:
+  includes/backup/restore/restore_country_staging.php
+  includes/backup/restore/restore_sql_runner.php (CRP chunk import)
+  includes/backup/restore/restore_validation_adapter.php (country pre/post check)
+  includes/backup/restore/restore_staging_target.php
+  includes/backup/restore/restore_fresh_backup_gate.php
+  includes/backup/restore/restore_uploads_applicator.php
+
+Self-test:
+  scripts/backup/self_test_restore_country_staging.php
+
+**Scope (2B.2 only):**
+- CLI-only country recovery package restore into isolated staging DB + staging uploads under restore work dir
+- Package path: `{BackupRoot}/country_packages/{country_code}/{timestamp}`
+- Pre-check: CRP verify + Phase 1C DRV with **overall_result=pass** (stricter than score-only)
+- Stage 3 fresh full disaster backup → rollback anchor on job (**mandatory — no bypass flag**)
+- Dedicated staging MySQL credentials — never production DB_USER / DB_PASS
+- SQL import: CRP `sql/*.sql` chunks only, ordered by registry **restore_order**, validated against package **dependency_graph.json** and live registry version
+- Never import global / excluded_ephemeral tables (forbidden-table scan on each chunk)
+- Preserves original IDs from package `id_snapshot.json`; post-restore ID + row-count validation
+- Uploads: extract `files/uploads_country.zip` into `{restore_work}/{job_id}/staging_uploads` only
+- Outputs: `staging_restore_manifest.json`, `restore_report.json` under job directory
+- Job lifecycle: enforced transitions through `awaiting_owner_approval` — **no production merge**
+
+**Failure policy:** production unchanged; `staging_dirty=true` after staging mutation begins; rollback anchor preserved if Stage 3 succeeded; no automatic retry.
+
+**NOT in 2B.2:** Production merge, full-disaster merge, Admin UI, restore APIs, automatic restore.
 
 ================================================================================
 Phase 2A deliverables (filesystem)
