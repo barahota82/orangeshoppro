@@ -211,6 +211,16 @@ function pvrb_seed_uploads_cutover_complete_job(string $entryStatus = ORANGE_RES
 
     $projectRoot = $backupRoot . DIRECTORY_SEPARATOR . 'project';
     mkdir($projectRoot);
+    pvrb_write_file(
+        $projectRoot . DIRECTORY_SEPARATOR . 'config.php',
+        "<?php\n"
+        . "if (!defined('DB_HOST')) { define('DB_HOST', 'localhost'); }\n"
+        . "if (!defined('DB_NAME')) { define('DB_NAME', 'orange_db'); }\n"
+    );
+    pvrb_write_file(
+        $projectRoot . DIRECTORY_SEPARATOR . '.env.php',
+        "<?php\nreturn ['DB_USER' => 'orange_test', 'DB_PASS' => 'orange_pass'];\n"
+    );
 
     $packageDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'pkg_' . bin2hex(random_bytes(2));
     mkdir($packageDir, 0775, true);
