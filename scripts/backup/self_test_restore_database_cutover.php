@@ -158,8 +158,10 @@ final class DbCutoverIdentityMockPdo extends PDO
         $this->grantLines = $grantLines !== [] ? $grantLines : db_cutover_mock_grant_lines($databaseName);
     }
 
-    public function query(string $query, ?int $fetchMode = null): PDOStatement|false
+    public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false
     {
+        unset($fetchMode, $fetchModeArgs);
+
         if (stripos($query, 'SHOW GRANTS') !== false) {
             return new DbCutoverGrantStatement($this->grantLines);
         }
@@ -195,8 +197,10 @@ final class DbCutoverProductionCutoverMockPdo extends PDO
         $this->driftAfterStatement = $driftAfterStatement;
     }
 
-    public function query(string $query, ?int $fetchMode = null): PDOStatement|false
+    public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false
     {
+        unset($fetchMode, $fetchModeArgs);
+
         if (stripos($query, 'SELECT DATABASE()') !== false) {
             return new DbCutoverScalarStatement($this->sessionDb);
         }
@@ -238,19 +242,21 @@ final class DbCutoverImportFailMockPdo extends DbCutoverProductionCutoverMockPdo
     }
 }
 
-final class DbCutoverScalarStatement
+final class DbCutoverScalarStatement extends PDOStatement
 {
     public function __construct(private mixed $value)
     {
     }
 
-    public function fetchColumn(): mixed
+    public function fetchColumn(int $column = 0): mixed
     {
+        unset($column);
+
         return $this->value;
     }
 }
 
-final class DbCutoverGrantStatement
+final class DbCutoverGrantStatement extends PDOStatement
 {
     public function __construct(private array $lines)
     {
@@ -258,8 +264,10 @@ final class DbCutoverGrantStatement
 
     private int $index = 0;
 
-    public function fetch(int $mode = PDO::FETCH_NUM): array|false
+    public function fetch(int $mode = PDO::FETCH_DEFAULT, int $cursorOrientation = PDO::FETCH_ORI_NEXT, int $cursorOffset = 0): mixed
     {
+        unset($mode, $cursorOrientation, $cursorOffset);
+
         if ($this->index >= count($this->lines)) {
             return false;
         }
@@ -268,15 +276,17 @@ final class DbCutoverGrantStatement
     }
 }
 
-final class DbCutoverEmptyStatement
+final class DbCutoverEmptyStatement extends PDOStatement
 {
-    public function fetch(int $mode = PDO::FETCH_NUM): array|false
+    public function fetch(int $mode = PDO::FETCH_DEFAULT, int $cursorOrientation = PDO::FETCH_ORI_NEXT, int $cursorOffset = 0): mixed
     {
+        unset($mode, $cursorOrientation, $cursorOffset);
+
         return false;
     }
 }
 
-final class DbCutoverTablesStatement
+final class DbCutoverTablesStatement extends PDOStatement
 {
     public function __construct(private array $tables)
     {
@@ -284,8 +294,10 @@ final class DbCutoverTablesStatement
 
     private int $index = 0;
 
-    public function fetch(int $mode = PDO::FETCH_NUM): array|false
+    public function fetch(int $mode = PDO::FETCH_DEFAULT, int $cursorOrientation = PDO::FETCH_ORI_NEXT, int $cursorOffset = 0): mixed
     {
+        unset($mode, $cursorOrientation, $cursorOffset);
+
         if ($this->index >= count($this->tables)) {
             return false;
         }

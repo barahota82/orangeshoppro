@@ -9,7 +9,7 @@ declare(strict_types=1);
  * maintenance mode enabled and verified for this job.
  *
  * Usage:
- *   php scripts/backup/restore_full_database_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
+ *   printf "%s\n" "SECRET" | php scripts/backup/restore_full_database_cutover.php --job=JOB_ID --admin-id=N --password-stdin --confirm=RESTORE
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -20,6 +20,8 @@ if (PHP_SAPI !== 'cli') {
 $jobId = '';
 $adminId = 0;
 $password = '';
+$passwordEnv = '';
+$passwordFromStdin = false;
 $confirmation = '';
 
 foreach ($_SERVER['argv'] ?? [] as $arg) {
@@ -27,15 +29,36 @@ foreach ($_SERVER['argv'] ?? [] as $arg) {
         $jobId = trim(substr($arg, strlen('--job=')));
     } elseif (str_starts_with($arg, '--admin-id=')) {
         $adminId = (int) substr($arg, strlen('--admin-id='));
+    } elseif ($arg === '--password-stdin') {
+        $passwordFromStdin = true;
+    } elseif (str_starts_with($arg, '--password-env=')) {
+        $passwordEnv = trim(substr($arg, strlen('--password-env=')));
     } elseif (str_starts_with($arg, '--password=')) {
-        $password = substr($arg, strlen('--password='));
+        fwrite(STDERR, "ERROR: --password=SECRET is not accepted. Use --password-stdin or --password-env=ENV_VAR.\n");
+        exit(2);
     } elseif (str_starts_with($arg, '--confirm=')) {
         $confirmation = substr($arg, strlen('--confirm='));
     }
 }
 
+if ($passwordFromStdin && $passwordEnv !== '') {
+    fwrite(STDERR, "ERROR: choose only one password source: --password-stdin or --password-env.\n");
+    exit(2);
+}
+if ($passwordFromStdin) {
+    $stdin = stream_get_contents(STDIN);
+    $password = rtrim(is_string($stdin) ? $stdin : '', "\r\n");
+} elseif ($passwordEnv !== '') {
+    if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $passwordEnv)) {
+        fwrite(STDERR, "ERROR: invalid --password-env variable name.\n");
+        exit(2);
+    }
+    $envPassword = getenv($passwordEnv);
+    $password = is_string($envPassword) ? $envPassword : '';
+}
+
 if ($jobId === '' || $adminId <= 0 || $password === '' || trim($confirmation) === '') {
-    fwrite(STDERR, "Usage: php restore_full_database_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE\n");
+    fwrite(STDERR, "Usage: php restore_full_database_cutover.php --job=JOB_ID --admin-id=N (--password-stdin|--password-env=ENV_VAR) --confirm=RESTORE\n");
     exit(2);
 }
 

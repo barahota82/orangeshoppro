@@ -248,7 +248,7 @@ Phase 2D.2 deliverables (production database cutover only — no uploads/rollbac
 unchanged. **Production DB cutover only** — uploads untouched, no rollback execution, no post-validation.
 
 CLI entry:
-  scripts/backup/restore_full_database_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
+  printf "%s\n" "SECRET" | php scripts/backup/restore_full_database_cutover.php --job=JOB_ID --admin-id=N --password-stdin --confirm=RESTORE
 
 Modules:
   includes/backup/restore/restore_merge_staging_export.php
