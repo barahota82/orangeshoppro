@@ -14,23 +14,22 @@ if (PHP_SAPI !== 'cli') {
     exit('CLI only');
 }
 
-$projectRoot = dirname(__DIR__, 2);
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'config.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_environment.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_runner.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_paths.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_job.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_lock.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_audit.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_approval.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_reauth.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_maintenance.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_staging_export.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_db_cutover.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_production_target.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_sql_runner.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'admin_permissions.php';
+$repoRoot = dirname(__DIR__, 2);
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_environment.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_runner.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_paths.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_job.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_lock.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_audit.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_approval.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_reauth.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_maintenance.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_staging_export.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_db_cutover.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_production_target.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_sql_runner.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'admin_permissions.php';
 
 $failures = 0;
 
@@ -72,6 +71,28 @@ function db_cutover_rmdir(string $dir): void
     @rmdir($dir);
 }
 
+function db_cutover_temp_project_root(): string
+{
+    $dir = db_cutover_temp_root();
+    file_put_contents($dir . DIRECTORY_SEPARATOR . 'config.php', implode("\n", [
+        '<?php',
+        'declare(strict_types=1);',
+        "if (!defined('DB_HOST')) { define('DB_HOST', 'localhost'); }",
+        "if (!defined('DB_NAME')) { define('DB_NAME', 'orange_db'); }",
+        '',
+    ]));
+    file_put_contents($dir . DIRECTORY_SEPARATOR . '.env.php', implode("\n", [
+        '<?php',
+        'return [',
+        "    'DB_USER' => 'orange_app',",
+        "    'DB_PASS' => 'app-pass',",
+        '];',
+        '',
+    ]));
+
+    return $dir;
+}
+
 function db_cutover_try(callable $fn): ?Throwable
 {
     try {
@@ -82,6 +103,11 @@ function db_cutover_try(callable $fn): ?Throwable
         return $e;
     }
 }
+
+$projectRoot = db_cutover_temp_project_root();
+register_shutdown_function(static function () use ($projectRoot): void {
+    db_cutover_rmdir($projectRoot);
+});
 
 function db_cutover_test_admin_pdo(): PDO
 {
@@ -158,8 +184,10 @@ final class DbCutoverIdentityMockPdo extends PDO
         $this->grantLines = $grantLines !== [] ? $grantLines : db_cutover_mock_grant_lines($databaseName);
     }
 
-    public function query(string $query, ?int $fetchMode = null): PDOStatement|false
+    public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false
     {
+        unset($fetchMode, $fetchModeArgs);
+
         if (stripos($query, 'SHOW GRANTS') !== false) {
             return new DbCutoverGrantStatement($this->grantLines);
         }
@@ -182,7 +210,7 @@ final class DbCutoverIdentityMockPdo extends PDO
     }
 }
 
-final class DbCutoverProductionCutoverMockPdo extends PDO
+class DbCutoverProductionCutoverMockPdo extends PDO
 {
     /** @var list<string> */
     public array $execLog = [];
@@ -195,8 +223,10 @@ final class DbCutoverProductionCutoverMockPdo extends PDO
         $this->driftAfterStatement = $driftAfterStatement;
     }
 
-    public function query(string $query, ?int $fetchMode = null): PDOStatement|false
+    public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false
     {
+        unset($fetchMode, $fetchModeArgs);
+
         if (stripos($query, 'SELECT DATABASE()') !== false) {
             return new DbCutoverScalarStatement($this->sessionDb);
         }
@@ -238,19 +268,21 @@ final class DbCutoverImportFailMockPdo extends DbCutoverProductionCutoverMockPdo
     }
 }
 
-final class DbCutoverScalarStatement
+final class DbCutoverScalarStatement extends PDOStatement
 {
     public function __construct(private mixed $value)
     {
     }
 
-    public function fetchColumn(): mixed
+    public function fetchColumn(int $column = 0): mixed
     {
+        unset($column);
+
         return $this->value;
     }
 }
 
-final class DbCutoverGrantStatement
+final class DbCutoverGrantStatement extends PDOStatement
 {
     public function __construct(private array $lines)
     {
@@ -258,8 +290,10 @@ final class DbCutoverGrantStatement
 
     private int $index = 0;
 
-    public function fetch(int $mode = PDO::FETCH_NUM): array|false
+    public function fetch(int $mode = PDO::FETCH_DEFAULT, int $cursorOrientation = PDO::FETCH_ORI_NEXT, int $cursorOffset = 0): mixed
     {
+        unset($mode, $cursorOrientation, $cursorOffset);
+
         if ($this->index >= count($this->lines)) {
             return false;
         }
@@ -268,15 +302,17 @@ final class DbCutoverGrantStatement
     }
 }
 
-final class DbCutoverEmptyStatement
+final class DbCutoverEmptyStatement extends PDOStatement
 {
-    public function fetch(int $mode = PDO::FETCH_NUM): array|false
+    public function fetch(int $mode = PDO::FETCH_DEFAULT, int $cursorOrientation = PDO::FETCH_ORI_NEXT, int $cursorOffset = 0): mixed
     {
+        unset($mode, $cursorOrientation, $cursorOffset);
+
         return false;
     }
 }
 
-final class DbCutoverTablesStatement
+final class DbCutoverTablesStatement extends PDOStatement
 {
     public function __construct(private array $tables)
     {
@@ -284,8 +320,10 @@ final class DbCutoverTablesStatement
 
     private int $index = 0;
 
-    public function fetch(int $mode = PDO::FETCH_NUM): array|false
+    public function fetch(int $mode = PDO::FETCH_DEFAULT, int $cursorOrientation = PDO::FETCH_ORI_NEXT, int $cursorOffset = 0): mixed
     {
+        unset($mode, $cursorOrientation, $cursorOffset);
+
         if ($this->index >= count($this->tables)) {
             return false;
         }
@@ -329,6 +367,7 @@ function db_cutover_seed_precheck_passed_job(bool $expiredWindow = false): array
     ]);
     $jobId = (string) $job['job_id'];
 
+    orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_VALIDATED);
     orange_restore_job_record_fresh_backup_anchor($workRoot, $jobId, $anchorDir, $anchorChecksum);
     orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_STAGING);
     orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED);

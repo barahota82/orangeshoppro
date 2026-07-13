@@ -501,7 +501,13 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.1 foundat
 **CLI:**
 
 ```powershell
-php D:\orange\scripts\backup\restore_full_database_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
+$Secure = Read-Host "Operator password" -AsSecureString
+$Ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Secure)
+try {
+  [Runtime.InteropServices.Marshal]::PtrToStringBSTR($Ptr) | php D:\orange\scripts\backup\restore_full_database_cutover.php --job=JOB_ID --admin-id=N --password-stdin --confirm=RESTORE
+} finally {
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Ptr)
+}
 ```
 
 **Pipeline:** cutover gate revalidation → merge-time re-auth → staging export to `merge_db_export.sql.gz` (verified) → `merge_started` → production schema wipe (merge credentials) → stream import → `database_cutover_complete`

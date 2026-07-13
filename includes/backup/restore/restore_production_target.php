@@ -123,21 +123,24 @@ function orange_restore_production_wipe(PDO $pdo, string $productionDb): void
     orange_restore_production_assert_identity($pdo, $productionDb);
     orange_restore_log('Production wipe... START');
     $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
-    $tables = [];
-    $st = $pdo->query('SHOW TABLES');
-    if ($st !== false) {
-        while ($row = $st->fetch(PDO::FETCH_NUM)) {
-            if (is_array($row) && isset($row[0])) {
-                $tables[] = (string) $row[0];
+    try {
+        $tables = [];
+        $st = $pdo->query('SHOW TABLES');
+        if ($st !== false) {
+            while ($row = $st->fetch(PDO::FETCH_NUM)) {
+                if (is_array($row) && isset($row[0])) {
+                    $tables[] = (string) $row[0];
+                }
             }
         }
+        foreach ($tables as $table) {
+            orange_restore_production_assert_identity($pdo, $productionDb);
+            $quoted = '`' . str_replace('`', '``', $table) . '`';
+            $pdo->exec('DROP TABLE IF EXISTS ' . $quoted);
+        }
+    } finally {
+        $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
     }
-    foreach ($tables as $table) {
-        orange_restore_production_assert_identity($pdo, $productionDb);
-        $quoted = '`' . str_replace('`', '``', $table) . '`';
-        $pdo->exec('DROP TABLE IF EXISTS ' . $quoted);
-    }
-    $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
     orange_restore_production_assert_identity($pdo, $productionDb);
     orange_restore_log('Production wipe... OK (tables=' . (string) count($tables) . ')');
 }
