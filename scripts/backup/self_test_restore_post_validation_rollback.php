@@ -154,13 +154,54 @@ function pvrb_create_anchor(string $backupRoot, string $suffix = ''): array
 {
     $anchorDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'anchor' . $suffix . '_' . bin2hex(random_bytes(2));
     mkdir($anchorDir, 0775, true);
-    pvrb_write_file($anchorDir . DIRECTORY_SEPARATOR . 'dump.sql.gz', 'fake-dump');
+
+    $dumpSql = "-- Orange Phase 1A PDO SQL export\n"
+        . "CREATE TABLE `pvrb_anchor` (`id` INT NOT NULL);\n"
+        . "INSERT INTO `pvrb_anchor` (`id`) VALUES (1);\n"
+        . "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;\n";
+    $dumpGz = gzencode($dumpSql);
+    if ($dumpGz === false) {
+        throw new RuntimeException('Cannot create test gzip dump.');
+    }
+    pvrb_write_file($anchorDir . DIRECTORY_SEPARATOR . 'dump.sql.gz', $dumpGz);
+
+    if (!class_exists('ZipArchive')) {
+        throw new RuntimeException('ZipArchive extension is required for restore rollback self-test anchor.');
+    }
+    $zip = new ZipArchive();
+    $zipPath = $anchorDir . DIRECTORY_SEPARATOR . 'uploads.zip';
+    if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        throw new RuntimeException('Cannot create test uploads.zip.');
+    }
+    $zip->addFromString('products/test.txt', 'fixture');
+    $zip->close();
+
+    orange_backup_write_json($anchorDir . DIRECTORY_SEPARATOR . 'health.json', [
+        'package_status' => 'healthy',
+        'failure_reasons' => [],
+        'warnings' => [],
+        'maintenance_notes' => [],
+    ]);
+
+    $dumpPath = $anchorDir . DIRECTORY_SEPARATOR . 'dump.sql.gz';
+    $uploadsPath = $anchorDir . DIRECTORY_SEPARATOR . 'uploads.zip';
     orange_backup_write_json($anchorDir . DIRECTORY_SEPARATOR . 'manifest.json', [
         'package_type' => 'full_disaster',
+        'package_version' => 'self-test',
+        'generated_at' => gmdate('c'),
+        'schema_revision' => 121,
         'dump_file' => 'dump.sql.gz',
-        'dump_sha256' => str_repeat('d', 64),
+        'uploads_file' => 'uploads.zip',
+        'dump_sha256' => hash_file('sha256', $dumpPath),
+        'uploads_sha256' => hash_file('sha256', $uploadsPath),
+        'dump_size_bytes' => filesize($dumpPath),
+        'uploads_size_bytes' => filesize($uploadsPath),
+        'backup_status' => 'healthy',
+        'health_report_file' => 'health.json',
+        'checksums_file' => 'checksums.sha256',
+        'export_backend' => 'php_pdo',
     ]);
-    orange_backup_write_checksums($anchorDir, ['manifest.json', 'dump.sql.gz']);
+    orange_backup_write_checksums($anchorDir, ['manifest.json', 'dump.sql.gz', 'uploads.zip', 'health.json']);
     $checksum = orange_backup_sha256_file($anchorDir . DIRECTORY_SEPARATOR . 'checksums.sha256');
 
     return ['path' => $anchorDir, 'checksum' => $checksum];
