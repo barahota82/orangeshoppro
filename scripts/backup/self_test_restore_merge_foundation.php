@@ -14,19 +14,18 @@ if (PHP_SAPI !== 'cli') {
     exit('CLI only');
 }
 
-$projectRoot = dirname(__DIR__, 2);
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'config.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_environment.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_paths.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_job.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_lock.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_audit.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_production_target.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_maintenance.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_approval.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_precheck.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_orchestrator.php';
+$repoRoot = dirname(__DIR__, 2);
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_environment.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_paths.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_job.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_lock.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_audit.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_production_target.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_maintenance.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_approval.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_precheck.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_orchestrator.php';
 
 $failures = 0;
 
@@ -68,6 +67,29 @@ function merge_foundation_rmdir(string $dir): void
     @rmdir($dir);
 }
 
+function merge_foundation_temp_project_root(): string
+{
+    $dir = merge_foundation_temp_root();
+    $config = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+if (!defined('DB_HOST')) {
+    define('DB_HOST', 'localhost');
+}
+if (!defined('DB_NAME')) {
+    define('DB_NAME', 'orange_db');
+}
+PHP;
+    file_put_contents($dir . DIRECTORY_SEPARATOR . 'config.php', $config);
+    file_put_contents(
+        $dir . DIRECTORY_SEPARATOR . '.env.php',
+        "<?php\nreturn ['DB_USER' => 'orange_app', 'DB_PASS' => 'app-pass'];\n"
+    );
+
+    return $dir;
+}
+
 /**
  * Minimal PDO stub for identity-only merge foundation tests.
  */
@@ -83,7 +105,7 @@ final class MergeFoundationIdentityMockPdo extends PDO
         ];
     }
 
-    public function query(string $query, ?int $fetchMode = null): PDOStatement|false
+    public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false
     {
         if (stripos($query, 'SHOW GRANTS') !== false) {
             return new MergeFoundationMockGrantStatement($this->grantLines);
@@ -99,19 +121,19 @@ final class MergeFoundationIdentityMockPdo extends PDO
     }
 }
 
-final class MergeFoundationMockScalarStatement
+final class MergeFoundationMockScalarStatement extends PDOStatement
 {
     public function __construct(private mixed $value)
     {
     }
 
-    public function fetchColumn(): mixed
+    public function fetchColumn(int $column = 0): mixed
     {
         return $this->value;
     }
 }
 
-final class MergeFoundationMockGrantStatement
+final class MergeFoundationMockGrantStatement extends PDOStatement
 {
     /** @var list<string> */
     private array $lines;
@@ -125,10 +147,11 @@ final class MergeFoundationMockGrantStatement
         $this->lines = $lines;
     }
 
-    /**
-     * @return list<mixed>|false
-     */
-    public function fetch(int $mode = PDO::FETCH_NUM): array|false
+    public function fetch(
+        int $mode = PDO::FETCH_DEFAULT,
+        int $cursorOrientation = PDO::FETCH_ORI_NEXT,
+        int $cursorOffset = 0
+    ): mixed
     {
         if ($this->index >= count($this->lines)) {
             return false;
@@ -193,6 +216,7 @@ function merge_foundation_seed_approved_job(bool $expiredWindow = false): array
     ]);
     $jobId = (string) $job['job_id'];
 
+    orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_VALIDATED);
     orange_restore_job_record_fresh_backup_anchor($workRoot, $jobId, $anchorDir, $anchorChecksum);
     orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_STAGING);
     orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED);
@@ -268,6 +292,8 @@ function merge_foundation_base_env(string $backupRoot): array
         'ORANGE_RESTORE_MERGE_DB_PASS' => 'merge-pass',
     ];
 }
+
+$projectRoot = merge_foundation_temp_project_root();
 
 // --- Credential fencing ---
 $envRoot = merge_foundation_temp_root();
@@ -603,5 +629,7 @@ try {
 } catch (Throwable $e) {
     merge_foundation_self_test(true, 'state: direct production_merged blocked');
 }
+
+merge_foundation_rmdir($projectRoot);
 
 exit($failures > 0 ? 1 : 0);
