@@ -109,7 +109,6 @@ function orange_restore_merge_rollback_resolve_uploads_action(string $projectRoo
     $uploadsDir = orange_restore_production_uploads_directory($projectRoot);
     $preMergeDir = orange_restore_uploads_pre_merge_directory($projectRoot, $jobId);
     $preMergeExists = is_dir($preMergeDir) || is_file($preMergeDir);
-    $uploadsExists = is_dir($uploadsDir) || is_file($uploadsDir);
 
     if ($preMergeExists) {
         return ['action' => 'rename_pre_merge', 'source' => 'uploads_pre_merge'];
@@ -130,6 +129,32 @@ function orange_restore_merge_rollback_atomic_rename(
     }
     if (!@rename($from, $to)) {
         throw new RuntimeException('Atomic directory rename failed: ' . $from . ' -> ' . $to);
+    }
+}
+
+/**
+ * When snapshot manifest exists, uploads tree must match verified pre-merge snapshot.
+ */
+function orange_restore_merge_rollback_verify_uploads_against_snapshot(
+    string $workRoot,
+    string $jobId,
+    string $uploadsDir
+): void {
+    $snapshotManifestPath = orange_restore_pre_merge_uploads_snapshot_manifest_path($workRoot, $jobId);
+    if (!is_file($snapshotManifestPath)) {
+        return;
+    }
+    $snapshotManifest = json_decode((string) file_get_contents($snapshotManifestPath), true);
+    if (!is_array($snapshotManifest)) {
+        throw new RuntimeException('pre_merge_uploads_snapshot manifest is invalid JSON.');
+    }
+    $liveInventory = orange_restore_uploads_tree_inventory($uploadsDir);
+    if ((int) ($snapshotManifest['file_count'] ?? -1) !== $liveInventory['file_count']
+        || !hash_equals(
+            (string) ($snapshotManifest['tree_checksum_sha256'] ?? ''),
+            $liveInventory['tree_checksum_sha256']
+        )) {
+        throw new RuntimeException('Rollback uploads tree does not match verified pre_merge_uploads_snapshot.');
     }
 }
 
@@ -332,6 +357,7 @@ function orange_restore_merge_rollback_run(array $options): array
             $uploadsAction = orange_restore_merge_rollback_resolve_uploads_action($projectRoot, $jobId);
             $uploadsDir = orange_restore_production_uploads_directory($projectRoot);
             $preMergeDir = orange_restore_uploads_pre_merge_directory($projectRoot, $jobId);
+            $uploadsRollbackOk = false;
 
             if (isset($options['uploads_rollback_override']) && is_callable($options['uploads_rollback_override'])) {
                 ($options['uploads_rollback_override'])([
@@ -339,6 +365,8 @@ function orange_restore_merge_rollback_run(array $options): array
                     'job_id' => $jobId,
                     'action' => $uploadsAction,
                 ]);
+                $uploadsRollbackOk = true;
+                $uploadsAction['source'] = 'test_override';
             } elseif ($uploadsAction['action'] === 'rename_pre_merge') {
                 orange_restore_uploads_fs_assert_atomic_rename_volume([$uploadsDir, $preMergeDir]);
 
@@ -350,8 +378,22 @@ function orange_restore_merge_rollback_run(array $options): array
                     orange_restore_merge_rollback_atomic_rename($uploadsDir, $trashDir, $renameOverride);
                 }
                 orange_restore_merge_rollback_atomic_rename($preMergeDir, $uploadsDir, $renameOverride);
+                orange_restore_merge_rollback_verify_uploads_against_snapshot($workRoot, $jobId, $uploadsDir);
                 $uploadsAction['source'] = 'uploads_pre_merge';
-            } elseif ($anchor['uploads_path'] !== '' && is_file($anchor['uploads_path'])) {
+                $uploadsRollbackOk = true;
+            } else {
+                $snapshotManifestPath = orange_restore_pre_merge_uploads_snapshot_manifest_path($workRoot, $jobId);
+                if ($anchor['uploads_path'] === '' || !is_file($anchor['uploads_path'])) {
+                    throw new RuntimeException(
+                        'No approved uploads rollback source: uploads_pre_merge missing and rollback anchor uploads file unavailable.'
+                    );
+                }
+                if (!is_file($snapshotManifestPath)) {
+                    throw new RuntimeException(
+                        'No approved uploads rollback source: verified pre_merge_uploads_snapshot manifest required when uploads_pre_merge is unavailable.'
+                    );
+                }
+
                 if (is_dir($uploadsDir)) {
                     $trashDir = dirname($uploadsDir) . DIRECTORY_SEPARATOR . 'uploads_rollback_trash_' . $jobId;
                     if (!is_dir($trashDir) && !is_file($trashDir)) {
@@ -366,29 +408,13 @@ function orange_restore_merge_rollback_run(array $options): array
                     throw new RuntimeException((string) ($extract['error'] ?? 'Rollback uploads extract failed.'));
                 }
 
-                $snapshotDir = orange_restore_pre_merge_uploads_snapshot_directory($workRoot, $jobId);
-                $snapshotManifestPath = orange_restore_pre_merge_uploads_snapshot_manifest_path($workRoot, $jobId);
-                if (is_file($snapshotManifestPath)) {
-                    $snapshotManifest = json_decode((string) file_get_contents($snapshotManifestPath), true);
-                    if (is_array($snapshotManifest)) {
-                        $liveInventory = orange_restore_uploads_tree_inventory($uploadsDir);
-                        if ((int) ($snapshotManifest['file_count'] ?? -1) !== $liveInventory['file_count']
-                            || !hash_equals(
-                                (string) ($snapshotManifest['tree_checksum_sha256'] ?? ''),
-                                $liveInventory['tree_checksum_sha256']
-                            )) {
-                            throw new RuntimeException(
-                                'Anchor uploads extract does not match pre_merge_uploads_snapshot verification.'
-                            );
-                        }
-                        $uploadsAction['source'] = 'pre_merge_uploads_snapshot_verified';
-                    }
-                } else {
-                    $uploadsAction['source'] = 'rollback_anchor_uploads';
-                }
-            } else {
-                orange_restore_log('Rollback uploads: no pre_merge and no anchor uploads file; skipping uploads mutation.');
-                $uploadsAction['source'] = 'skipped_no_source';
+                orange_restore_merge_rollback_verify_uploads_against_snapshot($workRoot, $jobId, $uploadsDir);
+                $uploadsAction['source'] = 'pre_merge_uploads_snapshot_verified';
+                $uploadsRollbackOk = true;
+            }
+
+            if (!$uploadsRollbackOk) {
+                throw new RuntimeException('Uploads rollback did not complete from an approved source.');
             }
 
             $job = orange_restore_job_write_rollback_checkpoint(

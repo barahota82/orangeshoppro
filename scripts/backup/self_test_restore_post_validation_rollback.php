@@ -30,6 +30,7 @@ require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR 
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_validation_adapter_production.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_post_validation.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_rollback.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_uploads_cutover.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'admin_permissions.php';
 
 $failures = 0;
@@ -271,6 +272,104 @@ function pvrb_prepare_runtime(array $seed): void
 {
     orange_restore_acquire_lock($seed['workRoot'], $seed['jobId']);
     orange_restore_merge_maintenance_enable($seed['workRoot'], $seed['jobId']);
+}
+
+function pvrb_copy_registry(string $projectRoot): void
+{
+    $src = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'backup_table_registry.json';
+    $destDir = $projectRoot . DIRECTORY_SEPARATOR . 'config';
+    if (!is_dir($destDir)) {
+        mkdir($destDir, 0775, true);
+    }
+    if (!copy($src, $destDir . DIRECTORY_SEPARATOR . 'backup_table_registry.json')) {
+        throw new RuntimeException('Cannot copy backup_table_registry.json for self-test project.');
+    }
+}
+
+function pvrb_sqlite_cross_country_pdo(bool $contaminated = false): PDO
+{
+    $pdo = new PDO('sqlite::memory:');
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+    $pdo->exec('INSERT INTO countries (id) VALUES (1), (2)');
+    $pdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, country_id INTEGER)');
+    if ($contaminated) {
+        $pdo->exec('INSERT INTO products (id, country_id) VALUES (1, 999)');
+    } else {
+        $pdo->exec('INSERT INTO products (id, country_id) VALUES (1, 1)');
+    }
+
+    return $pdo;
+}
+
+/**
+ * @param list<string> $productionTables
+ * @return array{passed:bool,gate:array<string,mixed>}
+ */
+function pvrb_eval_critical_row_gate(PDO $productionPdo, PDO $stagingPdo, array $productionTables, string $stagingDb): array
+{
+    $criticalRowChecks = [];
+    $criticalMismatch = false;
+    foreach (ORANGE_RESTORE_PRODUCTION_CRITICAL_TABLES as $tableName) {
+        if (!in_array($tableName, $productionTables, true)) {
+            $criticalMismatch = true;
+            $criticalRowChecks[] = [
+                'table' => $tableName,
+                'error' => 'Critical table missing from production schema.',
+                'ok' => false,
+            ];
+            continue;
+        }
+        $quoted = '`' . str_replace('`', '``', $tableName) . '`';
+        try {
+            orange_restore_staging_assert_safe_target($stagingPdo, $stagingDb);
+            $expectedCount = (int) ($stagingPdo->query('SELECT COUNT(*) FROM ' . $quoted)->fetchColumn() ?: 0);
+            $liveCount = (int) ($productionPdo->query('SELECT COUNT(*) FROM ' . $quoted)->fetchColumn() ?: 0);
+            $ok = $liveCount === $expectedCount;
+            $criticalRowChecks[] = [
+                'table' => $tableName,
+                'expected_rows' => $expectedCount,
+                'live_rows' => $liveCount,
+                'ok' => $ok,
+            ];
+            if (!$ok) {
+                $criticalMismatch = true;
+            }
+        } catch (Throwable $e) {
+            $criticalMismatch = true;
+            $criticalRowChecks[] = [
+                'table' => $tableName,
+                'error' => 'Critical table unreadable or staging compare failed: ' . $e->getMessage(),
+                'ok' => false,
+            ];
+        }
+    }
+    $gate = orange_restore_validation_adapter_production_gate(
+        'critical_row_counts',
+        ORANGE_RESTORE_PRODUCTION_GATE_HARD,
+        !$criticalMismatch && count($criticalRowChecks) === count(ORANGE_RESTORE_PRODUCTION_CRITICAL_TABLES),
+        !$criticalMismatch
+            ? 'Critical row counts match validated staging.'
+            : 'Critical row count validation failed (missing/unreadable/mismatch).',
+        ['checks' => $criticalRowChecks]
+    );
+
+    return ['passed' => (bool) ($gate['passed'] ?? false), 'gate' => $gate];
+}
+
+function pvrb_sqlite_critical_tables_pdo(bool $unreadableTable = false): PDO
+{
+    $pdo = new PDO('sqlite::memory:');
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    foreach (ORANGE_RESTORE_PRODUCTION_CRITICAL_TABLES as $tableName) {
+        if ($unreadableTable && $tableName === 'inventory_cost_layers') {
+            $pdo->exec('CREATE VIEW inventory_cost_layers AS SELECT id FROM __missing_inventory_cost_layers__');
+            continue;
+        }
+        $pdo->exec('CREATE TABLE ' . $tableName . ' (id INTEGER PRIMARY KEY)');
+    }
+
+    return $pdo;
 }
 
 // --- gate summarizer: warnings do not bypass hard failures ---
@@ -703,6 +802,209 @@ $rbEvents = array_column($auditRb, 'rollback_event');
 pvrb_self_test(in_array('rollback_completed', $rbEvents, true), 'rollback: rollback_completed audit event');
 orange_restore_release_lock($rbOk['workRoot']);
 pvrb_rmdir($rbOk['backupRoot']);
+
+orange_restore_release_lock($rbOk['workRoot']);
+pvrb_rmdir($rbOk['backupRoot']);
+
+// --- BLOCKER 1: maintenance hard gate during validation ---
+$maintGateSeed = pvrb_seed_uploads_cutover_complete_job();
+pvrb_prepare_runtime($maintGateSeed);
+$gateOk = orange_restore_validation_adapter_production_maintenance_hard_gate(
+    $maintGateSeed['workRoot'],
+    $maintGateSeed['jobId'],
+    'schema_and_counts'
+);
+pvrb_self_test(($gateOk['passed'] ?? false) === true, 'blocker1: maintenance hard gate passes when active');
+orange_restore_merge_maintenance_disable($maintGateSeed['workRoot'], $maintGateSeed['jobId']);
+$gateLost = orange_restore_validation_adapter_production_maintenance_hard_gate(
+    $maintGateSeed['workRoot'],
+    $maintGateSeed['jobId'],
+    'accounting_inventory_integrity'
+);
+pvrb_self_test(($gateLost['passed'] ?? true) === false, 'blocker1: maintenance lost during validation fails hard gate');
+$summaryMaint = orange_restore_validation_adapter_summarize_gates([$gateLost]);
+pvrb_self_test($summaryMaint['passed'] === false, 'blocker1: maintenance lost aborts validation summary');
+orange_restore_release_lock($maintGateSeed['workRoot']);
+pvrb_rmdir($maintGateSeed['backupRoot']);
+
+// --- BLOCKER 2: cross-country contamination detected ---
+$ccProject = pvrb_temp_root();
+pvrb_copy_registry($ccProject);
+$ccPdo = pvrb_sqlite_cross_country_pdo(true);
+$ccTables = ['countries', 'products'];
+$ccErrors = orange_restore_validation_adapter_production_cross_country_checks($ccPdo, $ccProject, $ccTables);
+pvrb_self_test($ccErrors !== [], 'blocker2: cross-country contamination detected');
+pvrb_self_test(
+    (bool) array_filter($ccErrors, static fn (string $e): bool => str_contains($e, 'products') || str_contains($e, 'foreign country')),
+    'blocker2: cross-country error references invalid country rows'
+);
+$ccClean = pvrb_sqlite_cross_country_pdo(false);
+$ccCleanErrors = orange_restore_validation_adapter_production_cross_country_checks($ccClean, $ccProject, $ccTables);
+pvrb_self_test($ccCleanErrors === [], 'blocker2: clean cross-country data passes');
+pvrb_rmdir($ccProject);
+
+// --- BLOCKER 3: critical table missing / unreadable ---
+$critPdo = pvrb_sqlite_critical_tables_pdo(false);
+$critTables = [];
+$stCrit = $critPdo->query("SELECT name FROM sqlite_master WHERE type='table'");
+while ($row = $stCrit->fetch(PDO::FETCH_NUM)) {
+    $critTables[] = (string) $row[0];
+}
+$critTablesMissing = array_values(array_filter(
+    $critTables,
+    static fn (string $t): bool => $t !== 'inventory_cost_layers'
+));
+$missingGate = pvrb_eval_critical_row_gate($critPdo, $critPdo, $critTablesMissing, 'orange_restore_staging');
+pvrb_self_test($missingGate['passed'] === false, 'blocker3: critical table missing fails hard');
+$unreadableGate = pvrb_eval_critical_row_gate(
+    pvrb_sqlite_critical_tables_pdo(true),
+    pvrb_sqlite_critical_tables_pdo(true),
+    ORANGE_RESTORE_PRODUCTION_CRITICAL_TABLES,
+    'orange_restore_staging'
+);
+pvrb_self_test($unreadableGate['passed'] === false, 'blocker3: critical table unreadable fails hard');
+
+// --- BLOCKER 4: required uploads missing / unverifiable ---
+$uploadsProject = pvrb_temp_root();
+pvrb_copy_registry($uploadsProject);
+$uploadsPdo = new PDO('sqlite::memory:');
+$uploadsPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$uploadsPdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, main_image TEXT)');
+$uploadsPdo->exec("INSERT INTO products (id, main_image) VALUES (1, 'missing.webp')");
+$uploadsDir = $uploadsProject . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'products';
+mkdir($uploadsDir, 0775, true);
+$missingUploads = orange_restore_validation_adapter_production_required_uploads_check(
+    $uploadsPdo,
+    $uploadsProject,
+    ['products']
+);
+pvrb_self_test(($missingUploads['ok'] ?? true) === false, 'blocker4: required uploads missing fails');
+pvrb_self_test(($missingUploads['verifiable'] ?? false) === true, 'blocker4: missing uploads remains verifiable');
+$noRegistryProject = pvrb_temp_root();
+$unverifiableUploads = orange_restore_validation_adapter_production_required_uploads_check(
+    $uploadsPdo,
+    $noRegistryProject,
+    ['products']
+);
+pvrb_self_test(($unverifiableUploads['ok'] ?? true) === false, 'blocker4: required uploads unverifiable fails');
+pvrb_self_test(($unverifiableUploads['verifiable'] ?? true) === false, 'blocker4: unverifiable uploads flagged');
+pvrb_rmdir($uploadsProject);
+pvrb_rmdir($noRegistryProject);
+
+// --- BLOCKER 5: rollback uploads source enforcement ---
+$rbNoSource = pvrb_seed_uploads_cutover_complete_job(ORANGE_RESTORE_JOB_STATUS_FAILED_POST_MERGE);
+pvrb_prepare_runtime($rbNoSource);
+$err = pvrb_try(static function () use ($rbNoSource): void {
+    orange_restore_merge_rollback_run([
+        'project_root' => $rbNoSource['projectRoot'],
+        'work_root' => $rbNoSource['workRoot'],
+        'job_id' => $rbNoSource['jobId'],
+        'admin_id' => 1,
+        'password' => 'correct-pass',
+        'confirmation_phrase' => 'ROLLBACK',
+        'env_override' => $rbNoSource['env'],
+        'admin_pdo_override' => $rbNoSource['adminPdo'],
+        'db_import_override' => static function (): void {},
+    ]);
+});
+$jobNoSource = orange_restore_job_read($rbNoSource['workRoot'], $rbNoSource['jobId']);
+pvrb_self_test($err !== null, 'blocker5: rollback with missing uploads source throws');
+pvrb_self_test(
+    ($jobNoSource['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_ROLLBACK_FAILED,
+    'blocker5: rollback with missing uploads source -> rollback_failed'
+);
+pvrb_self_test(
+    ($jobNoSource['status'] ?? '') !== ORANGE_RESTORE_JOB_STATUS_ROLLED_BACK,
+    'blocker5: rollback must not reach rolled_back without uploads source'
+);
+orange_restore_release_lock($rbNoSource['workRoot']);
+pvrb_rmdir($rbNoSource['backupRoot']);
+
+$rbCorruptSnap = pvrb_seed_uploads_cutover_complete_job(ORANGE_RESTORE_JOB_STATUS_FAILED_POST_MERGE);
+$preMergeCorrupt = orange_restore_uploads_pre_merge_directory($rbCorruptSnap['projectRoot'], $rbCorruptSnap['jobId']);
+pvrb_write_uploads_tree($preMergeCorrupt, ['products/old.webp' => 'pre-merge']);
+$snapDir = orange_restore_pre_merge_uploads_snapshot_directory($rbCorruptSnap['workRoot'], $rbCorruptSnap['jobId']);
+mkdir($snapDir, 0775, true);
+orange_backup_write_json(orange_restore_pre_merge_uploads_snapshot_manifest_path($rbCorruptSnap['workRoot'], $rbCorruptSnap['jobId']), [
+    'file_count' => 999,
+    'tree_checksum_sha256' => str_repeat('0', 64),
+]);
+pvrb_prepare_runtime($rbCorruptSnap);
+$err = pvrb_try(static function () use ($rbCorruptSnap): void {
+    orange_restore_merge_rollback_run([
+        'project_root' => $rbCorruptSnap['projectRoot'],
+        'work_root' => $rbCorruptSnap['workRoot'],
+        'job_id' => $rbCorruptSnap['jobId'],
+        'admin_id' => 1,
+        'password' => 'correct-pass',
+        'confirmation_phrase' => 'ROLLBACK',
+        'env_override' => $rbCorruptSnap['env'],
+        'admin_pdo_override' => $rbCorruptSnap['adminPdo'],
+        'db_import_override' => static function (): void {},
+    ]);
+});
+$jobCorruptSnap = orange_restore_job_read($rbCorruptSnap['workRoot'], $rbCorruptSnap['jobId']);
+pvrb_self_test($err !== null, 'blocker5: rollback with corrupt snapshot throws');
+pvrb_self_test(
+    ($jobCorruptSnap['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_ROLLBACK_FAILED,
+    'blocker5: corrupt snapshot -> rollback_failed'
+);
+orange_restore_release_lock($rbCorruptSnap['workRoot']);
+pvrb_rmdir($rbCorruptSnap['backupRoot']);
+
+$rbCorruptPre = pvrb_seed_uploads_cutover_complete_job(ORANGE_RESTORE_JOB_STATUS_FAILED_POST_MERGE);
+$preMergeBad = orange_restore_uploads_pre_merge_directory($rbCorruptPre['projectRoot'], $rbCorruptPre['jobId']);
+mkdir($preMergeBad, 0775, true);
+$liveUploads = orange_restore_production_uploads_directory($rbCorruptPre['projectRoot']);
+pvrb_write_uploads_tree($liveUploads, ['products/live.webp' => 'live']);
+orange_restore_merge_uploads_cutover_create_snapshot($rbCorruptPre['workRoot'], $rbCorruptPre['jobId'], $liveUploads);
+pvrb_write_file($preMergeBad . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'wrong.webp', 'wrong-tree');
+pvrb_prepare_runtime($rbCorruptPre);
+$err = pvrb_try(static function () use ($rbCorruptPre): void {
+    orange_restore_merge_rollback_run([
+        'project_root' => $rbCorruptPre['projectRoot'],
+        'work_root' => $rbCorruptPre['workRoot'],
+        'job_id' => $rbCorruptPre['jobId'],
+        'admin_id' => 1,
+        'password' => 'correct-pass',
+        'confirmation_phrase' => 'ROLLBACK',
+        'env_override' => $rbCorruptPre['env'],
+        'admin_pdo_override' => $rbCorruptPre['adminPdo'],
+        'db_import_override' => static function (): void {},
+    ]);
+});
+$jobCorruptPre = orange_restore_job_read($rbCorruptPre['workRoot'], $rbCorruptPre['jobId']);
+pvrb_self_test($err !== null, 'blocker5: rollback with corrupt uploads_pre_merge throws');
+pvrb_self_test(
+    ($jobCorruptPre['status'] ?? '') !== ORANGE_RESTORE_JOB_STATUS_ROLLED_BACK,
+    'blocker5: corrupt uploads_pre_merge must not reach rolled_back'
+);
+orange_restore_release_lock($rbCorruptPre['workRoot']);
+pvrb_rmdir($rbCorruptPre['backupRoot']);
+
+$rbPartial = pvrb_seed_uploads_cutover_complete_job(ORANGE_RESTORE_JOB_STATUS_FAILED_POST_MERGE);
+pvrb_prepare_runtime($rbPartial);
+$err = pvrb_try(static function () use ($rbPartial): void {
+    orange_restore_merge_rollback_run([
+        'project_root' => $rbPartial['projectRoot'],
+        'work_root' => $rbPartial['workRoot'],
+        'job_id' => $rbPartial['jobId'],
+        'admin_id' => 1,
+        'password' => 'correct-pass',
+        'confirmation_phrase' => 'ROLLBACK',
+        'env_override' => $rbPartial['env'],
+        'admin_pdo_override' => $rbPartial['adminPdo'],
+        'db_import_override' => static function (): void {},
+    ]);
+});
+$jobPartial = orange_restore_job_read($rbPartial['workRoot'], $rbPartial['jobId']);
+pvrb_self_test($err !== null, 'blocker5: DB-only rollback without uploads source throws');
+pvrb_self_test(
+    ($jobPartial['status'] ?? '') !== ORANGE_RESTORE_JOB_STATUS_ROLLED_BACK,
+    'blocker5: rolled_back requires DB and uploads both restored'
+);
+orange_restore_release_lock($rbPartial['workRoot']);
+pvrb_rmdir($rbPartial['backupRoot']);
 
 // --- production gate unit: GL imbalance ---
 $glGates = orange_restore_validation_adapter_summarize_gates([
