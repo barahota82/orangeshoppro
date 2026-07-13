@@ -156,7 +156,7 @@ Copy snapshots to storage separate from the production host (second disk, NAS, c
 
 ## Restore procedure (manual — not automated)
 
-**The backup script does not restore automatically.** Restore is a **manual, operator-driven** procedure:
+**The backup script does not restore automatically.** Until Phase 2 Restore is implemented per **`ORANGE_RESTORE_OWNER_POLICY.txt`**, restore remains a **manual, operator-driven** procedure on non-production or emergency basis only:
 
 1. **Stop web traffic** to the site (maintenance mode / stop app pool) before overwriting live data.
 2. **Database:** decompress `{db_name}.sql.gz`, then import into MariaDB/MySQL using the appropriate client (`mysql` CLI or Plesk database tools). Target the database name recorded in `manifest.json` (default from `config.php`: `orange_db`).
@@ -167,6 +167,30 @@ Copy snapshots to storage separate from the production host (second disk, NAS, c
 Restore must be **tested on a non-production clone** before relying on it for production go-live. An untested backup policy does not satisfy production readiness.
 
 **Phase 1A does not implement:** staging restore, production merge, restore APIs, or admin backup UI.
+
+**Permanent owner policy:** All future Restore work is governed by **`docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt`** (owner decision 2026-07-13). No Restore implementation may begin until that policy is acknowledged.
+
+---
+
+## Orange Restore Policy (Permanent Owner Decision — 2026-07-13)
+
+**Status:** Archived owner policy — **not implemented in code**.  
+**Full text:** `docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt`
+
+| # | Rule | Summary |
+|---|------|---------|
+| 1 | No automatic restore | No Scheduled Task, Cron, background worker, or unattended restore |
+| 2 | No public/automatic exposure | No public endpoint, webhook, URL trigger, auto command, or normal admin permission |
+| 3 | Super Admin + `backup_restore` | Dedicated permission; only Super Admin may execute restore |
+| 4 | Re-authentication | Current session insufficient; operator must authenticate again before restore |
+| 5 | High-friction confirmation | Type exactly `RESTORE` or `RESTORE KUWAIT` — no one-click restore |
+| 6 | Mandatory workflow | Validate → fresh full backup → **staging** → DRV → owner review → approval → production merge. **Direct production restore forbidden** |
+| 7 | Separate operations | Country Restore and Full Restore: separate permissions, workflows, audit trails |
+| 8 | Permanent audit | Operator, timestamp, package, checksum, version, schema revision, scope, staging target, merge approval, duration, result — **never editable** |
+| 9 | No silent production deletion | Every destructive action explicit and logged |
+| 10 | Implementation gate | No Restore code until this policy is archived and acknowledged (**satisfied by archive file above**) |
+
+**Phase 2 Restore implementation** must conform to every rule above before any merge to production paths.
 
 ---
 
@@ -196,7 +220,7 @@ Restore must be **tested on a non-production clone** before relying on it for pr
 | CRP export CLI (`export_country.php`) | **Implemented** |
 | CRP verify CLI (`verify_country_package.php`) | **Implemented** |
 | Country-scoped SQL + uploads collector | **Implemented** |
-| Staging restore / production merge | **Not implemented — Phase 2** |
+| Staging restore / production merge | **Not implemented — Phase 2** (gated by `ORANGE_RESTORE_OWNER_POLICY.txt`) |
 | Admin backup module | **Not implemented — Phase 3** |
 
 **Never import a CRP directly into production.** Packages are for offline review and future staging restore only.
@@ -210,7 +234,7 @@ Restore must be **tested on a non-production clone** before relying on it for pr
 | Batch CLI (`export_all_recoverable_countries.php`) | **Implemented** |
 | Dynamic country discovery | **Implemented** — active OR inactive with historical data |
 | Per-country retention | **Implemented** — configurable via `.env.php` |
-| Staging restore / production merge | **Not implemented — Phase 2** |
+| Staging restore / production merge | **Not implemented — Phase 2** (gated by `ORANGE_RESTORE_OWNER_POLICY.txt`) |
 | Admin backup module | **Not implemented — Phase 3** |
 
 **Discovery rule (every run, no hardcoded country IDs):**
@@ -238,7 +262,7 @@ php D:\orange\scripts\backup\self_test_backup_retention.php
 | DRV CLI (`validate_backup_recoverability.php`) | **Implemented** |
 | Full + CRP package support | **Implemented** |
 | `recovery_validation.json` report | **Implemented** (sibling file beside package) |
-| Restore / merge / admin UI | **Not implemented** |
+| Restore / merge / admin UI | **Not implemented — Phase 2+** (gated by `ORANGE_RESTORE_OWNER_POLICY.txt`) |
 
 ```powershell
 php D:\orange\scripts\backup\validate_backup_recoverability.php --package=D:\orange_backups\snapshots\yyyy-MM-dd_HHmmss
@@ -258,8 +282,10 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 
 | Item | Target phase |
 |------|----------------|
-| Staging restore / production merge | Phase 2 |
+| Staging restore / production merge | Phase 2 (gated by `ORANGE_RESTORE_OWNER_POLICY.txt`) |
 | Admin backup module / job tables | Phase 3 |
+| Dedicated permission `backup_restore` | Phase 2 (owner policy) |
+| Restore audit log (immutable) | Phase 2 (owner policy) |
 
 ---
 
@@ -284,6 +310,7 @@ php D:\orange\scripts\backup\verify_full_backup.php --package=D:\orange_backups\
 ## Related references
 
 - Operator usage: `scripts/backup/README.md`
+- **Restore owner policy (permanent):** `docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt`
 - Deploy / schema policy: `IBRAHIM_ORANGE_MASTER.txt` §2–§4, `docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`
 - Engineering decisions: Production Readiness Review PR-BAK-01, PR-BAK-02; checkpoint `docs/archive/ORANGE_ENGINEERING_CHECKPOINT_01.md`
 
@@ -301,7 +328,8 @@ php D:\orange\scripts\backup\verify_full_backup.php --package=D:\orange_backups\
 | Pre-migration snapshot procedure documented | This runbook + README |
 | Country Recovery Package (CRP) export | **Implemented — Phase 1B.2** |
 | Table registry (inventory) | **Implemented — Phase 1B.1** |
-| Staging restore / merge | **Not implemented — Phase 2** |
-| Restore automation (full DB) | **Not implemented — manual only** |
+| Staging restore / merge | **Not implemented — Phase 2** (gated by owner restore policy) |
+| Restore automation (full DB) | **Forbidden by owner policy** — Super Admin + `backup_restore` + staging workflow only |
 | Admin backup module | **Not implemented — Phase 3** |
+| Restore owner policy archived | **Yes** — `docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt` (2026-07-13) |
 | Restore tested on production | **Required before go-live** — operator responsibility |

@@ -1,0 +1,132 @@
+ORANGE — Orange Restore Policy (Permanent Owner Decision)
+================================================================================
+Document type: Owner policy archive — Backup & Recovery architecture
+Status: PERMANENT OWNER POLICY — effective 2026-07-13
+Scope: All future Restore implementation (Full Disaster + Country Recovery)
+Implementation: NOT STARTED — no Restore code until this policy is acknowledged
+Related runbook: docs/archive/ORANGE_BACKUP_RECOVERY_RUNBOOK.md
+================================================================================
+
+**Gate (Owner decision — permanent):**
+No Restore implementation begins until this owner policy is archived and acknowledged.
+This file satisfies the archive requirement. Future agents must read this policy before
+any Restore design or code work.
+
+================================================================================
+1. Restore must NEVER run automatically
+================================================================================
+- No Scheduled Task.
+- No Cron.
+- No background worker.
+- No unattended restore.
+
+================================================================================
+2. Restore must NEVER be exposed through public or automatic triggers
+================================================================================
+Restore must NEVER be exposed through:
+- public endpoint
+- webhook
+- URL trigger
+- command executed automatically
+- normal admin permission
+
+================================================================================
+3. Restore is restricted to Super Admin + dedicated permission
+================================================================================
+- Restore operator must be **Super Admin**.
+- Introduce a dedicated permission: **backup_restore**
+- No other admin role may execute restore.
+
+**تنفيذ:** Permission `backup_restore` and Super Admin gate — **not implemented** (Phase 2+).
+
+================================================================================
+4. Restore requires explicit re-authentication
+================================================================================
+The current logged-in session is **NOT** sufficient.
+Before any restore begins, the operator must authenticate again.
+
+**تنفيذ:** Re-auth step before restore — **not implemented** (Phase 2+).
+
+================================================================================
+5. Restore requires high-friction confirmation
+================================================================================
+Example — operator must type exactly:
+- RESTORE
+- or RESTORE KUWAIT (country-scoped restore)
+
+No one-click restore.
+
+**تنفيذ:** Typed confirmation UI/step — **not implemented** (Phase 2+).
+
+================================================================================
+6. Mandatory restore workflow (direct production restore forbidden)
+================================================================================
+Step 1 — Validate package (DRV / verify CLI).
+        ↓
+Step 2 — Create a fresh Full Disaster Backup.
+        ↓
+Step 3 — Restore into **STAGING** (never production first).
+        ↓
+Step 4 — Run Disaster Recovery Validation on staging result.
+        ↓
+Step 5 — Owner reviews results.
+        ↓
+Step 6 — Explicit approval.
+        ↓
+Step 7 — Production Merge.
+
+**Direct production restore is forbidden.**
+
+**تنفيذ:** Staging restore, production merge, admin workflow — **not implemented** (Phase 2+).
+Read-only validation exists: Phase 1C DRV (`validate_backup_recoverability.php`).
+
+================================================================================
+7. Country Restore and Full Restore are separate operations
+================================================================================
+- Separate permissions.
+- Separate workflow.
+- Separate audit trail.
+
+Country Recovery Package (CRP) restore and Full Disaster restore must not share
+a single undifferentiated code path or permission.
+
+**تنفيذ:** Separate Full vs Country restore paths — **not implemented** (Phase 2+).
+
+================================================================================
+8. Permanent audit record for every restore operation
+================================================================================
+Every restore operation must create a **permanent, non-editable** audit record.
+
+Minimum fields:
+- operator
+- timestamp
+- source package
+- package checksum
+- package version
+- schema revision
+- country / full (scope)
+- staging target
+- production merge approval
+- duration
+- result
+
+Audit entries must never be editable.
+
+**تنفيذ:** Restore audit log storage/UI — **not implemented** (Phase 2+).
+
+================================================================================
+9. No silent destructive actions on production
+================================================================================
+Restore must never delete existing production data silently.
+Every destructive action must be explicit and logged.
+
+**تنفيذ:** Explicit destructive-step logging — **not implemented** (Phase 2+).
+
+================================================================================
+10. Implementation gate (restatement)
+================================================================================
+This is a permanent owner decision.
+No Restore implementation begins until this owner policy is archived and acknowledged.
+
+Archive location: this file (`docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt`).
+Architecture reference: `docs/archive/ORANGE_BACKUP_RECOVERY_RUNBOOK.md` § Orange Restore Policy.
