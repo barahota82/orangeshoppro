@@ -156,13 +156,13 @@ Copy snapshots to storage separate from the production host (second disk, NAS, c
 
 ## Restore procedure (manual — not automated)
 
-**The backup script does not restore automatically.** Until Phase 2 Restore is implemented per **`ORANGE_RESTORE_OWNER_POLICY.txt`**, restore remains a **manual, operator-driven** procedure on non-production or emergency basis only:
+**The backup script does not restore automatically.** Until Phase 2 Restore is implemented per **`ORANGE_RESTORE_OWNER_POLICY.txt`**, restore remains a **manual, operator-driven staging/non-production validation** procedure only. Direct production restore is forbidden by owner policy; production recovery must go through validated staging restore, owner review, explicit approval, and a controlled production merge.
 
-1. **Stop web traffic** to the site (maintenance mode / stop app pool) before overwriting live data.
-2. **Database:** decompress `{db_name}.sql.gz`, then import into MariaDB/MySQL using the appropriate client (`mysql` CLI or Plesk database tools). Target the database name recorded in `manifest.json` (default from `config.php`: `orange_db`).
-3. **Uploads:** extract `uploads.zip` into the project `uploads/` directory, preserving relative paths. Merge or replace only after confirming the snapshot is the intended point-in-time.
+1. **Use a staging/non-production target** isolated from live traffic before overwriting any data.
+2. **Database:** decompress `{db_name}.sql.gz`, then import into MariaDB/MySQL using the appropriate client (`mysql` CLI or Plesk database tools). Target the staging database name recorded for the restore test, not the live production database.
+3. **Uploads:** extract `uploads.zip` into the staging project `uploads/` directory, preserving relative paths. Merge or replace only after confirming the snapshot is the intended point-in-time.
 4. **Verify:** run gated `health.php` checks, admin login, sample order/stock read, and spot-check uploaded files referenced by recent orders.
-5. **Document:** note snapshot timestamp, manifest `git_commit`, and reason for restore.
+5. **Document:** note snapshot timestamp, manifest `git_commit`, staging target, validation result, and reason for restore test.
 
 Restore must be **tested on a non-production clone** before relying on it for production go-live. An untested backup policy does not satisfy production readiness.
 
@@ -332,4 +332,4 @@ php D:\orange\scripts\backup\verify_full_backup.php --package=D:\orange_backups\
 | Restore automation (full DB) | **Forbidden by owner policy** — Super Admin + `backup_restore` + staging workflow only |
 | Admin backup module | **Not implemented — Phase 3** |
 | Restore owner policy archived | **Yes** — `docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt` (2026-07-13) |
-| Restore tested on production | **Required before go-live** — operator responsibility |
+| Restore workflow tested on staging/non-production | **Required before go-live** — operator responsibility |
