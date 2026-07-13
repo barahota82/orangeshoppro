@@ -603,9 +603,6 @@ orange_restore_release_lock($success['workRoot']);
 orange_restore_merge_maintenance_disable($success['workRoot'], $success['jobId']);
 uploads_cutover_rmdir($success['backupRoot']);
 
-orange_restore_merge_maintenance_disable($success['workRoot'], $success['jobId']);
-uploads_cutover_rmdir($success['backupRoot']);
-
 // --- staging manifest binding mismatch ---
 $bindingBad = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($bindingBad);
