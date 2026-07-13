@@ -501,8 +501,19 @@ uploads_cutover_self_test($err !== null, 'cutover: rename failure before first r
 uploads_cutover_self_test(is_dir($renameFail['uploadsDir']), 'cutover: uploads directory preserved on pre-rename failure');
 $failedJobRename = orange_restore_job_read($renameFail['workRoot'], $renameFail['jobId']);
 uploads_cutover_self_test(
-    ($failedJobRename['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE,
-    'cutover: pre-rename failure keeps database_cutover_complete'
+    ($failedJobRename['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_PENDING,
+    'cutover: pre-rename failure keeps resumable pending checkpoint'
+);
+$renameRetryResult = orange_restore_merge_uploads_cutover_run([
+    'project_root' => $renameFail['projectRoot'],
+    'work_root' => $renameFail['workRoot'],
+    'job_id' => $renameFail['jobId'],
+    'admin_id' => 1,
+    'env_override' => $renameFail['env'],
+]);
+uploads_cutover_self_test(
+    ($renameRetryResult['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE,
+    'cutover: retry after pre-rename failure reuses snapshot and completes'
 );
 orange_restore_release_lock($renameFail['workRoot']);
 orange_restore_merge_maintenance_disable($renameFail['workRoot'], $renameFail['jobId']);
@@ -935,6 +946,15 @@ try {
     uploads_cutover_self_test(false, 'state: direct uploads_first_rename_complete blocked');
 } catch (Throwable) {
     uploads_cutover_self_test(true, 'state: direct uploads_first_rename_complete blocked');
+}
+try {
+    orange_restore_job_assert_uploads_cutover_transition(
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_PENDING,
+        ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE
+    );
+    uploads_cutover_self_test(false, 'state: pending -> database_cutover_complete blocked');
+} catch (Throwable) {
+    uploads_cutover_self_test(true, 'state: pending -> database_cutover_complete blocked');
 }
 try {
     orange_restore_job_assert_uploads_cutover_transition(

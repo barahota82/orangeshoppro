@@ -820,6 +820,11 @@ function orange_restore_merge_uploads_cutover_handle_failure(
     } else {
         $failureEvent = 'uploads_cutover_failed';
     }
+    $productionWrites = $currentStatus === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE
+        || (
+            $currentStatus === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_PENDING
+            && !((bool) ($fsState['uploads_exists'] ?? false))
+        );
 
     orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, $failureEvent, 'failed', array_merge([
         'operator_admin_id' => $adminId,
@@ -830,10 +835,7 @@ function orange_restore_merge_uploads_cutover_handle_failure(
         'job_status' => $currentStatus,
         'error' => $e->getMessage(),
         'database_writes' => false,
-        'production_writes' => in_array($currentStatus, [
-            ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
-            ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_PENDING,
-        ], true),
+        'production_writes' => $productionWrites,
         'rollback_executed' => false,
     ], $fsState)));
 
@@ -854,22 +856,6 @@ function orange_restore_merge_uploads_cutover_handle_failure(
             0,
             $e
         );
-    }
-
-    if ($currentStatus === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_PENDING) {
-        $uploadsDir = (string) $verify['uploads_dir'];
-        $uploadsExists = is_dir($uploadsDir) || is_file($uploadsDir);
-        if ($uploadsExists) {
-            orange_restore_job_uploads_cutover_transition(
-                $workRoot,
-                $jobId,
-                ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE,
-                [
-                    'uploads_cutover_first_rename_pending' => false,
-                    'uploads_first_rename_pending_at' => '',
-                ]
-            );
-        }
     }
 
     throw $e;
