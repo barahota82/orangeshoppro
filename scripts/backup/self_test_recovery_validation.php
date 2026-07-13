@@ -90,7 +90,21 @@ function drv_write_crp_package(string $dir, array $overrides = []): void
 {
     mkdir($dir . DIRECTORY_SEPARATOR . 'sql');
     mkdir($dir . DIRECTORY_SEPARATOR . 'files');
-    file_put_contents($dir . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR . '001_orders.sql', "CREATE TABLE orders (id INT PRIMARY KEY);\nINSERT INTO orders VALUES (1);\n");
+    file_put_contents(
+        $dir . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR . '000_session_preamble.sql',
+        "-- Orange Phase 1A PDO SQL export\nSET NAMES utf8mb4;\n"
+    );
+    file_put_contents(
+        $dir . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR . '050_accounts.sql',
+        "-- Orange CRP export table=accounts country_id=1\n"
+        . "INSERT INTO `accounts` (`id`, `name`) VALUES\n"
+        . "(1, 'Cash');\n"
+        . "-- rows=1\n"
+    );
+    file_put_contents(
+        $dir . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR . '999_session_postamble.sql',
+        "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;\n"
+    );
     orange_country_uploads_write_empty_zip($dir . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip');
     $manifest = array_merge([
         'package_type' => 'country_recovery',
@@ -128,7 +142,9 @@ function drv_write_crp_package(string $dir, array $overrides = []): void
         'table_inventory.json',
         'id_snapshot.json',
         'files/uploads_country.zip',
-        'sql/001_orders.sql',
+        'sql/000_session_preamble.sql',
+        'sql/050_accounts.sql',
+        'sql/999_session_postamble.sql',
     ]);
 }
 
@@ -246,5 +262,62 @@ drv_self_test(orange_recovery_compute_score([], [])['recovery_score'] === 100, '
 drv_self_test(orange_recovery_compute_score([], ['informational: note'])['recovery_score'] >= 90, 'score algorithm informational');
 drv_self_test(orange_recovery_compute_score([], ['health warning: note'])['recovery_score'] >= 70, 'score algorithm warning band');
 drv_self_test(orange_recovery_compute_score(['fatal'], [])['recovery_score'] < 70, 'score algorithm fail band');
+
+$validInsert = "INSERT INTO `accounts` (`id`, `name`) VALUES (1, 'Cash');\n";
+drv_self_test(
+    orange_recovery_validate_sql_completeness($validInsert, '050_accounts.sql') === null,
+    'SQL completeness: valid INSERT ending with semicolon'
+);
+
+$crpAccountsChunk = "-- Orange CRP export table=accounts country_id=1\n"
+    . "INSERT INTO `accounts` (`id`, `name`) VALUES\n"
+    . "(1, 'Cash');\n"
+    . "-- rows=1\n";
+drv_self_test(
+    orange_recovery_validate_sql_completeness($crpAccountsChunk, '050_accounts.sql') === null,
+    'SQL completeness: CRP accounts chunk with rows footer'
+);
+
+$trailingComment = $validInsert . "\n-- export complete\n\n";
+drv_self_test(
+    orange_recovery_validate_sql_completeness($trailingComment, 'chunk.sql') === null,
+    'SQL completeness: trailing comment/newlines after final statement'
+);
+
+$emptyCrpChunk = "-- Orange CRP export table=accounts country_id=1\n-- rows=0\n";
+drv_self_test(
+    orange_recovery_validate_sql_completeness($emptyCrpChunk, '050_accounts.sql') === null,
+    'SQL completeness: empty CRP table chunk'
+);
+
+$commentOnlyChunk = "-- Orange CRP export table=accounts country_id=1\n-- no data for this slice\n-- rows=0\n";
+drv_self_test(
+    orange_recovery_validate_sql_completeness($commentOnlyChunk, '050_accounts.sql') === null,
+    'SQL completeness: comment-only CRP chunk'
+);
+
+$truncatedInsert = "INSERT INTO `accounts` (`id`, `name`) VALUES (1, 'Cash')\n";
+drv_self_test(
+    orange_recovery_validate_sql_completeness($truncatedInsert, '050_accounts.sql') !== null,
+    'SQL completeness: genuinely truncated INSERT detected'
+);
+
+$quotedSemi = "INSERT INTO `accounts` (`id`, `name`) VALUES (1, 'a;b');\n";
+drv_self_test(
+    orange_recovery_validate_sql_completeness($quotedSemi, '050_accounts.sql') === null,
+    'SQL completeness: quoted semicolon inside string accepted'
+);
+
+$crpWithMissingUploadWarning = orange_recovery_classify_health_warning('missing upload file: uploads/customers/42/');
+drv_self_test(
+    str_starts_with($crpWithMissingUploadWarning, 'informational:'),
+    'health warning reclassify: missing customer upload folder is informational'
+);
+
+$crpInfoScore = orange_recovery_compute_score([], [
+    'informational: missing upload file: uploads/suppliers/9/',
+    'informational: routine maintenance note',
+]);
+drv_self_test(($crpInfoScore['recovery_score'] ?? 0) >= 90, 'informational upload notes score band');
 
 exit($failures > 0 ? 1 : 0);

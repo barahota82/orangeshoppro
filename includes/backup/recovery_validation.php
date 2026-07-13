@@ -34,6 +34,198 @@ function orange_recovery_read_json_file(string $path, string $label): array
     }
 }
 
+function orange_recovery_sql_strip_bom(string $sqlText): string
+{
+    if (str_starts_with($sqlText, "\xEF\xBB\xBF")) {
+        return substr($sqlText, 3);
+    }
+
+    return $sqlText;
+}
+
+function orange_recovery_sql_strip_comments(string $sqlText): string
+{
+    $out = preg_replace('/\/\*.*?\*\//s', '', $sqlText) ?? $sqlText;
+    $out = preg_replace('/^\s*--[^\n]*$/m', '', $out) ?? $out;
+
+    return $out;
+}
+
+/**
+ * Strip CRP table-chunk metadata written by orange_country_export_table().
+ *
+ * Contract: header "-- Orange CRP export table=..." then zero or more INSERT chunks
+ * (each ending with ";\n" from orange_backup_pdo_write_insert_chunk) then footer "-- rows=N".
+ */
+function orange_recovery_sql_strip_crp_chunk_metadata(string $sqlText): string
+{
+    $sql = rtrim(orange_recovery_sql_strip_bom($sqlText));
+    if (preg_match('/-- rows=\d+\s*\z/', $sql) === 1) {
+        $sql = preg_replace('/\n-- rows=\d+\s*\z/', '', $sql) ?? $sql;
+    }
+    $sql = preg_replace('/^-- Orange CRP export[^\n]*\n/m', '', $sql) ?? $sql;
+
+    return $sql;
+}
+
+/**
+ * Statement-aware completeness scan (respects quotes and comments).
+ * Returns an error fragment or null when SQL body is complete.
+ */
+function orange_recovery_sql_detect_incomplete_statement(string $sqlText): ?string
+{
+    $sql = orange_recovery_sql_strip_bom($sqlText);
+    if (trim($sql) === '') {
+        return null;
+    }
+
+    $len = strlen($sql);
+    $inSingle = false;
+    $inDouble = false;
+    $inLineComment = false;
+    $inBlockComment = false;
+    $buffer = '';
+
+    for ($i = 0; $i < $len; $i++) {
+        $c = $sql[$i];
+        $next = $i + 1 < $len ? $sql[$i + 1] : '';
+
+        if ($inLineComment) {
+            if ($c === "\n" || $c === "\r") {
+                $inLineComment = false;
+                $buffer .= $c;
+            }
+            continue;
+        }
+
+        if ($inBlockComment) {
+            if ($c === '*' && $next === '/') {
+                $inBlockComment = false;
+                $i++;
+            }
+            continue;
+        }
+
+        if (!$inSingle && !$inDouble) {
+            if ($c === '-' && $next === '-') {
+                $inLineComment = true;
+                continue;
+            }
+            if ($c === '/' && $next === '*') {
+                $inBlockComment = true;
+                $i++;
+                continue;
+            }
+        }
+
+        if (!$inDouble && $c === "'") {
+            if ($inSingle && $next === "'") {
+                $buffer .= "''";
+                $i++;
+                continue;
+            }
+            $inSingle = !$inSingle;
+            $buffer .= $c;
+            continue;
+        }
+
+        if (!$inSingle && $c === '"') {
+            if ($inDouble && $next === '"') {
+                $buffer .= '""';
+                $i++;
+                continue;
+            }
+            $inDouble = !$inDouble;
+            $buffer .= $c;
+            continue;
+        }
+
+        if ($inSingle && $c === '\\' && $next !== '') {
+            $buffer .= $c . $next;
+            $i++;
+            continue;
+        }
+
+        if (!$inSingle && !$inDouble && $c === ';') {
+            $buffer = '';
+            continue;
+        }
+
+        $buffer .= $c;
+    }
+
+    if ($inSingle || $inDouble) {
+        return 'SQL appears truncated (unclosed string literal)';
+    }
+    if ($inBlockComment) {
+        return 'SQL appears truncated (unclosed block comment)';
+    }
+
+    $remainder = trim($buffer);
+    if ($remainder === '') {
+        return null;
+    }
+
+    $executableRemainder = trim(orange_recovery_sql_strip_comments($remainder));
+    if ($executableRemainder === '') {
+        return null;
+    }
+
+    if (preg_match('/\b(INSERT|CREATE|ALTER|UPDATE|DELETE|DROP|SET|USE)\b/i', $executableRemainder) === 1) {
+        return 'SQL appears truncated (incomplete final statement)';
+    }
+
+    return null;
+}
+
+function orange_recovery_sql_basename_from_label(string $label): string
+{
+    $normalized = str_replace('\\', '/', $label);
+    $pos = strrpos($normalized, '/');
+
+    return $pos === false ? $normalized : substr($normalized, $pos + 1);
+}
+
+/**
+ * Validate SQL completeness using export writer contracts (CRP chunks, session files, full dumps).
+ */
+function orange_recovery_validate_sql_completeness(string $sqlText, string $label): ?string
+{
+    $basename = orange_recovery_sql_basename_from_label($label);
+    $sql = orange_recovery_sql_strip_bom($sqlText);
+    if (trim($sql) === '') {
+        return null;
+    }
+
+    $isSessionFile = preg_match('/^\d{3}_session_(preamble|postamble)\.sql$/', $basename) === 1;
+    $isCrpTableChunk = !$isSessionFile && preg_match('/^\d{3}_[^\/]+\.sql$/', $basename) === 1;
+    $hasCrpHeader = preg_match('/^\s*-- Orange CRP export/m', $sql) === 1;
+
+    if ($isCrpTableChunk || $hasCrpHeader) {
+        $body = orange_recovery_sql_strip_crp_chunk_metadata($sql);
+
+        return orange_recovery_sql_detect_incomplete_statement($body);
+    }
+
+    return orange_recovery_sql_detect_incomplete_statement($sql);
+}
+
+function orange_recovery_classify_health_warning(string $warning): string
+{
+    $lower = strtolower($warning);
+    if (
+        preg_match('/missing upload file:\s*uploads\/(customers|suppliers)\//', $lower) === 1
+        || (
+            str_contains($lower, 'missing upload file')
+            && (str_contains($lower, 'uploads/customers/') || str_contains($lower, 'uploads/suppliers/'))
+        )
+    ) {
+        return 'informational: ' . $warning;
+    }
+
+    return 'health warning: ' . $warning;
+}
+
 /**
  * @return array{errors:list<string>,warnings:list<string>,create_table_count:int,insert_count:int}
  */
@@ -51,13 +243,9 @@ function orange_recovery_validate_sql_text(string $sqlText, string $label): arra
     }
     $createCount = preg_match_all('/^\s*CREATE\s+TABLE\b/im', $sqlText) ?: 0;
     $insertCount = preg_match_all('/^\s*INSERT\s+INTO\b/im', $sqlText) ?: 0;
-    $trimmed = rtrim($sqlText);
-    if (
-        $trimmed !== ''
-        && !str_ends_with($trimmed, ';')
-        && preg_match('/\b(INSERT|CREATE|ALTER|UPDATE|DELETE|DROP)\b/i', $trimmed) === 1
-    ) {
-        $errors[] = $label . ': SQL appears truncated (missing terminal semicolon on final statement)';
+    $completenessError = orange_recovery_validate_sql_completeness($sqlText, $label);
+    if ($completenessError !== null) {
+        $errors[] = $label . ': ' . $completenessError;
     }
     if (preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $sqlText) === 1) {
         $errors[] = $label . ': SQL contains binary/control characters';
@@ -237,7 +425,7 @@ function orange_recovery_validate_health_semantics(array $health, array $manifes
     $healthWarnings = is_array($health['warnings'] ?? null) ? $health['warnings'] : [];
     foreach ($healthWarnings as $warning) {
         if (is_string($warning) && $warning !== '') {
-            $warnings[] = 'health warning: ' . $warning;
+            $warnings[] = orange_recovery_classify_health_warning($warning);
         }
     }
     $maintenanceNotes = is_array($health['maintenance_notes'] ?? null) ? $health['maintenance_notes'] : [];
