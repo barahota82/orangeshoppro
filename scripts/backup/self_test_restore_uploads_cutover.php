@@ -178,6 +178,7 @@ function uploads_cutover_seed_database_cutover_complete_job(): array
     ]);
     $jobId = (string) $job['job_id'];
 
+    orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_VALIDATED);
     orange_restore_job_record_fresh_backup_anchor($workRoot, $jobId, $anchorDir, $anchorChecksum);
     orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_STAGING);
     orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED);
@@ -600,9 +601,6 @@ orange_restore_release_lock($success['workRoot']);
 orange_restore_merge_maintenance_disable($success['workRoot'], $success['jobId']);
 uploads_cutover_rmdir($success['backupRoot']);
 
-orange_restore_merge_maintenance_disable($success['workRoot'], $success['jobId']);
-uploads_cutover_rmdir($success['backupRoot']);
-
 // --- staging manifest binding mismatch ---
 $bindingBad = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($bindingBad);
@@ -894,6 +892,24 @@ uploads_cutover_self_test(
 $crashAudit = orange_restore_audit_read_all($crash['workRoot'], $crash['jobId']);
 $crashEvents = array_map(static fn (array $row): string => (string) ($row['uploads_cutover_event'] ?? ''), $crashAudit);
 uploads_cutover_self_test(in_array('uploads_first_rename_complete', $crashEvents, true), 'audit: durable first rename event before second rename');
+$resumeResult = orange_restore_merge_uploads_cutover_run([
+    'project_root' => $crash['projectRoot'],
+    'work_root' => $crash['workRoot'],
+    'job_id' => $crash['jobId'],
+    'admin_id' => 1,
+    'env_override' => $crash['env'],
+]);
+uploads_cutover_self_test(
+    ($resumeResult['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE,
+    'cutover: resume after first rename completes second rename'
+);
+uploads_cutover_self_test(
+    is_file($crash['uploadsDir'] . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'a.webp'),
+    'cutover: resume activates uploads_next as live uploads'
+);
+$resumeAudit = orange_restore_audit_read_all($crash['workRoot'], $crash['jobId']);
+$resumeEvents = array_map(static fn (array $row): string => (string) ($row['uploads_cutover_event'] ?? ''), $resumeAudit);
+uploads_cutover_self_test(in_array('uploads_cutover_complete', $resumeEvents, true), 'audit: resumed cutover records completion');
 orange_restore_release_lock($crash['workRoot']);
 orange_restore_merge_maintenance_disable($crash['workRoot'], $crash['jobId']);
 uploads_cutover_rmdir($crash['backupRoot']);
