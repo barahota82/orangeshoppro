@@ -8,6 +8,7 @@ require_once __DIR__ . '/../backup_validate.php';
 require_once __DIR__ . '/../country_export.php';
 require_once __DIR__ . '/../backup_table_registry_lib.php';
 require_once __DIR__ . '/restore_staging_target.php';
+require_once __DIR__ . '/restore_job.php';
 
 /**
  * Package verify + DRV pre-check (read-only). Abort caller on failure.
@@ -299,5 +300,143 @@ function orange_restore_validation_adapter_build_country_staging_drv_report(
         ],
         'country_staging_postcheck' => $countryStagingPostcheck,
         'overall_result' => ($countryStagingPostcheck['ok'] ?? false) ? 'pass' : 'fail',
+    ];
+}
+
+/**
+ * Compute SHA-256 checksum of a restore artifact file.
+ */
+function orange_restore_validation_adapter_file_checksum(string $path): string
+{
+    if (!is_file($path)) {
+        throw new RuntimeException('Restore artifact missing: ' . $path);
+    }
+
+    return orange_backup_sha256_file($path);
+}
+
+/**
+ * Resolve live package anchor checksum (must match job source_package_checksum).
+ *
+ * @param array<string, mixed> $manifest
+ */
+function orange_restore_validation_adapter_live_package_checksum(string $packagePath, array $manifest): string
+{
+    $checksumFile = $packagePath . DIRECTORY_SEPARATOR . 'checksums.sha256';
+    if (is_file($checksumFile)) {
+        return orange_backup_sha256_file($checksumFile);
+    }
+    $dumpSha = trim((string) ($manifest['dump_sha256'] ?? ''));
+    if ($dumpSha !== '') {
+        return $dumpSha;
+    }
+
+    throw new RuntimeException('Cannot determine live package checksum.');
+}
+
+/**
+ * Phase 2C staging validation gate — reads restore_report.json + staging manifest on disk.
+ *
+ * @return array{
+ *   ok:bool,
+ *   errors:list<string>,
+ *   warnings:list<string>,
+ *   report:array<string,mixed>,
+ *   manifest_path:string,
+ *   manifest_checksum:string,
+ *   staging_validation_passed:bool
+ * }
+ */
+function orange_restore_validation_adapter_staging_gate(string $workRoot, array $job): array
+{
+    $errors = [];
+    $warnings = [];
+    $jobId = (string) ($job['job_id'] ?? '');
+
+    $reportPath = trim((string) ($job['restore_report_path'] ?? ''));
+    if ($reportPath === '' || !is_file($reportPath)) {
+        $reportPath = orange_restore_job_report_path($workRoot, $jobId);
+    }
+    if (!is_file($reportPath)) {
+        return [
+            'ok' => false,
+            'errors' => ['Missing restore_report.json for staging validation gate.'],
+            'warnings' => [],
+            'report' => [],
+            'manifest_path' => '',
+            'manifest_checksum' => '',
+            'staging_validation_passed' => false,
+        ];
+    }
+
+    $report = json_decode((string) file_get_contents($reportPath), true);
+    if (!is_array($report)) {
+        return [
+            'ok' => false,
+            'errors' => ['Invalid restore_report.json payload.'],
+            'warnings' => [],
+            'report' => [],
+            'manifest_path' => '',
+            'manifest_checksum' => '',
+            'staging_validation_passed' => false,
+        ];
+    }
+
+    if ((string) ($report['overall_result'] ?? '') !== 'pass') {
+        $errors[] = 'restore_report.overall_result is not pass.';
+    }
+    if (($report['production_touched'] ?? true) !== false) {
+        $errors[] = 'restore_report indicates production_touched=true (forbidden).';
+    }
+
+    $jobType = (string) ($job['job_type'] ?? '');
+    $stagingPassed = false;
+    if ($jobType === ORANGE_RESTORE_JOB_TYPE_FULL) {
+        /** @var array<string, mixed> $stagingPost */
+        $stagingPost = is_array($report['staging_post_validation'] ?? null) ? $report['staging_post_validation'] : [];
+        /** @var array<string, mixed> $stagingDrv */
+        $stagingDrv = is_array($report['staging_drv_report'] ?? null) ? $report['staging_drv_report'] : [];
+        $stagingPassed = ($stagingPost['ok'] ?? false) === true
+            && (string) ($stagingDrv['overall_result'] ?? '') === 'pass';
+        if (!$stagingPassed) {
+            $errors[] = 'Full staging post-validation or staging DRV report did not pass.';
+        }
+    } elseif ($jobType === ORANGE_RESTORE_JOB_TYPE_COUNTRY) {
+        /** @var array<string, mixed> $stagingPost */
+        $stagingPost = is_array($report['country_staging_post_validation'] ?? null)
+            ? $report['country_staging_post_validation']
+            : [];
+        /** @var array<string, mixed> $stagingDrv */
+        $stagingDrv = is_array($report['country_staging_drv_report'] ?? null)
+            ? $report['country_staging_drv_report']
+            : [];
+        $stagingPassed = ($stagingPost['ok'] ?? false) === true
+            && (string) ($stagingDrv['overall_result'] ?? '') === 'pass';
+        if (!$stagingPassed) {
+            $errors[] = 'Country staging post-validation or staging DRV report did not pass.';
+        }
+    } else {
+        $errors[] = 'Unknown restore job type for staging gate.';
+    }
+
+    $manifestPath = trim((string) ($job['staging_restore_manifest_path'] ?? ''));
+    if ($manifestPath === '' || !is_file($manifestPath)) {
+        $manifestPath = orange_restore_job_staging_manifest_path($workRoot, $jobId);
+    }
+    $manifestChecksum = '';
+    if (!is_file($manifestPath)) {
+        $errors[] = 'Missing staging_restore_manifest.json.';
+    } else {
+        $manifestChecksum = orange_restore_validation_adapter_file_checksum($manifestPath);
+    }
+
+    return [
+        'ok' => $errors === [],
+        'errors' => $errors,
+        'warnings' => $warnings,
+        'report' => $report,
+        'manifest_path' => $manifestPath,
+        'manifest_checksum' => $manifestChecksum,
+        'staging_validation_passed' => $stagingPassed && $manifestChecksum !== '',
     ];
 }

@@ -79,5 +79,16 @@ function orange_restore_audit_from_job(array $job, string $stage, string $result
         'fresh_backup_path' => (string) ($job['fresh_backup_path'] ?? ''),
         'fresh_backup_checksum' => (string) ($job['fresh_backup_checksum'] ?? ''),
         'production_merge_approved' => (bool) ($job['production_merge_approved'] ?? false),
+        'job_status' => (string) ($job['status'] ?? ''),
     ], $extra);
+}
+
+/**
+ * @param array<string, mixed> $extra
+ */
+function orange_restore_audit_approval_event(array $job, string $event, string $result, array $extra = []): array
+{
+    return orange_restore_audit_from_job($job, 'approval_gate', $result, array_merge([
+        'approval_event' => $event,
+    ], $extra));
 }

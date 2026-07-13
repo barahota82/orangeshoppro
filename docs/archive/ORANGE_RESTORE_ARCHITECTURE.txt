@@ -73,7 +73,7 @@ Phase 2A — Restore foundation (IMPLEMENTED — schema-free)
 
 Phase 2B.1 — Full restore → staging CLI only (IMPLEMENTED)
 Phase 2B.2 — Country restore → staging CLI only (IMPLEMENTED)
-Phase 2C — Approval + staging validation gate CLI
+Phase 2C — Approval + staging validation gate CLI (IMPLEMENTED)
 Phase 2D.1 — Full production merge CLI
 Phase 2D.2 — Country production merge CLI
 Phase 2E — End-to-end orchestration CLI (manual steps, not scheduled)
@@ -155,6 +155,42 @@ Self-test:
 **Failure policy:** production unchanged; `staging_dirty=true` after staging mutation begins; rollback anchor preserved if Stage 3 succeeded; no automatic retry.
 
 **NOT in 2B.2:** Production merge, full-disaster merge, Admin UI, restore APIs, automatic restore.
+
+================================================================================
+Phase 2C deliverables (approval + staging validation gate — no merge, no production)
+================================================================================
+
+CLI entries:
+  scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=PHRASE --action=approve
+  scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password=SECRET --action=reject|cancel --reason=TEXT
+  scripts/backup/restore_job_status.php --job=JOB_ID
+
+Orchestrator + modules:
+  includes/backup/restore/restore_orchestrator.php
+  includes/backup/restore/restore_approval.php (token issue/verify/consume/invalidate)
+  includes/backup/restore/restore_reauth.php (Super Admin + permission + password re-auth)
+  includes/backup/restore/restore_validation_adapter.php (staging gate from restore_report.json)
+  includes/backup/restore/restore_job.php (state `approved_for_merge`, approval transitions)
+  includes/backup/restore/restore_audit.php (approval/rejection audit events)
+
+Self-test:
+  scripts/backup/self_test_restore_approval.php
+
+**Scope (2C only):**
+- Applies **only** to jobs in `awaiting_owner_approval` (after 2B.1 / 2B.2 staging restore)
+- Gates: Super Admin + dedicated permission (`backup_restore_full` or `backup_restore_country`) + mandatory password re-authentication + exact typed confirmation phrase (`RESTORE` or `RESTORE {COUNTRY_CODE}`) + live package checksum match + staging validation passed (restore_report + staging manifest) + rollback anchor recorded + approval window not expired
+- One-time approval token: cryptographically random, SHA-256 hashed at rest, bound to job/operator/scope/checksums, short TTL (1h), single-use, invalidated on use/reject/cancel/job mutation
+- Successful approval transitions job to `approved_for_merge` only — **never** writes production DB, production uploads, merge SQL, or merge engine
+- Rejection/cancellation before merge: records `rejected_by`/`rejected_at`/`rejection_reason` or cancellation fields; status `cancelled`; no automatic retry
+- Read-only job status CLI: package, checksums, staging validation, rollback anchor, approval status, audit events (no secrets/password hashes)
+- Append-only filesystem audit: re-auth, confirmation phrase, token issued/consumed, rejection/cancellation, state transitions
+
+**State machine (2C):**
+  awaiting_owner_approval → approved_for_merge
+  awaiting_owner_approval → cancelled
+  (No direct transition to production_merged or completed)
+
+**NOT in 2C:** Production merge, Admin UI, restore APIs, automatic restore, schema changes.
 
 ================================================================================
 Phase 2A deliverables (filesystem)

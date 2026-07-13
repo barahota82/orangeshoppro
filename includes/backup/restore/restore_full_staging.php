@@ -220,6 +220,7 @@ function orange_restore_full_staging_run(array $options): array
         orange_backup_write_json($reportPath, $report);
         $job = orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL, [
             'restore_report_path' => $reportPath,
+            'owner_approval_window_started_at' => gmdate('c'),
         ]);
 
         orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_from_job($job, 'staging_restore', 'pass', [

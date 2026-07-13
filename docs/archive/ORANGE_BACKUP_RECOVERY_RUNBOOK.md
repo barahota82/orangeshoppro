@@ -398,13 +398,66 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2B.2 section
 
 ---
 
-## Deferred — Phase 2C+ and Phase 3
+## Phase 2C — Owner Approval + Staging Validation Gate (CLI only)
+
+**Scope:** After a successful 2B.1 or 2B.2 staging restore, a Super Admin with the correct restore permission may **approve**, **reject**, or **cancel** the job. Approval moves the job to `approved_for_merge` only — **no production writes, no merge execution, no Admin UI.**
+
+**Prerequisites:** Job status must be `awaiting_owner_approval` with:
+- `restore_report.json` showing `overall_result=pass` and `production_touched=false`
+- Staging post-validation passed (full or country path)
+- `staging_restore_manifest.json` present
+- Stage 3 rollback anchor on job (`fresh_backup_path` + `fresh_backup_checksum`)
+- Owner approval window open (default 7 days from `owner_approval_window_started_at`)
+
+**Approval gates (all required):**
+1. Super Admin session operator (`--admin-id`)
+2. Dedicated permission: `backup_restore_full` (full disaster) or `backup_restore_country` (country recovery)
+3. Password re-authentication (`--password`)
+4. Exact confirmation phrase: `RESTORE` (full) or `RESTORE {COUNTRY_CODE}` (country)
+5. Live source package checksum matches job record
+6. Staging validation gate pass (report + manifest checksums bound into approval token)
+7. Rollback anchor present
+8. Job not expired, failed, cancelled, or already approved
+
+**Commands:**
+
+```powershell
+# Read-only status (JSON report — no secrets)
+php D:\orange\scripts\backup\restore_job_status.php --job=yyyy-MM-dd_HHmmss_xxxxxxxx
+
+# Approve for future merge (does NOT merge)
+php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password=SECRET --confirm=RESTORE --action=approve
+
+# Country approve example
+php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password=SECRET --confirm="RESTORE KW" --action=approve
+
+# Reject or cancel before merge
+php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password=SECRET --action=reject --reason="Owner declined"
+php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password=SECRET --action=cancel --reason="Operator cancelled"
+```
+
+**On success:** Job status becomes `approved_for_merge`. One-time approval token is issued and consumed in the same operation (hash stored on job + sidecar metadata). Filesystem audit records re-auth, phrase check, token lifecycle, and state transition.
+
+**Failure policy:** Any gate failure aborts with no state change (except audit of failed re-auth/phrase/permission). Rejection/cancellation sets status `cancelled` with reason fields. No automatic retry. Active approval tokens invalidated on job mutation, reject, or cancel.
+
+**Self-test:**
+
+```powershell
+php D:\orange\scripts\backup\self_test_restore_approval.php
+```
+
+Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2C section)
+
+---
+
+## Deferred — Phase 2D+ and Phase 3
 
 The following are **not part of Phase 1A / 1B** and must not be assumed available:
 
 | Item | Target phase |
 |------|----------------|
 | Production merge | Phase 2D (gated by `ORANGE_RESTORE_OWNER_POLICY.txt`) |
+| Owner approval gate (`approved_for_merge`) | **Phase 2C implemented** |
 | Admin backup/restore UI wrapper | Phase 3 |
 | Dedicated permissions `backup_restore_full` / `backup_restore_country` | **Phase 2A implemented** |
 | Restore audit DB table | First mutating restore phase (not 2A) |
@@ -422,6 +475,7 @@ php D:\orange\scripts\backup\self_test_country_batch_export.php
 php D:\orange\scripts\backup\self_test_recovery_validation.php
 php D:\orange\scripts\backup\self_test_restore_full_staging.php
 php D:\orange\scripts\backup\self_test_restore_country_staging.php
+php D:\orange\scripts\backup\self_test_restore_approval.php
 php D:\orange\scripts\backup\backup_environment_check.php
 php D:\orange\scripts\backup\validate_backup_recoverability.php --package=D:\orange_backups\snapshots\yyyy-MM-dd_HHmmss
 php D:\orange\scripts\backup\validate_registry.php --offline

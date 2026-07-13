@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../admin_permissions.php';
+require_once __DIR__ . '/restore_job.php';
+
 /**
  * Re-authentication gate — current session is NOT sufficient (owner policy §4).
- * Used by future restore CLIs before any job stage that mutates state.
  */
 function orange_restore_verify_operator_password(PDO $pdo, int $adminId, string $password): bool
 {
@@ -22,13 +24,62 @@ function orange_restore_verify_operator_password(PDO $pdo, int $adminId, string 
 }
 
 /**
- * @param array<string, mixed> $admin Row from admins table
+ * @return array<string, mixed>
+ */
+function orange_restore_reauth_load_admin(PDO $pdo, int $adminId): array
+{
+    if ($adminId <= 0) {
+        throw new RuntimeException('Invalid admin id for restore re-authentication.');
+    }
+    $st = $pdo->prepare(
+        'SELECT id, username, display_name, is_active, is_superuser FROM admins WHERE id = ? LIMIT 1'
+    );
+    $st->execute([$adminId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($row)) {
+        throw new RuntimeException('Restore operator admin not found: ' . (string) $adminId);
+    }
+    if ((int) ($row['is_active'] ?? 0) !== 1) {
+        throw new RuntimeException('Restore operator admin is inactive.');
+    }
+
+    return $row;
+}
+
+/**
+ * @param array<string, mixed> $admin
  */
 function orange_restore_assert_superuser_operator(array $admin): void
 {
     if ((int) ($admin['is_superuser'] ?? 0) !== 1) {
         throw new RuntimeException('Restore operator must be Super Admin.');
     }
+}
+
+/**
+ * @param array<string, mixed> $admin
+ */
+function orange_restore_reauth_assert_restore_permission(array $admin, PDO $pdo, string $jobType): void
+{
+    orange_restore_assert_superuser_operator($admin);
+
+    if ($jobType === ORANGE_RESTORE_JOB_TYPE_FULL) {
+        if (!orange_admin_may_backup_restore_full($admin, $pdo)) {
+            throw new RuntimeException('Operator lacks backup_restore_full permission.');
+        }
+
+        return;
+    }
+
+    if ($jobType === ORANGE_RESTORE_JOB_TYPE_COUNTRY) {
+        if (!orange_admin_may_backup_restore_country($admin, $pdo)) {
+            throw new RuntimeException('Operator lacks backup_restore_country permission.');
+        }
+
+        return;
+    }
+
+    throw new RuntimeException('Unknown restore job type for permission check.');
 }
 
 function orange_restore_reauth_timestamp(): string

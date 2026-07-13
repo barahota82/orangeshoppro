@@ -13,6 +13,7 @@ const ORANGE_RESTORE_JOB_STATUS_FRESH_BACKUP = 'fresh_backup_recorded';
 const ORANGE_RESTORE_JOB_STATUS_STAGING = 'staging_restore';
 const ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED = 'staging_validated';
 const ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL = 'awaiting_owner_approval';
+const ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE = 'approved_for_merge';
 const ORANGE_RESTORE_JOB_STATUS_MERGE_APPROVED = 'merge_approved';
 const ORANGE_RESTORE_JOB_STATUS_MERGED = 'production_merged';
 const ORANGE_RESTORE_JOB_STATUS_COMPLETED = 'completed';
@@ -31,6 +32,7 @@ function orange_restore_job_allowed_statuses(): array
         ORANGE_RESTORE_JOB_STATUS_STAGING,
         ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED,
         ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL,
+        ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE,
         ORANGE_RESTORE_JOB_STATUS_MERGE_APPROVED,
         ORANGE_RESTORE_JOB_STATUS_MERGED,
         ORANGE_RESTORE_JOB_STATUS_COMPLETED,
@@ -80,9 +82,24 @@ function orange_restore_job_create(string $workRoot, array $input): array
         'rollback_anchor_job_only' => true,
         'reauth_verified_at' => (string) ($input['reauth_verified_at'] ?? ''),
         'approval_token' => '',
+        'approval_token_hash' => '',
+        'approval_token_binding' => [],
+        'approval_token_issued_at' => '',
+        'approval_token_expires_at' => '',
+        'approval_token_consumed_at' => '',
+        'approval_token_invalidated_at' => '',
+        'approval_token_invalidation_reason' => '',
         'approval_phrase_expected' => (string) ($input['approval_phrase_expected'] ?? ''),
+        'owner_approval_window_started_at' => '',
         'owner_approval_at' => '',
         'owner_approval_by' => '',
+        'owner_approval_admin_id' => 0,
+        'rejected_by' => '',
+        'rejected_at' => '',
+        'rejection_reason' => '',
+        'cancelled_by' => '',
+        'cancelled_at' => '',
+        'cancellation_reason' => '',
         'production_merge_approved' => false,
         'result' => '',
         'stage_failed' => '',
@@ -153,6 +170,42 @@ function orange_restore_job_full_staging_transition_map(): array
         ORANGE_RESTORE_JOB_STATUS_STAGING => [ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED],
         ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED => [ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL],
     ];
+}
+
+/**
+ * Phase 2C approval gate transitions (no merge/completed).
+ *
+ * @return array<string, list<string>>
+ */
+function orange_restore_job_approval_transition_map(): array
+{
+    return [
+        ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL => [
+            ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE,
+            ORANGE_RESTORE_JOB_STATUS_CANCELLED,
+        ],
+    ];
+}
+
+function orange_restore_job_assert_approval_transition(string $fromStatus, string $toStatus): void
+{
+    if ($toStatus === ORANGE_RESTORE_JOB_STATUS_FAILED) {
+        return;
+    }
+
+    $allowed = orange_restore_job_approval_transition_map()[$fromStatus] ?? [];
+    if (!in_array($toStatus, $allowed, true)) {
+        throw new RuntimeException(
+            'Invalid restore approval transition: ' . $fromStatus . ' -> ' . $toStatus
+        );
+    }
+}
+
+function orange_restore_job_has_active_approval_token(array $job): bool
+{
+    return (string) ($job['approval_token_hash'] ?? '') !== ''
+        && (string) ($job['approval_token_consumed_at'] ?? '') === ''
+        && (string) ($job['approval_token_invalidated_at'] ?? '') === '';
 }
 
 function orange_restore_job_assert_full_staging_transition(string $fromStatus, string $toStatus): void
