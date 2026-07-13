@@ -1,0 +1,122 @@
+ORANGE — Restore Architecture (Approved — Owner adjustments 2026-07-13)
+================================================================================
+Document type: Engineering archive — Restore Phase 2 architecture
+Status: APPROVED for phased implementation
+Policy gate: docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt (acknowledged)
+Runbook: docs/archive/ORANGE_BACKUP_RECOVERY_RUNBOOK.md
+Schema revision at design time: 121
+================================================================================
+
+**Implementation gate:** Restore code follows this document and owner policy.
+Phase 2A (foundation) is schema-free and performs NO restore execution.
+
+================================================================================
+CLI-first architecture (Permanent owner adjustment #2)
+================================================================================
+
+All restore **business logic** lives in CLI scripts and `includes/backup/restore/*`.
+Future Admin UI is a **thin wrapper only**:
+
+    CLI Engine (scripts/backup/restore_*.php + includes/backup/restore/*)
+            ↓
+    Admin UI Wrapper (Phase 3 — invokes same CLI/orchestrator)
+            ↓
+    Operator (Super Admin + permission + re-auth + confirmation)
+
+**Rules:**
+- Admin pages/APIs must NOT duplicate restore logic (no SQL import, merge, or
+  validation algorithms in admin/api/restore beyond spawning CLI and displaying output).
+- Admin UI passes operator credentials into the same gates as CLI (re-auth, permissions,
+  typed confirmation, approval token).
+- No public endpoint, webhook, scheduled task, or background worker may invoke restore.
+
+================================================================================
+Rollback policy (Permanent owner adjustment #3)
+================================================================================
+
+**The ONLY production rollback anchor** for a restore job is the **Stage 3 Fresh
+Full Disaster Backup created inside that same restore job** (recorded on the job as
+`fresh_backup_path` + `fresh_backup_checksum` with `rollback_anchor_job_only=true`).
+
+- Older snapshots (including pre-job manual backups) must **never** automatically
+  become rollback anchors.
+- If Stage 3 fresh backup fails or is missing, merge must not proceed.
+- Post-merge rollback (when implemented) restores production from **that job's**
+  Stage 3 backup only — not from arbitrary older packages.
+
+================================================================================
+Mandatory restore pipeline (both Full and Country)
+================================================================================
+
+1. Package Selection
+2. Package Validation (Phase 1C DRV + verify)
+3. Fresh Full Disaster Backup (rollback anchor for THIS job)
+4. Staging Restore (Phase 2B — not implemented in 2A)
+5. Staging Validation (DRV on staging artifact)
+6. Owner Review
+7. Explicit Approval (typed phrase + approval token)
+8. Production Merge (Phase 2D — forbidden direct-to-production)
+9. Post Validation
+10. Audit finalize
+
+Country Restore and Full Restore use **separate** permissions, CLIs, merge engines,
+and audit scope (`full_disaster` vs `country_recovery`).
+
+================================================================================
+Phase breakdown (implementation)
+================================================================================
+
+Phase 2A — Restore foundation (IMPLEMENTED — schema-free)
+- Job store (filesystem JSON), lock, filesystem audit, approval/re-auth contracts
+- Permissions: backup_restore_full, backup_restore_country
+- NO restore execution, NO DB audit table, NO staging, NO merge
+
+Phase 2B.1 — Full restore → staging CLI only
+Phase 2B.2 — Country restore → staging CLI only
+Phase 2C — Approval + staging validation gate CLI
+Phase 2D.1 — Full production merge CLI
+Phase 2D.2 — Country production merge CLI
+Phase 2E — End-to-end orchestration CLI (manual steps, not scheduled)
+Phase 3 — Admin UI wrapper (no business logic)
+
+**DB audit table `restore_audit_log`:** deferred until the first phase that performs
+actual restore operations (not Phase 2A).
+
+================================================================================
+Phase 2A deliverables (filesystem)
+================================================================================
+
+includes/backup/restore/restore_paths.php
+includes/backup/restore/restore_job.php
+includes/backup/restore/restore_lock.php
+includes/backup/restore/restore_audit.php
+includes/backup/restore/restore_approval.php
+includes/backup/restore/restore_reauth.php
+scripts/backup/self_test_restore_foundation.php
+
+Permission helpers: includes/admin_permissions.php
+  - orange_admin_restore_permission_keys()
+  - orange_admin_may_backup_restore_full()
+  - orange_admin_may_backup_restore_country()
+
+================================================================================
+Environment (server-only .env.php — documented, not in repo)
+================================================================================
+
+ORANGE_BACKUP_ROOT          — existing
+ORANGE_RESTORE_WORK_DIR       — optional override; default {BackupRoot}/restore_work
+
+Future (Phase 2B+):
+ORANGE_RESTORE_STAGING_DB     — staging database name (not used in 2A)
+
+================================================================================
+Audit strategy (Phase 2A → Phase 2B transition)
+================================================================================
+
+Phase 2A: append-only `audit.jsonl` per job under restore_work/{job_id}/.
+Phase 2B+ (first mutating phase): introduce immutable DB table `restore_audit_log`
+and mirror events from filesystem audit; DB becomes authoritative read surface.
+
+Minimum audit fields (owner policy §8): operator, timestamp, source package,
+package checksum, package version, schema revision, country/full, staging target,
+production merge approval, duration, result.

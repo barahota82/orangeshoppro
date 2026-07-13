@@ -24,6 +24,8 @@ function orange_admin_resource_labels(): array
         'reports' => 'التقارير وسجل النشاط',
         'settings' => 'إعدادات الشركة والواجهات',
         'admin_users' => 'المستخدمون والصلاحيات',
+        'backup_restore_full' => 'استعادة كاملة (Full Disaster Restore)',
+        'backup_restore_country' => 'استعادة دولة (Country Recovery Restore)',
     ];
 }
 
@@ -45,6 +47,8 @@ function orange_admin_resource_screen_hints(): array
         'reports' => 'تقارير المبيعات، تحليل القنوات، سجل النشاط',
         'settings' => 'بيانات الشركة، الدول، قنوات العملاء، مناطق التوصيل، بانر المتجر، عروض السلة (مجموع/هدايا/BOGO/كومبو)، دمج هاتف التسجيل، أرشيف المستندات',
         'admin_users' => 'المستخدمون والصلاحيات (مشرف عام فقط)',
+        'backup_restore_full' => 'استعادة كاملة — Super Admin + صلاحية مخصصة (CLI فقط حتى Phase 3)',
+        'backup_restore_country' => 'استعادة دولة — Super Admin + صلاحية مخصصة (CLI فقط حتى Phase 3)',
     ];
 }
 
@@ -957,4 +961,32 @@ function orange_admin_nav_visible(array $admin, PDO $pdo, string $page): bool
         return orange_admin_has_full_access($admin);
     }
     return orange_admin_may_page($admin, $pdo, $page, 'view');
+}
+
+/** @return list<string> */
+function orange_admin_restore_permission_keys(): array
+{
+    return ['backup_restore_full', 'backup_restore_country'];
+}
+
+function orange_admin_may_backup_restore_full(array $admin, PDO $pdo): bool
+{
+    if (!orange_admin_is_superuser($admin)) {
+        return false;
+    }
+    $matrix = orange_admin_permissions_matrix($pdo, (int) $admin['id']);
+    $row = $matrix['backup_restore_full'] ?? null;
+
+    return is_array($row) && !empty($row['can_view']);
+}
+
+function orange_admin_may_backup_restore_country(array $admin, PDO $pdo): bool
+{
+    if (!orange_admin_is_superuser($admin)) {
+        return false;
+    }
+    $matrix = orange_admin_permissions_matrix($pdo, (int) $admin['id']);
+    $row = $matrix['backup_restore_country'] ?? null;
+
+    return is_array($row) && !empty($row['can_view']);
 }

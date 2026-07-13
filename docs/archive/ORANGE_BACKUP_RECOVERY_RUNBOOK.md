@@ -276,22 +276,48 @@ php D:\orange\scripts\backup\self_test_recovery_validation.php
 
 ---
 
-## Deferred — Phase 2 and later
+## Phase 2A — Restore foundation (implemented — schema-free)
+
+| Item | Status |
+|------|--------|
+| Restore job store (filesystem JSON) | **Implemented** |
+| Restore global lock | **Implemented** |
+| Filesystem audit (`audit.jsonl` per job) | **Implemented** — no DB table yet |
+| Approval + re-auth contracts | **Implemented** (no execution) |
+| Permissions `backup_restore_full` / `backup_restore_country` | **Implemented** (Super Admin + dedicated permission) |
+| Staging restore / production merge | **Not implemented** |
+| Admin restore UI | **Not implemented — Phase 3** |
+| DB table `restore_audit_log` | **Deferred** — first phase with actual restore ops |
+
+**CLI-first (permanent):** All restore business logic must live in CLI + `includes/backup/restore/*`. Future Admin UI wraps CLI only — no duplicate restore logic in admin PHP.
+
+**Rollback (permanent):** Stage 3 fresh full backup recorded **inside the current restore job** is the **only** automatic production rollback anchor. Older backups never become rollback anchors automatically.
+
+Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt`
+
+```powershell
+php D:\orange\scripts\backup\self_test_restore_foundation.php
+```
+
+---
+
+## Deferred — Phase 2B+ and Phase 3
 
 The following are **not part of Phase 1A / 1B** and must not be assumed available:
 
 | Item | Target phase |
 |------|----------------|
-| Staging restore / production merge | Phase 2 (gated by `ORANGE_RESTORE_OWNER_POLICY.txt`) |
-| Admin backup module / job tables | Phase 3 |
-| Dedicated permission `backup_restore` | Phase 2 (owner policy) |
-| Restore audit log (immutable) | Phase 2 (owner policy) |
+| Staging restore / production merge | Phase 2B–2D (gated by `ORANGE_RESTORE_OWNER_POLICY.txt`) |
+| Admin backup/restore UI wrapper | Phase 3 |
+| Dedicated permissions `backup_restore_full` / `backup_restore_country` | **Phase 2A implemented** |
+| Restore audit DB table | First mutating restore phase (not 2A) |
 
 ---
 
 ## QA commands (read-only / self-test)
 
 ```powershell
+php D:\orange\scripts\backup\self_test_restore_foundation.php
 php D:\orange\scripts\backup\self_test_backup.php
 php D:\orange\scripts\backup\self_test_backup_retention.php
 php D:\orange\scripts\backup\self_test_country_export.php
@@ -311,6 +337,7 @@ php D:\orange\scripts\backup\verify_full_backup.php --package=D:\orange_backups\
 
 - Operator usage: `scripts/backup/README.md`
 - **Restore owner policy (permanent):** `docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt`
+- **Restore architecture (approved):** `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt`
 - Deploy / schema policy: `IBRAHIM_ORANGE_MASTER.txt` §2–§4, `docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`
 - Engineering decisions: Production Readiness Review PR-BAK-01, PR-BAK-02; checkpoint `docs/archive/ORANGE_ENGINEERING_CHECKPOINT_01.md`
 
@@ -328,8 +355,10 @@ php D:\orange\scripts\backup\verify_full_backup.php --package=D:\orange_backups\
 | Pre-migration snapshot procedure documented | This runbook + README |
 | Country Recovery Package (CRP) export | **Implemented — Phase 1B.2** |
 | Table registry (inventory) | **Implemented — Phase 1B.1** |
-| Staging restore / merge | **Not implemented — Phase 2** (gated by owner restore policy) |
-| Restore automation (full DB) | **Forbidden by owner policy** — Super Admin + `backup_restore` + staging workflow only |
-| Admin backup module | **Not implemented — Phase 3** |
-| Restore owner policy archived | **Yes** — `docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt` (2026-07-13) |
+| Restore foundation (Phase 2A) | **Implemented — schema-free, no execution** |
+| Staging restore / merge | **Not implemented — Phase 2B–2D** |
+| Restore automation | **Forbidden by owner policy** — CLI + Super Admin + permissions only |
+| Admin restore UI | **Not implemented — Phase 3 wrapper only** |
+| Restore owner policy archived | **Yes** — `docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt` |
+| Restore architecture archived | **Yes** — `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` |
 | Restore tested on production | **Required before go-live** — operator responsibility |
