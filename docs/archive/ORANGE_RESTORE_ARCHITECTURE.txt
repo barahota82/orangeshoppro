@@ -223,12 +223,12 @@ Production Merge must **never** use the normal application MySQL account (`DB_US
   ORANGE_RESTORE_MERGE_DB_PASS
 
 Rules:
-- Must differ from `DB_USER` and from `ORANGE_RESTORE_STAGING_DB_USER`
+- Must differ from `DB_USER` / `DB_PASS` and from `ORANGE_RESTORE_STAGING_DB_USER` / `ORANGE_RESTORE_STAGING_DB_PASS`
 - Production database schema only (`DB_NAME` / `config.php`)
 - Minimum privileges required for merge (DDL/DML on production schema only — operator grants manually)
 - Never reused by the web application or routine backup/export paths
 - Documented in `.env.example.php`, this file, and `ORANGE_BACKUP_RECOVERY_RUNBOOK.md`
-- **Fail closed:** if either key is missing, empty, or equals `DB_USER` / staging user, merge aborts before any production write
+- **Fail closed:** if either key is missing, empty, or equals the application/staging user or password, merge aborts before any production write
 
 **Owner Decision — Uploads cutover volume safety (permanent, 2026-07-13):**
 Before any production uploads cutover, the merge engine **must** verify that live
@@ -302,13 +302,13 @@ ORANGE_RESTORE_STAGING_DB_PASS — **required** staging MySQL password
 
 Phase 2D.1 — Production Merge (architecture approved; **not implemented**):
 ORANGE_RESTORE_MERGE_DB_USER — **required** dedicated production-merge MySQL user (must differ from DB_USER and ORANGE_RESTORE_STAGING_DB_USER)
-ORANGE_RESTORE_MERGE_DB_PASS — **required** production-merge MySQL password
+ORANGE_RESTORE_MERGE_DB_PASS — **required** production-merge MySQL password (must differ from DB_PASS and ORANGE_RESTORE_STAGING_DB_PASS)
 
 Phase 2B.1 does **not** use production DB credentials or production uploads paths. Fail closed if
 staging keys are missing, staging DB equals production, or staging user equals production DB_USER.
 
 Phase 2D.1 merge must **not** use DB_USER / DB_PASS. Fail closed if ORANGE_RESTORE_MERGE_DB_USER
-or ORANGE_RESTORE_MERGE_DB_PASS is missing, empty, or equals DB_USER or staging user.
+or ORANGE_RESTORE_MERGE_DB_PASS is missing, empty, or equals the application/staging user or password.
 
 **Recommended MySQL grants (operator applies manually — Orange does not modify production privileges):**
 ```sql

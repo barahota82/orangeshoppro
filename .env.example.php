@@ -75,8 +75,8 @@ return [
     // 'ORANGE_RESTORE_WORK_DIR' => 'D:\\orange_backups\\restore_work',
 
     // Phase 2D.1 — Full Production Merge (ARCHITECTURE APPROVED — NOT IMPLEMENTED).
-    // Dedicated production-merge MySQL user ONLY — never DB_USER / DB_PASS, never staging user.
-    // Fail closed if missing or equal to DB_USER or ORANGE_RESTORE_STAGING_DB_USER.
+    // Dedicated production-merge MySQL user/password ONLY — never DB_USER / DB_PASS, never staging user/password.
+    // Fail closed if missing/empty or equal to DB_USER/DB_PASS or ORANGE_RESTORE_STAGING_DB_USER/_PASS.
     // 'ORANGE_RESTORE_MERGE_DB_USER' => 'orange_restore_merge',
     // 'ORANGE_RESTORE_MERGE_DB_PASS' => 'strong_merge_password',
 

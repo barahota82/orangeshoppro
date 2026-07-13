@@ -471,11 +471,11 @@ Production Merge must **never** use `DB_USER` / `DB_PASS`. Required server-only 
 | Key | Required | Notes |
 |-----|----------|-------|
 | `ORANGE_RESTORE_MERGE_DB_USER` | Yes | Must differ from `DB_USER` and `ORANGE_RESTORE_STAGING_DB_USER` |
-| `ORANGE_RESTORE_MERGE_DB_PASS` | Yes | Dedicated merge password |
+| `ORANGE_RESTORE_MERGE_DB_PASS` | Yes | Must differ from `DB_PASS` and `ORANGE_RESTORE_STAGING_DB_PASS` |
 
 - Production schema (`DB_NAME`) only; minimum merge privileges; never used by the application
 - Documented in `.env.example.php`, architecture archive, and this runbook
-- **Fail closed:** missing/empty/duplicate user → merge aborts before any production write
+- **Fail closed:** missing/empty/reused user or password → merge aborts before any production write
 
 Example grants (operator applies on server — adjust to minimum required):
 
