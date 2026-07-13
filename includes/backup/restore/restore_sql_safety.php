@@ -290,6 +290,10 @@ function orange_restore_sql_is_schema_qualified_object_context(array $lexemes, i
         return false;
     }
 
+    if ($last === 'INSERT' || $last === 'REPLACE') {
+        return true;
+    }
+
     if ($last === 'FROM') {
         return true;
     }
@@ -306,8 +310,45 @@ function orange_restore_sql_is_schema_qualified_object_context(array $lexemes, i
         return true;
     }
 
+    if ($last === 'VIEW') {
+        foreach (['CREATE', 'ALTER', 'DROP'] as $keyword) {
+            if (in_array($keyword, $preceding, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    if (in_array($last, ['TRIGGER', 'PROCEDURE', 'FUNCTION', 'EVENT'], true)) {
+        foreach (['CREATE', 'ALTER', 'DROP'] as $keyword) {
+            if (in_array($keyword, $preceding, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    if ($last === 'CALL') {
+        return true;
+    }
+
     if ($last === 'TRUNCATE') {
         return true;
+    }
+
+    if ($last === 'DESCRIBE' || $last === 'DESC') {
+        return true;
+    }
+
+    if ($last === 'ANALYZE' || $last === 'OPTIMIZE' || $last === 'CHECK' || $last === 'REPAIR') {
+        return true;
+    }
+
+    if ($last === 'ON') {
+        return orange_restore_sql_idents_contain_ordered_sequence($preceding, ['CREATE', 'INDEX'])
+            || orange_restore_sql_idents_contain_ordered_sequence($preceding, ['DROP', 'INDEX']);
     }
 
     if ($last === 'TO') {
@@ -320,11 +361,21 @@ function orange_restore_sql_is_schema_qualified_object_context(array $lexemes, i
 
     if ($last === 'EXISTS') {
         return orange_restore_sql_idents_contain_ordered_sequence($preceding, ['CREATE', 'TABLE'])
-            || orange_restore_sql_idents_contain_ordered_sequence($preceding, ['DROP', 'TABLE']);
+            || orange_restore_sql_idents_contain_ordered_sequence($preceding, ['DROP', 'TABLE'])
+            || orange_restore_sql_idents_contain_ordered_sequence($preceding, ['CREATE', 'VIEW'])
+            || orange_restore_sql_idents_contain_ordered_sequence($preceding, ['DROP', 'VIEW'])
+            || orange_restore_sql_idents_contain_ordered_sequence($preceding, ['DROP', 'TRIGGER'])
+            || orange_restore_sql_idents_contain_ordered_sequence($preceding, ['DROP', 'PROCEDURE'])
+            || orange_restore_sql_idents_contain_ordered_sequence($preceding, ['DROP', 'FUNCTION'])
+            || orange_restore_sql_idents_contain_ordered_sequence($preceding, ['DROP', 'EVENT']);
     }
 
     if ($last === 'TABLE') {
-        foreach (['CREATE', 'ALTER', 'DROP', 'RENAME', 'TRUNCATE'] as $keyword) {
+        if (orange_restore_sql_idents_contain_ordered_sequence($preceding, ['LOAD', 'DATA'])) {
+            return true;
+        }
+
+        foreach (['CREATE', 'ALTER', 'DROP', 'RENAME', 'TRUNCATE', 'ANALYZE', 'OPTIMIZE', 'CHECK', 'REPAIR'] as $keyword) {
             if (in_array($keyword, $preceding, true)) {
                 return true;
             }
