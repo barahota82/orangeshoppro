@@ -92,6 +92,8 @@ Orchestrator + modules:
   includes/backup/restore/restore_full_staging.php
   includes/backup/restore/restore_staging_target.php
   includes/backup/restore/restore_sql_runner.php
+  includes/backup/restore/restore_sql_safety.php
+  includes/backup/restore/restore_package_compat.php
   includes/backup/restore/restore_uploads_applicator.php
   includes/backup/restore/restore_validation_adapter.php
   includes/backup/restore/restore_fresh_backup_gate.php
@@ -102,18 +104,22 @@ Self-test:
 **Scope (2B.1 only):**
 - CLI-only full disaster restore into isolated staging DB + staging uploads under restore work dir
 - Pre-check: existing package verify + Phase 1C DRV (abort on failure)
-- Stage 3 fresh full disaster backup → rollback anchor on job (abort if backup/verify/DRV fails)
-- SQL import: streaming gzip (`orange_db.sql.gz`) — no full in-memory decompress
+- **Package compatibility gate:** `export_backend=php_pdo` only; mysqldump/PowerShell/DELIMITER dumps rejected **before** staging mutation
+- Stage 3 fresh full disaster backup → rollback anchor on job (**mandatory — no bypass flag**)
+- Dedicated staging MySQL credentials (`ORANGE_RESTORE_STAGING_DB_USER` / `_PASS`) — never production `DB_USER` / `DB_PASS`
+- SQL import: streaming gzip with pre-exec validator + `SELECT DATABASE()` session fence before/after each statement
+- Forbidden SQL: `USE`, `CREATE/DROP/ALTER DATABASE`, `DELIMITER`, cross-database `` `db`.`table` ``
 - Uploads: extract package `uploads.zip` into `{restore_work}/{job_id}/staging_uploads` only
 - Post-restore: staging DB postcheck + DRV-style staging report artifact
 - Outputs: `staging_restore_manifest.json`, `restore_report.json` under job directory
-- Job ends at `awaiting_owner_approval` — **no production merge**, **no country restore**
+- Job lifecycle: enforced transitions through `awaiting_owner_approval` — **no production merge**, **no country restore**
+- Restore lock: stale lock TTL (6h) + PID liveness; active locks never removed
 
 **Failure policy:**
-- Production DB and production uploads are never written
-- On any failure after staging wipe/import begins: `staging_dirty=true` on job, rollback anchor preserved if Stage 3 succeeded, no automatic retry
+- Production DB and production uploads are never written (fail-closed SQL validator + staging-only credentials + session checks)
+- On any failure after staging wipe/import begins: `staging_dirty=true` on job, rollback anchor preserved if Stage 3 succeeded, exact `stage_failed` recorded, no automatic retry
 
-**NOT in 2B.1:** Country restore, production merge, Admin UI, restore APIs, automatic/scheduled restore.
+**NOT in 2B.1:** Country restore, production merge, Admin UI, restore APIs, automatic/scheduled restore, mysqldump routine import.
 
 ================================================================================
 Phase 2A deliverables (filesystem)
@@ -138,10 +144,21 @@ Environment (server-only .env.php — documented, not in repo)
 
 ORANGE_BACKUP_ROOT          — existing
 ORANGE_RESTORE_WORK_DIR       — optional override; default {BackupRoot}/restore_work
-ORANGE_RESTORE_STAGING_DB     — **required for Phase 2B.1** staging database name (must differ from production DB_NAME)
+ORANGE_RESTORE_STAGING_DB     — **required** staging database name (must differ from production DB_NAME)
+ORANGE_RESTORE_STAGING_DB_USER — **required** dedicated staging MySQL user (must differ from production DB_USER)
+ORANGE_RESTORE_STAGING_DB_PASS — **required** staging MySQL password
 
-Phase 2B.1 does **not** use production DB or production uploads paths. Fail closed if
-ORANGE_RESTORE_STAGING_DB is missing or equals production.
+Phase 2B.1 does **not** use production DB credentials or production uploads paths. Fail closed if
+staging keys are missing, staging DB equals production, or staging user equals production DB_USER.
+
+**Recommended MySQL grants (operator applies manually — Orange does not modify production privileges):**
+```sql
+CREATE DATABASE orange_restore_staging CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'orange_restore_staging'@'localhost' IDENTIFIED BY 'strong_password';
+GRANT ALL PRIVILEGES ON orange_restore_staging.* TO 'orange_restore_staging'@'localhost';
+FLUSH PRIVILEGES;
+```
+The staging user must have **zero** privileges on the production database schema.
 
 ================================================================================
 Audit strategy (Phase 2A → Phase 2B transition)

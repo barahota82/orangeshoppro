@@ -9,6 +9,7 @@ declare(strict_types=1);
  *   php scripts/backup/restore_full_to_staging.php --package=PATH
  *
  * Never writes production DB or production uploads.
+ * Fresh backup rollback anchor is mandatory — no bypass flags.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -17,18 +18,18 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $packagePath = '';
-$skipFreshBackup = false;
 foreach ($_SERVER['argv'] ?? [] as $arg) {
     if (str_starts_with($arg, '--package=')) {
         $packagePath = trim(substr($arg, strlen('--package=')));
     }
     if ($arg === '--skip-fresh-backup') {
-        $skipFreshBackup = true;
+        fwrite(STDERR, "ERROR: --skip-fresh-backup is not supported (fresh backup anchor is mandatory).\n");
+        exit(2);
     }
 }
 
 if ($packagePath === '') {
-    fwrite(STDERR, "Usage: php restore_full_to_staging.php --package=PATH [--skip-fresh-backup]\n");
+    fwrite(STDERR, "Usage: php restore_full_to_staging.php --package=PATH\n");
     exit(2);
 }
 
@@ -39,7 +40,6 @@ try {
     $result = orange_restore_full_staging_run([
         'project_root' => $projectRoot,
         'package_path' => $packagePath,
-        'skip_fresh_backup' => $skipFreshBackup,
     ]);
     echo 'ok=1' . PHP_EOL;
     echo 'job_id=' . (string) ($result['job_id'] ?? '') . PHP_EOL;

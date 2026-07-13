@@ -10,16 +10,19 @@ require_once __DIR__ . '/restore_sql_runner.php';
 require_once __DIR__ . '/restore_uploads_applicator.php';
 require_once __DIR__ . '/restore_validation_adapter.php';
 require_once __DIR__ . '/restore_fresh_backup_gate.php';
+require_once __DIR__ . '/restore_package_compat.php';
 require_once __DIR__ . '/../backup_manifest.php';
 require_once __DIR__ . '/../backup_environment.php';
 
 /**
  * Full disaster restore into staging only (Phase 2B.1).
  *
+ * Fresh backup anchor is mandatory — no bypass flags.
+ *
  * @param array{
  *   project_root:string,
  *   package_path:string,
- *   skip_fresh_backup?:bool
+ *   env_override?:array<string,mixed>
  * } $options
  * @return array<string, mixed>
  */
@@ -28,7 +31,6 @@ function orange_restore_full_staging_run(array $options): array
     $startedAt = microtime(true);
     $projectRoot = (string) ($options['project_root'] ?? '');
     $packagePathInput = (string) ($options['package_path'] ?? '');
-    $skipFreshBackup = (bool) ($options['skip_fresh_backup'] ?? false);
 
     if ($projectRoot === '' || $packagePathInput === '') {
         throw new InvalidArgumentException('project_root and package_path are required.');
@@ -41,6 +43,7 @@ function orange_restore_full_staging_run(array $options): array
     $backupRoot = orange_backup_resolve_root($env);
     $workRoot = orange_restore_resolve_work_root($env);
     $packagePath = orange_restore_resolve_package_path($backupRoot, $packagePathInput);
+    $productionDb = orange_restore_production_db_name($projectRoot);
 
     orange_restore_log('Restore full → staging START');
     orange_restore_log('Package=' . $packagePath);
@@ -53,6 +56,7 @@ function orange_restore_full_staging_run(array $options): array
     $jobId = '';
     $stagingDirty = false;
     $rollbackPreserved = false;
+    $currentStage = 'package_precheck';
 
     try {
         $precheck = orange_restore_validation_adapter_package_precheck($packagePath);
@@ -89,42 +93,59 @@ function orange_restore_full_staging_run(array $options): array
             'source_package_checksum' => $packageChecksum,
         ]);
 
-        if (!$skipFreshBackup) {
-            $fresh = orange_restore_fresh_backup_gate($projectRoot, $backupRoot);
-            if (!$fresh['ok']) {
-                throw new RuntimeException('Fresh backup gate failed: ' . implode('; ', $fresh['errors']));
-            }
-            $job = orange_restore_job_record_fresh_backup_anchor(
-                $workRoot,
-                $jobId,
-                $fresh['snapshot_path'],
-                $fresh['checksum']
-            );
-            $rollbackPreserved = true;
-            orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_from_job($job, 'fresh_backup_anchor', 'pass', [
-                'fresh_backup_path' => $fresh['snapshot_path'],
-                'fresh_backup_checksum' => $fresh['checksum'],
-            ]));
+        $stagingDb = orange_restore_staging_db_name($env, $projectRoot);
+        $compat = orange_restore_package_staging_import_compat($packagePath, $manifest, $stagingDb, $productionDb);
+        if (!$compat['ok']) {
+            throw new RuntimeException((string) ($compat['error'] ?? 'Package not compatible with Phase 2B.1 staging import.'));
         }
 
-        $stagingDb = orange_restore_staging_db_name($env, $projectRoot);
+        $currentStage = 'fresh_backup_anchor';
+        $fresh = orange_restore_fresh_backup_gate($projectRoot, $backupRoot);
+        if (!$fresh['ok']) {
+            throw new RuntimeException('Fresh backup gate failed: ' . implode('; ', $fresh['errors']));
+        }
+        $job = orange_restore_job_record_fresh_backup_anchor(
+            $workRoot,
+            $jobId,
+            $fresh['snapshot_path'],
+            $fresh['checksum']
+        );
+        $rollbackPreserved = true;
+        orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_from_job($job, 'fresh_backup_anchor', 'pass', [
+            'fresh_backup_path' => $fresh['snapshot_path'],
+            'fresh_backup_checksum' => $fresh['checksum'],
+        ]));
+
+        $currentStage = 'staging_target_confirm';
+        $stagingTarget = orange_restore_staging_confirm_target($projectRoot, $env);
+        orange_restore_audit_append($workRoot, $jobId, [
+            'stage' => 'staging_target_confirm',
+            'result' => 'pass',
+            'staging_db' => $stagingTarget['staging_db'],
+            'staging_user' => $stagingTarget['staging_user'],
+            'production_db' => $stagingTarget['production_db'],
+            'session_database' => $stagingTarget['session_database'],
+        ]);
+
         $stagingUploads = orange_restore_staging_uploads_directory($workRoot, $jobId);
+        $currentStage = 'staging_restore';
         $job = orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_STAGING, [
             'staging_db' => $stagingDb,
             'staging_uploads_path' => $stagingUploads,
             'staging_dirty' => true,
+            'staging_target_confirmed_at' => $stagingTarget['confirmed_at'],
         ]);
         $stagingDirty = true;
 
         $pdo = orange_restore_connect_staging_pdo($projectRoot, $env);
-        orange_restore_staging_wipe($pdo);
+        orange_restore_staging_wipe($pdo, $stagingDb);
 
         $dumpFile = (string) ($manifest['dump_file'] ?? '');
         if ($dumpFile === '') {
             throw new RuntimeException('manifest.dump_file missing.');
         }
         $dumpPath = $packagePath . DIRECTORY_SEPARATOR . $dumpFile;
-        $sqlResult = orange_restore_sql_runner_import_gzip($pdo, $dumpPath);
+        $sqlResult = orange_restore_sql_runner_import_gzip($pdo, $dumpPath, $stagingDb, $productionDb);
         if (!$sqlResult['ok']) {
             throw new RuntimeException((string) ($sqlResult['error'] ?? 'SQL import failed'));
         }
@@ -139,6 +160,7 @@ function orange_restore_full_staging_run(array $options): array
             }
         }
 
+        $currentStage = 'staging_post_validation';
         $stagingPost = orange_restore_validation_adapter_staging_postcheck($pdo, $stagingDb, $manifest);
         $stagingDrv = orange_restore_validation_adapter_build_staging_drv_report(
             is_array($precheck['drv']) ? $precheck['drv'] : [],
@@ -154,8 +176,10 @@ function orange_restore_full_staging_run(array $options): array
             'job_type' => ORANGE_RESTORE_JOB_TYPE_FULL,
             'source_package_path' => $packagePath,
             'source_package_checksum' => $packageChecksum,
+            'export_backend' => (string) ($compat['export_backend'] ?? ''),
             'staging_db' => $stagingDb,
             'staging_uploads_path' => $stagingUploads,
+            'staging_target' => $stagingTarget,
             'sql_import' => $sqlResult,
             'uploads_extract' => $uploadsResult,
             'staging_post_validation' => $stagingPost,
@@ -214,9 +238,9 @@ function orange_restore_full_staging_run(array $options): array
         ];
     } catch (Throwable $e) {
         if ($jobId !== '') {
-            orange_restore_job_mark_failed($workRoot, $jobId, 'staging_restore', $e->getMessage(), $stagingDirty);
+            orange_restore_job_mark_failed($workRoot, $jobId, $currentStage, $e->getMessage(), $stagingDirty);
             orange_restore_audit_append($workRoot, $jobId, [
-                'stage' => 'staging_restore',
+                'stage' => $currentStage,
                 'result' => 'failed',
                 'error' => $e->getMessage(),
                 'staging_dirty' => $stagingDirty,

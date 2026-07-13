@@ -98,6 +98,7 @@ orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_from_job($jo
 $auditRows = orange_restore_audit_read_all($workRoot, $jobId);
 restore_foundation_test(count($auditRows) === 1, 'audit: append one record');
 
+orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_VALIDATED);
 $updated = orange_restore_job_record_fresh_backup_anchor(
     $workRoot,
     $jobId,

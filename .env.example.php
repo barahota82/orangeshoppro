@@ -66,6 +66,14 @@ return [
     // اختياري — مدة الاحتفاظ بالنسخ الاحتياطية (أيام). الافتراضي 30 عند غياب المفتاح.
     // 'ORANGE_BACKUP_RETENTION_DAYS' => 30,
 
+    // Phase 2B.1 — Full Disaster Restore → STAGING (CLI only; server-only secrets).
+    // Staging DB/user must differ from production DB_NAME / DB_USER. Staging user: zero production privileges.
+    // Supported restore packages: manifest.export_backend=php_pdo only (see ORANGE_BACKUP_RECOVERY_RUNBOOK.md).
+    // 'ORANGE_RESTORE_STAGING_DB' => 'orange_restore_staging',
+    // 'ORANGE_RESTORE_STAGING_DB_USER' => 'orange_restore_staging',
+    // 'ORANGE_RESTORE_STAGING_DB_PASS' => 'strong_staging_password',
+    // 'ORANGE_RESTORE_WORK_DIR' => 'D:\\orange_backups\\restore_work',
+
     // ==================================================================
     // بوابة الدفع الإلكتروني (المرحلة 2) — أسرار السيرفر فقط، لا تُرفع لـ Git.
     // معطّلة افتراضياً: بلا هذه المفاتيح + بلا تفعيل «الدفع بالبطاقة» per دولة = لا تعمل.

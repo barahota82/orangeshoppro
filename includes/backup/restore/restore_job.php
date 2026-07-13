@@ -142,6 +142,34 @@ function orange_restore_job_write(string $workRoot, array $job): void
 }
 
 /**
+ * @return array<string, list<string>>
+ */
+function orange_restore_job_full_staging_transition_map(): array
+{
+    return [
+        ORANGE_RESTORE_JOB_STATUS_CREATED => [ORANGE_RESTORE_JOB_STATUS_VALIDATED],
+        ORANGE_RESTORE_JOB_STATUS_VALIDATED => [ORANGE_RESTORE_JOB_STATUS_FRESH_BACKUP],
+        ORANGE_RESTORE_JOB_STATUS_FRESH_BACKUP => [ORANGE_RESTORE_JOB_STATUS_STAGING],
+        ORANGE_RESTORE_JOB_STATUS_STAGING => [ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED],
+        ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED => [ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL],
+    ];
+}
+
+function orange_restore_job_assert_full_staging_transition(string $fromStatus, string $toStatus): void
+{
+    if ($toStatus === ORANGE_RESTORE_JOB_STATUS_FAILED || $toStatus === ORANGE_RESTORE_JOB_STATUS_CANCELLED) {
+        return;
+    }
+
+    $allowed = orange_restore_job_full_staging_transition_map()[$fromStatus] ?? [];
+    if (!in_array($toStatus, $allowed, true)) {
+        throw new RuntimeException(
+            'Invalid full-disaster restore job transition: ' . $fromStatus . ' -> ' . $toStatus
+        );
+    }
+}
+
+/**
  * @param array<string, mixed> $patch
  * @return array<string, mixed>
  */
@@ -151,6 +179,10 @@ function orange_restore_job_transition(string $workRoot, string $jobId, string $
         throw new RuntimeException('Invalid restore job status: ' . $newStatus);
     }
     $job = orange_restore_job_read($workRoot, $jobId);
+    $currentStatus = (string) ($job['status'] ?? '');
+    if (($job['job_type'] ?? '') === ORANGE_RESTORE_JOB_TYPE_FULL) {
+        orange_restore_job_assert_full_staging_transition($currentStatus, $newStatus);
+    }
     $job['status'] = $newStatus;
     foreach ($patch as $key => $value) {
         $job[(string) $key] = $value;

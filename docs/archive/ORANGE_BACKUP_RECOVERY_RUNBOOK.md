@@ -314,18 +314,33 @@ php D:\orange\scripts\backup\self_test_restore_full_staging.php
 |-----|----------|-------|
 | `ORANGE_BACKUP_ROOT` | Yes | Package must live under this root |
 | `ORANGE_RESTORE_STAGING_DB` | Yes | Staging MySQL database name; **must not** equal production `DB_NAME` |
+| `ORANGE_RESTORE_STAGING_DB_USER` | Yes | Dedicated staging MySQL user; **must not** equal production `DB_USER` |
+| `ORANGE_RESTORE_STAGING_DB_PASS` | Yes | Staging MySQL password |
 | `ORANGE_RESTORE_WORK_DIR` | No | Default `{ORANGE_BACKUP_ROOT}/restore_work` |
 
-Create the staging database on the server before first restore (empty schema is wiped at start of import).
+Create the staging database and staging-only MySQL user before first restore. Example grants (apply manually on the server):
+
+```sql
+CREATE DATABASE orange_restore_staging CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'orange_restore_staging'@'localhost' IDENTIFIED BY 'strong_password';
+GRANT ALL PRIVILEGES ON orange_restore_staging.* TO 'orange_restore_staging'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+The staging user must have **zero** privileges on the production database.
+
+**Supported package backends (Phase 2B.1):** `manifest.export_backend=php_pdo` only. Packages from mysqldump/PowerShell (`php_mysqldump`, `powershell`, …) or SQL containing `DELIMITER` / `USE` / routine blocks are **rejected before staging mutation**.
 
 **Workflow:**
 
 1. Operator selects package path under `ORANGE_BACKUP_ROOT`.
 2. CLI runs **package verify** + **Phase 1C DRV** — abort on failure.
-3. CLI creates a **fresh full disaster backup** (Stage 3) and records it on the job as the **rollback anchor** — abort if backup or verify fails.
-4. CLI wipes **staging DB only**, streams `orange_db.sql.gz` import, extracts uploads to `{restore_work}/{job_id}/staging_uploads`.
-5. CLI runs **staging post-validation** and writes `staging_restore_manifest.json` + `restore_report.json`.
-6. Job status becomes `awaiting_owner_approval` — merge is **not** part of 2B.1.
+3. CLI verifies **php_pdo** compatibility and scans SQL for forbidden patterns — abort before staging mutation if unsupported.
+4. CLI creates a **fresh full disaster backup** (Stage 3, mandatory) and records it on the job as the **rollback anchor** — abort if backup or verify fails. **No bypass flag.**
+5. CLI confirms staging target (dedicated credentials, `SELECT DATABASE()`, privilege fence) and records it in audit.
+6. CLI wipes **staging DB only**, streams `orange_db.sql.gz` import (validated statements + session fence), extracts uploads to `{restore_work}/{job_id}/staging_uploads`.
+7. CLI runs **staging post-validation** and writes `staging_restore_manifest.json` + `restore_report.json`.
+8. Job status becomes `awaiting_owner_approval` — merge is **not** part of 2B.1.
 
 **Command:**
 
@@ -333,13 +348,7 @@ Create the staging database on the server before first restore (empty schema is 
 php D:\orange\scripts\backup\restore_full_to_staging.php --package=D:\orange_backups\snapshots\yyyy-MM-dd_HHmmss
 ```
 
-Optional for operator testing only (skips Stage 3 fresh backup — **not for production disaster drills**):
-
-```powershell
-php D:\orange\scripts\backup\restore_full_to_staging.php --package=PATH --skip-fresh-backup
-```
-
-**Failure policy:** Production DB and production uploads remain untouched. On failure after staging mutation, job is marked `failed` with `staging_dirty=true`. Rollback anchor from Stage 3 is preserved when recorded. No automatic retry.
+**Failure policy:** Production DB and production uploads remain untouched (staging-only credentials + SQL validator rejects database-switch statements + `SELECT DATABASE()` checks). On failure after staging mutation, job is marked `failed` with `staging_dirty=true` and exact `stage_failed`. Rollback anchor from Stage 3 is preserved when recorded. No automatic retry. Stale restore locks (6h TTL or dead PID) may be cleared safely; active locks are never removed.
 
 **Self-test:**
 

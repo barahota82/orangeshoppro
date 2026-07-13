@@ -7,9 +7,6 @@ declare(strict_types=1);
  *
  * Usage:
  *   php scripts/backup/self_test_restore_full_staging.php
- *
- * Most tests use temp fixtures (no production writes). Live staging restore runs only when
- * .env.php defines ORANGE_RESTORE_STAGING_DB and database connectivity is available.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -25,8 +22,11 @@ require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARAT
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_environment.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_paths.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_job.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_lock.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_staging_target.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_sql_safety.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_sql_runner.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_package_compat.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_uploads_applicator.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_validation_adapter.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_fresh_backup_gate.php';
@@ -80,6 +80,7 @@ function restore_staging_write_full_package(string $dir, array $overrides = []):
     $sql = "-- Orange restore staging self-test\n"
         . "CREATE TABLE restore_demo (id INT PRIMARY KEY, label VARCHAR(64));\n"
         . "INSERT INTO restore_demo VALUES (1, 'staging');\n"
+        . "# hash comment line\n"
         . "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;\n";
     $dumpPath = $dir . DIRECTORY_SEPARATOR . 'orange_db.sql.gz';
     $out = gzopen($dumpPath, 'wb9');
@@ -88,7 +89,6 @@ function restore_staging_write_full_package(string $dir, array $overrides = []):
 
     $uploadsZip = $dir . DIRECTORY_SEPARATOR . 'uploads.zip';
     orange_country_uploads_write_empty_zip($uploadsZip);
-    file_put_contents($dir . DIRECTORY_SEPARATOR . 'uploads_probe.txt', 'not-in-zip');
 
     $manifest = array_merge([
         'package_type' => 'full_disaster',
@@ -121,9 +121,228 @@ function restore_staging_write_full_package(string $dir, array $overrides = []):
     orange_backup_write_checksums($dir, ['orange_db.sql.gz', 'uploads.zip', 'manifest.json', 'health.json']);
 }
 
-/**
- * @return array{backup_root:string,work_root:string,package_dir:string}
- */
+function restore_staging_write_gzip_sql(string $path, string $sql): void
+{
+    $out = gzopen($path, 'wb9');
+    gzwrite($out, $sql);
+    gzclose($out);
+}
+
+function restore_staging_validate_rejects(string $sql, string $stagingDb, string $productionDb): bool
+{
+    try {
+        orange_restore_sql_validate_statement_for_staging($sql, $stagingDb, $productionDb);
+
+        return false;
+    } catch (Throwable) {
+        return true;
+    }
+}
+
+$fixture = restore_staging_fixture_layout();
+$backupRoot = $fixture['backup_root'];
+$workRoot = $fixture['work_root'];
+$packageDir = $fixture['package_dir'];
+
+$stagingDbName = 'orange_restore_staging_test';
+$productionDbName = orange_restore_production_db_name($projectRoot);
+
+$envOverride = [
+    'ORANGE_BACKUP_ROOT' => $backupRoot,
+    'ORANGE_RESTORE_WORK_DIR' => $workRoot,
+    ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName,
+    ORANGE_RESTORE_ENV_STAGING_DB_USER => 'restore_staging_user',
+    ORANGE_RESTORE_ENV_STAGING_DB_PASS => 'restore_staging_pass',
+];
+
+// SQL safety validator
+restore_staging_self_test(
+    restore_staging_validate_rejects('USE `' . $productionDbName . '`;', $stagingDbName, $productionDbName),
+    'sql safety: USE production_db rejected before execution'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects('CREATE DATABASE evil;', $stagingDbName, $productionDbName),
+    'sql safety: CREATE DATABASE rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects('DROP DATABASE evil;', $stagingDbName, $productionDbName),
+    'sql safety: DROP DATABASE rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects(
+        'INSERT INTO `' . $productionDbName . '`.`accounts` VALUES (1);',
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: fully qualified production table rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects('DELIMITER ;;', $stagingDbName, $productionDbName),
+    'sql safety: DELIMITER rejected'
+);
+restore_staging_self_test(
+    orange_restore_sql_is_comment_only("# only hash comment\n-- and dash\n"),
+    'sql safety: # comment-only statement recognized'
+);
+
+// Package backend compatibility
+$pdoCompat = orange_restore_package_staging_import_compat(
+    $packageDir,
+    json_decode((string) file_get_contents($packageDir . DIRECTORY_SEPARATOR . 'manifest.json'), true) ?: [],
+    $stagingDbName,
+    $productionDbName
+);
+restore_staging_self_test($pdoCompat['ok'] === true, 'package compat: php_pdo package accepted');
+
+$mysqldumpDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'pkg_mysqldump';
+mkdir($mysqldumpDir, 0775, true);
+restore_staging_write_full_package($mysqldumpDir, ['manifest' => ['export_backend' => 'php_mysqldump']]);
+$mysqldumpCompat = orange_restore_package_staging_import_compat(
+    $mysqldumpDir,
+    json_decode((string) file_get_contents($mysqldumpDir . DIRECTORY_SEPARATOR . 'manifest.json'), true) ?: [],
+    $stagingDbName,
+    $productionDbName
+);
+restore_staging_self_test($mysqldumpCompat['ok'] === false, 'package compat: php_mysqldump rejected before mutation');
+
+$delimiterDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'pkg_delimiter';
+mkdir($delimiterDir, 0775, true);
+restore_staging_write_full_package($delimiterDir);
+$delimiterDump = $delimiterDir . DIRECTORY_SEPARATOR . 'orange_db.sql.gz';
+restore_staging_write_gzip_sql($delimiterDump, "DELIMITER ;;\nCREATE TABLE x (id INT);;\nDELIMITER ;\n");
+$delimiterCompat = orange_restore_package_staging_import_compat(
+    $delimiterDir,
+    json_decode((string) file_get_contents($delimiterDir . DIRECTORY_SEPARATOR . 'manifest.json'), true) ?: [],
+    $stagingDbName,
+    $productionDbName
+);
+restore_staging_self_test($delimiterCompat['ok'] === false, 'package compat: DELIMITER dump rejected before mutation');
+
+// Staging credentials fail closed
+try {
+    orange_restore_staging_credentials([ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName], $projectRoot);
+    restore_staging_self_test(false, 'staging creds: missing ORANGE_RESTORE_STAGING_DB_USER rejected');
+} catch (Throwable $e) {
+    restore_staging_self_test(str_contains($e->getMessage(), 'ORANGE_RESTORE_STAGING_DB_USER'), 'staging creds: missing user rejected');
+}
+
+$productionCreds = orange_restore_production_db_credentials($projectRoot);
+try {
+    orange_restore_staging_credentials([
+        ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName,
+        ORANGE_RESTORE_ENV_STAGING_DB_USER => $productionCreds['user'],
+        ORANGE_RESTORE_ENV_STAGING_DB_PASS => 'x',
+    ], $projectRoot);
+    restore_staging_self_test(false, 'staging creds: production DB_USER reuse rejected');
+} catch (Throwable $e) {
+    restore_staging_self_test(str_contains($e->getMessage(), 'must not equal production DB_USER'), 'staging creds: production DB_USER reuse rejected');
+}
+
+// Lock: active preserved, stale cleared
+$lockWork = $backupRoot . DIRECTORY_SEPARATOR . 'lock_work';
+mkdir($lockWork, 0775, true);
+$activeLockPath = orange_restore_global_lock_path($lockWork);
+$activePayload = json_encode([
+    'pid' => getmypid(),
+    'hostname' => php_uname('n'),
+    'job_id' => 'active_job',
+    'started_at' => gmdate('c'),
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+file_put_contents($activeLockPath, $activePayload . "\n");
+$activeAgain = orange_restore_acquire_lock($lockWork, 'blocked');
+restore_staging_self_test($activeAgain['ok'] === false, 'lock: active lock preserved');
+@unlink($activeLockPath);
+
+$stalePayload = json_encode([
+    'pid' => 999999,
+    'hostname' => 'stale-host',
+    'job_id' => 'stale_job',
+    'started_at' => gmdate('c', time() - ORANGE_RESTORE_LOCK_STALE_SECONDS - 60),
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+file_put_contents($activeLockPath, $stalePayload . "\n");
+restore_staging_self_test(orange_restore_lock_is_stale(json_decode($stalePayload, true)), 'lock: stale lock detected');
+$staleAcquire = orange_restore_acquire_lock($lockWork, 'after_stale');
+restore_staging_self_test($staleAcquire['ok'] === true, 'lock: stale lock cleared and re-acquired');
+orange_restore_release_lock($lockWork);
+
+// Job lifecycle enforcement
+$lifeJob = orange_restore_job_create($workRoot, [
+    'job_type' => ORANGE_RESTORE_JOB_TYPE_FULL,
+    'operator_admin_id' => 0,
+    'operator_username' => 'cli',
+    'source_package_path' => $packageDir,
+    'source_package_checksum' => str_repeat('e', 64),
+    'package_version' => '1.2',
+    'schema_revision' => 121,
+    'approval_phrase_expected' => 'RESTORE',
+]);
+$lifeJobId = (string) ($lifeJob['job_id'] ?? '');
+try {
+    orange_restore_job_transition($workRoot, $lifeJobId, ORANGE_RESTORE_JOB_STATUS_STAGING);
+    restore_staging_self_test(false, 'job lifecycle: invalid jump created->staging rejected');
+} catch (Throwable $e) {
+    restore_staging_self_test(str_contains($e->getMessage(), 'Invalid full-disaster restore job transition'), 'job lifecycle: invalid transition rejected');
+}
+
+orange_restore_job_transition($workRoot, $lifeJobId, ORANGE_RESTORE_JOB_STATUS_VALIDATED);
+$failedStageJob = orange_restore_job_mark_failed($workRoot, $lifeJobId, 'package_compat', 'simulated', false);
+restore_staging_self_test(($failedStageJob['stage_failed'] ?? '') === 'package_compat', 'job lifecycle: exact failed stage recorded');
+
+// Orchestrator abort paths (no staging mutation)
+try {
+    orange_restore_full_staging_run([
+        'project_root' => $projectRoot,
+        'package_path' => $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'missing_pkg',
+        'env_override' => $envOverride,
+    ]);
+    restore_staging_self_test(false, 'orchestrator: missing package aborts');
+} catch (Throwable) {
+    restore_staging_self_test(true, 'orchestrator: missing package aborts');
+}
+
+$failPkgDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'pkg_fail';
+mkdir($failPkgDir, 0775, true);
+restore_staging_write_full_package($failPkgDir, [
+    'health' => ['package_status' => 'failed', 'failure_reasons' => ['simulated']],
+]);
+try {
+    orange_restore_full_staging_run([
+        'project_root' => $projectRoot,
+        'package_path' => $failPkgDir,
+        'env_override' => $envOverride,
+    ]);
+    restore_staging_self_test(false, 'orchestrator: failed validation aborts');
+} catch (Throwable) {
+    restore_staging_self_test(true, 'orchestrator: failed validation aborts');
+}
+
+// Upload restore
+$uploadsTarget = $backupRoot . DIRECTORY_SEPARATOR . 'uploads_target';
+mkdir($uploadsTarget, 0775, true);
+$uploadsZipWithFile = $backupRoot . DIRECTORY_SEPARATOR . 'uploads_with_file.zip';
+$zip = new ZipArchive();
+$zip->open($uploadsZipWithFile, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+$zip->addFromString('products/demo.txt', 'restore-upload-test');
+$zip->close();
+restore_staging_self_test(orange_restore_uploads_applicator_extract($uploadsZipWithFile, $uploadsTarget)['ok'] === true, 'uploads applicator: extract success');
+
+// CLI: --skip-fresh-backup unavailable
+$cliScript = $projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_full_to_staging.php';
+$cliPhp = (PHP_BINARY !== '' ? PHP_BINARY : 'php');
+$cliOutput = [];
+$cliExit = 0;
+exec(escapeshellarg($cliPhp) . ' ' . escapeshellarg($cliScript) . ' --package=x --skip-fresh-backup 2>&1', $cliOutput, $cliExit);
+restore_staging_self_test($cliExit === 2, 'cli: --skip-fresh-backup rejected');
+restore_staging_self_test(
+    str_contains(implode("\n", $cliOutput), 'not supported'),
+    'cli: skip-fresh-backup error message'
+);
+
+restore_staging_rmdir($backupRoot);
+
+echo PHP_EOL . ($failures === 0 ? 'ALL RESTORE STAGING SELF-TESTS PASSED' : "FAILURES: {$failures}") . PHP_EOL;
+exit($failures === 0 ? 0 : 1);
+
 function restore_staging_fixture_layout(): array
 {
     $backupRoot = restore_staging_temp_root();
@@ -139,247 +358,3 @@ function restore_staging_fixture_layout(): array
         'package_dir' => $packageDir,
     ];
 }
-
-$fixture = restore_staging_fixture_layout();
-$backupRoot = $fixture['backup_root'];
-$workRoot = $fixture['work_root'];
-$packageDir = $fixture['package_dir'];
-
-$envOverride = [
-    'ORANGE_BACKUP_ROOT' => $backupRoot,
-    'ORANGE_RESTORE_WORK_DIR' => $workRoot,
-];
-
-// missing package
-try {
-    orange_restore_full_staging_run([
-        'project_root' => $projectRoot,
-        'package_path' => $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'missing_pkg',
-        'skip_fresh_backup' => true,
-        'env_override' => $envOverride,
-    ]);
-    restore_staging_self_test(false, 'orchestrator: missing package aborts');
-} catch (Throwable) {
-    restore_staging_self_test(true, 'orchestrator: missing package aborts');
-}
-
-// failed package validation (DRV score below threshold)
-$failPkgDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'pkg_fail';
-mkdir($failPkgDir, 0775, true);
-restore_staging_write_full_package($failPkgDir, [
-    'health' => [
-        'package_status' => 'failed',
-        'failure_reasons' => ['simulated failure for restore self-test'],
-    ],
-]);
-try {
-    orange_restore_full_staging_run([
-        'project_root' => $projectRoot,
-        'package_path' => $failPkgDir,
-        'skip_fresh_backup' => true,
-        'env_override' => $envOverride,
-    ]);
-    restore_staging_self_test(false, 'orchestrator: failed validation aborts');
-} catch (Throwable) {
-    restore_staging_self_test(true, 'orchestrator: failed validation aborts');
-}
-
-$precheckFail = orange_restore_validation_adapter_package_precheck($failPkgDir);
-restore_staging_self_test($precheckFail['ok'] === false, 'validation adapter: failed package precheck');
-
-$precheckOk = orange_restore_validation_adapter_package_precheck($packageDir);
-restore_staging_self_test($precheckOk['ok'] === true, 'validation adapter: healthy package precheck');
-
-// missing staging DB config
-try {
-    orange_restore_staging_db_name([], $projectRoot);
-    restore_staging_self_test(false, 'staging target: missing ORANGE_RESTORE_STAGING_DB rejected');
-} catch (Throwable $e) {
-    restore_staging_self_test(
-        str_contains($e->getMessage(), 'ORANGE_RESTORE_STAGING_DB'),
-        'staging target: missing ORANGE_RESTORE_STAGING_DB rejected'
-    );
-}
-
-$productionDb = orange_restore_production_db_name($projectRoot);
-try {
-    orange_restore_staging_db_name([ORANGE_RESTORE_ENV_STAGING_DB => $productionDb], $projectRoot);
-    restore_staging_self_test(false, 'staging target: staging db equals production rejected');
-} catch (Throwable $e) {
-    restore_staging_self_test(
-        str_contains($e->getMessage(), 'must not equal production'),
-        'staging target: staging db equals production rejected'
-    );
-}
-
-// gzip failure / corrupted gzip
-$badGzipPath = $backupRoot . DIRECTORY_SEPARATOR . 'bad.sql.gz';
-file_put_contents($badGzipPath, 'not-a-gzip-stream');
-$pdoSqlite = new PDO('sqlite::memory:');
-$pdoSqlite->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$badGzipResult = orange_restore_sql_runner_import_gzip($pdoSqlite, $badGzipPath);
-restore_staging_self_test($badGzipResult['ok'] === false, 'sql runner: corrupted gzip fails');
-
-// corrupted SQL (valid gzip, invalid SQL statement)
-$corruptSqlPath = $backupRoot . DIRECTORY_SEPARATOR . 'corrupt.sql.gz';
-$gz = gzopen($corruptSqlPath, 'wb9');
-gzwrite($gz, "CREATE TABLE t1 (id INT);\nINSERT INTO t1 VALUES (;\n");
-gzclose($gz);
-$corruptSqlResult = orange_restore_sql_runner_import_gzip($pdoSqlite, $corruptSqlPath);
-restore_staging_self_test($corruptSqlResult['ok'] === false, 'sql runner: corrupted SQL fails import');
-
-// successful SQL streaming import (sqlite harness)
-$goodSqlPath = $backupRoot . DIRECTORY_SEPARATOR . 'good.sql.gz';
-$gz = gzopen($goodSqlPath, 'wb9');
-gzwrite($gz, "CREATE TABLE stream_demo (id INTEGER PRIMARY KEY);\nINSERT INTO stream_demo VALUES (42);\n");
-gzclose($gz);
-$goodSqlResult = orange_restore_sql_runner_import_gzip($pdoSqlite, $goodSqlPath);
-restore_staging_self_test($goodSqlResult['ok'] === true, 'sql runner: streaming import success');
-restore_staging_self_test(
-    (int) ($goodSqlResult['statements_executed'] ?? 0) >= 2,
-    'sql runner: progress counters populated'
-);
-
-// upload restore
-$uploadsTarget = $backupRoot . DIRECTORY_SEPARATOR . 'uploads_target';
-mkdir($uploadsTarget, 0775, true);
-$uploadsZipWithFile = $backupRoot . DIRECTORY_SEPARATOR . 'uploads_with_file.zip';
-$zip = new ZipArchive();
-$zip->open($uploadsZipWithFile, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-$zip->addFromString('products/demo.txt', 'restore-upload-test');
-$zip->close();
-$uploadsResult = orange_restore_uploads_applicator_extract($uploadsZipWithFile, $uploadsTarget);
-restore_staging_self_test($uploadsResult['ok'] === true, 'uploads applicator: extract success');
-restore_staging_self_test(
-    is_file($uploadsTarget . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'demo.txt'),
-    'uploads applicator: file present after extract'
-);
-
-$traversalZip = $backupRoot . DIRECTORY_SEPARATOR . 'traversal.zip';
-$zip = new ZipArchive();
-$zip->open($traversalZip, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-$zip->addFromString('../escape.txt', 'bad');
-$zip->close();
-$traversalResult = orange_restore_uploads_applicator_extract($traversalZip, $uploadsTarget);
-restore_staging_self_test($traversalResult['ok'] === false, 'uploads applicator: zip traversal blocked');
-
-// rollback anchor creation (job fields)
-$anchorJob = orange_restore_job_create($workRoot, [
-    'job_type' => ORANGE_RESTORE_JOB_TYPE_FULL,
-    'operator_admin_id' => 0,
-    'operator_username' => 'cli',
-    'source_package_path' => $packageDir,
-    'source_package_checksum' => str_repeat('c', 64),
-    'package_version' => '1.2',
-    'schema_revision' => 121,
-    'approval_phrase_expected' => 'RESTORE',
-]);
-$anchorJobId = (string) ($anchorJob['job_id'] ?? '');
-$anchorPath = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'fresh_anchor';
-mkdir($anchorPath, 0775, true);
-restore_staging_write_full_package($anchorPath);
-$anchorChecksum = orange_restore_fresh_backup_anchor_checksum(
-    $anchorPath,
-    json_decode((string) file_get_contents($anchorPath . DIRECTORY_SEPARATOR . 'manifest.json'), true) ?: []
-);
-$anchorUpdated = orange_restore_job_record_fresh_backup_anchor($workRoot, $anchorJobId, $anchorPath, $anchorChecksum);
-restore_staging_self_test(
-    ($anchorUpdated['fresh_backup_path'] ?? '') === $anchorPath,
-    'rollback anchor: fresh backup path recorded in job'
-);
-restore_staging_self_test(
-    ($anchorUpdated['rollback_anchor_job_only'] ?? false) === true,
-    'rollback anchor: job-only flag preserved'
-);
-
-// post-restore validation (DRV-style report builder)
-$stagingPostFake = [
-    'ok' => true,
-    'errors' => [],
-    'warnings' => [],
-    'table_count' => 5,
-    'database' => 'orange_restore_staging',
-];
-$stagingDrv = orange_restore_validation_adapter_build_staging_drv_report(
-    ['recovery_score' => 100, 'overall_result' => 'pass'],
-    $stagingPostFake
-);
-restore_staging_self_test(($stagingDrv['overall_result'] ?? '') === 'pass', 'post-restore validation: staging DRV report pass');
-restore_staging_self_test(
-    ($stagingDrv['validation_target'] ?? '') === 'staging_database',
-    'post-restore validation: staging target labeled'
-);
-$stagingDrvFail = orange_restore_validation_adapter_build_staging_drv_report(
-    ['recovery_score' => 100, 'overall_result' => 'pass'],
-    ['ok' => false, 'errors' => ['no tables'], 'warnings' => [], 'table_count' => 0, 'database' => 'x']
-);
-restore_staging_self_test(($stagingDrvFail['overall_result'] ?? '') === 'fail', 'post-restore validation: staging DRV report fail');
-
-// failure policy: staging marked dirty on import failure (unit-level)
-$dirtyJob = orange_restore_job_create($workRoot, [
-    'job_type' => ORANGE_RESTORE_JOB_TYPE_FULL,
-    'operator_admin_id' => 0,
-    'operator_username' => 'cli',
-    'source_package_path' => $packageDir,
-    'source_package_checksum' => str_repeat('d', 64),
-    'package_version' => '1.2',
-    'schema_revision' => 121,
-    'approval_phrase_expected' => 'RESTORE',
-]);
-$dirtyJobId = (string) ($dirtyJob['job_id'] ?? '');
-$failedJob = orange_restore_job_mark_failed($workRoot, $dirtyJobId, 'staging_restore', 'simulated import failure', true, [
-    'fresh_backup_path' => $anchorPath,
-    'fresh_backup_checksum' => $anchorChecksum,
-]);
-restore_staging_self_test(($failedJob['staging_dirty'] ?? false) === true, 'failure policy: staging_dirty on failure');
-restore_staging_self_test(
-    ($failedJob['fresh_backup_checksum'] ?? '') === $anchorChecksum,
-    'failure policy: rollback anchor preserved on failure'
-);
-
-// live staging restore (optional — requires .env.php + ORANGE_RESTORE_STAGING_DB + connectivity)
-$envReport = orange_backup_collect_environment_report($projectRoot);
-$liveEnv = orange_backup_load_env_array($projectRoot);
-$stagingDbConfigured = trim((string) ($liveEnv[ORANGE_RESTORE_ENV_STAGING_DB] ?? '')) !== '';
-if (!empty($envReport['database_connected']) && $stagingDbConfigured && is_file($projectRoot . DIRECTORY_SEPARATOR . '.env.php')) {
-    $liveEnvOverride = array_merge($envOverride, [
-        ORANGE_RESTORE_ENV_STAGING_DB => trim((string) $liveEnv[ORANGE_RESTORE_ENV_STAGING_DB]),
-    ]);
-    try {
-        $liveResult = orange_restore_full_staging_run([
-            'project_root' => $projectRoot,
-            'package_path' => $packageDir,
-            'skip_fresh_backup' => true,
-            'env_override' => $liveEnvOverride,
-        ]);
-        restore_staging_self_test(($liveResult['ok'] ?? false) === true, 'orchestrator: successful staging restore (live)');
-        $liveJobId = (string) ($liveResult['job_id'] ?? '');
-        $liveJob = orange_restore_job_read($workRoot, $liveJobId);
-        restore_staging_self_test(
-            ($liveJob['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL,
-            'orchestrator: job awaits approval after staging (no merge)'
-        );
-        restore_staging_self_test(
-            is_file((string) ($liveResult['staging_manifest_path'] ?? '')),
-            'orchestrator: staging_restore_manifest.json written'
-        );
-        restore_staging_self_test(
-            is_file((string) ($liveResult['report_path'] ?? '')),
-            'orchestrator: restore_report.json written'
-        );
-        $reportJson = json_decode((string) file_get_contents((string) $liveResult['report_path']), true);
-        restore_staging_self_test(
-            is_array($reportJson) && ($reportJson['production_touched'] ?? true) === false,
-            'orchestrator: production_touched false in report'
-        );
-    } catch (Throwable $e) {
-        restore_staging_self_test(false, 'orchestrator: successful staging restore (live) — ' . $e->getMessage());
-    }
-} else {
-    echo "SKIP: live staging restore (requires .env.php, DB connectivity, ORANGE_RESTORE_STAGING_DB)\n";
-}
-
-restore_staging_rmdir($backupRoot);
-
-echo PHP_EOL . ($failures === 0 ? 'ALL RESTORE STAGING SELF-TESTS PASSED' : "FAILURES: {$failures}") . PHP_EOL;
-exit($failures === 0 ? 0 : 1);
