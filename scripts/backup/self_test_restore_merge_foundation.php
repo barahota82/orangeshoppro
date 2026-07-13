@@ -83,7 +83,7 @@ final class MergeFoundationIdentityMockPdo extends PDO
         ];
     }
 
-    public function query(string $query, ?int $fetchMode = null): PDOStatement|false
+    public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false
     {
         if (stripos($query, 'SHOW GRANTS') !== false) {
             return new MergeFoundationMockGrantStatement($this->grantLines);
@@ -99,19 +99,19 @@ final class MergeFoundationIdentityMockPdo extends PDO
     }
 }
 
-final class MergeFoundationMockScalarStatement
+final class MergeFoundationMockScalarStatement extends PDOStatement
 {
     public function __construct(private mixed $value)
     {
     }
 
-    public function fetchColumn(): mixed
+    public function fetchColumn(int $column = 0): mixed
     {
         return $this->value;
     }
 }
 
-final class MergeFoundationMockGrantStatement
+final class MergeFoundationMockGrantStatement extends PDOStatement
 {
     /** @var list<string> */
     private array $lines;
