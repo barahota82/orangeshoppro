@@ -182,8 +182,18 @@ function orange_restore_job_write(string $workRoot, array $job): void
     if ($json === false) {
         throw new RuntimeException('Restore job JSON encode failed.');
     }
-    if (file_put_contents($path, $json . "\n", LOCK_EX) === false) {
-        throw new RuntimeException('Cannot write restore job file.');
+    $jobDir = dirname($path);
+    if (!is_dir($jobDir) && !@mkdir($jobDir, 0775, true) && !is_dir($jobDir)) {
+        throw new RuntimeException('Cannot create restore job directory.');
+    }
+    $tmpPath = $jobDir . DIRECTORY_SEPARATOR . '.job.' . bin2hex(random_bytes(6)) . '.tmp';
+    if (file_put_contents($tmpPath, $json . "\n", LOCK_EX) === false) {
+        @unlink($tmpPath);
+        throw new RuntimeException('Cannot write restore job temp file.');
+    }
+    if (!@rename($tmpPath, $path)) {
+        @unlink($tmpPath);
+        throw new RuntimeException('Cannot replace restore job file atomically.');
     }
 }
 
