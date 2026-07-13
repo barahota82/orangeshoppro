@@ -184,6 +184,18 @@ restore_staging_self_test(
     orange_restore_sql_is_comment_only("# only hash comment\n-- and dash\n"),
     'sql safety: # comment-only statement recognized'
 );
+$longInsertSql = "INSERT INTO restore_demo VALUES (2, '" . str_repeat('x', 70000) . "');\n";
+try {
+    $partialLongSplit = orange_restore_sql_runner_split_next_statement(substr($longInsertSql, 0, 65536));
+    restore_staging_self_test($partialLongSplit === null, 'sql runner: long string waits for next chunk');
+} catch (Throwable) {
+    restore_staging_self_test(false, 'sql runner: long string waits for next chunk');
+}
+$completeLongSplit = orange_restore_sql_runner_split_next_statement($longInsertSql);
+restore_staging_self_test(
+    is_array($completeLongSplit) && strlen($completeLongSplit['statement']) > 70000,
+    'sql runner: long string statement splits after terminator'
+);
 
 // Package backend compatibility
 $pdoCompat = orange_restore_package_staging_import_compat(
@@ -251,6 +263,12 @@ $activePayload = json_encode([
 file_put_contents($activeLockPath, $activePayload . "\n");
 $activeAgain = orange_restore_acquire_lock($lockWork, 'blocked');
 restore_staging_self_test($activeAgain['ok'] === false, 'lock: active lock preserved');
+orange_restore_update_lock_job_id($lockWork, 'updated_active_job');
+$updatedLockStatus = orange_restore_lock_status($lockWork);
+restore_staging_self_test(
+    ($updatedLockStatus['payload']['job_id'] ?? '') === 'updated_active_job',
+    'lock: active lock job id updated without release'
+);
 @unlink($activeLockPath);
 
 $stalePayload = json_encode([
