@@ -249,9 +249,7 @@ function orange_restore_merge_rollback_run(array $options): array
     ]));
 
     $mergePdo = $options['merge_pdo_override'] ?? null;
-    $mergePdo = $mergePdo instanceof PDO
-        ? $mergePdo
-        : orange_restore_connect_merge_pdo($projectRoot, $env);
+    $mergePdo = $mergePdo instanceof PDO ? $mergePdo : null;
 
     $renameOverride = isset($options['rename_override']) && is_callable($options['rename_override'])
         ? $options['rename_override']
@@ -289,6 +287,9 @@ function orange_restore_merge_rollback_run(array $options): array
             } else {
                 if ($anchor['dump_path'] === '' || !is_file($anchor['dump_path'])) {
                     throw new RuntimeException('Rollback anchor database dump missing.');
+                }
+                if (!$mergePdo instanceof PDO) {
+                    $mergePdo = orange_restore_connect_merge_pdo($projectRoot, $env);
                 }
                 orange_restore_production_wipe($mergePdo, $productionDb);
                 $import = orange_restore_sql_runner_import_gzip_to_target(
@@ -429,6 +430,9 @@ function orange_restore_merge_rollback_run(array $options): array
                 'env' => $env,
             ]);
         } else {
+            if (!$mergePdo instanceof PDO) {
+                $mergePdo = orange_restore_connect_merge_pdo($projectRoot, $env);
+            }
             $rollbackPost = orange_restore_validation_adapter_rollback_postcheck(
                 $projectRoot,
                 orange_restore_job_read($workRoot, $jobId),
