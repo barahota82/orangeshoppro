@@ -313,6 +313,18 @@ drv_self_test(
     'SQL completeness: quoted semicolon inside string accepted'
 );
 
+$mysqlExecutableComment = "/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;\n";
+drv_self_test(
+    orange_recovery_validate_sql_completeness($mysqlExecutableComment, 'dump.sql') === null,
+    'SQL completeness: MySQL executable comment ending with semicolon accepted'
+);
+
+$truncatedMysqlExecutableComment = "/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */\n";
+drv_self_test(
+    orange_recovery_validate_sql_completeness($truncatedMysqlExecutableComment, 'dump.sql') !== null,
+    'SQL completeness: MySQL executable comment missing semicolon detected'
+);
+
 $crpWithMissingUploadWarning = orange_recovery_classify_health_warning('missing upload file: uploads/customers/42/');
 drv_self_test(
     str_starts_with($crpWithMissingUploadWarning, 'informational:'),
@@ -343,5 +355,19 @@ drv_self_test(($streamResult['ok'] ?? false) === true, 'gzip SQL streaming valid
 drv_self_test($streamElapsed < 5.0, 'gzip SQL streaming validation completes within 5 seconds');
 @unlink($streamGz);
 @rmdir($streamDir);
+
+$utf8StreamDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_drv_utf8_stream_' . bin2hex(random_bytes(4));
+mkdir($utf8StreamDir);
+$utf8StreamGz = $utf8StreamDir . DIRECTORY_SEPARATOR . 'utf8-large.sql.gz';
+$utf8StreamOut = gzopen($utf8StreamGz, 'wb9');
+$utf8StreamPayload = "-- Orange Phase 1A PDO SQL export\n"
+    . "INSERT INTO demo VALUES ('" . str_repeat("\xD8\xA7", 200000) . "');\n"
+    . "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;\n";
+gzwrite($utf8StreamOut, $utf8StreamPayload);
+gzclose($utf8StreamOut);
+$utf8StreamResult = orange_recovery_validate_gzip_sql_file($utf8StreamGz, 'UTF-8 stream SQL dump');
+drv_self_test(($utf8StreamResult['ok'] ?? false) === true, 'gzip SQL streaming validation accepts long UTF-8 string values');
+@unlink($utf8StreamGz);
+@rmdir($utf8StreamDir);
 
 exit($failures > 0 ? 1 : 0);
