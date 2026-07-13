@@ -5,17 +5,27 @@ declare(strict_types=1);
 require_once __DIR__ . '/restore_job.php';
 require_once __DIR__ . '/restore_audit.php';
 require_once __DIR__ . '/restore_lock.php';
+require_once __DIR__ . '/restore_reauth.php';
+require_once __DIR__ . '/restore_approval.php';
 require_once __DIR__ . '/restore_merge_maintenance.php';
 require_once __DIR__ . '/restore_merge_precheck.php';
 require_once __DIR__ . '/restore_validation_adapter.php';
 require_once __DIR__ . '/../backup_environment.php';
 require_once __DIR__ . '/../backup_manifest.php';
 
+function orange_restore_uploads_assert_not_symlink(string $path, string $label): void
+{
+    if (is_link($path)) {
+        throw new RuntimeException($label . ' must not be a symlink/junction: ' . $path);
+    }
+}
+
 /**
  * @return array{file_count:int,total_size:int,tree_checksum_sha256:string,checksum_lines:list<string>}
  */
 function orange_restore_uploads_tree_inventory(string $rootDir): array
 {
+    orange_restore_uploads_assert_not_symlink($rootDir, 'Uploads root');
     if (!is_dir($rootDir)) {
         throw new RuntimeException('Uploads directory does not exist: ' . $rootDir);
     }
@@ -31,14 +41,18 @@ function orange_restore_uploads_tree_inventory(string $rootDir): array
     $checksumLines = [];
 
     $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($rootReal, FilesystemIterator::SKIP_DOTS)
+        new RecursiveDirectoryIterator($rootReal, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
     );
     foreach ($iterator as $fileInfo) {
-        if (!$fileInfo instanceof SplFileInfo || !$fileInfo->isFile()) {
+        if (!$fileInfo instanceof SplFileInfo) {
             continue;
         }
         if ($fileInfo->isLink()) {
             throw new RuntimeException('Symlink/junction blocked in uploads tree: ' . $fileInfo->getPathname());
+        }
+        if (!$fileInfo->isFile()) {
+            continue;
         }
 
         $fullPath = $fileInfo->getPathname();
@@ -115,6 +129,37 @@ function orange_restore_uploads_next_manifest_read(string $manifestPath): array
 }
 
 /**
+ * Assert uploads-cutover operator re-authentication (Super Admin + permission + password + phrase).
+ *
+ * @param array<string, mixed> $job
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_uploads_cutover_assert_operator_reauth(
+    PDO $adminPdo,
+    array $job,
+    int $adminId,
+    string $password,
+    string $confirmationPhrase
+): array {
+    $admin = orange_restore_reauth_load_admin($adminPdo, $adminId);
+    orange_restore_reauth_assert_restore_permission($admin, $adminPdo, (string) ($job['job_type'] ?? ''));
+    if (!orange_restore_verify_operator_password($adminPdo, $adminId, $password)) {
+        throw new RuntimeException('Operator password re-authentication failed.');
+    }
+
+    $countryCode = (string) ($job['country_code'] ?? '');
+    if (!orange_restore_validate_confirmation_phrase(
+        (string) ($job['job_type'] ?? ''),
+        $confirmationPhrase,
+        $countryCode
+    )) {
+        throw new RuntimeException('Confirmation phrase mismatch.');
+    }
+
+    return $admin;
+}
+
+/**
  * @param array<string, mixed> $job
  * @param callable(string,string):bool|null $sameVolumeOverride
  * @return array{
@@ -147,6 +192,23 @@ function orange_restore_merge_uploads_cutover_verify_preconditions(
     if (($job['job_type'] ?? '') !== ORANGE_RESTORE_JOB_TYPE_FULL) {
         throw new RuntimeException('Uploads cutover applies to full_disaster jobs only.');
     }
+
+    orange_restore_orchestrator_assert_approval_window_open($job);
+    if (!(bool) ($job['production_merge_approved'] ?? false)) {
+        throw new RuntimeException('Job production_merge_approved flag is false.');
+    }
+    if ((string) ($job['owner_approval_at'] ?? '') === '') {
+        throw new RuntimeException('Owner approval timestamp is missing.');
+    }
+    if ((string) ($job['approval_token_consumed_at'] ?? '') === '') {
+        throw new RuntimeException('Approval token has not been consumed.');
+    }
+    if ((string) ($job['approval_token_hash'] ?? '') === '') {
+        throw new RuntimeException('Approval token hash is missing on job.');
+    }
+    /** @var array<string, mixed> $approvalBinding */
+    $approvalBinding = is_array($job['approval_token_binding'] ?? null) ? $job['approval_token_binding'] : [];
+    orange_restore_merge_precheck_assert_binding_checksums($job, $approvalBinding);
 
     orange_restore_lock_assert_held_by_job($workRoot, $jobId);
     orange_restore_merge_maintenance_verify($workRoot, $jobId);
@@ -220,6 +282,10 @@ function orange_restore_merge_uploads_cutover_verify_preconditions(
     }
     if (!is_file($stagingManifestPath)) {
         throw new RuntimeException('Staging restore manifest missing.');
+    }
+    $liveManifestChecksum = orange_backup_sha256_file($stagingManifestPath);
+    if (!hash_equals((string) ($approvalBinding['staging_restore_manifest_checksum'] ?? ''), $liveManifestChecksum)) {
+        throw new RuntimeException('Staging manifest checksum mismatch (binding vs live manifest).');
     }
     $stagingManifest = json_decode((string) file_get_contents($stagingManifestPath), true);
     if (!is_array($stagingManifest)) {
@@ -358,7 +424,10 @@ function orange_restore_merge_uploads_cutover_atomic_rename(
  *   work_root?:string,
  *   job_id:string,
  *   admin_id:int,
+ *   password:string,
+ *   confirmation_phrase:string,
  *   env_override?:array<string,mixed>,
+ *   admin_pdo_override?:?PDO,
  *   same_volume_override?:?callable(string,string):bool,
  *   snapshot_override?:?callable(string,string,string):array<string,mixed>,
  *   rename_override?:?callable(string,string):void
@@ -374,9 +443,17 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
     $projectRoot = (string) ($options['project_root'] ?? '');
     $jobId = trim((string) ($options['job_id'] ?? ''));
     $adminId = (int) ($options['admin_id'] ?? 0);
+    $password = (string) ($options['password'] ?? '');
+    $confirmationPhrase = (string) ($options['confirmation_phrase'] ?? '');
 
     if ($projectRoot === '' || $jobId === '' || $adminId <= 0) {
         throw new InvalidArgumentException('project_root, job_id, and admin_id are required.');
+    }
+    if ($password === '') {
+        throw new InvalidArgumentException('password is required for uploads cutover re-authentication.');
+    }
+    if (trim($confirmationPhrase) === '') {
+        throw new InvalidArgumentException('confirmation_phrase is required for uploads cutover.');
     }
 
     $env = orange_backup_load_env_array($projectRoot);
@@ -392,7 +469,21 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
 
     $job = orange_restore_job_read($workRoot, $jobId);
     $startedAt = microtime(true);
-    $operatorUsername = (string) ($job['operator_username'] ?? '');
+
+    $adminPdo = $options['admin_pdo_override'] ?? null;
+    if (!$adminPdo instanceof PDO) {
+        require_once rtrim($projectRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'config.php';
+        $adminPdo = db();
+    }
+
+    $operator = orange_restore_merge_uploads_cutover_assert_operator_reauth(
+        $adminPdo,
+        $job,
+        $adminId,
+        $password,
+        $confirmationPhrase
+    );
+    $operatorUsername = (string) ($operator['username'] ?? ($job['operator_username'] ?? ''));
 
     /** @var callable(string,string):bool|null $sameVolumeOverride */
     $sameVolumeOverride = isset($options['same_volume_override']) && is_callable($options['same_volume_override'])

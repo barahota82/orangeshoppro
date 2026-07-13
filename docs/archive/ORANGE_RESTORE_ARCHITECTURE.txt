@@ -287,7 +287,7 @@ unchanged. **Production uploads cutover only** — production database untouched
 no post-validation.
 
 CLI entry:
-  scripts/backup/restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N
+  scripts/backup/restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
 
 Modules:
   includes/backup/restore/restore_merge_uploads_cutover.php
@@ -298,13 +298,14 @@ Modules:
 Self-test:
   scripts/backup/self_test_restore_uploads_cutover.php
 
-**Prerequisites:** Job `database_cutover_complete`; global restore lock held by current PID/job;
-maintenance mode **active and verified** for this job; `uploads_next/` prepared and verified under
+**Prerequisites:** Job `database_cutover_complete`; uploads cutover CLI can acquire the global
+restore lock for the current PID/job; maintenance mode **active and verified** for this job;
+Super Admin re-authentication (password + exact phrase `RESTORE`); `uploads_next/` prepared and verified under
 project root (same volume as live `uploads/`); `uploads_next_manifest.json` in job directory with
 `verified=true`, matching staging uploads tree checksum.
 
 **Workflow:**
-1. Re-verify cutover gates (lock, maintenance, rollback anchor, package checksum, uploads_next manifest)
+1. Re-verify cutover gates (lock, maintenance, owner approval binding, rollback anchor, package checksum, uploads_next manifest)
 2. Same-volume check (`uploads/` vs `uploads_next/`) — abort fail-closed if not atomic-rename-safe
 3. Pre-merge uploads snapshot → `{restore_work}/{job_id}/pre_merge_uploads_snapshot/` (path, counts, checksum manifest)
 4. Verify snapshot against live `uploads/` before any rename

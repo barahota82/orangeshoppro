@@ -531,14 +531,15 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.2 section
 
 **Prerequisites (operator):**
 1. Job in `database_cutover_complete` (Phase 2D.2 database cutover completed)
-2. Global restore lock acquired by the cutover CLI process for this job
+2. Uploads cutover CLI can acquire the global restore lock for this job
 3. Maintenance mode enabled and owned by this job
 4. `uploads_next/` prepared at project root, verified (`uploads_next_manifest.json` in job dir, `verified=true`, tree checksum matches staging uploads)
+5. Super Admin re-authenticates with password and exact confirmation phrase `RESTORE`
 
 **CLI:**
 
 ```powershell
-php D:\orange\scripts\backup\restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N
+php D:\orange\scripts\backup\restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
 ```
 
 **Pipeline:** pre-cutover gate revalidation → same-volume check → pre-merge uploads snapshot (checksum manifest) → verify snapshot → atomic directory renames (`uploads` → `uploads_pre_merge_{job}` ; `uploads_next` → `uploads`) → `uploads_cutover_complete`
