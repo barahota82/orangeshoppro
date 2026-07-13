@@ -5,8 +5,9 @@ declare(strict_types=1);
 /**
  * Phase 2D.3 — Production uploads cutover CLI (no DB writes, no rollback, no post-validation).
  *
- * Prerequisites: job in database_cutover_complete, global restore lock held by this process,
- * maintenance mode enabled and verified for this job, uploads_next prepared and verified.
+ * Prerequisites: job in database_cutover_complete, uploads_first_rename_pending (recovery),
+ * or uploads_first_rename_complete (resume second rename only); global restore lock held
+ * by this process, maintenance mode enabled and verified for this job, uploads_next prepared.
  *
  * Usage:
  *   php scripts/backup/restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N
