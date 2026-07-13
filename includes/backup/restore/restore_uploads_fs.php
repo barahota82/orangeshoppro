@@ -181,10 +181,14 @@ function orange_restore_uploads_fs_reparse_point_status(string $path): ?bool
     }
 
     $escaped = str_replace("'", "''", $path);
+    $quotedPath = "'" . $escaped . "'";
     $command = 'powershell -NoProfile -Command '
-        . '"$i=Get-Item -LiteralPath \''
-        . $escaped
-        . '\' -Force; if ($i.Attributes -band [IO.FileAttributes]::ReparsePoint) { ''1'' } else { ''0'' }"';
+        . '"$i=Get-Item -LiteralPath ' . $quotedPath
+        . ' -Force; if ($i.Attributes -band [IO.FileAttributes]::ReparsePoint) { '
+        . "'1'"
+        . ' } else { '
+        . "'0'"
+        . ' }"';
     $descriptors = [
         0 => ['pipe', 'r'],
         1 => ['pipe', 'w'],
