@@ -308,6 +308,18 @@ drv_self_test(
     'SQL completeness: quoted semicolon inside string accepted'
 );
 
+$mysqlVersionComment = "/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;\n";
+drv_self_test(
+    orange_recovery_validate_sql_completeness($mysqlVersionComment, 'full_dump.sql') === null,
+    'SQL completeness: MySQL executable version comment with semicolon accepted'
+);
+
+$truncatedMysqlVersionComment = "/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */\n";
+drv_self_test(
+    orange_recovery_validate_sql_completeness($truncatedMysqlVersionComment, 'full_dump.sql') !== null,
+    'SQL completeness: truncated MySQL executable version comment detected'
+);
+
 $crpWithMissingUploadWarning = orange_recovery_classify_health_warning('missing upload file: uploads/customers/42/');
 drv_self_test(
     str_starts_with($crpWithMissingUploadWarning, 'informational:'),
