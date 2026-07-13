@@ -137,7 +137,7 @@ Environment (server-only .env.php — documented, not in repo)
 ================================================================================
 
 ORANGE_BACKUP_ROOT          — existing
-ORANGE_RESTORE_WORK_DIR       — optional override; default {BackupRoot}/restore_work
+ORANGE_RESTORE_WORK_DIR       — optional absolute-path override; default {BackupRoot}/restore_work
 ORANGE_RESTORE_STAGING_DB     — **required for Phase 2B.1** staging database name (must differ from production DB_NAME)
 
 Phase 2B.1 does **not** use production DB or production uploads paths. Fail closed if

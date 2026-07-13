@@ -62,15 +62,38 @@ function orange_restore_uploads_applicator_extract(string $zipPath, string $targ
             if (!is_dir($parent) && !@mkdir($parent, 0775, true) && !is_dir($parent)) {
                 throw new RuntimeException('Cannot create parent directory for zip entry: ' . $name);
             }
-            $contents = $zip->getFromIndex($i);
-            if ($contents === false) {
-                throw new RuntimeException('Cannot read zip entry: ' . $name);
+            $entry = $zip->getStream($name);
+            if ($entry === false) {
+                throw new RuntimeException('Cannot open zip entry stream: ' . $name);
             }
-            if (file_put_contents($dest, $contents) === false) {
+            $out = @fopen($dest, 'wb');
+            if ($out === false) {
+                fclose($entry);
                 throw new RuntimeException('Cannot write zip entry: ' . $name);
             }
+            $entryBytes = 0;
+            while (!feof($entry)) {
+                $chunk = fread($entry, 65536);
+                if ($chunk === false) {
+                    fclose($entry);
+                    fclose($out);
+                    throw new RuntimeException('Cannot read zip entry: ' . $name);
+                }
+                if ($chunk === '') {
+                    continue;
+                }
+                $written = fwrite($out, $chunk);
+                if ($written === false || $written !== strlen($chunk)) {
+                    fclose($entry);
+                    fclose($out);
+                    throw new RuntimeException('Cannot write zip entry: ' . $name);
+                }
+                $entryBytes += $written;
+            }
+            fclose($entry);
+            fclose($out);
             $filesExtracted++;
-            $bytesExtracted += strlen($contents);
+            $bytesExtracted += $entryBytes;
         }
     } catch (Throwable $e) {
         $zip->close();

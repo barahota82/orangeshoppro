@@ -69,6 +69,7 @@ function orange_restore_sql_runner_import_gzip(PDO $pdo, string $gzipPath, ?call
             }
         }
 
+        orange_restore_sql_runner_split_next_statement($buffer, true);
         $tail = trim($buffer);
         if ($tail !== '' && !orange_restore_sql_runner_is_comment_only($tail)) {
             throw new RuntimeException('SQL import ended with incomplete statement in gzip stream.');
@@ -98,7 +99,7 @@ function orange_restore_sql_runner_import_gzip(PDO $pdo, string $gzipPath, ?call
 /**
  * @return array{statement:string,remainder:string}|null
  */
-function orange_restore_sql_runner_split_next_statement(string $buffer): ?array
+function orange_restore_sql_runner_split_next_statement(string $buffer, bool $final = false): ?array
 {
     $len = strlen($buffer);
     $inSingle = false;
@@ -181,6 +182,9 @@ function orange_restore_sql_runner_split_next_statement(string $buffer): ?array
     }
 
     if ($inSingle || $inDouble || $inBlockComment) {
+        if (!$final) {
+            return null;
+        }
         throw new RuntimeException('SQL stream contains unterminated string or comment.');
     }
 
