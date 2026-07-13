@@ -252,7 +252,7 @@ restore_staging_self_test($delimiterCompat['ok'] === false, 'package compat: DEL
 
 // Staging credentials fail closed
 try {
-    orange_restore_staging_credentials([ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName], $projectRoot);
+    orange_restore_staging_credentials([ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName], $dbProjectRoot);
     restore_staging_self_test(false, 'staging creds: missing ORANGE_RESTORE_STAGING_DB_USER rejected');
 } catch (Throwable $e) {
     restore_staging_self_test(str_contains($e->getMessage(), 'ORANGE_RESTORE_STAGING_DB_USER'), 'staging creds: missing user rejected');
