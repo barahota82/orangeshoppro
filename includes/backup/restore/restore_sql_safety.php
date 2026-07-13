@@ -32,29 +32,246 @@ function orange_restore_sql_validate_statement_for_staging(
         return;
     }
 
-    $upper = strtoupper(ltrim($normalized));
-
-    if (preg_match('/^DELIMITER\b/i', $normalized) === 1) {
+    if (preg_match('/^DELIMITER\b/i', orange_restore_sql_collapse_whitespace($normalized)) === 1) {
         throw new RuntimeException(
             'Staging SQL import rejected DELIMITER directive (unsupported in Phase 2B.1).'
         );
     }
 
-    $forbiddenStarts = [
-        'USE ' => 'USE database switch',
-        'CREATE DATABASE' => 'CREATE DATABASE',
-        'DROP DATABASE' => 'DROP DATABASE',
-        'ALTER DATABASE' => 'ALTER DATABASE',
-    ];
-    foreach ($forbiddenStarts as $prefix => $label) {
-        if (str_starts_with($upper, $prefix)) {
-            throw new RuntimeException(
-                'Staging SQL import rejected ' . $label . ' statement (production safety).'
-            );
+    $lexemes = orange_restore_sql_tokenize_executable($normalized);
+    orange_restore_sql_reject_forbidden_leading_keywords($lexemes);
+    orange_restore_sql_reject_cross_database_references_lexemes($lexemes, $stagingDb, $productionDb);
+}
+
+/**
+ * Collapse any run of ASCII whitespace to a single space (for keyword probes only).
+ */
+function orange_restore_sql_collapse_whitespace(string $sql): string
+{
+    $collapsed = preg_replace('/\s+/u', ' ', $sql);
+
+    return is_string($collapsed) ? trim($collapsed) : trim($sql);
+}
+
+/**
+ * Tokenize executable SQL outside comments and string literals.
+ *
+ * @return list<array{type:string,value?:string}>
+ */
+function orange_restore_sql_tokenize_executable(string $sql): array
+{
+    $len = strlen($sql);
+    $lexemes = [];
+    $inSingle = false;
+    $inDouble = false;
+    $inLineComment = false;
+    $inBlockComment = false;
+
+    for ($i = 0; $i < $len; $i++) {
+        $c = $sql[$i];
+        $next = $i + 1 < $len ? $sql[$i + 1] : '';
+
+        if ($inLineComment) {
+            if ($c === "\n" || $c === "\r") {
+                $inLineComment = false;
+            }
+            continue;
+        }
+
+        if ($inBlockComment) {
+            if ($c === '*' && $next === '/') {
+                $inBlockComment = false;
+                $i++;
+            }
+            continue;
+        }
+
+        if (!$inSingle && !$inDouble) {
+            if ($c === '-' && $next === '-') {
+                $inLineComment = true;
+                $i++;
+                continue;
+            }
+            if ($c === '#') {
+                $inLineComment = true;
+                continue;
+            }
+            if ($c === '/' && $next === '*') {
+                $inBlockComment = true;
+                $i++;
+                continue;
+            }
+        }
+
+        if (!$inDouble && $c === "'") {
+            if ($inSingle && $next === "'") {
+                $i++;
+                continue;
+            }
+            $inSingle = !$inSingle;
+            continue;
+        }
+
+        if (!$inSingle && $c === '"') {
+            if ($inDouble && $next === '"') {
+                $i++;
+                continue;
+            }
+            $inDouble = !$inDouble;
+            continue;
+        }
+
+        if ($inSingle || $inDouble) {
+            if ($inSingle && $c === '\\' && $next !== '') {
+                $i++;
+            }
+            continue;
+        }
+
+        if ($c === '`') {
+            $ident = orange_restore_sql_read_backtick_identifier($sql, $i);
+            $lexemes[] = ['type' => 'ident', 'value' => $ident];
+            continue;
+        }
+
+        if ($c === '.') {
+            $lexemes[] = ['type' => 'dot'];
+            continue;
+        }
+
+        if (ctype_space($c)) {
+            continue;
+        }
+
+        if (preg_match('/[A-Za-z0-9_$]/', $c) === 1) {
+            $start = $i;
+            while ($i + 1 < $len && preg_match('/[A-Za-z0-9_$]/', $sql[$i + 1]) === 1) {
+                $i++;
+            }
+            $lexemes[] = ['type' => 'ident', 'value' => substr($sql, $start, $i - $start + 1)];
+            continue;
+        }
+
+        $lexemes[] = ['type' => 'other', 'value' => $c];
+    }
+
+    if ($inSingle || $inDouble || $inBlockComment) {
+        throw new RuntimeException('Staging SQL import rejected unterminated string or comment.');
+    }
+
+    return $lexemes;
+}
+
+function orange_restore_sql_read_backtick_identifier(string $sql, int &$index): string
+{
+    $len = strlen($sql);
+    $value = '';
+    $index++;
+    while ($index < $len) {
+        $c = $sql[$index];
+        if ($c === '`') {
+            if ($index + 1 < $len && $sql[$index + 1] === '`') {
+                $value .= '`';
+                $index += 2;
+                continue;
+            }
+            break;
+        }
+        $value .= $c;
+        $index++;
+    }
+
+    return $value;
+}
+
+/**
+ * @param list<array{type:string,value?:string}> $lexemes
+ */
+function orange_restore_sql_reject_forbidden_leading_keywords(array $lexemes): void
+{
+    $idents = [];
+    foreach ($lexemes as $lexeme) {
+        if (($lexeme['type'] ?? '') === 'ident') {
+            $idents[] = strtoupper((string) ($lexeme['value'] ?? ''));
         }
     }
 
-    orange_restore_sql_reject_cross_database_references($normalized, $stagingDb, $productionDb);
+    if ($idents === []) {
+        return;
+    }
+
+    if ($idents[0] === 'USE') {
+        throw new RuntimeException(
+            'Staging SQL import rejected USE database switch statement (production safety).'
+        );
+    }
+
+    if ($idents[0] === 'CREATE' && ($idents[1] ?? '') === 'DATABASE') {
+        throw new RuntimeException(
+            'Staging SQL import rejected CREATE DATABASE statement (production safety).'
+        );
+    }
+
+    if ($idents[0] === 'DROP' && ($idents[1] ?? '') === 'DATABASE') {
+        throw new RuntimeException(
+            'Staging SQL import rejected DROP DATABASE statement (production safety).'
+        );
+    }
+
+    if ($idents[0] === 'ALTER' && ($idents[1] ?? '') === 'DATABASE') {
+        throw new RuntimeException(
+            'Staging SQL import rejected ALTER DATABASE statement (production safety).'
+        );
+    }
+}
+
+/**
+ * @param list<array{type:string,value?:string}> $lexemes
+ */
+function orange_restore_sql_reject_cross_database_references_lexemes(
+    array $lexemes,
+    string $stagingDb,
+    string $productionDb
+): void {
+    unset($productionDb);
+
+    $count = count($lexemes);
+    for ($i = 0; $i + 2 < $count; $i++) {
+        if (($lexemes[$i]['type'] ?? '') !== 'ident') {
+            continue;
+        }
+        if (($lexemes[$i + 1]['type'] ?? '') !== 'dot') {
+            continue;
+        }
+        if (($lexemes[$i + 2]['type'] ?? '') !== 'ident') {
+            continue;
+        }
+
+        $schema = (string) ($lexemes[$i]['value'] ?? '');
+        $object = (string) ($lexemes[$i + 2]['value'] ?? '');
+        if ($schema === '' || $object === '') {
+            continue;
+        }
+        if (orange_restore_sql_is_reserved_schema_noise($schema)) {
+            continue;
+        }
+        if (strcasecmp($schema, $stagingDb) !== 0) {
+            throw new RuntimeException(
+                'Staging SQL import rejected cross-database reference '
+                . $schema
+                . '.'
+                . $object
+                . ' (production safety).'
+            );
+        }
+    }
+}
+
+function orange_restore_sql_is_reserved_schema_noise(string $schema): bool
+{
+    return in_array(strtoupper($schema), [
+        'SET', 'VALUES', 'INTO', 'FROM', 'JOIN', 'TABLE', 'INDEX', 'KEY', 'WHERE', 'ON', 'AS',
+    ], true);
 }
 
 function orange_restore_sql_strip_leading_comments(string $sql): string
@@ -84,52 +301,6 @@ function orange_restore_sql_strip_leading_comments(string $sql): string
 }
 
 /**
- * Reject `other_db`.`table` and other_db.table where other_db is not staging.
- *
- * @throws RuntimeException
- */
-function orange_restore_sql_reject_cross_database_references(
-    string $sql,
-    string $stagingDb,
-    string $productionDb
-): void {
-    unset($productionDb);
-
-    if (preg_match_all('/`([^`]+)`\.`([^`]+)`/', $sql, $backtickMatches, PREG_SET_ORDER)) {
-        foreach ($backtickMatches as $match) {
-            $schema = (string) ($match[1] ?? '');
-            if ($schema !== '' && strcasecmp($schema, $stagingDb) !== 0) {
-                throw new RuntimeException(
-                    'Staging SQL import rejected cross-database reference `'
-                    . $schema
-                    . '`.`'
-                    . (string) ($match[2] ?? '')
-                    . '` (production safety).'
-                );
-            }
-        }
-    }
-
-    if (preg_match_all('/\b([A-Za-z0-9_]+)\.`([^`]+)`/', $sql, $mixedMatches, PREG_SET_ORDER)) {
-        foreach ($mixedMatches as $match) {
-            $schema = (string) ($match[1] ?? '');
-            if (in_array(strtoupper($schema), ['SET', 'VALUES', 'INTO', 'FROM', 'JOIN', 'TABLE', 'INDEX', 'KEY'], true)) {
-                continue;
-            }
-            if ($schema !== '' && strcasecmp($schema, $stagingDb) !== 0) {
-                throw new RuntimeException(
-                    'Staging SQL import rejected cross-database reference '
-                    . $schema
-                    . '.`'
-                    . (string) ($match[2] ?? '')
-                    . '` (production safety).'
-                );
-            }
-        }
-    }
-}
-
-/**
  * Stream-scan a gzip SQL dump for patterns incompatible with Phase 2B.1 staging import.
  *
  * @return array{ok:bool,error:?string,hits:list<string>}
@@ -139,6 +310,8 @@ function orange_restore_sql_scan_gzip_forbidden_patterns(
     string $stagingDb,
     string $productionDb
 ): array {
+    unset($productionDb);
+
     if (!is_file($gzipPath)) {
         return ['ok' => false, 'error' => 'SQL gzip file missing', 'hits' => []];
     }
@@ -155,7 +328,7 @@ function orange_restore_sql_scan_gzip_forbidden_patterns(
     $hits = [];
     $patterns = [
         'DELIMITER' => '/\bDELIMITER\b/i',
-        'USE database switch' => '/\bUSE\s+[`\'"]?(?:' . preg_quote($productionDb, '/') . ')[`\'"]?\s*;/i',
+        'USE database switch' => '/\bUSE\s+/i',
         'CREATE DATABASE' => '/\bCREATE\s+DATABASE\b/i',
         'DROP DATABASE' => '/\bDROP\s+DATABASE\b/i',
         'ALTER DATABASE' => '/\bALTER\s+DATABASE\b/i',

@@ -185,6 +185,116 @@ restore_staging_self_test(
     'sql safety: # comment-only statement recognized'
 );
 
+// Whitespace variants — all rejected before execution
+restore_staging_self_test(
+    restore_staging_validate_rejects("USE\t`{$productionDbName}`;", $stagingDbName, $productionDbName),
+    'sql safety: USE with tab rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects("USE\n`{$productionDbName}`;", $stagingDbName, $productionDbName),
+    'sql safety: USE with newline rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects("USE\r\n`{$productionDbName}`;", $stagingDbName, $productionDbName),
+    'sql safety: USE with CRLF rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects('USE    `' . $productionDbName . '`;', $stagingDbName, $productionDbName),
+    'sql safety: USE with multiple spaces rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects('CREATE  DATABASE evil;', $stagingDbName, $productionDbName),
+    'sql safety: CREATE DATABASE spacing variant rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects("CREATE\nDATABASE evil;", $stagingDbName, $productionDbName),
+    'sql safety: CREATE DATABASE newline variant rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects('DROP  DATABASE evil;', $stagingDbName, $productionDbName),
+    'sql safety: DROP DATABASE spacing variant rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects("DROP\nDATABASE evil;", $stagingDbName, $productionDbName),
+    'sql safety: DROP DATABASE newline variant rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects('ALTER  DATABASE evil;', $stagingDbName, $productionDbName),
+    'sql safety: ALTER DATABASE spacing variant rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects("ALTER\nDATABASE evil;", $stagingDbName, $productionDbName),
+    'sql safety: ALTER DATABASE newline variant rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects(
+        'INSERT INTO ' . $productionDbName . '.accounts VALUES (1);',
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: unquoted db.table rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects(
+        'INSERT INTO `' . $productionDbName . '`.`accounts` VALUES (1);',
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: quoted db.table rejected'
+);
+
+// Privilege fence — fail closed
+try {
+    orange_restore_staging_assert_no_production_privileges(
+        new PDO('sqlite::memory:'),
+        $stagingDbName,
+        $productionDbName
+    );
+    restore_staging_self_test(false, 'privilege fence: SHOW GRANTS unavailable fails closed');
+} catch (Throwable $e) {
+    restore_staging_self_test(
+        str_contains($e->getMessage(), 'SHOW GRANTS'),
+        'privilege fence: SHOW GRANTS unavailable fails closed'
+    );
+}
+
+try {
+    orange_restore_staging_validate_grant_lines(
+        ["GRANT ALL PRIVILEGES ON *.* TO 'restore_staging'@'localhost'"],
+        $productionDbName
+    );
+    restore_staging_self_test(false, 'privilege fence: global *.* grant rejected');
+} catch (Throwable $e) {
+    restore_staging_self_test(
+        str_contains($e->getMessage(), 'production schema'),
+        'privilege fence: global *.* grant rejected'
+    );
+}
+
+try {
+    orange_restore_staging_validate_grant_lines(
+        ["GRANT SELECT ON `{$productionDbName}`.* TO 'restore_staging'@'localhost'"],
+        $productionDbName
+    );
+    restore_staging_self_test(false, 'privilege fence: production schema grant rejected');
+} catch (Throwable $e) {
+    restore_staging_self_test(
+        str_contains($e->getMessage(), 'production schema'),
+        'privilege fence: production schema grant rejected'
+    );
+}
+
+$stagingGrantOk = true;
+try {
+    orange_restore_staging_validate_grant_lines(
+        ["GRANT ALL PRIVILEGES ON `{$stagingDbName}`.* TO 'restore_staging'@'localhost'"],
+        $productionDbName
+    );
+} catch (Throwable) {
+    $stagingGrantOk = false;
+}
+restore_staging_self_test($stagingGrantOk, 'privilege fence: staging-only grant accepted');
+
 // Package backend compatibility
 $pdoCompat = orange_restore_package_staging_import_compat(
     $packageDir,

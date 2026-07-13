@@ -130,6 +130,33 @@ function orange_restore_staging_assert_safe_target(PDO $pdo, string $expectedDb)
 }
 
 /**
+ * Evaluate SHOW GRANTS lines for production/global privilege violations.
+ *
+ * @param list<string> $grantLines
+ */
+function orange_restore_staging_validate_grant_lines(array $grantLines, string $productionDb): void
+{
+    $productionNeedle = '`' . str_replace('`', '``', $productionDb) . '`';
+    foreach ($grantLines as $grant) {
+        $grant = trim($grant);
+        if ($grant === '') {
+            continue;
+        }
+        if (
+            stripos($grant, ' ON ' . $productionNeedle . '.') !== false
+            || stripos($grant, ' ON ' . $productionNeedle . '.*') !== false
+            || stripos($grant, ' ON *.*') !== false
+        ) {
+            throw new RuntimeException(
+                'Staging DB user has detectable privilege on production schema ('
+                . $productionDb
+                . '). Grant staging-only access per runbook.'
+            );
+        }
+    }
+}
+
+/**
  * Detectable privilege fence: staging user must not hold schema privileges on production DB.
  */
 function orange_restore_staging_assert_no_production_privileges(
@@ -141,31 +168,26 @@ function orange_restore_staging_assert_no_production_privileges(
 
     try {
         $grantSt = $pdo->query('SHOW GRANTS FOR CURRENT_USER()');
-        if ($grantSt !== false) {
-            $productionNeedle = '`' . str_replace('`', '``', $productionDb) . '`';
-            while ($row = $grantSt->fetch(PDO::FETCH_NUM)) {
-                $grant = (string) ($row[0] ?? '');
-                if ($grant === '') {
-                    continue;
-                }
-                if (
-                    stripos($grant, ' ON ' . $productionNeedle . '.') !== false
-                    || stripos($grant, ' ON ' . $productionNeedle . '.*') !== false
-                    || stripos($grant, ' ON *.*') !== false
-                ) {
-                    throw new RuntimeException(
-                        'Staging DB user has detectable privilege on production schema ('
-                        . $productionDb
-                        . '). Grant staging-only access per runbook.'
-                    );
-                }
-            }
-        }
-    } catch (RuntimeException $e) {
-        throw $e;
-    } catch (Throwable) {
-        // Non-fatal when SHOW GRANTS unavailable; session + SQL validator remain primary barriers.
+    } catch (Throwable $e) {
+        throw new RuntimeException(
+            'Cannot inspect staging user privileges (SHOW GRANTS unavailable): ' . $e->getMessage()
+        );
     }
+
+    if ($grantSt === false) {
+        throw new RuntimeException(
+            'Cannot inspect staging user privileges (SHOW GRANTS returned false).'
+        );
+    }
+
+    $grantLines = [];
+    while ($row = $grantSt->fetch(PDO::FETCH_NUM)) {
+        if (is_array($row) && isset($row[0])) {
+            $grantLines[] = (string) $row[0];
+        }
+    }
+
+    orange_restore_staging_validate_grant_lines($grantLines, $productionDb);
 }
 
 /**
