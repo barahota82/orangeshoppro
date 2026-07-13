@@ -167,6 +167,29 @@ function orange_restore_release_lock(string $workRoot): void
     }
 }
 
+function orange_restore_update_lock_job_id(string $workRoot, string $jobId): void
+{
+    $path = orange_restore_global_lock_path($workRoot);
+    $status = orange_restore_lock_status($workRoot);
+    $payload = $status['payload'];
+    if (!$status['held'] || !is_array($payload)) {
+        throw new RuntimeException('Cannot update restore lock: lock is not held by this process.');
+    }
+    if ((int) ($payload['pid'] ?? 0) !== getmypid()) {
+        throw new RuntimeException('Cannot update restore lock: lock is held by another process.');
+    }
+
+    $payload['job_id'] = $jobId;
+    $payload['updated_at'] = gmdate('c');
+    $encoded = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($encoded === false) {
+        throw new RuntimeException('Cannot update restore lock: payload encode failed.');
+    }
+    if (file_put_contents($path, $encoded . "\n", LOCK_EX) === false) {
+        throw new RuntimeException('Cannot update restore lock file.');
+    }
+}
+
 /**
  * @return array{held:bool,payload:?array<string,mixed>,path:string}
  */

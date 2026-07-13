@@ -199,9 +199,5 @@ function orange_restore_sql_runner_split_next_statement(string $buffer): ?array
         $statement .= $c;
     }
 
-    if ($inSingle || $inDouble || $inBlockComment) {
-        throw new RuntimeException('SQL stream contains unterminated string or comment.');
-    }
-
     return null;
 }

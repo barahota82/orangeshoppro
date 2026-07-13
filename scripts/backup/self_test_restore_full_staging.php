@@ -53,6 +53,25 @@ function restore_staging_temp_root(): string
     return $dir;
 }
 
+function restore_staging_temp_project_root(): string
+{
+    $dir = restore_staging_temp_root();
+    file_put_contents(
+        $dir . DIRECTORY_SEPARATOR . 'config.php',
+        "<?php\n"
+        . "declare(strict_types=1);\n"
+        . "const DB_HOST = 'localhost';\n"
+        . "const DB_NAME = 'orange_prod_test';\n"
+    );
+    file_put_contents(
+        $dir . DIRECTORY_SEPARATOR . '.env.php',
+        "<?php\n"
+        . "return ['DB_USER' => 'orange_prod_user', 'DB_PASS' => 'orange_prod_pass'];\n"
+    );
+
+    return $dir;
+}
+
 function restore_staging_rmdir(string $dir): void
 {
     if (!is_dir($dir)) {
@@ -143,9 +162,10 @@ $fixture = restore_staging_fixture_layout();
 $backupRoot = $fixture['backup_root'];
 $workRoot = $fixture['work_root'];
 $packageDir = $fixture['package_dir'];
+$dbProjectRoot = restore_staging_temp_project_root();
 
 $stagingDbName = 'orange_restore_staging_test';
-$productionDbName = orange_restore_production_db_name($projectRoot);
+$productionDbName = orange_restore_production_db_name($dbProjectRoot);
 
 $envOverride = [
     'ORANGE_BACKUP_ROOT' => $backupRoot,
@@ -184,6 +204,18 @@ restore_staging_self_test(
     orange_restore_sql_is_comment_only("# only hash comment\n-- and dash\n"),
     'sql safety: # comment-only statement recognized'
 );
+$longInsertSql = "INSERT INTO restore_demo VALUES (2, '" . str_repeat('x', 70000) . "');\n";
+try {
+    $partialLongSplit = orange_restore_sql_runner_split_next_statement(substr($longInsertSql, 0, 65536));
+    restore_staging_self_test($partialLongSplit === null, 'sql runner: long string waits for next chunk');
+} catch (Throwable) {
+    restore_staging_self_test(false, 'sql runner: long string waits for next chunk');
+}
+$completeLongSplit = orange_restore_sql_runner_split_next_statement($longInsertSql);
+restore_staging_self_test(
+    is_array($completeLongSplit) && strlen($completeLongSplit['statement']) > 70000,
+    'sql runner: long string statement splits after terminator'
+);
 
 // Package backend compatibility
 $pdoCompat = orange_restore_package_staging_import_compat(
@@ -220,19 +252,19 @@ restore_staging_self_test($delimiterCompat['ok'] === false, 'package compat: DEL
 
 // Staging credentials fail closed
 try {
-    orange_restore_staging_credentials([ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName], $projectRoot);
+    orange_restore_staging_credentials([ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName], $dbProjectRoot);
     restore_staging_self_test(false, 'staging creds: missing ORANGE_RESTORE_STAGING_DB_USER rejected');
 } catch (Throwable $e) {
     restore_staging_self_test(str_contains($e->getMessage(), 'ORANGE_RESTORE_STAGING_DB_USER'), 'staging creds: missing user rejected');
 }
 
-$productionCreds = orange_restore_production_db_credentials($projectRoot);
+$productionCreds = orange_restore_production_db_credentials($dbProjectRoot);
 try {
     orange_restore_staging_credentials([
         ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName,
         ORANGE_RESTORE_ENV_STAGING_DB_USER => $productionCreds['user'],
         ORANGE_RESTORE_ENV_STAGING_DB_PASS => 'x',
-    ], $projectRoot);
+    ], $dbProjectRoot);
     restore_staging_self_test(false, 'staging creds: production DB_USER reuse rejected');
 } catch (Throwable $e) {
     restore_staging_self_test(str_contains($e->getMessage(), 'must not equal production DB_USER'), 'staging creds: production DB_USER reuse rejected');
@@ -251,6 +283,12 @@ $activePayload = json_encode([
 file_put_contents($activeLockPath, $activePayload . "\n");
 $activeAgain = orange_restore_acquire_lock($lockWork, 'blocked');
 restore_staging_self_test($activeAgain['ok'] === false, 'lock: active lock preserved');
+orange_restore_update_lock_job_id($lockWork, 'updated_active_job');
+$updatedLockStatus = orange_restore_lock_status($lockWork);
+restore_staging_self_test(
+    ($updatedLockStatus['payload']['job_id'] ?? '') === 'updated_active_job',
+    'lock: active lock job id updated without release'
+);
 @unlink($activeLockPath);
 
 $stalePayload = json_encode([
@@ -291,7 +329,7 @@ restore_staging_self_test(($failedStageJob['stage_failed'] ?? '') === 'package_c
 // Orchestrator abort paths (no staging mutation)
 try {
     orange_restore_full_staging_run([
-        'project_root' => $projectRoot,
+        'project_root' => $dbProjectRoot,
         'package_path' => $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'missing_pkg',
         'env_override' => $envOverride,
     ]);
@@ -307,7 +345,7 @@ restore_staging_write_full_package($failPkgDir, [
 ]);
 try {
     orange_restore_full_staging_run([
-        'project_root' => $projectRoot,
+        'project_root' => $dbProjectRoot,
         'package_path' => $failPkgDir,
         'env_override' => $envOverride,
     ]);
@@ -339,6 +377,7 @@ restore_staging_self_test(
 );
 
 restore_staging_rmdir($backupRoot);
+restore_staging_rmdir($dbProjectRoot);
 
 echo PHP_EOL . ($failures === 0 ? 'ALL RESTORE STAGING SELF-TESTS PASSED' : "FAILURES: {$failures}") . PHP_EOL;
 exit($failures === 0 ? 0 : 1);
