@@ -184,7 +184,7 @@ final class DbCutoverIdentityMockPdo extends PDO
     }
 }
 
-final class DbCutoverProductionCutoverMockPdo extends PDO
+class DbCutoverProductionCutoverMockPdo extends PDO
 {
     /** @var list<string> */
     public array $execLog = [];
