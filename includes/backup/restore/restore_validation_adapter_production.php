@@ -991,7 +991,7 @@ function orange_restore_validation_adapter_production_collect_upload_references(
                     if (is_array($row)) {
                         $logo = trim((string) ($row['company_logo'] ?? ''));
                         if ($logo !== '') {
-                            $add('uploads/company/' . ltrim($logo, '/'));
+                            $add('uploads/company/' . basename($logo));
                         }
                     }
                 }

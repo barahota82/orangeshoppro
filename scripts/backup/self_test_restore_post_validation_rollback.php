@@ -939,6 +939,19 @@ $missingUploads = orange_restore_validation_adapter_production_required_uploads_
 );
 pvrb_self_test(($missingUploads['ok'] ?? true) === false, 'blocker4: required uploads missing fails');
 pvrb_self_test(($missingUploads['verifiable'] ?? false) === true, 'blocker4: missing uploads remains verifiable');
+$uploadsPdo->exec('CREATE TABLE company_settings (id INTEGER PRIMARY KEY, company_logo TEXT)');
+$uploadsPdo->exec("INSERT INTO company_settings (id, company_logo) VALUES (1, 'uploads/company/company-logo.webp')");
+pvrb_write_file($uploadsProject . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'company' . DIRECTORY_SEPARATOR . 'company-logo.webp', 'logo');
+$companyLogoUploads = orange_restore_validation_adapter_production_required_uploads_check(
+    $uploadsPdo,
+    $uploadsProject,
+    ['products', 'company_settings']
+);
+pvrb_self_test(($companyLogoUploads['ok'] ?? false) === false, 'blocker4: product image still missing with company logo present');
+pvrb_self_test(
+    !in_array('uploads/company/company-logo.webp', $companyLogoUploads['missing'] ?? [], true),
+    'blocker4: company logo path resolves to uploads/company basename'
+);
 $noRegistryProject = pvrb_temp_root();
 $unverifiableUploads = orange_restore_validation_adapter_production_required_uploads_check(
     $uploadsPdo,
