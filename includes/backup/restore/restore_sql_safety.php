@@ -226,6 +226,147 @@ function orange_restore_sql_reject_forbidden_leading_keywords(array $lexemes): v
 }
 
 /**
+ * Collect uppercase identifier keywords immediately before a lexeme index.
+ *
+ * @param list<array{type:string,value?:string}> $lexemes
+ * @return list<string>
+ */
+function orange_restore_sql_identifiers_before(array $lexemes, int $beforeIndex, int $limit = 8): array
+{
+    $idents = [];
+    for ($j = $beforeIndex - 1; $j >= 0 && count($idents) < $limit; $j--) {
+        if (($lexemes[$j]['type'] ?? '') === 'ident') {
+            array_unshift($idents, strtoupper((string) ($lexemes[$j]['value'] ?? '')));
+        }
+    }
+
+    return $idents;
+}
+
+/**
+ * @param list<string> $precedingIdents
+ * @param list<string> $sequence
+ */
+function orange_restore_sql_idents_contain_ordered_sequence(array $precedingIdents, array $sequence): bool
+{
+    if ($sequence === []) {
+        return false;
+    }
+
+    $pos = 0;
+    foreach ($precedingIdents as $ident) {
+        if ($ident === $sequence[$pos]) {
+            $pos++;
+            if ($pos === count($sequence)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * True when a schema-qualified object name may legally appear at this lexeme index.
+ *
+ * @param list<array{type:string,value?:string}> $lexemes
+ */
+function orange_restore_sql_is_schema_qualified_object_context(array $lexemes, int $schemaLexIndex): bool
+{
+    $preceding = orange_restore_sql_identifiers_before($lexemes, $schemaLexIndex);
+    if ($preceding === []) {
+        return false;
+    }
+
+    $last = $preceding[count($preceding) - 1];
+
+    if ($last === 'INTO') {
+        foreach ($preceding as $ident) {
+            if ($ident === 'INSERT' || $ident === 'REPLACE') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    if ($last === 'FROM') {
+        return true;
+    }
+
+    if ($last === 'UPDATE') {
+        return true;
+    }
+
+    if ($last === 'JOIN' || $last === 'STRAIGHT_JOIN') {
+        return true;
+    }
+
+    if ($last === 'REFERENCES') {
+        return true;
+    }
+
+    if ($last === 'TRUNCATE') {
+        return true;
+    }
+
+    if ($last === 'TO') {
+        return orange_restore_sql_idents_contain_ordered_sequence($preceding, ['RENAME', 'TABLE']);
+    }
+
+    if ($last === 'TABLES') {
+        return in_array('LOCK', $preceding, true);
+    }
+
+    if ($last === 'EXISTS') {
+        return orange_restore_sql_idents_contain_ordered_sequence($preceding, ['CREATE', 'TABLE'])
+            || orange_restore_sql_idents_contain_ordered_sequence($preceding, ['DROP', 'TABLE']);
+    }
+
+    if ($last === 'TABLE') {
+        foreach (['CREATE', 'ALTER', 'DROP', 'RENAME', 'TRUNCATE'] as $keyword) {
+            if (in_array($keyword, $preceding, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    return false;
+}
+
+/**
+ * @param list<array{type:string,value?:string}> $lexemes
+ */
+function orange_restore_sql_reject_malformed_qualified_object(
+    array $lexemes,
+    int $schemaLexIndex,
+    string $stagingDb
+): void {
+    unset($stagingDb);
+
+    if (($lexemes[$schemaLexIndex + 1]['type'] ?? '') !== 'dot') {
+        return;
+    }
+
+    if (($lexemes[$schemaLexIndex + 2]['type'] ?? '') !== 'ident') {
+        $schema = (string) ($lexemes[$schemaLexIndex]['value'] ?? '');
+
+        throw new RuntimeException(
+            'Staging SQL import rejected malformed qualified object name after '
+            . $schema
+            . '. (production safety).'
+        );
+    }
+}
+
+/**
+ * Reject schema-qualified object references outside the staging database.
+ *
+ * Only inspects ident.ident shapes in executable object-name positions (INSERT INTO, FROM, JOIN, …).
+ * Numeric literals, DECIMAL(p,s), alias.column, and string/comment contents are ignored.
+ *
  * @param list<array{type:string,value?:string}> $lexemes
  */
 function orange_restore_sql_reject_cross_database_references_lexemes(
@@ -236,42 +377,41 @@ function orange_restore_sql_reject_cross_database_references_lexemes(
     unset($productionDb);
 
     $count = count($lexemes);
-    for ($i = 0; $i + 2 < $count; $i++) {
+    for ($i = 0; $i < $count; $i++) {
         if (($lexemes[$i]['type'] ?? '') !== 'ident') {
             continue;
         }
-        if (($lexemes[$i + 1]['type'] ?? '') !== 'dot') {
-            continue;
-        }
-        if (($lexemes[$i + 2]['type'] ?? '') !== 'ident') {
+
+        if (!orange_restore_sql_is_schema_qualified_object_context($lexemes, $i)) {
             continue;
         }
 
-        $schema = (string) ($lexemes[$i]['value'] ?? '');
-        $object = (string) ($lexemes[$i + 2]['value'] ?? '');
-        if ($schema === '' || $object === '') {
+        if (($lexemes[$i + 1]['type'] ?? '') === 'dot') {
+            orange_restore_sql_reject_malformed_qualified_object($lexemes, $i, $stagingDb);
+
+            $schema = (string) ($lexemes[$i]['value'] ?? '');
+            $object = (string) ($lexemes[$i + 2]['value'] ?? '');
+            if ($schema === '' || $object === '') {
+                throw new RuntimeException(
+                    'Staging SQL import rejected empty schema-qualified object name (production safety).'
+                );
+            }
+            if (strcasecmp($schema, $stagingDb) !== 0) {
+                throw new RuntimeException(
+                    'Staging SQL import rejected cross-database reference '
+                    . $schema
+                    . '.'
+                    . $object
+                    . ' (production safety).'
+                );
+            }
+
+            $i += 2;
             continue;
         }
-        if (orange_restore_sql_is_reserved_schema_noise($schema)) {
-            continue;
-        }
-        if (strcasecmp($schema, $stagingDb) !== 0) {
-            throw new RuntimeException(
-                'Staging SQL import rejected cross-database reference '
-                . $schema
-                . '.'
-                . $object
-                . ' (production safety).'
-            );
-        }
+
+        // Unqualified object name in object context — allowed.
     }
-}
-
-function orange_restore_sql_is_reserved_schema_noise(string $schema): bool
-{
-    return in_array(strtoupper($schema), [
-        'SET', 'VALUES', 'INTO', 'FROM', 'JOIN', 'TABLE', 'INDEX', 'KEY', 'WHERE', 'ON', 'AS',
-    ], true);
 }
 
 function orange_restore_sql_strip_leading_comments(string $sql): string

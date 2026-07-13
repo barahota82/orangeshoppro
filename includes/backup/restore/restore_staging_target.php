@@ -136,7 +136,19 @@ function orange_restore_staging_assert_safe_target(PDO $pdo, string $expectedDb)
  */
 function orange_restore_staging_validate_grant_lines(array $grantLines, string $productionDb): void
 {
+    if ($grantLines === []) {
+        throw new RuntimeException(
+            'Cannot inspect staging user privileges (SHOW GRANTS returned no rows).'
+        );
+    }
+
     $productionNeedle = '`' . str_replace('`', '``', $productionDb) . '`';
+    $productionPattern = '/\sON\s+(?:`'
+        . preg_quote(str_replace('`', '``', $productionDb), '/')
+        . '`|'
+        . preg_quote($productionDb, '/')
+        . ')\s*\./i';
+
     foreach ($grantLines as $grant) {
         $grant = trim($grant);
         if ($grant === '') {
@@ -145,6 +157,7 @@ function orange_restore_staging_validate_grant_lines(array $grantLines, string $
         if (
             stripos($grant, ' ON ' . $productionNeedle . '.') !== false
             || stripos($grant, ' ON ' . $productionNeedle . '.*') !== false
+            || preg_match($productionPattern, $grant) === 1
             || stripos($grant, ' ON *.*') !== false
         ) {
             throw new RuntimeException(
@@ -183,7 +196,10 @@ function orange_restore_staging_assert_no_production_privileges(
     $grantLines = [];
     while ($row = $grantSt->fetch(PDO::FETCH_NUM)) {
         if (is_array($row) && isset($row[0])) {
-            $grantLines[] = (string) $row[0];
+            $line = trim((string) $row[0]);
+            if ($line !== '') {
+                $grantLines[] = $line;
+            }
         }
     }
 

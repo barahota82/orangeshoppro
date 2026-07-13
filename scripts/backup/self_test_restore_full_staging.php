@@ -139,6 +139,17 @@ function restore_staging_validate_rejects(string $sql, string $stagingDb, string
     }
 }
 
+function restore_staging_validate_accepts(string $sql, string $stagingDb, string $productionDb): bool
+{
+    try {
+        orange_restore_sql_validate_statement_for_staging($sql, $stagingDb, $productionDb);
+
+        return true;
+    } catch (Throwable) {
+        return false;
+    }
+}
+
 $fixture = restore_staging_fixture_layout();
 $backupRoot = $fixture['backup_root'];
 $workRoot = $fixture['work_root'];
@@ -243,6 +254,122 @@ restore_staging_self_test(
     'sql safety: quoted db.table rejected'
 );
 
+// Context-aware cross-schema — must pass (no false positives)
+restore_staging_self_test(
+    restore_staging_validate_accepts(
+        'CREATE TABLE restore_pricing (id INT PRIMARY KEY, amount DECIMAL(10,2) NOT NULL);',
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: DECIMAL(10,2) in CREATE TABLE accepted'
+);
+restore_staging_self_test(
+    restore_staging_validate_accepts(
+        "INSERT INTO restore_pricing VALUES (1, 19.99);",
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: decimal literal VALUES (19.99) accepted'
+);
+restore_staging_self_test(
+    restore_staging_validate_accepts(
+        'SELECT t.column_name FROM restore_pricing t WHERE t.id = 1;',
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: alias.column accepted'
+);
+restore_staging_self_test(
+    restore_staging_validate_accepts(
+        "INSERT INTO restore_pricing VALUES (2, 'note: {$productionDbName}.accounts is safe in string');",
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: prod.table inside string literal accepted'
+);
+restore_staging_self_test(
+    restore_staging_validate_accepts(
+        "-- cross-schema mention {$productionDbName}.accounts in comment\nINSERT INTO restore_pricing VALUES (3, 1.25);",
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: prod.table in comment accepted'
+);
+restore_staging_self_test(
+    restore_staging_validate_accepts(
+        "SET NAMES utf8mb4;\n"
+        . "CREATE TABLE `restore_demo` (\n"
+        . "  `id` INT NOT NULL,\n"
+        . "  `price` DECIMAL(10,2) NOT NULL,\n"
+        . "  PRIMARY KEY (`id`)\n"
+        . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\n"
+        . "INSERT INTO `restore_demo` (`id`, `price`) VALUES\n"
+        . "(1, 19.99),\n"
+        . "(2, 0xDEADBEEF);\n",
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: php_pdo-style CREATE TABLE + multiline INSERT accepted'
+);
+
+// Context-aware cross-schema — must fail (object-name positions)
+$crossSchemaRejectCases = [
+    'INSERT INTO prod.table VALUES (1);' => 'INSERT INTO prod.table',
+    'UPDATE prod.table SET id = 1;' => 'UPDATE prod.table',
+    'DELETE FROM prod.table WHERE id = 1;' => 'DELETE FROM prod.table',
+    'SELECT * FROM prod.table;' => 'FROM prod.table',
+    'SELECT a.id FROM orders a JOIN prod.table b ON a.id = b.id;' => 'JOIN prod.table',
+    'CREATE TABLE prod.table (id INT);' => 'CREATE TABLE prod.table',
+    'ALTER TABLE prod.table ADD COLUMN x INT;' => 'ALTER TABLE prod.table',
+    'DROP TABLE prod.table;' => 'DROP TABLE prod.table',
+    'TRUNCATE prod.table;' => 'TRUNCATE prod.table',
+    'RENAME TABLE prod.a TO prod.b;' => 'RENAME TABLE prod.a TO prod.b',
+    'CREATE TABLE child (id INT, FOREIGN KEY (id) REFERENCES prod.parent (id));' => 'REFERENCES prod.table',
+    'LOCK TABLES prod.table READ;' => 'LOCK TABLES prod.table',
+    'REPLACE INTO prod.table VALUES (1);' => 'REPLACE INTO prod.table',
+];
+foreach ($crossSchemaRejectCases as $sqlTemplate => $label) {
+    $sql = str_replace('prod', $productionDbName, $sqlTemplate);
+    restore_staging_self_test(
+        restore_staging_validate_rejects($sql, $stagingDbName, $productionDbName),
+        'sql safety: rejects ' . $label
+    );
+}
+
+// Four quoting combinations for INSERT INTO
+restore_staging_self_test(
+    restore_staging_validate_rejects(
+        'INSERT INTO ' . $productionDbName . '.accounts VALUES (1);',
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: unquoted db.table (INSERT) rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects(
+        'INSERT INTO `' . $productionDbName . '`.`accounts` VALUES (1);',
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: quoted db.table (INSERT) rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects(
+        'INSERT INTO ' . $productionDbName . '.`accounts` VALUES (1);',
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: db.`table` (INSERT) rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects(
+        'INSERT INTO `' . $productionDbName . '`.accounts VALUES (1);',
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: `db`.table (INSERT) rejected'
+);
+
 // Privilege fence — fail closed
 try {
     orange_restore_staging_assert_no_production_privileges(
@@ -294,6 +421,40 @@ try {
     $stagingGrantOk = false;
 }
 restore_staging_self_test($stagingGrantOk, 'privilege fence: staging-only grant accepted');
+
+$stagingUnquotedGrantOk = true;
+try {
+    orange_restore_staging_validate_grant_lines(
+        ["GRANT ALL PRIVILEGES ON {$stagingDbName}.* TO 'restore_staging'@'localhost'"],
+        $productionDbName
+    );
+} catch (Throwable) {
+    $stagingUnquotedGrantOk = false;
+}
+restore_staging_self_test($stagingUnquotedGrantOk, 'privilege fence: unquoted staging-only grant accepted');
+
+try {
+    orange_restore_staging_validate_grant_lines([], $productionDbName);
+    restore_staging_self_test(false, 'privilege fence: empty SHOW GRANTS rejected');
+} catch (Throwable $e) {
+    restore_staging_self_test(
+        str_contains($e->getMessage(), 'no rows'),
+        'privilege fence: empty SHOW GRANTS rejected'
+    );
+}
+
+try {
+    orange_restore_staging_validate_grant_lines(
+        ["GRANT SELECT ON {$productionDbName}.* TO 'restore_staging'@'localhost'"],
+        $productionDbName
+    );
+    restore_staging_self_test(false, 'privilege fence: unquoted ON production.* rejected');
+} catch (Throwable $e) {
+    restore_staging_self_test(
+        str_contains($e->getMessage(), 'production schema'),
+        'privilege fence: unquoted ON production.* rejected'
+    );
+}
 
 // Package backend compatibility
 $pdoCompat = orange_restore_package_staging_import_compat(
