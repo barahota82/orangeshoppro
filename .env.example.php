@@ -74,6 +74,12 @@ return [
     // 'ORANGE_RESTORE_STAGING_DB_PASS' => 'strong_staging_password',
     // 'ORANGE_RESTORE_WORK_DIR' => 'D:\\orange_backups\\restore_work',
 
+    // Phase 2D.1 — Full Production Merge (ARCHITECTURE APPROVED — NOT IMPLEMENTED).
+    // Dedicated production-merge MySQL user ONLY — never DB_USER / DB_PASS, never staging user.
+    // Fail closed if missing or equal to DB_USER or ORANGE_RESTORE_STAGING_DB_USER.
+    // 'ORANGE_RESTORE_MERGE_DB_USER' => 'orange_restore_merge',
+    // 'ORANGE_RESTORE_MERGE_DB_PASS' => 'strong_merge_password',
+
     // ==================================================================
     // بوابة الدفع الإلكتروني (المرحلة 2) — أسرار السيرفر فقط، لا تُرفع لـ Git.
     // معطّلة افتراضياً: بلا هذه المفاتيح + بلا تفعيل «الدفع بالبطاقة» per دولة = لا تعمل.

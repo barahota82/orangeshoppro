@@ -130,3 +130,56 @@ No Restore implementation begins until this owner policy is archived and acknowl
 
 Archive location: this file (`docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt`).
 Architecture reference: `docs/archive/ORANGE_BACKUP_RECOVERY_RUNBOOK.md` § Orange Restore Policy.
+
+================================================================================
+11. Production Merge Credentials (Permanent owner decision — 2026-07-13)
+================================================================================
+Production Merge must **never** use the normal application MySQL account (`DB_USER` /
+`DB_PASS` from `.env.php` / `config.php`).
+
+Production Merge must always use a **dedicated** server-only account:
+
+  ORANGE_RESTORE_MERGE_DB_USER
+  ORANGE_RESTORE_MERGE_DB_PASS
+
+Rules:
+- Separate from `DB_USER` / `DB_PASS`
+- Separate from `ORANGE_RESTORE_STAGING_DB_USER` / `ORANGE_RESTORE_STAGING_DB_PASS`
+- Production database schema only (`DB_NAME`)
+- Minimum privileges required for merge (operator grants manually on server)
+- Never reused by the web application, storefront, admin, or routine backup jobs
+- Documented in `.env.example.php`, `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt`,
+  and `docs/archive/ORANGE_BACKUP_RECOVERY_RUNBOOK.md`
+
+**Fail closed:** If merge credentials are missing, empty, or equal to `DB_USER` or the
+staging restore user, Production Merge must abort before any production write.
+
+**تنفيذ:** Dedicated merge credentials + fail-closed gate — **architecture approved;
+not implemented** (Phase 2D.1).
+
+================================================================================
+12. Uploads cutover volume safety (Permanent owner decision — 2026-07-13)
+================================================================================
+Full Disaster Production Merge uploads cutover strategy (approved):
+
+  uploads_next  →  directory rename swap  →  uploads
+
+Before any production uploads cutover, the system **must** verify that live `uploads/`
+and prepared `uploads_next/` are on the **same filesystem / volume** so directory rename
+is atomic on the approved path.
+
+If they are **not** on the same volume:
+- **Abort the merge fail-closed** before any production uploads modification
+
+**Forbidden** (no silent fallback):
+- recursive copy
+- merge / partial merge of uploads trees
+- move
+- copy-then-delete
+- any non-atomic alternative
+
+Rationale: directory rename is the only approved production uploads cutover strategy.
+If atomic rename cannot be guaranteed, merge must not proceed to uploads cutover.
+
+**تنفيذ:** Same-volume verification gate — **architecture approved; not implemented**
+(Phase 2D.1).

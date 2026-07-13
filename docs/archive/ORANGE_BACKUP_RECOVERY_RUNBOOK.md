@@ -450,13 +450,66 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2C section)
 
 ---
 
+## Phase 2D.1 — Full Production Merge (ARCHITECTURE APPROVED — NOT IMPLEMENTED)
+
+**Status:** Architecture approved in principle (2026-07-13). **No merge CLI, merge engine,
+or production writes exist in the repository yet.**
+
+**Scope:** Promote a `full_disaster` job from `approved_for_merge` to production using
+CLI-first orchestration only. Separate from Phase 2D.2 (country merge).
+
+**Selected strategies (approved):**
+- **Database:** Validated staging export → controlled production replace (export staging DB to job artifact, then wipe + stream-import into production with 2B.1 SQL safety)
+- **Uploads:** Staged full-tree directory swap (`uploads_next` → rename → `uploads`) after pre-merge snapshot
+
+**Permanent owner decisions (2026-07-13):**
+
+### Production Merge Credentials
+
+Production Merge must **never** use `DB_USER` / `DB_PASS`. Required server-only keys:
+
+| Key | Required | Notes |
+|-----|----------|-------|
+| `ORANGE_RESTORE_MERGE_DB_USER` | Yes | Must differ from `DB_USER` and `ORANGE_RESTORE_STAGING_DB_USER` |
+| `ORANGE_RESTORE_MERGE_DB_PASS` | Yes | Dedicated merge password |
+
+- Production schema (`DB_NAME`) only; minimum merge privileges; never used by the application
+- Documented in `.env.example.php`, architecture archive, and this runbook
+- **Fail closed:** missing/empty/duplicate user → merge aborts before any production write
+
+Example grants (operator applies on server — adjust to minimum required):
+
+```sql
+CREATE USER 'orange_restore_merge'@'localhost' IDENTIFIED BY 'strong_merge_password';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, LOCK TABLES
+  ON orange_db.* TO 'orange_restore_merge'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+### Uploads cutover volume safety
+
+Before production uploads cutover, merge **must** verify `uploads/` and `uploads_next/` are on the **same filesystem / volume** (atomic directory rename).
+
+- **Not same volume → abort merge fail-closed** before any production uploads change
+- **No fallback:** recursive copy, merge, move, copy-then-delete, or any non-atomic method
+
+**Ordered pipeline (summary):** precheck → lock → maintenance → export staging → uploads snapshot → build `uploads_next` → **same-volume check** → DB cutover → uploads swap → post-validation → completed
+
+**Rollback:** This job's Stage-3 fresh full disaster backup only (+ pre-merge uploads snapshot).
+
+Architecture detail: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.1 section)
+
+---
+
 ## Deferred — Phase 2D+ and Phase 3
 
 The following are **not part of Phase 1A / 1B** and must not be assumed available:
 
 | Item | Target phase |
 |------|----------------|
-| Production merge | Phase 2D (gated by `ORANGE_RESTORE_OWNER_POLICY.txt`) |
+| Production merge | Phase 2D.1 architecture **approved** — **not implemented** |
+| Full production merge credentials (`ORANGE_RESTORE_MERGE_DB_*`) | **Owner policy §11 — required when 2D.1 implemented** |
+| Uploads same-volume gate | **Owner policy §12 — required when 2D.1 implemented** |
 | Owner approval gate (`approved_for_merge`) | **Phase 2C implemented** |
 | Admin backup/restore UI wrapper | Phase 3 |
 | Dedicated permissions `backup_restore_full` / `backup_restore_country` | **Phase 2A implemented** |

@@ -74,7 +74,7 @@ Phase 2A — Restore foundation (IMPLEMENTED — schema-free)
 Phase 2B.1 — Full restore → staging CLI only (IMPLEMENTED)
 Phase 2B.2 — Country restore → staging CLI only (IMPLEMENTED)
 Phase 2C — Approval + staging validation gate CLI (IMPLEMENTED)
-Phase 2D.1 — Full production merge CLI
+Phase 2D.1 — Full production merge CLI (ARCHITECTURE APPROVED — not implemented)
 Phase 2D.2 — Country production merge CLI
 Phase 2E — End-to-end orchestration CLI (manual steps, not scheduled)
 Phase 3 — Admin UI wrapper (no business logic)
@@ -193,6 +193,87 @@ Self-test:
 **NOT in 2C:** Production merge, Admin UI, restore APIs, automatic restore, schema changes.
 
 ================================================================================
+Phase 2D.1 — Full production merge (ARCHITECTURE APPROVED — NOT IMPLEMENTED)
+================================================================================
+
+**Status:** Architecture approved in principle (2026-07-13). **No merge code, CLI, or
+production writes exist yet.** Implementation gate: this section + owner policy §11–§12.
+
+**Goal:** Promote a job in `approved_for_merge` to production (`production_merged` →
+post-validation → `completed`) using CLI-first orchestration only. Country merge remains
+Phase 2D.2 (separate permission, engine, audit scope).
+
+**Selected DB strategy:** Validated staging export → controlled production replace (Strategy D).
+Export the already-validated staging database to a merge-ready artifact under the job
+directory, then wipe and stream-import into production using the same SQL safety pipeline
+as Phase 2B.1 (validator + `SELECT DATABASE()` session fence), with production identity
+checks. Does **not** re-import directly from package (staging is the proof).
+
+**Selected uploads strategy:** Staged full-tree directory swap.
+Build `uploads_next` from `{restore_work}/{job_id}/staging_uploads/`, pre-snapshot live
+`uploads/`, then near-atomic cutover:
+  `uploads` → `uploads_pre_merge_{job_id}` ; `uploads_next` → `uploads`
+Traversal/symlink/junction protection reuses 2B.1 rules. No partial merge for full disaster.
+
+**Owner Decision — Production Merge Credentials (permanent, 2026-07-13):**
+Production Merge must **never** use the normal application MySQL account (`DB_USER` /
+`DB_PASS`). A **dedicated** server-only account is mandatory:
+
+  ORANGE_RESTORE_MERGE_DB_USER
+  ORANGE_RESTORE_MERGE_DB_PASS
+
+Rules:
+- Must differ from `DB_USER` and from `ORANGE_RESTORE_STAGING_DB_USER`
+- Production database schema only (`DB_NAME` / `config.php`)
+- Minimum privileges required for merge (DDL/DML on production schema only — operator grants manually)
+- Never reused by the web application or routine backup/export paths
+- Documented in `.env.example.php`, this file, and `ORANGE_BACKUP_RECOVERY_RUNBOOK.md`
+- **Fail closed:** if either key is missing, empty, or equals `DB_USER` / staging user, merge aborts before any production write
+
+**Owner Decision — Uploads cutover volume safety (permanent, 2026-07-13):**
+Before any production uploads cutover, the merge engine **must** verify that live
+`uploads/` and prepared `uploads_next/` reside on the **same filesystem / volume** so
+directory rename is atomic on the approved path.
+
+- If not on the same volume: **abort merge fail-closed** before any production uploads modification
+- **Forbidden fallbacks:** recursive copy, merge, move, copy-then-delete, or any non-atomic alternative
+- Rationale: owner approved directory rename as the only production uploads cutover strategy; if atomic rename cannot be guaranteed, merge must not proceed
+
+**Mandatory merge preconditions (summary):**
+- Job `status === approved_for_merge`; 2C approval token consumed; approval binding checksums unchanged
+- Live package, staging manifest, and rollback anchor checksums match job + approval binding
+- Rollback anchor = this job's Stage-3 fresh full disaster backup only (`rollback_anchor_job_only=true`)
+- Staging validation gate pass (re-read artifacts + optional live staging sanity)
+- Staging DB identity verified; production DB identity verified; names differ
+- Dedicated merge credentials present and fenced (see above)
+- Global restore lock held; maintenance mode enabled and verified before first production write
+- Super Admin + `backup_restore_full` + merge-time password re-auth + exact phrase `RESTORE`
+
+**Merge pipeline (ordered — no stage skipped):**
+precheck → lock → maintenance on → maintenance verify → export staging DB → verify export →
+pre-merge uploads snapshot → build uploads_next → **same-volume check (uploads vs uploads_next)** →
+merge_started → production DB cutover → database_cutover_complete → uploads directory swap →
+uploads_cutover_complete → production_merged → post-validation → maintenance off → completed
+
+**Job states (2D.1):** `merge_started`, `database_cutover_complete`, `uploads_cutover_complete`,
+`production_merged`, `post_validation_passed`, `failed_merge`, `failed_post_merge`,
+`rollback_in_progress`, `rolled_back`, `completed`. No silent retries.
+
+**Rollback:** Only this job's Stage-3 fresh full disaster backup. Pre-merge uploads snapshot for
+uploads rollback. No automatic selection of older snapshots.
+
+**NOT in 2D.1 (until implementation phase):** Any merge CLI, production writes, Admin UI,
+restore APIs, automatic/scheduled merge, schema changes (unless owner separately approves
+`restore_audit_log` table for first mutating phase).
+
+Proposed implementation files (future — do not create until implementation approved):
+  scripts/backup/restore_full_merge.php
+  includes/backup/restore/restore_full_merge.php
+  includes/backup/restore/restore_merge_*.php (precheck, maintenance, staging export,
+    db cutover, uploads cutover, post-validation, rollback, production_target)
+  scripts/backup/self_test_restore_full_merge.php
+
+================================================================================
 Phase 2A deliverables (filesystem)
 ================================================================================
 
@@ -219,8 +300,15 @@ ORANGE_RESTORE_STAGING_DB     — **required** staging database name (must diffe
 ORANGE_RESTORE_STAGING_DB_USER — **required** dedicated staging MySQL user (must differ from production DB_USER)
 ORANGE_RESTORE_STAGING_DB_PASS — **required** staging MySQL password
 
+Phase 2D.1 — Production Merge (architecture approved; **not implemented**):
+ORANGE_RESTORE_MERGE_DB_USER — **required** dedicated production-merge MySQL user (must differ from DB_USER and ORANGE_RESTORE_STAGING_DB_USER)
+ORANGE_RESTORE_MERGE_DB_PASS — **required** production-merge MySQL password
+
 Phase 2B.1 does **not** use production DB credentials or production uploads paths. Fail closed if
 staging keys are missing, staging DB equals production, or staging user equals production DB_USER.
+
+Phase 2D.1 merge must **not** use DB_USER / DB_PASS. Fail closed if ORANGE_RESTORE_MERGE_DB_USER
+or ORANGE_RESTORE_MERGE_DB_PASS is missing, empty, or equals DB_USER or staging user.
 
 **Recommended MySQL grants (operator applies manually — Orange does not modify production privileges):**
 ```sql
@@ -230,6 +318,17 @@ GRANT ALL PRIVILEGES ON orange_restore_staging.* TO 'orange_restore_staging'@'lo
 FLUSH PRIVILEGES;
 ```
 The staging user must have **zero** privileges on the production database schema.
+
+**Recommended MySQL grants — production merge user (operator applies manually — Phase 2D.1):**
+```sql
+CREATE USER 'orange_restore_merge'@'localhost' IDENTIFIED BY 'strong_merge_password';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, LOCK TABLES
+  ON orange_db.* TO 'orange_restore_merge'@'localhost';
+FLUSH PRIVILEGES;
+```
+Adjust privilege list to minimum required for controlled wipe + import on **production schema only**.
+The merge user must have **zero** privileges on the staging database schema and must **not** be
+the application `DB_USER`.
 
 ================================================================================
 Audit strategy (Phase 2A → Phase 2B transition)
