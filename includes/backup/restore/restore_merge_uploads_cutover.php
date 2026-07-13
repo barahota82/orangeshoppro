@@ -278,6 +278,55 @@ function orange_restore_merge_uploads_cutover_collect_trust_gates(
         ];
     }
 
+    if ($phase === 'verify_live_uploads') {
+        if (!is_dir($uploadsDir) && !is_file($uploadsDir)) {
+            throw new RuntimeException('Production uploads directory missing during live uploads verification: ' . $uploadsDir);
+        }
+        if (is_dir($uploadsNextDir) || is_file($uploadsNextDir)) {
+            throw new RuntimeException('uploads_next still exists during live uploads verification: ' . $uploadsNextDir);
+        }
+        if (!is_dir($uploadsPreMergeDir)) {
+            throw new RuntimeException('uploads_pre_merge directory missing during live uploads verification: ' . $uploadsPreMergeDir);
+        }
+
+        orange_restore_uploads_fs_assert_atomic_rename_volume([
+            $uploadsDir,
+            $uploadsPreMergeDir,
+            dirname($uploadsDir),
+            dirname($uploadsNextDir),
+        ]);
+
+        $stagingInventory = orange_restore_uploads_tree_inventory($stagingUploadsDir);
+        $liveUploadsInventory = orange_restore_uploads_tree_inventory($uploadsDir);
+
+        $uploadsNextManifestPath = orange_restore_uploads_next_manifest_path($workRoot, $jobId);
+        $uploadsNextManifest = orange_restore_uploads_next_manifest_read($uploadsNextManifestPath);
+        orange_restore_uploads_next_manifest_validate(
+            $uploadsNextManifest,
+            $job,
+            $binding,
+            $liveUploadsInventory,
+            $stagingInventory,
+            (string) $stagingGate['checksum'],
+            $livePackageChecksum
+        );
+
+        return [
+            'uploads_dir' => $uploadsDir,
+            'uploads_next_dir' => $uploadsNextDir,
+            'uploads_pre_merge_dir' => $uploadsPreMergeDir,
+            'staging_uploads_dir' => $stagingUploadsDir,
+            'uploads_inventory' => $liveUploadsInventory,
+            'uploads_next_inventory' => $liveUploadsInventory,
+            'staging_inventory' => $stagingInventory,
+            'live_package_checksum' => $livePackageChecksum,
+            'live_staging_manifest_checksum' => (string) $stagingGate['checksum'],
+            'live_rollback_checksum' => $liveAnchorChecksum,
+            'uploads_next_tree_checksum' => $liveUploadsInventory['tree_checksum_sha256'],
+            'uploads_tree_checksum' => $liveUploadsInventory['tree_checksum_sha256'],
+        ];
+    }
+
     if (!is_dir($uploadsDir)) {
         throw new RuntimeException('Production uploads directory missing: ' . $uploadsDir);
     }
@@ -483,44 +532,6 @@ function orange_restore_merge_uploads_cutover_reconcile_pending_first_rename(
 }
 
 /**
- * Resume entry: job in uploads_first_rename_complete — second rename only.
- *
- * @param array<string, mixed> $job
- * @return array<string, mixed>
- */
-function orange_restore_merge_uploads_cutover_verify_resume_preconditions(
-    string $projectRoot,
-    string $workRoot,
-    string $backupRoot,
-    array $job
-): array {
-    $jobId = (string) ($job['job_id'] ?? '');
-    if ($jobId === '') {
-        throw new RuntimeException('Restore job missing job_id.');
-    }
-
-    $status = (string) ($job['status'] ?? '');
-    if ($status !== ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE) {
-        throw new RuntimeException('Restore job is not uploads_first_rename_complete (status=' . $status . ').');
-    }
-
-    if (($job['job_type'] ?? '') !== ORANGE_RESTORE_JOB_TYPE_FULL) {
-        throw new RuntimeException('Uploads cutover applies to full_disaster jobs only.');
-    }
-
-    orange_restore_lock_assert_held_by_job($workRoot, $jobId);
-    orange_restore_merge_maintenance_verify($workRoot, $jobId);
-
-    return orange_restore_merge_uploads_cutover_collect_trust_gates(
-        $projectRoot,
-        $workRoot,
-        $backupRoot,
-        $job,
-        'before_second_rename'
-    );
-}
-
-/**
  * @param array<string, mixed> $baseline
  */
 function orange_restore_merge_uploads_cutover_final_pre_rename_revalidation(
@@ -694,6 +705,290 @@ function orange_restore_merge_uploads_cutover_verify_snapshot(
     }
 }
 
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_uploads_cutover_load_existing_snapshot(
+    string $workRoot,
+    string $jobId,
+    string $uploadsDir,
+    array $job
+): array {
+    $snapshotDir = orange_restore_pre_merge_uploads_snapshot_directory($workRoot, $jobId);
+    if (!is_dir($snapshotDir)) {
+        throw new RuntimeException('Pre-merge uploads snapshot directory missing.');
+    }
+
+    $manifestPath = orange_restore_pre_merge_uploads_snapshot_manifest_path($workRoot, $jobId);
+    if (!is_file($manifestPath)) {
+        throw new RuntimeException('Pre-merge uploads snapshot manifest missing.');
+    }
+
+    $decoded = json_decode((string) file_get_contents($manifestPath), true);
+    if (!is_array($decoded)) {
+        throw new RuntimeException('Pre-merge uploads snapshot manifest is invalid JSON.');
+    }
+
+    if ((string) ($decoded['job_id'] ?? '') !== $jobId) {
+        throw new RuntimeException('Pre-merge uploads snapshot belongs to another job.');
+    }
+
+    $manifestUploadsPath = trim((string) ($decoded['path'] ?? ''));
+    if ($manifestUploadsPath === '') {
+        throw new RuntimeException('Pre-merge uploads snapshot manifest missing path.');
+    }
+
+    $uploadsReal = orange_restore_uploads_fs_require_realpath($uploadsDir);
+    $manifestReal = realpath($manifestUploadsPath) ?: $manifestUploadsPath;
+    if (strcasecmp(
+        rtrim(str_replace('\\', '/', $manifestReal), '/'),
+        rtrim(str_replace('\\', '/', $uploadsReal), '/')
+    ) !== 0) {
+        throw new RuntimeException('Pre-merge uploads snapshot path does not match live uploads directory.');
+    }
+
+    $checksumsPath = (string) ($decoded['checksums_path'] ?? '');
+    if ($checksumsPath === '' || !is_file($checksumsPath)) {
+        throw new RuntimeException('Pre-merge uploads snapshot checksums file missing.');
+    }
+
+    orange_restore_merge_uploads_cutover_verify_snapshot($uploadsDir, $decoded);
+
+    return $decoded;
+}
+
+/**
+ * @return array{manifest:array<string,mixed>,reused:bool}
+ */
+function orange_restore_merge_uploads_cutover_ensure_snapshot(
+    string $workRoot,
+    string $jobId,
+    string $uploadsDir,
+    ?callable $snapshotOverride = null
+): array {
+    $snapshotDir = orange_restore_pre_merge_uploads_snapshot_directory($workRoot, $jobId);
+    if (is_dir($snapshotDir)) {
+        return [
+            'manifest' => orange_restore_merge_uploads_cutover_load_existing_snapshot($workRoot, $jobId, $uploadsDir, []),
+            'reused' => true,
+        ];
+    }
+
+    if ($snapshotOverride !== null) {
+        $manifest = $snapshotOverride($workRoot, $jobId, $uploadsDir);
+        if (!is_array($manifest) || ($manifest['ok'] ?? true) === false) {
+            throw new RuntimeException('Pre-merge uploads snapshot override failed.');
+        }
+    } else {
+        $manifest = orange_restore_merge_uploads_cutover_create_snapshot($workRoot, $jobId, $uploadsDir);
+    }
+
+    orange_restore_merge_uploads_cutover_verify_snapshot($uploadsDir, $manifest);
+
+    return [
+        'manifest' => $manifest,
+        'reused' => false,
+    ];
+}
+
+/**
+ * @param array<string, mixed> $job
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_uploads_cutover_verify_snapshot_complete_entry(
+    string $projectRoot,
+    string $workRoot,
+    string $backupRoot,
+    array $job
+): array {
+    $jobId = (string) ($job['job_id'] ?? '');
+    if (($job['status'] ?? '') !== ORANGE_RESTORE_JOB_STATUS_UPLOADS_SNAPSHOT_COMPLETE) {
+        throw new RuntimeException('Snapshot resume requires uploads_snapshot_complete status.');
+    }
+
+    orange_restore_lock_assert_held_by_job($workRoot, $jobId);
+    orange_restore_merge_maintenance_verify($workRoot, $jobId);
+
+    $gate = orange_restore_merge_uploads_cutover_collect_trust_gates(
+        $projectRoot,
+        $workRoot,
+        $backupRoot,
+        $job,
+        'before_first_rename'
+    );
+
+    $uploadsPreMergeDir = (string) $gate['uploads_pre_merge_dir'];
+    if (is_dir($uploadsPreMergeDir) || is_file($uploadsPreMergeDir)) {
+        throw new RuntimeException('uploads_pre_merge target already exists: ' . $uploadsPreMergeDir);
+    }
+
+    orange_restore_merge_uploads_cutover_load_existing_snapshot(
+        $workRoot,
+        $jobId,
+        (string) $gate['uploads_dir'],
+        $job
+    );
+
+    return $gate;
+}
+
+/**
+ * @return array{
+ *   action:string,
+ *   job:array<string,mixed>,
+ *   gate:array<string,mixed>,
+ *   snapshot_manifest:array<string,mixed>|null
+ * }
+ */
+function orange_restore_merge_uploads_cutover_resolve_second_rename_entry(
+    string $projectRoot,
+    string $workRoot,
+    string $backupRoot,
+    array $job
+): array {
+    $jobId = (string) ($job['job_id'] ?? '');
+    $status = (string) ($job['status'] ?? '');
+    if (!in_array($status, [
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_SECOND_RENAME_PENDING,
+    ], true)) {
+        throw new RuntimeException('Second rename resolution requires uploads_first_rename_complete or uploads_second_rename_pending.');
+    }
+
+    orange_restore_lock_assert_held_by_job($workRoot, $jobId);
+    orange_restore_merge_maintenance_verify($workRoot, $jobId);
+
+    $uploadsDir = orange_restore_production_uploads_directory($projectRoot);
+    $uploadsNextDir = orange_restore_uploads_next_directory($projectRoot);
+    $uploadsPreMergeDir = orange_restore_uploads_pre_merge_directory($projectRoot, $jobId);
+    $uploadsExists = is_dir($uploadsDir) || is_file($uploadsDir);
+    $uploadsNextExists = is_dir($uploadsNextDir) || is_file($uploadsNextDir);
+    $preMergeExists = is_dir($uploadsPreMergeDir) || is_file($uploadsPreMergeDir);
+
+    if ($uploadsExists && $uploadsNextExists) {
+        throw new RuntimeException('Cannot reconcile second rename: both uploads and uploads_next exist.');
+    }
+    if (!$uploadsExists && !$uploadsNextExists) {
+        throw new RuntimeException('Cannot reconcile second rename: neither uploads nor uploads_next exists.');
+    }
+    if (!$preMergeExists) {
+        throw new RuntimeException('Cannot reconcile second rename: uploads_pre_merge is missing.');
+    }
+
+    if ($uploadsExists && !$uploadsNextExists) {
+        $gate = orange_restore_merge_uploads_cutover_collect_trust_gates(
+            $projectRoot,
+            $workRoot,
+            $backupRoot,
+            $job,
+            'verify_live_uploads'
+        );
+
+        return [
+            'action' => 'reconcile_cutover_complete',
+            'job' => $job,
+            'gate' => $gate,
+            'snapshot_manifest' => null,
+        ];
+    }
+
+    $gate = orange_restore_merge_uploads_cutover_collect_trust_gates(
+        $projectRoot,
+        $workRoot,
+        $backupRoot,
+        $job,
+        'before_second_rename'
+    );
+
+    if ($status === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE) {
+        return [
+            'action' => 'execute_second_rename',
+            'job' => $job,
+            'gate' => $gate,
+            'snapshot_manifest' => null,
+            'emit_pending_audit' => true,
+        ];
+    }
+
+    return [
+        'action' => 'execute_second_rename',
+        'job' => $job,
+        'gate' => $gate,
+        'snapshot_manifest' => null,
+        'emit_pending_audit' => false,
+    ];
+}
+
+/**
+ * @param array<string, mixed> $gate
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_uploads_cutover_reconcile_cutover_complete(
+    string $projectRoot,
+    string $workRoot,
+    string $backupRoot,
+    string $jobId,
+    array $job,
+    array $gate,
+    int $adminId,
+    string $operatorUsername,
+    float $startedAt
+): array {
+    $fsState = orange_restore_merge_uploads_cutover_filesystem_state($projectRoot, $gate);
+    $durationSeconds = (int) round(microtime(true) - $startedAt);
+    $priorStatus = (string) ($job['status'] ?? '');
+
+    if ($priorStatus === ORANGE_RESTORE_JOB_STATUS_UPLOADS_SECOND_RENAME_PENDING) {
+        orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_second_rename_reconciled', 'pass', array_merge($fsState, [
+            'operator_admin_id' => $adminId,
+            'operator_username' => $operatorUsername,
+            'reconciliation' => 'second_rename_already_applied',
+            'uploads_tree_checksum' => $gate['uploads_tree_checksum'],
+            'database_writes' => false,
+            'production_writes' => false,
+        ])));
+    }
+
+    $job = orange_restore_job_uploads_cutover_transition(
+        $workRoot,
+        $jobId,
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE,
+        [
+            'uploads_cutover_completed_at' => gmdate('c'),
+            'uploads_cutover_second_rename_pending' => false,
+            'uploads_second_rename_pending_at' => '',
+            'uploads_pre_merge_path' => $gate['uploads_pre_merge_dir'],
+            'pre_merge_uploads_snapshot_path' => orange_restore_pre_merge_uploads_snapshot_directory($workRoot, $jobId),
+            'duration_seconds' => $durationSeconds,
+            'result' => 'uploads_cutover_complete',
+        ]
+    );
+
+    orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_cutover_reconciled_complete', 'pass', array_merge([
+        'operator_admin_id' => $adminId,
+        'operator_username' => $operatorUsername,
+        'reconciliation' => 'live_uploads_matches_expected',
+        'uploads_tree_checksum' => $gate['uploads_tree_checksum'],
+        'uploads_next_tree_checksum' => $gate['uploads_next_tree_checksum'],
+        'duration_seconds' => $durationSeconds,
+        'database_writes' => false,
+        'production_writes' => true,
+        'rollback_executed' => false,
+    ], $fsState)));
+
+    return [
+        'ok' => true,
+        'job_id' => $jobId,
+        'status' => ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE,
+        'job' => $job,
+        'reconciled' => true,
+        'database_writes' => false,
+        'production_writes' => true,
+        'uploads_touched' => true,
+        'rollback_executed' => false,
+    ];
+}
+
 function orange_restore_merge_uploads_cutover_atomic_rename(
     string $from,
     string $to,
@@ -729,23 +1024,34 @@ function orange_restore_merge_uploads_cutover_execute_second_rename_phase(
     ?array $snapshotManifest,
     ?callable $renameOverride
 ): array {
+    $job = orange_restore_job_read($workRoot, $jobId);
+    if (($job['status'] ?? '') !== ORANGE_RESTORE_JOB_STATUS_UPLOADS_SECOND_RENAME_PENDING) {
+        throw new RuntimeException(
+            'Second rename requires uploads_second_rename_pending (status=' . (string) ($job['status'] ?? '') . ').'
+        );
+    }
+
     orange_restore_merge_uploads_cutover_final_pre_second_rename_revalidation(
         $projectRoot,
         $workRoot,
         $backupRoot,
-        orange_restore_job_read($workRoot, $jobId),
+        $job,
         $secondRenameBaseline
     );
 
-    orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_second_rename_started', 'started', [
-        'operator_admin_id' => $adminId,
-        'operator_username' => $operatorUsername,
-        'uploads_path' => $verify['uploads_dir'],
-        'uploads_pre_merge_path' => $verify['uploads_pre_merge_dir'],
-        'uploads_next_path' => $verify['uploads_next_dir'],
-        'database_writes' => false,
-        'production_writes' => true,
-    ]));
+    orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_second_rename_started', 'started', array_merge(
+        orange_restore_merge_uploads_cutover_filesystem_state($projectRoot, $verify),
+        [
+            'operator_admin_id' => $adminId,
+            'operator_username' => $operatorUsername,
+            'uploads_path' => $verify['uploads_dir'],
+            'uploads_pre_merge_path' => $verify['uploads_pre_merge_dir'],
+            'uploads_next_path' => $verify['uploads_next_dir'],
+            'uploads_next_tree_checksum' => $verify['uploads_next_tree_checksum'],
+            'database_writes' => false,
+            'production_writes' => true,
+        ]
+    )));
 
     orange_restore_merge_uploads_cutover_atomic_rename(
         (string) $verify['uploads_next_dir'],
@@ -760,6 +1066,8 @@ function orange_restore_merge_uploads_cutover_execute_second_rename_phase(
         ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE,
         [
             'uploads_cutover_completed_at' => gmdate('c'),
+            'uploads_cutover_second_rename_pending' => false,
+            'uploads_second_rename_pending_at' => '',
             'uploads_pre_merge_path' => $verify['uploads_pre_merge_dir'],
             'pre_merge_uploads_snapshot_path' => orange_restore_pre_merge_uploads_snapshot_directory($workRoot, $jobId),
             'duration_seconds' => $durationSeconds,
@@ -767,21 +1075,24 @@ function orange_restore_merge_uploads_cutover_execute_second_rename_phase(
         ]
     );
 
-    orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_cutover_complete', 'pass', [
-        'operator_admin_id' => $adminId,
-        'operator_username' => $operatorUsername,
-        'uploads_path' => $verify['uploads_dir'],
-        'uploads_pre_merge_path' => $verify['uploads_pre_merge_dir'],
-        'uploads_next_path' => $verify['uploads_next_dir'],
-        'file_count' => (int) ($snapshotManifest['file_count'] ?? ($verify['uploads_next_inventory']['file_count'] ?? 0)),
-        'total_size' => (int) ($snapshotManifest['total_size'] ?? ($verify['uploads_next_inventory']['total_size'] ?? 0)),
-        'tree_checksum_sha256' => (string) ($snapshotManifest['tree_checksum_sha256'] ?? ($verify['uploads_next_tree_checksum'] ?? '')),
-        'uploads_next_tree_checksum' => $verify['uploads_next_tree_checksum'],
-        'duration_seconds' => $durationSeconds,
-        'database_writes' => false,
-        'production_writes' => true,
-        'rollback_executed' => false,
-    ]));
+    orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_cutover_complete', 'pass', array_merge(
+        orange_restore_merge_uploads_cutover_filesystem_state($projectRoot, $verify),
+        [
+            'operator_admin_id' => $adminId,
+            'operator_username' => $operatorUsername,
+            'uploads_path' => $verify['uploads_dir'],
+            'uploads_pre_merge_path' => $verify['uploads_pre_merge_dir'],
+            'uploads_next_path' => $verify['uploads_next_dir'],
+            'file_count' => (int) ($snapshotManifest['file_count'] ?? ($verify['uploads_next_inventory']['file_count'] ?? 0)),
+            'total_size' => (int) ($snapshotManifest['total_size'] ?? ($verify['uploads_next_inventory']['total_size'] ?? 0)),
+            'tree_checksum_sha256' => (string) ($snapshotManifest['tree_checksum_sha256'] ?? ($verify['uploads_next_tree_checksum'] ?? '')),
+            'uploads_next_tree_checksum' => $verify['uploads_next_tree_checksum'],
+            'duration_seconds' => $durationSeconds,
+            'database_writes' => false,
+            'production_writes' => true,
+            'rollback_executed' => false,
+        ]
+    )));
 
     return [
         'ok' => true,
@@ -815,6 +1126,8 @@ function orange_restore_merge_uploads_cutover_handle_failure(
 
     if ($currentStatus === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE) {
         $failureEvent = 'uploads_second_rename_failed';
+    } elseif ($currentStatus === ORANGE_RESTORE_JOB_STATUS_UPLOADS_SECOND_RENAME_PENDING) {
+        $failureEvent = 'uploads_second_rename_failed';
     } elseif ($currentStatus === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_PENDING) {
         $failureEvent = 'uploads_first_rename_failed';
     } else {
@@ -832,12 +1145,16 @@ function orange_restore_merge_uploads_cutover_handle_failure(
         'database_writes' => false,
         'production_writes' => in_array($currentStatus, [
             ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
+            ORANGE_RESTORE_JOB_STATUS_UPLOADS_SECOND_RENAME_PENDING,
             ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_PENDING,
         ], true),
         'rollback_executed' => false,
     ], $fsState)));
 
-    if ($currentStatus === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE) {
+    if (in_array($currentStatus, [
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_SECOND_RENAME_PENDING,
+    ], true)) {
         orange_restore_job_mark_failed_merge(
             $workRoot,
             $jobId,
@@ -863,7 +1180,7 @@ function orange_restore_merge_uploads_cutover_handle_failure(
             orange_restore_job_uploads_cutover_transition(
                 $workRoot,
                 $jobId,
-                ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE,
+                ORANGE_RESTORE_JOB_STATUS_UPLOADS_SNAPSHOT_COMPLETE,
                 [
                     'uploads_cutover_first_rename_pending' => false,
                     'uploads_first_rename_pending_at' => '',
@@ -876,10 +1193,103 @@ function orange_restore_merge_uploads_cutover_handle_failure(
 }
 
 /**
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_uploads_cutover_transition_second_rename_pending(
+    string $workRoot,
+    string $jobId,
+    array $job,
+    array $verify,
+    int $adminId,
+    string $operatorUsername,
+    string $projectRoot,
+    bool $emitPendingAudit
+): array {
+    $job = orange_restore_job_read($workRoot, $jobId);
+    if (($job['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_UPLOADS_SECOND_RENAME_PENDING) {
+        return $job;
+    }
+
+    $pendingAt = gmdate('c');
+    $job = orange_restore_job_uploads_cutover_transition(
+        $workRoot,
+        $jobId,
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_SECOND_RENAME_PENDING,
+        [
+            'uploads_second_rename_pending_at' => $pendingAt,
+            'uploads_cutover_second_rename_pending' => true,
+            'uploads_pre_merge_path' => $verify['uploads_pre_merge_dir'],
+            'pre_merge_uploads_snapshot_path' => orange_restore_pre_merge_uploads_snapshot_directory($workRoot, $jobId),
+        ]
+    );
+
+    if ($emitPendingAudit) {
+        orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_second_rename_pending', 'pass', array_merge(
+            orange_restore_merge_uploads_cutover_filesystem_state($projectRoot, $verify),
+            [
+                'operator_admin_id' => $adminId,
+                'operator_username' => $operatorUsername,
+                'uploads_second_rename_pending_at' => $pendingAt,
+                'uploads_next_tree_checksum' => $verify['uploads_next_tree_checksum'],
+                'database_writes' => false,
+                'production_writes' => false,
+            ]
+        )));
+    }
+
+    return $job;
+}
+
+/**
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_uploads_cutover_run_second_rename_from_gate(
+    string $projectRoot,
+    string $workRoot,
+    string $backupRoot,
+    string $jobId,
+    array $job,
+    array $verify,
+    int $adminId,
+    string $operatorUsername,
+    float $startedAt,
+    ?array $snapshotManifest,
+    ?callable $renameOverride,
+    bool $emitPendingAudit
+): array {
+    $job = orange_restore_merge_uploads_cutover_transition_second_rename_pending(
+        $workRoot,
+        $jobId,
+        $job,
+        $verify,
+        $adminId,
+        $operatorUsername,
+        $projectRoot,
+        $emitPendingAudit
+    );
+
+    return orange_restore_merge_uploads_cutover_execute_second_rename_phase(
+        $projectRoot,
+        $workRoot,
+        $backupRoot,
+        $jobId,
+        $job,
+        $verify,
+        $verify,
+        $adminId,
+        $operatorUsername,
+        $startedAt,
+        $snapshotManifest,
+        $renameOverride
+    );
+}
+
+/**
  * Phase 2D.3 — production uploads cutover only (no DB writes, no rollback, no post-validation).
  *
- * Legal entry states: database_cutover_complete, uploads_first_rename_pending,
- * uploads_first_rename_complete (resume second rename only).
+ * Legal entry states: database_cutover_complete, uploads_snapshot_complete,
+ * uploads_first_rename_pending, uploads_first_rename_complete, uploads_second_rename_pending.
  *
  * @param array<string, mixed> $options
  * @return array<string, mixed>
@@ -927,40 +1337,64 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
     $snapshotManifest = null;
     $verify = [];
 
-    if ($entryStatus === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE) {
-        $verify = orange_restore_merge_uploads_cutover_verify_resume_preconditions(
-            $projectRoot,
-            $workRoot,
-            $backupRoot,
-            $job
-        );
-
+    if (in_array($entryStatus, [
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_SECOND_RENAME_PENDING,
+    ], true)) {
         orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_cutover_resume_started', 'started', [
             'operator_admin_id' => $adminId,
             'operator_username' => $operatorUsername,
-            'resume_from' => ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
-            'uploads_pre_merge_path' => $verify['uploads_pre_merge_dir'],
-            'uploads_next_path' => $verify['uploads_next_dir'],
+            'resume_from' => $entryStatus,
             'database_writes' => false,
             'production_writes' => true,
         ]));
 
         try {
-            return orange_restore_merge_uploads_cutover_execute_second_rename_phase(
+            $resolved = orange_restore_merge_uploads_cutover_resolve_second_rename_entry(
+                $projectRoot,
+                $workRoot,
+                $backupRoot,
+                orange_restore_job_read($workRoot, $jobId)
+            );
+            $job = $resolved['job'];
+            $verify = $resolved['gate'];
+
+            if ($resolved['action'] === 'reconcile_cutover_complete') {
+                return orange_restore_merge_uploads_cutover_reconcile_cutover_complete(
+                    $projectRoot,
+                    $workRoot,
+                    $backupRoot,
+                    $jobId,
+                    $job,
+                    $verify,
+                    $adminId,
+                    $operatorUsername,
+                    $startedAt
+                );
+            }
+
+            return orange_restore_merge_uploads_cutover_run_second_rename_from_gate(
                 $projectRoot,
                 $workRoot,
                 $backupRoot,
                 $jobId,
                 $job,
                 $verify,
-                $verify,
                 $adminId,
                 $operatorUsername,
                 $startedAt,
-                null,
-                $renameOverride
+                $resolved['snapshot_manifest'],
+                $renameOverride,
+                (bool) ($resolved['emit_pending_audit'] ?? false)
             );
         } catch (Throwable $e) {
+            if ($verify === []) {
+                $verify = [
+                    'uploads_dir' => orange_restore_production_uploads_directory($projectRoot),
+                    'uploads_next_dir' => orange_restore_uploads_next_directory($projectRoot),
+                    'uploads_pre_merge_dir' => orange_restore_uploads_pre_merge_directory($projectRoot, $jobId),
+                ];
+            }
             orange_restore_merge_uploads_cutover_handle_failure(
                 $projectRoot,
                 $workRoot,
@@ -1000,19 +1434,19 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
             }
 
             try {
-                return orange_restore_merge_uploads_cutover_execute_second_rename_phase(
+                return orange_restore_merge_uploads_cutover_run_second_rename_from_gate(
                     $projectRoot,
                     $workRoot,
                     $backupRoot,
                     $jobId,
                     $job,
                     $verify,
-                    $verify,
                     $adminId,
                     $operatorUsername,
                     $startedAt,
                     null,
-                    $renameOverride
+                    $renameOverride,
+                    true
                 );
             } catch (Throwable $e) {
                 orange_restore_merge_uploads_cutover_handle_failure(
@@ -1028,7 +1462,35 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
             }
         }
 
-        // proceed_first_rename — continue fresh cutover from pending marker (snapshot already exists).
+        $snapshotManifest = orange_restore_merge_uploads_cutover_load_existing_snapshot(
+            $workRoot,
+            $jobId,
+            (string) $verify['uploads_dir'],
+            $job
+        );
+    } elseif ($entryStatus === ORANGE_RESTORE_JOB_STATUS_UPLOADS_SNAPSHOT_COMPLETE) {
+        $verify = orange_restore_merge_uploads_cutover_verify_snapshot_complete_entry(
+            $projectRoot,
+            $workRoot,
+            $backupRoot,
+            $job
+        );
+        $snapshotManifest = orange_restore_merge_uploads_cutover_load_existing_snapshot(
+            $workRoot,
+            $jobId,
+            (string) $verify['uploads_dir'],
+            $job
+        );
+        orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_snapshot_reused', 'pass', [
+            'operator_admin_id' => $adminId,
+            'operator_username' => $operatorUsername,
+            'snapshot_path' => orange_restore_pre_merge_uploads_snapshot_directory($workRoot, $jobId),
+            'file_count' => (int) ($snapshotManifest['file_count'] ?? 0),
+            'total_size' => (int) ($snapshotManifest['total_size'] ?? 0),
+            'tree_checksum_sha256' => (string) ($snapshotManifest['tree_checksum_sha256'] ?? ''),
+            'database_writes' => false,
+            'production_writes' => false,
+        ]));
     } elseif ($entryStatus === ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE) {
         $verify = orange_restore_merge_uploads_cutover_verify_preconditions(
             $projectRoot,
@@ -1036,14 +1498,7 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
             $backupRoot,
             $job
         );
-    } else {
-        throw new RuntimeException(
-            'Uploads cutover illegal entry state (status=' . $entryStatus . '). '
-            . 'Allowed: database_cutover_complete, uploads_first_rename_pending, uploads_first_rename_complete.'
-        );
-    }
 
-    if ($entryStatus === ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE) {
         orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_snapshot_started', 'started', [
             'operator_admin_id' => $adminId,
             'operator_username' => $operatorUsername,
@@ -1054,25 +1509,58 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
         ]));
 
         try {
-            if ($snapshotOverride !== null) {
-                $snapshotManifest = $snapshotOverride($workRoot, $jobId, (string) $verify['uploads_dir']);
-                if (!is_array($snapshotManifest) || ($snapshotManifest['ok'] ?? true) === false) {
-                    throw new RuntimeException('Pre-merge uploads snapshot override failed.');
-                }
+            $snapshotResult = orange_restore_merge_uploads_cutover_ensure_snapshot(
+                $workRoot,
+                $jobId,
+                (string) $verify['uploads_dir'],
+                $snapshotOverride
+            );
+            $snapshotManifest = $snapshotResult['manifest'];
+            if ($snapshotResult['reused']) {
+                orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_snapshot_reused', 'pass', [
+                    'operator_admin_id' => $adminId,
+                    'operator_username' => $operatorUsername,
+                    'snapshot_path' => orange_restore_pre_merge_uploads_snapshot_directory($workRoot, $jobId),
+                    'file_count' => (int) ($snapshotManifest['file_count'] ?? 0),
+                    'total_size' => (int) ($snapshotManifest['total_size'] ?? 0),
+                    'tree_checksum_sha256' => (string) ($snapshotManifest['tree_checksum_sha256'] ?? ''),
+                    'database_writes' => false,
+                    'production_writes' => false,
+                ]));
             } else {
-                $snapshotManifest = orange_restore_merge_uploads_cutover_create_snapshot(
-                    $workRoot,
-                    $jobId,
-                    (string) $verify['uploads_dir']
-                );
+                orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_snapshot_completed', 'pass', [
+                    'operator_admin_id' => $adminId,
+                    'operator_username' => $operatorUsername,
+                    'snapshot_path' => (string) ($snapshotManifest['path'] ?? $verify['uploads_dir']),
+                    'file_count' => (int) ($snapshotManifest['file_count'] ?? 0),
+                    'total_size' => (int) ($snapshotManifest['total_size'] ?? 0),
+                    'tree_checksum_sha256' => (string) ($snapshotManifest['tree_checksum_sha256'] ?? ''),
+                    'duration_seconds' => (int) round(microtime(true) - $startedAt),
+                    'database_writes' => false,
+                    'production_writes' => false,
+                ]));
             }
 
-            orange_restore_merge_uploads_cutover_verify_snapshot((string) $verify['uploads_dir'], $snapshotManifest);
+            $snapshotAt = gmdate('c');
+            $job = orange_restore_job_uploads_cutover_transition(
+                $workRoot,
+                $jobId,
+                ORANGE_RESTORE_JOB_STATUS_UPLOADS_SNAPSHOT_COMPLETE,
+                [
+                    'uploads_snapshot_completed_at' => $snapshotAt,
+                    'uploads_cutover_snapshot_complete' => true,
+                    'pre_merge_uploads_snapshot_path' => orange_restore_pre_merge_uploads_snapshot_directory($workRoot, $jobId),
+                ]
+            );
 
-            $snapshotPath = orange_restore_pre_merge_uploads_snapshot_directory($workRoot, $jobId);
-            $job = orange_restore_job_read($workRoot, $jobId);
-            $job['pre_merge_uploads_snapshot_path'] = $snapshotPath;
-            orange_restore_job_write($workRoot, $job);
+            orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_snapshot_checkpointed', 'pass', [
+                'operator_admin_id' => $adminId,
+                'operator_username' => $operatorUsername,
+                'snapshot_reused' => $snapshotResult['reused'],
+                'uploads_snapshot_completed_at' => $snapshotAt,
+                'database_writes' => false,
+                'production_writes' => false,
+            ]));
         } catch (Throwable $e) {
             orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_cutover_failed', 'failed', [
                 'operator_admin_id' => $adminId,
@@ -1084,31 +1572,12 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
             ]));
             throw $e;
         }
-
-        orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_snapshot_completed', 'pass', [
-            'operator_admin_id' => $adminId,
-            'operator_username' => $operatorUsername,
-            'snapshot_path' => (string) ($snapshotManifest['path'] ?? $verify['uploads_dir']),
-            'file_count' => (int) ($snapshotManifest['file_count'] ?? 0),
-            'total_size' => (int) ($snapshotManifest['total_size'] ?? 0),
-            'tree_checksum_sha256' => (string) ($snapshotManifest['tree_checksum_sha256'] ?? ''),
-            'duration_seconds' => (int) round(microtime(true) - $startedAt),
-            'database_writes' => false,
-            'production_writes' => false,
-        ]));
-    }
-
-    if ($entryStatus === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_PENDING) {
-        $snapshotManifestPath = orange_restore_pre_merge_uploads_snapshot_manifest_path($workRoot, $jobId);
-        if (!is_file($snapshotManifestPath)) {
-            throw new RuntimeException('Pre-merge uploads snapshot manifest missing during pending recovery.');
-        }
-        $decodedSnapshot = json_decode((string) file_get_contents($snapshotManifestPath), true);
-        if (!is_array($decodedSnapshot)) {
-            throw new RuntimeException('Pre-merge uploads snapshot manifest is invalid JSON.');
-        }
-        $snapshotManifest = $decodedSnapshot;
-        orange_restore_merge_uploads_cutover_verify_snapshot((string) $verify['uploads_dir'], $snapshotManifest);
+    } else {
+        throw new RuntimeException(
+            'Uploads cutover illegal entry state (status=' . $entryStatus . '). '
+            . 'Allowed: database_cutover_complete, uploads_snapshot_complete, uploads_first_rename_pending, '
+            . 'uploads_first_rename_complete, uploads_second_rename_pending.'
+        );
     }
 
     orange_restore_merge_uploads_cutover_final_pre_rename_revalidation(
@@ -1119,7 +1588,10 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
         $verify
     );
 
-    if ($entryStatus === ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE) {
+    if (in_array($entryStatus, [
+        ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE,
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_SNAPSHOT_COMPLETE,
+    ], true)) {
         orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_cutover_started', 'started', [
             'operator_admin_id' => $adminId,
             'operator_username' => $operatorUsername,
@@ -1140,7 +1612,7 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
     }
 
     try {
-        if ($entryStatus === ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE) {
+        if (($job['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_UPLOADS_SNAPSHOT_COMPLETE) {
             $pendingAt = gmdate('c');
             $job = orange_restore_job_uploads_cutover_transition(
                 $workRoot,
@@ -1212,7 +1684,7 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
             ];
         }
 
-        $secondRenameBaseline = orange_restore_merge_uploads_cutover_collect_trust_gates(
+        $secondGate = orange_restore_merge_uploads_cutover_collect_trust_gates(
             $projectRoot,
             $workRoot,
             $backupRoot,
@@ -1220,19 +1692,19 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
             'before_second_rename'
         );
 
-        return orange_restore_merge_uploads_cutover_execute_second_rename_phase(
+        return orange_restore_merge_uploads_cutover_run_second_rename_from_gate(
             $projectRoot,
             $workRoot,
             $backupRoot,
             $jobId,
             $job,
-            $secondRenameBaseline,
-            $secondRenameBaseline,
+            $secondGate,
             $adminId,
             $operatorUsername,
             $startedAt,
             $snapshotManifest,
-            $renameOverride
+            $renameOverride,
+            true
         );
     } catch (Throwable $e) {
         orange_restore_merge_uploads_cutover_handle_failure(
