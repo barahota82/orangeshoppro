@@ -51,8 +51,8 @@ Mandatory restore pipeline (both Full and Country)
 1. Package Selection
 2. Package Validation (Phase 1C DRV + verify)
 3. Fresh Full Disaster Backup (rollback anchor for THIS job)
-4. Staging Restore (Phase 2B — not implemented in 2A)
-5. Staging Validation (DRV on staging artifact)
+4. Staging Restore (Phase 2B.1 — full disaster → staging CLI only)
+5. Staging Validation (post-restore checks + DRV-style staging report)
 6. Owner Review
 7. Explicit Approval (typed phrase + approval token)
 8. Production Merge (Phase 2D — forbidden direct-to-production)
@@ -71,7 +71,7 @@ Phase 2A — Restore foundation (IMPLEMENTED — schema-free)
 - Permissions: backup_restore_full, backup_restore_country
 - NO restore execution, NO DB audit table, NO staging, NO merge
 
-Phase 2B.1 — Full restore → staging CLI only
+Phase 2B.1 — Full restore → staging CLI only (IMPLEMENTED)
 Phase 2B.2 — Country restore → staging CLI only
 Phase 2C — Approval + staging validation gate CLI
 Phase 2D.1 — Full production merge CLI
@@ -79,8 +79,41 @@ Phase 2D.2 — Country production merge CLI
 Phase 2E — End-to-end orchestration CLI (manual steps, not scheduled)
 Phase 3 — Admin UI wrapper (no business logic)
 
-**DB audit table `restore_audit_log`:** deferred until the first phase that performs
-actual restore operations (not Phase 2A).
+**DB audit table `restore_audit_log`:** deferred until a later mutating phase (2B.1 uses filesystem audit only).
+
+================================================================================
+Phase 2B.1 deliverables (full disaster → staging only — no merge, no production)
+================================================================================
+
+CLI entry:
+  scripts/backup/restore_full_to_staging.php --package=PATH
+
+Orchestrator + modules:
+  includes/backup/restore/restore_full_staging.php
+  includes/backup/restore/restore_staging_target.php
+  includes/backup/restore/restore_sql_runner.php
+  includes/backup/restore/restore_uploads_applicator.php
+  includes/backup/restore/restore_validation_adapter.php
+  includes/backup/restore/restore_fresh_backup_gate.php
+
+Self-test:
+  scripts/backup/self_test_restore_full_staging.php
+
+**Scope (2B.1 only):**
+- CLI-only full disaster restore into isolated staging DB + staging uploads under restore work dir
+- Pre-check: existing package verify + Phase 1C DRV (abort on failure)
+- Stage 3 fresh full disaster backup → rollback anchor on job (abort if backup/verify/DRV fails)
+- SQL import: streaming gzip (`orange_db.sql.gz`) — no full in-memory decompress
+- Uploads: extract package `uploads.zip` into `{restore_work}/{job_id}/staging_uploads` only
+- Post-restore: staging DB postcheck + DRV-style staging report artifact
+- Outputs: `staging_restore_manifest.json`, `restore_report.json` under job directory
+- Job ends at `awaiting_owner_approval` — **no production merge**, **no country restore**
+
+**Failure policy:**
+- Production DB and production uploads are never written
+- On any failure after staging wipe/import begins: `staging_dirty=true` on job, rollback anchor preserved if Stage 3 succeeded, no automatic retry
+
+**NOT in 2B.1:** Country restore, production merge, Admin UI, restore APIs, automatic/scheduled restore.
 
 ================================================================================
 Phase 2A deliverables (filesystem)
@@ -105,9 +138,10 @@ Environment (server-only .env.php — documented, not in repo)
 
 ORANGE_BACKUP_ROOT          — existing
 ORANGE_RESTORE_WORK_DIR       — optional override; default {BackupRoot}/restore_work
+ORANGE_RESTORE_STAGING_DB     — **required for Phase 2B.1** staging database name (must differ from production DB_NAME)
 
-Future (Phase 2B+):
-ORANGE_RESTORE_STAGING_DB     — staging database name (not used in 2A)
+Phase 2B.1 does **not** use production DB or production uploads paths. Fail closed if
+ORANGE_RESTORE_STAGING_DB is missing or equals production.
 
 ================================================================================
 Audit strategy (Phase 2A → Phase 2B transition)

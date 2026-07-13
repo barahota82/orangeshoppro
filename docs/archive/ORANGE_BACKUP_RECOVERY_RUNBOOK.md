@@ -285,7 +285,9 @@ php D:\orange\scripts\backup\self_test_recovery_validation.php
 | Filesystem audit (`audit.jsonl` per job) | **Implemented** — no DB table yet |
 | Approval + re-auth contracts | **Implemented** (no execution) |
 | Permissions `backup_restore_full` / `backup_restore_country` | **Implemented** (Super Admin + dedicated permission) |
-| Staging restore / production merge | **Not implemented** |
+| Staging restore (full → staging) | **Implemented — Phase 2B.1 CLI only** |
+| Production merge | **Not implemented — Phase 2D** |
+| Country restore | **Not implemented — Phase 2B.2** |
 | Admin restore UI | **Not implemented — Phase 3** |
 | DB table `restore_audit_log` | **Deferred** — first phase with actual restore ops |
 
@@ -297,7 +299,55 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt`
 
 ```powershell
 php D:\orange\scripts\backup\self_test_restore_foundation.php
+php D:\orange\scripts\backup\self_test_restore_full_staging.php
 ```
+
+---
+
+## Phase 2B.1 — Full Disaster Restore → STAGING (CLI only)
+
+**Scope:** Restore a verified full disaster package into an **isolated staging database** and staging uploads under the restore work directory. **No production writes. No merge. No country restore. No Admin UI.**
+
+**Prerequisites (`.env.php` on server):**
+
+| Key | Required | Notes |
+|-----|----------|-------|
+| `ORANGE_BACKUP_ROOT` | Yes | Package must live under this root |
+| `ORANGE_RESTORE_STAGING_DB` | Yes | Staging MySQL database name; **must not** equal production `DB_NAME` |
+| `ORANGE_RESTORE_WORK_DIR` | No | Default `{ORANGE_BACKUP_ROOT}/restore_work` |
+
+Create the staging database on the server before first restore (empty schema is wiped at start of import).
+
+**Workflow:**
+
+1. Operator selects package path under `ORANGE_BACKUP_ROOT`.
+2. CLI runs **package verify** + **Phase 1C DRV** — abort on failure.
+3. CLI creates a **fresh full disaster backup** (Stage 3) and records it on the job as the **rollback anchor** — abort if backup or verify fails.
+4. CLI wipes **staging DB only**, streams `orange_db.sql.gz` import, extracts uploads to `{restore_work}/{job_id}/staging_uploads`.
+5. CLI runs **staging post-validation** and writes `staging_restore_manifest.json` + `restore_report.json`.
+6. Job status becomes `awaiting_owner_approval` — merge is **not** part of 2B.1.
+
+**Command:**
+
+```powershell
+php D:\orange\scripts\backup\restore_full_to_staging.php --package=D:\orange_backups\snapshots\yyyy-MM-dd_HHmmss
+```
+
+Optional for operator testing only (skips Stage 3 fresh backup — **not for production disaster drills**):
+
+```powershell
+php D:\orange\scripts\backup\restore_full_to_staging.php --package=PATH --skip-fresh-backup
+```
+
+**Failure policy:** Production DB and production uploads remain untouched. On failure after staging mutation, job is marked `failed` with `staging_dirty=true`. Rollback anchor from Stage 3 is preserved when recorded. No automatic retry.
+
+**Self-test:**
+
+```powershell
+php D:\orange\scripts\backup\self_test_restore_full_staging.php
+```
+
+Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2B.1 section)
 
 ---
 
@@ -307,7 +357,8 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 
 | Item | Target phase |
 |------|----------------|
-| Staging restore / production merge | Phase 2B–2D (gated by `ORANGE_RESTORE_OWNER_POLICY.txt`) |
+| Country restore → staging | Phase 2B.2 |
+| Production merge | Phase 2D (gated by `ORANGE_RESTORE_OWNER_POLICY.txt`) |
 | Admin backup/restore UI wrapper | Phase 3 |
 | Dedicated permissions `backup_restore_full` / `backup_restore_country` | **Phase 2A implemented** |
 | Restore audit DB table | First mutating restore phase (not 2A) |
@@ -356,7 +407,8 @@ php D:\orange\scripts\backup\verify_full_backup.php --package=D:\orange_backups\
 | Country Recovery Package (CRP) export | **Implemented — Phase 1B.2** |
 | Table registry (inventory) | **Implemented — Phase 1B.1** |
 | Restore foundation (Phase 2A) | **Implemented — schema-free, no execution** |
-| Staging restore / merge | **Not implemented — Phase 2B–2D** |
+| Full restore → staging (Phase 2B.1) | **Implemented — CLI only, no merge** |
+| Country restore / production merge | **Not implemented — Phase 2B.2 / 2D** |
 | Restore automation | **Forbidden by owner policy** — CLI + Super Admin + permissions only |
 | Admin restore UI | **Not implemented — Phase 3 wrapper only** |
 | Restore owner policy archived | **Yes** — `docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt` |

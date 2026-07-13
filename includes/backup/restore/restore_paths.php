@@ -8,7 +8,10 @@ const ORANGE_RESTORE_WORK_DIRNAME = 'restore_work';
 const ORANGE_RESTORE_LOCK_FILENAME = '.restore.lock';
 const ORANGE_RESTORE_JOB_FILENAME = 'job.json';
 const ORANGE_RESTORE_AUDIT_FILENAME = 'audit.jsonl';
-const ORANGE_RESTORE_ENGINE_VERSION = '2A.0';
+const ORANGE_RESTORE_ENGINE_VERSION = '2B.1';
+const ORANGE_RESTORE_ENV_STAGING_DB = 'ORANGE_RESTORE_STAGING_DB';
+const ORANGE_RESTORE_STAGING_MANIFEST_FILE = 'staging_restore_manifest.json';
+const ORANGE_RESTORE_REPORT_FILE = 'restore_report.json';
 
 /**
  * @param array<string, mixed> $env

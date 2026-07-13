@@ -88,6 +88,11 @@ function orange_restore_job_create(string $workRoot, array $input): array
         'stage_failed' => '',
         'error_summary' => '',
         'duration_seconds' => 0,
+        'staging_db' => '',
+        'staging_uploads_path' => '',
+        'staging_dirty' => false,
+        'staging_restore_manifest_path' => '',
+        'restore_report_path' => '',
     ];
 
     orange_restore_job_write($workRoot, $job);
@@ -175,4 +180,34 @@ function orange_restore_job_record_fresh_backup_anchor(
         'fresh_backup_checksum' => $freshBackupChecksum,
         'rollback_anchor_job_only' => true,
     ]);
+}
+
+/**
+ * @param array<string, mixed> $patch
+ * @return array<string, mixed>
+ */
+function orange_restore_job_mark_failed(
+    string $workRoot,
+    string $jobId,
+    string $stageFailed,
+    string $errorSummary,
+    bool $stagingDirty = false,
+    array $patch = []
+): array {
+    return orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_FAILED, array_merge([
+        'stage_failed' => $stageFailed,
+        'error_summary' => $errorSummary,
+        'result' => 'failed',
+        'staging_dirty' => $stagingDirty,
+    ], $patch));
+}
+
+function orange_restore_job_staging_manifest_path(string $workRoot, string $jobId): string
+{
+    return orange_restore_job_directory($workRoot, $jobId) . DIRECTORY_SEPARATOR . ORANGE_RESTORE_STAGING_MANIFEST_FILE;
+}
+
+function orange_restore_job_report_path(string $workRoot, string $jobId): string
+{
+    return orange_restore_job_directory($workRoot, $jobId) . DIRECTORY_SEPARATOR . ORANGE_RESTORE_REPORT_FILE;
 }
