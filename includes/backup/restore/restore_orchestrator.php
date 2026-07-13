@@ -42,6 +42,8 @@ function orange_restore_orchestrator_job_status_report(string $workRoot, string 
         $approvalStatus = 'merge_started';
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE) {
         $approvalStatus = 'database_cutover_complete';
+    } elseif ($status === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE) {
+        $approvalStatus = 'uploads_first_rename_complete';
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE) {
         $approvalStatus = 'uploads_cutover_complete';
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE) {

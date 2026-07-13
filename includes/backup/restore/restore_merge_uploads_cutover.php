@@ -8,95 +8,9 @@ require_once __DIR__ . '/restore_lock.php';
 require_once __DIR__ . '/restore_merge_maintenance.php';
 require_once __DIR__ . '/restore_merge_precheck.php';
 require_once __DIR__ . '/restore_validation_adapter.php';
+require_once __DIR__ . '/restore_uploads_fs.php';
 require_once __DIR__ . '/../backup_environment.php';
 require_once __DIR__ . '/../backup_manifest.php';
-
-/**
- * @return array{file_count:int,total_size:int,tree_checksum_sha256:string,checksum_lines:list<string>}
- */
-function orange_restore_uploads_tree_inventory(string $rootDir): array
-{
-    if (!is_dir($rootDir)) {
-        throw new RuntimeException('Uploads directory does not exist: ' . $rootDir);
-    }
-
-    $rootReal = realpath($rootDir);
-    if ($rootReal === false) {
-        throw new RuntimeException('Cannot resolve uploads directory: ' . $rootDir);
-    }
-
-    $rootNorm = strtolower(rtrim(str_replace('\\', '/', $rootReal), '/'));
-    $fileCount = 0;
-    $totalSize = 0;
-    $checksumLines = [];
-
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($rootReal, FilesystemIterator::SKIP_DOTS)
-    );
-    foreach ($iterator as $fileInfo) {
-        if (!$fileInfo instanceof SplFileInfo || !$fileInfo->isFile()) {
-            continue;
-        }
-        if ($fileInfo->isLink()) {
-            throw new RuntimeException('Symlink/junction blocked in uploads tree: ' . $fileInfo->getPathname());
-        }
-
-        $fullPath = $fileInfo->getPathname();
-        $fullNorm = strtolower(rtrim(str_replace('\\', '/', $fullPath), '/'));
-        if ($fullNorm !== $rootNorm && !str_starts_with($fullNorm, $rootNorm . '/')) {
-            throw new RuntimeException('Uploads traversal escaped root: ' . $fullPath);
-        }
-
-        $relative = ltrim(str_replace('\\', '/', substr($fullPath, strlen($rootReal))), '/');
-        if ($relative === '' || str_contains($relative, '..')) {
-            throw new RuntimeException('Invalid uploads relative path: ' . $relative);
-        }
-
-        $hash = orange_backup_sha256_file($fullPath);
-        $checksumLines[] = $hash . '  ' . $relative;
-        $fileCount++;
-        $totalSize += (int) $fileInfo->getSize();
-    }
-
-    sort($checksumLines, SORT_STRING);
-    $manifestBody = implode("\n", $checksumLines) . ($checksumLines !== [] ? "\n" : '');
-    $treeChecksum = hash('sha256', $manifestBody);
-
-    return [
-        'file_count' => $fileCount,
-        'total_size' => $totalSize,
-        'tree_checksum_sha256' => $treeChecksum,
-        'checksum_lines' => $checksumLines,
-    ];
-}
-
-function orange_restore_uploads_paths_same_volume(string $pathA, string $pathB): bool
-{
-    $realA = realpath($pathA);
-    $realB = realpath($pathB);
-    if ($realA === false || $realB === false) {
-        return false;
-    }
-
-    if (DIRECTORY_SEPARATOR === '\\') {
-        if (strlen($realA) < 2 || strlen($realB) < 2) {
-            return false;
-        }
-        if ($realA[1] !== ':' || $realB[1] !== ':') {
-            return false;
-        }
-
-        return strcasecmp($realA[0], $realB[0]) === 0;
-    }
-
-    $statA = stat($realA);
-    $statB = stat($realB);
-    if ($statA === false || $statB === false) {
-        return false;
-    }
-
-    return ($statA['dev'] ?? null) === ($statB['dev'] ?? null);
-}
 
 /**
  * @return array<string, mixed>
@@ -115,24 +29,260 @@ function orange_restore_uploads_next_manifest_read(string $manifestPath): array
 }
 
 /**
+ * @param array<string, mixed> $manifest
  * @param array<string, mixed> $job
- * @param callable(string,string):bool|null $sameVolumeOverride
- * @return array{
- *   uploads_dir:string,
- *   uploads_next_dir:string,
- *   uploads_pre_merge_dir:string,
- *   uploads_next_manifest:array<string,mixed>,
- *   staging_uploads_dir:string,
- *   staging_uploads_tree_checksum:string,
- *   uploads_next_tree_checksum:string
- * }
+ * @param array<string, mixed> $binding
+ * @param array{file_count:int,total_size:int,tree_checksum_sha256:string} $liveNextInventory
+ * @param array{file_count:int,total_size:int,tree_checksum_sha256:string} $liveStagingInventory
+ */
+function orange_restore_uploads_next_manifest_validate(
+    array $manifest,
+    array $job,
+    array $binding,
+    array $liveNextInventory,
+    array $liveStagingInventory,
+    string $liveStagingManifestChecksum,
+    string $livePackageChecksum
+): void {
+    $requiredStrings = [
+        'job_id',
+        'source_package_checksum',
+        'staging_restore_manifest_checksum',
+        'aggregate_tree_checksum',
+        'generated_at',
+    ];
+    foreach ($requiredStrings as $key) {
+        if (trim((string) ($manifest[$key] ?? '')) === '') {
+            throw new RuntimeException('uploads_next manifest missing required field: ' . $key);
+        }
+    }
+
+    if (($manifest['verified'] ?? false) !== true) {
+        throw new RuntimeException('uploads_next is not verified (manifest verified flag is false).');
+    }
+
+    if (!is_int($manifest['file_count'] ?? null) && !ctype_digit((string) ($manifest['file_count'] ?? ''))) {
+        throw new RuntimeException('uploads_next manifest file_count missing or invalid.');
+    }
+    $manifestFileCount = (int) ($manifest['file_count'] ?? -1);
+
+    $manifestTotalSize = null;
+    if (isset($manifest['total_size_bytes'])) {
+        $manifestTotalSize = (int) $manifest['total_size_bytes'];
+    } elseif (isset($manifest['total_size'])) {
+        $manifestTotalSize = (int) $manifest['total_size'];
+    }
+    if ($manifestTotalSize === null) {
+        throw new RuntimeException('uploads_next manifest total_size_bytes missing or invalid.');
+    }
+
+    $jobId = (string) ($job['job_id'] ?? '');
+    if ((string) ($manifest['job_id'] ?? '') !== $jobId) {
+        throw new RuntimeException('uploads_next manifest job_id does not match current job.');
+    }
+
+    if (!hash_equals((string) ($manifest['source_package_checksum'] ?? ''), (string) ($job['source_package_checksum'] ?? ''))) {
+        throw new RuntimeException('uploads_next manifest source_package_checksum mismatch with job.');
+    }
+    if (!hash_equals((string) ($manifest['source_package_checksum'] ?? ''), (string) ($binding['source_package_checksum'] ?? ''))) {
+        throw new RuntimeException('uploads_next manifest source_package_checksum mismatch with approval binding.');
+    }
+    if (!hash_equals((string) ($manifest['source_package_checksum'] ?? ''), $livePackageChecksum)) {
+        throw new RuntimeException('uploads_next manifest source_package_checksum mismatch with live package.');
+    }
+
+    if (!hash_equals((string) ($manifest['staging_restore_manifest_checksum'] ?? ''), $liveStagingManifestChecksum)) {
+        throw new RuntimeException('uploads_next manifest staging_restore_manifest_checksum mismatch with live staging manifest.');
+    }
+    if (!hash_equals((string) ($manifest['staging_restore_manifest_checksum'] ?? ''), (string) ($binding['staging_restore_manifest_checksum'] ?? ''))) {
+        throw new RuntimeException('uploads_next manifest staging_restore_manifest_checksum mismatch with approval binding.');
+    }
+
+    if ($manifestFileCount !== $liveNextInventory['file_count']) {
+        throw new RuntimeException('uploads_next manifest file_count mismatch with live uploads_next inventory.');
+    }
+    if ($manifestTotalSize !== $liveNextInventory['total_size']) {
+        throw new RuntimeException('uploads_next manifest total_size_bytes mismatch with live uploads_next inventory.');
+    }
+    if (!hash_equals((string) ($manifest['aggregate_tree_checksum'] ?? ''), $liveNextInventory['tree_checksum_sha256'])) {
+        throw new RuntimeException('uploads_next manifest aggregate_tree_checksum mismatch with live uploads_next inventory.');
+    }
+    if (!hash_equals($liveStagingInventory['tree_checksum_sha256'], $liveNextInventory['tree_checksum_sha256'])) {
+        throw new RuntimeException('uploads_next tree checksum does not match staging uploads tree checksum.');
+    }
+}
+
+/**
+ * @return array{path:string,checksum:string,manifest:array<string,mixed>}
+ */
+function orange_restore_merge_uploads_cutover_assert_staging_manifest_binding(
+    string $workRoot,
+    array $job
+): array {
+    /** @var array<string, mixed> $binding */
+    $binding = is_array($job['approval_token_binding'] ?? null) ? $job['approval_token_binding'] : [];
+    if ($binding === []) {
+        throw new RuntimeException('Approval token binding is missing on job.');
+    }
+    orange_restore_merge_precheck_assert_binding_checksums($job, $binding);
+
+    $stagingManifestPath = trim((string) ($job['staging_restore_manifest_path'] ?? ''));
+    if ($stagingManifestPath === '' || !is_file($stagingManifestPath)) {
+        $stagingManifestPath = orange_restore_job_staging_manifest_path($workRoot, (string) ($job['job_id'] ?? ''));
+    }
+    if (!is_file($stagingManifestPath)) {
+        throw new RuntimeException('Staging restore manifest missing.');
+    }
+
+    $liveManifestChecksum = orange_restore_validation_adapter_file_checksum($stagingManifestPath);
+    if (!hash_equals((string) ($binding['staging_restore_manifest_checksum'] ?? ''), $liveManifestChecksum)) {
+        throw new RuntimeException('Staging manifest checksum mismatch (binding vs live manifest).');
+    }
+
+    $stagingManifest = json_decode((string) file_get_contents($stagingManifestPath), true);
+    if (!is_array($stagingManifest)) {
+        throw new RuntimeException('Staging restore manifest is invalid JSON.');
+    }
+
+    return [
+        'path' => $stagingManifestPath,
+        'checksum' => $liveManifestChecksum,
+        'manifest' => $stagingManifest,
+    ];
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_uploads_cutover_collect_trust_gates(
+    string $projectRoot,
+    string $workRoot,
+    string $backupRoot,
+    array $job
+): array {
+    $jobId = (string) ($job['job_id'] ?? '');
+
+    $rollbackPath = trim((string) ($job['fresh_backup_path'] ?? ''));
+    $rollbackChecksum = trim((string) ($job['fresh_backup_checksum'] ?? ''));
+    if ($rollbackPath === '' || $rollbackChecksum === '') {
+        throw new RuntimeException('Rollback anchor (fresh backup) is missing on job.');
+    }
+    if (!(bool) ($job['rollback_anchor_job_only'] ?? false)) {
+        throw new RuntimeException('Rollback anchor must be job-only (rollback_anchor_job_only=true).');
+    }
+
+    $liveAnchorChecksum = orange_restore_merge_precheck_live_rollback_checksum($rollbackPath);
+    if (!hash_equals($rollbackChecksum, $liveAnchorChecksum)) {
+        throw new RuntimeException('Rollback anchor checksum mismatch (job vs live anchor package).');
+    }
+
+    /** @var array<string, mixed> $binding */
+    $binding = is_array($job['approval_token_binding'] ?? null) ? $job['approval_token_binding'] : [];
+    if ($binding === []) {
+        throw new RuntimeException('Approval token binding is missing on job.');
+    }
+    orange_restore_merge_precheck_assert_binding_checksums($job, $binding);
+
+    $expectedPackageChecksum = (string) ($job['source_package_checksum'] ?? '');
+    $packagePath = orange_restore_resolve_package_path($backupRoot, (string) ($job['source_package_path'] ?? ''));
+    $packageManifestPath = $packagePath . DIRECTORY_SEPARATOR . 'manifest.json';
+    if (!is_file($packageManifestPath)) {
+        throw new RuntimeException('Live package manifest.json missing.');
+    }
+    $packageManifest = json_decode((string) file_get_contents($packageManifestPath), true);
+    if (!is_array($packageManifest)) {
+        throw new RuntimeException('Invalid live package manifest.json.');
+    }
+    $livePackageChecksum = orange_restore_validation_adapter_live_package_checksum($packagePath, $packageManifest);
+    if (!hash_equals($expectedPackageChecksum, $livePackageChecksum)) {
+        throw new RuntimeException('Package checksum mismatch (job vs live package).');
+    }
+    if (!hash_equals((string) ($binding['source_package_checksum'] ?? ''), $livePackageChecksum)) {
+        throw new RuntimeException('Package checksum mismatch (binding vs live package).');
+    }
+
+    $stagingGate = orange_restore_merge_uploads_cutover_assert_staging_manifest_binding($workRoot, $job);
+    /** @var array<string, mixed> $stagingManifest */
+    $stagingManifest = $stagingGate['manifest'];
+
+    $stagingUploadsDir = trim((string) ($stagingManifest['staging_uploads_path'] ?? ''));
+    if ($stagingUploadsDir === '') {
+        $stagingUploadsDir = trim((string) ($job['staging_uploads_path'] ?? ''));
+    }
+    if ($stagingUploadsDir === '' || !is_dir($stagingUploadsDir)) {
+        throw new RuntimeException('Staging uploads directory missing from staging manifest.');
+    }
+
+    $uploadsDir = orange_restore_production_uploads_directory($projectRoot);
+    if (!is_dir($uploadsDir)) {
+        throw new RuntimeException('Production uploads directory missing: ' . $uploadsDir);
+    }
+
+    $uploadsNextDir = orange_restore_uploads_next_directory($projectRoot);
+    if (!is_dir($uploadsNextDir)) {
+        throw new RuntimeException('uploads_next directory missing: ' . $uploadsNextDir);
+    }
+
+    orange_restore_uploads_fs_assert_atomic_rename_volume([
+        $uploadsDir,
+        $uploadsNextDir,
+        dirname($uploadsDir),
+        dirname($uploadsNextDir),
+    ]);
+
+    $stagingInventory = orange_restore_uploads_tree_inventory($stagingUploadsDir);
+    $uploadsNextInventory = orange_restore_uploads_tree_inventory($uploadsNextDir);
+    $uploadsInventory = orange_restore_uploads_tree_inventory($uploadsDir);
+
+    $uploadsNextManifestPath = orange_restore_uploads_next_manifest_path($workRoot, $jobId);
+    $uploadsNextManifest = orange_restore_uploads_next_manifest_read($uploadsNextManifestPath);
+    orange_restore_uploads_next_manifest_validate(
+        $uploadsNextManifest,
+        $job,
+        $binding,
+        $uploadsNextInventory,
+        $stagingInventory,
+        (string) $stagingGate['checksum'],
+        $livePackageChecksum
+    );
+
+    $manifestUploadsNextPath = (string) ($uploadsNextManifest['uploads_next_path'] ?? '');
+    $uploadsNextReal = orange_restore_uploads_fs_require_realpath($uploadsNextDir);
+    if ($manifestUploadsNextPath !== '') {
+        $manifestReal = realpath($manifestUploadsNextPath) ?: $manifestUploadsNextPath;
+        if (strcasecmp(
+            rtrim(str_replace('\\', '/', $manifestReal), '/'),
+            rtrim(str_replace('\\', '/', $uploadsNextReal), '/')
+        ) !== 0) {
+            throw new RuntimeException('uploads_next manifest path does not match live uploads_next directory.');
+        }
+    }
+
+    return [
+        'uploads_dir' => $uploadsDir,
+        'uploads_next_dir' => $uploadsNextDir,
+        'uploads_pre_merge_dir' => orange_restore_uploads_pre_merge_directory($projectRoot, $jobId),
+        'staging_uploads_dir' => $stagingUploadsDir,
+        'uploads_inventory' => $uploadsInventory,
+        'uploads_next_inventory' => $uploadsNextInventory,
+        'staging_inventory' => $stagingInventory,
+        'live_package_checksum' => $livePackageChecksum,
+        'live_staging_manifest_checksum' => (string) $stagingGate['checksum'],
+        'live_rollback_checksum' => $liveAnchorChecksum,
+        'uploads_next_tree_checksum' => $uploadsNextInventory['tree_checksum_sha256'],
+        'uploads_tree_checksum' => $uploadsInventory['tree_checksum_sha256'],
+    ];
+}
+
+/**
+ * @param array<string, mixed> $job
+ * @return array<string, mixed>
  */
 function orange_restore_merge_uploads_cutover_verify_preconditions(
     string $projectRoot,
     string $workRoot,
     string $backupRoot,
-    array $job,
-    ?callable $sameVolumeOverride = null
+    array $job
 ): array {
     $jobId = (string) ($job['job_id'] ?? '');
     if ($jobId === '') {
@@ -151,127 +301,71 @@ function orange_restore_merge_uploads_cutover_verify_preconditions(
     orange_restore_lock_assert_held_by_job($workRoot, $jobId);
     orange_restore_merge_maintenance_verify($workRoot, $jobId);
 
-    $rollbackPath = trim((string) ($job['fresh_backup_path'] ?? ''));
-    $rollbackChecksum = trim((string) ($job['fresh_backup_checksum'] ?? ''));
-    if ($rollbackPath === '' || $rollbackChecksum === '') {
-        throw new RuntimeException('Rollback anchor (fresh backup) is missing on job.');
-    }
-    if (!(bool) ($job['rollback_anchor_job_only'] ?? false)) {
-        throw new RuntimeException('Rollback anchor must be job-only (rollback_anchor_job_only=true).');
-    }
+    $gate = orange_restore_merge_uploads_cutover_collect_trust_gates($projectRoot, $workRoot, $backupRoot, $job);
 
-    $liveAnchorChecksum = orange_restore_merge_precheck_live_rollback_checksum($rollbackPath);
-    if (!hash_equals($rollbackChecksum, $liveAnchorChecksum)) {
-        throw new RuntimeException('Rollback anchor checksum mismatch (job vs live anchor package).');
-    }
-
-    $expectedPackageChecksum = (string) ($job['source_package_checksum'] ?? '');
-    if ($expectedPackageChecksum === '') {
-        throw new RuntimeException('Job source_package_checksum is missing.');
-    }
-    $packagePath = orange_restore_resolve_package_path($backupRoot, (string) ($job['source_package_path'] ?? ''));
-    $manifestPath = $packagePath . DIRECTORY_SEPARATOR . 'manifest.json';
-    if (!is_file($manifestPath)) {
-        throw new RuntimeException('Live package manifest.json missing.');
-    }
-    $manifest = json_decode((string) file_get_contents($manifestPath), true);
-    if (!is_array($manifest)) {
-        throw new RuntimeException('Invalid live package manifest.json.');
-    }
-    $livePackageChecksum = orange_restore_validation_adapter_live_package_checksum($packagePath, $manifest);
-    if (!hash_equals($expectedPackageChecksum, $livePackageChecksum)) {
-        throw new RuntimeException('Package checksum mismatch (job vs live package).');
-    }
-
-    $uploadsDir = orange_restore_production_uploads_directory($projectRoot);
-    if (!is_dir($uploadsDir)) {
-        throw new RuntimeException('Production uploads directory missing: ' . $uploadsDir);
-    }
-
-    $uploadsNextDir = orange_restore_uploads_next_directory($projectRoot);
-    if (!is_dir($uploadsNextDir)) {
-        throw new RuntimeException('uploads_next directory missing: ' . $uploadsNextDir);
-    }
-
-    $manifestPath = orange_restore_uploads_next_manifest_path($workRoot, $jobId);
-    $uploadsNextManifest = orange_restore_uploads_next_manifest_read($manifestPath);
-    if (($uploadsNextManifest['verified'] ?? false) !== true) {
-        throw new RuntimeException('uploads_next is not verified (manifest verified flag is false).');
-    }
-    if ((string) ($uploadsNextManifest['job_id'] ?? '') !== $jobId) {
-        throw new RuntimeException('uploads_next manifest job_id does not match current job.');
-    }
-
-    $manifestUploadsNextPath = (string) ($uploadsNextManifest['uploads_next_path'] ?? '');
-    $uploadsNextReal = realpath($uploadsNextDir) ?: $uploadsNextDir;
-    if ($manifestUploadsNextPath !== '') {
-        $manifestReal = realpath($manifestUploadsNextPath) ?: $manifestUploadsNextPath;
-        if (strcasecmp(
-            rtrim(str_replace('\\', '/', $manifestReal), '/'),
-            rtrim(str_replace('\\', '/', $uploadsNextReal), '/')
-        ) !== 0) {
-            throw new RuntimeException('uploads_next manifest path does not match live uploads_next directory.');
-        }
-    }
-
-    $stagingManifestPath = trim((string) ($job['staging_restore_manifest_path'] ?? ''));
-    if ($stagingManifestPath === '' || !is_file($stagingManifestPath)) {
-        $stagingManifestPath = orange_restore_job_staging_manifest_path($workRoot, $jobId);
-    }
-    if (!is_file($stagingManifestPath)) {
-        throw new RuntimeException('Staging restore manifest missing.');
-    }
-    $stagingManifest = json_decode((string) file_get_contents($stagingManifestPath), true);
-    if (!is_array($stagingManifest)) {
-        throw new RuntimeException('Staging restore manifest is invalid JSON.');
-    }
-
-    $stagingUploadsDir = trim((string) ($stagingManifest['staging_uploads_path'] ?? ''));
-    if ($stagingUploadsDir === '') {
-        $stagingUploadsDir = trim((string) ($job['staging_uploads_path'] ?? ''));
-    }
-    if ($stagingUploadsDir === '' || !is_dir($stagingUploadsDir)) {
-        throw new RuntimeException('Staging uploads directory missing from staging manifest.');
-    }
-
-    $stagingInventory = orange_restore_uploads_tree_inventory($stagingUploadsDir);
-    $uploadsNextInventory = orange_restore_uploads_tree_inventory($uploadsNextDir);
-
-    $manifestStagingChecksum = trim((string) ($uploadsNextManifest['staging_uploads_tree_checksum'] ?? ''));
-    $manifestUploadsNextChecksum = trim((string) ($uploadsNextManifest['uploads_next_tree_checksum'] ?? ''));
-    if ($manifestStagingChecksum === '' || $manifestUploadsNextChecksum === '') {
-        throw new RuntimeException('uploads_next manifest missing tree checksum fields.');
-    }
-    if (!hash_equals($manifestStagingChecksum, $stagingInventory['tree_checksum_sha256'])) {
-        throw new RuntimeException('uploads_next manifest staging_uploads_tree_checksum mismatch with live staging uploads.');
-    }
-    if (!hash_equals($manifestUploadsNextChecksum, $uploadsNextInventory['tree_checksum_sha256'])) {
-        throw new RuntimeException('uploads_next manifest uploads_next_tree_checksum mismatch with live uploads_next.');
-    }
-    if (!hash_equals($stagingInventory['tree_checksum_sha256'], $uploadsNextInventory['tree_checksum_sha256'])) {
-        throw new RuntimeException('uploads_next tree checksum does not match staging uploads tree checksum.');
-    }
-
-    $sameVolume = $sameVolumeOverride !== null
-        ? (bool) $sameVolumeOverride($uploadsDir, $uploadsNextDir)
-        : orange_restore_uploads_paths_same_volume($uploadsDir, $uploadsNextDir);
-    if (!$sameVolume) {
-        throw new RuntimeException('uploads/ and uploads_next/ are not on the same filesystem/volume (atomic rename cannot be guaranteed).');
-    }
-
-    $uploadsPreMergeDir = orange_restore_uploads_pre_merge_directory($projectRoot, $jobId);
+    $uploadsPreMergeDir = (string) $gate['uploads_pre_merge_dir'];
     if (is_dir($uploadsPreMergeDir) || is_file($uploadsPreMergeDir)) {
         throw new RuntimeException('uploads_pre_merge target already exists: ' . $uploadsPreMergeDir);
     }
 
+    return $gate;
+}
+
+/**
+ * @param array<string, mixed> $baseline
+ */
+function orange_restore_merge_uploads_cutover_final_pre_rename_revalidation(
+    string $projectRoot,
+    string $workRoot,
+    string $backupRoot,
+    array $job,
+    array $baseline
+): void {
+    orange_restore_lock_assert_held_by_job($workRoot, (string) ($job['job_id'] ?? ''));
+    orange_restore_merge_maintenance_verify($workRoot, (string) ($job['job_id'] ?? ''));
+
+    $live = orange_restore_merge_uploads_cutover_collect_trust_gates($projectRoot, $workRoot, $backupRoot, $job);
+
+    if ((string) ($baseline['uploads_tree_checksum'] ?? '') !== (string) ($live['uploads_tree_checksum'] ?? '')) {
+        throw new RuntimeException('Final pre-rename revalidation detected uploads tree drift.');
+    }
+    if ((string) ($baseline['uploads_next_tree_checksum'] ?? '') !== (string) ($live['uploads_next_tree_checksum'] ?? '')) {
+        throw new RuntimeException('Final pre-rename revalidation detected uploads_next tree drift.');
+    }
+    if ((int) ($baseline['uploads_inventory']['file_count'] ?? -1) !== (int) ($live['uploads_inventory']['file_count'] ?? -2)) {
+        throw new RuntimeException('Final pre-rename revalidation detected uploads file_count drift.');
+    }
+    if ((int) ($baseline['uploads_inventory']['total_size'] ?? -1) !== (int) ($live['uploads_inventory']['total_size'] ?? -2)) {
+        throw new RuntimeException('Final pre-rename revalidation detected uploads total_size drift.');
+    }
+    if ((string) ($baseline['live_package_checksum'] ?? '') !== (string) ($live['live_package_checksum'] ?? '')) {
+        throw new RuntimeException('Final pre-rename revalidation detected live package checksum drift.');
+    }
+    if ((string) ($baseline['live_staging_manifest_checksum'] ?? '') !== (string) ($live['live_staging_manifest_checksum'] ?? '')) {
+        throw new RuntimeException('Final pre-rename revalidation detected staging manifest checksum drift.');
+    }
+    if ((string) ($baseline['live_rollback_checksum'] ?? '') !== (string) ($live['live_rollback_checksum'] ?? '')) {
+        throw new RuntimeException('Final pre-rename revalidation detected rollback anchor checksum drift.');
+    }
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_uploads_cutover_filesystem_state(string $projectRoot, array $verify): array
+{
+    $uploadsDir = (string) ($verify['uploads_dir'] ?? '');
+    $uploadsNextDir = (string) ($verify['uploads_next_dir'] ?? '');
+    $uploadsPreMergeDir = (string) ($verify['uploads_pre_merge_dir'] ?? '');
+
     return [
-        'uploads_dir' => $uploadsDir,
-        'uploads_next_dir' => $uploadsNextDir,
-        'uploads_pre_merge_dir' => $uploadsPreMergeDir,
-        'uploads_next_manifest' => $uploadsNextManifest,
-        'staging_uploads_dir' => $stagingUploadsDir,
-        'staging_uploads_tree_checksum' => $stagingInventory['tree_checksum_sha256'],
-        'uploads_next_tree_checksum' => $uploadsNextInventory['tree_checksum_sha256'],
+        'uploads_path' => $uploadsDir,
+        'uploads_exists' => is_dir($uploadsDir) || is_file($uploadsDir),
+        'uploads_pre_merge_path' => $uploadsPreMergeDir,
+        'uploads_pre_merge_exists' => is_dir($uploadsPreMergeDir) || is_file($uploadsPreMergeDir),
+        'uploads_next_path' => $uploadsNextDir,
+        'uploads_next_exists' => is_dir($uploadsNextDir) || is_file($uploadsNextDir),
+        'recorded_at' => gmdate('c'),
     ];
 }
 
@@ -332,6 +426,16 @@ function orange_restore_merge_uploads_cutover_verify_snapshot(
     )) {
         throw new RuntimeException('Pre-merge snapshot tree checksum mismatch before cutover rename.');
     }
+
+    $checksumsPath = (string) ($snapshotManifest['checksums_path'] ?? '');
+    if ($checksumsPath === '' || !is_file($checksumsPath)) {
+        throw new RuntimeException('Pre-merge snapshot checksums file missing.');
+    }
+    $expectedBody = implode("\n", $inventory['checksum_lines']) . ($inventory['checksum_lines'] !== [] ? "\n" : '');
+    $actualBody = (string) file_get_contents($checksumsPath);
+    if (!hash_equals($expectedBody, $actualBody)) {
+        throw new RuntimeException('Pre-merge snapshot checksums file mismatch before cutover rename.');
+    }
 }
 
 function orange_restore_merge_uploads_cutover_atomic_rename(
@@ -353,16 +457,7 @@ function orange_restore_merge_uploads_cutover_atomic_rename(
 /**
  * Phase 2D.3 — production uploads cutover only (no DB writes, no rollback, no post-validation).
  *
- * @param array{
- *   project_root:string,
- *   work_root?:string,
- *   job_id:string,
- *   admin_id:int,
- *   env_override?:array<string,mixed>,
- *   same_volume_override?:?callable(string,string):bool,
- *   snapshot_override?:?callable(string,string,string):array<string,mixed>,
- *   rename_override?:?callable(string,string):void
- * } $options
+ * @param array<string, mixed> $options
  * @return array<string, mixed>
  */
 function orange_restore_merge_uploads_cutover_run(array $options): array
@@ -394,10 +489,6 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
     $startedAt = microtime(true);
     $operatorUsername = (string) ($job['operator_username'] ?? '');
 
-    /** @var callable(string,string):bool|null $sameVolumeOverride */
-    $sameVolumeOverride = isset($options['same_volume_override']) && is_callable($options['same_volume_override'])
-        ? $options['same_volume_override']
-        : null;
     /** @var callable(string,string,string):array<string,mixed>|null $snapshotOverride */
     $snapshotOverride = isset($options['snapshot_override']) && is_callable($options['snapshot_override'])
         ? $options['snapshot_override']
@@ -406,13 +497,13 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
     $renameOverride = isset($options['rename_override']) && is_callable($options['rename_override'])
         ? $options['rename_override']
         : null;
+    $haltAfterFirstRename = (bool) ($options['halt_after_first_rename'] ?? false);
 
     $verify = orange_restore_merge_uploads_cutover_verify_preconditions(
         $projectRoot,
         $workRoot,
         $backupRoot,
-        $job,
-        $sameVolumeOverride
+        $job
     );
 
     orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_snapshot_started', 'started', [
@@ -427,7 +518,7 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
     $snapshotManifest = null;
     try {
         if ($snapshotOverride !== null) {
-            $snapshotManifest = $snapshotOverride($workRoot, $jobId, $verify['uploads_dir']);
+            $snapshotManifest = $snapshotOverride($workRoot, $jobId, (string) $verify['uploads_dir']);
             if (!is_array($snapshotManifest) || ($snapshotManifest['ok'] ?? true) === false) {
                 throw new RuntimeException('Pre-merge uploads snapshot override failed.');
             }
@@ -435,11 +526,11 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
             $snapshotManifest = orange_restore_merge_uploads_cutover_create_snapshot(
                 $workRoot,
                 $jobId,
-                $verify['uploads_dir']
+                (string) $verify['uploads_dir']
             );
         }
 
-        orange_restore_merge_uploads_cutover_verify_snapshot($verify['uploads_dir'], $snapshotManifest);
+        orange_restore_merge_uploads_cutover_verify_snapshot((string) $verify['uploads_dir'], $snapshotManifest);
 
         $snapshotPath = orange_restore_pre_merge_uploads_snapshot_directory($workRoot, $jobId);
         $job = orange_restore_job_read($workRoot, $jobId);
@@ -469,6 +560,14 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
         'production_writes' => false,
     ]));
 
+    orange_restore_merge_uploads_cutover_final_pre_rename_revalidation(
+        $projectRoot,
+        $workRoot,
+        $backupRoot,
+        orange_restore_job_read($workRoot, $jobId),
+        $verify
+    );
+
     orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_cutover_started', 'started', [
         'operator_admin_id' => $adminId,
         'operator_username' => $operatorUsername,
@@ -487,18 +586,64 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
     $job['uploads_next_manifest_path'] = orange_restore_uploads_next_manifest_path($workRoot, $jobId);
     orange_restore_job_write($workRoot, $job);
 
-    $firstRenameDone = false;
     try {
         orange_restore_merge_uploads_cutover_atomic_rename(
-            $verify['uploads_dir'],
-            $verify['uploads_pre_merge_dir'],
+            (string) $verify['uploads_dir'],
+            (string) $verify['uploads_pre_merge_dir'],
             $renameOverride
         );
-        $firstRenameDone = true;
+
+        $firstRenameAt = gmdate('c');
+        $job = orange_restore_job_uploads_cutover_transition(
+            $workRoot,
+            $jobId,
+            ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
+            [
+                'uploads_first_rename_completed_at' => $firstRenameAt,
+                'uploads_cutover_first_rename_complete' => true,
+                'uploads_pre_merge_path' => $verify['uploads_pre_merge_dir'],
+                'pre_merge_uploads_snapshot_path' => orange_restore_pre_merge_uploads_snapshot_directory($workRoot, $jobId),
+            ]
+        );
+
+        orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_first_rename_complete', 'pass', [
+            'operator_admin_id' => $adminId,
+            'operator_username' => $operatorUsername,
+            'first_rename_complete' => true,
+            'uploads_path' => $verify['uploads_dir'],
+            'uploads_pre_merge_path' => $verify['uploads_pre_merge_dir'],
+            'uploads_next_path' => $verify['uploads_next_dir'],
+            'first_rename_completed_at' => $firstRenameAt,
+            'database_writes' => false,
+            'production_writes' => true,
+        ]));
+
+        if ($haltAfterFirstRename) {
+            return [
+                'ok' => true,
+                'job_id' => $jobId,
+                'status' => ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
+                'job' => $job,
+                'halted_after_first_rename' => true,
+                'database_writes' => false,
+                'production_writes' => true,
+                'rollback_executed' => false,
+            ];
+        }
+
+        orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_second_rename_started', 'started', [
+            'operator_admin_id' => $adminId,
+            'operator_username' => $operatorUsername,
+            'uploads_path' => $verify['uploads_dir'],
+            'uploads_pre_merge_path' => $verify['uploads_pre_merge_dir'],
+            'uploads_next_path' => $verify['uploads_next_dir'],
+            'database_writes' => false,
+            'production_writes' => true,
+        ]));
 
         orange_restore_merge_uploads_cutover_atomic_rename(
-            $verify['uploads_next_dir'],
-            $verify['uploads_dir'],
+            (string) $verify['uploads_next_dir'],
+            (string) $verify['uploads_dir'],
             $renameOverride
         );
 
@@ -545,20 +690,25 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
         ];
     } catch (Throwable $e) {
         $job = orange_restore_job_read($workRoot, $jobId);
-        orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, 'uploads_cutover_failed', 'failed', [
+        $fsState = orange_restore_merge_uploads_cutover_filesystem_state($projectRoot, $verify);
+        $failureEvent = ($job['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE
+            ? 'uploads_second_rename_failed'
+            : 'uploads_cutover_failed';
+
+        orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_uploads_cutover_event($job, $failureEvent, 'failed', array_merge([
             'operator_admin_id' => $adminId,
             'operator_username' => $operatorUsername,
             'uploads_path' => $verify['uploads_dir'],
             'uploads_pre_merge_path' => $verify['uploads_pre_merge_dir'],
             'uploads_next_path' => $verify['uploads_next_dir'],
-            'first_rename_done' => $firstRenameDone,
+            'job_status' => (string) ($job['status'] ?? ''),
             'error' => $e->getMessage(),
             'database_writes' => false,
-            'production_writes' => $firstRenameDone,
+            'production_writes' => ($job['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
             'rollback_executed' => false,
-        ]));
+        ], $fsState)));
 
-        if ($firstRenameDone) {
+        if (($job['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE) {
             $job = orange_restore_job_mark_failed_merge(
                 $workRoot,
                 $jobId,

@@ -17,6 +17,7 @@ const ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE = 'approved_for_merge';
 const ORANGE_RESTORE_JOB_STATUS_MERGE_PRECHECK_PASSED = 'merge_precheck_passed';
 const ORANGE_RESTORE_JOB_STATUS_MERGE_STARTED = 'merge_started';
 const ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE = 'database_cutover_complete';
+const ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE = 'uploads_first_rename_complete';
 const ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE = 'uploads_cutover_complete';
 const ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE = 'failed_merge';
 const ORANGE_RESTORE_JOB_STATUS_MERGE_APPROVED = 'merge_approved';
@@ -41,6 +42,7 @@ function orange_restore_job_allowed_statuses(): array
         ORANGE_RESTORE_JOB_STATUS_MERGE_PRECHECK_PASSED,
         ORANGE_RESTORE_JOB_STATUS_MERGE_STARTED,
         ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE,
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
         ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE,
         ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE,
         ORANGE_RESTORE_JOB_STATUS_MERGE_APPROVED,
@@ -138,6 +140,8 @@ function orange_restore_job_create(string $workRoot, array $input): array
         'pre_merge_uploads_snapshot_path' => '',
         'uploads_pre_merge_path' => '',
         'uploads_cutover_started_at' => '',
+        'uploads_first_rename_completed_at' => '',
+        'uploads_cutover_first_rename_complete' => false,
         'uploads_cutover_completed_at' => '',
     ];
 
@@ -373,7 +377,7 @@ function orange_restore_job_mark_failed_merge(
             'result' => 'failed_merge',
         ], $patch));
     }
-    if ($currentStatus === ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE) {
+    if ($currentStatus === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE) {
         return orange_restore_job_uploads_cutover_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE, array_merge([
             'stage_failed' => $stageFailed,
             'error_summary' => $errorSummary,
@@ -382,7 +386,7 @@ function orange_restore_job_mark_failed_merge(
     }
 
     throw new RuntimeException(
-        'failed_merge is only allowed from merge_started or database_cutover_complete (current=' . $currentStatus . ').'
+        'failed_merge is only allowed from merge_started or uploads_first_rename_complete (current=' . $currentStatus . ').'
     );
 }
 
@@ -395,6 +399,9 @@ function orange_restore_job_uploads_cutover_transition_map(): array
 {
     return [
         ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE => [
+            ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
+        ],
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE => [
             ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE,
             ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE,
         ],
@@ -404,7 +411,7 @@ function orange_restore_job_uploads_cutover_transition_map(): array
 function orange_restore_job_assert_uploads_cutover_transition(string $fromStatus, string $toStatus): void
 {
     if ($toStatus === ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE) {
-        if ($fromStatus === ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE) {
+        if ($fromStatus === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE) {
             return;
         }
     }

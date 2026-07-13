@@ -24,6 +24,7 @@ require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR 
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_approval.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_maintenance.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_staging_target.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_uploads_fs.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_uploads_cutover.php';
 
 $failures = 0;
@@ -103,7 +104,9 @@ function uploads_cutover_write_uploads_next_manifest(
     string $jobId,
     string $projectRoot,
     string $stagingUploadsDir,
-    string $uploadsNextDir
+    string $uploadsNextDir,
+    string $sourcePackageChecksum,
+    string $stagingManifestChecksum
 ): array {
     $stagingInventory = orange_restore_uploads_tree_inventory($stagingUploadsDir);
     $nextInventory = orange_restore_uploads_tree_inventory($uploadsNextDir);
@@ -114,10 +117,11 @@ function uploads_cutover_write_uploads_next_manifest(
         'verified_at' => gmdate('c'),
         'uploads_next_path' => $uploadsNextDir,
         'staging_uploads_path' => $stagingUploadsDir,
-        'staging_uploads_tree_checksum' => $stagingInventory['tree_checksum_sha256'],
-        'uploads_next_tree_checksum' => $nextInventory['tree_checksum_sha256'],
+        'source_package_checksum' => $sourcePackageChecksum,
+        'staging_restore_manifest_checksum' => $stagingManifestChecksum,
         'file_count' => $nextInventory['file_count'],
-        'total_size' => $nextInventory['total_size'],
+        'total_size_bytes' => $nextInventory['total_size'],
+        'aggregate_tree_checksum' => $nextInventory['tree_checksum_sha256'],
     ];
     orange_backup_write_json(orange_restore_uploads_next_manifest_path($workRoot, $jobId), $manifest);
 
@@ -239,7 +243,15 @@ function uploads_cutover_seed_database_cutover_complete_job(): array
         'channels/b.webp' => 'live-b',
     ]);
 
-    uploads_cutover_write_uploads_next_manifest($workRoot, $jobId, $projectRoot, $stagingUploadsDir, $uploadsNextDir);
+    uploads_cutover_write_uploads_next_manifest(
+        $workRoot,
+        $jobId,
+        $projectRoot,
+        $stagingUploadsDir,
+        $uploadsNextDir,
+        $packageChecksum,
+        $manifestChecksum
+    );
 
     $env = [
         'ORANGE_BACKUP_ROOT' => $backupRoot,
@@ -261,8 +273,18 @@ function uploads_cutover_seed_database_cutover_complete_job(): array
 
 function uploads_cutover_prepare_runtime(array $seed): void
 {
+    orange_restore_uploads_fs_clear_test_seam();
+    uploads_cutover_set_uniform_volume_seam();
     orange_restore_acquire_lock($seed['workRoot'], $seed['jobId']);
     orange_restore_merge_maintenance_enable($seed['workRoot'], $seed['jobId']);
+}
+
+function uploads_cutover_set_uniform_volume_seam(): void
+{
+    orange_restore_uploads_fs_set_test_seam([
+        'volume_identity_provider' => static fn (string $path): string => 'test-vol-uniform',
+        'reparse_point_detector' => static fn (string $path): ?bool => false,
+    ]);
 }
 
 // --- same volume helper ---
@@ -271,10 +293,15 @@ $dirA = $sameVolRoot . DIRECTORY_SEPARATOR . 'a';
 $dirB = $sameVolRoot . DIRECTORY_SEPARATOR . 'b';
 mkdir($dirA);
 mkdir($dirB);
+orange_restore_uploads_fs_set_test_seam([
+    'volume_identity_provider' => static fn (string $path): string => 'same-mock-vol',
+    'reparse_point_detector' => static fn (string $path): ?bool => false,
+]);
 uploads_cutover_self_test(
-    orange_restore_uploads_paths_same_volume($dirA, $dirB),
-    'same volume: sibling directories on same temp root'
+    orange_restore_uploads_fs_volume_identity($dirA) === orange_restore_uploads_fs_volume_identity($dirB),
+    'same volume: mocked uniform identity'
 );
+orange_restore_uploads_fs_clear_test_seam();
 uploads_cutover_rmdir($sameVolRoot);
 
 // --- wrong state ---
@@ -386,9 +413,17 @@ orange_restore_release_lock($checksumBad['workRoot']);
 orange_restore_merge_maintenance_disable($checksumBad['workRoot'], $checksumBad['jobId']);
 uploads_cutover_rmdir($checksumBad['backupRoot']);
 
-// --- different filesystem ---
+// --- different volume identity (same drive letter mock) ---
 $diffVol = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($diffVol);
+orange_restore_uploads_fs_set_test_seam([
+    'volume_identity_provider' => static function (string $path): string {
+        return str_contains(str_replace('\\', '/', $path), '/uploads_next')
+            ? 'mock-vol-B'
+            : 'mock-vol-A';
+    },
+    'reparse_point_detector' => static fn (string $path): ?bool => false,
+]);
 $err = uploads_cutover_try(static function () use ($diffVol): void {
     orange_restore_merge_uploads_cutover_run([
         'project_root' => $diffVol['projectRoot'],
@@ -396,13 +431,37 @@ $err = uploads_cutover_try(static function () use ($diffVol): void {
         'job_id' => $diffVol['jobId'],
         'admin_id' => 1,
         'env_override' => $diffVol['env'],
-        'same_volume_override' => static fn (string $a, string $b): bool => false,
     ]);
 });
-uploads_cutover_self_test($err !== null, 'cutover: different filesystem rejected');
+uploads_cutover_self_test($err !== null, 'cutover: different mocked volume identity rejected');
+orange_restore_uploads_fs_clear_test_seam();
 orange_restore_release_lock($diffVol['workRoot']);
 orange_restore_merge_maintenance_disable($diffVol['workRoot'], $diffVol['jobId']);
 uploads_cutover_rmdir($diffVol['backupRoot']);
+
+// --- unknown volume identity ---
+$unknownVol = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($unknownVol);
+orange_restore_uploads_fs_set_test_seam([
+    'volume_identity_provider' => static function (string $path): string {
+        throw new RuntimeException('Cannot prove Windows volume identity for: ' . $path);
+    },
+    'reparse_point_detector' => static fn (string $path): ?bool => false,
+]);
+$err = uploads_cutover_try(static function () use ($unknownVol): void {
+    orange_restore_merge_uploads_cutover_run([
+        'project_root' => $unknownVol['projectRoot'],
+        'work_root' => $unknownVol['workRoot'],
+        'job_id' => $unknownVol['jobId'],
+        'admin_id' => 1,
+        'env_override' => $unknownVol['env'],
+    ]);
+});
+uploads_cutover_self_test($err !== null, 'cutover: unknown volume identity rejected');
+orange_restore_uploads_fs_clear_test_seam();
+orange_restore_release_lock($unknownVol['workRoot']);
+orange_restore_merge_maintenance_disable($unknownVol['workRoot'], $unknownVol['jobId']);
+uploads_cutover_rmdir($unknownVol['backupRoot']);
 
 // --- snapshot failure ---
 $snapFail = uploads_cutover_seed_database_cutover_complete_job();
@@ -474,6 +533,10 @@ $err = uploads_cutover_try(static function () use ($partialFail, &$renameCount):
     ]);
 });
 uploads_cutover_self_test($err !== null, 'cutover: first rename success second fails surfaces error');
+$partialAudit = orange_restore_audit_read_all($partialFail['workRoot'], $partialFail['jobId']);
+$partialEvents = array_map(static fn (array $row): string => (string) ($row['uploads_cutover_event'] ?? ''), $partialAudit);
+uploads_cutover_self_test(in_array('uploads_first_rename_complete', $partialEvents, true), 'audit: uploads_first_rename_complete before second rename failure');
+uploads_cutover_self_test(in_array('uploads_second_rename_failed', $partialEvents, true), 'audit: uploads_second_rename_failed records partial state');
 $partialJob = orange_restore_job_read($partialFail['workRoot'], $partialFail['jobId']);
 uploads_cutover_self_test(
     ($partialJob['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE,
@@ -530,24 +593,333 @@ $events = array_map(static fn (array $row): string => (string) ($row['uploads_cu
 uploads_cutover_self_test(in_array('uploads_snapshot_started', $events, true), 'audit: uploads_snapshot_started');
 uploads_cutover_self_test(in_array('uploads_snapshot_completed', $events, true), 'audit: uploads_snapshot_completed');
 uploads_cutover_self_test(in_array('uploads_cutover_started', $events, true), 'audit: uploads_cutover_started');
+uploads_cutover_self_test(in_array('uploads_first_rename_complete', $events, true), 'audit: uploads_first_rename_complete');
+uploads_cutover_self_test(in_array('uploads_second_rename_started', $events, true), 'audit: uploads_second_rename_started');
 uploads_cutover_self_test(in_array('uploads_cutover_complete', $events, true), 'audit: uploads_cutover_complete');
 orange_restore_release_lock($success['workRoot']);
 orange_restore_merge_maintenance_disable($success['workRoot'], $success['jobId']);
 uploads_cutover_rmdir($success['backupRoot']);
 
+orange_restore_merge_maintenance_disable($success['workRoot'], $success['jobId']);
+uploads_cutover_rmdir($success['backupRoot']);
+
+// --- staging manifest binding mismatch ---
+$bindingBad = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($bindingBad);
+$stagingPath = orange_restore_job_staging_manifest_path($bindingBad['workRoot'], $bindingBad['jobId']);
+orange_backup_write_json($stagingPath, ['staging_uploads_path' => $bindingBad['stagingUploadsDir'], 'tampered' => true]);
+$err = uploads_cutover_try(static function () use ($bindingBad): void {
+    orange_restore_merge_uploads_cutover_run([
+        'project_root' => $bindingBad['projectRoot'],
+        'work_root' => $bindingBad['workRoot'],
+        'job_id' => $bindingBad['jobId'],
+        'admin_id' => 1,
+        'env_override' => $bindingBad['env'],
+    ]);
+});
+uploads_cutover_self_test($err !== null, 'cutover: staging manifest binding mismatch rejected');
+orange_restore_release_lock($bindingBad['workRoot']);
+orange_restore_merge_maintenance_disable($bindingBad['workRoot'], $bindingBad['jobId']);
+uploads_cutover_rmdir($bindingBad['backupRoot']);
+
+// --- missing approval binding ---
+$noBinding = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($noBinding);
+$jobNoBinding = orange_restore_job_read($noBinding['workRoot'], $noBinding['jobId']);
+$jobNoBinding['approval_token_binding'] = [];
+orange_restore_job_write($noBinding['workRoot'], $jobNoBinding);
+$err = uploads_cutover_try(static function () use ($noBinding): void {
+    orange_restore_merge_uploads_cutover_run([
+        'project_root' => $noBinding['projectRoot'],
+        'work_root' => $noBinding['workRoot'],
+        'job_id' => $noBinding['jobId'],
+        'admin_id' => 1,
+        'env_override' => $noBinding['env'],
+    ]);
+});
+uploads_cutover_self_test($err !== null, 'cutover: missing approval binding rejected');
+orange_restore_release_lock($noBinding['workRoot']);
+orange_restore_merge_maintenance_disable($noBinding['workRoot'], $noBinding['jobId']);
+uploads_cutover_rmdir($noBinding['backupRoot']);
+
+// --- manifest verified=true but file_count mismatch ---
+$countBad = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($countBad);
+$manifestPath = orange_restore_uploads_next_manifest_path($countBad['workRoot'], $countBad['jobId']);
+$manifest = json_decode((string) file_get_contents($manifestPath), true);
+if (is_array($manifest)) {
+    $manifest['file_count'] = 999;
+    orange_backup_write_json($manifestPath, $manifest);
+}
+$err = uploads_cutover_try(static function () use ($countBad): void {
+    orange_restore_merge_uploads_cutover_run([
+        'project_root' => $countBad['projectRoot'],
+        'work_root' => $countBad['workRoot'],
+        'job_id' => $countBad['jobId'],
+        'admin_id' => 1,
+        'env_override' => $countBad['env'],
+    ]);
+});
+uploads_cutover_self_test($err !== null, 'cutover: manifest file_count mismatch rejected');
+orange_restore_release_lock($countBad['workRoot']);
+orange_restore_merge_maintenance_disable($countBad['workRoot'], $countBad['jobId']);
+uploads_cutover_rmdir($countBad['backupRoot']);
+
+// --- manifest total_size_bytes mismatch ---
+$sizeBad = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($sizeBad);
+$manifestPath = orange_restore_uploads_next_manifest_path($sizeBad['workRoot'], $sizeBad['jobId']);
+$manifest = json_decode((string) file_get_contents($manifestPath), true);
+if (is_array($manifest)) {
+    $manifest['total_size_bytes'] = 999999;
+    orange_backup_write_json($manifestPath, $manifest);
+}
+$err = uploads_cutover_try(static function () use ($sizeBad): void {
+    orange_restore_merge_uploads_cutover_run([
+        'project_root' => $sizeBad['projectRoot'],
+        'work_root' => $sizeBad['workRoot'],
+        'job_id' => $sizeBad['jobId'],
+        'admin_id' => 1,
+        'env_override' => $sizeBad['env'],
+    ]);
+});
+uploads_cutover_self_test($err !== null, 'cutover: manifest total_size_bytes mismatch rejected');
+orange_restore_release_lock($sizeBad['workRoot']);
+orange_restore_merge_maintenance_disable($sizeBad['workRoot'], $sizeBad['jobId']);
+uploads_cutover_rmdir($sizeBad['backupRoot']);
+
+// --- extra file after manifest creation ---
+$extraFile = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($extraFile);
+uploads_cutover_write_file($extraFile['uploadsNextDir'] . DIRECTORY_SEPARATOR . 'extra.txt', 'x');
+$err = uploads_cutover_try(static function () use ($extraFile): void {
+    orange_restore_merge_uploads_cutover_run([
+        'project_root' => $extraFile['projectRoot'],
+        'work_root' => $extraFile['workRoot'],
+        'job_id' => $extraFile['jobId'],
+        'admin_id' => 1,
+        'env_override' => $extraFile['env'],
+    ]);
+});
+uploads_cutover_self_test($err !== null, 'cutover: extra file in uploads_next rejected');
+orange_restore_release_lock($extraFile['workRoot']);
+orange_restore_merge_maintenance_disable($extraFile['workRoot'], $extraFile['jobId']);
+uploads_cutover_rmdir($extraFile['backupRoot']);
+
+// --- missing file after manifest creation ---
+$missingFile = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($missingFile);
+@unlink($missingFile['uploadsNextDir'] . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'a.webp');
+$err = uploads_cutover_try(static function () use ($missingFile): void {
+    orange_restore_merge_uploads_cutover_run([
+        'project_root' => $missingFile['projectRoot'],
+        'work_root' => $missingFile['workRoot'],
+        'job_id' => $missingFile['jobId'],
+        'admin_id' => 1,
+        'env_override' => $missingFile['env'],
+    ]);
+});
+uploads_cutover_self_test($err !== null, 'cutover: missing file in uploads_next rejected');
+orange_restore_release_lock($missingFile['workRoot']);
+orange_restore_merge_maintenance_disable($missingFile['workRoot'], $missingFile['jobId']);
+uploads_cutover_rmdir($missingFile['backupRoot']);
+
+// --- reparse point in uploads_next ---
+$reparseNext = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($reparseNext);
+orange_restore_uploads_fs_set_test_seam([
+    'volume_identity_provider' => static fn (string $path): string => 'test-vol-uniform',
+    'reparse_point_detector' => static function (string $path): ?bool {
+        return str_contains(str_replace('\\', '/', $path), '/uploads_next/products');
+    },
+]);
+$err = uploads_cutover_try(static function () use ($reparseNext): void {
+    orange_restore_merge_uploads_cutover_run([
+        'project_root' => $reparseNext['projectRoot'],
+        'work_root' => $reparseNext['workRoot'],
+        'job_id' => $reparseNext['jobId'],
+        'admin_id' => 1,
+        'env_override' => $reparseNext['env'],
+    ]);
+});
+uploads_cutover_self_test($err !== null, 'cutover: reparse point in uploads_next rejected');
+orange_restore_uploads_fs_clear_test_seam();
+orange_restore_release_lock($reparseNext['workRoot']);
+orange_restore_merge_maintenance_disable($reparseNext['workRoot'], $reparseNext['jobId']);
+uploads_cutover_rmdir($reparseNext['backupRoot']);
+
+// --- reparse point in live uploads ---
+$reparseLive = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($reparseLive);
+orange_restore_uploads_fs_set_test_seam([
+    'volume_identity_provider' => static fn (string $path): string => 'test-vol-uniform',
+    'reparse_point_detector' => static function (string $path): ?bool {
+        $norm = str_replace('\\', '/', $path);
+
+        return str_contains($norm, '/uploads/products') && !str_contains($norm, 'uploads_next');
+    },
+]);
+$err = uploads_cutover_try(static function () use ($reparseLive): void {
+    orange_restore_merge_uploads_cutover_run([
+        'project_root' => $reparseLive['projectRoot'],
+        'work_root' => $reparseLive['workRoot'],
+        'job_id' => $reparseLive['jobId'],
+        'admin_id' => 1,
+        'env_override' => $reparseLive['env'],
+    ]);
+});
+uploads_cutover_self_test($err !== null, 'cutover: reparse point in live uploads rejected');
+orange_restore_uploads_fs_clear_test_seam();
+orange_restore_release_lock($reparseLive['workRoot']);
+orange_restore_merge_maintenance_disable($reparseLive['workRoot'], $reparseLive['jobId']);
+uploads_cutover_rmdir($reparseLive['backupRoot']);
+
+// --- corrupt snapshot manifest ---
+$corruptSnap = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($corruptSnap);
+$err = uploads_cutover_try(static function () use ($corruptSnap): void {
+    orange_restore_merge_uploads_cutover_run([
+        'project_root' => $corruptSnap['projectRoot'],
+        'work_root' => $corruptSnap['workRoot'],
+        'job_id' => $corruptSnap['jobId'],
+        'admin_id' => 1,
+        'env_override' => $corruptSnap['env'],
+        'snapshot_override' => static fn (string $workRoot, string $jobId, string $uploadsDir): array => [
+            'path' => $uploadsDir,
+            'file_count' => 1,
+            'total_size' => 1,
+            'tree_checksum_sha256' => str_repeat('a', 64),
+            'checksums_path' => $uploadsDir,
+        ],
+    ]);
+});
+uploads_cutover_self_test($err !== null, 'cutover: corrupt snapshot manifest rejected');
+orange_restore_release_lock($corruptSnap['workRoot']);
+orange_restore_merge_maintenance_disable($corruptSnap['workRoot'], $corruptSnap['jobId']);
+uploads_cutover_rmdir($corruptSnap['backupRoot']);
+
+// --- uploads mutation between snapshot and first rename ---
+$mutated = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($mutated);
+$err = uploads_cutover_try(static function () use ($mutated): void {
+    orange_restore_merge_uploads_cutover_run([
+        'project_root' => $mutated['projectRoot'],
+        'work_root' => $mutated['workRoot'],
+        'job_id' => $mutated['jobId'],
+        'admin_id' => 1,
+        'env_override' => $mutated['env'],
+        'snapshot_override' => static function (string $workRoot, string $jobId, string $uploadsDir): array {
+            $manifest = orange_restore_merge_uploads_cutover_create_snapshot($workRoot, $jobId, $uploadsDir);
+            uploads_cutover_write_file($uploadsDir . DIRECTORY_SEPARATOR . 'mutated.txt', 'changed');
+
+            return $manifest;
+        },
+    ]);
+});
+uploads_cutover_self_test($err !== null, 'cutover: uploads mutation after snapshot rejected');
+orange_restore_release_lock($mutated['workRoot']);
+orange_restore_merge_maintenance_disable($mutated['workRoot'], $mutated['jobId']);
+uploads_cutover_rmdir($mutated['backupRoot']);
+
+// --- maintenance lost before first rename ---
+$lostMaint = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($lostMaint);
+$verifyBaseline = orange_restore_merge_uploads_cutover_collect_trust_gates(
+    $lostMaint['projectRoot'],
+    $lostMaint['workRoot'],
+    $lostMaint['backupRoot'],
+    orange_restore_job_read($lostMaint['workRoot'], $lostMaint['jobId'])
+);
+orange_restore_merge_maintenance_disable($lostMaint['workRoot'], $lostMaint['jobId']);
+$err = uploads_cutover_try(static function () use ($lostMaint, $verifyBaseline): void {
+    orange_restore_merge_uploads_cutover_final_pre_rename_revalidation(
+        $lostMaint['projectRoot'],
+        $lostMaint['workRoot'],
+        $lostMaint['backupRoot'],
+        orange_restore_job_read($lostMaint['workRoot'], $lostMaint['jobId']),
+        $verifyBaseline
+    );
+});
+uploads_cutover_self_test($err !== null, 'cutover: maintenance lost before first rename rejected');
+orange_restore_release_lock($lostMaint['workRoot']);
+uploads_cutover_rmdir($lostMaint['backupRoot']);
+
+// --- lock lost before first rename ---
+$lostLock = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($lostLock);
+$verifyBaseline = orange_restore_merge_uploads_cutover_collect_trust_gates(
+    $lostLock['projectRoot'],
+    $lostLock['workRoot'],
+    $lostLock['backupRoot'],
+    orange_restore_job_read($lostLock['workRoot'], $lostLock['jobId'])
+);
+orange_restore_release_lock($lostLock['workRoot']);
+$err = uploads_cutover_try(static function () use ($lostLock, $verifyBaseline): void {
+    orange_restore_merge_uploads_cutover_final_pre_rename_revalidation(
+        $lostLock['projectRoot'],
+        $lostLock['workRoot'],
+        $lostLock['backupRoot'],
+        orange_restore_job_read($lostLock['workRoot'], $lostLock['jobId']),
+        $verifyBaseline
+    );
+});
+uploads_cutover_self_test($err !== null, 'cutover: lock lost before first rename rejected');
+orange_restore_merge_maintenance_disable($lostLock['workRoot'], $lostLock['jobId']);
+uploads_cutover_rmdir($lostLock['backupRoot']);
+
+// --- durable first-rename checkpoint / simulated crash ---
+$crash = uploads_cutover_seed_database_cutover_complete_job();
+uploads_cutover_prepare_runtime($crash);
+$crashResult = orange_restore_merge_uploads_cutover_run([
+    'project_root' => $crash['projectRoot'],
+    'work_root' => $crash['workRoot'],
+    'job_id' => $crash['jobId'],
+    'admin_id' => 1,
+    'env_override' => $crash['env'],
+    'halt_after_first_rename' => true,
+]);
+uploads_cutover_self_test(
+    ($crashResult['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
+    'cutover: crash simulation leaves uploads_first_rename_complete'
+);
+$crashJob = orange_restore_job_read($crash['workRoot'], $crash['jobId']);
+uploads_cutover_self_test(
+    ($crashJob['uploads_cutover_first_rename_complete'] ?? false) === true,
+    'cutover: durable first_rename_complete flag persisted'
+);
+uploads_cutover_self_test(
+    is_dir(orange_restore_uploads_pre_merge_directory($crash['projectRoot'], $crash['jobId'])),
+    'cutover: crash simulation preserves uploads_pre_merge path'
+);
+$crashAudit = orange_restore_audit_read_all($crash['workRoot'], $crash['jobId']);
+$crashEvents = array_map(static fn (array $row): string => (string) ($row['uploads_cutover_event'] ?? ''), $crashAudit);
+uploads_cutover_self_test(in_array('uploads_first_rename_complete', $crashEvents, true), 'audit: durable first rename event before second rename');
+orange_restore_release_lock($crash['workRoot']);
+orange_restore_merge_maintenance_disable($crash['workRoot'], $crash['jobId']);
+uploads_cutover_rmdir($crash['backupRoot']);
+
 // --- state machine ---
 try {
     orange_restore_job_assert_uploads_cutover_transition(
         ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE,
-        ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE
     );
-    uploads_cutover_self_test(true, 'state: database_cutover_complete -> uploads_cutover_complete');
+    uploads_cutover_self_test(true, 'state: database_cutover_complete -> uploads_first_rename_complete');
 } catch (Throwable) {
-    uploads_cutover_self_test(false, 'state: database_cutover_complete -> uploads_cutover_complete');
+    uploads_cutover_self_test(false, 'state: database_cutover_complete -> uploads_first_rename_complete');
 }
 try {
     orange_restore_job_assert_uploads_cutover_transition(
-        ORANGE_RESTORE_JOB_STATUS_MERGE_PRECHECK_PASSED,
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
+        ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE
+    );
+    uploads_cutover_self_test(true, 'state: uploads_first_rename_complete -> uploads_cutover_complete');
+} catch (Throwable) {
+    uploads_cutover_self_test(false, 'state: uploads_first_rename_complete -> uploads_cutover_complete');
+}
+try {
+    orange_restore_job_assert_uploads_cutover_transition(
+        ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE,
         ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE
     );
     uploads_cutover_self_test(false, 'state: direct uploads_cutover_complete blocked');
