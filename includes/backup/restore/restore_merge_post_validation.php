@@ -190,17 +190,8 @@ function orange_restore_merge_post_validation_run(array $options): array
         }
 
         $passedAt = gmdate('c');
-        $job = orange_restore_job_post_validation_transition(
-            $workRoot,
-            $jobId,
-            ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED,
-            [
-                'post_validation_passed_at' => $passedAt,
-                'post_validation_report_path' => $reportPath,
-                'result' => 'post_validation_passed',
-                'duration_seconds' => $durationSeconds,
-            ]
-        );
+        $completedAt = gmdate('c');
+        $finalReportPath = orange_restore_final_restore_report_path($workRoot, $jobId);
 
         orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_post_validation_event($job, 'production_post_validation_passed', 'pass', [
             'operator_admin_id' => $adminId,
@@ -209,6 +200,13 @@ function orange_restore_merge_post_validation_run(array $options): array
             'database_writes' => false,
             'production_writes' => false,
         ]));
+
+        $finalReport = array_merge($report, [
+            'completed_at' => $completedAt,
+            'job_status' => ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+            'maintenance_disabled' => true,
+        ]);
+        orange_backup_write_json($finalReportPath, $finalReport);
 
         orange_restore_merge_maintenance_disable($workRoot, $jobId, [
             'reason' => 'post_validation_passed',
@@ -220,24 +218,19 @@ function orange_restore_merge_post_validation_run(array $options): array
             'production_writes' => false,
         ]));
 
-        $completedAt = gmdate('c');
         $job = orange_restore_job_post_validation_transition(
             $workRoot,
             $jobId,
             ORANGE_RESTORE_JOB_STATUS_COMPLETED,
             [
+                'post_validation_passed_at' => $passedAt,
+                'post_validation_report_path' => $reportPath,
                 'restore_completed_at' => $completedAt,
-                'final_restore_report_path' => orange_restore_final_restore_report_path($workRoot, $jobId),
+                'final_restore_report_path' => $finalReportPath,
                 'result' => 'completed',
+                'duration_seconds' => $durationSeconds,
             ]
         );
-
-        $finalReport = array_merge($report, [
-            'completed_at' => $completedAt,
-            'job_status' => ORANGE_RESTORE_JOB_STATUS_COMPLETED,
-            'maintenance_disabled' => true,
-        ]);
-        orange_backup_write_json((string) $job['final_restore_report_path'], $finalReport);
 
         orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_post_validation_event($job, 'restore_completed', 'pass', [
             'operator_admin_id' => $adminId,

@@ -213,18 +213,23 @@ function orange_restore_merge_rollback_run(array $options): array
     $productionDb = orange_restore_production_db_name($projectRoot);
     $stagingDb = orange_restore_staging_db_name($env, $projectRoot);
     $checkpoint = (string) ($job['rollback_checkpoint'] ?? '');
+    $isRetryAfterFailure = $entryStatus === ORANGE_RESTORE_JOB_STATUS_ROLLBACK_FAILED;
 
     if ($entryStatus !== ORANGE_RESTORE_JOB_STATUS_ROLLBACK_IN_PROGRESS) {
         $job = orange_restore_job_rollback_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_ROLLBACK_IN_PROGRESS, [
             'rollback_started_at' => gmdate('c'),
-            'result' => 'rollback_in_progress',
+            'result' => $isRetryAfterFailure ? 'rollback_retry_in_progress' : 'rollback_in_progress',
         ]);
-        $job = orange_restore_job_write_rollback_checkpoint(
-            $workRoot,
-            $jobId,
-            ORANGE_RESTORE_ROLLBACK_CHECKPOINT_PRECHECK_PASSED
-        );
-        $checkpoint = ORANGE_RESTORE_ROLLBACK_CHECKPOINT_PRECHECK_PASSED;
+        if ($checkpoint === '' || !$isRetryAfterFailure) {
+            $job = orange_restore_job_write_rollback_checkpoint(
+                $workRoot,
+                $jobId,
+                ORANGE_RESTORE_ROLLBACK_CHECKPOINT_PRECHECK_PASSED
+            );
+            $checkpoint = ORANGE_RESTORE_ROLLBACK_CHECKPOINT_PRECHECK_PASSED;
+        } else {
+            $job = orange_restore_job_read($workRoot, $jobId);
+        }
     }
 
     orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_rollback_event($job, 'rollback_precheck_passed', 'pass', [

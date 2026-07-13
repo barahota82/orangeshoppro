@@ -623,19 +623,47 @@ function orange_restore_validation_adapter_production_orphan_checks(PDO $pdo, ar
 function orange_restore_validation_adapter_production_cross_country_checks(PDO $pdo): array
 {
     $errors = [];
-    if (!orange_restore_validation_adapter_table_exists($pdo, 'journal_vouchers')
-        || !orange_restore_validation_adapter_table_exists($pdo, 'journal_lines')) {
-        return $errors;
-    }
-    try {
-        $sql = 'SELECT COUNT(*) FROM journal_lines jl INNER JOIN journal_vouchers jv ON jv.id = jl.journal_voucher_id '
-            . 'INNER JOIN journal_vouchers jv2 ON jv2.id = jl.journal_voucher_id WHERE jv.country_id <> jv2.country_id';
-        $count = (int) ($pdo->query($sql)->fetchColumn() ?: 0);
-        if ($count > 0) {
-            $errors[] = 'Cross-country journal integrity mismatch rows=' . (string) $count;
+
+    if (orange_restore_validation_adapter_table_exists($pdo, 'journal_vouchers')
+        && orange_restore_validation_adapter_table_exists($pdo, 'journal_lines')
+        && orange_restore_validation_adapter_table_exists($pdo, 'accounts')
+        && orange_restore_validation_adapter_column_exists($pdo, 'journal_vouchers', 'country_id')
+        && orange_restore_validation_adapter_column_exists($pdo, 'journal_lines', 'account_id')
+        && orange_restore_validation_adapter_column_exists($pdo, 'accounts', 'country_id')) {
+        try {
+            $sql = 'SELECT COUNT(*) FROM journal_lines jl '
+                . 'INNER JOIN journal_vouchers jv ON jv.id = jl.journal_voucher_id '
+                . 'INNER JOIN accounts a ON a.id = jl.account_id '
+                . 'WHERE jv.country_id IS NOT NULL AND jv.country_id > 0 '
+                . 'AND a.country_id IS NOT NULL AND a.country_id > 0 '
+                . 'AND jv.country_id <> a.country_id';
+            $count = (int) ($pdo->query($sql)->fetchColumn() ?: 0);
+            if ($count > 0) {
+                $errors[] = 'Journal voucher/account country mismatch rows=' . (string) $count;
+            }
+        } catch (Throwable $e) {
+            $errors[] = 'Journal country integrity check failed: ' . $e->getMessage();
         }
-    } catch (Throwable) {
-        // Table shape may differ; skip non-fatal
+    }
+
+    if (orange_restore_validation_adapter_table_exists($pdo, 'stock_movements')
+        && orange_restore_validation_adapter_table_exists($pdo, 'warehouses')
+        && orange_restore_validation_adapter_column_exists($pdo, 'stock_movements', 'country_id')
+        && orange_restore_validation_adapter_column_exists($pdo, 'stock_movements', 'warehouse_id')
+        && orange_restore_validation_adapter_column_exists($pdo, 'warehouses', 'country_id')) {
+        try {
+            $sql = 'SELECT COUNT(*) FROM stock_movements sm '
+                . 'INNER JOIN warehouses w ON w.id = sm.warehouse_id '
+                . 'WHERE sm.country_id IS NOT NULL AND sm.country_id > 0 '
+                . 'AND w.country_id IS NOT NULL AND w.country_id > 0 '
+                . 'AND sm.country_id <> w.country_id';
+            $count = (int) ($pdo->query($sql)->fetchColumn() ?: 0);
+            if ($count > 0) {
+                $errors[] = 'Stock movement/warehouse country mismatch rows=' . (string) $count;
+            }
+        } catch (Throwable $e) {
+            $errors[] = 'Stock movement country integrity check failed: ' . $e->getMessage();
+        }
     }
 
     return $errors;
@@ -706,6 +734,18 @@ function orange_restore_validation_adapter_table_exists(PDO $pdo, string $table)
 
     return (int) ($pdo->query(
         'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ' . $quoted
+    )->fetchColumn() ?: 0) > 0;
+}
+
+function orange_restore_validation_adapter_column_exists(PDO $pdo, string $table, string $column): bool
+{
+    $quotedTable = $pdo->quote($table);
+    $quotedColumn = $pdo->quote($column);
+
+    return (int) ($pdo->query(
+        'SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE()'
+        . ' AND table_name = ' . $quotedTable
+        . ' AND column_name = ' . $quotedColumn
     )->fetchColumn() ?: 0) > 0;
 }
 

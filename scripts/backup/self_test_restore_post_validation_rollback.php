@@ -572,6 +572,40 @@ pvrb_self_test(($maintDbFail['active'] ?? false) === true, 'rollback: DB failure
 orange_restore_release_lock($dbFail['workRoot']);
 pvrb_rmdir($dbFail['backupRoot']);
 
+// --- rollback: rollback_failed can retry from persisted checkpoint ---
+$retryFailed = pvrb_seed_uploads_cutover_complete_job(ORANGE_RESTORE_JOB_STATUS_ROLLBACK_FAILED);
+$jobRetryFailed = orange_restore_job_read($retryFailed['workRoot'], $retryFailed['jobId']);
+$jobRetryFailed['rollback_checkpoint'] = ORANGE_RESTORE_ROLLBACK_CHECKPOINT_DATABASE_COMPLETE;
+orange_restore_job_write($retryFailed['workRoot'], $jobRetryFailed);
+pvrb_prepare_runtime($retryFailed);
+$retryUploadsCalled = false;
+$resultRetryFailed = orange_restore_merge_rollback_run([
+    'project_root' => $retryFailed['projectRoot'],
+    'work_root' => $retryFailed['workRoot'],
+    'job_id' => $retryFailed['jobId'],
+    'admin_id' => 1,
+    'password' => 'correct-pass',
+    'confirmation_phrase' => 'ROLLBACK',
+    'env_override' => $retryFailed['env'],
+    'admin_pdo_override' => $retryFailed['adminPdo'],
+    'db_import_override' => static function (): void {
+        throw new RuntimeException('DB must not re-run when retrying rollback_failed at database_complete checkpoint.');
+    },
+    'uploads_rollback_override' => static function () use (&$retryUploadsCalled): void {
+        $retryUploadsCalled = true;
+    },
+    'rollback_postcheck_override' => static fn (): array => [
+        'ok' => true,
+        'hard_failures' => [],
+        'warnings' => [],
+        'overall_result' => 'pass',
+    ],
+]);
+pvrb_self_test($retryUploadsCalled, 'rollback: rollback_failed retry resumes from checkpoint');
+pvrb_self_test(($resultRetryFailed['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_ROLLED_BACK, 'rollback: rollback_failed retry -> rolled_back');
+orange_restore_release_lock($retryFailed['workRoot']);
+pvrb_rmdir($retryFailed['backupRoot']);
+
 // --- rollback: crash after DB before uploads (resume checkpoint) ---
 $crashUploads = pvrb_seed_uploads_cutover_complete_job(ORANGE_RESTORE_JOB_STATUS_ROLLBACK_IN_PROGRESS);
 $jobCrash = orange_restore_job_read($crashUploads['workRoot'], $crashUploads['jobId']);

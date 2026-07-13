@@ -327,7 +327,8 @@ no Admin UI, no restore APIs, no automatic/scheduled restore.
 
 CLI entries:
   scripts/backup/restore_full_post_validate.php --job=JOB_ID --admin-id=N
-  scripts/backup/restore_full_rollback.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=ROLLBACK
+  scripts/backup/restore_full_rollback.php --job=JOB_ID --admin-id=N --password-stdin --confirm=ROLLBACK
+  scripts/backup/restore_full_rollback.php --job=JOB_ID --admin-id=N --password-env=ORANGE_RESTORE_OPERATOR_PASSWORD --confirm=ROLLBACK
 
 Modules:
   includes/backup/restore/restore_merge_post_validation.php
@@ -345,9 +346,9 @@ Self-test:
 **Post-validation entry:** `uploads_cutover_complete` only. Global restore lock + maintenance active and
 owned by current job. Maintenance **must not** be disabled until all hard gates pass.
 
-**State path:** uploads_cutover_complete → production_merged → post_validation_passed → (maintenance off) → completed.
-Hard failure from uploads_cutover_complete or production_merged → failed_post_merge (maintenance stays active).
-No direct transition to completed.
+**State path:** uploads_cutover_complete → production_merged → validation report persisted → maintenance off → completed
+(`post_validation_passed_at` recorded on the job). Hard failure from uploads_cutover_complete or production_merged
+before maintenance-off → failed_post_merge (maintenance stays active).
 
 **Production validation gates (hard / warning / informational):**
 Hard failures block completion — production DB connectivity, SELECT DATABASE() identity, production≠staging DB,
@@ -366,12 +367,13 @@ Source = **this job's Stage-3 fresh full disaster backup only** (`fresh_backup_p
 `rollback_anchor_job_only=true`). Forbidden: operator-selected older backup, latest-backup lookup, arbitrary package,
 another job's anchor. Entry states: failed_merge, failed_post_merge, database_cutover_complete,
 uploads_first_rename_complete, uploads_second_rename_pending, uploads_cutover_complete, production_merged,
-rollback_in_progress (resume). Not from completed or rolled_back.
+post_validation_passed, rollback_in_progress (resume), rollback_failed (retry from checkpoint). Not from completed or rolled_back.
 
 **Rollback execution:** DB — merge credentials, wipe production schema, import anchor dump only, production identity
 fence. Uploads — prefer `uploads_pre_merge_{job_id}` rename reversal; else anchor uploads zip verified against
 pre_merge_uploads_snapshot when present. Both DB + uploads before rolled_back. Maintenance stays active on
-rollback_failed; disabled only after rollback post-validation passes.
+rollback_failed; disabled only after rollback post-validation passes. Retrying rollback_failed requires fresh re-auth
+and preserves the persisted rollback checkpoint.
 
 **Rollback checkpoints (persisted on job):** rollback_precheck_passed, rollback_database_pending,
 rollback_database_complete, rollback_uploads_pending, rollback_uploads_complete, rollback_validation_passed, rolled_back.
