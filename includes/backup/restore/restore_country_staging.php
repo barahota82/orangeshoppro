@@ -99,11 +99,7 @@ function orange_restore_country_staging_run(array $options): array
             'approval_phrase_expected' => orange_restore_confirmation_phrase(ORANGE_RESTORE_JOB_TYPE_COUNTRY, $countryCode),
         ]);
         $jobId = (string) ($job['job_id'] ?? '');
-        orange_restore_release_lock($workRoot);
-        $lock = orange_restore_acquire_lock($workRoot, $jobId);
-        if (!$lock['ok']) {
-            throw new RuntimeException($lock['message']);
-        }
+        orange_restore_update_lock_job_id($workRoot, $jobId);
 
         orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_from_job($job, 'package_precheck', 'pass'));
         $job = orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_VALIDATED, [
@@ -551,14 +547,32 @@ function orange_restore_country_staging_validate_dependency_graph(array $package
 
 function orange_restore_country_staging_scan_sql_file_forbidden(string $sqlPath): ?string
 {
-    $content = file_get_contents($sqlPath);
-    if ($content === false) {
-        return 'Cannot read SQL chunk: ' . basename($sqlPath);
+    $handle = @fopen($sqlPath, 'rb');
+    if ($handle === false) {
+        return 'Cannot open SQL chunk: ' . basename($sqlPath);
     }
-    foreach (ORANGE_COUNTRY_EXPORT_FORBIDDEN_SQL_TABLES as $forbidden) {
-        if (preg_match('/INSERT INTO `' . preg_quote($forbidden, '/') . '`/i', $content) === 1) {
-            return 'Forbidden global table data in SQL chunk ' . basename($sqlPath) . ': ' . $forbidden;
+
+    $carry = '';
+    try {
+        while (!feof($handle)) {
+            $chunk = fread($handle, 65536);
+            if ($chunk === false) {
+                return 'Cannot read SQL chunk: ' . basename($sqlPath);
+            }
+            if ($chunk === '') {
+                continue;
+            }
+
+            $scan = $carry . $chunk;
+            foreach (ORANGE_COUNTRY_EXPORT_FORBIDDEN_SQL_TABLES as $forbidden) {
+                if (preg_match('/INSERT INTO `' . preg_quote($forbidden, '/') . '`/i', $scan) === 1) {
+                    return 'Forbidden global table data in SQL chunk ' . basename($sqlPath) . ': ' . $forbidden;
+                }
+            }
+            $carry = substr($scan, -512);
         }
+    } finally {
+        fclose($handle);
     }
 
     return null;
@@ -577,13 +591,20 @@ function orange_restore_country_staging_clear_tables(PDO $pdo, string $stagingDb
 
     orange_restore_staging_assert_safe_target($pdo, $stagingDb);
     orange_restore_log('Country staging table clear... START');
-    $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
-    foreach ($tables as $tableName) {
+    $fkDisabled = false;
+    try {
+        $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
+        $fkDisabled = true;
+        foreach ($tables as $tableName) {
+            orange_restore_staging_assert_safe_target($pdo, $stagingDb);
+            $quoted = '`' . str_replace('`', '``', $tableName) . '`';
+            $pdo->exec('DELETE FROM ' . $quoted);
+        }
+    } finally {
+        if ($fkDisabled) {
+            $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+        }
         orange_restore_staging_assert_safe_target($pdo, $stagingDb);
-        $quoted = '`' . str_replace('`', '``', $tableName) . '`';
-        $pdo->exec('DELETE FROM ' . $quoted);
     }
-    $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
-    orange_restore_staging_assert_safe_target($pdo, $stagingDb);
     orange_restore_log('Country staging table clear... OK (tables=' . (string) count($tables) . ')');
 }

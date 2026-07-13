@@ -109,6 +109,36 @@ function orange_restore_acquire_lock_once(string $workRoot, string $jobId, ?stri
     ];
 }
 
+function orange_restore_update_lock_job_id(string $workRoot, string $jobId): void
+{
+    if ($jobId === '') {
+        throw new RuntimeException('Restore lock update requires job_id.');
+    }
+
+    $path = orange_restore_global_lock_path($workRoot);
+    $status = orange_restore_lock_status($workRoot);
+    $payload = $status['payload'];
+    if (!is_array($payload) || (int) ($payload['pid'] ?? 0) !== (int) getmypid()) {
+        throw new RuntimeException('Cannot update restore lock not owned by this process.');
+    }
+
+    $payload['job_id'] = $jobId;
+    $payload['updated_at'] = gmdate('c');
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        throw new RuntimeException('Restore lock payload encode failed.');
+    }
+
+    $tmp = $path . '.tmp.' . getmypid() . '.' . bin2hex(random_bytes(4));
+    if (file_put_contents($tmp, $json . "\n", LOCK_EX) === false) {
+        throw new RuntimeException('Cannot write restore lock update.');
+    }
+    if (!@rename($tmp, $path)) {
+        @unlink($tmp);
+        throw new RuntimeException('Cannot atomically update restore lock.');
+    }
+}
+
 /**
  * @param array<string, mixed>|null $payload
  */
