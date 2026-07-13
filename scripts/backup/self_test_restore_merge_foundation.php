@@ -310,12 +310,113 @@ mkdir($workRoot);
 $job = ['job_id' => 'maint_job', 'status' => ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE];
 orange_restore_orchestrator_merge_maintenance_enable($workRoot, 'maint_job', $job);
 $status = orange_restore_merge_maintenance_status($workRoot);
-merge_foundation_self_test($status['active'] === true, 'maintenance: enable');
+merge_foundation_self_test($status['active'] === true && ($status['corrupt'] ?? true) === false, 'maintenance: enable');
 orange_restore_merge_maintenance_verify($workRoot, 'maint_job');
 merge_foundation_self_test(true, 'maintenance: verify');
 orange_restore_orchestrator_merge_maintenance_disable($workRoot, 'maint_job', $job);
 merge_foundation_self_test(orange_restore_merge_maintenance_status($workRoot)['active'] === false, 'maintenance: disable');
 merge_foundation_rmdir($maintRoot);
+
+function merge_foundation_write_maintenance_file(string $workRoot, string $contents): string
+{
+    $path = orange_restore_merge_maintenance_file_path($workRoot);
+    $dir = dirname($path);
+    if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+        throw new RuntimeException('Cannot create maintenance directory.');
+    }
+    if (file_put_contents($path, $contents, LOCK_EX) === false) {
+        throw new RuntimeException('Cannot write maintenance file.');
+    }
+
+    return $path;
+}
+
+function merge_foundation_assert_maintenance_file_exists(string $workRoot): bool
+{
+    return is_file(orange_restore_merge_maintenance_file_path($workRoot));
+}
+
+// --- Maintenance ownership fail-closed ---
+$ownerRoot = merge_foundation_temp_root();
+$ownerWork = $ownerRoot . DIRECTORY_SEPARATOR . 'restore_work';
+mkdir($ownerWork);
+orange_restore_merge_maintenance_enable($ownerWork, 'owner_job');
+try {
+    orange_restore_merge_maintenance_disable($ownerWork, 'other_job');
+    merge_foundation_self_test(false, 'maintenance: different job cannot disable');
+} catch (Throwable $e) {
+    merge_foundation_self_test(true, 'maintenance: different job cannot disable');
+}
+merge_foundation_self_test(merge_foundation_assert_maintenance_file_exists($ownerWork), 'maintenance: file kept after foreign disable');
+orange_restore_merge_maintenance_disable($ownerWork, 'owner_job');
+merge_foundation_rmdir($ownerRoot);
+
+$emptyJobRoot = merge_foundation_temp_root();
+$emptyJobWork = $emptyJobRoot . DIRECTORY_SEPARATOR . 'restore_work';
+mkdir($emptyJobWork);
+merge_foundation_write_maintenance_file($emptyJobWork, json_encode([
+    'job_id' => '',
+    'reason' => 'full_merge_foundation',
+    'enabled_at' => gmdate('c'),
+    'pid' => 1234,
+    'hostname' => 'test-host',
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+$emptyStatus = orange_restore_merge_maintenance_status($emptyJobWork);
+merge_foundation_self_test($emptyStatus['active'] === true && $emptyStatus['corrupt'] === true, 'maintenance: status reports corrupt empty job_id');
+try {
+    orange_restore_merge_maintenance_disable($emptyJobWork, 'any_job');
+    merge_foundation_self_test(false, 'maintenance: empty job_id cannot disable');
+} catch (Throwable $e) {
+    merge_foundation_self_test(true, 'maintenance: empty job_id cannot disable');
+}
+merge_foundation_self_test(merge_foundation_assert_maintenance_file_exists($emptyJobWork), 'maintenance: corrupt empty job_id file kept');
+try {
+    orange_restore_merge_maintenance_verify($emptyJobWork, 'any_job');
+    merge_foundation_self_test(false, 'maintenance: verify fails on empty job_id');
+} catch (Throwable $e) {
+    merge_foundation_self_test(true, 'maintenance: verify fails on empty job_id');
+}
+merge_foundation_rmdir($emptyJobRoot);
+
+$missingJobRoot = merge_foundation_temp_root();
+$missingJobWork = $missingJobRoot . DIRECTORY_SEPARATOR . 'restore_work';
+mkdir($missingJobWork);
+merge_foundation_write_maintenance_file($missingJobWork, json_encode([
+    'reason' => 'full_merge_foundation',
+    'enabled_at' => gmdate('c'),
+    'pid' => 1234,
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+$missingStatus = orange_restore_merge_maintenance_status($missingJobWork);
+merge_foundation_self_test($missingStatus['active'] === true && $missingStatus['corrupt'] === true, 'maintenance: status reports corrupt missing job_id');
+try {
+    orange_restore_merge_maintenance_disable($missingJobWork, 'any_job');
+    merge_foundation_self_test(false, 'maintenance: missing job_id cannot disable');
+} catch (Throwable $e) {
+    merge_foundation_self_test(true, 'maintenance: missing job_id cannot disable');
+}
+merge_foundation_self_test(merge_foundation_assert_maintenance_file_exists($missingJobWork), 'maintenance: corrupt missing job_id file kept');
+merge_foundation_rmdir($missingJobRoot);
+
+$malformedRoot = merge_foundation_temp_root();
+$malformedWork = $malformedRoot . DIRECTORY_SEPARATOR . 'restore_work';
+mkdir($malformedWork);
+merge_foundation_write_maintenance_file($malformedWork, '{not-json');
+$malformedStatus = orange_restore_merge_maintenance_status($malformedWork);
+merge_foundation_self_test($malformedStatus['active'] === true && $malformedStatus['corrupt'] === true, 'maintenance: status reports corrupt malformed JSON');
+try {
+    orange_restore_merge_maintenance_disable($malformedWork, 'any_job');
+    merge_foundation_self_test(false, 'maintenance: malformed JSON cannot disable');
+} catch (Throwable $e) {
+    merge_foundation_self_test(true, 'maintenance: malformed JSON cannot disable');
+}
+merge_foundation_self_test(merge_foundation_assert_maintenance_file_exists($malformedWork), 'maintenance: malformed JSON file kept');
+try {
+    orange_restore_merge_maintenance_verify($malformedWork, 'any_job');
+    merge_foundation_self_test(false, 'maintenance: verify fails on malformed JSON');
+} catch (Throwable $e) {
+    merge_foundation_self_test(true, 'maintenance: verify fails on malformed JSON');
+}
+merge_foundation_rmdir($malformedRoot);
 
 // --- expired approval ---
 $expired = merge_foundation_seed_approved_job(true);
