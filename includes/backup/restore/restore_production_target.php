@@ -87,6 +87,82 @@ function orange_restore_production_assert_identity(PDO $pdo, string $expectedDb)
 }
 
 /**
+ * @return list<string>
+ */
+function orange_restore_production_merge_grant_lines(PDO $pdo): array
+{
+    try {
+        $grantSt = $pdo->query('SHOW GRANTS FOR CURRENT_USER()');
+    } catch (Throwable $e) {
+        throw new RuntimeException(
+            'Cannot inspect production merge user privileges (SHOW GRANTS unavailable): ' . $e->getMessage()
+        );
+    }
+
+    if ($grantSt === false) {
+        throw new RuntimeException('Cannot inspect production merge user privileges (SHOW GRANTS returned false).');
+    }
+
+    $grantLines = [];
+    while ($row = $grantSt->fetch(PDO::FETCH_NUM)) {
+        if (is_array($row) && isset($row[0])) {
+            $line = trim((string) $row[0]);
+            if ($line !== '') {
+                $grantLines[] = $line;
+            }
+        }
+    }
+
+    return $grantLines;
+}
+
+/**
+ * @param list<string> $grantLines
+ */
+function orange_restore_production_validate_merge_grant_lines(
+    array $grantLines,
+    string $productionDb,
+    string $stagingDb
+): void {
+    if ($grantLines === []) {
+        throw new RuntimeException(
+            'Cannot inspect production merge user privileges (SHOW GRANTS returned no rows).'
+        );
+    }
+
+    $hasProductionGrant = false;
+    foreach ($grantLines as $grant) {
+        $grant = trim($grant);
+        if ($grant === '') {
+            continue;
+        }
+
+        if (preg_match('/^GRANT\s+USAGE\s+ON\s+\*\.\*/i', $grant) === 1) {
+            continue;
+        }
+        if (preg_match('/\sON\s+\*\.\*/i', $grant) === 1) {
+            throw new RuntimeException('Production merge user must not have global database privileges.');
+        }
+        if (preg_match('/\sON\s+(?:`([^`]+)`|([A-Za-z0-9_]+))\s*\.\s*(?:\*|`[^`]+`|[A-Za-z0-9_]+)/i', $grant, $m) === 1) {
+            $db = (string) (($m[1] ?? '') !== '' ? $m[1] : ($m[2] ?? ''));
+            if (strcasecmp($db, $productionDb) === 0) {
+                $hasProductionGrant = true;
+                continue;
+            }
+            if (strcasecmp($db, $stagingDb) === 0) {
+                throw new RuntimeException('Production merge user must not have privileges on staging database.');
+            }
+
+            throw new RuntimeException('Production merge user has privileges outside production schema: ' . $db);
+        }
+    }
+
+    if (!$hasProductionGrant) {
+        throw new RuntimeException('Production merge user has no detectable production-schema grant.');
+    }
+}
+
+/**
  * Read-only production target verification for merge foundation (no SQL mutation).
  *
  * @param array<string, mixed> $env
@@ -103,6 +179,11 @@ function orange_restore_production_verify_target(string $projectRoot, array $env
 
     $pdo = $pdoOverride ?? orange_restore_connect_merge_pdo($projectRoot, $env);
     orange_restore_production_assert_identity($pdo, $creds['db']);
+    orange_restore_production_validate_merge_grant_lines(
+        orange_restore_production_merge_grant_lines($pdo),
+        $creds['db'],
+        $stagingDb
+    );
 
     return [
         'production_db' => $creds['db'],
