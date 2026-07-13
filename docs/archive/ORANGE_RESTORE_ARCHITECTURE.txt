@@ -161,8 +161,8 @@ Phase 2C deliverables (approval + staging validation gate — no merge, no produ
 ================================================================================
 
 CLI entries:
-  scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=PHRASE --action=approve
-  scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password=SECRET --action=reject|cancel --reason=TEXT
+  scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password-stdin --confirm=PHRASE --action=approve
+  scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password-stdin --action=reject|cancel --reason=TEXT
   scripts/backup/restore_job_status.php --job=JOB_ID
 
 Orchestrator + modules:
@@ -178,7 +178,7 @@ Self-test:
 
 **Scope (2C only):**
 - Applies **only** to jobs in `awaiting_owner_approval` (after 2B.1 / 2B.2 staging restore)
-- Gates: Super Admin + dedicated permission (`backup_restore_full` or `backup_restore_country`) + mandatory password re-authentication + exact typed confirmation phrase (`RESTORE` or `RESTORE {COUNTRY_CODE}`) + live package checksum match + staging validation passed (restore_report + staging manifest) + rollback anchor recorded + approval window not expired
+- Gates: Super Admin + executable dedicated permission (`backup_restore_full` or `backup_restore_country` with edit/execute rights) + mandatory password re-authentication (stdin/env only; no password in argv) + exact typed confirmation phrase (`RESTORE` or `RESTORE {COUNTRY_CODE}`) + live package checksum match + staging validation passed (restore_report + staging manifest bound to the current job/checksum) + rollback anchor recorded + approval window not expired
 - One-time approval token: cryptographically random, SHA-256 hashed at rest, bound to job/operator/scope/checksums, short TTL (1h), single-use, invalidated on use/reject/cancel/job mutation
 - Successful approval transitions job to `approved_for_merge` only — **never** writes production DB, production uploads, merge SQL, or merge engine
 - Rejection/cancellation before merge: records `rejected_by`/`rejected_at`/`rejection_reason` or cancellation fields; status `cancelled`; no automatic retry

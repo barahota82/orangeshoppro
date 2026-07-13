@@ -144,7 +144,7 @@ function orange_restore_full_staging_run(array $options): array
         if ($dumpFile === '') {
             throw new RuntimeException('manifest.dump_file missing.');
         }
-        $dumpPath = $packagePath . DIRECTORY_SEPARATOR . $dumpFile;
+        $dumpPath = orange_restore_resolve_package_member_path($packagePath, $dumpFile, 'manifest.dump_file');
         $sqlResult = orange_restore_sql_runner_import_gzip($pdo, $dumpPath, $stagingDb, $productionDb);
         if (!$sqlResult['ok']) {
             throw new RuntimeException((string) ($sqlResult['error'] ?? 'SQL import failed'));
@@ -153,7 +153,7 @@ function orange_restore_full_staging_run(array $options): array
         $uploadsFile = (string) ($manifest['uploads_file'] ?? '');
         $uploadsResult = ['ok' => true, 'files_extracted' => 0, 'bytes_extracted' => 0, 'error' => null];
         if ($uploadsFile !== '') {
-            $uploadsPath = $packagePath . DIRECTORY_SEPARATOR . $uploadsFile;
+            $uploadsPath = orange_restore_resolve_package_member_path($packagePath, $uploadsFile, 'manifest.uploads_file');
             $uploadsResult = orange_restore_uploads_applicator_extract($uploadsPath, $stagingUploads);
             if (!$uploadsResult['ok']) {
                 throw new RuntimeException((string) ($uploadsResult['error'] ?? 'Uploads extract failed'));
@@ -205,6 +205,7 @@ function orange_restore_full_staging_run(array $options): array
             'overall_result' => 'pass',
             'duration_seconds' => $duration,
             'source_package_path' => $packagePath,
+            'source_package_checksum' => $packageChecksum,
             'rollback_anchor' => [
                 'fresh_backup_path' => (string) ($job['fresh_backup_path'] ?? ''),
                 'fresh_backup_checksum' => (string) ($job['fresh_backup_checksum'] ?? ''),

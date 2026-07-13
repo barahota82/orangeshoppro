@@ -363,7 +363,7 @@ function orange_restore_orchestrator_approve_for_merge(PDO $pdo, array $options)
         'rollback_anchor_checksum' => $rollbackChecksum,
     ]));
 
-    $verify = orange_restore_approval_verify_token($job, $issued['plaintext'], true);
+    $verify = orange_restore_approval_verify_token($job, $issued['plaintext'], true, $binding);
     if (!$verify['ok']) {
         throw new RuntimeException('Approval token self-verify failed: ' . (string) ($verify['error'] ?? ''));
     }

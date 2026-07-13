@@ -69,7 +69,7 @@ function restore_approval_rmdir(string $dir): void
 /**
  * SQLite in-memory PDO for approval gate tests (re-auth + permission matrix).
  */
-function restore_approval_test_pdo(string $permKey = 'backup_restore_full', bool $superuser = true): PDO
+function restore_approval_test_pdo(string $permKey = 'backup_restore_full', bool $superuser = true, bool $canEdit = true): PDO
 {
     $pdo = new PDO('sqlite::memory:');
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -100,7 +100,7 @@ function restore_approval_test_pdo(string $permKey = 'backup_restore_full', bool
     if ($permKey !== '') {
         $pdo->exec(
             'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete)
-             VALUES (1, ' . $pdo->quote($permKey) . ', 1, 0, 0)'
+             VALUES (1, ' . $pdo->quote($permKey) . ', 1, ' . ($canEdit ? '1' : '0') . ', 0)'
         );
     }
 
@@ -181,11 +181,26 @@ function restore_approval_seed_job(
     orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED);
 
     $stagingManifestPath = orange_restore_job_staging_manifest_path($workRoot, $jobId);
-    orange_backup_write_json($stagingManifestPath, ['table_count' => 10, 'schema_revision' => 121]);
+    orange_backup_write_json($stagingManifestPath, [
+        'generated_at' => gmdate('c'),
+        'job_id' => $jobId,
+        'job_type' => $jobType,
+        'source_package_checksum' => $packageChecksum,
+        'staging_db' => 'orange_restore_staging',
+        'country_id' => $jobType === ORANGE_RESTORE_JOB_TYPE_COUNTRY ? 1 : 0,
+        'country_code' => strtoupper($countryCode),
+        'production_touched' => false,
+        'table_count' => 10,
+        'schema_revision' => 121,
+    ]);
 
     $report = [
         'overall_result' => $stagingPass ? 'pass' : 'fail',
+        'job_id' => $jobId,
+        'job_type' => $jobType,
+        'source_package_checksum' => $packageChecksum,
         'production_touched' => false,
+        'staging_manifest' => $stagingManifestPath,
         'staging_post_validation' => ['ok' => $stagingPass],
         'staging_drv_report' => ['overall_result' => $stagingPass ? 'pass' : 'fail'],
         'country_staging_post_validation' => ['ok' => $stagingPass],
@@ -248,6 +263,19 @@ try {
     restore_approval_self_test(true, 'state: direct merge blocked');
 }
 
+// --- Package member path safety ---
+$memberRoot = restore_approval_temp_root();
+$memberPackage = $memberRoot . DIRECTORY_SEPARATOR . 'pkg';
+mkdir($memberPackage);
+file_put_contents($memberPackage . DIRECTORY_SEPARATOR . 'orange_db.sql.gz', 'demo');
+$memberResolved = orange_restore_resolve_package_member_path($memberPackage, 'orange_db.sql.gz', 'test member');
+restore_approval_self_test(is_file($memberResolved), 'package member: resolves inside package');
+$memberTraversal = restore_approval_try(static function () use ($memberPackage): void {
+    orange_restore_resolve_package_member_path($memberPackage, '../outside.sql.gz', 'test member');
+});
+restore_approval_self_test($memberTraversal !== null, 'package member: traversal rejected');
+restore_approval_rmdir($memberRoot);
+
 // --- Token binding ---
 $tokenBinding = orange_restore_approval_issue_token([
     'job_id' => 'demo_job',
@@ -268,6 +296,24 @@ $tokenJob = [
 ];
 $verifyOk = orange_restore_approval_verify_token($tokenJob, $tokenBinding['plaintext'], false);
 restore_approval_self_test($verifyOk['ok'] === true, 'token: verify match');
+$verifyBindingOk = orange_restore_approval_verify_token($tokenJob, $tokenBinding['plaintext'], false, [
+    'job_id' => 'demo_job',
+    'operator_id' => 1,
+    'scope' => ORANGE_RESTORE_JOB_TYPE_FULL,
+    'source_package_checksum' => str_repeat('a', 64),
+    'staging_restore_manifest_checksum' => str_repeat('d', 64),
+    'rollback_anchor_checksum' => str_repeat('b', 64),
+]);
+restore_approval_self_test($verifyBindingOk['ok'] === true, 'token: binding fields verified');
+$verifyBindingBad = orange_restore_approval_verify_token($tokenJob, $tokenBinding['plaintext'], false, [
+    'job_id' => 'demo_job',
+    'operator_id' => 1,
+    'scope' => ORANGE_RESTORE_JOB_TYPE_FULL,
+    'source_package_checksum' => str_repeat('f', 64),
+    'staging_restore_manifest_checksum' => str_repeat('d', 64),
+    'rollback_anchor_checksum' => str_repeat('b', 64),
+]);
+restore_approval_self_test($verifyBindingBad['ok'] === false, 'token: binding checksum mismatch rejected');
 $verifyBad = orange_restore_approval_verify_token($tokenJob, 'bad-token', false);
 restore_approval_self_test($verifyBad['ok'] === false, 'token: verify mismatch');
 
@@ -403,6 +449,23 @@ $err = restore_approval_try(static function () use ($noPerm, $noPermPdo, $projec
 restore_approval_self_test($err !== null, 'gate: wrong permission rejected');
 restore_approval_rmdir($noPerm['backupRoot']);
 
+// --- View-only restore permission is not enough for approval/reject/cancel ---
+$viewOnly = restore_approval_seed_job(ORANGE_RESTORE_JOB_TYPE_FULL);
+$viewOnlyPdo = restore_approval_test_pdo('backup_restore_full', true, false);
+$err = restore_approval_try(static function () use ($viewOnly, $viewOnlyPdo, $projectRoot): void {
+    orange_restore_orchestrator_approve_for_merge($viewOnlyPdo, [
+        'project_root' => $projectRoot,
+        'work_root' => $viewOnly['workRoot'],
+        'job_id' => $viewOnly['jobId'],
+        'admin_id' => 1,
+        'password' => 'correct-pass',
+        'confirmation_phrase' => 'RESTORE',
+        'env_override' => ['ORANGE_BACKUP_ROOT' => $viewOnly['backupRoot']],
+    ]);
+});
+restore_approval_self_test($err !== null, 'gate: view-only restore permission rejected');
+restore_approval_rmdir($viewOnly['backupRoot']);
+
 // --- Checksum mismatch ---
 $checksumBad = restore_approval_seed_job(ORANGE_RESTORE_JOB_TYPE_FULL);
 $jobBad = orange_restore_job_read($checksumBad['workRoot'], $checksumBad['jobId']);
@@ -453,6 +516,28 @@ $err = restore_approval_try(static function () use ($stagingFail, $projectRoot):
 });
 restore_approval_self_test($err !== null, 'gate: failed staging validation rejected');
 restore_approval_rmdir($stagingFail['backupRoot']);
+
+// --- Staging report identity mismatch ---
+$reportMismatch = restore_approval_seed_job(ORANGE_RESTORE_JOB_TYPE_FULL);
+$reportPath = orange_restore_job_report_path($reportMismatch['workRoot'], $reportMismatch['jobId']);
+$reportPayload = json_decode((string) file_get_contents($reportPath), true);
+if (is_array($reportPayload)) {
+    $reportPayload['source_package_checksum'] = str_repeat('9', 64);
+    orange_backup_write_json($reportPath, $reportPayload);
+}
+$err = restore_approval_try(static function () use ($reportMismatch, $projectRoot): void {
+    orange_restore_orchestrator_approve_for_merge($reportMismatch['pdo'], [
+        'project_root' => $projectRoot,
+        'work_root' => $reportMismatch['workRoot'],
+        'job_id' => $reportMismatch['jobId'],
+        'admin_id' => 1,
+        'password' => 'correct-pass',
+        'confirmation_phrase' => 'RESTORE',
+        'env_override' => ['ORANGE_BACKUP_ROOT' => $reportMismatch['backupRoot']],
+    ]);
+});
+restore_approval_self_test($err !== null, 'gate: staging report checksum mismatch rejected');
+restore_approval_rmdir($reportMismatch['backupRoot']);
 
 // --- Expired approval window ---
 $expiredWindow = restore_approval_seed_job(ORANGE_RESTORE_JOB_TYPE_FULL);

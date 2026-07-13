@@ -101,3 +101,33 @@ function orange_restore_resolve_package_path(string $backupRoot, string $package
 
     return $resolved;
 }
+
+function orange_restore_resolve_package_member_path(string $packagePath, string $memberPath, string $label): string
+{
+    $memberPath = trim(str_replace('\\', '/', $memberPath));
+    if ($memberPath === '') {
+        throw new RuntimeException($label . ' path is missing.');
+    }
+    if (
+        str_starts_with($memberPath, '/')
+        || preg_match('/^[A-Za-z]:\//', $memberPath) === 1
+        || str_contains($memberPath, "\0")
+        || preg_match('~(^|/)\.\.(/|$)~', $memberPath) === 1
+    ) {
+        throw new RuntimeException($label . ' path must be a relative package member path.');
+    }
+
+    $candidate = $packagePath . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $memberPath);
+    $resolved = realpath($candidate);
+    if ($resolved === false || !is_file($resolved)) {
+        throw new RuntimeException($label . ' package member does not exist: ' . $memberPath);
+    }
+
+    $packageNorm = strtolower(rtrim(str_replace('\\', '/', realpath($packagePath) ?: $packagePath), '/'));
+    $resolvedNorm = strtolower(rtrim(str_replace('\\', '/', $resolved), '/'));
+    if ($resolvedNorm === $packageNorm || str_starts_with($resolvedNorm, $packageNorm . '/')) {
+        return $resolved;
+    }
+
+    throw new RuntimeException($label . ' package member escapes package root: ' . $memberPath);
+}

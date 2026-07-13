@@ -91,9 +91,15 @@ function orange_restore_approval_invalidate_token(array $job, string $reason = '
 
 /**
  * @param array<string, mixed> $job
+ * @param array<string, mixed> $expectedBinding
  * @return array{ok:bool,error:?string,binding:array<string,mixed>}
  */
-function orange_restore_approval_verify_token(array $job, string $plaintextToken, bool $consume = false): array
+function orange_restore_approval_verify_token(
+    array $job,
+    string $plaintextToken,
+    bool $consume = false,
+    array $expectedBinding = []
+): array
 {
     $hash = (string) ($job['approval_token_hash'] ?? '');
     if ($hash === '') {
@@ -121,6 +127,15 @@ function orange_restore_approval_verify_token(array $job, string $plaintextToken
     $binding = is_array($job['approval_token_binding'] ?? null) ? $job['approval_token_binding'] : [];
     if (($binding['job_id'] ?? '') !== ($job['job_id'] ?? '')) {
         return ['ok' => false, 'error' => 'Approval token binding job_id mismatch.', 'binding' => []];
+    }
+
+    foreach ($expectedBinding as $key => $expectedValue) {
+        $bindingValue = $binding[(string) $key] ?? null;
+        $expectedString = is_bool($expectedValue) ? ($expectedValue ? '1' : '0') : (string) $expectedValue;
+        $bindingString = is_bool($bindingValue) ? ($bindingValue ? '1' : '0') : (string) $bindingValue;
+        if (!hash_equals($expectedString, $bindingString)) {
+            return ['ok' => false, 'error' => 'Approval token binding ' . (string) $key . ' mismatch.', 'binding' => []];
+        }
     }
 
     if ($consume) {

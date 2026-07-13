@@ -411,8 +411,8 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2B.2 section
 
 **Approval gates (all required):**
 1. Super Admin session operator (`--admin-id`)
-2. Dedicated permission: `backup_restore_full` (full disaster) or `backup_restore_country` (country recovery)
-3. Password re-authentication (`--password`)
+2. Executable dedicated permission: `backup_restore_full` (full disaster) or `backup_restore_country` (country recovery) with edit/execute rights — view-only is not enough
+3. Password re-authentication (`--password-stdin` or `--password-env=ENV_NAME`; never `--password=SECRET`)
 4. Exact confirmation phrase: `RESTORE` (full) or `RESTORE {COUNTRY_CODE}` (country)
 5. Live source package checksum matches job record
 6. Staging validation gate pass (report + manifest checksums bound into approval token)
@@ -426,15 +426,17 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2B.2 section
 php D:\orange\scripts\backup\restore_job_status.php --job=yyyy-MM-dd_HHmmss_xxxxxxxx
 
 # Approve for future merge (does NOT merge)
-php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password=SECRET --confirm=RESTORE --action=approve
+php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password-stdin --confirm=RESTORE --action=approve
 
 # Country approve example
-php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password=SECRET --confirm="RESTORE KW" --action=approve
+php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password-stdin --confirm="RESTORE KW" --action=approve
 
 # Reject or cancel before merge
-php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password=SECRET --action=reject --reason="Owner declined"
-php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password=SECRET --action=cancel --reason="Operator cancelled"
+php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password-stdin --action=reject --reason="Owner declined"
+php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password-stdin --action=cancel --reason="Operator cancelled"
 ```
+
+`--password=SECRET` is intentionally rejected because command-line arguments can leak through shell history, task logs, or process listings. Pipe the password through stdin or set a short-lived environment variable and pass its name with `--password-env=ENV_NAME`.
 
 **On success:** Job status becomes `approved_for_merge`. One-time approval token is issued and consumed in the same operation (hash stored on job + sidecar metadata). Filesystem audit records re-auth, phrase check, token lifecycle, and state transition.
 
