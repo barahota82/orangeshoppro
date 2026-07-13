@@ -78,11 +78,7 @@ function orange_restore_full_staging_run(array $options): array
             'approval_phrase_expected' => 'RESTORE',
         ]);
         $jobId = (string) $job['job_id'];
-        orange_restore_release_lock($workRoot);
-        $lock = orange_restore_acquire_lock($workRoot, $jobId);
-        if (!$lock['ok']) {
-            throw new RuntimeException($lock['message']);
-        }
+        orange_restore_update_lock_job_id($workRoot, $jobId);
 
         orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_from_job($job, 'package_precheck', 'pass'));
         $job = orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_VALIDATED, [

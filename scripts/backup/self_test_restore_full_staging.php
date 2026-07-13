@@ -201,14 +201,31 @@ try {
     );
 }
 
-$productionDb = orange_restore_production_db_name($projectRoot);
 try {
-    orange_restore_staging_db_name([ORANGE_RESTORE_ENV_STAGING_DB => $productionDb], $projectRoot);
-    restore_staging_self_test(false, 'staging target: staging db equals production rejected');
+    $productionDb = orange_restore_production_db_name($projectRoot);
+    try {
+        orange_restore_staging_db_name([ORANGE_RESTORE_ENV_STAGING_DB => $productionDb], $projectRoot);
+        restore_staging_self_test(false, 'staging target: staging db equals production rejected');
+    } catch (Throwable $e) {
+        restore_staging_self_test(
+            str_contains($e->getMessage(), 'must not equal production'),
+            'staging target: staging db equals production rejected'
+        );
+    }
+} catch (Throwable $e) {
+    echo "SKIP: staging target: staging db equals production rejected (requires .env.php DB settings)\n";
+}
+
+try {
+    orange_restore_resolve_work_root([
+        'ORANGE_BACKUP_ROOT' => $backupRoot,
+        'ORANGE_RESTORE_WORK_DIR' => 'uploads/restore_work',
+    ]);
+    restore_staging_self_test(false, 'restore work dir: relative uploads path rejected');
 } catch (Throwable $e) {
     restore_staging_self_test(
-        str_contains($e->getMessage(), 'must not equal production'),
-        'staging target: staging db equals production rejected'
+        str_contains($e->getMessage(), 'absolute path'),
+        'restore work dir: relative uploads path rejected'
     );
 }
 
@@ -239,6 +256,25 @@ restore_staging_self_test(
     (int) ($goodSqlResult['statements_executed'] ?? 0) >= 2,
     'sql runner: progress counters populated'
 );
+
+$longSqlPath = $backupRoot . DIRECTORY_SEPARATOR . 'long.sql.gz';
+$longValue = str_repeat('a', 70000);
+$gz = gzopen($longSqlPath, 'wb9');
+gzwrite($gz, "CREATE TABLE long_stream_demo (label TEXT);\nINSERT INTO long_stream_demo VALUES ('{$longValue}');\n");
+gzclose($gz);
+$longSqlResult = orange_restore_sql_runner_import_gzip($pdoSqlite, $longSqlPath);
+restore_staging_self_test($longSqlResult['ok'] === true, 'sql runner: long string spanning chunks succeeds');
+restore_staging_self_test(
+    (int) $pdoSqlite->query('SELECT LENGTH(label) FROM long_stream_demo')->fetchColumn() === 70000,
+    'sql runner: long string data preserved'
+);
+
+$unterminatedSqlPath = $backupRoot . DIRECTORY_SEPARATOR . 'unterminated.sql.gz';
+$gz = gzopen($unterminatedSqlPath, 'wb9');
+gzwrite($gz, "CREATE TABLE unterminated_demo (label TEXT);\nINSERT INTO unterminated_demo VALUES ('open string");
+gzclose($gz);
+$unterminatedSqlResult = orange_restore_sql_runner_import_gzip($pdoSqlite, $unterminatedSqlPath);
+restore_staging_self_test($unterminatedSqlResult['ok'] === false, 'sql runner: unterminated final string fails');
 
 // upload restore
 $uploadsTarget = $backupRoot . DIRECTORY_SEPARATOR . 'uploads_target';
@@ -338,10 +374,13 @@ restore_staging_self_test(
 );
 
 // live staging restore (optional — requires .env.php + ORANGE_RESTORE_STAGING_DB + connectivity)
-$envReport = orange_backup_collect_environment_report($projectRoot);
-$liveEnv = orange_backup_load_env_array($projectRoot);
+$envPath = $projectRoot . DIRECTORY_SEPARATOR . '.env.php';
+$liveEnv = is_file($envPath) ? orange_backup_load_env_array($projectRoot) : [];
 $stagingDbConfigured = trim((string) ($liveEnv[ORANGE_RESTORE_ENV_STAGING_DB] ?? '')) !== '';
-if (!empty($envReport['database_connected']) && $stagingDbConfigured && is_file($projectRoot . DIRECTORY_SEPARATOR . '.env.php')) {
+$envReport = ($stagingDbConfigured && is_file($envPath))
+    ? orange_backup_collect_environment_report($projectRoot)
+    : ['database_connected' => false];
+if (!empty($envReport['database_connected']) && $stagingDbConfigured) {
     $liveEnvOverride = array_merge($envOverride, [
         ORANGE_RESTORE_ENV_STAGING_DB => trim((string) $liveEnv[ORANGE_RESTORE_ENV_STAGING_DB]),
     ]);

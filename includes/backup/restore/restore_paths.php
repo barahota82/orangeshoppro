@@ -21,7 +21,7 @@ function orange_restore_resolve_work_root(array $env, ?string $cliOverride = nul
     $backupRoot = orange_backup_resolve_root($env, $cliOverride);
     $configured = trim((string) ($env['ORANGE_RESTORE_WORK_DIR'] ?? ''));
     if ($configured !== '') {
-        $workRoot = orange_backup_normalize_directory_path($configured);
+        $workRoot = orange_restore_absolute_directory_path($configured);
         orange_backup_assert_outside_web_root($workRoot);
         if (!is_dir($workRoot) && !@mkdir($workRoot, 0775, true) && !is_dir($workRoot)) {
             throw new RuntimeException('ORANGE_RESTORE_WORK_DIR is not writable or cannot be created: ' . $workRoot);
@@ -36,6 +36,24 @@ function orange_restore_resolve_work_root(array $env, ?string $cliOverride = nul
     }
 
     return realpath($workRoot) ?: $workRoot;
+}
+
+function orange_restore_absolute_directory_path(string $path): string
+{
+    $path = orange_backup_normalize_directory_path($path);
+    if ($path === '') {
+        return '';
+    }
+
+    $portable = str_replace('\\', '/', $path);
+    $isAbsolute = str_starts_with($portable, '/')
+        || preg_match('/^[A-Za-z]:\//', $portable) === 1
+        || str_starts_with($path, '\\\\');
+    if ($isAbsolute) {
+        return $path;
+    }
+
+    throw new RuntimeException('ORANGE_RESTORE_WORK_DIR must be an absolute path.');
 }
 
 function orange_restore_assert_inside_work_root(string $workRoot, string $absolutePath): string

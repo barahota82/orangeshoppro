@@ -154,19 +154,25 @@ Copy snapshots to storage separate from the production host (second disk, NAS, c
 
 ---
 
-## Restore procedure (manual — not automated)
+## Restore procedure (legacy manual wording superseded)
 
-**The backup script does not restore automatically.** Until Phase 2 Restore is implemented per **`ORANGE_RESTORE_OWNER_POLICY.txt`**, restore remains a **manual, operator-driven** procedure on non-production or emergency basis only:
+**The backup script does not restore automatically.** The earlier emergency idea of
+decompressing a dump and importing it directly over production is **superseded and
+forbidden** by the permanent owner restore policy below. Current and future restore
+work must follow the staged workflow:
 
-1. **Stop web traffic** to the site (maintenance mode / stop app pool) before overwriting live data.
-2. **Database:** decompress `{db_name}.sql.gz`, then import into MariaDB/MySQL using the appropriate client (`mysql` CLI or Plesk database tools). Target the database name recorded in `manifest.json` (default from `config.php`: `orange_db`).
-3. **Uploads:** extract `uploads.zip` into the project `uploads/` directory, preserving relative paths. Merge or replace only after confirming the snapshot is the intended point-in-time.
-4. **Verify:** run gated `health.php` checks, admin login, sample order/stock read, and spot-check uploaded files referenced by recent orders.
-5. **Document:** note snapshot timestamp, manifest `git_commit`, and reason for restore.
+1. Validate the selected package (verify + DRV).
+2. Create a fresh full disaster backup inside the same restore job as the rollback anchor.
+3. Restore into an isolated staging database and staging uploads path only.
+4. Run staging validation and produce review artifacts.
+5. Proceed to production only through a later controlled production merge phase after
+   owner review and explicit approval.
 
-Restore must be **tested on a non-production clone** before relying on it for production go-live. An untested backup policy does not satisfy production readiness.
+Direct production import/extract from a package is not an approved Orange recovery path.
+Restore must be tested on a non-production clone before relying on it for production go-live.
+An untested backup policy does not satisfy production readiness.
 
-**Phase 1A does not implement:** staging restore, production merge, restore APIs, or admin backup UI.
+**Phase 1A does not implement:** production merge, restore APIs, or admin backup UI.
 
 **Permanent owner policy:** All future Restore work is governed by **`docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt`** (owner decision 2026-07-13). No Restore implementation may begin until that policy is acknowledged.
 
@@ -314,7 +320,7 @@ php D:\orange\scripts\backup\self_test_restore_full_staging.php
 |-----|----------|-------|
 | `ORANGE_BACKUP_ROOT` | Yes | Package must live under this root |
 | `ORANGE_RESTORE_STAGING_DB` | Yes | Staging MySQL database name; **must not** equal production `DB_NAME` |
-| `ORANGE_RESTORE_WORK_DIR` | No | Default `{ORANGE_BACKUP_ROOT}/restore_work` |
+| `ORANGE_RESTORE_WORK_DIR` | No | Absolute path only; default `{ORANGE_BACKUP_ROOT}/restore_work` |
 
 Create the staging database on the server before first restore (empty schema is wiped at start of import).
 
