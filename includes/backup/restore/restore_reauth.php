@@ -56,18 +56,27 @@ function orange_restore_assert_superuser_operator(array $admin): void
     }
 }
 
+function orange_restore_reauth_has_execute_permission(PDO $pdo, int $adminId, string $permissionKey): bool
+{
+    $st = $pdo->prepare(
+        'SELECT can_edit FROM admin_permissions WHERE admin_id = ? AND resource_key = ? LIMIT 1'
+    );
+    $st->execute([$adminId, $permissionKey]);
+    $value = $st->fetchColumn();
+
+    return (int) $value === 1;
+}
+
 /**
  * @param array<string, mixed> $admin
  */
 function orange_restore_reauth_assert_restore_permission(array $admin, PDO $pdo, string $jobType): void
 {
     orange_restore_assert_superuser_operator($admin);
-
-    $matrix = orange_admin_permissions_matrix($pdo, (int) ($admin['id'] ?? 0));
+    $adminId = (int) ($admin['id'] ?? 0);
 
     if ($jobType === ORANGE_RESTORE_JOB_TYPE_FULL) {
-        $row = $matrix['backup_restore_full'] ?? null;
-        if (!is_array($row) || empty($row['can_edit'])) {
+        if (!orange_restore_reauth_has_execute_permission($pdo, $adminId, 'backup_restore_full')) {
             throw new RuntimeException('Operator lacks executable backup_restore_full permission.');
         }
 
@@ -75,8 +84,7 @@ function orange_restore_reauth_assert_restore_permission(array $admin, PDO $pdo,
     }
 
     if ($jobType === ORANGE_RESTORE_JOB_TYPE_COUNTRY) {
-        $row = $matrix['backup_restore_country'] ?? null;
-        if (!is_array($row) || empty($row['can_edit'])) {
+        if (!orange_restore_reauth_has_execute_permission($pdo, $adminId, 'backup_restore_country')) {
             throw new RuntimeException('Operator lacks executable backup_restore_country permission.');
         }
 
