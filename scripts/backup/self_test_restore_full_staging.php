@@ -53,6 +53,25 @@ function restore_staging_temp_root(): string
     return $dir;
 }
 
+function restore_staging_temp_project_root(): string
+{
+    $dir = restore_staging_temp_root();
+    file_put_contents(
+        $dir . DIRECTORY_SEPARATOR . 'config.php',
+        "<?php\n"
+        . "declare(strict_types=1);\n"
+        . "const DB_HOST = 'localhost';\n"
+        . "const DB_NAME = 'orange_prod_test';\n"
+    );
+    file_put_contents(
+        $dir . DIRECTORY_SEPARATOR . '.env.php',
+        "<?php\n"
+        . "return ['DB_USER' => 'orange_prod_user', 'DB_PASS' => 'orange_prod_pass'];\n"
+    );
+
+    return $dir;
+}
+
 function restore_staging_rmdir(string $dir): void
 {
     if (!is_dir($dir)) {
@@ -143,9 +162,10 @@ $fixture = restore_staging_fixture_layout();
 $backupRoot = $fixture['backup_root'];
 $workRoot = $fixture['work_root'];
 $packageDir = $fixture['package_dir'];
+$dbProjectRoot = restore_staging_temp_project_root();
 
 $stagingDbName = 'orange_restore_staging_test';
-$productionDbName = orange_restore_production_db_name($projectRoot);
+$productionDbName = orange_restore_production_db_name($dbProjectRoot);
 
 $envOverride = [
     'ORANGE_BACKUP_ROOT' => $backupRoot,
@@ -238,13 +258,13 @@ try {
     restore_staging_self_test(str_contains($e->getMessage(), 'ORANGE_RESTORE_STAGING_DB_USER'), 'staging creds: missing user rejected');
 }
 
-$productionCreds = orange_restore_production_db_credentials($projectRoot);
+$productionCreds = orange_restore_production_db_credentials($dbProjectRoot);
 try {
     orange_restore_staging_credentials([
         ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName,
         ORANGE_RESTORE_ENV_STAGING_DB_USER => $productionCreds['user'],
         ORANGE_RESTORE_ENV_STAGING_DB_PASS => 'x',
-    ], $projectRoot);
+    ], $dbProjectRoot);
     restore_staging_self_test(false, 'staging creds: production DB_USER reuse rejected');
 } catch (Throwable $e) {
     restore_staging_self_test(str_contains($e->getMessage(), 'must not equal production DB_USER'), 'staging creds: production DB_USER reuse rejected');
@@ -309,7 +329,7 @@ restore_staging_self_test(($failedStageJob['stage_failed'] ?? '') === 'package_c
 // Orchestrator abort paths (no staging mutation)
 try {
     orange_restore_full_staging_run([
-        'project_root' => $projectRoot,
+        'project_root' => $dbProjectRoot,
         'package_path' => $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'missing_pkg',
         'env_override' => $envOverride,
     ]);
@@ -325,7 +345,7 @@ restore_staging_write_full_package($failPkgDir, [
 ]);
 try {
     orange_restore_full_staging_run([
-        'project_root' => $projectRoot,
+        'project_root' => $dbProjectRoot,
         'package_path' => $failPkgDir,
         'env_override' => $envOverride,
     ]);
@@ -357,6 +377,7 @@ restore_staging_self_test(
 );
 
 restore_staging_rmdir($backupRoot);
+restore_staging_rmdir($dbProjectRoot);
 
 echo PHP_EOL . ($failures === 0 ? 'ALL RESTORE STAGING SELF-TESTS PASSED' : "FAILURES: {$failures}") . PHP_EOL;
 exit($failures === 0 ? 0 : 1);
