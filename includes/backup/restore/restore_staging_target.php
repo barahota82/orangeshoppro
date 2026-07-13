@@ -142,10 +142,11 @@ function orange_restore_staging_validate_grant_lines(array $grantLines, string $
         if ($grant === '') {
             continue;
         }
+        $hasGlobalScope = stripos($grant, ' ON *.*') !== false;
         if (
             stripos($grant, ' ON ' . $productionNeedle . '.') !== false
             || stripos($grant, ' ON ' . $productionNeedle . '.*') !== false
-            || stripos($grant, ' ON *.*') !== false
+            || ($hasGlobalScope && !orange_restore_staging_is_noop_global_usage_grant($grant))
         ) {
             throw new RuntimeException(
                 'Staging DB user has detectable privilege on production schema ('
@@ -154,6 +155,18 @@ function orange_restore_staging_validate_grant_lines(array $grantLines, string $
             );
         }
     }
+}
+
+function orange_restore_staging_is_noop_global_usage_grant(string $grant): bool
+{
+    if (preg_match('/^\s*GRANT\s+(.+?)\s+ON\s+\*\.\*/i', $grant, $match) !== 1) {
+        return false;
+    }
+
+    $privileges = strtoupper(trim((string) ($match[1] ?? '')));
+    $privileges = preg_replace('/\s+/', ' ', $privileges) ?: $privileges;
+
+    return $privileges === 'USAGE';
 }
 
 /**

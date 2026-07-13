@@ -139,6 +139,17 @@ function restore_staging_validate_rejects(string $sql, string $stagingDb, string
     }
 }
 
+function restore_staging_validate_accepts(string $sql, string $stagingDb, string $productionDb): bool
+{
+    try {
+        orange_restore_sql_validate_statement_for_staging($sql, $stagingDb, $productionDb);
+
+        return true;
+    } catch (Throwable) {
+        return false;
+    }
+}
+
 $fixture = restore_staging_fixture_layout();
 $backupRoot = $fixture['backup_root'];
 $workRoot = $fixture['work_root'];
@@ -242,6 +253,26 @@ restore_staging_self_test(
     ),
     'sql safety: quoted db.table rejected'
 );
+restore_staging_self_test(
+    restore_staging_validate_accepts(
+        'INSERT INTO prices VALUES (1, 12.34, -5.67, 1.2e3);',
+        $stagingDbName,
+        $productionDbName
+    ),
+    'sql safety: decimal numeric literals are not db.table references'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects("/*!40101 USE `{$productionDbName}` */;", $stagingDbName, $productionDbName),
+    'sql safety: executable comment USE rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_rejects('CREATE /*!40101 DATABASE */ evil;', $stagingDbName, $productionDbName),
+    'sql safety: executable comment CREATE DATABASE rejected'
+);
+restore_staging_self_test(
+    restore_staging_validate_accepts('/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;', $stagingDbName, $productionDbName),
+    'sql safety: safe executable comment SET accepted'
+);
 
 // Privilege fence — fail closed
 try {
@@ -256,6 +287,16 @@ try {
         str_contains($e->getMessage(), 'SHOW GRANTS'),
         'privilege fence: SHOW GRANTS unavailable fails closed'
     );
+}
+
+try {
+    orange_restore_staging_validate_grant_lines(
+        ["GRANT USAGE ON *.* TO 'restore_staging'@'localhost'"],
+        $productionDbName
+    );
+    restore_staging_self_test(true, 'privilege fence: no-op USAGE grant accepted');
+} catch (Throwable) {
+    restore_staging_self_test(false, 'privilege fence: no-op USAGE grant accepted');
 }
 
 try {
@@ -327,6 +368,23 @@ $delimiterCompat = orange_restore_package_staging_import_compat(
     $productionDbName
 );
 restore_staging_self_test($delimiterCompat['ok'] === false, 'package compat: DELIMITER dump rejected before mutation');
+
+$safeTextDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'pkg_safe_text';
+mkdir($safeTextDir, 0775, true);
+restore_staging_write_full_package($safeTextDir);
+$safeTextDump = $safeTextDir . DIRECTORY_SEPARATOR . 'orange_db.sql.gz';
+restore_staging_write_gzip_sql(
+    $safeTextDump,
+    "CREATE TABLE restore_notes (label VARCHAR(128));\n"
+    . "INSERT INTO restore_notes VALUES ('Please USE the staging restore screen only; do not DROP DATABASE text.');\n"
+);
+$safeTextCompat = orange_restore_package_staging_import_compat(
+    $safeTextDir,
+    json_decode((string) file_get_contents($safeTextDir . DIRECTORY_SEPARATOR . 'manifest.json'), true) ?: [],
+    $stagingDbName,
+    $productionDbName
+);
+restore_staging_self_test($safeTextCompat['ok'] === true, 'package compat: SQL keywords inside data text accepted');
 
 // Staging credentials fail closed
 try {
