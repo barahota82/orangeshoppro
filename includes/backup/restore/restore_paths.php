@@ -8,10 +8,13 @@ const ORANGE_RESTORE_WORK_DIRNAME = 'restore_work';
 const ORANGE_RESTORE_LOCK_FILENAME = '.restore.lock';
 const ORANGE_RESTORE_JOB_FILENAME = 'job.json';
 const ORANGE_RESTORE_AUDIT_FILENAME = 'audit.jsonl';
-const ORANGE_RESTORE_ENGINE_VERSION = '2C';
+const ORANGE_RESTORE_ENGINE_VERSION = '2D.1-foundation';
 const ORANGE_RESTORE_ENV_STAGING_DB = 'ORANGE_RESTORE_STAGING_DB';
+const ORANGE_RESTORE_ENV_MERGE_DB_USER = 'ORANGE_RESTORE_MERGE_DB_USER';
+const ORANGE_RESTORE_ENV_MERGE_DB_PASS = 'ORANGE_RESTORE_MERGE_DB_PASS';
 const ORANGE_RESTORE_STAGING_MANIFEST_FILE = 'staging_restore_manifest.json';
 const ORANGE_RESTORE_REPORT_FILE = 'restore_report.json';
+const ORANGE_RESTORE_MAINTENANCE_FILENAME = '.maintenance.json';
 const ORANGE_RESTORE_APPROVAL_WINDOW_SECONDS = 604800;
 const ORANGE_RESTORE_APPROVAL_TOKEN_TTL_SECONDS = 3600;
 const ORANGE_RESTORE_APPROVAL_TOKEN_FILENAME = 'approval_token.json';
@@ -81,6 +84,11 @@ function orange_restore_audit_file_path(string $workRoot, string $jobId): string
 function orange_restore_global_lock_path(string $workRoot): string
 {
     return $workRoot . DIRECTORY_SEPARATOR . ORANGE_RESTORE_LOCK_FILENAME;
+}
+
+function orange_restore_merge_maintenance_file_path(string $workRoot): string
+{
+    return $workRoot . DIRECTORY_SEPARATOR . ORANGE_RESTORE_MAINTENANCE_FILENAME;
 }
 
 /**

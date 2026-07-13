@@ -444,16 +444,50 @@ php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1
 
 ```powershell
 php D:\orange\scripts\backup\self_test_restore_approval.php
+php D:\orange\scripts\backup\self_test_restore_merge_foundation.php
 ```
 
 Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2C section)
 
 ---
 
-## Phase 2D.1 — Full Production Merge (ARCHITECTURE APPROVED — NOT IMPLEMENTED)
+## Phase 2D.1 — Merge Foundation (IMPLEMENTED — precheck + maintenance + production identity)
 
-**Status:** Architecture approved in principle (2026-07-13). **No merge CLI, merge engine,
-or production writes exist in the repository yet.**
+**Status:** Implemented (2026-07-13). Engine `2D.1-foundation`. Schema revision **121** unchanged.
+
+**Scope:** Merge foundation only — **no production DB writes, no SQL import, no uploads changes,
+no merge cutover.** Callable from orchestrator; no dedicated merge CLI in this phase.
+
+**Modules:** `restore_merge_precheck.php`, `restore_merge_maintenance.php`,
+`restore_production_target.php`; extensions to `restore_orchestrator.php`, `restore_job.php`,
+`restore_lock.php`, `restore_audit.php`, `restore_paths.php`.
+
+**Precheck gates (fail closed, read-only):** `approved_for_merge`; approval window valid; token
+consumed; binding checksums unchanged; live package + rollback anchor + staging manifest checksums;
+staging validation pass; production ≠ staging DB names; merge credentials present and fenced;
+production identity (read-only PDO); staging identity; global restore lock held by current job;
+maintenance not already active. Success → job state `merge_precheck_passed` only.
+
+**Maintenance service:** `{restore_work}/.maintenance.json` — enable / disable / status / verify.
+Orchestrator wrappers record audit events. No merge, no DB writes, no uploads changes.
+
+**Audit (append-only):** `merge_precheck_started`, `merge_precheck_passed`, `merge_precheck_failed`,
+`maintenance_enabled`, `maintenance_disabled`.
+
+**Self-test:**
+
+```powershell
+php D:\orange\scripts\backup\self_test_restore_merge_foundation.php
+```
+
+Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.1 foundation section)
+
+---
+
+## Phase 2D.1 — Full Production Merge Cutover (ARCHITECTURE APPROVED — NOT IMPLEMENTED)
+
+**Status:** Architecture approved in principle (2026-07-13). **Merge foundation is implemented.**
+**No merge cutover CLI, cutover engine, or production writes exist yet.**
 
 **Scope:** Promote a `full_disaster` job from `approved_for_merge` to production using
 CLI-first orchestration only. Separate from Phase 2D.2 (country merge).
@@ -507,8 +541,9 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 
 | Item | Target phase |
 |------|----------------|
-| Production merge | Phase 2D.1 architecture **approved** — **not implemented** |
-| Full production merge credentials (`ORANGE_RESTORE_MERGE_DB_*`) | **Owner policy §11 — required when 2D.1 implemented** |
+| Production merge foundation (precheck + maintenance + identity) | **Phase 2D.1 foundation implemented** |
+| Production merge cutover (DB + uploads) | Phase 2D.1 cutover architecture **approved** — **not implemented** |
+| Full production merge credentials (`ORANGE_RESTORE_MERGE_DB_*`) | **Owner policy §11 — required (foundation + cutover)** |
 | Uploads same-volume gate | **Owner policy §12 — required when 2D.1 implemented** |
 | Owner approval gate (`approved_for_merge`) | **Phase 2C implemented** |
 | Admin backup/restore UI wrapper | Phase 3 |
@@ -529,6 +564,7 @@ php D:\orange\scripts\backup\self_test_recovery_validation.php
 php D:\orange\scripts\backup\self_test_restore_full_staging.php
 php D:\orange\scripts\backup\self_test_restore_country_staging.php
 php D:\orange\scripts\backup\self_test_restore_approval.php
+php D:\orange\scripts\backup\self_test_restore_merge_foundation.php
 php D:\orange\scripts\backup\backup_environment_check.php
 php D:\orange\scripts\backup\validate_backup_recoverability.php --package=D:\orange_backups\snapshots\yyyy-MM-dd_HHmmss
 php D:\orange\scripts\backup\validate_registry.php --offline

@@ -188,3 +188,34 @@ function orange_restore_lock_status(string $workRoot): array
         'path' => $path,
     ];
 }
+
+/**
+ * Assert the global restore lock is held by the current process for the given job.
+ */
+function orange_restore_lock_assert_held_by_job(string $workRoot, string $jobId): void
+{
+    $status = orange_restore_lock_status($workRoot);
+    if (!$status['held']) {
+        throw new RuntimeException('Global restore lock is not held.');
+    }
+
+    $payload = $status['payload'];
+    if (!is_array($payload)) {
+        throw new RuntimeException('Global restore lock payload is invalid.');
+    }
+
+    $lockPid = (int) ($payload['pid'] ?? 0);
+    $lockJob = (string) ($payload['job_id'] ?? '');
+
+    if ($lockPid !== getmypid()) {
+        throw new RuntimeException(
+            'Global restore lock is held by a different process (pid=' . (string) $lockPid . ').'
+        );
+    }
+
+    if ($lockJob !== $jobId) {
+        throw new RuntimeException(
+            'Global restore lock job_id mismatch (expected ' . $jobId . ', got ' . $lockJob . ').'
+        );
+    }
+}

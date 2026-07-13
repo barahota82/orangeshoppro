@@ -92,3 +92,13 @@ function orange_restore_audit_approval_event(array $job, string $event, string $
         'approval_event' => $event,
     ], $extra));
 }
+
+/**
+ * @param array<string, mixed> $extra
+ */
+function orange_restore_audit_merge_event(array $job, string $event, string $result, array $extra = []): array
+{
+    return orange_restore_audit_from_job($job, 'merge_foundation', $result, array_merge([
+        'merge_event' => $event,
+    ], $extra));
+}

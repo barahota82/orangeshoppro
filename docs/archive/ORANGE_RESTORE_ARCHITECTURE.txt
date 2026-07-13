@@ -74,7 +74,8 @@ Phase 2A — Restore foundation (IMPLEMENTED — schema-free)
 Phase 2B.1 — Full restore → staging CLI only (IMPLEMENTED)
 Phase 2B.2 — Country restore → staging CLI only (IMPLEMENTED)
 Phase 2C — Approval + staging validation gate CLI (IMPLEMENTED)
-Phase 2D.1 — Full production merge CLI (ARCHITECTURE APPROVED — not implemented)
+Phase 2D.1 — Full production merge foundation (IMPLEMENTED — precheck + maintenance + production identity only)
+Phase 2D.1 — Full production merge cutover CLI (ARCHITECTURE APPROVED — not implemented)
 Phase 2D.2 — Country production merge CLI
 Phase 2E — End-to-end orchestration CLI (manual steps, not scheduled)
 Phase 3 — Admin UI wrapper (no business logic)
@@ -193,11 +194,59 @@ Self-test:
 **NOT in 2C:** Production merge, Admin UI, restore APIs, automatic restore, schema changes.
 
 ================================================================================
-Phase 2D.1 — Full production merge (ARCHITECTURE APPROVED — NOT IMPLEMENTED)
+Phase 2D.1 foundation deliverables (merge precheck + maintenance + production identity — no cutover)
 ================================================================================
 
-**Status:** Architecture approved in principle (2026-07-13). **No merge code, CLI, or
-production writes exist yet.** Implementation gate: this section + owner policy §11–§12.
+**Status:** Implemented (2026-07-13). Engine version `2D.1-foundation`. Schema revision **121**
+unchanged. **No production DB writes, no SQL import, no uploads changes, no merge cutover.**
+
+Modules:
+  includes/backup/restore/restore_merge_precheck.php
+  includes/backup/restore/restore_merge_maintenance.php
+  includes/backup/restore/restore_production_target.php
+  includes/backup/restore/restore_orchestrator.php (merge foundation wrappers)
+  includes/backup/restore/restore_job.php (state `merge_precheck_passed` only)
+  includes/backup/restore/restore_lock.php (`orange_restore_lock_assert_held_by_job`)
+  includes/backup/restore/restore_audit.php (`merge_foundation` stage events)
+  includes/backup/restore/restore_paths.php (merge env keys, maintenance file path)
+
+Self-test:
+  scripts/backup/self_test_restore_merge_foundation.php
+
+**Scope (2D.1 foundation only):**
+- Callable via `orange_restore_orchestrator_merge_foundation_precheck()` / `orange_restore_merge_precheck_run()`
+- Production merge precheck gates (read-only; fail closed):
+  - Job `status === approved_for_merge`; `production_merge_approved`; owner approval timestamp present
+  - Approval window still open; approval token consumed; binding checksums unchanged
+  - Live package checksum matches job + binding
+  - Rollback anchor checksum matches job + binding + live Stage-3 anchor package
+  - Staging validation gate pass; live staging manifest checksum matches binding
+  - Production DB name vs staging DB name differ
+  - Dedicated merge credentials present (`ORANGE_RESTORE_MERGE_DB_*`); differ from `DB_USER` and staging user
+  - Production identity verified via read-only merge PDO (`SELECT DATABASE()` only)
+  - Staging identity verified (live PDO or confirm helper)
+  - Global restore lock held by current PID + job_id
+  - Maintenance mode **not** already active
+- On success: job transitions to `merge_precheck_passed` only (no later merge states)
+- Maintenance service (filesystem flag `{restore_work}/.maintenance.json` only):
+  - enable / disable / status / verify — no merge, no DB writes, no uploads changes
+  - Orchestrator wrappers audit `maintenance_enabled` / `maintenance_disabled`
+- Append-only filesystem audit events: `merge_precheck_started`, `merge_precheck_passed`,
+  `merge_precheck_failed`, `maintenance_enabled`, `maintenance_disabled`
+
+**Failure policy:** Any gate failure aborts immediately; audit `merge_precheck_failed`; never touches production.
+
+**NOT in 2D.1 foundation:** Database cutover, uploads cutover, rollback execution, production
+post-validation, merge CLI (`restore_full_merge.php`), Admin UI, restore APIs, job states beyond
+`merge_precheck_passed`, schema changes.
+
+================================================================================
+Phase 2D.1 — Full production merge cutover (ARCHITECTURE APPROVED — NOT IMPLEMENTED)
+================================================================================
+
+**Status:** Architecture approved in principle (2026-07-13). **Foundation (precheck + maintenance +
+production identity) is implemented.** **No merge cutover code, merge CLI, or production writes
+exist yet.** Implementation gate for cutover: this section + owner policy §11–§12.
 
 **Goal:** Promote a job in `approved_for_merge` to production (`production_merged` →
 post-validation → `completed`) using CLI-first orchestration only. Country merge remains
@@ -262,11 +311,11 @@ uploads_cutover_complete → production_merged → post-validation → maintenan
 **Rollback:** Only this job's Stage-3 fresh full disaster backup. Pre-merge uploads snapshot for
 uploads rollback. No automatic selection of older snapshots.
 
-**NOT in 2D.1 (until implementation phase):** Any merge CLI, production writes, Admin UI,
-restore APIs, automatic/scheduled merge, schema changes (unless owner separately approves
+**NOT in 2D.1 (until cutover implementation phase):** Merge CLI, production DB/uploads cutover,
+Admin UI, restore APIs, automatic/scheduled merge, schema changes (unless owner separately approves
 `restore_audit_log` table for first mutating phase).
 
-Proposed implementation files (future — do not create until implementation approved):
+Proposed cutover implementation files (future — do not create until cutover phase approved):
   scripts/backup/restore_full_merge.php
   includes/backup/restore/restore_full_merge.php
   includes/backup/restore/restore_merge_*.php (precheck, maintenance, staging export,
@@ -300,9 +349,11 @@ ORANGE_RESTORE_STAGING_DB     — **required** staging database name (must diffe
 ORANGE_RESTORE_STAGING_DB_USER — **required** dedicated staging MySQL user (must differ from production DB_USER)
 ORANGE_RESTORE_STAGING_DB_PASS — **required** staging MySQL password
 
-Phase 2D.1 — Production Merge (architecture approved; **not implemented**):
+Phase 2D.1 — Production Merge foundation (implemented — precheck/maintenance/identity only):
 ORANGE_RESTORE_MERGE_DB_USER — **required** dedicated production-merge MySQL user (must differ from DB_USER and ORANGE_RESTORE_STAGING_DB_USER)
 ORANGE_RESTORE_MERGE_DB_PASS — **required** production-merge MySQL password
+
+Phase 2D.1 cutover (architecture approved; **not implemented**): same keys required before any production write.
 
 Phase 2B.1 does **not** use production DB credentials or production uploads paths. Fail closed if
 staging keys are missing, staging DB equals production, or staging user equals production DB_USER.

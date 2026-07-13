@@ -14,6 +14,7 @@ const ORANGE_RESTORE_JOB_STATUS_STAGING = 'staging_restore';
 const ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED = 'staging_validated';
 const ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL = 'awaiting_owner_approval';
 const ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE = 'approved_for_merge';
+const ORANGE_RESTORE_JOB_STATUS_MERGE_PRECHECK_PASSED = 'merge_precheck_passed';
 const ORANGE_RESTORE_JOB_STATUS_MERGE_APPROVED = 'merge_approved';
 const ORANGE_RESTORE_JOB_STATUS_MERGED = 'production_merged';
 const ORANGE_RESTORE_JOB_STATUS_COMPLETED = 'completed';
@@ -33,6 +34,7 @@ function orange_restore_job_allowed_statuses(): array
         ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED,
         ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL,
         ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE,
+        ORANGE_RESTORE_JOB_STATUS_MERGE_PRECHECK_PASSED,
         ORANGE_RESTORE_JOB_STATUS_MERGE_APPROVED,
         ORANGE_RESTORE_JOB_STATUS_MERGED,
         ORANGE_RESTORE_JOB_STATUS_COMPLETED,
@@ -110,6 +112,9 @@ function orange_restore_job_create(string $workRoot, array $input): array
         'staging_dirty' => false,
         'staging_restore_manifest_path' => '',
         'restore_report_path' => '',
+        'merge_precheck_passed_at' => '',
+        'merge_precheck_production_db' => '',
+        'merge_precheck_staging_db' => '',
     ];
 
     orange_restore_job_write($workRoot, $job);
@@ -206,6 +211,61 @@ function orange_restore_job_has_active_approval_token(array $job): bool
     return (string) ($job['approval_token_hash'] ?? '') !== ''
         && (string) ($job['approval_token_consumed_at'] ?? '') === ''
         && (string) ($job['approval_token_invalidated_at'] ?? '') === '';
+}
+
+/**
+ * Phase 2D.1 merge foundation transitions (precheck only — no cutover states).
+ *
+ * @return array<string, list<string>>
+ */
+function orange_restore_job_merge_foundation_transition_map(): array
+{
+    return [
+        ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE => [
+            ORANGE_RESTORE_JOB_STATUS_MERGE_PRECHECK_PASSED,
+        ],
+    ];
+}
+
+function orange_restore_job_assert_merge_foundation_transition(string $fromStatus, string $toStatus): void
+{
+    if ($toStatus === ORANGE_RESTORE_JOB_STATUS_FAILED) {
+        return;
+    }
+
+    $allowed = orange_restore_job_merge_foundation_transition_map()[$fromStatus] ?? [];
+    if (!in_array($toStatus, $allowed, true)) {
+        throw new RuntimeException(
+            'Invalid merge foundation job transition: ' . $fromStatus . ' -> ' . $toStatus
+        );
+    }
+}
+
+/**
+ * @param array<string, mixed> $patch
+ * @return array<string, mixed>
+ */
+function orange_restore_job_merge_foundation_transition(
+    string $workRoot,
+    string $jobId,
+    string $newStatus,
+    array $patch = []
+): array {
+    if (!in_array($newStatus, orange_restore_job_allowed_statuses(), true)) {
+        throw new RuntimeException('Invalid restore job status: ' . $newStatus);
+    }
+
+    $job = orange_restore_job_read($workRoot, $jobId);
+    $currentStatus = (string) ($job['status'] ?? '');
+    orange_restore_job_assert_merge_foundation_transition($currentStatus, $newStatus);
+
+    $job['status'] = $newStatus;
+    foreach ($patch as $key => $value) {
+        $job[(string) $key] = $value;
+    }
+    orange_restore_job_write($workRoot, $job);
+
+    return $job;
 }
 
 function orange_restore_job_assert_full_staging_transition(string $fromStatus, string $toStatus): void

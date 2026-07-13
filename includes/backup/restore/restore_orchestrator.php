@@ -36,6 +36,8 @@ function orange_restore_orchestrator_job_status_report(string $workRoot, string 
         }
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE) {
         $approvalStatus = 'approved';
+    } elseif ($status === ORANGE_RESTORE_JOB_STATUS_MERGE_PRECHECK_PASSED) {
+        $approvalStatus = 'merge_precheck_passed';
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_CANCELLED) {
         $approvalStatus = (string) ($job['rejected_at'] ?? '') !== '' ? 'rejected' : 'cancelled';
     } elseif (in_array($status, [ORANGE_RESTORE_JOB_STATUS_FAILED], true)) {
@@ -517,4 +519,73 @@ function orange_restore_orchestrator_cancel_or_reject(PDO $pdo, array $options, 
         'job' => $job,
         'production_writes' => false,
     ];
+}
+
+require_once __DIR__ . '/restore_merge_maintenance.php';
+require_once __DIR__ . '/restore_merge_precheck.php';
+
+/**
+ * Phase 2D.1 foundation — run merge precheck gates only (no production writes).
+ *
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function orange_restore_orchestrator_merge_foundation_precheck(array $options): array
+{
+    return orange_restore_merge_precheck_run($options);
+}
+
+/**
+ * @param array<string, mixed> $job
+ * @param array<string, mixed> $context
+ * @return array<string, mixed>
+ */
+function orange_restore_orchestrator_merge_maintenance_enable(
+    string $workRoot,
+    string $jobId,
+    array $job,
+    array $context = []
+): array {
+    $result = orange_restore_merge_maintenance_enable($workRoot, $jobId, $context);
+    orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_merge_event($job, 'maintenance_enabled', 'pass', [
+        'maintenance_path' => (string) ($result['path'] ?? ''),
+        'production_writes' => false,
+    ]));
+
+    return $result;
+}
+
+/**
+ * @param array<string, mixed> $job
+ * @param array<string, mixed> $context
+ * @return array<string, mixed>
+ */
+function orange_restore_orchestrator_merge_maintenance_disable(
+    string $workRoot,
+    string $jobId,
+    array $job,
+    array $context = []
+): array {
+    $result = orange_restore_merge_maintenance_disable($workRoot, $jobId, $context);
+    orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_merge_event($job, 'maintenance_disabled', 'pass', [
+        'production_writes' => false,
+    ]));
+
+    return $result;
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_orchestrator_merge_maintenance_status(string $workRoot): array
+{
+    return orange_restore_merge_maintenance_status($workRoot);
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_orchestrator_merge_maintenance_verify(string $workRoot, string $jobId): array
+{
+    return orange_restore_merge_maintenance_verify($workRoot, $jobId);
 }
