@@ -315,6 +315,42 @@ function orange_restore_validation_adapter_file_checksum(string $path): string
     return orange_backup_sha256_file($path);
 }
 
+function orange_restore_validation_adapter_same_path(string $left, string $right): bool
+{
+    $leftNorm = strtolower(str_replace('\\', '/', realpath($left) ?: $left));
+    $rightNorm = strtolower(str_replace('\\', '/', realpath($right) ?: $right));
+
+    return rtrim($leftNorm, '/') === rtrim($rightNorm, '/');
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_validation_adapter_read_job_json_artifact(
+    string $workRoot,
+    string $jobId,
+    string $path,
+    string $label
+): array {
+    $jobDir = orange_restore_job_directory($workRoot, $jobId);
+    $resolved = orange_restore_assert_inside_work_root($workRoot, $path);
+    if (!is_file($resolved)) {
+        throw new RuntimeException('Missing ' . $label . '.');
+    }
+    $jobNorm = strtolower(rtrim(str_replace('\\', '/', realpath($jobDir) ?: $jobDir), '/'));
+    $artifactNorm = strtolower(rtrim(str_replace('\\', '/', realpath($resolved) ?: $resolved), '/'));
+    if ($artifactNorm !== $jobNorm && !str_starts_with($artifactNorm, $jobNorm . '/')) {
+        throw new RuntimeException($label . ' must live under the restore job directory.');
+    }
+
+    $payload = json_decode((string) file_get_contents($resolved), true);
+    if (!is_array($payload)) {
+        throw new RuntimeException('Invalid ' . $label . ' payload.');
+    }
+
+    return $payload;
+}
+
 /**
  * Resolve live package anchor checksum (must match job source_package_checksum).
  *
@@ -353,10 +389,7 @@ function orange_restore_validation_adapter_staging_gate(string $workRoot, array 
     $warnings = [];
     $jobId = (string) ($job['job_id'] ?? '');
 
-    $reportPath = trim((string) ($job['restore_report_path'] ?? ''));
-    if ($reportPath === '' || !is_file($reportPath)) {
-        $reportPath = orange_restore_job_report_path($workRoot, $jobId);
-    }
+    $reportPath = orange_restore_job_report_path($workRoot, $jobId);
     if (!is_file($reportPath)) {
         return [
             'ok' => false,
@@ -369,11 +402,12 @@ function orange_restore_validation_adapter_staging_gate(string $workRoot, array 
         ];
     }
 
-    $report = json_decode((string) file_get_contents($reportPath), true);
-    if (!is_array($report)) {
+    try {
+        $report = orange_restore_validation_adapter_read_job_json_artifact($workRoot, $jobId, $reportPath, 'restore_report.json');
+    } catch (Throwable $e) {
         return [
             'ok' => false,
-            'errors' => ['Invalid restore_report.json payload.'],
+            'errors' => [$e->getMessage()],
             'warnings' => [],
             'report' => [],
             'manifest_path' => '',
@@ -382,6 +416,16 @@ function orange_restore_validation_adapter_staging_gate(string $workRoot, array 
         ];
     }
 
+    if ((string) ($report['job_id'] ?? '') !== $jobId) {
+        $errors[] = 'restore_report.job_id mismatch.';
+    }
+    if ((string) ($report['job_type'] ?? '') !== (string) ($job['job_type'] ?? '')) {
+        $errors[] = 'restore_report.job_type mismatch.';
+    }
+    $reportChecksum = trim((string) ($report['source_package_checksum'] ?? ''));
+    if ($reportChecksum === '' || !hash_equals((string) ($job['source_package_checksum'] ?? ''), $reportChecksum)) {
+        $errors[] = 'restore_report.source_package_checksum mismatch.';
+    }
     if ((string) ($report['overall_result'] ?? '') !== 'pass') {
         $errors[] = 'restore_report.overall_result is not pass.';
     }
@@ -419,15 +463,50 @@ function orange_restore_validation_adapter_staging_gate(string $workRoot, array 
         $errors[] = 'Unknown restore job type for staging gate.';
     }
 
-    $manifestPath = trim((string) ($job['staging_restore_manifest_path'] ?? ''));
-    if ($manifestPath === '' || !is_file($manifestPath)) {
-        $manifestPath = orange_restore_job_staging_manifest_path($workRoot, $jobId);
-    }
+    $manifestPath = orange_restore_job_staging_manifest_path($workRoot, $jobId);
     $manifestChecksum = '';
+    $manifest = [];
     if (!is_file($manifestPath)) {
         $errors[] = 'Missing staging_restore_manifest.json.';
     } else {
-        $manifestChecksum = orange_restore_validation_adapter_file_checksum($manifestPath);
+        try {
+            $manifest = orange_restore_validation_adapter_read_job_json_artifact($workRoot, $jobId, $manifestPath, 'staging_restore_manifest.json');
+            $manifestChecksum = orange_restore_validation_adapter_file_checksum($manifestPath);
+        } catch (Throwable $e) {
+            $errors[] = $e->getMessage();
+        }
+    }
+
+    if ($manifest !== []) {
+        if ((string) ($manifest['job_id'] ?? '') !== $jobId) {
+            $errors[] = 'staging_restore_manifest.job_id mismatch.';
+        }
+        if ((string) ($manifest['job_type'] ?? '') !== (string) ($job['job_type'] ?? '')) {
+            $errors[] = 'staging_restore_manifest.job_type mismatch.';
+        }
+        if (!hash_equals((string) ($job['source_package_checksum'] ?? ''), (string) ($manifest['source_package_checksum'] ?? ''))) {
+            $errors[] = 'staging_restore_manifest.source_package_checksum mismatch.';
+        }
+        $jobStagingDb = (string) ($job['staging_db'] ?? '');
+        if ($jobStagingDb !== '' && (string) ($manifest['staging_db'] ?? '') !== $jobStagingDb) {
+            $errors[] = 'staging_restore_manifest.staging_db mismatch.';
+        }
+        if ($jobType === ORANGE_RESTORE_JOB_TYPE_COUNTRY) {
+            if ((int) ($manifest['country_id'] ?? 0) !== (int) ($job['country_id'] ?? 0)) {
+                $errors[] = 'staging_restore_manifest.country_id mismatch.';
+            }
+            if ((string) ($manifest['country_code'] ?? '') !== (string) ($job['country_code'] ?? '')) {
+                $errors[] = 'staging_restore_manifest.country_code mismatch.';
+            }
+        }
+        if (($manifest['production_touched'] ?? true) !== false) {
+            $errors[] = 'staging_restore_manifest indicates production_touched=true (forbidden).';
+        }
+    }
+
+    $reportManifestPath = trim((string) ($report['staging_manifest'] ?? ''));
+    if ($reportManifestPath === '' || !orange_restore_validation_adapter_same_path($reportManifestPath, $manifestPath)) {
+        $errors[] = 'restore_report.staging_manifest does not match job staging manifest.';
     }
 
     return [

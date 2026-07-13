@@ -8,9 +8,9 @@ declare(strict_types=1);
  * Approves a staging restore job for future merge only — never writes production.
  *
  * Usage:
- *   php scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE --action=approve
- *   php scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password=SECRET --action=reject --reason="..."
- *   php scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password=SECRET --action=cancel --reason="..."
+ *   php scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password-stdin --confirm=RESTORE --action=approve
+ *   php scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password-env=ENV_NAME --action=reject --reason="..."
+ *   php scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password-stdin --action=cancel --reason="..."
  *
  * Country confirm phrase: RESTORE {COUNTRY_CODE}
  */
@@ -26,6 +26,9 @@ $password = '';
 $confirmation = '';
 $action = 'approve';
 $reason = '';
+$passwordFromStdin = false;
+$passwordEnv = '';
+$passwordArgRejected = false;
 
 foreach ($_SERVER['argv'] ?? [] as $arg) {
     if (str_starts_with($arg, '--job=')) {
@@ -33,7 +36,11 @@ foreach ($_SERVER['argv'] ?? [] as $arg) {
     } elseif (str_starts_with($arg, '--admin-id=')) {
         $adminId = (int) substr($arg, strlen('--admin-id='));
     } elseif (str_starts_with($arg, '--password=')) {
-        $password = substr($arg, strlen('--password='));
+        $passwordArgRejected = true;
+    } elseif ($arg === '--password-stdin') {
+        $passwordFromStdin = true;
+    } elseif (str_starts_with($arg, '--password-env=')) {
+        $passwordEnv = trim(substr($arg, strlen('--password-env=')));
     } elseif (str_starts_with($arg, '--confirm=')) {
         $confirmation = substr($arg, strlen('--confirm='));
     } elseif (str_starts_with($arg, '--action=')) {
@@ -43,8 +50,29 @@ foreach ($_SERVER['argv'] ?? [] as $arg) {
     }
 }
 
+if ($passwordArgRejected) {
+    fwrite(STDERR, "ERROR: --password= is not allowed because it exposes the secret in process lists/history. Use --password-stdin or --password-env=ENV_NAME.\n");
+    exit(2);
+}
+
+if ($passwordFromStdin && $passwordEnv !== '') {
+    fwrite(STDERR, "ERROR: Use only one password source: --password-stdin or --password-env=ENV_NAME.\n");
+    exit(2);
+}
+
+if ($passwordFromStdin) {
+    $password = rtrim((string) stream_get_contents(STDIN), "\r\n");
+} elseif ($passwordEnv !== '') {
+    if (!preg_match('/^[A-Z_][A-Z0-9_]*$/', $passwordEnv)) {
+        fwrite(STDERR, "ERROR: --password-env must be an environment variable name (A-Z, 0-9, underscore).\n");
+        exit(2);
+    }
+    $passwordValue = getenv($passwordEnv);
+    $password = is_string($passwordValue) ? $passwordValue : '';
+}
+
 if ($jobId === '' || $adminId <= 0 || $password === '') {
-    fwrite(STDERR, "Usage: php restore_approve_merge.php --job=JOB_ID --admin-id=N --password=SECRET [--confirm=PHRASE] --action=approve|reject|cancel [--reason=TEXT]\n");
+    fwrite(STDERR, "Usage: php restore_approve_merge.php --job=JOB_ID --admin-id=N (--password-stdin|--password-env=ENV_NAME) [--confirm=PHRASE] --action=approve|reject|cancel [--reason=TEXT]\n");
     exit(2);
 }
 

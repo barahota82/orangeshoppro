@@ -223,6 +223,7 @@ function orange_restore_country_staging_run(array $options): array
             'overall_result' => 'pass',
             'duration_seconds' => $duration,
             'source_package_path' => $packagePath,
+            'source_package_checksum' => $packageChecksum,
             'country_id' => $countryId,
             'country_code' => $countryCode,
             'rollback_anchor' => [

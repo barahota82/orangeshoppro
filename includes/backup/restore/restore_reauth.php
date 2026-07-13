@@ -63,17 +63,21 @@ function orange_restore_reauth_assert_restore_permission(array $admin, PDO $pdo,
 {
     orange_restore_assert_superuser_operator($admin);
 
+    $matrix = orange_admin_permissions_matrix($pdo, (int) ($admin['id'] ?? 0));
+
     if ($jobType === ORANGE_RESTORE_JOB_TYPE_FULL) {
-        if (!orange_admin_may_backup_restore_full($admin, $pdo)) {
-            throw new RuntimeException('Operator lacks backup_restore_full permission.');
+        $row = $matrix['backup_restore_full'] ?? null;
+        if (!is_array($row) || empty($row['can_edit'])) {
+            throw new RuntimeException('Operator lacks executable backup_restore_full permission.');
         }
 
         return;
     }
 
     if ($jobType === ORANGE_RESTORE_JOB_TYPE_COUNTRY) {
-        if (!orange_admin_may_backup_restore_country($admin, $pdo)) {
-            throw new RuntimeException('Operator lacks backup_restore_country permission.');
+        $row = $matrix['backup_restore_country'] ?? null;
+        if (!is_array($row) || empty($row['can_edit'])) {
+            throw new RuntimeException('Operator lacks executable backup_restore_country permission.');
         }
 
         return;
