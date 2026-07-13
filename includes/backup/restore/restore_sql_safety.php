@@ -97,8 +97,18 @@ function orange_restore_sql_tokenize_executable(string $sql): array
                 continue;
             }
             if ($c === '/' && $next === '*') {
-                $inBlockComment = true;
-                $i++;
+                $end = strpos($sql, '*/', $i + 2);
+                if ($end === false) {
+                    throw new RuntimeException('Staging SQL import rejected unterminated string or comment.');
+                }
+                if ($i + 2 < $len && $sql[$i + 2] === '!') {
+                    $body = substr($sql, $i + 3, $end - ($i + 3));
+                    $body = preg_replace('/^\d{5,6}\s*/', '', $body) ?: $body;
+                    foreach (orange_restore_sql_tokenize_executable($body) as $innerLexeme) {
+                        $lexemes[] = $innerLexeme;
+                    }
+                }
+                $i = $end + 1;
                 continue;
             }
         }
@@ -143,7 +153,34 @@ function orange_restore_sql_tokenize_executable(string $sql): array
             continue;
         }
 
-        if (preg_match('/[A-Za-z0-9_$]/', $c) === 1) {
+        if (ctype_digit($c)) {
+            $start = $i;
+            while ($i + 1 < $len && ctype_digit($sql[$i + 1])) {
+                $i++;
+            }
+            if ($i + 2 < $len && $sql[$i + 1] === '.' && ctype_digit($sql[$i + 2])) {
+                $i += 2;
+                while ($i + 1 < $len && ctype_digit($sql[$i + 1])) {
+                    $i++;
+                }
+            }
+            if ($i + 1 < $len && ($sql[$i + 1] === 'e' || $sql[$i + 1] === 'E')) {
+                $exp = $i + 2;
+                if ($exp < $len && ($sql[$exp] === '+' || $sql[$exp] === '-')) {
+                    $exp++;
+                }
+                if ($exp < $len && ctype_digit($sql[$exp])) {
+                    $i = $exp;
+                    while ($i + 1 < $len && ctype_digit($sql[$i + 1])) {
+                        $i++;
+                    }
+                }
+            }
+            $lexemes[] = ['type' => 'number', 'value' => substr($sql, $start, $i - $start + 1)];
+            continue;
+        }
+
+        if (preg_match('/[A-Za-z_$]/', $c) === 1) {
             $start = $i;
             while ($i + 1 < $len && preg_match('/[A-Za-z0-9_$]/', $sql[$i + 1]) === 1) {
                 $i++;
@@ -286,6 +323,9 @@ function orange_restore_sql_strip_leading_comments(string $sql): string
             $remaining = ltrim(substr($remaining, $pos + 1));
             continue;
         }
+        if (str_starts_with($remaining, '/*!')) {
+            break;
+        }
         if (str_starts_with($remaining, '/*')) {
             $end = strpos($remaining, '*/');
             if ($end === false) {
@@ -327,11 +367,11 @@ function orange_restore_sql_scan_gzip_forbidden_patterns(
     $window = '';
     $hits = [];
     $patterns = [
-        'DELIMITER' => '/\bDELIMITER\b/i',
-        'USE database switch' => '/\bUSE\s+/i',
-        'CREATE DATABASE' => '/\bCREATE\s+DATABASE\b/i',
-        'DROP DATABASE' => '/\bDROP\s+DATABASE\b/i',
-        'ALTER DATABASE' => '/\bALTER\s+DATABASE\b/i',
+        'DELIMITER' => '/(?:^|[;\r\n])\s*DELIMITER\b/i',
+        'USE database switch' => '/(?:^|[;\r\n])\s*USE\s+/i',
+        'CREATE DATABASE' => '/(?:^|[;\r\n])\s*CREATE\s+DATABASE\b/i',
+        'DROP DATABASE' => '/(?:^|[;\r\n])\s*DROP\s+DATABASE\b/i',
+        'ALTER DATABASE' => '/(?:^|[;\r\n])\s*ALTER\s+DATABASE\b/i',
     ];
 
     try {
