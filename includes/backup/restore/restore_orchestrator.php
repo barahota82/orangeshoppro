@@ -659,6 +659,17 @@ function orange_restore_orchestrator_post_validation(array $options): array
 }
 
 /**
+ * Phase 2D.4 — finalize-only completion from post_validation_passed.
+ *
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function orange_restore_orchestrator_post_validation_finalize(array $options): array
+{
+    return orange_restore_merge_post_validation_finalize_run($options);
+}
+
+/**
  * Phase 2D.4 — manual production rollback (job-scoped anchor only).
  *
  * @param array<string, mixed> $options

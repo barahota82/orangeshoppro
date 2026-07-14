@@ -200,10 +200,30 @@ e2e_rmdir($uploads['backupRoot']);
 $postVal = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE);
 $postAction = orange_restore_e2e_resolve_action($postVal['job']);
 e2e_self_test(
-    ($postAction['action'] ?? '') === ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION,
-    'routing: uploads_cutover_complete resumes post-validation'
+    ($postAction['action'] ?? '') === ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION
+    && ($postAction['requires_reauth'] ?? false) === true,
+    'routing: uploads_cutover_complete resumes post-validation with re-auth'
 );
 e2e_rmdir($postVal['backupRoot']);
+
+$merged = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_MERGED);
+$mergedAction = orange_restore_e2e_resolve_action($merged['job']);
+e2e_self_test(
+    ($mergedAction['action'] ?? '') === ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION,
+    'routing: production_merged resumes post-validation'
+);
+e2e_rmdir($merged['backupRoot']);
+
+$postPassed = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED, [
+    'post_validation_report_path' => '',
+    'post_validation_passed_at' => gmdate('c'),
+]);
+$postPassedAction = orange_restore_e2e_resolve_action($postPassed['job']);
+e2e_self_test(
+    ($postPassedAction['action'] ?? '') === ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION_FINALIZE,
+    'routing: post_validation_passed finalizes completion'
+);
+e2e_rmdir($postPassed['backupRoot']);
 
 $failedMerge = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE);
 $failedMergeAction = orange_restore_e2e_resolve_action($failedMerge['job']);
@@ -275,6 +295,7 @@ e2e_rmdir($unknown['backupRoot']);
 $startRoot = e2e_temp_root();
 $startProject = $startRoot . DIRECTORY_SEPARATOR . 'project';
 mkdir($startProject);
+mkdir($startRoot . DIRECTORY_SEPARATOR . 'pkg');
 $startWorkRoot = orange_restore_resolve_work_root(['ORANGE_BACKUP_ROOT' => $startRoot]);
 $created = orange_restore_job_create($startWorkRoot, [
     'job_type' => ORANGE_RESTORE_JOB_TYPE_FULL,
@@ -389,11 +410,26 @@ e2e_rmdir($cutoverSeed['backupRoot']);
 
 // --- uploads + post-validation resume delegates ---
 $uploadsSeed = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE);
+$uploadsErr = e2e_try(static function () use ($uploadsSeed): void {
+    orange_restore_e2e_resume_full($uploadsSeed['adminPdo'], [
+        'project_root' => $uploadsSeed['projectRoot'],
+        'work_root' => $uploadsSeed['workRoot'],
+        'job_id' => $uploadsSeed['jobId'],
+        'admin_id' => 1,
+        'env_override' => $uploadsSeed['env'],
+    ]);
+});
+e2e_self_test(
+    $uploadsErr !== null && str_contains($uploadsErr->getMessage(), 'password'),
+    'resume: uploads cutover requires fresh re-auth'
+);
 $uploadsOk = orange_restore_e2e_resume_full($uploadsSeed['adminPdo'], [
     'project_root' => $uploadsSeed['projectRoot'],
     'work_root' => $uploadsSeed['workRoot'],
     'job_id' => $uploadsSeed['jobId'],
     'admin_id' => 1,
+    'password' => 'correct-pass',
+    'confirmation_phrase' => 'RESTORE',
     'env_override' => $uploadsSeed['env'],
     'uploads_cutover_override' => static fn (): array => [
         'ok' => true,
@@ -408,11 +444,26 @@ e2e_self_test(
 e2e_rmdir($uploadsSeed['backupRoot']);
 
 $postSeed = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE);
+$postErr = e2e_try(static function () use ($postSeed): void {
+    orange_restore_e2e_resume_full($postSeed['adminPdo'], [
+        'project_root' => $postSeed['projectRoot'],
+        'work_root' => $postSeed['workRoot'],
+        'job_id' => $postSeed['jobId'],
+        'admin_id' => 1,
+        'env_override' => $postSeed['env'],
+    ]);
+});
+e2e_self_test(
+    $postErr !== null && str_contains($postErr->getMessage(), 'password'),
+    'resume: post-validation requires fresh re-auth'
+);
 $postOk = orange_restore_e2e_resume_full($postSeed['adminPdo'], [
     'project_root' => $postSeed['projectRoot'],
     'work_root' => $postSeed['workRoot'],
     'job_id' => $postSeed['jobId'],
     'admin_id' => 1,
+    'password' => 'correct-pass',
+    'confirmation_phrase' => 'RESTORE',
     'env_override' => $postSeed['env'],
     'post_validation_override' => static function () use ($postSeed): array {
         orange_restore_job_post_validation_transition(
@@ -449,6 +500,260 @@ $auditPost = orange_restore_audit_read_all($postSeed['workRoot'], $postSeed['job
 $postEvents = array_column($auditPost, 'e2e_event');
 e2e_self_test(in_array('e2e_completed', $postEvents, true), 'audit: e2e_completed recorded');
 e2e_rmdir($postSeed['backupRoot']);
+
+// --- production_merged resume post-validation ---
+$mergedSeed = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_MERGED);
+orange_restore_merge_maintenance_enable($mergedSeed['workRoot'], $mergedSeed['jobId']);
+$mergedOk = orange_restore_e2e_resume_full($mergedSeed['adminPdo'], [
+    'project_root' => $mergedSeed['projectRoot'],
+    'work_root' => $mergedSeed['workRoot'],
+    'job_id' => $mergedSeed['jobId'],
+    'admin_id' => 1,
+    'password' => 'correct-pass',
+    'confirmation_phrase' => 'RESTORE',
+    'env_override' => $mergedSeed['env'],
+    'post_validation_override' => static fn (): array => [
+        'ok' => true,
+        'status' => ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+        'production_writes' => false,
+    ],
+]);
+e2e_self_test(
+    ($mergedOk['phase_result']['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+    'resume: production_merged resumes post-validation successfully'
+);
+e2e_rmdir($mergedSeed['backupRoot']);
+
+// --- post_validation_passed finalize-only ---
+$finalizeSeed = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED, [
+    'post_validation_passed_at' => gmdate('c'),
+]);
+$reportPath = orange_restore_production_post_validation_report_path($finalizeSeed['workRoot'], $finalizeSeed['jobId']);
+orange_backup_write_json($reportPath, [
+    'generated_at' => gmdate('c'),
+    'job_id' => $finalizeSeed['jobId'],
+    'overall_result' => 'pass',
+    'hard_failures' => [],
+    'warnings' => [],
+]);
+$finalizeJob = orange_restore_job_read($finalizeSeed['workRoot'], $finalizeSeed['jobId']);
+$finalizeJob['post_validation_report_path'] = $reportPath;
+orange_restore_job_write($finalizeSeed['workRoot'], $finalizeJob);
+orange_restore_merge_maintenance_enable($finalizeSeed['workRoot'], $finalizeSeed['jobId']);
+$finalizeOk = orange_restore_e2e_resume_full($finalizeSeed['adminPdo'], [
+    'project_root' => $finalizeSeed['projectRoot'],
+    'work_root' => $finalizeSeed['workRoot'],
+    'job_id' => $finalizeSeed['jobId'],
+    'admin_id' => 1,
+    'password' => 'correct-pass',
+    'confirmation_phrase' => 'RESTORE',
+    'env_override' => $finalizeSeed['env'],
+    'post_validation_finalize_override' => static function () use ($finalizeSeed, $reportPath): array {
+        orange_restore_merge_maintenance_verify($finalizeSeed['workRoot'], $finalizeSeed['jobId']);
+        orange_restore_job_post_validation_transition(
+            $finalizeSeed['workRoot'],
+            $finalizeSeed['jobId'],
+            ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+            ['restore_completed_at' => gmdate('c'), 'result' => 'completed']
+        );
+
+        return [
+            'ok' => true,
+            'status' => ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+            'production_writes' => false,
+        ];
+    },
+]);
+e2e_self_test(
+    ($finalizeOk['phase_result']['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+    'resume: post_validation_passed finalizes to completed'
+);
+e2e_rmdir($finalizeSeed['backupRoot']);
+
+// --- start idempotency ---
+$pkgPath = e2e_temp_root() . DIRECTORY_SEPARATOR . 'pkg';
+mkdir($pkgPath);
+$pkgChecksum = str_repeat('d', 64);
+$idempotentRoot = dirname($pkgPath);
+$idempotentWork = $idempotentRoot . DIRECTORY_SEPARATOR . 'restore_work';
+mkdir($idempotentWork);
+$existingJob = orange_restore_job_create($idempotentWork, [
+    'job_type' => ORANGE_RESTORE_JOB_TYPE_FULL,
+    'source_package_path' => $pkgPath,
+    'source_package_checksum' => $pkgChecksum,
+    'schema_revision' => 121,
+]);
+$existingJob['status'] = ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL;
+orange_restore_job_write($idempotentWork, $existingJob);
+$idempotentProject = $idempotentRoot . DIRECTORY_SEPARATOR . 'project';
+mkdir($idempotentProject);
+$existingStart = orange_restore_e2e_start_full(e2e_test_pdo(), [
+    'project_root' => $idempotentProject,
+    'package_path' => $pkgPath,
+    'admin_id' => 1,
+    'password' => 'correct-pass',
+    'confirmation_phrase' => 'RESTORE',
+    'env_override' => ['ORANGE_BACKUP_ROOT' => $idempotentRoot],
+    'start_precheck_override' => static fn (): array => [
+        'ok' => true,
+        'verify' => ['manifest' => ['package_type' => ORANGE_RESTORE_JOB_TYPE_FULL]],
+    ],
+    'package_checksum_override' => $pkgChecksum,
+]);
+e2e_self_test(
+    ($existingStart['resumed_existing'] ?? false) === true
+    && ($existingStart['job_id'] ?? '') === (string) ($existingJob['job_id'] ?? ''),
+    'start: repeated restore_run_full returns existing active job'
+);
+e2e_rmdir($idempotentRoot);
+
+$dupRoot = e2e_temp_root();
+$dupWork = $dupRoot . DIRECTORY_SEPARATOR . 'restore_work';
+mkdir($dupWork);
+$dupPkg = $dupRoot . DIRECTORY_SEPARATOR . 'pkg';
+mkdir($dupPkg);
+$dupChecksum = str_repeat('e', 64);
+$dupOne = orange_restore_job_create($dupWork, [
+    'job_type' => ORANGE_RESTORE_JOB_TYPE_FULL,
+    'source_package_path' => $dupPkg,
+    'source_package_checksum' => $dupChecksum,
+]);
+$dupOne['status'] = ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL;
+orange_restore_job_write($dupWork, $dupOne);
+$dupTwo = orange_restore_job_create($dupWork, [
+    'job_type' => ORANGE_RESTORE_JOB_TYPE_FULL,
+    'source_package_path' => $dupPkg,
+    'source_package_checksum' => $dupChecksum,
+]);
+$dupTwo['status'] = ORANGE_RESTORE_JOB_STATUS_MERGE_PRECHECK_PASSED;
+orange_restore_job_write($dupWork, $dupTwo);
+$dupMatches = orange_restore_job_find_active_full_by_package($dupWork, $dupPkg, $dupChecksum);
+$dupErr = e2e_try(static function () use ($dupMatches): void {
+    if (count($dupMatches) > 1) {
+        throw new RuntimeException('Multiple active full restore jobs match this package. Resolve manually before starting a new restore.');
+    }
+});
+e2e_self_test(
+    count($dupMatches) === 2 && $dupErr !== null,
+    'start: two matching active jobs fail closed'
+);
+$terminalRoot = e2e_temp_root();
+$terminalWork = $terminalRoot . DIRECTORY_SEPARATOR . 'restore_work';
+mkdir($terminalWork);
+$terminalPkg = $terminalRoot . DIRECTORY_SEPARATOR . 'pkg';
+mkdir($terminalPkg);
+$terminalChecksum = str_repeat('f', 64);
+$terminalJob = orange_restore_job_create($terminalWork, [
+    'job_type' => ORANGE_RESTORE_JOB_TYPE_FULL,
+    'source_package_path' => $terminalPkg,
+    'source_package_checksum' => $terminalChecksum,
+]);
+$terminalJob['status'] = ORANGE_RESTORE_JOB_STATUS_COMPLETED;
+orange_restore_job_write($terminalWork, $terminalJob);
+$terminalMatches = orange_restore_job_find_active_full_by_package($terminalWork, $terminalPkg, $terminalChecksum);
+e2e_self_test(count($terminalMatches) === 0, 'start: terminal previous job allows a new restore job');
+e2e_rmdir($dupRoot);
+e2e_rmdir($terminalRoot);
+
+// --- staging_validated delegates to 2B.1 ---
+$stagingSeed = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED, [
+    'staging_restore_manifest_path' => '',
+    'fresh_backup_path' => '/tmp/fresh',
+    'fresh_backup_checksum' => str_repeat('1', 64),
+]);
+$stagingManifestPath = orange_restore_job_staging_manifest_path($stagingSeed['workRoot'], $stagingSeed['jobId']);
+orange_backup_write_json($stagingManifestPath, [
+    'generated_at' => gmdate('c'),
+    'job_id' => $stagingSeed['jobId'],
+    'overall_result' => 'pass',
+]);
+$stagingReportPath = orange_restore_job_report_path($stagingSeed['workRoot'], $stagingSeed['jobId']);
+orange_backup_write_json($stagingReportPath, [
+    'generated_at' => gmdate('c'),
+    'job_id' => $stagingSeed['jobId'],
+    'overall_result' => 'pass',
+    'production_touched' => false,
+    'staging_post_validation' => ['ok' => true],
+    'staging_drv_report' => ['overall_result' => 'pass'],
+]);
+$stagingJob = orange_restore_job_read($stagingSeed['workRoot'], $stagingSeed['jobId']);
+$stagingJob['staging_restore_manifest_path'] = $stagingManifestPath;
+$stagingJob['restore_report_path'] = $stagingReportPath;
+orange_restore_job_write($stagingSeed['workRoot'], $stagingJob);
+$stagingResume = orange_restore_e2e_resume_full($stagingSeed['adminPdo'], [
+    'project_root' => $stagingSeed['projectRoot'],
+    'work_root' => $stagingSeed['workRoot'],
+    'job_id' => $stagingSeed['jobId'],
+    'admin_id' => 1,
+    'env_override' => $stagingSeed['env'],
+]);
+e2e_self_test(
+    ($stagingResume['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL,
+    'resume: staging_validated uses Phase 2B.1 finalizer delegation'
+);
+e2e_rmdir($stagingSeed['backupRoot']);
+
+// --- audit idempotency ---
+$terminalAudit = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_COMPLETED);
+orange_restore_e2e_resume_full($terminalAudit['adminPdo'], [
+    'project_root' => $terminalAudit['projectRoot'],
+    'work_root' => $terminalAudit['workRoot'],
+    'job_id' => $terminalAudit['jobId'],
+    'admin_id' => 1,
+    'env_override' => $terminalAudit['env'],
+]);
+orange_restore_e2e_resume_full($terminalAudit['adminPdo'], [
+    'project_root' => $terminalAudit['projectRoot'],
+    'work_root' => $terminalAudit['workRoot'],
+    'job_id' => $terminalAudit['jobId'],
+    'admin_id' => 1,
+    'env_override' => $terminalAudit['env'],
+]);
+$terminalEvents = array_filter(
+    array_column(orange_restore_audit_read_all($terminalAudit['workRoot'], $terminalAudit['jobId']), 'e2e_event'),
+    static fn ($event): bool => $event === 'e2e_terminal'
+);
+e2e_self_test(count($terminalEvents) === 1, 'audit: terminal resume does not duplicate terminal audit');
+$completedAudit = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE);
+orange_restore_merge_maintenance_enable($completedAudit['workRoot'], $completedAudit['jobId']);
+orange_restore_e2e_resume_full($completedAudit['adminPdo'], [
+    'project_root' => $completedAudit['projectRoot'],
+    'work_root' => $completedAudit['workRoot'],
+    'job_id' => $completedAudit['jobId'],
+    'admin_id' => 1,
+    'password' => 'correct-pass',
+    'confirmation_phrase' => 'RESTORE',
+    'env_override' => $completedAudit['env'],
+    'post_validation_override' => static function () use ($completedAudit): array {
+        orange_restore_job_post_validation_transition(
+            $completedAudit['workRoot'],
+            $completedAudit['jobId'],
+            ORANGE_RESTORE_JOB_STATUS_MERGED,
+            ['production_merged_at' => gmdate('c')]
+        );
+        orange_restore_job_post_validation_transition(
+            $completedAudit['workRoot'],
+            $completedAudit['jobId'],
+            ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED,
+            ['post_validation_passed_at' => gmdate('c')]
+        );
+        orange_restore_job_post_validation_transition(
+            $completedAudit['workRoot'],
+            $completedAudit['jobId'],
+            ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+            ['restore_completed_at' => gmdate('c')]
+        );
+
+        return ['ok' => true, 'status' => ORANGE_RESTORE_JOB_STATUS_COMPLETED];
+    },
+]);
+$completedEvents = array_filter(
+    array_column(orange_restore_audit_read_all($completedAudit['workRoot'], $completedAudit['jobId']), 'e2e_event'),
+    static fn ($event): bool => $event === 'e2e_completed'
+);
+e2e_self_test(count($completedEvents) === 1, 'audit: e2e_completed emitted once');
+e2e_rmdir($completedAudit['backupRoot']);
+e2e_rmdir($terminalAudit['backupRoot']);
 
 // --- rollback resume ---
 $rbSeed = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_ROLLBACK_IN_PROGRESS, [
@@ -498,8 +803,11 @@ $e2eSource = (string) file_get_contents($repoRoot . DIRECTORY_SEPARATOR . 'inclu
 e2e_self_test(
     !str_contains($e2eSource, 'orange_restore_sql_runner_import_gzip')
     && !str_contains($e2eSource, 'orange_restore_staging_wipe')
-    && !str_contains($e2eSource, 'orange_restore_orchestrator_approve_for_merge'),
-    'design: e2e orchestrator does not duplicate phase business logic'
+    && !str_contains($e2eSource, 'orange_restore_orchestrator_approve_for_merge')
+    && !str_contains($e2eSource, 'orange_restore_validation_adapter_staging_gate')
+    && !str_contains($e2eSource, 'function orange_restore_e2e_finalize_staging_approval')
+    && str_contains($e2eSource, 'orange_restore_full_staging_finalize_approval'),
+    'design: e2e orchestrator delegates staging finalization without duplicated gate logic'
 );
 
 echo PHP_EOL;

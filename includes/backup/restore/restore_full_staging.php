@@ -218,10 +218,7 @@ function orange_restore_full_staging_run(array $options): array
         ];
         $reportPath = orange_restore_job_report_path($workRoot, $jobId);
         orange_backup_write_json($reportPath, $report);
-        $job = orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL, [
-            'restore_report_path' => $reportPath,
-            'owner_approval_window_started_at' => gmdate('c'),
-        ]);
+        $job = orange_restore_full_staging_finalize_approval($workRoot, $jobId, $reportPath);
 
         orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_from_job($job, 'staging_restore', 'pass', [
             'duration_seconds' => $duration,
@@ -253,6 +250,56 @@ function orange_restore_full_staging_run(array $options): array
     } finally {
         orange_restore_release_lock($workRoot);
     }
+}
+
+/**
+ * Phase 2B.1 — finalize staging_validated → awaiting_owner_approval (shared; used by 2E resume).
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_full_staging_finalize_approval(string $workRoot, string $jobId, string $reportPath = ''): array
+{
+    $job = orange_restore_job_read($workRoot, $jobId);
+    $status = (string) ($job['status'] ?? '');
+    if ($status === ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL) {
+        return $job;
+    }
+    if ($status !== ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED) {
+        throw new RuntimeException('Staging finalization requires staging_validated (status=' . $status . ').');
+    }
+
+    $stagingGate = orange_restore_validation_adapter_staging_gate($workRoot, $job);
+    if (!$stagingGate['ok']) {
+        throw new RuntimeException('Staging validation gate failed: ' . implode('; ', $stagingGate['errors']));
+    }
+
+    if ($reportPath === '') {
+        $reportPath = (string) ($job['restore_report_path'] ?? '');
+    }
+    if ($reportPath === '' || !is_file($reportPath)) {
+        $reportPath = orange_restore_job_report_path($workRoot, $jobId);
+        orange_backup_write_json($reportPath, [
+            'generated_at' => gmdate('c'),
+            'job_id' => $jobId,
+            'job_type' => ORANGE_RESTORE_JOB_TYPE_FULL,
+            'overall_result' => 'pass',
+            'duration_seconds' => (int) ($job['duration_seconds'] ?? 0),
+            'source_package_path' => (string) ($job['source_package_path'] ?? ''),
+            'rollback_anchor' => [
+                'fresh_backup_path' => (string) ($job['fresh_backup_path'] ?? ''),
+                'fresh_backup_checksum' => (string) ($job['fresh_backup_checksum'] ?? ''),
+                'rollback_anchor_job_only' => (bool) ($job['rollback_anchor_job_only'] ?? true),
+            ],
+            'staging_manifest' => (string) ($stagingGate['manifest_path'] ?? ''),
+            'production_touched' => false,
+        ]);
+    }
+
+    return orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL, [
+        'restore_report_path' => $reportPath,
+        'owner_approval_window_started_at' => (string) ($job['owner_approval_window_started_at'] ?? gmdate('c')),
+        'result' => 'awaiting_owner_approval',
+    ]);
 }
 
 /**

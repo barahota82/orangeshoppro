@@ -933,3 +933,65 @@ function orange_restore_job_e2e_staging_incomplete_statuses(): array
         ORANGE_RESTORE_JOB_STATUS_STAGING,
     ];
 }
+
+/**
+ * @return list<string>
+ */
+function orange_restore_job_list_ids(string $workRoot): array
+{
+    if (!is_dir($workRoot)) {
+        return [];
+    }
+
+    $ids = [];
+    foreach (scandir($workRoot) ?: [] as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        $jobFile = $workRoot . DIRECTORY_SEPARATOR . $entry . DIRECTORY_SEPARATOR . ORANGE_RESTORE_JOB_FILENAME;
+        if (is_file($jobFile)) {
+            $ids[] = $entry;
+        }
+    }
+
+    return $ids;
+}
+
+/**
+ * Find non-terminal full_disaster jobs matching package path and checksum.
+ *
+ * @return list<array<string, mixed>>
+ */
+function orange_restore_job_find_active_full_by_package(
+    string $workRoot,
+    string $packagePath,
+    string $packageChecksum
+): array {
+    $terminal = orange_restore_job_e2e_terminal_statuses();
+    $matches = [];
+
+    foreach (orange_restore_job_list_ids($workRoot) as $jobId) {
+        try {
+            $job = orange_restore_job_read($workRoot, $jobId);
+        } catch (Throwable) {
+            continue;
+        }
+
+        if (($job['job_type'] ?? '') !== ORANGE_RESTORE_JOB_TYPE_FULL) {
+            continue;
+        }
+        if (in_array((string) ($job['status'] ?? ''), $terminal, true)) {
+            continue;
+        }
+        if ((string) ($job['source_package_path'] ?? '') !== $packagePath) {
+            continue;
+        }
+        if ((string) ($job['source_package_checksum'] ?? '') !== $packageChecksum) {
+            continue;
+        }
+
+        $matches[] = $job;
+    }
+
+    return $matches;
+}
