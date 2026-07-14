@@ -12,6 +12,149 @@ require_once __DIR__ . '/../backup_environment.php';
 require_once __DIR__ . '/../backup_manifest.php';
 
 /**
+ * @param array<string, mixed> $job
+ * @param array<string, mixed> $postcheck
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_post_validation_build_report(
+    array $job,
+    string $jobId,
+    array $postcheck,
+    int $durationSeconds
+): array {
+    $report = [
+        'generated_at' => gmdate('c'),
+        'job_id' => $jobId,
+        'overall_result' => (string) ($postcheck['overall_result'] ?? 'fail'),
+        'duration_seconds' => $durationSeconds,
+        'package_identity' => [
+            'source_package_path' => (string) ($job['source_package_path'] ?? ''),
+            'source_package_checksum' => (string) ($job['source_package_checksum'] ?? ''),
+            'package_version' => (string) ($job['package_version'] ?? ''),
+        ],
+        'rollback_anchor_identity' => [
+            'fresh_backup_path' => (string) ($job['fresh_backup_path'] ?? ''),
+            'fresh_backup_checksum' => (string) ($job['fresh_backup_checksum'] ?? ''),
+            'rollback_anchor_job_only' => (bool) ($job['rollback_anchor_job_only'] ?? true),
+        ],
+        'production_db_identity' => (string) ($postcheck['production_db'] ?? ''),
+        'schema_revision' => (int) ($postcheck['schema_revision'] ?? 0),
+        'table_count' => null,
+        'critical_row_counts' => [],
+        'gl_result' => null,
+        'inventory_fifo_result' => null,
+        'uploads_result' => null,
+        'hard_failures' => $postcheck['hard_failures'] ?? [],
+        'warnings' => $postcheck['warnings'] ?? [],
+        'informational' => $postcheck['informational'] ?? [],
+        'gates' => $postcheck['gates'] ?? [],
+    ];
+
+    foreach ($postcheck['gates'] ?? [] as $gate) {
+        if (!is_array($gate)) {
+            continue;
+        }
+        $gateId = (string) ($gate['gate_id'] ?? '');
+        if ($gateId === 'table_count_exact_match') {
+            $report['table_count'] = $gate['details'] ?? null;
+        }
+        if ($gateId === 'critical_row_counts') {
+            $report['critical_row_counts'] = $gate['details']['checks'] ?? [];
+        }
+        if ($gateId === 'gl_debit_credit_balance') {
+            $report['gl_result'] = $gate['details'] ?? null;
+        }
+        if (in_array($gateId, ['stock_movement_integrity', 'warehouse_variant_stock_consistency', 'fifo_layer_integrity', 'negative_quantity_policy'], true)) {
+            $report['inventory_fifo_result'] = is_array($report['inventory_fifo_result']) ? $report['inventory_fifo_result'] : [];
+            $report['inventory_fifo_result'][$gateId] = $gate['details'] ?? [];
+        }
+        if ($gateId === 'uploads_checksum_match') {
+            $report['uploads_result'] = $gate['details'] ?? null;
+        }
+    }
+
+    return $report;
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_post_validation_postcheck_from_exception(
+    Throwable $e,
+    array $job,
+    string $projectRoot,
+    array $env
+): array {
+    $stagingDb = orange_restore_staging_db_name($env, $projectRoot);
+    $productionDb = orange_restore_production_db_name($projectRoot);
+    $message = $e->getMessage();
+    $gateId = str_contains(strtolower($message), 'registry') ? 'registry_load' : 'production_post_validation_exception';
+
+    return orange_restore_validation_adapter_production_postcheck_finalize(
+        [
+            orange_restore_validation_adapter_production_gate(
+                $gateId,
+                ORANGE_RESTORE_PRODUCTION_GATE_HARD,
+                false,
+                $message,
+                ['exception_class' => $e::class]
+            ),
+        ],
+        $job,
+        $productionDb,
+        $stagingDb
+    );
+}
+
+/**
+ * Persist failed post-validation artifacts (reports, audit, job state).
+ *
+ * @param array<string, mixed> $job
+ * @param array<string, mixed> $report
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_post_validation_record_failure(
+    string $workRoot,
+    string $jobId,
+    int $adminId,
+    array $job,
+    array $report,
+    int $durationSeconds
+): array {
+    $reportPath = orange_restore_production_post_validation_report_path($workRoot, $jobId);
+    orange_backup_write_json($reportPath, $report);
+
+    $finalReportPath = orange_restore_final_restore_report_path($workRoot, $jobId);
+    $finalReport = array_merge($report, [
+        'completed_at' => gmdate('c'),
+        'job_status' => ORANGE_RESTORE_JOB_STATUS_FAILED_POST_MERGE,
+        'maintenance_disabled' => false,
+    ]);
+    orange_backup_write_json($finalReportPath, $finalReport);
+
+    orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_post_validation_event($job, 'production_post_validation_failed', 'failed', [
+        'operator_admin_id' => $adminId,
+        'hard_failures' => $report['hard_failures'],
+        'warnings' => $report['warnings'],
+        'duration_seconds' => $durationSeconds,
+        'database_writes' => false,
+        'production_writes' => false,
+    ]));
+
+    return orange_restore_job_mark_failed_post_merge(
+        $workRoot,
+        $jobId,
+        'production_post_validation',
+        implode('; ', $report['hard_failures'] ?? []),
+        [
+            'post_validation_report_path' => $reportPath,
+            'final_restore_report_path' => $finalReportPath,
+            'duration_seconds' => $durationSeconds,
+        ]
+    );
+}
+
+/**
  * Phase 2D.4 — production post-validation after full DB + uploads cutover.
  *
  * Legal entry: uploads_cutover_complete only.
@@ -95,92 +238,41 @@ function orange_restore_merge_post_validation_run(array $options): array
                 'env' => $env,
             ]);
         } else {
-            $postcheck = orange_restore_validation_adapter_production_postcheck(
-                $projectRoot,
-                $workRoot,
-                $job,
-                $env,
-                $productionPdo,
-                $stagingPdo
-            );
+            try {
+                $postcheck = orange_restore_validation_adapter_production_postcheck(
+                    $projectRoot,
+                    $workRoot,
+                    $job,
+                    $env,
+                    $productionPdo,
+                    $stagingPdo
+                );
+            } catch (Throwable $postcheckError) {
+                $postcheck = orange_restore_merge_post_validation_postcheck_from_exception(
+                    $postcheckError,
+                    $job,
+                    $projectRoot,
+                    $env
+                );
+            }
         }
 
         orange_restore_merge_maintenance_verify($workRoot, $jobId);
 
         $durationSeconds = (int) round(microtime(true) - $startedAt);
+        $report = orange_restore_merge_post_validation_build_report($job, $jobId, $postcheck, $durationSeconds);
         $reportPath = orange_restore_production_post_validation_report_path($workRoot, $jobId);
-        $report = [
-            'generated_at' => gmdate('c'),
-            'job_id' => $jobId,
-            'overall_result' => (string) ($postcheck['overall_result'] ?? 'fail'),
-            'duration_seconds' => $durationSeconds,
-            'package_identity' => [
-                'source_package_path' => (string) ($job['source_package_path'] ?? ''),
-                'source_package_checksum' => (string) ($job['source_package_checksum'] ?? ''),
-                'package_version' => (string) ($job['package_version'] ?? ''),
-            ],
-            'rollback_anchor_identity' => [
-                'fresh_backup_path' => (string) ($job['fresh_backup_path'] ?? ''),
-                'fresh_backup_checksum' => (string) ($job['fresh_backup_checksum'] ?? ''),
-                'rollback_anchor_job_only' => (bool) ($job['rollback_anchor_job_only'] ?? true),
-            ],
-            'production_db_identity' => (string) ($postcheck['production_db'] ?? ''),
-            'schema_revision' => (int) ($postcheck['schema_revision'] ?? 0),
-            'table_count' => null,
-            'critical_row_counts' => [],
-            'gl_result' => null,
-            'inventory_fifo_result' => null,
-            'uploads_result' => null,
-            'hard_failures' => $postcheck['hard_failures'] ?? [],
-            'warnings' => $postcheck['warnings'] ?? [],
-            'informational' => $postcheck['informational'] ?? [],
-            'gates' => $postcheck['gates'] ?? [],
-        ];
-
-        foreach ($postcheck['gates'] ?? [] as $gate) {
-            if (!is_array($gate)) {
-                continue;
-            }
-            $gateId = (string) ($gate['gate_id'] ?? '');
-            if ($gateId === 'table_count_exact_match') {
-                $report['table_count'] = $gate['details'] ?? null;
-            }
-            if ($gateId === 'critical_row_counts') {
-                $report['critical_row_counts'] = $gate['details']['checks'] ?? [];
-            }
-            if ($gateId === 'gl_debit_credit_balance') {
-                $report['gl_result'] = $gate['details'] ?? null;
-            }
-            if (in_array($gateId, ['stock_movement_integrity', 'warehouse_variant_stock_consistency', 'fifo_layer_integrity', 'negative_quantity_policy'], true)) {
-                $report['inventory_fifo_result'] = is_array($report['inventory_fifo_result']) ? $report['inventory_fifo_result'] : [];
-                $report['inventory_fifo_result'][$gateId] = $gate['details'] ?? [];
-            }
-            if ($gateId === 'uploads_checksum_match') {
-                $report['uploads_result'] = $gate['details'] ?? null;
-            }
-        }
 
         orange_backup_write_json($reportPath, $report);
 
         if (!($postcheck['ok'] ?? false)) {
-            orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_post_validation_event($job, 'production_post_validation_failed', 'failed', [
-                'operator_admin_id' => $adminId,
-                'hard_failures' => $report['hard_failures'],
-                'warnings' => $report['warnings'],
-                'duration_seconds' => $durationSeconds,
-                'database_writes' => false,
-                'production_writes' => false,
-            ]));
-
-            $job = orange_restore_job_mark_failed_post_merge(
+            $job = orange_restore_merge_post_validation_record_failure(
                 $workRoot,
                 $jobId,
-                'production_post_validation',
-                implode('; ', $report['hard_failures']),
-                [
-                    'post_validation_report_path' => $reportPath,
-                    'duration_seconds' => $durationSeconds,
-                ]
+                $adminId,
+                $job,
+                $report,
+                $durationSeconds
             );
 
             throw new RuntimeException(
@@ -261,11 +353,21 @@ function orange_restore_merge_post_validation_run(array $options): array
     } catch (Throwable $e) {
         if (($job['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_MERGED) {
             try {
-                orange_restore_job_mark_failed_post_merge(
+                $durationSeconds = (int) round(microtime(true) - $startedAt);
+                $postcheck = orange_restore_merge_post_validation_postcheck_from_exception(
+                    $e,
+                    $job,
+                    $projectRoot,
+                    $env
+                );
+                $report = orange_restore_merge_post_validation_build_report($job, $jobId, $postcheck, $durationSeconds);
+                orange_restore_merge_post_validation_record_failure(
                     $workRoot,
                     $jobId,
-                    'production_post_validation',
-                    $e->getMessage()
+                    $adminId,
+                    $job,
+                    $report,
+                    $durationSeconds
                 );
             } catch (Throwable) {
                 // preserve original error

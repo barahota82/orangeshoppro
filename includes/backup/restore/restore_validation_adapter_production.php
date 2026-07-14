@@ -134,6 +134,26 @@ function orange_restore_validation_adapter_production_append_gate(array &$gates,
 }
 
 /**
+ * @return array{ok:bool,registry:array<string,mixed>,error:string}
+ */
+function orange_restore_validation_adapter_production_registry_load_safe(string $projectRoot): array
+{
+    try {
+        return [
+            'ok' => true,
+            'registry' => orange_backup_registry_load($projectRoot),
+            'error' => '',
+        ];
+    } catch (Throwable $e) {
+        return [
+            'ok' => false,
+            'registry' => [],
+            'error' => $e->getMessage(),
+        ];
+    }
+}
+
+/**
  * @return list<int>
  */
 function orange_restore_validation_adapter_production_load_country_ids(PDO $pdo): array
@@ -292,16 +312,37 @@ function orange_restore_validation_adapter_production_cross_country_fk_checks(
     ];
 
     foreach ($checks as $check) {
+        $checkFailed = false;
         foreach ($check['tables'] as $tableName) {
             if (!in_array($tableName, $productionTables, true)) {
-                continue 2;
+                $errors[] = 'Cross-country FK validation cannot run: missing table '
+                    . $tableName
+                    . ' for '
+                    . (string) $check['label']
+                    . '.';
+                $checkFailed = true;
+                break;
             }
+        }
+        if ($checkFailed) {
+            continue;
         }
         $requiresColumn = is_array($check['requires_column'] ?? null) ? $check['requires_column'] : [];
         foreach ($requiresColumn as $tableName => $columnName) {
             if (!orange_restore_validation_adapter_table_has_column($pdo, (string) $tableName, (string) $columnName)) {
-                continue 2;
+                $errors[] = 'Cross-country FK validation cannot run: missing column '
+                    . (string) $tableName
+                    . '.'
+                    . (string) $columnName
+                    . ' for '
+                    . (string) $check['label']
+                    . '.';
+                $checkFailed = true;
+                break;
             }
+        }
+        if ($checkFailed) {
+            continue;
         }
         try {
             $count = (int) ($pdo->query((string) $check['sql'])->fetchColumn() ?: 0);
@@ -809,7 +850,19 @@ function orange_restore_validation_adapter_production_required_uploads_check(
     $checked = 0;
     $referencedPaths = [];
 
-    $registry = orange_backup_registry_load($projectRoot);
+    $registryLoad = orange_restore_validation_adapter_production_registry_load_safe($projectRoot);
+    if (!$registryLoad['ok']) {
+        return [
+            'ok' => false,
+            'verifiable' => false,
+            'no_uploads_required' => false,
+            'checked' => 0,
+            'missing' => [],
+            'warnings' => $warnings,
+            'scan_errors' => ['Registry load failed: ' . $registryLoad['error']],
+        ];
+    }
+    $registry = $registryLoad['registry'];
     $registryTables = is_array($registry['tables'] ?? null) ? $registry['tables'] : [];
     $uploadLinkedTables = [];
     foreach ($registryTables as $tableName => $meta) {
@@ -868,10 +921,29 @@ function orange_restore_validation_adapter_production_required_uploads_check(
 
     foreach (array_keys($referencedPaths) as $relativePath) {
         $checked++;
-        $abs = orange_restore_validation_adapter_production_resolve_upload_absolute($projectRoot, $relativePath);
-        if (!is_file($abs)) {
-            $missing[] = $relativePath;
+        $validated = orange_restore_validation_adapter_production_validate_upload_reference($projectRoot, $relativePath);
+        if (!$validated['ok']) {
+            $scanErrors[] = 'Invalid uploads reference '
+                . ($validated['relative_path'] !== '' ? $validated['relative_path'] : $relativePath)
+                . ': '
+                . $validated['error'];
+            continue;
         }
+        if (!$validated['exists']) {
+            $missing[] = $validated['relative_path'];
+        }
+    }
+
+    if ($scanErrors !== []) {
+        return [
+            'ok' => false,
+            'verifiable' => false,
+            'no_uploads_required' => false,
+            'checked' => $checked,
+            'missing' => $missing,
+            'warnings' => $warnings,
+            'scan_errors' => $scanErrors,
+        ];
     }
 
     if ($checked === 0) {
@@ -1000,9 +1072,126 @@ function orange_restore_validation_adapter_production_collect_upload_references(
     return array_keys($paths);
 }
 
-function orange_restore_validation_adapter_production_resolve_upload_absolute(string $projectRoot, string $relativePath): string
+/**
+ * Normalize a DB-stored uploads reference to uploads/... relative form.
+ *
+ * @throws RuntimeException when the reference violates hardened uploads policy.
+ */
+function orange_restore_validation_adapter_production_normalize_upload_reference(string $rawPath): string
 {
-    return $projectRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+    $path = trim(str_replace('\\', '/', $rawPath));
+    if ($path === '') {
+        throw new RuntimeException('Empty uploads reference.');
+    }
+    if (str_contains($path, '..')) {
+        throw new RuntimeException('Uploads reference traversal blocked.');
+    }
+    if (preg_match('/^[A-Za-z]:[\\/]/', $path) === 1) {
+        throw new RuntimeException('Absolute uploads reference blocked.');
+    }
+    if (str_starts_with($path, '//') || str_starts_with($path, '\\\\')) {
+        throw new RuntimeException('Absolute uploads reference blocked.');
+    }
+    if (str_starts_with($path, '/') && !str_starts_with($path, '/uploads/')) {
+        throw new RuntimeException('Absolute uploads reference blocked.');
+    }
+    if (str_starts_with($path, '/uploads/')) {
+        $path = ltrim($path, '/');
+    } elseif (!str_starts_with($path, 'uploads/')) {
+        $path = 'uploads/products/' . ltrim($path, '/');
+    }
+    if (!orange_country_uploads_is_allowlisted($path)) {
+        throw new RuntimeException('Uploads reference outside allowlisted prefixes.');
+    }
+
+    return $path;
+}
+
+/**
+ * Hardened uploads reference validation (same filesystem policy as uploads cutover).
+ *
+ * @return array{
+ *   ok:bool,
+ *   relative_path:string,
+ *   absolute_path:string,
+ *   exists:bool,
+ *   error:string
+ * }
+ */
+function orange_restore_validation_adapter_production_validate_upload_reference(
+    string $projectRoot,
+    string $rawDbPath
+): array {
+    try {
+        $relative = orange_restore_validation_adapter_production_normalize_upload_reference($rawDbPath);
+        $uploadsDir = orange_restore_production_uploads_directory($projectRoot);
+        if (!is_dir($uploadsDir) && !@mkdir($uploadsDir, 0775, true) && !is_dir($uploadsDir)) {
+            throw new RuntimeException('Production uploads directory missing.');
+        }
+
+        $uploadsRootReal = orange_restore_uploads_fs_require_realpath($uploadsDir);
+        orange_restore_uploads_fs_assert_not_reparse_point($uploadsRootReal);
+
+        $suffix = substr($relative, strlen('uploads/'));
+        if ($suffix === '' || str_contains($suffix, '..')) {
+            throw new RuntimeException('Invalid uploads relative suffix.');
+        }
+
+        $parts = explode('/', $suffix);
+        $current = $uploadsRootReal;
+        $lastIndex = count($parts) - 1;
+        foreach ($parts as $index => $part) {
+            if ($part === '' || $part === '.') {
+                throw new RuntimeException('Invalid uploads path segment.');
+            }
+            if ($part === '..') {
+                throw new RuntimeException('Uploads reference traversal blocked.');
+            }
+
+            $current = $current . DIRECTORY_SEPARATOR . $part;
+            if ($index < $lastIndex) {
+                if (file_exists($current)) {
+                    if (is_link($current)) {
+                        throw new RuntimeException('Symlink blocked in uploads tree: ' . $current);
+                    }
+                    orange_restore_uploads_fs_assert_not_reparse_point($current);
+                    orange_restore_uploads_fs_assert_path_inside_root($current, $uploadsRootReal);
+                    $current = orange_restore_uploads_fs_require_realpath($current);
+                }
+            }
+        }
+
+        orange_restore_uploads_fs_assert_lexical_path_inside_root($current, $uploadsRootReal);
+
+        if (file_exists($current)) {
+            if (is_link($current)) {
+                throw new RuntimeException('Symlink blocked for uploads reference: ' . $relative);
+            }
+            orange_restore_uploads_fs_assert_not_reparse_point($current);
+            orange_restore_uploads_fs_assert_path_inside_root($current, $uploadsRootReal);
+            $absolute = orange_restore_uploads_fs_require_realpath($current);
+            $exists = is_file($absolute);
+        } else {
+            $absolute = $current;
+            $exists = false;
+        }
+
+        return [
+            'ok' => true,
+            'relative_path' => $relative,
+            'absolute_path' => $absolute,
+            'exists' => $exists,
+            'error' => '',
+        ];
+    } catch (Throwable $e) {
+        return [
+            'ok' => false,
+            'relative_path' => trim(str_replace('\\', '/', $rawDbPath)),
+            'absolute_path' => '',
+            'exists' => false,
+            'error' => $e->getMessage(),
+        ];
+    }
 }
 
 /**
@@ -1064,11 +1253,19 @@ function orange_restore_validation_adapter_production_cross_country_checks(
     }
 
     $errors = [];
-    $registry = orange_backup_registry_load($projectRoot);
+    $registryLoad = orange_restore_validation_adapter_production_registry_load_safe($projectRoot);
+    if (!$registryLoad['ok']) {
+        return ['Registry load failed for cross-country validation: ' . $registryLoad['error']];
+    }
+    $registry = $registryLoad['registry'];
     $registryTables = is_array($registry['tables'] ?? null) ? $registry['tables'] : [];
 
     foreach ($registryTables as $tableName => $meta) {
-        if (!is_string($tableName) || !in_array($tableName, $productionTables, true) || !is_array($meta)) {
+        if (!is_string($tableName) || !in_array($tableName, $productionTables, true)) {
+            continue;
+        }
+        if (!is_array($meta)) {
+            $errors[] = 'Cross-country registry metadata invalid for table ' . $tableName . '.';
             continue;
         }
         $ownership = (string) ($meta['ownership_type'] ?? '');
@@ -1107,30 +1304,50 @@ function orange_restore_validation_adapter_production_cross_country_checks(
         if ($ownership === 'dependent') {
             $parent = is_array($meta['parent_dependency'] ?? null) ? $meta['parent_dependency'] : null;
             if ($parent === null) {
+                $errors[] = 'Cross-country dependent validation cannot run: parent_dependency missing for ' . $tableName . '.';
                 continue;
             }
             $parentTable = (string) ($parent['table'] ?? '');
             $foreignKey = (string) ($parent['foreign_key'] ?? '');
-            if ($parentTable === '' || $foreignKey === '' || !in_array($parentTable, $productionTables, true)) {
+            if ($parentTable === '' || $foreignKey === '') {
+                $errors[] = 'Cross-country dependent validation cannot run: invalid parent_dependency for ' . $tableName . '.';
+                continue;
+            }
+            if (!in_array($parentTable, $productionTables, true)) {
+                $errors[] = 'Cross-country dependent validation cannot run: parent table missing '
+                    . $parentTable
+                    . ' for '
+                    . $tableName
+                    . '.';
                 continue;
             }
             if (!orange_restore_validation_adapter_table_has_column($pdo, $parentTable, 'country_id')) {
+                $errors[] = 'Cross-country dependent validation cannot run: parent table '
+                    . $parentTable
+                    . ' missing country_id for '
+                    . $tableName
+                    . '.';
                 continue;
             }
-            if (orange_restore_validation_adapter_table_has_column($pdo, $tableName, 'country_id')) {
-                $child = '`' . str_replace('`', '``', $tableName) . '`';
-                $parentSql = '`' . str_replace('`', '``', $parentTable) . '`';
-                $fk = '`' . str_replace('`', '``', $foreignKey) . '`';
-                $sql = 'SELECT COUNT(*) FROM ' . $child . ' c INNER JOIN ' . $parentSql . ' p ON p.id = c.' . $fk
-                    . ' WHERE c.' . $fk . ' IS NOT NULL AND c.country_id IS NOT NULL AND c.country_id <> p.country_id';
-                try {
-                    $count = (int) ($pdo->query($sql)->fetchColumn() ?: 0);
-                    if ($count > 0) {
-                        $errors[] = 'Cross-country ownership mismatch in ' . $tableName . ' vs ' . $parentTable . ' (' . (string) $count . ' rows).';
-                    }
-                } catch (Throwable $e) {
-                    $errors[] = 'Cross-country dependent validation failed for ' . $tableName . ': ' . $e->getMessage();
+            if (!orange_restore_validation_adapter_table_has_column($pdo, $tableName, 'country_id')) {
+                $errors[] = 'Cross-country dependent validation cannot run: '
+                    . $tableName
+                    . ' missing country_id for dependent ownership validation.';
+                continue;
+            }
+
+            $child = '`' . str_replace('`', '``', $tableName) . '`';
+            $parentSql = '`' . str_replace('`', '``', $parentTable) . '`';
+            $fk = '`' . str_replace('`', '``', $foreignKey) . '`';
+            $sql = 'SELECT COUNT(*) FROM ' . $child . ' c INNER JOIN ' . $parentSql . ' p ON p.id = c.' . $fk
+                . ' WHERE c.' . $fk . ' IS NOT NULL AND c.country_id IS NOT NULL AND c.country_id <> p.country_id';
+            try {
+                $count = (int) ($pdo->query($sql)->fetchColumn() ?: 0);
+                if ($count > 0) {
+                    $errors[] = 'Cross-country ownership mismatch in ' . $tableName . ' vs ' . $parentTable . ' (' . (string) $count . ' rows).';
                 }
+            } catch (Throwable $e) {
+                $errors[] = 'Cross-country dependent validation failed for ' . $tableName . ': ' . $e->getMessage();
             }
         }
     }

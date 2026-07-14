@@ -230,10 +230,18 @@ function orange_restore_uploads_fs_assert_path_inside_root(string $path, string 
         throw new RuntimeException('Cannot resolve path inside uploads tree: ' . $path);
     }
 
+    orange_restore_uploads_fs_assert_lexical_path_inside_root($pathReal, $rootReal);
+}
+
+/**
+ * Fail-closed lexical containment check (candidate file may not exist yet).
+ */
+function orange_restore_uploads_fs_assert_lexical_path_inside_root(string $candidatePath, string $rootReal): void
+{
     $rootNorm = strtolower(rtrim(str_replace('\\', '/', $rootReal), '/'));
-    $pathNorm = strtolower(rtrim(str_replace('\\', '/', $pathReal), '/'));
+    $pathNorm = strtolower(rtrim(str_replace('\\', '/', $candidatePath), '/'));
     if ($pathNorm !== $rootNorm && !str_starts_with($pathNorm, $rootNorm . '/')) {
-        throw new RuntimeException('Uploads traversal escaped root: ' . $path);
+        throw new RuntimeException('Uploads traversal escaped root: ' . $candidatePath);
     }
 }
 

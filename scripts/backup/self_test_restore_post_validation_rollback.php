@@ -803,8 +803,234 @@ pvrb_self_test(in_array('rollback_completed', $rbEvents, true), 'rollback: rollb
 orange_restore_release_lock($rbOk['workRoot']);
 pvrb_rmdir($rbOk['backupRoot']);
 
-orange_restore_release_lock($rbOk['workRoot']);
-pvrb_rmdir($rbOk['backupRoot']);
+// --- BLOCKER FIX: uploads path validation ---
+function pvrb_seed_uploads_validation_project(): array
+{
+    $projectRoot = pvrb_temp_root();
+    mkdir($projectRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'products', 0775, true);
+    pvrb_copy_registry($projectRoot);
+    pvrb_write_file(
+        $projectRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'ok.webp',
+        'ok'
+    );
+
+    return ['projectRoot' => $projectRoot];
+}
+
+$uploadsPathProject = pvrb_seed_uploads_validation_project();
+$traversal = orange_restore_validation_adapter_production_validate_upload_reference(
+    $uploadsPathProject['projectRoot'],
+    'uploads/products/../outside.webp'
+);
+pvrb_self_test(($traversal['ok'] ?? true) === false, 'blocker-fix: uploads path traversal blocked');
+$absolute = orange_restore_validation_adapter_production_validate_upload_reference(
+    $uploadsPathProject['projectRoot'],
+    'C:/Windows/outside.webp'
+);
+pvrb_self_test(($absolute['ok'] ?? true) === false, 'blocker-fix: uploads absolute path blocked');
+$outside = orange_restore_validation_adapter_production_validate_upload_reference(
+    $uploadsPathProject['projectRoot'],
+    'uploads/products/../../outside.webp'
+);
+pvrb_self_test(($outside['ok'] ?? true) === false, 'blocker-fix: uploads outside uploads root blocked');
+$validUpload = orange_restore_validation_adapter_production_validate_upload_reference(
+    $uploadsPathProject['projectRoot'],
+    'ok.webp'
+);
+pvrb_self_test(($validUpload['ok'] ?? false) === true && ($validUpload['exists'] ?? false) === true, 'blocker-fix: valid uploads reference passes');
+pvrb_rmdir($uploadsPathProject['projectRoot']);
+
+$symlinkProject = pvrb_seed_uploads_validation_project();
+$symlinkTarget = $symlinkProject['projectRoot'] . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'link.webp';
+if (function_exists('symlink')) {
+    @symlink(
+        $symlinkProject['projectRoot'] . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'ok.webp',
+        $symlinkTarget
+    );
+    $symlinkResult = orange_restore_validation_adapter_production_validate_upload_reference(
+        $symlinkProject['projectRoot'],
+        'uploads/products/link.webp'
+    );
+    pvrb_self_test(($symlinkResult['ok'] ?? true) === false, 'blocker-fix: uploads symlink blocked');
+}
+pvrb_rmdir($symlinkProject['projectRoot']);
+
+$reparseProject = pvrb_seed_uploads_validation_project();
+$reparseDir = $reparseProject['projectRoot'] . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'reparse_dir';
+mkdir($reparseDir, 0775, true);
+pvrb_write_file($reparseDir . DIRECTORY_SEPARATOR . 'inside.webp', 'inside');
+orange_restore_uploads_fs_set_test_seam([
+    'reparse_point_detector' => static function (string $path): ?bool {
+        return str_contains(str_replace('\\', '/', $path), '/reparse_dir') ? true : false;
+    },
+]);
+$reparseResult = orange_restore_validation_adapter_production_validate_upload_reference(
+    $reparseProject['projectRoot'],
+    'uploads/products/reparse_dir/inside.webp'
+);
+orange_restore_uploads_fs_clear_test_seam();
+pvrb_self_test(($reparseResult['ok'] ?? true) === false, 'blocker-fix: uploads reparse point blocked');
+pvrb_rmdir($reparseProject['projectRoot']);
+
+$junctionProject = pvrb_seed_uploads_validation_project();
+$junctionDir = $junctionProject['projectRoot'] . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'junction_dir';
+mkdir($junctionDir, 0775, true);
+pvrb_write_file($junctionDir . DIRECTORY_SEPARATOR . 'inside.webp', 'inside');
+orange_restore_uploads_fs_set_test_seam([
+    'reparse_point_detector' => static function (string $path): ?bool {
+        return str_contains(str_replace('\\', '/', $path), '/junction_dir') ? true : false;
+    },
+]);
+$junctionResult = orange_restore_validation_adapter_production_validate_upload_reference(
+    $junctionProject['projectRoot'],
+    'uploads/products/junction_dir/inside.webp'
+);
+orange_restore_uploads_fs_clear_test_seam();
+pvrb_self_test(($junctionResult['ok'] ?? true) === false, 'blocker-fix: uploads junction blocked');
+pvrb_rmdir($junctionProject['projectRoot']);
+
+// --- BLOCKER FIX: FK / registry dependency validation ---
+$fkPdo = pvrb_sqlite_cross_country_pdo(false);
+$fkErrors = orange_restore_validation_adapter_production_cross_country_fk_checks($fkPdo, ['countries'], [1, 2]);
+pvrb_self_test(
+    (bool) array_filter($fkErrors, static fn (string $e): bool => str_contains($e, 'missing table')),
+    'blocker-fix: FK table missing is hard failure'
+);
+$fkColPdo = new PDO('sqlite::memory:');
+$fkColPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$fkColPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$fkColPdo->exec('INSERT INTO countries (id) VALUES (1)');
+$fkColPdo->exec('CREATE TABLE journal_vouchers (id INTEGER PRIMARY KEY, country_id INTEGER)');
+$fkColPdo->exec('CREATE TABLE party_subledger (id INTEGER PRIMARY KEY, voucher_id INTEGER)');
+$fkColumnErrors = orange_restore_validation_adapter_production_cross_country_fk_checks(
+    $fkColPdo,
+    ['countries', 'party_subledger', 'journal_vouchers'],
+    [1]
+);
+pvrb_self_test(
+    (bool) array_filter($fkColumnErrors, static fn (string $e): bool => str_contains($e, 'missing column')),
+    'blocker-fix: FK column missing is hard failure'
+);
+
+$noRegistryProject = pvrb_temp_root();
+$noRegistryPdo = new PDO('sqlite::memory:');
+$noRegistryPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$noRegistryPdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, main_image TEXT)');
+$registryUploadsFail = orange_restore_validation_adapter_production_required_uploads_check(
+    $noRegistryPdo,
+    $noRegistryProject,
+    ['products']
+);
+pvrb_self_test(
+    ($registryUploadsFail['ok'] ?? true) === false
+    && str_contains(implode('; ', $registryUploadsFail['scan_errors'] ?? []), 'Registry load failed'),
+    'blocker-fix: registry load failure in required uploads check'
+);
+$registryCrossFail = orange_restore_validation_adapter_production_cross_country_checks(
+    $noRegistryPdo,
+    $noRegistryProject,
+    ['countries']
+);
+pvrb_self_test(
+    (bool) array_filter($registryCrossFail, static fn (string $e): bool => str_contains($e, 'Registry load failed')),
+    'blocker-fix: registry load failure in cross-country check'
+);
+pvrb_rmdir($noRegistryProject);
+
+$depProject = pvrb_temp_root();
+pvrb_copy_registry($depProject);
+$depPdo = new PDO('sqlite::memory:');
+$depPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$depPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$depPdo->exec('INSERT INTO countries (id) VALUES (1)');
+$depPdo->exec('CREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id INTEGER, country_id INTEGER)');
+$depErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $depPdo,
+    $depProject,
+    ['countries', 'order_items']
+);
+pvrb_self_test(
+    (bool) array_filter($depErrors, static fn (string $e): bool => str_contains($e, 'parent table missing')),
+    'blocker-fix: registry parent missing is hard failure'
+);
+pvrb_rmdir($depProject);
+
+$malformedProject = pvrb_temp_root();
+pvrb_copy_registry($malformedProject);
+$malformedRegistryPath = $malformedProject . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'backup_table_registry.json';
+$registryData = json_decode((string) file_get_contents($malformedRegistryPath), true);
+if (is_array($registryData)) {
+    $registryData['tables']['products'] = 'not-an-array';
+    orange_backup_write_json($malformedRegistryPath, $registryData);
+}
+$malformedPdo = pvrb_sqlite_cross_country_pdo(false);
+$malformedErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $malformedPdo,
+    $malformedProject,
+    ['countries', 'products']
+);
+pvrb_self_test(
+    (bool) array_filter($malformedErrors, static fn (string $e): bool => str_contains($e, 'registry metadata invalid')),
+    'blocker-fix: malformed registry metadata fails closed'
+);
+pvrb_rmdir($malformedProject);
+
+// --- BLOCKER FIX: registry load failure reporting ---
+$registryFailSeed = pvrb_seed_uploads_cutover_complete_job();
+pvrb_prepare_runtime($registryFailSeed);
+pvrb_rmdir($registryFailSeed['projectRoot'] . DIRECTORY_SEPARATOR . 'config');
+$err = pvrb_try(static function () use ($registryFailSeed): void {
+    orange_restore_merge_post_validation_run([
+        'project_root' => $registryFailSeed['projectRoot'],
+        'work_root' => $registryFailSeed['workRoot'],
+        'job_id' => $registryFailSeed['jobId'],
+        'admin_id' => 1,
+        'env_override' => $registryFailSeed['env'],
+        'postcheck_override' => static function (array $ctx) use ($registryFailSeed): array {
+            $load = orange_restore_validation_adapter_production_registry_load_safe($registryFailSeed['projectRoot']);
+
+            return orange_restore_validation_adapter_production_postcheck_finalize(
+                [
+                    orange_restore_validation_adapter_production_gate(
+                        'registry_load',
+                        ORANGE_RESTORE_PRODUCTION_GATE_HARD,
+                        false,
+                        'Registry load failed: ' . (string) ($load['error'] ?? 'unknown'),
+                        ['registry_failure' => true]
+                    ),
+                ],
+                $ctx['job'],
+                orange_restore_production_db_name($registryFailSeed['projectRoot']),
+                orange_restore_staging_db_name($registryFailSeed['env'], $registryFailSeed['projectRoot'])
+            );
+        },
+    ]);
+});
+$registryFailJob = orange_restore_job_read($registryFailSeed['workRoot'], $registryFailSeed['jobId']);
+$postReportPath = orange_restore_production_post_validation_report_path($registryFailSeed['workRoot'], $registryFailSeed['jobId']);
+$finalReportPath = orange_restore_final_restore_report_path($registryFailSeed['workRoot'], $registryFailSeed['jobId']);
+$registryFailAudit = orange_restore_audit_read_all($registryFailSeed['workRoot'], $registryFailSeed['jobId']);
+$registryFailEvents = array_column($registryFailAudit, 'post_validation_event');
+pvrb_self_test($err !== null, 'blocker-fix: registry load failure throws after structured handling');
+pvrb_self_test(
+    ($registryFailJob['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_FAILED_POST_MERGE,
+    'blocker-fix: registry load failure -> failed_post_merge'
+);
+pvrb_self_test(is_file($postReportPath), 'blocker-fix: registry load failure writes production_post_validation.json');
+pvrb_self_test(is_file($finalReportPath), 'blocker-fix: registry load failure writes final_restore_report.json');
+$postReport = json_decode((string) file_get_contents($postReportPath), true);
+pvrb_self_test(
+    is_array($postReport)
+    && ($postReport['overall_result'] ?? '') === 'fail'
+    && ($postReport['hard_failures'] ?? []) !== [],
+    'blocker-fix: failed report generation includes hard failures'
+);
+pvrb_self_test(
+    in_array('production_post_validation_failed', $registryFailEvents, true),
+    'blocker-fix: failed audit generation records production_post_validation_failed'
+);
+orange_restore_release_lock($registryFailSeed['workRoot']);
+pvrb_rmdir($registryFailSeed['backupRoot']);
 
 // --- BLOCKER 1: maintenance hard gate during validation ---
 $maintGateSeed = pvrb_seed_uploads_cutover_complete_job();
