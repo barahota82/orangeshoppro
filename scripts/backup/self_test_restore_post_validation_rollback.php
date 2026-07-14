@@ -1019,6 +1019,8 @@ pvrb_self_test(
 $noRegistryProject = pvrb_temp_root();
 $noRegistryPdo = new PDO('sqlite::memory:');
 $noRegistryPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$noRegistryPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$noRegistryPdo->exec('INSERT INTO countries (id) VALUES (1)');
 $noRegistryPdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, main_image TEXT)');
 $registryUploadsFail = orange_restore_validation_adapter_production_required_uploads_check(
     $noRegistryPdo,
@@ -1164,15 +1166,26 @@ pvrb_write_registry_tables($ccProject, [
     'products' => pvrb_registry_country_owned(orange_backup_registry_country_id(), 60, true),
 ]);
 $ccPdo = pvrb_sqlite_cross_country_pdo(true);
-$ccTables = ['countries', 'products'];
-$ccErrors = orange_restore_validation_adapter_production_cross_country_checks($ccPdo, $ccProject, $ccTables);
+$ccErrors = orange_restore_validation_adapter_production_count_invalid_country_refs(
+    $ccPdo,
+    'products',
+    'country_id',
+    [1, 2],
+    true
+);
 pvrb_self_test($ccErrors !== [], 'blocker2: cross-country contamination detected');
 pvrb_self_test(
     (bool) array_filter($ccErrors, static fn (string $e): bool => str_contains($e, 'products') || str_contains($e, 'foreign country')),
     'blocker2: cross-country error references invalid country rows'
 );
 $ccClean = pvrb_sqlite_cross_country_pdo(false);
-$ccCleanErrors = orange_restore_validation_adapter_production_cross_country_checks($ccClean, $ccProject, $ccTables);
+$ccCleanErrors = orange_restore_validation_adapter_production_count_invalid_country_refs(
+    $ccClean,
+    'products',
+    'country_id',
+    [1, 2],
+    true
+);
 pvrb_self_test($ccCleanErrors === [], 'blocker2: clean cross-country data passes');
 pvrb_rmdir($ccProject);
 
@@ -1204,12 +1217,31 @@ $uploadsPdo = new PDO('sqlite::memory:');
 $uploadsPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $uploadsPdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, main_image TEXT)');
 $uploadsPdo->exec("INSERT INTO products (id, main_image) VALUES (1, 'missing.webp')");
+$uploadsPdo->exec('CREATE TABLE product_images (id INTEGER PRIMARY KEY, image_path TEXT)');
+$uploadsPdo->exec('CREATE TABLE product_colorway_images (id INTEGER PRIMARY KEY, image_path TEXT)');
+$uploadsPdo->exec('CREATE TABLE payment_transactions (id INTEGER PRIMARY KEY, proof_file TEXT)');
+$uploadsPdo->exec('CREATE TABLE orange_company_documents (id INTEGER PRIMARY KEY, storage_path TEXT)');
+$uploadsPdo->exec('CREATE TABLE customers (id INTEGER PRIMARY KEY)');
+$uploadsPdo->exec('CREATE TABLE suppliers (id INTEGER PRIMARY KEY)');
+$uploadsPdo->exec('CREATE TABLE inventory_reconciliation (id INTEGER PRIMARY KEY)');
+$uploadsPdo->exec('CREATE TABLE company_settings (id INTEGER PRIMARY KEY, company_logo TEXT)');
 $uploadsDir = $uploadsProject . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'products';
 mkdir($uploadsDir, 0775, true);
+$uploadsProductionTables = [
+    'products',
+    'product_images',
+    'product_colorway_images',
+    'payment_transactions',
+    'orange_company_documents',
+    'customers',
+    'suppliers',
+    'inventory_reconciliation',
+    'company_settings',
+];
 $missingUploads = orange_restore_validation_adapter_production_required_uploads_check(
     $uploadsPdo,
     $uploadsProject,
-    ['products']
+    $uploadsProductionTables
 );
 pvrb_self_test(($missingUploads['ok'] ?? true) === false, 'blocker4: required uploads missing fails');
 pvrb_self_test(($missingUploads['verifiable'] ?? false) === true, 'blocker4: missing uploads remains verifiable');
@@ -1217,7 +1249,7 @@ $noRegistryProject = pvrb_temp_root();
 $unverifiableUploads = orange_restore_validation_adapter_production_required_uploads_check(
     $uploadsPdo,
     $noRegistryProject,
-    ['products']
+    $uploadsProductionTables
 );
 pvrb_self_test(($unverifiableUploads['ok'] ?? true) === false, 'blocker4: required uploads unverifiable fails');
 pvrb_self_test(($unverifiableUploads['verifiable'] ?? true) === false, 'blocker4: unverifiable uploads flagged');
