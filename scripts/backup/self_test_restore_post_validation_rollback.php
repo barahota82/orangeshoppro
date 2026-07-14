@@ -840,6 +840,18 @@ $validUpload = orange_restore_validation_adapter_production_validate_upload_refe
 pvrb_self_test(($validUpload['ok'] ?? false) === true && ($validUpload['exists'] ?? false) === true, 'blocker-fix: valid uploads reference passes');
 pvrb_rmdir($uploadsPathProject['projectRoot']);
 
+$missingUploadsProject = pvrb_temp_root();
+$missingUploadsResult = orange_restore_validation_adapter_production_validate_upload_reference(
+    $missingUploadsProject,
+    'uploads/products/missing.webp'
+);
+pvrb_self_test(
+    ($missingUploadsResult['ok'] ?? true) === false
+    && !is_dir($missingUploadsProject . DIRECTORY_SEPARATOR . 'uploads'),
+    'blocker-fix: uploads validation is read-only when uploads root is missing'
+);
+pvrb_rmdir($missingUploadsProject);
+
 $symlinkProject = pvrb_seed_uploads_validation_project();
 $symlinkTarget = $symlinkProject['projectRoot'] . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'link.webp';
 if (function_exists('symlink')) {
@@ -954,6 +966,98 @@ pvrb_self_test(
     'blocker-fix: registry parent missing is hard failure'
 );
 pvrb_rmdir($depProject);
+
+$depScopedProject = pvrb_temp_root();
+pvrb_copy_registry($depScopedProject);
+pvrb_patch_registry_table($depScopedProject, 'child_rows', [
+    'ownership_type' => 'dependent',
+    'extraction_rule' => ['type' => 'custom_sql', 'sql' => 'SELECT c.id FROM child_rows c INNER JOIN parent_rows p ON p.id = c.parent_id WHERE p.country_id = :country_id'],
+    'parent_dependency' => ['table' => 'parent_rows', 'foreign_key' => 'parent_id'],
+    'uploads_linked' => false,
+    'integrity_critical' => true,
+]);
+$depScopedPdo = new PDO('sqlite::memory:');
+$depScopedPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$depScopedPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$depScopedPdo->exec('INSERT INTO countries (id) VALUES (1)');
+$depScopedPdo->exec('CREATE TABLE parent_rows (id INTEGER PRIMARY KEY, country_id INTEGER)');
+$depScopedPdo->exec('CREATE TABLE child_rows (id INTEGER PRIMARY KEY, parent_id INTEGER)');
+$depScopedPdo->exec('INSERT INTO parent_rows (id, country_id) VALUES (1, 1)');
+$depScopedPdo->exec('INSERT INTO child_rows (id, parent_id) VALUES (1, 1)');
+$depScopedErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $depScopedPdo,
+    $depScopedProject,
+    ['countries', 'parent_rows', 'child_rows']
+);
+pvrb_self_test(
+    $depScopedErrors === [],
+    'blocker-fix: dependent child without country_id inherits parent scope'
+);
+$depScopedPdo->exec('INSERT INTO child_rows (id, parent_id) VALUES (2, 99)');
+$depOrphanErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $depScopedPdo,
+    $depScopedProject,
+    ['countries', 'parent_rows', 'child_rows']
+);
+pvrb_self_test(
+    (bool) array_filter($depOrphanErrors, static fn (string $e): bool => str_contains($e, 'orphan child_rows.parent_id')),
+    'blocker-fix: dependent child orphan fails hard'
+);
+pvrb_rmdir($depScopedProject);
+
+$depMissingFkProject = pvrb_temp_root();
+pvrb_copy_registry($depMissingFkProject);
+pvrb_patch_registry_table($depMissingFkProject, 'child_rows', [
+    'ownership_type' => 'dependent',
+    'extraction_rule' => ['type' => 'custom_sql', 'sql' => 'SELECT c.id FROM child_rows c INNER JOIN parent_rows p ON p.id = c.parent_id WHERE p.country_id = :country_id'],
+    'parent_dependency' => ['table' => 'parent_rows', 'foreign_key' => 'parent_id'],
+    'uploads_linked' => false,
+    'integrity_critical' => true,
+]);
+$depMissingFkPdo = new PDO('sqlite::memory:');
+$depMissingFkPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$depMissingFkPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$depMissingFkPdo->exec('INSERT INTO countries (id) VALUES (1)');
+$depMissingFkPdo->exec('CREATE TABLE parent_rows (id INTEGER PRIMARY KEY, country_id INTEGER)');
+$depMissingFkPdo->exec('CREATE TABLE child_rows (id INTEGER PRIMARY KEY)');
+$depMissingFkErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $depMissingFkPdo,
+    $depMissingFkProject,
+    ['countries', 'parent_rows', 'child_rows']
+);
+pvrb_self_test(
+    (bool) array_filter($depMissingFkErrors, static fn (string $e): bool => str_contains($e, 'missing child foreign key parent_id')),
+    'blocker-fix: dependent child FK missing fails hard'
+);
+pvrb_rmdir($depMissingFkProject);
+
+$depMismatchProject = pvrb_temp_root();
+pvrb_copy_registry($depMismatchProject);
+pvrb_patch_registry_table($depMismatchProject, 'child_rows', [
+    'ownership_type' => 'dependent',
+    'extraction_rule' => ['type' => 'custom_sql', 'sql' => 'SELECT c.id FROM child_rows c INNER JOIN parent_rows p ON p.id = c.parent_id WHERE p.country_id = :country_id'],
+    'parent_dependency' => ['table' => 'parent_rows', 'foreign_key' => 'parent_id'],
+    'uploads_linked' => false,
+    'integrity_critical' => true,
+]);
+$depMismatchPdo = new PDO('sqlite::memory:');
+$depMismatchPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$depMismatchPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$depMismatchPdo->exec('INSERT INTO countries (id) VALUES (1), (2)');
+$depMismatchPdo->exec('CREATE TABLE parent_rows (id INTEGER PRIMARY KEY, country_id INTEGER)');
+$depMismatchPdo->exec('CREATE TABLE child_rows (id INTEGER PRIMARY KEY, parent_id INTEGER, country_id INTEGER)');
+$depMismatchPdo->exec('INSERT INTO parent_rows (id, country_id) VALUES (1, 1)');
+$depMismatchPdo->exec('INSERT INTO child_rows (id, parent_id, country_id) VALUES (1, 1, 2)');
+$depMismatchErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $depMismatchPdo,
+    $depMismatchProject,
+    ['countries', 'parent_rows', 'child_rows']
+);
+pvrb_self_test(
+    (bool) array_filter($depMismatchErrors, static fn (string $e): bool => str_contains($e, 'ownership mismatch in child_rows vs parent_rows')),
+    'blocker-fix: dependent child country mismatch fails hard when child country_id exists'
+);
+pvrb_rmdir($depMismatchProject);
 
 $malformedProject = pvrb_temp_root();
 pvrb_copy_registry($malformedProject);

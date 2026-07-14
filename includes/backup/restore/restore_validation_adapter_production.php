@@ -1125,7 +1125,7 @@ function orange_restore_validation_adapter_production_validate_upload_reference(
     try {
         $relative = orange_restore_validation_adapter_production_normalize_upload_reference($rawDbPath);
         $uploadsDir = orange_restore_production_uploads_directory($projectRoot);
-        if (!is_dir($uploadsDir) && !@mkdir($uploadsDir, 0775, true) && !is_dir($uploadsDir)) {
+        if (!is_dir($uploadsDir)) {
             throw new RuntimeException('Production uploads directory missing.');
         }
 
@@ -1420,22 +1420,55 @@ function orange_restore_validation_adapter_production_cross_country_checks(
                     . '.';
                 continue;
             }
-            if (!orange_restore_validation_adapter_table_has_column($pdo, $tableName, 'country_id')) {
+            if (!orange_restore_validation_adapter_table_has_column($pdo, $tableName, $foreignKey)) {
                 $errors[] = 'Cross-country dependent validation cannot run: '
                     . $tableName
-                    . ' missing country_id for dependent ownership validation.';
+                    . ' missing child foreign key '
+                    . $foreignKey
+                    . ' for dependent ownership validation.';
                 continue;
             }
 
             $child = '`' . str_replace('`', '``', $tableName) . '`';
             $parentSql = '`' . str_replace('`', '``', $parentTable) . '`';
             $fk = '`' . str_replace('`', '``', $foreignKey) . '`';
-            $sql = 'SELECT COUNT(*) FROM ' . $child . ' c INNER JOIN ' . $parentSql . ' p ON p.id = c.' . $fk
-                . ' WHERE c.' . $fk . ' IS NOT NULL AND c.country_id IS NOT NULL AND c.country_id <> p.country_id';
             try {
-                $count = (int) ($pdo->query($sql)->fetchColumn() ?: 0);
-                if ($count > 0) {
-                    $errors[] = 'Cross-country ownership mismatch in ' . $tableName . ' vs ' . $parentTable . ' (' . (string) $count . ' rows).';
+                $orphanSql = 'SELECT COUNT(*) FROM ' . $child . ' c LEFT JOIN ' . $parentSql . ' p ON p.id = c.' . $fk
+                    . ' WHERE c.' . $fk . ' IS NOT NULL AND p.id IS NULL';
+                $orphanCount = (int) ($pdo->query($orphanSql)->fetchColumn() ?: 0);
+                if ($orphanCount > 0) {
+                    $errors[] = 'Cross-country dependent validation cannot run: orphan '
+                        . $tableName
+                        . '.'
+                        . $foreignKey
+                        . ' rows without parent '
+                        . $parentTable
+                        . ' ('
+                        . (string) $orphanCount
+                        . ' rows).';
+                }
+
+                if (($parent['nullable'] ?? false) !== true) {
+                    $nullSql = 'SELECT COUNT(*) FROM ' . $child . ' c WHERE c.' . $fk . ' IS NULL';
+                    $nullCount = (int) ($pdo->query($nullSql)->fetchColumn() ?: 0);
+                    if ($nullCount > 0) {
+                        $errors[] = 'Cross-country dependent validation cannot run: NULL '
+                            . $tableName
+                            . '.'
+                            . $foreignKey
+                            . ' for non-null dependent ownership ('
+                            . (string) $nullCount
+                            . ' rows).';
+                    }
+                }
+
+                if (orange_restore_validation_adapter_table_has_column($pdo, $tableName, 'country_id')) {
+                    $sql = 'SELECT COUNT(*) FROM ' . $child . ' c INNER JOIN ' . $parentSql . ' p ON p.id = c.' . $fk
+                        . ' WHERE c.' . $fk . ' IS NOT NULL AND c.country_id IS NOT NULL AND c.country_id <> p.country_id';
+                    $count = (int) ($pdo->query($sql)->fetchColumn() ?: 0);
+                    if ($count > 0) {
+                        $errors[] = 'Cross-country ownership mismatch in ' . $tableName . ' vs ' . $parentTable . ' (' . (string) $count . ' rows).';
+                    }
                 }
             } catch (Throwable $e) {
                 $errors[] = 'Cross-country dependent validation failed for ' . $tableName . ': ' . $e->getMessage();
