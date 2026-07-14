@@ -189,6 +189,19 @@ function orange_restore_e2e_resolve_action(array $job): array
     }
 
     if (in_array($status, [
+        ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING,
+        ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED,
+    ], true)) {
+        return orange_restore_e2e_action_spec(
+            ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION_FINALIZE,
+            'Resume restore finalize checkpoint (status=' . $status . '). Requires fresh Super Admin re-auth and RESTORE confirmation.',
+            'php scripts/backup/restore_resume_full.php --job=' . (string) ($job['job_id'] ?? '') . ' --admin-id=N --password=SECRET --confirm=RESTORE',
+            true,
+            'RESTORE'
+        );
+    }
+
+    if (in_array($status, [
         ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE,
         ORANGE_RESTORE_JOB_STATUS_FAILED_POST_MERGE,
         ORANGE_RESTORE_JOB_STATUS_ROLLBACK_FAILED,
@@ -783,6 +796,8 @@ function orange_restore_e2e_status_full(string $projectRoot, string $jobId, arra
             'uploads_cutover_completed_at' => (string) ($job['uploads_cutover_completed_at'] ?? ''),
             'production_merged_at' => (string) ($job['production_merged_at'] ?? ''),
             'post_validation_passed_at' => (string) ($job['post_validation_passed_at'] ?? ''),
+            'maintenance_disable_pending_at' => (string) ($job['maintenance_disable_pending_at'] ?? ''),
+            'maintenance_disabled_at' => (string) ($job['maintenance_disabled_at'] ?? ''),
             'restore_completed_at' => (string) ($job['restore_completed_at'] ?? ''),
         ],
         'e2e_audit_summary' => $e2eAudit,

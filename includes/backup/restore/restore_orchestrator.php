@@ -56,6 +56,10 @@ function orange_restore_orchestrator_job_status_report(string $workRoot, string 
         $approvalStatus = 'production_merged';
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED) {
         $approvalStatus = 'post_validation_passed';
+    } elseif ($status === ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING) {
+        $approvalStatus = 'maintenance_disable_pending';
+    } elseif ($status === ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED) {
+        $approvalStatus = 'maintenance_disabled';
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_FAILED_POST_MERGE) {
         $approvalStatus = 'failed_post_merge';
     } elseif ($status === ORANGE_RESTORE_JOB_STATUS_ROLLBACK_IN_PROGRESS) {

@@ -24,6 +24,7 @@ require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR 
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_approval.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_reauth.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_maintenance.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_post_validation.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_validation_adapter.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_e2e_orchestrator.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'admin_permissions.php';
@@ -163,6 +164,80 @@ function e2e_seed_job(string $status, array $extra = []): array
     ];
 }
 
+/**
+ * @return array<string, mixed>
+ */
+function e2e_seed_finalize_checkpoint(string $status, array $extra = []): array
+{
+    $seed = e2e_seed_job($status, array_merge([
+        'post_validation_passed_at' => gmdate('c'),
+        'fresh_backup_path' => '/tmp/fresh-backup',
+        'fresh_backup_checksum' => str_repeat('9', 64),
+        'rollback_anchor_job_only' => true,
+    ], $extra));
+    $reportPath = orange_restore_production_post_validation_report_path($seed['workRoot'], $seed['jobId']);
+    orange_backup_write_json($reportPath, [
+        'generated_at' => gmdate('c'),
+        'job_id' => $seed['jobId'],
+        'overall_result' => 'pass',
+        'hard_failures' => [],
+        'warnings' => [],
+        'rollback_anchor_identity' => [
+            'fresh_backup_path' => '/tmp/fresh-backup',
+            'fresh_backup_checksum' => str_repeat('9', 64),
+            'rollback_anchor_job_only' => true,
+        ],
+    ]);
+    $job = orange_restore_job_read($seed['workRoot'], $seed['jobId']);
+    $job['post_validation_report_path'] = $reportPath;
+    orange_restore_job_write($seed['workRoot'], $job);
+    orange_restore_audit_append($seed['workRoot'], $seed['jobId'], orange_restore_audit_post_validation_event($job, 'production_post_validation_passed', 'pass', [
+        'operator_admin_id' => 1,
+        'database_writes' => false,
+        'production_writes' => false,
+    ]));
+    if ($status === ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING) {
+        orange_restore_audit_append($seed['workRoot'], $seed['jobId'], orange_restore_audit_post_validation_event($job, 'maintenance_disable_pending', 'checkpoint', [
+            'operator_admin_id' => 1,
+            'database_writes' => false,
+            'production_writes' => false,
+        ]));
+    }
+    if ($status === ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED) {
+        orange_restore_audit_append($seed['workRoot'], $seed['jobId'], orange_restore_audit_post_validation_event($job, 'maintenance_disable_pending', 'checkpoint', [
+            'operator_admin_id' => 1,
+            'database_writes' => false,
+            'production_writes' => false,
+        ]));
+        orange_restore_audit_append($seed['workRoot'], $seed['jobId'], orange_restore_audit_post_validation_event($job, 'maintenance_disabled_checkpoint', 'checkpoint', [
+            'operator_admin_id' => 1,
+            'database_writes' => false,
+            'production_writes' => false,
+        ]));
+    }
+
+    $seed['job'] = orange_restore_job_read($seed['workRoot'], $seed['jobId']);
+    $seed['reportPath'] = $reportPath;
+
+    return $seed;
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function e2e_run_finalize(array $seed): array
+{
+    orange_restore_acquire_lock($seed['workRoot'], $seed['jobId']);
+
+    return orange_restore_merge_post_validation_finalize_run([
+        'project_root' => $seed['projectRoot'],
+        'work_root' => $seed['workRoot'],
+        'job_id' => $seed['jobId'],
+        'admin_id' => 1,
+        'env_override' => $seed['env'],
+    ]);
+}
+
 // --- routing ---
 $awaiting = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL);
 $awaitAction = orange_restore_e2e_resolve_action($awaiting['job']);
@@ -224,6 +299,22 @@ e2e_self_test(
     'routing: post_validation_passed finalizes completion'
 );
 e2e_rmdir($postPassed['backupRoot']);
+
+$pendingRoute = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING);
+$pendingRouteAction = orange_restore_e2e_resolve_action($pendingRoute['job']);
+e2e_self_test(
+    ($pendingRouteAction['action'] ?? '') === ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION_FINALIZE,
+    'routing: maintenance_disable_pending resumes finalize'
+);
+e2e_rmdir($pendingRoute['backupRoot']);
+
+$disabledRoute = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED);
+$disabledRouteAction = orange_restore_e2e_resolve_action($disabledRoute['job']);
+e2e_self_test(
+    ($disabledRouteAction['action'] ?? '') === ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION_FINALIZE,
+    'routing: maintenance_disabled resumes finalize'
+);
+e2e_rmdir($disabledRoute['backupRoot']);
 
 $failedMerge = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE);
 $failedMergeAction = orange_restore_e2e_resolve_action($failedMerge['job']);
@@ -481,6 +572,18 @@ $postOk = orange_restore_e2e_resume_full($postSeed['adminPdo'], [
         orange_restore_job_post_validation_transition(
             $postSeed['workRoot'],
             $postSeed['jobId'],
+            ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING,
+            ['maintenance_disable_pending_at' => gmdate('c')]
+        );
+        orange_restore_job_post_validation_transition(
+            $postSeed['workRoot'],
+            $postSeed['jobId'],
+            ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED,
+            ['maintenance_disabled_at' => gmdate('c')]
+        );
+        orange_restore_job_post_validation_transition(
+            $postSeed['workRoot'],
+            $postSeed['jobId'],
             ORANGE_RESTORE_JOB_STATUS_COMPLETED,
             ['restore_completed_at' => gmdate('c'), 'result' => 'completed']
         );
@@ -553,6 +656,18 @@ $finalizeOk = orange_restore_e2e_resume_full($finalizeSeed['adminPdo'], [
         orange_restore_job_post_validation_transition(
             $finalizeSeed['workRoot'],
             $finalizeSeed['jobId'],
+            ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING,
+            ['maintenance_disable_pending_at' => gmdate('c')]
+        );
+        orange_restore_job_post_validation_transition(
+            $finalizeSeed['workRoot'],
+            $finalizeSeed['jobId'],
+            ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED,
+            ['maintenance_disabled_at' => gmdate('c')]
+        );
+        orange_restore_job_post_validation_transition(
+            $finalizeSeed['workRoot'],
+            $finalizeSeed['jobId'],
             ORANGE_RESTORE_JOB_STATUS_COMPLETED,
             ['restore_completed_at' => gmdate('c'), 'result' => 'completed']
         );
@@ -569,6 +684,73 @@ e2e_self_test(
     'resume: post_validation_passed finalizes to completed'
 );
 e2e_rmdir($finalizeSeed['backupRoot']);
+
+// --- finalize checkpoint crash recovery ---
+$crashPending = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING);
+orange_restore_merge_maintenance_enable($crashPending['workRoot'], $crashPending['jobId']);
+$crashPendingResult = e2e_run_finalize($crashPending);
+e2e_self_test(
+    ($crashPendingResult['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+    'checkpoint: crash after pending before disable resumes to completed'
+);
+e2e_rmdir($crashPending['backupRoot']);
+
+$crashDisabled = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING, [
+    'maintenance_disable_pending_at' => gmdate('c'),
+]);
+$crashDisabledJob = orange_restore_job_read($crashDisabled['workRoot'], $crashDisabled['jobId']);
+orange_restore_job_write($crashDisabled['workRoot'], $crashDisabledJob);
+orange_restore_merge_maintenance_enable($crashDisabled['workRoot'], $crashDisabled['jobId']);
+orange_restore_merge_maintenance_disable($crashDisabled['workRoot'], $crashDisabled['jobId'], ['reason' => 'test_crash']);
+$crashDisabledResult = e2e_run_finalize($crashDisabled);
+e2e_self_test(
+    ($crashDisabledResult['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+    'checkpoint: crash after disable before completed resumes to completed'
+);
+e2e_rmdir($crashDisabled['backupRoot']);
+
+$resumeDisabled = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED, [
+    'maintenance_disable_pending_at' => gmdate('c'),
+    'maintenance_disabled_at' => gmdate('c'),
+]);
+$resumeDisabledResult = e2e_run_finalize($resumeDisabled);
+e2e_self_test(
+    ($resumeDisabledResult['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+    'checkpoint: resume from maintenance_disabled completes without re-disable'
+);
+e2e_rmdir($resumeDisabled['backupRoot']);
+
+$repeatFinalize = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED);
+orange_restore_merge_maintenance_enable($repeatFinalize['workRoot'], $repeatFinalize['jobId']);
+$repeatFirst = e2e_run_finalize($repeatFinalize);
+$repeatSecond = e2e_run_finalize($repeatFinalize);
+e2e_self_test(
+    ($repeatFirst['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_COMPLETED
+    && ($repeatSecond['idempotent'] ?? false) === true,
+    'checkpoint: repeated finalize is idempotent'
+);
+e2e_rmdir($repeatFinalize['backupRoot']);
+
+$maintenanceOff = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED);
+$maintenanceOffResult = e2e_run_finalize($maintenanceOff);
+e2e_self_test(
+    ($maintenanceOffResult['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+    'checkpoint: maintenance already off still completes'
+);
+e2e_rmdir($maintenanceOff['backupRoot']);
+
+$auditOnce = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED);
+orange_restore_merge_maintenance_enable($auditOnce['workRoot'], $auditOnce['jobId']);
+e2e_run_finalize($auditOnce);
+e2e_run_finalize($auditOnce);
+$auditEvents = array_column(orange_restore_audit_read_all($auditOnce['workRoot'], $auditOnce['jobId']), 'post_validation_event');
+$restoreCompletedCount = count(array_filter($auditEvents, static fn ($event): bool => $event === 'restore_completed'));
+$maintenanceDisabledCount = count(array_filter($auditEvents, static fn ($event): bool => $event === 'maintenance_disabled'));
+e2e_self_test(
+    $restoreCompletedCount === 1 && $maintenanceDisabledCount === 1,
+    'checkpoint: restore_completed and maintenance_disabled emitted once'
+);
+e2e_rmdir($auditOnce['backupRoot']);
 
 // --- start idempotency ---
 $pkgPath = e2e_temp_root() . DIRECTORY_SEPARATOR . 'pkg';
@@ -736,6 +918,18 @@ orange_restore_e2e_resume_full($completedAudit['adminPdo'], [
             $completedAudit['jobId'],
             ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED,
             ['post_validation_passed_at' => gmdate('c')]
+        );
+        orange_restore_job_post_validation_transition(
+            $completedAudit['workRoot'],
+            $completedAudit['jobId'],
+            ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING,
+            ['maintenance_disable_pending_at' => gmdate('c')]
+        );
+        orange_restore_job_post_validation_transition(
+            $completedAudit['workRoot'],
+            $completedAudit['jobId'],
+            ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED,
+            ['maintenance_disabled_at' => gmdate('c')]
         );
         orange_restore_job_post_validation_transition(
             $completedAudit['workRoot'],

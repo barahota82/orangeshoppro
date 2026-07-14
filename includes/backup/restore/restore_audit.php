@@ -181,3 +181,32 @@ function orange_restore_audit_e2e_append_once(
 
     orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_e2e_event($job, $event, $result, $extra));
 }
+
+function orange_restore_audit_post_validation_has_event(string $workRoot, string $jobId, string $eventName): bool
+{
+    foreach (orange_restore_audit_read_all($workRoot, $jobId) as $event) {
+        if ((string) ($event['post_validation_event'] ?? '') === $eventName) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * @param array<string, mixed> $extra
+ */
+function orange_restore_audit_post_validation_append_once(
+    string $workRoot,
+    string $jobId,
+    array $job,
+    string $event,
+    string $result,
+    array $extra = []
+): void {
+    if (orange_restore_audit_post_validation_has_event($workRoot, $jobId, $event)) {
+        return;
+    }
+
+    orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_post_validation_event($job, $event, $result, $extra));
+}

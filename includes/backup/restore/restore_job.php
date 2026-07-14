@@ -26,6 +26,8 @@ const ORANGE_RESTORE_JOB_STATUS_FAILED_MERGE = 'failed_merge';
 const ORANGE_RESTORE_JOB_STATUS_MERGE_APPROVED = 'merge_approved';
 const ORANGE_RESTORE_JOB_STATUS_MERGED = 'production_merged';
 const ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED = 'post_validation_passed';
+const ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING = 'maintenance_disable_pending';
+const ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED = 'maintenance_disabled';
 const ORANGE_RESTORE_JOB_STATUS_FAILED_POST_MERGE = 'failed_post_merge';
 const ORANGE_RESTORE_JOB_STATUS_ROLLBACK_IN_PROGRESS = 'rollback_in_progress';
 const ORANGE_RESTORE_JOB_STATUS_ROLLED_BACK = 'rolled_back';
@@ -82,6 +84,8 @@ function orange_restore_job_allowed_statuses(): array
         ORANGE_RESTORE_JOB_STATUS_MERGE_APPROVED,
         ORANGE_RESTORE_JOB_STATUS_MERGED,
         ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED,
+        ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING,
+        ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED,
         ORANGE_RESTORE_JOB_STATUS_FAILED_POST_MERGE,
         ORANGE_RESTORE_JOB_STATUS_ROLLBACK_IN_PROGRESS,
         ORANGE_RESTORE_JOB_STATUS_ROLLED_BACK,
@@ -191,6 +195,8 @@ function orange_restore_job_create(string $workRoot, array $input): array
         'production_merged_at' => '',
         'post_validation_passed_at' => '',
         'post_validation_report_path' => '',
+        'maintenance_disable_pending_at' => '',
+        'maintenance_disabled_at' => '',
         'final_restore_report_path' => '',
         'restore_completed_at' => '',
         'rollback_checkpoint' => '',
@@ -685,8 +691,26 @@ function orange_restore_job_post_validation_transition_map(): array
             ORANGE_RESTORE_JOB_STATUS_FAILED_POST_MERGE,
         ],
         ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED => [
+            ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING,
+        ],
+        ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING => [
+            ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED,
+        ],
+        ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED => [
             ORANGE_RESTORE_JOB_STATUS_COMPLETED,
         ],
+    ];
+}
+
+/**
+ * @return list<string>
+ */
+function orange_restore_job_post_validation_finalize_entry_statuses(): array
+{
+    return [
+        ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED,
+        ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING,
+        ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED,
     ];
 }
 
