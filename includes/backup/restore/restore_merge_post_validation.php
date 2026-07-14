@@ -8,6 +8,7 @@ require_once __DIR__ . '/restore_lock.php';
 require_once __DIR__ . '/restore_merge_maintenance.php';
 require_once __DIR__ . '/restore_validation_adapter.php';
 require_once __DIR__ . '/restore_validation_adapter_production.php';
+require_once __DIR__ . '/restore_merge_precheck.php';
 require_once __DIR__ . '/../backup_environment.php';
 require_once __DIR__ . '/../backup_manifest.php';
 
@@ -426,15 +427,265 @@ function orange_restore_merge_post_validation_finalize_entry_statuses(): array
 /**
  * @param array<string, mixed> $job
  * @param array<string, mixed> $report
+ * @return list<string>
  */
-function orange_restore_merge_post_validation_verify_finalize_prerequisites(
+function orange_restore_merge_post_validation_completion_missing_artifacts(
     string $workRoot,
     string $jobId,
     array $job,
-    array $report
+    array $report = []
+): array {
+    $missing = [];
+
+    if ((string) ($job['restore_completed_at'] ?? '') === '') {
+        $missing[] = 'restore_completed_at';
+    }
+    if ((string) ($job['maintenance_disable_pending_at'] ?? '') === '') {
+        $missing[] = 'maintenance_disable_pending_at';
+    }
+    if ((string) ($job['maintenance_disabled_at'] ?? '') === '') {
+        $missing[] = 'maintenance_disabled_at';
+    }
+
+    $finalReportPath = (string) ($job['final_restore_report_path'] ?? '');
+    if ($finalReportPath === '') {
+        $finalReportPath = orange_restore_final_restore_report_path($workRoot, $jobId);
+    }
+    if (!is_file($finalReportPath)) {
+        $missing[] = 'final_restore_report.json';
+    } else {
+        $raw = file_get_contents($finalReportPath);
+        $finalReport = is_string($raw) ? json_decode($raw, true) : null;
+        if (!is_array($finalReport)
+            || (string) ($finalReport['job_status'] ?? '') !== ORANGE_RESTORE_JOB_STATUS_COMPLETED
+            || (string) ($finalReport['completed_at'] ?? '') === ''
+            || ($finalReport['maintenance_disabled'] ?? null) !== true) {
+            $missing[] = 'final_restore_report_completion_fields';
+        }
+    }
+
+    foreach ([
+        'maintenance_disable_pending',
+        'maintenance_disabled_checkpoint',
+        'maintenance_disabled',
+        'restore_completed',
+    ] as $eventName) {
+        if (!orange_restore_audit_post_validation_has_event($workRoot, $jobId, $eventName)) {
+            $missing[] = 'audit:' . $eventName;
+        }
+    }
+
+    return $missing;
+}
+
+/**
+ * @param array<string, mixed> $job
+ */
+function orange_restore_merge_post_validation_is_fully_reconciled(
+    string $workRoot,
+    string $jobId,
+    array $job
+): bool {
+    return orange_restore_merge_post_validation_completion_missing_artifacts($workRoot, $jobId, $job) === [];
+}
+
+/**
+ * @param array<string, mixed> $extra
+ */
+function orange_restore_merge_post_validation_throw_reconciliation_failure(
+    string $workRoot,
+    string $jobId,
+    string $failureSummary,
+    array $missingArtifacts,
+    array $reportingErrors,
+    array $persisted,
+    array $extra = []
 ): void {
+    $report = [
+        'generated_at' => gmdate('c'),
+        'job_id' => $jobId,
+        'overall_result' => 'fail',
+        'hard_failures' => [$failureSummary],
+        'warnings' => [],
+    ];
+    $emergencyResult = orange_restore_merge_post_validation_write_emergency_failure_log(
+        $workRoot,
+        $jobId,
+        $failureSummary,
+        $report,
+        $reportingErrors,
+        $persisted,
+        is_array($extra['emergency_log_override'] ?? null) ? $extra['emergency_log_override'] : []
+    );
+
+    $message = 'Restore completion reconciliation failed (job=' . $jobId . '): ' . $failureSummary
+        . '; missing=' . implode(',', $missingArtifacts);
+    if ($reportingErrors !== []) {
+        $message .= '; reporting_errors=' . implode('; ', array_map(
+            static fn (string $key, string $value): string => $key . ': ' . $value,
+            array_keys($reportingErrors),
+            array_values($reportingErrors)
+        ));
+    }
+    if ((string) ($emergencyResult['emergency_log_path'] ?? '') !== '') {
+        $message .= '; emergency_log=' . (string) $emergencyResult['emergency_log_path'];
+    }
+
+    throw new RuntimeException($message);
+}
+
+/**
+ * Fail closed when a checkpoint requires maintenance to already be OFF.
+ */
+function orange_restore_merge_post_validation_assert_maintenance_off_for_checkpoint(
+    string $workRoot,
+    string $jobId,
+    string $checkpointContext
+): void {
+    $state = orange_restore_merge_maintenance_read_state($workRoot);
+    if (!(bool) ($state['active'] ?? false)) {
+        return;
+    }
+
+    if ((bool) ($state['corrupt'] ?? false)) {
+        throw new RuntimeException(
+            'Restore maintenance mode file is corrupt (' . $checkpointContext . ' aborted).'
+        );
+    }
+
+    $ownerJobId = (string) ($state['payload']['job_id'] ?? '');
+    throw new RuntimeException(
+        'Inconsistent maintenance/job checkpoint state (' . $checkpointContext . '): maintenance is active'
+        . ($ownerJobId !== '' ? ' for job ' . $ownerJobId : '')
+        . ' but ' . $checkpointContext . ' requires maintenance OFF. Manual operator investigation required.'
+    );
+}
+
+/**
+ * @param array<string, mixed> $job
+ */
+function orange_restore_merge_post_validation_handle_maintenance_for_finalize(
+    string $workRoot,
+    string $jobId,
+    array $job
+): bool {
+    $status = (string) ($job['status'] ?? '');
+
+    if ($status === ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED) {
+        orange_restore_merge_post_validation_assert_maintenance_off_for_checkpoint(
+            $workRoot,
+            $jobId,
+            'maintenance_disabled'
+        );
+
+        return false;
+    }
+
+    if ($status === ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING) {
+        $maintenanceActive = orange_restore_merge_post_validation_assert_maintenance_owned_active($workRoot, $jobId, $job);
+        if ($maintenanceActive) {
+            orange_restore_merge_maintenance_disable($workRoot, $jobId, [
+                'reason' => 'post_validation_passed',
+            ]);
+
+            return true;
+        }
+
+        orange_restore_merge_post_validation_verify_finalize_audit_chain($workRoot, $jobId, $job);
+
+        return false;
+    }
+
+    // post_validation_passed — legacy recovery may resume with maintenance already OFF.
+    $maintenanceActive = orange_restore_merge_post_validation_assert_maintenance_owned_active($workRoot, $jobId, $job);
+    if ($maintenanceActive) {
+        orange_restore_merge_maintenance_disable($workRoot, $jobId, [
+            'reason' => 'post_validation_passed',
+        ]);
+
+        return true;
+    }
+
+    orange_restore_merge_post_validation_verify_finalize_audit_chain($workRoot, $jobId, $job);
+
+    return false;
+}
+
+/**
+ * @param array<string, mixed> $job
+ * @param array<string, mixed> $report
+ * @param array<string, mixed> $options
+ */
+function orange_restore_merge_post_validation_verify_finalize_prerequisites(
+    string $projectRoot,
+    string $backupRoot,
+    string $workRoot,
+    string $jobId,
+    array $job,
+    array $report,
+    array $options = []
+): void {
+    if (isset($options['finalize_prerequisites_override']) && is_callable($options['finalize_prerequisites_override'])) {
+        ($options['finalize_prerequisites_override'])([
+            'project_root' => $projectRoot,
+            'backup_root' => $backupRoot,
+            'work_root' => $workRoot,
+            'job_id' => $jobId,
+            'job' => $job,
+            'report' => $report,
+        ]);
+
+        return;
+    }
+
     if ((string) ($job['post_validation_passed_at'] ?? '') === '') {
         throw new RuntimeException('Post-validation passed timestamp missing on job (job=' . $jobId . ').');
+    }
+
+    if ((string) ($report['job_id'] ?? '') !== $jobId) {
+        throw new RuntimeException('Post-validation report job_id does not match restore job.');
+    }
+
+    if ((string) ($report['overall_result'] ?? '') !== 'pass') {
+        throw new RuntimeException('Post-validation report does not show pass (overall_result=' . (string) ($report['overall_result'] ?? '') . ').');
+    }
+
+    $hardFailures = $report['hard_failures'] ?? [];
+    if (!is_array($hardFailures)) {
+        throw new RuntimeException('Post-validation report hard_failures is malformed.');
+    }
+    if ($hardFailures !== []) {
+        throw new RuntimeException('Post-validation report contains hard failures.');
+    }
+
+    $jobSchemaRevision = (int) ($job['schema_revision'] ?? 0);
+    $reportSchemaRevision = (int) ($report['schema_revision'] ?? 0);
+    if ($jobSchemaRevision <= 0 || $reportSchemaRevision <= 0 || $jobSchemaRevision !== $reportSchemaRevision) {
+        throw new RuntimeException('Post-validation report schema_revision does not match job.');
+    }
+
+    $reportProductionDb = trim((string) ($report['production_db_identity'] ?? ''));
+    $jobProductionDb = trim((string) ($job['merge_precheck_production_db'] ?? ''));
+    if ($reportProductionDb === '') {
+        throw new RuntimeException('Post-validation report production_db_identity is missing.');
+    }
+    if ($jobProductionDb !== '' && $reportProductionDb !== $jobProductionDb) {
+        throw new RuntimeException('Post-validation report production_db_identity does not match job.');
+    }
+
+    $packageIdentity = is_array($report['package_identity'] ?? null) ? $report['package_identity'] : [];
+    $reportPackagePath = trim((string) ($packageIdentity['source_package_path'] ?? ''));
+    $reportPackageChecksum = trim((string) ($packageIdentity['source_package_checksum'] ?? ''));
+    $jobPackagePath = trim((string) ($job['source_package_path'] ?? ''));
+    $jobPackageChecksum = trim((string) ($job['source_package_checksum'] ?? ''));
+    if ($jobPackagePath === '' || $jobPackageChecksum === '') {
+        throw new RuntimeException('Job source package identity is missing.');
+    }
+    if ($reportPackagePath !== '' && $reportPackagePath !== $jobPackagePath) {
+        throw new RuntimeException('Post-validation report package path does not match job.');
+    }
+    if ($reportPackageChecksum !== '' && !hash_equals($reportPackageChecksum, $jobPackageChecksum)) {
+        throw new RuntimeException('Post-validation report package checksum does not match job.');
     }
 
     $jobPath = trim((string) ($job['fresh_backup_path'] ?? ''));
@@ -447,13 +698,45 @@ function orange_restore_merge_post_validation_verify_finalize_prerequisites(
     }
 
     $reportAnchor = is_array($report['rollback_anchor_identity'] ?? null) ? $report['rollback_anchor_identity'] : [];
-    $reportPath = trim((string) ($reportAnchor['fresh_backup_path'] ?? ''));
-    $reportChecksum = trim((string) ($reportAnchor['fresh_backup_checksum'] ?? ''));
-    if ($reportPath !== '' && $reportPath !== $jobPath) {
+    $reportAnchorPath = trim((string) ($reportAnchor['fresh_backup_path'] ?? ''));
+    $reportAnchorChecksum = trim((string) ($reportAnchor['fresh_backup_checksum'] ?? ''));
+    if ($reportAnchorPath !== '' && $reportAnchorPath !== $jobPath) {
         throw new RuntimeException('Post-validation report rollback anchor path does not match job.');
     }
-    if ($reportChecksum !== '' && !hash_equals($reportChecksum, $jobChecksum)) {
+    if ($reportAnchorChecksum !== '' && !hash_equals($reportAnchorChecksum, $jobChecksum)) {
         throw new RuntimeException('Post-validation report rollback anchor checksum does not match job.');
+    }
+
+    /** @var array<string, mixed> $binding */
+    $binding = is_array($job['approval_token_binding'] ?? null) ? $job['approval_token_binding'] : [];
+    if ($binding === []) {
+        throw new RuntimeException('Approval token binding is missing on job.');
+    }
+    orange_restore_merge_precheck_assert_binding_checksums($job, $binding);
+
+    orange_restore_orchestrator_verify_live_package_checksum($backupRoot, $job);
+
+    $stagingGate = orange_restore_validation_adapter_staging_gate($workRoot, $job);
+    if (!$stagingGate['ok']) {
+        throw new RuntimeException(
+            'Staging manifest binding verification failed: ' . implode('; ', $stagingGate['errors'])
+        );
+    }
+
+    $liveManifestChecksum = (string) ($stagingGate['manifest_checksum'] ?? '');
+    if ($liveManifestChecksum === '') {
+        throw new RuntimeException('Live staging_restore_manifest checksum is missing.');
+    }
+    if (!hash_equals((string) ($binding['staging_restore_manifest_checksum'] ?? ''), $liveManifestChecksum)) {
+        throw new RuntimeException('Staging manifest checksum mismatch (binding vs live staging manifest).');
+    }
+
+    $liveAnchorChecksum = orange_restore_merge_precheck_live_rollback_checksum($jobPath);
+    if (!hash_equals($jobChecksum, $liveAnchorChecksum)) {
+        throw new RuntimeException('Rollback anchor checksum mismatch (job vs live anchor package).');
+    }
+    if (!hash_equals((string) ($binding['rollback_anchor_checksum'] ?? ''), $liveAnchorChecksum)) {
+        throw new RuntimeException('Rollback anchor checksum mismatch (binding vs live anchor package).');
     }
 
     if (!orange_restore_audit_post_validation_has_event($workRoot, $jobId, 'production_post_validation_passed')) {
@@ -504,6 +787,169 @@ function orange_restore_merge_post_validation_assert_maintenance_owned_active(st
 }
 
 /**
+ * Read-only/idempotent completion artifact reconciliation for terminal completed jobs.
+ *
+ * @param array<string, mixed> $job
+ * @param array<string, mixed> $report
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_post_validation_reconcile_completed_artifacts(
+    string $workRoot,
+    string $jobId,
+    int $adminId,
+    array $job,
+    array $report,
+    string $reportPath,
+    int $durationSeconds,
+    array $options = []
+): array {
+    orange_restore_merge_post_validation_assert_maintenance_off_for_checkpoint(
+        $workRoot,
+        $jobId,
+        'completed reconciliation'
+    );
+
+    $missingBefore = orange_restore_merge_post_validation_completion_missing_artifacts($workRoot, $jobId, $job, $report);
+    if ($missingBefore === []) {
+        return [
+            'ok' => true,
+            'job_id' => $jobId,
+            'status' => ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+            'job' => $job,
+            'post_validation_report_path' => $reportPath,
+            'final_restore_report_path' => (string) ($job['final_restore_report_path'] ?? orange_restore_final_restore_report_path($workRoot, $jobId)),
+            'reconciled' => false,
+            'idempotent' => true,
+            'database_writes' => false,
+            'production_writes' => false,
+            'rollback_executed' => false,
+        ];
+    }
+
+    $persisted = [];
+    $reportingErrors = [];
+    $completedAt = (string) ($job['restore_completed_at'] ?? '');
+    if ($completedAt === '') {
+        $completedAt = gmdate('c');
+    }
+
+    $finalReportPath = (string) ($job['final_restore_report_path'] ?? '');
+    if ($finalReportPath === '') {
+        $finalReportPath = orange_restore_final_restore_report_path($workRoot, $jobId);
+    }
+
+    $jobPatch = [
+        'restore_completed_at' => $completedAt,
+        'final_restore_report_path' => $finalReportPath,
+    ];
+    if ((string) ($job['maintenance_disable_pending_at'] ?? '') === '') {
+        $jobPatch['maintenance_disable_pending_at'] = $completedAt;
+    }
+    if ((string) ($job['maintenance_disabled_at'] ?? '') === '') {
+        $jobPatch['maintenance_disabled_at'] = $completedAt;
+    }
+
+    try {
+        $job = orange_restore_job_read($workRoot, $jobId);
+        foreach ($jobPatch as $key => $value) {
+            if ($value !== '' && (string) ($job[(string) $key] ?? '') === '') {
+                $job[(string) $key] = $value;
+            }
+        }
+        orange_restore_job_write($workRoot, $job);
+        $persisted['job_completion_fields'] = true;
+    } catch (Throwable $e) {
+        $reportingErrors['job_completion_fields'] = $e->getMessage();
+        $persisted['job_completion_fields'] = false;
+    }
+
+    $finalReport = array_merge($report, [
+        'completed_at' => $completedAt,
+        'job_status' => ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+        'maintenance_disabled' => true,
+    ]);
+
+    $writeFinalReport = isset($options['final_report_write_override']) && is_callable($options['final_report_write_override'])
+        ? $options['final_report_write_override']
+        : static function (string $path, array $payload): void {
+            orange_backup_write_json($path, $payload);
+        };
+
+    try {
+        $writeFinalReport($finalReportPath, $finalReport);
+        $persisted['final_restore_report.json'] = true;
+    } catch (Throwable $e) {
+        $reportingErrors['final_restore_report.json'] = $e->getMessage();
+        $persisted['final_restore_report.json'] = false;
+    }
+
+    $job = orange_restore_job_read($workRoot, $jobId);
+
+    orange_restore_audit_post_validation_append_once($workRoot, $jobId, $job, 'maintenance_disable_pending', 'checkpoint', [
+        'operator_admin_id' => $adminId,
+        'reconciled' => true,
+        'database_writes' => false,
+        'production_writes' => false,
+    ]);
+    orange_restore_audit_post_validation_append_once($workRoot, $jobId, $job, 'maintenance_disabled_checkpoint', 'checkpoint', [
+        'operator_admin_id' => $adminId,
+        'reconciled' => true,
+        'maintenance_was_active' => false,
+        'database_writes' => false,
+        'production_writes' => false,
+    ]);
+    orange_restore_audit_post_validation_append_once($workRoot, $jobId, $job, 'maintenance_disabled', 'pass', [
+        'operator_admin_id' => $adminId,
+        'reconciled' => true,
+        'database_writes' => false,
+        'production_writes' => false,
+    ]);
+    orange_restore_audit_post_validation_append_once($workRoot, $jobId, $job, 'restore_completed', 'pass', [
+        'operator_admin_id' => $adminId,
+        'duration_seconds' => $durationSeconds,
+        'reconciled' => true,
+        'database_writes' => false,
+        'production_writes' => false,
+        'rollback_executed' => false,
+    ]);
+
+    $job = orange_restore_job_read($workRoot, $jobId);
+    $missingAfter = orange_restore_merge_post_validation_completion_missing_artifacts($workRoot, $jobId, $job, $report);
+    if ($missingAfter !== [] || in_array(false, $persisted, true)) {
+        orange_restore_merge_post_validation_throw_reconciliation_failure(
+            $workRoot,
+            $jobId,
+            'Completion artifact reconciliation could not persist all required artifacts.',
+            $missingAfter,
+            $reportingErrors,
+            $persisted,
+            $options
+        );
+    }
+
+    orange_restore_audit_post_validation_append_once($workRoot, $jobId, $job, 'restore_completion_reconciled', 'pass', [
+        'operator_admin_id' => $adminId,
+        'database_writes' => false,
+        'production_writes' => false,
+    ]);
+
+    return [
+        'ok' => true,
+        'job_id' => $jobId,
+        'status' => ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+        'job' => $job,
+        'post_validation_report_path' => $reportPath,
+        'final_restore_report_path' => $finalReportPath,
+        'reconciled' => true,
+        'idempotent' => false,
+        'database_writes' => false,
+        'production_writes' => false,
+        'rollback_executed' => false,
+    ];
+}
+
+/**
  * @param array<string, mixed> $job
  * @param array<string, mixed> $report
  * @return array<string, mixed>
@@ -515,23 +961,24 @@ function orange_restore_merge_post_validation_complete_after_pass(
     array $job,
     array $report,
     string $reportPath,
-    int $durationSeconds
+    int $durationSeconds,
+    array $options = []
 ): array {
+    $projectRoot = (string) ($options['project_root'] ?? '');
+    $backupRoot = (string) ($options['backup_root'] ?? '');
     $currentStatus = (string) ($job['status'] ?? '');
 
     if ($currentStatus === ORANGE_RESTORE_JOB_STATUS_COMPLETED) {
-        return [
-            'ok' => true,
-            'job_id' => $jobId,
-            'status' => ORANGE_RESTORE_JOB_STATUS_COMPLETED,
-            'job' => $job,
-            'post_validation_report_path' => $reportPath,
-            'final_restore_report_path' => (string) ($job['final_restore_report_path'] ?? ''),
-            'idempotent' => true,
-            'database_writes' => false,
-            'production_writes' => false,
-            'rollback_executed' => false,
-        ];
+        return orange_restore_merge_post_validation_reconcile_completed_artifacts(
+            $workRoot,
+            $jobId,
+            $adminId,
+            $job,
+            $report,
+            $reportPath,
+            $durationSeconds,
+            $options
+        );
     }
 
     if (!in_array($currentStatus, [
@@ -592,16 +1039,17 @@ function orange_restore_merge_post_validation_complete_after_pass(
         ]);
     }
 
-    orange_restore_merge_post_validation_verify_finalize_prerequisites($workRoot, $jobId, $job, $report);
+    orange_restore_merge_post_validation_verify_finalize_prerequisites(
+        $projectRoot,
+        $backupRoot,
+        $workRoot,
+        $jobId,
+        $job,
+        $report,
+        $options
+    );
 
-    $maintenanceActive = orange_restore_merge_post_validation_assert_maintenance_owned_active($workRoot, $jobId, $job);
-    if ($maintenanceActive) {
-        orange_restore_merge_maintenance_disable($workRoot, $jobId, [
-            'reason' => 'post_validation_passed',
-        ]);
-    } else {
-        orange_restore_merge_post_validation_verify_finalize_audit_chain($workRoot, $jobId, $job);
-    }
+    $maintenanceActive = orange_restore_merge_post_validation_handle_maintenance_for_finalize($workRoot, $jobId, $job);
 
     $currentStatus = (string) ($job['status'] ?? '');
     if ($currentStatus !== ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED) {
@@ -643,18 +1091,16 @@ function orange_restore_merge_post_validation_complete_after_pass(
     }
 
     if ((string) ($job['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_COMPLETED) {
-        return [
-            'ok' => true,
-            'job_id' => $jobId,
-            'status' => ORANGE_RESTORE_JOB_STATUS_COMPLETED,
-            'job' => $job,
-            'post_validation_report_path' => $reportPath,
-            'final_restore_report_path' => (string) ($job['final_restore_report_path'] ?? ''),
-            'idempotent' => true,
-            'database_writes' => false,
-            'production_writes' => false,
-            'rollback_executed' => false,
-        ];
+        return orange_restore_merge_post_validation_reconcile_completed_artifacts(
+            $workRoot,
+            $jobId,
+            $adminId,
+            $job,
+            $report,
+            $reportPath,
+            $durationSeconds,
+            $options
+        );
     }
 
     $completedAt = gmdate('c');
@@ -755,28 +1201,10 @@ function orange_restore_merge_post_validation_finalize_run(array $options): arra
     if ($workRoot === '') {
         $workRoot = orange_restore_resolve_work_root($env);
     }
+    $backupRoot = orange_backup_resolve_root($env);
 
     $job = orange_restore_job_read($workRoot, $jobId);
     $entryStatus = (string) ($job['status'] ?? '');
-
-    if ($entryStatus === ORANGE_RESTORE_JOB_STATUS_COMPLETED) {
-        return [
-            'ok' => true,
-            'job_id' => $jobId,
-            'status' => ORANGE_RESTORE_JOB_STATUS_COMPLETED,
-            'job' => $job,
-            'idempotent' => true,
-            'database_writes' => false,
-            'production_writes' => false,
-            'rollback_executed' => false,
-        ];
-    }
-
-    if (!in_array($entryStatus, orange_restore_merge_post_validation_finalize_entry_statuses(), true)) {
-        throw new RuntimeException(
-            'Post-validation finalize requires post_validation_passed, maintenance_disable_pending, or maintenance_disabled (status=' . $entryStatus . ').'
-        );
-    }
 
     if (($job['job_type'] ?? '') !== ORANGE_RESTORE_JOB_TYPE_FULL) {
         throw new RuntimeException('Post-validation finalize applies to full_disaster jobs only.');
@@ -785,6 +1213,46 @@ function orange_restore_merge_post_validation_finalize_run(array $options): arra
     orange_restore_lock_assert_held_by_job($workRoot, $jobId);
 
     $loaded = orange_restore_merge_post_validation_load_pass_report($workRoot, $jobId, $job);
+
+    orange_restore_merge_post_validation_verify_finalize_prerequisites(
+        $projectRoot,
+        $backupRoot,
+        $workRoot,
+        $jobId,
+        $job,
+        $loaded['report'],
+        $options
+    );
+
+    if ($entryStatus === ORANGE_RESTORE_JOB_STATUS_COMPLETED) {
+        orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_post_validation_event($job, 'production_post_validation_finalize_started', 'started', [
+            'operator_admin_id' => $adminId,
+            'resume_from' => $entryStatus,
+            'reconciliation' => true,
+            'database_writes' => false,
+            'production_writes' => false,
+        ]));
+
+        return orange_restore_merge_post_validation_reconcile_completed_artifacts(
+            $workRoot,
+            $jobId,
+            $adminId,
+            $job,
+            $loaded['report'],
+            $loaded['report_path'],
+            (int) ($job['duration_seconds'] ?? 0),
+            array_merge($options, [
+                'project_root' => $projectRoot,
+                'backup_root' => $backupRoot,
+            ])
+        );
+    }
+
+    if (!in_array($entryStatus, orange_restore_merge_post_validation_finalize_entry_statuses(), true)) {
+        throw new RuntimeException(
+            'Post-validation finalize requires post_validation_passed, maintenance_disable_pending, maintenance_disabled, or completed reconciliation (status=' . $entryStatus . ').'
+        );
+    }
 
     orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_post_validation_event($job, 'production_post_validation_finalize_started', 'started', [
         'operator_admin_id' => $adminId,
@@ -800,7 +1268,11 @@ function orange_restore_merge_post_validation_finalize_run(array $options): arra
         $job,
         $loaded['report'],
         $loaded['report_path'],
-        (int) ($job['duration_seconds'] ?? 0)
+        (int) ($job['duration_seconds'] ?? 0),
+        array_merge($options, [
+            'project_root' => $projectRoot,
+            'backup_root' => $backupRoot,
+        ])
     );
 }
 
@@ -835,6 +1307,7 @@ function orange_restore_merge_post_validation_run(array $options): array
     if ($workRoot === '') {
         $workRoot = orange_restore_resolve_work_root($env);
     }
+    $backupRoot = orange_backup_resolve_root($env);
 
     $job = orange_restore_job_read($workRoot, $jobId);
     $startedAt = microtime(true);
@@ -957,7 +1430,11 @@ function orange_restore_merge_post_validation_run(array $options): array
             $job,
             $report,
             $reportPath,
-            $durationSeconds
+            $durationSeconds,
+            array_merge($options, [
+                'project_root' => $projectRoot,
+                'backup_root' => $backupRoot,
+            ])
         );
     } catch (Throwable $e) {
         if ($originalFailure === null && ($job['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_MERGED) {

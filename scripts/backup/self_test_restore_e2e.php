@@ -17,6 +17,7 @@ if (PHP_SAPI !== 'cli') {
 $repoRoot = dirname(__DIR__, 2);
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_environment.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_paths.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_job.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_lock.php';
@@ -167,6 +168,107 @@ function e2e_seed_job(string $status, array $extra = []): array
 /**
  * @return array<string, mixed>
  */
+function e2e_finalize_install_bindings(array $seed): array
+{
+    $backupRoot = $seed['backupRoot'];
+    $workRoot = $seed['workRoot'];
+    $jobId = $seed['jobId'];
+
+    $packageDir = $backupRoot . DIRECTORY_SEPARATOR . 'pkg_' . bin2hex(random_bytes(2));
+    mkdir($packageDir);
+    orange_backup_write_json($packageDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+        'package_type' => ORANGE_RESTORE_JOB_TYPE_FULL,
+        'dump_sha256' => str_repeat('c', 64),
+    ]);
+    orange_backup_write_checksums($packageDir, ['manifest.json']);
+    $packageChecksum = orange_backup_sha256_file($packageDir . DIRECTORY_SEPARATOR . 'checksums.sha256');
+
+    $anchorDir = $backupRoot . DIRECTORY_SEPARATOR . 'anchor_' . bin2hex(random_bytes(2));
+    mkdir($anchorDir);
+    file_put_contents($anchorDir . DIRECTORY_SEPARATOR . 'dump.sql.gz', 'fake-dump');
+    orange_backup_write_json($anchorDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+        'package_type' => ORANGE_RESTORE_JOB_TYPE_FULL,
+        'dump_sha256' => str_repeat('d', 64),
+    ]);
+    orange_backup_write_checksums($anchorDir, ['manifest.json', 'dump.sql.gz']);
+    $anchorChecksum = orange_backup_sha256_file($anchorDir . DIRECTORY_SEPARATOR . 'checksums.sha256');
+
+    $stagingManifestPath = orange_restore_job_staging_manifest_path($workRoot, $jobId);
+    orange_backup_write_json($stagingManifestPath, [
+        'generated_at' => gmdate('c'),
+        'job_id' => $jobId,
+        'overall_result' => 'pass',
+    ]);
+    $manifestChecksum = orange_backup_sha256_file($stagingManifestPath);
+
+    $restoreReportPath = orange_restore_job_report_path($workRoot, $jobId);
+    orange_backup_write_json($restoreReportPath, [
+        'generated_at' => gmdate('c'),
+        'job_id' => $jobId,
+        'overall_result' => 'pass',
+        'production_touched' => false,
+        'staging_post_validation' => ['ok' => true],
+        'staging_drv_report' => ['overall_result' => 'pass'],
+    ]);
+
+    $job = orange_restore_job_read($workRoot, $jobId);
+    $job['source_package_path'] = $packageDir;
+    $job['source_package_checksum'] = $packageChecksum;
+    $job['fresh_backup_path'] = $anchorDir;
+    $job['fresh_backup_checksum'] = $anchorChecksum;
+    $job['rollback_anchor_job_only'] = true;
+    $job['schema_revision'] = 121;
+    $job['merge_precheck_production_db'] = 'orange_db';
+    $job['staging_restore_manifest_path'] = $stagingManifestPath;
+    $job['restore_report_path'] = $restoreReportPath;
+    $job['approval_token_binding'] = [
+        'source_package_checksum' => $packageChecksum,
+        'staging_restore_manifest_checksum' => $manifestChecksum,
+        'rollback_anchor_checksum' => $anchorChecksum,
+    ];
+    orange_restore_job_write($workRoot, $job);
+
+    $reportPath = orange_restore_production_post_validation_report_path($workRoot, $jobId);
+    orange_backup_write_json($reportPath, [
+        'generated_at' => gmdate('c'),
+        'job_id' => $jobId,
+        'overall_result' => 'pass',
+        'hard_failures' => [],
+        'warnings' => [],
+        'schema_revision' => 121,
+        'production_db_identity' => 'orange_db',
+        'package_identity' => [
+            'source_package_path' => $packageDir,
+            'source_package_checksum' => $packageChecksum,
+            'package_version' => '',
+        ],
+        'rollback_anchor_identity' => [
+            'fresh_backup_path' => $anchorDir,
+            'fresh_backup_checksum' => $anchorChecksum,
+            'rollback_anchor_job_only' => true,
+        ],
+    ]);
+    $job = orange_restore_job_read($workRoot, $jobId);
+    $job['post_validation_report_path'] = $reportPath;
+    orange_restore_job_write($workRoot, $job);
+    orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_post_validation_event($job, 'production_post_validation_passed', 'pass', [
+        'operator_admin_id' => 1,
+        'database_writes' => false,
+        'production_writes' => false,
+    ]));
+
+    $seed['job'] = orange_restore_job_read($workRoot, $jobId);
+    $seed['reportPath'] = $reportPath;
+    $seed['packageChecksum'] = $packageChecksum;
+    $seed['manifestChecksum'] = $manifestChecksum;
+    $seed['anchorChecksum'] = $anchorChecksum;
+
+    return $seed;
+}
+
+/**
+ * @return array<string, mixed>
+ */
 function e2e_seed_finalize_checkpoint(string $status, array $extra = []): array
 {
     $seed = e2e_seed_job($status, array_merge([
@@ -175,27 +277,13 @@ function e2e_seed_finalize_checkpoint(string $status, array $extra = []): array
         'fresh_backup_checksum' => str_repeat('9', 64),
         'rollback_anchor_job_only' => true,
     ], $extra));
-    $reportPath = orange_restore_production_post_validation_report_path($seed['workRoot'], $seed['jobId']);
-    orange_backup_write_json($reportPath, [
-        'generated_at' => gmdate('c'),
-        'job_id' => $seed['jobId'],
-        'overall_result' => 'pass',
-        'hard_failures' => [],
-        'warnings' => [],
-        'rollback_anchor_identity' => [
-            'fresh_backup_path' => '/tmp/fresh-backup',
-            'fresh_backup_checksum' => str_repeat('9', 64),
-            'rollback_anchor_job_only' => true,
-        ],
-    ]);
+    $seed = e2e_finalize_install_bindings($seed);
     $job = orange_restore_job_read($seed['workRoot'], $seed['jobId']);
-    $job['post_validation_report_path'] = $reportPath;
+    foreach ($extra as $key => $value) {
+        $job[(string) $key] = $value;
+    }
+    $job['status'] = $status;
     orange_restore_job_write($seed['workRoot'], $job);
-    orange_restore_audit_append($seed['workRoot'], $seed['jobId'], orange_restore_audit_post_validation_event($job, 'production_post_validation_passed', 'pass', [
-        'operator_admin_id' => 1,
-        'database_writes' => false,
-        'production_writes' => false,
-    ]));
     if ($status === ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLE_PENDING) {
         orange_restore_audit_append($seed['workRoot'], $seed['jobId'], orange_restore_audit_post_validation_event($job, 'maintenance_disable_pending', 'checkpoint', [
             'operator_admin_id' => 1,
@@ -215,27 +303,26 @@ function e2e_seed_finalize_checkpoint(string $status, array $extra = []): array
             'production_writes' => false,
         ]));
     }
-
     $seed['job'] = orange_restore_job_read($seed['workRoot'], $seed['jobId']);
-    $seed['reportPath'] = $reportPath;
 
     return $seed;
 }
 
 /**
+ * @param array<string, mixed> $extraOptions
  * @return array<string, mixed>
  */
-function e2e_run_finalize(array $seed): array
+function e2e_run_finalize(array $seed, array $extraOptions = []): array
 {
     orange_restore_acquire_lock($seed['workRoot'], $seed['jobId']);
 
-    return orange_restore_merge_post_validation_finalize_run([
+    return orange_restore_merge_post_validation_finalize_run(array_merge([
         'project_root' => $seed['projectRoot'],
         'work_root' => $seed['workRoot'],
         'job_id' => $seed['jobId'],
         'admin_id' => 1,
         'env_override' => $seed['env'],
-    ]);
+    ], $extraOptions));
 }
 
 // --- routing ---
@@ -751,6 +838,230 @@ e2e_self_test(
     'checkpoint: restore_completed and maintenance_disabled emitted once'
 );
 e2e_rmdir($auditOnce['backupRoot']);
+
+// --- completed reconciliation + binding verification ---
+$crashCompleted = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_COMPLETED, [
+    'restore_completed_at' => gmdate('c'),
+]);
+$crashCompletedResult = e2e_run_finalize($crashCompleted);
+$crashCompletedEvents = array_column(
+    orange_restore_audit_read_all($crashCompleted['workRoot'], $crashCompleted['jobId']),
+    'post_validation_event'
+);
+e2e_self_test(
+    ($crashCompletedResult['reconciled'] ?? false) === true
+    && in_array('restore_completed', $crashCompletedEvents, true),
+    'reconcile: crash after completed state backfills restore_completed audit'
+);
+e2e_rmdir($crashCompleted['backupRoot']);
+
+$missingFinalFields = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_COMPLETED, [
+    'restore_completed_at' => gmdate('c'),
+    'maintenance_disable_pending_at' => gmdate('c'),
+    'maintenance_disabled_at' => gmdate('c'),
+]);
+orange_backup_write_json(orange_restore_final_restore_report_path($missingFinalFields['workRoot'], $missingFinalFields['jobId']), [
+    'job_id' => $missingFinalFields['jobId'],
+    'overall_result' => 'pass',
+]);
+$missingFinalResult = e2e_run_finalize($missingFinalFields);
+$missingFinalRaw = file_get_contents(orange_restore_final_restore_report_path($missingFinalFields['workRoot'], $missingFinalFields['jobId']));
+$missingFinalDecoded = is_string($missingFinalRaw) ? json_decode($missingFinalRaw, true) : null;
+e2e_self_test(
+    ($missingFinalResult['reconciled'] ?? false) === true
+    && is_array($missingFinalDecoded)
+    && (string) ($missingFinalDecoded['job_status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+    'reconcile: missing final_restore_report completion fields are backfilled'
+);
+e2e_rmdir($missingFinalFields['backupRoot']);
+
+$reconcileBackfill = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_COMPLETED, [
+    'restore_completed_at' => gmdate('c'),
+]);
+$reconcileBackfillResult = e2e_run_finalize($reconcileBackfill);
+e2e_self_test(
+    ($reconcileBackfillResult['reconciled'] ?? false) === true
+    && is_file(orange_restore_final_restore_report_path($reconcileBackfill['workRoot'], $reconcileBackfill['jobId'])),
+    'reconcile: completed job backfills missing report and audit'
+);
+e2e_rmdir($reconcileBackfill['backupRoot']);
+
+$noValidationRerun = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_COMPLETED, [
+    'restore_completed_at' => gmdate('c'),
+]);
+$noValidationRerunResult = e2e_run_finalize($noValidationRerun);
+e2e_self_test(
+    ($noValidationRerunResult['production_writes'] ?? true) === false
+    && ($noValidationRerunResult['database_writes'] ?? true) === false,
+    'reconcile: completed reconciliation does not rerun validation'
+);
+e2e_rmdir($noValidationRerun['backupRoot']);
+
+$noDisableOnReconcile = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_COMPLETED, [
+    'restore_completed_at' => gmdate('c'),
+]);
+$noDisableResult = e2e_run_finalize($noDisableOnReconcile);
+$maintAfterReconcile = orange_restore_merge_maintenance_status($noDisableOnReconcile['workRoot']);
+e2e_self_test(
+    ($noDisableResult['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_COMPLETED
+    && ($maintAfterReconcile['active'] ?? true) === false,
+    'reconcile: completed reconciliation does not disable maintenance'
+);
+e2e_rmdir($noDisableOnReconcile['backupRoot']);
+
+$reconcileNoDup = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_COMPLETED, [
+    'restore_completed_at' => gmdate('c'),
+]);
+e2e_run_finalize($reconcileNoDup);
+e2e_run_finalize($reconcileNoDup);
+$reconcileEvents = array_column(
+    orange_restore_audit_read_all($reconcileNoDup['workRoot'], $reconcileNoDup['jobId']),
+    'post_validation_event'
+);
+$reconcileCompletedCount = count(array_filter($reconcileEvents, static fn ($event): bool => $event === 'restore_completed'));
+$reconcileReconciledCount = count(array_filter($reconcileEvents, static fn ($event): bool => $event === 'restore_completion_reconciled'));
+e2e_self_test(
+    $reconcileCompletedCount === 1 && $reconcileReconciledCount === 1,
+    'reconcile: completed reconciliation emits no duplicate completion events'
+);
+e2e_rmdir($reconcileNoDup['backupRoot']);
+
+$reconcilePersistFail = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_COMPLETED, [
+    'restore_completed_at' => gmdate('c'),
+]);
+$reconcilePersistErr = e2e_try(static function () use ($reconcilePersistFail): void {
+    e2e_run_finalize($reconcilePersistFail, [
+        'final_report_write_override' => static function (): void {
+            throw new RuntimeException('Simulated final report write failure.');
+        },
+    ]);
+});
+$emergencyPath = orange_restore_post_validation_emergency_failure_log_path($reconcilePersistFail['workRoot'], $reconcilePersistFail['jobId']);
+e2e_self_test(
+    $reconcilePersistErr !== null
+    && str_contains($reconcilePersistErr->getMessage(), 'reconciliation')
+    && is_file($emergencyPath),
+    'reconcile: persistence failure is visible and emergency-logged'
+);
+e2e_rmdir($reconcilePersistFail['backupRoot']);
+
+$pkgMismatch = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED);
+$pkgMismatchJob = orange_restore_job_read($pkgMismatch['workRoot'], $pkgMismatch['jobId']);
+$pkgMismatchJob['source_package_checksum'] = str_repeat('0', 64);
+orange_restore_job_write($pkgMismatch['workRoot'], $pkgMismatchJob);
+$pkgMismatchErr = e2e_try(static fn (): array => e2e_run_finalize($pkgMismatch));
+e2e_self_test(
+    $pkgMismatchErr !== null && str_contains($pkgMismatchErr->getMessage(), 'checksum'),
+    'binding: package checksum mismatch fails closed'
+);
+e2e_rmdir($pkgMismatch['backupRoot']);
+
+$stagingMismatch = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED);
+$stagingMismatchJob = orange_restore_job_read($stagingMismatch['workRoot'], $stagingMismatch['jobId']);
+$binding = is_array($stagingMismatchJob['approval_token_binding'] ?? null) ? $stagingMismatchJob['approval_token_binding'] : [];
+$binding['staging_restore_manifest_checksum'] = str_repeat('0', 64);
+$stagingMismatchJob['approval_token_binding'] = $binding;
+orange_restore_job_write($stagingMismatch['workRoot'], $stagingMismatchJob);
+$stagingMismatchErr = e2e_try(static fn (): array => e2e_run_finalize($stagingMismatch));
+e2e_self_test(
+    $stagingMismatchErr !== null && str_contains($stagingMismatchErr->getMessage(), 'Staging manifest checksum mismatch'),
+    'binding: staging manifest checksum mismatch fails closed'
+);
+e2e_rmdir($stagingMismatch['backupRoot']);
+
+$approvalMismatch = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED);
+$approvalMismatchJob = orange_restore_job_read($approvalMismatch['workRoot'], $approvalMismatch['jobId']);
+$approvalMismatchJob['approval_token_binding'] = [
+    'source_package_checksum' => str_repeat('0', 64),
+    'staging_restore_manifest_checksum' => (string) ($approvalMismatch['manifestChecksum'] ?? ''),
+    'rollback_anchor_checksum' => (string) ($approvalMismatch['anchorChecksum'] ?? ''),
+];
+orange_restore_job_write($approvalMismatch['workRoot'], $approvalMismatchJob);
+$approvalMismatchErr = e2e_try(static fn (): array => e2e_run_finalize($approvalMismatch));
+e2e_self_test(
+    $approvalMismatchErr !== null && str_contains($approvalMismatchErr->getMessage(), 'differs from approval binding'),
+    'binding: approval binding mismatch fails closed'
+);
+e2e_rmdir($approvalMismatch['backupRoot']);
+
+$anchorDrift = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED);
+$anchorPath = (string) ($anchorDrift['job']['fresh_backup_path'] ?? '');
+file_put_contents($anchorPath . DIRECTORY_SEPARATOR . 'checksums.sha256', str_repeat('f', 64) . "  manifest.json\n");
+$anchorDriftErr = e2e_try(static fn (): array => e2e_run_finalize($anchorDrift));
+e2e_self_test(
+    $anchorDriftErr !== null && str_contains($anchorDriftErr->getMessage(), 'Rollback anchor checksum mismatch'),
+    'binding: live rollback anchor checksum drift fails closed'
+);
+e2e_rmdir($anchorDrift['backupRoot']);
+
+$wrongJobReport = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED);
+$wrongJobReportPath = (string) ($wrongJobReport['reportPath'] ?? '');
+$wrongJobReportRaw = file_get_contents($wrongJobReportPath);
+if (is_string($wrongJobReportRaw)) {
+    orange_backup_write_json($wrongJobReportPath, array_merge(
+        json_decode($wrongJobReportRaw, true) ?: [],
+        ['job_id' => 'other-job-id']
+    ));
+}
+$wrongJobReportErr = e2e_try(static fn (): array => e2e_run_finalize($wrongJobReport));
+e2e_self_test(
+    $wrongJobReportErr !== null && str_contains($wrongJobReportErr->getMessage(), 'job_id'),
+    'binding: pass report for another job fails closed'
+);
+e2e_rmdir($wrongJobReport['backupRoot']);
+
+$dbMismatch = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED);
+$dbMismatchPath = (string) ($dbMismatch['reportPath'] ?? '');
+$dbMismatchRaw = file_get_contents($dbMismatchPath);
+if (is_string($dbMismatchRaw)) {
+    orange_backup_write_json($dbMismatchPath, array_merge(
+        json_decode($dbMismatchRaw, true) ?: [],
+        ['production_db_identity' => 'other_db']
+    ));
+}
+$dbMismatchErr = e2e_try(static fn (): array => e2e_run_finalize($dbMismatch));
+e2e_self_test(
+    $dbMismatchErr !== null && str_contains($dbMismatchErr->getMessage(), 'production_db_identity'),
+    'binding: production DB identity mismatch fails closed'
+);
+e2e_rmdir($dbMismatch['backupRoot']);
+
+$disabledMaintOn = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED, [
+    'maintenance_disable_pending_at' => gmdate('c'),
+    'maintenance_disabled_at' => gmdate('c'),
+]);
+orange_restore_merge_maintenance_enable($disabledMaintOn['workRoot'], $disabledMaintOn['jobId']);
+$disabledMaintOnErr = e2e_try(static fn (): array => e2e_run_finalize($disabledMaintOn));
+e2e_self_test(
+    $disabledMaintOnErr !== null
+    && str_contains($disabledMaintOnErr->getMessage(), 'requires maintenance OFF'),
+    'checkpoint: maintenance_disabled with maintenance ON fails closed without disable'
+);
+e2e_rmdir($disabledMaintOn['backupRoot']);
+
+$completedMaintOn = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_COMPLETED, [
+    'restore_completed_at' => gmdate('c'),
+]);
+orange_restore_merge_maintenance_enable($completedMaintOn['workRoot'], $completedMaintOn['jobId']);
+$completedMaintOnErr = e2e_try(static fn (): array => e2e_run_finalize($completedMaintOn));
+e2e_self_test(
+    $completedMaintOnErr !== null
+    && str_contains($completedMaintOnErr->getMessage(), 'requires maintenance OFF'),
+    'reconcile: completed with maintenance ON fails closed'
+);
+e2e_rmdir($completedMaintOn['backupRoot']);
+
+$missingReport = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED, [
+    'maintenance_disable_pending_at' => gmdate('c'),
+    'maintenance_disabled_at' => gmdate('c'),
+]);
+@unlink((string) ($missingReport['reportPath'] ?? ''));
+$missingReportErr = e2e_try(static fn (): array => e2e_run_finalize($missingReport));
+e2e_self_test(
+    $missingReportErr !== null && str_contains($missingReportErr->getMessage(), 'Post-validation report missing'),
+    'binding: missing pass report fails closed'
+);
+e2e_rmdir($missingReport['backupRoot']);
 
 // --- start idempotency ---
 $pkgPath = e2e_temp_root() . DIRECTORY_SEPARATOR . 'pkg';
