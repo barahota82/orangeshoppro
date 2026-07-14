@@ -1250,6 +1250,396 @@ pvrb_self_test(
     'gates: GL tolerance is 0.01'
 );
 
+/**
+ * @return array<string, mixed>
+ */
+function pvrb_failure_report_seed(): array
+{
+    $seed = pvrb_seed_uploads_cutover_complete_job();
+    $seed['job']['status'] = ORANGE_RESTORE_JOB_STATUS_MERGED;
+
+    return $seed;
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function pvrb_failure_report_payload(array $seed): array
+{
+    return [
+        'generated_at' => gmdate('c'),
+        'job_id' => $seed['jobId'],
+        'overall_result' => 'fail',
+        'duration_seconds' => 1,
+        'hard_failures' => ['simulated post-validation failure'],
+        'warnings' => [],
+        'informational' => [],
+        'gates' => [],
+    ];
+}
+
+// --- Phase 2D.4 BLOCKER 1: fail-safe failure reporting ---
+$reportSeed = pvrb_failure_report_seed();
+$reportPayload = pvrb_failure_report_payload($reportSeed);
+$markFailResult = orange_restore_merge_post_validation_record_failure(
+    $reportSeed['workRoot'],
+    $reportSeed['jobId'],
+    1,
+    $reportSeed['job'],
+    $reportPayload,
+    1,
+    [
+        'mark_failed_override' => static function (): array {
+            throw new RuntimeException('Simulated failed_post_merge transition failure.');
+        },
+    ]
+);
+pvrb_self_test(
+    ($markFailResult['persisted']['failed_post_merge'] ?? true) === false
+    && isset($reportSeed['jobId'], $markFailResult['reporting_errors']['failed_post_merge']),
+    'blocker1-reporting: job transition write failure recorded'
+);
+pvrb_self_test(
+    ($markFailResult['persisted']['production_post_validation.json'] ?? false) === true,
+    'blocker1-reporting: remaining steps run after failed_post_merge failure'
+);
+pvrb_rmdir($reportSeed['backupRoot']);
+
+$jsonFailSeed = pvrb_failure_report_seed();
+$jsonFailResult = orange_restore_merge_post_validation_record_failure(
+    $jsonFailSeed['workRoot'],
+    $jsonFailSeed['jobId'],
+    1,
+    $jsonFailSeed['job'],
+    pvrb_failure_report_payload($jsonFailSeed),
+    1,
+    [
+        'write_json_override' => static function (string $path, array $payload): void {
+            if (str_contains($path, 'production_post_validation.json')) {
+                throw new RuntimeException('Simulated production_post_validation.json write failure.');
+            }
+            orange_backup_write_json($path, $payload);
+        },
+    ]
+);
+pvrb_self_test(
+    ($jsonFailResult['persisted']['production_post_validation.json'] ?? true) === false
+    && isset($jsonFailResult['reporting_errors']['production_post_validation.json']),
+    'blocker1-reporting: production_post_validation.json write failure recorded'
+);
+pvrb_self_test(
+    ($jsonFailResult['persisted']['final_restore_report.json'] ?? false) === true,
+    'blocker1-reporting: final_restore_report.json still attempted after post-validation json failure'
+);
+pvrb_rmdir($jsonFailSeed['backupRoot']);
+
+$finalFailSeed = pvrb_failure_report_seed();
+$finalFailResult = orange_restore_merge_post_validation_record_failure(
+    $finalFailSeed['workRoot'],
+    $finalFailSeed['jobId'],
+    1,
+    $finalFailSeed['job'],
+    pvrb_failure_report_payload($finalFailSeed),
+    1,
+    [
+        'write_json_override' => static function (string $path, array $payload): void {
+            if (str_contains($path, 'final_restore_report.json')) {
+                throw new RuntimeException('Simulated final_restore_report.json write failure.');
+            }
+            orange_backup_write_json($path, $payload);
+        },
+    ]
+);
+pvrb_self_test(
+    ($finalFailResult['persisted']['final_restore_report.json'] ?? true) === false
+    && isset($finalFailResult['reporting_errors']['final_restore_report.json']),
+    'blocker1-reporting: final_restore_report.json write failure recorded'
+);
+pvrb_rmdir($finalFailSeed['backupRoot']);
+
+$auditFailSeed = pvrb_failure_report_seed();
+$auditFailResult = orange_restore_merge_post_validation_record_failure(
+    $auditFailSeed['workRoot'],
+    $auditFailSeed['jobId'],
+    1,
+    $auditFailSeed['job'],
+    pvrb_failure_report_payload($auditFailSeed),
+    1,
+    [
+        'audit_append_override' => static function (): void {
+            throw new RuntimeException('Simulated audit append failure.');
+        },
+    ]
+);
+pvrb_self_test(
+    ($auditFailResult['persisted']['production_post_validation_failed_audit'] ?? true) === false
+    && isset($auditFailResult['reporting_errors']['production_post_validation_failed_audit']),
+    'blocker1-reporting: audit append failure recorded'
+);
+pvrb_rmdir($auditFailSeed['backupRoot']);
+
+$multiFailSeed = pvrb_failure_report_seed();
+$multiFailResult = orange_restore_merge_post_validation_record_failure(
+    $multiFailSeed['workRoot'],
+    $multiFailSeed['jobId'],
+    1,
+    $multiFailSeed['job'],
+    pvrb_failure_report_payload($multiFailSeed),
+    1,
+    [
+        'mark_failed_override' => static function (): array {
+            throw new RuntimeException('Simulated failed_post_merge transition failure.');
+        },
+        'write_json_override' => static function (string $path, array $payload): void {
+            if (str_contains($path, 'production_post_validation.json')) {
+                throw new RuntimeException('Simulated production_post_validation.json write failure.');
+            }
+            if (str_contains($path, 'final_restore_report.json')) {
+                throw new RuntimeException('Simulated final_restore_report.json write failure.');
+            }
+            orange_backup_write_json($path, $payload);
+        },
+        'audit_append_override' => static function (): void {
+            throw new RuntimeException('Simulated audit append failure.');
+        },
+    ]
+);
+pvrb_self_test(count($multiFailResult['reporting_errors'] ?? []) === 4, 'blocker1-reporting: multiple reporting failures collected');
+$multiUnpersisted = array_keys(array_filter(
+    is_array($multiFailResult['persisted'] ?? null) ? $multiFailResult['persisted'] : [],
+    static fn (bool $ok): bool => !$ok
+));
+pvrb_self_test(count($multiUnpersisted) === 4, 'blocker1-reporting: all unpersisted artifacts tracked on multi-failure');
+pvrb_self_test(
+    is_string($multiFailResult['emergency_log_path'] ?? null)
+    && ($multiFailResult['emergency_log_path'] ?? '') !== ''
+    && is_file((string) $multiFailResult['emergency_log_path']),
+    'blocker1-reporting: emergency fallback log written on reporting failures'
+);
+$originalFailure = new RuntimeException('Original post-validation failure.');
+$composed = orange_restore_merge_post_validation_compose_failure_exception(
+    $originalFailure,
+    $multiFailResult,
+    pvrb_failure_report_payload($multiFailSeed)
+);
+pvrb_self_test(
+    str_contains($composed->getMessage(), 'Original error: Original post-validation failure.')
+    && str_contains($composed->getMessage(), 'Reporting failures:')
+    && str_contains($composed->getMessage(), 'Unpersisted artifacts/events:')
+    && str_contains($composed->getMessage(), 'Emergency failure log:'),
+    'blocker1-reporting: final exception aggregates original and secondary failures'
+);
+pvrb_self_test($composed->getPrevious() === $originalFailure, 'blocker1-reporting: original failure preserved as previous exception');
+pvrb_rmdir($multiFailSeed['backupRoot']);
+
+$runFailSeed = pvrb_seed_uploads_cutover_complete_job();
+pvrb_prepare_runtime($runFailSeed);
+$runErr = pvrb_try(static function () use ($runFailSeed): void {
+    orange_restore_merge_post_validation_run([
+        'project_root' => $runFailSeed['projectRoot'],
+        'work_root' => $runFailSeed['workRoot'],
+        'job_id' => $runFailSeed['jobId'],
+        'admin_id' => 1,
+        'env_override' => $runFailSeed['env'],
+        'postcheck_override' => static fn (): array => [
+            'ok' => false,
+            'overall_result' => 'fail',
+            'hard_failures' => ['simulated gate failure'],
+            'warnings' => [],
+            'informational' => [],
+            'gates' => [],
+            'production_db' => 'orange_db',
+            'schema_revision' => 121,
+        ],
+        'failure_record_override' => [
+            'mark_failed_override' => static function (): array {
+                throw new RuntimeException('Simulated failed_post_merge transition failure.');
+            },
+        ],
+    ]);
+});
+pvrb_self_test(
+    $runErr !== null
+    && str_contains($runErr->getMessage(), 'Reporting failures:')
+    && str_contains($runErr->getMessage(), 'failed_post_merge:'),
+    'blocker1-reporting: run path surfaces reporting failure instead of silent abandon'
+);
+pvrb_self_test(
+    is_file(orange_restore_production_post_validation_report_path($runFailSeed['workRoot'], $runFailSeed['jobId'])),
+    'blocker1-reporting: run path still writes production_post_validation.json when mark_failed fails'
+);
+orange_restore_release_lock($runFailSeed['workRoot']);
+pvrb_rmdir($runFailSeed['backupRoot']);
+
+/**
+ * @param array<string, mixed> $tableMeta
+ */
+function pvrb_patch_registry_table(string $projectRoot, string $tableName, array $tableMeta): void
+{
+    $registryPath = $projectRoot . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'backup_table_registry.json';
+    $registryData = json_decode((string) file_get_contents($registryPath), true);
+    if (!is_array($registryData)) {
+        throw new RuntimeException('Cannot patch registry for self-test.');
+    }
+    if (!isset($registryData['tables']) || !is_array($registryData['tables'])) {
+        $registryData['tables'] = [];
+    }
+    $registryData['tables'][$tableName] = $tableMeta;
+    orange_backup_write_json($registryPath, $registryData);
+}
+
+// --- Phase 2D.4 BLOCKER 2: country_owned rule validation ---
+$ownedMissingRuleProject = pvrb_temp_root();
+pvrb_copy_registry($ownedMissingRuleProject);
+pvrb_patch_registry_table($ownedMissingRuleProject, 'test_country_owned', [
+    'ownership_type' => 'country_owned',
+]);
+$ownedMissingRulePdo = new PDO('sqlite::memory:');
+$ownedMissingRulePdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$ownedMissingRulePdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$ownedMissingRulePdo->exec('INSERT INTO countries (id) VALUES (1)');
+$ownedMissingRulePdo->exec('CREATE TABLE test_country_owned (id INTEGER PRIMARY KEY, country_id INTEGER)');
+$ownedMissingRuleErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $ownedMissingRulePdo,
+    $ownedMissingRuleProject,
+    ['countries', 'test_country_owned']
+);
+pvrb_self_test(
+    (bool) array_filter($ownedMissingRuleErrors, static fn (string $e): bool => str_contains($e, 'missing extraction_rule')),
+    'blocker2-country_owned: missing extraction_rule fails hard'
+);
+pvrb_rmdir($ownedMissingRuleProject);
+
+$ownedUnsupportedProject = pvrb_temp_root();
+pvrb_copy_registry($ownedUnsupportedProject);
+pvrb_patch_registry_table($ownedUnsupportedProject, 'test_country_owned', [
+    'ownership_type' => 'country_owned',
+    'extraction_rule' => ['type' => 'unsupported_rule_type'],
+]);
+$ownedUnsupportedPdo = new PDO('sqlite::memory:');
+$ownedUnsupportedPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$ownedUnsupportedPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$ownedUnsupportedPdo->exec('INSERT INTO countries (id) VALUES (1)');
+$ownedUnsupportedPdo->exec('CREATE TABLE test_country_owned (id INTEGER PRIMARY KEY, country_id INTEGER)');
+$ownedUnsupportedErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $ownedUnsupportedPdo,
+    $ownedUnsupportedProject,
+    ['countries', 'test_country_owned']
+);
+pvrb_self_test(
+    (bool) array_filter($ownedUnsupportedErrors, static fn (string $e): bool => str_contains($e, 'unsupported extraction_rule.type')),
+    'blocker2-country_owned: unsupported extraction_rule fails hard'
+);
+pvrb_rmdir($ownedUnsupportedProject);
+
+$ownedMalformedScopeProject = pvrb_temp_root();
+pvrb_copy_registry($ownedMalformedScopeProject);
+pvrb_patch_registry_table($ownedMalformedScopeProject, 'test_country_owned', [
+    'ownership_type' => 'country_owned',
+    'extraction_rule' => ['type' => 'country_scope_or', 'columns' => []],
+]);
+$ownedMalformedScopePdo = new PDO('sqlite::memory:');
+$ownedMalformedScopePdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$ownedMalformedScopePdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$ownedMalformedScopePdo->exec('INSERT INTO countries (id) VALUES (1)');
+$ownedMalformedScopePdo->exec('CREATE TABLE test_country_owned (id INTEGER PRIMARY KEY, country_id INTEGER)');
+$ownedMalformedScopeErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $ownedMalformedScopePdo,
+    $ownedMalformedScopeProject,
+    ['countries', 'test_country_owned']
+);
+pvrb_self_test(
+    (bool) array_filter($ownedMalformedScopeErrors, static fn (string $e): bool => str_contains($e, 'country_scope_or rule missing columns')),
+    'blocker2-country_owned: malformed country_scope_or fails hard'
+);
+pvrb_rmdir($ownedMalformedScopeProject);
+
+$ownedMissingColumnProject = pvrb_temp_root();
+pvrb_copy_registry($ownedMissingColumnProject);
+pvrb_patch_registry_table($ownedMissingColumnProject, 'test_country_owned', [
+    'ownership_type' => 'country_owned',
+    'extraction_rule' => ['type' => 'country_id', 'column' => 'country_id'],
+]);
+$ownedMissingColumnPdo = new PDO('sqlite::memory:');
+$ownedMissingColumnPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$ownedMissingColumnPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$ownedMissingColumnPdo->exec('INSERT INTO countries (id) VALUES (1)');
+$ownedMissingColumnPdo->exec('CREATE TABLE test_country_owned (id INTEGER PRIMARY KEY)');
+$ownedMissingColumnErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $ownedMissingColumnPdo,
+    $ownedMissingColumnProject,
+    ['countries', 'test_country_owned']
+);
+pvrb_self_test(
+    (bool) array_filter($ownedMissingColumnErrors, static fn (string $e): bool => str_contains($e, 'missing ownership column country_id')),
+    'blocker2-country_owned: country_id rule with missing column fails hard'
+);
+pvrb_rmdir($ownedMissingColumnProject);
+
+$ownedValidIdProject = pvrb_temp_root();
+pvrb_copy_registry($ownedValidIdProject);
+pvrb_patch_registry_table($ownedValidIdProject, 'test_country_owned', [
+    'ownership_type' => 'country_owned',
+    'extraction_rule' => ['type' => 'country_id', 'column' => 'country_id'],
+]);
+$ownedValidIdPdo = new PDO('sqlite::memory:');
+$ownedValidIdPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$ownedValidIdPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$ownedValidIdPdo->exec('INSERT INTO countries (id) VALUES (1)');
+$ownedValidIdPdo->exec('CREATE TABLE test_country_owned (id INTEGER PRIMARY KEY, country_id INTEGER)');
+$ownedValidIdPdo->exec('INSERT INTO test_country_owned (id, country_id) VALUES (1, 1)');
+$ownedValidIdErrors = orange_restore_validation_adapter_production_validate_country_owned_rule(
+    $ownedValidIdPdo,
+    'test_country_owned',
+    [
+        'ownership_type' => 'country_owned',
+        'extraction_rule' => ['type' => 'country_id', 'column' => 'country_id'],
+    ]
+);
+$ownedValidIdCrossErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $ownedValidIdPdo,
+    $ownedValidIdProject,
+    ['countries', 'test_country_owned']
+);
+pvrb_self_test($ownedValidIdErrors === [], 'blocker2-country_owned: valid country_id rule passes validation');
+pvrb_self_test($ownedValidIdCrossErrors === [], 'blocker2-country_owned: valid country_id rule passes cross-country checks');
+pvrb_rmdir($ownedValidIdProject);
+
+$ownedValidScopeProject = pvrb_temp_root();
+pvrb_copy_registry($ownedValidScopeProject);
+pvrb_patch_registry_table($ownedValidScopeProject, 'test_country_owned', [
+    'ownership_type' => 'country_owned',
+    'extraction_rule' => ['type' => 'country_scope_or', 'columns' => ['country_id', 'scope_country_id']],
+]);
+$ownedValidScopePdo = new PDO('sqlite::memory:');
+$ownedValidScopePdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$ownedValidScopePdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$ownedValidScopePdo->exec('INSERT INTO countries (id) VALUES (1)');
+$ownedValidScopePdo->exec(
+    'CREATE TABLE test_country_owned (
+        id INTEGER PRIMARY KEY,
+        country_id INTEGER,
+        scope_country_id INTEGER
+    )'
+);
+$ownedValidScopePdo->exec('INSERT INTO test_country_owned (id, country_id, scope_country_id) VALUES (1, 1, NULL)');
+$ownedValidScopeErrors = orange_restore_validation_adapter_production_validate_country_owned_rule(
+    $ownedValidScopePdo,
+    'test_country_owned',
+    [
+        'ownership_type' => 'country_owned',
+        'extraction_rule' => ['type' => 'country_scope_or', 'columns' => ['country_id', 'scope_country_id']],
+    ]
+);
+$ownedValidScopeCrossErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $ownedValidScopePdo,
+    $ownedValidScopeProject,
+    ['countries', 'test_country_owned']
+);
+pvrb_self_test($ownedValidScopeErrors === [], 'blocker2-country_owned: valid country_scope_or rule passes validation');
+pvrb_self_test($ownedValidScopeCrossErrors === [], 'blocker2-country_owned: valid country_scope_or rule passes cross-country checks');
+pvrb_rmdir($ownedValidScopeProject);
+
 echo PHP_EOL;
 if ($failures === 0) {
     echo "ALL Phase 2D.4 post-validation + rollback self-tests PASSED.\n";

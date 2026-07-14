@@ -1229,6 +1229,74 @@ function orange_restore_validation_adapter_production_orphan_checks(PDO $pdo, ar
 }
 
 /**
+ * Validate registry country_owned extraction rules before cross-country SQL execution.
+ *
+ * Approved rule types: country_id, country_scope_or.
+ *
+ * @param array<string, mixed> $meta
+ * @return list<string>
+ */
+function orange_restore_validation_adapter_production_validate_country_owned_rule(
+    PDO $pdo,
+    string $tableName,
+    array $meta
+): array {
+    $rule = $meta['extraction_rule'] ?? null;
+    if (!is_array($rule)) {
+        return ['Cross-country country_owned rule missing extraction_rule for ' . $tableName . '.'];
+    }
+
+    $ruleType = trim((string) ($rule['type'] ?? ''));
+    if ($ruleType === '') {
+        return ['Cross-country country_owned rule missing extraction_rule.type for ' . $tableName . '.'];
+    }
+
+    if ($ruleType === 'country_id') {
+        $column = trim((string) ($rule['column'] ?? 'country_id'));
+        if ($column === '') {
+            return ['Cross-country country_owned country_id rule missing column for ' . $tableName . '.'];
+        }
+        if (!orange_restore_validation_adapter_table_has_column($pdo, $tableName, $column)) {
+            return ['Cross-country country_owned table ' . $tableName . ' missing ownership column ' . $column . '.'];
+        }
+
+        return [];
+    }
+
+    if ($ruleType === 'country_scope_or') {
+        $columns = $rule['columns'] ?? null;
+        if (!is_array($columns) || $columns === []) {
+            return ['Cross-country country_owned country_scope_or rule missing columns for ' . $tableName . '.'];
+        }
+        foreach ($columns as $column) {
+            $columnName = trim((string) $column);
+            if ($columnName === '') {
+                return ['Cross-country country_owned country_scope_or rule has empty column for ' . $tableName . '.'];
+            }
+            if (!orange_restore_validation_adapter_table_has_column($pdo, $tableName, $columnName)) {
+                return [
+                    'Cross-country country_owned table '
+                    . $tableName
+                    . ' missing country_scope_or column '
+                    . $columnName
+                    . '.',
+                ];
+            }
+        }
+
+        return [];
+    }
+
+    return [
+        'Cross-country country_owned rule unsupported extraction_rule.type '
+        . $ruleType
+        . ' for '
+        . $tableName
+        . '.',
+    ];
+}
+
+/**
  * Registry-driven cross-country integrity validation for full production DB.
  *
  * @param list<string> $productionTables
@@ -1273,17 +1341,40 @@ function orange_restore_validation_adapter_production_cross_country_checks(
         $ruleType = (string) ($rule['type'] ?? '');
         $integrityCritical = (bool) ($meta['integrity_critical'] ?? false);
 
-        if ($ownership === 'country_owned' && $ruleType === 'country_id') {
-            $errors = array_merge(
-                $errors,
-                orange_restore_validation_adapter_production_count_invalid_country_refs(
-                    $pdo,
-                    $tableName,
-                    (string) ($rule['column'] ?? 'country_id'),
-                    $countryIds,
-                    $integrityCritical
-                )
+        if ($ownership === 'country_owned') {
+            $ownedRuleErrors = orange_restore_validation_adapter_production_validate_country_owned_rule(
+                $pdo,
+                $tableName,
+                $meta
             );
+            if ($ownedRuleErrors !== []) {
+                $errors = array_merge($errors, $ownedRuleErrors);
+                continue;
+            }
+
+            if ($ruleType === 'country_id') {
+                $errors = array_merge(
+                    $errors,
+                    orange_restore_validation_adapter_production_count_invalid_country_refs(
+                        $pdo,
+                        $tableName,
+                        (string) ($rule['column'] ?? 'country_id'),
+                        $countryIds,
+                        $integrityCritical
+                    )
+                );
+            } elseif ($ruleType === 'country_scope_or') {
+                $columns = is_array($rule['columns'] ?? null) ? $rule['columns'] : [];
+                $errors = array_merge(
+                    $errors,
+                    orange_restore_validation_adapter_production_count_country_scope_or_violations(
+                        $pdo,
+                        $tableName,
+                        $columns,
+                        $countryIds
+                    )
+                );
+            }
             continue;
         }
 

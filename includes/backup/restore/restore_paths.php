@@ -11,6 +11,7 @@ const ORANGE_RESTORE_AUDIT_FILENAME = 'audit.jsonl';
 const ORANGE_RESTORE_ENGINE_VERSION = '2D.4-post-validation-rollback';
 const ORANGE_RESTORE_PRODUCTION_POST_VALIDATION_FILE = 'production_post_validation.json';
 const ORANGE_RESTORE_FINAL_RESTORE_REPORT_FILE = 'final_restore_report.json';
+const ORANGE_RESTORE_POST_VALIDATION_EMERGENCY_FAILURE_FILE = 'post_validation_emergency_failure.json';
 const ORANGE_RESTORE_ROLLBACK_CONFIRMATION_PHRASE = 'ROLLBACK';
 const ORANGE_RESTORE_UPLOADS_NEXT_DIRNAME = 'uploads_next';
 const ORANGE_RESTORE_UPLOADS_NEXT_MANIFEST_FILENAME = 'uploads_next_manifest.json';
@@ -184,4 +185,9 @@ function orange_restore_production_post_validation_report_path(string $workRoot,
 function orange_restore_final_restore_report_path(string $workRoot, string $jobId): string
 {
     return orange_restore_job_directory($workRoot, $jobId) . DIRECTORY_SEPARATOR . ORANGE_RESTORE_FINAL_RESTORE_REPORT_FILE;
+}
+
+function orange_restore_post_validation_emergency_failure_log_path(string $workRoot, string $jobId): string
+{
+    return orange_restore_job_directory($workRoot, $jobId) . DIRECTORY_SEPARATOR . ORANGE_RESTORE_POST_VALIDATION_EMERGENCY_FAILURE_FILE;
 }

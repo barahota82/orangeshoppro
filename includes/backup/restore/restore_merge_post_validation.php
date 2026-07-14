@@ -107,11 +107,17 @@ function orange_restore_merge_post_validation_postcheck_from_exception(
 }
 
 /**
- * Persist failed post-validation artifacts (reports, audit, job state).
+ * Fail-safe post-validation failure persistence. Each step is attempted independently.
  *
  * @param array<string, mixed> $job
  * @param array<string, mixed> $report
- * @return array<string, mixed>
+ * @param array<string, mixed> $options
+ * @return array{
+ *   job:array<string,mixed>,
+ *   persisted:array<string,bool>,
+ *   reporting_errors:array<string,string>,
+ *   emergency_log_path:?string
+ * }
  */
 function orange_restore_merge_post_validation_record_failure(
     string $workRoot,
@@ -119,39 +125,194 @@ function orange_restore_merge_post_validation_record_failure(
     int $adminId,
     array $job,
     array $report,
-    int $durationSeconds
+    int $durationSeconds,
+    array $options = []
 ): array {
     $reportPath = orange_restore_production_post_validation_report_path($workRoot, $jobId);
-    orange_backup_write_json($reportPath, $report);
-
     $finalReportPath = orange_restore_final_restore_report_path($workRoot, $jobId);
     $finalReport = array_merge($report, [
         'completed_at' => gmdate('c'),
         'job_status' => ORANGE_RESTORE_JOB_STATUS_FAILED_POST_MERGE,
         'maintenance_disabled' => false,
     ]);
-    orange_backup_write_json($finalReportPath, $finalReport);
 
-    orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_post_validation_event($job, 'production_post_validation_failed', 'failed', [
-        'operator_admin_id' => $adminId,
-        'hard_failures' => $report['hard_failures'],
-        'warnings' => $report['warnings'],
-        'duration_seconds' => $durationSeconds,
-        'database_writes' => false,
-        'production_writes' => false,
-    ]));
+    $writeJson = isset($options['write_json_override']) && is_callable($options['write_json_override'])
+        ? $options['write_json_override']
+        : static function (string $path, array $payload): void {
+            orange_backup_write_json($path, $payload);
+        };
+    $auditAppend = isset($options['audit_append_override']) && is_callable($options['audit_append_override'])
+        ? $options['audit_append_override']
+        : static function (string $wr, string $jid, array $event) use ($workRoot, $jobId): void {
+            orange_restore_audit_append($wr, $jid, $event);
+        };
+    $markFailed = isset($options['mark_failed_override']) && is_callable($options['mark_failed_override'])
+        ? $options['mark_failed_override']
+        : static function (
+            string $wr,
+            string $jid,
+            string $stageFailed,
+            string $errorSummary,
+            array $patch
+        ) use ($workRoot, $jobId, $report, $durationSeconds): array {
+            return orange_restore_job_mark_failed_post_merge($wr, $jid, $stageFailed, $errorSummary, $patch);
+        };
 
-    return orange_restore_job_mark_failed_post_merge(
-        $workRoot,
-        $jobId,
-        'production_post_validation',
-        implode('; ', $report['hard_failures'] ?? []),
-        [
-            'post_validation_report_path' => $reportPath,
-            'final_restore_report_path' => $finalReportPath,
+    $persisted = [
+        'failed_post_merge' => false,
+        'production_post_validation.json' => false,
+        'final_restore_report.json' => false,
+        'production_post_validation_failed_audit' => false,
+    ];
+    $reportingErrors = [];
+
+    try {
+        $job = $markFailed(
+            $workRoot,
+            $jobId,
+            'production_post_validation',
+            implode('; ', $report['hard_failures'] ?? []),
+            [
+                'post_validation_report_path' => $reportPath,
+                'final_restore_report_path' => $finalReportPath,
+                'duration_seconds' => $durationSeconds,
+            ]
+        );
+        $persisted['failed_post_merge'] = true;
+    } catch (Throwable $e) {
+        $reportingErrors['failed_post_merge'] = $e->getMessage();
+    }
+
+    try {
+        $writeJson($reportPath, $report);
+        $persisted['production_post_validation.json'] = true;
+    } catch (Throwable $e) {
+        $reportingErrors['production_post_validation.json'] = $e->getMessage();
+    }
+
+    try {
+        $writeJson($finalReportPath, $finalReport);
+        $persisted['final_restore_report.json'] = true;
+    } catch (Throwable $e) {
+        $reportingErrors['final_restore_report.json'] = $e->getMessage();
+    }
+
+    try {
+        $auditAppend($workRoot, $jobId, orange_restore_audit_post_validation_event($job, 'production_post_validation_failed', 'failed', [
+            'operator_admin_id' => $adminId,
+            'hard_failures' => $report['hard_failures'],
+            'warnings' => $report['warnings'],
             'duration_seconds' => $durationSeconds,
-        ]
-    );
+            'database_writes' => false,
+            'production_writes' => false,
+        ]));
+        $persisted['production_post_validation_failed_audit'] = true;
+    } catch (Throwable $e) {
+        $reportingErrors['production_post_validation_failed_audit'] = $e->getMessage();
+    }
+
+    $emergencyLogPath = null;
+    if ($reportingErrors !== []) {
+        $emergencyLogPath = orange_restore_merge_post_validation_write_emergency_failure_log(
+            $workRoot,
+            $jobId,
+            implode('; ', $report['hard_failures'] ?? []),
+            $report,
+            $reportingErrors,
+            $persisted
+        );
+    }
+
+    return [
+        'job' => $job,
+        'persisted' => $persisted,
+        'reporting_errors' => $reportingErrors,
+        'emergency_log_path' => $emergencyLogPath,
+    ];
+}
+
+/**
+ * @param array<string, mixed> $report
+ * @param array<string, string> $reportingErrors
+ * @param array<string, bool> $persisted
+ */
+function orange_restore_merge_post_validation_write_emergency_failure_log(
+    string $workRoot,
+    string $jobId,
+    string $originalFailure,
+    array $report,
+    array $reportingErrors,
+    array $persisted
+): ?string {
+    $path = orange_restore_post_validation_emergency_failure_log_path($workRoot, $jobId);
+    $payload = [
+        'generated_at' => gmdate('c'),
+        'job_id' => $jobId,
+        'original_failure' => $originalFailure,
+        'hard_failures' => $report['hard_failures'] ?? [],
+        'warnings' => $report['warnings'] ?? [],
+        'reporting_errors' => $reportingErrors,
+        'persisted' => $persisted,
+        'unpersisted_artifacts' => array_keys(array_filter(
+            $persisted,
+            static fn (bool $ok): bool => !$ok
+        )),
+    ];
+
+    try {
+        orange_backup_write_json($path, $payload);
+
+        return $path;
+    } catch (Throwable) {
+        $fallbackPath = $workRoot . DIRECTORY_SEPARATOR . $jobId . '_post_validation_emergency_failure.log';
+        $line = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($line !== false && file_put_contents($fallbackPath, $line . "\n", FILE_APPEND | LOCK_EX) !== false) {
+            return $fallbackPath;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * @param array<string, mixed> $failureResult
+ */
+function orange_restore_merge_post_validation_compose_failure_exception(
+    Throwable $original,
+    array $failureResult,
+    array $report
+): RuntimeException {
+    $reportingErrors = is_array($failureResult['reporting_errors'] ?? null) ? $failureResult['reporting_errors'] : [];
+    $persisted = is_array($failureResult['persisted'] ?? null) ? $failureResult['persisted'] : [];
+    $parts = [
+        'Production post-validation failed: ' . implode('; ', $report['hard_failures'] ?? []),
+        'Original error: ' . $original->getMessage(),
+    ];
+
+    if ($reportingErrors !== []) {
+        $secondary = [];
+        foreach ($reportingErrors as $step => $message) {
+            $secondary[] = $step . ': ' . $message;
+        }
+        $parts[] = 'Reporting failures: ' . implode(' | ', $secondary);
+    }
+
+    $unpersisted = [];
+    foreach ($persisted as $artifact => $ok) {
+        if (!$ok) {
+            $unpersisted[] = (string) $artifact;
+        }
+    }
+    if ($unpersisted !== []) {
+        $parts[] = 'Unpersisted artifacts/events: ' . implode(', ', $unpersisted);
+    }
+
+    $emergencyLogPath = (string) ($failureResult['emergency_log_path'] ?? '');
+    if ($emergencyLogPath !== '') {
+        $parts[] = 'Emergency failure log: ' . $emergencyLogPath;
+    }
+
+    return new RuntimeException(implode(' || ', $parts), 0, $original);
 }
 
 /**
@@ -210,6 +371,8 @@ function orange_restore_merge_post_validation_run(array $options): array
         'production_writes' => false,
     ]));
 
+    $originalFailure = null;
+
     try {
         $mergedAt = gmdate('c');
         $job = orange_restore_job_post_validation_transition(
@@ -263,23 +426,28 @@ function orange_restore_merge_post_validation_run(array $options): array
         $report = orange_restore_merge_post_validation_build_report($job, $jobId, $postcheck, $durationSeconds);
         $reportPath = orange_restore_production_post_validation_report_path($workRoot, $jobId);
 
-        orange_backup_write_json($reportPath, $report);
-
         if (!($postcheck['ok'] ?? false)) {
-            $job = orange_restore_merge_post_validation_record_failure(
+            $originalFailure = new RuntimeException(
+                'Production post-validation failed (job=' . $jobId . '): '
+                . implode('; ', $report['hard_failures'] ?? [])
+            );
+            $failureResult = orange_restore_merge_post_validation_record_failure(
                 $workRoot,
                 $jobId,
                 $adminId,
                 $job,
                 $report,
-                $durationSeconds
+                $durationSeconds,
+                is_array($options['failure_record_override'] ?? null) ? $options['failure_record_override'] : []
             );
-
-            throw new RuntimeException(
-                'Production post-validation failed (job=' . $jobId . ', status=failed_post_merge): '
-                . implode('; ', $report['hard_failures'])
+            throw orange_restore_merge_post_validation_compose_failure_exception(
+                $originalFailure,
+                $failureResult,
+                $report
             );
         }
+
+        orange_backup_write_json($reportPath, $report);
 
         $passedAt = gmdate('c');
         $job = orange_restore_job_post_validation_transition(
@@ -351,28 +519,31 @@ function orange_restore_merge_post_validation_run(array $options): array
             'rollback_executed' => false,
         ];
     } catch (Throwable $e) {
-        if (($job['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_MERGED) {
-            try {
-                $durationSeconds = (int) round(microtime(true) - $startedAt);
-                $postcheck = orange_restore_merge_post_validation_postcheck_from_exception(
-                    $e,
-                    $job,
-                    $projectRoot,
-                    $env
-                );
-                $report = orange_restore_merge_post_validation_build_report($job, $jobId, $postcheck, $durationSeconds);
-                orange_restore_merge_post_validation_record_failure(
-                    $workRoot,
-                    $jobId,
-                    $adminId,
-                    $job,
-                    $report,
-                    $durationSeconds
-                );
-            } catch (Throwable) {
-                // preserve original error
-            }
+        if ($originalFailure === null && ($job['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_MERGED) {
+            $durationSeconds = (int) round(microtime(true) - $startedAt);
+            $postcheck = orange_restore_merge_post_validation_postcheck_from_exception(
+                $e,
+                $job,
+                $projectRoot,
+                $env
+            );
+            $report = orange_restore_merge_post_validation_build_report($job, $jobId, $postcheck, $durationSeconds);
+            $failureResult = orange_restore_merge_post_validation_record_failure(
+                $workRoot,
+                $jobId,
+                $adminId,
+                $job,
+                $report,
+                $durationSeconds,
+                is_array($options['failure_record_override'] ?? null) ? $options['failure_record_override'] : []
+            );
+            throw orange_restore_merge_post_validation_compose_failure_exception($e, $failureResult, $report);
         }
+
+        if ($originalFailure !== null && $e->getPrevious() === $originalFailure) {
+            throw $e;
+        }
+
         throw $e;
     }
 }
