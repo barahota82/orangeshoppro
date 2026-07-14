@@ -1329,14 +1329,22 @@ function orange_restore_validation_adapter_production_cross_country_checks(
     $registryTables = is_array($registry['tables'] ?? null) ? $registry['tables'] : [];
 
     foreach ($registryTables as $tableName => $meta) {
-        if (!is_string($tableName) || !in_array($tableName, $productionTables, true)) {
+        if (!is_string($tableName)) {
             continue;
         }
         if (!is_array($meta)) {
-            $errors[] = 'Cross-country registry metadata invalid for table ' . $tableName . '.';
+            if (in_array($tableName, $productionTables, true)) {
+                $errors[] = 'Cross-country registry metadata invalid for table ' . $tableName . '.';
+            }
             continue;
         }
         $ownership = (string) ($meta['ownership_type'] ?? '');
+        if (!in_array($tableName, $productionTables, true)) {
+            if ($ownership === 'country_owned') {
+                $errors[] = 'Cross-country country_owned registry table ' . $tableName . ' missing from production schema.';
+            }
+            continue;
+        }
         $rule = is_array($meta['extraction_rule'] ?? null) ? $meta['extraction_rule'] : [];
         $ruleType = (string) ($rule['type'] ?? '');
         $integrityCritical = (bool) ($meta['integrity_critical'] ?? false);

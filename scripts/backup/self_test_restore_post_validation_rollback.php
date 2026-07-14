@@ -1471,6 +1471,172 @@ pvrb_self_test(
 orange_restore_release_lock($runFailSeed['workRoot']);
 pvrb_rmdir($runFailSeed['backupRoot']);
 
+// --- Phase 2D.4 emergency logging blockers ---
+$emPrimaryFailSeed = pvrb_failure_report_seed();
+$emPrimaryFailResult = orange_restore_merge_post_validation_record_failure(
+    $emPrimaryFailSeed['workRoot'],
+    $emPrimaryFailSeed['jobId'],
+    1,
+    $emPrimaryFailSeed['job'],
+    pvrb_failure_report_payload($emPrimaryFailSeed),
+    1,
+    [
+        'mark_failed_override' => static function (): array {
+            throw new RuntimeException('Simulated failed_post_merge transition failure.');
+        },
+        'emergency_log_override' => [
+            'write_primary_override' => static function (): void {
+                throw new RuntimeException('Simulated primary emergency JSON write failure.');
+            },
+        ],
+    ]
+);
+pvrb_self_test(
+    ($emPrimaryFailResult['emergency_result']['primary_written'] ?? false) === false
+    && ($emPrimaryFailResult['emergency_result']['fallback_written'] ?? false) === true
+    && is_file((string) ($emPrimaryFailResult['emergency_result']['fallback_path'] ?? '')),
+    'emergency-reporting: primary fails and fallback succeeds'
+);
+pvrb_self_test(
+    isset($emPrimaryFailResult['reporting_errors']['post_validation_emergency_failure.json']),
+    'emergency-reporting: primary failure added to reporting_errors'
+);
+$emPrimaryComposed = orange_restore_merge_post_validation_compose_failure_exception(
+    new RuntimeException('Original post-validation failure.'),
+    $emPrimaryFailResult,
+    pvrb_failure_report_payload($emPrimaryFailSeed)
+);
+pvrb_self_test(
+    str_contains($emPrimaryComposed->getMessage(), 'successful fallback emergency log:'),
+    'emergency-reporting: successful fallback path appears in final exception'
+);
+pvrb_rmdir($emPrimaryFailSeed['backupRoot']);
+
+$emPrimaryOkSeed = pvrb_failure_report_seed();
+$emPrimaryOkResult = orange_restore_merge_post_validation_record_failure(
+    $emPrimaryOkSeed['workRoot'],
+    $emPrimaryOkSeed['jobId'],
+    1,
+    $emPrimaryOkSeed['job'],
+    pvrb_failure_report_payload($emPrimaryOkSeed),
+    1,
+    [
+        'mark_failed_override' => static function (): array {
+            throw new RuntimeException('Simulated failed_post_merge transition failure.');
+        },
+    ]
+);
+pvrb_self_test(
+    ($emPrimaryOkResult['emergency_result']['primary_written'] ?? false) === true
+    && ($emPrimaryOkResult['emergency_result']['fallback_attempted'] ?? true) === false,
+    'emergency-reporting: primary succeeds and fallback is not attempted'
+);
+pvrb_self_test(
+    is_file((string) ($emPrimaryOkResult['emergency_result']['primary_path'] ?? '')),
+    'emergency-reporting: primary emergency JSON written in job directory'
+);
+pvrb_rmdir($emPrimaryOkSeed['backupRoot']);
+
+$emBothFailSeed = pvrb_failure_report_seed();
+$emBothFailResult = orange_restore_merge_post_validation_record_failure(
+    $emBothFailSeed['workRoot'],
+    $emBothFailSeed['jobId'],
+    1,
+    $emBothFailSeed['job'],
+    pvrb_failure_report_payload($emBothFailSeed),
+    1,
+    [
+        'mark_failed_override' => static function (): array {
+            throw new RuntimeException('Simulated failed_post_merge transition failure.');
+        },
+        'emergency_log_override' => [
+            'write_primary_override' => static function (): void {
+                throw new RuntimeException('Simulated primary emergency JSON write failure.');
+            },
+            'write_fallback_override' => static function (): void {
+                throw new RuntimeException('Simulated fallback emergency log write failure.');
+            },
+        ],
+    ]
+);
+pvrb_self_test(
+    isset(
+        $emBothFailResult['reporting_errors']['post_validation_emergency_failure.json'],
+        $emBothFailResult['reporting_errors']['post_validation_emergency_failure.log']
+    ),
+    'emergency-reporting: both emergency failures appear in reporting_errors'
+);
+$emBothOriginal = new RuntimeException('Original post-validation failure.');
+$emBothComposed = orange_restore_merge_post_validation_compose_failure_exception(
+    $emBothOriginal,
+    $emBothFailResult,
+    pvrb_failure_report_payload($emBothFailSeed)
+);
+pvrb_self_test(
+    str_contains($emBothComposed->getMessage(), 'Emergency failure reporting could not be persisted')
+    && str_contains($emBothComposed->getMessage(), 'primary emergency path:')
+    && str_contains($emBothComposed->getMessage(), 'fallback emergency path:'),
+    'emergency-reporting: both emergency failures appear in final exception'
+);
+pvrb_self_test($emBothComposed->getPrevious() === $emBothOriginal, 'emergency-reporting: original failure remains getPrevious()');
+pvrb_rmdir($emBothFailSeed['backupRoot']);
+
+$emSecretSeed = pvrb_failure_report_seed();
+$emSecretReport = pvrb_failure_report_payload($emSecretSeed);
+$emSecretReport['password'] = 'super-secret-password';
+$emSecretReport['approval_token'] = 'secret-token-value';
+$emSecretReport['db_password'] = 'db-secret-password';
+$emSecretResult = orange_restore_merge_post_validation_write_emergency_failure_log(
+    $emSecretSeed['workRoot'],
+    $emSecretSeed['jobId'],
+    'simulated failure',
+    $emSecretReport,
+    ['failed_post_merge' => 'simulated'],
+    ['failed_post_merge' => false]
+);
+$emSecretPayload = json_decode(
+    (string) file_get_contents((string) ($emSecretResult['primary_path'] ?? '')),
+    true
+);
+pvrb_self_test(
+    is_array($emSecretPayload)
+    && !array_key_exists('password', $emSecretPayload)
+    && !array_key_exists('approval_token', $emSecretPayload)
+    && !array_key_exists('db_password', $emSecretPayload)
+    && !str_contains(json_encode($emSecretPayload, JSON_UNESCAPED_UNICODE), 'super-secret-password')
+    && !str_contains(json_encode($emSecretPayload, JSON_UNESCAPED_UNICODE), 'secret-token-value')
+    && !str_contains(json_encode($emSecretPayload, JSON_UNESCAPED_UNICODE), 'db-secret-password'),
+    'emergency-reporting: emergency payload contains no password, approval token, or DB password'
+);
+pvrb_rmdir($emSecretSeed['backupRoot']);
+
+$emStepsSeed = pvrb_failure_report_seed();
+$emStepsResult = orange_restore_merge_post_validation_record_failure(
+    $emStepsSeed['workRoot'],
+    $emStepsSeed['jobId'],
+    1,
+    $emStepsSeed['job'],
+    pvrb_failure_report_payload($emStepsSeed),
+    1,
+    [
+        'mark_failed_override' => static function (): array {
+            throw new RuntimeException('Simulated failed_post_merge transition failure.');
+        },
+        'emergency_log_override' => [
+            'write_primary_override' => static function (): void {
+                throw new RuntimeException('Simulated primary emergency JSON write failure.');
+            },
+        ],
+    ]
+);
+pvrb_self_test(
+    ($emStepsResult['persisted']['production_post_validation.json'] ?? false) === true
+    && ($emStepsResult['persisted']['final_restore_report.json'] ?? false) === true
+    && ($emStepsResult['persisted']['production_post_validation_failed_audit'] ?? false) === true,
+    'emergency-reporting: normal remaining reporting steps still execute when emergency primary fails'
+);
+pvrb_rmdir($emStepsSeed['backupRoot']);
+
 /**
  * @param array<string, mixed> $tableMeta
  */
@@ -1639,6 +1805,31 @@ $ownedValidScopeCrossErrors = orange_restore_validation_adapter_production_cross
 pvrb_self_test($ownedValidScopeErrors === [], 'blocker2-country_owned: valid country_scope_or rule passes validation');
 pvrb_self_test($ownedValidScopeCrossErrors === [], 'blocker2-country_owned: valid country_scope_or rule passes cross-country checks');
 pvrb_rmdir($ownedValidScopeProject);
+
+$ownedMissingTableProject = pvrb_temp_root();
+pvrb_copy_registry($ownedMissingTableProject);
+pvrb_patch_registry_table($ownedMissingTableProject, 'missing_country_owned_table', [
+    'ownership_type' => 'country_owned',
+    'extraction_rule' => ['type' => 'country_id', 'column' => 'country_id'],
+]);
+$ownedMissingTablePdo = new PDO('sqlite::memory:');
+$ownedMissingTablePdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$ownedMissingTablePdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$ownedMissingTablePdo->exec('INSERT INTO countries (id) VALUES (1)');
+$ownedMissingTableErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $ownedMissingTablePdo,
+    $ownedMissingTableProject,
+    ['countries']
+);
+pvrb_self_test(
+    (bool) array_filter(
+        $ownedMissingTableErrors,
+        static fn (string $e): bool => str_contains($e, 'missing_country_owned_table')
+            && str_contains($e, 'missing from production schema')
+    ),
+    'blocker2-country_owned: registry table absent from productionTables hard-fails'
+);
+pvrb_rmdir($ownedMissingTableProject);
 
 echo PHP_EOL;
 if ($failures === 0) {

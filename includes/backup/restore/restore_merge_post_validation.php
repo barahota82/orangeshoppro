@@ -116,7 +116,8 @@ function orange_restore_merge_post_validation_postcheck_from_exception(
  *   job:array<string,mixed>,
  *   persisted:array<string,bool>,
  *   reporting_errors:array<string,string>,
- *   emergency_log_path:?string
+ *   emergency_log_path:?string,
+ *   emergency_result:array<string,mixed>
  * }
  */
 function orange_restore_merge_post_validation_record_failure(
@@ -211,23 +212,53 @@ function orange_restore_merge_post_validation_record_failure(
         $reportingErrors['production_post_validation_failed_audit'] = $e->getMessage();
     }
 
-    $emergencyLogPath = null;
+    $emergencyResult = orange_restore_merge_post_validation_empty_emergency_result($workRoot, $jobId);
     if ($reportingErrors !== []) {
-        $emergencyLogPath = orange_restore_merge_post_validation_write_emergency_failure_log(
+        $emergencyOptions = is_array($options['emergency_log_override'] ?? null) ? $options['emergency_log_override'] : [];
+        $emergencyResult = orange_restore_merge_post_validation_write_emergency_failure_log(
             $workRoot,
             $jobId,
             implode('; ', $report['hard_failures'] ?? []),
             $report,
             $reportingErrors,
-            $persisted
+            $persisted,
+            $emergencyOptions
         );
+
+        if (($emergencyResult['primary_attempted'] ?? false) && !($emergencyResult['primary_written'] ?? false)) {
+            $reportingErrors['post_validation_emergency_failure.json'] = (string) ($emergencyResult['primary_error'] ?? 'Primary emergency write failed.');
+        }
+        if (($emergencyResult['fallback_attempted'] ?? false) && !($emergencyResult['fallback_written'] ?? false)) {
+            $reportingErrors['post_validation_emergency_failure.log'] = (string) ($emergencyResult['fallback_error'] ?? 'Fallback emergency write failed.');
+        }
     }
 
     return [
         'job' => $job,
         'persisted' => $persisted,
         'reporting_errors' => $reportingErrors,
-        'emergency_log_path' => $emergencyLogPath,
+        'emergency_log_path' => is_string($emergencyResult['emergency_log_path'] ?? null)
+            ? $emergencyResult['emergency_log_path']
+            : null,
+        'emergency_result' => $emergencyResult,
+    ];
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_merge_post_validation_empty_emergency_result(string $workRoot, string $jobId): array
+{
+    return [
+        'primary_attempted' => false,
+        'primary_written' => false,
+        'primary_path' => orange_restore_post_validation_emergency_failure_log_path($workRoot, $jobId),
+        'primary_error' => null,
+        'fallback_attempted' => false,
+        'fallback_written' => false,
+        'fallback_path' => orange_restore_post_validation_emergency_failure_fallback_log_path($workRoot, $jobId),
+        'fallback_error' => null,
+        'emergency_log_path' => null,
     ];
 }
 
@@ -235,6 +266,8 @@ function orange_restore_merge_post_validation_record_failure(
  * @param array<string, mixed> $report
  * @param array<string, string> $reportingErrors
  * @param array<string, bool> $persisted
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
  */
 function orange_restore_merge_post_validation_write_emergency_failure_log(
     string $workRoot,
@@ -242,9 +275,11 @@ function orange_restore_merge_post_validation_write_emergency_failure_log(
     string $originalFailure,
     array $report,
     array $reportingErrors,
-    array $persisted
-): ?string {
-    $path = orange_restore_post_validation_emergency_failure_log_path($workRoot, $jobId);
+    array $persisted,
+    array $options = []
+): array {
+    $primaryPath = orange_restore_post_validation_emergency_failure_log_path($workRoot, $jobId);
+    $fallbackPath = orange_restore_post_validation_emergency_failure_fallback_log_path($workRoot, $jobId);
     $payload = [
         'generated_at' => gmdate('c'),
         'job_id' => $jobId,
@@ -259,19 +294,54 @@ function orange_restore_merge_post_validation_write_emergency_failure_log(
         )),
     ];
 
-    try {
-        orange_backup_write_json($path, $payload);
+    $writePrimary = isset($options['write_primary_override']) && is_callable($options['write_primary_override'])
+        ? $options['write_primary_override']
+        : static function (string $path, array $payloadToWrite): void {
+            orange_backup_write_json($path, $payloadToWrite);
+        };
+    $writeFallback = isset($options['write_fallback_override']) && is_callable($options['write_fallback_override'])
+        ? $options['write_fallback_override']
+        : static function (string $path, array $payloadToWrite): void {
+            $line = json_encode($payloadToWrite, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if ($line === false || file_put_contents($path, $line . "\n", FILE_APPEND | LOCK_EX) === false) {
+                throw new RuntimeException('Fallback emergency failure log write failed.');
+            }
+        };
 
-        return $path;
-    } catch (Throwable) {
-        $fallbackPath = $workRoot . DIRECTORY_SEPARATOR . $jobId . '_post_validation_emergency_failure.log';
-        $line = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if ($line !== false && file_put_contents($fallbackPath, $line . "\n", FILE_APPEND | LOCK_EX) !== false) {
-            return $fallbackPath;
-        }
+    $result = [
+        'primary_attempted' => true,
+        'primary_written' => false,
+        'primary_path' => $primaryPath,
+        'primary_error' => null,
+        'fallback_attempted' => false,
+        'fallback_written' => false,
+        'fallback_path' => $fallbackPath,
+        'fallback_error' => null,
+        'emergency_log_path' => null,
+    ];
+
+    try {
+        $writePrimary($primaryPath, $payload);
+        $result['primary_written'] = true;
+        $result['emergency_log_path'] = $primaryPath;
+
+        return $result;
+    } catch (Throwable $e) {
+        $result['primary_error'] = $e->getMessage();
     }
 
-    return null;
+    $result['fallback_attempted'] = true;
+    try {
+        $writeFallback($fallbackPath, $payload);
+        $result['fallback_written'] = true;
+        $result['emergency_log_path'] = $fallbackPath;
+
+        return $result;
+    } catch (Throwable $e) {
+        $result['fallback_error'] = $e->getMessage();
+    }
+
+    return $result;
 }
 
 /**
@@ -307,8 +377,27 @@ function orange_restore_merge_post_validation_compose_failure_exception(
         $parts[] = 'Unpersisted artifacts/events: ' . implode(', ', $unpersisted);
     }
 
+    $emergencyResult = is_array($failureResult['emergency_result'] ?? null) ? $failureResult['emergency_result'] : [];
+    $primaryAttempted = (bool) ($emergencyResult['primary_attempted'] ?? false);
+    $primaryWritten = (bool) ($emergencyResult['primary_written'] ?? false);
+    $fallbackAttempted = (bool) ($emergencyResult['fallback_attempted'] ?? false);
+    $fallbackWritten = (bool) ($emergencyResult['fallback_written'] ?? false);
+    $primaryPath = (string) ($emergencyResult['primary_path'] ?? '');
+    $fallbackPath = (string) ($emergencyResult['fallback_path'] ?? '');
+    $primaryError = (string) ($emergencyResult['primary_error'] ?? '');
+    $fallbackError = (string) ($emergencyResult['fallback_error'] ?? '');
     $emergencyLogPath = (string) ($failureResult['emergency_log_path'] ?? '');
-    if ($emergencyLogPath !== '') {
+
+    if ($primaryAttempted && !$primaryWritten && $fallbackAttempted && !$fallbackWritten) {
+        $parts[] = 'Emergency failure reporting could not be persisted'
+            . '; primary emergency path: ' . $primaryPath . ' (' . $primaryError . ')'
+            . '; fallback emergency path: ' . $fallbackPath . ' (' . $fallbackError . ')';
+    } elseif ($primaryAttempted && !$primaryWritten && $fallbackWritten) {
+        $parts[] = 'Primary emergency write failed: ' . $primaryPath . ' (' . $primaryError . ')'
+            . '; successful fallback emergency log: ' . $fallbackPath;
+    } elseif ($primaryWritten && $primaryPath !== '') {
+        $parts[] = 'Emergency failure log: ' . $primaryPath;
+    } elseif ($emergencyLogPath !== '') {
         $parts[] = 'Emergency failure log: ' . $emergencyLogPath;
     }
 

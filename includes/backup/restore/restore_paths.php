@@ -191,3 +191,14 @@ function orange_restore_post_validation_emergency_failure_log_path(string $workR
 {
     return orange_restore_job_directory($workRoot, $jobId) . DIRECTORY_SEPARATOR . ORANGE_RESTORE_POST_VALIDATION_EMERGENCY_FAILURE_FILE;
 }
+
+function orange_restore_post_validation_emergency_failure_fallback_log_path(string $workRoot, string $jobId): string
+{
+    if (!preg_match('/^[a-zA-Z0-9._-]+$/', $jobId)) {
+        throw new RuntimeException('Invalid restore job id.');
+    }
+    $path = $workRoot . DIRECTORY_SEPARATOR . $jobId . '_post_validation_emergency_failure.log';
+    orange_restore_assert_inside_work_root($workRoot, $path);
+
+    return $path;
+}
