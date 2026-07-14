@@ -142,3 +142,13 @@ function orange_restore_audit_rollback_event(array $job, string $event, string $
         'rollback_event' => $event,
     ], $extra));
 }
+
+/**
+ * @param array<string, mixed> $extra
+ */
+function orange_restore_audit_e2e_event(array $job, string $event, string $result, array $extra = []): array
+{
+    return orange_restore_audit_from_job($job, 'e2e_orchestrator', $result, array_merge([
+        'e2e_event' => $event,
+    ], $extra));
+}

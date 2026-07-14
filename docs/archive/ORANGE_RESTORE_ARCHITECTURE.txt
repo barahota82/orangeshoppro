@@ -384,11 +384,53 @@ rollback_validation_started/passed/failed, rollback_completed, rollback_failed.
 restore, schema changes.
 
 ================================================================================
+Phase 2E — End-to-end Full Restore orchestrator (IMPLEMENTED — CLI-first, manual stop points)
+================================================================================
+
+**Goal:** One guided CLI orchestrator for Full Restore that **coordinates** already-approved phases
+(2B.1 staging, 2C approval, 2D.1 precheck, 2D.2 DB cutover, 2D.3 uploads cutover, 2D.4 post-validation +
+manual rollback) **without duplicating** their business logic.
+
+**Deliverables:**
+- `includes/backup/restore/restore_e2e_orchestrator.php` — state routing, start/resume/status
+- `scripts/backup/restore_run_full.php` — start pre-approval workflow only (`--package`, `--admin-id`, `--password`, `--confirm=RESTORE`)
+- `scripts/backup/restore_resume_full.php` — resume exactly one legal next phase from persisted job state
+- `scripts/backup/restore_status_full.php` — read-only status (no secrets)
+- `scripts/backup/self_test_restore_e2e.php`
+
+**Orchestration only:** E2E calls existing wrappers in `restore_orchestrator.php` and
+`orange_restore_full_staging_run()` — no duplicated package validation, staging import, approval, merge,
+cutover, post-validation, or rollback logic.
+
+**Manual stop points (never automatic):**
+- `awaiting_owner_approval` → stop; operator runs `restore_approve_merge.php`
+- `approved_for_merge` → stop; operator runs merge foundation precheck manually
+- `failed_merge` / `failed_post_merge` / `rollback_failed` → stop; operator runs `restore_full_rollback.php`
+- No automatic approval, merge, or rollback
+
+**State routing (summary):**
+- Pre-approval incomplete staging (`created` … `staging_restore`) → fail-closed stop (no mid-staging resume)
+- `staging_validated` → finalize to `awaiting_owner_approval` only
+- `merge_precheck_passed` → database cutover (fresh re-auth + RESTORE)
+- Uploads checkpoint states → uploads cutover resume
+- `uploads_cutover_complete` / `production_merged` → post-validation
+- `rollback_in_progress` → rollback resume (re-auth + ROLLBACK)
+- `completed` / `rolled_back` / `cancelled` / `failed` → terminal
+
+**Security:** Every mutating resume requires Super Admin + `backup_restore_full` + fresh password re-auth +
+exact phrase when applicable + restore lock + maintenance where required by underlying phase. No cached auth.
+
+**Audit (append-only, no secrets):** `e2e_started`, `e2e_resumed`, `e2e_stopped_for_approval`,
+`e2e_stopped_for_merge_confirmation`, `e2e_stopped_for_rollback`, `e2e_completed`, `e2e_terminal`.
+
+**NOT in 2E:** Country Production Merge, Admin UI, restore APIs, automatic/scheduled restore, schema changes.
+
+================================================================================
 Phase 2D.1 — Full production merge remaining cutover (ARCHITECTURE APPROVED — PARTIAL)
 ================================================================================
 
-**Status:** Database cutover (2D.2), uploads cutover (2D.3), and **post-validation + manual rollback (2D.4)** are
-**implemented**. **Full end-to-end merge CLI wrapper and Country Production Merge remain not implemented.**
+**Status:** Database cutover (2D.2), uploads cutover (2D.3), **post-validation + manual rollback (2D.4)**, and
+**Full Restore end-to-end orchestrator (2E)** are **implemented**. **Country Production Merge remains not implemented.**
 
 **Goal:** Promote a job in `approved_for_merge` to production (`production_merged` →
 post-validation → `completed`) using CLI-first orchestration only. Country merge remains

@@ -180,11 +180,9 @@ function orange_restore_uploads_fs_reparse_point_status(string $path): ?bool
         return null;
     }
 
-    $escaped = str_replace("'", "''", $path);
-    $command = 'powershell -NoProfile -Command '
-        . '"$i=Get-Item -LiteralPath \''
-        . $escaped
-        . '\' -Force; if ($i.Attributes -band [IO.FileAttributes]::ReparsePoint) { ''1'' } else { ''0'' }"';
+    $psScript = '$i=Get-Item -LiteralPath ' . var_export($path, true) . ' -Force; '
+        . "if (\$i.Attributes -band [IO.FileAttributes]::ReparsePoint) { '1' } else { '0' }";
+    $command = 'powershell -NoProfile -Command ' . escapeshellarg($psScript);
     $descriptors = [
         0 => ['pipe', 'r'],
         1 => ['pipe', 'w'],

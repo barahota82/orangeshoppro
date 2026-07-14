@@ -903,3 +903,33 @@ function orange_restore_job_write_rollback_checkpoint(
 
     return $job;
 }
+
+/**
+ * Phase 2E — terminal job statuses (no further resume action).
+ *
+ * @return list<string>
+ */
+function orange_restore_job_e2e_terminal_statuses(): array
+{
+    return [
+        ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+        ORANGE_RESTORE_JOB_STATUS_ROLLED_BACK,
+        ORANGE_RESTORE_JOB_STATUS_CANCELLED,
+        ORANGE_RESTORE_JOB_STATUS_FAILED,
+    ];
+}
+
+/**
+ * Phase 2E — staging workflow states that cannot be auto-resumed without duplicating anchors.
+ *
+ * @return list<string>
+ */
+function orange_restore_job_e2e_staging_incomplete_statuses(): array
+{
+    return [
+        ORANGE_RESTORE_JOB_STATUS_CREATED,
+        ORANGE_RESTORE_JOB_STATUS_VALIDATED,
+        ORANGE_RESTORE_JOB_STATUS_FRESH_BACKUP,
+        ORANGE_RESTORE_JOB_STATUS_STAGING,
+    ];
+}

@@ -668,3 +668,21 @@ function orange_restore_orchestrator_rollback(array $options): array
 {
     return orange_restore_merge_rollback_run($options);
 }
+
+/**
+ * Phase 2E — read-only end-to-end status wrapper.
+ *
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function orange_restore_orchestrator_e2e_status(array $options): array
+{
+    require_once __DIR__ . '/restore_e2e_orchestrator.php';
+    $projectRoot = (string) ($options['project_root'] ?? '');
+    $jobId = trim((string) ($options['job_id'] ?? ''));
+    if ($projectRoot === '' || $jobId === '') {
+        throw new InvalidArgumentException('project_root and job_id are required.');
+    }
+
+    return orange_restore_e2e_status_full($projectRoot, $jobId, $options);
+}

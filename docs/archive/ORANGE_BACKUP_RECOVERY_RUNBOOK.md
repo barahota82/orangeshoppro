@@ -606,10 +606,50 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.4 section
 
 ---
 
-## Phase 2D.1 — Remaining Full Production Merge (end-to-end wrapper — NOT IMPLEMENTED)
+## Phase 2E — Full Restore End-to-End Orchestrator (IMPLEMENTED)
 
-**Status:** Database cutover (Phase 2D.2), uploads cutover (Phase 2D.3), and post-validation + manual rollback
-(Phase 2D.4) are **implemented**. **Full end-to-end merge CLI wrapper and Country Production Merge remain not implemented.**
+**Status:** CLI-first guided orchestrator coordinating approved phases with manual stop points. **No** Country
+Production Merge, Admin UI, restore APIs, automatic/scheduled restore, or schema changes.
+
+**Start (pre-approval only):**
+
+```powershell
+php D:\orange\scripts\backup\restore_run_full.php --package=PATH --admin-id=N --password=SECRET --confirm=RESTORE
+```
+
+Runs package validation → fresh backup → staging restore → stops at `awaiting_owner_approval`.
+
+**Resume (state-driven, one legal action per run):**
+
+```powershell
+php D:\orange\scripts\backup\restore_resume_full.php --job=JOB_ID [--admin-id=N] [--password=SECRET] [--confirm=RESTORE|ROLLBACK]
+```
+
+**Read-only status:**
+
+```powershell
+php D:\orange\scripts\backup\restore_status_full.php --job=JOB_ID
+```
+
+**Manual gates (orchestrator stops — never auto):**
+- `awaiting_owner_approval` → `restore_approve_merge.php`
+- `approved_for_merge` → merge foundation precheck (approved PHP entry) before cutover
+- `failed_merge` / `failed_post_merge` → `restore_full_rollback.php`
+
+**Self-test:**
+
+```powershell
+php D:\orange\scripts\backup\self_test_restore_e2e.php
+```
+
+Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2E section)
+
+---
+
+## Phase 2D.1 — Remaining Full Production Merge (Country merge — NOT IMPLEMENTED)
+
+**Status:** Database cutover (Phase 2D.2), uploads cutover (Phase 2D.3), post-validation + manual rollback
+(Phase 2D.4), and Full Restore end-to-end orchestrator (Phase 2E) are **implemented**. **Country Production Merge remains not implemented.**
 
 **Scope:** Remaining full-disaster merge steps after `uploads_cutover_complete`.
 
@@ -666,7 +706,8 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 | Production database cutover (DB only) | **Phase 2D.2 implemented** |
 | Production uploads cutover (uploads only) | **Phase 2D.3 implemented** |
 | Production merge post-validation + manual rollback | **Phase 2D.4 implemented** |
-| Full end-to-end merge CLI wrapper + Country Production Merge | Phase 2D+ — **not implemented** |
+| Full Restore end-to-end orchestrator (2E) | **Phase 2E implemented** |
+| Country Production Merge | Phase 2D+ — **not implemented** |
 | Full production merge credentials (`ORANGE_RESTORE_MERGE_DB_*`) | **Owner policy §11 — required (foundation + cutover)** |
 | Uploads same-volume gate | **Owner policy §12 — required when 2D.1 implemented** |
 | Owner approval gate (`approved_for_merge`) | **Phase 2C implemented** |
