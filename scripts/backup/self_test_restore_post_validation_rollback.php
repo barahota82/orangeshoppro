@@ -1877,10 +1877,12 @@ $ownedValidIdErrors = orange_restore_validation_adapter_production_validate_coun
         'extraction_rule' => ['type' => 'country_id', 'column' => 'country_id'],
     ]
 );
-$ownedValidIdCrossErrors = orange_restore_validation_adapter_production_cross_country_checks(
+$ownedValidIdCrossErrors = orange_restore_validation_adapter_production_count_invalid_country_refs(
     $ownedValidIdPdo,
-    $ownedValidIdProject,
-    ['countries', 'test_country_owned']
+    'test_country_owned',
+    'country_id',
+    [1],
+    false
 );
 pvrb_self_test($ownedValidIdErrors === [], 'blocker2-country_owned: valid country_id rule passes validation');
 pvrb_self_test($ownedValidIdCrossErrors === [], 'blocker2-country_owned: valid country_id rule passes cross-country checks');
@@ -1911,10 +1913,11 @@ $ownedValidScopeErrors = orange_restore_validation_adapter_production_validate_c
         'extraction_rule' => ['type' => 'country_scope_or', 'columns' => ['country_id', 'scope_country_id']],
     ]
 );
-$ownedValidScopeCrossErrors = orange_restore_validation_adapter_production_cross_country_checks(
+$ownedValidScopeCrossErrors = orange_restore_validation_adapter_production_count_country_scope_or_violations(
     $ownedValidScopePdo,
-    $ownedValidScopeProject,
-    ['countries', 'test_country_owned']
+    'test_country_owned',
+    ['country_id', 'scope_country_id'],
+    [1]
 );
 pvrb_self_test($ownedValidScopeErrors === [], 'blocker2-country_owned: valid country_scope_or rule passes validation');
 pvrb_self_test($ownedValidScopeCrossErrors === [], 'blocker2-country_owned: valid country_scope_or rule passes cross-country checks');
@@ -1937,10 +1940,14 @@ $ownedValidCustomPdo->exec('CREATE TABLE accounts (id INTEGER PRIMARY KEY, count
 $ownedValidCustomPdo->exec('INSERT INTO accounts (id, country_id) VALUES (1, 1), (2, 2)');
 $ownedValidCustomPdo->exec('CREATE TABLE test_country_owned_custom (id INTEGER PRIMARY KEY, account_id INTEGER)');
 $ownedValidCustomPdo->exec('INSERT INTO test_country_owned_custom (id, account_id) VALUES (1, 1), (2, 2)');
-$ownedValidCustomErrors = orange_restore_validation_adapter_production_cross_country_checks(
+$ownedValidCustomErrors = orange_restore_validation_adapter_production_count_custom_sql_coverage_violations(
     $ownedValidCustomPdo,
-    $ownedValidCustomProject,
-    ['countries', 'accounts', 'test_country_owned_custom']
+    'test_country_owned_custom',
+    [
+        'type' => 'custom_sql',
+        'sql' => 'SELECT t.id FROM test_country_owned_custom t INNER JOIN accounts a ON a.id = t.account_id WHERE a.country_id = :country_id',
+    ],
+    [1, 2]
 );
 pvrb_self_test($ownedValidCustomErrors === [], 'blocker2-country_owned: valid custom_sql rule passes cross-country checks');
 pvrb_rmdir($ownedValidCustomProject);
