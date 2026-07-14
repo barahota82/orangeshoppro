@@ -31,6 +31,7 @@ require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARAT
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_validation_adapter.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_fresh_backup_gate.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_full_staging.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'restore_self_test_helpers.php';
 
 $failures = 0;
 
@@ -88,7 +89,7 @@ function restore_staging_write_full_package(string $dir, array $overrides = []):
     gzclose($out);
 
     $uploadsZip = $dir . DIRECTORY_SEPARATOR . 'uploads.zip';
-    orange_country_uploads_write_empty_zip($uploadsZip);
+    restore_self_test_write_empty_zip($uploadsZip);
 
     $manifest = array_merge([
         'package_type' => 'full_disaster',
@@ -156,7 +157,7 @@ $workRoot = $fixture['work_root'];
 $packageDir = $fixture['package_dir'];
 
 $stagingDbName = 'orange_restore_staging_test';
-$productionDbName = orange_restore_production_db_name($projectRoot);
+$productionDbName = restore_self_test_production_db_name($projectRoot);
 
 $envOverride = [
     'ORANGE_BACKUP_ROOT' => $backupRoot,
@@ -490,20 +491,21 @@ $delimiterCompat = orange_restore_package_staging_import_compat(
 restore_staging_self_test($delimiterCompat['ok'] === false, 'package compat: DELIMITER dump rejected before mutation');
 
 // Staging credentials fail closed
+$stagingCredsProjectRoot = restore_self_test_temp_project_root();
 try {
-    orange_restore_staging_credentials([ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName], $projectRoot);
+    orange_restore_staging_credentials([ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName], $stagingCredsProjectRoot);
     restore_staging_self_test(false, 'staging creds: missing ORANGE_RESTORE_STAGING_DB_USER rejected');
 } catch (Throwable $e) {
     restore_staging_self_test(str_contains($e->getMessage(), 'ORANGE_RESTORE_STAGING_DB_USER'), 'staging creds: missing user rejected');
 }
 
-$productionCreds = orange_restore_production_db_credentials($projectRoot);
+$productionCreds = orange_restore_production_db_credentials($stagingCredsProjectRoot);
 try {
     orange_restore_staging_credentials([
         ORANGE_RESTORE_ENV_STAGING_DB => $stagingDbName,
         ORANGE_RESTORE_ENV_STAGING_DB_USER => $productionCreds['user'],
         ORANGE_RESTORE_ENV_STAGING_DB_PASS => 'x',
-    ], $projectRoot);
+    ], $stagingCredsProjectRoot);
     restore_staging_self_test(false, 'staging creds: production DB_USER reuse rejected');
 } catch (Throwable $e) {
     restore_staging_self_test(str_contains($e->getMessage(), 'must not equal production DB_USER'), 'staging creds: production DB_USER reuse rejected');

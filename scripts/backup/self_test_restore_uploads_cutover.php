@@ -26,6 +26,7 @@ require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR 
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_staging_target.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_uploads_fs.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_uploads_cutover.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'restore_self_test_helpers.php';
 
 $failures = 0;
 
@@ -208,7 +209,7 @@ function uploads_cutover_seed_database_cutover_complete_job(): array
     mkdir($workRoot);
 
     $projectRoot = $backupRoot . DIRECTORY_SEPARATOR . 'project';
-    mkdir($projectRoot);
+    restore_self_test_bootstrap_project_root($projectRoot);
 
     $packageDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'pkg_' . bin2hex(random_bytes(2));
     mkdir($packageDir, 0775, true);
@@ -238,59 +239,40 @@ function uploads_cutover_seed_database_cutover_complete_job(): array
     ]);
     $jobId = (string) $job['job_id'];
 
-    orange_restore_job_record_fresh_backup_anchor($workRoot, $jobId, $anchorDir, $anchorChecksum);
-    orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_STAGING);
-    orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED);
-
     $stagingUploadsDir = orange_restore_staging_uploads_directory($workRoot, $jobId);
     uploads_cutover_write_uploads_tree($stagingUploadsDir, [
         'products/a.webp' => 'live-a',
         'channels/b.webp' => 'live-b',
     ]);
 
-    $manifestPath = orange_restore_job_staging_manifest_path($workRoot, $jobId);
-    orange_backup_write_json($manifestPath, [
-        'staging_uploads_path' => $stagingUploadsDir,
-        'schema_revision' => 121,
-    ]);
-    $manifestChecksum = orange_backup_sha256_file($manifestPath);
+    $staging = restore_self_test_apply_staging_chain(
+        $workRoot,
+        $jobId,
+        $anchorDir,
+        $anchorChecksum,
+        [
+            'staging_uploads_path' => $stagingUploadsDir,
+            'schema_revision' => 121,
+        ],
+        [],
+        [
+            'staging_db' => 'orange_restore_staging',
+            'staging_uploads_path' => $stagingUploadsDir,
+        ]
+    );
 
-    $reportPath = orange_restore_job_report_path($workRoot, $jobId);
-    orange_backup_write_json($reportPath, [
-        'overall_result' => 'pass',
-        'production_touched' => false,
-        'staging_post_validation' => ['ok' => true],
-        'staging_drv_report' => ['overall_result' => 'pass'],
-    ]);
-
-    orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL, [
-        'restore_report_path' => $reportPath,
-        'staging_restore_manifest_path' => $manifestPath,
-        'owner_approval_window_started_at' => gmdate('c'),
-        'staging_db' => 'orange_restore_staging',
-        'staging_uploads_path' => $stagingUploadsDir,
-    ]);
-
-    $binding = [
-        'job_id' => $jobId,
-        'operator_id' => 1,
-        'scope' => ORANGE_RESTORE_JOB_TYPE_FULL,
-        'source_package_checksum' => $packageChecksum,
-        'staging_restore_manifest_checksum' => $manifestChecksum,
-        'rollback_anchor_checksum' => $anchorChecksum,
-    ];
-    $issued = orange_restore_approval_issue_token($binding);
-
-    $job = orange_restore_job_read($workRoot, $jobId);
-    $job['status'] = ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE;
-    $job['approval_token_hash'] = $issued['hash'];
-    $job['approval_token_binding'] = $binding;
-    $job['approval_token_consumed_at'] = gmdate('c');
-    $job['owner_approval_at'] = gmdate('c');
-    $job['production_merge_approved'] = true;
-    $job['merge_precheck_passed_at'] = gmdate('c');
-    $job['database_cutover_completed_at'] = gmdate('c');
-    orange_restore_job_write($workRoot, $job);
+    restore_self_test_apply_owner_approval(
+        $workRoot,
+        $jobId,
+        $packageChecksum,
+        $staging['manifestChecksum'],
+        $anchorChecksum,
+        ORANGE_RESTORE_JOB_TYPE_FULL,
+        1,
+        'superadmin'
+    );
+    restore_self_test_apply_merge_precheck_passed($workRoot, $jobId);
+    restore_self_test_apply_database_cutover_complete($workRoot, $jobId);
 
     $uploadsDir = orange_restore_production_uploads_directory($projectRoot);
     uploads_cutover_write_uploads_tree($uploadsDir, [
@@ -310,7 +292,7 @@ function uploads_cutover_seed_database_cutover_complete_job(): array
         $stagingUploadsDir,
         $uploadsNextDir,
         $packageChecksum,
-        $manifestChecksum
+        $staging['manifestChecksum']
     );
 
     $env = [
@@ -660,9 +642,6 @@ uploads_cutover_self_test(in_array('uploads_second_rename_pending', $events, tru
 uploads_cutover_self_test(in_array('uploads_second_rename_started', $events, true), 'audit: uploads_second_rename_started');
 uploads_cutover_self_test(in_array('uploads_cutover_complete', $events, true), 'audit: uploads_cutover_complete');
 orange_restore_release_lock($success['workRoot']);
-orange_restore_merge_maintenance_disable($success['workRoot'], $success['jobId']);
-uploads_cutover_rmdir($success['backupRoot']);
-
 orange_restore_merge_maintenance_disable($success['workRoot'], $success['jobId']);
 uploads_cutover_rmdir($success['backupRoot']);
 

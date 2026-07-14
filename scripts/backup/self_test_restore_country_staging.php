@@ -29,6 +29,7 @@ require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARAT
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_uploads_applicator.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_country_staging.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_full_staging.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'restore_self_test_helpers.php';
 
 $failures = 0;
 
@@ -94,7 +95,7 @@ function country_restore_write_package(string $dir, array $overrides = []): void
     );
     file_put_contents($sqlDir . DIRECTORY_SEPARATOR . '999_session_postamble.sql', "SET FOREIGN_KEY_CHECKS=1;\n");
 
-    orange_country_uploads_write_empty_zip($filesDir . DIRECTORY_SEPARATOR . 'uploads_country.zip');
+    restore_self_test_write_empty_zip($filesDir . DIRECTORY_SEPARATOR . 'uploads_country.zip');
 
     $manifest = array_merge([
         'package_type' => 'country_recovery',
@@ -160,7 +161,7 @@ mkdir($packageDir, 0775, true);
 country_restore_write_package($packageDir);
 
 $stagingDbName = 'orange_restore_country_staging_test';
-$productionDbName = orange_restore_production_db_name($projectRoot);
+$productionDbName = restore_self_test_production_db_name($projectRoot);
 
 $envOverride = [
     'ORANGE_BACKUP_ROOT' => $backupRoot,
@@ -271,10 +272,7 @@ if (($drv['overall_result'] ?? '') === 'pass') {
 $uploadsTarget = $backupRoot . DIRECTORY_SEPARATOR . 'uploads_target';
 mkdir($uploadsTarget, 0775, true);
 $uploadsZip = $packageDir . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip';
-$zip = new ZipArchive();
-$zip->open($uploadsZip, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-$zip->addFromString('products/kw-demo.jpg', 'country-upload-test');
-$zip->close();
+restore_self_test_write_zip_with_entry($uploadsZip, 'products/kw-demo.jpg', 'country-upload-test');
 country_restore_self_test(
     orange_restore_uploads_applicator_extract($uploadsZip, $uploadsTarget)['ok'] === true,
     'uploads: country zip extract to staging_uploads'

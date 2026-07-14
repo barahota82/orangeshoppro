@@ -69,7 +69,7 @@ function restore_approval_rmdir(string $dir): void
 /**
  * SQLite in-memory PDO for approval gate tests (re-auth + permission matrix).
  */
-function restore_approval_test_pdo(string $permKey = 'backup_restore_full', bool $superuser = true): PDO
+function restore_approval_test_pdo(string $permKey = 'backup_restore_full', bool $superuser = true, int $adminId = 1): PDO
 {
     $pdo = new PDO('sqlite::memory:');
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -95,12 +95,12 @@ function restore_approval_test_pdo(string $permKey = 'backup_restore_full', bool
     );
     $pdo->exec(
         'INSERT INTO admins (id, username, password_hash, display_name, is_active, is_superuser)
-         VALUES (1, \'superadmin\', ' . $pdo->quote($hash) . ', \'Super Admin\', 1, ' . ($superuser ? '1' : '0') . ')'
+         VALUES (' . $adminId . ', \'superadmin\', ' . $pdo->quote($hash) . ', \'Super Admin\', 1, ' . ($superuser ? '1' : '0') . ')'
     );
     if ($permKey !== '') {
         $pdo->exec(
             'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete)
-             VALUES (1, ' . $pdo->quote($permKey) . ', 1, 0, 0)'
+             VALUES (' . $adminId . ', ' . $pdo->quote($permKey) . ', 1, 0, 0)'
         );
     }
 
@@ -201,7 +201,8 @@ function restore_approval_seed_job(
     ]);
 
     $permKey = $jobType === ORANGE_RESTORE_JOB_TYPE_COUNTRY ? 'backup_restore_country' : 'backup_restore_full';
-    $pdo = restore_approval_test_pdo($permKey, true);
+    $adminId = $jobType === ORANGE_RESTORE_JOB_TYPE_COUNTRY ? 2 : 1;
+    $pdo = restore_approval_test_pdo($permKey, true, $adminId);
 
     return [
         'workRoot' => $workRoot,
@@ -307,7 +308,7 @@ $countryResult = orange_restore_orchestrator_approve_for_merge($countrySeed['pdo
     'project_root' => $projectRoot,
     'work_root' => $countrySeed['workRoot'],
     'job_id' => $countrySeed['jobId'],
-    'admin_id' => 1,
+    'admin_id' => 2,
     'password' => 'correct-pass',
     'confirmation_phrase' => 'RESTORE KW',
     'env_override' => ['ORANGE_BACKUP_ROOT' => $countrySeed['backupRoot']],
@@ -388,13 +389,13 @@ restore_approval_rmdir($nonSuper['backupRoot']);
 
 // --- Wrong permission ---
 $noPerm = restore_approval_seed_job(ORANGE_RESTORE_JOB_TYPE_FULL);
-$noPermPdo = restore_approval_test_pdo('', true);
+$noPermPdo = restore_approval_test_pdo('', true, 3);
 $err = restore_approval_try(static function () use ($noPerm, $noPermPdo, $projectRoot): void {
     orange_restore_orchestrator_approve_for_merge($noPermPdo, [
         'project_root' => $projectRoot,
         'work_root' => $noPerm['workRoot'],
         'job_id' => $noPerm['jobId'],
-        'admin_id' => 1,
+        'admin_id' => 3,
         'password' => 'correct-pass',
         'confirmation_phrase' => 'RESTORE',
         'env_override' => ['ORANGE_BACKUP_ROOT' => $noPerm['backupRoot']],

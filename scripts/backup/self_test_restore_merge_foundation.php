@@ -15,7 +15,6 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__, 2);
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'config.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_environment.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_paths.php';
@@ -27,6 +26,9 @@ require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARAT
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_approval.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_precheck.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_orchestrator.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'restore_self_test_helpers.php';
+
+$mergeTestProjectRoot = restore_self_test_temp_project_root();
 
 $failures = 0;
 
@@ -83,16 +85,16 @@ final class MergeFoundationIdentityMockPdo extends PDO
         ];
     }
 
-    public function query(string $query, ?int $fetchMode = null): PDOStatement|false
+    public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false
     {
         if (stripos($query, 'SHOW GRANTS') !== false) {
-            return new MergeFoundationMockGrantStatement($this->grantLines);
+            return restore_self_test_grant_statement($this->grantLines);
         }
         if (stripos($query, 'SELECT DATABASE()') !== false) {
-            return new MergeFoundationMockScalarStatement($this->databaseName);
+            return restore_self_test_scalar_statement($this->databaseName);
         }
         if (stripos($query, 'SELECT 1') !== false) {
-            return new MergeFoundationMockScalarStatement('1');
+            return restore_self_test_scalar_statement('1');
         }
 
         return false;
@@ -193,57 +195,29 @@ function merge_foundation_seed_approved_job(bool $expiredWindow = false): array
     ]);
     $jobId = (string) $job['job_id'];
 
-    orange_restore_job_record_fresh_backup_anchor($workRoot, $jobId, $anchorDir, $anchorChecksum);
-    orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_STAGING);
-    orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED);
+    $staging = restore_self_test_apply_staging_chain(
+        $workRoot,
+        $jobId,
+        $anchorDir,
+        $anchorChecksum,
+        ['table_count' => 5, 'schema_revision' => 121],
+        [],
+        [
+            'owner_approval_window_started_at' => $expiredWindow
+                ? gmdate('c', time() - ORANGE_RESTORE_APPROVAL_WINDOW_SECONDS - 60)
+                : gmdate('c'),
+        ]
+    );
 
-    $manifestPath = orange_restore_job_staging_manifest_path($workRoot, $jobId);
-    orange_backup_write_json($manifestPath, ['table_count' => 5, 'schema_revision' => 121]);
-    $manifestChecksum = orange_backup_sha256_file($manifestPath);
-
-    $reportPath = orange_restore_job_report_path($workRoot, $jobId);
-    orange_backup_write_json($reportPath, [
-        'overall_result' => 'pass',
-        'production_touched' => false,
-        'staging_post_validation' => ['ok' => true],
-        'staging_drv_report' => ['overall_result' => 'pass'],
-    ]);
-
-    orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL, [
-        'restore_report_path' => $reportPath,
-        'staging_restore_manifest_path' => $manifestPath,
-        'owner_approval_window_started_at' => $expiredWindow
-            ? gmdate('c', time() - ORANGE_RESTORE_APPROVAL_WINDOW_SECONDS - 60)
-            : gmdate('c'),
-        'staging_db' => 'orange_restore_staging',
-    ]);
-
-    $binding = [
-        'job_id' => $jobId,
-        'operator_id' => 1,
-        'scope' => ORANGE_RESTORE_JOB_TYPE_FULL,
-        'source_package_checksum' => $packageChecksum,
-        'staging_restore_manifest_checksum' => $manifestChecksum,
-        'rollback_anchor_checksum' => $anchorChecksum,
-        'issued_at' => gmdate('c'),
-        'expires_at' => gmdate('c', time() + 3600),
-    ];
-    $issued = orange_restore_approval_issue_token($binding);
-
-    $job = orange_restore_job_read($workRoot, $jobId);
-    $job['status'] = ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE;
-    $job['approval_token_hash'] = $issued['hash'];
-    $job['approval_token_binding'] = $binding;
-    $job['approval_token_issued_at'] = $issued['issued_at'];
-    $job['approval_token_expires_at'] = $issued['expires_at'];
-    $job['approval_token_consumed_at'] = gmdate('c');
-    $job['owner_approval_at'] = gmdate('c');
-    $job['owner_approval_by'] = 'superadmin';
-    $job['owner_approval_admin_id'] = 1;
-    $job['production_merge_approved'] = true;
-    $job['restore_report_path'] = $reportPath;
-    $job['staging_restore_manifest_path'] = $manifestPath;
-    orange_restore_job_write($workRoot, $job);
+    $approval = restore_self_test_apply_owner_approval(
+        $workRoot,
+        $jobId,
+        $packageChecksum,
+        $staging['manifestChecksum'],
+        $anchorChecksum,
+        ORANGE_RESTORE_JOB_TYPE_FULL
+    );
+    $job = $approval['job'];
 
     return [
         'workRoot' => $workRoot,
@@ -252,7 +226,7 @@ function merge_foundation_seed_approved_job(bool $expiredWindow = false): array
         'anchorPath' => $anchorDir,
         'jobId' => $jobId,
         'job' => $job,
-        'manifestChecksum' => $manifestChecksum,
+        'manifestChecksum' => $staging['manifestChecksum'],
         'anchorChecksum' => $anchorChecksum,
     ];
 }
@@ -281,7 +255,7 @@ try {
     merge_foundation_self_test(true, 'credentials: missing user rejected');
 }
 try {
-    $prodUser = orange_restore_production_db_credentials($projectRoot)['user'];
+    $prodUser = restore_self_test_production_db_credentials($projectRoot)['user'];
     orange_restore_merge_credentials(array_merge($baseEnv, [
         ORANGE_RESTORE_ENV_MERGE_DB_USER => $prodUser,
     ]), $projectRoot);
@@ -421,9 +395,9 @@ merge_foundation_rmdir($malformedRoot);
 // --- expired approval ---
 $expired = merge_foundation_seed_approved_job(true);
 orange_restore_acquire_lock($expired['workRoot'], $expired['jobId']);
-$err = merge_foundation_try(static function () use ($expired, $projectRoot): void {
+$err = merge_foundation_try(static function () use ($expired, $mergeTestProjectRoot): void {
     orange_restore_merge_precheck_run([
-        'project_root' => $projectRoot,
+        'project_root' => $mergeTestProjectRoot,
         'work_root' => $expired['workRoot'],
         'job_id' => $expired['jobId'],
         'env_override' => merge_foundation_base_env($expired['backupRoot']),
@@ -443,9 +417,9 @@ $jobBad = orange_restore_job_read($checksumBad['workRoot'], $checksumBad['jobId'
 $jobBad['source_package_checksum'] = str_repeat('f', 64);
 orange_restore_job_write($checksumBad['workRoot'], $jobBad);
 orange_restore_acquire_lock($checksumBad['workRoot'], $checksumBad['jobId']);
-$err = merge_foundation_try(static function () use ($checksumBad, $projectRoot): void {
+$err = merge_foundation_try(static function () use ($checksumBad, $mergeTestProjectRoot): void {
     orange_restore_merge_precheck_run([
-        'project_root' => $projectRoot,
+        'project_root' => $mergeTestProjectRoot,
         'work_root' => $checksumBad['workRoot'],
         'job_id' => $checksumBad['jobId'],
         'env_override' => merge_foundation_base_env($checksumBad['backupRoot']),
@@ -463,9 +437,9 @@ $jobAnchor = orange_restore_job_read($anchorBad['workRoot'], $anchorBad['jobId']
 $jobAnchor['fresh_backup_checksum'] = str_repeat('f', 64);
 orange_restore_job_write($anchorBad['workRoot'], $jobAnchor);
 orange_restore_acquire_lock($anchorBad['workRoot'], $anchorBad['jobId']);
-$err = merge_foundation_try(static function () use ($anchorBad, $projectRoot): void {
+$err = merge_foundation_try(static function () use ($anchorBad, $mergeTestProjectRoot): void {
     orange_restore_merge_precheck_run([
-        'project_root' => $projectRoot,
+        'project_root' => $mergeTestProjectRoot,
         'work_root' => $anchorBad['workRoot'],
         'job_id' => $anchorBad['jobId'],
         'env_override' => merge_foundation_base_env($anchorBad['backupRoot']),
@@ -481,9 +455,9 @@ merge_foundation_rmdir($anchorBad['backupRoot']);
 $maintActive = merge_foundation_seed_approved_job();
 orange_restore_merge_maintenance_enable($maintActive['workRoot'], $maintActive['jobId']);
 orange_restore_acquire_lock($maintActive['workRoot'], $maintActive['jobId']);
-$err = merge_foundation_try(static function () use ($maintActive, $projectRoot): void {
+$err = merge_foundation_try(static function () use ($maintActive, $mergeTestProjectRoot): void {
     orange_restore_merge_precheck_run([
-        'project_root' => $projectRoot,
+        'project_root' => $mergeTestProjectRoot,
         'work_root' => $maintActive['workRoot'],
         'job_id' => $maintActive['jobId'],
         'env_override' => merge_foundation_base_env($maintActive['backupRoot']),
@@ -498,9 +472,9 @@ merge_foundation_rmdir($maintActive['backupRoot']);
 
 // --- lock missing ---
 $noLock = merge_foundation_seed_approved_job();
-$err = merge_foundation_try(static function () use ($noLock, $projectRoot): void {
+$err = merge_foundation_try(static function () use ($noLock, $mergeTestProjectRoot): void {
     orange_restore_merge_precheck_run([
-        'project_root' => $projectRoot,
+        'project_root' => $mergeTestProjectRoot,
         'work_root' => $noLock['workRoot'],
         'job_id' => $noLock['jobId'],
         'env_override' => merge_foundation_base_env($noLock['backupRoot']),
@@ -514,9 +488,9 @@ merge_foundation_rmdir($noLock['backupRoot']);
 // --- lock conflict ---
 $lockConflict = merge_foundation_seed_approved_job();
 orange_restore_acquire_lock($lockConflict['workRoot'], 'other_job');
-$err = merge_foundation_try(static function () use ($lockConflict, $projectRoot): void {
+$err = merge_foundation_try(static function () use ($lockConflict, $mergeTestProjectRoot): void {
     orange_restore_merge_precheck_run([
-        'project_root' => $projectRoot,
+        'project_root' => $mergeTestProjectRoot,
         'work_root' => $lockConflict['workRoot'],
         'job_id' => $lockConflict['jobId'],
         'env_override' => merge_foundation_base_env($lockConflict['backupRoot']),
@@ -531,9 +505,9 @@ merge_foundation_rmdir($lockConflict['backupRoot']);
 // --- duplicate staging user in merge credentials ---
 $dupStaging = merge_foundation_seed_approved_job();
 orange_restore_acquire_lock($dupStaging['workRoot'], $dupStaging['jobId']);
-$err = merge_foundation_try(static function () use ($dupStaging, $projectRoot): void {
+$err = merge_foundation_try(static function () use ($dupStaging, $mergeTestProjectRoot): void {
     orange_restore_merge_precheck_run([
-        'project_root' => $projectRoot,
+        'project_root' => $mergeTestProjectRoot,
         'work_root' => $dupStaging['workRoot'],
         'job_id' => $dupStaging['jobId'],
         'env_override' => array_merge(merge_foundation_base_env($dupStaging['backupRoot']), [
@@ -551,7 +525,7 @@ merge_foundation_rmdir($dupStaging['backupRoot']);
 $success = merge_foundation_seed_approved_job();
 orange_restore_acquire_lock($success['workRoot'], $success['jobId']);
 $result = orange_restore_merge_precheck_run([
-    'project_root' => $projectRoot,
+    'project_root' => $mergeTestProjectRoot,
     'work_root' => $success['workRoot'],
     'job_id' => $success['jobId'],
     'env_override' => merge_foundation_base_env($success['backupRoot']),

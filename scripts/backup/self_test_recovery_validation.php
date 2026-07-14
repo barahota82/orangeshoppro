@@ -17,6 +17,7 @@ if (PHP_SAPI !== 'cli') {
 $projectRoot = dirname(__DIR__, 2);
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'recovery_validation.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'uploads_collector.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'restore_self_test_helpers.php';
 
 $failures = 0;
 
@@ -57,7 +58,7 @@ function drv_write_full_package(string $dir, array $overrides = []): void
     $out = gzopen($dumpPath, 'wb9');
     gzwrite($out, $sql);
     gzclose($out);
-    orange_country_uploads_write_empty_zip($dir . DIRECTORY_SEPARATOR . 'uploads.zip');
+    restore_self_test_write_empty_zip($dir . DIRECTORY_SEPARATOR . 'uploads.zip');
     $manifest = array_merge([
         'package_type' => 'full_disaster',
         'package_version' => '1.2',
@@ -110,7 +111,7 @@ function drv_write_crp_package(string $dir, array $overrides = []): void
         $dir . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR . '999_session_postamble.sql',
         "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;\n"
     );
-    orange_country_uploads_write_empty_zip($dir . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip');
+    restore_self_test_write_empty_zip($dir . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip');
     $manifest = array_merge([
         'package_type' => 'country_recovery',
         'package_version' => '1.0',
