@@ -286,6 +286,55 @@ function pvrb_copy_registry(string $projectRoot): void
     }
 }
 
+/**
+ * @param array<string, array<string, mixed>> $tables
+ */
+function pvrb_write_registry_tables(string $projectRoot, array $tables): void
+{
+    $destDir = $projectRoot . DIRECTORY_SEPARATOR . 'config';
+    if (!is_dir($destDir)) {
+        mkdir($destDir, 0775, true);
+    }
+    orange_backup_write_json($destDir . DIRECTORY_SEPARATOR . 'backup_table_registry.json', [
+        'registry_version' => ORANGE_BACKUP_REGISTRY_VERSION,
+        'schema_revision' => 121,
+        'generated_at' => gmdate('c'),
+        'generated_by' => 'self-test',
+        'table_count' => count($tables),
+        'tables' => $tables,
+    ]);
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function pvrb_registry_global(int $order = 1, bool $critical = false): array
+{
+    return orange_backup_registry_row(
+        'global',
+        $order,
+        orange_backup_registry_full_table(),
+        null,
+        false,
+        $critical
+    );
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function pvrb_registry_country_owned(array $rule, int $order = 50, bool $critical = false): array
+{
+    return orange_backup_registry_row(
+        'country_owned',
+        $order,
+        $rule,
+        null,
+        false,
+        $critical
+    );
+}
+
 function pvrb_sqlite_cross_country_pdo(bool $contaminated = false): PDO
 {
     $pdo = new PDO('sqlite::memory:');
@@ -1055,7 +1104,10 @@ pvrb_rmdir($maintGateSeed['backupRoot']);
 
 // --- BLOCKER 2: cross-country contamination detected ---
 $ccProject = pvrb_temp_root();
-pvrb_copy_registry($ccProject);
+pvrb_write_registry_tables($ccProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'products' => pvrb_registry_country_owned(orange_backup_registry_country_id(), 60, true),
+]);
 $ccPdo = pvrb_sqlite_cross_country_pdo(true);
 $ccTables = ['countries', 'products'];
 $ccErrors = orange_restore_validation_adapter_production_cross_country_checks($ccPdo, $ccProject, $ccTables);
@@ -1656,9 +1708,17 @@ function pvrb_patch_registry_table(string $projectRoot, string $tableName, array
 
 // --- Phase 2D.4 BLOCKER 2: country_owned rule validation ---
 $ownedMissingRuleProject = pvrb_temp_root();
-pvrb_copy_registry($ownedMissingRuleProject);
-pvrb_patch_registry_table($ownedMissingRuleProject, 'test_country_owned', [
-    'ownership_type' => 'country_owned',
+pvrb_write_registry_tables($ownedMissingRuleProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'test_country_owned' => [
+        'ownership_type' => 'country_owned',
+        'export_order' => 50,
+        'delete_order' => 450,
+        'restore_order' => 50,
+        'parent_dependency' => null,
+        'uploads_linked' => false,
+        'integrity_critical' => false,
+    ],
 ]);
 $ownedMissingRulePdo = new PDO('sqlite::memory:');
 $ownedMissingRulePdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -1677,10 +1737,9 @@ pvrb_self_test(
 pvrb_rmdir($ownedMissingRuleProject);
 
 $ownedUnsupportedProject = pvrb_temp_root();
-pvrb_copy_registry($ownedUnsupportedProject);
-pvrb_patch_registry_table($ownedUnsupportedProject, 'test_country_owned', [
-    'ownership_type' => 'country_owned',
-    'extraction_rule' => ['type' => 'unsupported_rule_type'],
+pvrb_write_registry_tables($ownedUnsupportedProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'test_country_owned' => pvrb_registry_country_owned(['type' => 'unsupported_rule_type']),
 ]);
 $ownedUnsupportedPdo = new PDO('sqlite::memory:');
 $ownedUnsupportedPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -1699,10 +1758,9 @@ pvrb_self_test(
 pvrb_rmdir($ownedUnsupportedProject);
 
 $ownedMalformedScopeProject = pvrb_temp_root();
-pvrb_copy_registry($ownedMalformedScopeProject);
-pvrb_patch_registry_table($ownedMalformedScopeProject, 'test_country_owned', [
-    'ownership_type' => 'country_owned',
-    'extraction_rule' => ['type' => 'country_scope_or', 'columns' => []],
+pvrb_write_registry_tables($ownedMalformedScopeProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'test_country_owned' => pvrb_registry_country_owned(['type' => 'country_scope_or', 'columns' => []]),
 ]);
 $ownedMalformedScopePdo = new PDO('sqlite::memory:');
 $ownedMalformedScopePdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -1721,10 +1779,9 @@ pvrb_self_test(
 pvrb_rmdir($ownedMalformedScopeProject);
 
 $ownedMissingColumnProject = pvrb_temp_root();
-pvrb_copy_registry($ownedMissingColumnProject);
-pvrb_patch_registry_table($ownedMissingColumnProject, 'test_country_owned', [
-    'ownership_type' => 'country_owned',
-    'extraction_rule' => ['type' => 'country_id', 'column' => 'country_id'],
+pvrb_write_registry_tables($ownedMissingColumnProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'test_country_owned' => pvrb_registry_country_owned(['type' => 'country_id', 'column' => 'country_id']),
 ]);
 $ownedMissingColumnPdo = new PDO('sqlite::memory:');
 $ownedMissingColumnPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -1743,10 +1800,9 @@ pvrb_self_test(
 pvrb_rmdir($ownedMissingColumnProject);
 
 $ownedValidIdProject = pvrb_temp_root();
-pvrb_copy_registry($ownedValidIdProject);
-pvrb_patch_registry_table($ownedValidIdProject, 'test_country_owned', [
-    'ownership_type' => 'country_owned',
-    'extraction_rule' => ['type' => 'country_id', 'column' => 'country_id'],
+pvrb_write_registry_tables($ownedValidIdProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'test_country_owned' => pvrb_registry_country_owned(['type' => 'country_id', 'column' => 'country_id']),
 ]);
 $ownedValidIdPdo = new PDO('sqlite::memory:');
 $ownedValidIdPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -1772,10 +1828,9 @@ pvrb_self_test($ownedValidIdCrossErrors === [], 'blocker2-country_owned: valid c
 pvrb_rmdir($ownedValidIdProject);
 
 $ownedValidScopeProject = pvrb_temp_root();
-pvrb_copy_registry($ownedValidScopeProject);
-pvrb_patch_registry_table($ownedValidScopeProject, 'test_country_owned', [
-    'ownership_type' => 'country_owned',
-    'extraction_rule' => ['type' => 'country_scope_or', 'columns' => ['country_id', 'scope_country_id']],
+pvrb_write_registry_tables($ownedValidScopeProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'test_country_owned' => pvrb_registry_country_owned(['type' => 'country_scope_or', 'columns' => ['country_id', 'scope_country_id']]),
 ]);
 $ownedValidScopePdo = new PDO('sqlite::memory:');
 $ownedValidScopePdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -1806,11 +1861,35 @@ pvrb_self_test($ownedValidScopeErrors === [], 'blocker2-country_owned: valid cou
 pvrb_self_test($ownedValidScopeCrossErrors === [], 'blocker2-country_owned: valid country_scope_or rule passes cross-country checks');
 pvrb_rmdir($ownedValidScopeProject);
 
+$ownedValidCustomProject = pvrb_temp_root();
+pvrb_write_registry_tables($ownedValidCustomProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'accounts' => pvrb_registry_country_owned(orange_backup_registry_country_id(), 50, true),
+    'test_country_owned_custom' => pvrb_registry_country_owned([
+        'type' => 'custom_sql',
+        'sql' => 'SELECT t.id FROM test_country_owned_custom t INNER JOIN accounts a ON a.id = t.account_id WHERE a.country_id = :country_id',
+    ], 51),
+]);
+$ownedValidCustomPdo = new PDO('sqlite::memory:');
+$ownedValidCustomPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$ownedValidCustomPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$ownedValidCustomPdo->exec('INSERT INTO countries (id) VALUES (1), (2)');
+$ownedValidCustomPdo->exec('CREATE TABLE accounts (id INTEGER PRIMARY KEY, country_id INTEGER)');
+$ownedValidCustomPdo->exec('INSERT INTO accounts (id, country_id) VALUES (1, 1), (2, 2)');
+$ownedValidCustomPdo->exec('CREATE TABLE test_country_owned_custom (id INTEGER PRIMARY KEY, account_id INTEGER)');
+$ownedValidCustomPdo->exec('INSERT INTO test_country_owned_custom (id, account_id) VALUES (1, 1), (2, 2)');
+$ownedValidCustomErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $ownedValidCustomPdo,
+    $ownedValidCustomProject,
+    ['countries', 'accounts', 'test_country_owned_custom']
+);
+pvrb_self_test($ownedValidCustomErrors === [], 'blocker2-country_owned: valid custom_sql rule passes cross-country checks');
+pvrb_rmdir($ownedValidCustomProject);
+
 $ownedMissingTableProject = pvrb_temp_root();
-pvrb_copy_registry($ownedMissingTableProject);
-pvrb_patch_registry_table($ownedMissingTableProject, 'missing_country_owned_table', [
-    'ownership_type' => 'country_owned',
-    'extraction_rule' => ['type' => 'country_id', 'column' => 'country_id'],
+pvrb_write_registry_tables($ownedMissingTableProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'missing_country_owned_table' => pvrb_registry_country_owned(['type' => 'country_id', 'column' => 'country_id']),
 ]);
 $ownedMissingTablePdo = new PDO('sqlite::memory:');
 $ownedMissingTablePdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);

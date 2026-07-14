@@ -1231,7 +1231,7 @@ function orange_restore_validation_adapter_production_orphan_checks(PDO $pdo, ar
 /**
  * Validate registry country_owned extraction rules before cross-country SQL execution.
  *
- * Approved rule types: country_id, country_scope_or.
+ * Approved rule types: country_id, country_scope_or, custom_sql.
  *
  * @param array<string, mixed> $meta
  * @return list<string>
@@ -1287,6 +1287,24 @@ function orange_restore_validation_adapter_production_validate_country_owned_rul
         return [];
     }
 
+    if ($ruleType === 'custom_sql') {
+        $sql = trim((string) ($rule['sql'] ?? ''));
+        if ($sql === '') {
+            return ['Cross-country country_owned custom_sql rule missing sql for ' . $tableName . '.'];
+        }
+        if (!preg_match('/^\s*SELECT\s+/i', $sql)) {
+            return ['Cross-country country_owned custom_sql rule must be SELECT for ' . $tableName . '.'];
+        }
+        if (!str_contains($sql, ':country_id')) {
+            return ['Cross-country country_owned custom_sql rule must bind :country_id for ' . $tableName . '.'];
+        }
+        if (!orange_restore_validation_adapter_table_has_column($pdo, $tableName, 'id')) {
+            return ['Cross-country country_owned custom_sql table ' . $tableName . ' missing id column for coverage validation.'];
+        }
+
+        return [];
+    }
+
     return [
         'Cross-country country_owned rule unsupported extraction_rule.type '
         . $ruleType
@@ -1294,6 +1312,90 @@ function orange_restore_validation_adapter_production_validate_country_owned_rul
         . $tableName
         . '.',
     ];
+}
+
+/**
+ * Verify custom_sql country ownership covers each table row exactly once.
+ *
+ * @param list<int> $countryIds
+ * @return list<string>
+ */
+function orange_restore_validation_adapter_production_count_custom_sql_coverage_violations(
+    PDO $pdo,
+    string $tableName,
+    array $rule,
+    array $countryIds
+): array {
+    if ($countryIds === []) {
+        return ['Cross-country validation cannot run: countries table is empty.'];
+    }
+
+    $idSql = trim((string) ($rule['sql'] ?? ''));
+    $paramCount = substr_count($idSql, ':country_id');
+    $positionalSql = str_replace(':country_id', '?', $idSql);
+    $seen = [];
+    $duplicateMatches = 0;
+    $invalidIds = 0;
+
+    try {
+        $st = $pdo->prepare($positionalSql);
+        foreach ($countryIds as $countryId) {
+            $st->execute(array_fill(0, $paramCount, $countryId));
+            while ($row = $st->fetch(PDO::FETCH_NUM)) {
+                $id = (int) ($row[0] ?? 0);
+                if ($id <= 0) {
+                    $invalidIds++;
+                    continue;
+                }
+                if (isset($seen[$id])) {
+                    $duplicateMatches++;
+                }
+                $seen[$id] = true;
+            }
+        }
+
+        $table = '`' . str_replace('`', '``', $tableName) . '`';
+        $tableIds = [];
+        $rows = $pdo->query('SELECT id FROM ' . $table);
+        if ($rows === false) {
+            throw new RuntimeException('Cannot read ids from ' . $tableName . '.');
+        }
+        while ($row = $rows->fetch(PDO::FETCH_NUM)) {
+            $id = (int) ($row[0] ?? 0);
+            if ($id > 0) {
+                $tableIds[$id] = true;
+            }
+        }
+    } catch (Throwable $e) {
+        return ['Cross-country custom_sql validation failed for ' . $tableName . ': ' . $e->getMessage()];
+    }
+
+    $uncovered = 0;
+    foreach ($tableIds as $id => $_) {
+        if (!isset($seen[$id])) {
+            $uncovered++;
+        }
+    }
+
+    $phantom = 0;
+    foreach ($seen as $id => $_) {
+        if (!isset($tableIds[$id])) {
+            $phantom++;
+        }
+    }
+
+    $errors = [];
+    if ($uncovered > 0) {
+        $errors[] = 'Cross-country custom_sql ownership leaves unowned rows in ' . $tableName . ' (' . (string) $uncovered . ' rows).';
+    }
+    if ($duplicateMatches > 0) {
+        $errors[] = 'Cross-country custom_sql ownership matches rows in multiple countries for ' . $tableName . ' (' . (string) $duplicateMatches . ' duplicate matches).';
+    }
+    if ($phantom > 0 || $invalidIds > 0) {
+        $errors[] = 'Cross-country custom_sql ownership returned invalid ids for ' . $tableName . ' (phantom=' . (string) $phantom . ', invalid=' . (string) $invalidIds . ').';
+    }
+
+    return $errors;
 }
 
 /**
@@ -1379,6 +1481,16 @@ function orange_restore_validation_adapter_production_cross_country_checks(
                         $pdo,
                         $tableName,
                         $columns,
+                        $countryIds
+                    )
+                );
+            } elseif ($ruleType === 'custom_sql') {
+                $errors = array_merge(
+                    $errors,
+                    orange_restore_validation_adapter_production_count_custom_sql_coverage_violations(
+                        $pdo,
+                        $tableName,
+                        $rule,
                         $countryIds
                     )
                 );
