@@ -1484,8 +1484,32 @@ function orange_restore_validation_adapter_production_cross_country_checks(
 
 function orange_restore_validation_adapter_table_has_column(PDO $pdo, string $table, string $column): bool
 {
+    try {
+        $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    } catch (Throwable) {
+        $driver = '';
+    }
+
+    if ($driver === 'sqlite') {
+        $quotedTable = '"' . str_replace('"', '""', $table) . '"';
+        $st = $pdo->query('PRAGMA table_info(' . $quotedTable . ')');
+        if ($st === false) {
+            return false;
+        }
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            if (is_array($row) && strcasecmp((string) ($row['name'] ?? ''), $column) === 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     $quotedTable = $pdo->quote($table);
     $quotedColumn = $pdo->quote($column);
+    if (!is_string($quotedTable) || !is_string($quotedColumn)) {
+        return false;
+    }
 
     return (int) ($pdo->query(
         'SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '
