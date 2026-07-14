@@ -155,13 +155,44 @@ function pvrb_create_anchor(string $backupRoot, string $suffix = ''): array
 {
     $anchorDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'anchor' . $suffix . '_' . bin2hex(random_bytes(2));
     mkdir($anchorDir, 0775, true);
-    pvrb_write_file($anchorDir . DIRECTORY_SEPARATOR . 'dump.sql.gz', 'fake-dump');
+    $dumpFile = 'dump.sql.gz';
+    $uploadsFile = 'uploads.zip';
+    $dumpPath = $anchorDir . DIRECTORY_SEPARATOR . $dumpFile;
+    $uploadsPath = $anchorDir . DIRECTORY_SEPARATOR . $uploadsFile;
+    $dumpSql = "-- Orange Phase 1A PDO SQL export\n"
+        . "CREATE TABLE `orange_restore_self_test` (`id` INT NOT NULL);\n"
+        . "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;\n";
+    $gz = gzencode($dumpSql);
+    if ($gz === false) {
+        throw new RuntimeException('Cannot build test rollback dump.');
+    }
+    pvrb_write_file($dumpPath, $gz);
+    orange_country_uploads_write_empty_zip($uploadsPath);
+
+    $health = [
+        'generated_at' => gmdate('c'),
+        'schema_revision' => 121,
+        'package_status' => 'healthy',
+        'failure_reasons' => [],
+        'warnings' => [],
+    ];
     orange_backup_write_json($anchorDir . DIRECTORY_SEPARATOR . 'manifest.json', [
         'package_type' => 'full_disaster',
-        'dump_file' => 'dump.sql.gz',
-        'dump_sha256' => str_repeat('d', 64),
+        'package_version' => ORANGE_BACKUP_FULL_PACKAGE_VERSION,
+        'generated_at' => gmdate('c'),
+        'schema_revision' => 121,
+        'dump_file' => $dumpFile,
+        'uploads_file' => $uploadsFile,
+        'dump_sha256' => orange_backup_sha256_file($dumpPath),
+        'uploads_sha256' => orange_backup_sha256_file($uploadsPath),
+        'dump_size_bytes' => filesize($dumpPath) ?: 0,
+        'uploads_size_bytes' => filesize($uploadsPath) ?: 0,
+        'backup_status' => 'success',
+        'health_report_file' => ORANGE_BACKUP_HEALTH_FILE,
+        'checksums_file' => ORANGE_BACKUP_CHECKSUMS_FILE,
     ]);
-    orange_backup_write_checksums($anchorDir, ['manifest.json', 'dump.sql.gz']);
+    orange_backup_write_json($anchorDir . DIRECTORY_SEPARATOR . ORANGE_BACKUP_HEALTH_FILE, $health);
+    orange_backup_write_checksums($anchorDir, ['manifest.json', $dumpFile, $uploadsFile, ORANGE_BACKUP_HEALTH_FILE]);
     $checksum = orange_backup_sha256_file($anchorDir . DIRECTORY_SEPARATOR . 'checksums.sha256');
 
     return ['path' => $anchorDir, 'checksum' => $checksum];
@@ -178,6 +209,16 @@ function pvrb_seed_uploads_cutover_complete_job(string $entryStatus = ORANGE_RES
 
     $projectRoot = $backupRoot . DIRECTORY_SEPARATOR . 'project';
     mkdir($projectRoot);
+    pvrb_write_file(
+        $projectRoot . DIRECTORY_SEPARATOR . 'config.php',
+        "<?php\n"
+        . "if (!defined('DB_HOST')) { define('DB_HOST', 'localhost'); }\n"
+        . "if (!defined('DB_NAME')) { define('DB_NAME', 'orange_db'); }\n"
+    );
+    pvrb_write_file(
+        $projectRoot . DIRECTORY_SEPARATOR . '.env.php',
+        "<?php\nreturn ['DB_USER' => 'orange_restore_test', 'DB_PASS' => 'test'];\n"
+    );
 
     $packageDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'pkg_' . bin2hex(random_bytes(2));
     mkdir($packageDir, 0775, true);
@@ -200,6 +241,7 @@ function pvrb_seed_uploads_cutover_complete_job(string $entryStatus = ORANGE_RES
     ]);
     $jobId = (string) $job['job_id'];
 
+    orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_VALIDATED);
     orange_restore_job_record_fresh_backup_anchor($workRoot, $jobId, $anchor['path'], $anchor['checksum']);
 
     $stagingUploadsDir = orange_restore_staging_uploads_directory($workRoot, $jobId);
@@ -265,6 +307,7 @@ function pvrb_seed_uploads_cutover_complete_job(string $entryStatus = ORANGE_RES
         'packageChecksum' => $packageChecksum,
         'manifestChecksum' => $manifestChecksum,
         'adminPdo' => pvrb_test_pdo(),
+        'mergePdo' => pvrb_test_pdo(),
     ];
 }
 
@@ -284,6 +327,55 @@ function pvrb_copy_registry(string $projectRoot): void
     if (!copy($src, $destDir . DIRECTORY_SEPARATOR . 'backup_table_registry.json')) {
         throw new RuntimeException('Cannot copy backup_table_registry.json for self-test project.');
     }
+}
+
+/**
+ * @param array<string, array<string, mixed>> $tables
+ */
+function pvrb_write_registry_tables(string $projectRoot, array $tables): void
+{
+    $destDir = $projectRoot . DIRECTORY_SEPARATOR . 'config';
+    if (!is_dir($destDir)) {
+        mkdir($destDir, 0775, true);
+    }
+    orange_backup_write_json($destDir . DIRECTORY_SEPARATOR . 'backup_table_registry.json', [
+        'registry_version' => ORANGE_BACKUP_REGISTRY_VERSION,
+        'schema_revision' => 121,
+        'generated_at' => gmdate('c'),
+        'generated_by' => 'self-test',
+        'table_count' => count($tables),
+        'tables' => $tables,
+    ]);
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function pvrb_registry_global(int $order = 1, bool $critical = false): array
+{
+    return orange_backup_registry_row(
+        'global',
+        $order,
+        orange_backup_registry_full_table(),
+        null,
+        false,
+        $critical
+    );
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function pvrb_registry_country_owned(array $rule, int $order = 50, bool $critical = false): array
+{
+    return orange_backup_registry_row(
+        'country_owned',
+        $order,
+        $rule,
+        null,
+        false,
+        $critical
+    );
 }
 
 function pvrb_sqlite_cross_country_pdo(bool $contaminated = false): PDO
@@ -514,6 +606,7 @@ $err = pvrb_try(static function () use ($completed): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $completed['env'],
         'admin_pdo_override' => $completed['adminPdo'],
+        'merge_pdo_override' => $completed['mergePdo'],
     ]);
 });
 pvrb_self_test($err !== null, 'rollback: completed state rejected');
@@ -533,6 +626,7 @@ $err = pvrb_try(static function () use ($badPass): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $badPass['env'],
         'admin_pdo_override' => $badPass['adminPdo'],
+        'merge_pdo_override' => $badPass['mergePdo'],
     ]);
 });
 pvrb_self_test($err !== null && str_contains($err->getMessage(), 'password'), 'rollback: wrong password rejected');
@@ -552,6 +646,7 @@ $err = pvrb_try(static function () use ($badPhrase): void {
         'confirmation_phrase' => 'RESTORE',
         'env_override' => $badPhrase['env'],
         'admin_pdo_override' => $badPhrase['adminPdo'],
+        'merge_pdo_override' => $badPhrase['mergePdo'],
     ]);
 });
 pvrb_self_test($err !== null && str_contains($err->getMessage(), 'ROLLBACK'), 'rollback: wrong confirmation phrase rejected');
@@ -572,6 +667,7 @@ $err = pvrb_try(static function () use ($badPerm): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $badPerm['env'],
         'admin_pdo_override' => $badPerm['adminPdo'],
+        'merge_pdo_override' => $badPerm['mergePdo'],
     ]);
 });
 pvrb_self_test($err !== null, 'rollback: non-superuser rejected');
@@ -595,6 +691,7 @@ $err = pvrb_try(static function () use ($noAnchor): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $noAnchor['env'],
         'admin_pdo_override' => $noAnchor['adminPdo'],
+        'merge_pdo_override' => $noAnchor['mergePdo'],
     ]);
 });
 pvrb_self_test($err !== null && str_contains($err->getMessage(), 'anchor'), 'rollback: missing anchor rejected');
@@ -617,6 +714,7 @@ $err = pvrb_try(static function () use ($badChecksum): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $badChecksum['env'],
         'admin_pdo_override' => $badChecksum['adminPdo'],
+        'merge_pdo_override' => $badChecksum['mergePdo'],
     ]);
 });
 pvrb_self_test($err !== null && str_contains($err->getMessage(), 'checksum'), 'rollback: anchor checksum mismatch rejected');
@@ -639,6 +737,7 @@ $err = pvrb_try(static function () use ($otherAnchor): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $otherAnchor['env'],
         'admin_pdo_override' => $otherAnchor['adminPdo'],
+        'merge_pdo_override' => $otherAnchor['mergePdo'],
     ]);
 });
 pvrb_self_test($err !== null && str_contains($err->getMessage(), 'job-only'), 'rollback: non job-only anchor rejected');
@@ -658,6 +757,7 @@ $err = pvrb_try(static function () use ($dbFail): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $dbFail['env'],
         'admin_pdo_override' => $dbFail['adminPdo'],
+        'merge_pdo_override' => $dbFail['mergePdo'],
         'db_import_override' => static function (): void {
             throw new RuntimeException('Simulated DB rollback failure.');
         },
@@ -687,6 +787,7 @@ $resultCrash = orange_restore_merge_rollback_run([
     'confirmation_phrase' => 'ROLLBACK',
     'env_override' => $crashUploads['env'],
     'admin_pdo_override' => $crashUploads['adminPdo'],
+    'merge_pdo_override' => $crashUploads['mergePdo'],
     'db_import_override' => static function (): void {
         throw new RuntimeException('DB must not re-run when checkpoint is database_complete.');
     },
@@ -718,6 +819,7 @@ $err = pvrb_try(static function () use ($uploadsFail): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $uploadsFail['env'],
         'admin_pdo_override' => $uploadsFail['adminPdo'],
+        'merge_pdo_override' => $uploadsFail['mergePdo'],
         'db_import_override' => static function (): void {
             // ok
         },
@@ -743,6 +845,7 @@ $err = pvrb_try(static function () use ($valFail): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $valFail['env'],
         'admin_pdo_override' => $valFail['adminPdo'],
+        'merge_pdo_override' => $valFail['mergePdo'],
         'db_import_override' => static function (): void {},
         'uploads_rollback_override' => static function (): void {},
         'rollback_postcheck_override' => static fn (): array => [
@@ -775,6 +878,7 @@ $resultRb = orange_restore_merge_rollback_run([
     'confirmation_phrase' => 'ROLLBACK',
     'env_override' => $rbOk['env'],
     'admin_pdo_override' => $rbOk['adminPdo'],
+    'merge_pdo_override' => $rbOk['mergePdo'],
     'db_import_override' => static function (): void {},
     'rename_override' => static function (string $from, string $to): void {
         if (!@rename($from, $to)) {
@@ -915,6 +1019,8 @@ pvrb_self_test(
 $noRegistryProject = pvrb_temp_root();
 $noRegistryPdo = new PDO('sqlite::memory:');
 $noRegistryPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$noRegistryPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$noRegistryPdo->exec('INSERT INTO countries (id) VALUES (1)');
 $noRegistryPdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, main_image TEXT)');
 $registryUploadsFail = orange_restore_validation_adapter_production_required_uploads_check(
     $noRegistryPdo,
@@ -1055,17 +1161,31 @@ pvrb_rmdir($maintGateSeed['backupRoot']);
 
 // --- BLOCKER 2: cross-country contamination detected ---
 $ccProject = pvrb_temp_root();
-pvrb_copy_registry($ccProject);
+pvrb_write_registry_tables($ccProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'products' => pvrb_registry_country_owned(orange_backup_registry_country_id(), 60, true),
+]);
 $ccPdo = pvrb_sqlite_cross_country_pdo(true);
-$ccTables = ['countries', 'products'];
-$ccErrors = orange_restore_validation_adapter_production_cross_country_checks($ccPdo, $ccProject, $ccTables);
+$ccErrors = orange_restore_validation_adapter_production_count_invalid_country_refs(
+    $ccPdo,
+    'products',
+    'country_id',
+    [1, 2],
+    true
+);
 pvrb_self_test($ccErrors !== [], 'blocker2: cross-country contamination detected');
 pvrb_self_test(
     (bool) array_filter($ccErrors, static fn (string $e): bool => str_contains($e, 'products') || str_contains($e, 'foreign country')),
     'blocker2: cross-country error references invalid country rows'
 );
 $ccClean = pvrb_sqlite_cross_country_pdo(false);
-$ccCleanErrors = orange_restore_validation_adapter_production_cross_country_checks($ccClean, $ccProject, $ccTables);
+$ccCleanErrors = orange_restore_validation_adapter_production_count_invalid_country_refs(
+    $ccClean,
+    'products',
+    'country_id',
+    [1, 2],
+    true
+);
 pvrb_self_test($ccCleanErrors === [], 'blocker2: clean cross-country data passes');
 pvrb_rmdir($ccProject);
 
@@ -1097,12 +1217,31 @@ $uploadsPdo = new PDO('sqlite::memory:');
 $uploadsPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $uploadsPdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, main_image TEXT)');
 $uploadsPdo->exec("INSERT INTO products (id, main_image) VALUES (1, 'missing.webp')");
+$uploadsPdo->exec('CREATE TABLE product_images (id INTEGER PRIMARY KEY, image_path TEXT)');
+$uploadsPdo->exec('CREATE TABLE product_colorway_images (id INTEGER PRIMARY KEY, image_path TEXT)');
+$uploadsPdo->exec('CREATE TABLE payment_transactions (id INTEGER PRIMARY KEY, proof_file TEXT)');
+$uploadsPdo->exec('CREATE TABLE orange_company_documents (id INTEGER PRIMARY KEY, storage_path TEXT)');
+$uploadsPdo->exec('CREATE TABLE customers (id INTEGER PRIMARY KEY)');
+$uploadsPdo->exec('CREATE TABLE suppliers (id INTEGER PRIMARY KEY)');
+$uploadsPdo->exec('CREATE TABLE inventory_reconciliation (id INTEGER PRIMARY KEY)');
+$uploadsPdo->exec('CREATE TABLE company_settings (id INTEGER PRIMARY KEY, company_logo TEXT)');
 $uploadsDir = $uploadsProject . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'products';
 mkdir($uploadsDir, 0775, true);
+$uploadsProductionTables = [
+    'products',
+    'product_images',
+    'product_colorway_images',
+    'payment_transactions',
+    'orange_company_documents',
+    'customers',
+    'suppliers',
+    'inventory_reconciliation',
+    'company_settings',
+];
 $missingUploads = orange_restore_validation_adapter_production_required_uploads_check(
     $uploadsPdo,
     $uploadsProject,
-    ['products']
+    $uploadsProductionTables
 );
 pvrb_self_test(($missingUploads['ok'] ?? true) === false, 'blocker4: required uploads missing fails');
 pvrb_self_test(($missingUploads['verifiable'] ?? false) === true, 'blocker4: missing uploads remains verifiable');
@@ -1110,7 +1249,7 @@ $noRegistryProject = pvrb_temp_root();
 $unverifiableUploads = orange_restore_validation_adapter_production_required_uploads_check(
     $uploadsPdo,
     $noRegistryProject,
-    ['products']
+    $uploadsProductionTables
 );
 pvrb_self_test(($unverifiableUploads['ok'] ?? true) === false, 'blocker4: required uploads unverifiable fails');
 pvrb_self_test(($unverifiableUploads['verifiable'] ?? true) === false, 'blocker4: unverifiable uploads flagged');
@@ -1130,6 +1269,7 @@ $err = pvrb_try(static function () use ($rbNoSource): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $rbNoSource['env'],
         'admin_pdo_override' => $rbNoSource['adminPdo'],
+        'merge_pdo_override' => $rbNoSource['mergePdo'],
         'db_import_override' => static function (): void {},
     ]);
 });
@@ -1166,6 +1306,7 @@ $err = pvrb_try(static function () use ($rbCorruptSnap): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $rbCorruptSnap['env'],
         'admin_pdo_override' => $rbCorruptSnap['adminPdo'],
+        'merge_pdo_override' => $rbCorruptSnap['mergePdo'],
         'db_import_override' => static function (): void {},
     ]);
 });
@@ -1196,6 +1337,7 @@ $err = pvrb_try(static function () use ($rbCorruptPre): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $rbCorruptPre['env'],
         'admin_pdo_override' => $rbCorruptPre['adminPdo'],
+        'merge_pdo_override' => $rbCorruptPre['mergePdo'],
         'db_import_override' => static function (): void {},
     ]);
 });
@@ -1220,6 +1362,7 @@ $err = pvrb_try(static function () use ($rbPartial): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $rbPartial['env'],
         'admin_pdo_override' => $rbPartial['adminPdo'],
+        'merge_pdo_override' => $rbPartial['mergePdo'],
         'db_import_override' => static function (): void {},
     ]);
 });
@@ -1656,9 +1799,17 @@ function pvrb_patch_registry_table(string $projectRoot, string $tableName, array
 
 // --- Phase 2D.4 BLOCKER 2: country_owned rule validation ---
 $ownedMissingRuleProject = pvrb_temp_root();
-pvrb_copy_registry($ownedMissingRuleProject);
-pvrb_patch_registry_table($ownedMissingRuleProject, 'test_country_owned', [
-    'ownership_type' => 'country_owned',
+pvrb_write_registry_tables($ownedMissingRuleProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'test_country_owned' => [
+        'ownership_type' => 'country_owned',
+        'export_order' => 50,
+        'delete_order' => 450,
+        'restore_order' => 50,
+        'parent_dependency' => null,
+        'uploads_linked' => false,
+        'integrity_critical' => false,
+    ],
 ]);
 $ownedMissingRulePdo = new PDO('sqlite::memory:');
 $ownedMissingRulePdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -1677,10 +1828,9 @@ pvrb_self_test(
 pvrb_rmdir($ownedMissingRuleProject);
 
 $ownedUnsupportedProject = pvrb_temp_root();
-pvrb_copy_registry($ownedUnsupportedProject);
-pvrb_patch_registry_table($ownedUnsupportedProject, 'test_country_owned', [
-    'ownership_type' => 'country_owned',
-    'extraction_rule' => ['type' => 'unsupported_rule_type'],
+pvrb_write_registry_tables($ownedUnsupportedProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'test_country_owned' => pvrb_registry_country_owned(['type' => 'unsupported_rule_type']),
 ]);
 $ownedUnsupportedPdo = new PDO('sqlite::memory:');
 $ownedUnsupportedPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -1699,10 +1849,9 @@ pvrb_self_test(
 pvrb_rmdir($ownedUnsupportedProject);
 
 $ownedMalformedScopeProject = pvrb_temp_root();
-pvrb_copy_registry($ownedMalformedScopeProject);
-pvrb_patch_registry_table($ownedMalformedScopeProject, 'test_country_owned', [
-    'ownership_type' => 'country_owned',
-    'extraction_rule' => ['type' => 'country_scope_or', 'columns' => []],
+pvrb_write_registry_tables($ownedMalformedScopeProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'test_country_owned' => pvrb_registry_country_owned(['type' => 'country_scope_or', 'columns' => []]),
 ]);
 $ownedMalformedScopePdo = new PDO('sqlite::memory:');
 $ownedMalformedScopePdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -1721,10 +1870,9 @@ pvrb_self_test(
 pvrb_rmdir($ownedMalformedScopeProject);
 
 $ownedMissingColumnProject = pvrb_temp_root();
-pvrb_copy_registry($ownedMissingColumnProject);
-pvrb_patch_registry_table($ownedMissingColumnProject, 'test_country_owned', [
-    'ownership_type' => 'country_owned',
-    'extraction_rule' => ['type' => 'country_id', 'column' => 'country_id'],
+pvrb_write_registry_tables($ownedMissingColumnProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'test_country_owned' => pvrb_registry_country_owned(['type' => 'country_id', 'column' => 'country_id']),
 ]);
 $ownedMissingColumnPdo = new PDO('sqlite::memory:');
 $ownedMissingColumnPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -1743,10 +1891,9 @@ pvrb_self_test(
 pvrb_rmdir($ownedMissingColumnProject);
 
 $ownedValidIdProject = pvrb_temp_root();
-pvrb_copy_registry($ownedValidIdProject);
-pvrb_patch_registry_table($ownedValidIdProject, 'test_country_owned', [
-    'ownership_type' => 'country_owned',
-    'extraction_rule' => ['type' => 'country_id', 'column' => 'country_id'],
+pvrb_write_registry_tables($ownedValidIdProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'test_country_owned' => pvrb_registry_country_owned(['type' => 'country_id', 'column' => 'country_id']),
 ]);
 $ownedValidIdPdo = new PDO('sqlite::memory:');
 $ownedValidIdPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -1762,20 +1909,21 @@ $ownedValidIdErrors = orange_restore_validation_adapter_production_validate_coun
         'extraction_rule' => ['type' => 'country_id', 'column' => 'country_id'],
     ]
 );
-$ownedValidIdCrossErrors = orange_restore_validation_adapter_production_cross_country_checks(
+$ownedValidIdCrossErrors = orange_restore_validation_adapter_production_count_invalid_country_refs(
     $ownedValidIdPdo,
-    $ownedValidIdProject,
-    ['countries', 'test_country_owned']
+    'test_country_owned',
+    'country_id',
+    [1],
+    false
 );
 pvrb_self_test($ownedValidIdErrors === [], 'blocker2-country_owned: valid country_id rule passes validation');
 pvrb_self_test($ownedValidIdCrossErrors === [], 'blocker2-country_owned: valid country_id rule passes cross-country checks');
 pvrb_rmdir($ownedValidIdProject);
 
 $ownedValidScopeProject = pvrb_temp_root();
-pvrb_copy_registry($ownedValidScopeProject);
-pvrb_patch_registry_table($ownedValidScopeProject, 'test_country_owned', [
-    'ownership_type' => 'country_owned',
-    'extraction_rule' => ['type' => 'country_scope_or', 'columns' => ['country_id', 'scope_country_id']],
+pvrb_write_registry_tables($ownedValidScopeProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'test_country_owned' => pvrb_registry_country_owned(['type' => 'country_scope_or', 'columns' => ['country_id', 'scope_country_id']]),
 ]);
 $ownedValidScopePdo = new PDO('sqlite::memory:');
 $ownedValidScopePdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -1797,20 +1945,49 @@ $ownedValidScopeErrors = orange_restore_validation_adapter_production_validate_c
         'extraction_rule' => ['type' => 'country_scope_or', 'columns' => ['country_id', 'scope_country_id']],
     ]
 );
-$ownedValidScopeCrossErrors = orange_restore_validation_adapter_production_cross_country_checks(
+$ownedValidScopeCrossErrors = orange_restore_validation_adapter_production_count_country_scope_or_violations(
     $ownedValidScopePdo,
-    $ownedValidScopeProject,
-    ['countries', 'test_country_owned']
+    'test_country_owned',
+    ['country_id', 'scope_country_id'],
+    [1]
 );
 pvrb_self_test($ownedValidScopeErrors === [], 'blocker2-country_owned: valid country_scope_or rule passes validation');
 pvrb_self_test($ownedValidScopeCrossErrors === [], 'blocker2-country_owned: valid country_scope_or rule passes cross-country checks');
 pvrb_rmdir($ownedValidScopeProject);
 
+$ownedValidCustomProject = pvrb_temp_root();
+pvrb_write_registry_tables($ownedValidCustomProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'accounts' => pvrb_registry_country_owned(orange_backup_registry_country_id(), 50, true),
+    'test_country_owned_custom' => pvrb_registry_country_owned([
+        'type' => 'custom_sql',
+        'sql' => 'SELECT t.id FROM test_country_owned_custom t INNER JOIN accounts a ON a.id = t.account_id WHERE a.country_id = :country_id',
+    ], 51),
+]);
+$ownedValidCustomPdo = new PDO('sqlite::memory:');
+$ownedValidCustomPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$ownedValidCustomPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$ownedValidCustomPdo->exec('INSERT INTO countries (id) VALUES (1), (2)');
+$ownedValidCustomPdo->exec('CREATE TABLE accounts (id INTEGER PRIMARY KEY, country_id INTEGER)');
+$ownedValidCustomPdo->exec('INSERT INTO accounts (id, country_id) VALUES (1, 1), (2, 2)');
+$ownedValidCustomPdo->exec('CREATE TABLE test_country_owned_custom (id INTEGER PRIMARY KEY, account_id INTEGER)');
+$ownedValidCustomPdo->exec('INSERT INTO test_country_owned_custom (id, account_id) VALUES (1, 1), (2, 2)');
+$ownedValidCustomErrors = orange_restore_validation_adapter_production_count_custom_sql_coverage_violations(
+    $ownedValidCustomPdo,
+    'test_country_owned_custom',
+    [
+        'type' => 'custom_sql',
+        'sql' => 'SELECT t.id FROM test_country_owned_custom t INNER JOIN accounts a ON a.id = t.account_id WHERE a.country_id = :country_id',
+    ],
+    [1, 2]
+);
+pvrb_self_test($ownedValidCustomErrors === [], 'blocker2-country_owned: valid custom_sql rule passes cross-country checks');
+pvrb_rmdir($ownedValidCustomProject);
+
 $ownedMissingTableProject = pvrb_temp_root();
-pvrb_copy_registry($ownedMissingTableProject);
-pvrb_patch_registry_table($ownedMissingTableProject, 'missing_country_owned_table', [
-    'ownership_type' => 'country_owned',
-    'extraction_rule' => ['type' => 'country_id', 'column' => 'country_id'],
+pvrb_write_registry_tables($ownedMissingTableProject, [
+    'countries' => pvrb_registry_global(1, true),
+    'missing_country_owned_table' => pvrb_registry_country_owned(['type' => 'country_id', 'column' => 'country_id']),
 ]);
 $ownedMissingTablePdo = new PDO('sqlite::memory:');
 $ownedMissingTablePdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
