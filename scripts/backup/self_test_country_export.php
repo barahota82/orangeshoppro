@@ -91,7 +91,10 @@ $parentQuery = orange_country_export_build_parent_rows_query('order_items', [
     'parent_table' => 'orders',
     'foreign_key' => 'order_id',
 ], $idSnapshot);
-crp_self_test(str_contains($parentQuery['sql'], 'order_id IN'), 'dependent row extraction query');
+crp_self_test(
+    str_contains($parentQuery['sql'], '`order_id` IN') && $parentQuery['params'] === [1, 2],
+    'dependent row extraction query'
+);
 $emptyParentQuery = orange_country_export_build_parent_rows_query('order_items', [
     'type' => 'parent_rows',
     'parent_table' => 'orders',
@@ -114,7 +117,7 @@ $logoPaths = array_map(static fn (array $c): string => (string) ($c['relative_pa
 crp_self_test(in_array('uploads/company/company-logo.webp', $logoPaths, true), 'company logo resolves to uploads/company/');
 crp_self_test(!in_array('uploads/products/company-logo.webp', $logoPaths, true), 'company logo never resolves to uploads/products/');
 $uploadIssues = orange_country_uploads_collect($projectRoot, 1, [
-    'products' => [['id' => 1, 'main_image' => 'missing-file.webp']],
+    'product_colorway_images' => [['id' => 1, 'image_path' => 'missing-file.webp']],
 ]);
 $classified = orange_country_export_classify_upload_issues($uploadIssues['issues']);
 crp_self_test(($classified['package_status'] ?? '') === 'healthy', 'warning upload missing does not downgrade package_status');
