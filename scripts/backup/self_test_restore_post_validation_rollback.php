@@ -840,6 +840,15 @@ $validUpload = orange_restore_validation_adapter_production_validate_upload_refe
 pvrb_self_test(($validUpload['ok'] ?? false) === true && ($validUpload['exists'] ?? false) === true, 'blocker-fix: valid uploads reference passes');
 pvrb_rmdir($uploadsPathProject['projectRoot']);
 
+$missingUploadsRoot = pvrb_temp_root();
+$missingRootResult = orange_restore_validation_adapter_production_validate_upload_reference(
+    $missingUploadsRoot,
+    'uploads/products/missing.webp'
+);
+pvrb_self_test(($missingRootResult['ok'] ?? true) === false, 'review-fix: missing uploads root fails validation');
+pvrb_self_test(!is_dir($missingUploadsRoot . DIRECTORY_SEPARATOR . 'uploads'), 'review-fix: validation does not create uploads root');
+pvrb_rmdir($missingUploadsRoot);
+
 $symlinkProject = pvrb_seed_uploads_validation_project();
 $symlinkTarget = $symlinkProject['projectRoot'] . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'link.webp';
 if (function_exists('symlink')) {
@@ -954,6 +963,29 @@ pvrb_self_test(
     'blocker-fix: registry parent missing is hard failure'
 );
 pvrb_rmdir($depProject);
+
+$depNoCountryProject = pvrb_temp_root();
+pvrb_copy_registry($depNoCountryProject);
+$depNoCountryPdo = new PDO('sqlite::memory:');
+$depNoCountryPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$depNoCountryPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$depNoCountryPdo->exec('INSERT INTO countries (id) VALUES (1)');
+$depNoCountryPdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, country_id INTEGER)');
+$depNoCountryPdo->exec('INSERT INTO products (id, country_id) VALUES (1, 1)');
+$depNoCountryPdo->exec('CREATE TABLE product_variants (id INTEGER PRIMARY KEY, product_id INTEGER)');
+$depNoCountryErrors = orange_restore_validation_adapter_production_cross_country_checks(
+    $depNoCountryPdo,
+    $depNoCountryProject,
+    ['countries', 'products', 'product_variants']
+);
+pvrb_self_test(
+    !(bool) array_filter(
+        $depNoCountryErrors,
+        static fn (string $e): bool => str_contains($e, 'product_variants missing country_id')
+    ),
+    'review-fix: dependent child without country_id is scoped through parent FK'
+);
+pvrb_rmdir($depNoCountryProject);
 
 $malformedProject = pvrb_temp_root();
 pvrb_copy_registry($malformedProject);
