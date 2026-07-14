@@ -35,8 +35,8 @@ try {
         'message' => $ok ? 'اكتمل تصدير حزم الدول.' : (string) ($result['message'] ?? 'فشل تصدير حزم الدول.'),
         'result' => orange_backup_admin_redact_secrets([
             'exit_code' => (int) ($result['exit_code'] ?? 1),
-            'stdout_excerpt' => orange_backup_admin_sanitize_cli_excerpt((string) ($result['stdout'] ?? ''), 4000),
-            'stderr_excerpt' => orange_backup_admin_sanitize_cli_excerpt((string) ($result['stderr'] ?? ''), 2000),
+            'stdout_excerpt' => mb_substr((string) ($result['stdout'] ?? ''), 0, 4000),
+            'stderr_excerpt' => mb_substr((string) ($result['stderr'] ?? ''), 0, 2000),
         ]),
     ], $ok ? 200 : 409);
 } catch (Throwable $e) {

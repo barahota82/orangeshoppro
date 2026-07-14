@@ -168,10 +168,6 @@ $redacted = orange_backup_admin_redact_secrets([
 ]);
 backup_admin_self_test(!isset($redacted['db_pass']) && !isset($redacted['manifest']['token']), 'security: secrets redacted from admin payloads');
 
-$redactedText = orange_backup_admin_redact_text('DB_PASS=supersecret token=abc123');
-backup_admin_self_test(!str_contains($redactedText, 'supersecret') && !str_contains($redactedText, 'abc123'), 'security: secret values redacted from text payloads');
-backup_admin_self_test(!in_array('checksums.sha256', ORANGE_BACKUP_ADMIN_VIEWABLE_FILES, true), 'security: checksums file not in view allowlist');
-
 $pageSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'backup_center.php');
 backup_admin_self_test(!str_contains($pageSource, 'restore_run_full') && !str_contains($pageSource, 'rollback'), 'scope: no restore UI actions in backup_center page');
 backup_admin_self_test(!str_contains($pageSource, 'delete'), 'scope: no delete action in backup_center page');

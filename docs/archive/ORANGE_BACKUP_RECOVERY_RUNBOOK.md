@@ -741,21 +741,7 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 
 ### Page
 
-- `admin/index.php?page=backup_center` → `admin/pages/backup_center.php` (**single screen** — no separate Full/Country admin pages)
-- **Menu:** الإعدادات → الأسواق (مشرف عام) → **إدارة النسخ الاحتياطي** (immediately below **المستخدمون والصلاحيات**); mirrored in `admin/partials/header.php` (`$navSettings`) and `includes/admin_nav_tree.php`
-
-**Layout (one page, shared sections not duplicated):**
-
-| Section | Scope |
-|---------|--------|
-| نظرة عامة | Shared |
-| Tab **النسخ الاحتياطي الشامل** | Latest Full status, Run Full Backup, snapshots, verify, DRV, manifest/health/recovery report view |
-| Tab **نسخ الدول** | Dynamic country discovery, Run All Recoverable Countries, latest package per country, verify, DRV, manifest/health/dependency graph/inventory view |
-| حالة المهام المجدولة | Shared (read-only) |
-| التخزين والاحتفاظ | Shared |
-| السجلات | Shared (read-only) |
-
-UI may hide tabs/actions by permission; every API enforces `backup_view` / `backup_run` / `backup_verify` independently.
+- `admin/index.php?page=backup_center` → `admin/pages/backup_center.php`
 
 ### Permissions (server-side enforced on every API)
 
@@ -779,10 +765,6 @@ UI may hide tabs/actions by permission; every API enforces `backup_view` / `back
 | `admin/api/backup/recovery-check.php` | POST | `orange_recovery_validate_package()` |
 
 Package paths are **never** accepted from the client — only server-discovered allowlisted `package_id` + optional `country_code`.
-
-**View allowlist (Phase 3A admin file view):** `manifest.json`, `health.json`, `recovery_validation.json`, `dependency_graph.json`, `table_inventory.json` only — not SQL dumps, ZIPs, checksum files, or `.env.php`.
-
-**Redaction (Phase 3A):** JSON keys matching secret fragments are stripped; log tails and CLI excerpts pass through `orange_backup_admin_redact_text()` before API/audit output. Log tail accepts only filenames discovered under `BackupRoot/logs/`.
 
 ### Scheduled Tasks section
 

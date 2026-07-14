@@ -61,11 +61,6 @@ try {
         if ($resolved === false || $resolvedLogs === false || !str_starts_with(str_replace('\\', '/', $resolved), str_replace('\\', '/', $resolvedLogs))) {
             json_response(['success' => false, 'message' => 'السجل غير موجود'], 404);
         }
-        $discoveredLogs = orange_backup_admin_list_logs($backupRoot, 200);
-        $allowedLogNames = array_map(static fn (array $row): string => (string) ($row['name'] ?? ''), $discoveredLogs);
-        if (!in_array($logName, $allowedLogNames, true)) {
-            json_response(['success' => false, 'message' => 'السجل غير موجود'], 404);
-        }
         $maxBytes = 65536;
         $size = filesize($resolved) ?: 0;
         $content = '';
@@ -83,7 +78,7 @@ try {
             'success' => true,
             'log' => $logName,
             'size_bytes' => $size,
-            'tail' => orange_backup_admin_redact_text($content),
+            'tail' => $content,
         ]);
     }
 

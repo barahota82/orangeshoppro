@@ -9,7 +9,7 @@ require_once __DIR__ . '/../../includes/backup/backup_admin.php';
 $pdo = orange_admin_page_pdo();
 
 if (!orange_backup_admin_may_view($admin, $pdo)) {
-    echo '<div class="card"><div class="alert-error">لا تملك صلاحية عرض إدارة النسخ الاحتياطي.</div></div>';
+    echo '<div class="card"><div class="alert-error">لا تملك صلاحية عرض مركز النسخ الاحتياطي.</div></div>';
 
     return;
 }
@@ -37,20 +37,12 @@ $apiBase = storefront_public_path('/admin/api/backup');
 .bc-pre{max-height:360px;overflow:auto;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;font-size:.78rem;white-space:pre-wrap;word-break:break-word}
 .bc-progress{display:none;margin:12px 0;padding:10px;border-radius:8px;background:#eff6ff;color:#1e3a8a}
 .bc-section{margin-bottom:18px}
-.bc-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;border-bottom:1px solid #e5e7eb;padding-bottom:8px}
-.bc-tab{padding:8px 14px;border:1px solid #d1d5db;border-radius:8px 8px 0 0;background:#f9fafb;cursor:pointer;font-weight:600;font:inherit}
-.bc-tab.is-active{background:#fff;border-bottom-color:#fff;color:#1d4ed8}
-.bc-tab-panel{display:none}
-.bc-tab-panel.is-active{display:block}
-.bc-status-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}
-.bc-status-strip dt{font-size:.78rem;color:#64748b;margin:0 0 2px}
-.bc-status-strip dd{margin:0;font-weight:600;font-size:.95rem}
 @media (max-width:768px){.bc-grid{grid-template-columns:1fr}}
 </style>
 
 <div class="page-title">
-    <h1>إدارة النسخ الاحتياطي</h1>
-    <p class="card-hint" style="margin:0.35rem 0 0;">شاشة واحدة — النسخ الشامل ونسخ الدول مع أقسام مشتركة (نظرة عامة، الجدولة، التخزين، السجلات).</p>
+    <h1>مركز النسخ الاحتياطي</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;">إدارة محرك النسخ الاحتياطي المعتمد — Phase 3A (بدون استعادة الإنتاج من الواجهة).</p>
 </div>
 
 <div id="bc_progress" class="bc-progress" role="status" aria-live="polite">جاري التنفيذ…</div>
@@ -64,77 +56,59 @@ $apiBase = storefront_public_path('/admin/api/backup');
 </div>
 
 <div class="bc-section card">
-    <div class="bc-tabs" role="tablist" aria-label="أقسام النسخ الاحتياطي">
-        <button type="button" class="bc-tab is-active" role="tab" id="bc_tab_full_btn" aria-controls="bc_tab_full" aria-selected="true" data-bc-tab="full">النسخ الاحتياطي الشامل</button>
-        <button type="button" class="bc-tab" role="tab" id="bc_tab_country_btn" aria-controls="bc_tab_country" aria-selected="false" data-bc-tab="country">نسخ الدول</button>
+    <h3>Full Disaster Backup</h3>
+    <div class="bc-actions">
+        <?php if ($canRun): ?>
+        <button type="button" class="btn-primary" id="bc_run_full_btn" data-action="run_full">تشغيل Full Backup</button>
+        <?php endif; ?>
+        <button type="button" class="btn-secondary" id="bc_refresh_btn">تحديث</button>
     </div>
-
-    <div id="bc_tab_full" class="bc-tab-panel is-active" role="tabpanel" aria-labelledby="bc_tab_full_btn">
-        <h3>النسخ الاحتياطي الشامل</h3>
-        <dl id="bc_latest_full" class="bc-status-strip">
-            <div><dt>آخر Full</dt><dd>…</dd></div>
-            <div><dt>الحالة</dt><dd>…</dd></div>
-            <div><dt>Schema</dt><dd>…</dd></div>
-            <div><dt>DRV Score</dt><dd>…</dd></div>
-        </dl>
-        <div class="bc-actions">
-            <?php if ($canRun): ?>
-            <button type="button" class="btn-primary" id="bc_run_full_btn" data-action="run_full">تشغيل Full Backup</button>
-            <?php endif; ?>
-            <button type="button" class="btn-secondary" id="bc_refresh_btn">تحديث</button>
-        </div>
-        <div class="table-wrap">
-            <table id="bc_full_table">
-                <thead>
-                    <tr>
-                        <th>الوقت</th>
-                        <th>الحالة</th>
-                        <th>Schema</th>
-                        <th>Backend</th>
-                        <th>Dump</th>
-                        <th>Uploads</th>
-                        <th>DRV</th>
-                        <th>إجراءات</th>
-                    </tr>
-                </thead>
-                <tbody><tr><td colspan="8" class="muted">…</td></tr></tbody>
-            </table>
-        </div>
-    </div>
-
-    <div id="bc_tab_country" class="bc-tab-panel" role="tabpanel" aria-labelledby="bc_tab_country_btn" hidden>
-        <h3>نسخ الدول</h3>
-        <dl id="bc_country_discovery" class="bc-status-strip">
-            <div><dt>دول قابلة للاسترداد</dt><dd>…</dd></div>
-            <div><dt>آخر Country Batch</dt><dd>…</dd></div>
-            <div><dt>حزم مسجّلة</dt><dd>…</dd></div>
-        </dl>
-        <div class="bc-actions">
-            <?php if ($canRun): ?>
-            <button type="button" class="btn-primary" id="bc_run_countries_btn" data-action="run_countries">تشغيل All Recoverable Countries</button>
-            <?php endif; ?>
-        </div>
-        <div class="table-wrap">
-            <table id="bc_country_table">
-                <thead>
-                    <tr>
-                        <th>الدولة</th>
-                        <th>الحزمة</th>
-                        <th>الحالة</th>
-                        <th>Schema</th>
-                        <th>Registry</th>
-                        <th>DRV</th>
-                        <th>إجراءات</th>
-                    </tr>
-                </thead>
-                <tbody><tr><td colspan="7" class="muted">…</td></tr></tbody>
-            </table>
-        </div>
+    <div class="table-wrap">
+        <table id="bc_full_table">
+            <thead>
+                <tr>
+                    <th>الوقت</th>
+                    <th>الحالة</th>
+                    <th>Schema</th>
+                    <th>Backend</th>
+                    <th>Dump</th>
+                    <th>Uploads</th>
+                    <th>DRV</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody><tr><td colspan="8" class="muted">…</td></tr></tbody>
+        </table>
     </div>
 </div>
 
 <div class="bc-section card">
-    <h3>حالة المهام المجدولة</h3>
+    <h3>Country Recovery Packages</h3>
+    <div class="bc-actions">
+        <?php if ($canRun): ?>
+        <button type="button" class="btn-primary" id="bc_run_countries_btn" data-action="run_countries">تشغيل All Recoverable Countries</button>
+        <?php endif; ?>
+    </div>
+    <div class="table-wrap">
+        <table id="bc_country_table">
+            <thead>
+                <tr>
+                    <th>الدولة</th>
+                    <th>الحزمة</th>
+                    <th>الحالة</th>
+                    <th>Schema</th>
+                    <th>Registry</th>
+                    <th>DRV</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody><tr><td colspan="7" class="muted">…</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="bc-section card">
+    <h3>Scheduled Tasks (قراءة فقط)</h3>
     <div class="table-wrap">
         <table id="bc_schedule_table">
             <thead><tr><th>المهمة</th><th>الجدولة</th><th>المسار</th></tr></thead>
@@ -145,12 +119,12 @@ $apiBase = storefront_public_path('/admin/api/backup');
 </div>
 
 <div class="bc-section card">
-    <h3>التخزين والاحتفاظ</h3>
+    <h3>التخزين / الاحتفاظ</h3>
     <div id="bc_storage" class="bc-grid"></div>
 </div>
 
 <div class="bc-section card">
-    <h3>السجلات</h3>
+    <h3>السجلات (قراءة فقط)</h3>
     <div class="table-wrap">
         <table id="bc_logs_table">
             <thead><tr><th>الملف</th><th>النوع</th><th>الحجم</th><th>آخر تعديل</th><th></th></tr></thead>
@@ -240,13 +214,10 @@ $apiBase = storefront_public_path('/admin/api/backup');
     function renderOverview(o) {
         const ov = o.overview || {};
         const last = ov.last_successful_full || ov.latest_full || {};
-        const latestFull = (o.full_snapshots && o.full_snapshots[0]) ? o.full_snapshots[0] : last;
-        const countryBatch = ov.latest_country_batch || {};
-        const countryCount = Array.isArray(o.country_packages) ? o.country_packages.length : 0;
         const cards = [
             ['آخر Full ناجح', last.generated_at || '—'],
             ['حالة Full الأخير', last.package_status || '—'],
-            ['Country Batch الأخير', countryBatch.generated_at || '—'],
+            ['Country Batch الأخير', (ov.latest_country_batch || {}).generated_at || '—'],
             ['دول قابلة للاسترداد', String(ov.recoverable_countries ?? '—')],
             ['BackupRoot', ov.backup_root_status || '—'],
             ['Retention (يوم)', String(ov.retention_days ?? '—')],
@@ -257,15 +228,6 @@ $apiBase = storefront_public_path('/admin/api/backup');
         el('bc_overview').innerHTML = cards.map(([t, v]) =>
             '<div class="bc-card"><h4>' + t + '</h4><div class="bc-val">' + v + '</div></div>'
         ).join('');
-        el('bc_latest_full').innerHTML =
-            '<div><dt>آخر Full</dt><dd>' + (latestFull.generated_at || '—') + '</dd></div>' +
-            '<div><dt>الحالة</dt><dd>' + badge(latestFull.package_status || last.package_status) + '</dd></div>' +
-            '<div><dt>Schema</dt><dd>' + (latestFull.schema_revision ?? '—') + '</dd></div>' +
-            '<div><dt>DRV Score</dt><dd>' + (latestFull.recovery_score ?? ov.latest_recovery_score ?? 0) + '</dd></div>';
-        el('bc_country_discovery').innerHTML =
-            '<div><dt>دول قابلة للاسترداد</dt><dd>' + String(ov.recoverable_countries ?? '—') + '</dd></div>' +
-            '<div><dt>آخر Country Batch</dt><dd>' + (countryBatch.generated_at || '—') + '</dd></div>' +
-            '<div><dt>حزم مسجّلة</dt><dd>' + countryCount + '</dd></div>';
         const st = ov.storage || {};
         el('bc_storage').innerHTML = [
             ['Backup Root', ov.backup_root || '—'],
@@ -433,26 +395,6 @@ $apiBase = storefront_public_path('/admin/api/backup');
             } catch (e) { showAlert(e.message, false); }
             finally { setBusy(false); }
         }
-    });
-
-    function switchTab(name) {
-        const fullBtn = el('bc_tab_full_btn');
-        const countryBtn = el('bc_tab_country_btn');
-        const fullPanel = el('bc_tab_full');
-        const countryPanel = el('bc_tab_country');
-        const isFull = name === 'full';
-        fullBtn.classList.toggle('is-active', isFull);
-        countryBtn.classList.toggle('is-active', !isFull);
-        fullBtn.setAttribute('aria-selected', isFull ? 'true' : 'false');
-        countryBtn.setAttribute('aria-selected', isFull ? 'false' : 'true');
-        fullPanel.classList.toggle('is-active', isFull);
-        countryPanel.classList.toggle('is-active', !isFull);
-        fullPanel.hidden = !isFull;
-        countryPanel.hidden = isFull;
-    }
-
-    document.querySelectorAll('[data-bc-tab]').forEach((btn) => {
-        btn.addEventListener('click', () => switchTab(btn.getAttribute('data-bc-tab') || 'full'));
     });
 
     loadAll();
