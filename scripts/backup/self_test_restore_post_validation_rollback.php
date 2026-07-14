@@ -225,6 +225,16 @@ function pvrb_seed_uploads_cutover_complete_job(string $entryStatus = ORANGE_RES
 
     $projectRoot = $backupRoot . DIRECTORY_SEPARATOR . 'project';
     mkdir($projectRoot);
+    pvrb_write_file(
+        $projectRoot . DIRECTORY_SEPARATOR . 'config.php',
+        "<?php\n"
+        . "if (!defined('DB_HOST')) { define('DB_HOST', 'localhost'); }\n"
+        . "if (!defined('DB_NAME')) { define('DB_NAME', 'orange_db'); }\n"
+    );
+    pvrb_write_file(
+        $projectRoot . DIRECTORY_SEPARATOR . '.env.php',
+        "<?php\nreturn ['DB_USER' => 'orange_self_test', 'DB_PASS' => 'orange_self_test'];\n"
+    );
 
     $packageDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'pkg_' . bin2hex(random_bytes(2));
     mkdir($packageDir, 0775, true);
@@ -709,6 +719,7 @@ $err = pvrb_try(static function () use ($dbFail): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $dbFail['env'],
         'admin_pdo_override' => $dbFail['adminPdo'],
+        'merge_pdo_override' => $dbFail['adminPdo'],
         'db_import_override' => static function (): void {
             throw new RuntimeException('Simulated DB rollback failure.');
         },
@@ -738,6 +749,7 @@ $resultCrash = orange_restore_merge_rollback_run([
     'confirmation_phrase' => 'ROLLBACK',
     'env_override' => $crashUploads['env'],
     'admin_pdo_override' => $crashUploads['adminPdo'],
+    'merge_pdo_override' => $crashUploads['adminPdo'],
     'db_import_override' => static function (): void {
         throw new RuntimeException('DB must not re-run when checkpoint is database_complete.');
     },
@@ -769,6 +781,7 @@ $err = pvrb_try(static function () use ($uploadsFail): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $uploadsFail['env'],
         'admin_pdo_override' => $uploadsFail['adminPdo'],
+        'merge_pdo_override' => $uploadsFail['adminPdo'],
         'db_import_override' => static function (): void {
             // ok
         },
@@ -794,6 +807,7 @@ $err = pvrb_try(static function () use ($valFail): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $valFail['env'],
         'admin_pdo_override' => $valFail['adminPdo'],
+        'merge_pdo_override' => $valFail['adminPdo'],
         'db_import_override' => static function (): void {},
         'uploads_rollback_override' => static function (): void {},
         'rollback_postcheck_override' => static fn (): array => [
@@ -826,6 +840,7 @@ $resultRb = orange_restore_merge_rollback_run([
     'confirmation_phrase' => 'ROLLBACK',
     'env_override' => $rbOk['env'],
     'admin_pdo_override' => $rbOk['adminPdo'],
+    'merge_pdo_override' => $rbOk['adminPdo'],
     'db_import_override' => static function (): void {},
     'rename_override' => static function (string $from, string $to): void {
         if (!@rename($from, $to)) {
@@ -1285,6 +1300,7 @@ $err = pvrb_try(static function () use ($rbNoSource): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $rbNoSource['env'],
         'admin_pdo_override' => $rbNoSource['adminPdo'],
+        'merge_pdo_override' => $rbNoSource['adminPdo'],
         'db_import_override' => static function (): void {},
     ]);
 });
@@ -1321,6 +1337,7 @@ $err = pvrb_try(static function () use ($rbCorruptSnap): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $rbCorruptSnap['env'],
         'admin_pdo_override' => $rbCorruptSnap['adminPdo'],
+        'merge_pdo_override' => $rbCorruptSnap['adminPdo'],
         'db_import_override' => static function (): void {},
     ]);
 });
@@ -1351,6 +1368,7 @@ $err = pvrb_try(static function () use ($rbCorruptPre): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $rbCorruptPre['env'],
         'admin_pdo_override' => $rbCorruptPre['adminPdo'],
+        'merge_pdo_override' => $rbCorruptPre['adminPdo'],
         'db_import_override' => static function (): void {},
     ]);
 });
@@ -1375,6 +1393,7 @@ $err = pvrb_try(static function () use ($rbPartial): void {
         'confirmation_phrase' => 'ROLLBACK',
         'env_override' => $rbPartial['env'],
         'admin_pdo_override' => $rbPartial['adminPdo'],
+        'merge_pdo_override' => $rbPartial['adminPdo'],
         'db_import_override' => static function (): void {},
     ]);
 });
