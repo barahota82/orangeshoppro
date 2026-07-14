@@ -538,8 +538,10 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.2 section
 **CLI:**
 
 ```powershell
-php D:\orange\scripts\backup\restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N
+php D:\orange\scripts\backup\restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
 ```
+
+**Security:** Super Admin + `backup_restore_full` + password re-auth + exact phrase `RESTORE` (enforced at CLI and service boundary before any production/filesystem mutation).
 
 **Pipeline:** pre-cutover gate revalidation → same-volume check → pre-merge uploads snapshot (checksum manifest) → verify snapshot → atomic directory renames (`uploads` → `uploads_pre_merge_{job}` ; `uploads_next` → `uploads`) → `uploads_cutover_complete`
 
@@ -568,12 +570,24 @@ no Admin UI, no restore APIs, no automatic/scheduled restore.
 ### Post-validation CLI
 
 ```powershell
-php D:\orange\scripts\backup\restore_full_post_validate.php --job=JOB_ID --admin-id=N
+php D:\orange\scripts\backup\restore_full_post_validate.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
 ```
+
+**Security:** Same merge-time re-auth policy as other production-mutating CLIs (before validation or job transitions).
+
+### Post-validation finalize CLI
+
+```powershell
+php D:\orange\scripts\backup\restore_full_post_validate_finalize.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
+```
+
+**Entry:** `post_validation_passed`, `maintenance_disable_pending`, `maintenance_disabled`, or `completed` (artifact reconciliation only).
+
+**Finalize checkpoints:** `post_validation_passed` → `maintenance_disable_pending` → disable maintenance → `maintenance_disabled` → `completed`.
 
 **Entry:** `uploads_cutover_complete` only. Requires global restore lock + maintenance active and owned by job.
 
-**State path:** `uploads_cutover_complete` → `production_merged` → `post_validation_passed` → maintenance off → `completed`.
+**State path:** `uploads_cutover_complete` → `production_merged` → `post_validation_passed` → `maintenance_disable_pending` → `maintenance_disabled` → `completed`.
 Hard failure → `failed_post_merge` (maintenance stays active). No direct jump to `completed`.
 
 **Reports:** `production_post_validation.json`, `final_restore_report.json` under `{restore_work}/{job_id}/`.
@@ -634,7 +648,11 @@ php D:\orange\scripts\backup\restore_status_full.php --job=JOB_ID
 **Manual gates (orchestrator stops — never auto):**
 - `awaiting_owner_approval` → `restore_approve_merge.php`
 - `approved_for_merge` → merge foundation precheck (approved PHP entry) before cutover
+- Legacy `merge_approved` job status → normalized on read to `approved_for_merge` (same stop as above)
 - `failed_merge` / `failed_post_merge` → `restore_full_rollback.php`
+- `completed` with missing completion artifacts → `reconcile_completed` via `restore_resume_full.php` (fresh re-auth + RESTORE; artifact backfill only)
+
+**Direct mutating CLIs:** `restore_full_database_cutover.php`, `restore_full_uploads_cutover.php`, `restore_full_post_validate.php`, and `restore_full_post_validate_finalize.php` each require `--admin-id`, `--password`, `--confirm=RESTORE` independently (do not rely on the E2E wrapper alone).
 
 **Self-test:**
 

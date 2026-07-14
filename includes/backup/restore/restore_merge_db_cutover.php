@@ -26,22 +26,13 @@ function orange_restore_merge_db_cutover_assert_operator_reauth(
     string $password,
     string $confirmationPhrase
 ): array {
-    $admin = orange_restore_reauth_load_admin($adminPdo, $adminId);
-    orange_restore_reauth_assert_restore_permission($admin, $adminPdo, (string) ($job['job_type'] ?? ''));
-    if (!orange_restore_verify_operator_password($adminPdo, $adminId, $password)) {
-        throw new RuntimeException('Operator password re-authentication failed.');
-    }
-
-    $countryCode = (string) ($job['country_code'] ?? '');
-    if (!orange_restore_validate_confirmation_phrase(
-        (string) ($job['job_type'] ?? ''),
-        $confirmationPhrase,
-        $countryCode
-    )) {
-        throw new RuntimeException('Confirmation phrase mismatch.');
-    }
-
-    return $admin;
+    return orange_restore_assert_production_mutating_reauth(
+        $adminPdo,
+        $job,
+        $adminId,
+        $password,
+        $confirmationPhrase
+    );
 }
 
 /**
@@ -110,7 +101,7 @@ function orange_restore_merge_db_cutover_run(array $options): array
 
     $adminPdo = $options['admin_pdo_override'] ?? null;
     if (!$adminPdo instanceof PDO) {
-        require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'config.php';
+        require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'config.php';
         $adminPdo = db();
     }
 

@@ -151,6 +151,23 @@ function pvrb_test_pdo(string $permKey = 'backup_restore_full', bool $superuser 
     return $pdo;
 }
 
+/**
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function pvrb_mutating_post_validation_run(array $options): array
+{
+    $defaults = [
+        'password' => 'correct-pass',
+        'confirmation_phrase' => 'RESTORE',
+    ];
+    if (!isset($options['admin_pdo_override'])) {
+        $defaults['admin_pdo_override'] = pvrb_test_pdo();
+    }
+
+    return orange_restore_merge_post_validation_run(array_merge($defaults, $options));
+}
+
 function pvrb_create_anchor(string $backupRoot, string $suffix = ''): array
 {
     $anchorDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'anchor' . $suffix . '_' . bin2hex(random_bytes(2));
@@ -388,7 +405,7 @@ pvrb_self_test(!orange_restore_validate_rollback_phrase('RESTORE'), 'rollback ph
 $wrongState = pvrb_seed_uploads_cutover_complete_job(ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE);
 pvrb_prepare_runtime($wrongState);
 $err = pvrb_try(static function () use ($wrongState): void {
-    orange_restore_merge_post_validation_run([
+    pvrb_mutating_post_validation_run([
         'project_root' => $wrongState['projectRoot'],
         'work_root' => $wrongState['workRoot'],
         'job_id' => $wrongState['jobId'],
@@ -404,7 +421,7 @@ pvrb_rmdir($wrongState['backupRoot']);
 $noLock = pvrb_seed_uploads_cutover_complete_job();
 $err = pvrb_try(static function () use ($noLock): void {
     orange_restore_merge_maintenance_enable($noLock['workRoot'], $noLock['jobId']);
-    orange_restore_merge_post_validation_run([
+    pvrb_mutating_post_validation_run([
         'project_root' => $noLock['projectRoot'],
         'work_root' => $noLock['workRoot'],
         'job_id' => $noLock['jobId'],
@@ -419,7 +436,7 @@ pvrb_rmdir($noLock['backupRoot']);
 $noMaint = pvrb_seed_uploads_cutover_complete_job();
 orange_restore_acquire_lock($noMaint['workRoot'], $noMaint['jobId']);
 $err = pvrb_try(static function () use ($noMaint): void {
-    orange_restore_merge_post_validation_run([
+    pvrb_mutating_post_validation_run([
         'project_root' => $noMaint['projectRoot'],
         'work_root' => $noMaint['workRoot'],
         'job_id' => $noMaint['jobId'],
@@ -435,7 +452,7 @@ pvrb_rmdir($noMaint['backupRoot']);
 $hardFail = pvrb_seed_uploads_cutover_complete_job();
 pvrb_prepare_runtime($hardFail);
 $err = pvrb_try(static function () use ($hardFail): void {
-    orange_restore_merge_post_validation_run([
+    pvrb_mutating_post_validation_run([
         'project_root' => $hardFail['projectRoot'],
         'work_root' => $hardFail['workRoot'],
         'job_id' => $hardFail['jobId'],
@@ -468,7 +485,7 @@ pvrb_rmdir($hardFail['backupRoot']);
 // --- post-validation: success -> completed only after maintenance disable ---
 $success = pvrb_seed_uploads_cutover_complete_job();
 pvrb_prepare_runtime($success);
-$result = orange_restore_merge_post_validation_run([
+$result = pvrb_mutating_post_validation_run([
     'project_root' => $success['projectRoot'],
     'work_root' => $success['workRoot'],
     'job_id' => $success['jobId'],
@@ -980,7 +997,7 @@ $registryFailSeed = pvrb_seed_uploads_cutover_complete_job();
 pvrb_prepare_runtime($registryFailSeed);
 pvrb_rmdir($registryFailSeed['projectRoot'] . DIRECTORY_SEPARATOR . 'config');
 $err = pvrb_try(static function () use ($registryFailSeed): void {
-    orange_restore_merge_post_validation_run([
+    pvrb_mutating_post_validation_run([
         'project_root' => $registryFailSeed['projectRoot'],
         'work_root' => $registryFailSeed['workRoot'],
         'job_id' => $registryFailSeed['jobId'],
@@ -1435,7 +1452,7 @@ pvrb_rmdir($multiFailSeed['backupRoot']);
 $runFailSeed = pvrb_seed_uploads_cutover_complete_job();
 pvrb_prepare_runtime($runFailSeed);
 $runErr = pvrb_try(static function () use ($runFailSeed): void {
-    orange_restore_merge_post_validation_run([
+    pvrb_mutating_post_validation_run([
         'project_root' => $runFailSeed['projectRoot'],
         'work_root' => $runFailSeed['workRoot'],
         'job_id' => $runFailSeed['jobId'],

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../admin_permissions.php';
 require_once __DIR__ . '/restore_job.php';
+require_once __DIR__ . '/restore_approval.php';
 
 /**
  * Re-authentication gate — current session is NOT sufficient (owner policy §4).
@@ -85,4 +86,81 @@ function orange_restore_reauth_assert_restore_permission(array $admin, PDO $pdo,
 function orange_restore_reauth_timestamp(): string
 {
     return gmdate('c');
+}
+
+/**
+ * Resolve admin PDO for restore re-authentication (test override or live config).
+ */
+function orange_restore_resolve_admin_pdo(array $options): PDO
+{
+    $adminPdo = $options['admin_pdo_override'] ?? null;
+    if ($adminPdo instanceof PDO) {
+        return $adminPdo;
+    }
+
+    require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'config.php';
+
+    return db();
+}
+
+/**
+ * Assert merge-time operator re-authentication (Super Admin + permission + password + phrase).
+ *
+ * @param array<string, mixed> $job
+ * @return array<string, mixed>
+ */
+function orange_restore_assert_production_mutating_reauth(
+    PDO $adminPdo,
+    array $job,
+    int $adminId,
+    string $password,
+    string $confirmationPhrase
+): array {
+    $admin = orange_restore_reauth_load_admin($adminPdo, $adminId);
+    orange_restore_reauth_assert_restore_permission($admin, $adminPdo, (string) ($job['job_type'] ?? ''));
+    if (!orange_restore_verify_operator_password($adminPdo, $adminId, $password)) {
+        throw new RuntimeException('Operator password re-authentication failed.');
+    }
+
+    if (!orange_restore_validate_confirmation_phrase(
+        (string) ($job['job_type'] ?? ''),
+        $confirmationPhrase,
+        (string) ($job['country_code'] ?? '')
+    )) {
+        throw new RuntimeException('Confirmation phrase mismatch.');
+    }
+
+    return $admin;
+}
+
+/**
+ * Validate options and assert production-mutating re-authentication before side effects.
+ *
+ * @param array<string, mixed> $options
+ * @param array<string, mixed> $job
+ * @return array<string, mixed>
+ */
+function orange_restore_require_production_mutating_credentials(array $options, array $job): array
+{
+    $adminId = (int) ($options['admin_id'] ?? 0);
+    $password = (string) ($options['password'] ?? '');
+    $confirmationPhrase = (string) ($options['confirmation_phrase'] ?? '');
+
+    if ($adminId <= 0) {
+        throw new InvalidArgumentException('admin_id is required.');
+    }
+    if ($password === '') {
+        throw new InvalidArgumentException('password is required for merge-time re-authentication.');
+    }
+    if (trim($confirmationPhrase) === '') {
+        throw new InvalidArgumentException('confirmation phrase is required.');
+    }
+
+    return orange_restore_assert_production_mutating_reauth(
+        orange_restore_resolve_admin_pdo($options),
+        $job,
+        $adminId,
+        $password,
+        $confirmationPhrase
+    );
 }

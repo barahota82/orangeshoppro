@@ -228,7 +228,40 @@ function orange_restore_job_read(string $workRoot, string $jobId): array
         throw new RuntimeException('Invalid restore job JSON: ' . $jobId);
     }
 
-    return $decoded;
+    return orange_restore_job_normalize_legacy_status($workRoot, $decoded);
+}
+
+/**
+ * Normalize legacy persisted statuses to supported engine states (read-time migration).
+ *
+ * @param array<string, mixed> $job
+ * @return array<string, mixed>
+ */
+function orange_restore_job_normalize_legacy_status(string $workRoot, array $job): array
+{
+    $status = (string) ($job['status'] ?? '');
+    if ($status !== ORANGE_RESTORE_JOB_STATUS_MERGE_APPROVED) {
+        return $job;
+    }
+
+    $jobId = (string) ($job['job_id'] ?? '');
+    if ($jobId === '') {
+        throw new RuntimeException('Restore job missing job_id.');
+    }
+
+    $job['status'] = ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE;
+    if (!(bool) ($job['production_merge_approved'] ?? false)) {
+        $job['production_merge_approved'] = true;
+    }
+    orange_restore_job_write($workRoot, $job);
+
+    require_once __DIR__ . '/restore_audit.php';
+    orange_restore_audit_job_append_once($workRoot, $jobId, $job, 'legacy_merge_approved_normalized', 'pass', [
+        'legacy_status' => ORANGE_RESTORE_JOB_STATUS_MERGE_APPROVED,
+        'normalized_status' => ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE,
+    ]);
+
+    return $job;
 }
 
 /**

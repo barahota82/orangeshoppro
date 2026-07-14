@@ -210,3 +210,42 @@ function orange_restore_audit_post_validation_append_once(
 
     orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_post_validation_event($job, $event, $result, $extra));
 }
+
+/**
+ * @param array<string, mixed> $extra
+ */
+function orange_restore_audit_job_event(array $job, string $event, string $result, array $extra = []): array
+{
+    return orange_restore_audit_from_job($job, 'restore_job', $result, array_merge([
+        'job_event' => $event,
+    ], $extra));
+}
+
+function orange_restore_audit_job_has_event(string $workRoot, string $jobId, string $eventName): bool
+{
+    foreach (orange_restore_audit_read_all($workRoot, $jobId) as $event) {
+        if ((string) ($event['job_event'] ?? '') === $eventName) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * @param array<string, mixed> $extra
+ */
+function orange_restore_audit_job_append_once(
+    string $workRoot,
+    string $jobId,
+    array $job,
+    string $event,
+    string $result,
+    array $extra = []
+): void {
+    if (orange_restore_audit_job_has_event($workRoot, $jobId, $event)) {
+        return;
+    }
+
+    orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_job_event($job, $event, $result, $extra));
+}

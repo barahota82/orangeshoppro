@@ -3,13 +3,13 @@
 declare(strict_types=1);
 
 /**
- * Phase 2D.4 — Production post-validation CLI.
+ * Phase 2D.4 — Production post-validation finalize CLI (maintenance disable + completed).
  *
- * Prerequisites: job in uploads_cutover_complete; global restore lock held;
- * maintenance mode enabled and verified for this job.
+ * Prerequisites: job in post_validation_passed, maintenance_disable_pending,
+ * maintenance_disabled, or completed (artifact reconciliation); global restore lock held.
  *
  * Usage:
- *   php scripts/backup/restore_full_post_validate.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
+ *   php scripts/backup/restore_full_post_validate_finalize.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -35,7 +35,7 @@ foreach ($_SERVER['argv'] ?? [] as $arg) {
 }
 
 if ($jobId === '' || $adminId <= 0 || $password === '' || trim($confirmation) === '') {
-    fwrite(STDERR, "Usage: php restore_full_post_validate.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE\n");
+    fwrite(STDERR, "Usage: php restore_full_post_validate_finalize.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE\n");
     exit(2);
 }
 
@@ -44,7 +44,7 @@ require_once $projectRoot . DIRECTORY_SEPARATOR . 'config.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_orchestrator.php';
 
 try {
-    $result = orange_restore_orchestrator_post_validation([
+    $result = orange_restore_orchestrator_post_validation_finalize([
         'project_root' => $projectRoot,
         'job_id' => $jobId,
         'admin_id' => $adminId,
@@ -55,6 +55,8 @@ try {
     echo 'ok=1' . PHP_EOL;
     echo 'job_id=' . (string) ($result['job_id'] ?? '') . PHP_EOL;
     echo 'status=' . (string) ($result['status'] ?? '') . PHP_EOL;
+    echo 'reconciled=' . ((bool) ($result['reconciled'] ?? false) ? '1' : '0') . PHP_EOL;
+    echo 'idempotent=' . ((bool) ($result['idempotent'] ?? false) ? '1' : '0') . PHP_EOL;
     echo 'database_writes=0' . PHP_EOL;
     echo 'rollback_executed=0' . PHP_EOL;
     exit(0);

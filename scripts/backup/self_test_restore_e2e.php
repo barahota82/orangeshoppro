@@ -26,6 +26,7 @@ require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR 
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_reauth.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_maintenance.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_post_validation.php';
+require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_merge_uploads_cutover.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_validation_adapter.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_e2e_orchestrator.php';
 require_once $repoRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'admin_permissions.php';
@@ -321,6 +322,9 @@ function e2e_run_finalize(array $seed, array $extraOptions = []): array
         'work_root' => $seed['workRoot'],
         'job_id' => $seed['jobId'],
         'admin_id' => 1,
+        'password' => 'correct-pass',
+        'confirmation_phrase' => 'RESTORE',
+        'admin_pdo_override' => $seed['adminPdo'],
         'env_override' => $seed['env'],
     ], $extraOptions));
 }
@@ -437,13 +441,28 @@ e2e_self_test(
 );
 e2e_rmdir($rollback['backupRoot']);
 
-$completed = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_COMPLETED);
-$completedAction = orange_restore_e2e_resolve_action($completed['job']);
+$completed = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_COMPLETED, [
+    'restore_completed_at' => gmdate('c'),
+]);
+$completedAction = orange_restore_e2e_resolve_action($completed['job'], $completed['workRoot']);
 e2e_self_test(
-    ($completedAction['action'] ?? '') === ORANGE_RESTORE_E2E_ACTION_TERMINAL,
-    'routing: completed is terminal'
+    ($completedAction['action'] ?? '') === ORANGE_RESTORE_E2E_ACTION_RECONCILE_COMPLETED
+    && ($completedAction['requires_reauth'] ?? false) === true,
+    'routing: completed with missing artifacts requires reconcile_completed'
 );
 e2e_rmdir($completed['backupRoot']);
+
+$completedReconciled = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_COMPLETED, [
+    'restore_completed_at' => gmdate('c'),
+]);
+e2e_run_finalize($completedReconciled);
+$completedReconciledJob = orange_restore_job_read($completedReconciled['workRoot'], $completedReconciled['jobId']);
+$completedReconciledAction = orange_restore_e2e_resolve_action($completedReconciledJob, $completedReconciled['workRoot']);
+e2e_self_test(
+    ($completedReconciledAction['action'] ?? '') === ORANGE_RESTORE_E2E_ACTION_TERMINAL,
+    'routing: completed with complete artifacts is terminal'
+);
+e2e_rmdir($completedReconciled['backupRoot']);
 
 $rolledBack = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_ROLLED_BACK);
 $rolledBackAction = orange_restore_e2e_resolve_action($rolledBack['job']);
@@ -461,13 +480,26 @@ e2e_self_test(
 );
 e2e_rmdir($cancelled['backupRoot']);
 
-$unknown = e2e_seed_job('merge_approved');
-$unknownAction = orange_restore_e2e_resolve_action($unknown['job']);
+$legacyMerge = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL);
+$legacyPath = orange_restore_job_file_path($legacyMerge['workRoot'], $legacyMerge['jobId']);
+$legacyRaw = json_decode((string) file_get_contents($legacyPath), true);
+if (is_array($legacyRaw)) {
+    $legacyRaw['status'] = ORANGE_RESTORE_JOB_STATUS_MERGE_APPROVED;
+    file_put_contents($legacyPath, json_encode($legacyRaw, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n", LOCK_EX);
+}
+$legacyJob = orange_restore_job_read($legacyMerge['workRoot'], $legacyMerge['jobId']);
+$legacyAction = orange_restore_e2e_resolve_action($legacyJob, $legacyMerge['workRoot']);
 e2e_self_test(
-    ($unknownAction['action'] ?? '') === ORANGE_RESTORE_E2E_ACTION_UNKNOWN_STATE,
-    'routing: unknown state fails closed'
+    ($legacyJob['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_APPROVED_FOR_MERGE
+    && ($legacyAction['action'] ?? '') === ORANGE_RESTORE_E2E_ACTION_STOP_MERGE_CONFIRMATION,
+    'routing: legacy merge_approved normalizes to approved_for_merge stop'
 );
-e2e_rmdir($unknown['backupRoot']);
+$legacyAudit = array_column(orange_restore_audit_read_all($legacyMerge['workRoot'], $legacyMerge['jobId']), 'job_event');
+e2e_self_test(
+    in_array('legacy_merge_approved_normalized', $legacyAudit, true),
+    'routing: merge_approved normalization audited once'
+);
+e2e_rmdir($legacyMerge['backupRoot']);
 
 // --- start stops at awaiting_owner_approval ---
 $startRoot = e2e_temp_root();
@@ -1051,6 +1083,106 @@ e2e_self_test(
 );
 e2e_rmdir($completedMaintOn['backupRoot']);
 
+// --- E2E completed reconciliation via primary resume CLI ---
+$e2eReconcileSeed = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_COMPLETED, [
+    'restore_completed_at' => gmdate('c'),
+]);
+$e2eReconcileErr = e2e_try(static function () use ($e2eReconcileSeed): void {
+    orange_restore_e2e_resume_full($e2eReconcileSeed['adminPdo'], [
+        'project_root' => $e2eReconcileSeed['projectRoot'],
+        'work_root' => $e2eReconcileSeed['workRoot'],
+        'job_id' => $e2eReconcileSeed['jobId'],
+        'admin_id' => 1,
+        'env_override' => $e2eReconcileSeed['env'],
+    ]);
+});
+e2e_self_test(
+    $e2eReconcileErr !== null && str_contains($e2eReconcileErr->getMessage(), 'password'),
+    'e2e reconcile: completed reconciliation requires fresh re-auth'
+);
+$e2eReconcileOk = orange_restore_e2e_resume_full($e2eReconcileSeed['adminPdo'], [
+    'project_root' => $e2eReconcileSeed['projectRoot'],
+    'work_root' => $e2eReconcileSeed['workRoot'],
+    'job_id' => $e2eReconcileSeed['jobId'],
+    'admin_id' => 1,
+    'password' => 'correct-pass',
+    'confirmation_phrase' => 'RESTORE',
+    'env_override' => $e2eReconcileSeed['env'],
+]);
+e2e_self_test(
+    ($e2eReconcileOk['terminal'] ?? false) === true
+    && ($e2eReconcileOk['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_COMPLETED,
+    'e2e reconcile: completed job reconciles through primary resume CLI'
+);
+$e2eReconcileAgain = orange_restore_e2e_resume_full($e2eReconcileSeed['adminPdo'], [
+    'project_root' => $e2eReconcileSeed['projectRoot'],
+    'work_root' => $e2eReconcileSeed['workRoot'],
+    'job_id' => $e2eReconcileSeed['jobId'],
+    'admin_id' => 1,
+    'env_override' => $e2eReconcileSeed['env'],
+]);
+e2e_self_test(
+    ($e2eReconcileAgain['terminal'] ?? false) === true
+    && ($e2eReconcileAgain['action']['action'] ?? '') === ORANGE_RESTORE_E2E_ACTION_TERMINAL,
+    'e2e reconcile: repeated completed resume is idempotent terminal'
+);
+e2e_rmdir($e2eReconcileSeed['backupRoot']);
+
+// --- direct production-mutating CLIs enforce re-auth ---
+$directUploads = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_DATABASE_CUTOVER_COMPLETE);
+orange_restore_acquire_lock($directUploads['workRoot'], $directUploads['jobId']);
+orange_restore_merge_maintenance_enable($directUploads['workRoot'], $directUploads['jobId']);
+$directUploadsErr = e2e_try(static function () use ($directUploads): void {
+    orange_restore_merge_uploads_cutover_run([
+        'project_root' => $directUploads['projectRoot'],
+        'work_root' => $directUploads['workRoot'],
+        'job_id' => $directUploads['jobId'],
+        'admin_id' => 1,
+        'env_override' => $directUploads['env'],
+    ]);
+});
+e2e_self_test(
+    $directUploadsErr !== null && str_contains($directUploadsErr->getMessage(), 'password'),
+    'security: direct uploads cutover rejects missing password before mutation'
+);
+orange_restore_release_lock($directUploads['workRoot']);
+e2e_rmdir($directUploads['backupRoot']);
+
+$directPost = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_UPLOADS_CUTOVER_COMPLETE);
+orange_restore_acquire_lock($directPost['workRoot'], $directPost['jobId']);
+orange_restore_merge_maintenance_enable($directPost['workRoot'], $directPost['jobId']);
+$directPostErr = e2e_try(static function () use ($directPost): void {
+    orange_restore_merge_post_validation_run([
+        'project_root' => $directPost['projectRoot'],
+        'work_root' => $directPost['workRoot'],
+        'job_id' => $directPost['jobId'],
+        'admin_id' => 1,
+        'env_override' => $directPost['env'],
+    ]);
+});
+e2e_self_test(
+    $directPostErr !== null && str_contains($directPostErr->getMessage(), 'password'),
+    'security: direct post-validation rejects missing password before mutation'
+);
+orange_restore_release_lock($directPost['workRoot']);
+e2e_rmdir($directPost['backupRoot']);
+
+$directFinalize = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_POST_VALIDATION_PASSED);
+$directFinalizeErr = e2e_try(static function () use ($directFinalize): void {
+    orange_restore_merge_post_validation_finalize_run([
+        'project_root' => $directFinalize['projectRoot'],
+        'work_root' => $directFinalize['workRoot'],
+        'job_id' => $directFinalize['jobId'],
+        'admin_id' => 1,
+        'env_override' => $directFinalize['env'],
+    ]);
+});
+e2e_self_test(
+    $directFinalizeErr !== null && str_contains($directFinalizeErr->getMessage(), 'password'),
+    'security: direct finalize rejects missing password before mutation'
+);
+e2e_rmdir($directFinalize['backupRoot']);
+
 $missingReport = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_MAINTENANCE_DISABLED, [
     'maintenance_disable_pending_at' => gmdate('c'),
     'maintenance_disabled_at' => gmdate('c'),
@@ -1187,7 +1319,10 @@ e2e_self_test(
 e2e_rmdir($stagingSeed['backupRoot']);
 
 // --- audit idempotency ---
-$terminalAudit = e2e_seed_job(ORANGE_RESTORE_JOB_STATUS_COMPLETED);
+$terminalAudit = e2e_seed_finalize_checkpoint(ORANGE_RESTORE_JOB_STATUS_COMPLETED, [
+    'restore_completed_at' => gmdate('c'),
+]);
+e2e_run_finalize($terminalAudit);
 orange_restore_e2e_resume_full($terminalAudit['adminPdo'], [
     'project_root' => $terminalAudit['projectRoot'],
     'work_root' => $terminalAudit['workRoot'],
@@ -1311,7 +1446,8 @@ e2e_self_test(
     && !str_contains($e2eSource, 'orange_restore_orchestrator_approve_for_merge')
     && !str_contains($e2eSource, 'orange_restore_validation_adapter_staging_gate')
     && !str_contains($e2eSource, 'function orange_restore_e2e_finalize_staging_approval')
-    && str_contains($e2eSource, 'orange_restore_full_staging_finalize_approval'),
+    && str_contains($e2eSource, 'orange_restore_full_staging_finalize_approval')
+    && str_contains($e2eSource, 'ORANGE_RESTORE_E2E_ACTION_RECONCILE_COMPLETED'),
     'design: e2e orchestrator delegates staging finalization without duplicated gate logic'
 );
 

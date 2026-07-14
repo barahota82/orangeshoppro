@@ -287,7 +287,7 @@ unchanged. **Production uploads cutover only** — production database untouched
 no post-validation.
 
 CLI entry:
-  scripts/backup/restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N
+  scripts/backup/restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
 
 Modules:
   includes/backup/restore/restore_merge_uploads_cutover.php
@@ -304,6 +304,7 @@ project root (same volume as live `uploads/`); `uploads_next_manifest.json` in j
 `verified=true`, matching staging uploads tree checksum.
 
 **Workflow:**
+0. Merge-time re-authentication (Super Admin + backup_restore_full + password + phrase `RESTORE`) — before any production/filesystem mutation
 1. Re-verify cutover gates (lock, maintenance, rollback anchor, package checksum, uploads_next manifest)
 2. Same-volume check (`uploads/` vs `uploads_next/`) — abort fail-closed if not atomic-rename-safe
 3. Pre-merge uploads snapshot → `{restore_work}/{job_id}/pre_merge_uploads_snapshot/` (path, counts, checksum manifest)
@@ -326,7 +327,8 @@ unchanged. **Post-validation and manual rollback only** — no Country Productio
 no Admin UI, no restore APIs, no automatic/scheduled restore.
 
 CLI entries:
-  scripts/backup/restore_full_post_validate.php --job=JOB_ID --admin-id=N
+  scripts/backup/restore_full_post_validate.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
+  scripts/backup/restore_full_post_validate_finalize.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
   scripts/backup/restore_full_rollback.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=ROLLBACK
 
 Modules:
@@ -345,7 +347,8 @@ Self-test:
 **Post-validation entry:** `uploads_cutover_complete` only. Global restore lock + maintenance active and
 owned by current job. Maintenance **must not** be disabled until all hard gates pass.
 
-**State path:** uploads_cutover_complete → production_merged → post_validation_passed → (maintenance off) → completed.
+**State path:** uploads_cutover_complete → production_merged → post_validation_passed →
+maintenance_disable_pending → maintenance_disabled → completed.
 Hard failure from uploads_cutover_complete or production_merged → failed_post_merge (maintenance stays active).
 No direct transition to completed.
 
@@ -405,6 +408,7 @@ cutover, post-validation, or rollback logic.
 **Manual stop points (never automatic):**
 - `awaiting_owner_approval` → stop; operator runs `restore_approve_merge.php`
 - `approved_for_merge` → stop; operator runs merge foundation precheck manually
+- Legacy persisted status `merge_approved` → normalized on job read to `approved_for_merge` (append-once audit `legacy_merge_approved_normalized`); same manual merge-precheck stop — no automatic merge
 - `failed_merge` / `failed_post_merge` / `rollback_failed` → stop; operator runs `restore_full_rollback.php`
 - No automatic approval, merge, or rollback
 
@@ -414,14 +418,24 @@ cutover, post-validation, or rollback logic.
 - `merge_precheck_passed` → database cutover (fresh re-auth + RESTORE)
 - Uploads checkpoint states → uploads cutover resume
 - `uploads_cutover_complete` / `production_merged` → post-validation
+- `post_validation_passed` / `maintenance_disable_pending` / `maintenance_disabled` → finalize (fresh re-auth + RESTORE)
+- `completed` with incomplete completion artifacts → `reconcile_completed` (inspect artifacts first; fresh re-auth + RESTORE + lock; delegates to completion artifact reconciliation only — no validation rerun, no maintenance disable, no production DB/uploads writes, no merge/rollback rerun)
+- `completed` with all completion artifacts → terminal (idempotent)
 - `rollback_in_progress` → rollback resume (re-auth + ROLLBACK)
-- `completed` / `rolled_back` / `cancelled` / `failed` → terminal
+- `rolled_back` / `cancelled` / `failed` → terminal
+
+**Direct production-mutating CLIs (uniform policy):** Every direct CLI capable of production mutation independently
+requires `--admin-id`, `--password`, `--confirm=RESTORE` (or `ROLLBACK` for rollback): database cutover, uploads cutover,
+post-validation, post-validation finalize (including completed artifact reconciliation). Service boundaries re-assert
+re-auth where practical. Wrong/missing admin, permission, password, or phrase fails before production/filesystem mutation
+or maintenance disable. Passwords and confirmation phrases are never logged.
 
 **Security:** Every mutating resume requires Super Admin + `backup_restore_full` + fresh password re-auth +
 exact phrase when applicable + restore lock + maintenance where required by underlying phase. No cached auth.
 
 **Audit (append-only, no secrets):** `e2e_started`, `e2e_resumed`, `e2e_stopped_for_approval`,
-`e2e_stopped_for_merge_confirmation`, `e2e_stopped_for_rollback`, `e2e_completed`, `e2e_terminal`.
+`e2e_stopped_for_merge_confirmation`, `e2e_stopped_for_rollback`, `e2e_reconcile_completed_started`,
+`e2e_reconcile_completed`, `e2e_completed`, `e2e_terminal`.
 
 **NOT in 2E:** Country Production Merge, Admin UI, restore APIs, automatic/scheduled restore, schema changes.
 

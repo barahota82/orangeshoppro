@@ -11,7 +11,7 @@ declare(strict_types=1);
  * maintenance mode enabled and verified for this job, uploads_next prepared.
  *
  * Usage:
- *   php scripts/backup/restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N
+ *   php scripts/backup/restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -21,17 +21,23 @@ if (PHP_SAPI !== 'cli') {
 
 $jobId = '';
 $adminId = 0;
+$password = '';
+$confirmation = '';
 
 foreach ($_SERVER['argv'] ?? [] as $arg) {
     if (str_starts_with($arg, '--job=')) {
         $jobId = trim(substr($arg, strlen('--job=')));
     } elseif (str_starts_with($arg, '--admin-id=')) {
         $adminId = (int) substr($arg, strlen('--admin-id='));
+    } elseif (str_starts_with($arg, '--password=')) {
+        $password = substr($arg, strlen('--password='));
+    } elseif (str_starts_with($arg, '--confirm=')) {
+        $confirmation = substr($arg, strlen('--confirm='));
     }
 }
 
-if ($jobId === '' || $adminId <= 0) {
-    fwrite(STDERR, "Usage: php restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N\n");
+if ($jobId === '' || $adminId <= 0 || $password === '' || trim($confirmation) === '') {
+    fwrite(STDERR, "Usage: php restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE\n");
     exit(2);
 }
 
@@ -44,6 +50,8 @@ try {
         'project_root' => $projectRoot,
         'job_id' => $jobId,
         'admin_id' => $adminId,
+        'password' => $password,
+        'confirmation_phrase' => $confirmation,
     ]);
 
     echo 'ok=1' . PHP_EOL;

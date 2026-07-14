@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/restore_job.php';
 require_once __DIR__ . '/restore_audit.php';
 require_once __DIR__ . '/restore_lock.php';
+require_once __DIR__ . '/restore_reauth.php';
 require_once __DIR__ . '/restore_merge_maintenance.php';
 require_once __DIR__ . '/restore_validation_adapter.php';
 require_once __DIR__ . '/restore_validation_adapter_production.php';
@@ -804,6 +805,11 @@ function orange_restore_merge_post_validation_reconcile_completed_artifacts(
     int $durationSeconds,
     array $options = []
 ): array {
+    orange_restore_require_production_mutating_credentials(
+        array_merge($options, ['admin_id' => $adminId]),
+        $job
+    );
+
     orange_restore_merge_post_validation_assert_maintenance_off_for_checkpoint(
         $workRoot,
         $jobId,
@@ -1204,6 +1210,7 @@ function orange_restore_merge_post_validation_finalize_run(array $options): arra
     $backupRoot = orange_backup_resolve_root($env);
 
     $job = orange_restore_job_read($workRoot, $jobId);
+    orange_restore_require_production_mutating_credentials($options, $job);
     $entryStatus = (string) ($job['status'] ?? '');
 
     if (($job['job_type'] ?? '') !== ORANGE_RESTORE_JOB_TYPE_FULL) {
@@ -1310,6 +1317,7 @@ function orange_restore_merge_post_validation_run(array $options): array
     $backupRoot = orange_backup_resolve_root($env);
 
     $job = orange_restore_job_read($workRoot, $jobId);
+    orange_restore_require_production_mutating_credentials($options, $job);
     $startedAt = microtime(true);
     $entryStatus = (string) ($job['status'] ?? '');
 

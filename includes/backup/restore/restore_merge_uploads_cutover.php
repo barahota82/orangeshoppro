@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/restore_job.php';
 require_once __DIR__ . '/restore_audit.php';
 require_once __DIR__ . '/restore_lock.php';
+require_once __DIR__ . '/restore_reauth.php';
 require_once __DIR__ . '/restore_merge_maintenance.php';
 require_once __DIR__ . '/restore_merge_precheck.php';
 require_once __DIR__ . '/restore_validation_adapter.php';
@@ -1320,8 +1321,9 @@ function orange_restore_merge_uploads_cutover_run(array $options): array
     }
 
     $job = orange_restore_job_read($workRoot, $jobId);
+    $operator = orange_restore_require_production_mutating_credentials($options, $job);
     $startedAt = microtime(true);
-    $operatorUsername = (string) ($job['operator_username'] ?? '');
+    $operatorUsername = (string) ($operator['username'] ?? (string) ($job['operator_username'] ?? ''));
 
     /** @var callable(string,string,string):array<string,mixed>|null $snapshotOverride */
     $snapshotOverride = isset($options['snapshot_override']) && is_callable($options['snapshot_override'])

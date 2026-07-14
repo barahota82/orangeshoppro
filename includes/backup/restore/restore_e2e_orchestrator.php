@@ -37,6 +37,7 @@ const ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION_FINALIZE = 'run_post_validat
 const ORANGE_RESTORE_E2E_ACTION_RUN_DATABASE_CUTOVER = 'run_database_cutover';
 const ORANGE_RESTORE_E2E_ACTION_RUN_UPLOADS_CUTOVER = 'run_uploads_cutover';
 const ORANGE_RESTORE_E2E_ACTION_RUN_ROLLBACK = 'run_rollback';
+const ORANGE_RESTORE_E2E_ACTION_RECONCILE_COMPLETED = 'reconcile_completed';
 const ORANGE_RESTORE_E2E_ACTION_UNKNOWN_STATE = 'unknown_state';
 
 /**
@@ -58,16 +59,27 @@ function orange_restore_e2e_action_spec(
     ];
 }
 
+function orange_restore_e2e_require_post_validation(): void
+{
+    static $loaded = false;
+    if ($loaded) {
+        return;
+    }
+    require_once __DIR__ . '/restore_merge_post_validation.php';
+    $loaded = true;
+}
+
 /**
  * State-driven routing for Full Restore resume (Phase 2E).
  *
  * @param array<string, mixed> $job
  * @return array<string, mixed>
  */
-function orange_restore_e2e_resolve_action(array $job): array
+function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): array
 {
     $status = (string) ($job['status'] ?? '');
     $jobType = (string) ($job['job_type'] ?? '');
+    $jobId = (string) ($job['job_id'] ?? '');
 
     if ($jobType !== ORANGE_RESTORE_JOB_TYPE_FULL) {
         return orange_restore_e2e_action_spec(
@@ -76,6 +88,19 @@ function orange_restore_e2e_resolve_action(array $job): array
             '',
             false
         );
+    }
+
+    if ($status === ORANGE_RESTORE_JOB_STATUS_COMPLETED && $workRoot !== '' && $jobId !== '') {
+        orange_restore_e2e_require_post_validation();
+        if (!orange_restore_merge_post_validation_is_fully_reconciled($workRoot, $jobId, $job)) {
+            return orange_restore_e2e_action_spec(
+                ORANGE_RESTORE_E2E_ACTION_RECONCILE_COMPLETED,
+                'Job completed but completion artifacts are incomplete. Reconcile requires fresh Super Admin re-auth and RESTORE confirmation.',
+                'php scripts/backup/restore_resume_full.php --job=' . $jobId . ' --admin-id=N --password=SECRET --confirm=RESTORE',
+                true,
+                'RESTORE'
+            );
+        }
     }
 
     if (in_array($status, orange_restore_job_e2e_terminal_statuses(), true)) {
@@ -356,7 +381,7 @@ function orange_restore_e2e_start_full(PDO $pdo, array $options): array
                     'operator_admin_id' => $adminId,
                 ]));
             }
-            $action = orange_restore_e2e_resolve_action($existing);
+            $action = orange_restore_e2e_resolve_action($existing, $workRoot);
 
             return [
                 'ok' => true,
@@ -408,7 +433,7 @@ function orange_restore_e2e_start_full(PDO $pdo, array $options): array
         ]));
     }
 
-    $action = orange_restore_e2e_resolve_action($job);
+    $action = orange_restore_e2e_resolve_action($job, $workRoot);
 
     return [
         'ok' => true,
@@ -453,8 +478,12 @@ function orange_restore_e2e_resume_full(PDO $pdo, array $options): array
         $workRoot = orange_restore_resolve_work_root($env);
     }
 
+    if (!isset($options['admin_pdo_override'])) {
+        $options['admin_pdo_override'] = $pdo;
+    }
+
     $job = orange_restore_job_read($workRoot, $jobId);
-    $actionSpec = orange_restore_e2e_resolve_action($job);
+    $actionSpec = orange_restore_e2e_resolve_action($job, $workRoot);
     $action = (string) ($actionSpec['action'] ?? '');
 
     orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_e2e_event($job, 'e2e_resumed', 'started', [
@@ -523,7 +552,7 @@ function orange_restore_e2e_resume_full(PDO $pdo, array $options): array
         orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_e2e_event($job, 'e2e_stopped_for_approval', 'stopped', [
             'operator_admin_id' => $adminId,
         ]));
-        $actionSpec = orange_restore_e2e_resolve_action($job);
+        $actionSpec = orange_restore_e2e_resolve_action($job, $workRoot);
 
         return orange_restore_e2e_stop_result($jobId, $job, $actionSpec);
     }
@@ -533,6 +562,7 @@ function orange_restore_e2e_resume_full(PDO $pdo, array $options): array
         ORANGE_RESTORE_E2E_ACTION_RUN_UPLOADS_CUTOVER,
         ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION,
         ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION_FINALIZE,
+        ORANGE_RESTORE_E2E_ACTION_RECONCILE_COMPLETED,
         ORANGE_RESTORE_E2E_ACTION_RUN_ROLLBACK,
     ], true)) {
         if ($password === '' || trim($confirmationPhrase) === '') {
@@ -553,6 +583,7 @@ function orange_restore_e2e_resume_full(PDO $pdo, array $options): array
             ORANGE_RESTORE_E2E_ACTION_RUN_UPLOADS_CUTOVER,
             ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION,
             ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION_FINALIZE,
+            ORANGE_RESTORE_E2E_ACTION_RECONCILE_COMPLETED,
             ORANGE_RESTORE_E2E_ACTION_RUN_ROLLBACK,
         ], true)) {
             $lock = orange_restore_acquire_lock($workRoot, $jobId);
@@ -594,6 +625,8 @@ function orange_restore_e2e_resume_full(PDO $pdo, array $options): array
                 'work_root' => $workRoot,
                 'job_id' => $jobId,
                 'admin_id' => $adminId,
+                'password' => $password,
+                'confirmation_phrase' => $confirmationPhrase,
                 'admin_pdo_override' => $options['admin_pdo_override'] ?? null,
             ]));
         } elseif ($action === ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION) {
@@ -610,6 +643,8 @@ function orange_restore_e2e_resume_full(PDO $pdo, array $options): array
                 'work_root' => $workRoot,
                 'job_id' => $jobId,
                 'admin_id' => $adminId,
+                'password' => $password,
+                'confirmation_phrase' => $confirmationPhrase,
                 'admin_pdo_override' => $options['admin_pdo_override'] ?? null,
             ]));
         } elseif ($action === ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION_FINALIZE) {
@@ -626,8 +661,38 @@ function orange_restore_e2e_resume_full(PDO $pdo, array $options): array
                 'work_root' => $workRoot,
                 'job_id' => $jobId,
                 'admin_id' => $adminId,
+                'password' => $password,
+                'confirmation_phrase' => $confirmationPhrase,
                 'admin_pdo_override' => $options['admin_pdo_override'] ?? null,
             ]));
+        } elseif ($action === ORANGE_RESTORE_E2E_ACTION_RECONCILE_COMPLETED) {
+            $reconcileRunner = isset($options['reconcile_completed_override']) && is_callable($options['reconcile_completed_override'])
+                ? $options['reconcile_completed_override']
+                : static function (array $reconcileOptions): array {
+                    orange_restore_e2e_require_orchestrator();
+
+                    return orange_restore_orchestrator_post_validation_finalize($reconcileOptions);
+                };
+
+            orange_restore_audit_append($workRoot, $jobId, orange_restore_audit_e2e_event($job, 'e2e_reconcile_completed_started', 'started', [
+                'operator_admin_id' => $adminId,
+            ]));
+
+            $phaseResult = $reconcileRunner(array_merge($options, [
+                'project_root' => $projectRoot,
+                'work_root' => $workRoot,
+                'job_id' => $jobId,
+                'admin_id' => $adminId,
+                'password' => $password,
+                'confirmation_phrase' => $confirmationPhrase,
+                'admin_pdo_override' => $options['admin_pdo_override'] ?? null,
+            ]));
+
+            orange_restore_audit_e2e_append_once($workRoot, $jobId, orange_restore_job_read($workRoot, $jobId), 'e2e_reconcile_completed', 'pass', [
+                'operator_admin_id' => $adminId,
+                'reconciled' => (bool) ($phaseResult['reconciled'] ?? false),
+                'idempotent' => (bool) ($phaseResult['idempotent'] ?? false),
+            ]);
         } elseif ($action === ORANGE_RESTORE_E2E_ACTION_RUN_ROLLBACK) {
             $rollbackRunner = isset($options['rollback_override']) && is_callable($options['rollback_override'])
                 ? $options['rollback_override']
@@ -651,7 +716,7 @@ function orange_restore_e2e_resume_full(PDO $pdo, array $options): array
         }
 
         $job = orange_restore_job_read($workRoot, $jobId);
-        $nextAction = orange_restore_e2e_resolve_action($job);
+        $nextAction = orange_restore_e2e_resolve_action($job, $workRoot);
         $finalStatus = (string) ($job['status'] ?? '');
 
         if ($finalStatus === ORANGE_RESTORE_JOB_STATUS_COMPLETED) {
@@ -742,7 +807,7 @@ function orange_restore_e2e_status_full(string $projectRoot, string $jobId, arra
     orange_restore_e2e_require_orchestrator();
     $base = orange_restore_orchestrator_job_status_report($workRoot, $jobId);
     $job = orange_restore_job_read($workRoot, $jobId);
-    $action = orange_restore_e2e_resolve_action($job);
+    $action = orange_restore_e2e_resolve_action($job, $workRoot);
     $lock = orange_restore_lock_status($workRoot);
     $maintenance = orange_restore_merge_maintenance_status($workRoot);
 

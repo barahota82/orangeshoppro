@@ -40,6 +40,77 @@ function uploads_cutover_self_test(bool $ok, string $label): void
     }
 }
 
+function uploads_cutover_try(callable $fn): ?Throwable
+{
+    try {
+        $fn();
+
+        return null;
+    } catch (Throwable $e) {
+        return $e;
+    }
+}
+
+function uploads_cutover_test_pdo(): PDO
+{
+    $pdo = new PDO('sqlite::memory:');
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $hash = password_hash('correct-pass', PASSWORD_DEFAULT);
+    $pdo->exec(
+        'CREATE TABLE admins (
+            id INTEGER PRIMARY KEY,
+            username TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            display_name TEXT,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            is_superuser INTEGER NOT NULL DEFAULT 0
+        )'
+    );
+    $pdo->exec(
+        'CREATE TABLE admin_permissions (
+            admin_id INTEGER NOT NULL,
+            resource_key TEXT NOT NULL,
+            can_view INTEGER NOT NULL DEFAULT 0,
+            can_edit INTEGER NOT NULL DEFAULT 0,
+            can_delete INTEGER NOT NULL DEFAULT 0
+        )'
+    );
+    $pdo->exec(
+        'INSERT INTO admins (id, username, password_hash, display_name, is_active, is_superuser)
+         VALUES (1, \'superadmin\', ' . $pdo->quote($hash) . ', \'Super Admin\', 1, 1)'
+    );
+    $pdo->exec(
+        'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete)
+         VALUES (1, \'backup_restore_full\', 1, 0, 0)'
+    );
+
+    $GLOBALS['orange_schema_table_cache'] = [
+        'admins' => true,
+        'admin_permissions' => true,
+    ];
+    $GLOBALS['orange_schema_column_cache'] = [
+        'admin_permissions.can_lock' => false,
+        'admin_permissions.can_unlock' => false,
+        'admin_permissions.can_print' => false,
+        'admin_permissions.can_export' => false,
+    ];
+
+    return $pdo;
+}
+
+/**
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function uploads_cutover_mutating_run(array $options): array
+{
+    return orange_restore_merge_uploads_cutover_run(array_merge([
+        'password' => 'correct-pass',
+        'confirmation_phrase' => 'RESTORE',
+        'admin_pdo_override' => uploads_cutover_test_pdo(),
+    ], $options));
+}
+
 function uploads_cutover_temp_root(): string
 {
     $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_2d3_' . bin2hex(random_bytes(4));
@@ -65,17 +136,6 @@ function uploads_cutover_rmdir(string $dir): void
         }
     }
     @rmdir($dir);
-}
-
-function uploads_cutover_try(callable $fn): ?Throwable
-{
-    try {
-        $fn();
-
-        return null;
-    } catch (Throwable $e) {
-        return $e;
-    }
 }
 
 function uploads_cutover_write_file(string $path, string $contents): void
@@ -311,7 +371,7 @@ $jobBad = orange_restore_job_read($wrongState['workRoot'], $wrongState['jobId'])
 $jobBad['status'] = ORANGE_RESTORE_JOB_STATUS_MERGE_PRECHECK_PASSED;
 orange_restore_job_write($wrongState['workRoot'], $jobBad);
 $err = uploads_cutover_try(static function () use ($wrongState): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $wrongState['projectRoot'],
         'work_root' => $wrongState['workRoot'],
         'job_id' => $wrongState['jobId'],
@@ -328,7 +388,7 @@ uploads_cutover_rmdir($wrongState['backupRoot']);
 $noMaint = uploads_cutover_seed_database_cutover_complete_job();
 orange_restore_acquire_lock($noMaint['workRoot'], $noMaint['jobId']);
 $err = uploads_cutover_try(static function () use ($noMaint): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $noMaint['projectRoot'],
         'work_root' => $noMaint['workRoot'],
         'job_id' => $noMaint['jobId'],
@@ -344,7 +404,7 @@ uploads_cutover_rmdir($noMaint['backupRoot']);
 $noLock = uploads_cutover_seed_database_cutover_complete_job();
 orange_restore_merge_maintenance_enable($noLock['workRoot'], $noLock['jobId']);
 $err = uploads_cutover_try(static function () use ($noLock): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $noLock['projectRoot'],
         'work_root' => $noLock['workRoot'],
         'job_id' => $noLock['jobId'],
@@ -361,7 +421,7 @@ $wrongLock = uploads_cutover_seed_database_cutover_complete_job();
 orange_restore_acquire_lock($wrongLock['workRoot'], 'other_job');
 orange_restore_merge_maintenance_enable($wrongLock['workRoot'], $wrongLock['jobId']);
 $err = uploads_cutover_try(static function () use ($wrongLock): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $wrongLock['projectRoot'],
         'work_root' => $wrongLock['workRoot'],
         'job_id' => $wrongLock['jobId'],
@@ -379,7 +439,7 @@ $missingNext = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_rmdir($missingNext['uploadsNextDir']);
 uploads_cutover_prepare_runtime($missingNext);
 $err = uploads_cutover_try(static function () use ($missingNext): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $missingNext['projectRoot'],
         'work_root' => $missingNext['workRoot'],
         'job_id' => $missingNext['jobId'],
@@ -398,7 +458,7 @@ $checksumBad = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_write_file($checksumBad['uploadsNextDir'] . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'tampered.webp', 'x');
 uploads_cutover_prepare_runtime($checksumBad);
 $err = uploads_cutover_try(static function () use ($checksumBad): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $checksumBad['projectRoot'],
         'work_root' => $checksumBad['workRoot'],
         'job_id' => $checksumBad['jobId'],
@@ -425,7 +485,7 @@ orange_restore_uploads_fs_set_test_seam([
     'reparse_point_detector' => static fn (string $path): ?bool => false,
 ]);
 $err = uploads_cutover_try(static function () use ($diffVol): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $diffVol['projectRoot'],
         'work_root' => $diffVol['workRoot'],
         'job_id' => $diffVol['jobId'],
@@ -449,7 +509,7 @@ orange_restore_uploads_fs_set_test_seam([
     'reparse_point_detector' => static fn (string $path): ?bool => false,
 ]);
 $err = uploads_cutover_try(static function () use ($unknownVol): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $unknownVol['projectRoot'],
         'work_root' => $unknownVol['workRoot'],
         'job_id' => $unknownVol['jobId'],
@@ -467,7 +527,7 @@ uploads_cutover_rmdir($unknownVol['backupRoot']);
 $snapFail = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($snapFail);
 $err = uploads_cutover_try(static function () use ($snapFail): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $snapFail['projectRoot'],
         'work_root' => $snapFail['workRoot'],
         'job_id' => $snapFail['jobId'],
@@ -486,7 +546,7 @@ uploads_cutover_rmdir($snapFail['backupRoot']);
 $renameFail = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($renameFail);
 $err = uploads_cutover_try(static function () use ($renameFail): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $renameFail['projectRoot'],
         'work_root' => $renameFail['workRoot'],
         'job_id' => $renameFail['jobId'],
@@ -513,7 +573,7 @@ $partialFail = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($partialFail);
 $renameCount = 0;
 $err = uploads_cutover_try(static function () use ($partialFail, &$renameCount): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $partialFail['projectRoot'],
         'work_root' => $partialFail['workRoot'],
         'job_id' => $partialFail['jobId'],
@@ -561,7 +621,7 @@ uploads_cutover_rmdir($partialFail['backupRoot']);
 $success = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($success);
 $oldUploadsHash = orange_backup_sha256_file($success['uploadsDir'] . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'old.webp');
-$result = orange_restore_merge_uploads_cutover_run([
+$result = uploads_cutover_mutating_run([
     'project_root' => $success['projectRoot'],
     'work_root' => $success['workRoot'],
     'job_id' => $success['jobId'],
@@ -612,7 +672,7 @@ uploads_cutover_prepare_runtime($bindingBad);
 $stagingPath = orange_restore_job_staging_manifest_path($bindingBad['workRoot'], $bindingBad['jobId']);
 orange_backup_write_json($stagingPath, ['staging_uploads_path' => $bindingBad['stagingUploadsDir'], 'tampered' => true]);
 $err = uploads_cutover_try(static function () use ($bindingBad): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $bindingBad['projectRoot'],
         'work_root' => $bindingBad['workRoot'],
         'job_id' => $bindingBad['jobId'],
@@ -632,7 +692,7 @@ $jobNoBinding = orange_restore_job_read($noBinding['workRoot'], $noBinding['jobI
 $jobNoBinding['approval_token_binding'] = [];
 orange_restore_job_write($noBinding['workRoot'], $jobNoBinding);
 $err = uploads_cutover_try(static function () use ($noBinding): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $noBinding['projectRoot'],
         'work_root' => $noBinding['workRoot'],
         'job_id' => $noBinding['jobId'],
@@ -655,7 +715,7 @@ if (is_array($manifest)) {
     orange_backup_write_json($manifestPath, $manifest);
 }
 $err = uploads_cutover_try(static function () use ($countBad): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $countBad['projectRoot'],
         'work_root' => $countBad['workRoot'],
         'job_id' => $countBad['jobId'],
@@ -678,7 +738,7 @@ if (is_array($manifest)) {
     orange_backup_write_json($manifestPath, $manifest);
 }
 $err = uploads_cutover_try(static function () use ($sizeBad): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $sizeBad['projectRoot'],
         'work_root' => $sizeBad['workRoot'],
         'job_id' => $sizeBad['jobId'],
@@ -696,7 +756,7 @@ $extraFile = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($extraFile);
 uploads_cutover_write_file($extraFile['uploadsNextDir'] . DIRECTORY_SEPARATOR . 'extra.txt', 'x');
 $err = uploads_cutover_try(static function () use ($extraFile): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $extraFile['projectRoot'],
         'work_root' => $extraFile['workRoot'],
         'job_id' => $extraFile['jobId'],
@@ -714,7 +774,7 @@ $missingFile = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($missingFile);
 @unlink($missingFile['uploadsNextDir'] . DIRECTORY_SEPARATOR . 'products' . DIRECTORY_SEPARATOR . 'a.webp');
 $err = uploads_cutover_try(static function () use ($missingFile): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $missingFile['projectRoot'],
         'work_root' => $missingFile['workRoot'],
         'job_id' => $missingFile['jobId'],
@@ -737,7 +797,7 @@ orange_restore_uploads_fs_set_test_seam([
     },
 ]);
 $err = uploads_cutover_try(static function () use ($reparseNext): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $reparseNext['projectRoot'],
         'work_root' => $reparseNext['workRoot'],
         'job_id' => $reparseNext['jobId'],
@@ -763,7 +823,7 @@ orange_restore_uploads_fs_set_test_seam([
     },
 ]);
 $err = uploads_cutover_try(static function () use ($reparseLive): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $reparseLive['projectRoot'],
         'work_root' => $reparseLive['workRoot'],
         'job_id' => $reparseLive['jobId'],
@@ -781,7 +841,7 @@ uploads_cutover_rmdir($reparseLive['backupRoot']);
 $corruptSnap = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($corruptSnap);
 $err = uploads_cutover_try(static function () use ($corruptSnap): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $corruptSnap['projectRoot'],
         'work_root' => $corruptSnap['workRoot'],
         'job_id' => $corruptSnap['jobId'],
@@ -805,7 +865,7 @@ uploads_cutover_rmdir($corruptSnap['backupRoot']);
 $mutated = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($mutated);
 $err = uploads_cutover_try(static function () use ($mutated): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $mutated['projectRoot'],
         'work_root' => $mutated['workRoot'],
         'job_id' => $mutated['jobId'],
@@ -873,7 +933,7 @@ uploads_cutover_rmdir($lostLock['backupRoot']);
 // --- durable first-rename checkpoint / simulated crash ---
 $crash = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($crash);
-$crashResult = orange_restore_merge_uploads_cutover_run([
+$crashResult = uploads_cutover_mutating_run([
     'project_root' => $crash['projectRoot'],
     'work_root' => $crash['workRoot'],
     'job_id' => $crash['jobId'],
@@ -969,7 +1029,7 @@ try {
 // --- resume from uploads_first_rename_complete (successful) ---
 $resume = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($resume);
-$haltResult = orange_restore_merge_uploads_cutover_run([
+$haltResult = uploads_cutover_mutating_run([
     'project_root' => $resume['projectRoot'],
     'work_root' => $resume['workRoot'],
     'job_id' => $resume['jobId'],
@@ -981,7 +1041,7 @@ uploads_cutover_self_test(
     ($haltResult['status'] ?? '') === ORANGE_RESTORE_JOB_STATUS_UPLOADS_FIRST_RENAME_COMPLETE,
     'resume setup: halt leaves uploads_first_rename_complete'
 );
-$resumeResult = orange_restore_merge_uploads_cutover_run([
+$resumeResult = uploads_cutover_mutating_run([
     'project_root' => $resume['projectRoot'],
     'work_root' => $resume['workRoot'],
     'job_id' => $resume['jobId'],
@@ -1031,7 +1091,7 @@ $preMergePending = orange_restore_uploads_pre_merge_directory($pendingRecover['p
 if (!@rename($pendingRecover['uploadsDir'], $preMergePending)) {
     throw new RuntimeException('Test setup failed: cannot simulate pending recovery rename.');
 }
-$pendingRecoverResult = orange_restore_merge_uploads_cutover_run([
+$pendingRecoverResult = uploads_cutover_mutating_run([
     'project_root' => $pendingRecover['projectRoot'],
     'work_root' => $pendingRecover['workRoot'],
     'job_id' => $pendingRecover['jobId'],
@@ -1074,7 +1134,7 @@ orange_restore_job_uploads_cutover_transition(
     ]
 );
 uploads_cutover_self_test(is_dir($pendingProceed['uploadsDir']), 'pending proceed setup: uploads still exists');
-$pendingProceedResult = orange_restore_merge_uploads_cutover_run([
+$pendingProceedResult = uploads_cutover_mutating_run([
     'project_root' => $pendingProceed['projectRoot'],
     'work_root' => $pendingProceed['workRoot'],
     'job_id' => $pendingProceed['jobId'],
@@ -1092,7 +1152,7 @@ uploads_cutover_rmdir($pendingProceed['backupRoot']);
 // --- uploads_next mutation after first rename (resume rejected) ---
 $mutatedResume = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($mutatedResume);
-orange_restore_merge_uploads_cutover_run([
+uploads_cutover_mutating_run([
     'project_root' => $mutatedResume['projectRoot'],
     'work_root' => $mutatedResume['workRoot'],
     'job_id' => $mutatedResume['jobId'],
@@ -1102,7 +1162,7 @@ orange_restore_merge_uploads_cutover_run([
 ]);
 uploads_cutover_write_file($mutatedResume['uploadsNextDir'] . DIRECTORY_SEPARATOR . 'tampered.txt', 'bad');
 $mutatedResumeErr = uploads_cutover_try(static function () use ($mutatedResume): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $mutatedResume['projectRoot'],
         'work_root' => $mutatedResume['workRoot'],
         'job_id' => $mutatedResume['jobId'],
@@ -1118,7 +1178,7 @@ uploads_cutover_rmdir($mutatedResume['backupRoot']);
 // --- second-rename revalidation failure ---
 $secondGateFail = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($secondGateFail);
-orange_restore_merge_uploads_cutover_run([
+uploads_cutover_mutating_run([
     'project_root' => $secondGateFail['projectRoot'],
     'work_root' => $secondGateFail['workRoot'],
     'job_id' => $secondGateFail['jobId'],
@@ -1156,7 +1216,7 @@ orange_restore_merge_uploads_cutover_create_snapshot(
     $snapReuse['jobId'],
     $snapReuse['uploadsDir']
 );
-$snapReuseResult = orange_restore_merge_uploads_cutover_run([
+$snapReuseResult = uploads_cutover_mutating_run([
     'project_root' => $snapReuse['projectRoot'],
     'work_root' => $snapReuse['workRoot'],
     'job_id' => $snapReuse['jobId'],
@@ -1190,7 +1250,7 @@ if (is_array($manifest)) {
     orange_backup_write_json($manifestPath, $manifest);
 }
 $corruptSnapErr = uploads_cutover_try(static function () use ($corruptSnapRetry): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $corruptSnapRetry['projectRoot'],
         'work_root' => $corruptSnapRetry['workRoot'],
         'job_id' => $corruptSnapRetry['jobId'],
@@ -1218,7 +1278,7 @@ if (is_array($manifest)) {
     orange_backup_write_json($manifestPath, $manifest);
 }
 $wrongJobErr = uploads_cutover_try(static function () use ($wrongJobSnap): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $wrongJobSnap['projectRoot'],
         'work_root' => $wrongJobSnap['workRoot'],
         'job_id' => $wrongJobSnap['jobId'],
@@ -1245,7 +1305,7 @@ orange_restore_job_uploads_cutover_transition(
     ORANGE_RESTORE_JOB_STATUS_UPLOADS_SNAPSHOT_COMPLETE,
     ['uploads_cutover_snapshot_complete' => true]
 );
-$snapResumeResult = orange_restore_merge_uploads_cutover_run([
+$snapResumeResult = uploads_cutover_mutating_run([
     'project_root' => $snapResume['projectRoot'],
     'work_root' => $snapResume['workRoot'],
     'job_id' => $snapResume['jobId'],
@@ -1264,7 +1324,7 @@ uploads_cutover_rmdir($snapResume['backupRoot']);
 // --- second rename crash reconciliation (rename done, job pending) ---
 $secondCrash = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($secondCrash);
-orange_restore_merge_uploads_cutover_run([
+uploads_cutover_mutating_run([
     'project_root' => $secondCrash['projectRoot'],
     'work_root' => $secondCrash['workRoot'],
     'job_id' => $secondCrash['jobId'],
@@ -1281,7 +1341,7 @@ orange_restore_job_uploads_cutover_transition(
 if (!@rename($secondCrash['uploadsNextDir'], $secondCrash['uploadsDir'])) {
     throw new RuntimeException('Test setup failed: cannot simulate second rename crash.');
 }
-$secondCrashResult = orange_restore_merge_uploads_cutover_run([
+$secondCrashResult = uploads_cutover_mutating_run([
     'project_root' => $secondCrash['projectRoot'],
     'work_root' => $secondCrash['workRoot'],
     'job_id' => $secondCrash['jobId'],
@@ -1303,7 +1363,7 @@ uploads_cutover_rmdir($secondCrash['backupRoot']);
 // --- second rename pending with rename not yet executed ---
 $secondPending = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($secondPending);
-orange_restore_merge_uploads_cutover_run([
+uploads_cutover_mutating_run([
     'project_root' => $secondPending['projectRoot'],
     'work_root' => $secondPending['workRoot'],
     'job_id' => $secondPending['jobId'],
@@ -1317,7 +1377,7 @@ orange_restore_job_uploads_cutover_transition(
     ORANGE_RESTORE_JOB_STATUS_UPLOADS_SECOND_RENAME_PENDING,
     ['uploads_cutover_second_rename_pending' => true]
 );
-$secondPendingResult = orange_restore_merge_uploads_cutover_run([
+$secondPendingResult = uploads_cutover_mutating_run([
     'project_root' => $secondPending['projectRoot'],
     'work_root' => $secondPending['workRoot'],
     'job_id' => $secondPending['jobId'],
@@ -1335,7 +1395,7 @@ uploads_cutover_rmdir($secondPending['backupRoot']);
 // --- live uploads mismatch after second rename crash ---
 $liveMismatch = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($liveMismatch);
-orange_restore_merge_uploads_cutover_run([
+uploads_cutover_mutating_run([
     'project_root' => $liveMismatch['projectRoot'],
     'work_root' => $liveMismatch['workRoot'],
     'job_id' => $liveMismatch['jobId'],
@@ -1354,7 +1414,7 @@ if (!@rename($liveMismatch['uploadsNextDir'], $liveMismatch['uploadsDir'])) {
 }
 uploads_cutover_write_file($liveMismatch['uploadsDir'] . DIRECTORY_SEPARATOR . 'bad.txt', 'tampered');
 $liveMismatchErr = uploads_cutover_try(static function () use ($liveMismatch): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $liveMismatch['projectRoot'],
         'work_root' => $liveMismatch['workRoot'],
         'job_id' => $liveMismatch['jobId'],
@@ -1375,7 +1435,7 @@ uploads_cutover_rmdir($liveMismatch['backupRoot']);
 // --- both uploads and uploads_next exist fails closed ---
 $bothExist = uploads_cutover_seed_database_cutover_complete_job();
 uploads_cutover_prepare_runtime($bothExist);
-orange_restore_merge_uploads_cutover_run([
+uploads_cutover_mutating_run([
     'project_root' => $bothExist['projectRoot'],
     'work_root' => $bothExist['workRoot'],
     'job_id' => $bothExist['jobId'],
@@ -1385,7 +1445,7 @@ orange_restore_merge_uploads_cutover_run([
 ]);
 mkdir($bothExist['uploadsDir'], 0775, true);
 $bothExistErr = uploads_cutover_try(static function () use ($bothExist): void {
-    orange_restore_merge_uploads_cutover_run([
+    uploads_cutover_mutating_run([
         'project_root' => $bothExist['projectRoot'],
         'work_root' => $bothExist['workRoot'],
         'job_id' => $bothExist['jobId'],
