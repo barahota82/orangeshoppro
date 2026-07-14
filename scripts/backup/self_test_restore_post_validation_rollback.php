@@ -155,13 +155,44 @@ function pvrb_create_anchor(string $backupRoot, string $suffix = ''): array
 {
     $anchorDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . 'anchor' . $suffix . '_' . bin2hex(random_bytes(2));
     mkdir($anchorDir, 0775, true);
-    pvrb_write_file($anchorDir . DIRECTORY_SEPARATOR . 'dump.sql.gz', 'fake-dump');
+    $dumpFile = 'dump.sql.gz';
+    $uploadsFile = 'uploads.zip';
+    $dumpPath = $anchorDir . DIRECTORY_SEPARATOR . $dumpFile;
+    $uploadsPath = $anchorDir . DIRECTORY_SEPARATOR . $uploadsFile;
+    $dumpSql = "-- Orange Phase 1A PDO SQL export\n"
+        . "CREATE TABLE `orange_restore_self_test` (`id` INT NOT NULL);\n"
+        . "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;\n";
+    $gz = gzencode($dumpSql);
+    if ($gz === false) {
+        throw new RuntimeException('Cannot build test rollback dump.');
+    }
+    pvrb_write_file($dumpPath, $gz);
+    orange_country_uploads_write_empty_zip($uploadsPath);
+
+    $health = [
+        'generated_at' => gmdate('c'),
+        'schema_revision' => 121,
+        'package_status' => 'healthy',
+        'failure_reasons' => [],
+        'warnings' => [],
+    ];
     orange_backup_write_json($anchorDir . DIRECTORY_SEPARATOR . 'manifest.json', [
         'package_type' => 'full_disaster',
-        'dump_file' => 'dump.sql.gz',
-        'dump_sha256' => str_repeat('d', 64),
+        'package_version' => ORANGE_BACKUP_FULL_PACKAGE_VERSION,
+        'generated_at' => gmdate('c'),
+        'schema_revision' => 121,
+        'dump_file' => $dumpFile,
+        'uploads_file' => $uploadsFile,
+        'dump_sha256' => orange_backup_sha256_file($dumpPath),
+        'uploads_sha256' => orange_backup_sha256_file($uploadsPath),
+        'dump_size_bytes' => filesize($dumpPath) ?: 0,
+        'uploads_size_bytes' => filesize($uploadsPath) ?: 0,
+        'backup_status' => 'success',
+        'health_report_file' => ORANGE_BACKUP_HEALTH_FILE,
+        'checksums_file' => ORANGE_BACKUP_CHECKSUMS_FILE,
     ]);
-    orange_backup_write_checksums($anchorDir, ['manifest.json', 'dump.sql.gz']);
+    orange_backup_write_json($anchorDir . DIRECTORY_SEPARATOR . ORANGE_BACKUP_HEALTH_FILE, $health);
+    orange_backup_write_checksums($anchorDir, ['manifest.json', $dumpFile, $uploadsFile, ORANGE_BACKUP_HEALTH_FILE]);
     $checksum = orange_backup_sha256_file($anchorDir . DIRECTORY_SEPARATOR . 'checksums.sha256');
 
     return ['path' => $anchorDir, 'checksum' => $checksum];
