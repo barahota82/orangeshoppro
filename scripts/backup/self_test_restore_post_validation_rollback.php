@@ -363,6 +363,48 @@ function pvrb_sqlite_cross_country_pdo(bool $contaminated = false): PDO
     return $pdo;
 }
 
+function pvrb_sqlite_add_cross_country_fk_fixture(PDO $pdo): void
+{
+    $pdo->exec('CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS journal_vouchers (id INTEGER PRIMARY KEY, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS journal_lines (id INTEGER PRIMARY KEY, journal_voucher_id INTEGER, account_id INTEGER)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS order_items (id INTEGER PRIMARY KEY, order_id INTEGER, product_id INTEGER)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS warehouses (id INTEGER PRIMARY KEY, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS product_variants (id INTEGER PRIMARY KEY, product_id INTEGER)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS warehouse_variant_stock (id INTEGER PRIMARY KEY, warehouse_id INTEGER, variant_id INTEGER)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS stock_movements (id INTEGER PRIMARY KEY, country_id INTEGER, warehouse_id INTEGER)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS party_subledger (id INTEGER PRIMARY KEY, country_id INTEGER, voucher_id INTEGER)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS purchases (id INTEGER PRIMARY KEY, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS suppliers (id INTEGER PRIMARY KEY, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS purchase_returns (id INTEGER PRIMARY KEY, purchase_id INTEGER, supplier_id INTEGER)');
+}
+
+/**
+ * @param list<string> $extra
+ * @return list<string>
+ */
+function pvrb_cross_country_tables(array $extra = []): array
+{
+    return array_values(array_unique(array_merge([
+        'countries',
+        'accounts',
+        'journal_vouchers',
+        'journal_lines',
+        'orders',
+        'order_items',
+        'products',
+        'warehouses',
+        'product_variants',
+        'warehouse_variant_stock',
+        'stock_movements',
+        'party_subledger',
+        'purchases',
+        'suppliers',
+        'purchase_returns',
+    ], $extra)));
+}
+
 /**
  * @param list<string> $productionTables
  * @return array{passed:bool,gate:array<string,mixed>}
@@ -993,6 +1035,8 @@ pvrb_self_test(
 $noRegistryProject = pvrb_temp_root();
 $noRegistryPdo = new PDO('sqlite::memory:');
 $noRegistryPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$noRegistryPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$noRegistryPdo->exec('INSERT INTO countries (id) VALUES (1)');
 $noRegistryPdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, main_image TEXT)');
 $registryUploadsFail = orange_restore_validation_adapter_production_required_uploads_check(
     $noRegistryPdo,
@@ -1046,6 +1090,8 @@ $depScopedPdo = new PDO('sqlite::memory:');
 $depScopedPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $depScopedPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
 $depScopedPdo->exec('INSERT INTO countries (id) VALUES (1)');
+$depScopedPdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, country_id INTEGER)');
+pvrb_sqlite_add_cross_country_fk_fixture($depScopedPdo);
 $depScopedPdo->exec('CREATE TABLE parent_rows (id INTEGER PRIMARY KEY, country_id INTEGER)');
 $depScopedPdo->exec('CREATE TABLE child_rows (id INTEGER PRIMARY KEY, parent_id INTEGER)');
 $depScopedPdo->exec('INSERT INTO parent_rows (id, country_id) VALUES (1, 1)');
@@ -1053,7 +1099,7 @@ $depScopedPdo->exec('INSERT INTO child_rows (id, parent_id) VALUES (1, 1)');
 $depScopedErrors = orange_restore_validation_adapter_production_cross_country_checks(
     $depScopedPdo,
     $depScopedProject,
-    ['countries', 'parent_rows', 'child_rows']
+    pvrb_cross_country_tables(['parent_rows', 'child_rows'])
 );
 pvrb_self_test(
     $depScopedErrors === [],
@@ -1063,7 +1109,7 @@ $depScopedPdo->exec('INSERT INTO child_rows (id, parent_id) VALUES (2, 99)');
 $depOrphanErrors = orange_restore_validation_adapter_production_cross_country_checks(
     $depScopedPdo,
     $depScopedProject,
-    ['countries', 'parent_rows', 'child_rows']
+    pvrb_cross_country_tables(['parent_rows', 'child_rows'])
 );
 pvrb_self_test(
     (bool) array_filter($depOrphanErrors, static fn (string $e): bool => str_contains($e, 'orphan child_rows.parent_id')),
@@ -1110,6 +1156,8 @@ $depMismatchPdo = new PDO('sqlite::memory:');
 $depMismatchPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $depMismatchPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
 $depMismatchPdo->exec('INSERT INTO countries (id) VALUES (1), (2)');
+$depMismatchPdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, country_id INTEGER)');
+pvrb_sqlite_add_cross_country_fk_fixture($depMismatchPdo);
 $depMismatchPdo->exec('CREATE TABLE parent_rows (id INTEGER PRIMARY KEY, country_id INTEGER)');
 $depMismatchPdo->exec('CREATE TABLE child_rows (id INTEGER PRIMARY KEY, parent_id INTEGER, country_id INTEGER)');
 $depMismatchPdo->exec('INSERT INTO parent_rows (id, country_id) VALUES (1, 1)');
@@ -1117,7 +1165,7 @@ $depMismatchPdo->exec('INSERT INTO child_rows (id, parent_id, country_id) VALUES
 $depMismatchErrors = orange_restore_validation_adapter_production_cross_country_checks(
     $depMismatchPdo,
     $depMismatchProject,
-    ['countries', 'parent_rows', 'child_rows']
+    pvrb_cross_country_tables(['parent_rows', 'child_rows'])
 );
 pvrb_self_test(
     (bool) array_filter($depMismatchErrors, static fn (string $e): bool => str_contains($e, 'ownership mismatch in child_rows vs parent_rows')),
@@ -1227,7 +1275,8 @@ pvrb_rmdir($maintGateSeed['backupRoot']);
 $ccProject = pvrb_temp_root();
 pvrb_copy_registry($ccProject);
 $ccPdo = pvrb_sqlite_cross_country_pdo(true);
-$ccTables = ['countries', 'products'];
+$ccTables = pvrb_cross_country_tables();
+pvrb_sqlite_add_cross_country_fk_fixture($ccPdo);
 $ccErrors = orange_restore_validation_adapter_production_cross_country_checks($ccPdo, $ccProject, $ccTables);
 pvrb_self_test($ccErrors !== [], 'blocker2: cross-country contamination detected');
 pvrb_self_test(
@@ -1235,7 +1284,9 @@ pvrb_self_test(
     'blocker2: cross-country error references invalid country rows'
 );
 $ccClean = pvrb_sqlite_cross_country_pdo(false);
-$ccCleanErrors = orange_restore_validation_adapter_production_cross_country_checks($ccClean, $ccProject, $ccTables);
+$ccCleanTables = pvrb_cross_country_tables();
+pvrb_sqlite_add_cross_country_fk_fixture($ccClean);
+$ccCleanErrors = orange_restore_validation_adapter_production_cross_country_checks($ccClean, $ccProject, $ccCleanTables);
 pvrb_self_test($ccCleanErrors === [], 'blocker2: clean cross-country data passes');
 pvrb_rmdir($ccProject);
 
@@ -1760,6 +1811,8 @@ $ownedValidIdPdo = new PDO('sqlite::memory:');
 $ownedValidIdPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $ownedValidIdPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
 $ownedValidIdPdo->exec('INSERT INTO countries (id) VALUES (1)');
+$ownedValidIdPdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, country_id INTEGER)');
+pvrb_sqlite_add_cross_country_fk_fixture($ownedValidIdPdo);
 $ownedValidIdPdo->exec('CREATE TABLE test_country_owned (id INTEGER PRIMARY KEY, country_id INTEGER)');
 $ownedValidIdPdo->exec('INSERT INTO test_country_owned (id, country_id) VALUES (1, 1)');
 $ownedValidIdErrors = orange_restore_validation_adapter_production_validate_country_owned_rule(
@@ -1773,7 +1826,7 @@ $ownedValidIdErrors = orange_restore_validation_adapter_production_validate_coun
 $ownedValidIdCrossErrors = orange_restore_validation_adapter_production_cross_country_checks(
     $ownedValidIdPdo,
     $ownedValidIdProject,
-    ['countries', 'test_country_owned']
+    pvrb_cross_country_tables(['test_country_owned'])
 );
 pvrb_self_test($ownedValidIdErrors === [], 'blocker2-country_owned: valid country_id rule passes validation');
 pvrb_self_test($ownedValidIdCrossErrors === [], 'blocker2-country_owned: valid country_id rule passes cross-country checks');
@@ -1789,6 +1842,8 @@ $ownedValidScopePdo = new PDO('sqlite::memory:');
 $ownedValidScopePdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $ownedValidScopePdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
 $ownedValidScopePdo->exec('INSERT INTO countries (id) VALUES (1)');
+$ownedValidScopePdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, country_id INTEGER)');
+pvrb_sqlite_add_cross_country_fk_fixture($ownedValidScopePdo);
 $ownedValidScopePdo->exec(
     'CREATE TABLE test_country_owned (
         id INTEGER PRIMARY KEY,
@@ -1808,7 +1863,7 @@ $ownedValidScopeErrors = orange_restore_validation_adapter_production_validate_c
 $ownedValidScopeCrossErrors = orange_restore_validation_adapter_production_cross_country_checks(
     $ownedValidScopePdo,
     $ownedValidScopeProject,
-    ['countries', 'test_country_owned']
+    pvrb_cross_country_tables(['test_country_owned'])
 );
 pvrb_self_test($ownedValidScopeErrors === [], 'blocker2-country_owned: valid country_scope_or rule passes validation');
 pvrb_self_test($ownedValidScopeCrossErrors === [], 'blocker2-country_owned: valid country_scope_or rule passes cross-country checks');

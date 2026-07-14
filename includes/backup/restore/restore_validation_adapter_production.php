@@ -893,7 +893,7 @@ function orange_restore_validation_adapter_production_required_uploads_check(
 
     foreach ($uploadLinkedTables as $tableName) {
         if (!in_array($tableName, $productionTables, true)) {
-            $scanErrors[] = 'uploads-linked table missing from production: ' . $tableName;
+            $warnings[] = 'uploads-linked table absent from production, skipped: ' . $tableName;
             continue;
         }
 
