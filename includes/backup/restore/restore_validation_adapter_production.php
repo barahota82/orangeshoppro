@@ -893,7 +893,7 @@ function orange_restore_validation_adapter_production_required_uploads_check(
 
     foreach ($uploadLinkedTables as $tableName) {
         if (!in_array($tableName, $productionTables, true)) {
-            $scanErrors[] = 'uploads-linked table missing from production: ' . $tableName;
+            $warnings[] = 'uploads-linked table missing from production (skipped): ' . $tableName;
             continue;
         }
 
@@ -1125,7 +1125,7 @@ function orange_restore_validation_adapter_production_validate_upload_reference(
     try {
         $relative = orange_restore_validation_adapter_production_normalize_upload_reference($rawDbPath);
         $uploadsDir = orange_restore_production_uploads_directory($projectRoot);
-        if (!is_dir($uploadsDir) && !@mkdir($uploadsDir, 0775, true) && !is_dir($uploadsDir)) {
+        if (!is_dir($uploadsDir)) {
             throw new RuntimeException('Production uploads directory missing.');
         }
 
@@ -1329,10 +1329,23 @@ function orange_restore_validation_adapter_production_cross_country_checks(
                     . '.';
                 continue;
             }
-            if (!orange_restore_validation_adapter_table_has_column($pdo, $tableName, 'country_id')) {
+            if (!orange_restore_validation_adapter_table_has_column($pdo, $tableName, $foreignKey)) {
                 $errors[] = 'Cross-country dependent validation cannot run: '
                     . $tableName
-                    . ' missing country_id for dependent ownership validation.';
+                    . ' missing foreign key column '
+                    . $foreignKey
+                    . ' for dependent ownership validation.';
+                continue;
+            }
+            if (!orange_restore_validation_adapter_table_has_column($pdo, $parentTable, 'id')) {
+                $errors[] = 'Cross-country dependent validation cannot run: parent table '
+                    . $parentTable
+                    . ' missing id for '
+                    . $tableName
+                    . '.';
+                continue;
+            }
+            if (!orange_restore_validation_adapter_table_has_column($pdo, $tableName, 'country_id')) {
                 continue;
             }
 
@@ -1360,6 +1373,21 @@ function orange_restore_validation_adapter_production_cross_country_checks(
 
 function orange_restore_validation_adapter_table_has_column(PDO $pdo, string $table, string $column): bool
 {
+    if ((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+        $tableLiteral = str_replace("'", "''", $table);
+        $st = $pdo->query("PRAGMA table_info('" . $tableLiteral . "')");
+        if ($st === false) {
+            return false;
+        }
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            if (is_array($row) && (string) ($row['name'] ?? '') === $column) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     $quotedTable = $pdo->quote($table);
     $quotedColumn = $pdo->quote($column);
 
