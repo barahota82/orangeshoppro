@@ -20,7 +20,7 @@ orange_admin_render_mega_section_index(
         'company_settings' => 'بيانات الشركة والشعار للطباعة.',
         'company_documents' => 'أرشيف مستندات الشركة.',
         'logs' => 'سجل نشاط المستخدمين.',
-        'backup_center' => 'مركز النسخ الاحتياطي (Full + Country Batch).',
+        'backup_center' => 'إدارة النسخ الاحتياطي — شامل + نسخ الدول.',
         'countries' => 'إدارة الدول والأسواق.',
         'admin_users' => 'المستخدمون وصلاحيات الشاشات.',
         'channels' => 'قنوات البيع للعملاء.',
