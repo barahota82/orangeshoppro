@@ -200,6 +200,10 @@ function pvrb_seed_uploads_cutover_complete_job(string $entryStatus = ORANGE_RES
     ]);
     $jobId = (string) $job['job_id'];
 
+    orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_VALIDATED, [
+        'package_validated_at' => gmdate('c'),
+        'package_validation_result' => 'self_test_seed',
+    ]);
     orange_restore_job_record_fresh_backup_anchor($workRoot, $jobId, $anchor['path'], $anchor['checksum']);
 
     $stagingUploadsDir = orange_restore_staging_uploads_directory($workRoot, $jobId);
