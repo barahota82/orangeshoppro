@@ -352,6 +352,58 @@ function pvrb_sqlite_cross_country_pdo(bool $contaminated = false): PDO
 }
 
 /**
+ * @return list<string>
+ */
+function pvrb_sqlite_cross_country_add_full_fk_fixture(PDO $pdo): array
+{
+    $pdo->exec('CREATE TABLE accounts (id INTEGER PRIMARY KEY, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE journal_vouchers (id INTEGER PRIMARY KEY, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE journal_lines (id INTEGER PRIMARY KEY, journal_voucher_id INTEGER, account_id INTEGER)');
+    $pdo->exec('CREATE TABLE orders (id INTEGER PRIMARY KEY, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id INTEGER, product_id INTEGER)');
+    $pdo->exec('CREATE TABLE warehouses (id INTEGER PRIMARY KEY, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE product_variants (id INTEGER PRIMARY KEY, product_id INTEGER)');
+    $pdo->exec('CREATE TABLE warehouse_variant_stock (id INTEGER PRIMARY KEY, warehouse_id INTEGER, variant_id INTEGER)');
+    $pdo->exec('CREATE TABLE stock_movements (id INTEGER PRIMARY KEY, warehouse_id INTEGER, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE party_subledger (id INTEGER PRIMARY KEY, voucher_id INTEGER, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE purchases (id INTEGER PRIMARY KEY, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE suppliers (id INTEGER PRIMARY KEY, country_id INTEGER)');
+    $pdo->exec('CREATE TABLE purchase_returns (id INTEGER PRIMARY KEY, purchase_id INTEGER, supplier_id INTEGER)');
+
+    $pdo->exec('INSERT INTO accounts (id, country_id) VALUES (1, 1)');
+    $pdo->exec('INSERT INTO journal_vouchers (id, country_id) VALUES (1, 1)');
+    $pdo->exec('INSERT INTO journal_lines (id, journal_voucher_id, account_id) VALUES (1, 1, 1)');
+    $pdo->exec('INSERT INTO orders (id, country_id) VALUES (1, 1)');
+    $pdo->exec('INSERT INTO order_items (id, order_id, product_id) VALUES (1, 1, 1)');
+    $pdo->exec('INSERT INTO warehouses (id, country_id) VALUES (1, 1)');
+    $pdo->exec('INSERT INTO product_variants (id, product_id) VALUES (1, 1)');
+    $pdo->exec('INSERT INTO warehouse_variant_stock (id, warehouse_id, variant_id) VALUES (1, 1, 1)');
+    $pdo->exec('INSERT INTO stock_movements (id, warehouse_id, country_id) VALUES (1, 1, 1)');
+    $pdo->exec('INSERT INTO party_subledger (id, voucher_id, country_id) VALUES (1, 1, 1)');
+    $pdo->exec('INSERT INTO purchases (id, country_id) VALUES (1, 1)');
+    $pdo->exec('INSERT INTO suppliers (id, country_id) VALUES (1, 1)');
+    $pdo->exec('INSERT INTO purchase_returns (id, purchase_id, supplier_id) VALUES (1, 1, 1)');
+
+    return [
+        'countries',
+        'products',
+        'accounts',
+        'journal_vouchers',
+        'journal_lines',
+        'orders',
+        'order_items',
+        'warehouses',
+        'product_variants',
+        'warehouse_variant_stock',
+        'stock_movements',
+        'party_subledger',
+        'purchases',
+        'suppliers',
+        'purchase_returns',
+    ];
+}
+
+/**
  * @param list<string> $productionTables
  * @return array{passed:bool,gate:array<string,mixed>}
  */
@@ -978,6 +1030,8 @@ pvrb_self_test(
 $noRegistryProject = pvrb_temp_root();
 $noRegistryPdo = new PDO('sqlite::memory:');
 $noRegistryPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$noRegistryPdo->exec('CREATE TABLE countries (id INTEGER PRIMARY KEY)');
+$noRegistryPdo->exec('INSERT INTO countries (id) VALUES (1)');
 $noRegistryPdo->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, main_image TEXT)');
 $registryUploadsFail = orange_restore_validation_adapter_production_required_uploads_check(
     $noRegistryPdo,
@@ -1151,7 +1205,8 @@ pvrb_self_test(
     'blocker2: cross-country error references invalid country rows'
 );
 $ccClean = pvrb_sqlite_cross_country_pdo(false);
-$ccCleanErrors = orange_restore_validation_adapter_production_cross_country_checks($ccClean, $ccProject, $ccTables);
+$ccCleanTables = pvrb_sqlite_cross_country_add_full_fk_fixture($ccClean);
+$ccCleanErrors = orange_restore_validation_adapter_production_cross_country_checks($ccClean, $ccProject, $ccCleanTables);
 pvrb_self_test($ccCleanErrors === [], 'blocker2: clean cross-country data passes');
 pvrb_rmdir($ccProject);
 
