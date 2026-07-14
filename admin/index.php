@@ -91,6 +91,7 @@ $allowed = [
     'sales_reports',
     'financial_report',
     'logs',
+    'backup_center',
     'channels',
     'company_documents',
     'channel_analytics',

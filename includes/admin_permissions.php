@@ -26,6 +26,9 @@ function orange_admin_resource_labels(): array
         'admin_users' => 'المستخدمون والصلاحيات',
         'backup_restore_full' => 'استعادة كاملة (Full Disaster Restore)',
         'backup_restore_country' => 'استعادة دولة (Country Recovery Restore)',
+        'backup_view' => 'عرض مركز النسخ الاحتياطي',
+        'backup_run' => 'تشغيل النسخ الاحتياطي',
+        'backup_verify' => 'التحقق من النسخ الاحتياطي',
     ];
 }
 
@@ -49,6 +52,9 @@ function orange_admin_resource_screen_hints(): array
         'admin_users' => 'المستخدمون والصلاحيات (مشرف عام فقط)',
         'backup_restore_full' => 'استعادة كاملة — Super Admin + صلاحية مخصصة (CLI فقط حتى Phase 3)',
         'backup_restore_country' => 'استعادة دولة — Super Admin + صلاحية مخصصة (CLI فقط حتى Phase 3)',
+        'backup_view' => 'مركز النسخ الاحتياطي — عرض الحالة والحزم والسجلات',
+        'backup_run' => 'مركز النسخ الاحتياطي — تشغيل Full/Country Batch',
+        'backup_verify' => 'مركز النسخ الاحتياطي — التحقق وDRV',
     ];
 }
 
@@ -139,6 +145,7 @@ function orange_admin_page_resource(string $page): string
         'sales_reports' => 'reports',
         'channel_analytics' => 'reports',
         'logs' => 'reports',
+        'backup_center' => 'reports',
         'company_settings' => 'settings',
         'storefront_hero' => 'settings',
         'storefront_merge_requests' => 'settings',
@@ -471,6 +478,19 @@ function orange_admin_caps_for_page(array $admin, PDO $pdo, string $page): array
     }
     if ($page === 'countries') {
         return orange_admin_can_manage_countries($admin) ? orange_admin_full_caps() : orange_admin_empty_caps();
+    }
+    if ($page === 'backup_center') {
+        require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_admin.php';
+
+        return [
+            'can_view' => orange_backup_admin_may_view($admin, $pdo),
+            'can_edit' => orange_backup_admin_may_run($admin, $pdo),
+            'can_delete' => false,
+            'can_lock' => false,
+            'can_unlock' => false,
+            'can_print' => orange_backup_admin_may_view($admin, $pdo),
+            'can_export' => false,
+        ];
     }
     $matrix = orange_admin_permissions_matrix($pdo, (int) $admin['id']);
     if ($matrix === []) {
@@ -907,6 +927,14 @@ function orange_admin_require_page(array $admin, PDO $pdo, string $page): void
 function orange_admin_enforce_api(array $admin, PDO $pdo): void
 {
     $path = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_FILENAME'] ?? ''));
+    if (str_contains($path, '/admin/api/backup/')) {
+        require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_admin.php';
+        if (!orange_backup_admin_may_view($admin, $pdo)) {
+            json_response(['success' => false, 'message' => 'لا تملك صلاحية مركز النسخ الاحتياطي'], 403);
+        }
+
+        return;
+    }
     if (str_contains($path, '/admin/api/edit-lock/')) {
         if (!orange_admin_may_page($admin, $pdo, 'edit_lock', 'view')) {
             json_response(['success' => false, 'message' => 'لا تملك صلاحية عرض إقفال التعديلات'], 403);
@@ -959,6 +987,11 @@ function orange_admin_nav_visible(array $admin, PDO $pdo, string $page): bool
     }
     if ($page === 'country_screen_copy') {
         return orange_admin_has_full_access($admin);
+    }
+    if ($page === 'backup_center') {
+        require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_admin.php';
+
+        return orange_backup_admin_may_view($admin, $pdo);
     }
     return orange_admin_may_page($admin, $pdo, $page, 'view');
 }

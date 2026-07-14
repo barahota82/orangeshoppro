@@ -198,6 +198,7 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'company_settings', 'label' => 'بيانات الشركة'],
                         ['page' => 'company_documents', 'label' => 'أرشيف المستندات'],
                         ['page' => 'logs', 'label' => 'سجل النشاط'],
+                        ['page' => 'backup_center', 'label' => 'مركز النسخ الاحتياطي'],
                     ],
                 ],
                 [

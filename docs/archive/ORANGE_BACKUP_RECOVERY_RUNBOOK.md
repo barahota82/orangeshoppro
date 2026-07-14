@@ -729,9 +729,61 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 | Full production merge credentials (`ORANGE_RESTORE_MERGE_DB_*`) | **Owner policy §11 — required (foundation + cutover)** |
 | Uploads same-volume gate | **Owner policy §12 — required when 2D.1 implemented** |
 | Owner approval gate (`approved_for_merge`) | **Phase 2C implemented** |
-| Admin backup/restore UI wrapper | Phase 3 |
+| Admin backup/restore UI wrapper | **Phase 3A Backup Center implemented** (restore UI deferred) |
 | Dedicated permissions `backup_restore_full` / `backup_restore_country` | **Phase 2A implemented** |
 | Restore audit DB table | First mutating restore phase (not 2A) |
+
+---
+
+## Phase 3A — Admin Backup Center
+
+**Scope:** Secure admin wrapper around the **already-approved Backup Engine** (Phase 1A–1C). No restore/rollback UI, no production restore buttons, no package delete/download in this phase.
+
+### Page
+
+- `admin/index.php?page=backup_center` → `admin/pages/backup_center.php`
+
+### Permissions (server-side enforced on every API)
+
+| Key | Purpose |
+|-----|---------|
+| `backup_view` | View Backup Center, list packages/logs/storage |
+| `backup_run` | Run Full Disaster Backup + Country Batch export |
+| `backup_verify` | Verify package + Recoverability Validation (DRV) |
+
+**Rules:** Super Admin **or** explicit matrix permission (`can_view` for view, `can_edit` for run/verify). Restore permissions (`backup_restore_*`) are **not** granted here.
+
+### Admin APIs (POST mutating actions require CSRF token)
+
+| Endpoint | Method | Delegates to |
+|----------|--------|--------------|
+| `admin/api/backup/list.php` | GET | `orange_backup_admin_collect_overview()`, package discovery |
+| `admin/api/backup/status.php` | GET | Lock status, allowlisted file view, log tail |
+| `admin/api/backup/run-full.php` | POST | `orange_backup_run_full()` |
+| `admin/api/backup/run-countries.php` | POST | Fixed CLI `scripts/backup/export_all_recoverable_countries.php` |
+| `admin/api/backup/verify.php` | POST | `orange_backup_verify_full_package()` / `orange_country_export_verify_package()` |
+| `admin/api/backup/recovery-check.php` | POST | `orange_recovery_validate_package()` |
+
+Package paths are **never** accepted from the client — only server-discovered allowlisted `package_id` + optional `country_code`.
+
+### Scheduled Tasks section
+
+Read-only display of expected Plesk schedules (Full daily 03:00 UTC, Country batch after Full, retention days). Orange does **not** edit Plesk Scheduled Tasks.
+
+### Explicitly deferred (Phase 3A)
+
+- Restore UI / production restore buttons / rollback UI
+- Country Production Merge from admin
+- HTTP Restore APIs / automatic restore
+- Package delete / download
+- DB-backed immutable restore audit table
+- Real controlled Plesk staging/production drill
+
+### Self-test
+
+```powershell
+php D:\orange\scripts\backup\self_test_backup_admin.php
+```
 
 ---
 
@@ -739,6 +791,7 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 
 ```powershell
 php D:\orange\scripts\backup\self_test_restore_foundation.php
+php D:\orange\scripts\backup\self_test_backup_admin.php
 php D:\orange\scripts\backup\self_test_backup.php
 php D:\orange\scripts\backup\self_test_backup_retention.php
 php D:\orange\scripts\backup\self_test_country_export.php
