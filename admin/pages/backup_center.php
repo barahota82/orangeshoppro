@@ -42,8 +42,15 @@ $apiBase = storefront_public_path('/admin/api/backup');
 .bc-progress{display:none;margin:12px 0;padding:10px;border-radius:8px;background:#eff6ff;color:#1e3a8a}
 .bc-section{margin-bottom:18px}
 .bc-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;border-bottom:1px solid #e5e7eb;padding-bottom:8px}
-.bc-tab{padding:8px 14px;border:1px solid #d1d5db;border-radius:8px 8px 0 0;background:#f9fafb;cursor:pointer;font-weight:600;font:inherit}
-.bc-tab.is-active{background:#fff;border-bottom-color:#fff;color:#1d4ed8}
+.bc-tab{padding:8px 14px;border:1px solid var(--primary,#ea580c);border-radius:8px 8px 0 0;background:var(--primary,#ea580c);color:#fff;cursor:pointer;font-weight:600;font:inherit}
+.bc-tab:hover{background:var(--primary-hover,#c2410c);border-color:var(--primary-hover,#c2410c);color:#fff}
+.bc-tab.is-active{background:var(--primary-hover,#c2410c);border-color:var(--primary-hover,#c2410c);border-bottom-color:#fff;color:#fff}
+.bc-tab.is-active:hover{background:var(--primary-hover,#c2410c);color:#fff}
+.bc-btn-orange,.bc-tabs .bc-tab,#bc_run_full_btn,#bc_run_countries_btn,#bc_confirm_ok,.bc-modal .btn-primary,.bc-actions .btn-primary,.bc-actions .btn-link,.bc-actions button.btn-link,#bc_storage_copy_btn,#bc_logs_table .btn-link{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;background:var(--primary,#ea580c);color:#fff!important;-webkit-text-fill-color:#fff;text-decoration:none}
+.bc-btn-orange:hover,.bc-tabs .bc-tab:hover,#bc_run_full_btn:hover,#bc_run_countries_btn:hover,#bc_confirm_ok:hover,.bc-modal .btn-primary:hover,.bc-actions .btn-primary:hover,.bc-actions .btn-link:hover,.bc-actions button.btn-link:hover,#bc_storage_copy_btn:hover,#bc_logs_table .btn-link:hover{background:var(--primary-hover,#c2410c);color:#fff!important;-webkit-text-fill-color:#fff;text-decoration:none}
+.bc-actions .btn-link,.bc-actions button.btn-link,#bc_storage_copy_btn,#bc_logs_table .btn-link{padding:var(--admin-btn-pad-y,7px) var(--admin-btn-pad-x,14px);min-height:var(--admin-btn-min-h,32px);border:0;border-radius:var(--radius-sm,10px);font-weight:600;cursor:pointer}
+.bc-actions .btn-secondary,#bc_refresh_btn,#bc_confirm_cancel,#bc_view_close{background:#475569;color:#fff!important;-webkit-text-fill-color:#fff}
+.bc-actions .btn-secondary:hover,#bc_refresh_btn:hover,#bc_confirm_cancel:hover,#bc_view_close:hover{background:#334155;color:#fff!important;-webkit-text-fill-color:#fff}
 .bc-tab-panel{display:none}
 .bc-tab-panel.is-active{display:block}
 .bc-status-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}
