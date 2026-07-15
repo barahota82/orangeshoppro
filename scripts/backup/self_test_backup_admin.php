@@ -37,6 +37,68 @@ function backup_admin_self_test(bool $ok, string $label): void
     }
 }
 
+function backup_admin_test_set_readonly(string $dir): bool
+{
+    if (!is_dir($dir)) {
+        return false;
+    }
+    if (PHP_OS_FAMILY === 'Windows') {
+        $user = getenv('USERNAME') ?: getenv('USER');
+        if (!is_string($user) || $user === '') {
+            return false;
+        }
+        exec('icacls ' . escapeshellarg($dir) . ' /inheritance:r', $out, $code1);
+        exec('icacls ' . escapeshellarg($dir) . ' /grant:r ' . escapeshellarg($user . ':(R)'), $out, $code2);
+
+        return $code1 === 0 && $code2 === 0 && !is_writable($dir);
+    }
+
+    if (!@chmod($dir, 0555)) {
+        return false;
+    }
+
+    return !is_writable($dir);
+}
+
+function backup_admin_test_restore_writable(string $dir): void
+{
+    if (!is_dir($dir)) {
+        return;
+    }
+    if (PHP_OS_FAMILY === 'Windows') {
+        $user = getenv('USERNAME') ?: getenv('USER');
+        exec('icacls ' . escapeshellarg($dir) . ' /reset', $out, $code);
+        if (is_string($user) && $user !== '') {
+            exec('icacls ' . escapeshellarg($dir) . ' /grant:r ' . escapeshellarg($user . ':(OI)(CI)F'), $out, $code);
+        }
+    } else {
+        @chmod($dir, 0775);
+    }
+}
+
+function backup_admin_test_remove_tree(string $dir): void
+{
+    if (!is_dir($dir)) {
+        return;
+    }
+    $items = scandir($dir);
+    if ($items === false) {
+        return;
+    }
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+        $path = $dir . DIRECTORY_SEPARATOR . $item;
+        if (is_dir($path)) {
+            backup_admin_test_remove_tree($path);
+        } else {
+            @unlink($path);
+        }
+    }
+    @rmdir($dir);
+}
+
 function backup_admin_test_pdo(string $permKey, bool $canEdit, int $adminId = 2): PDO
 {
     $pdo = new PDO('sqlite::memory:');
@@ -191,6 +253,129 @@ foreach ($apiFiles as $file) {
 }
 
 backup_admin_self_test(defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') && ORANGE_CATALOG_SCHEMA_PHP_REVISION === 121, 'schema: revision remains 121');
+
+$strictResolveSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_paths.php');
+backup_admin_self_test(str_contains($strictResolveSource, 'is_writable($resolved)') || str_contains($strictResolveSource, 'is_writable($candidate)'), 'engine: strict orange_backup_resolve_root still checks writable');
+
+$viewCtxWritable = orange_backup_admin_context_for_view($projectRoot);
+backup_admin_self_test(($viewCtxWritable['root_health']['readable'] ?? false) === true, 'view: context succeeds when BackupRoot is readable');
+
+$fakeProjectRoot = $tmpRoot . DIRECTORY_SEPARATOR . 'fake_project';
+if (!is_dir($fakeProjectRoot)) {
+    mkdir($fakeProjectRoot, 0775, true);
+}
+$readonlyBackupRoot = $tmpRoot . DIRECTORY_SEPARATOR . 'readonly_backups';
+if (is_dir($readonlyBackupRoot)) {
+    backup_admin_test_remove_tree($readonlyBackupRoot);
+}
+mkdir($readonlyBackupRoot, 0775, true);
+$readonlySnap = $readonlyBackupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . '2026-07-15_130000';
+mkdir($readonlySnap, 0775, true);
+orange_backup_write_json($readonlySnap . DIRECTORY_SEPARATOR . 'manifest.json', [
+    'package_type' => 'full_disaster',
+    'generated_at' => gmdate('c'),
+    'schema_revision' => 121,
+    'backup_status' => 'success',
+]);
+file_put_contents(
+    $fakeProjectRoot . DIRECTORY_SEPARATOR . '.env.php',
+    "<?php\nreturn ['ORANGE_BACKUP_ROOT' => " . var_export($readonlyBackupRoot, true) . "];\n"
+);
+
+$viewBeforeReadonly = orange_backup_admin_resolve_root_for_view($fakeProjectRoot);
+backup_admin_self_test($viewBeforeReadonly['readable'] === true && $viewBeforeReadonly['writable'] === true, 'view: writable root reports manual_actions_available');
+
+$readonlyApplied = backup_admin_test_set_readonly($readonlyBackupRoot);
+if ($readonlyApplied) {
+    $viewReadonly = orange_backup_admin_resolve_root_for_view($fakeProjectRoot);
+    backup_admin_self_test($viewReadonly['readable'] === true, 'view: readable=true when root is read-only for PHP');
+    backup_admin_self_test($viewReadonly['writable'] === false, 'view: writable=false does not throw');
+    backup_admin_self_test($viewReadonly['manual_actions_available'] === false, 'view: manual_actions_available=false when non-writable');
+    backup_admin_self_test($viewReadonly['warning'] === ORANGE_BACKUP_ADMIN_ROOT_READONLY_WARNING, 'view: readonly warning constant returned');
+
+    $listed = orange_backup_admin_list_full_snapshots($readonlyBackupRoot, 10);
+    backup_admin_self_test(count($listed) >= 1, 'view: list discovers packages on readable non-writable root');
+
+    $healthPayload = orange_backup_admin_root_health_payload($viewReadonly);
+    backup_admin_self_test($healthPayload['manual_actions_available'] === false, 'view: health payload exposes manual_actions_available=false');
+
+    $blockMsg = orange_backup_admin_manual_actions_block_message($fakeProjectRoot);
+    backup_admin_self_test(is_string($blockMsg) && $blockMsg !== '', 'mutation: manual Full/Country blocked before engine when non-writable');
+
+    try {
+        orange_backup_admin_assert_manual_actions_available($fakeProjectRoot);
+        backup_admin_self_test(false, 'mutation: assert manual actions throws when non-writable');
+    } catch (Throwable) {
+        backup_admin_self_test(true, 'mutation: assert manual actions throws when non-writable');
+    }
+
+    try {
+        orange_backup_resolve_root(orange_backup_load_env_array($fakeProjectRoot));
+        backup_admin_self_test(false, 'engine: strict resolve rejects non-writable root');
+    } catch (Throwable) {
+        backup_admin_self_test(true, 'engine: strict resolve rejects non-writable root');
+    }
+
+    backup_admin_test_restore_writable($readonlyBackupRoot);
+} else {
+    echo "SKIP: readonly ACL simulation unavailable on this host\n";
+}
+
+try {
+    orange_backup_admin_validate_configured_root_candidate('C:/inetpub/vhosts/example.com/httpdocs/orange_backups');
+    backup_admin_self_test(false, 'view: public web root candidate rejected');
+} catch (Throwable) {
+    backup_admin_self_test(true, 'view: public web root candidate rejected');
+}
+
+try {
+    file_put_contents(
+        $fakeProjectRoot . DIRECTORY_SEPARATOR . '.env.php',
+        "<?php\nreturn ['ORANGE_BACKUP_ROOT' => " . var_export($tmpRoot . DIRECTORY_SEPARATOR . 'missing_backup_root_' . bin2hex(random_bytes(3)), true) . "];\n"
+    );
+    orange_backup_admin_resolve_root_for_view($fakeProjectRoot);
+    backup_admin_self_test(false, 'view: missing BackupRoot directory fails closed');
+} catch (Throwable) {
+    backup_admin_self_test(true, 'view: missing BackupRoot directory fails closed');
+}
+
+$listApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'list.php');
+backup_admin_self_test(str_contains($listApi, 'orange_backup_admin_context_for_view'), 'api: list.php uses view context');
+backup_admin_self_test(str_contains($listApi, 'backup_root_health'), 'api: list.php returns backup_root_health');
+
+$statusApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'status.php');
+backup_admin_self_test(str_contains($statusApi, 'orange_backup_admin_context_for_view'), 'api: status.php uses view context');
+
+$verifyApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'verify.php');
+backup_admin_self_test(str_contains($verifyApi, 'orange_backup_admin_context_for_view'), 'api: verify.php uses view context (read-only verify)');
+
+$recoveryApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'recovery-check.php');
+backup_admin_self_test(str_contains($recoveryApi, 'manual_actions_block_message'), 'api: recovery-check.php blocks before write when non-writable');
+backup_admin_self_test(str_contains($recoveryApi, 'context_for_mutation'), 'api: recovery-check.php uses mutation context after writable check');
+
+$runFullApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'run-full.php');
+backup_admin_self_test(str_contains($runFullApi, 'manual_actions_block_message') && str_contains($runFullApi, 'orange_backup_admin_run_full'), 'api: run-full.php blocks then delegates only when writable');
+
+$runCountriesApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'run-countries.php');
+backup_admin_self_test(str_contains($runCountriesApi, 'manual_actions_block_message') && str_contains($runCountriesApi, 'orange_backup_admin_run_country_batch'), 'api: run-countries.php blocks then delegates only when writable');
+
+backup_admin_self_test(str_contains($pageSource, 'bc_root_warning'), 'ui: writable warning banner element present');
+backup_admin_self_test(str_contains($pageSource, 'renderRootHealth'), 'ui: renderRootHealth without generic alert for readonly health');
+backup_admin_self_test(str_contains($pageSource, 'applyActionAvailability'), 'ui: run buttons disabled via applyActionAvailability');
+backup_admin_self_test(str_contains($pageSource, ORANGE_BACKUP_ADMIN_ROOT_READONLY_WARNING), 'ui: Arabic readonly warning text embedded for banner');
+
+$listApiUsesMutation = str_contains($listApi, 'orange_backup_admin_context_for_mutation') || str_contains($listApi, 'orange_backup_admin_run_full');
+backup_admin_self_test(!$listApiUsesMutation, 'view: list.php does not invoke mutation engine paths');
+
+$statusApiUsesMutation = str_contains($statusApi, 'orange_backup_admin_run_full') || str_contains($statusApi, 'orange_backup_admin_run_country_batch');
+backup_admin_self_test(!$statusApiUsesMutation, 'view: status.php does not invoke backup run engines');
+
+@unlink($fakeProjectRoot . DIRECTORY_SEPARATOR . '.env.php');
+@unlink($readonlySnap . DIRECTORY_SEPARATOR . 'manifest.json');
+@rmdir($readonlySnap);
+@rmdir($readonlyBackupRoot . DIRECTORY_SEPARATOR . 'snapshots');
+@rmdir($readonlyBackupRoot);
+@rmdir($fakeProjectRoot);
 
 // Cleanup
 @rmdir($locksDir);

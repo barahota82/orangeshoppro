@@ -30,6 +30,10 @@ $apiBase = storefront_public_path('/admin/api/backup');
 .bc-badge--failed{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
 .bc-badge--running{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
 .bc-badge--muted{background:#f3f4f6;color:#4b5563;border:1px solid #e5e7eb}
+.bc-root-warning{display:none;margin-bottom:12px;padding:12px 14px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.bc-root-health{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:0;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}
+.bc-root-health dt{font-size:.78rem;color:#64748b;margin:0 0 2px}
+.bc-root-health dd{margin:0;font-weight:600;font-size:.95rem}
 .bc-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
 .bc-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:5000}
 .bc-modal{background:#fff;border-radius:12px;max-width:520px;width:92%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
@@ -56,6 +60,17 @@ $apiBase = storefront_public_path('/admin/api/backup');
 <div id="bc_progress" class="bc-progress" role="status" aria-live="polite">جاري التنفيذ…</div>
 <div id="bc_alert" class="card" style="display:none;margin-bottom:12px;"></div>
 
+<div id="bc_root_warning" class="bc-root-warning" role="status" aria-live="polite"></div>
+
+<div class="bc-section card">
+    <h3>حالة مسار النسخ الاحتياطي</h3>
+    <dl id="bc_root_health" class="bc-root-health">
+        <div><dt>المسار موجود</dt><dd>…</dd></div>
+        <div><dt>قابل للقراءة</dt><dd>…</dd></div>
+        <div><dt>قابل للكتابة</dt><dd>…</dd></div>
+        <div><dt>التشغيل اليدوي</dt><dd>…</dd></div>
+    </dl>
+</div>
 <div class="bc-section">
     <h3>نظرة عامة</h3>
     <div id="bc_overview" class="bc-grid">
@@ -186,6 +201,9 @@ $apiBase = storefront_public_path('/admin/api/backup');
     const CAN_VERIFY = <?php echo $canVerify ? 'true' : 'false'; ?>;
 
     let state = { full: [], country: [], busy: false, pendingAction: null };
+    let manualActionsAvailable = true;
+    let recoveryCheckRequiresWrite = true;
+    let rootHealthWarning = '';
 
     const el = (id) => document.getElementById(id);
     const fmtBytes = (n) => {
@@ -209,14 +227,64 @@ $apiBase = storefront_public_path('/admin/api/backup');
         box.style.display = 'block';
         box.innerHTML = '<div class="' + (ok ? 'alert-success' : 'alert-error') + '">' + msg + '</div>';
     };
+    const healthBadge = (ok, yesLabel, noLabel) => {
+        const label = ok ? yesLabel : noLabel;
+        const cls = ok ? 'bc-badge--success' : 'bc-badge--warning';
+        return '<span class="bc-badge ' + cls + '">' + label + '</span>';
+    };
+    const applyActionAvailability = () => {
+        const runDisabled = !manualActionsAvailable || state.busy;
+        ['bc_run_full_btn', 'bc_run_countries_btn'].forEach((id) => {
+            const b = el(id);
+            if (!b) {
+                return;
+            }
+            b.disabled = runDisabled;
+            if (!manualActionsAvailable) {
+                b.title = rootHealthWarning || 'التشغيل اليدوي غير متاح';
+            } else {
+                b.removeAttribute('title');
+            }
+        });
+        if (el('bc_refresh_btn')) {
+            el('bc_refresh_btn').disabled = state.busy;
+        }
+        document.querySelectorAll('.bc-drv').forEach((btn) => {
+            if (recoveryCheckRequiresWrite && !manualActionsAvailable) {
+                btn.disabled = true;
+                btn.title = rootHealthWarning || 'DRV يتطلب كتابة على مسار النسخ الاحتياطي';
+            } else {
+                btn.disabled = false;
+                btn.removeAttribute('title');
+            }
+        });
+    };
     const setBusy = (on, text) => {
         state.busy = on;
         el('bc_progress').style.display = on ? 'block' : 'none';
         if (text) el('bc_progress').textContent = text;
-        ['bc_run_full_btn', 'bc_run_countries_btn', 'bc_refresh_btn'].forEach((id) => {
-            const b = el(id);
-            if (b) b.disabled = on;
-        });
+        applyActionAvailability();
+    };
+    const renderRootHealth = (data) => {
+        const h = data.backup_root_health || {};
+        const perms = data.permissions || {};
+        manualActionsAvailable = !!(perms.manual_actions_available ?? h.manual_actions_available);
+        recoveryCheckRequiresWrite = perms.recovery_check_requires_write !== false;
+        rootHealthWarning = h.warning || '';
+        const warnBox = el('bc_root_warning');
+        if (h.readable && !h.writable && h.warning) {
+            warnBox.textContent = h.warning;
+            warnBox.style.display = 'block';
+        } else {
+            warnBox.style.display = 'none';
+            warnBox.textContent = '';
+        }
+        el('bc_root_health').innerHTML =
+            '<div><dt>المسار موجود</dt><dd>' + healthBadge(!!h.exists, 'نعم', 'لا') + '</dd></div>' +
+            '<div><dt>قابل للقراءة</dt><dd>' + healthBadge(!!h.readable, 'نعم', 'لا') + '</dd></div>' +
+            '<div><dt>قابل للكتابة</dt><dd>' + healthBadge(!!h.writable, 'نعم', 'لا') + '</dd></div>' +
+            '<div><dt>التشغيل اليدوي</dt><dd>' + healthBadge(manualActionsAvailable, 'متاح', 'غير متاح') + '</dd></div>';
+        applyActionAvailability();
     };
 
     async function apiGet(path) {
@@ -310,12 +378,14 @@ $apiBase = storefront_public_path('/admin/api/backup');
         el('bc_logs_table').querySelector('tbody').innerHTML = (data.logs || []).map((log) =>
             '<tr><td><code>' + log.name + '</code></td><td>' + log.category + '</td><td>' + fmtBytes(log.size_bytes) + '</td><td>' + new Date(log.mtime * 1000).toLocaleString() + '</td><td><button type="button" class="btn-link bc-log-tail" data-log="' + log.name + '">عرض</button></td></tr>'
         ).join('');
+        applyActionAvailability();
     }
 
     async function loadAll() {
         setBusy(true, 'جاري تحميل البيانات…');
         try {
             const data = await apiGet('list.php');
+            renderRootHealth(data);
             renderOverview(data);
             renderTables(data);
             const locks = await apiGet('status.php?action=locks');
@@ -323,6 +393,7 @@ $apiBase = storefront_public_path('/admin/api/backup');
                 showAlert('هناك عملية نسخ احتياطي قيد التشغيل حالياً.', false);
             }
         } catch (e) {
+            el('bc_root_warning').style.display = 'none';
             showAlert(e.message || 'تعذر التحميل', false);
         } finally {
             setBusy(false);

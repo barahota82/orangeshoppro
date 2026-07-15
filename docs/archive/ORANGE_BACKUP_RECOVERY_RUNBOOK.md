@@ -785,6 +785,24 @@ Package paths are **never** accepted from the client — only server-discovered 
 
 **Redaction (Phase 3A):** JSON keys matching secret fragments are stripped; log tails and CLI excerpts pass through `orange_backup_admin_redact_text()` before API/audit output. Log tail accepts only filenames discovered under `BackupRoot/logs/`.
 
+### BackupRoot health — read vs write (Admin UI, Phase 3A hardening)
+
+On Windows/Plesk, **Scheduled Task PHP** (CLI under Task Scheduler) and **Website PHP** (IIS application pool / site identity) may run as **different Windows accounts**. It is common for the scheduled Full/Country backup tasks to succeed while the Admin Backup Center reports the same `ORANGE_BACKUP_ROOT` as **readable but not writable** to Website PHP.
+
+| Access | Required Windows ACL (typical) | Used by |
+|--------|----------------------------------|---------|
+| **Read** | Read & execute / List folder contents on `{BackupRoot}` and subfolders | Admin Backup Center **view**: list packages, view manifest/health/logs, Verify (read-only), lock status |
+| **Modify / Write** | Modify (or Write) on `{BackupRoot}` | Manual Admin actions: Run Full Backup, Run All Countries, DRV/recovery-check (writes `recovery_validation.json` into package dirs), engine locks/logs during manual runs |
+
+**Admin behavior (no ACL changes from UI):**
+
+- `list.php` / read-only `status.php` actions use **`orange_backup_admin_context_for_view()`** — readable BackupRoot is enough; `backup_root_health` reports `writable` / `manual_actions_available` without HTTP 500.
+- Mutating APIs (`run-full.php`, `run-countries.php`, `recovery-check.php`) use **`orange_backup_admin_manual_actions_block_message()`** and strict **`orange_backup_resolve_root()`** — fail closed before engine/CLI when Website PHP cannot write.
+- `verify.php` remains **read-only** (view context); it does not require write access.
+- Backup Center UI shows **حالة مسار النسخ الاحتياطي** (exists / readable / writable / manual available) and an Arabic banner when readable+non-writable; Run buttons and DRV are disabled; no generic alert for this expected condition.
+
+**Operator action:** ACL fixes on `{BackupRoot}` remain a **server/Plesk operation** (grant Website PHP identity Modify on the private backup folder). Orange does not expose ACL editing in Admin.
+
 ### Scheduled Tasks section
 
 Read-only display of expected Plesk schedules (Full daily 03:00 UTC, Country batch after Full, retention days). Orange does **not** edit Plesk Scheduled Tasks.

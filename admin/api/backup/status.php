@@ -12,7 +12,7 @@ try {
     orange_backup_admin_require_view($admin, $pdo);
 
     $projectRoot = backup_admin_api_project_root();
-    $ctx = orange_backup_admin_context($projectRoot);
+    $ctx = orange_backup_admin_context_for_view($projectRoot);
     $backupRoot = $ctx['backup_root'];
 
     $action = trim((string) ($_GET['action'] ?? 'locks'));

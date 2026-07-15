@@ -16,6 +16,20 @@ try {
 
     $projectRoot = backup_admin_api_project_root();
     $startedAt = gmdate('c');
+    $blockMessage = orange_backup_admin_manual_actions_block_message($projectRoot);
+    if ($blockMessage !== null) {
+        orange_backup_admin_audit(
+            'run_country_batch',
+            'country_recovery',
+            'batch',
+            $startedAt,
+            gmdate('c'),
+            false,
+            $blockMessage
+        );
+        json_response(['success' => false, 'message' => $blockMessage], 422);
+    }
+
     $result = orange_backup_admin_run_country_batch($projectRoot);
     $finishedAt = (string) ($result['finished_at'] ?? gmdate('c'));
     $ok = (bool) ($result['ok'] ?? false);

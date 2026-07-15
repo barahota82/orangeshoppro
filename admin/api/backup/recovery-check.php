@@ -18,7 +18,24 @@ try {
     $packageId = trim((string) ($data['package_id'] ?? ''));
     $countryCode = trim((string) ($data['country_code'] ?? ''));
 
-    $ctx = orange_backup_admin_context(backup_admin_api_project_root());
+    $projectRoot = backup_admin_api_project_root();
+    $startedAt = gmdate('c');
+    $blockMessage = orange_backup_admin_manual_actions_block_message($projectRoot);
+    if ($blockMessage !== null) {
+        orange_backup_admin_audit(
+            'recovery_validation',
+            $packageType !== '' ? $packageType : 'unknown',
+            $packageId,
+            $startedAt,
+            gmdate('c'),
+            false,
+            $blockMessage
+        );
+        json_response(['success' => false, 'message' => $blockMessage], 422);
+    }
+
+    // DRV writes recovery_validation.json into the package directory — requires writable BackupRoot.
+    $ctx = orange_backup_admin_context_for_mutation($projectRoot);
     if ($packageType === 'full_disaster') {
         $packagePath = orange_backup_admin_resolve_full_package_path($ctx['backup_root'], $packageId);
     } elseif ($packageType === 'country_recovery') {
@@ -27,7 +44,6 @@ try {
         json_response(['success' => false, 'message' => 'نوع الحزمة غير مدعوم'], 422);
     }
 
-    $startedAt = gmdate('c');
     $result = orange_backup_admin_recovery_validate($packagePath);
     $finishedAt = gmdate('c');
     $ok = (bool) ($result['ok'] ?? false);

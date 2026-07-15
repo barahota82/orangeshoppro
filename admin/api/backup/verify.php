@@ -18,7 +18,8 @@ try {
     $packageId = trim((string) ($data['package_id'] ?? ''));
     $countryCode = trim((string) ($data['country_code'] ?? ''));
 
-    $ctx = orange_backup_admin_context(backup_admin_api_project_root());
+    // Verify is read-only (checksum/manifest validation only) — view context is sufficient.
+    $ctx = orange_backup_admin_context_for_view(backup_admin_api_project_root());
     if ($packageType === 'full_disaster') {
         $packagePath = orange_backup_admin_resolve_full_package_path($ctx['backup_root'], $packageId);
     } elseif ($packageType === 'country_recovery') {

@@ -15,6 +15,12 @@ require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'admin_permissions.php';
 const ORANGE_BACKUP_ADMIN_PACKAGE_ID_PATTERN = '/^\d{4}-\d{2}-\d{2}_\d{6}$/';
 const ORANGE_BACKUP_ADMIN_COUNTRY_CODE_PATTERN = '/^[A-Za-z]{2}$/';
 
+const ORANGE_BACKUP_ADMIN_ROOT_READONLY_WARNING =
+    'مسار النسخ الاحتياطي قابل للقراءة لكنه غير قابل للكتابة بواسطة PHP الخاص بالموقع. يمكن عرض النسخ الحالية، لكن التشغيل اليدوي متوقف حتى يتم ضبط صلاحيات المجلد.';
+
+const ORANGE_BACKUP_ADMIN_ROOT_NOT_WRITABLE_MESSAGE =
+    'مسار النسخ الاحتياطي غير قابل للكتابة بواسطة PHP الخاص بالموقع. لا يمكن تنفيذ التشغيل اليدوي حتى يتم ضبط صلاحيات المجلد.';
+
 /** @var list<string> */
 const ORANGE_BACKUP_ADMIN_VIEWABLE_FILES = [
     'manifest.json',
@@ -141,10 +147,138 @@ function orange_backup_admin_resolve_backup_root(string $projectRoot): string
     return orange_backup_resolve_root($env);
 }
 
+function orange_backup_admin_validate_configured_root_candidate(string $candidate): void
+{
+    $candidate = trim($candidate);
+    if ($candidate === '') {
+        throw new RuntimeException('ORANGE_BACKUP_ROOT must not be empty.');
+    }
+
+    $candidateNorm = str_replace('\\', '/', $candidate);
+    if (preg_match('#(^|/)(httpdocs|public_html|wwwroot)(/|$)#i', $candidateNorm)) {
+        throw new RuntimeException('ORANGE_BACKUP_ROOT must not be inside a public web root (httpdocs/public_html/wwwroot).');
+    }
+    if (str_contains($candidate, '..')) {
+        throw new RuntimeException('ORANGE_BACKUP_ROOT must not contain path traversal (..).');
+    }
+}
+
 /**
- * @return array{project_root:string,backup_root:string,env:array<string,mixed>}
+ * View-safe BackupRoot resolution — readable root is enough; non-writable root does not throw.
+ *
+ * @return array{
+ *   backup_root:string,
+ *   configured_path:string,
+ *   exists:bool,
+ *   readable:bool,
+ *   writable:bool,
+ *   writable_for_manual_actions:bool,
+ *   manual_actions_available:bool,
+ *   warning:?string,
+ *   error:?string
+ * }
  */
-function orange_backup_admin_context(string $projectRoot): array
+function orange_backup_admin_resolve_root_for_view(string $projectRoot): array
+{
+    $projectRoot = realpath($projectRoot) ?: $projectRoot;
+    $env = orange_backup_load_env_array($projectRoot);
+    $candidate = orange_backup_backup_root_candidate($env, $projectRoot);
+    $configured = orange_backup_env_trimmed($env, ORANGE_BACKUP_ENV_ROOT);
+
+    if (array_key_exists(ORANGE_BACKUP_ENV_ROOT, $env) && $configured === '') {
+        throw new RuntimeException('ORANGE_BACKUP_ROOT must not be empty.');
+    }
+
+    orange_backup_admin_validate_configured_root_candidate($candidate);
+
+    if (!is_dir($candidate)) {
+        throw new RuntimeException('ORANGE_BACKUP_ROOT is not a directory: ' . $candidate);
+    }
+
+    $resolved = realpath($candidate);
+    if ($resolved === false) {
+        $resolved = orange_backup_normalize_directory_path($candidate);
+    }
+    if (!is_dir($resolved)) {
+        throw new RuntimeException('ORANGE_BACKUP_ROOT is not a directory: ' . $candidate);
+    }
+
+    orange_backup_assert_outside_web_root($resolved);
+
+    if (!is_readable($resolved)) {
+        throw new RuntimeException('ORANGE_BACKUP_ROOT is not readable: ' . $resolved);
+    }
+
+    $writable = is_writable($resolved);
+    $warning = null;
+    if (!$writable) {
+        $warning = ORANGE_BACKUP_ADMIN_ROOT_READONLY_WARNING;
+    }
+
+    return [
+        'backup_root' => $resolved,
+        'configured_path' => $candidate,
+        'exists' => true,
+        'readable' => true,
+        'writable' => $writable,
+        'writable_for_manual_actions' => $writable,
+        'manual_actions_available' => $writable,
+        'warning' => $warning,
+        'error' => null,
+    ];
+}
+
+/**
+ * @param array{
+ *   backup_root:string,
+ *   configured_path:string,
+ *   exists:bool,
+ *   readable:bool,
+ *   writable:bool,
+ *   writable_for_manual_actions:bool,
+ *   manual_actions_available:bool,
+ *   warning:?string,
+ *   error:?string
+ * } $viewRoot
+ * @return array<string, mixed>
+ */
+function orange_backup_admin_root_health_payload(array $viewRoot): array
+{
+    return [
+        'path' => $viewRoot['backup_root'],
+        'configured_path' => $viewRoot['configured_path'],
+        'exists' => (bool) ($viewRoot['exists'] ?? false),
+        'readable' => (bool) ($viewRoot['readable'] ?? false),
+        'writable' => (bool) ($viewRoot['writable'] ?? false),
+        'writable_for_manual_actions' => (bool) ($viewRoot['writable_for_manual_actions'] ?? false),
+        'manual_actions_available' => (bool) ($viewRoot['manual_actions_available'] ?? false),
+        'warning' => $viewRoot['warning'] ?? null,
+    ];
+}
+
+/**
+ * @return array{project_root:string,backup_root:string,env:array<string,mixed>,root_health:array<string,mixed>}
+ */
+function orange_backup_admin_context_for_view(string $projectRoot): array
+{
+    $projectRoot = realpath($projectRoot) ?: $projectRoot;
+    $env = orange_backup_load_env_array($projectRoot);
+    $viewRoot = orange_backup_admin_resolve_root_for_view($projectRoot);
+
+    return [
+        'project_root' => $projectRoot,
+        'backup_root' => $viewRoot['backup_root'],
+        'env' => $env,
+        'root_health' => orange_backup_admin_root_health_payload($viewRoot),
+    ];
+}
+
+/**
+ * Strict mutating context — requires writable BackupRoot via engine resolver.
+ *
+ * @return array{project_root:string,backup_root:string,env:array<string,mixed>,root_health:array<string,mixed>}
+ */
+function orange_backup_admin_context_for_mutation(string $projectRoot): array
 {
     $projectRoot = realpath($projectRoot) ?: $projectRoot;
     $env = orange_backup_load_env_array($projectRoot);
@@ -154,7 +288,56 @@ function orange_backup_admin_context(string $projectRoot): array
         'project_root' => $projectRoot,
         'backup_root' => $backupRoot,
         'env' => $env,
+        'root_health' => [
+            'path' => $backupRoot,
+            'configured_path' => orange_backup_backup_root_candidate($env, $projectRoot),
+            'exists' => true,
+            'readable' => is_readable($backupRoot),
+            'writable' => true,
+            'writable_for_manual_actions' => true,
+            'manual_actions_available' => true,
+            'warning' => null,
+        ],
     ];
+}
+
+/**
+ * @return array{project_root:string,backup_root:string,env:array<string,mixed>,root_health:array<string,mixed>}
+ */
+function orange_backup_admin_context(string $projectRoot): array
+{
+    return orange_backup_admin_context_for_mutation($projectRoot);
+}
+
+/**
+ * Fail closed before manual backup engine invocation when BackupRoot is not writable.
+ *
+ * @return array{project_root:string,backup_root:string,env:array<string,mixed>,root_health:array<string,mixed>}
+ */
+function orange_backup_admin_assert_manual_actions_available(string $projectRoot): array
+{
+    try {
+        return orange_backup_admin_context_for_mutation($projectRoot);
+    } catch (RuntimeException $e) {
+        $msg = $e->getMessage();
+        if (str_contains($msg, 'not writable') || str_contains($msg, 'cannot be created')) {
+            throw new RuntimeException(ORANGE_BACKUP_ADMIN_ROOT_NOT_WRITABLE_MESSAGE, 0, $e);
+        }
+
+        throw $e;
+    }
+}
+
+/** Operator-facing block reason for mutating Admin APIs, or null when manual actions may proceed. */
+function orange_backup_admin_manual_actions_block_message(string $projectRoot): ?string
+{
+    try {
+        orange_backup_admin_assert_manual_actions_available($projectRoot);
+
+        return null;
+    } catch (RuntimeException $e) {
+        return $e->getMessage();
+    }
 }
 
 function orange_backup_admin_resolve_full_package_path(string $backupRoot, string $packageId): string
@@ -552,11 +735,14 @@ function orange_backup_admin_log_category(string $fileName): string
 /**
  * @return array<string, mixed>
  */
-function orange_backup_admin_collect_overview(PDO $pdo, string $projectRoot): array
+function orange_backup_admin_collect_overview(PDO $pdo, string $projectRoot, ?array $viewCtx = null): array
 {
-    $ctx = orange_backup_admin_context($projectRoot);
-    $backupRoot = $ctx['backup_root'];
-    $env = $ctx['env'];
+    $viewCtx = $viewCtx ?? orange_backup_admin_context_for_view($projectRoot);
+    $backupRoot = $viewCtx['backup_root'];
+    $env = $viewCtx['env'];
+    $rootHealth = $viewCtx['root_health'] ?? orange_backup_admin_root_health_payload(
+        orange_backup_admin_resolve_root_for_view($projectRoot)
+    );
     $retentionDays = orange_backup_retention_days($env);
 
     $snapshotsDir = orange_backup_path_inside_root($backupRoot, 'snapshots');
@@ -607,7 +793,8 @@ function orange_backup_admin_collect_overview(PDO $pdo, string $projectRoot): ar
 
     return [
         'backup_root' => $backupRoot,
-        'backup_root_status' => is_writable($backupRoot) ? 'writable' : 'not_writable',
+        'backup_root_status' => !empty($rootHealth['writable']) ? 'writable' : 'not_writable',
+        'backup_root_health' => $rootHealth,
         'retention_days' => $retentionDays,
         'selected_backend' => $backend,
         'recoverable_countries' => $recoverableCount,

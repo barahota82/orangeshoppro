@@ -12,15 +12,21 @@ try {
     orange_backup_admin_require_view($admin, $pdo);
 
     $projectRoot = backup_admin_api_project_root();
-    $ctx = orange_backup_admin_context($projectRoot);
-    $overview = orange_backup_admin_collect_overview($pdo, $projectRoot);
+    $ctx = orange_backup_admin_context_for_view($projectRoot);
+    $rootHealth = $ctx['root_health'];
+    $overview = orange_backup_admin_collect_overview($pdo, $projectRoot, $ctx);
+    $manualAvailable = !empty($rootHealth['manual_actions_available']);
 
     json_response([
         'success' => true,
+        'backup_root_health' => $rootHealth,
         'permissions' => [
             'can_view' => orange_backup_admin_may_view($admin, $pdo),
-            'can_run' => orange_backup_admin_may_run($admin, $pdo),
+            'can_run' => orange_backup_admin_may_run($admin, $pdo) && $manualAvailable,
             'can_verify' => orange_backup_admin_may_verify($admin, $pdo),
+            'manual_actions_available' => $manualAvailable,
+            'verify_is_read_only' => true,
+            'recovery_check_requires_write' => true,
         ],
         'csrf_token' => orange_backup_admin_csrf_token(),
         'overview' => $overview,
