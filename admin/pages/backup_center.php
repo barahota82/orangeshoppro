@@ -35,9 +35,12 @@ $apiBase = storefront_public_path('/admin/api/backup');
 .bc-root-health dt{font-size:.78rem;color:#64748b;margin:0 0 2px}
 .bc-root-health dd{margin:0;font-weight:600;font-size:.95rem}
 .bc-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
-td.bc-actions{margin:0;flex-wrap:nowrap;align-items:center;width:1%;white-space:nowrap;vertical-align:middle}
-td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
-@media (max-width:1024px){td.bc-actions{flex-wrap:wrap;white-space:normal;width:auto}}
+.bc-snapshot-table{width:100%;table-layout:fixed}
+.bc-snapshot-table col.bc-col-actions{width:42rem}
+.bc-snapshot-table th.bc-actions-col,.bc-snapshot-table td.bc-actions{width:42rem;min-width:42rem;max-width:42rem;box-sizing:border-box;padding:8px 10px;text-align:left;direction:ltr;vertical-align:middle}
+.bc-snapshot-table td.bc-actions{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:8px;margin:0;white-space:nowrap}
+.bc-snapshot-table td.bc-actions .btn-link,.bc-snapshot-table td.bc-actions button.btn-link{flex-shrink:0}
+@media (max-width:1024px){.bc-snapshot-table col.bc-col-actions{width:auto}.bc-snapshot-table th.bc-actions-col,.bc-snapshot-table td.bc-actions{width:auto;min-width:0;max-width:none;flex-wrap:wrap;white-space:normal}}
 .bc-ts{display:inline-flex;flex-wrap:nowrap;align-items:baseline;gap:.35em;font-family:ui-monospace,Consolas,monospace;font-size:.82rem;line-height:1.45;white-space:nowrap}
 .bc-ts-date,.bc-ts-time{white-space:nowrap}
 .bc-ts-cell{vertical-align:middle;min-width:0}
@@ -125,7 +128,8 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
             <button type="button" class="btn-secondary" id="bc_refresh_btn">تحديث</button>
         </div>
         <div class="table-wrap">
-            <table id="bc_full_table">
+            <table id="bc_full_table" class="bc-snapshot-table">
+                <colgroup><col><col><col><col><col><col><col><col class="bc-col-actions"></colgroup>
                 <thead>
                     <tr>
                         <th>الوقت</th>
@@ -135,7 +139,7 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
                         <th>Dump</th>
                         <th>Uploads</th>
                         <th>DRV</th>
-                        <th>إجراءات</th>
+                        <th class="bc-actions-col">إجراءات</th>
                     </tr>
                 </thead>
                 <tbody><tr><td colspan="8" class="muted">…</td></tr></tbody>
@@ -156,7 +160,8 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
             <?php endif; ?>
         </div>
         <div class="table-wrap">
-            <table id="bc_country_table">
+            <table id="bc_country_table" class="bc-snapshot-table">
+                <colgroup><col><col><col><col><col><col><col class="bc-col-actions"></colgroup>
                 <thead>
                     <tr>
                         <th>الدولة</th>
@@ -165,7 +170,7 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
                         <th>Schema</th>
                         <th>Registry</th>
                         <th>DRV</th>
-                        <th>إجراءات</th>
+                        <th class="bc-actions-col">إجراءات</th>
                     </tr>
                 </thead>
                 <tbody><tr><td colspan="7" class="muted">…</td></tr></tbody>
