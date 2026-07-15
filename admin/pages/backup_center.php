@@ -49,14 +49,17 @@ $apiBase = storefront_public_path('/admin/api/backup');
 .bc-status-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}
 .bc-status-strip dt{font-size:.78rem;color:#64748b;margin:0 0 2px}
 .bc-status-strip dd{margin:0;font-weight:600;font-size:.95rem}
-.bc-storage{display:flex;flex-direction:column;gap:12px}
+.bc-storage{display:flex;flex-direction:column;gap:18px}
 .bc-storage-root{margin-bottom:0}
-.bc-storage-root-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
-.bc-storage-root-title{margin:0;font-size:.95rem;font-weight:600;display:flex;align-items:center;gap:6px}
-.bc-storage-path{margin:0;font-family:ui-monospace,Consolas,monospace;font-size:.82rem;line-height:1.55;color:#334155;word-break:break-all;overflow-wrap:anywhere;max-width:100%}
+.bc-storage-root-title{margin:0 0 10px;font-size:.95rem;font-weight:600;display:flex;align-items:center;gap:6px}
+.bc-storage-path-row{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px}
+.bc-storage-path{margin:0;font-family:ui-monospace,Consolas,monospace;font-size:.82rem;line-height:1.55;color:#334155;word-break:break-all;overflow-wrap:anywhere;max-width:100%;flex:1 1 200px;min-width:0}
 .bc-storage-path--ellipsis{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all}
+.bc-storage-copy{flex:0 0 auto;white-space:nowrap;align-self:center}
 .bc-storage-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
-.bc-kpi-card .bc-val{font-size:1.15rem;font-weight:700;word-break:break-word}
+.bc-kpi-card{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:96px}
+.bc-kpi-card h4{margin:0 0 8px;width:100%;text-align:center;font-size:.95rem}
+.bc-kpi-card .bc-val{font-size:1.15rem;font-weight:700;word-break:break-word;display:flex;align-items:center;justify-content:center;flex:1;width:100%;text-align:center;direction:ltr;unicode-bidi:isolate}
 @media (max-width:1024px){.bc-storage-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:768px){.bc-grid{grid-template-columns:1fr}.bc-storage-kpis{grid-template-columns:1fr}}
 </style>
@@ -172,11 +175,11 @@ $apiBase = storefront_public_path('/admin/api/backup');
     <h3>التخزين والاحتفاظ</h3>
     <div class="bc-storage" id="bc_storage">
         <div class="bc-card bc-storage-root">
-            <div class="bc-storage-root-head">
-                <h4 class="bc-storage-root-title">📁 Backup Root</h4>
+            <h4 class="bc-storage-root-title">📁 Backup Root</h4>
+            <div class="bc-storage-path-row">
+                <p id="bc_storage_path" class="bc-storage-path" title="">—</p>
                 <button type="button" class="btn-link bc-storage-copy" id="bc_storage_copy_btn" hidden>نسخ المسار</button>
             </div>
-            <p id="bc_storage_path" class="bc-storage-path" title="">—</p>
         </div>
         <div class="bc-storage-kpis" id="bc_storage_kpis">
             <div class="bc-card bc-kpi-card"><h4>Snapshots</h4><div class="bc-val">—</div></div>
@@ -378,7 +381,7 @@ $apiBase = storefront_public_path('/admin/api/backup');
             ['Retention', retentionLabel]
         ];
         el('bc_storage_kpis').innerHTML = kpis.map(([t, v]) =>
-            '<div class="bc-card bc-kpi-card"><h4>' + t + '</h4><div class="bc-val">' + v + '</div></div>'
+            '<div class="bc-card bc-kpi-card"><h4>' + t + '</h4><div class="bc-val" dir="ltr">' + v + '</div></div>'
         ).join('');
         const sched = ov.scheduled_tasks || [];
         el('bc_schedule_table').querySelector('tbody').innerHTML = sched.map((row) =>
