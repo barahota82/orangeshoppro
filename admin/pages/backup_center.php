@@ -49,7 +49,16 @@ $apiBase = storefront_public_path('/admin/api/backup');
 .bc-status-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}
 .bc-status-strip dt{font-size:.78rem;color:#64748b;margin:0 0 2px}
 .bc-status-strip dd{margin:0;font-weight:600;font-size:.95rem}
-@media (max-width:768px){.bc-grid{grid-template-columns:1fr}}
+.bc-storage{display:flex;flex-direction:column;gap:12px}
+.bc-storage-root{margin-bottom:0}
+.bc-storage-root-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.bc-storage-root-title{margin:0;font-size:.95rem;font-weight:600;display:flex;align-items:center;gap:6px}
+.bc-storage-path{margin:0;font-family:ui-monospace,Consolas,monospace;font-size:.82rem;line-height:1.55;color:#334155;word-break:break-all;overflow-wrap:anywhere;max-width:100%}
+.bc-storage-path--ellipsis{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all}
+.bc-storage-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.bc-kpi-card .bc-val{font-size:1.15rem;font-weight:700;word-break:break-word}
+@media (max-width:1024px){.bc-storage-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:768px){.bc-grid{grid-template-columns:1fr}.bc-storage-kpis{grid-template-columns:1fr}}
 </style>
 
 <div class="page-title">
@@ -161,7 +170,18 @@ $apiBase = storefront_public_path('/admin/api/backup');
 
 <div class="bc-section card">
     <h3>التخزين والاحتفاظ</h3>
-    <div id="bc_storage" class="bc-grid"></div>
+    <div class="bc-storage" id="bc_storage">
+        <div class="bc-card bc-storage-root">
+            <div class="bc-storage-root-head">
+                <h4 class="bc-storage-root-title">📁 Backup Root</h4>
+                <button type="button" class="btn-link bc-storage-copy" id="bc_storage_copy_btn" hidden>نسخ المسار</button>
+            </div>
+            <p id="bc_storage_path" class="bc-storage-path" title="">—</p>
+        </div>
+        <div class="bc-storage-kpis" id="bc_storage_kpis">
+            <div class="bc-card bc-kpi-card"><h4>Snapshots</h4><div class="bc-val">—</div></div>
+        </div>
+    </div>
 </div>
 
 <div class="bc-section card">
@@ -335,14 +355,31 @@ $apiBase = storefront_public_path('/admin/api/backup');
             '<div><dt>آخر Country Batch</dt><dd>' + (countryBatch.generated_at || '—') + '</dd></div>' +
             '<div><dt>حزم مسجّلة</dt><dd>' + countryCount + '</dd></div>';
         const st = ov.storage || {};
-        el('bc_storage').innerHTML = [
-            ['Backup Root', ov.backup_root || '—'],
+        const rootPath = ov.backup_root || '—';
+        const pathEl = el('bc_storage_path');
+        const copyBtn = el('bc_storage_copy_btn');
+        if (pathEl) {
+            pathEl.textContent = rootPath;
+            pathEl.title = rootPath !== '—' ? rootPath : '';
+            pathEl.classList.toggle('bc-storage-path--ellipsis', rootPath.length > 96);
+        }
+        if (copyBtn) {
+            copyBtn.hidden = !rootPath || rootPath === '—';
+        }
+        const retentionRaw = ov.retention_days;
+        const retentionLabel = retentionRaw !== undefined && retentionRaw !== null && retentionRaw !== ''
+            ? String(retentionRaw) + ' يوم'
+            : '—';
+        const kpis = [
             ['Snapshots', st.snapshots_human || '—'],
             ['Country Packages', st.country_packages_human || '—'],
             ['Logs', st.logs_human || '—'],
             ['Total', st.total_human || '—'],
-            ['Retention days', String(ov.retention_days ?? '—')]
-        ].map(([t, v]) => '<div class="bc-card"><h4>' + t + '</h4><div class="bc-val">' + v + '</div></div>').join('');
+            ['Retention', retentionLabel]
+        ];
+        el('bc_storage_kpis').innerHTML = kpis.map(([t, v]) =>
+            '<div class="bc-card bc-kpi-card"><h4>' + t + '</h4><div class="bc-val">' + v + '</div></div>'
+        ).join('');
         const sched = ov.scheduled_tasks || [];
         el('bc_schedule_table').querySelector('tbody').innerHTML = sched.map((row) =>
             '<tr><td>' + row.task + '</td><td>' + row.schedule + '</td><td><code>' + row.script + '</code></td></tr>'
@@ -421,6 +458,36 @@ $apiBase = storefront_public_path('/admin/api/backup');
 
     el('bc_refresh_btn').addEventListener('click', loadAll);
 
+
+    const storageCopyBtn = el('bc_storage_copy_btn');
+    if (storageCopyBtn) {
+        storageCopyBtn.addEventListener('click', async () => {
+            const path = el('bc_storage_path')?.textContent?.trim() || '';
+            if (!path || path === '—') {
+                return;
+            }
+            const prevLabel = storageCopyBtn.textContent;
+            try {
+                if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(path);
+                } else {
+                    const ta = document.createElement('textarea');
+                    ta.value = path;
+                    ta.setAttribute('readonly', '');
+                    ta.style.position = 'absolute';
+                    ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                }
+                storageCopyBtn.textContent = 'تم النسخ';
+                setTimeout(() => { storageCopyBtn.textContent = prevLabel; }, 2000);
+            } catch (e) {
+                showAlert('تعذر نسخ المسار.', false);
+            }
+        });
+    }
     if (CAN_RUN) {
         el('bc_run_full_btn').addEventListener('click', () => confirmAction(
             'تشغيل Full Disaster Backup',
