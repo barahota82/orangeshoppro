@@ -22,7 +22,6 @@ const ORANGE_BACKUP_ADMIN_VIEWABLE_FILES = [
     'recovery_validation.json',
     'dependency_graph.json',
     'table_inventory.json',
-    'checksums.sha256',
 ];
 
 /** @var list<string> */
@@ -212,6 +211,39 @@ function orange_backup_admin_redact_secrets(array $data): array
     }
 
     return $out;
+}
+
+function orange_backup_admin_redact_text(string $text): string
+{
+    if ($text === '') {
+        return '';
+    }
+    $patterns = [
+        '/(?i)(db_pass|db_user|db_name|db_host|password|passwd|secret|token|api_key|credential|auth)\s*[=:]\s*\S+/u',
+        '/(?i)(DB_PASS|DB_USER|DB_NAME|DB_HOST)\s*=\s*\S+/u',
+        '/(?i)\.env\.php[^\s]*/u',
+    ];
+    foreach ($patterns as $pattern) {
+        $replaced = preg_replace($pattern, '$1=[REDACTED]', $text);
+        if (is_string($replaced)) {
+            $text = $replaced;
+        }
+    }
+
+    return $text;
+}
+
+function orange_backup_admin_sanitize_cli_excerpt(string $text, int $maxLen = 2000): string
+{
+    $text = orange_backup_admin_redact_text(trim($text));
+    if ($text === '') {
+        return '';
+    }
+    if (mb_strlen($text) > $maxLen) {
+        return mb_substr($text, 0, $maxLen);
+    }
+
+    return $text;
 }
 
 /**
@@ -740,6 +772,7 @@ function orange_backup_admin_audit(
     bool $ok,
     string $errorSummary = ''
 ): void {
+    $errorSummary = orange_backup_admin_sanitize_cli_excerpt($errorSummary, 500);
     $message = sprintf(
         'backup_admin %s type=%s id=%s started=%s finished=%s result=%s%s',
         $action,

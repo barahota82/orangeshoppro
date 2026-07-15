@@ -741,7 +741,22 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 
 ### Page
 
-- `admin/index.php?page=backup_center` → `admin/pages/backup_center.php`
+- `admin/index.php?page=backup_center` → `admin/pages/backup_center.php` (**single screen** — no separate Full/Country admin pages)
+- **Menu:** الإعدادات → الأسواق (مشرف عام) → **إدارة النسخ الاحتياطي** (immediately below **المستخدمون والصلاحيات**); mirrored in `admin/partials/header.php` (`$navSettings`) and `includes/admin_nav_tree.php`
+- **Nav safety:** `orange_admin_nav_visible()` / `orange_admin_caps_for_page()` for `backup_center` use lightweight matrix checks (`orange_admin_may_backup_*`) — **never** `require_once includes/backup/backup_admin.php` during header/nav rendering. Engine loads only from `admin/pages/backup_center.php` and `admin/api/backup/_bootstrap.php`.
+
+**Layout (one page, shared sections not duplicated):**
+
+| Section | Scope |
+|---------|--------|
+| نظرة عامة | Shared |
+| Tab **النسخ الاحتياطي الشامل** | Latest Full status, Run Full Backup, snapshots, verify, DRV, manifest/health/recovery report view |
+| Tab **نسخ الدول** | Dynamic country discovery, Run All Recoverable Countries, latest package per country, verify, DRV, manifest/health/dependency graph/inventory view |
+| حالة المهام المجدولة | Shared (read-only) |
+| التخزين والاحتفاظ | Shared |
+| السجلات | Shared (read-only) |
+
+UI may hide tabs/actions by permission; every API enforces `backup_view` / `backup_run` / `backup_verify` independently.
 
 ### Permissions (server-side enforced on every API)
 
@@ -766,6 +781,10 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 
 Package paths are **never** accepted from the client — only server-discovered allowlisted `package_id` + optional `country_code`.
 
+**View allowlist (Phase 3A admin file view):** `manifest.json`, `health.json`, `recovery_validation.json`, `dependency_graph.json`, `table_inventory.json` only — not SQL dumps, ZIPs, checksum files, or `.env.php`.
+
+**Redaction (Phase 3A):** JSON keys matching secret fragments are stripped; log tails and CLI excerpts pass through `orange_backup_admin_redact_text()` before API/audit output. Log tail accepts only filenames discovered under `BackupRoot/logs/`.
+
 ### Scheduled Tasks section
 
 Read-only display of expected Plesk schedules (Full daily 03:00 UTC, Country batch after Full, retention days). Orange does **not** edit Plesk Scheduled Tasks.
@@ -783,6 +802,7 @@ Read-only display of expected Plesk schedules (Full daily 03:00 UTC, Country bat
 
 ```powershell
 php D:\orange\scripts\backup\self_test_backup_admin.php
+php D:\orange\scripts\backup\self_test_backup_admin_nav.php
 ```
 
 ---

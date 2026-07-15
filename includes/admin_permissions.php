@@ -480,15 +480,13 @@ function orange_admin_caps_for_page(array $admin, PDO $pdo, string $page): array
         return orange_admin_can_manage_countries($admin) ? orange_admin_full_caps() : orange_admin_empty_caps();
     }
     if ($page === 'backup_center') {
-        require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_admin.php';
-
         return [
-            'can_view' => orange_backup_admin_may_view($admin, $pdo),
-            'can_edit' => orange_backup_admin_may_run($admin, $pdo),
+            'can_view' => orange_admin_may_backup_view($admin, $pdo),
+            'can_edit' => orange_admin_may_backup_run($admin, $pdo),
             'can_delete' => false,
             'can_lock' => false,
             'can_unlock' => false,
-            'can_print' => orange_backup_admin_may_view($admin, $pdo),
+            'can_print' => orange_admin_may_backup_view($admin, $pdo),
             'can_export' => false,
         ];
     }
@@ -928,8 +926,7 @@ function orange_admin_enforce_api(array $admin, PDO $pdo): void
 {
     $path = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_FILENAME'] ?? ''));
     if (str_contains($path, '/admin/api/backup/')) {
-        require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_admin.php';
-        if (!orange_backup_admin_may_view($admin, $pdo)) {
+        if (!orange_admin_may_backup_view($admin, $pdo)) {
             json_response(['success' => false, 'message' => 'لا تملك صلاحية مركز النسخ الاحتياطي'], 403);
         }
 
@@ -989,11 +986,42 @@ function orange_admin_nav_visible(array $admin, PDO $pdo, string $page): bool
         return orange_admin_has_full_access($admin);
     }
     if ($page === 'backup_center') {
-        require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_admin.php';
-
-        return orange_backup_admin_may_view($admin, $pdo);
+        return orange_admin_may_backup_view($admin, $pdo);
     }
     return orange_admin_may_page($admin, $pdo, $page, 'view');
+}
+
+function orange_admin_may_backup_view(array $admin, PDO $pdo): bool
+{
+    if (orange_admin_is_superuser($admin)) {
+        return true;
+    }
+    $matrix = orange_admin_permissions_matrix($pdo, (int) ($admin['id'] ?? 0));
+    $row = $matrix['backup_view'] ?? null;
+
+    return is_array($row) && !empty($row['can_view']);
+}
+
+function orange_admin_may_backup_run(array $admin, PDO $pdo): bool
+{
+    if (orange_admin_is_superuser($admin)) {
+        return true;
+    }
+    $matrix = orange_admin_permissions_matrix($pdo, (int) ($admin['id'] ?? 0));
+    $row = $matrix['backup_run'] ?? null;
+
+    return is_array($row) && !empty($row['can_edit']);
+}
+
+function orange_admin_may_backup_verify(array $admin, PDO $pdo): bool
+{
+    if (orange_admin_is_superuser($admin)) {
+        return true;
+    }
+    $matrix = orange_admin_permissions_matrix($pdo, (int) ($admin['id'] ?? 0));
+    $row = $matrix['backup_verify'] ?? null;
+
+    return is_array($row) && !empty($row['can_edit']);
 }
 
 /** @return list<string> */
