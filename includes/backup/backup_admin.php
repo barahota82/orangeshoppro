@@ -838,6 +838,86 @@ function orange_backup_admin_scheduled_tasks_readonly(int $retentionDays): array
 }
 
 /**
+ * Classify unexpected stdout captured during Admin API full backup runs.
+ *
+ * @return array{type:'none'|'runner_log'|'php_error',operator_message:?string}
+ */
+function orange_backup_admin_classify_captured_stdout(string $captured): array
+{
+    $captured = trim($captured);
+    if ($captured === '') {
+        return ['type' => 'none', 'operator_message' => null];
+    }
+
+    if (preg_match('/\b(?:Fatal error|Parse error|Warning|Notice|Deprecated):\s/iu', $captured)) {
+        return [
+            'type' => 'php_error',
+            'operator_message' => 'تعذر تنفيذ النسخ الاحتياطي بسبب خطأ من بيئة PHP. راجع سجل الخادم.',
+        ];
+    }
+
+    $lines = preg_split('/\R/u', $captured) ?: [];
+    $nonEmpty = 0;
+    foreach ($lines as $line) {
+        $line = trim((string) $line);
+        if ($line === '') {
+            continue;
+        }
+        $nonEmpty++;
+        if (!preg_match('/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] \[[A-Z]+\] /', $line)) {
+            return [
+                'type' => 'php_error',
+                'operator_message' => 'تعذر تنفيذ النسخ الاحتياطي بسبب مخرجات غير متوقعة من الخادم. راجع سجل الخادم.',
+            ];
+        }
+    }
+
+    if ($nonEmpty === 0) {
+        return ['type' => 'none', 'operator_message' => null];
+    }
+
+    return ['type' => 'runner_log', 'operator_message' => null];
+}
+
+/**
+ * Admin API boundary for manual Full Backup — suppress runner console echo; preserve log files.
+ *
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function orange_backup_admin_run_full_for_api(string $projectRoot, array $options = []): array
+{
+    ob_start();
+    try {
+        $result = orange_backup_admin_run_full($projectRoot, $options);
+    } catch (Throwable $e) {
+        $captured = ob_get_clean();
+        if ($captured !== '') {
+            $classification = orange_backup_admin_classify_captured_stdout($captured);
+            if ($classification['type'] === 'php_error') {
+                error_log('[orange backup admin] run_full php output: ' . $captured);
+            } else {
+                error_log('[orange backup admin] run_full suppressed runner stdout (' . strlen($captured) . ' bytes) during failure');
+            }
+        }
+        throw $e;
+    }
+
+    $captured = ob_get_clean();
+    if ($captured !== '') {
+        $classification = orange_backup_admin_classify_captured_stdout($captured);
+        if ($classification['type'] === 'php_error') {
+            error_log('[orange backup admin] run_full php output: ' . $captured);
+            throw new RuntimeException((string) ($classification['operator_message'] ?? 'تعذر تنفيذ النسخ الاحتياطي.'));
+        }
+
+        error_log('[orange backup admin] run_full suppressed runner stdout (' . strlen($captured) . ' bytes)');
+    }
+
+    return $result;
+}
+
+/**
  * @param array<string, mixed> $options
  * @return array<string, mixed>
  */

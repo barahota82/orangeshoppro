@@ -337,9 +337,22 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
         applyActionAvailability();
     };
 
+    async function parseApiJsonResponse(r) {
+        const raw = await r.text();
+        try {
+            return JSON.parse(raw);
+        } catch (e) {
+            const snippet = raw.replace(/\s+/g, ' ').trim().slice(0, 120);
+            throw new Error(
+                'Server response was not valid JSON'
+                + (snippet ? ' (' + snippet + ')' : '')
+                + '. Refresh the page to check backup status.'
+            );
+        }
+    }
     async function apiGet(path) {
         const r = await fetch(API_BASE + '/' + path, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
-        const j = await r.json();
+        const j = await parseApiJsonResponse(r);
         if (!j.success && r.status >= 400) throw new Error(j.message || 'Request failed');
         return j;
     }
@@ -350,7 +363,7 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify(Object.assign({ csrf_token: CSRF }, body || {}))
         });
-        const j = await r.json();
+        const j = await parseApiJsonResponse(r);
         if (!j.success) throw new Error(j.message || 'Request failed');
         return j;
     }

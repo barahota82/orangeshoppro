@@ -30,7 +30,7 @@ try {
         json_response(['success' => false, 'message' => $blockMessage], 422);
     }
 
-    $result = orange_backup_admin_run_full($projectRoot);
+    $result = orange_backup_admin_run_full_for_api($projectRoot);
     $finishedAt = (string) ($result['finished_at'] ?? gmdate('c'));
     $ok = (bool) ($result['ok'] ?? false);
 

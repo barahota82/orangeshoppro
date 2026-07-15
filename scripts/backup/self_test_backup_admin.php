@@ -197,6 +197,44 @@ $resultFull = orange_backup_admin_run_full($projectRoot, [
 ]);
 backup_admin_self_test($delegatedFull && ($resultFull['ok'] ?? false) === true, 'engine: full backup delegates via override');
 
+$tempRunnerLog = $backupRoot . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATOR . 'selftest_runner.log';
+@mkdir(dirname($tempRunnerLog), 0775, true);
+$outerStdout = '';
+ob_start();
+try {
+    $apiFullResult = orange_backup_admin_run_full_for_api($projectRoot, [
+        'run_full_override' => static function () use ($tempRunnerLog): array {
+            orange_backup_runner_log($tempRunnerLog, 'Self-test progress line one');
+            orange_backup_runner_log($tempRunnerLog, 'Self-test progress line two');
+
+            return [
+                'ok' => true,
+                'backend' => 'test',
+                'snapshot' => '2026-07-15_120000',
+                'message' => 'ok',
+                'exit_code' => 0,
+                'log_file' => $tempRunnerLog,
+            ];
+        },
+    ]);
+} finally {
+    $outerStdout = ob_get_clean();
+}
+backup_admin_self_test($outerStdout === '', 'api: run_full_for_api suppresses runner stdout');
+backup_admin_self_test(is_file($tempRunnerLog) && str_contains((string) file_get_contents($tempRunnerLog), 'Self-test progress line one'), 'api: run_full_for_api preserves runner log file output');
+$apiJsonBody = json_encode([
+    'success' => true,
+    'message' => 'ok',
+    'result' => orange_backup_admin_redact_secrets($apiFullResult),
+], JSON_THROW_ON_ERROR);
+$decodedApiBody = json_decode($apiJsonBody, true);
+backup_admin_self_test(is_array($decodedApiBody) && ($decodedApiBody['success'] ?? false) === true, 'api: run_full_for_api payload is valid JSON');
+$runnerOnly = orange_backup_admin_classify_captured_stdout("[2026-07-16 00:00:00] [INFO] Orange full backup started.\n");
+backup_admin_self_test(($runnerOnly['type'] ?? '') === 'runner_log', 'api: runner log stdout classified as runner_log');
+$phpOnly = orange_backup_admin_classify_captured_stdout("Warning: something bad in /path/file.php on line 1\n");
+backup_admin_self_test(($phpOnly['type'] ?? '') === 'php_error', 'api: php warning stdout classified as php_error');
+@unlink($tempRunnerLog);
+
 $delegatedBatch = false;
 $resultBatch = orange_backup_admin_run_country_batch($projectRoot, [
     'batch_override' => static function () use (&$delegatedBatch): array {
@@ -354,7 +392,7 @@ backup_admin_self_test(str_contains($recoveryApi, 'manual_actions_block_message'
 backup_admin_self_test(str_contains($recoveryApi, 'context_for_mutation'), 'api: recovery-check.php uses mutation context after writable check');
 
 $runFullApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'run-full.php');
-backup_admin_self_test(str_contains($runFullApi, 'manual_actions_block_message') && str_contains($runFullApi, 'orange_backup_admin_run_full'), 'api: run-full.php blocks then delegates only when writable');
+backup_admin_self_test(str_contains($runFullApi, 'manual_actions_block_message') && str_contains($runFullApi, 'orange_backup_admin_run_full_for_api'), 'api: run-full.php blocks then delegates via run_full_for_api when writable');
 
 $runCountriesApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'run-countries.php');
 backup_admin_self_test(str_contains($runCountriesApi, 'manual_actions_block_message') && str_contains($runCountriesApi, 'orange_backup_admin_run_country_batch'), 'api: run-countries.php blocks then delegates only when writable');
