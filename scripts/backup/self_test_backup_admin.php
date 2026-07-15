@@ -229,6 +229,18 @@ $apiJsonBody = json_encode([
 ], JSON_THROW_ON_ERROR);
 $decodedApiBody = json_decode($apiJsonBody, true);
 backup_admin_self_test(is_array($decodedApiBody) && ($decodedApiBody['success'] ?? false) === true, 'api: run_full_for_api payload is valid JSON');
+$cliStdoutSample = "[2026-07-16 00:00:00] [INFO] Orange full backup started.\n"
+    . '{"ok":true,"backend":"php_pdo","snapshot":"2026-07-16_120000","log_file":"x.log","message":"ok"}' . "\n";
+$cliParsed = orange_backup_admin_parse_run_full_cli_stdout($cliStdoutSample, 0);
+backup_admin_self_test(($cliParsed['ok'] ?? false) === true && ($cliParsed['snapshot'] ?? '') === '2026-07-16_120000', 'api: parse run_full CLI stdout after runner logs');
+$adminSrc = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_admin.php');
+backup_admin_self_test(str_contains($adminSrc, 'run_full_backup.php') && str_contains($adminSrc, 'orange_backup_run_command_capture'), 'api: run_full_for_api delegates via CLI capture');
+$bootstrapSrc = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . '_bootstrap.php');
+backup_admin_self_test(str_contains($bootstrapSrc, 'backup_admin_api_begin_json_only') && str_contains($bootstrapSrc, 'backup_admin_api_json_shutdown_guard'), 'api: backup bootstrap enforces json-only guard');
+backup_admin_self_test(str_contains($bootstrapSrc, 'application/json'), 'api: backup bootstrap sets json content type early');
+$configSrc = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'config.php');
+backup_admin_self_test(str_contains($configSrc, 'ORANGE_JSON_RESPONSE_EMITTED'), 'api: json_response marks emitted json and clears buffers');
+backup_admin_self_test(str_contains($configSrc, "json_response(['success' => false, 'message' => 'غير مصرح'], 401)"), 'api: unauthenticated admin api returns json 401');
 $runnerOnly = orange_backup_admin_classify_captured_stdout("[2026-07-16 00:00:00] [INFO] Orange full backup started.\n");
 backup_admin_self_test(($runnerOnly['type'] ?? '') === 'runner_log', 'api: runner log stdout classified as runner_log');
 $phpOnly = orange_backup_admin_classify_captured_stdout("Warning: something bad in /path/file.php on line 1\n");
@@ -273,6 +285,8 @@ backup_admin_self_test(!str_contains($redactedText, 'supersecret') && !str_conta
 backup_admin_self_test(!in_array('checksums.sha256', ORANGE_BACKUP_ADMIN_VIEWABLE_FILES, true), 'security: checksums file not in view allowlist');
 
 $pageSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'backup_center.php');
+backup_admin_self_test(str_contains($pageSource, 'parseApiJsonResponse') && str_contains($pageSource, 'text/html'), 'ui: api client detects html responses before json parse');
+backup_admin_self_test(str_contains($pageSource, '\\u0627\\u0633\\u062a\\u062c\\u0627\\u0628'), 'ui: sanitized arabic message for non-json responses');
 backup_admin_self_test(!str_contains($pageSource, 'restore_run_full') && !str_contains($pageSource, 'rollback'), 'scope: no restore UI actions in backup_center page');
 backup_admin_self_test(!str_contains($pageSource, 'delete'), 'scope: no delete action in backup_center page');
 
@@ -393,6 +407,7 @@ backup_admin_self_test(str_contains($recoveryApi, 'context_for_mutation'), 'api:
 
 $runFullApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'run-full.php');
 backup_admin_self_test(str_contains($runFullApi, 'manual_actions_block_message') && str_contains($runFullApi, 'orange_backup_admin_run_full_for_api'), 'api: run-full.php blocks then delegates via run_full_for_api when writable');
+backup_admin_self_test(!str_contains($runFullApi, 'partials/header') && !str_contains($runFullApi, 'admin/index.php'), 'api: run-full.php does not include admin layout');
 
 $runCountriesApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'run-countries.php');
 backup_admin_self_test(str_contains($runCountriesApi, 'manual_actions_block_message') && str_contains($runCountriesApi, 'orange_backup_admin_run_country_batch'), 'api: run-countries.php blocks then delegates only when writable');

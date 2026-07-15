@@ -339,15 +339,15 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
 
     async function parseApiJsonResponse(r) {
         const raw = await r.text();
+        const ct = (r.headers.get('Content-Type') || '').toLowerCase();
+        const looksHtml = ct.includes('text/html') || /^\s*</.test(raw);
+        if (looksHtml) {
+            throw new Error('\u0627\u0633\u062a\u062c\u0627\u0628 \u0627\u0644\u062e\u0627\u062f\u0645 \u0628\u0635\u064a\u063a\u0629 \u063a\u064a\u0631 \u0645\u062a\u0648\u0642\u0639\u0629. \u0631\u0627\u062c\u0639 \u0633\u062c\u0644 \u0627\u0644\u0623\u062e\u0637\u0627\u0621.');
+        }
         try {
             return JSON.parse(raw);
         } catch (e) {
-            const snippet = raw.replace(/\s+/g, ' ').trim().slice(0, 120);
-            throw new Error(
-                'Server response was not valid JSON'
-                + (snippet ? ' (' + snippet + ')' : '')
-                + '. Refresh the page to check backup status.'
-            );
+            throw new Error('\u0627\u0633\u062a\u062c\u0627\u0628 \u0627\u0644\u062e\u0627\u062f\u0645 \u0628\u0635\u064a\u063a\u0629 \u063a\u064a\u0631 \u0645\u062a\u0648\u0642\u0639\u0629. \u0631\u0627\u062c\u0639 \u0633\u062c\u0644 \u0627\u0644\u0623\u062e\u0637\u0627\u0621.');
         }
     }
     async function apiGet(path) {

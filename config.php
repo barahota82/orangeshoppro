@@ -2944,6 +2944,12 @@ function orange_fatal_shutdown_handler(): void
 }
 
 function json_response($data, int $httpCode = 200): void {
+    if (!defined('ORANGE_JSON_RESPONSE_EMITTED')) {
+        define('ORANGE_JSON_RESPONSE_EMITTED', true);
+    }
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
     http_response_code($httpCode);
     header('Content-Type: application/json; charset=utf-8');
     $flags = JSON_UNESCAPED_UNICODE;

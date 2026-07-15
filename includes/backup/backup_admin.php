@@ -880,41 +880,126 @@ function orange_backup_admin_classify_captured_stdout(string $captured): array
 }
 
 /**
- * Admin API boundary for manual Full Backup — suppress runner console echo; preserve log files.
+ * Parse JSON result line from scripts/backup/run_full_backup.php stdout.
+ *
+ * @return array<string, mixed>
+ */
+function orange_backup_admin_parse_run_full_cli_stdout(string $stdout, int $exitCode, string $stderr = ''): array
+{
+    $decoded = null;
+    $stdout = trim($stdout);
+    if ($stdout !== '') {
+        foreach (array_reverse(preg_split('/\R/u', $stdout) ?: []) as $line) {
+            $line = trim((string) $line);
+            if ($line === '' || $line[0] !== '{') {
+                continue;
+            }
+            try {
+                $candidate = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
+                if (is_array($candidate)) {
+                    $decoded = $candidate;
+                    break;
+                }
+            } catch (Throwable) {
+                continue;
+            }
+        }
+    }
+
+    if (!is_array($decoded)) {
+        $message = 'Full backup CLI did not return a valid JSON result.';
+        $stderr = trim($stderr);
+        if ($stderr !== '') {
+            $message .= ' ' . orange_backup_admin_sanitize_cli_excerpt($stderr, 240);
+        }
+
+        return [
+            'ok' => false,
+            'exit_code' => $exitCode !== 0 ? $exitCode : 1,
+            'backend' => null,
+            'message' => $message,
+            'snapshot' => null,
+            'log_file' => null,
+            'stdout_excerpt' => orange_backup_admin_sanitize_cli_excerpt($stdout, 2000),
+        ];
+    }
+
+    $ok = (bool) ($decoded['ok'] ?? false) && $exitCode === 0;
+
+    return [
+        'ok' => $ok,
+        'exit_code' => $exitCode,
+        'backend' => $decoded['backend'] ?? null,
+        'message' => (string) ($decoded['message'] ?? ($ok ? 'Full backup completed.' : 'Full backup failed.')),
+        'snapshot' => $decoded['snapshot'] ?? null,
+        'log_file' => $decoded['log_file'] ?? null,
+    ];
+}
+
+function orange_backup_admin_discard_captured_stdout(string $captured): void
+{
+    if ($captured === '') {
+        return;
+    }
+
+    $classification = orange_backup_admin_classify_captured_stdout($captured);
+    if ($classification['type'] === 'php_error') {
+        error_log('[orange backup admin] run_full php output: ' . $captured);
+        throw new RuntimeException((string) ($classification['operator_message'] ?? 'تعذر تنفيذ النسخ الاحتياطي.'));
+    }
+
+    error_log('[orange backup admin] run_full suppressed runner stdout (' . strlen($captured) . ' bytes)');
+}
+
+/**
+ * Admin API boundary for manual Full Backup — run via CLI capture; preserve engine logs on disk.
  *
  * @param array<string, mixed> $options
  * @return array<string, mixed>
  */
 function orange_backup_admin_run_full_for_api(string $projectRoot, array $options = []): array
 {
-    ob_start();
-    try {
-        $result = orange_backup_admin_run_full($projectRoot, $options);
-    } catch (Throwable $e) {
+    $startedAt = gmdate('c');
+
+    if (isset($options['run_full_override']) && is_callable($options['run_full_override'])) {
+        ob_start();
+        try {
+            $result = orange_backup_admin_run_full($projectRoot, $options);
+        } catch (Throwable $e) {
+            $captured = ob_get_clean();
+            if ($captured !== '') {
+                orange_backup_admin_discard_captured_stdout($captured);
+            }
+            throw $e;
+        }
         $captured = ob_get_clean();
         if ($captured !== '') {
-            $classification = orange_backup_admin_classify_captured_stdout($captured);
-            if ($classification['type'] === 'php_error') {
-                error_log('[orange backup admin] run_full php output: ' . $captured);
-            } else {
-                error_log('[orange backup admin] run_full suppressed runner stdout (' . strlen($captured) . ' bytes) during failure');
-            }
-        }
-        throw $e;
-    }
-
-    $captured = ob_get_clean();
-    if ($captured !== '') {
-        $classification = orange_backup_admin_classify_captured_stdout($captured);
-        if ($classification['type'] === 'php_error') {
-            error_log('[orange backup admin] run_full php output: ' . $captured);
-            throw new RuntimeException((string) ($classification['operator_message'] ?? 'تعذر تنفيذ النسخ الاحتياطي.'));
+            orange_backup_admin_discard_captured_stdout($captured);
         }
 
-        error_log('[orange backup admin] run_full suppressed runner stdout (' . strlen($captured) . ' bytes)');
+        return $result;
     }
 
-    return $result;
+    $projectRoot = realpath($projectRoot) ?: $projectRoot;
+    $script = $projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup'
+        . DIRECTORY_SEPARATOR . 'run_full_backup.php';
+    if (!is_file($script)) {
+        throw new RuntimeException('Full backup CLI script not found.');
+    }
+
+    $phpBinary = (defined('PHP_BINARY') && is_string(PHP_BINARY) && PHP_BINARY !== '') ? PHP_BINARY : 'php';
+    $capture = orange_backup_run_command_capture([$phpBinary, $script], 7200);
+    $parsed = orange_backup_admin_parse_run_full_cli_stdout(
+        (string) ($capture['stdout'] ?? ''),
+        (int) ($capture['exit_code'] ?? 1),
+        (string) ($capture['stderr'] ?? '')
+    );
+
+    return array_merge($parsed, [
+        'started_at' => $startedAt,
+        'finished_at' => gmdate('c'),
+        'action' => 'run_full_backup',
+    ]);
 }
 
 /**
