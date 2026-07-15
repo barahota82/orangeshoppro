@@ -38,6 +38,10 @@ $apiBase = storefront_public_path('/admin/api/backup');
 td.bc-actions{margin:0;flex-wrap:nowrap;align-items:center;width:1%;white-space:nowrap;vertical-align:middle}
 td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
 @media (max-width:1024px){td.bc-actions{flex-wrap:wrap;white-space:normal;width:auto}}
+.bc-ts{display:inline-flex;flex-wrap:nowrap;align-items:baseline;gap:.35em;font-family:ui-monospace,Consolas,monospace;font-size:.82rem;line-height:1.45;white-space:nowrap}
+.bc-ts-date,.bc-ts-time{white-space:nowrap}
+.bc-ts-cell{vertical-align:middle;min-width:0}
+@media (max-width:1024px){.bc-ts{flex-wrap:wrap;gap:0;white-space:normal}.bc-ts-date{display:block}.bc-ts-time{display:block;white-space:nowrap}}
 .bc-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:5000}
 .bc-modal{background:#fff;border-radius:12px;max-width:520px;width:92%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
 .bc-modal h3{margin:0 0 10px}
@@ -246,6 +250,19 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
         if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
         return (n / 1073741824).toFixed(2) + ' GB';
     };
+    const fmtTimestampDisplay = (raw) => {
+        const s = String(raw || '').trim();
+        if (!s) return '—';
+        const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        const m = s.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?$/);
+        if (!m) {
+            return '<time class="bc-ts bc-ts--raw" datetime="' + esc(s) + '" title="' + esc(s) + '">' + esc(s) + '</time>';
+        }
+        let offset = m[3] || '';
+        if (offset === 'Z') offset = '+00:00';
+        const timePart = m[2] + (offset ? ' ' + offset : '');
+        return '<time class="bc-ts" datetime="' + esc(s) + '" title="' + esc(s) + '"><span class="bc-ts-date">' + esc(m[1]) + '</span><span class="bc-ts-time">' + esc(timePart) + '</span></time>';
+    };
     const badge = (status) => {
         const s = String(status || '').toLowerCase();
         let cls = 'bc-badge--muted';
@@ -345,9 +362,9 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
         const countryBatch = ov.latest_country_batch || {};
         const countryCount = Array.isArray(o.country_packages) ? o.country_packages.length : 0;
         const cards = [
-            ['آخر Full ناجح', last.generated_at || '—'],
+            ['آخر Full ناجح', fmtTimestampDisplay(last.generated_at)],
             ['حالة Full الأخير', last.package_status || '—'],
-            ['Country Batch الأخير', countryBatch.generated_at || '—'],
+            ['Country Batch الأخير', fmtTimestampDisplay(countryBatch.generated_at)],
             ['دول قابلة للاسترداد', String(ov.recoverable_countries ?? '—')],
             ['BackupRoot', ov.backup_root_status || '—'],
             ['Retention (يوم)', String(ov.retention_days ?? '—')],
@@ -359,13 +376,13 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
             '<div class="bc-card"><h4>' + t + '</h4><div class="bc-val">' + v + '</div></div>'
         ).join('');
         el('bc_latest_full').innerHTML =
-            '<div><dt>آخر Full</dt><dd>' + (latestFull.generated_at || '—') + '</dd></div>' +
+            '<div><dt>آخر Full</dt><dd>' + fmtTimestampDisplay(latestFull.generated_at) + '</dd></div>' +
             '<div><dt>الحالة</dt><dd>' + badge(latestFull.package_status || last.package_status) + '</dd></div>' +
             '<div><dt>Schema</dt><dd>' + (latestFull.schema_revision ?? '—') + '</dd></div>' +
             '<div><dt>DRV Score</dt><dd>' + (latestFull.recovery_score ?? ov.latest_recovery_score ?? 0) + '</dd></div>';
         el('bc_country_discovery').innerHTML =
             '<div><dt>دول قابلة للاسترداد</dt><dd>' + String(ov.recoverable_countries ?? '—') + '</dd></div>' +
-            '<div><dt>آخر Country Batch</dt><dd>' + (countryBatch.generated_at || '—') + '</dd></div>' +
+            '<div><dt>آخر Country Batch</dt><dd>' + (fmtTimestampDisplay(countryBatch.generated_at)) + '</dd></div>' +
             '<div><dt>حزم مسجّلة</dt><dd>' + countryCount + '</dd></div>';
         const st = ov.storage || {};
         const rootPath = ov.backup_root || '—';
@@ -420,13 +437,13 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
         state.full = data.full_snapshots || [];
         state.country = data.country_packages || [];
         el('bc_full_table').querySelector('tbody').innerHTML = state.full.length
-            ? state.full.map((p) => '<tr><td>' + (p.generated_at || '') + '</td><td>' + badge(p.package_status) + '</td><td>' + p.schema_revision + '</td><td>' + (p.backend || '') + '</td><td>' + fmtBytes(p.dump_size_bytes) + '</td><td>' + fmtBytes(p.uploads_size_bytes) + '</td><td>' + (p.recovery_score || 0) + '</td><td class="bc-actions">' + actionButtons(p, 'full_disaster') + '</td></tr>').join('')
+            ? state.full.map((p) => '<tr><td class="bc-ts-cell">' + fmtTimestampDisplay(p.generated_at) + '</td><td>' + badge(p.package_status) + '</td><td>' + p.schema_revision + '</td><td>' + (p.backend || '') + '</td><td>' + fmtBytes(p.dump_size_bytes) + '</td><td>' + fmtBytes(p.uploads_size_bytes) + '</td><td>' + (p.recovery_score || 0) + '</td><td class="bc-actions">' + actionButtons(p, 'full_disaster') + '</td></tr>').join('')
             : '<tr><td colspan="8" class="muted">لا توجد لقطات.</td></tr>';
         el('bc_country_table').querySelector('tbody').innerHTML = state.country.length
             ? state.country.map((p) => '<tr><td>' + (p.country_code || '') + (p.country_name ? ' — ' + p.country_name : '') + '</td><td>' + p.package_id + '</td><td>' + badge(p.package_status) + '</td><td>' + p.schema_revision + '</td><td>' + (p.registry_version || '') + '</td><td>' + (p.recovery_score || 0) + '</td><td class="bc-actions">' + actionButtons(p, 'country_recovery') + '</td></tr>').join('')
             : '<tr><td colspan="7" class="muted">لا توجد حزم دول.</td></tr>';
         el('bc_logs_table').querySelector('tbody').innerHTML = (data.logs || []).map((log) =>
-            '<tr><td><code>' + log.name + '</code></td><td>' + log.category + '</td><td>' + fmtBytes(log.size_bytes) + '</td><td>' + new Date(log.mtime * 1000).toLocaleString() + '</td><td><button type="button" class="btn-link bc-log-tail" data-log="' + log.name + '">عرض</button></td></tr>'
+            '<tr><td><code>' + log.name + '</code></td><td>' + log.category + '</td><td>' + fmtBytes(log.size_bytes) + '</td><td class="bc-ts-cell">' + fmtTimestampDisplay(new Date(log.mtime * 1000).toISOString()) + '</td><td><button type="button" class="btn-link bc-log-tail" data-log="' + log.name + '">عرض</button></td></tr>'
         ).join('');
         applyActionAvailability();
     }
