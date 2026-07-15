@@ -35,6 +35,9 @@ $apiBase = storefront_public_path('/admin/api/backup');
 .bc-root-health dt{font-size:.78rem;color:#64748b;margin:0 0 2px}
 .bc-root-health dd{margin:0;font-weight:600;font-size:.95rem}
 .bc-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+td.bc-actions{margin:0;flex-wrap:nowrap;align-items:center;width:1%;white-space:nowrap;vertical-align:middle}
+td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
+@media (max-width:1024px){td.bc-actions{flex-wrap:wrap;white-space:normal;width:auto}}
 .bc-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:5000}
 .bc-modal{background:#fff;border-radius:12px;max-width:520px;width:92%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
 .bc-modal h3{margin:0 0 10px}
