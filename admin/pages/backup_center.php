@@ -18,6 +18,8 @@ $canRun = orange_backup_admin_may_run($admin, $pdo);
 $canVerify = orange_backup_admin_may_verify($admin, $pdo);
 $csrfToken = orange_backup_admin_csrf_token();
 $apiBase = storefront_public_path('/admin/api/backup');
+
+orange_admin_render_page_title_with_country('إدارة النسخ الاحتياطي', $pdo);
 ?>
 <style>
 .bc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px}
@@ -77,11 +79,6 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
 @media (max-width:1024px){.bc-storage-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:768px){.bc-grid{grid-template-columns:1fr}.bc-storage-kpis{grid-template-columns:1fr}}
 </style>
-
-<div class="page-title">
-    <h1>إدارة النسخ الاحتياطي</h1>
-    <p class="card-hint" style="margin:0.35rem 0 0;">شاشة واحدة — النسخ الشامل ونسخ الدول مع أقسام مشتركة (نظرة عامة، الجدولة، التخزين، السجلات).</p>
-</div>
 
 <div id="bc_progress" class="bc-progress" role="status" aria-live="polite">جاري التنفيذ…</div>
 <div id="bc_alert" class="card" style="display:none;margin-bottom:12px;"></div>
