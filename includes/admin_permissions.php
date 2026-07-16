@@ -1057,10 +1057,10 @@ function orange_admin_restore_permission_keys(): array
 
 function orange_admin_may_backup_restore_full(array $admin, PDO $pdo): bool
 {
-    if (!orange_admin_is_superuser($admin)) {
-        return false;
+    if (orange_admin_is_superuser($admin)) {
+        return true;
     }
-    $matrix = orange_admin_permissions_matrix($pdo, (int) $admin['id']);
+    $matrix = orange_admin_permissions_matrix($pdo, (int) ($admin['id'] ?? 0));
     $row = $matrix['backup_restore_full'] ?? null;
 
     return is_array($row) && !empty($row['can_view']);
@@ -1068,10 +1068,10 @@ function orange_admin_may_backup_restore_full(array $admin, PDO $pdo): bool
 
 function orange_admin_may_backup_restore_country(array $admin, PDO $pdo): bool
 {
-    if (!orange_admin_is_superuser($admin)) {
-        return false;
+    if (orange_admin_is_superuser($admin)) {
+        return true;
     }
-    $matrix = orange_admin_permissions_matrix($pdo, (int) $admin['id']);
+    $matrix = orange_admin_permissions_matrix($pdo, (int) ($admin['id'] ?? 0));
     $row = $matrix['backup_restore_country'] ?? null;
 
     return is_array($row) && !empty($row['can_view']);
