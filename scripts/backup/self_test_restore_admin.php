@@ -127,39 +127,45 @@ function restore_admin_test_traced_is_writable(string $path): bool
     return is_writable($path);
 }
 
-function restore_admin_test_trace_candidate_report(
+function restore_admin_test_candidate_short_label(string $path): string
+{
+    if ($path === '') {
+        return 'EMPTY';
+    }
+    if (restore_admin_test_normalize_path_lexical($path) === 'c:/windows/temp') {
+        return 'Windows/Temp';
+    }
+    $short = str_replace('\\', '/', rtrim($path, '/\\'));
+    if (strlen($short) <= 40) {
+        return $short;
+    }
+    $base = basename($short);
+
+    return $base !== '' ? $base : substr($short, -36);
+}
+
+function restore_admin_test_trace_candidate_compact(
     string $path,
-    bool $allowedByOpenBasedir,
-    string $openBasedirHelper,
-    bool $skippedBeforeFilesystem,
-    string $skipHelper,
+    bool $allowed,
+    bool $dir,
+    bool $baseWritable,
+    bool $outsideProject,
+    bool $mkdir,
+    bool $generatedWritable,
     bool $selected,
-    string $rejectionReason = '',
-    string $generatedFixtureRoot = '',
-    bool $mkdirResult = false,
-    bool $generatedRootWritable = false,
-    bool $outsideProjectRoot = false
+    string $reason
 ): void {
-    $trace = restore_admin_test_fs_trace_snapshot();
-    echo 'Candidate:' . PHP_EOL . $path . PHP_EOL;
-    echo 'AllowedByOpenBaseDir:' . PHP_EOL . ($allowedByOpenBasedir ? 'YES' : 'NO') . PHP_EOL;
-    echo 'OpenBaseDirHelper:' . PHP_EOL . $openBasedirHelper . PHP_EOL;
-    echo 'SkippedBeforeFilesystem:' . PHP_EOL . ($skippedBeforeFilesystem ? 'YES' : 'NO') . PHP_EOL;
-    if ($skippedBeforeFilesystem && $skipHelper !== '') {
-        echo 'SkipHelper:' . PHP_EOL . $skipHelper . PHP_EOL;
-    }
-    echo 'CalledRealpath:' . PHP_EOL . ($trace['calledRealpath'] ? 'YES' : 'NO') . PHP_EOL;
-    echo 'CalledIsDir:' . PHP_EOL . ($trace['calledIsDir'] ? 'YES' : 'NO') . PHP_EOL;
-    echo 'CalledIsWritable:' . PHP_EOL . ($trace['calledIsWritable'] ? 'YES' : 'NO') . PHP_EOL;
-    echo 'OutsideProjectRoot:' . PHP_EOL . ($outsideProjectRoot ? 'YES' : 'NO') . PHP_EOL;
-    echo 'GeneratedFixtureRoot:' . PHP_EOL . ($generatedFixtureRoot !== '' ? $generatedFixtureRoot : '—') . PHP_EOL;
-    echo 'MkdirResult:' . PHP_EOL . ($mkdirResult ? 'YES' : 'NO') . PHP_EOL;
-    echo 'GeneratedRootWritable:' . PHP_EOL . ($generatedRootWritable ? 'YES' : 'NO') . PHP_EOL;
-    if (!$selected && $rejectionReason !== '') {
-        echo 'RejectionReason:' . PHP_EOL . $rejectionReason . PHP_EOL;
-    }
-    echo 'Selected:' . PHP_EOL . ($selected ? 'YES' : 'NO') . PHP_EOL;
-    echo '---' . PHP_EOL;
+    $reasonSafe = str_replace([';', "\r", "\n"], ['_', ' ', ' '], $reason);
+    echo 'TEMP_CANDIDATE=' . restore_admin_test_candidate_short_label($path)
+        . ';ALLOWED=' . ($allowed ? 'Y' : 'N')
+        . ';DIR=' . ($dir ? 'Y' : 'N')
+        . ';BASE_WRITABLE=' . ($baseWritable ? 'Y' : 'N')
+        . ';OUTSIDE_PROJECT=' . ($outsideProject ? 'Y' : 'N')
+        . ';MKDIR=' . ($mkdir ? 'Y' : 'N')
+        . ';GENERATED_WRITABLE=' . ($generatedWritable ? 'Y' : 'N')
+        . ';SELECTED=' . ($selected ? 'Y' : 'N')
+        . ';REASON=' . ($reasonSafe !== '' ? $reasonSafe : 'ok')
+        . PHP_EOL;
 }
 
 function restore_admin_test_normalize_path_lexical(string $path): string
@@ -284,168 +290,72 @@ function restore_admin_test_temp_base_candidates(): array
 
 function restore_admin_test_temp_root(string $projectRoot): string
 {
-    echo 'OpenBaseDirIni:' . PHP_EOL . (string) ini_get('open_basedir') . PHP_EOL;
-    echo 'SysGetTempDirString:' . PHP_EOL . sys_get_temp_dir() . PHP_EOL;
-
     foreach (restore_admin_test_temp_base_candidates() as $baseDir) {
         restore_admin_test_fs_trace_reset();
         $baseDir = rtrim($baseDir, '\\/');
-        $generatedFixtureRoot = '';
+        $dirOk = false;
+        $baseWritable = false;
+        $outsideProjectRoot = false;
         $mkdirResult = false;
         $generatedRootWritable = false;
-        $outsideProjectRoot = false;
 
         if ($baseDir === '') {
-            restore_admin_test_trace_candidate_report(
-                $baseDir,
-                false,
-                'restore_admin_test_path_open_basedir_allowed',
-                true,
-                'restore_admin_test_temp_root',
-                false,
-                'other:empty_candidate'
-            );
+            restore_admin_test_trace_candidate_compact('', false, false, false, false, false, false, false, 'other:empty_candidate');
             continue;
         }
 
         $allowedByOpenBasedir = restore_admin_test_path_open_basedir_allowed($baseDir);
         if (!$allowedByOpenBasedir) {
-            restore_admin_test_trace_candidate_report(
-                $baseDir,
-                false,
-                'restore_admin_test_path_open_basedir_allowed',
-                true,
-                'restore_admin_test_path_open_basedir_allowed',
-                false,
-                'generated_root_not_allowed'
-            );
+            restore_admin_test_trace_candidate_compact($baseDir, false, false, false, false, false, false, false, 'generated_root_not_allowed');
             continue;
         }
 
         $outsideProjectRoot = restore_admin_test_path_outside_project($baseDir, $projectRoot);
         if (!$outsideProjectRoot) {
-            restore_admin_test_trace_candidate_report(
-                $baseDir,
-                true,
-                'restore_admin_test_path_open_basedir_allowed',
-                true,
-                'restore_admin_test_path_outside_project',
-                false,
-                'inside_project_root',
-                '',
-                false,
-                false,
-                false
-            );
+            restore_admin_test_trace_candidate_compact($baseDir, true, false, false, false, false, false, false, 'inside_project_root');
             continue;
         }
 
-        if (
-            !restore_admin_test_traced_is_dir($baseDir)
-            && !mkdir($baseDir, 0775, true)
-            && !restore_admin_test_traced_is_dir($baseDir)
-        ) {
-            restore_admin_test_trace_candidate_report(
-                $baseDir,
-                true,
-                'restore_admin_test_path_open_basedir_allowed',
-                false,
-                'restore_admin_test_temp_root',
-                false,
-                'mkdir_failed',
-                '',
-                false,
-                false,
-                $outsideProjectRoot
-            );
+        $dirOk = restore_admin_test_traced_is_dir($baseDir);
+        if (!$dirOk && !mkdir($baseDir, 0775, true)) {
+            $dirOk = restore_admin_test_traced_is_dir($baseDir);
+        }
+        if (!$dirOk) {
+            restore_admin_test_trace_candidate_compact($baseDir, true, false, false, true, false, false, false, 'mkdir_failed');
             continue;
         }
-        if (!restore_admin_test_path_writable($baseDir)) {
-            restore_admin_test_trace_candidate_report(
-                $baseDir,
-                true,
-                'restore_admin_test_path_open_basedir_allowed',
-                false,
-                'restore_admin_test_path_writable',
-                false,
-                'other:base_dir_not_writable',
-                '',
-                false,
-                false,
-                $outsideProjectRoot
-            );
+
+        $baseWritable = restore_admin_test_path_writable($baseDir);
+        if (!$baseWritable) {
+            restore_admin_test_trace_candidate_compact($baseDir, true, true, false, true, false, false, false, 'other:base_dir_not_writable');
             continue;
         }
 
         $generatedFixtureRoot = $baseDir . DIRECTORY_SEPARATOR . 'orange_restore_admin_' . bin2hex(random_bytes(4));
         $mkdirResult = mkdir($generatedFixtureRoot, 0775, true);
         if (!$mkdirResult && !restore_admin_test_traced_is_dir($generatedFixtureRoot)) {
-            restore_admin_test_trace_candidate_report(
-                $baseDir,
-                true,
-                'restore_admin_test_path_open_basedir_allowed',
-                false,
-                'restore_admin_test_temp_root',
-                false,
-                'mkdir_failed',
-                $generatedFixtureRoot,
-                false,
-                false,
-                $outsideProjectRoot
-            );
+            restore_admin_test_trace_candidate_compact($baseDir, true, true, true, true, false, false, false, 'mkdir_failed');
             continue;
         }
         if (!restore_admin_test_path_open_basedir_allowed($generatedFixtureRoot)) {
-            restore_admin_test_trace_candidate_report(
-                $baseDir,
-                true,
-                'restore_admin_test_path_open_basedir_allowed',
-                false,
-                'restore_admin_test_path_open_basedir_allowed',
-                false,
-                'generated_root_not_allowed',
-                $generatedFixtureRoot,
-                true,
-                false,
-                $outsideProjectRoot
-            );
+            restore_admin_test_trace_candidate_compact($baseDir, true, true, true, true, true, false, false, 'generated_root_not_allowed');
             continue;
         }
+
         $generatedRootWritable = restore_admin_test_generated_root_writable($generatedFixtureRoot);
         if (!$generatedRootWritable) {
-            restore_admin_test_trace_candidate_report(
-                $baseDir,
-                true,
-                'restore_admin_test_path_open_basedir_allowed',
-                false,
-                'restore_admin_test_generated_root_writable',
-                false,
-                'generated_root_not_writable',
-                $generatedFixtureRoot,
-                true,
-                false,
-                $outsideProjectRoot
-            );
+            restore_admin_test_trace_candidate_compact($baseDir, true, true, true, true, true, false, false, 'generated_root_not_writable');
             restore_admin_test_rmtree($generatedFixtureRoot);
             continue;
         }
 
-        restore_admin_test_trace_candidate_report(
-            $baseDir,
-            true,
-            'restore_admin_test_path_open_basedir_allowed',
-            false,
-            '',
-            true,
-            '',
-            $generatedFixtureRoot,
-            true,
-            true,
-            $outsideProjectRoot
-        );
+        restore_admin_test_trace_candidate_compact($baseDir, true, true, true, true, true, true, true, 'ok');
+        echo 'TEMP_SELECTED=' . $generatedFixtureRoot . PHP_EOL;
 
         return $generatedFixtureRoot;
     }
+
+    echo 'TEMP_SELECTED=NONE' . PHP_EOL;
 
     throw new RuntimeException(
         'Cannot resolve writable restore admin self-test temp directory outside ProjectRoot (open_basedir-safe).'
@@ -667,6 +577,6 @@ restore_admin_test_rmtree($tmpRoot);
     echo $failures === 0 ? "All restore admin self-tests passed.\n" : "Restore admin self-tests failed: {$failures}\n";
     exit($failures > 0 ? 1 : 0);
 } catch (Throwable $e) {
-    echo 'THROWABLE: ' . get_class($e) . ' @ ' . basename(str_replace('\\', '/', $e->getFile())) . ':' . $e->getLine() . ' — ' . $e->getMessage() . PHP_EOL;
+    echo 'THROWABLE:' . get_class($e) . '@' . basename(str_replace('\\', '/', $e->getFile())) . ':' . $e->getLine() . ':' . str_replace(["\r", "\n", ';'], ' ', $e->getMessage()) . PHP_EOL;
     exit(1);
 }
