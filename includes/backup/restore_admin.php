@@ -7,6 +7,7 @@ require_once __DIR__ . '/restore/restore_paths.php';
 require_once __DIR__ . '/restore/restore_job.php';
 require_once __DIR__ . '/restore/restore_lock.php';
 require_once __DIR__ . '/restore/restore_merge_maintenance.php';
+require_once __DIR__ . '/restore/restore_validation_adapter.php';
 
 const ORANGE_RESTORE_ADMIN_JOB_ID_PATTERN = '/^[a-zA-Z0-9._-]+$/';
 
@@ -153,38 +154,136 @@ function orange_restore_admin_context(string $projectRoot): array
 }
 
 /**
+ * @return array{drv_result:string,drv_score:?int}
+ */
+function orange_restore_admin_drv_fields_from_package(array $package): array
+{
+    $verification = is_array($package['verification'] ?? null) ? $package['verification'] : null;
+    if ($verification === null) {
+        return ['drv_result' => 'missing', 'drv_score' => null];
+    }
+
+    $overall = strtolower(trim((string) ($verification['overall_result'] ?? '')));
+    $drvResult = match ($overall) {
+        'pass' => 'pass',
+        'fail' => 'fail',
+        'warning' => 'unknown',
+        default => 'unknown',
+    };
+
+    $score = null;
+    if (array_key_exists('recovery_score', $verification) && $verification['recovery_score'] !== null && is_numeric($verification['recovery_score'])) {
+        $score = (int) $verification['recovery_score'];
+    } elseif (array_key_exists('recovery_score', $package) && $package['recovery_score'] !== null && is_numeric($package['recovery_score'])) {
+        $score = (int) $package['recovery_score'];
+    }
+
+    return ['drv_result' => $drvResult, 'drv_score' => $score];
+}
+
+function orange_restore_admin_eligibility_reason_label_ar(string $code): string
+{
+    return match ($code) {
+        'package_not_healthy' => 'الحزمة غير سليمة',
+        'package_type_invalid' => 'نوع الحزمة غير مدعوم للاسترداد',
+        'schema_incompatible' => 'إصدار المخطط غير متوافق',
+        'drv_report_missing' => 'تقرير DRV غير موجود',
+        'drv_score_below_threshold' => 'درجة DRV أقل من الحد المطلوب (70)',
+        'drv_not_pass' => 'فشل التحقق DRV',
+        'drv_result_warning_country' => 'DRV بحالة تحذير — Country يتطلب pass',
+        'export_backend_unsupported' => 'محرك التصدير غير مدعوم للاسترداد',
+        'registry_invalid' => 'سجل الدولة غير صالح',
+        'registry_missing' => 'سجل الدولة غير مسجل في الحزمة',
+        default => 'غير مؤهل للاسترداد',
+    };
+}
+
+/**
+ * Read-only eligibility aligned with orange_restore_validation_adapter_*_package_precheck().
+ *
  * @param array<string, mixed> $package
- * @return array{eligible:bool,label:string,reasons:list<string>}
+ * @return array{
+ *   eligibility_status:string,
+ *   eligibility_reason_code:string,
+ *   eligibility_reason_label_ar:string,
+ *   drv_result:string,
+ *   drv_score:?int,
+ *   reasons:list<string>
+ * }
  */
 function orange_restore_admin_package_eligibility(array $package, string $packageType): array
 {
     $reasons = [];
-    $healthy = !empty($package['healthy']);
-    if (!$healthy) {
+    $drvFields = orange_restore_admin_drv_fields_from_package($package);
+    $verification = is_array($package['verification'] ?? null) ? $package['verification'] : null;
+
+    $declaredType = (string) ($package['package_type'] ?? '');
+    if ($packageType === 'full_disaster' && $declaredType !== 'full_disaster') {
+        $reasons[] = 'package_type_invalid';
+    }
+    if ($packageType === 'country_recovery' && $declaredType !== 'country_recovery') {
+        $reasons[] = 'package_type_invalid';
+    }
+
+    if (empty($package['healthy'])) {
         $reasons[] = 'package_not_healthy';
     }
 
-    $score = (int) ($package['recovery_score'] ?? 0);
+    $schemaRevision = (int) ($package['schema_revision'] ?? 0);
+    if ($schemaRevision !== ORANGE_RECOVERY_VALIDATION_EXPECTED_SCHEMA_REVISION) {
+        $reasons[] = 'schema_incompatible';
+    }
+
+    if ($verification === null) {
+        $reasons[] = 'drv_report_missing';
+    }
+
     if ($packageType === 'full_disaster') {
-        if ($score < 70) {
-            $reasons[] = 'drv_score_below_threshold';
-        }
         $backend = strtolower(trim((string) ($package['backend'] ?? '')));
         if ($backend !== '' && $backend !== 'php_pdo') {
             $reasons[] = 'export_backend_unsupported';
         }
+        if ($verification !== null && ($drvFields['drv_score'] === null || $drvFields['drv_score'] < 70)) {
+            $reasons[] = 'drv_score_below_threshold';
+        }
     } else {
-        $verification = is_array($package['verification'] ?? null) ? $package['verification'] : [];
-        if ((string) ($verification['overall_result'] ?? '') !== 'pass' && $score < 70) {
-            $reasons[] = 'country_drv_not_pass';
+        $registryVersion = trim((string) ($package['registry_version'] ?? ''));
+        if ($registryVersion === '') {
+            $reasons[] = 'registry_missing';
+        } elseif ($registryVersion !== ORANGE_RECOVERY_VALIDATION_EXPECTED_REGISTRY_VERSION) {
+            $reasons[] = 'registry_invalid';
+        }
+        $overall = strtolower(trim((string) ($verification['overall_result'] ?? '')));
+        if ($verification !== null && $overall !== 'pass') {
+            $reasons[] = $overall === 'warning' ? 'drv_result_warning_country' : 'drv_not_pass';
         }
     }
 
-    $eligible = $reasons === [];
+    $reasons = array_values(array_unique($reasons));
+    $primaryReason = $reasons[0] ?? '';
+
+    if ($reasons === []) {
+        return [
+            'eligibility_status' => 'eligible',
+            'eligibility_reason_code' => '',
+            'eligibility_reason_label_ar' => '',
+            'drv_result' => $drvFields['drv_result'],
+            'drv_score' => $drvFields['drv_score'],
+            'reasons' => [],
+        ];
+    }
+
+    $status = 'not_eligible';
+    if ($reasons === ['drv_report_missing']) {
+        $status = 'unknown';
+    }
 
     return [
-        'eligible' => $eligible,
-        'label' => $eligible ? 'eligible' : 'not_eligible',
+        'eligibility_status' => $status,
+        'eligibility_reason_code' => $primaryReason,
+        'eligibility_reason_label_ar' => orange_restore_admin_eligibility_reason_label_ar($primaryReason),
+        'drv_result' => $drvFields['drv_result'],
+        'drv_score' => $drvFields['drv_score'],
         'reasons' => $reasons,
     ];
 }
@@ -198,8 +297,16 @@ function orange_restore_admin_public_package_row(array $package, string $package
     unset($package['package_path']);
     $row = orange_restore_admin_redact_secrets($package);
     $eligibility = orange_restore_admin_package_eligibility($package, $packageType);
-    $row['restore_eligibility'] = $eligibility['label'];
+    $row['eligibility_status'] = $eligibility['eligibility_status'];
+    $row['eligibility_reason_code'] = $eligibility['eligibility_reason_code'];
+    $row['eligibility_reason_label_ar'] = $eligibility['eligibility_reason_label_ar'];
+    $row['drv_result'] = $eligibility['drv_result'];
+    $row['drv_score'] = $eligibility['drv_score'];
+    $row['restore_eligibility'] = $eligibility['eligibility_status'] === 'eligible' ? 'eligible' : ($eligibility['eligibility_status'] === 'unknown' ? 'unknown' : 'not_eligible');
     $row['restore_eligibility_reasons'] = $eligibility['reasons'];
+    if ($row['recovery_score'] === null) {
+        unset($row['recovery_score']);
+    }
 
     return $row;
 }

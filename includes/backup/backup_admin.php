@@ -446,6 +446,20 @@ function orange_backup_admin_read_package_file(string $packagePath, string $file
     if ($resolvedPackage === false || !is_dir($resolvedPackage)) {
         throw new RuntimeException('Package path is invalid.');
     }
+    if ($fileName === ORANGE_RECOVERY_VALIDATION_REPORT_FILE) {
+        $packageId = basename($resolvedPackage);
+        $recovery = orange_backup_admin_read_recovery_validation_report($resolvedPackage, $packageId);
+        if ($recovery === null) {
+            return ['ok' => false, 'data' => null, 'raw_text' => null, 'errors' => ['File not found: ' . $fileName]];
+        }
+
+        return [
+            'ok' => true,
+            'data' => orange_backup_admin_redact_secrets($recovery),
+            'raw_text' => null,
+            'errors' => [],
+        ];
+    }
     $fullPath = $resolvedPackage . DIRECTORY_SEPARATOR . $fileName;
     $resolvedFile = realpath($fullPath);
     if ($resolvedFile === false || !is_file($resolvedFile)) {
@@ -557,6 +571,40 @@ function orange_backup_admin_read_json_if_exists(string $path): ?array
     return is_array($decoded) ? $decoded : null;
 }
 
+function orange_backup_admin_recovery_report_sibling_path(string $packagePath, string $packageId): string
+{
+    return dirname($packagePath) . DIRECTORY_SEPARATOR . $packageId . '.' . ORANGE_RECOVERY_VALIDATION_REPORT_FILE;
+}
+
+/**
+ * DRV reports are written beside the package directory (see orange_recovery_write_report_file).
+ * Fall back to in-package recovery_validation.json for legacy/test fixtures.
+ *
+ * @return array<string, mixed>|null
+ */
+function orange_backup_admin_read_recovery_validation_report(string $packagePath, string $packageId): ?array
+{
+    $sibling = orange_backup_admin_read_json_if_exists(
+        orange_backup_admin_recovery_report_sibling_path($packagePath, $packageId)
+    );
+    if ($sibling !== null) {
+        return $sibling;
+    }
+
+    return orange_backup_admin_read_json_if_exists(
+        $packagePath . DIRECTORY_SEPARATOR . ORANGE_RECOVERY_VALIDATION_REPORT_FILE
+    );
+}
+
+function orange_backup_admin_recovery_score_from_report(?array $recovery): ?int
+{
+    if (!is_array($recovery) || !array_key_exists('recovery_score', $recovery) || !is_numeric($recovery['recovery_score'])) {
+        return null;
+    }
+
+    return (int) $recovery['recovery_score'];
+}
+
 /**
  * @return array<string, mixed>
  */
@@ -564,16 +612,14 @@ function orange_backup_admin_summarize_full_package(string $packagePath, string 
 {
     $manifest = orange_backup_admin_read_json_if_exists($packagePath . DIRECTORY_SEPARATOR . ORANGE_BACKUP_MANIFEST_FILE);
     $health = orange_backup_admin_read_json_if_exists($packagePath . DIRECTORY_SEPARATOR . ORANGE_BACKUP_HEALTH_FILE);
-    $recovery = orange_backup_admin_read_json_if_exists(
-        $packagePath . DIRECTORY_SEPARATOR . ORANGE_RECOVERY_VALIDATION_REPORT_FILE
-    );
+    $recovery = orange_backup_admin_read_recovery_validation_report($packagePath, $packageId);
 
     $packageStatus = (string) ($health['package_status'] ?? $manifest['backup_status'] ?? 'unknown');
     $verification = null;
     if (is_array($recovery)) {
         $verification = [
             'overall_result' => (string) ($recovery['overall_result'] ?? ''),
-            'recovery_score' => (int) ($recovery['recovery_score'] ?? 0),
+            'recovery_score' => orange_backup_admin_recovery_score_from_report($recovery),
             'validated_at' => (string) ($recovery['validated_at'] ?? $recovery['generated_at'] ?? ''),
         ];
     }
@@ -589,7 +635,7 @@ function orange_backup_admin_summarize_full_package(string $packagePath, string 
         'uploads_size_bytes' => (int) ($manifest['uploads_size_bytes'] ?? 0),
         'table_count' => (int) ($manifest['table_count'] ?? 0),
         'approx_total_rows' => (int) ($manifest['approx_total_rows'] ?? 0),
-        'recovery_score' => (int) ($recovery['recovery_score'] ?? 0),
+        'recovery_score' => orange_backup_admin_recovery_score_from_report($recovery),
         'verification' => $verification,
         'package_path' => $packagePath,
         'healthy' => ($health['package_status'] ?? '') === 'healthy',
@@ -607,15 +653,13 @@ function orange_backup_admin_summarize_country_package(
 ): array {
     $manifest = orange_backup_admin_read_json_if_exists($packagePath . DIRECTORY_SEPARATOR . 'manifest.json');
     $health = orange_backup_admin_read_json_if_exists($packagePath . DIRECTORY_SEPARATOR . 'health.json');
-    $recovery = orange_backup_admin_read_json_if_exists(
-        $packagePath . DIRECTORY_SEPARATOR . ORANGE_RECOVERY_VALIDATION_REPORT_FILE
-    );
+    $recovery = orange_backup_admin_read_recovery_validation_report($packagePath, $packageId);
 
     $verification = null;
     if (is_array($recovery)) {
         $verification = [
             'overall_result' => (string) ($recovery['overall_result'] ?? ''),
-            'recovery_score' => (int) ($recovery['recovery_score'] ?? 0),
+            'recovery_score' => orange_backup_admin_recovery_score_from_report($recovery),
             'validated_at' => (string) ($recovery['validated_at'] ?? $recovery['generated_at'] ?? ''),
         ];
     }
@@ -631,7 +675,7 @@ function orange_backup_admin_summarize_country_package(
         'schema_revision' => (int) ($manifest['schema_revision'] ?? 0),
         'registry_version' => (string) ($manifest['registry_version'] ?? ''),
         'row_counts_summary' => $manifest['row_counts_summary'] ?? ($manifest['row_counts'] ?? null),
-        'recovery_score' => (int) ($recovery['recovery_score'] ?? 0),
+        'recovery_score' => orange_backup_admin_recovery_score_from_report($recovery),
         'verification' => $verification,
         'package_path' => $packagePath,
         'healthy' => ($health['package_status'] ?? '') === 'healthy',

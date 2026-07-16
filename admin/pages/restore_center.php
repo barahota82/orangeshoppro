@@ -89,7 +89,7 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                     <th>Schema</th>
                     <th>Backend</th>
                     <th>DRV</th>
-                    <th>Restore eligibility</th>
+                    <th>أهلية الاسترداد</th>
                     <th>إجراءات</th>
                 </tr>
             </thead>
@@ -113,7 +113,7 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                     <th>Schema</th>
                     <th>Registry</th>
                     <th>DRV</th>
-                    <th>Restore eligibility</th>
+                    <th>أهلية الاسترداد</th>
                     <th>إجراءات</th>
                 </tr>
             </thead>
@@ -196,9 +196,29 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge')) cls = 'rc-badge--running';
         return '<span class="rc-badge ' + cls + '">' + (status || '—') + '</span>';
     };
-    const eligibilityBadge = (label) => {
-        const ok = String(label || '') === 'eligible';
-        return '<span class="rc-badge ' + (ok ? 'rc-badge--success' : 'rc-badge--warning') + '">' + (ok ? 'eligible' : 'not_eligible') + '</span>';
+    const eligibilityBadge = (pkg) => {
+        const status = String(pkg.eligibility_status || pkg.restore_eligibility || '');
+        const labelAr = pkg.eligibility_reason_label_ar || '';
+        let text = 'غير مؤهلة';
+        let cls = 'rc-badge--failed';
+        if (status === 'eligible') {
+            text = 'مؤهلة';
+            cls = 'rc-badge--success';
+        } else if (status === 'unknown') {
+            text = 'غير محسومة';
+            cls = 'rc-badge--warning';
+        }
+        const title = labelAr ? ' title="' + String(labelAr).replace(/"/g, '&quot;') + '"' : '';
+        return '<span class="rc-badge ' + cls + '"' + title + '>' + text + '</span>';
+    };
+    const drvCell = (pkg) => {
+        const result = String(pkg.drv_result || '').toLowerCase();
+        if (result === 'pass') return badge('PASS');
+        if (result === 'fail') return badge('FAIL');
+        if (result === 'missing') return '—';
+        const score = pkg.drv_score;
+        if (score === null || score === undefined || score === '') return '—';
+        return String(score);
     };
     const showAlert = (msg, ok) => {
         const box = el('rc_alert');
@@ -251,8 +271,8 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         const lock = ov.restore_lock || {};
         const maint = ov.maintenance || {};
         el('rc_lock_maintenance').innerHTML =
-            '<div><dt>قفل الاسترداد العام</dt><dd>' + (lock.held ? badge('held — ' + (lock.job_id || '')) : badge('free')) + '</dd></div>' +
-            '<div><dt>وضع الصيانة</dt><dd>' + (maint.active ? badge('active — ' + (maint.job_id || '')) : badge('inactive')) + '</dd></div>';
+            '<div><dt>قفل الاسترداد العام</dt><dd>' + (lock.held ? badge('held — ' + (lock.job_id || '')) : badge('متاح')) + '</dd></div>' +
+            '<div><dt>وضع الصيانة</dt><dd>' + (maint.active ? badge('active — ' + (maint.job_id || '')) : badge('غير مفعّل')) + '</dd></div>';
     }
 
     function packageActions(pkg, type) {
@@ -265,7 +285,7 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         files.forEach(([file, label]) => {
             html += '<button type="button" class="btn-link rc-view-file" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '" data-file="' + file + '">' + label + '</button> ';
         });
-        html += '<button type="button" class="btn-link rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">View package details</button>';
+        html += '<button type="button" class="btn-link rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">عرض تفاصيل الحزمة</button>';
         return html;
     }
 
@@ -287,12 +307,12 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
 
         if (CAN_FULL && el('rc_full_table')) {
             el('rc_full_table').querySelector('tbody').innerHTML = state.full.length
-                ? state.full.map((p) => '<tr><td class="rc-ts-cell">' + fmtTimestampDisplay(p.generated_at) + '</td><td>' + p.package_id + '</td><td>' + badge(p.package_status) + '</td><td>' + p.schema_revision + '</td><td>' + (p.backend || '') + '</td><td>' + (p.recovery_score || 0) + '</td><td>' + eligibilityBadge(p.restore_eligibility) + '</td><td class="rc-actions">' + packageActions(p, 'full_disaster') + '</td></tr>').join('')
+                ? state.full.map((p) => '<tr><td class="rc-ts-cell">' + fmtTimestampDisplay(p.generated_at) + '</td><td>' + p.package_id + '</td><td>' + badge(p.package_status) + '</td><td>' + p.schema_revision + '</td><td>' + (p.backend || '') + '</td><td>' + drvCell(p) + '</td><td>' + eligibilityBadge(p) + '</td><td class="rc-actions">' + packageActions(p, 'full_disaster') + '</td></tr>').join('')
                 : '<tr><td colspan="8" class="muted">لا توجد حزم Full.</td></tr>';
         }
         if (CAN_COUNTRY && el('rc_country_table')) {
             el('rc_country_table').querySelector('tbody').innerHTML = state.country.length
-                ? state.country.map((p) => '<tr><td>' + (p.country_code || '') + (p.country_name ? ' — ' + p.country_name : '') + '</td><td class="rc-ts-cell">' + fmtTimestampDisplay(p.generated_at) + '</td><td>' + p.package_id + '</td><td>' + badge(p.package_status) + '</td><td>' + p.schema_revision + '</td><td>' + (p.registry_version || '') + '</td><td>' + (p.recovery_score || 0) + '</td><td>' + eligibilityBadge(p.restore_eligibility) + '</td><td class="rc-actions">' + packageActions(p, 'country_recovery') + '</td></tr>').join('')
+                ? state.country.map((p) => '<tr><td>' + (p.country_code || '') + (p.country_name ? ' — ' + p.country_name : '') + '</td><td class="rc-ts-cell">' + fmtTimestampDisplay(p.generated_at) + '</td><td>' + p.package_id + '</td><td>' + badge(p.package_status) + '</td><td>' + p.schema_revision + '</td><td>' + (p.registry_version || '') + '</td><td>' + drvCell(p) + '</td><td>' + eligibilityBadge(p) + '</td><td class="rc-actions">' + packageActions(p, 'country_recovery') + '</td></tr>').join('')
                 : '<tr><td colspan="9" class="muted">لا توجد حزم دول.</td></tr>';
         }
         el('rc_jobs_table').querySelector('tbody').innerHTML = state.jobs.length

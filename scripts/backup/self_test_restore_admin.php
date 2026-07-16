@@ -344,11 +344,19 @@ orange_backup_write_json($fullPkgDir . DIRECTORY_SEPARATOR . 'manifest.json', [
     'backup_status' => 'success',
 ]);
 orange_backup_write_json($fullPkgDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
-orange_backup_write_json($fullPkgDir . DIRECTORY_SEPARATOR . 'recovery_validation.json', [
-    'overall_result' => 'pass',
-    'recovery_score' => 95,
-    'generated_at' => gmdate('c'),
-]);
+orange_backup_write_json(
+    orange_backup_admin_recovery_report_sibling_path($fullPkgDir, $fullPkgId),
+    [
+        'overall_result' => 'pass',
+        'recovery_score' => 95,
+        'validated_at' => gmdate('c'),
+        'manifest_valid' => true,
+        'health_valid' => true,
+        'checksums_valid' => true,
+        'sql_valid' => true,
+        'uploads_valid' => true,
+    ]
+);
 
 $countryPkgId = '2026-07-01_130000';
 $countryPkgDir = $backupRoot . DIRECTORY_SEPARATOR . 'country_packages' . DIRECTORY_SEPARATOR . 'kw' . DIRECTORY_SEPARATOR . $countryPkgId;
@@ -357,14 +365,160 @@ orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'manifest.json',
     'package_type' => 'country_recovery',
     'generated_at' => gmdate('c'),
     'schema_revision' => 121,
-    'registry_version' => '1',
+    'registry_version' => '1.0',
     'backup_status' => 'success',
 ]);
 orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
-orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'recovery_validation.json', [
-    'overall_result' => 'pass',
-    'recovery_score' => 88,
+orange_backup_write_json(
+    orange_backup_admin_recovery_report_sibling_path($countryPkgDir, $countryPkgId),
+    [
+        'overall_result' => 'pass',
+        'recovery_score' => 88,
+        'validated_at' => gmdate('c'),
+        'registry_valid' => true,
+        'dependency_graph_valid' => true,
+    ]
+);
+
+$fullMissingDrvId = '2026-07-01_110000';
+$fullMissingDrvDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $fullMissingDrvId;
+mkdir($fullMissingDrvDir, 0775, true);
+orange_backup_write_json($fullMissingDrvDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+    'package_type' => 'full_disaster',
+    'generated_at' => gmdate('c', time() - 3600),
+    'schema_revision' => 121,
+    'export_backend' => 'php_pdo',
+    'backup_status' => 'success',
 ]);
+orange_backup_write_json($fullMissingDrvDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+
+$fullFailedDrvId = '2026-07-01_100000';
+$fullFailedDrvDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $fullFailedDrvId;
+mkdir($fullFailedDrvDir, 0775, true);
+orange_backup_write_json($fullFailedDrvDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+    'package_type' => 'full_disaster',
+    'generated_at' => gmdate('c', time() - 7200),
+    'schema_revision' => 121,
+    'export_backend' => 'php_pdo',
+    'backup_status' => 'success',
+]);
+orange_backup_write_json($fullFailedDrvDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+orange_backup_write_json(
+    orange_backup_admin_recovery_report_sibling_path($fullFailedDrvDir, $fullFailedDrvId),
+    ['overall_result' => 'fail', 'recovery_score' => 40, 'validated_at' => gmdate('c')]
+);
+
+$fullWarningDrvId = '2026-07-01_090000';
+$fullWarningDrvDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $fullWarningDrvId;
+mkdir($fullWarningDrvDir, 0775, true);
+orange_backup_write_json($fullWarningDrvDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+    'package_type' => 'full_disaster',
+    'generated_at' => gmdate('c', time() - 10800),
+    'schema_revision' => 121,
+    'export_backend' => 'php_pdo',
+    'backup_status' => 'success',
+]);
+orange_backup_write_json($fullWarningDrvDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+orange_backup_write_json(
+    orange_backup_admin_recovery_report_sibling_path($fullWarningDrvDir, $fullWarningDrvId),
+    ['overall_result' => 'warning', 'recovery_score' => 80, 'validated_at' => gmdate('c')]
+);
+
+$fullBadBackendId = '2026-07-01_080000';
+$fullBadBackendDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $fullBadBackendId;
+mkdir($fullBadBackendDir, 0775, true);
+orange_backup_write_json($fullBadBackendDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+    'package_type' => 'full_disaster',
+    'generated_at' => gmdate('c', time() - 14400),
+    'schema_revision' => 121,
+    'export_backend' => 'mysqldump',
+    'backup_status' => 'success',
+]);
+orange_backup_write_json($fullBadBackendDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+orange_backup_write_json(
+    orange_backup_admin_recovery_report_sibling_path($fullBadBackendDir, $fullBadBackendId),
+    ['overall_result' => 'pass', 'recovery_score' => 95, 'validated_at' => gmdate('c')]
+);
+
+$fullBadSchemaId = '2026-07-01_070000';
+$fullBadSchemaDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $fullBadSchemaId;
+mkdir($fullBadSchemaDir, 0775, true);
+orange_backup_write_json($fullBadSchemaDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+    'package_type' => 'full_disaster',
+    'generated_at' => gmdate('c', time() - 18000),
+    'schema_revision' => 99,
+    'export_backend' => 'php_pdo',
+    'backup_status' => 'success',
+]);
+orange_backup_write_json($fullBadSchemaDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+orange_backup_write_json(
+    orange_backup_admin_recovery_report_sibling_path($fullBadSchemaDir, $fullBadSchemaId),
+    ['overall_result' => 'pass', 'recovery_score' => 95, 'validated_at' => gmdate('c')]
+);
+
+$fullPassNoScoreId = '2026-07-01_060000';
+$fullPassNoScoreDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $fullPassNoScoreId;
+mkdir($fullPassNoScoreDir, 0775, true);
+orange_backup_write_json($fullPassNoScoreDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+    'package_type' => 'full_disaster',
+    'generated_at' => gmdate('c', time() - 21600),
+    'schema_revision' => 121,
+    'export_backend' => 'php_pdo',
+    'backup_status' => 'success',
+]);
+orange_backup_write_json($fullPassNoScoreDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+orange_backup_write_json(
+    orange_backup_admin_recovery_report_sibling_path($fullPassNoScoreDir, $fullPassNoScoreId),
+    ['overall_result' => 'pass', 'validated_at' => gmdate('c')]
+);
+
+$countryFailedDrvId = '2026-07-01_124000';
+$countryFailedDrvDir = $backupRoot . DIRECTORY_SEPARATOR . 'country_packages' . DIRECTORY_SEPARATOR . 'kw' . DIRECTORY_SEPARATOR . $countryFailedDrvId;
+mkdir($countryFailedDrvDir, 0775, true);
+orange_backup_write_json($countryFailedDrvDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+    'package_type' => 'country_recovery',
+    'generated_at' => gmdate('c', time() - 3600),
+    'schema_revision' => 121,
+    'registry_version' => '1.0',
+    'backup_status' => 'success',
+]);
+orange_backup_write_json($countryFailedDrvDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+orange_backup_write_json(
+    orange_backup_admin_recovery_report_sibling_path($countryFailedDrvDir, $countryFailedDrvId),
+    ['overall_result' => 'fail', 'recovery_score' => 50, 'validated_at' => gmdate('c')]
+);
+
+$countryWarningDrvId = '2026-07-01_123000';
+$countryWarningDrvDir = $backupRoot . DIRECTORY_SEPARATOR . 'country_packages' . DIRECTORY_SEPARATOR . 'kw' . DIRECTORY_SEPARATOR . $countryWarningDrvId;
+mkdir($countryWarningDrvDir, 0775, true);
+orange_backup_write_json($countryWarningDrvDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+    'package_type' => 'country_recovery',
+    'generated_at' => gmdate('c', time() - 7200),
+    'schema_revision' => 121,
+    'registry_version' => '1.0',
+    'backup_status' => 'success',
+]);
+orange_backup_write_json($countryWarningDrvDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+orange_backup_write_json(
+    orange_backup_admin_recovery_report_sibling_path($countryWarningDrvDir, $countryWarningDrvId),
+    ['overall_result' => 'warning', 'recovery_score' => 80, 'validated_at' => gmdate('c')]
+);
+
+$countryBadRegistryId = '2026-07-01_122000';
+$countryBadRegistryDir = $backupRoot . DIRECTORY_SEPARATOR . 'country_packages' . DIRECTORY_SEPARATOR . 'kw' . DIRECTORY_SEPARATOR . $countryBadRegistryId;
+mkdir($countryBadRegistryDir, 0775, true);
+orange_backup_write_json($countryBadRegistryDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+    'package_type' => 'country_recovery',
+    'generated_at' => gmdate('c', time() - 10800),
+    'schema_revision' => 121,
+    'registry_version' => '9.9',
+    'backup_status' => 'success',
+]);
+orange_backup_write_json($countryBadRegistryDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+orange_backup_write_json(
+    orange_backup_admin_recovery_report_sibling_path($countryBadRegistryDir, $countryBadRegistryId),
+    ['overall_result' => 'pass', 'recovery_score' => 95, 'validated_at' => gmdate('c')]
+);
 
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_job.php';
 
@@ -433,10 +587,116 @@ $overview = orange_restore_admin_collect_overview($workRoot);
 restore_admin_self_test(($overview['job_counts']['total_jobs'] ?? 0) >= 2, 'overview: total jobs counted');
 restore_admin_self_test(($overview['job_counts']['awaiting_owner_approval'] ?? 0) >= 1, 'overview: awaiting approval counted');
 
-$fullPackages = orange_backup_admin_list_full_snapshots($backupRoot, 5);
+$fullPackages = orange_backup_admin_list_full_snapshots($backupRoot, 20);
 $publicFull = orange_restore_admin_public_package_row($fullPackages[0], 'full_disaster');
 restore_admin_self_test(!isset($publicFull['package_path']), 'packages: absolute package_path stripped');
-restore_admin_self_test(isset($publicFull['restore_eligibility']), 'packages: restore eligibility attached');
+restore_admin_self_test(isset($publicFull['eligibility_status']), 'packages: eligibility_status attached');
+restore_admin_self_test(
+    ($publicFull['eligibility_status'] ?? '') === 'eligible',
+    'eligibility: healthy full + DRV pass => eligible'
+);
+restore_admin_self_test(
+    ($publicFull['drv_result'] ?? '') === 'pass' && ($publicFull['drv_score'] ?? null) === 95,
+    'eligibility: full DRV pass with score from sibling report'
+);
+restore_admin_self_test(
+    orange_backup_admin_read_recovery_validation_report($fullPkgDir, $fullPkgId) !== null,
+    'eligibility: full DRV resolves from sibling report path'
+);
+
+$countryPackages = orange_backup_admin_list_country_packages($superPdo, $backupRoot, 20);
+$publicCountry = orange_restore_admin_public_package_row($countryPackages[0], 'country_recovery');
+restore_admin_self_test(
+    ($publicCountry['eligibility_status'] ?? '') === 'eligible',
+    'eligibility: healthy country + DRV pass => eligible'
+);
+restore_admin_self_test(
+    orange_backup_admin_read_recovery_validation_report($countryPkgDir, $countryPkgId) !== null,
+    'eligibility: country DRV resolves from sibling report path'
+);
+
+$missingDrvSummary = orange_backup_admin_summarize_full_package($fullMissingDrvDir, $fullMissingDrvId);
+$missingDrvPublic = orange_restore_admin_public_package_row($missingDrvSummary, 'full_disaster');
+restore_admin_self_test(
+    ($missingDrvPublic['eligibility_status'] ?? '') === 'unknown',
+    'eligibility: missing DRV report => unknown'
+);
+restore_admin_self_test(
+    ($missingDrvPublic['eligibility_reason_code'] ?? '') === 'drv_report_missing',
+    'eligibility: missing DRV explicit reason code'
+);
+restore_admin_self_test(
+    ($missingDrvPublic['drv_result'] ?? '') === 'missing' && ($missingDrvPublic['drv_score'] ?? 'x') === null,
+    'eligibility: missing DRV does not default score to 0'
+);
+
+$failedDrvSummary = orange_backup_admin_summarize_full_package($fullFailedDrvDir, $fullFailedDrvId);
+$failedDrvPublic = orange_restore_admin_public_package_row($failedDrvSummary, 'full_disaster');
+restore_admin_self_test(
+    ($failedDrvPublic['eligibility_status'] ?? '') === 'not_eligible'
+    && ($failedDrvPublic['drv_result'] ?? '') === 'fail',
+    'eligibility: failed DRV => not eligible'
+);
+
+$warningDrvSummary = orange_backup_admin_summarize_full_package($fullWarningDrvDir, $fullWarningDrvId);
+$warningDrvPublic = orange_restore_admin_public_package_row($warningDrvSummary, 'full_disaster');
+restore_admin_self_test(
+    ($warningDrvPublic['eligibility_status'] ?? '') === 'eligible',
+    'eligibility: warning full with score>=70 => eligible per adapter policy'
+);
+
+$badBackendSummary = orange_backup_admin_summarize_full_package($fullBadBackendDir, $fullBadBackendId);
+$badBackendPublic = orange_restore_admin_public_package_row($badBackendSummary, 'full_disaster');
+restore_admin_self_test(
+    ($badBackendPublic['eligibility_reason_code'] ?? '') === 'export_backend_unsupported',
+    'eligibility: unsupported backend => not eligible'
+);
+
+$badSchemaSummary = orange_backup_admin_summarize_full_package($fullBadSchemaDir, $fullBadSchemaId);
+$badSchemaPublic = orange_restore_admin_public_package_row($badSchemaSummary, 'full_disaster');
+restore_admin_self_test(
+    ($badSchemaPublic['eligibility_reason_code'] ?? '') === 'schema_incompatible',
+    'eligibility: incompatible schema => not eligible'
+);
+
+$passNoScoreSummary = orange_backup_admin_summarize_full_package($fullPassNoScoreDir, $fullPassNoScoreId);
+$passNoScorePublic = orange_restore_admin_public_package_row($passNoScoreSummary, 'full_disaster');
+restore_admin_self_test(
+    ($passNoScorePublic['drv_result'] ?? '') === 'pass' && ($passNoScorePublic['drv_score'] ?? 'x') === null,
+    'eligibility: pass without numeric score leaves drv_score null'
+);
+restore_admin_self_test(
+    ($passNoScorePublic['eligibility_status'] ?? '') === 'not_eligible'
+    && ($passNoScorePublic['eligibility_reason_code'] ?? '') === 'drv_score_below_threshold',
+    'eligibility: pass without numeric score still blocked below threshold'
+);
+
+$countryFailedPublic = orange_restore_admin_public_package_row(
+    orange_backup_admin_summarize_country_package($countryFailedDrvDir, $countryFailedDrvId, 'kw'),
+    'country_recovery'
+);
+restore_admin_self_test(
+    ($countryFailedPublic['eligibility_status'] ?? '') === 'not_eligible',
+    'eligibility: country failed DRV => not eligible'
+);
+
+$countryWarningPublic = orange_restore_admin_public_package_row(
+    orange_backup_admin_summarize_country_package($countryWarningDrvDir, $countryWarningDrvId, 'kw'),
+    'country_recovery'
+);
+restore_admin_self_test(
+    ($countryWarningPublic['eligibility_reason_code'] ?? '') === 'drv_result_warning_country',
+    'eligibility: country warning DRV => not eligible'
+);
+
+$countryBadRegistryPublic = orange_restore_admin_public_package_row(
+    orange_backup_admin_summarize_country_package($countryBadRegistryDir, $countryBadRegistryId, 'kw'),
+    'country_recovery'
+);
+restore_admin_self_test(
+    ($countryBadRegistryPublic['eligibility_reason_code'] ?? '') === 'registry_invalid',
+    'eligibility: country invalid registry => not eligible'
+);
 
 try {
     orange_restore_admin_assert_job_allowlisted($workRoot, '../../etc/passwd');
@@ -481,6 +741,9 @@ restore_admin_self_test(!str_contains(strtolower($statusApiSource), 'orchestrato
 
 $pageSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php');
 restore_admin_self_test(str_contains($pageSource, 'orange_admin_render_page_title_with_country'), 'ui: restore_center unified page title');
+restore_admin_self_test(str_contains($pageSource, 'أهلية الاسترداد'), 'ui: eligibility column arabic label');
+restore_admin_self_test(str_contains($pageSource, 'عرض تفاصيل الحزمة'), 'ui: package details button arabic');
+restore_admin_self_test(str_contains($pageSource, 'drvCell'), 'ui: DRV cell avoids zero placeholder');
 restore_admin_self_test(str_contains($pageSource, 'read_only') || str_contains($pageSource, 'للعرض والمتابعة فقط'), 'ui: read-only warning present');
 restore_admin_self_test(!str_contains($pageSource, 'بدء الاسترداد'), 'ui: no Start Restore button label');
 restore_admin_self_test(!preg_match('/<button[^>]*>[^<]*موافقة/u', $pageSource), 'ui: no approval action button');
