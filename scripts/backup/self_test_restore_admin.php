@@ -81,24 +81,35 @@ function restore_admin_test_rmtree(string $dir): void
     @rmdir($dir);
 }
 
+function restore_admin_test_normalize_path_lexical(string $path): string
+{
+    $path = str_replace('\\', '/', trim($path));
+    if ($path === '') {
+        return '';
+    }
+    $path = preg_replace('#/+#', '/', $path) ?? $path;
+    $path = rtrim($path, '/');
+    if (DIRECTORY_SEPARATOR === '\\') {
+        return strtolower($path);
+    }
+
+    return $path;
+}
+
 function restore_admin_test_path_open_basedir_allowed(string $path): bool
 {
     $raw = ini_get('open_basedir');
     if (!is_string($raw) || trim($raw) === '') {
         return true;
     }
-    $pathNorm = str_replace('\\', '/', $path);
-    if (DIRECTORY_SEPARATOR === '\\') {
-        $pathNorm = strtolower($pathNorm);
+    $pathNorm = restore_admin_test_normalize_path_lexical($path);
+    if ($pathNorm === '') {
+        return false;
     }
     foreach (explode(';', $raw) as $allowed) {
-        $allowed = trim(str_replace('\\', '/', $allowed));
-        if ($allowed === '') {
+        $allowedNorm = restore_admin_test_normalize_path_lexical($allowed);
+        if ($allowedNorm === '') {
             continue;
-        }
-        $allowedNorm = rtrim($allowed, '/');
-        if (DIRECTORY_SEPARATOR === '\\') {
-            $allowedNorm = strtolower($allowedNorm);
         }
         if ($pathNorm === $allowedNorm || str_starts_with($pathNorm, $allowedNorm . '/')) {
             return true;
@@ -114,32 +125,27 @@ function restore_admin_test_path_writable(string $dir): bool
         return false;
     }
     $probe = $dir . DIRECTORY_SEPARATOR . 'orange_writable_' . bin2hex(random_bytes(2));
-    if (@file_put_contents($probe, '1') === false) {
+    if (file_put_contents($probe, '1') === false) {
         return false;
     }
-    @unlink($probe);
+    unlink($probe);
 
     return true;
 }
 
 function restore_admin_test_path_outside_project(string $path, string $projectRoot): bool
 {
-    $resolvedPath = realpath($path);
-    if ($resolvedPath === false) {
-        $resolvedPath = $path;
+    $normPath = restore_admin_test_normalize_path_lexical($path);
+    $normProject = restore_admin_test_normalize_path_lexical($projectRoot);
+    if ($normPath === '' || $normProject === '') {
+        return false;
     }
-    $resolvedProject = realpath($projectRoot);
-    if ($resolvedProject === false) {
-        $resolvedProject = $projectRoot;
-    }
-    $normPath = str_replace('\\', '/', strtolower(rtrim($resolvedPath, '\\/')));
-    $normProject = str_replace('\\', '/', strtolower(rtrim($resolvedProject, '\\/')));
 
     return $normPath !== $normProject && !str_starts_with($normPath, $normProject . '/');
 }
 
 /** @return list<string> */
-function restore_admin_test_temp_base_candidates(string $projectRoot): array
+function restore_admin_test_temp_base_candidates(): array
 {
     $candidates = [];
     $seen = [];
@@ -149,8 +155,8 @@ function restore_admin_test_temp_base_candidates(string $projectRoot): array
         if ($path === '') {
             return;
         }
-        $key = strtolower(str_replace('\\', '/', $path));
-        if (isset($seen[$key])) {
+        $key = restore_admin_test_normalize_path_lexical($path);
+        if ($key === '' || isset($seen[$key])) {
             return;
         }
         $seen[$key] = true;
@@ -176,30 +182,30 @@ function restore_admin_test_temp_base_candidates(string $projectRoot): array
         $addCandidate($sysTemp);
     }
 
-    $outsideProject = [];
-    foreach ($candidates as $candidate) {
-        if (restore_admin_test_path_outside_project($candidate, $projectRoot)) {
-            $outsideProject[] = $candidate;
-        }
-    }
-
-    return $outsideProject;
+    return $candidates;
 }
 
 function restore_admin_test_temp_root(string $projectRoot): string
 {
-    foreach (restore_admin_test_temp_base_candidates($projectRoot) as $baseDir) {
+    foreach (restore_admin_test_temp_base_candidates() as $baseDir) {
+        $baseDir = rtrim($baseDir, '\\/');
+        if ($baseDir === '') {
+            continue;
+        }
         if (!restore_admin_test_path_open_basedir_allowed($baseDir)) {
             continue;
         }
-        if (!is_dir($baseDir) && !@mkdir($baseDir, 0775, true) && !is_dir($baseDir)) {
+        if (!restore_admin_test_path_outside_project($baseDir, $projectRoot)) {
+            continue;
+        }
+        if (!is_dir($baseDir) && !mkdir($baseDir, 0775, true) && !is_dir($baseDir)) {
             continue;
         }
         if (!restore_admin_test_path_writable($baseDir)) {
             continue;
         }
         $tmpRoot = $baseDir . DIRECTORY_SEPARATOR . 'orange_restore_admin_' . bin2hex(random_bytes(4));
-        if (!@mkdir($tmpRoot, 0775, true) && !is_dir($tmpRoot)) {
+        if (!mkdir($tmpRoot, 0775, true) && !is_dir($tmpRoot)) {
             continue;
         }
 
