@@ -122,20 +122,68 @@ function restore_admin_test_path_writable(string $dir): bool
     return true;
 }
 
+function restore_admin_test_path_outside_project(string $path, string $projectRoot): bool
+{
+    $resolvedPath = realpath($path);
+    if ($resolvedPath === false) {
+        $resolvedPath = $path;
+    }
+    $resolvedProject = realpath($projectRoot);
+    if ($resolvedProject === false) {
+        $resolvedProject = $projectRoot;
+    }
+    $normPath = str_replace('\\', '/', strtolower(rtrim($resolvedPath, '\\/')));
+    $normProject = str_replace('\\', '/', strtolower(rtrim($resolvedProject, '\\/')));
+
+    return $normPath !== $normProject && !str_starts_with($normPath, $normProject . '/');
+}
+
 /** @return list<string> */
 function restore_admin_test_temp_base_candidates(string $projectRoot): array
 {
     $candidates = [];
+    $seen = [];
+
+    $addCandidate = function (string $path) use (&$candidates, &$seen): void {
+        $path = rtrim($path, '\\/');
+        if ($path === '') {
+            return;
+        }
+        $key = strtolower(str_replace('\\', '/', $path));
+        if (isset($seen[$key])) {
+            return;
+        }
+        $seen[$key] = true;
+        $candidates[] = $path;
+    };
+
     if (DIRECTORY_SEPARATOR === '\\') {
-        $candidates[] = 'C:\\Windows\\Temp';
-    }
-    $candidates[] = $projectRoot . DIRECTORY_SEPARATOR . 'var' . DIRECTORY_SEPARATOR . 'test_tmp';
-    $sysTemp = sys_get_temp_dir();
-    if ($sysTemp !== '') {
-        $candidates[] = $sysTemp;
+        $addCandidate('C:\\Windows\\Temp');
     }
 
-    return $candidates;
+    $rawOpenBasedir = ini_get('open_basedir');
+    if (is_string($rawOpenBasedir) && trim($rawOpenBasedir) !== '') {
+        foreach (explode(';', $rawOpenBasedir) as $allowed) {
+            $allowed = trim($allowed);
+            if ($allowed !== '') {
+                $addCandidate($allowed);
+            }
+        }
+    }
+
+    $sysTemp = sys_get_temp_dir();
+    if ($sysTemp !== '') {
+        $addCandidate($sysTemp);
+    }
+
+    $outsideProject = [];
+    foreach ($candidates as $candidate) {
+        if (restore_admin_test_path_outside_project($candidate, $projectRoot)) {
+            $outsideProject[] = $candidate;
+        }
+    }
+
+    return $outsideProject;
 }
 
 function restore_admin_test_temp_root(string $projectRoot): string
@@ -158,7 +206,9 @@ function restore_admin_test_temp_root(string $projectRoot): string
         return $tmpRoot;
     }
 
-    throw new RuntimeException('Cannot resolve writable restore admin self-test temp directory.');
+    throw new RuntimeException(
+        'Cannot resolve writable restore admin self-test temp directory outside ProjectRoot (open_basedir-safe).'
+    );
 }
 
 /** @return list<string> */
@@ -199,12 +249,16 @@ try {
 
     $tmpRoot = restore_admin_test_temp_root($projectRoot);
     $backupRoot = $tmpRoot . DIRECTORY_SEPARATOR . 'backups';
-$workRoot = $backupRoot . DIRECTORY_SEPARATOR . 'restore_work';
-$fakeProject = $tmpRoot . DIRECTORY_SEPARATOR . 'project';
-mkdir($backupRoot, 0775, true);
-mkdir($workRoot, 0775, true);
-mkdir($fakeProject, 0775, true);
-file_put_contents(
+    $workRoot = $tmpRoot . DIRECTORY_SEPARATOR . 'restore_work';
+    $fakeProject = $tmpRoot . DIRECTORY_SEPARATOR . 'fake_project';
+    mkdir($backupRoot, 0775, true);
+    mkdir($workRoot, 0775, true);
+    mkdir($fakeProject, 0775, true);
+    restore_admin_self_test(
+        restore_admin_test_path_outside_project($backupRoot, $projectRoot),
+        'fixture: BackupRoot outside ProjectRoot'
+    );
+    file_put_contents(
     $fakeProject . DIRECTORY_SEPARATOR . '.env.php',
     "<?php\nreturn ['ORANGE_BACKUP_ROOT' => " . var_export($backupRoot, true) . "];\n"
 );
