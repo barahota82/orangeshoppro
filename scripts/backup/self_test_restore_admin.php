@@ -14,6 +14,17 @@ if (PHP_SAPI !== 'cli') {
     exit('CLI only');
 }
 
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+error_reporting(E_ALL);
+
+register_shutdown_function(function (): void {
+    $error = error_get_last();
+    if ($error !== null) {
+        echo 'FATAL: ' . $error['type'] . ' @ ' . $error['file'] . ':' . $error['line'] . ' — ' . $error['message'] . PHP_EOL;
+    }
+});
+
 $projectRoot = dirname(__DIR__, 2);
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'admin_permissions.php';
 
@@ -102,10 +113,11 @@ $visible = orange_admin_nav_visible($superAdmin, $superPdo, 'restore_center');
 restore_admin_self_test($visible === true, 'nav: superuser sees restore_center');
 restore_admin_self_test(restore_admin_included_engine_file() === null, 'nav: restore_center visibility does not load restore engine');
 
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_admin.php';
+try {
+    require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
+    require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_admin.php';
 
-$tmpRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_admin_' . bin2hex(random_bytes(4));
+    $tmpRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_admin_' . bin2hex(random_bytes(4));
 $backupRoot = $tmpRoot . DIRECTORY_SEPARATOR . 'backups';
 $workRoot = $backupRoot . DIRECTORY_SEPARATOR . 'restore_work';
 $fakeProject = $tmpRoot . DIRECTORY_SEPARATOR . 'project';
@@ -277,5 +289,9 @@ restore_admin_self_test(!str_contains($restoreAdminLib, 'orange_restore_e2e_star
 
 restore_admin_test_rmtree($tmpRoot);
 
-echo $failures === 0 ? "All restore admin self-tests passed.\n" : "Restore admin self-tests failed: {$failures}\n";
-exit($failures > 0 ? 1 : 0);
+    echo $failures === 0 ? "All restore admin self-tests passed.\n" : "Restore admin self-tests failed: {$failures}\n";
+    exit($failures > 0 ? 1 : 0);
+} catch (Throwable $e) {
+    echo 'THROWABLE: ' . get_class($e) . ' @ ' . $e->getFile() . ':' . $e->getLine() . ' — ' . $e->getMessage() . PHP_EOL;
+    exit(1);
+}
