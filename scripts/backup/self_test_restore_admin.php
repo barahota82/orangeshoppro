@@ -372,6 +372,6 @@ restore_admin_test_rmtree($tmpRoot);
     echo $failures === 0 ? "All restore admin self-tests passed.\n" : "Restore admin self-tests failed: {$failures}\n";
     exit($failures > 0 ? 1 : 0);
 } catch (Throwable $e) {
-    echo 'THROWABLE: ' . get_class($e) . ' @ ' . $e->getFile() . ':' . $e->getLine() . ' — ' . $e->getMessage() . PHP_EOL;
+    echo 'THROWABLE: ' . get_class($e) . ' @ ' . basename(str_replace('\\', '/', $e->getFile())) . ':' . $e->getLine() . ' — ' . $e->getMessage() . PHP_EOL;
     exit(1);
 }
