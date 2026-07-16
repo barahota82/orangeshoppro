@@ -81,6 +81,75 @@ function restore_admin_test_rmtree(string $dir): void
     @rmdir($dir);
 }
 
+/** @var array{calledRealpath:bool,calledIsDir:bool,calledIsWritable:bool} */
+$GLOBALS['restore_admin_test_fs_trace'] = [
+    'calledRealpath' => false,
+    'calledIsDir' => false,
+    'calledIsWritable' => false,
+];
+
+function restore_admin_test_fs_trace_reset(): void
+{
+    $GLOBALS['restore_admin_test_fs_trace'] = [
+        'calledRealpath' => false,
+        'calledIsDir' => false,
+        'calledIsWritable' => false,
+    ];
+}
+
+/** @return array{calledRealpath:bool,calledIsDir:bool,calledIsWritable:bool} */
+function restore_admin_test_fs_trace_snapshot(): array
+{
+    /** @var array{calledRealpath:bool,calledIsDir:bool,calledIsWritable:bool} $trace */
+    $trace = $GLOBALS['restore_admin_test_fs_trace'];
+
+    return $trace;
+}
+
+function restore_admin_test_traced_realpath(string $path): string|false
+{
+    $GLOBALS['restore_admin_test_fs_trace']['calledRealpath'] = true;
+
+    return realpath($path);
+}
+
+function restore_admin_test_traced_is_dir(string $path): bool
+{
+    $GLOBALS['restore_admin_test_fs_trace']['calledIsDir'] = true;
+
+    return is_dir($path);
+}
+
+function restore_admin_test_traced_is_writable(string $path): bool
+{
+    $GLOBALS['restore_admin_test_fs_trace']['calledIsWritable'] = true;
+
+    return is_writable($path);
+}
+
+function restore_admin_test_trace_candidate_report(
+    string $path,
+    bool $allowedByOpenBasedir,
+    string $openBasedirHelper,
+    bool $skippedBeforeFilesystem,
+    string $skipHelper,
+    bool $selected
+): void {
+    $trace = restore_admin_test_fs_trace_snapshot();
+    echo 'Candidate:' . PHP_EOL . $path . PHP_EOL;
+    echo 'AllowedByOpenBaseDir:' . PHP_EOL . ($allowedByOpenBasedir ? 'YES' : 'NO') . PHP_EOL;
+    echo 'OpenBaseDirHelper:' . PHP_EOL . $openBasedirHelper . PHP_EOL;
+    echo 'SkippedBeforeFilesystem:' . PHP_EOL . ($skippedBeforeFilesystem ? 'YES' : 'NO') . PHP_EOL;
+    if ($skippedBeforeFilesystem && $skipHelper !== '') {
+        echo 'SkipHelper:' . PHP_EOL . $skipHelper . PHP_EOL;
+    }
+    echo 'CalledRealpath:' . PHP_EOL . ($trace['calledRealpath'] ? 'YES' : 'NO') . PHP_EOL;
+    echo 'CalledIsDir:' . PHP_EOL . ($trace['calledIsDir'] ? 'YES' : 'NO') . PHP_EOL;
+    echo 'CalledIsWritable:' . PHP_EOL . ($trace['calledIsWritable'] ? 'YES' : 'NO') . PHP_EOL;
+    echo 'Selected:' . PHP_EOL . ($selected ? 'YES' : 'NO') . PHP_EOL;
+    echo '---' . PHP_EOL;
+}
+
 function restore_admin_test_normalize_path_lexical(string $path): string
 {
     $path = str_replace('\\', '/', trim($path));
@@ -121,7 +190,7 @@ function restore_admin_test_path_open_basedir_allowed(string $path): bool
 
 function restore_admin_test_path_writable(string $dir): bool
 {
-    if ($dir === '' || !is_dir($dir) || !is_writable($dir)) {
+    if ($dir === '' || !restore_admin_test_traced_is_dir($dir) || !restore_admin_test_traced_is_writable($dir)) {
         return false;
     }
     $probe = $dir . DIRECTORY_SEPARATOR . 'orange_writable_' . bin2hex(random_bytes(2));
@@ -179,7 +248,14 @@ function restore_admin_test_temp_base_candidates(): array
 
     $sysTemp = sys_get_temp_dir();
     if ($sysTemp !== '') {
-        $addCandidate($sysTemp);
+        $rawOpenBasedirForSysTemp = ini_get('open_basedir');
+        if (is_string($rawOpenBasedirForSysTemp) && trim($rawOpenBasedirForSysTemp) !== '') {
+            if (restore_admin_test_path_open_basedir_allowed($sysTemp)) {
+                $addCandidate($sysTemp);
+            }
+        } elseif (DIRECTORY_SEPARATOR !== '\\') {
+            $addCandidate($sysTemp);
+        }
     }
 
     return $candidates;
@@ -187,27 +263,96 @@ function restore_admin_test_temp_base_candidates(): array
 
 function restore_admin_test_temp_root(string $projectRoot): string
 {
+    echo 'OpenBaseDirIni:' . PHP_EOL . (string) ini_get('open_basedir') . PHP_EOL;
+    echo 'SysGetTempDirString:' . PHP_EOL . sys_get_temp_dir() . PHP_EOL;
+
     foreach (restore_admin_test_temp_base_candidates() as $baseDir) {
+        restore_admin_test_fs_trace_reset();
         $baseDir = rtrim($baseDir, '\\/');
         if ($baseDir === '') {
+            restore_admin_test_trace_candidate_report(
+                $baseDir,
+                false,
+                'restore_admin_test_path_open_basedir_allowed',
+                true,
+                'restore_admin_test_temp_root(empty candidate)',
+                false
+            );
             continue;
         }
-        if (!restore_admin_test_path_open_basedir_allowed($baseDir)) {
+
+        $allowedByOpenBasedir = restore_admin_test_path_open_basedir_allowed($baseDir);
+        if (!$allowedByOpenBasedir) {
+            restore_admin_test_trace_candidate_report(
+                $baseDir,
+                false,
+                'restore_admin_test_path_open_basedir_allowed',
+                true,
+                'restore_admin_test_path_open_basedir_allowed',
+                false
+            );
             continue;
         }
+
         if (!restore_admin_test_path_outside_project($baseDir, $projectRoot)) {
+            restore_admin_test_trace_candidate_report(
+                $baseDir,
+                true,
+                'restore_admin_test_path_open_basedir_allowed',
+                true,
+                'restore_admin_test_path_outside_project',
+                false
+            );
             continue;
         }
-        if (!is_dir($baseDir) && !mkdir($baseDir, 0775, true) && !is_dir($baseDir)) {
+
+        if (
+            !restore_admin_test_traced_is_dir($baseDir)
+            && !mkdir($baseDir, 0775, true)
+            && !restore_admin_test_traced_is_dir($baseDir)
+        ) {
+            restore_admin_test_trace_candidate_report(
+                $baseDir,
+                true,
+                'restore_admin_test_path_open_basedir_allowed',
+                false,
+                'restore_admin_test_temp_root(mkdir base)',
+                false
+            );
             continue;
         }
         if (!restore_admin_test_path_writable($baseDir)) {
+            restore_admin_test_trace_candidate_report(
+                $baseDir,
+                true,
+                'restore_admin_test_path_open_basedir_allowed',
+                false,
+                'restore_admin_test_path_writable',
+                false
+            );
             continue;
         }
         $tmpRoot = $baseDir . DIRECTORY_SEPARATOR . 'orange_restore_admin_' . bin2hex(random_bytes(4));
-        if (!mkdir($tmpRoot, 0775, true) && !is_dir($tmpRoot)) {
+        if (!mkdir($tmpRoot, 0775, true) && !restore_admin_test_traced_is_dir($tmpRoot)) {
+            restore_admin_test_trace_candidate_report(
+                $baseDir,
+                true,
+                'restore_admin_test_path_open_basedir_allowed',
+                false,
+                'restore_admin_test_temp_root(mkdir tmpRoot)',
+                false
+            );
             continue;
         }
+
+        restore_admin_test_trace_candidate_report(
+            $baseDir,
+            true,
+            'restore_admin_test_path_open_basedir_allowed',
+            false,
+            '',
+            true
+        );
 
         return $tmpRoot;
     }
