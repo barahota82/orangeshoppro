@@ -254,7 +254,7 @@ function restore_admin_test_temp_base_candidates(string $projectRoot): array
     $seen = [];
 
     $addCandidate = function (string $path) use (&$candidates, &$seen): void {
-        $path = rtrim(str_replace('/', DIRECTORY_SEPARATOR, $path), '\\/');
+        $path = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path), DIRECTORY_SEPARATOR);
         if ($path === '') {
             return;
         }
@@ -266,7 +266,11 @@ function restore_admin_test_temp_base_candidates(string $projectRoot): array
         $candidates[] = $path;
     };
 
-    $addCandidate(dirname($projectRoot) . DIRECTORY_SEPARATOR . 'private' . DIRECTORY_SEPARATOR . 'restore_admin_test_tmp');
+    $addCandidate(
+        rtrim(dirname($projectRoot), DIRECTORY_SEPARATOR . '/\\')
+        . DIRECTORY_SEPARATOR . 'private'
+        . DIRECTORY_SEPARATOR . 'restore_admin_test_tmp'
+    );
 
     $rawOpenBasedir = ini_get('open_basedir');
     if (is_string($rawOpenBasedir) && trim($rawOpenBasedir) !== '') {
