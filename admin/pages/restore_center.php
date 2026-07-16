@@ -18,9 +18,7 @@ $canFull = orange_admin_may_backup_restore_full($admin, $pdo);
 $canCountry = orange_admin_may_backup_restore_country($admin, $pdo);
 $apiBase = storefront_public_path('/admin/api/restore');
 
-orange_admin_render_page_title_with_country('إدارة الاسترداد', $pdo, [
-    'subtitle' => 'Phase 3B.1 — لوحة متابعة للعرض فقط. لا تنفيذ استرداد أو موافقة أو دمج في هذه المرحلة.',
-]);
+orange_admin_render_page_title_with_country('إدارة الاسترداد', $pdo);
 ?>
 <style>
 .rc-readonly-banner{margin:0 0 16px;padding:12px 14px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;line-height:1.65}
@@ -59,11 +57,6 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
 #rc_view_close,#rc_detail_close{background:#475569;color:#fff!important}
 @media (max-width:768px){.rc-grid{grid-template-columns:1fr}}
 </style>
-
-<div class="page-title">
-    <h1>إدارة الاسترداد</h1>
-    <p class="card-hint" style="margin:0.35rem 0 0;">Restore Center — متابعة حزم الاسترداد ومهام Restore Jobs (عرض فقط).</p>
-</div>
 
 <p class="rc-readonly-banner" role="status">
     <strong>تنبيه:</strong> هذه الشاشة للعرض والمتابعة فقط. تنفيذ الاسترداد والموافقة والدمج والاسترجاع العكسي غير متاح في هذه المرحلة.
