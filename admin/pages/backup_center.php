@@ -432,8 +432,8 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
         const cc = pkg.country_code || '';
         let html = '';
         const viewFiles = type === 'full'
-            ? [['manifest.json', 'المانيفست'], ['health.json', 'Health'], ['recovery_validation.json', 'DRV Report']]
-            : [['manifest.json', 'المانيفست'], ['health.json', 'Health'], ['dependency_graph.json', 'Graph'], ['table_inventory.json', 'Inventory'], ['recovery_validation.json', 'DRV Report']];
+            ? [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['recovery_validation.json', 'DRV Report']]
+            : [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['dependency_graph.json', 'Graph'], ['table_inventory.json', 'Inventory'], ['recovery_validation.json', 'DRV Report']];
         viewFiles.forEach(([file, label]) => {
             html += '<button type="button" class="btn-link bc-view-file" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '" data-file="' + file + '">' + label + '</button> ';
         });
