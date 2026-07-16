@@ -21,6 +21,11 @@ const ORANGE_BACKUP_ADMIN_ROOT_READONLY_WARNING =
 const ORANGE_BACKUP_ADMIN_ROOT_NOT_WRITABLE_MESSAGE =
     'مسار النسخ الاحتياطي غير قابل للكتابة بواسطة PHP الخاص بالموقع. لا يمكن تنفيذ التشغيل اليدوي حتى يتم ضبط صلاحيات المجلد.';
 
+const ORANGE_BACKUP_ADMIN_RUN_FULL_CLI_TIMEOUT_SECONDS = 7200;
+const ORANGE_BACKUP_ADMIN_COUNTRY_BATCH_CLI_TIMEOUT_SECONDS = 7200;
+
+const ORANGE_BACKUP_ADMIN_RUN_FULL_CLI_SCRIPT = 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'run_full_backup.php';
+
 /** @var list<string> */
 const ORANGE_BACKUP_ADMIN_VIEWABLE_FILES = [
     'manifest.json',
@@ -838,6 +843,85 @@ function orange_backup_admin_scheduled_tasks_readonly(int $retentionDays): array
 }
 
 /**
+ * Resolve an approved PHP CLI executable for backup subprocesses (never php-cgi / FastCGI).
+ */
+function orange_backup_admin_resolve_cli_php_binary(string $projectRoot): string
+{
+    $env = orange_backup_load_env_array($projectRoot);
+    $configured = trim((string) ($env['ORANGE_PHP_CLI'] ?? ''));
+    $candidates = [];
+    if ($configured !== '') {
+        $candidates[] = $configured;
+    }
+    if (defined('PHP_BINARY') && is_string(PHP_BINARY) && PHP_BINARY !== '') {
+        $candidates[] = PHP_BINARY;
+        if (preg_match('/php-cgi(?:\.exe)?$/i', PHP_BINARY)) {
+            $candidates[] = preg_replace('/php-cgi(\.exe)?$/i', 'php$1', PHP_BINARY) ?? PHP_BINARY;
+        }
+    }
+    $candidates[] = 'php';
+
+    $seen = [];
+    foreach ($candidates as $candidate) {
+        $candidate = trim((string) $candidate);
+        if ($candidate === '' || isset($seen[$candidate])) {
+            continue;
+        }
+        $seen[$candidate] = true;
+        if ($candidate !== 'php' && !is_file($candidate)) {
+            continue;
+        }
+        if (orange_backup_admin_cli_php_binary_is_cli($candidate)) {
+            return $candidate;
+        }
+    }
+
+    return 'php';
+}
+
+function orange_backup_admin_cli_php_binary_is_cli(string $phpBinary): bool
+{
+    if ($phpBinary !== 'php' && (!is_file($phpBinary) || preg_match('/php-cgi(?:\.exe)?$/i', $phpBinary))) {
+        return false;
+    }
+
+    $capture = orange_backup_run_command_capture([$phpBinary, '-r', 'echo PHP_SAPI;'], 20);
+    if ((int) ($capture['exit_code'] ?? 1) !== 0) {
+        return false;
+    }
+
+    return trim((string) ($capture['stdout'] ?? '')) === 'cli';
+}
+
+/**
+ * Fixed approved CLI command for manual Full Backup (no request-derived paths).
+ *
+ * @return array{0:string,1:string}
+ */
+function orange_backup_admin_run_full_cli_command(string $projectRoot): array
+{
+    $projectRoot = realpath($projectRoot) ?: $projectRoot;
+    $script = $projectRoot . DIRECTORY_SEPARATOR . ORANGE_BACKUP_ADMIN_RUN_FULL_CLI_SCRIPT;
+    if (!is_file($script)) {
+        throw new RuntimeException('Full backup CLI script not found.');
+    }
+    $realScript = realpath($script);
+    if ($realScript === false || !is_file($realScript)) {
+        throw new RuntimeException('Full backup CLI script not found.');
+    }
+    $normalizedScript = str_replace('\\', '/', $realScript);
+    $approvedSuffix = str_replace('\\', '/', ORANGE_BACKUP_ADMIN_RUN_FULL_CLI_SCRIPT);
+    if (!str_ends_with($normalizedScript, $approvedSuffix)) {
+        throw new RuntimeException('Full backup CLI script path is not approved.');
+    }
+
+    return [
+        orange_backup_admin_resolve_cli_php_binary($projectRoot),
+        $realScript,
+    ];
+}
+
+/**
  * Classify unexpected stdout captured during Admin API full backup runs.
  *
  * @return array{type:'none'|'runner_log'|'php_error',operator_message:?string}
@@ -907,33 +991,82 @@ function orange_backup_admin_parse_run_full_cli_stdout(string $stdout, int $exit
     }
 
     if (!is_array($decoded)) {
-        $message = 'Full backup CLI did not return a valid JSON result.';
-        $stderr = trim($stderr);
-        if ($stderr !== '') {
-            $message .= ' ' . orange_backup_admin_sanitize_cli_excerpt($stderr, 240);
+        $stderrTrim = trim($stderr);
+        if ($stdout !== '') {
+            error_log('[orange backup admin] run_full cli stdout (no json): ' . orange_backup_admin_sanitize_cli_excerpt($stdout, 4000));
+        }
+        if ($stderrTrim !== '') {
+            error_log('[orange backup admin] run_full cli stderr: ' . orange_backup_admin_sanitize_cli_excerpt($stderrTrim, 2000));
         }
 
         return [
             'ok' => false,
             'exit_code' => $exitCode !== 0 ? $exitCode : 1,
             'backend' => null,
-            'message' => $message,
+            'message' => 'Full backup CLI did not return a valid JSON result.',
             'snapshot' => null,
             'log_file' => null,
-            'stdout_excerpt' => orange_backup_admin_sanitize_cli_excerpt($stdout, 2000),
+            'error' => orange_backup_admin_sanitize_cli_excerpt(
+                $stderrTrim !== '' ? $stderrTrim : 'Full backup CLI did not return a valid JSON result.',
+                400
+            ),
         ];
     }
 
     $ok = (bool) ($decoded['ok'] ?? false) && $exitCode === 0;
+    $message = (string) ($decoded['message'] ?? ($ok ? 'Full backup completed.' : 'Full backup failed.'));
+    $stderrTrim = trim($stderr);
+    $error = null;
+    if (!$ok) {
+        if ($stdout !== '') {
+            error_log('[orange backup admin] run_full cli stdout: ' . orange_backup_admin_sanitize_cli_excerpt($stdout, 4000));
+        }
+        if ($stderrTrim !== '') {
+            error_log('[orange backup admin] run_full cli stderr: ' . orange_backup_admin_sanitize_cli_excerpt($stderrTrim, 2000));
+        }
+        $error = orange_backup_admin_sanitize_cli_excerpt(
+            $stderrTrim !== '' ? $stderrTrim : $message,
+            400
+        );
+    }
 
     return [
         'ok' => $ok,
         'exit_code' => $exitCode,
         'backend' => $decoded['backend'] ?? null,
-        'message' => (string) ($decoded['message'] ?? ($ok ? 'Full backup completed.' : 'Full backup failed.')),
+        'message' => $message,
         'snapshot' => $decoded['snapshot'] ?? null,
         'log_file' => $decoded['log_file'] ?? null,
+        'error' => $error,
     ];
+}
+
+function orange_backup_admin_refresh_full_snapshot_after_cli(array $parsed, string $projectRoot): array
+{
+    if (!($parsed['ok'] ?? false)) {
+        return $parsed;
+    }
+    if (!empty($parsed['snapshot'])) {
+        return $parsed;
+    }
+
+    try {
+        $env = orange_backup_load_env_array($projectRoot);
+        $backupRoot = orange_backup_resolve_root($env);
+        $latest = orange_backup_latest_snapshot_name($backupRoot);
+        if (is_string($latest) && $latest !== '') {
+            $parsed['snapshot'] = $latest;
+        }
+    } catch (Throwable) {
+        // discovery refresh is best-effort
+    }
+
+    return $parsed;
+}
+
+function orange_backup_admin_self_test_enabled(): bool
+{
+    return defined('ORANGE_BACKUP_ADMIN_SELF_TEST') && ORANGE_BACKUP_ADMIN_SELF_TEST;
 }
 
 function orange_backup_admin_discard_captured_stdout(string $captured): void
@@ -961,7 +1094,9 @@ function orange_backup_admin_run_full_for_api(string $projectRoot, array $option
 {
     $startedAt = gmdate('c');
 
-    if (isset($options['run_full_override']) && is_callable($options['run_full_override'])) {
+    if (orange_backup_admin_self_test_enabled()
+        && isset($options['run_full_override'])
+        && is_callable($options['run_full_override'])) {
         ob_start();
         try {
             $result = orange_backup_admin_run_full($projectRoot, $options);
@@ -980,20 +1115,17 @@ function orange_backup_admin_run_full_for_api(string $projectRoot, array $option
         return $result;
     }
 
-    $projectRoot = realpath($projectRoot) ?: $projectRoot;
-    $script = $projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup'
-        . DIRECTORY_SEPARATOR . 'run_full_backup.php';
-    if (!is_file($script)) {
-        throw new RuntimeException('Full backup CLI script not found.');
-    }
-
-    $phpBinary = (defined('PHP_BINARY') && is_string(PHP_BINARY) && PHP_BINARY !== '') ? PHP_BINARY : 'php';
-    $capture = orange_backup_run_command_capture([$phpBinary, $script], 7200);
+    [$phpBinary, $script] = orange_backup_admin_run_full_cli_command($projectRoot);
+    $capture = orange_backup_run_command_capture(
+        [$phpBinary, $script],
+        ORANGE_BACKUP_ADMIN_RUN_FULL_CLI_TIMEOUT_SECONDS
+    );
     $parsed = orange_backup_admin_parse_run_full_cli_stdout(
         (string) ($capture['stdout'] ?? ''),
         (int) ($capture['exit_code'] ?? 1),
         (string) ($capture['stderr'] ?? '')
     );
+    $parsed = orange_backup_admin_refresh_full_snapshot_after_cli($parsed, $projectRoot);
 
     return array_merge($parsed, [
         'started_at' => $startedAt,
@@ -1009,7 +1141,9 @@ function orange_backup_admin_run_full_for_api(string $projectRoot, array $option
 function orange_backup_admin_run_full(string $projectRoot, array $options = []): array
 {
     $startedAt = gmdate('c');
-    if (isset($options['run_full_override']) && is_callable($options['run_full_override'])) {
+    if (orange_backup_admin_self_test_enabled()
+        && isset($options['run_full_override'])
+        && is_callable($options['run_full_override'])) {
         /** @var array<string, mixed> $result */
         $result = ($options['run_full_override'])($projectRoot);
     } else {
@@ -1033,7 +1167,9 @@ function orange_backup_admin_run_country_batch(string $projectRoot, array $optio
     $startedAt = gmdate('c');
     $projectRoot = realpath($projectRoot) ?: $projectRoot;
 
-    if (isset($options['batch_override']) && is_callable($options['batch_override'])) {
+    if (orange_backup_admin_self_test_enabled()
+        && isset($options['batch_override'])
+        && is_callable($options['batch_override'])) {
         /** @var array<string, mixed> $cliResult */
         $cliResult = ($options['batch_override'])();
     } else {
@@ -1042,8 +1178,15 @@ function orange_backup_admin_run_country_batch(string $projectRoot, array $optio
         if (!is_file($script)) {
             throw new RuntimeException('Country batch script not found.');
         }
-        $phpBinary = (defined('PHP_BINARY') && is_string(PHP_BINARY) && PHP_BINARY !== '') ? PHP_BINARY : 'php';
-        $capture = orange_backup_run_command_capture([$phpBinary, $script], 7200);
+        $realScript = realpath($script);
+        if ($realScript === false || !is_file($realScript)) {
+            throw new RuntimeException('Country batch script not found.');
+        }
+        $phpBinary = orange_backup_admin_resolve_cli_php_binary($projectRoot);
+        $capture = orange_backup_run_command_capture(
+            [$phpBinary, $realScript],
+            ORANGE_BACKUP_ADMIN_COUNTRY_BATCH_CLI_TIMEOUT_SECONDS
+        );
         $cliResult = [
             'ok' => ((int) ($capture['exit_code'] ?? 1)) === 0,
             'exit_code' => (int) ($capture['exit_code'] ?? 1),

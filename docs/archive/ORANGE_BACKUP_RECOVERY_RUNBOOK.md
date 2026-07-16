@@ -774,7 +774,7 @@ UI may hide tabs/actions by permission; every API enforces `backup_view` / `back
 |----------|--------|--------------|
 | `admin/api/backup/list.php` | GET | `orange_backup_admin_collect_overview()`, package discovery |
 | `admin/api/backup/status.php` | GET | Lock status, allowlisted file view, log tail |
-| `admin/api/backup/run-full.php` | POST | `orange_backup_run_full()` |
+| `admin/api/backup/run-full.php` | POST | Fixed CLI `scripts/backup/run_full_backup.php` → `orange_backup_run_full()` (subprocess; **not** in-process under IIS FastCGI) |
 | `admin/api/backup/run-countries.php` | POST | Fixed CLI `scripts/backup/export_all_recoverable_countries.php` |
 | `admin/api/backup/verify.php` | POST | `orange_backup_verify_full_package()` / `orange_country_export_verify_package()` |
 | `admin/api/backup/recovery-check.php` | POST | `orange_recovery_validate_package()` |
@@ -800,6 +800,14 @@ On Windows/Plesk, **Scheduled Task PHP** (CLI under Task Scheduler) and **Websit
 - Mutating APIs (`run-full.php`, `run-countries.php`, `recovery-check.php`) use **`orange_backup_admin_manual_actions_block_message()`** and strict **`orange_backup_resolve_root()`** — fail closed before engine/CLI when Website PHP cannot write.
 - `verify.php` remains **read-only** (view context); it does not require write access.
 - Backup Center UI shows **حالة مسار النسخ الاحتياطي** (exists / readable / writable / manual available) and an Arabic banner when readable+non-writable; Run buttons and DRV are disabled; no generic alert for this expected condition.
+
+**Manual Full Backup execution model (Admin API — Phase 3A):**
+
+- **Manual Run Full Backup** from Admin **never** calls `orange_backup_run_full()` inside the IIS FastCGI HTTP request. The approved boundary is: `admin/api/backup/run-full.php` → **`orange_backup_admin_run_full_for_api()`** → subprocess **`scripts/backup/run_full_backup.php`** → **`orange_backup_run_full()`** (same engine entry as Plesk Scheduled Tasks).
+- **Country Batch** uses the same subprocess pattern: fixed CLI **`scripts/backup/export_all_recoverable_countries.php`** (no request-derived script/path; `proc_open` argv array only).
+- **`php_pdo` export remains CLI-only** — `orange_backup_pdo_export_database()` enforces `PHP_SAPI === 'cli'` and is **not** weakened. Admin must launch an approved **CLI PHP binary** (not `php-cgi`/FastCGI) for subprocess backup.
+- Subprocess **stdout/stderr** are captured, redacted/sanitized for API/audit; runner progress lines must **not** be returned raw to the browser. API returns **one JSON object** only (`success`, `message`, `exit_code`; `error` on failure).
+- Writable **BackupRoot**, **`backup_run`**, **CSRF**, and **POST-only** are enforced before subprocess launch.
 
 **Operator action:** ACL fixes on `{BackupRoot}` remain a **server/Plesk operation** (grant Website PHP identity Modify on the private backup folder). Orange does not expose ACL editing in Admin.
 

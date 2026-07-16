@@ -14,6 +14,8 @@ if (PHP_SAPI !== 'cli') {
     exit('CLI only');
 }
 
+define('ORANGE_BACKUP_ADMIN_SELF_TEST', true);
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
     @session_start();
 }
@@ -233,8 +235,28 @@ $cliStdoutSample = "[2026-07-16 00:00:00] [INFO] Orange full backup started.\n"
     . '{"ok":true,"backend":"php_pdo","snapshot":"2026-07-16_120000","log_file":"x.log","message":"ok"}' . "\n";
 $cliParsed = orange_backup_admin_parse_run_full_cli_stdout($cliStdoutSample, 0);
 backup_admin_self_test(($cliParsed['ok'] ?? false) === true && ($cliParsed['snapshot'] ?? '') === '2026-07-16_120000', 'api: parse run_full CLI stdout after runner logs');
+$runFullCmd = orange_backup_admin_run_full_cli_command($projectRoot);
+backup_admin_self_test(count($runFullCmd) === 2, 'api: run_full admin action launches fixed CLI argv array');
+backup_admin_self_test(str_ends_with(str_replace('\\', '/', $runFullCmd[1]), 'scripts/backup/run_full_backup.php'), 'api: run_full uses approved run_full_backup.php entry');
+backup_admin_self_test(!str_contains($runFullCmd[0], '&') && !str_contains($runFullCmd[0], '|'), 'api: cli php binary has no shell metacharacters');
+$failExit = orange_backup_admin_parse_run_full_cli_stdout('{"ok":false,"message":"Backup already running."}', 2, '');
+backup_admin_self_test(($failExit['ok'] ?? true) === false && (int) ($failExit['exit_code'] ?? 0) === 2, 'api: non-zero exit returns failure');
+$lockFail = orange_backup_admin_parse_run_full_cli_stdout('{"ok":false,"message":"Backup already running."}', 2, 'lock busy');
+backup_admin_self_test(($lockFail['ok'] ?? true) === false, 'api: engine lock failure remains failure');
+$timeoutFail = orange_backup_admin_parse_run_full_cli_stdout('', 124, 'Command timed out.');
+backup_admin_self_test(($timeoutFail['ok'] ?? true) === false && ($timeoutFail['error'] ?? '') !== '', 'api: timeout returns sanitized failure');
+$stderrSan = orange_backup_admin_parse_run_full_cli_stdout('', 1, 'DB_PASS=secret token=abc');
+backup_admin_self_test(($stderrSan['ok'] ?? true) === false && !str_contains((string) ($stderrSan['error'] ?? ''), 'secret'), 'api: stderr sanitized before api error field');
+$successExit = orange_backup_admin_parse_run_full_cli_stdout($cliStdoutSample, 0);
+backup_admin_self_test(($successExit['ok'] ?? false) === true && (int) ($successExit['exit_code'] ?? 1) === 0, 'api: successful exit returns success');
 $adminSrc = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_admin.php');
-backup_admin_self_test(str_contains($adminSrc, 'run_full_backup.php') && str_contains($adminSrc, 'orange_backup_run_command_capture'), 'api: run_full_for_api delegates via CLI capture');
+backup_admin_self_test(str_contains($adminSrc, 'orange_backup_admin_run_full_cli_command') && str_contains($adminSrc, 'orange_backup_run_command_capture'), 'api: run_full_for_api delegates via CLI capture');
+backup_admin_self_test(str_contains($adminSrc, 'orange_backup_admin_self_test_enabled'), 'api: self-test override gated from production');
+backup_admin_self_test(str_contains($adminSrc, 'orange_backup_admin_resolve_cli_php_binary'), 'api: resolves approved cli php binary');
+$pdoExportSrc = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_pdo_export.php');
+backup_admin_self_test(str_contains($pdoExportSrc, "PHP_SAPI !== 'cli'") && str_contains($pdoExportSrc, 'PDO export is CLI-only.'), 'security: PDO export cli-only guard unchanged');
+$runFullApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'run-full.php');
+backup_admin_self_test(str_contains($runFullApi, 'orange_backup_admin_run_full_for_api') && !str_contains($runFullApi, 'orange_backup_run_full('), 'api: run-full.php does not call engine in-process');
 $bootstrapSrc = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . '_bootstrap.php');
 backup_admin_self_test(str_contains($bootstrapSrc, 'backup_admin_api_begin_json_only') && str_contains($bootstrapSrc, 'backup_admin_api_json_shutdown_guard'), 'api: backup bootstrap enforces json-only guard');
 backup_admin_self_test(str_contains($bootstrapSrc, 'application/json'), 'api: backup bootstrap sets json content type early');

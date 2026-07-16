@@ -27,12 +27,19 @@ try {
             false,
             $blockMessage
         );
-        json_response(['success' => false, 'message' => $blockMessage], 422);
+        json_response([
+            'success' => false,
+            'message' => 'تعذر إنشاء النسخة الاحتياطية الشاملة.',
+            'error' => $blockMessage,
+            'exit_code' => 1,
+        ], 422);
     }
 
     $result = orange_backup_admin_run_full_for_api($projectRoot);
     $finishedAt = (string) ($result['finished_at'] ?? gmdate('c'));
     $ok = (bool) ($result['ok'] ?? false);
+    $exitCode = (int) ($result['exit_code'] ?? ($ok ? 0 : 1));
+    $errorSummary = $ok ? null : (string) ($result['error'] ?? orange_backup_admin_sanitize_cli_excerpt((string) ($result['message'] ?? ''), 400));
 
     orange_backup_admin_audit(
         'run_full',
@@ -41,14 +48,22 @@ try {
         $startedAt,
         $finishedAt,
         $ok,
-        $ok ? '' : (string) ($result['message'] ?? '')
+        $ok ? '' : (string) ($errorSummary ?? '')
     );
 
-    json_response([
+    $payload = [
         'success' => $ok,
-        'message' => $ok ? 'اكتمل النسخ الاحتياطي الكامل.' : (string) ($result['message'] ?? 'فشل النسخ الاحتياطي.'),
-        'result' => orange_backup_admin_redact_secrets($result),
-    ], $ok ? 200 : 409);
+        'message' => $ok ? 'اكتمل إنشاء النسخة الاحتياطية الشاملة.' : 'تعذر إنشاء النسخة الاحتياطية الشاملة.',
+        'exit_code' => $exitCode,
+    ];
+    if ($ok && !empty($result['snapshot'])) {
+        $payload['snapshot'] = (string) $result['snapshot'];
+    }
+    if (!$ok && $errorSummary !== null && $errorSummary !== '') {
+        $payload['error'] = $errorSummary;
+    }
+
+    json_response($payload, $ok ? 200 : 409);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, backup_admin_api_safe_message($e));
 }
