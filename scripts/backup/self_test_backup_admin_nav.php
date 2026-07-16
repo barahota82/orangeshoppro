@@ -132,7 +132,7 @@ backup_nav_self_test(
 );
 
 $restoreFullPdo = backup_nav_test_pdo('backup_restore_full', false, 5);
-$restoreFullAdmin = ['id' => 5, 'is_superuser' => 0, 'is_active' => 1];
+$restoreFullAdmin = ['id' => 5, 'is_superuser' => 0, 'is_active' => 1, 'country_id' => 1];
 $restoreCaps = orange_admin_caps_for_page($restoreFullAdmin, $restoreFullPdo, 'restore_center');
 backup_nav_self_test(
     !empty($restoreCaps['can_view']) && ($restoreCaps['can_edit'] ?? false) === false,

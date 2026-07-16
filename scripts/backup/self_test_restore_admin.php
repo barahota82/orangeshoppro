@@ -16,8 +16,6 @@ if (PHP_SAPI !== 'cli') {
 
 $projectRoot = dirname(__DIR__, 2);
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'admin_permissions.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_admin.php';
 
 $failures = 0;
 
@@ -98,6 +96,15 @@ function restore_admin_included_engine_file(): ?string
     return null;
 }
 
+$superAdmin = ['id' => 1, 'is_superuser' => 1, 'is_active' => 1];
+$superPdo = restore_admin_test_pdo('', true, 1);
+$visible = orange_admin_nav_visible($superAdmin, $superPdo, 'restore_center');
+restore_admin_self_test($visible === true, 'nav: superuser sees restore_center');
+restore_admin_self_test(restore_admin_included_engine_file() === null, 'nav: restore_center visibility does not load restore engine');
+
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_admin.php';
+
 $tmpRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_admin_' . bin2hex(random_bytes(4));
 $backupRoot = $tmpRoot . DIRECTORY_SEPARATOR . 'backups';
 $workRoot = $backupRoot . DIRECTORY_SEPARATOR . 'restore_work';
@@ -173,8 +180,6 @@ $countryJob = orange_restore_job_create($workRoot, [
 ]);
 $countryJobId = (string) ($countryJob['job_id'] ?? '');
 
-$superAdmin = ['id' => 1, 'is_superuser' => 1, 'is_active' => 1];
-$superPdo = restore_admin_test_pdo('', true, 1);
 $fullOnlyPdo = restore_admin_test_pdo('backup_restore_full', false, 2);
 $fullOnlyAdmin = ['id' => 2, 'is_superuser' => 0, 'is_active' => 1];
 $countryOnlyPdo = restore_admin_test_pdo('backup_restore_country', false, 3);
@@ -265,11 +270,6 @@ restore_admin_self_test(!str_contains($pageSource, 'بدء الاسترداد'),
 restore_admin_self_test(!preg_match('/<button[^>]*>[^<]*موافقة/u', $pageSource), 'ui: no approval action button');
 restore_admin_self_test(stripos($pageSource, '>Rollback<') === false && stripos($pageSource, 'restore_full_rollback.php') === false, 'ui: no Rollback action control');
 restore_admin_self_test(!str_contains($pageSource, 'restore_admin.php'), 'ui: page does not load restore_admin.php at render');
-
-$navBefore = count(get_included_files());
-$visible = orange_admin_nav_visible($superAdmin, $superPdo, 'restore_center');
-restore_admin_self_test($visible === true, 'nav: superuser sees restore_center');
-restore_admin_self_test(restore_admin_included_engine_file() === null, 'nav: restore_center visibility does not load restore engine');
 
 $restoreAdminLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_admin.php');
 restore_admin_self_test(!str_contains($restoreAdminLib, 'function orange_restore_orchestrator_approve'), 'lib: restore_admin does not define mutating orchestrator wrappers');
