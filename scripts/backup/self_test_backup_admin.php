@@ -307,6 +307,11 @@ backup_admin_self_test(!str_contains($redactedText, 'supersecret') && !str_conta
 backup_admin_self_test(!in_array('checksums.sha256', ORANGE_BACKUP_ADMIN_VIEWABLE_FILES, true), 'security: checksums file not in view allowlist');
 
 $pageSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'backup_center.php');
+$restorePageSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php');
+$headerSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'partials' . DIRECTORY_SEPARATOR . 'header.php');
+backup_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php'), 'phase3b: restore_center page exists');
+backup_admin_self_test(str_contains($restorePageSource, 'Restore Center') && str_contains($restorePageSource, 'Phase 3B'), 'phase3b: restore_center placeholder scaffold');
+backup_admin_self_test(strpos($headerSource, 'backup_center') !== false && strpos($headerSource, 'restore_center') !== false && strpos($headerSource, 'backup_center') < strpos($headerSource, 'restore_center'), 'phase3b: menu order backup_center then restore_center');
 backup_admin_self_test(str_contains($pageSource, 'parseApiJsonResponse') && str_contains($pageSource, 'text/html'), 'ui: api client detects html responses before json parse');
 backup_admin_self_test(str_contains($pageSource, '\\u0627\\u0633\\u062a\\u062c\\u0627\\u0628'), 'ui: sanitized arabic message for non-json responses');
 backup_admin_self_test(!str_contains($pageSource, 'restore_run_full') && !str_contains($pageSource, 'rollback'), 'scope: no restore UI actions in backup_center page');

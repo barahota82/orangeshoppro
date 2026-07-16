@@ -146,6 +146,7 @@ function orange_admin_page_resource(string $page): string
         'channel_analytics' => 'reports',
         'logs' => 'reports',
         'backup_center' => 'reports',
+        'restore_center' => 'reports',
         'company_settings' => 'settings',
         'storefront_hero' => 'settings',
         'storefront_merge_requests' => 'settings',
@@ -487,6 +488,17 @@ function orange_admin_caps_for_page(array $admin, PDO $pdo, string $page): array
             'can_lock' => false,
             'can_unlock' => false,
             'can_print' => orange_admin_may_backup_view($admin, $pdo),
+            'can_export' => false,
+        ];
+    }
+    if ($page === 'restore_center') {
+        return [
+            'can_view' => orange_admin_may_restore_center_view($admin, $pdo),
+            'can_edit' => false,
+            'can_delete' => false,
+            'can_lock' => false,
+            'can_unlock' => false,
+            'can_print' => orange_admin_may_restore_center_view($admin, $pdo),
             'can_export' => false,
         ];
     }
@@ -988,7 +1000,20 @@ function orange_admin_nav_visible(array $admin, PDO $pdo, string $page): bool
     if ($page === 'backup_center') {
         return orange_admin_may_backup_view($admin, $pdo);
     }
+    if ($page === 'restore_center') {
+        return orange_admin_may_restore_center_view($admin, $pdo);
+    }
     return orange_admin_may_page($admin, $pdo, $page, 'view');
+}
+
+function orange_admin_may_restore_center_view(array $admin, PDO $pdo): bool
+{
+    if (orange_admin_is_superuser($admin)) {
+        return true;
+    }
+
+    return orange_admin_may_backup_restore_full($admin, $pdo)
+        || orange_admin_may_backup_restore_country($admin, $pdo);
 }
 
 function orange_admin_may_backup_view(array $admin, PDO $pdo): bool

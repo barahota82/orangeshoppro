@@ -84,7 +84,7 @@ $viewAdmin = ['id' => 3, 'is_superuser' => 0, 'is_active' => 1];
 $dashboardPdo = backup_nav_test_pdo('', false, 4);
 $dashboardAdmin = ['id' => 4, 'is_superuser' => 0, 'is_active' => 1];
 
-$settingsNavPages = ['countries', 'country_screen_copy', 'admin_users', 'backup_center'];
+$settingsNavPages = ['countries', 'country_screen_copy', 'admin_users', 'backup_center', 'restore_center'];
 
 foreach ($settingsNavPages as $page) {
     $before = count(get_included_files());
@@ -94,6 +94,9 @@ foreach ($settingsNavPages as $page) {
     backup_nav_self_test($before <= count(get_included_files()), 'nav: included file count stable for ' . $page);
     if ($page === 'backup_center') {
         backup_nav_self_test($visible === true, 'nav: superuser sees backup_center');
+    }
+    if ($page === 'restore_center') {
+        backup_nav_self_test($visible === true, 'nav: superuser sees restore_center');
     }
 }
 

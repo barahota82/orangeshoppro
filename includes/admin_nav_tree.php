@@ -207,6 +207,7 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'country_screen_copy', 'label' => 'نسخ إعدادات بين الدول'],
                         ['page' => 'admin_users', 'label' => 'المستخدمون والصلاحيات'],
                         ['page' => 'backup_center', 'label' => 'إدارة النسخ الاحتياطي'],
+                        ['page' => 'restore_center', 'label' => 'إدارة الاسترداد'],
                     ],
                 ],
                 [
