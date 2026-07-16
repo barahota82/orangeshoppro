@@ -160,6 +160,7 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
                 <thead>
                     <tr>
                         <th>الدولة</th>
+                        <th>الوقت</th>
                         <th>الحزمة</th>
                         <th>الحالة</th>
                         <th>Schema</th>
@@ -168,7 +169,7 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
                         <th>إجراءات</th>
                     </tr>
                 </thead>
-                <tbody><tr><td colspan="7" class="muted">…</td></tr></tbody>
+                <tbody><tr><td colspan="8" class="muted">…</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -453,8 +454,8 @@ td.bc-actions .btn-link,td.bc-actions button.btn-link{flex-shrink:0}
             ? state.full.map((p) => '<tr><td class="bc-ts-cell">' + fmtTimestampDisplay(p.generated_at) + '</td><td>' + badge(p.package_status) + '</td><td>' + p.schema_revision + '</td><td>' + (p.backend || '') + '</td><td>' + fmtBytes(p.dump_size_bytes) + '</td><td>' + fmtBytes(p.uploads_size_bytes) + '</td><td>' + (p.recovery_score || 0) + '</td><td class="bc-actions">' + actionButtons(p, 'full_disaster') + '</td></tr>').join('')
             : '<tr><td colspan="8" class="muted">لا توجد لقطات.</td></tr>';
         el('bc_country_table').querySelector('tbody').innerHTML = state.country.length
-            ? state.country.map((p) => '<tr><td>' + (p.country_code || '') + (p.country_name ? ' — ' + p.country_name : '') + '</td><td>' + p.package_id + '</td><td>' + badge(p.package_status) + '</td><td>' + p.schema_revision + '</td><td>' + (p.registry_version || '') + '</td><td>' + (p.recovery_score || 0) + '</td><td class="bc-actions">' + actionButtons(p, 'country_recovery') + '</td></tr>').join('')
-            : '<tr><td colspan="7" class="muted">لا توجد حزم دول.</td></tr>';
+            ? state.country.map((p) => '<tr><td>' + (p.country_code || '') + (p.country_name ? ' — ' + p.country_name : '') + '</td><td class="bc-ts-cell">' + fmtTimestampDisplay(p.generated_at) + '</td><td>' + p.package_id + '</td><td>' + badge(p.package_status) + '</td><td>' + p.schema_revision + '</td><td>' + (p.registry_version || '') + '</td><td>' + (p.recovery_score || 0) + '</td><td class="bc-actions">' + actionButtons(p, 'country_recovery') + '</td></tr>').join('')
+            : '<tr><td colspan="8" class="muted">لا توجد حزم دول.</td></tr>';
         el('bc_logs_table').querySelector('tbody').innerHTML = (data.logs || []).map((log) =>
             '<tr><td><code>' + log.name + '</code></td><td>' + log.category + '</td><td>' + fmtBytes(log.size_bytes) + '</td><td class="bc-ts-cell">' + fmtTimestampDisplay(new Date(log.mtime * 1000).toISOString()) + '</td><td><button type="button" class="btn-link bc-log-tail" data-log="' + log.name + '">عرض</button></td></tr>'
         ).join('');
