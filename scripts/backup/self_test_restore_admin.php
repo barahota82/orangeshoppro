@@ -81,6 +81,86 @@ function restore_admin_test_rmtree(string $dir): void
     @rmdir($dir);
 }
 
+function restore_admin_test_path_open_basedir_allowed(string $path): bool
+{
+    $raw = ini_get('open_basedir');
+    if (!is_string($raw) || trim($raw) === '') {
+        return true;
+    }
+    $pathNorm = str_replace('\\', '/', $path);
+    if (DIRECTORY_SEPARATOR === '\\') {
+        $pathNorm = strtolower($pathNorm);
+    }
+    foreach (explode(';', $raw) as $allowed) {
+        $allowed = trim(str_replace('\\', '/', $allowed));
+        if ($allowed === '') {
+            continue;
+        }
+        $allowedNorm = rtrim($allowed, '/');
+        if (DIRECTORY_SEPARATOR === '\\') {
+            $allowedNorm = strtolower($allowedNorm);
+        }
+        if ($pathNorm === $allowedNorm || str_starts_with($pathNorm, $allowedNorm . '/')) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function restore_admin_test_path_writable(string $dir): bool
+{
+    if ($dir === '' || !is_dir($dir) || !is_writable($dir)) {
+        return false;
+    }
+    $probe = $dir . DIRECTORY_SEPARATOR . 'orange_writable_' . bin2hex(random_bytes(2));
+    if (@file_put_contents($probe, '1') === false) {
+        return false;
+    }
+    @unlink($probe);
+
+    return true;
+}
+
+/** @return list<string> */
+function restore_admin_test_temp_base_candidates(string $projectRoot): array
+{
+    $candidates = [];
+    if (DIRECTORY_SEPARATOR === '\\') {
+        $candidates[] = 'C:\\Windows\\Temp';
+    }
+    $candidates[] = $projectRoot . DIRECTORY_SEPARATOR . 'var' . DIRECTORY_SEPARATOR . 'test_tmp';
+    $sysTemp = sys_get_temp_dir();
+    if ($sysTemp !== '') {
+        $candidates[] = $sysTemp;
+    }
+
+    return $candidates;
+}
+
+function restore_admin_test_temp_root(string $projectRoot): string
+{
+    foreach (restore_admin_test_temp_base_candidates($projectRoot) as $baseDir) {
+        if (!restore_admin_test_path_open_basedir_allowed($baseDir)) {
+            continue;
+        }
+        if (!is_dir($baseDir) && !@mkdir($baseDir, 0775, true) && !is_dir($baseDir)) {
+            continue;
+        }
+        if (!restore_admin_test_path_writable($baseDir)) {
+            continue;
+        }
+        $tmpRoot = $baseDir . DIRECTORY_SEPARATOR . 'orange_restore_admin_' . bin2hex(random_bytes(4));
+        if (!@mkdir($tmpRoot, 0775, true) && !is_dir($tmpRoot)) {
+            continue;
+        }
+
+        return $tmpRoot;
+    }
+
+    throw new RuntimeException('Cannot resolve writable restore admin self-test temp directory.');
+}
+
 /** @return list<string> */
 function restore_admin_engine_markers(): array
 {
@@ -117,8 +197,8 @@ try {
     require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
     require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_admin.php';
 
-    $tmpRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_admin_' . bin2hex(random_bytes(4));
-$backupRoot = $tmpRoot . DIRECTORY_SEPARATOR . 'backups';
+    $tmpRoot = restore_admin_test_temp_root($projectRoot);
+    $backupRoot = $tmpRoot . DIRECTORY_SEPARATOR . 'backups';
 $workRoot = $backupRoot . DIRECTORY_SEPARATOR . 'restore_work';
 $fakeProject = $tmpRoot . DIRECTORY_SEPARATOR . 'project';
 mkdir($backupRoot, 0775, true);
