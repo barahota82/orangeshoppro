@@ -132,7 +132,11 @@ function restore_admin_test_candidate_short_label(string $path): string
     if ($path === '') {
         return 'EMPTY';
     }
-    if (restore_admin_test_normalize_path_lexical($path) === 'c:/windows/temp') {
+    $norm = restore_admin_test_normalize_path_lexical($path);
+    if (str_ends_with($norm, '/private/restore_admin_test_tmp')) {
+        return 'private/restore_admin_test_tmp';
+    }
+    if ($norm === 'c:/windows/temp') {
         return 'Windows/Temp';
     }
     $short = str_replace('\\', '/', rtrim($path, '/\\'));
@@ -175,6 +179,9 @@ function restore_admin_test_normalize_path_lexical(string $path): string
         return '';
     }
     $path = preg_replace('#/+#', '/', $path) ?? $path;
+    if (DIRECTORY_SEPARATOR === '\\' && preg_match('#^([A-Za-z]):/#', $path, $m) === 1) {
+        $path = strtolower($m[1]) . ':/' . substr($path, 3);
+    }
     $path = rtrim($path, '/');
     if (DIRECTORY_SEPARATOR === '\\') {
         return strtolower($path);
@@ -241,13 +248,13 @@ function restore_admin_test_path_outside_project(string $path, string $projectRo
 }
 
 /** @return list<string> */
-function restore_admin_test_temp_base_candidates(): array
+function restore_admin_test_temp_base_candidates(string $projectRoot): array
 {
     $candidates = [];
     $seen = [];
 
     $addCandidate = function (string $path) use (&$candidates, &$seen): void {
-        $path = rtrim($path, '\\/');
+        $path = rtrim(str_replace('/', DIRECTORY_SEPARATOR, $path), '\\/');
         if ($path === '') {
             return;
         }
@@ -259,9 +266,7 @@ function restore_admin_test_temp_base_candidates(): array
         $candidates[] = $path;
     };
 
-    if (DIRECTORY_SEPARATOR === '\\') {
-        $addCandidate('C:\\Windows\\Temp');
-    }
+    $addCandidate(dirname($projectRoot) . DIRECTORY_SEPARATOR . 'private' . DIRECTORY_SEPARATOR . 'restore_admin_test_tmp');
 
     $rawOpenBasedir = ini_get('open_basedir');
     if (is_string($rawOpenBasedir) && trim($rawOpenBasedir) !== '') {
@@ -274,15 +279,16 @@ function restore_admin_test_temp_base_candidates(): array
     }
 
     $sysTemp = sys_get_temp_dir();
-    if ($sysTemp !== '') {
-        $rawOpenBasedirForSysTemp = ini_get('open_basedir');
-        if (is_string($rawOpenBasedirForSysTemp) && trim($rawOpenBasedirForSysTemp) !== '') {
-            if (restore_admin_test_path_open_basedir_allowed($sysTemp)) {
-                $addCandidate($sysTemp);
-            }
-        } elseif (DIRECTORY_SEPARATOR !== '\\') {
+    if ($sysTemp !== '' && restore_admin_test_path_open_basedir_allowed($sysTemp)) {
+        $addCandidate($sysTemp);
+    } elseif ($sysTemp !== '' && (!is_string($rawOpenBasedir) || trim($rawOpenBasedir) === '')) {
+        if (DIRECTORY_SEPARATOR !== '\\') {
             $addCandidate($sysTemp);
         }
+    }
+
+    if (DIRECTORY_SEPARATOR === '\\') {
+        $addCandidate('C:\\Windows\\Temp');
     }
 
     return $candidates;
@@ -290,7 +296,7 @@ function restore_admin_test_temp_base_candidates(): array
 
 function restore_admin_test_temp_root(string $projectRoot): string
 {
-    foreach (restore_admin_test_temp_base_candidates() as $baseDir) {
+    foreach (restore_admin_test_temp_base_candidates($projectRoot) as $baseDir) {
         restore_admin_test_fs_trace_reset();
         $baseDir = rtrim($baseDir, '\\/');
         $dirOk = false;
