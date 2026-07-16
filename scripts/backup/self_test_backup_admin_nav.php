@@ -40,6 +40,9 @@ function backup_nav_engine_markers(): array
         'backup_full.php',
         'country_batch_export.php',
         'recovery_validation.php',
+        'restore_orchestrator.php',
+        'restore_e2e_orchestrator.php',
+        'restore_admin.php',
     ];
 }
 
@@ -126,6 +129,18 @@ backup_nav_self_test(
 backup_nav_self_test(
     backup_nav_included_engine_file() === null,
     'nav: backup_center caps_for_page does not load backup engine'
+);
+
+$restoreFullPdo = backup_nav_test_pdo('backup_restore_full', false, 5);
+$restoreFullAdmin = ['id' => 5, 'is_superuser' => 0, 'is_active' => 1];
+$restoreCaps = orange_admin_caps_for_page($restoreFullAdmin, $restoreFullPdo, 'restore_center');
+backup_nav_self_test(
+    !empty($restoreCaps['can_view']) && ($restoreCaps['can_edit'] ?? false) === false,
+    'nav: restore_center caps use lightweight restore permission only'
+);
+backup_nav_self_test(
+    backup_nav_included_engine_file() === null,
+    'nav: restore_center caps_for_page does not load restore engine'
 );
 
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_admin.php';

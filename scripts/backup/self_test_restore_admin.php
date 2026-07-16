@@ -1,0 +1,281 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Phase 3B.1 — Restore Center read-only admin self-tests.
+ *
+ * Usage:
+ *   php scripts/backup/self_test_restore_admin.php
+ */
+
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit('CLI only');
+}
+
+$projectRoot = dirname(__DIR__, 2);
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'admin_permissions.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_admin.php';
+
+$failures = 0;
+
+function restore_admin_self_test(bool $ok, string $label): void
+{
+    global $failures;
+    if ($ok) {
+        echo "PASS: {$label}\n";
+    } else {
+        echo "FAIL: {$label}\n";
+        $failures++;
+    }
+}
+
+function restore_admin_test_pdo(string $permKey, bool $superuser, int $adminId = 2): PDO
+{
+    $pdo = new PDO('sqlite::memory:');
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->exec('CREATE TABLE admins (id INTEGER PRIMARY KEY, username TEXT, is_active INTEGER, is_superuser INTEGER, display_name TEXT, password_hash TEXT)');
+    $pdo->exec('CREATE TABLE admin_permissions (admin_id INTEGER, resource_key TEXT, can_view INTEGER, can_edit INTEGER, can_delete INTEGER)');
+    $pdo->exec('INSERT INTO admins VALUES (' . $adminId . ', \'op\', 1, ' . ($superuser ? '1' : '0') . ', \'Op\', \'\')');
+    if ($permKey !== '') {
+        $pdo->exec('INSERT INTO admin_permissions VALUES (' . $adminId . ', ' . $pdo->quote($permKey) . ', 1, 0, 0)');
+    }
+    $GLOBALS['orange_schema_table_cache'] = ['admins' => true, 'admin_permissions' => true];
+    $GLOBALS['orange_schema_column_cache'] = [
+        'admin_permissions.can_lock' => false,
+        'admin_permissions.can_unlock' => false,
+        'admin_permissions.can_print' => false,
+        'admin_permissions.can_export' => false,
+    ];
+
+    return $pdo;
+}
+
+function restore_admin_test_rmtree(string $dir): void
+{
+    if (!is_dir($dir)) {
+        return;
+    }
+    foreach (scandir($dir) ?: [] as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        $path = $dir . DIRECTORY_SEPARATOR . $entry;
+        if (is_dir($path)) {
+            restore_admin_test_rmtree($path);
+        } else {
+            @unlink($path);
+        }
+    }
+    @rmdir($dir);
+}
+
+/** @return list<string> */
+function restore_admin_engine_markers(): array
+{
+    return [
+        'restore_orchestrator.php',
+        'restore_e2e_orchestrator.php',
+        'restore_full_staging.php',
+        'restore_country_staging.php',
+        'restore_admin.php',
+    ];
+}
+
+function restore_admin_included_engine_file(): ?string
+{
+    foreach (get_included_files() as $path) {
+        $base = basename(str_replace('\\', '/', $path));
+        foreach (restore_admin_engine_markers() as $marker) {
+            if ($base === $marker) {
+                return $path;
+            }
+        }
+    }
+
+    return null;
+}
+
+$tmpRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_restore_admin_' . bin2hex(random_bytes(4));
+$backupRoot = $tmpRoot . DIRECTORY_SEPARATOR . 'backups';
+$workRoot = $backupRoot . DIRECTORY_SEPARATOR . 'restore_work';
+$fakeProject = $tmpRoot . DIRECTORY_SEPARATOR . 'project';
+mkdir($backupRoot, 0775, true);
+mkdir($workRoot, 0775, true);
+mkdir($fakeProject, 0775, true);
+file_put_contents(
+    $fakeProject . DIRECTORY_SEPARATOR . '.env.php',
+    "<?php\nreturn ['ORANGE_BACKUP_ROOT' => " . var_export($backupRoot, true) . "];\n"
+);
+
+$fullPkgId = '2026-07-01_120000';
+$fullPkgDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $fullPkgId;
+mkdir($fullPkgDir, 0775, true);
+orange_backup_write_json($fullPkgDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+    'package_type' => 'full_disaster',
+    'generated_at' => gmdate('c'),
+    'schema_revision' => 121,
+    'export_backend' => 'php_pdo',
+    'backup_status' => 'success',
+]);
+orange_backup_write_json($fullPkgDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+orange_backup_write_json($fullPkgDir . DIRECTORY_SEPARATOR . 'recovery_validation.json', [
+    'overall_result' => 'pass',
+    'recovery_score' => 95,
+    'generated_at' => gmdate('c'),
+]);
+
+$countryPkgId = '2026-07-01_130000';
+$countryPkgDir = $backupRoot . DIRECTORY_SEPARATOR . 'country_packages' . DIRECTORY_SEPARATOR . 'kw' . DIRECTORY_SEPARATOR . $countryPkgId;
+mkdir($countryPkgDir, 0775, true);
+orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'manifest.json', [
+    'package_type' => 'country_recovery',
+    'generated_at' => gmdate('c'),
+    'schema_revision' => 121,
+    'registry_version' => '1',
+    'backup_status' => 'success',
+]);
+orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'recovery_validation.json', [
+    'overall_result' => 'pass',
+    'recovery_score' => 88,
+]);
+
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_job.php';
+
+$fullJob = orange_restore_job_create($workRoot, [
+    'job_type' => ORANGE_RESTORE_JOB_TYPE_FULL,
+    'operator_admin_id' => 1,
+    'operator_username' => 'superadmin',
+    'source_package_path' => $fullPkgDir,
+    'source_package_checksum' => str_repeat('a', 64),
+    'schema_revision' => 121,
+]);
+$fullJobId = (string) ($fullJob['job_id'] ?? '');
+orange_restore_job_write($workRoot, array_merge($fullJob, [
+    'status' => ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL,
+    'approval_token' => 'PLAIN-MUST-NOT-LEAK',
+    'approval_token_hash' => hash('sha256', 'secret-token'),
+    'fresh_backup_path' => $fullPkgDir,
+    'fresh_backup_checksum' => str_repeat('b', 64),
+]));
+
+$countryJob = orange_restore_job_create($workRoot, [
+    'job_type' => ORANGE_RESTORE_JOB_TYPE_COUNTRY,
+    'operator_admin_id' => 2,
+    'operator_username' => 'countryop',
+    'source_package_path' => $countryPkgDir,
+    'source_package_checksum' => str_repeat('c', 64),
+    'country_code' => 'KW',
+    'schema_revision' => 121,
+]);
+$countryJobId = (string) ($countryJob['job_id'] ?? '');
+
+$superAdmin = ['id' => 1, 'is_superuser' => 1, 'is_active' => 1];
+$superPdo = restore_admin_test_pdo('', true, 1);
+$fullOnlyPdo = restore_admin_test_pdo('backup_restore_full', false, 2);
+$fullOnlyAdmin = ['id' => 2, 'is_superuser' => 0, 'is_active' => 1];
+$countryOnlyPdo = restore_admin_test_pdo('backup_restore_country', false, 3);
+$countryOnlyAdmin = ['id' => 3, 'is_superuser' => 0, 'is_active' => 1];
+$noPermPdo = restore_admin_test_pdo('', false, 4);
+$noPermAdmin = ['id' => 4, 'is_superuser' => 0, 'is_active' => 1];
+
+restore_admin_self_test(orange_restore_admin_may_view_full($superAdmin, $superPdo), 'permissions: superuser sees full');
+restore_admin_self_test(orange_restore_admin_may_view_country($superAdmin, $superPdo), 'permissions: superuser sees country');
+restore_admin_self_test(orange_restore_admin_may_view_full($fullOnlyAdmin, $fullOnlyPdo), 'permissions: full-only sees full');
+restore_admin_self_test(!orange_restore_admin_may_view_country($fullOnlyAdmin, $fullOnlyPdo), 'permissions: full-only denied country');
+restore_admin_self_test(!orange_restore_admin_may_view_full($countryOnlyAdmin, $countryOnlyPdo), 'permissions: country-only denied full');
+restore_admin_self_test(orange_restore_admin_may_view_country($countryOnlyAdmin, $countryOnlyPdo), 'permissions: country-only sees country');
+restore_admin_self_test(!orange_admin_may_restore_center_view($noPermAdmin, $noPermPdo), 'permissions: no restore permission denied');
+
+$ctx = orange_restore_admin_context($fakeProject);
+restore_admin_self_test($ctx['backup_root'] !== '', 'context: backup root resolved');
+
+$allJobs = orange_restore_admin_list_jobs($workRoot, true, true);
+restore_admin_self_test(count($allJobs) >= 2, 'jobs: superuser list includes jobs');
+
+$fullJobsOnly = orange_restore_admin_list_jobs($workRoot, true, false);
+restore_admin_self_test(
+    count($fullJobsOnly) >= 1 && !in_array($countryJobId, array_column($fullJobsOnly, 'job_id'), true),
+    'jobs: full-only permission filters country jobs'
+);
+
+$countryJobsOnly = orange_restore_admin_list_jobs($workRoot, false, true);
+restore_admin_self_test(
+    count($countryJobsOnly) >= 1 && !in_array($fullJobId, array_column($countryJobsOnly, 'job_id'), true),
+    'jobs: country-only permission filters full jobs'
+);
+
+$overview = orange_restore_admin_collect_overview($workRoot);
+restore_admin_self_test(($overview['job_counts']['total_jobs'] ?? 0) >= 2, 'overview: total jobs counted');
+restore_admin_self_test(($overview['job_counts']['awaiting_owner_approval'] ?? 0) >= 1, 'overview: awaiting approval counted');
+
+$fullPackages = orange_backup_admin_list_full_snapshots($backupRoot, 5);
+$publicFull = orange_restore_admin_public_package_row($fullPackages[0], 'full_disaster');
+restore_admin_self_test(!isset($publicFull['package_path']), 'packages: absolute package_path stripped');
+restore_admin_self_test(isset($publicFull['restore_eligibility']), 'packages: restore eligibility attached');
+
+try {
+    orange_restore_admin_assert_job_allowlisted($workRoot, '../../etc/passwd');
+    restore_admin_self_test(false, 'security: arbitrary job id rejected');
+} catch (Throwable) {
+    restore_admin_self_test(true, 'security: arbitrary job id rejected');
+}
+
+try {
+    orange_backup_admin_resolve_full_package_path($backupRoot, '../../../evil');
+    restore_admin_self_test(false, 'security: arbitrary package id rejected');
+} catch (Throwable) {
+    restore_admin_self_test(true, 'security: arbitrary package id rejected');
+}
+
+$redacted = orange_restore_admin_redact_secrets([
+    'approval_token' => 'secret-token',
+    'password' => 'pw',
+    'token_hash' => 'abc',
+    'safe' => 'visible',
+]);
+restore_admin_self_test(!isset($redacted['approval_token']) && !isset($redacted['password']) && !isset($redacted['token_hash']), 'security: token/hash/password redaction');
+restore_admin_self_test(($redacted['safe'] ?? '') === 'visible', 'security: non-secret fields preserved');
+
+$detail = orange_restore_admin_job_detail($fakeProject, $workRoot, $fullJobId);
+restore_admin_self_test(($detail['read_only'] ?? false) === true, 'job detail: read_only flag');
+restore_admin_self_test(!str_contains(json_encode($detail, JSON_UNESCAPED_UNICODE), 'PLAIN-MUST-NOT-LEAK'), 'job detail: no plaintext approval token');
+restore_admin_self_test(!str_contains(json_encode($detail, JSON_UNESCAPED_UNICODE), $fullPkgDir), 'job detail: no raw absolute package path');
+
+$auditPayload = orange_restore_admin_sanitize_audit_list([
+    ['recorded_at' => gmdate('c'), 'stage' => 'approval_gate', 'approval_token' => 'leak', 'result' => 'pass'],
+]);
+restore_admin_self_test(!isset($auditPayload[0]['approval_token']), 'security: audit sanitization removes tokens');
+
+$listApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'list.php');
+$statusApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'status.php');
+restore_admin_self_test(str_contains($listApiSource, 'restore_admin_api_require_get'), 'api: list.php GET-only guard');
+restore_admin_self_test(str_contains($statusApiSource, 'restore_admin_api_require_get'), 'api: status.php GET-only guard');
+restore_admin_self_test(!str_contains(strtolower($listApiSource), 'orchestrator_approve'), 'api: list.php has no mutating restore calls');
+restore_admin_self_test(!str_contains(strtolower($statusApiSource), 'orchestrator_rollback'), 'api: status.php has no rollback calls');
+restore_admin_self_test(!str_contains(strtolower($statusApiSource), 'orchestrator_merge'), 'api: status.php has no merge calls');
+
+$pageSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php');
+restore_admin_self_test(str_contains($pageSource, 'Phase 3B.1'), 'ui: restore_center Phase 3B.1');
+restore_admin_self_test(str_contains($pageSource, 'read_only') || str_contains($pageSource, 'للعرض والمتابعة فقط'), 'ui: read-only warning present');
+restore_admin_self_test(!str_contains($pageSource, 'بدء الاسترداد'), 'ui: no Start Restore button label');
+restore_admin_self_test(!preg_match('/<button[^>]*>[^<]*موافقة/u', $pageSource), 'ui: no approval action button');
+restore_admin_self_test(stripos($pageSource, '>Rollback<') === false && stripos($pageSource, 'restore_full_rollback.php') === false, 'ui: no Rollback action control');
+restore_admin_self_test(!str_contains($pageSource, 'restore_admin.php'), 'ui: page does not load restore_admin.php at render');
+
+$navBefore = count(get_included_files());
+$visible = orange_admin_nav_visible($superAdmin, $superPdo, 'restore_center');
+restore_admin_self_test($visible === true, 'nav: superuser sees restore_center');
+restore_admin_self_test(restore_admin_included_engine_file() === null, 'nav: restore_center visibility does not load restore engine');
+
+$restoreAdminLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_admin.php');
+restore_admin_self_test(!str_contains($restoreAdminLib, 'function orange_restore_orchestrator_approve'), 'lib: restore_admin does not define mutating orchestrator wrappers');
+restore_admin_self_test(!str_contains($restoreAdminLib, 'orange_restore_e2e_start_full'), 'lib: restore_admin does not expose e2e start');
+
+restore_admin_test_rmtree($tmpRoot);
+
+echo $failures === 0 ? "All restore admin self-tests passed.\n" : "Restore admin self-tests failed: {$failures}\n";
+exit($failures > 0 ? 1 : 0);
