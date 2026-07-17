@@ -571,28 +571,38 @@ Fail → rollback_preparing.
 - **Prerequisite:** `pre_restore_backup_ready` + pinned rollback anchor + valid execution contract; Full only  
 - **Tests:** `self_test_shadow_restore.php` + expansions in `self_test_restore_admin.php`  
 
-### 3B.3B5 — File restore staging + verification
+### 3B.3B5 — Shadow Database Verification & Production Readiness (owner scope)
+
+- **Code:** `includes/backup/restore/restore_shadow_verify.php`; CLI `scripts/backup/restore_shadow_verify.php --job=`; GET `shadow-verification.php` (read-only)  
+- **Prerequisite:** `shadow_restore_ready` (+ pinned pre-restore anchor + valid contract); Full only  
+- **Effects:** deep read-only inspect of shadow DB; writes `{job}/shadow_verification.json` + `{job}/shadow_verification_report.json`; stops at `shadow_verified` / `shadow_not_ready` (via `shadow_verifying`)  
+- **Report overall:** `READY` | `WARNING` | `FAIL` + **readiness_score** (0–100)  
+- **Checks:** schema revision, tables, FKs, indexes, triggers/routines/events/views, AUTO_INCREMENT, row counts, CHECKSUM where supported, charset/collation; compare vs package + read-only production schema; detect missing/extra objects, broken FK, orphans  
+- **Must not:** production writes, cutover, app config switch, file restore, maintenance enable, rollback execution, HTTP-side verification run  
+- **Tests:** `self_test_shadow_verify.php` + expansions in `self_test_restore_admin.php`  
+
+### 3B.3B6 — File restore staging + verification
 
 - **Code:** uploads applicator to staging/`uploads_next`; no production rename  
 - **Effects:** staging files only  
 - **Tests:** zip-slip, symlink deny, checksum  
 - **Rollback:** delete staging tree  
 
-### 3B.3B6 — Rollback engine
+### 3B.3B7 — Rollback engine
 
 - **Code:** automate rollback from pinned Full anchor + uploads snapshot; CLI + later admin  
 - **Effects:** may touch prod **only** in controlled rollback drills on non-prod first  
 - **Tests:** simulated cutover failure → rolled_back  
 - **Prod gate:** drill sign-off  
 
-### 3B.3B7 — Production execution wiring
+### 3B.3B8 — Production execution wiring
 
 - **Code:** cutover wiring under maint; admin progress UI; heartbeat worker  
 - **Effects:** real Full restore path  
 - **Tests:** end-to-end on clone; then limited prod drill window  
-- **Rollback:** 3B.3B5  
+- **Rollback:** 3B.3B7  
 
-### 3B.3B7 — Disaster recovery drill
+### 3B.3B9 — Disaster recovery drill
 
 - **Code:** runbooks + checklist automation  
 - **Effects:** scheduled drill restore on clone  

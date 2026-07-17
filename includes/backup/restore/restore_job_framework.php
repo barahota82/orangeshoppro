@@ -39,6 +39,9 @@ const ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING = 'shadow_restore_running'
 const ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING = 'shadow_restore_verifying';
 const ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY = 'shadow_restore_ready';
 const ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED = 'shadow_restore_failed';
+const ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFYING = 'shadow_verifying';
+const ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED = 'shadow_verified';
+const ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY = 'shadow_not_ready';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED = 'execution_completed';
@@ -66,6 +69,9 @@ const ORANGE_RESTORE_FW_PHASE_SHADOW_RESTORE_RUNNING = 'shadow_restore_running';
 const ORANGE_RESTORE_FW_PHASE_SHADOW_RESTORE_VERIFYING = 'shadow_restore_verifying';
 const ORANGE_RESTORE_FW_PHASE_SHADOW_RESTORE_READY = 'shadow_restore_ready';
 const ORANGE_RESTORE_FW_PHASE_SHADOW_RESTORE_FAILED = 'shadow_restore_failed';
+const ORANGE_RESTORE_FW_PHASE_SHADOW_VERIFYING = 'shadow_verifying';
+const ORANGE_RESTORE_FW_PHASE_SHADOW_VERIFIED = 'shadow_verified';
+const ORANGE_RESTORE_FW_PHASE_SHADOW_NOT_READY = 'shadow_not_ready';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_COMPLETED = 'execution_completed';
@@ -124,6 +130,9 @@ function orange_restore_fw_allowed_statuses(): array
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY,
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFYING,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED,
@@ -467,6 +476,9 @@ function orange_restore_fw_public_row(array $job): array
                 ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFYING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY,
             ], true),
         'pre_restore_backup_requestable' => in_array($status, [
             ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
@@ -484,6 +496,9 @@ function orange_restore_fw_public_row(array $job): array
                 ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFYING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY,
             ], true),
         'pre_restore_backup_status' => (string) ($job['pre_restore_backup_status'] ?? ''),
         'shadow_restore_requestable' => in_array($status, [
@@ -497,8 +512,23 @@ function orange_restore_fw_public_row(array $job): array
                 ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFYING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY,
             ], true),
         'shadow_restore_status' => (string) ($job['shadow_restore_status'] ?? ''),
+        'shadow_verification_runnable' => in_array($status, [
+            ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY,
+        ], true) && (string) ($job['package_type'] ?? '') === 'full_disaster',
+        'has_shadow_verification' => !empty($job['shadow_verification_file'])
+            || in_array($status, [
+                ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFYING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY,
+            ], true),
+        'shadow_verification_status' => (string) ($job['shadow_verification_status'] ?? ''),
+        'shadow_readiness_score' => (int) ($job['shadow_readiness_score'] ?? 0),
         'requires_final_approval' => (bool) ($job['requires_final_approval'] ?? false),
         'execution_started' => (bool) ($job['execution_started'] ?? false),
         'framework_version' => (string) ($job['framework_version'] ?? ORANGE_RESTORE_FW_VERSION),

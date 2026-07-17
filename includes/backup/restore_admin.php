@@ -17,6 +17,7 @@ require_once __DIR__ . '/restore/restore_final_approval.php';
 require_once __DIR__ . '/restore/restore_execution_bridge.php';
 require_once __DIR__ . '/restore/restore_pre_restore_backup.php';
 require_once __DIR__ . '/restore/restore_shadow_db.php';
+require_once __DIR__ . '/restore/restore_shadow_verify.php';
 
 const ORANGE_RESTORE_ADMIN_JOB_ID_PATTERN = '/^[a-zA-Z0-9._-]+$/';
 
@@ -1261,6 +1262,57 @@ function orange_restore_admin_fw_shadow_restore(
 }
 
 /**
+ * Read-only shadow verification status/report (HTTP never runs verifier).
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_shadow_verification(
+    string $workRoot,
+    bool $mayFull,
+    bool $mayCountry,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    if ($type === 'full_disaster' && !$mayFull) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+    if ($type === 'country_recovery' && !$mayCountry) {
+        throw new RuntimeException('Operator lacks backup_restore_country permission.');
+    }
+
+    $status = (string) ($job['status'] ?? '');
+    $labels = [
+        ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFYING => 'جارٍ التحقق العميق من قاعدة الظل',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED => 'قاعدة الظل موثّقة وجاهزة (بدون قطع إنتاج)',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY => 'قاعدة الظل غير جاهزة للقطع',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY => 'بانتظار تشغيل عامل CLI للتحقق',
+    ];
+    $meta = orange_restore_shadow_verify_load_meta($workRoot, $jobId);
+    $report = orange_restore_shadow_verify_load_report($workRoot, $jobId);
+    $cliNeeded = in_array($status, [
+        ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY,
+    ], true);
+
+    return [
+        'job' => orange_restore_fw_public_row($job),
+        'meta' => $meta !== null ? orange_restore_shadow_verify_public_meta($meta) : null,
+        'report' => $report !== null ? orange_restore_shadow_verify_public_report($report) : null,
+        'status_label_ar' => $labels[$status] ?? '',
+        'cli_needed' => $cliNeeded,
+        'cli_command' => 'php scripts/backup/restore_shadow_verify.php --job=' . $jobId,
+        'execution_started' => false,
+        'production_touched' => false,
+        'read_only' => true,
+    ];
+}
+
+/**
  * Read-only execution contract for an approved framework job.
  *
  * @return array<string, mixed>
@@ -1375,6 +1427,10 @@ function orange_restore_admin_safe_message(Throwable $e): string
         'shadow_verify_failed',
         'dump_file_missing',
         'package_incompatible',
+        'shadow_verify_lock_active',
+        'shadow_restore_not_ready',
+        'shadow_not_ready',
+        'shadow_verification_failed',
     ];
     if (in_array($msg, $passthrough, true)) {
         return $msg;

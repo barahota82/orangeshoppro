@@ -408,6 +408,9 @@ function orange_restore_validate_execution_contract(
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY,
         ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFYING,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY,
     ];
     if (!in_array($status, $contractValidStatuses, true)) {
         $reasons[] = 'invalid_status';

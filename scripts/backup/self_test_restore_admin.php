@@ -2321,6 +2321,32 @@ restore_admin_self_test(
     'shadow: Restore Center UI wires request/view + ready status'
 );
 
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_shadow_verify.php'), 'shadow-verify: CLI entry present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'shadow-verification.php'), 'shadow-verify: GET API present');
+restore_admin_self_test(!is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-shadow-verification.php'), 'shadow-verify: no HTTP request endpoint');
+$shadowVerifyLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_shadow_verify.php');
+restore_admin_self_test(
+    str_contains($shadowVerifyLib, 'shadow_verification_report.json')
+    && str_contains($shadowVerifyLib, 'readiness_score')
+    && str_contains($shadowVerifyLib, 'ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED')
+    && str_contains($shadowVerifyLib, 'ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY')
+    && !str_contains($shadowVerifyLib, 'orange_restore_orchestrator_database_cutover(')
+    && !str_contains($shadowVerifyLib, 'orange_restore_full_staging_run('),
+    'shadow-verify: report + score + statuses; no cutover/staging'
+);
+$shadowVerifyApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'shadow-verification.php');
+restore_admin_self_test(
+    str_contains($shadowVerifyApi, 'restore_admin_api_require_get')
+    && !str_contains($shadowVerifyApi, 'orange_restore_shadow_verify_run_cli'),
+    'shadow-verify: HTTP is GET/read-only'
+);
+restore_admin_self_test(
+    str_contains($shadowUi, 'rc-shadow-verify-view')
+    && str_contains($shadowUi, 'shadow_verified')
+    && str_contains($shadowUi, 'shadow_not_ready'),
+    'shadow-verify: Restore Center UI wires verification view + statuses'
+);
+
     restore_admin_test_run_cleanup();
     restore_admin_test_emit_summary();
     exit($failures > 0 ? 1 : 0);
