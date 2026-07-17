@@ -105,6 +105,18 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     </dl>
 </div>
 
+<div class="rc-section card" id="rc_rollback_section">
+    <h3>التراجع الإنتاجي (Production Rollback)</h3>
+    <p id="rc_rollback_banner" class="rc-readonly-banner" style="margin:0 0 10px;" role="status">
+        <strong>Maintenance remains active. Restore is NOT completed. Rollback anchor retained.</strong>
+    </p>
+    <dl id="rc_rollback_status" class="rc-status-strip">
+        <div><dt>الحالة</dt><dd>…</dd></div>
+        <div><dt>أعلى نقطة تحقق</dt><dd>…</dd></div>
+        <div><dt>CLI</dt><dd>…</dd></div>
+    </dl>
+</div>
+
 <div id="rc_progress" class="rc-progress" role="status" aria-live="polite">جاري التحميل…</div>
 <div id="rc_alert" class="card" style="display:none;margin-bottom:12px;"></div>
 
@@ -523,6 +535,30 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         }
         if (job.uploads_cutover_requestable || job.has_uploads_cutover || job.is_uploads_cutover_ready || job.is_uploads_cutover_failed) {
             html += '<strong class="muted">Maintenance remains active. Restore is NOT completed.</strong> ';
+        }
+        if (job.rollback_requestable) {
+            html += '<button type="button" class="btn-link rc-rollback-req" data-id="' + id + '">طلب التراجع الإنتاجي</button> ';
+        }
+        if (job.has_rollback || job.is_rollback_ready || job.is_rollback_failed) {
+            html += '<button type="button" class="btn-link rc-rollback-view" data-id="' + id + '">حالة التراجع</button> ';
+        }
+        if (job.status === 'rollback_pending') {
+            html += '<span class="rc-badge rc-badge--warning">Rollback Pending</span> ';
+        }
+        if (job.status === 'rollback_database_running' || job.status === 'rollback_database_verifying') {
+            html += '<span class="rc-badge rc-badge--warning">Rollback DB</span> ';
+        }
+        if (job.status === 'rollback_files_running' || job.status === 'rollback_files_verifying') {
+            html += '<span class="rc-badge rc-badge--warning">Rollback Files</span> ';
+        }
+        if (job.is_rollback_ready) {
+            html += '<span class="rc-badge rc-badge--success">Rollback Ready</span> ';
+        }
+        if (job.is_rollback_failed) {
+            html += '<span class="rc-badge rc-badge--failed">Rollback Failed</span> ';
+        }
+        if (job.rollback_requestable || job.has_rollback || job.is_rollback_ready || job.is_rollback_failed) {
+            html += '<strong class="muted">Maintenance remains active. Restore is NOT completed. Anchor retained.</strong> ';
         }
         if (job.execution_plan_cancellable) {
             html += '<button type="button" class="btn-link rc-cancel-exec" data-id="' + id + '">إلغاء الخطة</button> ';
@@ -1180,6 +1216,67 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                     maintenance_released: false,
                     restore_completed: false,
                     warning: 'Maintenance remains active. Restore is NOT completed. Rollback was NOT executed.'
+                }, null, 2));
+            } catch (e) {
+                showAlert(e.message || 'تعذر العرض', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-rollback-req')) {
+            try {
+                setBusy(true, 'جاري طلب التراجع الإنتاجي…');
+                const j = await apiPost('job/request-rollback.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || ''
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert(
+                    (j.message || 'Rollback Pending')
+                    + ' — Maintenance remains active. Restore is NOT completed. Anchor retained.'
+                    + (j.cli_command ? (' CLI: ' + j.cli_command) : ''),
+                    true
+                );
+                if (el('rc_rollback_status')) {
+                    el('rc_rollback_status').innerHTML =
+                        '<div><dt>الحالة</dt><dd>' + badge('Rollback Pending') + '</dd></div>'
+                        + '<div><dt>أعلى نقطة تحقق</dt><dd>—</dd></div>'
+                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || '—') + '</code></dd></div>';
+                }
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر طلب التراجع', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-rollback-view')) {
+            try {
+                setBusy(true, 'جاري التحميل…');
+                const j = await apiGet('job/rollback.php?id=' + encodeURIComponent(t.dataset.id || ''));
+                if (el('rc_rollback_status')) {
+                    el('rc_rollback_status').innerHTML =
+                        '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || '—') + '</dd></div>'
+                        + '<div><dt>أعلى نقطة تحقق</dt><dd>' + (j.highest_checkpoint || '—') + '</dd></div>'
+                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '—') + '</dd></div>';
+                }
+                openView('Rollback — ' + (t.dataset.id || ''), JSON.stringify({
+                    status_label: j.status_label || '',
+                    job: j.job || {},
+                    meta: j.meta || {},
+                    report: j.report || {},
+                    checkpoint_history: j.checkpoint_history || [],
+                    highest_checkpoint: j.highest_checkpoint || '',
+                    execution_started: false,
+                    maintenance_released: false,
+                    restore_completed: false,
+                    rollback_anchor_deleted: false,
+                    retention_pin_removed: false,
+                    warning: 'Maintenance remains active. Restore is NOT completed. Rollback anchor retained.'
                 }, null, 2));
             } catch (e) {
                 showAlert(e.message || 'تعذر العرض', false);

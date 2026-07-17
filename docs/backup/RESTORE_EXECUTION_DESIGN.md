@@ -637,21 +637,23 @@ Fail → rollback_preparing.
 - **Must not:** database import, rollback, maintenance release, finalize/complete  
 - **Tests:** `self_test_production_uploads_cutover.php`  
 
-### 3B.3B8 / 3B.4F — Rollback engine (implementation; see 3B.4 design)
+### 3B.4E — Production Rollback Engine
 
-- **Code:** automate rollback from pinned Full anchor + uploads snapshot; CLI + later admin  
-- **Effects:** may touch prod **only** in controlled rollback drills on non-prod first  
-- **Tests:** simulated cutover failure → rolled_back  
-- **Prod gate:** drill sign-off  
+- **Code:** `includes/backup/restore/restore_production_rollback.php`  
+- **CLI:** `scripts/backup/restore_rollback.php --job=`  
+- **APIs:** `request-rollback.php` (metadata), `rollback.php` (status)  
+- **Effects:** production DB restore from Full rollback anchor + uploads rename from `uploads_pre_merge`; checkpoints C9–C12; stops at `rollback_ready`  
+- **Must not:** release maintenance, mark restore completed, finalize, delete anchors, unpin retention  
+- **Tests:** `self_test_production_rollback.php`  
 
-### 3B.3B9 / 3B.4D–3B.4G — Production execution wiring (implementation; see 3B.4 design)
+### 3B.3B9 / 3B.4F–3B.4H — Production execution wiring (implementation; see 3B.4 design)
 
-- **Code:** cutover wiring under maint; admin progress UI; heartbeat worker; import safety checkpoints per 3B.4A  
-- **Effects:** real Full restore path  
+- **Code:** authorization gate, route middleware, smoke + finalize + maint exit  
+- **Effects:** real Full restore path completion  
 - **Tests:** end-to-end on clone; then limited prod drill window  
-- **Rollback:** 3B.4F  
+- **Rollback:** 3B.4E  
 
-### 3B.3B10 / 3B.4H — Disaster recovery drill (implementation; see 3B.4 design)
+### 3B.3B10 / 3B.4I — Disaster recovery drill (implementation; see 3B.4 design)
 
 - **Code:** runbooks + checklist automation  
 - **Effects:** scheduled drill restore on clone  

@@ -487,22 +487,27 @@ Live cutover is **forbidden** until all boxes are checked:
 - **Must not:** database import, rollback, maintenance release, finalize/complete restore  
 - **Tests:** `self_test_production_uploads_cutover.php` (temp directories only)  
 
-### 3B.4E — Production cutover authorization gate (metadata + UI warnings only)
+### 3B.4E — Production Rollback Engine — DONE
+
+- **Code:** `includes/backup/restore/restore_production_rollback.php`  
+- **CLI:** `scripts/backup/restore_rollback.php --job=` (only); HTTP never executes  
+- **APIs:** `request-rollback.php` (metadata), `rollback.php` (status GET)  
+- **States:** `uploads_cutover_ready` → `rollback_pending` → `rollback_database_running` → `rollback_database_verifying` → `rollback_files_running` → `rollback_files_verifying` → `rollback_ready` / `rollback_failed`  
+- **Checkpoints:** C9 database rollback complete | C10 database verify complete | C11 uploads rollback complete | C12 rollback verify complete  
+- **Sources:** Full rollback anchor dump only (never shadow DB); `uploads_pre_merge_{job}` → `uploads` only (never shadow workspace)  
+- **Must not:** release maintenance, mark restore completed, finalize execution, delete rollback anchors, remove retention pins  
+- **Tests:** `self_test_production_rollback.php` (isolated fixtures / mock PDO only)  
+
+### 3B.4F — Production cutover authorization gate (metadata + UI warnings only)
 
 - Explicit `production_cutover_authorized` record separate from shadow readiness  
 - Still no application PHP/.env cutover  
 - Tests: cannot authorize without readiness; Country rejected  
 
-### 3B.4F — Route-level maintenance middleware wiring (storefront/admin/cron)
+### 3B.4G — Route-level maintenance middleware wiring (storefront/admin/cron)
 
 - Wire real request guards using `orange_restore_production_maintenance_decide`  
 - Tests: writes 503; Restore Center emergency paths permissioned  
-
-### 3B.4G — Rollback worker + emergency UI
-
-- Wire `orange_restore_merge_rollback_*` to 3B job + anchor pin  
-- Auto-trigger after PONR failures  
-- Tests: induced failures → `rolled_back`  
 
 ### 3B.4H — Production smoke + finalize + maint exit
 
@@ -522,28 +527,19 @@ Live cutover is **forbidden** until all boxes are checked:
 
 ---
 
-## 16. State machine additions (future)
+## 16. State machine additions (3B.4E rollback path)
 
-Pre-execution (already exist through 3B.3B7) remain. After authorization:
-
-```
-cutover_authorized
-→ maintenance_entering → maintenance_active
-→ cutover_exporting
-→ cutover_checkpoint_a
-→ database_cutover_running → database_cutover_complete
-→ files_cutover_running → files_cutover_complete
-→ post_cutover_validating
-→ production_smoke_running
-→ finalizing → completed
-```
-
-Failure/rollback:
+After uploads cutover ready:
 
 ```
-→ rollback_preparing → rolling_back_database → rolling_back_files
-→ rollback_verifying → rolled_back | rollback_failed
+uploads_cutover_ready
+→ rollback_pending
+→ rollback_database_running → rollback_database_verifying
+→ rollback_files_running → rollback_files_verifying
+→ rollback_ready
 ```
+
+Failure: `rollback_failed` (maintenance remains active; anchors/pins retained).
 
 Cancel allowed only **before PONR**. After PONR: rollback only.
 
