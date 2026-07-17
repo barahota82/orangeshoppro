@@ -59,19 +59,24 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
 </style>
 
 <p class="rc-readonly-banner" role="status">
-    <strong>تنبيه:</strong> يمكن إنشاء مهمة، Dry Validation، إعداد خطة، وطلب تحدي الموافقة النهائية فقط.
-    الاعتماد لا يبدأ الاسترداد ولا يفعّل وضع الصيانة. لا يوجد تنفيذ / تفعيل صيانة / عامل / استرجاع عكسي في هذه المرحلة.
+    <strong>تنبيه:</strong> يمكن تفعيل إطار الصيانة بعد الجاهزية المعزولة.
+    <strong>Production restore has NOT started.</strong>
+    لا يوجد استيراد/مسح لقاعدة الإنتاج، ولا استعادة ملفات، ولا cutover، ولا rollback في هذه المرحلة.
 </p>
 
 <div class="rc-section card" id="rc_maint_section">
-    <h3>حالة وضع الصيانة</h3>
-    <p class="muted" style="margin:0 0 10px;">عرض فقط — الاعتماد لا يبدأ الاسترداد ولا يفعّل الصيانة.</p>
+    <h3>حالة وضع الصيانة (Production Maintenance)</h3>
+    <p id="rc_maint_banner" class="rc-readonly-banner" style="margin:0 0 10px;" role="status">
+        <strong>Production restore has NOT started.</strong>
+    </p>
     <dl id="rc_maint_status" class="rc-status-strip">
         <div><dt>الحالة</dt><dd>…</dd></div>
+        <div><dt>الملصق</dt><dd>…</dd></div>
         <div><dt>المهمة المرتبطة</dt><dd>…</dd></div>
         <div><dt>وقت الطلب</dt><dd>…</dd></div>
         <div><dt>وقت التفعيل</dt><dd>…</dd></div>
         <div><dt>آخر نبضة</dt><dd>…</dd></div>
+        <div><dt>Stale</dt><dd>…</dd></div>
     </dl>
     <div id="rc_maint_policy" class="muted" style="margin-top:8px;"></div>
 </div>
@@ -334,16 +339,26 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     function renderMaintenance(m) {
         const st = m || {};
         if (!el('rc_maint_status')) return;
+        let label = st.label || st.state || 'inactive';
+        if (st.maintenance_active) label = 'Maintenance Active';
+        else if (st.maintenance_ready) label = 'Maintenance Ready';
         el('rc_maint_status').innerHTML =
             '<div><dt>الحالة</dt><dd>' + badge(st.state || 'inactive') + '</dd></div>' +
+            '<div><dt>الملصق</dt><dd><strong>' + label + '</strong></dd></div>' +
             '<div><dt>المهمة المرتبطة</dt><dd>' + (st.related_job_id || '—') + '</dd></div>' +
             '<div><dt>وقت الطلب</dt><dd class="rc-ts-cell">' + fmtTimestampDisplay(st.requested_at) + '</dd></div>' +
             '<div><dt>وقت التفعيل</dt><dd class="rc-ts-cell">' + fmtTimestampDisplay(st.activated_at) + '</dd></div>' +
-            '<div><dt>آخر نبضة</dt><dd class="rc-ts-cell">' + fmtTimestampDisplay(st.heartbeat_at) + '</dd></div>';
+            '<div><dt>آخر نبضة</dt><dd class="rc-ts-cell">' + fmtTimestampDisplay(st.heartbeat_at) + '</dd></div>' +
+            '<div><dt>Stale</dt><dd>' + (st.stale ? badge('stale — no auto-release') : badge('fresh')) + '</dd></div>';
+        if (el('rc_maint_banner')) {
+            el('rc_maint_banner').innerHTML = '<strong>Production restore has NOT started.</strong>'
+                + (st.stale ? ' <span class="rc-badge rc-badge--warning">Maintenance heartbeat stale — never auto-released.</span>' : '');
+        }
         const scopes = Array.isArray(st.blocked_write_scopes) ? st.blocked_write_scopes.join(', ') : '';
         el('rc_maint_policy').textContent = 'سياسة القراءة الآمنة: ' + (st.safe_read_policy || '—')
             + (scopes ? ' | نطاقات الكتابة المحظورة عند التفعيل: ' + scopes : '')
-            + ' | ' + (st.warning || '');
+            + ' | auto_release_forbidden=true'
+            + ' | ' + (st.warning || 'Production restore has NOT started.');
     }
 
     function packageActions(pkg, type) {
@@ -419,6 +434,23 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         }
         if (job.has_shadow_smoke || job.has_cutover_readiness) {
             html += '<button type="button" class="btn-link rc-shadow-smoke-view" data-id="' + id + '">عرض اختبار الجاهزية / قرار التحويل</button> ';
+        }
+        if (job.maintenance_requestable) {
+            html += '<button type="button" class="btn-link rc-maint-req" data-id="' + id + '">طلب تفعيل الصيانة</button> ';
+        }
+        if (job.maintenance_activatable || job.is_maintenance_ready) {
+            html += '<button type="button" class="btn-link rc-maint-activate" data-id="' + id + '">تفعيل الصيانة</button> ';
+        }
+        if (job.is_maintenance_ready) {
+            html += '<span class="rc-badge rc-badge--warning">Maintenance Ready</span> ';
+            html += '<strong class="muted">Production restore has NOT started.</strong> ';
+        }
+        if (job.is_maintenance_active) {
+            html += '<span class="rc-badge rc-badge--failed">Maintenance Active</span> ';
+            html += '<strong>Production restore has NOT started.</strong> ';
+        }
+        if (job.is_maintenance_ready || job.is_maintenance_active || job.maintenance_requestable) {
+            html += '<button type="button" class="btn-link rc-maint-state" data-id="' + id + '">حالة الصيانة</button> ';
         }
         if (job.execution_plan_cancellable) {
             html += '<button type="button" class="btn-link rc-cancel-exec" data-id="' + id + '">إلغاء الخطة</button> ';
@@ -873,6 +905,87 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                     production_cutover_allowed: false,
                     execution_started: false,
                     warning: j.warning || 'لم يتم تعديل قاعدة الإنتاج أو ملفات الإنتاج، ولا يزال التحويل إلى الإنتاج غير مسموح.'
+                }, null, 2));
+            } catch (e) {
+                showAlert(e.message || 'تعذر العرض', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-maint-req')) {
+            try {
+                setBusy(true, 'جاري طلب تفعيل الصيانة…');
+                const j = await apiPost('job/request-maintenance.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || ''
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert((j.message || 'Maintenance Ready') + ' — Production restore has NOT started.', true);
+                if (j.challenge && j.challenge.nonce) {
+                    state.maintNonce = state.maintNonce || {};
+                    state.maintNonce[t.dataset.id || ''] = j.challenge.nonce;
+                }
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر طلب الصيانة', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-maint-activate')) {
+            try {
+                const jobId = t.dataset.id || '';
+                let nonce = (state.maintNonce && state.maintNonce[jobId]) || '';
+                if (!nonce) {
+                    const req = await apiPost('job/request-maintenance.php', {
+                        csrf_token: state.csrf,
+                        job_id: jobId
+                    });
+                    if (req.csrf_token) state.csrf = req.csrf_token;
+                    nonce = (req.challenge && req.challenge.nonce) || '';
+                    state.maintNonce = state.maintNonce || {};
+                    state.maintNonce[jobId] = nonce;
+                }
+                const password = window.prompt('كلمة مرور إعادة التحقق لتفعيل الصيانة (مطلوبة):', '');
+                if (password === null || password === '') {
+                    showAlert('recent_authentication_not_available', false);
+                    return;
+                }
+                setBusy(true, 'جاري تفعيل إطار الصيانة…');
+                const j = await apiPost('job/activate-maintenance.php', {
+                    csrf_token: state.csrf,
+                    job_id: jobId,
+                    password: password,
+                    nonce: nonce
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert('Maintenance Active — Production restore has NOT started.', true);
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر تفعيل الصيانة', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-maint-state')) {
+            try {
+                setBusy(true, 'جاري التحميل…');
+                const j = await apiGet('job/maintenance-state.php?id=' + encodeURIComponent(t.dataset.id || ''));
+                openView('Maintenance State — ' + (t.dataset.id || ''), JSON.stringify({
+                    maintenance: j.maintenance || {},
+                    job: j.job || {},
+                    record: j.record || {},
+                    stale: !!j.stale,
+                    auto_release_forbidden: true,
+                    execution_started: false,
+                    restore_started: false,
+                    warning: 'Production restore has NOT started.'
                 }, null, 2));
             } catch (e) {
                 showAlert(e.message || 'تعذر العرض', false);

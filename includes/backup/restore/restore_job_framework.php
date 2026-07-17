@@ -54,6 +54,9 @@ const ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED = 'shadow_smoke_failed';
 const ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY = 'cutover_readiness_ready';
 const ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW = 'cutover_readiness_manual_review';
 const ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED = 'cutover_readiness_blocked';
+const ORANGE_RESTORE_FW_STATUS_MAINTENANCE_REQUESTED = 'maintenance_requested';
+const ORANGE_RESTORE_FW_STATUS_MAINTENANCE_VALIDATING = 'maintenance_validating';
+const ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE = 'maintenance_active';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED = 'execution_completed';
@@ -96,6 +99,9 @@ const ORANGE_RESTORE_FW_PHASE_SHADOW_SMOKE_FAILED = 'shadow_smoke_failed';
 const ORANGE_RESTORE_FW_PHASE_CUTOVER_READINESS_READY = 'cutover_readiness_ready';
 const ORANGE_RESTORE_FW_PHASE_CUTOVER_READINESS_MANUAL_REVIEW = 'cutover_readiness_manual_review';
 const ORANGE_RESTORE_FW_PHASE_CUTOVER_READINESS_BLOCKED = 'cutover_readiness_blocked';
+const ORANGE_RESTORE_FW_PHASE_MAINTENANCE_REQUESTED = 'maintenance_requested';
+const ORANGE_RESTORE_FW_PHASE_MAINTENANCE_VALIDATING = 'maintenance_validating';
+const ORANGE_RESTORE_FW_PHASE_MAINTENANCE_ACTIVE = 'maintenance_active';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_COMPLETED = 'execution_completed';
@@ -169,6 +175,9 @@ function orange_restore_fw_allowed_statuses(): array
         ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY,
         ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
         ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
+        ORANGE_RESTORE_FW_STATUS_MAINTENANCE_REQUESTED,
+        ORANGE_RESTORE_FW_STATUS_MAINTENANCE_VALIDATING,
+        ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED,
@@ -527,7 +536,21 @@ function orange_restore_fw_public_row(array $job): array
                 ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY,
                 ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
                 ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
+                ORANGE_RESTORE_FW_STATUS_MAINTENANCE_REQUESTED,
+                ORANGE_RESTORE_FW_STATUS_MAINTENANCE_VALIDATING,
+                ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE,
             ], true),
+        'maintenance_requestable' => in_array($status, [
+            ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
+            ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY,
+            ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_READY,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING,
+        ], true) && (string) ($job['package_type'] ?? '') === 'full_disaster',
+        'maintenance_activatable' => $status === ORANGE_RESTORE_FW_STATUS_MAINTENANCE_REQUESTED
+            && (string) ($job['package_type'] ?? '') === 'full_disaster',
+        'is_maintenance_ready' => $status === ORANGE_RESTORE_FW_STATUS_MAINTENANCE_REQUESTED,
+        'is_maintenance_active' => $status === ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE,
         'pre_restore_backup_requestable' => in_array($status, [
             ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
             ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,

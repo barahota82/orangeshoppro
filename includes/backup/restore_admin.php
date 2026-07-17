@@ -20,6 +20,7 @@ require_once __DIR__ . '/restore/restore_shadow_db.php';
 require_once __DIR__ . '/restore/restore_shadow_verify.php';
 require_once __DIR__ . '/restore/restore_shadow_files.php';
 require_once __DIR__ . '/restore/restore_shadow_smoke.php';
+require_once __DIR__ . '/restore/restore_production_maintenance.php';
 
 const ORANGE_RESTORE_ADMIN_JOB_ID_PATTERN = '/^[a-zA-Z0-9._-]+$/';
 
@@ -1547,6 +1548,103 @@ function orange_restore_admin_fw_execution_contract(
     ];
 }
 
+/**
+ * Request production maintenance activation (metadata only; no restore).
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_request_maintenance(
+    string $backupRoot,
+    string $workRoot,
+    array $admin,
+    PDO $pdo,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    orange_restore_admin_assert_package_type_permission($admin, $pdo, $type);
+    if ($type !== 'full_disaster') {
+        throw new RuntimeException('country_production_restore_not_enabled');
+    }
+    if (!orange_restore_admin_may_view_full($admin, $pdo)) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+
+    return orange_restore_prod_maint_request($workRoot, $jobId, $backupRoot, $admin);
+}
+
+/**
+ * Activate production maintenance framework only (no restore/cutover/rollback).
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_activate_maintenance(
+    string $backupRoot,
+    string $workRoot,
+    array $admin,
+    PDO $pdo,
+    string $jobId,
+    string $password,
+    string $nonce
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    orange_restore_admin_assert_package_type_permission($admin, $pdo, $type);
+    if ($type !== 'full_disaster') {
+        throw new RuntimeException('country_production_restore_not_enabled');
+    }
+    if (!orange_restore_admin_may_view_full($admin, $pdo)) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+
+    return orange_restore_prod_maint_activate(
+        $workRoot,
+        $jobId,
+        $backupRoot,
+        $admin,
+        $pdo,
+        $password,
+        $nonce
+    );
+}
+
+/**
+ * Read-only production maintenance state.
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_maintenance_state(
+    string $workRoot,
+    bool $mayFull,
+    bool $mayCountry,
+    string $jobId = ''
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    if ($jobId !== '') {
+        orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+        $job = orange_restore_fw_read($workRoot, $jobId);
+        $type = (string) ($job['package_type'] ?? '');
+        if ($type === 'full_disaster' && !$mayFull) {
+            throw new RuntimeException('Operator lacks backup_restore_full permission.');
+        }
+        if ($type === 'country_recovery' && !$mayCountry) {
+            throw new RuntimeException('Operator lacks backup_restore_country permission.');
+        }
+    }
+
+    return orange_restore_prod_maint_state($workRoot, $jobId);
+}
+
 function orange_restore_admin_safe_message(Throwable $e): string
 {
     $msg = trim($e->getMessage());
@@ -1638,6 +1736,21 @@ function orange_restore_admin_safe_message(Throwable $e): string
         'production_db_identity_rejected',
         'production_file_root_rejected',
         'smoke_pipeline_override_invalid',
+        'missing_rollback_anchor',
+        'invalid_approval',
+        'invalid_execution_contract',
+        'invalid_version_lock',
+        'invalid_shadow_readiness',
+        'invalid_smoke_report',
+        'duplicate_maintenance',
+        'conflicting_backup_job',
+        'conflicting_restore_job',
+        'maintenance_auth_stale',
+        'not_approved_waiting_execution',
+        'maintenance_already_active_or_releasing',
+        'maintenance_activate_invalid_state',
+        'maintenance_validate_invalid_state',
+        'maintenance_not_active',
     ];
     if (in_array($msg, $passthrough, true)) {
         return $msg;

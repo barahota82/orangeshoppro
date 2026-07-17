@@ -612,6 +612,13 @@ Fail → rollback_preparing.
 - **Effects:** study/contract only — checkpoints, resume, partial detection, DDL/FK/transactions, failure matrix, chunk/timeout/memory, operator recovery, shadow-promotion rejection  
 - **Must not:** production import, wipe, DB modification, or production import code  
 
+### 3B.4B — Production Maintenance Activation Framework
+
+- **Code:** `includes/backup/restore/restore_production_maintenance.php`; extended `restore_maintenance_framework.php`  
+- **APIs:** `admin/api/restore/job/request-maintenance.php`, `activate-maintenance.php`, `maintenance-state.php`  
+- **Effects:** job states `maintenance_requested` → `maintenance_validating` → `maintenance_active`; framework heartbeat/stale; decision helper only  
+- **Must not:** production import/wipe, file restore, cutover, rollback, auto restore worker  
+
 ### 3B.3B8 / 3B.4F — Rollback engine (implementation; see 3B.4 design)
 
 - **Code:** automate rollback from pinned Full anchor + uploads snapshot; CLI + later admin  

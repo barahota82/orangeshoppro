@@ -3,21 +3,23 @@
 declare(strict_types=1);
 
 /**
- * Phase 3B.3B1 — Maintenance framework (metadata + policy only).
+ * Phase 3B.3B1 / 3B.4B — Maintenance framework (metadata + policy).
  *
- * Does not enable production maintenance from approval.
- * Does not wire storefront routes in this phase.
+ * 3B.4B wires production activation of this metadata only.
+ * Does not import/wipe production DB, restore files, cutover, or rollback.
+ * Does not wire every storefront/admin route — central decision helper only.
  */
 
 require_once __DIR__ . '/restore_job_framework.php';
 
-const ORANGE_RESTORE_MAINT_FW_VERSION = '3B.3B1-maintenance-framework';
+const ORANGE_RESTORE_MAINT_FW_VERSION = '3B.4B-maintenance-activation';
 const ORANGE_RESTORE_MAINT_STATE_FILE = 'maintenance_state.json';
 const ORANGE_RESTORE_MAINT_LOCK_FILE = '.maintenance_state.lock';
 const ORANGE_RESTORE_MAINT_STALE_SECONDS = 21600;
 
 const ORANGE_RESTORE_MAINT_STATE_INACTIVE = 'inactive';
 const ORANGE_RESTORE_MAINT_STATE_REQUESTED = 'requested';
+const ORANGE_RESTORE_MAINT_STATE_VALIDATING = 'validating';
 const ORANGE_RESTORE_MAINT_STATE_ACTIVE = 'active';
 const ORANGE_RESTORE_MAINT_STATE_RELEASING = 'releasing';
 const ORANGE_RESTORE_MAINT_STATE_FAILED = 'failed';
@@ -30,6 +32,7 @@ function orange_restore_maint_fw_allowed_states(): array
     return [
         ORANGE_RESTORE_MAINT_STATE_INACTIVE,
         ORANGE_RESTORE_MAINT_STATE_REQUESTED,
+        ORANGE_RESTORE_MAINT_STATE_VALIDATING,
         ORANGE_RESTORE_MAINT_STATE_ACTIVE,
         ORANGE_RESTORE_MAINT_STATE_RELEASING,
         ORANGE_RESTORE_MAINT_STATE_FAILED,
@@ -97,6 +100,7 @@ function orange_restore_maint_fw_default_state(): array
         'stale' => false,
         'auto_release_forbidden' => true,
         'production_activation_wired' => false,
+        'restore_started' => false,
     ];
 }
 
@@ -191,7 +195,11 @@ function orange_restore_maint_fw_request(
     }
     try {
         $state = orange_restore_maint_fw_read($workRoot);
-        if (in_array((string) $state['state'], [ORANGE_RESTORE_MAINT_STATE_ACTIVE, ORANGE_RESTORE_MAINT_STATE_RELEASING], true)) {
+        if (in_array((string) $state['state'], [
+            ORANGE_RESTORE_MAINT_STATE_ACTIVE,
+            ORANGE_RESTORE_MAINT_STATE_RELEASING,
+            ORANGE_RESTORE_MAINT_STATE_VALIDATING,
+        ], true)) {
             throw new RuntimeException('maintenance_already_active_or_releasing');
         }
         $state['state'] = ORANGE_RESTORE_MAINT_STATE_REQUESTED;
@@ -200,6 +208,7 @@ function orange_restore_maint_fw_request(
         $state['related_job_id'] = $relatedJobId;
         $state['reason_code'] = $reasonCode;
         $state['production_activation_wired'] = false;
+        $state['restore_started'] = false;
         orange_restore_maint_fw_write($workRoot, $state);
 
         return orange_restore_maint_fw_public($state);
@@ -212,8 +221,49 @@ function orange_restore_maint_fw_request(
 }
 
 /**
- * Framework-level activate for isolated fixtures / future wiring only.
- * Not called from approval endpoints in 3B.3B1.
+ * Mark validating (activation prechecks in progress). Never starts restore.
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_maint_fw_mark_validating(
+    string $workRoot,
+    string $by,
+    string $relatedJobId = ''
+): array {
+    $lock = orange_restore_maint_fw_acquire_lock($workRoot);
+    if (!$lock['ok']) {
+        throw new RuntimeException((string) $lock['message']);
+    }
+    try {
+        $state = orange_restore_maint_fw_read($workRoot);
+        if (!in_array((string) $state['state'], [
+            ORANGE_RESTORE_MAINT_STATE_REQUESTED,
+            ORANGE_RESTORE_MAINT_STATE_VALIDATING,
+        ], true)) {
+            throw new RuntimeException('maintenance_validate_invalid_state');
+        }
+        $state['state'] = ORANGE_RESTORE_MAINT_STATE_VALIDATING;
+        $state['activated_by'] = $by;
+        if ($relatedJobId !== '') {
+            $state['related_job_id'] = $relatedJobId;
+        }
+        $state['reason_code'] = 'maintenance_validating';
+        $state['production_activation_wired'] = false;
+        $state['restore_started'] = false;
+        orange_restore_maint_fw_write($workRoot, $state);
+
+        return orange_restore_maint_fw_public($state);
+    } finally {
+        if (is_resource($lock['handle'])) {
+            flock($lock['handle'], LOCK_UN);
+            fclose($lock['handle']);
+        }
+    }
+}
+
+/**
+ * Framework-level activate after validation. Sets production_activation_wired=true.
+ * Does not invoke restore workers, cutover, wipe, or import.
  *
  * @return array<string, mixed>
  */
@@ -228,7 +278,11 @@ function orange_restore_maint_fw_activate(
     }
     try {
         $state = orange_restore_maint_fw_read($workRoot);
-        if (!in_array((string) $state['state'], [ORANGE_RESTORE_MAINT_STATE_REQUESTED, ORANGE_RESTORE_MAINT_STATE_INACTIVE], true)) {
+        if (!in_array((string) $state['state'], [
+            ORANGE_RESTORE_MAINT_STATE_REQUESTED,
+            ORANGE_RESTORE_MAINT_STATE_VALIDATING,
+            ORANGE_RESTORE_MAINT_STATE_INACTIVE,
+        ], true)) {
             throw new RuntimeException('maintenance_activate_invalid_state');
         }
         $now = gmdate('c');
@@ -239,7 +293,9 @@ function orange_restore_maint_fw_activate(
         if ($relatedJobId !== '') {
             $state['related_job_id'] = $relatedJobId;
         }
-        $state['production_activation_wired'] = false;
+        $state['production_activation_wired'] = true;
+        $state['restore_started'] = false;
+        $state['reason_code'] = 'production_maintenance_active';
         orange_restore_maint_fw_write($workRoot, $state);
 
         return orange_restore_maint_fw_public($state);
@@ -332,13 +388,14 @@ function orange_restore_maint_fw_release(string $workRoot, string $by): array
 }
 
 /**
- * Central policy classifier. Does not mutate production.
+ * Central policy classifier. Does not mutate production. Does not wire routes.
  *
  * @param array{
  *   method?:string,
  *   path?:string,
  *   scope?:string,
  *   is_cli?:bool,
+ *   is_admin?:bool,
  *   bypass_token?:string,
  *   bypass_job_id?:string,
  *   is_static_asset?:bool,
@@ -348,7 +405,7 @@ function orange_restore_maint_fw_release(string $workRoot, string $by): array
  *   is_payment_callback?:bool,
  *   payment_callback_allowlisted?:bool
  * } $request
- * @return array{allow:bool,action:string,reason_code:string,scope:string}
+ * @return array{allow:bool,action:string,reason_code:string,scope:string,http_status:int}
  */
 function orange_restore_maint_fw_classify_request(string $workRoot, array $request): array
 {
@@ -357,13 +414,28 @@ function orange_restore_maint_fw_classify_request(string $workRoot, array $reque
     $scope = (string) ($request['scope'] ?? 'unknown');
 
     if ($status !== ORANGE_RESTORE_MAINT_STATE_ACTIVE) {
-        return ['allow' => true, 'action' => 'passthrough', 'reason_code' => 'maintenance_inactive', 'scope' => $scope];
+        return [
+            'allow' => true,
+            'action' => 'passthrough',
+            'reason_code' => 'maintenance_inactive',
+            'scope' => $scope,
+            'http_status' => 200,
+        ];
     }
 
-    // No query/header/IP bypass — only scoped CLI token path.
+    // No administrator bypass. No query/header/IP bypass — only scoped CLI token.
+    if (!empty($request['is_admin']) && empty($request['is_cli']) && empty($request['is_restore_center_read'])) {
+        // Admins still blocked for mutating business scopes; restore-center reads allowed below.
+    }
     if (!empty($request['bypass_token']) || !empty($request['bypass_header']) || !empty($request['bypass_ip'])) {
         if (empty($request['is_cli']) || empty($request['bypass_token']) || empty($request['bypass_job_id'])) {
-            return ['allow' => false, 'action' => 'block', 'reason_code' => 'maintenance_bypass_forbidden', 'scope' => $scope];
+            return [
+                'allow' => false,
+                'action' => 'block',
+                'reason_code' => 'maintenance_bypass_forbidden',
+                'scope' => $scope,
+                'http_status' => 503,
+            ];
         }
         $tokenOk = orange_restore_maint_fw_validate_cli_bypass(
             $workRoot,
@@ -372,37 +444,112 @@ function orange_restore_maint_fw_classify_request(string $workRoot, array $reque
             $scope
         );
         if (!$tokenOk) {
-            return ['allow' => false, 'action' => 'block', 'reason_code' => 'maintenance_bypass_invalid', 'scope' => $scope];
+            return [
+                'allow' => false,
+                'action' => 'block',
+                'reason_code' => 'maintenance_bypass_invalid',
+                'scope' => $scope,
+                'http_status' => 503,
+            ];
         }
 
-        return ['allow' => true, 'action' => 'cli_bypass', 'reason_code' => 'maintenance_cli_bypass', 'scope' => $scope];
+        return [
+            'allow' => true,
+            'action' => 'cli_bypass',
+            'reason_code' => 'maintenance_cli_bypass',
+            'scope' => $scope,
+            'http_status' => 200,
+        ];
     }
 
     if (!empty($request['is_static_asset']) || !empty($request['is_maintenance_page'])) {
-        return ['allow' => true, 'action' => 'allow_read', 'reason_code' => 'maintenance_safe_read', 'scope' => $scope];
+        return [
+            'allow' => true,
+            'action' => 'allow_read',
+            'reason_code' => 'maintenance_safe_read',
+            'scope' => $scope,
+            'http_status' => 200,
+        ];
     }
     if (!empty($request['is_restore_center_read']) || !empty($request['is_health_probe'])) {
-        return ['allow' => true, 'action' => 'allow_read', 'reason_code' => 'maintenance_safe_read', 'scope' => $scope];
+        return [
+            'allow' => true,
+            'action' => 'allow_read',
+            'reason_code' => 'maintenance_safe_read',
+            'scope' => $scope,
+            'http_status' => 200,
+        ];
     }
     if (!empty($request['is_payment_callback'])) {
         if (!empty($request['payment_callback_allowlisted'])) {
-            return ['allow' => true, 'action' => 'allow_payment_callback', 'reason_code' => 'maintenance_payment_allowlisted', 'scope' => $scope];
+            return [
+                'allow' => true,
+                'action' => 'allow_payment_callback',
+                'reason_code' => 'maintenance_payment_allowlisted',
+                'scope' => $scope,
+                'http_status' => 200,
+            ];
         }
 
-        return ['allow' => false, 'action' => 'block', 'reason_code' => 'maintenance_payment_blocked', 'scope' => $scope];
+        return [
+            'allow' => false,
+            'action' => 'block',
+            'reason_code' => 'maintenance_payment_blocked',
+            'scope' => $scope,
+            'http_status' => 503,
+        ];
     }
 
-    $blocked = orange_restore_maint_fw_default_blocked_scopes();
+    $blocked = is_array($state['blocked_write_scopes'] ?? null)
+        ? array_values(array_map('strval', $state['blocked_write_scopes']))
+        : orange_restore_maint_fw_default_blocked_scopes();
     if (in_array($scope, $blocked, true)) {
-        return ['allow' => false, 'action' => 'block', 'reason_code' => 'maintenance_write_blocked', 'scope' => $scope];
+        return [
+            'allow' => false,
+            'action' => 'block',
+            'reason_code' => 'maintenance_write_blocked',
+            'scope' => $scope,
+            'http_status' => 503,
+        ];
     }
 
     $method = strtoupper((string) ($request['method'] ?? 'GET'));
     if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
-        return ['allow' => false, 'action' => 'block', 'reason_code' => 'maintenance_write_blocked', 'scope' => $scope !== '' ? $scope : 'application_write_api'];
+        return [
+            'allow' => false,
+            'action' => 'block',
+            'reason_code' => 'maintenance_write_blocked',
+            'scope' => $scope !== '' ? $scope : 'application_write_api',
+            'http_status' => 503,
+        ];
     }
 
-    return ['allow' => true, 'action' => 'allow_read', 'reason_code' => 'maintenance_safe_read', 'scope' => $scope];
+    return [
+        'allow' => true,
+        'action' => 'allow_read',
+        'reason_code' => 'maintenance_safe_read',
+        'scope' => $scope,
+        'http_status' => 200,
+    ];
+}
+
+/**
+ * Production middleware decision helper (policy only — callers wire routes later).
+ *
+ * @param array<string, mixed> $request
+ * @return array{allow:bool,action:string,reason_code:string,scope:string,http_status:int,maintenance_active:bool,stale:bool}
+ */
+function orange_restore_production_maintenance_decide(string $workRoot, array $request): array
+{
+    $state = orange_restore_maint_fw_read($workRoot);
+    $decision = orange_restore_maint_fw_classify_request($workRoot, $request);
+
+    return $decision + [
+        'maintenance_active' => (string) ($state['state'] ?? '') === ORANGE_RESTORE_MAINT_STATE_ACTIVE,
+        'stale' => (bool) ($state['stale'] ?? false),
+        'auto_release_forbidden' => true,
+        'restore_started' => false,
+    ];
 }
 
 /**
@@ -488,9 +635,19 @@ function orange_restore_maint_fw_future_integration_points(): array
  */
 function orange_restore_maint_fw_public(array $state): array
 {
+    $fwState = (string) ($state['state'] ?? ORANGE_RESTORE_MAINT_STATE_INACTIVE);
+    $active = $fwState === ORANGE_RESTORE_MAINT_STATE_ACTIVE;
+    $ready = in_array($fwState, [
+        ORANGE_RESTORE_MAINT_STATE_REQUESTED,
+        ORANGE_RESTORE_MAINT_STATE_VALIDATING,
+    ], true);
+
     return [
         'version' => (string) ($state['version'] ?? ORANGE_RESTORE_MAINT_FW_VERSION),
-        'state' => (string) ($state['state'] ?? ORANGE_RESTORE_MAINT_STATE_INACTIVE),
+        'state' => $fwState,
+        'label' => $active ? 'Maintenance Active' : ($ready ? 'Maintenance Ready' : $fwState),
+        'maintenance_ready' => $ready,
+        'maintenance_active' => $active,
         'requested_by' => (string) ($state['requested_by'] ?? ''),
         'requested_at' => (string) ($state['requested_at'] ?? ''),
         'activated_by' => (string) ($state['activated_by'] ?? ''),
@@ -505,8 +662,10 @@ function orange_restore_maint_fw_public(array $state): array
             ? array_values($state['blocked_write_scopes'])
             : orange_restore_maint_fw_default_blocked_scopes(),
         'auto_release_forbidden' => true,
-        'production_activation_wired' => false,
-        'warning' => 'Approval does not start restore and does not enable maintenance in this phase.',
+        'production_activation_wired' => (bool) ($state['production_activation_wired'] ?? false),
+        'restore_started' => false,
+        'execution_started' => false,
+        'warning' => 'Production restore has NOT started.',
         'future_integration_points' => orange_restore_maint_fw_future_integration_points(),
     ];
 }

@@ -423,6 +423,9 @@ function orange_restore_validate_execution_contract(
         ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY,
         ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
         ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
+        ORANGE_RESTORE_FW_STATUS_MAINTENANCE_REQUESTED,
+        ORANGE_RESTORE_FW_STATUS_MAINTENANCE_VALIDATING,
+        ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE,
     ];
     if (!in_array($status, $contractValidStatuses, true)) {
         $reasons[] = 'invalid_status';

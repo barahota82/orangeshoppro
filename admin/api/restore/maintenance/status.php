@@ -19,7 +19,10 @@ try {
         'success' => true,
         'read_only' => true,
         'maintenance' => $maintenance,
-        'warning' => 'Approval does not start restore or enable maintenance in this phase.',
+        'warning' => 'Production restore has NOT started.',
+        'execution_started' => false,
+        'restore_started' => false,
+        'auto_release_forbidden' => true,
     ]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, orange_restore_admin_safe_message($e));

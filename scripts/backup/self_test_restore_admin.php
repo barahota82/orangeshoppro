@@ -2412,6 +2412,43 @@ restore_admin_self_test(
     'shadow-smoke: no cutover execute/approve endpoints'
 );
 
+// --- Phase 3B.4B production maintenance activation (surface checks) ---
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_production_maintenance.php'), 'maint-3B.4B: activation lib present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-maintenance.php'), 'maint-3B.4B: request API present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'activate-maintenance.php'), 'maint-3B.4B: activate API present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'maintenance-state.php'), 'maint-3B.4B: state API present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'self_test_maintenance_framework.php'), 'maint-3B.4B: dedicated self-test present');
+$prodMaintLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_production_maintenance.php');
+restore_admin_self_test(
+    str_contains($prodMaintLib, 'ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE')
+    && str_contains($prodMaintLib, 'orange_restore_production_maintenance_decide') === false
+    && !str_contains($prodMaintLib, 'orange_restore_merge_db_cutover')
+    && !str_contains($prodMaintLib, 'orange_restore_production_wipe'),
+    'maint-3B.4B: states present; no cutover/wipe'
+);
+restore_admin_self_test(
+    function_exists('orange_restore_production_maintenance_decide')
+    && function_exists('orange_restore_prod_maint_request')
+    && function_exists('orange_restore_prod_maint_activate'),
+    'maint-3B.4B: decision + request/activate helpers exist'
+);
+$maintUi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php');
+restore_admin_self_test(
+    str_contains($maintUi, 'Maintenance Ready')
+    && str_contains($maintUi, 'Maintenance Active')
+    && str_contains($maintUi, 'Production restore has NOT started.')
+    && str_contains($maintUi, 'rc-maint-req')
+    && str_contains($maintUi, 'rc-maint-activate'),
+    'maint-3B.4B: Restore Center UI wires ready/active warning + controls'
+);
+$actMaintApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'activate-maintenance.php');
+restore_admin_self_test(
+    str_contains($actMaintApi, 'framework_activation_only')
+    && !str_contains($actMaintApi, 'orange_restore_sql_runner_import_gzip')
+    && !str_contains($actMaintApi, 'proc_open'),
+    'maint-3B.4B: activate API does not run restore worker'
+);
+
     restore_admin_test_run_cleanup();
     restore_admin_test_emit_summary();
     exit($failures > 0 ? 1 : 0);
