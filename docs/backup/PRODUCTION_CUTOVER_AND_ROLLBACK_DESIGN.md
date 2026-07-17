@@ -11,6 +11,7 @@
 - `docs/backup/RESTORE_PHASE2_CLI_ENTRYPOINTS.md`
 - Phase 3B modules: framework, bridge, final approval, pre-restore backup, shadow DB, shadow verify, shadow files, shadow smoke, maintenance framework, version lock
 - Phase 2 cutover primitives: `restore_merge_db_cutover.php`, `restore_merge_uploads_cutover.php`, `restore_merge_rollback.php`, `restore_merge_maintenance.php`, `restore_e2e_orchestrator.php`
+- Import crash-safety contract: `docs/backup/PRODUCTION_IMPORT_SAFETY.md` (Phase 3B.4A)
 
 **Prerequisite gate (already built):** job must reach a cutover-readiness decision with prior shadow reports successful. Even then, **`production_cutover_allowed` remains false until a future implementation phase explicitly flips it under owner authorization.** Country production restore remains **disabled**.
 
@@ -392,7 +393,8 @@ Live cutover is **forbidden** until all boxes are checked:
 
 - [ ] This design document accepted by owner  
 - [ ] Phase 3B.3B1–3B.3B7 artifacts present and green on clone  
-- [ ] Implementation phases 3B.4A–3B.4E (below) complete with self-tests  
+- [ ] Implementation phases 3B.4B–3B.4F (below) complete with self-tests  
+- [x] Phase 3B.4A import safety study (`PRODUCTION_IMPORT_SAFETY.md`) 
 - [ ] Maintenance middleware proven on storefront + admin write APIs  
 - [ ] Retention pin cannot be pruned by normal retention  
 - [ ] DB cutover path proven: wipe+import from verified export  
@@ -442,45 +444,52 @@ Live cutover is **forbidden** until all boxes are checked:
 
 ## 15. Implementation phases (smallest safe slices)
 
-> These phases are **future work**. 3B.4 (this document) implements nothing.
+> 3B.4 (this document) is design-only. **3B.4A** (import safety study) is also documentation-only. Remaining slices below are future work.
 
-### 3B.4A — Production cutover authorization gate (metadata + UI warnings only)
+### 3B.4A — Production Import Safety Layer (study / documentation only) — DONE
+
+- **Deliverable:** `docs/backup/PRODUCTION_IMPORT_SAFETY.md`  
+- Crash-safe import contract: checkpoints, resume rules, partial detection, DDL/FK/transaction boundaries, failure matrix, chunk/timeout/memory strategy, operator recovery, shadow-promotion rejection, risk comparison  
+- **Must not:** production import/wipe/DB modification; no production code  
+
+### 3B.4B — Production cutover authorization gate (metadata + UI warnings only)
 
 - Explicit `production_cutover_authorized` record separate from shadow readiness  
 - Still no wipe/rename  
 - Tests: cannot authorize without readiness; Country rejected  
 
-### 3B.4B — Maintenance middleware enforcement (storefront/admin/cron)
+### 3B.4C — Maintenance middleware enforcement (storefront/admin/cron)
 
 - Real request guards reading `.maintenance.json`  
 - No cutover yet  
 - Tests: writes 503; Restore Center emergency paths permissioned  
 
-### 3B.4C — Bridge 3B job → Phase 2 cutover worker (DB only)
+### 3B.4D — Bridge 3B job → Phase 2 cutover worker (DB only)
 
 - CLI production DB cutover invoking existing `orange_restore_merge_db_cutover_run` / export+wipe+import  
+- Must implement durable checkpoints + fail-closed recovery per `PRODUCTION_IMPORT_SAFETY.md`  
 - Uploads not yet switched (or explicitly gated)  
 - Tests on clone only  
 
-### 3B.4D — Production uploads two-phase rename wiring
+### 3B.4E — Production uploads two-phase rename wiring
 
 - Bridge shadow workspace → `uploads_next` verify → existing uploads cutover  
 - Reconcile pending rename statuses  
 - Tests: mid-rename crash reconcile  
 
-### 3B.4E — Rollback worker + emergency UI
+### 3B.4F — Rollback worker + emergency UI
 
 - Wire `orange_restore_merge_rollback_*` to 3B job + anchor pin  
 - Auto-trigger after PONR failures  
 - Tests: induced failures → `rolled_back`  
 
-### 3B.4F — Production smoke + finalize + maint exit
+### 3B.4G — Production smoke + finalize + maint exit
 
 - Post-cutover smoke (production, read-only under maint)  
 - Final report; cache invalidate; maint disable API/CLI with phrase  
 - Tests: smoke fail triggers rollback  
 
-### 3B.4G — Disaster recovery drill automation + certification pack
+### 3B.4H — Disaster recovery drill automation + certification pack
 
 - Scripted drill; metrics capture; checklist enforcement flag  
 - **Prod gate:** owner certification (§12)  
@@ -527,7 +536,8 @@ Cancel allowed only **before PONR**. After PONR: rollback only.
 - No client-supplied absolute paths or DB names  
 - No `.env.php` rewrite  
 - No application source restore  
-- `production_cutover_allowed` false until 3B.4A+ authorization record says otherwise **and** certification checklist complete  
+- `production_cutover_allowed` false until 3B.4B+ authorization record says otherwise **and** certification checklist complete  
+- Production DB import must follow `docs/backup/PRODUCTION_IMPORT_SAFETY.md` (no mid-stream resume by default; re-wipe+re-import or rollback) 
 - Country production disabled  
 
 ---

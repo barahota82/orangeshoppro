@@ -603,24 +603,30 @@ Fail → rollback_preparing.
 
 ### 3B.4 — Production Cutover & Rollback Design (documentation only)
 
-- **Deliverable:** `docs/backup/PRODUCTION_CUTOVER_AND_ROLLBACK_DESIGN.md` — implementation contract for DB/files cutover, PONR, rollback, crash recovery, drills, and remaining phases **3B.4A–3B.4G**  
+- **Deliverable:** `docs/backup/PRODUCTION_CUTOVER_AND_ROLLBACK_DESIGN.md` — implementation contract for DB/files cutover, PONR, rollback, crash recovery, drills, and remaining phases **3B.4A–3B.4H**  
 - **Must not (this phase):** production cutover/rollback code, maintenance activation, execute/cutover/resume endpoints  
 
-### 3B.3B8 / 3B.4E — Rollback engine (implementation; see 3B.4 design)
+### 3B.4A — Production Import Safety Layer (documentation only)
+
+- **Deliverable:** `docs/backup/PRODUCTION_IMPORT_SAFETY.md`  
+- **Effects:** study/contract only — checkpoints, resume, partial detection, DDL/FK/transactions, failure matrix, chunk/timeout/memory, operator recovery, shadow-promotion rejection  
+- **Must not:** production import, wipe, DB modification, or production import code  
+
+### 3B.3B8 / 3B.4F — Rollback engine (implementation; see 3B.4 design)
 
 - **Code:** automate rollback from pinned Full anchor + uploads snapshot; CLI + later admin  
 - **Effects:** may touch prod **only** in controlled rollback drills on non-prod first  
 - **Tests:** simulated cutover failure → rolled_back  
 - **Prod gate:** drill sign-off  
 
-### 3B.3B9 / 3B.4C–3B.4F — Production execution wiring (implementation; see 3B.4 design)
+### 3B.3B9 / 3B.4D–3B.4G — Production execution wiring (implementation; see 3B.4 design)
 
-- **Code:** cutover wiring under maint; admin progress UI; heartbeat worker  
+- **Code:** cutover wiring under maint; admin progress UI; heartbeat worker; import safety checkpoints per 3B.4A  
 - **Effects:** real Full restore path  
 - **Tests:** end-to-end on clone; then limited prod drill window  
-- **Rollback:** 3B.4E  
+- **Rollback:** 3B.4F  
 
-### 3B.3B10 / 3B.4G — Disaster recovery drill (implementation; see 3B.4 design)
+### 3B.3B10 / 3B.4H — Disaster recovery drill (implementation; see 3B.4 design)
 
 - **Code:** runbooks + checklist automation  
 - **Effects:** scheduled drill restore on clone  
