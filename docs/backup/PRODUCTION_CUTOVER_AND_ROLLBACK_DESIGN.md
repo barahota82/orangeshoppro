@@ -397,6 +397,7 @@ Live cutover is **forbidden** until all boxes are checked:
 - [x] Phase 3B.4A import safety study (`PRODUCTION_IMPORT_SAFETY.md`)  
 - [x] Phase 3B.4B production maintenance activation framework
 - [x] Phase 3B.4C production database import engine (DB only; files not switched)
+- [x] Phase 3B.4D production uploads cutover (rename only; no finalize/rollback/maint release)
 - [ ] Maintenance middleware proven on storefront + admin write APIs  
 - [ ] Retention pin cannot be pruned by normal retention  
 - [ ] DB cutover path proven: wipe+import from verified export  
@@ -475,23 +476,27 @@ Live cutover is **forbidden** until all boxes are checked:
 - **Must not:** file cutover, uploads rename, rollback execution, maintenance release, completion/finalization  
 - **Tests:** `self_test_production_import.php` (isolated fixtures / mock PDO only)  
 
-### 3B.4D — Production cutover authorization gate (metadata + UI warnings only)
+### 3B.4D — Production Uploads Cutover — DONE
+
+- **Code:** `includes/backup/restore/restore_production_uploads_cutover.php`  
+- **CLI:** `scripts/backup/restore_uploads_cutover.php --job=` (only); HTTP never renames  
+- **APIs:** `request-uploads-cutover.php` (metadata), `uploads-cutover.php` (status GET)  
+- **States:** `production_import_ready` → `uploads_cutover_pending` → `uploads_cutover_running` → `uploads_cutover_verifying` → `uploads_cutover_ready` / `uploads_cutover_failed`  
+- **Checkpoints:** C7 uploads rename completed | C8 uploads verification completed  
+- Bridge shadow workspace → `uploads_next` → two-phase rename (`uploads`→`uploads_pre_merge`, `uploads_next`→`uploads`) via approved atomic rename helper  
+- **Must not:** database import, rollback, maintenance release, finalize/complete restore  
+- **Tests:** `self_test_production_uploads_cutover.php` (temp directories only)  
+
+### 3B.4E — Production cutover authorization gate (metadata + UI warnings only)
 
 - Explicit `production_cutover_authorized` record separate from shadow readiness  
-- Still no file wipe/rename / cutover flip  
+- Still no application PHP/.env cutover  
 - Tests: cannot authorize without readiness; Country rejected  
 
-### 3B.4E — Route-level maintenance middleware wiring (storefront/admin/cron)
+### 3B.4F — Route-level maintenance middleware wiring (storefront/admin/cron)
 
 - Wire real request guards using `orange_restore_production_maintenance_decide`  
-- No file cutover yet  
 - Tests: writes 503; Restore Center emergency paths permissioned  
-
-### 3B.4F — Production uploads two-phase rename wiring
-
-- Bridge shadow workspace → `uploads_next` verify → existing uploads cutover  
-- Reconcile pending rename statuses  
-- Tests: mid-rename crash reconcile  
 
 ### 3B.4G — Rollback worker + emergency UI
 

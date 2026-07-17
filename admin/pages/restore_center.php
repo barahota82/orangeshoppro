@@ -93,6 +93,18 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     </dl>
 </div>
 
+<div class="rc-section card" id="rc_uploads_cutover_section">
+    <h3>تحويل ملفات الرفع (Production Uploads Cutover)</h3>
+    <p id="rc_uploads_cutover_banner" class="rc-readonly-banner" style="margin:0 0 10px;" role="status">
+        <strong>Maintenance remains active. Restore is NOT completed. Rollback was NOT executed.</strong>
+    </p>
+    <dl id="rc_uploads_cutover_status" class="rc-status-strip">
+        <div><dt>الحالة</dt><dd>…</dd></div>
+        <div><dt>أعلى نقطة تحقق</dt><dd>…</dd></div>
+        <div><dt>CLI</dt><dd>…</dd></div>
+    </dl>
+</div>
+
 <div id="rc_progress" class="rc-progress" role="status" aria-live="polite">جاري التحميل…</div>
 <div id="rc_alert" class="card" style="display:none;margin-bottom:12px;"></div>
 
@@ -487,6 +499,30 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         }
         if (job.production_import_requestable || job.has_production_import || job.is_production_import_ready || job.is_production_import_failed) {
             html += '<strong class="muted">Application files have NOT been switched.</strong> ';
+        }
+        if (job.uploads_cutover_requestable) {
+            html += '<button type="button" class="btn-link rc-uploads-cutover-req" data-id="' + id + '">طلب تحويل ملفات الرفع</button> ';
+        }
+        if (job.has_uploads_cutover || job.is_uploads_cutover_ready || job.is_uploads_cutover_failed) {
+            html += '<button type="button" class="btn-link rc-uploads-cutover-view" data-id="' + id + '">حالة تحويل الرفع</button> ';
+        }
+        if (job.status === 'uploads_cutover_pending') {
+            html += '<span class="rc-badge rc-badge--warning">Uploads Cutover Pending</span> ';
+        }
+        if (job.status === 'uploads_cutover_running') {
+            html += '<span class="rc-badge rc-badge--warning">Running</span> ';
+        }
+        if (job.status === 'uploads_cutover_verifying') {
+            html += '<span class="rc-badge rc-badge--warning">Verifying</span> ';
+        }
+        if (job.is_uploads_cutover_ready) {
+            html += '<span class="rc-badge rc-badge--success">Ready</span> ';
+        }
+        if (job.is_uploads_cutover_failed) {
+            html += '<span class="rc-badge rc-badge--failed">Failed</span> ';
+        }
+        if (job.uploads_cutover_requestable || job.has_uploads_cutover || job.is_uploads_cutover_ready || job.is_uploads_cutover_failed) {
+            html += '<strong class="muted">Maintenance remains active. Restore is NOT completed.</strong> ';
         }
         if (job.execution_plan_cancellable) {
             html += '<button type="button" class="btn-link rc-cancel-exec" data-id="' + id + '">إلغاء الخطة</button> ';
@@ -1083,6 +1119,67 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                     maintenance_released: false,
                     production_cutover_allowed: false,
                     warning: 'Application files have NOT been switched.'
+                }, null, 2));
+            } catch (e) {
+                showAlert(e.message || 'تعذر العرض', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-uploads-cutover-req')) {
+            try {
+                setBusy(true, 'جاري طلب تحويل ملفات الرفع…');
+                const j = await apiPost('job/request-uploads-cutover.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || ''
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert(
+                    (j.message || 'Uploads Cutover Pending')
+                    + ' — Maintenance remains active. Restore is NOT completed.'
+                    + (j.cli_command ? (' CLI: ' + j.cli_command) : ''),
+                    true
+                );
+                if (el('rc_uploads_cutover_status')) {
+                    el('rc_uploads_cutover_status').innerHTML =
+                        '<div><dt>الحالة</dt><dd>' + badge('Uploads Cutover Pending') + '</dd></div>'
+                        + '<div><dt>أعلى نقطة تحقق</dt><dd>—</dd></div>'
+                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || '—') + '</code></dd></div>';
+                }
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر طلب تحويل الرفع', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-uploads-cutover-view')) {
+            try {
+                setBusy(true, 'جاري التحميل…');
+                const j = await apiGet('job/uploads-cutover.php?id=' + encodeURIComponent(t.dataset.id || ''));
+                if (el('rc_uploads_cutover_status')) {
+                    el('rc_uploads_cutover_status').innerHTML =
+                        '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || '—') + '</dd></div>'
+                        + '<div><dt>أعلى نقطة تحقق</dt><dd>' + (j.highest_checkpoint || '—') + '</dd></div>'
+                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '—') + '</dd></div>';
+                }
+                openView('Uploads Cutover — ' + (t.dataset.id || ''), JSON.stringify({
+                    status_label: j.status_label || '',
+                    job: j.job || {},
+                    meta: j.meta || {},
+                    report: j.report || {},
+                    checkpoint_history: j.checkpoint_history || [],
+                    highest_checkpoint: j.highest_checkpoint || '',
+                    execution_started: false,
+                    database_import_performed: false,
+                    rollback_executed: false,
+                    maintenance_released: false,
+                    restore_completed: false,
+                    warning: 'Maintenance remains active. Restore is NOT completed. Rollback was NOT executed.'
                 }, null, 2));
             } catch (e) {
                 showAlert(e.message || 'تعذر العرض', false);

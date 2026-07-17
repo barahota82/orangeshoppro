@@ -2479,6 +2479,35 @@ restore_admin_self_test(
     'prod-import-3B.4C: Restore Center UI wires import states + files warning'
 );
 
+// --- Phase 3B.4D production uploads cutover (surface checks) ---
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_production_uploads_cutover.php'), 'uploads-cutover-3B.4D: engine lib present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_uploads_cutover.php'), 'uploads-cutover-3B.4D: CLI present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-uploads-cutover.php'), 'uploads-cutover-3B.4D: request API present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'uploads-cutover.php'), 'uploads-cutover-3B.4D: status API present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'self_test_production_uploads_cutover.php'), 'uploads-cutover-3B.4D: dedicated self-test present');
+$uploadsCutoverLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_production_uploads_cutover.php');
+restore_admin_self_test(
+    str_contains($uploadsCutoverLib, 'ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_READY')
+    && str_contains($uploadsCutoverLib, 'orange_restore_merge_uploads_cutover_atomic_rename')
+    && !str_contains($uploadsCutoverLib, 'orange_restore_production_wipe')
+    && !str_contains($uploadsCutoverLib, 'orange_restore_merge_rollback'),
+    'uploads-cutover-3B.4D: rename only; no wipe/rollback'
+);
+$uploadsReqApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-uploads-cutover.php');
+restore_admin_self_test(
+    str_contains($uploadsReqApi, 'metadata_only')
+    && str_contains($uploadsReqApi, 'http_never_cutover')
+    && !str_contains($uploadsReqApi, 'orange_restore_uploads_cutover_run_cli'),
+    'uploads-cutover-3B.4D: request API metadata only'
+);
+$uploadsUi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php');
+restore_admin_self_test(
+    str_contains($uploadsUi, 'Uploads Cutover Pending')
+    && str_contains($uploadsUi, 'rc-uploads-cutover-req')
+    && str_contains($uploadsUi, 'Restore is NOT completed'),
+    'uploads-cutover-3B.4D: Restore Center UI wires cutover states + warning'
+);
+
     restore_admin_test_run_cleanup();
     restore_admin_test_emit_summary();
     exit($failures > 0 ? 1 : 0);

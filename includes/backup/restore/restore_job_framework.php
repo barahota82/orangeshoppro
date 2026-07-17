@@ -62,6 +62,11 @@ const ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_RUNNING = 'production_import_ru
 const ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_VERIFYING = 'production_import_verifying';
 const ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY = 'production_import_ready';
 const ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_FAILED = 'production_import_failed';
+const ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_PENDING = 'uploads_cutover_pending';
+const ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_RUNNING = 'uploads_cutover_running';
+const ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_VERIFYING = 'uploads_cutover_verifying';
+const ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_READY = 'uploads_cutover_ready';
+const ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_FAILED = 'uploads_cutover_failed';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED = 'execution_completed';
@@ -112,6 +117,11 @@ const ORANGE_RESTORE_FW_PHASE_PRODUCTION_IMPORT_RUNNING = 'production_import_run
 const ORANGE_RESTORE_FW_PHASE_PRODUCTION_IMPORT_VERIFYING = 'production_import_verifying';
 const ORANGE_RESTORE_FW_PHASE_PRODUCTION_IMPORT_READY = 'production_import_ready';
 const ORANGE_RESTORE_FW_PHASE_PRODUCTION_IMPORT_FAILED = 'production_import_failed';
+const ORANGE_RESTORE_FW_PHASE_UPLOADS_CUTOVER_PENDING = 'uploads_cutover_pending';
+const ORANGE_RESTORE_FW_PHASE_UPLOADS_CUTOVER_RUNNING = 'uploads_cutover_running';
+const ORANGE_RESTORE_FW_PHASE_UPLOADS_CUTOVER_VERIFYING = 'uploads_cutover_verifying';
+const ORANGE_RESTORE_FW_PHASE_UPLOADS_CUTOVER_READY = 'uploads_cutover_ready';
+const ORANGE_RESTORE_FW_PHASE_UPLOADS_CUTOVER_FAILED = 'uploads_cutover_failed';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_COMPLETED = 'execution_completed';
@@ -193,6 +203,11 @@ function orange_restore_fw_allowed_statuses(): array
         ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_VERIFYING,
         ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY,
         ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_FAILED,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_PENDING,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_VERIFYING,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_READY,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_FAILED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED,
@@ -582,6 +597,17 @@ function orange_restore_fw_public_row(array $job): array
         ], true),
         'is_production_import_ready' => $status === ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY,
         'is_production_import_failed' => $status === ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_FAILED,
+        'uploads_cutover_requestable' => $status === ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY
+            && (string) ($job['package_type'] ?? '') === 'full_disaster',
+        'has_uploads_cutover' => in_array($status, [
+            ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_PENDING,
+            ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_RUNNING,
+            ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_VERIFYING,
+            ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_READY,
+            ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_FAILED,
+        ], true),
+        'is_uploads_cutover_ready' => $status === ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_READY,
+        'is_uploads_cutover_failed' => $status === ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_FAILED,
         'pre_restore_backup_requestable' => in_array($status, [
             ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
             ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,

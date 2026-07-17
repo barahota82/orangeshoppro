@@ -628,6 +628,15 @@ Fail → rollback_preparing.
 - **Must not:** file cutover, uploads rename, rollback, maintenance release, completion  
 - **Tests:** `self_test_production_import.php`  
 
+### 3B.4D — Production Uploads Cutover
+
+- **Code:** `includes/backup/restore/restore_production_uploads_cutover.php`  
+- **CLI:** `scripts/backup/restore_uploads_cutover.php --job=`  
+- **APIs:** `request-uploads-cutover.php` (metadata), `uploads-cutover.php` (status)  
+- **Effects:** shadow→`uploads_next` materialize + two-phase rename; checkpoints C7–C8; stops at `uploads_cutover_ready`  
+- **Must not:** database import, rollback, maintenance release, finalize/complete  
+- **Tests:** `self_test_production_uploads_cutover.php`  
+
 ### 3B.3B8 / 3B.4F — Rollback engine (implementation; see 3B.4 design)
 
 - **Code:** automate rollback from pinned Full anchor + uploads snapshot; CLI + later admin  
