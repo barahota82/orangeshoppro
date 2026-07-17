@@ -8,6 +8,7 @@ require_once __DIR__ . '/restore/restore_job.php';
 require_once __DIR__ . '/restore/restore_lock.php';
 require_once __DIR__ . '/restore/restore_merge_maintenance.php';
 require_once __DIR__ . '/restore/restore_validation_adapter.php';
+require_once __DIR__ . '/restore/restore_job_framework.php';
 
 const ORANGE_RESTORE_ADMIN_JOB_ID_PATTERN = '/^[a-zA-Z0-9._-]+$/';
 
@@ -729,14 +730,173 @@ function orange_restore_admin_assert_job_type_visible(string $jobType, bool $may
     }
 }
 
+function orange_restore_admin_assert_package_type_permission(
+    array $admin,
+    PDO $pdo,
+    string $packageType
+): void {
+    if ($packageType === 'full_disaster') {
+        if (!orange_restore_admin_may_view_full($admin, $pdo)) {
+            throw new RuntimeException('Operator lacks backup_restore_full permission.');
+        }
+
+        return;
+    }
+    if ($packageType === 'country_recovery') {
+        if (!orange_restore_admin_may_view_country($admin, $pdo)) {
+            throw new RuntimeException('Operator lacks backup_restore_country permission.');
+        }
+
+        return;
+    }
+
+    throw new RuntimeException('Invalid package type.');
+}
+
+/**
+ * @return list<array<string, mixed>>
+ */
+function orange_restore_admin_fw_list_jobs(string $workRoot, bool $mayFull, bool $mayCountry): array
+{
+    if ($workRoot === '' || !is_dir($workRoot)) {
+        return [];
+    }
+    $rows = [];
+    foreach (orange_restore_fw_list_jobs($workRoot) as $row) {
+        $type = (string) ($row['package_type'] ?? '');
+        if ($type === 'full_disaster' && !$mayFull) {
+            continue;
+        }
+        if ($type === 'country_recovery' && !$mayCountry) {
+            continue;
+        }
+        $rows[] = $row;
+    }
+
+    return $rows;
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_view_job(string $workRoot, string $jobId, bool $mayFull, bool $mayCountry): array
+{
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    if ($type === 'full_disaster' && !$mayFull) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+    if ($type === 'country_recovery' && !$mayCountry) {
+        throw new RuntimeException('Operator lacks backup_restore_country permission.');
+    }
+
+    $public = orange_restore_fw_public_row($job);
+    $public['audit_events'] = orange_restore_admin_sanitize_audit_list(
+        array_map(static function (array $event): array {
+            return [
+                'recorded_at' => (string) ($event['recorded_at'] ?? ''),
+                'stage' => (string) ($event['event'] ?? $event['stage'] ?? ''),
+                'result' => (string) ($event['result'] ?? ''),
+                'job_status' => (string) ($event['status'] ?? ''),
+                'operator_username' => (string) ($event['operator_username'] ?? ''),
+                'message' => (string) ($event['message'] ?? ''),
+            ];
+        }, orange_restore_fw_audit_read($workRoot, $jobId))
+    );
+    $public['read_only_execution'] = true;
+    $public['execution_enabled'] = false;
+
+    return $public;
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_create_job(
+    string $backupRoot,
+    string $workRoot,
+    array $admin,
+    PDO $pdo,
+    string $packageType,
+    string $packageId,
+    string $countryCode = ''
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_package_type_permission($admin, $pdo, $packageType);
+    orange_backup_admin_assert_package_id($packageId);
+
+    if ($packageType === 'full_disaster') {
+        $packagePath = orange_backup_admin_resolve_full_package_path($backupRoot, $packageId);
+        $summary = orange_backup_admin_summarize_full_package($packagePath, $packageId);
+        $countryCode = '';
+    } else {
+        orange_backup_admin_assert_country_code($countryCode);
+        $packagePath = orange_backup_admin_resolve_country_package_path($backupRoot, $countryCode, $packageId);
+        $summary = orange_backup_admin_summarize_country_package($packagePath, $packageId, $countryCode);
+    }
+
+    $eligibility = orange_restore_admin_package_eligibility($summary, $packageType);
+    if (($eligibility['eligibility_status'] ?? '') !== 'eligible') {
+        throw new RuntimeException(
+            'Package is not eligible for restore job creation: '
+            . (string) ($eligibility['eligibility_reason_code'] ?? 'not_eligible')
+        );
+    }
+
+    $username = trim((string) ($admin['username'] ?? $admin['display_name'] ?? 'admin'));
+    $job = orange_restore_fw_create($workRoot, [
+        'package_id' => $packageId,
+        'package_type' => $packageType,
+        'country_code' => $countryCode !== '' ? $countryCode : null,
+        'created_by' => $username !== '' ? $username : 'admin',
+        'created_by_admin_id' => (int) ($admin['id'] ?? 0),
+    ]);
+
+    return orange_restore_fw_public_row($job);
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_cancel_job(
+    string $workRoot,
+    array $admin,
+    bool $mayFull,
+    bool $mayCountry,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    if ($type === 'full_disaster' && !$mayFull) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+    if ($type === 'country_recovery' && !$mayCountry) {
+        throw new RuntimeException('Operator lacks backup_restore_country permission.');
+    }
+    $username = trim((string) ($admin['username'] ?? $admin['display_name'] ?? 'admin'));
+    $cancelled = orange_restore_fw_cancel($workRoot, $jobId, $username !== '' ? $username : 'admin');
+
+    return orange_restore_fw_public_row($cancelled);
+}
+
 function orange_restore_admin_safe_message(Throwable $e): string
 {
     $msg = trim($e->getMessage());
     if ($msg === '') {
         return 'تعذر تنفيذ العملية.';
     }
+    if ($msg === 'restore_job_already_active') {
+        return 'restore_job_already_active';
+    }
     if (str_contains($msg, 'permission') || str_contains($msg, 'Invalid') || str_contains($msg, 'not found')
-        || str_contains($msg, 'allowlisted') || str_contains($msg, 'Method not allowed')) {
+        || str_contains($msg, 'allowlisted') || str_contains($msg, 'Method not allowed')
+        || str_contains($msg, 'CSRF') || str_contains($msg, 'cannot be cancelled')
+        || str_contains($msg, 'not eligible')) {
         return $msg;
     }
 

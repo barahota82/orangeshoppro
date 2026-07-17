@@ -795,11 +795,145 @@ restore_admin_self_test(str_contains($pageSource, 'orange_admin_render_page_titl
 restore_admin_self_test(str_contains($pageSource, 'أهلية الاسترداد'), 'ui: eligibility column arabic label');
 restore_admin_self_test(str_contains($pageSource, 'عرض تفاصيل الحزمة'), 'ui: package details button arabic');
 restore_admin_self_test(str_contains($pageSource, 'drvCell'), 'ui: DRV cell avoids zero placeholder');
-restore_admin_self_test(str_contains($pageSource, 'read_only') || str_contains($pageSource, 'للعرض والمتابعة فقط'), 'ui: read-only warning present');
+restore_admin_self_test(str_contains($pageSource, 'انتظار التأكيد') || str_contains($pageSource, 'read_only'), 'ui: confirmation-gate warning present');
 restore_admin_self_test(!str_contains($pageSource, 'بدء الاسترداد'), 'ui: no Start Restore button label');
 restore_admin_self_test(!preg_match('/<button[^>]*>[^<]*موافقة/u', $pageSource), 'ui: no approval action button');
 restore_admin_self_test(stripos($pageSource, '>Rollback<') === false && stripos($pageSource, 'restore_full_rollback.php') === false, 'ui: no Rollback action control');
 restore_admin_self_test(!str_contains($pageSource, 'restore_admin.php'), 'ui: page does not load restore_admin.php at render');
+restore_admin_self_test(str_contains($pageSource, 'rc-create-job') && str_contains($pageSource, 'rc-fw-cancel'), 'ui: framework create/cancel controls present');
+restore_admin_self_test(!str_contains($pageSource, 'Execute'), 'ui: no Execute button');
+
+$createApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'create.php');
+$cancelApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'cancel.php');
+$viewApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'view.php');
+$jobListApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'list.php');
+restore_admin_self_test(str_contains($createApiSource, 'restore_admin_api_require_csrf'), 'api: job create requires CSRF');
+restore_admin_self_test(str_contains($cancelApiSource, 'restore_admin_api_require_csrf'), 'api: job cancel requires CSRF');
+restore_admin_self_test(str_contains($viewApiSource, 'restore_admin_api_require_get'), 'api: job view GET-only');
+restore_admin_self_test(str_contains($jobListApiSource, 'restore_admin_api_require_get'), 'api: job list GET-only');
+restore_admin_self_test(!str_contains(strtolower($createApiSource), 'orchestrator'), 'api: job create has no orchestrator calls');
+restore_admin_self_test(!str_contains(strtolower($createApiSource), 'extract'), 'api: job create has no extract calls');
+
+$fwJob = orange_restore_admin_fw_create_job(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    'full_disaster',
+    $fullPkgId,
+    ''
+);
+restore_admin_self_test(($fwJob['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_WAITING_CONFIRMATION, 'framework: create job stops at waiting_confirmation');
+restore_admin_self_test(($fwJob['progress'] ?? -1) === 0, 'framework: default progress is 0');
+restore_admin_self_test(($fwJob['message'] ?? '') === 'Waiting confirmation', 'framework: default message waiting confirmation');
+restore_admin_self_test(($fwJob['execution_enabled'] ?? true) === false, 'framework: execution disabled');
+
+$duplicateRejected = false;
+try {
+    orange_restore_admin_fw_create_job(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        'full_disaster',
+        $fullPkgId,
+        ''
+    );
+} catch (Throwable $e) {
+    $duplicateRejected = trim($e->getMessage()) === 'restore_job_already_active';
+}
+restore_admin_self_test($duplicateRejected, 'framework: duplicate active job rejected');
+
+$fwView = orange_restore_admin_fw_view_job($workRoot, (string) $fwJob['job_id'], true, true);
+restore_admin_self_test(($fwView['job_id'] ?? '') === ($fwJob['job_id'] ?? ''), 'framework: view job returns same id');
+$auditEvents = $fwView['audit_events'] ?? [];
+$auditStages = array_map(static fn ($e) => (string) ($e['stage'] ?? ''), is_array($auditEvents) ? $auditEvents : []);
+restore_admin_self_test(
+    in_array('Restore Job Created', $auditStages, true)
+    && in_array('Restore Job Locked', $auditStages, true)
+    && in_array('Restore Job Waiting Confirmation', $auditStages, true),
+    'framework: audit entries recorded for create/lock/wait'
+);
+
+$cancelledQueued = orange_restore_admin_fw_cancel_job(
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin'],
+    true,
+    true,
+    (string) $fwJob['job_id']
+);
+restore_admin_self_test(($cancelledQueued['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_CANCELLED, 'framework: cancel waiting_confirmation job');
+
+$prepJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_fw_write($workRoot, array_merge($prepJob, [
+    'status' => ORANGE_RESTORE_FW_STATUS_PREPARING,
+    'phase' => ORANGE_RESTORE_FW_PHASE_PREPARING,
+    'message' => 'Preparing',
+]));
+$cancelledPreparing = orange_restore_fw_cancel($workRoot, (string) $prepJob['job_id'], 'superadmin');
+restore_admin_self_test(($cancelledPreparing['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_CANCELLED, 'framework: cancel preparing job');
+
+$completedJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_fw_release_lock($workRoot, (string) $completedJob['job_id']);
+orange_restore_fw_write($workRoot, array_merge($completedJob, [
+    'status' => ORANGE_RESTORE_FW_STATUS_COMPLETED,
+    'phase' => ORANGE_RESTORE_FW_PHASE_COMPLETED,
+    'message' => 'Completed',
+]));
+$cannotCancelCompleted = false;
+try {
+    orange_restore_fw_cancel($workRoot, (string) $completedJob['job_id'], 'superadmin');
+} catch (Throwable) {
+    $cannotCancelCompleted = true;
+}
+restore_admin_self_test($cannotCancelCompleted, 'framework: cannot cancel completed job');
+
+$permDenied = false;
+try {
+    orange_restore_admin_fw_create_job(
+        $backupRoot,
+        $workRoot,
+        $noPermAdmin,
+        $noPermPdo,
+        'full_disaster',
+        $fullPkgId,
+        ''
+    );
+} catch (Throwable $e) {
+    $permDenied = str_contains($e->getMessage(), 'permission');
+}
+restore_admin_self_test($permDenied, 'framework: permissions enforced on create');
+
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+$_SESSION['orange_backup_admin_csrf'] = 'framework-csrf-token-test';
+$csrfRejected = false;
+try {
+    orange_backup_admin_verify_csrf('wrong-token');
+} catch (Throwable $e) {
+    $csrfRejected = str_contains($e->getMessage(), 'CSRF');
+}
+restore_admin_self_test($csrfRejected, 'framework: CSRF rejection works');
+orange_backup_admin_verify_csrf('framework-csrf-token-test');
+restore_admin_self_test(true, 'framework: CSRF acceptance works');
+
+$activeAfterCancel = orange_restore_fw_find_active_job($workRoot);
+restore_admin_self_test($activeAfterCancel === null, 'framework: no single active job after cancel/completed');
+
+$fwLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_job_framework.php');
+restore_admin_self_test(!str_contains($fwLib, 'mysqli_query') && !str_contains($fwLib, 'ZipArchive'), 'framework: no SQL/archive execution');
+restore_admin_self_test(!str_contains($fwLib, 'restoring'), 'framework: no restoring status');
 
 $restoreAdminLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_admin.php');
 restore_admin_self_test(!str_contains($restoreAdminLib, 'function orange_restore_orchestrator_approve'), 'lib: restore_admin does not define mutating orchestrator wrappers');

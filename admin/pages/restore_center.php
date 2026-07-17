@@ -59,7 +59,7 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
 </style>
 
 <p class="rc-readonly-banner" role="status">
-    <strong>تنبيه:</strong> هذه الشاشة للعرض والمتابعة فقط. تنفيذ الاسترداد والموافقة والدمج والاسترجاع العكسي غير متاح في هذه المرحلة.
+    <strong>تنبيه:</strong> يمكن إنشاء مهمة استرداد وإلغاؤها فقط. تنفيذ الاسترداد والموافقة والدمج والاسترجاع العكسي غير متاح في هذه المرحلة — المهمة تتوقف عند انتظار التأكيد.
 </p>
 
 <div id="rc_progress" class="rc-progress" role="status" aria-live="polite">جاري التحميل…</div>
@@ -133,18 +133,16 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
             <thead>
                 <tr>
                     <th>Job ID</th>
-                    <th>النوع</th>
-                    <th>الدولة</th>
-                    <th>الحزمة</th>
-                    <th>الحالة</th>
-                    <th>المرحلة الحالية</th>
-                    <th>آخر تحديث</th>
-                    <th>المشغل</th>
-                    <th>rollback anchor</th>
-                    <th>إجراءات</th>
+                    <th>Package</th>
+                    <th>Created</th>
+                    <th>Status</th>
+                    <th>Phase</th>
+                    <th>Progress</th>
+                    <th>Message</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
-            <tbody><tr><td colspan="10" class="muted">…</td></tr></tbody>
+            <tbody><tr><td colspan="8" class="muted">…</td></tr></tbody>
         </table>
     </div>
 </div>
@@ -171,7 +169,7 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     const CAN_FULL = <?php echo $canFull ? 'true' : 'false'; ?>;
     const CAN_COUNTRY = <?php echo $canCountry ? 'true' : 'false'; ?>;
 
-    let state = { full: [], country: [], jobs: [], busy: false };
+    let state = { full: [], country: [], jobs: [], busy: false, csrf: '' };
 
     const el = (id) => document.getElementById(id);
     const fmtTimestampDisplay = (raw) => {
@@ -253,6 +251,22 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         return j;
     }
 
+    async function apiPost(path, body) {
+        const r = await fetch(API_BASE + '/' + path, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify(body || {})
+        });
+        const j = await parseApiJsonResponse(r);
+        if (!j.success && r.status >= 400) {
+            const err = new Error(j.message || 'Request failed');
+            err.code = j.code || '';
+            throw err;
+        }
+        return j;
+    }
+
     function renderOverview(data) {
         const ov = data.overview || {};
         const counts = ov.job_counts || {};
@@ -286,24 +300,26 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
             html += '<button type="button" class="btn-link rc-view-file" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '" data-file="' + file + '">' + label + '</button> ';
         });
         html += '<button type="button" class="btn-link rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">عرض تفاصيل الحزمة</button>';
+        if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
+            html += ' <button type="button" class="btn-link rc-create-job" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">إنشاء مهمة</button>';
+        }
         return html;
     }
 
     function jobActions(job) {
         const id = job.job_id;
-        let html = '';
-        html += '<button type="button" class="btn-link rc-job-status" data-id="' + id + '">View status</button> ';
-        html += '<button type="button" class="btn-link rc-job-report" data-id="' + id + '" data-file="restore_report.json">View report</button> ';
-        html += '<button type="button" class="btn-link rc-job-audit" data-id="' + id + '">View audit</button> ';
-        html += '<button type="button" class="btn-link rc-job-file" data-id="' + id + '" data-file="staging_restore_manifest.json">View staging manifest</button> ';
-        html += '<button type="button" class="btn-link rc-job-rollback" data-id="' + id + '">View rollback anchor metadata</button>';
+        let html = '<button type="button" class="btn-link rc-fw-view" data-id="' + id + '">View</button> ';
+        if (job.cancellable) {
+            html += '<button type="button" class="btn-link rc-fw-cancel" data-id="' + id + '">Cancel</button>';
+        }
         return html;
     }
 
     function renderTables(data) {
         state.full = data.full_packages || [];
         state.country = data.country_packages || [];
-        state.jobs = data.jobs || [];
+        state.jobs = data.framework_jobs || data.jobs || [];
+        if (data.csrf_token) state.csrf = data.csrf_token;
 
         if (CAN_FULL && el('rc_full_table')) {
             el('rc_full_table').querySelector('tbody').innerHTML = state.full.length
@@ -316,8 +332,11 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                 : '<tr><td colspan="9" class="muted">لا توجد حزم دول.</td></tr>';
         }
         el('rc_jobs_table').querySelector('tbody').innerHTML = state.jobs.length
-            ? state.jobs.map((j) => '<tr><td><code>' + j.job_id + '</code></td><td>' + (j.job_type || '') + '</td><td>' + (j.country_code || '—') + '</td><td>' + (j.package_id || '—') + '</td><td>' + badge(j.status) + '</td><td>' + (j.current_phase || '—') + '</td><td class="rc-ts-cell">' + fmtTimestampDisplay(j.updated_at) + '</td><td>' + (j.operator_username || '—') + '</td><td>' + (j.rollback_anchor_checksum ? String(j.rollback_anchor_checksum).slice(0, 12) + '…' : '—') + '</td><td class="rc-actions">' + jobActions(j) + '</td></tr>').join('')
-            : '<tr><td colspan="10" class="muted">لا توجد Restore Jobs.</td></tr>';
+            ? state.jobs.map((j) => {
+                const pkgLabel = (j.package_type || '') + (j.country_code ? ' / ' + j.country_code : '') + ' / ' + (j.package_id || '—');
+                return '<tr><td><code>' + j.job_id + '</code></td><td>' + pkgLabel + '</td><td class="rc-ts-cell">' + fmtTimestampDisplay(j.created_at) + '</td><td>' + badge(j.status) + '</td><td>' + (j.phase || '—') + '</td><td>' + String(j.progress ?? 0) + '%</td><td>' + (j.message || '—') + '</td><td class="rc-actions">' + jobActions(j) + '</td></tr>';
+            }).join('')
+            : '<tr><td colspan="8" class="muted">لا توجد Restore Jobs.</td></tr>';
     }
 
     function openView(title, content) {
@@ -422,11 +441,31 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
             return;
         }
 
-        if (t.classList.contains('rc-job-status')) {
+        if (t.classList.contains('rc-create-job')) {
+            try {
+                setBusy(true, 'جاري إنشاء المهمة…');
+                const j = await apiPost('job/create.php', {
+                    csrf_token: state.csrf,
+                    package_type: t.dataset.type || '',
+                    package_id: t.dataset.id || '',
+                    country_code: t.dataset.cc || ''
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert('تم إنشاء المهمة وتوقفت عند انتظار التأكيد.', true);
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر إنشاء المهمة', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-fw-view')) {
             try {
                 setBusy(true, 'جاري التحميل…');
-                const j = await apiGet('status.php?action=job&job_id=' + encodeURIComponent(t.dataset.id || ''));
-                openJobDetail(j.job || {});
+                const j = await apiGet('job/view.php?id=' + encodeURIComponent(t.dataset.id || ''));
+                openView('Restore Job — ' + (t.dataset.id || ''), JSON.stringify(j.job || {}, null, 2));
             } catch (e) {
                 showAlert(e.message || 'تعذر العرض', false);
             } finally {
@@ -435,42 +474,19 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
             return;
         }
 
-        if (t.classList.contains('rc-job-report') || t.classList.contains('rc-job-file')) {
+        if (t.classList.contains('rc-fw-cancel')) {
+            if (!window.confirm('إلغاء مهمة الاسترداد؟')) return;
             try {
-                setBusy(true, 'جاري التحميل…');
-                const q = 'status.php?action=job_file&job_id=' + encodeURIComponent(t.dataset.id || '') +
-                    '&file=' + encodeURIComponent(t.dataset.file || '');
-                const j = await apiGet(q);
-                const body = j.data ? JSON.stringify(j.data, null, 2) : (j.raw_text || j.errors?.join('\n') || '');
-                openView(t.dataset.file || 'job file', body);
+                setBusy(true, 'جاري الإلغاء…');
+                const j = await apiPost('job/cancel.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || ''
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert('تم إلغاء المهمة.', true);
+                await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
-            } finally {
-                setBusy(false);
-            }
-            return;
-        }
-
-        if (t.classList.contains('rc-job-audit')) {
-            try {
-                setBusy(true, 'جاري التحميل…');
-                const j = await apiGet('status.php?action=job&job_id=' + encodeURIComponent(t.dataset.id || ''));
-                openView('Audit — ' + (t.dataset.id || ''), JSON.stringify((j.job || {}).audit_events || [], null, 2));
-            } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
-            } finally {
-                setBusy(false);
-            }
-            return;
-        }
-
-        if (t.classList.contains('rc-job-rollback')) {
-            try {
-                setBusy(true, 'جاري التحميل…');
-                const j = await apiGet('status.php?action=rollback_anchor&job_id=' + encodeURIComponent(t.dataset.id || ''));
-                openView('Rollback anchor metadata', JSON.stringify(j.rollback_anchor || {}, null, 2));
-            } catch (e) {
-                showAlert(e.message || 'تعذر العرض', false);
+                showAlert(e.message || 'تعذر الإلغاء', false);
             } finally {
                 setBusy(false);
             }

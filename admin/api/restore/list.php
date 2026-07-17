@@ -35,15 +35,21 @@ try {
     json_response([
         'success' => true,
         'read_only' => true,
+        'read_only_execution' => true,
+        'csrf_token' => orange_backup_admin_csrf_token(),
         'permissions' => [
             'can_view_full' => $mayFull,
             'can_view_country' => $mayCountry,
             'is_superuser' => orange_admin_is_superuser($admin),
+            'can_create_job' => $mayFull || $mayCountry,
+            'can_cancel_job' => $mayFull || $mayCountry,
         ],
         'overview' => orange_restore_admin_collect_overview($workRoot),
         'full_packages' => $fullPackages,
         'country_packages' => $countryPackages,
-        'jobs' => orange_restore_admin_list_jobs($workRoot, $mayFull, $mayCountry),
+        'framework_jobs' => orange_restore_admin_fw_list_jobs($workRoot, $mayFull, $mayCountry),
+        'jobs' => orange_restore_admin_fw_list_jobs($workRoot, $mayFull, $mayCountry),
+        'legacy_engine_jobs' => orange_restore_admin_list_jobs($workRoot, $mayFull, $mayCountry),
     ]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, orange_restore_admin_safe_message($e));

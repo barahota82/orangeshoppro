@@ -92,3 +92,32 @@ function restore_admin_api_require_get(): void
         json_response(['success' => false, 'message' => 'Method not allowed'], 405);
     }
 }
+
+function restore_admin_api_require_post(): void
+{
+    if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
+        json_response(['success' => false, 'message' => 'Method not allowed'], 405);
+    }
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function restore_admin_api_json_body(): array
+{
+    $data = get_json_input();
+    if (is_array($data) && $data !== []) {
+        return $data;
+    }
+    if ($_POST !== []) {
+        return $_POST;
+    }
+
+    return [];
+}
+
+function restore_admin_api_require_csrf(array $data): void
+{
+    $token = (string) ($data['csrf_token'] ?? $data['_csrf'] ?? '');
+    orange_backup_admin_verify_csrf($token);
+}
