@@ -14,6 +14,7 @@ require_once __DIR__ . '/restore/restore_execution_orchestrator.php';
 require_once __DIR__ . '/restore/restore_version_lock.php';
 require_once __DIR__ . '/restore/restore_maintenance_framework.php';
 require_once __DIR__ . '/restore/restore_final_approval.php';
+require_once __DIR__ . '/restore/restore_execution_bridge.php';
 
 const ORANGE_RESTORE_ADMIN_JOB_ID_PATTERN = '/^[a-zA-Z0-9._-]+$/';
 
@@ -1108,6 +1109,49 @@ function orange_restore_admin_fw_maintenance_status(string $workRoot): array
     return orange_restore_maint_fw_public(orange_restore_maint_fw_read($workRoot));
 }
 
+/**
+ * Read-only execution contract for an approved framework job.
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_execution_contract(
+    string $workRoot,
+    string $backupRoot,
+    bool $mayFull,
+    bool $mayCountry,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    if ($type === 'full_disaster' && !$mayFull) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+    if ($type === 'country_recovery' && !$mayCountry) {
+        throw new RuntimeException('Operator lacks backup_restore_country permission.');
+    }
+
+    $contract = orange_restore_load_execution_contract($workRoot, $jobId);
+    $validation = orange_restore_validate_execution_contract($workRoot, $jobId, $backupRoot, $contract);
+
+    return [
+        'contract' => orange_restore_bridge_public_contract($contract),
+        'validation' => [
+            'ok' => (bool) ($validation['ok'] ?? false),
+            'code' => (string) ($validation['code'] ?? ''),
+            'reasons' => is_array($validation['reasons'] ?? null)
+                ? array_values($validation['reasons'])
+                : [],
+        ],
+        'execution_started' => false,
+        'read_only' => true,
+    ];
+}
+
 function orange_restore_admin_safe_message(Throwable $e): string
 {
     $msg = trim($e->getMessage());
@@ -1150,6 +1194,17 @@ function orange_restore_admin_safe_message(Throwable $e): string
         'version_manifest_missing',
         'version_schema_incompatible',
         'version_backend_incompatible',
+        'contract_missing',
+        'contract_invalid',
+        'package_changed',
+        'plan_changed',
+        'approval_changed',
+        'version_mismatch',
+        'backend_mismatch',
+        'schema_mismatch',
+        'execution_started_forbidden',
+        'final_approval_missing',
+        'final_approval_invalid',
     ];
     if (in_array($msg, $passthrough, true)) {
         return $msg;

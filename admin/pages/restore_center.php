@@ -368,6 +368,9 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         if (job.is_approved_waiting_execution) {
             html += '<span class="muted">تم اعتماد الخطة، لكن لم يبدأ الاسترداد ولم يتم تفعيل وضع الصيانة.</span> ';
         }
+        if (job.has_execution_contract) {
+            html += '<button type="button" class="btn-link rc-exec-contract" data-id="' + id + '">View Execution Contract</button> ';
+        }
         if (job.execution_plan_cancellable) {
             html += '<button type="button" class="btn-link rc-cancel-exec" data-id="' + id + '">إلغاء الخطة</button> ';
         }
@@ -604,6 +607,27 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                 setBusy(true, 'جاري التحميل…');
                 const j = await apiGet('job/execution-plan.php?id=' + encodeURIComponent(t.dataset.id || ''));
                 openView('خطة الاسترداد — ' + (t.dataset.id || ''), JSON.stringify(j.plan || {}, null, 2));
+            } catch (e) {
+                showAlert(e.message || 'تعذر العرض', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-exec-contract')) {
+            try {
+                setBusy(true, 'جاري التحميل…');
+                const j = await apiGet('job/execution-contract.php?id=' + encodeURIComponent(t.dataset.id || ''));
+                openView(
+                    'Execution Contract — ' + (t.dataset.id || ''),
+                    JSON.stringify({
+                        contract: j.contract || {},
+                        validation: j.validation || {},
+                        execution_started: false,
+                        warning: j.warning || ''
+                    }, null, 2)
+                );
             } catch (e) {
                 showAlert(e.message || 'تعذر العرض', false);
             } finally {

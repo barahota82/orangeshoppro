@@ -12,6 +12,7 @@ require_once __DIR__ . '/restore_job_framework.php';
 require_once __DIR__ . '/restore_execution_orchestrator.php';
 require_once __DIR__ . '/restore_dry_run.php';
 require_once __DIR__ . '/restore_version_lock.php';
+require_once __DIR__ . '/restore_execution_bridge.php';
 require_once __DIR__ . '/restore_reauth.php';
 require_once __DIR__ . '/../backup_admin.php';
 
@@ -490,9 +491,13 @@ function orange_restore_final_approval_grant(
             'cli_invoked' => false,
         ]);
 
+        // 3B.3B2 — metadata-only CLI execution contract (never invokes restore).
+        $contract = orange_restore_prepare_execution_contract($workRoot, $jobId, $backupRoot);
+
         return [
             'job' => orange_restore_fw_public_row(orange_restore_fw_read($workRoot, $jobId)),
             'approval' => orange_restore_final_approval_public($approval),
+            'execution_contract' => orange_restore_bridge_public_contract($contract),
         ];
     } catch (Throwable $e) {
         $code = trim($e->getMessage());

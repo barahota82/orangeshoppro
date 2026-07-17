@@ -921,6 +921,8 @@ restore_admin_self_test(str_contains($pageSource, 'Run Dry Validation') && str_c
 restore_admin_self_test(str_contains($pageSource, 'إعداد خطة الاسترداد') && str_contains($pageSource, 'عرض خطة الاسترداد') && str_contains($pageSource, 'إلغاء الخطة'), 'ui: execution plan Arabic controls present');
 restore_admin_self_test(str_contains($pageSource, 'بانتظار الموافقة النهائية') && str_contains($pageSource, 'لم يتم تنفيذ أي استرداد حتى الآن'), 'ui: awaiting final approval warning present');
 restore_admin_self_test(str_contains($pageSource, 'حالة وضع الصيانة') && str_contains($pageSource, 'الموافقة النهائية'), 'ui: maintenance section and final approval control present');
+restore_admin_self_test(str_contains($pageSource, 'View Execution Contract') && str_contains($pageSource, 'rc-exec-contract'), 'ui: View Execution Contract control present');
+restore_admin_self_test(!str_contains($pageSource, 'Execute Restore') && !preg_match('/\\bResume\\b/', $pageSource), 'ui: no Execute/Resume restore controls');
 restore_admin_self_test(str_contains($pageSource, 'تم اعتماد الخطة، لكن لم يبدأ الاسترداد ولم يتم تفعيل وضع الصيانة'), 'ui: approved-waiting message present');
 restore_admin_self_test(!str_contains($pageSource, 'Execute Restore') && !str_contains($pageSource, 'بدء الاسترداد') && !str_contains($pageSource, 'Start Worker') && !str_contains($pageSource, 'Enable Maintenance'), 'ui: no Execute/Enable Maintenance/Start Worker');
 
@@ -1914,6 +1916,8 @@ restore_admin_self_test(($granted['approval']['execution_started'] ?? true) === 
 restore_admin_self_test(($granted['approval']['maintenance_enabled'] ?? true) === false, 'approval: no maintenance enabled');
 restore_admin_self_test(($granted['approval']['cli_invoked'] ?? true) === false, 'approval: no CLI invoked');
 restore_admin_self_test(is_file(orange_restore_final_approval_record_path($workRoot, (string) $approveJob2['job_id'])), 'approval: final_approval.json written');
+restore_admin_self_test(is_file(orange_restore_exec_contract_path($workRoot, (string) $approveJob2['job_id'])), 'bridge: contract written on final approval');
+restore_admin_self_test(($granted['execution_contract']['execution_started'] ?? true) === false, 'bridge: grant payload execution_started false');
 $maintAfterApprove = orange_restore_maint_fw_read($workRoot);
 restore_admin_self_test(($maintAfterApprove['state'] ?? '') === ORANGE_RESTORE_MAINT_STATE_INACTIVE, 'approval: production maintenance remains inactive');
 
@@ -2123,11 +2127,145 @@ if (is_file($planPath)) {
     restore_admin_self_test(in_array('version_plan_incompatible', $vl['reasons'] ?? [], true), 'version-lock: incompatible restore plan');
 }
 
+// --- Phase 3B.3B2 restore bridge / execution contract ---
+// Dedicated approved job (prior fixtures may still hold the orchestration lock / active status).
+try {
+    orange_restore_admin_fw_cancel_execution_plan(
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $approveJob4['job_id'],
+        'bridge self-test cleanup'
+    );
+} catch (Throwable) {
+    orange_restore_exec_release_lock($workRoot, (string) $approveJob4['job_id']);
+    orange_restore_fw_write($workRoot, array_merge(orange_restore_fw_read($workRoot, (string) $approveJob4['job_id']), [
+        'status' => ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
+        'phase' => ORANGE_RESTORE_FW_PHASE_EXECUTION_CANCELLED,
+    ]));
+}
+$bridgeJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$bridgeJobId = (string) $bridgeJob['job_id'];
+orange_restore_dry_run_execute($workRoot, $bridgeJobId, [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+orange_restore_admin_fw_prepare_execution(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    $bridgeJobId
+);
+$bridgeChallenge = orange_restore_admin_fw_create_approval_challenge(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    $bridgeJobId
+);
+$bridgeGranted = orange_restore_admin_fw_final_approve(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    $bridgeJobId,
+    $fullPkgId,
+    (string) $bridgeChallenge['required_confirmation_phrase'],
+    (string) $bridgeChallenge['nonce'],
+    'restore-test-password'
+);
+restore_admin_self_test(($bridgeGranted['job']['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION, 'bridge: dedicated job approved for contract');
+restore_admin_self_test(is_file(orange_restore_exec_contract_path($workRoot, $bridgeJobId)), 'bridge: contract file exists after approve');
+
+$contractLoaded = orange_restore_load_execution_contract($workRoot, $bridgeJobId);
+restore_admin_self_test(($contractLoaded['contract_version'] ?? '') === ORANGE_RESTORE_EXEC_CONTRACT_VERSION, 'bridge: contract generation version');
+restore_admin_self_test(($contractLoaded['execution_started'] ?? true) === false, 'bridge: contract execution_started false');
+restore_admin_self_test(($contractLoaded['cli_invoked'] ?? true) === false, 'bridge: contract cli_invoked false');
+restore_admin_self_test(($contractLoaded['backend'] ?? '') === 'php_pdo', 'bridge: backend php_pdo');
+restore_admin_self_test((int) ($contractLoaded['schema_revision'] ?? 0) === ORANGE_RECOVERY_VALIDATION_EXPECTED_SCHEMA_REVISION, 'bridge: schema_revision locked');
+restore_admin_self_test(($contractLoaded['cli_request']['invoked'] ?? true) === false, 'bridge: cli_request.invoked false');
+
+$contractValidate = orange_restore_validate_execution_contract($workRoot, $bridgeJobId, $backupRoot);
+restore_admin_self_test(($contractValidate['ok'] ?? false) === true, 'bridge: validation passes for fresh contract');
+
+$adminContract = orange_restore_admin_fw_execution_contract($workRoot, $backupRoot, true, true, $bridgeJobId);
+restore_admin_self_test(($adminContract['execution_started'] ?? true) === false && ($adminContract['validation']['ok'] ?? false) === true, 'bridge: admin GET helper read-only ok');
+
+// package fingerprint mismatch
+$contractTamper = $contractLoaded;
+$contractTamper['package_fingerprint'] = str_repeat('a', 64);
+$pkgMismatch = orange_restore_validate_execution_contract($workRoot, $bridgeJobId, $backupRoot, $contractTamper);
+restore_admin_self_test(($pkgMismatch['ok'] ?? true) === false && in_array('package_changed', $pkgMismatch['reasons'] ?? [], true), 'bridge: fingerprint mismatch rejected');
+
+// approval mismatch
+$contractTamper2 = $contractLoaded;
+$contractTamper2['approval_hash'] = str_repeat('b', 64);
+$approvalMismatch = orange_restore_validate_execution_contract($workRoot, $bridgeJobId, $backupRoot, $contractTamper2);
+restore_admin_self_test(($approvalMismatch['ok'] ?? true) === false && in_array('approval_changed', $approvalMismatch['reasons'] ?? [], true), 'bridge: approval mismatch rejected');
+
+// version mismatch
+$contractTamper3 = $contractLoaded;
+$contractTamper3['contract_version'] = '0-invalid';
+$versionMismatch = orange_restore_validate_execution_contract($workRoot, $bridgeJobId, $backupRoot, $contractTamper3);
+restore_admin_self_test(($versionMismatch['ok'] ?? true) === false && in_array('version_mismatch', $versionMismatch['reasons'] ?? [], true), 'bridge: version mismatch rejected');
+
+// schema mismatch
+$contractTamper4 = $contractLoaded;
+$contractTamper4['schema_revision'] = 1;
+$schemaMismatch = orange_restore_validate_execution_contract($workRoot, $bridgeJobId, $backupRoot, $contractTamper4);
+restore_admin_self_test(($schemaMismatch['ok'] ?? true) === false && in_array('schema_mismatch', $schemaMismatch['reasons'] ?? [], true), 'bridge: schema mismatch rejected');
+
+// backend mismatch
+$contractTamper5 = $contractLoaded;
+$contractTamper5['backend'] = 'mysqldump';
+$backendMismatch = orange_restore_validate_execution_contract($workRoot, $bridgeJobId, $backupRoot, $contractTamper5);
+restore_admin_self_test(($backendMismatch['ok'] ?? true) === false && in_array('backend_mismatch', $backendMismatch['reasons'] ?? [], true), 'bridge: backend mismatch rejected');
+
+// plan hash mismatch
+$contractTamper6 = $contractLoaded;
+$contractTamper6['execution_plan_hash'] = str_repeat('c', 64);
+$planMismatch = orange_restore_validate_execution_contract($workRoot, $bridgeJobId, $backupRoot, $contractTamper6);
+restore_admin_self_test(($planMismatch['ok'] ?? true) === false && in_array('plan_changed', $planMismatch['reasons'] ?? [], true), 'bridge: plan hash mismatch rejected');
+
+$bridgeLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_execution_bridge.php');
+$bridgeApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'execution-contract.php');
+restore_admin_self_test(
+    !str_contains($bridgeLib, 'shell_exec') && !str_contains($bridgeLib, 'proc_open')
+    && !str_contains($bridgeLib, 'orange_restore_e2e_start_full(')
+    && !str_contains($bridgeLib, 'orange_restore_full_staging_run(')
+    && !str_contains($bridgeLib, 'mysqli_query'),
+    'bridge: no CLI/SQL/staging execution calls'
+);
+restore_admin_self_test(
+    str_contains($bridgeLib, 'function orange_restore_prepare_execution_contract')
+    && str_contains($bridgeLib, 'function orange_restore_validate_execution_contract')
+    && str_contains($bridgeLib, 'function orange_restore_load_execution_contract')
+    && !str_contains($bridgeLib, 'function orange_restore_execute')
+    && !str_contains($bridgeLib, 'function orange_restore_invoke_cli'),
+    'bridge: only prepare/validate/load helpers exposed'
+);
+restore_admin_self_test(
+    str_contains($bridgeApi, 'restore_admin_api_require_get')
+    && !str_contains($bridgeApi, 'orange_restore_prepare_execution_contract')
+    && !str_contains(strtolower($bridgeApi), 'execute'),
+    'api: execution-contract is GET/read-only and does not prepare/execute'
+);
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'docs' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'RESTORE_PHASE2_CLI_ENTRYPOINTS.md'), 'bridge: Phase 2 CLI discovery doc present');
+restore_admin_self_test(count(orange_restore_bridge_phase2_cli_entrypoints()) >= 8, 'bridge: Phase 2 CLI entrypoints catalogued');
+
 $finalApprovalLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_final_approval.php');
 $maintLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_maintenance_framework.php');
-restore_admin_self_test(!str_contains($finalApprovalLib, 'mysqli_query') && !str_contains($finalApprovalLib, 'orange_restore_full_staging'), 'approval: no SQL / staging restore');
+restore_admin_self_test(!str_contains($finalApprovalLib, 'mysqli_query') && !str_contains($finalApprovalLib, 'orange_restore_full_staging_run'), 'approval: no SQL / staging restore');
 restore_admin_self_test(!str_contains($maintLib, 'extractTo') && !str_contains($maintLib, 'shell_exec'), 'maint: no extraction/shell');
 restore_admin_self_test(!is_dir($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'execute.php'), 'regression: no execute endpoint file');
+restore_admin_self_test(!is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'run.php'), 'regression: no run endpoint file');
+restore_admin_self_test(!is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'resume.php'), 'regression: no resume endpoint file');
 
     restore_admin_test_run_cleanup();
     restore_admin_test_emit_summary();

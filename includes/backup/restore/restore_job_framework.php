@@ -424,6 +424,7 @@ function orange_restore_fw_public_row(array $job): array
         'final_approval_available' => $status === ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL
             && (string) ($job['package_type'] ?? '') === 'full_disaster',
         'is_approved_waiting_execution' => $status === ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
+        'has_execution_contract' => !empty($job['execution_contract_file']),
         'requires_final_approval' => (bool) ($job['requires_final_approval'] ?? false),
         'execution_started' => (bool) ($job['execution_started'] ?? false),
         'framework_version' => (string) ($job['framework_version'] ?? ORANGE_RESTORE_FW_VERSION),

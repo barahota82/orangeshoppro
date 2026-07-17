@@ -542,7 +542,15 @@ Fail → rollback_preparing.
 - **Prod gate:** feature flag off by default  
 - **Rollback:** disable flag; delete maint file via emergency unlock  
 
-### 3B.3B2 — Mandatory pre-restore backup + verification
+### 3B.3B2 — Restore Bridge Layer (owner scope; contract only)
+
+- **Code:** `includes/backup/restore/restore_execution_bridge.php`; discovery doc `docs/backup/RESTORE_PHASE2_CLI_ENTRYPOINTS.md`; GET `admin/api/restore/job/execution-contract.php`  
+- **Effects:** writes `{job}/restore_execution_contract.json` after final approval (`execution_started=false`); never invokes CLI / SQL / staging / cutover / maintenance  
+- **Helpers only:** `orange_restore_prepare_execution_contract`, `orange_restore_validate_execution_contract`, `orange_restore_load_execution_contract`  
+- **UI:** View Execution Contract (no Execute / Run / Resume)  
+- **Tests:** contract generation + mismatch rejection in `self_test_restore_admin.php`  
+
+### 3B.3B2b — Mandatory pre-restore backup + verification (design sequence; after bridge)
 
 - **Code:** wire `orange_restore_fresh_backup_gate`; retention pin  
 - **Effects:** creates Full backup package only  
@@ -552,7 +560,7 @@ Fail → rollback_preparing.
 
 ### 3B.3B3 — Database restore engine in isolated staging
 
-- **Code:** bridge 3B → `orange_restore_full_staging_run` (or extracted shared service); no production cutover  
+- **Code:** use bridge contract → invoke `orange_restore_full_staging_run` (or extracted shared service); no production cutover  
 - **Effects:** staging DB only  
 - **Tests:** import/verify against staging; SQL safety  
 - **Prod gate:** staging credentials required in env  
@@ -614,7 +622,9 @@ Fail → rollback_preparing.
 - `includes/backup/country_export.php`, `country_batch_export.php`  
 - `includes/backup/recovery_validation.php`  
 - `includes/backup/restore_admin.php`  
-- `includes/backup/restore/restore_job_framework.php`, `restore_dry_run.php`, `restore_execution_orchestrator.php`  
+- `includes/backup/restore/restore_job_framework.php`, `restore_dry_run.php`, `restore_execution_orchestrator.php`, `restore_final_approval.php`, `restore_execution_bridge.php`  
+- `docs/backup/RESTORE_PHASE2_CLI_ENTRYPOINTS.md`  
+
 - `includes/backup/restore/restore_job.php`, `restore_lock.php`, `restore_merge_maintenance.php`  
 - `includes/backup/restore/restore_fresh_backup_gate.php`, `restore_full_staging.php`, `restore_country_staging.php`  
 - `includes/backup/restore/restore_sql_runner.php`, `restore_sql_safety.php`  
