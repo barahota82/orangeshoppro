@@ -36,6 +36,7 @@ The bridge converts an **approved** 3B framework job into a **versioned executio
 | `scripts/backup/restore_prepare_backup.php` | 3B framework: pre-restore Full anchor (CLI) | `orange_restore_pre_backup_run_cli()` |
 | `scripts/backup/restore_shadow_db.php` | 3B framework: shadow DB import only (CLI; no cutover) | `orange_restore_shadow_run_cli()` |
 | `scripts/backup/restore_shadow_verify.php` | 3B framework: shadow readiness verification (CLI; read-only vs prod) | `orange_restore_shadow_verify_run_cli()` |
+| `scripts/backup/restore_shadow_files.php` | 3B framework: shadow file extract only (CLI; no rename/cutover) | `orange_restore_shadow_files_run_cli()` |
 
 ---
 

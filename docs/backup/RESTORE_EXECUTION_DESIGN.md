@@ -581,12 +581,16 @@ Fail → rollback_preparing.
 - **Must not:** production writes, cutover, app config switch, file restore, maintenance enable, rollback execution, HTTP-side verification run  
 - **Tests:** `self_test_shadow_verify.php` + expansions in `self_test_restore_admin.php`  
 
-### 3B.3B6 — File restore staging + verification
+### 3B.3B6 — Shadow File Restore (owner scope; isolated workspace only)
 
-- **Code:** uploads applicator to staging/`uploads_next`; no production rename  
-- **Effects:** staging files only  
-- **Tests:** zip-slip, symlink deny, checksum  
-- **Rollback:** delete staging tree  
+- **Code:** `includes/backup/restore/restore_shadow_files.php`; CLI `scripts/backup/restore_shadow_files.php --job=`; GET `shadow-files.php` (read-only)  
+- **Prerequisite:** `shadow_verified` (+ pinned pre-restore anchor + valid contract); Full only  
+- **Target:** `{framework_job}/restore_shadow_workspace/` only — never production uploads, never `uploads_next` rename  
+- **Reuses:** `orange_restore_uploads_applicator_extract`, `orange_restore_uploads_tree_inventory`, symlink/reparse fences  
+- **Effects:** wipe+extract package `uploads.zip` into shadow workspace; writes `{job}/shadow_files.json` + `{job}/shadow_files_report.json`; stops at `shadow_files_ready` / `shadow_files_failed`  
+- **Validate:** zip-slip, absolute/drive paths, symlink entries, uploads SHA-256, file set match, tree checksum, readability/permissions report  
+- **Must not:** production filesystem writes, directory rename/cutover, app config changes, maintenance enable, HTTP-side extract  
+- **Tests:** `self_test_shadow_files.php` + expansions in `self_test_restore_admin.php`  
 
 ### 3B.3B7 — Rollback engine
 
@@ -609,7 +613,7 @@ Fail → rollback_preparing.
 - **Tests:** timed RTO/RPO metrics  
 - **Prod gate:** owner acceptance  
 
-**Country production** starts only after a dedicated **3B.3C** series following table-boundary proof — not before 3B.3B6 Full success.
+**Country production** starts only after a dedicated **3B.3C** series following table-boundary proof — not before Full shadow path success.
 
 ---
 

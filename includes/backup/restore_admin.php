@@ -18,6 +18,7 @@ require_once __DIR__ . '/restore/restore_execution_bridge.php';
 require_once __DIR__ . '/restore/restore_pre_restore_backup.php';
 require_once __DIR__ . '/restore/restore_shadow_db.php';
 require_once __DIR__ . '/restore/restore_shadow_verify.php';
+require_once __DIR__ . '/restore/restore_shadow_files.php';
 
 const ORANGE_RESTORE_ADMIN_JOB_ID_PATTERN = '/^[a-zA-Z0-9._-]+$/';
 
@@ -1313,6 +1314,58 @@ function orange_restore_admin_fw_shadow_verification(
 }
 
 /**
+ * Read-only shadow files status/report (HTTP never runs extractor).
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_shadow_files(
+    string $workRoot,
+    bool $mayFull,
+    bool $mayCountry,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    if ($type === 'full_disaster' && !$mayFull) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+    if ($type === 'country_recovery' && !$mayCountry) {
+        throw new RuntimeException('Operator lacks backup_restore_country permission.');
+    }
+
+    $status = (string) ($job['status'] ?? '');
+    $labels = [
+        ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_RUNNING => 'جارٍ استخراج ملفات الظل',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_VERIFYING => 'جارٍ التحقق من ملفات الظل',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY => 'ملفات الظل جاهزة (الإنتاج لم يُمس)',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_FAILED => 'فشل استخراج ملفات الظل',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED => 'بانتظار تشغيل عامل CLI لملفات الظل',
+    ];
+    $meta = orange_restore_shadow_files_load_meta($workRoot, $jobId);
+    $report = orange_restore_shadow_files_load_report($workRoot, $jobId);
+    $cliNeeded = in_array($status, [
+        ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_FAILED,
+    ], true);
+
+    return [
+        'job' => orange_restore_fw_public_row($job),
+        'meta' => $meta !== null ? orange_restore_shadow_files_public_meta($meta) : null,
+        'report' => $report !== null ? orange_restore_shadow_files_public_report($report) : null,
+        'status_label_ar' => $labels[$status] ?? '',
+        'cli_needed' => $cliNeeded,
+        'cli_command' => 'php scripts/backup/restore_shadow_files.php --job=' . $jobId,
+        'execution_started' => false,
+        'production_touched' => false,
+        'read_only' => true,
+    ];
+}
+
+/**
  * Read-only execution contract for an approved framework job.
  *
  * @return array<string, mixed>
@@ -1431,6 +1484,14 @@ function orange_restore_admin_safe_message(Throwable $e): string
         'shadow_restore_not_ready',
         'shadow_not_ready',
         'shadow_verification_failed',
+        'shadow_files_lock_active',
+        'shadow_not_verified',
+        'uploads_file_missing',
+        'uploads_zip_missing',
+        'uploads_checksum_mismatch',
+        'shadow_files_verify_failed',
+        'shadow_files_failed',
+        'shadow_workspace_create_failed',
     ];
     if (in_array($msg, $passthrough, true)) {
         return $msg;

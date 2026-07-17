@@ -2347,6 +2347,32 @@ restore_admin_self_test(
     'shadow-verify: Restore Center UI wires verification view + statuses'
 );
 
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_shadow_files.php'), 'shadow-files: CLI entry present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'shadow-files.php'), 'shadow-files: GET API present');
+restore_admin_self_test(!is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-shadow-files.php'), 'shadow-files: no HTTP request endpoint');
+$shadowFilesLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_shadow_files.php');
+restore_admin_self_test(
+    str_contains($shadowFilesLib, 'restore_shadow_workspace')
+    && str_contains($shadowFilesLib, 'shadow_files_report.json')
+    && str_contains($shadowFilesLib, 'ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY')
+    && str_contains($shadowFilesLib, 'orange_restore_uploads_applicator_extract')
+    && !str_contains($shadowFilesLib, 'orange_restore_orchestrator_uploads_cutover(')
+    && !str_contains($shadowFilesLib, 'orange_restore_merge_uploads_cutover('),
+    'shadow-files: workspace + report + safe extract; no cutover'
+);
+$shadowFilesApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'shadow-files.php');
+restore_admin_self_test(
+    str_contains($shadowFilesApi, 'restore_admin_api_require_get')
+    && !str_contains($shadowFilesApi, 'orange_restore_shadow_files_run_cli'),
+    'shadow-files: HTTP is GET/read-only'
+);
+restore_admin_self_test(
+    str_contains($shadowUi, 'rc-shadow-files-view')
+    && str_contains($shadowUi, 'shadow_files_ready')
+    && str_contains($shadowUi, 'shadow_files_failed'),
+    'shadow-files: Restore Center UI wires files view + statuses'
+);
+
     restore_admin_test_run_cleanup();
     restore_admin_test_emit_summary();
     exit($failures > 0 ? 1 : 0);
