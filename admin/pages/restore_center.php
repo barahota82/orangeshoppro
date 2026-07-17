@@ -59,9 +59,9 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
 </style>
 
 <p class="rc-readonly-banner" role="status">
-    <strong>تنبيه:</strong> يمكن تفعيل إطار الصيانة بعد الجاهزية المعزولة.
-    <strong>Production restore has NOT started.</strong>
-    لا يوجد استيراد/مسح لقاعدة الإنتاج، ولا استعادة ملفات، ولا cutover، ولا rollback في هذه المرحلة.
+    <strong>تنبيه:</strong> بعد تفعيل الصيانة يمكن طلب استيراد قاعدة الإنتاج عبر CLI فقط.
+    <strong>Application files have NOT been switched.</strong>
+    لا يوجد تبديل ملفات تطبيق، ولا uploads rename، ولا cutover، ولا rollback، ولا إغلاق صيانة في هذه المرحلة.
 </p>
 
 <div class="rc-section card" id="rc_maint_section">
@@ -79,6 +79,18 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         <div><dt>Stale</dt><dd>…</dd></div>
     </dl>
     <div id="rc_maint_policy" class="muted" style="margin-top:8px;"></div>
+</div>
+
+<div class="rc-section card" id="rc_prod_import_section">
+    <h3>استيراد قاعدة الإنتاج (Production Database Import)</h3>
+    <p id="rc_prod_import_banner" class="rc-readonly-banner" style="margin:0 0 10px;" role="status">
+        <strong>Application files have NOT been switched.</strong>
+    </p>
+    <dl id="rc_prod_import_status" class="rc-status-strip">
+        <div><dt>الحالة</dt><dd>…</dd></div>
+        <div><dt>أعلى نقطة تحقق</dt><dd>…</dd></div>
+        <div><dt>CLI</dt><dd>…</dd></div>
+    </dl>
 </div>
 
 <div id="rc_progress" class="rc-progress" role="status" aria-live="polite">جاري التحميل…</div>
@@ -451,6 +463,30 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         }
         if (job.is_maintenance_ready || job.is_maintenance_active || job.maintenance_requestable) {
             html += '<button type="button" class="btn-link rc-maint-state" data-id="' + id + '">حالة الصيانة</button> ';
+        }
+        if (job.production_import_requestable) {
+            html += '<button type="button" class="btn-link rc-prod-import-req" data-id="' + id + '">طلب استيراد قاعدة الإنتاج</button> ';
+        }
+        if (job.has_production_import || job.is_production_import_ready || job.is_production_import_failed) {
+            html += '<button type="button" class="btn-link rc-prod-import-view" data-id="' + id + '">حالة استيراد الإنتاج</button> ';
+        }
+        if (job.status === 'production_import_pending') {
+            html += '<span class="rc-badge rc-badge--warning">Production Import Pending</span> ';
+        }
+        if (job.status === 'production_import_running') {
+            html += '<span class="rc-badge rc-badge--warning">Running</span> ';
+        }
+        if (job.status === 'production_import_verifying') {
+            html += '<span class="rc-badge rc-badge--warning">Verifying</span> ';
+        }
+        if (job.is_production_import_ready) {
+            html += '<span class="rc-badge rc-badge--success">Ready</span> ';
+        }
+        if (job.is_production_import_failed) {
+            html += '<span class="rc-badge rc-badge--failed">Failed</span> ';
+        }
+        if (job.production_import_requestable || job.has_production_import || job.is_production_import_ready || job.is_production_import_failed) {
+            html += '<strong class="muted">Application files have NOT been switched.</strong> ';
         }
         if (job.execution_plan_cancellable) {
             html += '<button type="button" class="btn-link rc-cancel-exec" data-id="' + id + '">إلغاء الخطة</button> ';
@@ -986,6 +1022,67 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                     execution_started: false,
                     restore_started: false,
                     warning: 'Production restore has NOT started.'
+                }, null, 2));
+            } catch (e) {
+                showAlert(e.message || 'تعذر العرض', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-prod-import-req')) {
+            try {
+                setBusy(true, 'جاري طلب استيراد قاعدة الإنتاج…');
+                const j = await apiPost('job/request-production-import.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || ''
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert(
+                    (j.message || 'Production Import Pending')
+                    + ' — Application files have NOT been switched.'
+                    + (j.cli_command ? (' CLI: ' + j.cli_command) : ''),
+                    true
+                );
+                if (el('rc_prod_import_status')) {
+                    el('rc_prod_import_status').innerHTML =
+                        '<div><dt>الحالة</dt><dd>' + badge('Production Import Pending') + '</dd></div>'
+                        + '<div><dt>أعلى نقطة تحقق</dt><dd>—</dd></div>'
+                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || '—') + '</code></dd></div>';
+                }
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر طلب استيراد الإنتاج', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-prod-import-view')) {
+            try {
+                setBusy(true, 'جاري التحميل…');
+                const j = await apiGet('job/production-import.php?id=' + encodeURIComponent(t.dataset.id || ''));
+                if (el('rc_prod_import_status')) {
+                    el('rc_prod_import_status').innerHTML =
+                        '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || '—') + '</dd></div>'
+                        + '<div><dt>أعلى نقطة تحقق</dt><dd>' + (j.highest_checkpoint || '—') + '</dd></div>'
+                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '—') + '</dd></div>';
+                }
+                openView('Production Import — ' + (t.dataset.id || ''), JSON.stringify({
+                    status_label: j.status_label || '',
+                    job: j.job || {},
+                    meta: j.meta || {},
+                    report: j.report || {},
+                    checkpoint_history: j.checkpoint_history || [],
+                    highest_checkpoint: j.highest_checkpoint || '',
+                    execution_started: false,
+                    files_switched: false,
+                    rollback_executed: false,
+                    maintenance_released: false,
+                    production_cutover_allowed: false,
+                    warning: 'Application files have NOT been switched.'
                 }, null, 2));
             } catch (e) {
                 showAlert(e.message || 'تعذر العرض', false);

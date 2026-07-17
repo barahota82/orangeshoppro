@@ -396,6 +396,7 @@ Live cutover is **forbidden** until all boxes are checked:
 - [ ] Implementation phases 3B.4C–3B.4G (below) complete with self-tests  
 - [x] Phase 3B.4A import safety study (`PRODUCTION_IMPORT_SAFETY.md`)  
 - [x] Phase 3B.4B production maintenance activation framework
+- [x] Phase 3B.4C production database import engine (DB only; files not switched)
 - [ ] Maintenance middleware proven on storefront + admin write APIs  
 - [ ] Retention pin cannot be pruned by normal retention  
 - [ ] DB cutover path proven: wipe+import from verified export  
@@ -463,24 +464,28 @@ Live cutover is **forbidden** until all boxes are checked:
 - CLI scoped bypass only; no administrator bypass  
 - **Must not:** production import/wipe, file restore, cutover, rollback, auto worker invoke  
 
-### 3B.4C — Production cutover authorization gate (metadata + UI warnings only)
+### 3B.4C — Production Database Import Engine — DONE
+
+- **Code:** `includes/backup/restore/restore_production_import.php`  
+- **CLI:** `scripts/backup/restore_import_production.php --job=` (only); HTTP never imports  
+- **APIs:** `request-production-import.php` (metadata), `production-import.php` (status GET)  
+- **States:** `maintenance_active` → `production_import_pending` → `production_import_running` → `production_import_verifying` → `production_import_ready` / `production_import_failed`  
+- **Checkpoints:** C0 validated … C6 import committed (owner contract); resume only at documented safe points  
+- Reuses approved SQL runner + documented production wipe; streaming 64 KiB chunks  
+- **Must not:** file cutover, uploads rename, rollback execution, maintenance release, completion/finalization  
+- **Tests:** `self_test_production_import.php` (isolated fixtures / mock PDO only)  
+
+### 3B.4D — Production cutover authorization gate (metadata + UI warnings only)
 
 - Explicit `production_cutover_authorized` record separate from shadow readiness  
-- Still no wipe/rename  
+- Still no file wipe/rename / cutover flip  
 - Tests: cannot authorize without readiness; Country rejected  
 
-### 3B.4D — Route-level maintenance middleware wiring (storefront/admin/cron)
+### 3B.4E — Route-level maintenance middleware wiring (storefront/admin/cron)
 
 - Wire real request guards using `orange_restore_production_maintenance_decide`  
-- No cutover yet  
+- No file cutover yet  
 - Tests: writes 503; Restore Center emergency paths permissioned  
-
-### 3B.4E — Bridge 3B job → Phase 2 cutover worker (DB only)
-
-- CLI production DB cutover invoking existing `orange_restore_merge_db_cutover_run` / export+wipe+import  
-- Must implement durable checkpoints + fail-closed recovery per `PRODUCTION_IMPORT_SAFETY.md`  
-- Uploads not yet switched (or explicitly gated)  
-- Tests on clone only  
 
 ### 3B.4F — Production uploads two-phase rename wiring
 

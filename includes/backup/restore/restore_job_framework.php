@@ -57,6 +57,11 @@ const ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED = 'cutover_readiness_bl
 const ORANGE_RESTORE_FW_STATUS_MAINTENANCE_REQUESTED = 'maintenance_requested';
 const ORANGE_RESTORE_FW_STATUS_MAINTENANCE_VALIDATING = 'maintenance_validating';
 const ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE = 'maintenance_active';
+const ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_PENDING = 'production_import_pending';
+const ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_RUNNING = 'production_import_running';
+const ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_VERIFYING = 'production_import_verifying';
+const ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY = 'production_import_ready';
+const ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_FAILED = 'production_import_failed';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED = 'execution_completed';
@@ -102,6 +107,11 @@ const ORANGE_RESTORE_FW_PHASE_CUTOVER_READINESS_BLOCKED = 'cutover_readiness_blo
 const ORANGE_RESTORE_FW_PHASE_MAINTENANCE_REQUESTED = 'maintenance_requested';
 const ORANGE_RESTORE_FW_PHASE_MAINTENANCE_VALIDATING = 'maintenance_validating';
 const ORANGE_RESTORE_FW_PHASE_MAINTENANCE_ACTIVE = 'maintenance_active';
+const ORANGE_RESTORE_FW_PHASE_PRODUCTION_IMPORT_PENDING = 'production_import_pending';
+const ORANGE_RESTORE_FW_PHASE_PRODUCTION_IMPORT_RUNNING = 'production_import_running';
+const ORANGE_RESTORE_FW_PHASE_PRODUCTION_IMPORT_VERIFYING = 'production_import_verifying';
+const ORANGE_RESTORE_FW_PHASE_PRODUCTION_IMPORT_READY = 'production_import_ready';
+const ORANGE_RESTORE_FW_PHASE_PRODUCTION_IMPORT_FAILED = 'production_import_failed';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_COMPLETED = 'execution_completed';
@@ -178,6 +188,11 @@ function orange_restore_fw_allowed_statuses(): array
         ORANGE_RESTORE_FW_STATUS_MAINTENANCE_REQUESTED,
         ORANGE_RESTORE_FW_STATUS_MAINTENANCE_VALIDATING,
         ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_PENDING,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_VERIFYING,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_FAILED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED,
@@ -539,6 +554,11 @@ function orange_restore_fw_public_row(array $job): array
                 ORANGE_RESTORE_FW_STATUS_MAINTENANCE_REQUESTED,
                 ORANGE_RESTORE_FW_STATUS_MAINTENANCE_VALIDATING,
                 ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE,
+                ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_PENDING,
+                ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_RUNNING,
+                ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_VERIFYING,
+                ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY,
+                ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_FAILED,
             ], true),
         'maintenance_requestable' => in_array($status, [
             ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
@@ -551,6 +571,17 @@ function orange_restore_fw_public_row(array $job): array
             && (string) ($job['package_type'] ?? '') === 'full_disaster',
         'is_maintenance_ready' => $status === ORANGE_RESTORE_FW_STATUS_MAINTENANCE_REQUESTED,
         'is_maintenance_active' => $status === ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE,
+        'production_import_requestable' => $status === ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE
+            && (string) ($job['package_type'] ?? '') === 'full_disaster',
+        'has_production_import' => in_array($status, [
+            ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_PENDING,
+            ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_RUNNING,
+            ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_VERIFYING,
+            ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY,
+            ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_FAILED,
+        ], true),
+        'is_production_import_ready' => $status === ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY,
+        'is_production_import_failed' => $status === ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_FAILED,
         'pre_restore_backup_requestable' => in_array($status, [
             ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
             ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,

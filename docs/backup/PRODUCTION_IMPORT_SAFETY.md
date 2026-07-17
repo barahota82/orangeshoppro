@@ -1,7 +1,7 @@
 # Orange Production Import Safety Layer (Phase 3B.4A — Study Only)
 
-**Status:** STUDY / DESIGN ONLY — no production import implementation in this phase.  
-**Date:** 2026-07-17  
+**Status:** STUDY / DESIGN (3B.4A). Implementation of the production import engine is **3B.4C** (`restore_production_import.php`) using the owner checkpoint labels C0–C6 (validated → … → import committed). Resume rules in §2 still apply.  
+**Date:** 2026-07-17 (status note updated 2026-07-18)  
 **Parent contract:** `docs/backup/PRODUCTION_CUTOVER_AND_ROLLBACK_DESIGN.md`  
 **Grounding code (read-only study):**  
 `includes/backup/restore/restore_sql_runner.php`,  

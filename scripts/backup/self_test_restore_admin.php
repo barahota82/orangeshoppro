@@ -2449,6 +2449,36 @@ restore_admin_self_test(
     'maint-3B.4B: activate API does not run restore worker'
 );
 
+// --- Phase 3B.4C production database import engine (surface checks) ---
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_production_import.php'), 'prod-import-3B.4C: engine lib present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_import_production.php'), 'prod-import-3B.4C: CLI present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-production-import.php'), 'prod-import-3B.4C: request API present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'production-import.php'), 'prod-import-3B.4C: status API present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'self_test_production_import.php'), 'prod-import-3B.4C: dedicated self-test present');
+$prodImportLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_production_import.php');
+restore_admin_self_test(
+    str_contains($prodImportLib, 'ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY')
+    && str_contains($prodImportLib, 'orange_restore_sql_runner_import_gzip_to_target')
+    && str_contains($prodImportLib, 'orange_restore_production_wipe')
+    && !str_contains($prodImportLib, 'orange_restore_merge_uploads_cutover')
+    && !str_contains($prodImportLib, 'orange_restore_merge_rollback'),
+    'prod-import-3B.4C: DB import only; no uploads/rollback'
+);
+$prodImportReqApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-production-import.php');
+restore_admin_self_test(
+    str_contains($prodImportReqApi, 'metadata_only')
+    && str_contains($prodImportReqApi, 'http_never_imports')
+    && !str_contains($prodImportReqApi, 'orange_restore_prod_import_run_cli'),
+    'prod-import-3B.4C: request API metadata only'
+);
+$prodImportUi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php');
+restore_admin_self_test(
+    str_contains($prodImportUi, 'Production Import Pending')
+    && str_contains($prodImportUi, 'Application files have NOT been switched.')
+    && str_contains($prodImportUi, 'rc-prod-import-req'),
+    'prod-import-3B.4C: Restore Center UI wires import states + files warning'
+);
+
     restore_admin_test_run_cleanup();
     restore_admin_test_emit_summary();
     exit($failures > 0 ? 1 : 0);

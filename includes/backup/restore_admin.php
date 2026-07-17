@@ -21,6 +21,7 @@ require_once __DIR__ . '/restore/restore_shadow_verify.php';
 require_once __DIR__ . '/restore/restore_shadow_files.php';
 require_once __DIR__ . '/restore/restore_shadow_smoke.php';
 require_once __DIR__ . '/restore/restore_production_maintenance.php';
+require_once __DIR__ . '/restore/restore_production_import.php';
 
 const ORANGE_RESTORE_ADMIN_JOB_ID_PATTERN = '/^[a-zA-Z0-9._-]+$/';
 
@@ -1645,6 +1646,63 @@ function orange_restore_admin_fw_maintenance_state(
     return orange_restore_prod_maint_state($workRoot, $jobId);
 }
 
+/**
+ * Request production DB import (metadata only; HTTP never imports).
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_request_production_import(
+    string $backupRoot,
+    string $workRoot,
+    string $projectRoot,
+    array $admin,
+    PDO $pdo,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    orange_restore_admin_assert_package_type_permission($admin, $pdo, $type);
+    if ($type !== 'full_disaster') {
+        throw new RuntimeException('country_production_restore_not_enabled');
+    }
+    if (!orange_restore_admin_may_view_full($admin, $pdo)) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+
+    return orange_restore_prod_import_request($workRoot, $jobId, $backupRoot, $projectRoot, $admin);
+}
+
+/**
+ * Read-only production import status/report.
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_production_import_status(
+    string $workRoot,
+    bool $mayFull,
+    bool $mayCountry,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    if ($type === 'full_disaster' && !$mayFull) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+    if ($type === 'country_recovery' && !$mayCountry) {
+        throw new RuntimeException('Operator lacks backup_restore_country permission.');
+    }
+
+    return orange_restore_prod_import_status($workRoot, $jobId);
+}
+
 function orange_restore_admin_safe_message(Throwable $e): string
 {
     $msg = trim($e->getMessage());
@@ -1751,6 +1809,15 @@ function orange_restore_admin_safe_message(Throwable $e): string
         'maintenance_activate_invalid_state',
         'maintenance_validate_invalid_state',
         'maintenance_not_active',
+        'execution_already_started',
+        'shadow_verification_not_ready',
+        'shadow_smoke_not_ready',
+        'cutover_readiness_not_ready',
+        'shadow_db_equals_production',
+        'shadow_db_rejected_as_production',
+        'staging_db_rejected_as_production',
+        'production_identity_drift',
+        'db_identity_invalid',
     ];
     if (in_array($msg, $passthrough, true)) {
         return $msg;

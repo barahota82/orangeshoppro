@@ -619,6 +619,15 @@ Fail → rollback_preparing.
 - **Effects:** job states `maintenance_requested` → `maintenance_validating` → `maintenance_active`; framework heartbeat/stale; decision helper only  
 - **Must not:** production import/wipe, file restore, cutover, rollback, auto restore worker  
 
+### 3B.4C — Production Database Import Engine
+
+- **Code:** `includes/backup/restore/restore_production_import.php`  
+- **CLI:** `scripts/backup/restore_import_production.php --job=`  
+- **APIs:** `request-production-import.php` (metadata), `production-import.php` (status)  
+- **Effects:** production DB wipe+stream import+verify under maintenance; checkpoints C0–C6; stops at `production_import_ready`  
+- **Must not:** file cutover, uploads rename, rollback, maintenance release, completion  
+- **Tests:** `self_test_production_import.php`  
+
 ### 3B.3B8 / 3B.4F — Rollback engine (implementation; see 3B.4 design)
 
 - **Code:** automate rollback from pinned Full anchor + uploads snapshot; CLI + later admin  
