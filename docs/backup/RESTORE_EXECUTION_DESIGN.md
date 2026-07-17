@@ -646,14 +646,23 @@ Fail → rollback_preparing.
 - **Must not:** release maintenance, mark restore completed, finalize, delete anchors, unpin retention  
 - **Tests:** `self_test_production_rollback.php`  
 
-### 3B.3B9 / 3B.4F–3B.4H — Production execution wiring (implementation; see 3B.4 design)
+### 3B.4F — Restore Finalization & Maintenance Release
 
-- **Code:** authorization gate, route middleware, smoke + finalize + maint exit  
-- **Effects:** real Full restore path completion  
+- **Code:** `includes/backup/restore/restore_production_finalize.php`  
+- **CLI:** `scripts/backup/restore_finalize.php --job=`  
+- **APIs:** `request-finalize.php` (metadata), `finalize.php` (status)  
+- **Effects:** `restore_completed` or `rollback_completed`; release maintenance + execution lock; write `restore_final_report.json`; preserve forensic artifacts  
+- **Must not:** DB import, uploads rename, rollback execution, unpin/delete anchors  
+- **Tests:** `self_test_production_finalize.php`  
+
+### 3B.3B9 / 3B.4G–3B.4I — Remaining production wiring (implementation; see 3B.4 design)
+
+- **Code:** authorization gate, route middleware, post-finalize smoke/cache  
+- **Effects:** hardening after completion path  
 - **Tests:** end-to-end on clone; then limited prod drill window  
-- **Rollback:** 3B.4E  
+- **Rollback:** 3B.4E + finalize 3B.4F  
 
-### 3B.3B10 / 3B.4I — Disaster recovery drill (implementation; see 3B.4 design)
+### 3B.3B10 / 3B.4J — Disaster recovery drill (implementation; see 3B.4 design)
 
 - **Code:** runbooks + checklist automation  
 - **Effects:** scheduled drill restore on clone  

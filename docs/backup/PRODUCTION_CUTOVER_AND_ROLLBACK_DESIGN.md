@@ -498,24 +498,34 @@ Live cutover is **forbidden** until all boxes are checked:
 - **Must not:** release maintenance, mark restore completed, finalize execution, delete rollback anchors, remove retention pins  
 - **Tests:** `self_test_production_rollback.php` (isolated fixtures / mock PDO only)  
 
-### 3B.4F — Production cutover authorization gate (metadata + UI warnings only)
+### 3B.4F — Restore Finalization & Maintenance Release — DONE
+
+- **Code:** `includes/backup/restore/restore_production_finalize.php`  
+- **CLI:** `scripts/backup/restore_finalize.php --job=` (only); HTTP never finalizes  
+- **APIs:** `request-finalize.php` (metadata), `finalize.php` (status GET)  
+- **Success states:** `uploads_cutover_ready` → `restore_finalizing` → `restore_completed`  
+- **Rollback states:** `rollback_ready` → `rollback_finalizing` → `rollback_completed`  
+- **Actions:** write `restore_final_report.json`; release framework + merge maintenance; release execution lock; preserve rollback anchor, retention pin, reports, checkpoints  
+- **Must not:** DB import, uploads rename, rollback execution, shadow execution, delete anchors, remove pins, re-run verification  
+- **Tests:** `self_test_production_finalize.php`  
+
+### 3B.4G — Production cutover authorization gate (metadata + UI warnings only)
 
 - Explicit `production_cutover_authorized` record separate from shadow readiness  
 - Still no application PHP/.env cutover  
 - Tests: cannot authorize without readiness; Country rejected  
 
-### 3B.4G — Route-level maintenance middleware wiring (storefront/admin/cron)
+### 3B.4H — Route-level maintenance middleware wiring (storefront/admin/cron)
 
 - Wire real request guards using `orange_restore_production_maintenance_decide`  
 - Tests: writes 503; Restore Center emergency paths permissioned  
 
-### 3B.4H — Production smoke + finalize + maint exit
+### 3B.4I — Production smoke (post-finalize optional) + cache invalidate
 
-- Post-cutover smoke (production, read-only under maint)  
-- Final report; cache invalidate; maint disable API/CLI with phrase  
-- Tests: smoke fail triggers rollback  
+- Post-completion smoke / cache bust (after maintenance released)  
+- Tests: smoke fail does not re-enter cutover without new job  
 
-### 3B.4I — Disaster recovery drill automation + certification pack
+### 3B.4J — Disaster recovery drill automation + certification pack
 
 - Scripted drill; metrics capture; checklist enforcement flag  
 - **Prod gate:** owner certification (§12)  

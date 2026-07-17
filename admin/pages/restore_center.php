@@ -117,6 +117,18 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     </dl>
 </div>
 
+<div class="rc-section card" id="rc_finalize_section">
+    <h3>الإنهاء وإطلاق الصيانة (Finalize & Maintenance Release)</h3>
+    <p id="rc_finalize_banner" class="rc-readonly-banner" style="margin:0 0 10px;" role="status">
+        <strong>Finalization releases maintenance after restore or rollback success. Forensic artifacts retained.</strong>
+    </p>
+    <dl id="rc_finalize_status" class="rc-status-strip">
+        <div><dt>الحالة</dt><dd>…</dd></div>
+        <div><dt>الصيانة</dt><dd>…</dd></div>
+        <div><dt>CLI</dt><dd>…</dd></div>
+    </dl>
+</div>
+
 <div id="rc_progress" class="rc-progress" role="status" aria-live="polite">جاري التحميل…</div>
 <div id="rc_alert" class="card" style="display:none;margin-bottom:12px;"></div>
 
@@ -559,6 +571,27 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         }
         if (job.rollback_requestable || job.has_rollback || job.is_rollback_ready || job.is_rollback_failed) {
             html += '<strong class="muted">Maintenance remains active. Restore is NOT completed. Anchor retained.</strong> ';
+        }
+        if (job.finalize_requestable) {
+            html += '<button type="button" class="btn-link rc-finalize-req" data-id="' + id + '">طلب الإنهاء / إطلاق الصيانة</button> ';
+        }
+        if (job.has_finalize || job.is_restore_completed || job.is_rollback_completed) {
+            html += '<button type="button" class="btn-link rc-finalize-view" data-id="' + id + '">حالة الإنهاء</button> ';
+        }
+        if (job.status === 'restore_finalizing' || job.status === 'rollback_finalizing') {
+            html += '<span class="rc-badge rc-badge--warning">Finalizing</span> ';
+        }
+        if (job.is_restore_completed) {
+            html += '<span class="rc-badge rc-badge--success">Restore Completed</span> ';
+        }
+        if (job.is_rollback_completed) {
+            html += '<span class="rc-badge rc-badge--success">Rollback Completed</span> ';
+        }
+        if (job.is_maintenance_released) {
+            html += '<span class="rc-badge rc-badge--success">Maintenance Released</span> ';
+        }
+        if (job.is_execution_finished) {
+            html += '<span class="rc-badge rc-badge--success">Execution Finished</span> ';
         }
         if (job.execution_plan_cancellable) {
             html += '<button type="button" class="btn-link rc-cancel-exec" data-id="' + id + '">إلغاء الخطة</button> ';
@@ -1277,6 +1310,66 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                     rollback_anchor_deleted: false,
                     retention_pin_removed: false,
                     warning: 'Maintenance remains active. Restore is NOT completed. Rollback anchor retained.'
+                }, null, 2));
+            } catch (e) {
+                showAlert(e.message || 'تعذر العرض', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-finalize-req')) {
+            try {
+                setBusy(true, 'جاري طلب الإنهاء…');
+                const j = await apiPost('job/request-finalize.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || ''
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert(
+                    (j.message || 'Finalize Pending')
+                    + (j.cli_command ? (' CLI: ' + j.cli_command) : ''),
+                    true
+                );
+                if (el('rc_finalize_status')) {
+                    el('rc_finalize_status').innerHTML =
+                        '<div><dt>الحالة</dt><dd>' + badge('Finalizing') + '</dd></div>'
+                        + '<div><dt>الصيانة</dt><dd>pending release</dd></div>'
+                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || '—') + '</code></dd></div>';
+                }
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر طلب الإنهاء', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-finalize-view')) {
+            try {
+                setBusy(true, 'جاري التحميل…');
+                const j = await apiGet('job/finalize.php?id=' + encodeURIComponent(t.dataset.id || ''));
+                if (el('rc_finalize_status')) {
+                    el('rc_finalize_status').innerHTML =
+                        '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || '—') + '</dd></div>'
+                        + '<div><dt>الصيانة</dt><dd>' + (j.maintenance_released ? 'Maintenance Released' : 'active') + '</dd></div>'
+                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '—') + '</dd></div>';
+                }
+                openView('Finalize — ' + (t.dataset.id || ''), JSON.stringify({
+                    status_label: j.status_label || '',
+                    job: j.job || {},
+                    meta: j.meta || {},
+                    report: j.report || {},
+                    artifacts: j.artifacts || {},
+                    restore_completed: !!j.restore_completed,
+                    rollback_completed: !!j.rollback_completed,
+                    maintenance_released: !!j.maintenance_released,
+                    execution_finished: !!j.execution_finished,
+                    rollback_anchor_deleted: false,
+                    retention_pin_removed: false,
+                    warning: j.warning || ''
                 }, null, 2));
             } catch (e) {
                 showAlert(e.message || 'تعذر العرض', false);

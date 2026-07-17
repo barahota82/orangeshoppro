@@ -443,6 +443,10 @@ function orange_restore_validate_execution_contract(
         ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_VERIFYING,
         ORANGE_RESTORE_FW_STATUS_ROLLBACK_READY,
         ORANGE_RESTORE_FW_STATUS_ROLLBACK_FAILED,
+        ORANGE_RESTORE_FW_STATUS_RESTORE_FINALIZING,
+        ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_FINALIZING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED,
     ];
     if (!in_array($status, $contractValidStatuses, true)) {
         $reasons[] = 'invalid_status';

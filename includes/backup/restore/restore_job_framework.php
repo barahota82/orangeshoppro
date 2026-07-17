@@ -74,6 +74,10 @@ const ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_RUNNING = 'rollback_files_running'
 const ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_VERIFYING = 'rollback_files_verifying';
 const ORANGE_RESTORE_FW_STATUS_ROLLBACK_READY = 'rollback_ready';
 const ORANGE_RESTORE_FW_STATUS_ROLLBACK_FAILED = 'rollback_failed';
+const ORANGE_RESTORE_FW_STATUS_RESTORE_FINALIZING = 'restore_finalizing';
+const ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED = 'restore_completed';
+const ORANGE_RESTORE_FW_STATUS_ROLLBACK_FINALIZING = 'rollback_finalizing';
+const ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED = 'rollback_completed';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED = 'execution_completed';
@@ -136,6 +140,10 @@ const ORANGE_RESTORE_FW_PHASE_ROLLBACK_FILES_RUNNING = 'rollback_files_running';
 const ORANGE_RESTORE_FW_PHASE_ROLLBACK_FILES_VERIFYING = 'rollback_files_verifying';
 const ORANGE_RESTORE_FW_PHASE_ROLLBACK_READY = 'rollback_ready';
 const ORANGE_RESTORE_FW_PHASE_ROLLBACK_FAILED = 'rollback_failed';
+const ORANGE_RESTORE_FW_PHASE_RESTORE_FINALIZING = 'restore_finalizing';
+const ORANGE_RESTORE_FW_PHASE_RESTORE_COMPLETED = 'restore_completed';
+const ORANGE_RESTORE_FW_PHASE_ROLLBACK_FINALIZING = 'rollback_finalizing';
+const ORANGE_RESTORE_FW_PHASE_ROLLBACK_COMPLETED = 'rollback_completed';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_COMPLETED = 'execution_completed';
@@ -229,6 +237,10 @@ function orange_restore_fw_allowed_statuses(): array
         ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_VERIFYING,
         ORANGE_RESTORE_FW_STATUS_ROLLBACK_READY,
         ORANGE_RESTORE_FW_STATUS_ROLLBACK_FAILED,
+        ORANGE_RESTORE_FW_STATUS_RESTORE_FINALIZING,
+        ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_FINALIZING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED,
@@ -633,6 +645,10 @@ function orange_restore_fw_public_row(array $job): array
             ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_VERIFYING,
             ORANGE_RESTORE_FW_STATUS_ROLLBACK_READY,
             ORANGE_RESTORE_FW_STATUS_ROLLBACK_FAILED,
+            ORANGE_RESTORE_FW_STATUS_RESTORE_FINALIZING,
+            ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_FINALIZING,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED,
         ], true),
         'is_uploads_cutover_ready' => $status === ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_READY,
         'is_uploads_cutover_failed' => $status === ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_FAILED,
@@ -646,9 +662,31 @@ function orange_restore_fw_public_row(array $job): array
             ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_VERIFYING,
             ORANGE_RESTORE_FW_STATUS_ROLLBACK_READY,
             ORANGE_RESTORE_FW_STATUS_ROLLBACK_FAILED,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_FINALIZING,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED,
         ], true),
         'is_rollback_ready' => $status === ORANGE_RESTORE_FW_STATUS_ROLLBACK_READY,
         'is_rollback_failed' => $status === ORANGE_RESTORE_FW_STATUS_ROLLBACK_FAILED,
+        'finalize_requestable' => in_array($status, [
+            ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_READY,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_READY,
+        ], true) && (string) ($job['package_type'] ?? '') === 'full_disaster',
+        'has_finalize' => in_array($status, [
+            ORANGE_RESTORE_FW_STATUS_RESTORE_FINALIZING,
+            ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_FINALIZING,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED,
+        ], true),
+        'is_restore_completed' => $status === ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED,
+        'is_rollback_completed' => $status === ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED,
+        'is_maintenance_released' => in_array($status, [
+            ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED,
+        ], true),
+        'is_execution_finished' => in_array($status, [
+            ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED,
+        ], true),
         'pre_restore_backup_requestable' => in_array($status, [
             ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
             ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,
