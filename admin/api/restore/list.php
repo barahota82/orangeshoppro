@@ -50,6 +50,7 @@ try {
         'framework_jobs' => orange_restore_admin_fw_list_jobs($workRoot, $mayFull, $mayCountry),
         'jobs' => orange_restore_admin_fw_list_jobs($workRoot, $mayFull, $mayCountry),
         'legacy_engine_jobs' => orange_restore_admin_list_jobs($workRoot, $mayFull, $mayCountry),
+        'maintenance' => orange_restore_admin_fw_maintenance_status($workRoot),
     ]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, orange_restore_admin_safe_message($e));

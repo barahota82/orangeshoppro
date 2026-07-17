@@ -28,6 +28,7 @@ const ORANGE_RESTORE_FW_STATUS_DRY_FAILED = 'dry_failed';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_PRECHECK = 'execution_precheck';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_PLAN_READY = 'execution_plan_ready';
 const ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL = 'awaiting_final_approval';
+const ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION = 'approved_waiting_execution';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED = 'execution_completed';
@@ -44,6 +45,7 @@ const ORANGE_RESTORE_FW_PHASE_DRY_FAILED = 'dry_failed';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_PRECHECK = 'execution_precheck';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_PLAN_READY = 'execution_plan_ready';
 const ORANGE_RESTORE_FW_PHASE_AWAITING_FINAL_APPROVAL = 'awaiting_final_approval';
+const ORANGE_RESTORE_FW_PHASE_APPROVED_WAITING_EXECUTION = 'approved_waiting_execution';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_COMPLETED = 'execution_completed';
@@ -91,6 +93,7 @@ function orange_restore_fw_allowed_statuses(): array
         ORANGE_RESTORE_FW_STATUS_EXECUTION_PRECHECK,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_PLAN_READY,
         ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL,
+        ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED,
@@ -400,6 +403,7 @@ function orange_restore_fw_public_row(array $job): array
             ORANGE_RESTORE_FW_STATUS_DRY_COMPLETED,
             ORANGE_RESTORE_FW_STATUS_DRY_FAILED,
             ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL,
+            ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
             ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
             ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED,
         ], true) || !empty($job['dry_run_report_file']),
@@ -409,6 +413,7 @@ function orange_restore_fw_public_row(array $job): array
         'has_execution_plan' => !empty($job['execution_plan_file']) || in_array($status, [
             ORANGE_RESTORE_FW_STATUS_EXECUTION_PLAN_READY,
             ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL,
+            ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
             ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
         ], true),
         'execution_plan_cancellable' => in_array($status, [
@@ -416,6 +421,9 @@ function orange_restore_fw_public_row(array $job): array
             ORANGE_RESTORE_FW_STATUS_EXECUTION_PLAN_READY,
             ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL,
         ], true),
+        'final_approval_available' => $status === ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL
+            && (string) ($job['package_type'] ?? '') === 'full_disaster',
+        'is_approved_waiting_execution' => $status === ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
         'requires_final_approval' => (bool) ($job['requires_final_approval'] ?? false),
         'execution_started' => (bool) ($job['execution_started'] ?? false),
         'framework_version' => (string) ($job['framework_version'] ?? ORANGE_RESTORE_FW_VERSION),

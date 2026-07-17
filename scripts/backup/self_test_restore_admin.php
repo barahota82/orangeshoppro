@@ -94,7 +94,11 @@ function restore_admin_test_pdo(string $permKey, bool $superuser, int $adminId =
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->exec('CREATE TABLE admins (id INTEGER PRIMARY KEY, username TEXT, is_active INTEGER, is_superuser INTEGER, display_name TEXT, password_hash TEXT)');
     $pdo->exec('CREATE TABLE admin_permissions (admin_id INTEGER, resource_key TEXT, can_view INTEGER, can_edit INTEGER, can_delete INTEGER)');
-    $pdo->exec('INSERT INTO admins VALUES (' . $adminId . ', \'op\', 1, ' . ($superuser ? '1' : '0') . ', \'Op\', \'\')');
+    $hash = password_hash('restore-test-password', PASSWORD_DEFAULT);
+    $pdo->exec(
+        'INSERT INTO admins VALUES (' . $adminId . ', \'op\', 1, ' . ($superuser ? '1' : '0')
+        . ', \'Op\', ' . $pdo->quote($hash) . ')'
+    );
     if ($permKey !== '') {
         $pdo->exec('INSERT INTO admin_permissions VALUES (' . $adminId . ', ' . $pdo->quote($permKey) . ', 1, 0, 0)');
     }
@@ -470,6 +474,7 @@ function restore_admin_test_seed_full_dry_package(string $pkgDir, string $pkgId,
             'overall_result' => 'pass',
             'recovery_score' => 95,
             'validated_at' => gmdate('c'),
+            'validation_engine_version' => ORANGE_RECOVERY_VALIDATION_ENGINE_VERSION,
             'manifest_valid' => true,
             'health_valid' => true,
             'checksums_valid' => true,
@@ -533,6 +538,7 @@ orange_backup_write_json(
         'overall_result' => 'pass',
         'recovery_score' => 88,
         'validated_at' => gmdate('c'),
+        'validation_engine_version' => ORANGE_RECOVERY_VALIDATION_ENGINE_VERSION,
         'registry_valid' => true,
         'dependency_graph_valid' => true,
     ]
@@ -907,14 +913,16 @@ restore_admin_self_test(str_contains($pageSource, 'عرض تفاصيل الحز�
 restore_admin_self_test(str_contains($pageSource, 'drvCell'), 'ui: DRV cell avoids zero placeholder');
 restore_admin_self_test(str_contains($pageSource, 'انتظار التأكيد') || str_contains($pageSource, 'read_only'), 'ui: confirmation-gate warning present');
 restore_admin_self_test(!str_contains($pageSource, 'بدء الاسترداد'), 'ui: no Start Restore button label');
-restore_admin_self_test(!preg_match('/<button[^>]*>[^<]*موافقة/u', $pageSource), 'ui: no approval action button');
+restore_admin_self_test(!preg_match('/<button[^>]*>[^<]*موافقة(?! النهائية)/u', $pageSource), 'ui: no legacy merge approval button');
 restore_admin_self_test(stripos($pageSource, '>Rollback<') === false && stripos($pageSource, 'restore_full_rollback.php') === false, 'ui: no Rollback action control');
 restore_admin_self_test(!str_contains($pageSource, 'restore_admin.php'), 'ui: page does not load restore_admin.php at render');
 restore_admin_self_test(str_contains($pageSource, 'rc-create-job') && str_contains($pageSource, 'rc-fw-cancel'), 'ui: framework create/cancel controls present');
 restore_admin_self_test(str_contains($pageSource, 'Run Dry Validation') && str_contains($pageSource, 'View Dry Report'), 'ui: dry validation controls present');
 restore_admin_self_test(str_contains($pageSource, 'إعداد خطة الاسترداد') && str_contains($pageSource, 'عرض خطة الاسترداد') && str_contains($pageSource, 'إلغاء الخطة'), 'ui: execution plan Arabic controls present');
 restore_admin_self_test(str_contains($pageSource, 'بانتظار الموافقة النهائية') && str_contains($pageSource, 'لم يتم تنفيذ أي استرداد حتى الآن'), 'ui: awaiting final approval warning present');
-restore_admin_self_test(!str_contains($pageSource, 'Execute Restore') && !str_contains($pageSource, 'بدء الاسترداد'), 'ui: no Execute Restore button');
+restore_admin_self_test(str_contains($pageSource, 'حالة وضع الصيانة') && str_contains($pageSource, 'الموافقة النهائية'), 'ui: maintenance section and final approval control present');
+restore_admin_self_test(str_contains($pageSource, 'تم اعتماد الخطة، لكن لم يبدأ الاسترداد ولم يتم تفعيل وضع الصيانة'), 'ui: approved-waiting message present');
+restore_admin_self_test(!str_contains($pageSource, 'Execute Restore') && !str_contains($pageSource, 'بدء الاسترداد') && !str_contains($pageSource, 'Start Worker') && !str_contains($pageSource, 'Enable Maintenance'), 'ui: no Execute/Enable Maintenance/Start Worker');
 
 $createApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'create.php');
 $cancelApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'cancel.php');
@@ -1336,7 +1344,13 @@ $warnFullDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPAR
 restore_admin_test_seed_full_dry_package($warnFullDir, $warnFullId);
 orange_backup_write_json(
     orange_backup_admin_recovery_report_sibling_path($warnFullDir, $warnFullId),
-    ['overall_result' => 'warning', 'recovery_score' => 80, 'validated_at' => gmdate('c'), 'manifest_valid' => true]
+    [
+        'overall_result' => 'warning',
+        'recovery_score' => 80,
+        'validated_at' => gmdate('c'),
+        'validation_engine_version' => ORANGE_RECOVERY_VALIDATION_ENGINE_VERSION,
+        'manifest_valid' => true,
+    ]
 );
 $warnFullJob = orange_restore_fw_create($workRoot, [
     'package_id' => $warnFullId,
@@ -1716,6 +1730,404 @@ try {
     $execPermDenied = str_contains($e->getMessage(), 'permission');
 }
 restore_admin_self_test($execPermDenied, 'exec-orch: permission separation Full/Country');
+
+// --- Phase 3B.3B1 final approval + maintenance framework ---
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+$_SESSION['orange_backup_admin_csrf'] = 'approval-csrf-token-test';
+
+$maintDefault = orange_restore_maint_fw_read($workRoot);
+restore_admin_self_test(($maintDefault['state'] ?? '') === ORANGE_RESTORE_MAINT_STATE_INACTIVE, 'maint: default inactive');
+
+$vOk = orange_restore_version_lock_evaluate($workRoot, (string) $fullDryForPerm['job_id'], $backupRoot);
+// fullDryForPerm may be dry_completed without plan — expect plan missing
+restore_admin_self_test(($vOk['ok'] ?? true) === false && in_array('version_plan_missing', $vOk['reasons'] ?? [], true), 'version-lock: missing plan incompatible');
+
+$approveJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_dry_run_execute($workRoot, (string) $approveJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+$approvePrepared = orange_restore_admin_fw_prepare_execution(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $approveJob['job_id']
+);
+restore_admin_self_test(($approvePrepared['job']['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL, 'approval: plan ready for challenge');
+
+$vCompat = orange_restore_version_lock_evaluate($workRoot, (string) $approveJob['job_id'], $backupRoot);
+restore_admin_self_test(($vCompat['ok'] ?? false) === true, 'version-lock: all compatible for prepared Full job');
+
+$challenge = orange_restore_admin_fw_create_approval_challenge(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $approveJob['job_id']
+);
+restore_admin_self_test(($challenge['nonce'] ?? '') !== '' && str_contains((string) ($challenge['required_confirmation_phrase'] ?? ''), 'RESTORE '), 'approval: valid challenge creation');
+$expectedPhrase = orange_restore_final_approval_phrase($fullPkgId, (string) $approveJob['job_id']);
+restore_admin_self_test(($challenge['required_confirmation_phrase'] ?? '') === $expectedPhrase, 'approval: deterministic phrase with ids');
+
+$wrongStatusRejected = false;
+try {
+    orange_restore_admin_fw_create_approval_challenge(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $fullDryForPerm['job_id']
+    );
+} catch (Throwable $e) {
+    $wrongStatusRejected = trim($e->getMessage()) === 'invalid_status' || trim($e->getMessage()) === 'execution_lock_not_held' || trim($e->getMessage()) === 'execution_plan_missing';
+}
+restore_admin_self_test($wrongStatusRejected, 'approval: wrong status rejected');
+
+$countryApproveJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $countryPkgId,
+    'package_type' => 'country_recovery',
+    'country_code' => 'KW',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_dry_run_execute($workRoot, (string) $countryApproveJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+// Cancel Full approval lock first so country can prepare.
+orange_restore_admin_fw_cancel_execution_plan(
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $approveJob['job_id']
+);
+orange_restore_admin_fw_prepare_execution(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $countryApproveJob['job_id']
+);
+$countryBlocked = false;
+try {
+    orange_restore_admin_fw_create_approval_challenge(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $countryApproveJob['job_id']
+    );
+} catch (Throwable $e) {
+    $countryBlocked = trim($e->getMessage()) === 'country_production_restore_not_enabled';
+}
+restore_admin_self_test($countryBlocked, 'approval: Country production approval rejected');
+orange_restore_admin_fw_cancel_execution_plan(
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $countryApproveJob['job_id']
+);
+
+// Re-prepare Full job for approval success path (re-dry after cancel).
+$approveJob2 = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_dry_run_execute($workRoot, (string) $approveJob2['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+orange_restore_admin_fw_prepare_execution(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $approveJob2['job_id']
+);
+$challenge2 = orange_restore_admin_fw_create_approval_challenge(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $approveJob2['job_id']
+);
+
+$noPassword = false;
+try {
+    orange_restore_admin_fw_final_approve(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $approveJob2['job_id'],
+        $fullPkgId,
+        (string) $challenge2['required_confirmation_phrase'],
+        (string) $challenge2['nonce'],
+        ''
+    );
+} catch (Throwable $e) {
+    $noPassword = trim($e->getMessage()) === 'recent_authentication_not_available';
+}
+restore_admin_self_test($noPassword, 'approval: recent-auth absence blocks approval');
+
+$wrongPhrase = false;
+try {
+    orange_restore_admin_fw_final_approve(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $approveJob2['job_id'],
+        $fullPkgId,
+        'WRONG PHRASE',
+        (string) $challenge2['nonce'],
+        'restore-test-password'
+    );
+} catch (Throwable $e) {
+    $wrongPhrase = trim($e->getMessage()) === 'confirmation_phrase_mismatch';
+}
+restore_admin_self_test($wrongPhrase, 'approval: wrong phrase rejected');
+
+$granted = orange_restore_admin_fw_final_approve(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $approveJob2['job_id'],
+    $fullPkgId,
+    (string) $challenge2['required_confirmation_phrase'],
+    (string) $challenge2['nonce'],
+    'restore-test-password'
+);
+restore_admin_self_test(($granted['job']['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION, 'approval: Full reaches approved_waiting_execution');
+restore_admin_self_test(($granted['approval']['execution_started'] ?? true) === false, 'approval: execution_started remains false');
+restore_admin_self_test(($granted['approval']['maintenance_enabled'] ?? true) === false, 'approval: no maintenance enabled');
+restore_admin_self_test(($granted['approval']['cli_invoked'] ?? true) === false, 'approval: no CLI invoked');
+restore_admin_self_test(is_file(orange_restore_final_approval_record_path($workRoot, (string) $approveJob2['job_id'])), 'approval: final_approval.json written');
+$maintAfterApprove = orange_restore_maint_fw_read($workRoot);
+restore_admin_self_test(($maintAfterApprove['state'] ?? '') === ORANGE_RESTORE_MAINT_STATE_INACTIVE, 'approval: production maintenance remains inactive');
+
+$dupApprove = false;
+try {
+    $chReplay = orange_restore_admin_fw_create_approval_challenge(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $approveJob2['job_id']
+    );
+    orange_restore_admin_fw_final_approve(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $approveJob2['job_id'],
+        $fullPkgId,
+        (string) ($chReplay['required_confirmation_phrase'] ?? ''),
+        (string) ($chReplay['nonce'] ?? ''),
+        'restore-test-password'
+    );
+} catch (Throwable $e) {
+    $dupApprove = in_array(trim($e->getMessage()), ['already_approved', 'invalid_status'], true);
+}
+restore_admin_self_test($dupApprove, 'approval: duplicate approval rejected');
+
+// Nonce replay on a fresh job
+$approveJob3 = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+// Must cancel approved job lock first
+orange_restore_exec_release_lock($workRoot, (string) $approveJob2['job_id']);
+orange_restore_fw_write($workRoot, array_merge(orange_restore_fw_read($workRoot, (string) $approveJob2['job_id']), [
+    'status' => ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
+    'phase' => ORANGE_RESTORE_FW_PHASE_EXECUTION_CANCELLED,
+]));
+orange_restore_dry_run_execute($workRoot, (string) $approveJob3['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+orange_restore_admin_fw_prepare_execution(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $approveJob3['job_id']
+);
+$ch3 = orange_restore_admin_fw_create_approval_challenge(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $approveJob3['job_id']
+);
+orange_restore_admin_fw_final_approve(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $approveJob3['job_id'],
+    $fullPkgId,
+    (string) $ch3['required_confirmation_phrase'],
+    (string) $ch3['nonce'],
+    'restore-test-password'
+);
+$replay = false;
+try {
+    orange_restore_admin_fw_final_approve(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $approveJob3['job_id'],
+        $fullPkgId,
+        (string) $ch3['required_confirmation_phrase'],
+        (string) $ch3['nonce'],
+        'restore-test-password'
+    );
+} catch (Throwable $e) {
+    $replay = in_array(trim($e->getMessage()), ['approval_nonce_used', 'already_approved', 'invalid_status'], true);
+}
+restore_admin_self_test($replay, 'approval: nonce replay rejected');
+
+// Wrong operator
+orange_restore_exec_release_lock($workRoot, (string) $approveJob3['job_id']);
+orange_restore_fw_write($workRoot, array_merge(orange_restore_fw_read($workRoot, (string) $approveJob3['job_id']), [
+    'status' => ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
+]));
+$approveJob4 = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_dry_run_execute($workRoot, (string) $approveJob4['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+orange_restore_admin_fw_prepare_execution(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $approveJob4['job_id']
+);
+$ch4 = orange_restore_admin_fw_create_approval_challenge(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $approveJob4['job_id']
+);
+$wrongOp = false;
+try {
+    orange_restore_admin_fw_final_approve(
+        $backupRoot,
+        $workRoot,
+        ['id' => 99, 'username' => 'other', 'is_superuser' => 1, 'is_active' => 1],
+        restore_admin_test_pdo('', true, 99),
+        (string) $approveJob4['job_id'],
+        $fullPkgId,
+        (string) $ch4['required_confirmation_phrase'],
+        (string) $ch4['nonce'],
+        'restore-test-password'
+    );
+} catch (Throwable $e) {
+    $wrongOp = in_array(trim($e->getMessage()), ['approval_nonce_wrong_operator', 'recent_authentication_failed'], true);
+}
+restore_admin_self_test($wrongOp, 'approval: wrong operator rejected');
+
+// Nonce expiry
+$chPath = orange_restore_final_approval_challenge_path($workRoot, (string) $approveJob4['job_id']);
+$chRaw = json_decode((string) file_get_contents($chPath), true);
+$chRaw['expires_at'] = gmdate('c', time() - 10);
+file_put_contents($chPath, json_encode($chRaw, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n");
+$expired = false;
+try {
+    orange_restore_admin_fw_final_approve(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $approveJob4['job_id'],
+        $fullPkgId,
+        (string) $ch4['required_confirmation_phrase'],
+        (string) $ch4['nonce'],
+        'restore-test-password'
+    );
+} catch (Throwable $e) {
+    $expired = trim($e->getMessage()) === 'approval_nonce_expired';
+}
+restore_admin_self_test($expired, 'approval: nonce expiry rejected');
+
+// CSRF source checks
+$challengeApiSrc = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'create-approval-challenge.php');
+$finalApiSrc = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'final-approve.php');
+restore_admin_self_test(str_contains($challengeApiSrc, 'restore_admin_api_require_csrf'), 'api: create-approval-challenge CSRF');
+restore_admin_self_test(str_contains($finalApiSrc, 'restore_admin_api_require_csrf'), 'api: final-approve CSRF');
+restore_admin_self_test(!str_contains(strtolower($finalApiSrc), 'orange_restore_full_staging') && !str_contains(strtolower($finalApiSrc), 'cutover'), 'api: final-approve has no restore/cutover');
+
+// Maintenance framework fixture transitions
+$req = orange_restore_maint_fw_request($workRoot, 'tester', 'job_fixture', 'test');
+restore_admin_self_test(($req['state'] ?? '') === ORANGE_RESTORE_MAINT_STATE_REQUESTED, 'maint: request transition');
+$act = orange_restore_maint_fw_activate($workRoot, 'tester', 'job_fixture');
+restore_admin_self_test(($act['state'] ?? '') === ORANGE_RESTORE_MAINT_STATE_ACTIVE, 'maint: activate transition');
+$clsBlock = orange_restore_maint_fw_classify_request($workRoot, ['scope' => 'order_create', 'method' => 'POST']);
+restore_admin_self_test(($clsBlock['allow'] ?? true) === false, 'maint: central policy blocks writes');
+$clsRead = orange_restore_maint_fw_classify_request($workRoot, ['is_restore_center_read' => true, 'method' => 'GET']);
+restore_admin_self_test(($clsRead['allow'] ?? false) === true, 'maint: safe reads allowed');
+$clsBypass = orange_restore_maint_fw_classify_request($workRoot, [
+    'scope' => 'order_create',
+    'bypass_token' => 'x',
+    'method' => 'POST',
+]);
+restore_admin_self_test(($clsBypass['reason_code'] ?? '') === 'maintenance_bypass_forbidden', 'maint: no query/header/IP bypass');
+$cliTok = orange_restore_maint_fw_issue_cli_bypass($workRoot, 'job_fixture', 'order_create', 120);
+$clsCli = orange_restore_maint_fw_classify_request($workRoot, [
+    'scope' => 'order_create',
+    'is_cli' => true,
+    'bypass_token' => $cliTok,
+    'bypass_job_id' => 'job_fixture',
+    'method' => 'POST',
+]);
+restore_admin_self_test(($clsCli['allow'] ?? false) === true && ($clsCli['action'] ?? '') === 'cli_bypass', 'maint: CLI bypass scoped and job-bound');
+$staleState = orange_restore_maint_fw_read($workRoot);
+$staleState['heartbeat_at'] = gmdate('c', time() - 400000);
+$staleState['activated_at'] = gmdate('c', time() - 400000);
+orange_restore_maint_fw_write($workRoot, $staleState);
+$staleRead = orange_restore_maint_fw_read($workRoot);
+restore_admin_self_test(($staleRead['stale'] ?? false) === true && ($staleRead['state'] ?? '') === ORANGE_RESTORE_MAINT_STATE_ACTIVE, 'maint: stale active does not auto-release');
+orange_restore_maint_fw_release($workRoot, 'tester');
+restore_admin_self_test((orange_restore_maint_fw_read($workRoot)['state'] ?? '') === ORANGE_RESTORE_MAINT_STATE_INACTIVE, 'maint: release returns inactive');
+
+// Version lock reason codes
+$planPath = orange_restore_exec_plan_path($workRoot, (string) $approveJob4['job_id']);
+if (is_file($planPath)) {
+    $planBad = orange_restore_exec_read_plan($workRoot, (string) $approveJob4['job_id']);
+    $planBad['plan_version'] = '999';
+    orange_restore_exec_write_plan($workRoot, (string) $approveJob4['job_id'], $planBad);
+    // Job may not be awaiting — force status for version lock read only
+    $vl = orange_restore_version_lock_evaluate($workRoot, (string) $approveJob4['job_id'], $backupRoot);
+    restore_admin_self_test(in_array('version_plan_incompatible', $vl['reasons'] ?? [], true), 'version-lock: incompatible restore plan');
+}
+
+$finalApprovalLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_final_approval.php');
+$maintLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_maintenance_framework.php');
+restore_admin_self_test(!str_contains($finalApprovalLib, 'mysqli_query') && !str_contains($finalApprovalLib, 'orange_restore_full_staging'), 'approval: no SQL / staging restore');
+restore_admin_self_test(!str_contains($maintLib, 'extractTo') && !str_contains($maintLib, 'shell_exec'), 'maint: no extraction/shell');
+restore_admin_self_test(!is_dir($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'execute.php'), 'regression: no execute endpoint file');
 
     restore_admin_test_run_cleanup();
     restore_admin_test_emit_summary();

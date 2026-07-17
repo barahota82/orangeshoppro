@@ -59,9 +59,22 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
 </style>
 
 <p class="rc-readonly-banner" role="status">
-    <strong>تنبيه:</strong> يمكن إنشاء مهمة، تشغيل Dry Validation، وإعداد خطة استرداد فقط. تنفيذ الاسترداد والموافقة النهائية والدمج والاسترجاع العكسي غير متاح في هذه المرحلة.
-    بعد إعداد الخطة تتوقف المهمة عند <strong>بانتظار الموافقة النهائية</strong>. لم يتم تنفيذ أي استرداد حتى الآن — الخطة تصف العملية المستقبلية فقط.
+    <strong>تنبيه:</strong> يمكن إنشاء مهمة، Dry Validation، إعداد خطة، وطلب تحدي الموافقة النهائية فقط.
+    الاعتماد لا يبدأ الاسترداد ولا يفعّل وضع الصيانة. لا يوجد تنفيذ / تفعيل صيانة / عامل / استرجاع عكسي في هذه المرحلة.
 </p>
+
+<div class="rc-section card" id="rc_maint_section">
+    <h3>حالة وضع الصيانة</h3>
+    <p class="muted" style="margin:0 0 10px;">عرض فقط — الاعتماد لا يبدأ الاسترداد ولا يفعّل الصيانة.</p>
+    <dl id="rc_maint_status" class="rc-status-strip">
+        <div><dt>الحالة</dt><dd>…</dd></div>
+        <div><dt>المهمة المرتبطة</dt><dd>…</dd></div>
+        <div><dt>وقت الطلب</dt><dd>…</dd></div>
+        <div><dt>وقت التفعيل</dt><dd>…</dd></div>
+        <div><dt>آخر نبضة</dt><dd>…</dd></div>
+    </dl>
+    <div id="rc_maint_policy" class="muted" style="margin-top:8px;"></div>
+</div>
 
 <div id="rc_progress" class="rc-progress" role="status" aria-live="polite">جاري التحميل…</div>
 <div id="rc_alert" class="card" style="display:none;margin-bottom:12px;"></div>
@@ -189,12 +202,13 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     const badge = (status) => {
         const s = String(status || '').toLowerCase();
         let cls = 'rc-badge--muted';
-        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed') cls = 'rc-badge--success';
+        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed' || s === 'approved_waiting_execution') cls = 'rc-badge--success';
         else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval' || s === 'waiting_confirmation' || s === 'execution_plan_ready') cls = 'rc-badge--warning';
         else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible' || s === 'dry_failed' || s === 'execution_failed' || s === 'execution_cancelled' || s === 'cancelled') cls = 'rc-badge--failed';
         else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge') || s === 'execution_precheck' || s === 'dry_running') cls = 'rc-badge--running';
         let label = status || '—';
         if (s === 'awaiting_final_approval') label = 'بانتظار الموافقة النهائية';
+        if (s === 'approved_waiting_execution') label = 'معتمدة — بانتظار التنفيذ';
         return '<span class="rc-badge ' + cls + '">' + label + '</span>';
     };
     const eligibilityBadge = (pkg) => {
@@ -289,7 +303,22 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         const maint = ov.maintenance || {};
         el('rc_lock_maintenance').innerHTML =
             '<div><dt>قفل الاسترداد العام</dt><dd>' + (lock.held ? badge('held — ' + (lock.job_id || '')) : badge('متاح')) + '</dd></div>' +
-            '<div><dt>وضع الصيانة</dt><dd>' + (maint.active ? badge('active — ' + (maint.job_id || '')) : badge('غير مفعّل')) + '</dd></div>';
+            '<div><dt>وضع الصيانة (قديم/دمج)</dt><dd>' + (maint.active ? badge('active — ' + (maint.job_id || '')) : badge('غير مفعّل')) + '</dd></div>';
+    }
+
+    function renderMaintenance(m) {
+        const st = m || {};
+        if (!el('rc_maint_status')) return;
+        el('rc_maint_status').innerHTML =
+            '<div><dt>الحالة</dt><dd>' + badge(st.state || 'inactive') + '</dd></div>' +
+            '<div><dt>المهمة المرتبطة</dt><dd>' + (st.related_job_id || '—') + '</dd></div>' +
+            '<div><dt>وقت الطلب</dt><dd class="rc-ts-cell">' + fmtTimestampDisplay(st.requested_at) + '</dd></div>' +
+            '<div><dt>وقت التفعيل</dt><dd class="rc-ts-cell">' + fmtTimestampDisplay(st.activated_at) + '</dd></div>' +
+            '<div><dt>آخر نبضة</dt><dd class="rc-ts-cell">' + fmtTimestampDisplay(st.heartbeat_at) + '</dd></div>';
+        const scopes = Array.isArray(st.blocked_write_scopes) ? st.blocked_write_scopes.join(', ') : '';
+        el('rc_maint_policy').textContent = 'سياسة القراءة الآمنة: ' + (st.safe_read_policy || '—')
+            + (scopes ? ' | نطاقات الكتابة المحظورة عند التفعيل: ' + scopes : '')
+            + ' | ' + (st.warning || '');
     }
 
     function packageActions(pkg, type) {
@@ -332,6 +361,12 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         }
         if (job.has_execution_plan) {
             html += '<button type="button" class="btn-link rc-exec-plan" data-id="' + id + '">عرض خطة الاسترداد</button> ';
+        }
+        if (job.final_approval_available) {
+            html += '<button type="button" class="btn-link rc-final-approve" data-id="' + id + '" data-pkg="' + (job.package_id || '') + '">الموافقة النهائية</button> ';
+        }
+        if (job.is_approved_waiting_execution) {
+            html += '<span class="muted">تم اعتماد الخطة، لكن لم يبدأ الاسترداد ولم يتم تفعيل وضع الصيانة.</span> ';
         }
         if (job.execution_plan_cancellable) {
             html += '<button type="button" class="btn-link rc-cancel-exec" data-id="' + id + '">إلغاء الخطة</button> ';
@@ -410,6 +445,7 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                 showAlert('تحذير: الاستجابة ليست للعرض فقط.', false);
             }
             renderOverview(data);
+            renderMaintenance(data.maintenance || {});
             renderTables(data);
         } catch (e) {
             showAlert(e.message || 'تعذر التحميل', false);
@@ -570,6 +606,46 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                 openView('خطة الاسترداد — ' + (t.dataset.id || ''), JSON.stringify(j.plan || {}, null, 2));
             } catch (e) {
                 showAlert(e.message || 'تعذر العرض', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-final-approve')) {
+            try {
+                setBusy(true, 'جاري تجهيز تحدي الموافقة…');
+                const ch = await apiPost('job/create-approval-challenge.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || ''
+                });
+                if (ch.csrf_token) state.csrf = ch.csrf_token;
+                const challenge = ch.challenge || {};
+                const phrase = challenge.required_confirmation_phrase || '';
+                const typed = window.prompt(
+                    'أعد كتابة العبارة بالضبط ثم أدخل كلمة مرور إعادة التحقق.\n\nالعبارة:\n' + phrase + '\n\nالصق العبارة هنا:',
+                    ''
+                );
+                if (typed === null) return;
+                const password = window.prompt('كلمة مرور إعادة التحقق (مطلوبة):', '');
+                if (password === null || password === '') {
+                    showAlert('recent_authentication_not_available', false);
+                    return;
+                }
+                setBusy(true, 'جاري اعتماد الخطة…');
+                const j = await apiPost('job/final-approve.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || '',
+                    package_id: t.dataset.pkg || challenge.package_id || '',
+                    confirmation_phrase: typed,
+                    nonce: challenge.nonce || '',
+                    password: password
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert(j.message || 'تم اعتماد الخطة، لكن لم يبدأ الاسترداد ولم يتم تفعيل وضع الصيانة.', true);
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر الاعتماد', false);
             } finally {
                 setBusy(false);
             }

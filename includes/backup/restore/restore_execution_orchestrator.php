@@ -30,6 +30,7 @@ function orange_restore_exec_active_statuses(): array
         ORANGE_RESTORE_FW_STATUS_EXECUTION_PRECHECK,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_PLAN_READY,
         ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL,
+        ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
     ];
 }
 
@@ -354,6 +355,7 @@ function orange_restore_exec_public_plan(array $plan): array
         'requires_final_approval' => (bool) ($plan['requires_final_approval'] ?? true),
         'execution_started' => (bool) ($plan['execution_started'] ?? false),
         'orchestrator_version' => (string) ($plan['orchestrator_version'] ?? ''),
+        'version_lock' => is_array($plan['version_lock'] ?? null) ? $plan['version_lock'] : null,
         'warning' => 'No restore has been executed. This plan only describes the future operation.',
     ];
 }

@@ -11,6 +11,9 @@ require_once __DIR__ . '/restore/restore_validation_adapter.php';
 require_once __DIR__ . '/restore/restore_job_framework.php';
 require_once __DIR__ . '/restore/restore_dry_run.php';
 require_once __DIR__ . '/restore/restore_execution_orchestrator.php';
+require_once __DIR__ . '/restore/restore_version_lock.php';
+require_once __DIR__ . '/restore/restore_maintenance_framework.php';
+require_once __DIR__ . '/restore/restore_final_approval.php';
 
 const ORANGE_RESTORE_ADMIN_JOB_ID_PATTERN = '/^[a-zA-Z0-9._-]+$/';
 
@@ -1053,6 +1056,58 @@ function orange_restore_admin_fw_cancel_execution_plan(
     );
 }
 
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_create_approval_challenge(
+    string $backupRoot,
+    string $workRoot,
+    array $admin,
+    PDO $pdo,
+    string $jobId
+): array {
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+
+    return orange_restore_final_approval_create_challenge($workRoot, $jobId, $backupRoot, $admin, $pdo);
+}
+
+/**
+ * @return array{job:array<string,mixed>,approval:array<string,mixed>}
+ */
+function orange_restore_admin_fw_final_approve(
+    string $backupRoot,
+    string $workRoot,
+    array $admin,
+    PDO $pdo,
+    string $jobId,
+    string $packageId,
+    string $confirmationPhrase,
+    string $nonce,
+    string $password
+): array {
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+
+    return orange_restore_final_approval_grant(
+        $workRoot,
+        $jobId,
+        $backupRoot,
+        $admin,
+        $pdo,
+        $packageId,
+        $confirmationPhrase,
+        $nonce,
+        $password
+    );
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_maintenance_status(string $workRoot): array
+{
+    return orange_restore_maint_fw_public(orange_restore_maint_fw_read($workRoot));
+}
+
 function orange_restore_admin_safe_message(Throwable $e): string
 {
     $msg = trim($e->getMessage());
@@ -1075,6 +1130,26 @@ function orange_restore_admin_safe_message(Throwable $e): string
         'package_not_eligible',
         'schema_incompatible',
         'backend_incompatible',
+        'country_production_restore_not_enabled',
+        'recent_authentication_not_available',
+        'recent_authentication_failed',
+        'approval_nonce_used',
+        'approval_nonce_expired',
+        'approval_nonce_invalid',
+        'approval_nonce_wrong_operator',
+        'approval_nonce_wrong_session',
+        'confirmation_phrase_mismatch',
+        'plan_changed_after_challenge',
+        'already_approved',
+        'invalid_status',
+        'execution_lock_not_held',
+        'execution_plan_missing',
+        'version_plan_incompatible',
+        'version_drv_unknown',
+        'version_drv_incompatible',
+        'version_manifest_missing',
+        'version_schema_incompatible',
+        'version_backend_incompatible',
     ];
     if (in_array($msg, $passthrough, true)) {
         return $msg;
