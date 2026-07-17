@@ -33,6 +33,8 @@ The bridge converts an **approved** 3B framework job into a **versioned executio
 | `scripts/backup/restore_full_post_validate_finalize.php` | Finalize post-validation | `orange_restore_orchestrator_post_validation_finalize()` |
 | `scripts/backup/restore_full_rollback.php` | Rollback path | `orange_restore_orchestrator_rollback()` |
 | `scripts/backup/restore_job_status.php` | Generic job status | restore job helpers |
+| `scripts/backup/restore_prepare_backup.php` | 3B framework: pre-restore Full anchor (CLI) | `orange_restore_pre_backup_run_cli()` |
+| `scripts/backup/restore_shadow_db.php` | 3B framework: shadow DB import only (CLI; no cutover) | `orange_restore_shadow_run_cli()` |
 
 ---
 

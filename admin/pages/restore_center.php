@@ -202,10 +202,10 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     const badge = (status) => {
         const s = String(status || '').toLowerCase();
         let cls = 'rc-badge--muted';
-        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed' || s === 'approved_waiting_execution' || s === 'pre_restore_backup_ready') cls = 'rc-badge--success';
-        else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval' || s === 'waiting_confirmation' || s === 'execution_plan_ready' || s === 'pre_restore_backup_pending') cls = 'rc-badge--warning';
-        else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible' || s === 'dry_failed' || s === 'execution_failed' || s === 'execution_cancelled' || s === 'cancelled' || s === 'pre_restore_backup_failed') cls = 'rc-badge--failed';
-        else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge') || s === 'execution_precheck' || s === 'dry_running' || s === 'pre_restore_backup_running' || s === 'pre_restore_backup_verifying') cls = 'rc-badge--running';
+        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed' || s === 'approved_waiting_execution' || s === 'pre_restore_backup_ready' || s === 'shadow_restore_ready') cls = 'rc-badge--success';
+        else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval' || s === 'waiting_confirmation' || s === 'execution_plan_ready' || s === 'pre_restore_backup_pending' || s === 'shadow_restore_pending') cls = 'rc-badge--warning';
+        else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible' || s === 'dry_failed' || s === 'execution_failed' || s === 'execution_cancelled' || s === 'cancelled' || s === 'pre_restore_backup_failed' || s === 'shadow_restore_failed') cls = 'rc-badge--failed';
+        else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge') || s === 'execution_precheck' || s === 'dry_running' || s === 'pre_restore_backup_running' || s === 'pre_restore_backup_verifying' || s === 'shadow_restore_running' || s === 'shadow_restore_verifying') cls = 'rc-badge--running';
         let label = status || '—';
         if (s === 'awaiting_final_approval') label = 'بانتظار الموافقة النهائية';
         if (s === 'approved_waiting_execution') label = 'معتمدة — بانتظار التنفيذ';
@@ -214,6 +214,11 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         if (s === 'pre_restore_backup_verifying') label = 'جارٍ التحقق';
         if (s === 'pre_restore_backup_ready') label = 'النسخة الاحتياطية جاهزة وآمنة للرجوع';
         if (s === 'pre_restore_backup_failed') label = 'فشل إعداد النسخة الاحتياطية';
+        if (s === 'shadow_restore_pending') label = 'بانتظار تشغيل عامل CLI لقاعدة الظل';
+        if (s === 'shadow_restore_running') label = 'جارٍ استيراد قاعدة الظل';
+        if (s === 'shadow_restore_verifying') label = 'جارٍ التحقق من قاعدة الظل';
+        if (s === 'shadow_restore_ready') label = 'قاعدة الظل جاهزة (الإنتاج لم يُمس)';
+        if (s === 'shadow_restore_failed') label = 'فشل استعادة قاعدة الظل';
         return '<span class="rc-badge ' + cls + '">' + label + '</span>';
     };
     const eligibilityBadge = (pkg) => {
@@ -381,6 +386,12 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         }
         if (job.has_pre_restore_backup) {
             html += '<button type="button" class="btn-link rc-pre-backup-view" data-id="' + id + '">عرض حالة النسخة الاحتياطية</button> ';
+        }
+        if (job.shadow_restore_requestable) {
+            html += '<button type="button" class="btn-link rc-shadow-req" data-id="' + id + '">استعادة قاعدة الظل (Shadow DB)</button> ';
+        }
+        if (job.has_shadow_restore) {
+            html += '<button type="button" class="btn-link rc-shadow-view" data-id="' + id + '">عرض تقرير قاعدة الظل</button> ';
         }
         if (job.execution_plan_cancellable) {
             html += '<button type="button" class="btn-link rc-cancel-exec" data-id="' + id + '">إلغاء الخطة</button> ';
@@ -685,6 +696,56 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                     record: j.record || {},
                     execution_started: false,
                     warning: j.warning || 'لن يبدأ الاسترداد قبل إنشاء نسخة Full احتياطية موثقة ومثبتة ضد الحذف.'
+                }, null, 2));
+            } catch (e) {
+                showAlert(e.message || 'تعذر العرض', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-shadow-req')) {
+            try {
+                setBusy(true, 'جاري طلب استعادة قاعدة الظل…');
+                const j = await apiPost('job/request-shadow-restore.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || ''
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert(
+                    (j.message || 'تم الطلب') + (j.cli_needed ? ' — يلزم تشغيل عامل CLI.' : ''),
+                    true
+                );
+                if (j.meta) {
+                    openView('قاعدة الظل — ' + (t.dataset.id || ''), JSON.stringify({
+                        meta: j.meta,
+                        cli_needed: !!j.cli_needed,
+                        production_touched: false,
+                        execution_started: false,
+                        warning: j.warning || 'Shadow restore only — production database will not be modified.'
+                    }, null, 2));
+                }
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر الطلب', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-shadow-view')) {
+            try {
+                setBusy(true, 'جاري التحميل…');
+                const j = await apiGet('job/shadow-restore.php?id=' + encodeURIComponent(t.dataset.id || ''));
+                openView('تقرير قاعدة الظل — ' + (t.dataset.id || ''), JSON.stringify({
+                    status_label_ar: j.status_label_ar || '',
+                    meta: j.meta || {},
+                    report: j.report || {},
+                    production_touched: false,
+                    execution_started: false,
+                    warning: j.warning || 'Shadow restore only — production database was not modified.'
                 }, null, 2));
             } catch (e) {
                 showAlert(e.message || 'تعذر العرض', false);

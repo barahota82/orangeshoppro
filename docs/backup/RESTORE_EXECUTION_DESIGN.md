@@ -560,30 +560,32 @@ Fail → rollback_preparing.
 
 ### 3B.3B2b — (superseded naming) see 3B.3B3 above  
 
+### 3B.3B4 — Shadow Database Restore Engine (owner scope; shadow DB only)
 
-### 3B.3B3 — Database restore engine in isolated staging
+- **Code:** `includes/backup/restore/restore_shadow_db.php`; CLI `scripts/backup/restore_shadow_db.php --job=`; POST `request-shadow-restore.php` (metadata only); GET `shadow-restore.php` (status/report)  
+- **Reuses:** staging credential fences (`restore_staging_target.php`), `orange_restore_sql_runner_import_gzip()`, approved Full `manifest.dump_file` gzip SQL  
+- **Shadow name:** `ORANGE_RESTORE_SHADOW_DB` or fallback `ORANGE_RESTORE_STAGING_DB` — never equals production  
+- **Effects:** create/wipe/import into shadow DB only; writes `{job}/shadow_restore.json` + `{job}/shadow_restore_report.json`; stops at `shadow_restore_ready` / `shadow_restore_failed`  
+- **Verify:** schema objects (tables/views/routines/triggers/events), row counts, charset/collation; compare vs package + read-only production inventory  
+- **Must not:** production writes, cutover, app config switch, file restore, maintenance enable, rollback execution, HTTP-side SQL import  
+- **Prerequisite:** `pre_restore_backup_ready` + pinned rollback anchor + valid execution contract; Full only  
+- **Tests:** `self_test_shadow_restore.php` + expansions in `self_test_restore_admin.php`  
 
-- **Code:** use bridge contract → invoke `orange_restore_full_staging_run` (or extracted shared service); no production cutover  
-- **Effects:** staging DB only  
-- **Tests:** import/verify against staging; SQL safety  
-- **Prod gate:** staging credentials required in env  
-- **Rollback:** drop/wipe staging  
-
-### 3B.3B4 — File restore staging + verification
+### 3B.3B5 — File restore staging + verification
 
 - **Code:** uploads applicator to staging/`uploads_next`; no production rename  
 - **Effects:** staging files only  
 - **Tests:** zip-slip, symlink deny, checksum  
 - **Rollback:** delete staging tree  
 
-### 3B.3B5 — Rollback engine
+### 3B.3B6 — Rollback engine
 
 - **Code:** automate rollback from pinned Full anchor + uploads snapshot; CLI + later admin  
 - **Effects:** may touch prod **only** in controlled rollback drills on non-prod first  
 - **Tests:** simulated cutover failure → rolled_back  
 - **Prod gate:** drill sign-off  
 
-### 3B.3B6 — Production execution wiring
+### 3B.3B7 — Production execution wiring
 
 - **Code:** cutover wiring under maint; admin progress UI; heartbeat worker  
 - **Effects:** real Full restore path  

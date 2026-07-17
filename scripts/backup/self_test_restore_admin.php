@@ -2289,6 +2289,38 @@ restore_admin_self_test(
     'pre-backup: HTTP request does not run backup engine'
 );
 
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_shadow_db.php'), 'shadow: CLI entry present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-shadow-restore.php'), 'shadow: request API present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'shadow-restore.php'), 'shadow: status API present');
+$shadowLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_shadow_db.php');
+restore_admin_self_test(
+    str_contains($shadowLib, 'orange_restore_sql_runner_import_gzip')
+    && str_contains($shadowLib, 'shadow_restore_report.json')
+    && str_contains($shadowLib, 'ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY')
+    && !str_contains($shadowLib, 'orange_restore_orchestrator_database_cutover(')
+    && !str_contains($shadowLib, 'orange_restore_full_staging_run('),
+    'shadow: reuses SQL import; no cutover / full-staging run'
+);
+$shadowReqApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-shadow-restore.php');
+restore_admin_self_test(
+    !str_contains($shadowReqApi, 'orange_restore_shadow_run_cli')
+    && !str_contains($shadowReqApi, 'orange_restore_sql_runner_import_gzip'),
+    'shadow: HTTP request does not run import'
+);
+$shadowGetApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'shadow-restore.php');
+restore_admin_self_test(
+    str_contains($shadowGetApi, 'restore_admin_api_require_get')
+    && !str_contains($shadowGetApi, 'orange_restore_shadow_run_cli'),
+    'shadow: status API is GET/read-only'
+);
+$shadowUi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php');
+restore_admin_self_test(
+    str_contains($shadowUi, 'rc-shadow-req')
+    && str_contains($shadowUi, 'rc-shadow-view')
+    && str_contains($shadowUi, 'shadow_restore_ready'),
+    'shadow: Restore Center UI wires request/view + ready status'
+);
+
     restore_admin_test_run_cleanup();
     restore_admin_test_emit_summary();
     exit($failures > 0 ? 1 : 0);
