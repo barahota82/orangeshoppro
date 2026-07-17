@@ -7,6 +7,9 @@ declare(strict_types=1);
  *
  * Usage:
  *   php scripts/backup/self_test_restore_admin.php
+ *   php scripts/backup/self_test_restore_admin.php --verbose
+ *
+ * Default output is quiet (FAIL/THROWABLE/FATAL + final summary only).
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -18,13 +21,29 @@ ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
 error_reporting(E_ALL);
 
+/** @var array{quiet:bool,passes:int,fail_labels:list<string>} */
+$GLOBALS['restore_admin_test_output'] = [
+    'quiet' => true,
+    'passes' => 0,
+    'fail_labels' => [],
+];
+
+foreach ($argv ?? [] as $restoreAdminTestArg) {
+    if ($restoreAdminTestArg === '--verbose' || $restoreAdminTestArg === '-v') {
+        $GLOBALS['restore_admin_test_output']['quiet'] = false;
+    }
+}
+
 register_shutdown_function(function (): void {
     $error = error_get_last();
     if ($error !== null) {
         echo 'FATAL: ' . $error['type'] . ' @ ' . $error['file'] . ':' . $error['line'] . ' — ' . $error['message'] . PHP_EOL;
     }
     restore_admin_test_run_cleanup();
-    restore_admin_test_emit_diagnostics();
+    if (!restore_admin_test_is_quiet()) {
+        restore_admin_test_emit_diagnostics();
+    }
+    restore_admin_test_emit_summary();
 });
 
 $projectRoot = dirname(__DIR__, 2);
@@ -32,15 +51,41 @@ require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARAT
 
 $failures = 0;
 
+function restore_admin_test_is_quiet(): bool
+{
+    return (bool) ($GLOBALS['restore_admin_test_output']['quiet'] ?? true);
+}
+
 function restore_admin_self_test(bool $ok, string $label): void
 {
     global $failures;
     if ($ok) {
-        echo "PASS: {$label}\n";
+        $GLOBALS['restore_admin_test_output']['passes']++;
+        if (!restore_admin_test_is_quiet()) {
+            echo "PASS: {$label}\n";
+        }
     } else {
         echo "FAIL: {$label}\n";
+        $GLOBALS['restore_admin_test_output']['fail_labels'][] = $label;
         $failures++;
     }
+}
+
+function restore_admin_test_emit_summary(): void
+{
+    if (($GLOBALS['restore_admin_test_summary_emitted'] ?? false) === true) {
+        return;
+    }
+    $GLOBALS['restore_admin_test_summary_emitted'] = true;
+
+    global $failures;
+    $passes = (int) ($GLOBALS['restore_admin_test_output']['passes'] ?? 0);
+    $failCount = (int) $failures;
+    $result = $failCount === 0 ? 'PASS' : 'FAIL';
+
+    echo 'RESTORE_ADMIN_TEST_RESULT: ' . $result . PHP_EOL;
+    echo 'TOTAL_PASS: ' . $passes . PHP_EOL;
+    echo 'TOTAL_FAIL: ' . $failCount . PHP_EOL;
 }
 
 function restore_admin_test_pdo(string $permKey, bool $superuser, int $adminId = 2): PDO
@@ -133,6 +178,9 @@ function restore_admin_test_path_outside_project(string $path, string $projectRo
 
 function restore_admin_test_emit_diagnostics(): void
 {
+    if (restore_admin_test_is_quiet()) {
+        return;
+    }
     if (($GLOBALS['restore_admin_test_diag']['emitted'] ?? false) === true) {
         return;
     }
@@ -755,13 +803,11 @@ restore_admin_self_test(!str_contains($restoreAdminLib, 'function orange_restore
 restore_admin_self_test(!str_contains($restoreAdminLib, 'orange_restore_e2e_start_full'), 'lib: restore_admin does not expose e2e start');
 
     restore_admin_test_run_cleanup();
-    restore_admin_test_emit_diagnostics();
-
-    echo $failures === 0 ? "All restore admin self-tests passed.\n" : "Restore admin self-tests failed: {$failures}\n";
+    restore_admin_test_emit_summary();
     exit($failures > 0 ? 1 : 0);
 } catch (Throwable $e) {
     restore_admin_test_run_cleanup();
-    restore_admin_test_emit_diagnostics();
     echo 'THROWABLE:' . get_class($e) . '@' . basename(str_replace('\\', '/', $e->getFile())) . ':' . $e->getLine() . ':' . str_replace(["\r", "\n", ';'], ' ', $e->getMessage()) . PHP_EOL;
+    restore_admin_test_emit_summary();
     exit(1);
 }
