@@ -171,14 +171,18 @@ function orange_restore_admin_drv_fields_from_package(array $package): array
         default => 'unknown',
     };
 
-    $score = null;
-    if (array_key_exists('recovery_score', $verification) && $verification['recovery_score'] !== null && is_numeric($verification['recovery_score'])) {
-        $score = (int) $verification['recovery_score'];
-    } elseif (array_key_exists('recovery_score', $package) && $package['recovery_score'] !== null && is_numeric($package['recovery_score'])) {
-        $score = (int) $package['recovery_score'];
-    }
+    $score = orange_restore_admin_recovery_score_from_verification($verification);
 
     return ['drv_result' => $drvResult, 'drv_score' => $score];
+}
+
+function orange_restore_admin_recovery_score_from_verification(?array $verification): ?int
+{
+    if (!is_array($verification)) {
+        return null;
+    }
+
+    return orange_backup_admin_recovery_score_from_report($verification);
 }
 
 function orange_restore_admin_eligibility_reason_label_ar(string $code): string
@@ -243,8 +247,13 @@ function orange_restore_admin_package_eligibility(array $package, string $packag
         if ($backend !== '' && $backend !== 'php_pdo') {
             $reasons[] = 'export_backend_unsupported';
         }
-        if ($verification !== null && ($drvFields['drv_score'] === null || $drvFields['drv_score'] < 70)) {
-            $reasons[] = 'drv_score_below_threshold';
+        if ($verification !== null) {
+            $overall = strtolower(trim((string) ($verification['overall_result'] ?? '')));
+            if ($drvFields['drv_score'] !== null && $drvFields['drv_score'] < 70) {
+                $reasons[] = 'drv_score_below_threshold';
+            } elseif ($drvFields['drv_score'] === null && !in_array($overall, ['pass', 'warning'], true)) {
+                $reasons[] = 'drv_not_pass';
+            }
         }
     } else {
         $registryVersion = trim((string) ($package['registry_version'] ?? ''));
@@ -304,7 +313,7 @@ function orange_restore_admin_public_package_row(array $package, string $package
     $row['drv_score'] = $eligibility['drv_score'];
     $row['restore_eligibility'] = $eligibility['eligibility_status'] === 'eligible' ? 'eligible' : ($eligibility['eligibility_status'] === 'unknown' ? 'unknown' : 'not_eligible');
     $row['restore_eligibility_reasons'] = $eligibility['reasons'];
-    if ($row['recovery_score'] === null) {
+    if (!array_key_exists('recovery_score', $row) || $row['recovery_score'] === null) {
         unset($row['recovery_score']);
     }
 

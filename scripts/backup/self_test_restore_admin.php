@@ -674,7 +674,9 @@ restore_admin_self_test(
     'eligibility: missing DRV explicit reason code'
 );
 restore_admin_self_test(
-    ($missingDrvPublic['drv_result'] ?? '') === 'missing' && ($missingDrvPublic['drv_score'] ?? 'x') === null,
+    ($missingDrvPublic['drv_result'] ?? '') === 'missing'
+    && array_key_exists('drv_score', $missingDrvPublic)
+    && $missingDrvPublic['drv_score'] === null,
     'eligibility: missing DRV does not default score to 0'
 );
 
@@ -710,13 +712,14 @@ restore_admin_self_test(
 $passNoScoreSummary = orange_backup_admin_summarize_full_package($fullPassNoScoreDir, $fullPassNoScoreId);
 $passNoScorePublic = orange_restore_admin_public_package_row($passNoScoreSummary, 'full_disaster');
 restore_admin_self_test(
-    ($passNoScorePublic['drv_result'] ?? '') === 'pass' && ($passNoScorePublic['drv_score'] ?? 'x') === null,
+    ($passNoScorePublic['drv_result'] ?? '') === 'pass'
+    && array_key_exists('drv_score', $passNoScorePublic)
+    && $passNoScorePublic['drv_score'] === null,
     'eligibility: pass without numeric score leaves drv_score null'
 );
 restore_admin_self_test(
-    ($passNoScorePublic['eligibility_status'] ?? '') === 'not_eligible'
-    && ($passNoScorePublic['eligibility_reason_code'] ?? '') === 'drv_score_below_threshold',
-    'eligibility: pass without numeric score still blocked below threshold'
+    ($passNoScorePublic['eligibility_status'] ?? '') === 'eligible',
+    'eligibility: pass without numeric score uses overall_result pass'
 );
 
 $countryFailedPublic = orange_restore_admin_public_package_row(

@@ -619,12 +619,15 @@ function orange_backup_admin_summarize_full_package(string $packagePath, string 
     if (is_array($recovery)) {
         $verification = [
             'overall_result' => (string) ($recovery['overall_result'] ?? ''),
-            'recovery_score' => orange_backup_admin_recovery_score_from_report($recovery),
             'validated_at' => (string) ($recovery['validated_at'] ?? $recovery['generated_at'] ?? ''),
         ];
+        $recoveryScore = orange_backup_admin_recovery_score_from_report($recovery);
+        if ($recoveryScore !== null) {
+            $verification['recovery_score'] = $recoveryScore;
+        }
     }
 
-    return orange_backup_admin_redact_secrets([
+    $summary = [
         'package_id' => $packageId,
         'package_type' => 'full_disaster',
         'generated_at' => (string) ($manifest['generated_at'] ?? ''),
@@ -635,11 +638,16 @@ function orange_backup_admin_summarize_full_package(string $packagePath, string 
         'uploads_size_bytes' => (int) ($manifest['uploads_size_bytes'] ?? 0),
         'table_count' => (int) ($manifest['table_count'] ?? 0),
         'approx_total_rows' => (int) ($manifest['approx_total_rows'] ?? 0),
-        'recovery_score' => orange_backup_admin_recovery_score_from_report($recovery),
         'verification' => $verification,
         'package_path' => $packagePath,
         'healthy' => ($health['package_status'] ?? '') === 'healthy',
-    ]);
+    ];
+    $recoveryScore = orange_backup_admin_recovery_score_from_report($recovery);
+    if ($recoveryScore !== null) {
+        $summary['recovery_score'] = $recoveryScore;
+    }
+
+    return orange_backup_admin_redact_secrets($summary);
 }
 
 /**
@@ -659,12 +667,15 @@ function orange_backup_admin_summarize_country_package(
     if (is_array($recovery)) {
         $verification = [
             'overall_result' => (string) ($recovery['overall_result'] ?? ''),
-            'recovery_score' => orange_backup_admin_recovery_score_from_report($recovery),
             'validated_at' => (string) ($recovery['validated_at'] ?? $recovery['generated_at'] ?? ''),
         ];
+        $recoveryScore = orange_backup_admin_recovery_score_from_report($recovery);
+        if ($recoveryScore !== null) {
+            $verification['recovery_score'] = $recoveryScore;
+        }
     }
 
-    return orange_backup_admin_redact_secrets([
+    $summary = [
         'package_id' => $packageId,
         'package_type' => 'country_recovery',
         'country_code' => strtoupper($countryCode),
@@ -675,11 +686,16 @@ function orange_backup_admin_summarize_country_package(
         'schema_revision' => (int) ($manifest['schema_revision'] ?? 0),
         'registry_version' => (string) ($manifest['registry_version'] ?? ''),
         'row_counts_summary' => $manifest['row_counts_summary'] ?? ($manifest['row_counts'] ?? null),
-        'recovery_score' => orange_backup_admin_recovery_score_from_report($recovery),
         'verification' => $verification,
         'package_path' => $packagePath,
         'healthy' => ($health['package_status'] ?? '') === 'healthy',
-    ]);
+    ];
+    $recoveryScore = orange_backup_admin_recovery_score_from_report($recovery);
+    if ($recoveryScore !== null) {
+        $summary['recovery_score'] = $recoveryScore;
+    }
+
+    return orange_backup_admin_redact_secrets($summary);
 }
 
 /**
