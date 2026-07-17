@@ -601,21 +601,26 @@ Fail → rollback_preparing.
 - **Must not:** production DB/file/config writes, cutover, maintenance, rollback execution, HTTP-side smoke run; **`production_cutover_allowed` always false**  
 - **Tests:** `self_test_shadow_smoke.php` + expansions in `self_test_restore_admin.php`  
 
-### 3B.3B8 — Rollback engine
+### 3B.4 — Production Cutover & Rollback Design (documentation only)
+
+- **Deliverable:** `docs/backup/PRODUCTION_CUTOVER_AND_ROLLBACK_DESIGN.md` — implementation contract for DB/files cutover, PONR, rollback, crash recovery, drills, and remaining phases **3B.4A–3B.4G**  
+- **Must not (this phase):** production cutover/rollback code, maintenance activation, execute/cutover/resume endpoints  
+
+### 3B.3B8 / 3B.4E — Rollback engine (implementation; see 3B.4 design)
 
 - **Code:** automate rollback from pinned Full anchor + uploads snapshot; CLI + later admin  
 - **Effects:** may touch prod **only** in controlled rollback drills on non-prod first  
 - **Tests:** simulated cutover failure → rolled_back  
 - **Prod gate:** drill sign-off  
 
-### 3B.3B9 — Production execution wiring
+### 3B.3B9 / 3B.4C–3B.4F — Production execution wiring (implementation; see 3B.4 design)
 
 - **Code:** cutover wiring under maint; admin progress UI; heartbeat worker  
 - **Effects:** real Full restore path  
 - **Tests:** end-to-end on clone; then limited prod drill window  
-- **Rollback:** 3B.3B8  
+- **Rollback:** 3B.4E  
 
-### 3B.3B10 — Disaster recovery drill
+### 3B.3B10 / 3B.4G — Disaster recovery drill (implementation; see 3B.4 design)
 
 - **Code:** runbooks + checklist automation  
 - **Effects:** scheduled drill restore on clone  

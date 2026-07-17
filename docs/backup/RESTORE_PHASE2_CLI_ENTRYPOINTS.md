@@ -67,6 +67,8 @@ The bridge converts an **approved** 3B framework job into a **versioned executio
 
 **Country production** remains disabled at the 3B approval layer (`country_production_restore_not_enabled`).
 
+**Production cutover/rollback contract (Phase 3B.4, design only):** see `docs/backup/PRODUCTION_CUTOVER_AND_ROLLBACK_DESIGN.md`.
+
 ---
 
 ## Bridge contract file
