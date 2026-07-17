@@ -46,6 +46,14 @@ const ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_RUNNING = 'shadow_files_running';
 const ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_VERIFYING = 'shadow_files_verifying';
 const ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY = 'shadow_files_ready';
 const ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_FAILED = 'shadow_files_failed';
+const ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING = 'shadow_smoke_pending';
+const ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_RUNNING = 'shadow_smoke_running';
+const ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_READY = 'shadow_smoke_ready';
+const ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING = 'shadow_smoke_warning';
+const ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED = 'shadow_smoke_failed';
+const ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY = 'cutover_readiness_ready';
+const ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW = 'cutover_readiness_manual_review';
+const ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED = 'cutover_readiness_blocked';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED = 'execution_completed';
@@ -80,6 +88,14 @@ const ORANGE_RESTORE_FW_PHASE_SHADOW_FILES_RUNNING = 'shadow_files_running';
 const ORANGE_RESTORE_FW_PHASE_SHADOW_FILES_VERIFYING = 'shadow_files_verifying';
 const ORANGE_RESTORE_FW_PHASE_SHADOW_FILES_READY = 'shadow_files_ready';
 const ORANGE_RESTORE_FW_PHASE_SHADOW_FILES_FAILED = 'shadow_files_failed';
+const ORANGE_RESTORE_FW_PHASE_SHADOW_SMOKE_PENDING = 'shadow_smoke_pending';
+const ORANGE_RESTORE_FW_PHASE_SHADOW_SMOKE_RUNNING = 'shadow_smoke_running';
+const ORANGE_RESTORE_FW_PHASE_SHADOW_SMOKE_READY = 'shadow_smoke_ready';
+const ORANGE_RESTORE_FW_PHASE_SHADOW_SMOKE_WARNING = 'shadow_smoke_warning';
+const ORANGE_RESTORE_FW_PHASE_SHADOW_SMOKE_FAILED = 'shadow_smoke_failed';
+const ORANGE_RESTORE_FW_PHASE_CUTOVER_READINESS_READY = 'cutover_readiness_ready';
+const ORANGE_RESTORE_FW_PHASE_CUTOVER_READINESS_MANUAL_REVIEW = 'cutover_readiness_manual_review';
+const ORANGE_RESTORE_FW_PHASE_CUTOVER_READINESS_BLOCKED = 'cutover_readiness_blocked';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_CANCELLED = 'execution_cancelled';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_FAILED = 'execution_failed';
 const ORANGE_RESTORE_FW_PHASE_EXECUTION_COMPLETED = 'execution_completed';
@@ -145,6 +161,14 @@ function orange_restore_fw_allowed_statuses(): array
         ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_VERIFYING,
         ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY,
         ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_FAILED,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_READY,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED,
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY,
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED,
         ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED,
@@ -495,6 +519,14 @@ function orange_restore_fw_public_row(array $job): array
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_VERIFYING,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_FAILED,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_RUNNING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_READY,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
             ], true),
         'pre_restore_backup_requestable' => in_array($status, [
             ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
@@ -519,6 +551,14 @@ function orange_restore_fw_public_row(array $job): array
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_VERIFYING,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_FAILED,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_RUNNING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_READY,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
             ], true),
         'pre_restore_backup_status' => (string) ($job['pre_restore_backup_status'] ?? ''),
         'shadow_restore_requestable' => in_array($status, [
@@ -539,6 +579,14 @@ function orange_restore_fw_public_row(array $job): array
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_VERIFYING,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_FAILED,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_RUNNING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_READY,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
             ], true),
         'shadow_restore_status' => (string) ($job['shadow_restore_status'] ?? ''),
         'shadow_verification_runnable' => in_array($status, [
@@ -554,6 +602,14 @@ function orange_restore_fw_public_row(array $job): array
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_VERIFYING,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_FAILED,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_RUNNING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_READY,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
             ], true),
         'shadow_verification_status' => (string) ($job['shadow_verification_status'] ?? ''),
         'shadow_readiness_score' => (int) ($job['shadow_readiness_score'] ?? 0),
@@ -567,12 +623,48 @@ function orange_restore_fw_public_row(array $job): array
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_VERIFYING,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY,
                 ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_FAILED,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_RUNNING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_READY,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
             ], true),
         'shadow_files_status' => (string) ($job['shadow_files_status'] ?? ''),
+        'shadow_smoke_requestable' => in_array($status, [
+            ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING,
+            ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
+            ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
+        ], true) && (string) ($job['package_type'] ?? '') === 'full_disaster',
+        'has_shadow_smoke' => !empty($job['shadow_smoke_file'])
+            || in_array($status, [
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_RUNNING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_READY,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING,
+                ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
+            ], true),
+        'shadow_smoke_status' => (string) ($job['shadow_smoke_status'] ?? ''),
+        'has_cutover_readiness' => !empty($job['cutover_readiness_file'])
+            || in_array($status, [
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
+                ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
+            ], true),
+        'cutover_readiness_status' => (string) ($job['cutover_readiness_status'] ?? ''),
+        'shadow_smoke_score' => (int) ($job['shadow_smoke_score'] ?? 0),
         'requires_final_approval' => (bool) ($job['requires_final_approval'] ?? false),
         'execution_started' => (bool) ($job['execution_started'] ?? false),
         'framework_version' => (string) ($job['framework_version'] ?? ORANGE_RESTORE_FW_VERSION),
         'execution_enabled' => false,
+        'production_cutover_allowed' => false,
     ];
 }
 

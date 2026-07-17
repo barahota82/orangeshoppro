@@ -202,10 +202,10 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     const badge = (status) => {
         const s = String(status || '').toLowerCase();
         let cls = 'rc-badge--muted';
-        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed' || s === 'approved_waiting_execution' || s === 'pre_restore_backup_ready' || s === 'shadow_restore_ready' || s === 'shadow_verified' || s === 'shadow_files_ready') cls = 'rc-badge--success';
-        else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval' || s === 'waiting_confirmation' || s === 'execution_plan_ready' || s === 'pre_restore_backup_pending' || s === 'shadow_restore_pending' || s === 'shadow_not_ready') cls = 'rc-badge--warning';
-        else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible' || s === 'dry_failed' || s === 'execution_failed' || s === 'execution_cancelled' || s === 'cancelled' || s === 'pre_restore_backup_failed' || s === 'shadow_restore_failed' || s === 'shadow_files_failed') cls = 'rc-badge--failed';
-        else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge') || s === 'execution_precheck' || s === 'dry_running' || s === 'pre_restore_backup_running' || s === 'pre_restore_backup_verifying' || s === 'shadow_restore_running' || s === 'shadow_restore_verifying' || s === 'shadow_verifying' || s === 'shadow_files_running' || s === 'shadow_files_verifying') cls = 'rc-badge--running';
+        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed' || s === 'approved_waiting_execution' || s === 'pre_restore_backup_ready' || s === 'shadow_restore_ready' || s === 'shadow_verified' || s === 'shadow_files_ready' || s === 'shadow_smoke_ready' || s === 'cutover_readiness_ready') cls = 'rc-badge--success';
+        else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval' || s === 'waiting_confirmation' || s === 'execution_plan_ready' || s === 'pre_restore_backup_pending' || s === 'shadow_restore_pending' || s === 'shadow_not_ready' || s === 'shadow_smoke_pending' || s === 'shadow_smoke_warning' || s === 'cutover_readiness_manual_review') cls = 'rc-badge--warning';
+        else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible' || s === 'dry_failed' || s === 'execution_failed' || s === 'execution_cancelled' || s === 'cancelled' || s === 'pre_restore_backup_failed' || s === 'shadow_restore_failed' || s === 'shadow_files_failed' || s === 'shadow_smoke_failed' || s === 'cutover_readiness_blocked') cls = 'rc-badge--failed';
+        else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge') || s === 'execution_precheck' || s === 'dry_running' || s === 'pre_restore_backup_running' || s === 'pre_restore_backup_verifying' || s === 'shadow_restore_running' || s === 'shadow_restore_verifying' || s === 'shadow_verifying' || s === 'shadow_files_running' || s === 'shadow_files_verifying' || s === 'shadow_smoke_running') cls = 'rc-badge--running';
         let label = status || '—';
         if (s === 'awaiting_final_approval') label = 'بانتظار الموافقة النهائية';
         if (s === 'approved_waiting_execution') label = 'معتمدة — بانتظار التنفيذ';
@@ -226,6 +226,14 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         if (s === 'shadow_files_verifying') label = 'جارٍ التحقق من ملفات الظل';
         if (s === 'shadow_files_ready') label = 'ملفات الظل جاهزة (الإنتاج لم يُمس)';
         if (s === 'shadow_files_failed') label = 'فشل استخراج ملفات الظل';
+        if (s === 'shadow_smoke_pending') label = 'بانتظار تشغيل اختبار CLI';
+        if (s === 'shadow_smoke_running') label = 'جارٍ اختبار قاعدة البيانات والملفات المعزولة';
+        if (s === 'shadow_smoke_ready') label = 'البيئة المعزولة جاهزة';
+        if (s === 'shadow_smoke_warning') label = 'تحتاج مراجعة يدوية';
+        if (s === 'shadow_smoke_failed') label = 'البيئة غير جاهزة';
+        if (s === 'cutover_readiness_ready') label = 'البيئة المعزولة جاهزة';
+        if (s === 'cutover_readiness_manual_review') label = 'تحتاج مراجعة يدوية';
+        if (s === 'cutover_readiness_blocked') label = 'البيئة غير جاهزة';
         return '<span class="rc-badge ' + cls + '">' + label + '</span>';
     };
     const eligibilityBadge = (pkg) => {
@@ -405,6 +413,12 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         }
         if (job.shadow_files_runnable || job.has_shadow_files) {
             html += '<button type="button" class="btn-link rc-shadow-files-view" data-id="' + id + '">عرض ملفات الظل</button> ';
+        }
+        if (job.shadow_smoke_requestable) {
+            html += '<button type="button" class="btn-link rc-shadow-smoke-req" data-id="' + id + '">تشغيل اختبارات الجاهزية المعزولة</button> ';
+        }
+        if (job.has_shadow_smoke || job.has_cutover_readiness) {
+            html += '<button type="button" class="btn-link rc-shadow-smoke-view" data-id="' + id + '">عرض اختبار الجاهزية / قرار التحويل</button> ';
         }
         if (job.execution_plan_cancellable) {
             html += '<button type="button" class="btn-link rc-cancel-exec" data-id="' + id + '">إلغاء الخطة</button> ';
@@ -804,6 +818,61 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                     directories_renamed: false,
                     execution_started: false,
                     warning: j.warning || 'Shadow file restore only — production filesystem was not modified. HTTP is read-only; run CLI to extract.'
+                }, null, 2));
+            } catch (e) {
+                showAlert(e.message || 'تعذر العرض', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-shadow-smoke-req')) {
+            try {
+                setBusy(true, 'جاري طلب اختبارات الجاهزية المعزولة…');
+                const j = await apiPost('job/request-shadow-smoke.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || ''
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert(
+                    (j.message || 'تم الطلب') + (j.cli_needed ? ' — يلزم تشغيل عامل CLI.' : ''),
+                    true
+                );
+                if (j.meta) {
+                    openView('اختبار الجاهزية المعزولة — ' + (t.dataset.id || ''), JSON.stringify({
+                        meta: j.meta,
+                        cli_needed: !!j.cli_needed,
+                        production_touched: false,
+                        production_cutover_allowed: false,
+                        execution_started: false,
+                        warning: j.warning || 'لم يتم تعديل قاعدة الإنتاج أو ملفات الإنتاج، ولا يزال التحويل إلى الإنتاج غير مسموح.'
+                    }, null, 2));
+                }
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر الطلب', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-shadow-smoke-view')) {
+            try {
+                setBusy(true, 'جاري التحميل…');
+                const j = await apiGet('job/shadow-smoke.php?id=' + encodeURIComponent(t.dataset.id || ''));
+                openView('اختبار الجاهزية / قرار التحويل — ' + (t.dataset.id || ''), JSON.stringify({
+                    status_label_ar: j.status_label_ar || '',
+                    cli_needed: !!j.cli_needed,
+                    cli_command: j.cli_command || '',
+                    meta: j.meta || {},
+                    report: j.report || {},
+                    cutover_readiness: j.cutover_readiness || {},
+                    production_touched: false,
+                    production_cutover_allowed: false,
+                    execution_started: false,
+                    warning: j.warning || 'لم يتم تعديل قاعدة الإنتاج أو ملفات الإنتاج، ولا يزال التحويل إلى الإنتاج غير مسموح.'
                 }, null, 2));
             } catch (e) {
                 showAlert(e.message || 'تعذر العرض', false);

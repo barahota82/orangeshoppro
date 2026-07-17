@@ -592,21 +592,30 @@ Fail → rollback_preparing.
 - **Must not:** production filesystem writes, directory rename/cutover, app config changes, maintenance enable, HTTP-side extract  
 - **Tests:** `self_test_shadow_files.php` + expansions in `self_test_restore_admin.php`  
 
-### 3B.3B7 — Rollback engine
+### 3B.3B7 — Shadow End-to-End Smoke Tests and Cutover Readiness (owner scope; non-destructive)
+
+- **Code:** `includes/backup/restore/restore_shadow_smoke.php`; CLI `scripts/backup/restore_shadow_smoke.php --job=`; POST `request-shadow-smoke.php` (metadata only); GET `shadow-smoke.php` + `cutover-readiness.php`  
+- **Prerequisite:** `shadow_files_ready` + prior PASS/READY reports + pinned rollback anchor + valid approval/contract; Full only  
+- **Effects:** read-only smoke of Shadow DB + Shadow Files workspace; writes `{job}/shadow_smoke_report.json` + `{job}/cutover_readiness.json`; stops at cutover readiness decision  
+- **States:** `shadow_smoke_pending|running|ready|warning|failed` → `cutover_readiness_ready|manual_review|blocked`  
+- **Must not:** production DB/file/config writes, cutover, maintenance, rollback execution, HTTP-side smoke run; **`production_cutover_allowed` always false**  
+- **Tests:** `self_test_shadow_smoke.php` + expansions in `self_test_restore_admin.php`  
+
+### 3B.3B8 — Rollback engine
 
 - **Code:** automate rollback from pinned Full anchor + uploads snapshot; CLI + later admin  
 - **Effects:** may touch prod **only** in controlled rollback drills on non-prod first  
 - **Tests:** simulated cutover failure → rolled_back  
 - **Prod gate:** drill sign-off  
 
-### 3B.3B8 — Production execution wiring
+### 3B.3B9 — Production execution wiring
 
 - **Code:** cutover wiring under maint; admin progress UI; heartbeat worker  
 - **Effects:** real Full restore path  
 - **Tests:** end-to-end on clone; then limited prod drill window  
-- **Rollback:** 3B.3B7  
+- **Rollback:** 3B.3B8  
 
-### 3B.3B9 — Disaster recovery drill
+### 3B.3B10 — Disaster recovery drill
 
 - **Code:** runbooks + checklist automation  
 - **Effects:** scheduled drill restore on clone  

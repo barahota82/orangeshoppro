@@ -19,6 +19,7 @@ require_once __DIR__ . '/restore/restore_pre_restore_backup.php';
 require_once __DIR__ . '/restore/restore_shadow_db.php';
 require_once __DIR__ . '/restore/restore_shadow_verify.php';
 require_once __DIR__ . '/restore/restore_shadow_files.php';
+require_once __DIR__ . '/restore/restore_shadow_smoke.php';
 
 const ORANGE_RESTORE_ADMIN_JOB_ID_PATTERN = '/^[a-zA-Z0-9._-]+$/';
 
@@ -1314,6 +1315,144 @@ function orange_restore_admin_fw_shadow_verification(
 }
 
 /**
+ * Request shadow smoke (metadata only; CLI runs tests).
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_request_shadow_smoke(
+    string $backupRoot,
+    string $workRoot,
+    array $admin,
+    PDO $pdo,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    orange_restore_admin_assert_package_type_permission($admin, $pdo, $type);
+    if ($type !== 'full_disaster') {
+        throw new RuntimeException('country_production_restore_not_enabled');
+    }
+    if (!orange_restore_admin_may_view_full($admin, $pdo)) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+
+    return orange_restore_shadow_smoke_request($workRoot, $jobId, $backupRoot, $admin);
+}
+
+/**
+ * Read-only shadow smoke status/report (HTTP never runs smoke).
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_shadow_smoke(
+    string $workRoot,
+    bool $mayFull,
+    bool $mayCountry,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    if ($type === 'full_disaster' && !$mayFull) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+    if ($type === 'country_recovery' && !$mayCountry) {
+        throw new RuntimeException('Operator lacks backup_restore_country permission.');
+    }
+
+    $status = (string) ($job['status'] ?? '');
+    $labels = [
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING => 'بانتظار تشغيل اختبار CLI',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_RUNNING => 'جارٍ اختبار قاعدة البيانات والملفات المعزولة',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_READY => 'البيئة المعزولة جاهزة',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING => 'تحتاج مراجعة يدوية',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED => 'البيئة غير جاهزة',
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY => 'البيئة المعزولة جاهزة',
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW => 'تحتاج مراجعة يدوية',
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED => 'البيئة غير جاهزة',
+        ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY => 'بانتظار تشغيل اختبار CLI',
+    ];
+    $meta = orange_restore_shadow_smoke_load_meta($workRoot, $jobId);
+    $report = orange_restore_shadow_smoke_load_report($workRoot, $jobId);
+    $decision = orange_restore_cutover_readiness_load($workRoot, $jobId);
+    $cliNeeded = in_array($status, [
+        ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED,
+        ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING,
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
+    ], true);
+
+    return [
+        'job' => orange_restore_fw_public_row($job),
+        'meta' => $meta !== null ? orange_restore_shadow_smoke_public_meta($meta) : null,
+        'report' => $report !== null ? orange_restore_shadow_smoke_public_report($report) : null,
+        'cutover_readiness' => $decision !== null ? orange_restore_cutover_readiness_public($decision) : null,
+        'status_label_ar' => $labels[$status] ?? '',
+        'cli_needed' => $cliNeeded,
+        'cli_command' => 'php scripts/backup/restore_shadow_smoke.php --job=' . $jobId,
+        'execution_started' => false,
+        'production_touched' => false,
+        'production_cutover_allowed' => false,
+        'read_only' => true,
+    ];
+}
+
+/**
+ * Read-only cutover readiness decision (never allows production cutover).
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_cutover_readiness(
+    string $workRoot,
+    bool $mayFull,
+    bool $mayCountry,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    if ($type === 'full_disaster' && !$mayFull) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+    if ($type === 'country_recovery' && !$mayCountry) {
+        throw new RuntimeException('Operator lacks backup_restore_country permission.');
+    }
+
+    $status = (string) ($job['status'] ?? '');
+    $labels = [
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_READY => 'البيئة المعزولة جاهزة',
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW => 'تحتاج مراجعة يدوية',
+        ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED => 'البيئة غير جاهزة',
+    ];
+    $decision = orange_restore_cutover_readiness_load($workRoot, $jobId);
+    $report = orange_restore_shadow_smoke_load_report($workRoot, $jobId);
+
+    return [
+        'job' => orange_restore_fw_public_row($job),
+        'cutover_readiness' => $decision !== null ? orange_restore_cutover_readiness_public($decision) : null,
+        'smoke_report' => $report !== null ? orange_restore_shadow_smoke_public_report($report) : null,
+        'status_label_ar' => $labels[$status] ?? '',
+        'execution_started' => false,
+        'production_touched' => false,
+        'production_cutover_allowed' => false,
+        'read_only' => true,
+        'warning' => 'لم يتم تعديل قاعدة الإنتاج أو ملفات الإنتاج، ولا يزال التحويل إلى الإنتاج غير مسموح.',
+    ];
+}
+
+/**
  * Read-only shadow files status/report (HTTP never runs extractor).
  *
  * @return array<string, mixed>
@@ -1492,6 +1631,13 @@ function orange_restore_admin_safe_message(Throwable $e): string
         'shadow_files_verify_failed',
         'shadow_files_failed',
         'shadow_workspace_create_failed',
+        'shadow_smoke_lock_active',
+        'shadow_files_not_ready',
+        'shadow_context_write_blocked',
+        'shadow_context_integration_blocked',
+        'production_db_identity_rejected',
+        'production_file_root_rejected',
+        'smoke_pipeline_override_invalid',
     ];
     if (in_array($msg, $passthrough, true)) {
         return $msg;

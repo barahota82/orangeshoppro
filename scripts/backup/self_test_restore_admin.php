@@ -2373,6 +2373,45 @@ restore_admin_self_test(
     'shadow-files: Restore Center UI wires files view + statuses'
 );
 
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_shadow_smoke.php'), 'shadow-smoke: CLI entry present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-shadow-smoke.php'), 'shadow-smoke: POST request API present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'shadow-smoke.php'), 'shadow-smoke: GET status API present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'cutover-readiness.php'), 'shadow-smoke: GET cutover-readiness API present');
+$shadowSmokeLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_shadow_smoke.php');
+restore_admin_self_test(
+    str_contains($shadowSmokeLib, 'shadow_smoke_report.json')
+    && str_contains($shadowSmokeLib, 'cutover_readiness.json')
+    && str_contains($shadowSmokeLib, 'orange_restore_shadow_context_assert_read_only')
+    && str_contains($shadowSmokeLib, "'production_cutover_allowed' => false")
+    && !str_contains($shadowSmokeLib, 'orange_restore_merge_db_cutover('),
+    'shadow-smoke: reports + read-only guard; no DB cutover'
+);
+$shadowSmokeReq = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-shadow-smoke.php');
+restore_admin_self_test(
+    str_contains($shadowSmokeReq, 'restore_admin_api_require_post')
+    && !str_contains($shadowSmokeReq, 'orange_restore_shadow_smoke_run_cli'),
+    'shadow-smoke: HTTP request is metadata-only'
+);
+$shadowSmokeGet = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'shadow-smoke.php');
+restore_admin_self_test(
+    str_contains($shadowSmokeGet, 'restore_admin_api_require_get')
+    && !str_contains($shadowSmokeGet, 'orange_restore_shadow_smoke_run_cli'),
+    'shadow-smoke: HTTP status is GET/read-only'
+);
+restore_admin_self_test(
+    str_contains($shadowUi, 'rc-shadow-smoke-req')
+    && str_contains($shadowUi, 'rc-shadow-smoke-view')
+    && str_contains($shadowUi, 'shadow_smoke_ready')
+    && str_contains($shadowUi, 'cutover_readiness_blocked')
+    && str_contains($shadowUi, 'لم يتم تعديل قاعدة الإنتاج أو ملفات الإنتاج'),
+    'shadow-smoke: Restore Center UI wires request/view + statuses'
+);
+restore_admin_self_test(
+    !is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'execute-cutover.php')
+    && !is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'approve-cutover.php'),
+    'shadow-smoke: no cutover execute/approve endpoints'
+);
+
     restore_admin_test_run_cleanup();
     restore_admin_test_emit_summary();
     exit($failures > 0 ? 1 : 0);
