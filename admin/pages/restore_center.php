@@ -59,7 +59,8 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
 </style>
 
 <p class="rc-readonly-banner" role="status">
-    <strong>تنبيه:</strong> يمكن إنشاء مهمة استرداد وإلغاؤها فقط. تنفيذ الاسترداد والموافقة والدمج والاسترجاع العكسي غير متاح في هذه المرحلة — المهمة تتوقف عند انتظار التأكيد.
+    <strong>تنبيه:</strong> يمكن إنشاء مهمة، تشغيل Dry Validation، وإعداد خطة استرداد فقط. تنفيذ الاسترداد والموافقة النهائية والدمج والاسترجاع العكسي غير متاح في هذه المرحلة.
+    بعد إعداد الخطة تتوقف المهمة عند <strong>بانتظار الموافقة النهائية</strong>. لم يتم تنفيذ أي استرداد حتى الآن — الخطة تصف العملية المستقبلية فقط.
 </p>
 
 <div id="rc_progress" class="rc-progress" role="status" aria-live="polite">جاري التحميل…</div>
@@ -188,11 +189,13 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     const badge = (status) => {
         const s = String(status || '').toLowerCase();
         let cls = 'rc-badge--muted';
-        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed') cls = 'rc-badge--success';
-        else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval') cls = 'rc-badge--warning';
-        else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible') cls = 'rc-badge--failed';
-        else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge')) cls = 'rc-badge--running';
-        return '<span class="rc-badge ' + cls + '">' + (status || '—') + '</span>';
+        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed') cls = 'rc-badge--success';
+        else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval' || s === 'waiting_confirmation' || s === 'execution_plan_ready') cls = 'rc-badge--warning';
+        else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible' || s === 'dry_failed' || s === 'execution_failed' || s === 'execution_cancelled' || s === 'cancelled') cls = 'rc-badge--failed';
+        else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge') || s === 'execution_precheck' || s === 'dry_running') cls = 'rc-badge--running';
+        let label = status || '—';
+        if (s === 'awaiting_final_approval') label = 'بانتظار الموافقة النهائية';
+        return '<span class="rc-badge ' + cls + '">' + label + '</span>';
     };
     const eligibilityBadge = (pkg) => {
         const status = String(pkg.eligibility_status || pkg.restore_eligibility || '');
@@ -323,6 +326,15 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         }
         if (job.has_dry_run_report) {
             html += '<button type="button" class="btn-link rc-dry-report" data-id="' + id + '">View Dry Report</button> ';
+        }
+        if (job.prepare_execution_available) {
+            html += '<button type="button" class="btn-link rc-prepare-exec" data-id="' + id + '">إعداد خطة الاسترداد</button> ';
+        }
+        if (job.has_execution_plan) {
+            html += '<button type="button" class="btn-link rc-exec-plan" data-id="' + id + '">عرض خطة الاسترداد</button> ';
+        }
+        if (job.execution_plan_cancellable) {
+            html += '<button type="button" class="btn-link rc-cancel-exec" data-id="' + id + '">إلغاء الخطة</button> ';
         }
         if (job.cancellable) {
             html += '<button type="button" class="btn-link rc-fw-cancel" data-id="' + id + '">Cancel</button>';
@@ -524,6 +536,59 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                 openView('Restore Job — ' + (t.dataset.id || ''), JSON.stringify(j.job || {}, null, 2));
             } catch (e) {
                 showAlert(e.message || 'تعذر العرض', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-prepare-exec')) {
+            try {
+                setBusy(true, 'جاري إعداد خطة الاسترداد…');
+                const j = await apiPost('job/prepare-execution.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || ''
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert('تم إعداد الخطة — بانتظار الموافقة النهائية. لم يتم تنفيذ أي استرداد حتى الآن.', true);
+                if (j.plan) {
+                    openView('خطة الاسترداد — ' + (t.dataset.id || ''), JSON.stringify(j.plan, null, 2));
+                }
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر إعداد الخطة', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-exec-plan')) {
+            try {
+                setBusy(true, 'جاري التحميل…');
+                const j = await apiGet('job/execution-plan.php?id=' + encodeURIComponent(t.dataset.id || ''));
+                openView('خطة الاسترداد — ' + (t.dataset.id || ''), JSON.stringify(j.plan || {}, null, 2));
+            } catch (e) {
+                showAlert(e.message || 'تعذر العرض', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-cancel-exec')) {
+            if (!window.confirm('إلغاء خطة الاسترداد؟ لن يُنفَّذ أي استرداد.')) return;
+            try {
+                setBusy(true, 'جاري إلغاء الخطة…');
+                const j = await apiPost('job/cancel-execution.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || ''
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert('تم إلغاء الخطة. لم يتم تنفيذ أي استرداد.', true);
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر إلغاء الخطة', false);
             } finally {
                 setBusy(false);
             }

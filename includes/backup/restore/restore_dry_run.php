@@ -36,6 +36,8 @@ function orange_restore_dry_run_execute(string $workRoot, string $jobId, array $
         ORANGE_RESTORE_FW_STATUS_WAITING_CONFIRMATION,
         ORANGE_RESTORE_FW_STATUS_DRY_COMPLETED,
         ORANGE_RESTORE_FW_STATUS_DRY_FAILED,
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED,
     ];
     if (!in_array($status, $allowedStart, true)) {
         throw new RuntimeException('Dry run not allowed in status: ' . $status);
@@ -512,6 +514,21 @@ function orange_restore_dry_run_execute(string $workRoot, string $jobId, array $
         );
         $job['dry_run_overall_result'] = $overall;
         $job['dry_run_report_file'] = ORANGE_RESTORE_DRY_RUN_REPORT_FILE;
+        try {
+            require_once __DIR__ . '/restore_execution_orchestrator.php';
+            $job['dry_run_fingerprint'] = orange_restore_exec_file_sha256($reportPath);
+            $fp = orange_restore_exec_build_package_fingerprint(
+                (string) ($context['backup_root'] ?? ''),
+                $packageType,
+                $packageId,
+                $countryCode !== '' ? $countryCode : null
+            );
+            $job['package_fingerprint'] = (string) ($fp['fingerprint'] ?? '');
+        } catch (Throwable) {
+            // Fingerprint binding is best-effort at dry-run time; prepare will recompute.
+        }
+        $job['execution_started'] = false;
+        $job['requires_final_approval'] = false;
         orange_restore_fw_write($workRoot, $job);
         orange_restore_fw_release_lock($workRoot, $jobId);
 

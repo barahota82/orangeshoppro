@@ -493,9 +493,16 @@ orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'manifest.json',
     'schema_revision' => 121,
     'registry_version' => '1.0',
     'country_id' => 1,
+    'country_code' => 'KW',
     'backup_status' => 'success',
+    'checksums_file' => 'checksums.sha256',
+    'health_report_file' => 'health.json',
 ]);
-orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'health.json', [
+    'package_status' => 'healthy',
+    'country_id' => 1,
+    'country_code' => 'KW',
+]);
 mkdir($countryPkgDir . DIRECTORY_SEPARATOR . 'sql', 0775, true);
 mkdir($countryPkgDir . DIRECTORY_SEPARATOR . 'files', 0775, true);
 file_put_contents($countryPkgDir . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR . 'countries.sql', "INSERT INTO countries VALUES (1);\n");
@@ -503,6 +510,23 @@ restore_admin_test_write_zip($countryPkgDir . DIRECTORY_SEPARATOR . 'files' . DI
 orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'dependency_graph.json', ['tables' => ['countries']]);
 orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'table_inventory.json', ['tables' => ['countries' => 1]]);
 orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'id_snapshot.json', ['country_id' => 1, 'tables' => []]);
+$countryChecksumLines = [];
+foreach ([
+    'manifest.json',
+    'health.json',
+    'dependency_graph.json',
+    'table_inventory.json',
+    'id_snapshot.json',
+    'sql/countries.sql',
+    'files/uploads_country.zip',
+] as $rel) {
+    $abs = $countryPkgDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel);
+    $sha = hash_file('sha256', $abs);
+    if (is_string($sha) && $sha !== '') {
+        $countryChecksumLines[] = $sha . '  ' . $rel;
+    }
+}
+file_put_contents($countryPkgDir . DIRECTORY_SEPARATOR . 'checksums.sha256', implode("\n", $countryChecksumLines) . "\n");
 orange_backup_write_json(
     orange_backup_admin_recovery_report_sibling_path($countryPkgDir, $countryPkgId),
     [
@@ -888,7 +912,9 @@ restore_admin_self_test(stripos($pageSource, '>Rollback<') === false && stripos(
 restore_admin_self_test(!str_contains($pageSource, 'restore_admin.php'), 'ui: page does not load restore_admin.php at render');
 restore_admin_self_test(str_contains($pageSource, 'rc-create-job') && str_contains($pageSource, 'rc-fw-cancel'), 'ui: framework create/cancel controls present');
 restore_admin_self_test(str_contains($pageSource, 'Run Dry Validation') && str_contains($pageSource, 'View Dry Report'), 'ui: dry validation controls present');
-restore_admin_self_test(!str_contains($pageSource, 'Execute'), 'ui: no Execute button');
+restore_admin_self_test(str_contains($pageSource, 'إعداد خطة الاسترداد') && str_contains($pageSource, 'عرض خطة الاسترداد') && str_contains($pageSource, 'إلغاء الخطة'), 'ui: execution plan Arabic controls present');
+restore_admin_self_test(str_contains($pageSource, 'بانتظار الموافقة النهائية') && str_contains($pageSource, 'لم يتم تنفيذ أي استرداد حتى الآن'), 'ui: awaiting final approval warning present');
+restore_admin_self_test(!str_contains($pageSource, 'Execute Restore') && !str_contains($pageSource, 'بدء الاسترداد'), 'ui: no Execute Restore button');
 
 $createApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'create.php');
 $cancelApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'cancel.php');
@@ -1186,6 +1212,510 @@ restore_admin_self_test(!str_contains($dryLib, 'extractTo') && !str_contains($dr
 $restoreAdminLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_admin.php');
 restore_admin_self_test(!str_contains($restoreAdminLib, 'function orange_restore_orchestrator_approve'), 'lib: restore_admin does not define mutating orchestrator wrappers');
 restore_admin_self_test(!str_contains($restoreAdminLib, 'orange_restore_e2e_start_full'), 'lib: restore_admin does not expose e2e start');
+
+// --- Phase 3B.3A execution orchestrator (metadata plan only) ---
+$prepareApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'prepare-execution.php');
+$execPlanApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'execution-plan.php');
+$cancelExecApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'cancel-execution.php');
+$execOrchLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_execution_orchestrator.php');
+restore_admin_self_test(str_contains($prepareApiSource, 'restore_admin_api_require_csrf'), 'api: prepare-execution requires CSRF');
+restore_admin_self_test(str_contains($prepareApiSource, 'restore_admin_api_require_post'), 'api: prepare-execution POST-only');
+restore_admin_self_test(str_contains($execPlanApiSource, 'restore_admin_api_require_get'), 'api: execution-plan GET-only');
+restore_admin_self_test(str_contains($cancelExecApiSource, 'restore_admin_api_require_csrf'), 'api: cancel-execution requires CSRF');
+restore_admin_self_test(!str_contains($execOrchLib, 'mysqli_query') && !str_contains($execOrchLib, '->query('), 'exec-orch: no SQL execution');
+restore_admin_self_test(!str_contains($execOrchLib, 'extractTo') && !str_contains($execOrchLib, 'ZipArchive'), 'exec-orch: no archive extraction');
+restore_admin_self_test(!str_contains($execOrchLib, 'restoring_database') && !str_contains($execOrchLib, 'restoring_files'), 'exec-orch: no restoring_* states');
+restore_admin_self_test(!str_contains($execOrchLib, 'orange_restore_e2e_') && !str_contains($execOrchLib, 'orange_restore_orchestrator_approve'), 'exec-orch: no production restore functions');
+
+$execPrepare = orange_restore_admin_fw_prepare_execution(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $dryOkJob['job_id']
+);
+restore_admin_self_test(($execPrepare['job']['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL, 'exec-orch: successful plan stops at awaiting_final_approval');
+restore_admin_self_test(($execPrepare['plan']['execution_started'] ?? true) === false, 'exec-orch: execution_started always false');
+restore_admin_self_test(($execPrepare['plan']['requires_final_approval'] ?? false) === true, 'exec-orch: final approval always required');
+$planPath = orange_restore_exec_plan_path($workRoot, (string) $dryOkJob['job_id']);
+restore_admin_self_test(is_file($planPath), 'exec-orch: execution_plan.json written');
+$planRaw = orange_restore_exec_read_plan($workRoot, (string) $dryOkJob['job_id']);
+$requiredPlanFields = [
+    'plan_version', 'job_id', 'package_id', 'package_type', 'country_code', 'created_at', 'created_by',
+    'package_fingerprint', 'dry_run_fingerprint', 'preconditions', 'planned_stages', 'safety_gates',
+    'rollback_strategy', 'estimated_duration', 'requires_final_approval', 'execution_started',
+];
+$planFieldsOk = true;
+foreach ($requiredPlanFields as $field) {
+    if (!array_key_exists($field, $planRaw)) {
+        $planFieldsOk = false;
+        break;
+    }
+}
+restore_admin_self_test($planFieldsOk, 'exec-orch: execution_plan.json fields complete');
+restore_admin_self_test(($planRaw['execution_started'] ?? true) === false, 'exec-orch: plan execution_started false');
+restore_admin_self_test(is_array($planRaw['planned_stages'] ?? null) && count($planRaw['planned_stages']) >= 8, 'exec-orch: planned_stages describe future ops');
+$lockAfterPrepare = orange_restore_exec_lock_status($workRoot);
+restore_admin_self_test(($lockAfterPrepare['held'] ?? false) === true, 'exec-orch: lock held after plan ready');
+
+$publicPlan = orange_restore_admin_fw_execution_plan($workRoot, true, true, (string) $dryOkJob['job_id']);
+$planJson = (string) json_encode($publicPlan, JSON_UNESCAPED_UNICODE);
+restore_admin_self_test(!str_contains($planJson, $backupRoot) && !str_contains($planJson, $workRoot), 'exec-orch: safe redaction no absolute roots');
+restore_admin_self_test(!isset($publicPlan['package_path']) && !isset($publicPlan['secrets']), 'exec-orch: public plan strips sensitive keys');
+
+$dupLockJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$dupDry = orange_restore_dry_run_execute($workRoot, (string) $dupLockJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+restore_admin_self_test(($dupDry['job']['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_DRY_COMPLETED, 'exec-orch: second dry job ready for lock test');
+$dupRejected = false;
+try {
+    orange_restore_admin_fw_prepare_execution(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $dupLockJob['job_id']
+    );
+} catch (Throwable $e) {
+    $dupRejected = trim($e->getMessage()) === 'execution_orchestration_already_active';
+}
+restore_admin_self_test($dupRejected, 'exec-orch: duplicate execution orchestration lock rejected');
+
+$cancelledPlan = orange_restore_admin_fw_cancel_execution_plan(
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $dryOkJob['job_id'],
+    'self-test cancel'
+);
+restore_admin_self_test(($cancelledPlan['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED, 'exec-orch: cancel sets execution_cancelled');
+restore_admin_self_test(is_file($planPath), 'exec-orch: cancel preserves execution_plan.json');
+$lockAfterCancel = orange_restore_exec_lock_status($workRoot);
+restore_admin_self_test(($lockAfterCancel['held'] ?? false) === false, 'exec-orch: cancel plan releases lock');
+
+$cancelThenPrepareRejected = false;
+try {
+    orange_restore_admin_fw_prepare_execution(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $dryOkJob['job_id']
+    );
+} catch (Throwable $e) {
+    $cancelThenPrepareRejected = trim($e->getMessage()) === 'execution_plan_cancelled_reset_required';
+}
+restore_admin_self_test($cancelThenPrepareRejected, 'exec-orch: cancelled plan cannot prepare without reset');
+
+// After lock released, prepare the duplicate dry-completed job.
+$execPrepare2 = orange_restore_admin_fw_prepare_execution(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $dupLockJob['job_id']
+);
+restore_admin_self_test(($execPrepare2['job']['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL, 'exec-orch: prepare after lock release works');
+orange_restore_admin_fw_cancel_execution_plan(
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $dupLockJob['job_id']
+);
+
+// WARNING policy: Full WARNING allowed; Country WARNING rejected.
+$warnFullId = '2026-07-01_046000';
+$warnFullDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $warnFullId;
+restore_admin_test_seed_full_dry_package($warnFullDir, $warnFullId);
+orange_backup_write_json(
+    orange_backup_admin_recovery_report_sibling_path($warnFullDir, $warnFullId),
+    ['overall_result' => 'warning', 'recovery_score' => 80, 'validated_at' => gmdate('c'), 'manifest_valid' => true]
+);
+$warnFullJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $warnFullId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$warnFullDry = orange_restore_dry_run_execute($workRoot, (string) $warnFullJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+restore_admin_self_test(($warnFullDry['report']['overall_result'] ?? '') === 'WARNING', 'exec-orch: full warning dry-run overall WARNING');
+$warnFullPrepare = orange_restore_admin_fw_prepare_execution(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $warnFullJob['job_id']
+);
+restore_admin_self_test(($warnFullPrepare['job']['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL, 'exec-orch: WARNING follows approved Full policy');
+orange_restore_admin_fw_cancel_execution_plan($workRoot, ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1], $superPdo, (string) $warnFullJob['job_id']);
+
+$countryWarnJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $countryPkgId,
+    'package_type' => 'country_recovery',
+    'country_code' => 'KW',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$countryWarnDry = orange_restore_dry_run_execute($workRoot, (string) $countryWarnJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+restore_admin_self_test(($countryWarnDry['report']['overall_result'] ?? '') === 'PASS', 'exec-orch: country dry PASS baseline');
+$countryReportPath = orange_restore_dry_run_report_path($workRoot, (string) $countryWarnJob['job_id']);
+$countryReport = orange_restore_dry_run_read_report($workRoot, (string) $countryWarnJob['job_id']);
+$countryReport['overall_result'] = 'WARNING';
+file_put_contents($countryReportPath, json_encode($countryReport, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n");
+$countryJobRow = orange_restore_fw_read($workRoot, (string) $countryWarnJob['job_id']);
+$countryJobRow['dry_run_overall_result'] = 'WARNING';
+$countryJobRow['dry_run_fingerprint'] = hash_file('sha256', $countryReportPath) ?: '';
+orange_restore_fw_write($workRoot, $countryJobRow);
+$countryWarnRejected = false;
+try {
+    orange_restore_admin_fw_prepare_execution(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $countryWarnJob['job_id']
+    );
+} catch (Throwable $e) {
+    $countryWarnRejected = trim($e->getMessage()) === 'dry_run_warning_not_approved_for_package_type';
+}
+restore_admin_self_test($countryWarnRejected, 'exec-orch: country WARNING rejected by policy');
+
+// FAIL dry run rejected
+$failDryRejected = false;
+try {
+    orange_restore_admin_fw_prepare_execution(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $missingJob['job_id']
+    );
+} catch (Throwable $e) {
+    $failDryRejected = in_array(trim($e->getMessage()), ['dry_run_failed', 'Execution plan requires dry_completed status.'], true);
+}
+restore_admin_self_test($failDryRejected, 'exec-orch: FAIL Dry Run rejected');
+
+// Missing Dry Run rejected
+$noDryJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_fw_release_lock($workRoot, (string) $noDryJob['job_id']);
+orange_restore_fw_write($workRoot, array_merge(orange_restore_fw_read($workRoot, (string) $noDryJob['job_id']), [
+    'status' => ORANGE_RESTORE_FW_STATUS_DRY_COMPLETED,
+    'phase' => ORANGE_RESTORE_FW_PHASE_DRY_COMPLETED,
+    'dry_run_overall_result' => 'PASS',
+]));
+$missingDryRejected = false;
+try {
+    orange_restore_admin_fw_prepare_execution(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $noDryJob['job_id']
+    );
+} catch (Throwable $e) {
+    $missingDryRejected = trim($e->getMessage()) === 'dry_run_report_missing';
+}
+restore_admin_self_test($missingDryRejected, 'exec-orch: missing Dry Run rejected');
+
+// execution_performed=true rejected
+$perfJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$perfDry = orange_restore_dry_run_execute($workRoot, (string) $perfJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+$perfReportPath = orange_restore_dry_run_report_path($workRoot, (string) $perfJob['job_id']);
+$perfReport = orange_restore_dry_run_read_report($workRoot, (string) $perfJob['job_id']);
+$perfReport['execution_performed'] = true;
+file_put_contents($perfReportPath, json_encode($perfReport, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n");
+$perfJobRow = orange_restore_fw_read($workRoot, (string) $perfJob['job_id']);
+$perfJobRow['dry_run_fingerprint'] = hash_file('sha256', $perfReportPath) ?: '';
+orange_restore_fw_write($workRoot, $perfJobRow);
+$perfRejected = false;
+try {
+    orange_restore_admin_fw_prepare_execution(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $perfJob['job_id']
+    );
+} catch (Throwable $e) {
+    $perfRejected = trim($e->getMessage()) === 'execution_already_performed';
+}
+restore_admin_self_test($perfRejected, 'exec-orch: execution_performed=true rejected');
+
+// package changed after Dry Run
+$changedJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_dry_run_execute($workRoot, (string) $changedJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+$manifestPath = $fullPkgDir . DIRECTORY_SEPARATOR . 'manifest.json';
+$manifest = json_decode((string) file_get_contents($manifestPath), true);
+$manifest['table_count'] = 999;
+file_put_contents($manifestPath, json_encode($manifest, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n");
+$changedRejected = false;
+try {
+    orange_restore_admin_fw_prepare_execution(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $changedJob['job_id']
+    );
+} catch (Throwable $e) {
+    $changedRejected = trim($e->getMessage()) === 'package_changed_after_dry_run';
+}
+restore_admin_self_test($changedRejected, 'exec-orch: package changed after Dry Run rejected');
+// restore manifest for later tests
+$manifest['table_count'] = 1;
+file_put_contents($manifestPath, json_encode($manifest, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n");
+
+// mismatched package type
+$typeJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_dry_run_execute($workRoot, (string) $typeJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+$typeReportPath = orange_restore_dry_run_report_path($workRoot, (string) $typeJob['job_id']);
+$typeReport = orange_restore_dry_run_read_report($workRoot, (string) $typeJob['job_id']);
+$typeReport['package_type'] = 'country_recovery';
+file_put_contents($typeReportPath, json_encode($typeReport, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n");
+$typeJobRow = orange_restore_fw_read($workRoot, (string) $typeJob['job_id']);
+$typeJobRow['dry_run_fingerprint'] = hash_file('sha256', $typeReportPath) ?: '';
+orange_restore_fw_write($workRoot, $typeJobRow);
+$typeRejected = false;
+try {
+    orange_restore_admin_fw_prepare_execution(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $typeJob['job_id']
+    );
+} catch (Throwable $e) {
+    $typeRejected = trim($e->getMessage()) === 'package_type_mismatch';
+}
+restore_admin_self_test($typeRejected, 'exec-orch: mismatched package type rejected');
+
+// mismatched country
+$ccJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $countryPkgId,
+    'package_type' => 'country_recovery',
+    'country_code' => 'KW',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_dry_run_execute($workRoot, (string) $ccJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+$ccReportPath = orange_restore_dry_run_report_path($workRoot, (string) $ccJob['job_id']);
+$ccReport = orange_restore_dry_run_read_report($workRoot, (string) $ccJob['job_id']);
+$ccReport['country_code'] = 'SA';
+file_put_contents($ccReportPath, json_encode($ccReport, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n");
+$ccJobRow = orange_restore_fw_read($workRoot, (string) $ccJob['job_id']);
+$ccJobRow['dry_run_fingerprint'] = hash_file('sha256', $ccReportPath) ?: '';
+orange_restore_fw_write($workRoot, $ccJobRow);
+$ccRejected = false;
+try {
+    orange_restore_admin_fw_prepare_execution(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $ccJob['job_id']
+    );
+} catch (Throwable $e) {
+    $ccRejected = trim($e->getMessage()) === 'country_code_mismatch';
+}
+restore_admin_self_test($ccRejected, 'exec-orch: mismatched country rejected');
+
+// incompatible schema/backend
+$schemaExecId = '2026-07-01_045000';
+$schemaExecDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $schemaExecId;
+restore_admin_test_seed_full_dry_package($schemaExecDir, $schemaExecId);
+$schemaExecJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $schemaExecId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_dry_run_execute($workRoot, (string) $schemaExecJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+$schemaManifest = json_decode((string) file_get_contents($schemaExecDir . DIRECTORY_SEPARATOR . 'manifest.json'), true);
+$schemaManifest['schema_revision'] = 1;
+// Rewrite checksums file to keep package eligible-ish; prepare checks schema_revision vs expected.
+file_put_contents(
+    $schemaExecDir . DIRECTORY_SEPARATOR . 'manifest.json',
+    json_encode($schemaManifest, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n"
+);
+// Clear bound fingerprint so prepare uses live schema check instead of package_changed.
+$schemaJobRow = orange_restore_fw_read($workRoot, (string) $schemaExecJob['job_id']);
+$schemaJobRow['package_fingerprint'] = '';
+orange_restore_fw_write($workRoot, $schemaJobRow);
+$schemaRejected = false;
+try {
+    orange_restore_admin_fw_prepare_execution(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $schemaExecJob['job_id']
+    );
+} catch (Throwable $e) {
+    $schemaRejected = in_array(trim($e->getMessage()), ['schema_incompatible', 'package_changed_after_dry_run', 'package_not_eligible'], true);
+}
+restore_admin_self_test($schemaRejected, 'exec-orch: incompatible schema/backend rejected');
+
+$backendExecId = '2026-07-01_044000';
+$backendExecDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $backendExecId;
+restore_admin_test_seed_full_dry_package($backendExecDir, $backendExecId, ['export_backend' => 'php_pdo']);
+$backendExecJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $backendExecId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_dry_run_execute($workRoot, (string) $backendExecJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+$backendManifest = json_decode((string) file_get_contents($backendExecDir . DIRECTORY_SEPARATOR . 'manifest.json'), true);
+$backendManifest['export_backend'] = 'mysqldump';
+file_put_contents(
+    $backendExecDir . DIRECTORY_SEPARATOR . 'manifest.json',
+    json_encode($backendManifest, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n"
+);
+$backendJobRow = orange_restore_fw_read($workRoot, (string) $backendExecJob['job_id']);
+$backendJobRow['package_fingerprint'] = '';
+orange_restore_fw_write($workRoot, $backendJobRow);
+$backendRejected = false;
+try {
+    orange_restore_admin_fw_prepare_execution(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $backendExecJob['job_id']
+    );
+} catch (Throwable $e) {
+    $backendRejected = in_array(trim($e->getMessage()), ['backend_incompatible', 'package_changed_after_dry_run', 'package_not_eligible'], true);
+}
+restore_admin_self_test($backendRejected, 'exec-orch: incompatible backend rejected');
+
+// stale lock handling — clear stale lock and allow prepare
+$staleJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_dry_run_execute($workRoot, (string) $staleJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+$staleLockPath = orange_restore_exec_lock_path($workRoot);
+file_put_contents($staleLockPath, json_encode([
+    'job_id' => 'rstfw_stale_other',
+    'pid' => 999999991,
+    'started_at' => gmdate('c', time() - 400000),
+    'orchestrator_version' => ORANGE_RESTORE_EXEC_ORCH_VERSION,
+], JSON_UNESCAPED_UNICODE) . "\n");
+$stalePrepare = orange_restore_admin_fw_prepare_execution(
+    $backupRoot,
+    $workRoot,
+    ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+    $superPdo,
+    (string) $staleJob['job_id']
+);
+restore_admin_self_test(($stalePrepare['job']['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_AWAITING_FINAL_APPROVAL, 'exec-orch: stale lock cleared then prepare succeeds');
+orange_restore_admin_fw_cancel_execution_plan($workRoot, ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1], $superPdo, (string) $staleJob['job_id']);
+
+// completed/failed jobs rejected
+$termJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_fw_release_lock($workRoot, (string) $termJob['job_id']);
+orange_restore_fw_write($workRoot, array_merge(orange_restore_fw_read($workRoot, (string) $termJob['job_id']), [
+    'status' => ORANGE_RESTORE_FW_STATUS_COMPLETED,
+    'phase' => ORANGE_RESTORE_FW_PHASE_COMPLETED,
+]));
+$termRejected = false;
+try {
+    orange_restore_admin_fw_prepare_execution(
+        $backupRoot,
+        $workRoot,
+        ['id' => 1, 'username' => 'superadmin', 'is_superuser' => 1, 'is_active' => 1],
+        $superPdo,
+        (string) $termJob['job_id']
+    );
+} catch (Throwable $e) {
+    $termRejected = str_contains($e->getMessage(), 'terminal') || str_contains($e->getMessage(), 'dry_completed');
+}
+restore_admin_self_test($termRejected, 'exec-orch: completed/failed jobs rejected');
+
+$fullDryForPerm = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+orange_restore_dry_run_execute($workRoot, (string) $fullDryForPerm['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+$execPermDenied = false;
+try {
+    orange_restore_admin_fw_prepare_execution(
+        $backupRoot,
+        $workRoot,
+        $countryOnlyAdmin,
+        $countryOnlyPdo,
+        (string) $fullDryForPerm['job_id']
+    );
+} catch (Throwable $e) {
+    $execPermDenied = str_contains($e->getMessage(), 'permission');
+}
+restore_admin_self_test($execPermDenied, 'exec-orch: permission separation Full/Country');
 
     restore_admin_test_run_cleanup();
     restore_admin_test_emit_summary();

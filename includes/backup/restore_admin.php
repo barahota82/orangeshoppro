@@ -10,6 +10,7 @@ require_once __DIR__ . '/restore/restore_merge_maintenance.php';
 require_once __DIR__ . '/restore/restore_validation_adapter.php';
 require_once __DIR__ . '/restore/restore_job_framework.php';
 require_once __DIR__ . '/restore/restore_dry_run.php';
+require_once __DIR__ . '/restore/restore_execution_orchestrator.php';
 
 const ORANGE_RESTORE_ADMIN_JOB_ID_PATTERN = '/^[a-zA-Z0-9._-]+$/';
 
@@ -73,6 +74,14 @@ function orange_restore_admin_assert_job_allowlisted(string $workRoot, string $j
     orange_restore_admin_assert_job_id($jobId);
     if (!in_array($jobId, orange_restore_job_list_ids($workRoot), true)) {
         throw new RuntimeException('Restore job not found.');
+    }
+}
+
+function orange_restore_admin_assert_fw_job_allowlisted(string $workRoot, string $jobId): void
+{
+    orange_restore_admin_assert_job_id($jobId);
+    if (!in_array($jobId, orange_restore_fw_list_ids($workRoot), true)) {
+        throw new RuntimeException('Restore framework job not found.');
     }
 }
 
@@ -961,19 +970,120 @@ function orange_restore_admin_fw_dry_report(
     return $report;
 }
 
+/**
+ * @return array{job:array<string,mixed>,plan:array<string,mixed>}
+ */
+function orange_restore_admin_fw_prepare_execution(
+    string $backupRoot,
+    string $workRoot,
+    array $admin,
+    PDO $pdo,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    orange_restore_admin_assert_package_type_permission($admin, $pdo, $type);
+
+    $username = trim((string) ($admin['username'] ?? $admin['display_name'] ?? 'admin'));
+
+    return orange_restore_exec_prepare_plan($workRoot, $jobId, [
+        'backup_root' => $backupRoot,
+        'operator_username' => $username !== '' ? $username : 'admin',
+        'operator_admin_id' => (int) ($admin['id'] ?? 0),
+    ]);
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_execution_plan(
+    string $workRoot,
+    bool $mayFull,
+    bool $mayCountry,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    if ($type === 'full_disaster' && !$mayFull) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+    if ($type === 'country_recovery' && !$mayCountry) {
+        throw new RuntimeException('Operator lacks backup_restore_country permission.');
+    }
+
+    return orange_restore_exec_public_plan(orange_restore_exec_read_plan($workRoot, $jobId));
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_cancel_execution_plan(
+    string $workRoot,
+    array $admin,
+    PDO $pdo,
+    string $jobId,
+    string $reason = ''
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    orange_restore_admin_assert_package_type_permission($admin, $pdo, $type);
+
+    $username = trim((string) ($admin['username'] ?? $admin['display_name'] ?? 'admin'));
+
+    return orange_restore_exec_cancel_plan(
+        $workRoot,
+        $jobId,
+        $username !== '' ? $username : 'admin',
+        $reason
+    );
+}
+
 function orange_restore_admin_safe_message(Throwable $e): string
 {
     $msg = trim($e->getMessage());
     if ($msg === '') {
         return 'تعذر تنفيذ العملية.';
     }
-    if ($msg === 'restore_job_already_active') {
-        return 'restore_job_already_active';
+    $passthrough = [
+        'restore_job_already_active',
+        'execution_orchestration_already_active',
+        'execution_plan_cancelled_reset_required',
+        'execution_plan_failed_reset_required',
+        'package_changed_after_dry_run',
+        'dry_run_report_missing',
+        'dry_run_failed',
+        'dry_run_warning_not_approved_for_package_type',
+        'execution_already_performed',
+        'package_type_mismatch',
+        'package_id_mismatch',
+        'country_code_mismatch',
+        'package_not_eligible',
+        'schema_incompatible',
+        'backend_incompatible',
+    ];
+    if (in_array($msg, $passthrough, true)) {
+        return $msg;
     }
     if (str_contains($msg, 'permission') || str_contains($msg, 'Invalid') || str_contains($msg, 'not found')
         || str_contains($msg, 'allowlisted') || str_contains($msg, 'Method not allowed')
         || str_contains($msg, 'CSRF') || str_contains($msg, 'cannot be cancelled')
-        || str_contains($msg, 'not eligible')) {
+        || str_contains($msg, 'not eligible') || str_contains($msg, 'dry_completed')
+        || str_contains($msg, 'Execution plan')) {
         return $msg;
     }
 
