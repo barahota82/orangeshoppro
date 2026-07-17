@@ -302,13 +302,28 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         html += '<button type="button" class="btn-link rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">عرض تفاصيل الحزمة</button>';
         if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
             html += ' <button type="button" class="btn-link rc-create-job" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">إنشاء مهمة</button>';
+            html += ' <button type="button" class="btn-link rc-dry-run" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">Run Dry Validation</button>';
         }
         return html;
+    }
+
+    function dryResultBadge(result) {
+        const r = String(result || '').toUpperCase();
+        if (r === 'PASS') return '<span class="rc-badge rc-badge--success">PASS</span>';
+        if (r === 'WARNING') return '<span class="rc-badge rc-badge--warning">WARNING</span>';
+        if (r === 'FAIL') return '<span class="rc-badge rc-badge--failed">FAIL</span>';
+        return '<span class="rc-badge rc-badge--muted">—</span>';
     }
 
     function jobActions(job) {
         const id = job.job_id;
         let html = '<button type="button" class="btn-link rc-fw-view" data-id="' + id + '">View</button> ';
+        if (job.dry_run_available) {
+            html += '<button type="button" class="btn-link rc-dry-run" data-job="' + id + '">Run Dry Validation</button> ';
+        }
+        if (job.has_dry_run_report) {
+            html += '<button type="button" class="btn-link rc-dry-report" data-id="' + id + '">View Dry Report</button> ';
+        }
         if (job.cancellable) {
             html += '<button type="button" class="btn-link rc-fw-cancel" data-id="' + id + '">Cancel</button>';
         }
@@ -334,7 +349,8 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         el('rc_jobs_table').querySelector('tbody').innerHTML = state.jobs.length
             ? state.jobs.map((j) => {
                 const pkgLabel = (j.package_type || '') + (j.country_code ? ' / ' + j.country_code : '') + ' / ' + (j.package_id || '—');
-                return '<tr><td><code>' + j.job_id + '</code></td><td>' + pkgLabel + '</td><td class="rc-ts-cell">' + fmtTimestampDisplay(j.created_at) + '</td><td>' + badge(j.status) + '</td><td>' + (j.phase || '—') + '</td><td>' + String(j.progress ?? 0) + '%</td><td>' + (j.message || '—') + '</td><td class="rc-actions">' + jobActions(j) + '</td></tr>';
+                const dryBadge = j.dry_run_overall_result ? ' ' + dryResultBadge(j.dry_run_overall_result) : '';
+                return '<tr><td><code>' + j.job_id + '</code></td><td>' + pkgLabel + '</td><td class="rc-ts-cell">' + fmtTimestampDisplay(j.created_at) + '</td><td>' + badge(j.status) + dryBadge + '</td><td>' + (j.phase || '—') + '</td><td>' + String(j.progress ?? 0) + '%</td><td>' + (j.message || '—') + '</td><td class="rc-actions">' + jobActions(j) + '</td></tr>';
             }).join('')
             : '<tr><td colspan="8" class="muted">لا توجد Restore Jobs.</td></tr>';
     }
@@ -455,6 +471,46 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                 await loadAll();
             } catch (e) {
                 showAlert(e.message || 'تعذر إنشاء المهمة', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-dry-run')) {
+            try {
+                setBusy(true, 'جاري Dry Validation…');
+                const payload = { csrf_token: state.csrf };
+                if (t.dataset.job) {
+                    payload.job_id = t.dataset.job;
+                } else {
+                    payload.package_type = t.dataset.type || '';
+                    payload.package_id = t.dataset.id || '';
+                    payload.country_code = t.dataset.cc || '';
+                }
+                const j = await apiPost('job/dry-run.php', payload);
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                const overall = ((j.report || {}).overall_result || '').toUpperCase();
+                showAlert('Dry Validation: ' + (overall || 'DONE'), overall === 'FAIL' ? false : true);
+                if (j.report) {
+                    openView('Dry Report — ' + ((j.job || {}).job_id || ''), JSON.stringify(j.report, null, 2));
+                }
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر Dry Validation', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-dry-report')) {
+            try {
+                setBusy(true, 'جاري التحميل…');
+                const j = await apiGet('job/dry-report.php?id=' + encodeURIComponent(t.dataset.id || ''));
+                openView('Dry Report — ' + (t.dataset.id || ''), JSON.stringify(j.report || {}, null, 2));
+            } catch (e) {
+                showAlert(e.message || 'تعذر العرض', false);
             } finally {
                 setBusy(false);
             }

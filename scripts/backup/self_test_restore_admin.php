@@ -381,42 +381,128 @@ try {
     "<?php\nreturn ['ORANGE_BACKUP_ROOT' => " . var_export($backupRoot, true) . "];\n"
 );
 
+function restore_admin_test_write_gzip(string $path, string $contents): void
+{
+    $gz = gzencode($contents, 1);
+    if ($gz === false) {
+        throw new RuntimeException('gzencode failed');
+    }
+    file_put_contents($path, $gz);
+}
+
+function restore_admin_test_write_zip(string $path, array $files): void
+{
+    if (class_exists('ZipArchive')) {
+        $zip = new ZipArchive();
+        if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new RuntimeException('zip create failed');
+        }
+        foreach ($files as $name => $body) {
+            $zip->addFromString((string) $name, (string) $body);
+        }
+        $zip->close();
+
+        return;
+    }
+
+    // Minimal stored (no compression) ZIP writer for environments without ZipArchive.
+    $local = '';
+    $central = '';
+    $offset = 0;
+    $count = 0;
+    foreach ($files as $name => $body) {
+        $name = (string) $name;
+        $body = (string) $body;
+        $nameLen = strlen($name);
+        $size = strlen($body);
+        $crc = crc32($body);
+        if ($crc < 0) {
+            $crc = $crc & 0xFFFFFFFF;
+        }
+        $localHeader = pack('VvvvvvVVVvv', 0x04034b50, 20, 0, 0, 0, 0, $crc, $size, $size, $nameLen, 0)
+            . $name . $body;
+        $centralHeader = pack('VvvvvvvVVVvvvvvVV', 0x02014b50, 20, 20, 0, 0, 0, 0, $crc, $size, $size, $nameLen, 0, 0, 0, 0, 0, $offset)
+            . $name;
+        $local .= $localHeader;
+        $central .= $centralHeader;
+        $offset += strlen($localHeader);
+        $count++;
+    }
+    $end = pack('VvvvvVVv', 0x06054b50, 0, 0, $count, $count, strlen($central), strlen($local), 0);
+    file_put_contents($path, $local . $central . $end);
+}
+
+function restore_admin_test_seed_full_dry_package(string $pkgDir, string $pkgId, array $manifestExtra = []): void
+{
+    if (!is_dir($pkgDir)) {
+        mkdir($pkgDir, 0775, true);
+    }
+    $dumpRel = 'database.sql.gz';
+    $uploadsRel = 'uploads.zip';
+    restore_admin_test_write_gzip($pkgDir . DIRECTORY_SEPARATOR . $dumpRel, "SET NAMES utf8mb4;\nCREATE TABLE t(id INT);\n");
+    restore_admin_test_write_zip($pkgDir . DIRECTORY_SEPARATOR . $uploadsRel, ['a.txt' => 'hello']);
+    $dumpSha = hash_file('sha256', $pkgDir . DIRECTORY_SEPARATOR . $dumpRel) ?: '';
+    $uploadsSha = hash_file('sha256', $pkgDir . DIRECTORY_SEPARATOR . $uploadsRel) ?: '';
+    $manifest = array_merge([
+        'package_type' => 'full_disaster',
+        'package_version' => '1.0.0',
+        'generated_at' => gmdate('c'),
+        'schema_revision' => 121,
+        'export_backend' => 'php_pdo',
+        'backup_status' => 'success',
+        'dump_file' => $dumpRel,
+        'uploads_file' => $uploadsRel,
+        'dump_sha256' => $dumpSha,
+        'uploads_sha256' => $uploadsSha,
+        'dump_size_bytes' => (int) filesize($pkgDir . DIRECTORY_SEPARATOR . $dumpRel),
+        'uploads_size_bytes' => (int) filesize($pkgDir . DIRECTORY_SEPARATOR . $uploadsRel),
+        'health_report_file' => 'health.json',
+        'checksums_file' => 'checksums.sha256',
+        'table_count' => 1,
+    ], $manifestExtra);
+    orange_backup_write_json($pkgDir . DIRECTORY_SEPARATOR . 'manifest.json', $manifest);
+    orange_backup_write_json($pkgDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+    $checksumBody = $dumpSha . '  ' . $dumpRel . "\n" . $uploadsSha . '  ' . $uploadsRel . "\n";
+    file_put_contents($pkgDir . DIRECTORY_SEPARATOR . 'checksums.sha256', $checksumBody);
+    orange_backup_write_json(
+        orange_backup_admin_recovery_report_sibling_path($pkgDir, $pkgId),
+        [
+            'overall_result' => 'pass',
+            'recovery_score' => 95,
+            'validated_at' => gmdate('c'),
+            'manifest_valid' => true,
+            'health_valid' => true,
+            'checksums_valid' => true,
+            'sql_valid' => true,
+            'uploads_valid' => true,
+        ]
+    );
+}
+
 $fullPkgId = '2026-07-01_120000';
 $fullPkgDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $fullPkgId;
-mkdir($fullPkgDir, 0775, true);
-orange_backup_write_json($fullPkgDir . DIRECTORY_SEPARATOR . 'manifest.json', [
-    'package_type' => 'full_disaster',
-    'generated_at' => gmdate('c'),
-    'schema_revision' => 121,
-    'export_backend' => 'php_pdo',
-    'backup_status' => 'success',
-]);
-orange_backup_write_json($fullPkgDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
-orange_backup_write_json(
-    orange_backup_admin_recovery_report_sibling_path($fullPkgDir, $fullPkgId),
-    [
-        'overall_result' => 'pass',
-        'recovery_score' => 95,
-        'validated_at' => gmdate('c'),
-        'manifest_valid' => true,
-        'health_valid' => true,
-        'checksums_valid' => true,
-        'sql_valid' => true,
-        'uploads_valid' => true,
-    ]
-);
+restore_admin_test_seed_full_dry_package($fullPkgDir, $fullPkgId);
 
 $countryPkgId = '2026-07-01_130000';
 $countryPkgDir = $backupRoot . DIRECTORY_SEPARATOR . 'country_packages' . DIRECTORY_SEPARATOR . 'kw' . DIRECTORY_SEPARATOR . $countryPkgId;
 mkdir($countryPkgDir, 0775, true);
 orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'manifest.json', [
     'package_type' => 'country_recovery',
+    'package_version' => '1.0.0',
     'generated_at' => gmdate('c'),
     'schema_revision' => 121,
     'registry_version' => '1.0',
+    'country_id' => 1,
     'backup_status' => 'success',
 ]);
 orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+mkdir($countryPkgDir . DIRECTORY_SEPARATOR . 'sql', 0775, true);
+mkdir($countryPkgDir . DIRECTORY_SEPARATOR . 'files', 0775, true);
+file_put_contents($countryPkgDir . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR . 'countries.sql', "INSERT INTO countries VALUES (1);\n");
+restore_admin_test_write_zip($countryPkgDir . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip', ['x.txt' => 'x']);
+orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'dependency_graph.json', ['tables' => ['countries']]);
+orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'table_inventory.json', ['tables' => ['countries' => 1]]);
+orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'id_snapshot.json', ['country_id' => 1, 'tables' => []]);
 orange_backup_write_json(
     orange_backup_admin_recovery_report_sibling_path($countryPkgDir, $countryPkgId),
     [
@@ -801,6 +887,7 @@ restore_admin_self_test(!preg_match('/<button[^>]*>[^<]*موافقة/u', $pageSo
 restore_admin_self_test(stripos($pageSource, '>Rollback<') === false && stripos($pageSource, 'restore_full_rollback.php') === false, 'ui: no Rollback action control');
 restore_admin_self_test(!str_contains($pageSource, 'restore_admin.php'), 'ui: page does not load restore_admin.php at render');
 restore_admin_self_test(str_contains($pageSource, 'rc-create-job') && str_contains($pageSource, 'rc-fw-cancel'), 'ui: framework create/cancel controls present');
+restore_admin_self_test(str_contains($pageSource, 'Run Dry Validation') && str_contains($pageSource, 'View Dry Report'), 'ui: dry validation controls present');
 restore_admin_self_test(!str_contains($pageSource, 'Execute'), 'ui: no Execute button');
 
 $createApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'create.php');
@@ -932,8 +1019,169 @@ $activeAfterCancel = orange_restore_fw_find_active_job($workRoot);
 restore_admin_self_test($activeAfterCancel === null, 'framework: no single active job after cancel/completed');
 
 $fwLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_job_framework.php');
-restore_admin_self_test(!str_contains($fwLib, 'mysqli_query') && !str_contains($fwLib, 'ZipArchive'), 'framework: no SQL/archive execution');
+restore_admin_self_test(!str_contains($fwLib, 'mysqli_query'), 'framework: no SQL execution');
 restore_admin_self_test(!str_contains($fwLib, 'restoring'), 'framework: no restoring status');
+
+$dryApiSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'dry-run.php');
+restore_admin_self_test(str_contains($dryApiSource, 'restore_admin_api_require_csrf'), 'api: dry-run requires CSRF');
+restore_admin_self_test(!str_contains(strtolower($dryApiSource), 'orchestrator'), 'api: dry-run has no orchestrator');
+
+// --- Dry run engine cases ---
+$dryOkJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$dryOk = orange_restore_dry_run_execute($workRoot, (string) $dryOkJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+restore_admin_self_test(($dryOk['job']['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_DRY_COMPLETED, 'dry-run: successful dry run completes');
+restore_admin_self_test(($dryOk['report']['overall_result'] ?? '') === 'PASS', 'dry-run: successful overall PASS');
+restore_admin_self_test(($dryOk['report']['execution_performed'] ?? true) === false, 'dry-run: execution_performed false');
+restore_admin_self_test(is_file(orange_restore_dry_run_report_path($workRoot, (string) $dryOkJob['job_id'])), 'dry-run: report file written');
+restore_admin_self_test(($dryOk['job']['progress'] ?? 0) === 100, 'dry-run: progress reaches 100');
+
+$missingPkgId = '2099-01-01_000001';
+$missingJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $missingPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$missingDry = orange_restore_dry_run_execute($workRoot, (string) $missingJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+restore_admin_self_test(($missingDry['job']['status'] ?? '') === ORANGE_RESTORE_FW_STATUS_DRY_FAILED, 'dry-run: missing package => dry_failed');
+restore_admin_self_test(($missingDry['report']['overall_result'] ?? '') === 'FAIL', 'dry-run: missing package overall FAIL');
+
+$corruptId = '2026-07-01_050000';
+$corruptDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $corruptId;
+mkdir($corruptDir, 0775, true);
+file_put_contents($corruptDir . DIRECTORY_SEPARATOR . 'manifest.json', '{not-json');
+orange_backup_write_json($corruptDir . DIRECTORY_SEPARATOR . 'health.json', ['package_status' => 'healthy']);
+$corruptJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $corruptId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$corruptDry = orange_restore_dry_run_execute($workRoot, (string) $corruptJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+restore_admin_self_test(($corruptDry['report']['overall_result'] ?? '') === 'FAIL', 'dry-run: corrupt manifest => FAIL');
+
+$drvFailJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullFailedDrvId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$drvFailDry = orange_restore_dry_run_execute($workRoot, (string) $drvFailJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+restore_admin_self_test(($drvFailDry['report']['overall_result'] ?? '') === 'FAIL', 'dry-run: DRV fail => FAIL');
+
+$schemaMismatchId = '2026-07-01_049000';
+$schemaMismatchDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $schemaMismatchId;
+restore_admin_test_seed_full_dry_package($schemaMismatchDir, $schemaMismatchId, ['schema_revision' => 99]);
+$schemaJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $schemaMismatchId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$schemaDry = orange_restore_dry_run_execute($workRoot, (string) $schemaJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+$schemaCheck = array_values(array_filter($schemaDry['report']['checks'] ?? [], static fn ($c) => ($c['id'] ?? '') === 'schema'));
+restore_admin_self_test(($schemaCheck[0]['result'] ?? '') === 'fail', 'dry-run: schema mismatch detected');
+
+$backendMismatchId = '2026-07-01_048000';
+$backendMismatchDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $backendMismatchId;
+restore_admin_test_seed_full_dry_package($backendMismatchDir, $backendMismatchId, ['export_backend' => 'mysqldump']);
+$backendJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $backendMismatchId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$backendDry = orange_restore_dry_run_execute($workRoot, (string) $backendJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+$backendCheck = array_values(array_filter($backendDry['report']['checks'] ?? [], static fn ($c) => ($c['id'] ?? '') === 'backend'));
+restore_admin_self_test(($backendCheck[0]['result'] ?? '') === 'fail', 'dry-run: backend mismatch detected');
+
+$registryJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $countryBadRegistryId,
+    'package_type' => 'country_recovery',
+    'country_code' => 'KW',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$registryDry = orange_restore_dry_run_execute($workRoot, (string) $registryJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+$registryCheck = array_values(array_filter($registryDry['report']['checks'] ?? [], static fn ($c) => ($c['id'] ?? '') === 'registry'));
+restore_admin_self_test(($registryCheck[0]['result'] ?? '') === 'fail', 'dry-run: registry mismatch detected');
+
+$lowDiskJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $fullPkgId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$lowDiskDry = orange_restore_dry_run_execute($workRoot, (string) $lowDiskJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+    'disk_free_bytes_override' => 1024,
+]);
+$diskCheck = array_values(array_filter($lowDiskDry['report']['checks'] ?? [], static fn ($c) => ($c['id'] ?? '') === 'free_disk_space'));
+restore_admin_self_test(($diskCheck[0]['result'] ?? '') === 'fail', 'dry-run: low disk detected');
+
+$noUploadsId = '2026-07-01_047000';
+$noUploadsDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $noUploadsId;
+restore_admin_test_seed_full_dry_package($noUploadsDir, $noUploadsId);
+@unlink($noUploadsDir . DIRECTORY_SEPARATOR . 'uploads.zip');
+$noUploadsJob = orange_restore_fw_create($workRoot, [
+    'package_id' => $noUploadsId,
+    'package_type' => 'full_disaster',
+    'created_by' => 'superadmin',
+    'created_by_admin_id' => 1,
+]);
+$noUploadsDry = orange_restore_dry_run_execute($workRoot, (string) $noUploadsJob['job_id'], [
+    'backup_root' => $backupRoot,
+    'operator_username' => 'superadmin',
+]);
+restore_admin_self_test(($noUploadsDry['report']['overall_result'] ?? '') === 'FAIL', 'dry-run: missing uploads => FAIL');
+
+$dryPermDenied = false;
+try {
+    orange_restore_admin_fw_dry_run(
+        $backupRoot,
+        $workRoot,
+        $noPermAdmin,
+        $noPermPdo,
+        '',
+        'full_disaster',
+        $fullPkgId,
+        ''
+    );
+} catch (Throwable $e) {
+    $dryPermDenied = str_contains($e->getMessage(), 'permission');
+}
+restore_admin_self_test($dryPermDenied, 'dry-run: permission failure enforced');
+
+$dryLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_dry_run.php');
+restore_admin_self_test(!str_contains($dryLib, 'mysqli_query') && !str_contains($dryLib, '->query('), 'dry-run: no SQL execution');
+restore_admin_self_test(!str_contains($dryLib, 'extractTo') && !str_contains($dryLib, 'ZipArchive::EXTRACT'), 'dry-run: no archive extraction');
 
 $restoreAdminLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_admin.php');
 restore_admin_self_test(!str_contains($restoreAdminLib, 'function orange_restore_orchestrator_approve'), 'lib: restore_admin does not define mutating orchestrator wrappers');

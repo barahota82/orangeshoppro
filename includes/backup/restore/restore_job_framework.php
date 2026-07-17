@@ -17,11 +17,14 @@ const ORANGE_RESTORE_FW_DIRNAME = 'framework';
 const ORANGE_RESTORE_FW_JOB_FILE = 'job.json';
 const ORANGE_RESTORE_FW_AUDIT_FILE = 'audit.jsonl';
 const ORANGE_RESTORE_FW_LOCK_FILE = '.restore_framework.lock';
-const ORANGE_RESTORE_FW_VERSION = '3B.2A-framework';
+const ORANGE_RESTORE_FW_VERSION = '3B.2B-framework';
 
 const ORANGE_RESTORE_FW_STATUS_QUEUED = 'queued';
 const ORANGE_RESTORE_FW_STATUS_PREPARING = 'preparing';
 const ORANGE_RESTORE_FW_STATUS_WAITING_CONFIRMATION = 'waiting_confirmation';
+const ORANGE_RESTORE_FW_STATUS_DRY_RUNNING = 'dry_running';
+const ORANGE_RESTORE_FW_STATUS_DRY_COMPLETED = 'dry_completed';
+const ORANGE_RESTORE_FW_STATUS_DRY_FAILED = 'dry_failed';
 const ORANGE_RESTORE_FW_STATUS_CANCELLED = 'cancelled';
 const ORANGE_RESTORE_FW_STATUS_FAILED = 'failed';
 const ORANGE_RESTORE_FW_STATUS_COMPLETED = 'completed';
@@ -29,6 +32,9 @@ const ORANGE_RESTORE_FW_STATUS_COMPLETED = 'completed';
 const ORANGE_RESTORE_FW_PHASE_QUEUED = 'queued';
 const ORANGE_RESTORE_FW_PHASE_PREPARING = 'preparing';
 const ORANGE_RESTORE_FW_PHASE_WAITING_CONFIRMATION = 'waiting_confirmation';
+const ORANGE_RESTORE_FW_PHASE_DRY_RUNNING = 'dry_running';
+const ORANGE_RESTORE_FW_PHASE_DRY_COMPLETED = 'dry_completed';
+const ORANGE_RESTORE_FW_PHASE_DRY_FAILED = 'dry_failed';
 const ORANGE_RESTORE_FW_PHASE_CANCELLED = 'cancelled';
 const ORANGE_RESTORE_FW_PHASE_FAILED = 'failed';
 const ORANGE_RESTORE_FW_PHASE_COMPLETED = 'completed';
@@ -42,6 +48,7 @@ function orange_restore_fw_active_statuses(): array
         ORANGE_RESTORE_FW_STATUS_QUEUED,
         ORANGE_RESTORE_FW_STATUS_PREPARING,
         ORANGE_RESTORE_FW_STATUS_WAITING_CONFIRMATION,
+        ORANGE_RESTORE_FW_STATUS_DRY_RUNNING,
     ];
 }
 
@@ -50,7 +57,11 @@ function orange_restore_fw_active_statuses(): array
  */
 function orange_restore_fw_cancellable_statuses(): array
 {
-    return orange_restore_fw_active_statuses();
+    return [
+        ORANGE_RESTORE_FW_STATUS_QUEUED,
+        ORANGE_RESTORE_FW_STATUS_PREPARING,
+        ORANGE_RESTORE_FW_STATUS_WAITING_CONFIRMATION,
+    ];
 }
 
 /**
@@ -62,6 +73,9 @@ function orange_restore_fw_allowed_statuses(): array
         ORANGE_RESTORE_FW_STATUS_QUEUED,
         ORANGE_RESTORE_FW_STATUS_PREPARING,
         ORANGE_RESTORE_FW_STATUS_WAITING_CONFIRMATION,
+        ORANGE_RESTORE_FW_STATUS_DRY_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_DRY_COMPLETED,
+        ORANGE_RESTORE_FW_STATUS_DRY_FAILED,
         ORANGE_RESTORE_FW_STATUS_CANCELLED,
         ORANGE_RESTORE_FW_STATUS_FAILED,
         ORANGE_RESTORE_FW_STATUS_COMPLETED,
@@ -339,6 +353,8 @@ function orange_restore_fw_find_active_job(string $workRoot): ?array
  */
 function orange_restore_fw_public_row(array $job): array
 {
+    $status = (string) ($job['status'] ?? '');
+
     return [
         'job_id' => (string) ($job['job_id'] ?? ''),
         'package_id' => (string) ($job['package_id'] ?? ''),
@@ -350,14 +366,37 @@ function orange_restore_fw_public_row(array $job): array
         'created_by_admin_id' => (int) ($job['created_by_admin_id'] ?? 0),
         'created_at' => (string) ($job['created_at'] ?? ''),
         'updated_at' => (string) ($job['updated_at'] ?? ''),
-        'status' => (string) ($job['status'] ?? ''),
+        'status' => $status,
         'phase' => (string) ($job['phase'] ?? ''),
         'progress' => (int) ($job['progress'] ?? 0),
         'message' => (string) ($job['message'] ?? ''),
-        'cancellable' => in_array((string) ($job['status'] ?? ''), orange_restore_fw_cancellable_statuses(), true),
+        'cancellable' => in_array($status, orange_restore_fw_cancellable_statuses(), true),
+        'dry_run_available' => in_array($status, [
+            ORANGE_RESTORE_FW_STATUS_WAITING_CONFIRMATION,
+            ORANGE_RESTORE_FW_STATUS_DRY_COMPLETED,
+            ORANGE_RESTORE_FW_STATUS_DRY_FAILED,
+        ], true),
+        'has_dry_run_report' => in_array($status, [
+            ORANGE_RESTORE_FW_STATUS_DRY_COMPLETED,
+            ORANGE_RESTORE_FW_STATUS_DRY_FAILED,
+        ], true) || !empty($job['dry_run_report_file']),
+        'dry_run_overall_result' => (string) ($job['dry_run_overall_result'] ?? ''),
         'framework_version' => (string) ($job['framework_version'] ?? ORANGE_RESTORE_FW_VERSION),
         'execution_enabled' => false,
     ];
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_fw_set_progress(string $workRoot, string $jobId, int $progress, string $message): array
+{
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $job['progress'] = max(0, min(100, $progress));
+    $job['message'] = $message;
+    orange_restore_fw_write($workRoot, $job);
+
+    return $job;
 }
 
 /**

@@ -9,6 +9,7 @@ require_once __DIR__ . '/restore/restore_lock.php';
 require_once __DIR__ . '/restore/restore_merge_maintenance.php';
 require_once __DIR__ . '/restore/restore_validation_adapter.php';
 require_once __DIR__ . '/restore/restore_job_framework.php';
+require_once __DIR__ . '/restore/restore_dry_run.php';
 
 const ORANGE_RESTORE_ADMIN_JOB_ID_PATTERN = '/^[a-zA-Z0-9._-]+$/';
 
@@ -882,6 +883,82 @@ function orange_restore_admin_fw_cancel_job(
     $cancelled = orange_restore_fw_cancel($workRoot, $jobId, $username !== '' ? $username : 'admin');
 
     return orange_restore_fw_public_row($cancelled);
+}
+
+/**
+ * @param array<string, mixed> $options
+ * @return array{job:array<string,mixed>,report:array<string,mixed>}
+ */
+function orange_restore_admin_fw_dry_run(
+    string $backupRoot,
+    string $workRoot,
+    array $admin,
+    PDO $pdo,
+    string $jobId = '',
+    string $packageType = '',
+    string $packageId = '',
+    string $countryCode = '',
+    array $options = []
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+
+    if ($jobId === '') {
+        if ($packageType === '' || $packageId === '') {
+            throw new RuntimeException('job_id or package_type+package_id required.');
+        }
+        $created = orange_restore_admin_fw_create_job(
+            $backupRoot,
+            $workRoot,
+            $admin,
+            $pdo,
+            $packageType,
+            $packageId,
+            $countryCode
+        );
+        $jobId = (string) ($created['job_id'] ?? '');
+    }
+
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    orange_restore_admin_assert_package_type_permission($admin, $pdo, $type);
+
+    $username = trim((string) ($admin['username'] ?? $admin['display_name'] ?? 'admin'));
+    $context = [
+        'backup_root' => $backupRoot,
+        'operator_username' => $username !== '' ? $username : 'admin',
+    ];
+    if (array_key_exists('disk_free_bytes_override', $options)) {
+        $context['disk_free_bytes_override'] = $options['disk_free_bytes_override'];
+    }
+
+    return orange_restore_dry_run_execute($workRoot, $jobId, $context);
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_dry_report(
+    string $workRoot,
+    bool $mayFull,
+    bool $mayCountry,
+    string $jobId
+): array {
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    if ($type === 'full_disaster' && !$mayFull) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+    if ($type === 'country_recovery' && !$mayCountry) {
+        throw new RuntimeException('Operator lacks backup_restore_country permission.');
+    }
+    $report = orange_restore_dry_run_read_report($workRoot, $jobId);
+    if ($report === null) {
+        throw new RuntimeException('Dry run report not found.');
+    }
+
+    return $report;
 }
 
 function orange_restore_admin_safe_message(Throwable $e): string
