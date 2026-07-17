@@ -15,6 +15,7 @@ require_once __DIR__ . '/restore/restore_version_lock.php';
 require_once __DIR__ . '/restore/restore_maintenance_framework.php';
 require_once __DIR__ . '/restore/restore_final_approval.php';
 require_once __DIR__ . '/restore/restore_execution_bridge.php';
+require_once __DIR__ . '/restore/restore_pre_restore_backup.php';
 
 const ORANGE_RESTORE_ADMIN_JOB_ID_PATTERN = '/^[a-zA-Z0-9._-]+$/';
 
@@ -1110,6 +1111,79 @@ function orange_restore_admin_fw_maintenance_status(string $workRoot): array
 }
 
 /**
+ * Request pre-restore Full backup preparation (metadata only; CLI runs the engine).
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_request_pre_restore_backup(
+    string $backupRoot,
+    string $workRoot,
+    array $admin,
+    PDO $pdo,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    orange_restore_admin_assert_package_type_permission($admin, $pdo, $type);
+    if ($type !== 'full_disaster') {
+        throw new RuntimeException('country_production_restore_not_enabled');
+    }
+    if (!orange_restore_admin_may_view_full($admin, $pdo)) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+
+    return orange_restore_pre_backup_request($workRoot, $jobId, $backupRoot, $admin);
+}
+
+/**
+ * Read-only pre-restore backup status/record.
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_admin_fw_pre_restore_backup(
+    string $workRoot,
+    bool $mayFull,
+    bool $mayCountry,
+    string $jobId
+): array {
+    if ($workRoot === '') {
+        throw new RuntimeException('Restore work root unavailable.');
+    }
+    orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $type = (string) ($job['package_type'] ?? '');
+    if ($type === 'full_disaster' && !$mayFull) {
+        throw new RuntimeException('Operator lacks backup_restore_full permission.');
+    }
+    if ($type === 'country_recovery' && !$mayCountry) {
+        throw new RuntimeException('Operator lacks backup_restore_country permission.');
+    }
+
+    $status = (string) ($job['status'] ?? '');
+    $record = orange_restore_pre_backup_load_record($workRoot, $jobId);
+    $labels = [
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING => 'بانتظار تشغيل عامل CLI',
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_RUNNING => 'جارٍ إنشاء النسخة الاحتياطية',
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_VERIFYING => 'جارٍ التحقق',
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY => 'النسخة الاحتياطية جاهزة وآمنة للرجوع',
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED => 'فشل إعداد النسخة الاحتياطية',
+        ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION => 'بانتظار طلب إعداد النسخة الاحتياطية',
+    ];
+
+    return [
+        'job' => orange_restore_fw_public_row($job),
+        'record' => $record !== null ? orange_restore_pre_backup_public_record($record) : null,
+        'status_label_ar' => $labels[$status] ?? '',
+        'execution_started' => false,
+        'read_only' => true,
+    ];
+}
+
+/**
  * Read-only execution contract for an approved framework job.
  *
  * @return array<string, mixed>
@@ -1205,6 +1279,18 @@ function orange_restore_admin_safe_message(Throwable $e): string
         'execution_started_forbidden',
         'final_approval_missing',
         'final_approval_invalid',
+        'pre_restore_backup_lock_active',
+        'rollback_anchor_already_exists',
+        'backup_engine_failed',
+        'verify_failed',
+        'drv_failed',
+        'health_unacceptable',
+        'package_unreadable',
+        'retention_pin_failed',
+        'cli_only',
+        'backup_package_id_invalid',
+        'package_fingerprint_unstable',
+        'package_already_pinned_for_other_job',
     ];
     if (in_array($msg, $passthrough, true)) {
         return $msg;

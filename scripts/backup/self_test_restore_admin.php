@@ -922,6 +922,11 @@ restore_admin_self_test(str_contains($pageSource, 'إعداد خطة الاست�
 restore_admin_self_test(str_contains($pageSource, 'بانتظار الموافقة النهائية') && str_contains($pageSource, 'لم يتم تنفيذ أي استرداد حتى الآن'), 'ui: awaiting final approval warning present');
 restore_admin_self_test(str_contains($pageSource, 'حالة وضع الصيانة') && str_contains($pageSource, 'الموافقة النهائية'), 'ui: maintenance section and final approval control present');
 restore_admin_self_test(str_contains($pageSource, 'View Execution Contract') && str_contains($pageSource, 'rc-exec-contract'), 'ui: View Execution Contract control present');
+restore_admin_self_test(
+    str_contains($pageSource, 'إعداد النسخة الاحتياطية الإلزامية قبل الاسترداد')
+    && str_contains($pageSource, 'لن يبدأ الاسترداد قبل إنشاء نسخة Full احتياطية موثقة ومثبتة ضد الحذف'),
+    'ui: pre-restore backup controls and warning present'
+);
 restore_admin_self_test(!str_contains($pageSource, 'Execute Restore') && !preg_match('/\\bResume\\b/', $pageSource), 'ui: no Execute/Resume restore controls');
 restore_admin_self_test(str_contains($pageSource, 'تم اعتماد الخطة، لكن لم يبدأ الاسترداد ولم يتم تفعيل وضع الصيانة'), 'ui: approved-waiting message present');
 restore_admin_self_test(!str_contains($pageSource, 'Execute Restore') && !str_contains($pageSource, 'بدء الاسترداد') && !str_contains($pageSource, 'Start Worker') && !str_contains($pageSource, 'Enable Maintenance'), 'ui: no Execute/Enable Maintenance/Start Worker');
@@ -2266,6 +2271,23 @@ restore_admin_self_test(!str_contains($maintLib, 'extractTo') && !str_contains($
 restore_admin_self_test(!is_dir($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'execute.php'), 'regression: no execute endpoint file');
 restore_admin_self_test(!is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'run.php'), 'regression: no run endpoint file');
 restore_admin_self_test(!is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'resume.php'), 'regression: no resume endpoint file');
+restore_admin_self_test(!is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'unpin.php'), 'regression: no unpin endpoint');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore_prepare_backup.php'), 'pre-backup: CLI entry present');
+restore_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-pre-restore-backup.php'), 'pre-backup: request API present');
+$preBackupLib = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_pre_restore_backup.php');
+restore_admin_self_test(
+    str_contains($preBackupLib, 'orange_backup_run_full')
+    && str_contains($preBackupLib, 'orange_backup_verify_full_package')
+    && str_contains($preBackupLib, 'orange_recovery_validate_package')
+    && str_contains($preBackupLib, 'orange_backup_retention_pin_package')
+    && !str_contains($preBackupLib, 'orange_restore_full_staging_run('),
+    'pre-backup: reuses Full/Verify/DRV/pin without staging restore'
+);
+$reqApi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'job' . DIRECTORY_SEPARATOR . 'request-pre-restore-backup.php');
+restore_admin_self_test(
+    !str_contains($reqApi, 'orange_restore_pre_backup_run_cli') && !str_contains($reqApi, 'orange_backup_run_full'),
+    'pre-backup: HTTP request does not run backup engine'
+);
 
     restore_admin_test_run_cleanup();
     restore_admin_test_emit_summary();

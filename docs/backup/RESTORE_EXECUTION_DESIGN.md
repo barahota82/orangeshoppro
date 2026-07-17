@@ -550,13 +550,16 @@ Fail → rollback_preparing.
 - **UI:** View Execution Contract (no Execute / Run / Resume)  
 - **Tests:** contract generation + mismatch rejection in `self_test_restore_admin.php`  
 
-### 3B.3B2b — Mandatory pre-restore backup + verification (design sequence; after bridge)
+### 3B.3B3 — Mandatory Pre-Restore Backup Gate (owner scope; rollback anchor only)
 
-- **Code:** wire `orange_restore_fresh_backup_gate`; retention pin  
-- **Effects:** creates Full backup package only  
-- **Tests:** fail closed on verify/DRV; pin survives retention  
-- **Prod gate:** drill on staging server  
-- **Rollback:** delete failed snapshot; unpin  
+- **Code:** `includes/backup/restore/restore_pre_restore_backup.php`; CLI `scripts/backup/restore_prepare_backup.php --job=`; retention pins in `backup_retention.php`; APIs request + GET status  
+- **Reuses:** `orange_backup_run_full`, `orange_backup_verify_full_package`, `orange_recovery_validate_package` (score ≥ 70), `orange_backup_retention_pin_package`  
+- **Effects:** Full rollback anchor + pin only; stops at `pre_restore_backup_ready`; `execution_started=false`  
+- **Must not:** restore DB/files, shadow cutover, maintenance enable, restore worker, contract execution, unpin API  
+- **Tests:** `self_test_pre_restore_backup.php` + expansions in `self_test_restore_admin.php`  
+
+### 3B.3B2b — (superseded naming) see 3B.3B3 above  
+
 
 ### 3B.3B3 — Database restore engine in isolated staging
 

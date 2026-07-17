@@ -202,13 +202,18 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     const badge = (status) => {
         const s = String(status || '').toLowerCase();
         let cls = 'rc-badge--muted';
-        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed' || s === 'approved_waiting_execution') cls = 'rc-badge--success';
-        else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval' || s === 'waiting_confirmation' || s === 'execution_plan_ready') cls = 'rc-badge--warning';
-        else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible' || s === 'dry_failed' || s === 'execution_failed' || s === 'execution_cancelled' || s === 'cancelled') cls = 'rc-badge--failed';
-        else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge') || s === 'execution_precheck' || s === 'dry_running') cls = 'rc-badge--running';
+        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed' || s === 'approved_waiting_execution' || s === 'pre_restore_backup_ready') cls = 'rc-badge--success';
+        else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval' || s === 'waiting_confirmation' || s === 'execution_plan_ready' || s === 'pre_restore_backup_pending') cls = 'rc-badge--warning';
+        else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible' || s === 'dry_failed' || s === 'execution_failed' || s === 'execution_cancelled' || s === 'cancelled' || s === 'pre_restore_backup_failed') cls = 'rc-badge--failed';
+        else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge') || s === 'execution_precheck' || s === 'dry_running' || s === 'pre_restore_backup_running' || s === 'pre_restore_backup_verifying') cls = 'rc-badge--running';
         let label = status || '—';
         if (s === 'awaiting_final_approval') label = 'بانتظار الموافقة النهائية';
         if (s === 'approved_waiting_execution') label = 'معتمدة — بانتظار التنفيذ';
+        if (s === 'pre_restore_backup_pending') label = 'بانتظار تشغيل عامل CLI';
+        if (s === 'pre_restore_backup_running') label = 'جارٍ إنشاء النسخة الاحتياطية';
+        if (s === 'pre_restore_backup_verifying') label = 'جارٍ التحقق';
+        if (s === 'pre_restore_backup_ready') label = 'النسخة الاحتياطية جاهزة وآمنة للرجوع';
+        if (s === 'pre_restore_backup_failed') label = 'فشل إعداد النسخة الاحتياطية';
         return '<span class="rc-badge ' + cls + '">' + label + '</span>';
     };
     const eligibilityBadge = (pkg) => {
@@ -370,6 +375,12 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         }
         if (job.has_execution_contract) {
             html += '<button type="button" class="btn-link rc-exec-contract" data-id="' + id + '">View Execution Contract</button> ';
+        }
+        if (job.pre_restore_backup_requestable) {
+            html += '<button type="button" class="btn-link rc-pre-backup-req" data-id="' + id + '">إعداد النسخة الاحتياطية الإلزامية قبل الاسترداد</button> ';
+        }
+        if (job.has_pre_restore_backup) {
+            html += '<button type="button" class="btn-link rc-pre-backup-view" data-id="' + id + '">عرض حالة النسخة الاحتياطية</button> ';
         }
         if (job.execution_plan_cancellable) {
             html += '<button type="button" class="btn-link rc-cancel-exec" data-id="' + id + '">إلغاء الخطة</button> ';
@@ -628,6 +639,53 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
                         warning: j.warning || ''
                     }, null, 2)
                 );
+            } catch (e) {
+                showAlert(e.message || 'تعذر العرض', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-pre-backup-req')) {
+            try {
+                setBusy(true, 'جاري طلب إعداد النسخة الاحتياطية…');
+                const j = await apiPost('job/request-pre-restore-backup.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || ''
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert(
+                    (j.message || 'تم الطلب') + (j.cli_needed ? ' — يلزم تشغيل عامل CLI.' : ''),
+                    true
+                );
+                if (j.record) {
+                    openView('النسخة الاحتياطية قبل الاسترداد — ' + (t.dataset.id || ''), JSON.stringify({
+                        record: j.record,
+                        cli_needed: !!j.cli_needed,
+                        execution_started: false,
+                        warning: j.warning || 'لن يبدأ الاسترداد قبل إنشاء نسخة Full احتياطية موثقة ومثبتة ضد الحذف.'
+                    }, null, 2));
+                }
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر الطلب', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-pre-backup-view')) {
+            try {
+                setBusy(true, 'جاري التحميل…');
+                const j = await apiGet('job/pre-restore-backup.php?id=' + encodeURIComponent(t.dataset.id || ''));
+                openView('النسخة الاحتياطية قبل الاسترداد — ' + (t.dataset.id || ''), JSON.stringify({
+                    status_label_ar: j.status_label_ar || '',
+                    record: j.record || {},
+                    execution_started: false,
+                    warning: j.warning || 'لن يبدأ الاسترداد قبل إنشاء نسخة Full احتياطية موثقة ومثبتة ضد الحذف.'
+                }, null, 2));
             } catch (e) {
                 showAlert(e.message || 'تعذر العرض', false);
             } finally {

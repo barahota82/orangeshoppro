@@ -9,10 +9,160 @@ const ORANGE_BACKUP_RETENTION_ENV_DAYS = 'ORANGE_BACKUP_RETENTION_DAYS';
 const ORANGE_BACKUP_RETENTION_DEFAULT_DAYS = 30;
 const ORANGE_BACKUP_RETENTION_FAMILY_FULL = 'full_disaster';
 const ORANGE_BACKUP_RETENTION_FAMILY_CRP = 'country_recovery';
+const ORANGE_BACKUP_RETENTION_PIN_REASON_PRE_RESTORE = 'pre_restore_rollback_anchor';
+const ORANGE_BACKUP_RETENTION_PIN_STORE_RELATIVE = 'locks' . DIRECTORY_SEPARATOR . 'retention_pins.json';
 
 function orange_backup_retention_days(array $env): int
 {
     return max(1, (int) ($env[ORANGE_BACKUP_RETENTION_ENV_DAYS] ?? ORANGE_BACKUP_RETENTION_DEFAULT_DAYS));
+}
+
+function orange_backup_retention_pin_store_path(string $backupRoot): string
+{
+    return orange_backup_path_inside_root($backupRoot, ORANGE_BACKUP_RETENTION_PIN_STORE_RELATIVE);
+}
+
+/**
+ * @return array{version:string,pins:array<string,array<string,mixed>>}
+ */
+function orange_backup_retention_pin_store_read(string $backupRoot): array
+{
+    $path = orange_backup_retention_pin_store_path($backupRoot);
+    if (!is_file($path)) {
+        return ['version' => '1', 'pins' => []];
+    }
+    $raw = file_get_contents($path);
+    $decoded = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($decoded)) {
+        return ['version' => '1', 'pins' => []];
+    }
+    $pins = is_array($decoded['pins'] ?? null) ? $decoded['pins'] : [];
+
+    return [
+        'version' => (string) ($decoded['version'] ?? '1'),
+        'pins' => $pins,
+    ];
+}
+
+/**
+ * @param array{version?:string,pins:array<string,array<string,mixed>>} $store
+ */
+function orange_backup_retention_pin_store_write(string $backupRoot, array $store): void
+{
+    $path = orange_backup_retention_pin_store_path($backupRoot);
+    $dir = dirname($path);
+    if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+        throw new RuntimeException('Cannot create retention pin store directory.');
+    }
+    $payload = [
+        'version' => (string) ($store['version'] ?? '1'),
+        'pins' => is_array($store['pins'] ?? null) ? $store['pins'] : [],
+        'updated_at' => gmdate('c'),
+    ];
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    if ($json === false || file_put_contents($path, $json . "\n", LOCK_EX) === false) {
+        throw new RuntimeException('Cannot persist retention pin store.');
+    }
+}
+
+function orange_backup_retention_is_pinned(string $backupRoot, string $packageId): bool
+{
+    if ($packageId === '' || !preg_match('/^\d{4}-\d{2}-\d{2}_\d{6}$/', $packageId)) {
+        return false;
+    }
+    $store = orange_backup_retention_pin_store_read($backupRoot);
+
+    return isset($store['pins'][$packageId]) && is_array($store['pins'][$packageId]);
+}
+
+/**
+ * Idempotent pin. Does not unpin. Private metadata only (no absolute paths).
+ *
+ * @param array{
+ *   framework_job_id:string,
+ *   reason?:string,
+ *   source_package_id?:string,
+ *   created_by?:string,
+ *   purpose?:string,
+ *   identity_tag?:string
+ * } $meta
+ * @return array{pin_id:string,package_id:string,created:bool,pin:array<string,mixed>}
+ */
+function orange_backup_retention_pin_package(string $backupRoot, string $packageId, array $meta): array
+{
+    if ($packageId === '' || !preg_match('/^\d{4}-\d{2}-\d{2}_\d{6}$/', $packageId)) {
+        throw new RuntimeException('Invalid package id for retention pin.');
+    }
+    $jobId = trim((string) ($meta['framework_job_id'] ?? ''));
+    if ($jobId === '' || !preg_match('/^[a-zA-Z0-9._-]+$/', $jobId)) {
+        throw new RuntimeException('Invalid framework_job_id for retention pin.');
+    }
+    $reason = trim((string) ($meta['reason'] ?? ORANGE_BACKUP_RETENTION_PIN_REASON_PRE_RESTORE));
+    if ($reason !== ORANGE_BACKUP_RETENTION_PIN_REASON_PRE_RESTORE) {
+        throw new RuntimeException('Unsupported retention pin reason.');
+    }
+
+    $store = orange_backup_retention_pin_store_read($backupRoot);
+    if (isset($store['pins'][$packageId]) && is_array($store['pins'][$packageId])) {
+        $existing = $store['pins'][$packageId];
+        if ((string) ($existing['framework_job_id'] ?? '') === $jobId
+            && (string) ($existing['reason'] ?? '') === $reason) {
+            return [
+                'pin_id' => (string) ($existing['pin_id'] ?? ''),
+                'package_id' => $packageId,
+                'created' => false,
+                'pin' => $existing,
+            ];
+        }
+        throw new RuntimeException('package_already_pinned_for_other_job');
+    }
+
+    $pinId = 'pin_' . substr(hash('sha256', $packageId . '|' . $jobId . '|' . $reason), 0, 24);
+    $pin = [
+        'pin_id' => $pinId,
+        'package_id' => $packageId,
+        'package_type' => 'full_disaster',
+        'framework_job_id' => $jobId,
+        'reason' => $reason,
+        'purpose' => (string) ($meta['purpose'] ?? ORANGE_BACKUP_RETENTION_PIN_REASON_PRE_RESTORE),
+        'source_package_id' => (string) ($meta['source_package_id'] ?? ''),
+        'created_by' => (string) ($meta['created_by'] ?? ''),
+        'identity_tag' => (string) ($meta['identity_tag'] ?? ''),
+        'created_at' => gmdate('c'),
+    ];
+    $store['pins'][$packageId] = $pin;
+    orange_backup_retention_pin_store_write($backupRoot, $store);
+
+    return [
+        'pin_id' => $pinId,
+        'package_id' => $packageId,
+        'created' => true,
+        'pin' => $pin,
+    ];
+}
+
+/**
+ * Public/safe pin summary (no paths).
+ *
+ * @return array<string, mixed>|null
+ */
+function orange_backup_retention_pin_public(string $backupRoot, string $packageId): ?array
+{
+    $store = orange_backup_retention_pin_store_read($backupRoot);
+    $pin = $store['pins'][$packageId] ?? null;
+    if (!is_array($pin)) {
+        return null;
+    }
+
+    return [
+        'pin_id' => (string) ($pin['pin_id'] ?? ''),
+        'package_id' => (string) ($pin['package_id'] ?? $packageId),
+        'framework_job_id' => (string) ($pin['framework_job_id'] ?? ''),
+        'reason' => (string) ($pin['reason'] ?? ''),
+        'purpose' => (string) ($pin['purpose'] ?? ''),
+        'retention_pinned' => true,
+        'created_at' => (string) ($pin['created_at'] ?? ''),
+    ];
 }
 
 function orange_backup_retention_is_temp_dir_name(string $name): bool
@@ -202,6 +352,13 @@ function orange_backup_retention_apply(
     foreach ($allDirs as $dir) {
         $name = $dir['name'];
         $path = $dir['path'];
+
+        // Pins win over age / newest-healthy protection and never expose paths in the kept row.
+        if (orange_backup_retention_is_pinned($backupRoot, $name)) {
+            $kept[] = ['name' => $name, 'reason' => 'skipped_due_to_pin'];
+            $logger('Retention keep name=' . $name . ' reason=skipped_due_to_pin');
+            continue;
+        }
 
         if (isset($protected[$name])) {
             $kept[] = ['name' => $name, 'path' => $path, 'reason' => $protected[$name]];

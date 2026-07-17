@@ -395,7 +395,16 @@ function orange_restore_validate_execution_contract(
     }
 
     $job = orange_restore_fw_read($workRoot, $jobId);
-    if ((string) ($job['status'] ?? '') !== ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION) {
+    $status = (string) ($job['status'] ?? '');
+    $contractValidStatuses = [
+        ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING,
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_VERIFYING,
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY,
+        ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,
+    ];
+    if (!in_array($status, $contractValidStatuses, true)) {
         $reasons[] = 'invalid_status';
     }
     if ((string) ($contract['framework_job_id'] ?? '') !== $jobId) {
