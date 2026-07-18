@@ -12,6 +12,9 @@ require_once __DIR__ . '/../../includes/delivery_areas.php';
 require_once __DIR__ . '/../../includes/storefront_api_errors.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/product_preview.php';
+require_once __DIR__ . '/../../includes/backup/restore/restore_maintenance_enforcement.php';
+
+orange_restore_maint_enforcement_api_mutation_guard('order_create');
 
 try {
     $pdo = db();

@@ -520,10 +520,12 @@ Live cutover is **forbidden** until all boxes are checked:
 - **Scope:** isolated fixtures only; marker `.orange_restore_dr_drill_fixture`; Country remains uncertified  
 - **Must not:** real production wipe/rename/maintenance/.env mutation/live integrations  
 
-### 3B.4H — Route-level maintenance middleware wiring (storefront/admin/cron)
+### 3B.4H — Route-level maintenance middleware wiring (storefront/admin/cron) — DONE (P0-1)
 
-- Wire real request guards using `orange_restore_production_maintenance_decide`  
-- Tests: writes 503; Restore Center emergency paths permissioned  
+- **Code:** `includes/backup/restore/restore_maintenance_enforcement.php` (wiring only; policy remains `orange_restore_production_maintenance_decide`)  
+- **Hooks:** `require_admin_api` / `require_admin_page` in `config.php`; storefront mutation APIs; `order_intake_queue`; `process_order_intake_queue.php`; `orange_backup_run_full`; restore CLI workers issue scoped bypass  
+- **Payments:** callbacks blocked by default (`payment_callback_allowlisted=false`) until owner allowlists in archive  
+- **Tests:** `scripts/backup/self_test_maintenance_enforcement.php`  
 
 ### 3B.4I — Production smoke (post-finalize optional) + cache invalidate
 

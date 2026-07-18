@@ -54,6 +54,10 @@ try {
     }
     orange_restore_admin_assert_fw_job_allowlisted($workRoot, $jobId);
 
+    require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup'
+        . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_maintenance_enforcement.php';
+    orange_restore_maint_enforcement_cli_restore_worker($workRoot, $jobId, 'production_uploads_cutover');
+
     $result = orange_restore_uploads_cutover_run_cli([
         'project_root' => $projectRoot,
         'work_root' => $workRoot,

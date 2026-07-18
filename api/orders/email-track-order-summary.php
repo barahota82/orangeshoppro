@@ -13,6 +13,9 @@ require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/phone_validation.php';
 require_once __DIR__ . '/../../includes/storefront_order_email.php';
 require_once __DIR__ . '/../../includes/orange_mail.php';
+require_once __DIR__ . '/../../includes/backup/restore/restore_maintenance_enforcement.php';
+
+orange_restore_maint_enforcement_api_mutation_guard('application_write_api');
 
 try {
     $pdo = db();

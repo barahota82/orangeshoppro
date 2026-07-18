@@ -10,6 +10,10 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/order_intake_queue.php';
+require_once __DIR__ . '/../includes/backup/restore/restore_maintenance_enforcement.php';
+
+// P0-1: do not drain intake (business mutation) while restore maintenance is active.
+orange_restore_maint_enforcement_cron_guard('scheduled_business_write');
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);

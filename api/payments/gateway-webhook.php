@@ -6,6 +6,13 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/payments/payment_gateway.php';
+require_once __DIR__ . '/../../includes/backup/restore/restore_maintenance_enforcement.php';
+
+// Owner has not allowlisted payment callbacks during maintenance (default: block).
+orange_restore_maint_enforcement_api_mutation_guard('application_write_api', [
+    'is_payment_callback' => true,
+    'payment_callback_allowlisted' => false,
+]);
 
 header('Content-Type: application/json; charset=utf-8');
 

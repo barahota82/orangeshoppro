@@ -534,7 +534,8 @@ function orange_restore_maint_fw_classify_request(string $workRoot, array $reque
 }
 
 /**
- * Production middleware decision helper (policy only — callers wire routes later).
+ * Production middleware decision helper (single policy source).
+ * Callers must wire via restore_maintenance_enforcement.php (3B.4H / P0-1).
  *
  * @param array<string, mixed> $request
  * @return array{allow:bool,action:string,reason_code:string,scope:string,http_status:int,maintenance_active:bool,stale:bool}

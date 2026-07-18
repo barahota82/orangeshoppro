@@ -42,6 +42,9 @@ if ($jobId === '' || $adminId <= 0 || $password === '' || trim($confirmation) ==
 $projectRoot = dirname(__DIR__, 2);
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'config.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_orchestrator.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_maintenance_enforcement.php';
+
+orange_restore_maint_enforcement_cron_guard('application_write_api');
 
 try {
     $result = orange_restore_orchestrator_rollback([

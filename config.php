@@ -3153,6 +3153,10 @@ function require_admin_page(): array {
     orange_admin_sync_session_country_lock($admin);
     $GLOBALS['orange_admin_active_record'] = $admin;
 
+    // P0-1 / 3B.4H: block admin page POSTs while restore maintenance is active.
+    require_once __DIR__ . '/includes/backup/restore/restore_maintenance_enforcement.php';
+    orange_restore_maint_enforcement_http_guard(['is_admin' => true]);
+
     return $admin;
 }
 
@@ -3178,5 +3182,10 @@ function require_admin_api(): void {
     orange_catalog_ensure_schema($pdo);
     orange_catalog_ensure_country_id_columns_once($pdo);
     orange_admin_bootstrap_country_context($pdo);
+
+    // P0-1 / 3B.4H: enforce restore maintenance on admin API mutations (restore APIs allowlisted).
+    require_once __DIR__ . '/includes/backup/restore/restore_maintenance_enforcement.php';
+    orange_restore_maint_enforcement_http_guard(['is_admin' => true]);
+
     orange_admin_enforce_api($admin, $pdo);
 }

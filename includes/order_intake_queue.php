@@ -861,6 +861,9 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
  */
 function orange_order_intake_process_next(PDO $pdo, bool $respectAdminCountry = false): bool
 {
+    require_once __DIR__ . '/backup/restore/restore_maintenance_enforcement.php';
+    orange_restore_maint_enforcement_library_mutation_guard('scheduled_business_write');
+
     $pdo->beginTransaction();
     $qid = 0;
     try {
@@ -933,6 +936,9 @@ function orange_order_intake_process_next(PDO $pdo, bool $respectAdminCountry = 
  */
 function orange_order_intake_enqueue(PDO $pdo, array $data): array
 {
+    require_once __DIR__ . '/backup/restore/restore_maintenance_enforcement.php';
+    orange_restore_maint_enforcement_library_mutation_guard('order_create');
+
     $token = bin2hex(random_bytes(16));
     $flags = JSON_UNESCAPED_UNICODE;
     if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {

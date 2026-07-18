@@ -8,6 +8,9 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/payments/payment_core.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/backup/restore/restore_maintenance_enforcement.php';
+
+orange_restore_maint_enforcement_api_mutation_guard('application_write_api');
 
 header('Content-Type: application/json; charset=utf-8');
 

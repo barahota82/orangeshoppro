@@ -574,6 +574,11 @@ function orange_backup_run_via_pdo(string $projectRoot, string $backupRoot, stri
 function orange_backup_run_full(string $projectRoot, ?string $backupRootOverride = null): array
 {
     $projectRoot = realpath($projectRoot) ?: $projectRoot;
+    // P0-1: block conflicting full backups while restore maintenance is active
+    // (pre-restore backup runs before maintenance_active).
+    require_once __DIR__ . '/restore/restore_maintenance_enforcement.php';
+    orange_restore_maint_enforcement_library_mutation_guard('conflicting_backup_job');
+
     $env = orange_backup_load_env_array($projectRoot);
     $backupRoot = orange_backup_resolve_root($env, $backupRootOverride);
 

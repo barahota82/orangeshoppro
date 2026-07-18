@@ -6,6 +6,9 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/storefront_phone_merge.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
+require_once __DIR__ . '/../../includes/backup/restore/restore_maintenance_enforcement.php';
+
+orange_restore_maint_enforcement_api_mutation_guard('application_write_api');
 
 try {
     $pdo = db();

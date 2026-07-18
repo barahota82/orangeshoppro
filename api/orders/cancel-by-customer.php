@@ -9,6 +9,9 @@ require_once __DIR__ . '/../../includes/order_stock.php';
 require_once __DIR__ . '/../../includes/phone_validation.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
 require_once __DIR__ . '/../../includes/loyalty.php';
+require_once __DIR__ . '/../../includes/backup/restore/restore_maintenance_enforcement.php';
+
+orange_restore_maint_enforcement_api_mutation_guard('order_status_mutation');
 
 try {
     $pdo = db();
