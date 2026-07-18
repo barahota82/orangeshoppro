@@ -1,7 +1,7 @@
 {
     "certification_version": "3B.4G-v1",
-    "tested_commit": "508e3aef",
-    "tested_at": "2026-07-18T00:34:18+00:00",
+    "tested_commit": "59f3f447",
+    "tested_at": "2026-07-18T00:40:54+00:00",
     "environment": "isolated_drill",
     "mode": "all",
     "full_restore_success_drill": {
@@ -53,7 +53,7 @@
                 "label": "no_production_resource_touched"
             }
         ],
-        "job_id": "2026-07-18_003243_808a9965"
+        "job_id": "2026-07-18_003914_d1c88d67"
     },
     "rollback_drill": {
         "ran": true,
@@ -116,7 +116,7 @@
                 "label": "no_production_resource_touched"
             }
         ],
-        "job_id": "2026-07-18_003253_974ab097"
+        "job_id": "2026-07-18_003926_2edd362e"
     },
     "failure_injection_summary": {
         "ok": true,
@@ -426,7 +426,7 @@
         "rollback_assertions": 14,
         "failure_injections_passed": 17,
         "failure_injections_failed": 0,
-        "duration_seconds": 96
+        "duration_seconds": 100
     },
     "open_blockers": [
         {
