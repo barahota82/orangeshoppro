@@ -545,6 +545,18 @@ Live cutover is **forbidden** until all boxes are checked:
 - **Not:** a second final_approval; does not flip `production_cutover_allowed`; does not change DB import/uploads engines beyond the gate/consume  
 - **Tests:** `scripts/backup/self_test_production_cutover_authorization.php`  
 
+### 3B.4L — Real MySQL/MariaDB clone DR validation — DONE (P0-4)
+
+- **Goal:** Replace Mock-PDO-only confidence with a **physically isolated** MySQL/MariaDB clone (never production schema, credentials, uploads, or `.env.php`).  
+- **Code:** `includes/backup/restore/restore_real_clone_validation.php` (`3B.4L-real-clone-v1`)  
+- **Clone strategy:** datadir `D:\orange_clone_mysql` (outside repo); mysqld on `127.0.0.1:3307`; DBs `orange_clone_target` / `orange_clone_shadow`; marker `.orange_restore_real_clone` on work/backup/uploads roots; isolation asserts before every destructive stage; `mock_pdo_used=false`.  
+- **Pipeline:** workspace prep → DRV on package → real shadow wipe/import → shadow verify → real target wipe/import → smoke.  
+- **CLI:** `scripts/backup/run_restore_real_clone_validation.php` (`--verbose` only; rejects path/db/password argv).  
+- **Report:** `real_clone_validation_report.json` (clone work root + copy under `docs/backup/`) — server version, engine, charset, collation, timings, DRV, smoke, production isolation proof.  
+- **Tests:** `scripts/backup/self_test_restore_real_clone_validation.php`  
+- **Requires:** PHP `ZipArchive` (`extension=zip`) for DRV uploads stage.  
+- **Must not:** touch production `DB_NAME` / uploads / config; use Mock PDO; accept production DB names as clone targets.  
+
 ### 3B.4J — Production smoke (post-finalize optional) + cache invalidate
 
 - Post-completion smoke / cache bust (after maintenance released)  

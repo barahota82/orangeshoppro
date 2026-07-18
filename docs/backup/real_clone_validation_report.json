@@ -1,0 +1,79 @@
+{
+    "report_version": "3B.4L-real-clone-v1",
+    "generated_at": "2026-07-18T17:01:10+00:00",
+    "overall_result": "PASS",
+    "server_version": "8.4.3",
+    "engine": "InnoDB",
+    "charset": "utf8mb4",
+    "collation": "utf8mb4_0900_ai_ci",
+    "restore_duration_seconds": 0.139,
+    "timings": {
+        "bootstrap_seconds": 0.004,
+        "workspace_seconds": 0.017,
+        "drv_seconds": 0.005,
+        "shadow_restore_seconds": 0.049,
+        "shadow_verify_seconds": 0.006,
+        "target_restore_seconds": 0.047,
+        "smoke_seconds": 0.005,
+        "total_seconds": 0.139
+    },
+    "verification": {
+        "shadow_import": {
+            "ok": true,
+            "statements_executed": 6,
+            "bytes_read": 348,
+            "error": null
+        },
+        "target_import": {
+            "ok": true,
+            "statements_executed": 6,
+            "bytes_read": 348,
+            "error": null,
+            "failed_statement": null
+        },
+        "sql_gzip_sha256": "e2435e427046fd1ef21f12a671243502beb864e3c1857a0459999b07589b39d3"
+    },
+    "drv": {
+        "ok": true,
+        "overall_result": "warning",
+        "recovery_score": 89
+    },
+    "shadow_verify": {
+        "ok": true,
+        "tables": [
+            "clone_items"
+        ],
+        "row_count": 2,
+        "schema_charset": "utf8mb4",
+        "session_database": "orange_clone_shadow"
+    },
+    "smoke": {
+        "ok": true,
+        "row_count": 2,
+        "sample_name": "alpha",
+        "session_database": "orange_clone_target",
+        "not_production": true
+    },
+    "production_isolation_proof": {
+        "clone_marker": ".orange_restore_real_clone",
+        "clone_root": "D:\\orange_clone_mysql",
+        "work_root": "D:\\orange_clone_mysql\\restore_work",
+        "backup_root": "D:\\orange_clone_mysql\\backups",
+        "uploads_root": "D:\\orange_clone_mysql\\uploads",
+        "target_db": "orange_clone_target",
+        "shadow_db": "orange_clone_shadow",
+        "production_db": "orange_db",
+        "db_port": 3307,
+        "production_db_differs": true,
+        "uploads_differs_from_production": true,
+        "workspace_outside_project": true,
+        "mock_pdo_used": false,
+        "asserts_before_destructive_stages": true
+    },
+    "package_id": "clone_20260718_170110",
+    "mock_pdo_used": false,
+    "notes": [
+        "Clone target DB stands in for production schema during validation only.",
+        "Real project DB_NAME / uploads / .env.php were not modified."
+    ]
+}

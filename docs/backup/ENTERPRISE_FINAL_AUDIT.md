@@ -375,6 +375,7 @@ Country production restore remains correctly blocked in production engines.
 - **Affected files:** `restore_dr_drill.php`, `self_test_production_import.php`, certification JSON
 - **Recommended fix:** Mandatory clone-host drill with real MySQL + real uploads tree before CERTIFIED.
 - **Production risk:** First live wipe is under-proven.
+- **Remediation (P0-4 — 2026-07-18):** **REMEDIATED (real clone path).** Isolated MySQL instance under `D:\orange_clone_mysql` on port **3307** (never production `orange_db` / 3306). Marker `.orange_restore_real_clone`; DBs `orange_clone_target` / `orange_clone_shadow`; workspace/uploads outside project tree. Pipeline: restore → verify → DRV → shadow verify → smoke with **real PDO only** (`mock_pdo_used=false`). Module: `includes/backup/restore/restore_real_clone_validation.php`. CLI: `scripts/backup/run_restore_real_clone_validation.php`. Report: `real_clone_validation_report.json` (clone work root + `docs/backup/`). Tests: `scripts/backup/self_test_restore_real_clone_validation.php` (18/18). Note: fixture Mock PDO drills remain for unit speed; certification honesty for live DB steps is now covered by this clone validation.
 
 ### F-TEST-03 — DRV uploads ZIP failures on ZipArchive-less PHP create false negatives / soft paths
 - **Severity:** Medium
@@ -556,7 +557,7 @@ Country production restore remains correctly blocked in production engines.
 | P0 | Wire maintenance middleware; integration-test write blocking | F-SEC-01, F-PROD-01 |
 | P0 | ~~Remove/disable Phase-2 production cutover CLIs on prod~~ **DONE (P0-2)** | F-ARCH-01, F-CLI-02, F-PROD-02 |
 | P0 | ~~Explicit production cutover authorization before wipe/rename~~ **DONE (P0-3)** | F-SM-03 |
-| P0 | Live clone drill with real DB/files; refresh certification | F-TEST-02 |
+| P0 | ~~Live clone drill with real DB/files~~ **DONE (P0-4)** — see F-TEST-02 remediation | F-TEST-02 |
 | P1 | Target host ZipArchive/DRV uploads integrity | F-SEC-04 |
 | P1 | Owner decision on two-person approval | F-SEC-06 |
 | P1 | Exec lock heartbeat + include rollback/finalize in active set | F-LOCK-01, F-ARCH-03 |
