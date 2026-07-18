@@ -163,8 +163,8 @@ Phase 2C deliverables (approval + staging validation gate — no merge, no produ
 ================================================================================
 
 CLI entries:
-  scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=PHRASE --action=approve
-  scripts/backup/restore_approve_merge.php --job=JOB_ID --admin-id=N --password=SECRET --action=reject|cancel --reason=TEXT
+  DISABLED tombstone (P0-2): restore_approve_merge.php → legacy_restore_entrypoint_disabled
+  USE: Restore Center final approval + approved_3b_restore_workflow (no argv credentials)
   scripts/backup/restore_job_status.php --job=JOB_ID
 
 Orchestrator + modules:
@@ -247,10 +247,12 @@ Phase 2D.2 deliverables (production database cutover only — no uploads/rollbac
 **Status:** Implemented (2026-07-13). Engine version `2D.2-db-cutover`. Schema revision **121**
 unchanged. **Production DB cutover only** — uploads untouched, no rollback execution, no post-validation.
 
-CLI entry:
-  scripts/backup/restore_full_database_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
+CLI entry (P0-2 — DISABLED tombstone; do not run):
+  restore_full_database_cutover.php → LEGACY_RESTORE_ENTRYPOINT: DISABLED
+  REASON: legacy_restore_entrypoint_disabled
+  USE: scripts/backup/restore_import_production.php --job=JOB_ID (approved_3b_restore_workflow)
 
-Modules:
+Modules (library retained; not invoked by disabled CLI):
   includes/backup/restore/restore_merge_staging_export.php
   includes/backup/restore/restore_merge_db_cutover.php
   includes/backup/restore/restore_orchestrator.php (database cutover wrapper)
@@ -286,10 +288,12 @@ Phase 2D.3 deliverables (production uploads cutover only — no rollback/post-va
 unchanged. **Production uploads cutover only** — production database untouched, no rollback execution,
 no post-validation.
 
-CLI entry:
-  scripts/backup/restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
+CLI entry (P0-2 — DISABLED tombstone; do not run):
+  restore_full_uploads_cutover.php → LEGACY_RESTORE_ENTRYPOINT: DISABLED
+  REASON: legacy_restore_entrypoint_disabled
+  USE: scripts/backup/restore_uploads_cutover.php --job=JOB_ID (approved_3b_restore_workflow)
 
-Modules:
+Modules (library retained; not invoked by disabled CLI):
   includes/backup/restore/restore_merge_uploads_cutover.php
   includes/backup/restore/restore_orchestrator.php (uploads cutover wrapper)
   includes/backup/restore/restore_job.php (states uploads_cutover_complete, failed_merge from database_cutover_complete)
@@ -326,12 +330,12 @@ Phase 2D.4 deliverables (production post-validation + manual rollback only)
 unchanged. **Post-validation and manual rollback only** — no Country Production Merge, no end-to-end wrapper,
 no Admin UI, no restore APIs, no automatic/scheduled restore.
 
-CLI entries:
-  scripts/backup/restore_full_post_validate.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
-  scripts/backup/restore_full_post_validate_finalize.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
-  scripts/backup/restore_full_rollback.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=ROLLBACK
+CLI entries (P0-2 — DISABLED tombstones; do not run):
+  restore_full_post_validate.php / restore_full_post_validate_finalize.php / restore_full_rollback.php
+  → LEGACY_RESTORE_ENTRYPOINT: DISABLED (legacy_restore_entrypoint_disabled)
+  USE: restore_finalize.php / restore_rollback.php --job=JOB_ID (approved_3b_restore_workflow; no argv credentials)
 
-Modules:
+Modules (library retained; not invoked by disabled CLIs):
   includes/backup/restore/restore_merge_post_validation.php
   includes/backup/restore/restore_merge_rollback.php
   includes/backup/restore/restore_validation_adapter_production.php
@@ -395,21 +399,19 @@ Phase 2E — End-to-end Full Restore orchestrator (IMPLEMENTED — CLI-first, ma
 manual rollback) **without duplicating** their business logic.
 
 **Deliverables:**
-- `includes/backup/restore/restore_e2e_orchestrator.php` — state routing, start/resume/status
-- `scripts/backup/restore_run_full.php` — start pre-approval workflow only (`--package`, `--admin-id`, `--password`, `--confirm=RESTORE`)
-- `scripts/backup/restore_resume_full.php` — resume exactly one legal next phase from persisted job state
-- `scripts/backup/restore_status_full.php` — read-only status (no secrets)
-- `scripts/backup/self_test_restore_e2e.php`
+- `includes/backup/restore/restore_e2e_orchestrator.php` — library state routing (tests / historical)
+- `scripts/backup/restore_run_full.php` — P0-2 DISABLED tombstone (legacy_restore_entrypoint_disabled)
+- `scripts/backup/restore_resume_full.php` — P0-2 DISABLED tombstone
+- `scripts/backup/restore_status_full.php` — read-only status (still allowed; no secrets)
+- `scripts/backup/self_test_restore_e2e.php` — calls library adapters only (not production CLIs)
 
-**Orchestration only:** E2E calls existing wrappers in `restore_orchestrator.php` and
-`orange_restore_full_staging_run()` — no duplicated package validation, staging import, approval, merge,
-cutover, post-validation, or rollback logic.
+**P0-2 production policy:** Phase-2 production cutover / E2E / approve CLIs are permanently disabled.
+Approved mutation workers only: `restore_import_production.php`, `restore_uploads_cutover.php`,
+`restore_rollback.php`, `restore_finalize.php` (`--job=` only; argv credentials prohibited).
 
 **Manual stop points (never automatic):**
-- `awaiting_owner_approval` → stop; operator runs `restore_approve_merge.php`
-- `approved_for_merge` → stop; operator runs merge foundation precheck manually
-- Legacy persisted status `merge_approved` → normalized on job read to `approved_for_merge` (append-once audit `legacy_merge_approved_normalized`); same manual merge-precheck stop — no automatic merge
-- `failed_merge` / `failed_post_merge` / `rollback_failed` → stop; operator runs `restore_full_rollback.php`
+- Use Restore Center final approval + 3B.4 execution contract / workers
+- Phase-2 `restore_approve_merge.php` / `restore_full_rollback.php` are DISABLED tombstones
 - No automatic approval, merge, or rollback
 
 **State routing (summary):**
@@ -424,9 +426,8 @@ cutover, post-validation, or rollback logic.
 - `rollback_in_progress` → rollback resume (re-auth + ROLLBACK)
 - `rolled_back` / `cancelled` / `failed` → terminal
 
-**Direct production-mutating CLIs (uniform policy):** Every direct CLI capable of production mutation independently
-requires `--admin-id`, `--password`, `--confirm=RESTORE` (or `ROLLBACK` for rollback): database cutover, uploads cutover,
-post-validation, post-validation finalize (including completed artifact reconciliation). Service boundaries re-assert
+**Direct production-mutating CLIs (P0-2 policy):** Phase-2 password-argv cutover CLIs are DISABLED tombstones.
+Approved 3B.4 workers accept `--job=` only (no `--password=` / `--db-password=` on argv). Service boundaries re-assert
 re-auth where practical. Wrong/missing admin, permission, password, or phrase fails before production/filesystem mutation
 or maintenance disable. Passwords and confirmation phrases are never logged.
 

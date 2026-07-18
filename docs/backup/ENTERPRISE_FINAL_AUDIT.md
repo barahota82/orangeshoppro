@@ -32,6 +32,7 @@ Country production restore remains correctly blocked in production engines.
 - **Affected files:** `scripts/backup/restore_full_database_cutover.php`, `scripts/backup/restore_run_full.php`, `includes/backup/restore/restore_orchestrator.php`, `includes/backup/restore/restore_job.php`, `includes/backup/restore/restore_production_import.php`
 - **Recommended fix:** Hard-disable or fail-closed legacy cutover CLIs in production (env fence / removed from deploy allowlist) until deleted after owner approval; document single supported command sequence only.
 - **Production risk:** Accidental use of Phase-2 cutover against a live job/DB while 3B.4 path is the certified path.
+- **Remediation (P0-2 — 2026-07-18):** **REMEDIATED.** All Phase-2 production cutover / merge / E2E CLIs are permanent fail-closed tombstones (`legacy_restore_entrypoint_disabled`) that exit before loading orchestrators. Approved production mutation allowlist only: `restore_import_production.php`, `restore_uploads_cutover.php`, `restore_rollback.php`, `restore_finalize.php`. Policy catalog: `includes/backup/restore/restore_production_cli_policy.php`. Tests: `scripts/backup/self_test_legacy_restore_fencing.php`. Underlying Phase-2 library functions retained for isolated tests / internal reuse; executable legacy paths are not.
 
 ### F-ARCH-02 — Framework transition helper has no from→to matrix
 - **Severity:** High
@@ -208,6 +209,7 @@ Country production restore remains correctly blocked in production engines.
 - **Affected files:** those scripts + orchestrators they call
 - **Recommended fix:** Disable in production; never pass passwords on argv; migrate operators exclusively to 3B.4 `--job=` workers.
 - **Production risk:** Credential leakage; accidental Phase-2 production cutover.
+- **Remediation (P0-2 — 2026-07-18):** **REMEDIATED.** Legacy production entrypoints no longer parse argv credentials (tombstones reject immediately). Operator docs updated to prohibit `--password=` / `--db-password=` on restore CLIs. Approved workers accept `--job=` only. Static scan in `self_test_legacy_restore_fencing.php`.
 
 ### F-CLI-03 — HTTP does not run import/cutover/rollback/finalize/drill
 - **Severity:** Info (positive)
@@ -310,6 +312,7 @@ Country production restore remains correctly blocked in production engines.
 
 ### F-PROD-02 — Parallel Phase-2 production cutover CLIs remain runnable
 - Same as F-ARCH-01 / F-CLI-02.
+- **Remediation (P0-2 — 2026-07-18):** **REMEDIATED** with F-ARCH-01 / F-CLI-02 (tombstones + allowlist).
 
 ### F-PROD-03 — No real production touched by DR drill (good)
 - **Severity:** Info (positive)
@@ -536,7 +539,7 @@ Country production restore remains correctly blocked in production engines.
 ## Conditions blocking READY
 
 1. **Wire and prove** maintenance middleware on storefront + admin write APIs (and listed integration points).
-2. **Disable or fail-closed** legacy Phase-2 production cutover / password-argv CLIs on production hosts.
+2. ~~**Disable or fail-closed** legacy Phase-2 production cutover / password-argv CLIs on production hosts.~~ **DONE (P0-2)** — see F-ARCH-01 / F-CLI-02 remediation.
 3. **Implement or explicitly waive (in owner archive)** production cutover authorization + two-person control policy.
 4. **Run and pass** a real MySQL + real uploads clone drill (no mock PDO for wipe/import/rollback).
 5. **Prove** ZipArchive (or equivalent DRV uploads integrity) on the target PHP runtime.
@@ -550,7 +553,7 @@ Country production restore remains correctly blocked in production engines.
 | Priority | Item | Finding IDs |
 |----------|------|-------------|
 | P0 | Wire maintenance middleware; integration-test write blocking | F-SEC-01, F-PROD-01 |
-| P0 | Remove/disable Phase-2 production cutover CLIs on prod | F-ARCH-01, F-CLI-02, F-PROD-02 |
+| P0 | ~~Remove/disable Phase-2 production cutover CLIs on prod~~ **DONE (P0-2)** | F-ARCH-01, F-CLI-02, F-PROD-02 |
 | P0 | Explicit production cutover authorization before wipe/rename | F-SM-03 |
 | P0 | Live clone drill with real DB/files; refresh certification | F-TEST-02 |
 | P1 | Target host ZipArchive/DRV uploads integrity | F-SEC-04 |

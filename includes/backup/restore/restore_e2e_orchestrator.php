@@ -96,7 +96,7 @@ function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): a
             return orange_restore_e2e_action_spec(
                 ORANGE_RESTORE_E2E_ACTION_RECONCILE_COMPLETED,
                 'Job completed but completion artifacts are incomplete. Reconcile requires fresh Super Admin re-auth and RESTORE confirmation.',
-                'php scripts/backup/restore_resume_full.php --job=' . $jobId . ' --admin-id=N --password=SECRET --confirm=RESTORE',
+                'DISABLED: use approved_3b_restore_workflow (restore_finalize.php --job=JOB_ID)',
                 true,
                 'RESTORE'
             );
@@ -125,7 +125,7 @@ function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): a
         return orange_restore_e2e_action_spec(
             ORANGE_RESTORE_E2E_ACTION_FINALIZE_STAGING,
             'Delegate staging finalization to approved Phase 2B.1 function.',
-            'php scripts/backup/restore_resume_full.php --job=' . (string) ($job['job_id'] ?? '') . ' --admin-id=N',
+            'DISABLED: Phase-2 resume CLI tombstoned; use approved_3b_restore_workflow',
             false
         );
     }
@@ -134,7 +134,7 @@ function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): a
         return orange_restore_e2e_action_spec(
             ORANGE_RESTORE_E2E_ACTION_STOP_AWAITING_APPROVAL,
             'Owner approval required. Run approval CLI with RESTORE confirmation — no automatic approval.',
-            'php scripts/backup/restore_approve_merge.php --job=' . (string) ($job['job_id'] ?? '') . ' --admin-id=N --password=SECRET --confirm=RESTORE --action=approve',
+            'DISABLED: use Restore Center final approval + approved_3b_restore_workflow',
             false
         );
     }
@@ -143,7 +143,7 @@ function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): a
         return orange_restore_e2e_action_spec(
             ORANGE_RESTORE_E2E_ACTION_STOP_MERGE_CONFIRMATION,
             'Job approved for merge. Run merge foundation precheck manually — no automatic merge.',
-            'Invoke orange_restore_orchestrator_merge_foundation_precheck() for job, then resume with restore_resume_full.php',
+            'DISABLED: Phase-2 merge path tombstoned; use approved_3b_restore_workflow',
             false
         );
     }
@@ -152,7 +152,7 @@ function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): a
         return orange_restore_e2e_action_spec(
             ORANGE_RESTORE_E2E_ACTION_RUN_DATABASE_CUTOVER,
             'Merge precheck passed. Database cutover requires fresh Super Admin re-auth and RESTORE confirmation.',
-            'php scripts/backup/restore_resume_full.php --job=' . (string) ($job['job_id'] ?? '') . ' --admin-id=N --password=SECRET --confirm=RESTORE',
+            'DISABLED: use approved_3b_restore_workflow (job-scoped 3B.4 workers; no argv credentials)',
             true,
             'RESTORE'
         );
@@ -162,7 +162,7 @@ function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): a
         return orange_restore_e2e_action_spec(
             ORANGE_RESTORE_E2E_ACTION_STOP_CUTOVER_IN_PROGRESS,
             'Database cutover in progress (merge_started). Resume is blocked to prevent duplicate cutover. Use manual rollback if production is inconsistent.',
-            'php scripts/backup/restore_full_rollback.php --job=' . (string) ($job['job_id'] ?? '') . ' --admin-id=N --password=SECRET --confirm=ROLLBACK',
+            'DISABLED: use scripts/backup/restore_rollback.php --job=JOB_ID (approved_3b_restore_workflow)',
             false
         );
     }
@@ -177,7 +177,7 @@ function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): a
         return orange_restore_e2e_action_spec(
             ORANGE_RESTORE_E2E_ACTION_RUN_UPLOADS_CUTOVER,
             'Resume uploads cutover from checkpoint status=' . $status . '. Requires fresh Super Admin re-auth and RESTORE confirmation.',
-            'php scripts/backup/restore_resume_full.php --job=' . (string) ($job['job_id'] ?? '') . ' --admin-id=N --password=SECRET --confirm=RESTORE',
+            'DISABLED: use approved_3b_restore_workflow (job-scoped 3B.4 workers; no argv credentials)',
             true,
             'RESTORE'
         );
@@ -187,7 +187,7 @@ function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): a
         return orange_restore_e2e_action_spec(
             ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION,
             'Run production post-validation. Requires fresh Super Admin re-auth and RESTORE confirmation.',
-            'php scripts/backup/restore_resume_full.php --job=' . (string) ($job['job_id'] ?? '') . ' --admin-id=N --password=SECRET --confirm=RESTORE',
+            'DISABLED: use approved_3b_restore_workflow (job-scoped 3B.4 workers; no argv credentials)',
             true,
             'RESTORE'
         );
@@ -197,7 +197,7 @@ function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): a
         return orange_restore_e2e_action_spec(
             ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION,
             'Resume production post-validation from production_merged. Requires fresh Super Admin re-auth and RESTORE confirmation.',
-            'php scripts/backup/restore_resume_full.php --job=' . (string) ($job['job_id'] ?? '') . ' --admin-id=N --password=SECRET --confirm=RESTORE',
+            'DISABLED: use approved_3b_restore_workflow (job-scoped 3B.4 workers; no argv credentials)',
             true,
             'RESTORE'
         );
@@ -207,7 +207,7 @@ function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): a
         return orange_restore_e2e_action_spec(
             ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION_FINALIZE,
             'Finalize restore completion (maintenance disable + completed). Requires fresh Super Admin re-auth and RESTORE confirmation.',
-            'php scripts/backup/restore_resume_full.php --job=' . (string) ($job['job_id'] ?? '') . ' --admin-id=N --password=SECRET --confirm=RESTORE',
+            'DISABLED: use approved_3b_restore_workflow (job-scoped 3B.4 workers; no argv credentials)',
             true,
             'RESTORE'
         );
@@ -220,7 +220,7 @@ function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): a
         return orange_restore_e2e_action_spec(
             ORANGE_RESTORE_E2E_ACTION_RUN_POST_VALIDATION_FINALIZE,
             'Resume restore finalize checkpoint (status=' . $status . '). Requires fresh Super Admin re-auth and RESTORE confirmation.',
-            'php scripts/backup/restore_resume_full.php --job=' . (string) ($job['job_id'] ?? '') . ' --admin-id=N --password=SECRET --confirm=RESTORE',
+            'DISABLED: use approved_3b_restore_workflow (job-scoped 3B.4 workers; no argv credentials)',
             true,
             'RESTORE'
         );
@@ -234,7 +234,7 @@ function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): a
         return orange_restore_e2e_action_spec(
             ORANGE_RESTORE_E2E_ACTION_STOP_FOR_ROLLBACK,
             'Manual rollback required (status=' . $status . '). No automatic rollback.',
-            'php scripts/backup/restore_full_rollback.php --job=' . (string) ($job['job_id'] ?? '') . ' --admin-id=N --password=SECRET --confirm=ROLLBACK',
+            'DISABLED: use scripts/backup/restore_rollback.php --job=JOB_ID (approved_3b_restore_workflow)',
             true,
             'ROLLBACK'
         );
@@ -244,7 +244,7 @@ function orange_restore_e2e_resolve_action(array $job, string $workRoot = ''): a
         return orange_restore_e2e_action_spec(
             ORANGE_RESTORE_E2E_ACTION_RUN_ROLLBACK,
             'Resume manual rollback from checkpoint.',
-            'php scripts/backup/restore_resume_full.php --job=' . (string) ($job['job_id'] ?? '') . ' --admin-id=N --password=SECRET --confirm=ROLLBACK',
+            'DISABLED: use scripts/backup/restore_rollback.php --job=JOB_ID (approved_3b_restore_workflow)',
             true,
             'ROLLBACK'
         );

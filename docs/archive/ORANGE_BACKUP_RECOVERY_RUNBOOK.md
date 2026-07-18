@@ -419,21 +419,16 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2B.2 section
 7. Rollback anchor present
 8. Job not expired, failed, cancelled, or already approved
 
-**Commands:**
+**Commands (P0-2 — Phase-2 approve CLI permanently disabled):**
 
 ```powershell
 # Read-only status (JSON report — no secrets)
 php D:\orange\scripts\backup\restore_job_status.php --job=yyyy-MM-dd_HHmmss_xxxxxxxx
 
-# Approve for future merge (does NOT merge)
-php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password=SECRET --confirm=RESTORE --action=approve
-
-# Country approve example
-php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password=SECRET --confirm="RESTORE KW" --action=approve
-
-# Reject or cancel before merge
-php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password=SECRET --action=reject --reason="Owner declined"
-php D:\orange\scripts\backup\restore_approve_merge.php --job=JOB_ID --admin-id=1 --password=SECRET --action=cancel --reason="Operator cancelled"
+# LEGACY: restore_approve_merge.php is a DISABLED tombstone (legacy_restore_entrypoint_disabled).
+# Do not run Phase-2 approve/cutover CLIs. Use Restore Center final approval + approved 3B.4 workers:
+#   restore_import_production.php / restore_uploads_cutover.php / restore_rollback.php / restore_finalize.php
+#   (--job=JOB_ID only; argv credentials prohibited)
 ```
 
 **On success:** Job status becomes `approved_for_merge`. One-time approval token is issued and consumed in the same operation (hash stored on job + sidecar metadata). Filesystem audit records re-auth, phrase check, token lifecycle, and state transition.
@@ -498,13 +493,17 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.1 foundat
 2. Global restore lock acquired by the cutover CLI process for this job
 3. Maintenance mode enabled and owned by this job (`orange_restore_orchestrator_merge_maintenance_enable`)
 
-**CLI:**
+**CLI (P0-2 — permanently disabled tombstone):**
 
-```powershell
-php D:\orange\scripts\backup\restore_full_database_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
+```text
+LEGACY_RESTORE_ENTRYPOINT: DISABLED
+REASON: legacy_restore_entrypoint_disabled
+USE: approved_3b_restore_workflow
+Approved worker: php scripts/backup/restore_import_production.php --job=JOB_ID
+(argv credentials prohibited; no --password= / --db-password=)
 ```
 
-**Pipeline:** cutover gate revalidation → merge-time re-auth → staging export to `merge_db_export.sql.gz` (verified) → `merge_started` → production schema wipe (merge credentials) → stream import → `database_cutover_complete`
+**Historical pipeline (library only; not a runnable CLI path):** cutover gate revalidation → merge-time re-auth → staging export to `merge_db_export.sql.gz` (verified) → `merge_started` → production schema wipe (merge credentials) → stream import → `database_cutover_complete`
 
 **Failure policy:**
 - Before production wipe: production unchanged; job stays `merge_precheck_passed`
@@ -535,13 +534,17 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.2 section
 3. Maintenance mode enabled and owned by this job
 4. `uploads_next/` prepared at project root, verified (`uploads_next_manifest.json` in job dir, `verified=true`, tree checksum matches staging uploads)
 
-**CLI:**
+**CLI (P0-2 — permanently disabled tombstone):**
 
-```powershell
-php D:\orange\scripts\backup\restore_full_uploads_cutover.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
+```text
+LEGACY_RESTORE_ENTRYPOINT: DISABLED
+REASON: legacy_restore_entrypoint_disabled
+USE: approved_3b_restore_workflow
+Approved worker: php scripts/backup/restore_uploads_cutover.php --job=JOB_ID
+(argv credentials prohibited)
 ```
 
-**Security:** Super Admin + `backup_restore_full` + password re-auth + exact phrase `RESTORE` (enforced at CLI and service boundary before any production/filesystem mutation).
+**Security (3B.4 workers):** job-scoped CLI identity + maintenance active + execution contract + scoped worker token — never argv passwords.
 
 **Pipeline:** pre-cutover gate revalidation → same-volume check → pre-merge uploads snapshot (checksum manifest) → verify snapshot → atomic directory renames (`uploads` → `uploads_pre_merge_{job}` ; `uploads_next` → `uploads`) → `uploads_cutover_complete`
 
@@ -567,18 +570,20 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.3 section
 **Post-validation and explicit manual rollback only** — no Country Production Merge, no end-to-end wrapper,
 no Admin UI, no restore APIs, no automatic/scheduled restore.
 
-### Post-validation CLI
+### Post-validation CLI (P0-2 — DISABLED tombstone)
 
-```powershell
-php D:\orange\scripts\backup\restore_full_post_validate.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
+```text
+LEGACY_RESTORE_ENTRYPOINT: DISABLED — restore_full_post_validate.php
+REASON: legacy_restore_entrypoint_disabled
+USE: approved_3b_restore_workflow
 ```
 
-**Security:** Same merge-time re-auth policy as other production-mutating CLIs (before validation or job transitions).
+### Post-validation finalize CLI (P0-2 — DISABLED tombstone)
 
-### Post-validation finalize CLI
-
-```powershell
-php D:\orange\scripts\backup\restore_full_post_validate_finalize.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=RESTORE
+```text
+LEGACY_RESTORE_ENTRYPOINT: DISABLED — restore_full_post_validate_finalize.php
+REASON: legacy_restore_entrypoint_disabled
+Approved worker: php scripts/backup/restore_finalize.php --job=JOB_ID
 ```
 
 **Entry:** `post_validation_passed`, `maintenance_disable_pending`, `maintenance_disabled`, or `completed` (artifact reconciliation only).
@@ -592,13 +597,16 @@ Hard failure → `failed_post_merge` (maintenance stays active). No direct jump 
 
 **Reports:** `production_post_validation.json`, `final_restore_report.json` under `{restore_work}/{job_id}/`.
 
-### Manual rollback CLI
+### Manual rollback CLI (P0-2 — DISABLED tombstone)
 
-```powershell
-php D:\orange\scripts\backup\restore_full_rollback.php --job=JOB_ID --admin-id=N --password=SECRET --confirm=ROLLBACK
+```text
+LEGACY_RESTORE_ENTRYPOINT: DISABLED — restore_full_rollback.php
+REASON: legacy_restore_entrypoint_disabled
+Approved worker: php scripts/backup/restore_rollback.php --job=JOB_ID
+(argv credentials prohibited)
 ```
 
-**Policy:** Super Admin + `backup_restore_full` + password re-auth + exact phrase `ROLLBACK`. **Only** this job's
+**Policy (3B.4):** job-scoped rollback worker only; maintenance + contract + rollback anchor gates. **Only** this job's
 Stage-3 fresh full disaster backup (`fresh_backup_path` + `fresh_backup_checksum` on job). No older backup selection.
 
 **Eligible states:** `failed_merge`, `failed_post_merge`, `database_cutover_complete`, uploads partial states,
@@ -625,34 +633,24 @@ Architecture: `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` (Phase 2D.4 section
 **Status:** CLI-first guided orchestrator coordinating approved phases with manual stop points. **No** Country
 Production Merge, Admin UI, restore APIs, automatic/scheduled restore, or schema changes.
 
-**Start (pre-approval only):**
+**P0-2 (2026-07-18):** Phase-2 E2E start/resume CLIs are **permanently disabled tombstones**
+(`legacy_restore_entrypoint_disabled`). Do **not** run `restore_run_full.php` / `restore_resume_full.php`.
+Production mutations use **only** the approved 3B.4 workers (`--job=` only; no argv credentials).
 
-```powershell
-php D:\orange\scripts\backup\restore_run_full.php --package=PATH --admin-id=N --password=SECRET --confirm=RESTORE
-```
-
-Runs package validation → fresh backup → staging restore → stops at `awaiting_owner_approval`.
-
-**Resume (state-driven, one legal action per run):**
-
-```powershell
-php D:\orange\scripts\backup\restore_resume_full.php --job=JOB_ID [--admin-id=N] [--password=SECRET] [--confirm=RESTORE|ROLLBACK]
-```
-
-**Read-only status:**
+**Read-only status (still allowed):**
 
 ```powershell
 php D:\orange\scripts\backup\restore_status_full.php --job=JOB_ID
 ```
 
-**Manual gates (orchestrator stops — never auto):**
-- `awaiting_owner_approval` → `restore_approve_merge.php`
-- `approved_for_merge` → merge foundation precheck (approved PHP entry) before cutover
-- Legacy `merge_approved` job status → normalized on read to `approved_for_merge` (same stop as above)
-- `failed_merge` / `failed_post_merge` → `restore_full_rollback.php`
-- `completed` with missing completion artifacts → `reconcile_completed` via `restore_resume_full.php` (fresh re-auth + RESTORE; artifact backfill only)
+**Approved production mutation workers:**
+- `scripts/backup/restore_import_production.php --job=JOB_ID`
+- `scripts/backup/restore_uploads_cutover.php --job=JOB_ID`
+- `scripts/backup/restore_rollback.php --job=JOB_ID`
+- `scripts/backup/restore_finalize.php --job=JOB_ID`
 
-**Direct mutating CLIs:** `restore_full_database_cutover.php`, `restore_full_uploads_cutover.php`, `restore_full_post_validate.php`, and `restore_full_post_validate_finalize.php` each require `--admin-id`, `--password`, `--confirm=RESTORE` independently (do not rely on the E2E wrapper alone).
+**Manual gates:** Restore Center final approval + 3B.4 execution contract / maintenance framework.
+Phase-2 merge approve / cutover / rollback CLIs are DISABLED tombstones (not runnable).
 
 **Self-test:**
 

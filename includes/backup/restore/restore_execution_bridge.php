@@ -22,6 +22,7 @@ require_once __DIR__ . '/restore_execution_orchestrator.php';
 require_once __DIR__ . '/restore_dry_run.php';
 require_once __DIR__ . '/restore_final_approval.php';
 require_once __DIR__ . '/restore_version_lock.php';
+require_once __DIR__ . '/restore_production_cli_policy.php';
 require_once __DIR__ . '/../backup_admin.php';
 require_once __DIR__ . '/../recovery_validation.php';
 
@@ -30,24 +31,21 @@ const ORANGE_RESTORE_EXEC_CONTRACT_FILE = 'restore_execution_contract.json';
 const ORANGE_RESTORE_EXEC_CONTRACT_BACKEND = 'php_pdo';
 
 /**
+ * Historical Phase-2 CLI catalog (P0-2: production mutators are disabled tombstones).
+ *
  * @return list<string>
  */
 function orange_restore_bridge_phase2_cli_entrypoints(): array
 {
-    return [
-        'scripts/backup/restore_run_full.php',
-        'scripts/backup/restore_resume_full.php',
-        'scripts/backup/restore_status_full.php',
-        'scripts/backup/restore_full_to_staging.php',
-        'scripts/backup/restore_country_to_staging.php',
-        'scripts/backup/restore_approve_merge.php',
-        'scripts/backup/restore_full_database_cutover.php',
-        'scripts/backup/restore_full_uploads_cutover.php',
-        'scripts/backup/restore_full_post_validate.php',
-        'scripts/backup/restore_full_post_validate_finalize.php',
-        'scripts/backup/restore_full_rollback.php',
-        'scripts/backup/restore_job_status.php',
-    ];
+    return array_values(array_unique(array_merge(
+        orange_restore_legacy_production_cli_tombstones(),
+        [
+            'scripts/backup/restore_status_full.php',
+            'scripts/backup/restore_full_to_staging.php',
+            'scripts/backup/restore_country_to_staging.php',
+            'scripts/backup/restore_job_status.php',
+        ]
+    )));
 }
 
 function orange_restore_exec_contract_path(string $workRoot, string $jobId): string
@@ -97,31 +95,32 @@ function orange_restore_bridge_build_cli_request(
     $packageId = (string) ($job['package_id'] ?? '');
     $isFull = $packageType === 'full_disaster';
 
+    $approvedWorkers = orange_restore_approved_production_mutation_cli_workers();
+
     return [
         'invoked' => false,
         'execution_allowed' => false,
         'execution_started' => false,
         'primary_cli' => $isFull
-            ? 'scripts/backup/restore_run_full.php'
+            ? 'scripts/backup/restore_import_production.php'
             : 'scripts/backup/restore_country_to_staging.php',
         'staging_cli' => $isFull
             ? 'scripts/backup/restore_full_to_staging.php'
             : 'scripts/backup/restore_country_to_staging.php',
+        'approved_production_mutation_workers' => $approvedWorkers,
+        'legacy_production_cli_tombstones' => orange_restore_legacy_production_cli_tombstones(),
         'orchestration_module' => $isFull
-            ? 'includes/backup/restore/restore_e2e_orchestrator.php'
+            ? 'includes/backup/restore/restore_production_import.php'
             : 'includes/backup/restore/restore_country_staging.php',
         'orchestration_entry_function' => $isFull
-            ? 'orange_restore_e2e_start_full'
+            ? 'orange_restore_prod_import_run_cli'
             : 'orange_restore_country_staging_run',
         'phase2_cli_entrypoints' => orange_restore_bridge_phase2_cli_entrypoints(),
         'argv_template' => $isFull
             ? [
                 'php',
-                'scripts/backup/restore_run_full.php',
-                '--package=<package_path>',
-                '--admin-id=<admin_id>',
-                '--password=<redacted>',
-                '--confirm=RESTORE',
+                'scripts/backup/restore_import_production.php',
+                '--job=<job_id>',
             ]
             : [
                 'php',
@@ -134,7 +133,8 @@ function orange_restore_bridge_build_cli_request(
         'approval_bound' => (string) ($approval['approved_at'] ?? '') !== '',
         'export_backend' => (string) ($fingerprint['export_backend'] ?? ''),
         'schema_revision' => (int) ($fingerprint['schema_revision'] ?? 0),
-        'note' => 'Metadata only. Bridge must not invoke CLI in 3B.3B2.',
+        'note' => 'Metadata only. Phase-2 production cutover CLIs are permanently disabled'
+            . ' (legacy_restore_entrypoint_disabled). Bridge must not invoke CLI.',
     ];
 }
 

@@ -527,14 +527,23 @@ Live cutover is **forbidden** until all boxes are checked:
 - **Payments:** callbacks blocked by default (`payment_callback_allowlisted=false`) until owner allowlists in archive  
 - **Tests:** `scripts/backup/self_test_maintenance_enforcement.php`  
 
-### 3B.4I — Production smoke (post-finalize optional) + cache invalidate
+### 3B.4I — Permanently fence legacy Phase-2 production restore CLIs — DONE (P0-2)
+
+- **Policy:** `includes/backup/restore/restore_production_cli_policy.php` (approved mutation worker allowlist + legacy tombstone catalog)  
+- **Tombstones:** `restore_full_database_cutover.php`, `restore_full_uploads_cutover.php`, `restore_full_rollback.php`, `restore_run_full.php`, `restore_resume_full.php`, `restore_approve_merge.php`, `restore_full_post_validate.php`, `restore_full_post_validate_finalize.php` — fail closed with `legacy_restore_entrypoint_disabled` before any mutation / credential parse  
+- **Approved workers (unchanged security model):** `restore_import_production.php`, `restore_uploads_cutover.php`, `restore_rollback.php`, `restore_finalize.php` (`--job=` only; no argv credentials)  
+- **Docs:** runbook + architecture + Phase-2 entrypoints map updated; audit F-ARCH-01 / F-CLI-02 / F-PROD-02 marked remediated  
+- **Tests:** `scripts/backup/self_test_legacy_restore_fencing.php`  
+- **Must not:** compatibility re-enable flags; argv passwords; deleting reusable Phase-2 library functions used by tests/3B  
+
+### 3B.4J — Production smoke (post-finalize optional) + cache invalidate
 
 - Post-completion smoke / cache bust (after maintenance released)  
 - Tests: smoke fail does not re-enter cutover without new job  
 
-### 3B.4J — (reserved / superseded numbering)
+### Numbering note
 
-- Owner phase **3B.4G** is the DR drill + certification pack (above). Older drafts that labeled this 3B.4J are obsolete.  
+- Owner phase **3B.4G** is the DR drill + certification pack (above). Older drafts that labeled certification as 3B.4J are obsolete.  
 
 ### 3B.3C — Country production (separate series)
 
