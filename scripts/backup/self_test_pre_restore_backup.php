@@ -462,9 +462,15 @@ try {
 
     pre_backup_self_test(!is_file($projectRoot . '/admin/api/restore/job/unpin.php'), 'no unpin endpoint');
     pre_backup_self_test(!is_file($projectRoot . '/admin/api/restore/job/execute.php'), 'no execute endpoint');
-    pre_backup_self_test(!is_file($projectRoot . '/admin/api/restore/job/rollback.php'), 'no rollback endpoint');
+    // Rollback API exists (3B.4E+) but must not be invoked from the pre-restore backup module.
+    pre_backup_self_test(is_file($projectRoot . '/admin/api/restore/job/rollback.php'), 'rollback endpoint exists separately');
 
     $mod = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_pre_restore_backup.php');
+    pre_backup_self_test(
+        !str_contains($mod, 'orange_restore_prod_rollback_')
+        && !str_contains($mod, 'restore_production_rollback.php'),
+        'pre_restore module does not invoke rollback engine'
+    );
     pre_backup_self_test(
         !str_contains($mod, 'orange_restore_full_staging_run(')
         && !str_contains($mod, 'orange_restore_e2e_start_full(')

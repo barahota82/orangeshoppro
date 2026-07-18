@@ -509,11 +509,16 @@ Live cutover is **forbidden** until all boxes are checked:
 - **Must not:** DB import, uploads rename, rollback execution, shadow execution, delete anchors, remove pins, re-run verification  
 - **Tests:** `self_test_production_finalize.php`  
 
-### 3B.4G — Production cutover authorization gate (metadata + UI warnings only)
+### 3B.4G — Disaster Recovery Drill & Production Certification — DONE
 
-- Explicit `production_cutover_authorized` record separate from shadow readiness  
-- Still no application PHP/.env cutover  
-- Tests: cannot authorize without readiness; Country rejected  
+- **Code:** `includes/backup/restore/restore_dr_drill.php`  
+- **CLI:** `scripts/backup/run_restore_dr_drill.php --mode=success|rollback|all` (default `all`); optional `--verbose`  
+- **Master tests:** `scripts/backup/run_restore_certification_tests.php`  
+- **Self-test:** `scripts/backup/self_test_restore_dr_drill.php`  
+- **Docs:** `ORANGE_DR_PRODUCTION_CERTIFICATION.md`, `ORANGE_DR_OPERATOR_RUNBOOK.md`, `restore_dr_certification_report.json`  
+- **UI:** Restore Center read-only «شهادة جاهزية الاسترداد» + `admin/api/restore/certification.php` (GET; HTTP never runs drill)  
+- **Scope:** isolated fixtures only; marker `.orange_restore_dr_drill_fixture`; Country remains uncertified  
+- **Must not:** real production wipe/rename/maintenance/.env mutation/live integrations  
 
 ### 3B.4H — Route-level maintenance middleware wiring (storefront/admin/cron)
 
@@ -525,10 +530,9 @@ Live cutover is **forbidden** until all boxes are checked:
 - Post-completion smoke / cache bust (after maintenance released)  
 - Tests: smoke fail does not re-enter cutover without new job  
 
-### 3B.4J — Disaster recovery drill automation + certification pack
+### 3B.4J — (reserved / superseded numbering)
 
-- Scripted drill; metrics capture; checklist enforcement flag  
-- **Prod gate:** owner certification (§12)  
+- Owner phase **3B.4G** is the DR drill + certification pack (above). Older drafts that labeled this 3B.4J are obsolete.  
 
 ### 3B.3C — Country production (separate series)
 

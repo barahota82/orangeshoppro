@@ -129,6 +129,22 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     </dl>
 </div>
 
+<div class="rc-section card" id="rc_certification_section">
+    <h3>شهادة جاهزية الاسترداد</h3>
+    <p id="rc_cert_banner" class="rc-readonly-banner" style="margin:0 0 10px;" role="status">
+        عرض فقط — لا يُشغَّل تمرين الاسترداد من الواجهة. الأمر CLI: <code>run_restore_dr_drill.php</code>
+    </p>
+    <dl id="rc_cert_status" class="rc-status-strip">
+        <div><dt>Full Restore</dt><dd>…</dd></div>
+        <div><dt>تمرين التراجع</dt><dd>…</dd></div>
+        <div><dt>العزل</dt><dd>…</dd></div>
+        <div><dt>Commit</dt><dd>…</dd></div>
+        <div><dt>تاريخ الاختبار</dt><dd>…</dd></div>
+        <div><dt>Country Restore</dt><dd>غير معتمد للإنتاج</dd></div>
+    </dl>
+    <div id="rc_cert_blockers" class="muted" style="margin-top:8px;"></div>
+</div>
+
 <div id="rc_progress" class="rc-progress" role="status" aria-live="polite">جاري التحميل…</div>
 <div id="rc_alert" class="card" style="display:none;margin-bottom:12px;"></div>
 
@@ -662,6 +678,45 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         el('rc_detail_modal').style.display = 'flex';
     }
 
+    function renderCertification(cert) {
+        const box = el('rc_cert_status');
+        const blockersEl = el('rc_cert_blockers');
+        if (!box) return;
+        if (!cert || !cert.available) {
+            box.innerHTML =
+                '<div><dt>Full Restore</dt><dd>لا يوجد تقرير</dd></div>' +
+                '<div><dt>تمرين التراجع</dt><dd>—</dd></div>' +
+                '<div><dt>العزل</dt><dd>—</dd></div>' +
+                '<div><dt>Commit</dt><dd>—</dd></div>' +
+                '<div><dt>تاريخ الاختبار</dt><dd>—</dd></div>' +
+                '<div><dt>Country Restore</dt><dd>غير معتمد للإنتاج</dd></div>';
+            if (blockersEl) {
+                blockersEl.textContent = (cert && cert.message) ? String(cert.message) : 'شغّل تمرين CLI على بيئة معزولة أولاً.';
+            }
+            return;
+        }
+        const rec = String(cert.production_execution_recommendation || 'NOT_CERTIFIED');
+        const full = cert.full_restore_certified ? ('معتمد (' + rec + ')') : ('غير معتمد — ' + rec);
+        box.innerHTML =
+            '<div><dt>Full Restore</dt><dd>' + full + '</dd></div>' +
+            '<div><dt>تمرين التراجع</dt><dd>' + (cert.rollback_drill_ok ? 'ناجح' : 'فشل / غير متوفر') + '</dd></div>' +
+            '<div><dt>العزل</dt><dd>' + (cert.production_isolation_ok ? 'مثبت' : 'غير مثبت') + '</dd></div>' +
+            '<div><dt>Commit</dt><dd>' + (cert.tested_commit || '—') + '</dd></div>' +
+            '<div><dt>تاريخ الاختبار</dt><dd>' + (cert.tested_at || '—') + '</dd></div>' +
+            '<div><dt>Country Restore</dt><dd>غير معتمد للإنتاج</dd></div>';
+        const blockers = Array.isArray(cert.open_blockers) ? cert.open_blockers : [];
+        if (blockersEl) {
+            if (!blockers.length) {
+                blockersEl.textContent = 'لا توجد عوائق مفتوحة في التقرير.';
+            } else {
+                blockersEl.innerHTML = '<strong>عوائق مفتوحة:</strong><ul style="margin:6px 0 0 0;">' +
+                    blockers.map(function (b) {
+                        return '<li>[' + (b.severity || '') + '] ' + (b.code || '') + ' — ' + (b.message || '') + '</li>';
+                    }).join('') + '</ul>';
+            }
+        }
+    }
+
     async function loadAll() {
         setBusy(true, 'جاري تحميل البيانات…');
         try {
@@ -672,6 +727,12 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
             renderOverview(data);
             renderMaintenance(data.maintenance || {});
             renderTables(data);
+            try {
+                const certResp = await apiGet('certification.php');
+                renderCertification(certResp.certification || {});
+            } catch (certErr) {
+                renderCertification({ available: false, message: (certErr && certErr.message) ? certErr.message : 'تعذر تحميل الشهادة' });
+            }
         } catch (e) {
             showAlert(e.message || 'تعذر التحميل', false);
         } finally {

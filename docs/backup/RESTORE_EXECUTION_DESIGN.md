@@ -655,19 +655,21 @@ Fail → rollback_preparing.
 - **Must not:** DB import, uploads rename, rollback execution, unpin/delete anchors  
 - **Tests:** `self_test_production_finalize.php`  
 
-### 3B.3B9 / 3B.4G–3B.4I — Remaining production wiring (implementation; see 3B.4 design)
+### 3B.4G — Disaster Recovery Drill & Production Certification
 
-- **Code:** authorization gate, route middleware, post-finalize smoke/cache  
+- **Code:** `includes/backup/restore/restore_dr_drill.php`  
+- **CLI:** `scripts/backup/run_restore_dr_drill.php --mode=success|rollback|all`  
+- **Docs:** `ORANGE_DR_PRODUCTION_CERTIFICATION.md`, `ORANGE_DR_OPERATOR_RUNBOOK.md`, `restore_dr_certification_report.json`  
+- **Effects:** isolated success + rollback drills, failure injection, locks/security checks, honest certification recommendation  
+- **Tests:** `self_test_restore_dr_drill.php`, `run_restore_certification_tests.php`  
+- **Country:** remains uncertified for production  
+
+### 3B.4H–3B.4I — Remaining production wiring (implementation; see 3B.4 design)
+
+- **Code:** route middleware, post-finalize smoke/cache  
 - **Effects:** hardening after completion path  
 - **Tests:** end-to-end on clone; then limited prod drill window  
-- **Rollback:** 3B.4E + finalize 3B.4F  
-
-### 3B.3B10 / 3B.4J — Disaster recovery drill (implementation; see 3B.4 design)
-
-- **Code:** runbooks + checklist automation  
-- **Effects:** scheduled drill restore on clone  
-- **Tests:** timed RTO/RPO metrics  
-- **Prod gate:** owner acceptance  
+- **Rollback:** 3B.4E + finalize 3B.4F + DR drill 3B.4G  
 
 **Country production** starts only after a dedicated **3B.3C** series following table-boundary proof — not before Full shadow path success.
 

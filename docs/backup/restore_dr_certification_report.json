@@ -1,0 +1,463 @@
+{
+    "certification_version": "3B.4G-v1",
+    "tested_commit": "508e3aef",
+    "tested_at": "2026-07-18T00:34:18+00:00",
+    "environment": "isolated_drill",
+    "mode": "all",
+    "full_restore_success_drill": {
+        "ran": true,
+        "ok": true,
+        "assertions": [
+            {
+                "ok": true,
+                "label": "job_prepared_through_cutover_readiness"
+            },
+            {
+                "ok": true,
+                "label": "import_cutover_finalize_ran"
+            },
+            {
+                "ok": true,
+                "label": "state_restore_completed"
+            },
+            {
+                "ok": true,
+                "label": "checkpoints_c0_c8"
+            },
+            {
+                "ok": true,
+                "label": "final_report_restore_completed"
+            },
+            {
+                "ok": true,
+                "label": "maintenance_released"
+            },
+            {
+                "ok": true,
+                "label": "execution_lock_released"
+            },
+            {
+                "ok": true,
+                "label": "rollback_anchor_preserved"
+            },
+            {
+                "ok": true,
+                "label": "retention_pin_preserved"
+            },
+            {
+                "ok": true,
+                "label": "forensic_reports_preserved"
+            },
+            {
+                "ok": true,
+                "label": "no_production_resource_touched"
+            }
+        ],
+        "job_id": "2026-07-18_003243_808a9965"
+    },
+    "rollback_drill": {
+        "ran": true,
+        "ok": true,
+        "assertions": [
+            {
+                "ok": true,
+                "label": "reached_uploads_cutover_ready"
+            },
+            {
+                "ok": true,
+                "label": "maintenance_active_before_rollback"
+            },
+            {
+                "ok": true,
+                "label": "rollback_ready"
+            },
+            {
+                "ok": true,
+                "label": "checkpoint_C9"
+            },
+            {
+                "ok": true,
+                "label": "checkpoint_C10"
+            },
+            {
+                "ok": true,
+                "label": "checkpoint_C11"
+            },
+            {
+                "ok": true,
+                "label": "checkpoint_C12"
+            },
+            {
+                "ok": true,
+                "label": "uploads_restored_to_pre_restore_fixture"
+            },
+            {
+                "ok": true,
+                "label": "maintenance_held_until_rollback_finalize"
+            },
+            {
+                "ok": true,
+                "label": "rollback_completed"
+            },
+            {
+                "ok": true,
+                "label": "final_report_rollback_completed"
+            },
+            {
+                "ok": true,
+                "label": "retention_pin_preserved"
+            },
+            {
+                "ok": true,
+                "label": "rollback_anchor_preserved"
+            },
+            {
+                "ok": true,
+                "label": "no_production_resource_touched"
+            }
+        ],
+        "job_id": "2026-07-18_003253_974ab097"
+    },
+    "failure_injection_summary": {
+        "ok": true,
+        "cases": [
+            {
+                "injection": "pre_restore_backup_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "prepare",
+                    "error": "injected_pre_restore_backup_failure"
+                }
+            },
+            {
+                "injection": "verify_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "prepare",
+                    "error": "injected_verify_failure"
+                }
+            },
+            {
+                "injection": "drv_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "prepare",
+                    "error": "injected_drv_failure"
+                }
+            },
+            {
+                "injection": "shadow_db_import_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "prepare",
+                    "error": "injected_shadow_db_import_failure"
+                }
+            },
+            {
+                "injection": "shadow_verification_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "prepare",
+                    "error": "injected_shadow_verification_failure"
+                }
+            },
+            {
+                "injection": "shadow_files_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "prepare",
+                    "error": "injected_shadow_files_failure"
+                }
+            },
+            {
+                "injection": "smoke_test_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "prepare",
+                    "error": "injected_smoke_test_failure"
+                }
+            },
+            {
+                "injection": "maintenance_activation_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "prepare",
+                    "error": "injected_maintenance_activation_failure"
+                }
+            },
+            {
+                "injection": "crash_after_c3",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "cutover",
+                    "error": "injected_crash_after_c3"
+                }
+            },
+            {
+                "injection": "crash_after_c4",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "cutover",
+                    "error": "injected_crash_after_c4"
+                }
+            },
+            {
+                "injection": "production_verification_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "cutover",
+                    "error": "injected_production_verification_failure"
+                }
+            },
+            {
+                "injection": "uploads_first_rename_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "cutover",
+                    "error": "drill_uploads_cutover_failed:injected_uploads_first_rename_failure"
+                }
+            },
+            {
+                "injection": "uploads_second_rename_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "cutover",
+                    "error": "drill_uploads_cutover_failed:injected_uploads_second_rename_failure"
+                }
+            },
+            {
+                "injection": "uploads_verification_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "cutover",
+                    "error": "injected_uploads_verification_failure"
+                }
+            },
+            {
+                "injection": "db_rollback_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "rollback",
+                    "status": "rollback_failed"
+                }
+            },
+            {
+                "injection": "files_rollback_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "files_rollback",
+                    "status": "rollback_failed"
+                }
+            },
+            {
+                "injection": "maintenance_release_failure",
+                "ok": true,
+                "expected_failure": true,
+                "observed": {
+                    "ok": true,
+                    "phase": "maintenance_release_failure_policy",
+                    "note": "Drill asserts maintenance remains active when finalize/release is not completed"
+                }
+            }
+        ],
+        "passed": 17,
+        "failed": 0,
+        "total": 17
+    },
+    "checkpoint_validation": {
+        "success_c0_c8": true,
+        "rollback_c9_c12": true,
+        "note": "Validated existing documented checkpoint behavior via fixture engines; no new resume policy.",
+        "ok": true,
+        "checks": [
+            {
+                "name": "import_documents_c3_rewipe",
+                "ok": true,
+                "note": "Existing import engine: post-C3 restart = re-wipe/re-import"
+            },
+            {
+                "name": "import_documents_c4_verify_continue",
+                "ok": true,
+                "note": "Existing import engine: post-C4 = verification-only continuation"
+            },
+            {
+                "name": "uploads_partial_rename_detection",
+                "ok": true
+            },
+            {
+                "name": "rollback_checkpoint_continuation",
+                "ok": true
+            },
+            {
+                "name": "crash_injections_cover_c3_c4",
+                "ok": true
+            }
+        ]
+    },
+    "lock_validation": {
+        "ok": true,
+        "checks": [
+            {
+                "name": "second_execution_lock_blocked",
+                "ok": true
+            },
+            {
+                "name": "second_job_record_creatable",
+                "ok": true,
+                "note": "Job create allowed; execution lock remains single-holder"
+            },
+            {
+                "name": "lock_reacquire_after_release",
+                "ok": true
+            }
+        ]
+    },
+    "security_validation": {
+        "ok": true,
+        "checks": [
+            {
+                "name": "cli_only_restore_import_production.php",
+                "ok": true
+            },
+            {
+                "name": "cli_rejects_arbitrary_paths_restore_import_production.php",
+                "ok": true
+            },
+            {
+                "name": "cli_only_restore_uploads_cutover.php",
+                "ok": true
+            },
+            {
+                "name": "cli_rejects_arbitrary_paths_restore_uploads_cutover.php",
+                "ok": true
+            },
+            {
+                "name": "cli_only_restore_rollback.php",
+                "ok": true
+            },
+            {
+                "name": "cli_rejects_arbitrary_paths_restore_rollback.php",
+                "ok": true
+            },
+            {
+                "name": "cli_only_restore_finalize.php",
+                "ok": true
+            },
+            {
+                "name": "cli_rejects_arbitrary_paths_restore_finalize.php",
+                "ok": true
+            },
+            {
+                "name": "cli_only_run_restore_dr_drill.php",
+                "ok": true
+            },
+            {
+                "name": "cli_rejects_arbitrary_paths_run_restore_dr_drill.php",
+                "ok": true
+            },
+            {
+                "name": "no_env_injection_flag_restore_production_import.php",
+                "ok": true
+            },
+            {
+                "name": "no_env_injection_flag_restore_production_uploads_cutover.php",
+                "ok": true
+            },
+            {
+                "name": "no_env_injection_flag_restore_production_rollback.php",
+                "ok": true
+            },
+            {
+                "name": "no_env_injection_flag_restore_production_finalize.php",
+                "ok": true
+            },
+            {
+                "name": "no_env_injection_flag_restore_dr_drill.php",
+                "ok": true
+            },
+            {
+                "name": "country_production_blocked_constant",
+                "ok": true,
+                "note": "Engines reject package_type=country_recovery for production paths"
+            }
+        ]
+    },
+    "production_isolation_validation": {
+        "ok": true,
+        "marker": ".orange_restore_dr_drill_fixture",
+        "fixture_prod_db": "orange_dr_fixture_prod",
+        "fixture_shadow_db": "orange_dr_fixture_shadow",
+        "real_production_touched": false
+    },
+    "test_totals": {
+        "success_assertions": 11,
+        "rollback_assertions": 14,
+        "failure_injections_passed": 17,
+        "failure_injections_failed": 0,
+        "duration_seconds": 96
+    },
+    "open_blockers": [
+        {
+            "severity": "high",
+            "code": "maintenance_middleware_not_wired",
+            "message": "Storefront/admin route-level maintenance middleware (3B.4H) is not fully proven in this drill."
+        },
+        {
+            "severity": "medium",
+            "code": "db_steps_use_fixture_adapters",
+            "message": "DB wipe/import/rollback steps in this drill use isolated mock PDO adapters, not a live MySQL clone server."
+        }
+    ],
+    "country_restore_certified": false,
+    "full_restore_certified": false,
+    "production_execution_recommendation": "CONDITIONAL",
+    "required_operator_actions": [
+        "Review open blockers before any live window",
+        "Run scripts/backup/run_restore_certification_tests.php on the target server clone",
+        "Complete maintenance middleware wiring (3B.4H) before CERTIFIED live cutover",
+        "Keep Country production restore disabled"
+    ],
+    "evidence_artifacts": [
+        "docs/backup/ORANGE_DR_PRODUCTION_CERTIFICATION.md",
+        "docs/backup/ORANGE_DR_OPERATOR_RUNBOOK.md",
+        "restore_dr_certification_report.json"
+    ],
+    "confirmation": {
+        "real_production_restore_run": false,
+        "real_production_db_wiped": false,
+        "real_uploads_renamed": false,
+        "real_maintenance_enabled": false
+    }
+}

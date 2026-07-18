@@ -561,10 +561,16 @@ try {
     shadow_self_test($nameRejected, 'shadow DB name cannot equal production');
 
     shadow_self_test(!is_file($projectRoot . '/admin/api/restore/job/execute.php'), 'no execute endpoint');
-    shadow_self_test(!is_file($projectRoot . '/admin/api/restore/job/rollback.php'), 'no rollback endpoint');
+    // Rollback API exists (3B.4E+) but must not be invoked from the shadow restore module.
+    shadow_self_test(is_file($projectRoot . '/admin/api/restore/job/rollback.php'), 'rollback endpoint exists separately');
     shadow_self_test(!is_file($projectRoot . '/admin/api/restore/job/cutover.php'), 'no cutover endpoint');
 
     $mod = (string) file_get_contents($projectRoot . '/includes/backup/restore/restore_shadow_db.php');
+    shadow_self_test(
+        !str_contains($mod, 'orange_restore_prod_rollback_')
+        && !str_contains($mod, 'restore_production_rollback.php'),
+        'shadow module does not invoke rollback engine'
+    );
     shadow_self_test(
         !str_contains($mod, 'orange_restore_orchestrator_database_cutover(')
         && !str_contains($mod, 'orange_restore_orchestrator_uploads_cutover(')
