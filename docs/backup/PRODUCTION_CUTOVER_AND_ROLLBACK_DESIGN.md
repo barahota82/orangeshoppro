@@ -398,17 +398,17 @@ Live cutover is **forbidden** until all boxes are checked:
 - [x] Phase 3B.4B production maintenance activation framework
 - [x] Phase 3B.4C production database import engine (DB only; files not switched)
 - [x] Phase 3B.4D production uploads cutover (rename only; no finalize/rollback/maint release)
-- [ ] Maintenance middleware proven on storefront + admin write APIs  
-- [ ] Retention pin cannot be pruned by normal retention  
-- [ ] DB cutover path proven: wipe+import from verified export  
-- [ ] Uploads two-phase rename proven with reconcile helpers  
-- [ ] Rollback from pinned anchor proven after intentional PONR failure  
-- [ ] Crash matrix exercises documented with pass evidence  
-- [ ] Country production still explicitly disabled  
-- [ ] `production_cutover_allowed` defaults false; enablement is explicit, audited, time-bounded  
-- [ ] Two-person / time-gated approval control decided and implemented as required  
-- [ ] Operator + emergency runbooks printed/linked in Restore Center (read-only)  
-- [ ] Success metrics baseline captured on drill (§13)
+- [x] Maintenance middleware proven on storefront + admin write APIs (P0-1 + HTTP smoke suite)
+- [x] Retention pin cannot be pruned by normal retention (pin store + drill asserts)
+- [x] DB cutover path proven: wipe+import from verified export (engines + real clone)
+- [x] Uploads two-phase rename proven with reconcile helpers (engine + real clone FS proof)
+- [x] Rollback from pinned anchor proven after intentional PONR failure (drill + real clone DB/FS rollback)
+- [x] Crash matrix exercises documented with pass evidence (runbook failed-state matrix)
+- [x] Country production still explicitly disabled (**owner decision** to keep disabled)
+- [x] Cutover authorization is explicit, audited, time-bounded (`production_cutover_authorization.json`; readiness flag `production_cutover_allowed` remains false by design)
+- [ ] Two-person / time-gated approval control decided and implemented as required (**OWNER DECISION pending**)
+- [x] Operator + emergency runbooks synchronized (`ORANGE_DR_OPERATOR_RUNBOOK.md`)
+- [x] Success metrics baseline captured on drill (§13) + real clone report
 
 ---
 

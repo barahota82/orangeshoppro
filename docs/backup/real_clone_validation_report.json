@@ -1,21 +1,23 @@
 {
     "report_version": "3B.4L-real-clone-v1",
-    "generated_at": "2026-07-18T17:01:10+00:00",
+    "generated_at": "2026-07-18T21:53:41+00:00",
     "overall_result": "PASS",
     "server_version": "8.4.3",
     "engine": "InnoDB",
     "charset": "utf8mb4",
     "collation": "utf8mb4_0900_ai_ci",
-    "restore_duration_seconds": 0.139,
+    "restore_duration_seconds": 0.194,
     "timings": {
-        "bootstrap_seconds": 0.004,
-        "workspace_seconds": 0.017,
-        "drv_seconds": 0.005,
-        "shadow_restore_seconds": 0.049,
-        "shadow_verify_seconds": 0.006,
-        "target_restore_seconds": 0.047,
-        "smoke_seconds": 0.005,
-        "total_seconds": 0.139
+        "bootstrap_seconds": 0.024,
+        "workspace_seconds": 0.018,
+        "drv_seconds": 0.004,
+        "shadow_restore_seconds": 0.042,
+        "shadow_verify_seconds": 0.005,
+        "target_restore_seconds": 0.044,
+        "smoke_seconds": 0.003,
+        "uploads_cutover_rollback_seconds": 0.006,
+        "db_rollback_seconds": 0.043,
+        "total_seconds": 0.194
     },
     "verification": {
         "shadow_import": {
@@ -54,6 +56,28 @@
         "session_database": "orange_clone_target",
         "not_production": true
     },
+    "uploads_cutover": {
+        "ok": true,
+        "model": "uploads→uploads_pre_merge; uploads_next→uploads",
+        "post_file": "a.txt"
+    },
+    "uploads_rollback": {
+        "ok": true,
+        "model": "uploads→uploads_failed_cutover; uploads_pre_merge→uploads",
+        "restored_file": "seed.txt"
+    },
+    "db_rollback": {
+        "ok": true,
+        "sample_name": "pre_restore_anchor",
+        "import": {
+            "ok": true,
+            "statements_executed": 4,
+            "bytes_read": 289,
+            "error": null,
+            "failed_statement": null
+        },
+        "session_database": "orange_clone_target"
+    },
     "production_isolation_proof": {
         "clone_marker": ".orange_restore_real_clone",
         "clone_root": "D:\\orange_clone_mysql",
@@ -70,10 +94,11 @@
         "mock_pdo_used": false,
         "asserts_before_destructive_stages": true
     },
-    "package_id": "clone_20260718_170110",
+    "package_id": "clone_20260718_215341",
     "mock_pdo_used": false,
     "notes": [
         "Clone target DB stands in for production schema during validation only.",
-        "Real project DB_NAME / uploads / .env.php were not modified."
+        "Real project DB_NAME / uploads / .env.php were not modified.",
+        "Uploads cutover/rollback exercised on isolated clone filesystem only."
     ]
 }

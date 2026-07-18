@@ -610,24 +610,33 @@ function orange_restore_maint_fw_validate_cli_bypass(
 }
 
 /**
- * Future integration points (documentation encoded for agents).
+ * Wired integration inventory (P0-1). Kept for operator visibility; not "future".
  *
+ * @return list<string>
+ */
+function orange_restore_maint_fw_wired_integration_points(): array
+{
+    return [
+        'config.php require_admin_api/page → orange_restore_maint_enforcement_http_guard',
+        'api/orders/create-order.php',
+        'api/orders/amend-order-items.php',
+        'api/orders/cancel-by-customer.php',
+        'api/payments/* mutation guards',
+        'api/auth/* mutation guards',
+        'includes/order_intake_queue.php',
+        'scripts/process_order_intake_queue.php',
+        'includes/backup/backup_runner.php',
+        'approved restore CLI workers (scoped bypass)',
+    ];
+}
+
+/**
+ * @deprecated Use orange_restore_maint_fw_wired_integration_points()
  * @return list<string>
  */
 function orange_restore_maint_fw_future_integration_points(): array
 {
-    return [
-        'api/orders/create-order.php',
-        'api/orders/amend-order-items.php',
-        'admin/api/orders/*',
-        'includes/order_intake_queue.php',
-        'includes/gl_posting / journal write paths',
-        'admin catalog mutation APIs',
-        'includes/backup/backup_runner.php scheduled entry',
-        'payment callback endpoints (allowlist TBD by owner)',
-        'email/queue workers',
-        'storefront cart checkout POST',
-    ];
+    return orange_restore_maint_fw_wired_integration_points();
 }
 
 /**
@@ -667,6 +676,8 @@ function orange_restore_maint_fw_public(array $state): array
         'restore_started' => false,
         'execution_started' => false,
         'warning' => 'Production restore has NOT started.',
-        'future_integration_points' => orange_restore_maint_fw_future_integration_points(),
+        'wired_integration_points' => orange_restore_maint_fw_wired_integration_points(),
+        // Backward-compatible alias (no longer means unwired).
+        'future_integration_points' => orange_restore_maint_fw_wired_integration_points(),
     ];
 }

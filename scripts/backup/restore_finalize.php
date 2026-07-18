@@ -60,6 +60,10 @@ try {
         . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_maintenance_enforcement.php';
     orange_restore_maint_enforcement_cli_restore_worker($workRoot, $jobId, 'production_finalize');
 
+    require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup'
+        . DIRECTORY_SEPARATOR . 'restore' . DIRECTORY_SEPARATOR . 'restore_execution_orchestrator.php';
+    orange_restore_exec_lock_heartbeat($workRoot, $jobId);
+
     $result = orange_restore_prod_finalize_run_cli([
         'project_root' => $projectRoot,
         'work_root' => $workRoot,

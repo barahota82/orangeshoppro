@@ -509,6 +509,136 @@ function orange_restore_real_clone_seed_package(string $pkgDir, string $pkgId): 
 }
 
 /**
+ * Isolated clone FS: two-phase uploads rename + rollback (never production paths).
+ *
+ * @return array{ok:bool,cutover:array<string,mixed>,rollback:array<string,mixed>}
+ */
+function orange_restore_real_clone_uploads_cutover_and_rollback(string $uploadsRoot, string $packageDir): array
+{
+    $marker = orange_restore_real_clone_marker_path($uploadsRoot);
+    if (!is_file($marker)) {
+        throw new RuntimeException('clone_uploads_marker_missing');
+    }
+    $zipPath = $packageDir . DIRECTORY_SEPARATOR . 'uploads.zip';
+    if (!is_file($zipPath) || !class_exists('ZipArchive')) {
+        throw new RuntimeException('clone_uploads_zip_missing');
+    }
+
+    $uploadsNext = dirname($uploadsRoot) . DIRECTORY_SEPARATOR . 'uploads_next';
+    $uploadsPre = dirname($uploadsRoot) . DIRECTORY_SEPARATOR . 'uploads_pre_merge';
+    foreach ([$uploadsNext, $uploadsPre] as $dir) {
+        if (is_dir($dir)) {
+            orange_restore_real_clone_rm_tree($dir);
+        }
+    }
+    if (!mkdir($uploadsNext, 0775, true) && !is_dir($uploadsNext)) {
+        throw new RuntimeException('clone_uploads_next_mkdir_failed');
+    }
+    orange_restore_real_clone_write_marker($uploadsNext, ['role' => 'uploads_next']);
+
+    $zip = new ZipArchive();
+    if ($zip->open($zipPath) !== true) {
+        throw new RuntimeException('clone_uploads_zip_open_failed');
+    }
+    if (!$zip->extractTo($uploadsNext)) {
+        $zip->close();
+        throw new RuntimeException('clone_uploads_zip_extract_failed');
+    }
+    $zip->close();
+
+    $seedBefore = is_file($uploadsRoot . DIRECTORY_SEPARATOR . 'seed.txt');
+    if (!@rename($uploadsRoot, $uploadsPre)) {
+        throw new RuntimeException('clone_uploads_rename_to_pre_merge_failed');
+    }
+    if (!@rename($uploadsNext, $uploadsRoot)) {
+        @rename($uploadsPre, $uploadsRoot);
+        throw new RuntimeException('clone_uploads_rename_next_to_live_failed');
+    }
+    orange_restore_real_clone_write_marker($uploadsRoot, ['role' => 'uploads_root_after_cutover']);
+    $cutoverOk = is_file($uploadsRoot . DIRECTORY_SEPARATOR . 'a.txt')
+        && is_dir($uploadsPre)
+        && $seedBefore;
+
+    // Rollback files: reverse rename (production model).
+    $uploadsFailed = dirname($uploadsRoot) . DIRECTORY_SEPARATOR . 'uploads_failed_cutover';
+    if (is_dir($uploadsFailed)) {
+        orange_restore_real_clone_rm_tree($uploadsFailed);
+    }
+    if (!@rename($uploadsRoot, $uploadsFailed)) {
+        throw new RuntimeException('clone_uploads_rollback_park_failed');
+    }
+    if (!@rename($uploadsPre, $uploadsRoot)) {
+        @rename($uploadsFailed, $uploadsRoot);
+        throw new RuntimeException('clone_uploads_rollback_restore_failed');
+    }
+    orange_restore_real_clone_write_marker($uploadsRoot, ['role' => 'uploads_root']);
+    $rollbackOk = is_file($uploadsRoot . DIRECTORY_SEPARATOR . 'seed.txt')
+        && !is_file($uploadsRoot . DIRECTORY_SEPARATOR . 'a.txt');
+
+    return [
+        'ok' => $cutoverOk && $rollbackOk,
+        'cutover' => [
+            'ok' => $cutoverOk,
+            'model' => 'uploads→uploads_pre_merge; uploads_next→uploads',
+            'post_file' => 'a.txt',
+        ],
+        'rollback' => [
+            'ok' => $rollbackOk,
+            'model' => 'uploads→uploads_failed_cutover; uploads_pre_merge→uploads',
+            'restored_file' => 'seed.txt',
+        ],
+    ];
+}
+
+function orange_restore_real_clone_rm_tree(string $dir): void
+{
+    if (!is_dir($dir)) {
+        return;
+    }
+    $items = scandir($dir);
+    if (!is_array($items)) {
+        return;
+    }
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+        $path = $dir . DIRECTORY_SEPARATOR . $item;
+        if (is_dir($path)) {
+            orange_restore_real_clone_rm_tree($path);
+        } else {
+            @unlink($path);
+        }
+    }
+    @rmdir($dir);
+}
+
+/**
+ * Anchor SQL representing pre-restore DB content for clone rollback proof.
+ */
+function orange_restore_real_clone_write_rollback_sql_gzip(string $path): string
+{
+    $sql = <<<'SQL'
+SET NAMES utf8mb4;
+DROP TABLE IF EXISTS `clone_items`;
+CREATE TABLE `clone_items` (
+  `id` INT NOT NULL PRIMARY KEY,
+  `name` VARCHAR(64) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT INTO `clone_items` (`id`, `name`) VALUES (1, 'pre_restore_anchor');
+SQL;
+    $gz = gzencode($sql, 1);
+    if ($gz === false) {
+        throw new RuntimeException('clone_rollback_gzip_failed');
+    }
+    if (@file_put_contents($path, $gz) === false) {
+        throw new RuntimeException('clone_rollback_sql_write_failed');
+    }
+
+    return hash_file('sha256', $path) ?: '';
+}
+
+/**
  * Build gzip SQL artifact for clone restore (real file, imported via real PDO).
  */
 function orange_restore_real_clone_write_sql_gzip(string $path): string
@@ -709,6 +839,41 @@ function orange_restore_real_clone_run(array $options): array
     ];
     $timings['smoke_seconds'] = round(microtime(true) - $t0, 3);
 
+    // --- Real FS uploads cutover + rollback (isolated clone uploads only) ---
+    $t0 = microtime(true);
+    orange_restore_real_clone_assert_isolation();
+    $uploadsFs = orange_restore_real_clone_uploads_cutover_and_rollback(
+        (string) $cfg['uploads_root'],
+        (string) $cfg['package_dir']
+    );
+    $timings['uploads_cutover_rollback_seconds'] = round(microtime(true) - $t0, 3);
+
+    // --- Real DB rollback proof on clone target (wipe + re-import prior image) ---
+    $t0 = microtime(true);
+    orange_restore_real_clone_assert_isolation();
+    orange_restore_real_clone_assert_session_db($targetPdo, (string) $cfg['target_db'], $prod['db']);
+    $rollbackSqlGz = (string) $cfg['work_root'] . DIRECTORY_SEPARATOR . 'clone_rollback_anchor.sql.gz';
+    orange_restore_real_clone_write_rollback_sql_gzip($rollbackSqlGz);
+    orange_restore_production_wipe($targetPdo, (string) $cfg['target_db']);
+    orange_restore_real_clone_assert_session_db($targetPdo, (string) $cfg['target_db'], $prod['db']);
+    $dbRollbackImport = orange_restore_sql_runner_import_gzip_to_target(
+        $targetPdo,
+        $rollbackSqlGz,
+        (string) $cfg['target_db'],
+        $prod['db']
+    );
+    if (empty($dbRollbackImport['ok'])) {
+        throw new RuntimeException('clone_db_rollback_import_failed:' . (string) ($dbRollbackImport['error'] ?? ''));
+    }
+    $rbName = (string) $targetPdo->query('SELECT `name` FROM `clone_items` WHERE id=1')->fetchColumn();
+    $dbRollback = [
+        'ok' => !empty($dbRollbackImport['ok']) && $rbName === 'pre_restore_anchor',
+        'sample_name' => $rbName,
+        'import' => $dbRollbackImport,
+        'session_database' => (string) $targetPdo->query('SELECT DATABASE()')->fetchColumn(),
+    ];
+    $timings['db_rollback_seconds'] = round(microtime(true) - $t0, 3);
+
     $timings['total_seconds'] = round(microtime(true) - $started, 3);
 
     $isolationProof = [
@@ -734,6 +899,8 @@ function orange_restore_real_clone_run(array $options): array
         && ($smoke['ok'] ?? false)
         && !empty($shadowImport['ok'])
         && !empty($targetImport['ok'])
+        && !empty($uploadsFs['ok'])
+        && !empty($dbRollback['ok'])
         && $isolationProof['production_db_differs'];
 
     $report = [
@@ -758,12 +925,16 @@ function orange_restore_real_clone_run(array $options): array
         ],
         'shadow_verify' => $shadowVerify,
         'smoke' => $smoke,
+        'uploads_cutover' => $uploadsFs['cutover'] ?? [],
+        'uploads_rollback' => $uploadsFs['rollback'] ?? [],
+        'db_rollback' => $dbRollback,
         'production_isolation_proof' => $isolationProof,
         'package_id' => (string) $cfg['package_id'],
         'mock_pdo_used' => false,
         'notes' => [
             'Clone target DB stands in for production schema during validation only.',
             'Real project DB_NAME / uploads / .env.php were not modified.',
+            'Uploads cutover/rollback exercised on isolated clone filesystem only.',
         ],
     ];
 

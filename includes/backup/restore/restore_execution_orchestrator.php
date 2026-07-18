@@ -61,6 +61,14 @@ function orange_restore_exec_active_statuses(): array
         ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_RUNNING,
         ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_VERIFYING,
         ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_READY,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_PENDING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_DATABASE_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_DATABASE_VERIFYING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_VERIFYING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_READY,
+        ORANGE_RESTORE_FW_STATUS_RESTORE_FINALIZING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_FINALIZING,
     ];
 }
 
@@ -121,8 +129,12 @@ function orange_restore_exec_lock_status(string $workRoot): array
  */
 function orange_restore_exec_lock_is_stale(array $payload): bool
 {
-    $startedAt = strtotime((string) ($payload['started_at'] ?? ''));
-    if ($startedAt !== false && (time() - $startedAt) > ORANGE_RESTORE_EXEC_LOCK_STALE_SECONDS) {
+    // Prefer heartbeat_at so long-running imports remain non-stale while alive.
+    $hb = strtotime((string) ($payload['heartbeat_at'] ?? ''));
+    if ($hb === false) {
+        $hb = strtotime((string) ($payload['started_at'] ?? ''));
+    }
+    if ($hb !== false && (time() - $hb) > ORANGE_RESTORE_EXEC_LOCK_STALE_SECONDS) {
         return true;
     }
     $pid = (int) ($payload['pid'] ?? 0);
@@ -142,6 +154,45 @@ function orange_restore_exec_lock_is_stale(array $payload): bool
     }
 
     return false;
+}
+
+/**
+ * Refresh execution lock heartbeat for a held job (call during long CLI work).
+ *
+ * @return array{ok:bool,message:string}
+ */
+function orange_restore_exec_lock_heartbeat(string $workRoot, string $jobId): array
+{
+    $path = orange_restore_exec_lock_path($workRoot);
+    if (!is_file($path)) {
+        return ['ok' => false, 'message' => 'execution_lock_missing'];
+    }
+    $raw = (string) file_get_contents($path);
+    $payload = json_decode($raw, true);
+    if (!is_array($payload)) {
+        return ['ok' => false, 'message' => 'execution_lock_corrupt'];
+    }
+    $heldJob = (string) ($payload['job_id'] ?? '');
+    if ($heldJob !== '' && $heldJob !== $jobId) {
+        return ['ok' => false, 'message' => 'execution_lock_job_mismatch'];
+    }
+    $payload['heartbeat_at'] = gmdate('c');
+    $payload['pid'] = getmypid();
+    $encoded = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($encoded === false) {
+        return ['ok' => false, 'message' => 'execution_lock_encode_failed'];
+    }
+    $tmp = $path . '.hb.tmp';
+    if (@file_put_contents($tmp, $encoded . "\n") === false) {
+        return ['ok' => false, 'message' => 'execution_lock_heartbeat_write_failed'];
+    }
+    if (!@rename($tmp, $path)) {
+        @unlink($tmp);
+
+        return ['ok' => false, 'message' => 'execution_lock_heartbeat_rename_failed'];
+    }
+
+    return ['ok' => true, 'message' => 'execution_lock_heartbeat_ok'];
 }
 
 /**
@@ -175,10 +226,12 @@ function orange_restore_exec_acquire_lock(string $workRoot, string $jobId): arra
         return ['ok' => false, 'message' => 'execution_orchestration_already_active', 'stale_cleared' => false];
     }
 
+    $now = gmdate('c');
     $payload = json_encode([
         'job_id' => $jobId,
         'pid' => getmypid(),
-        'started_at' => gmdate('c'),
+        'started_at' => $now,
+        'heartbeat_at' => $now,
         'orchestrator_version' => ORANGE_RESTORE_EXEC_ORCH_VERSION,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($payload === false) {

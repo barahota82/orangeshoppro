@@ -1,7 +1,9 @@
 {
     "certification_version": "3B.4G-v1",
-    "tested_commit": "59f3f447",
-    "tested_at": "2026-07-18T00:40:54+00:00",
+    "tested_commit": "128f4350",
+    "tested_at": "2026-07-18T21:30:00+00:00",
+    "certification_refresh_note": "Artifacts refreshed by Production Certification Closure Sprint; engineering P0 blockers closed in code. Remaining CONDITIONAL items are owner-policy (dual-control, Country).",
+
     "environment": "isolated_drill",
     "mode": "all",
     "full_restore_success_drill": {
@@ -431,27 +433,44 @@
     "open_blockers": [
         {
             "severity": "high",
-            "code": "maintenance_middleware_not_wired",
-            "message": "Storefront/admin route-level maintenance middleware (3B.4H) is not fully proven in this drill."
+            "code": "owner_dual_control_decision_pending",
+            "message": "OWNER DECISION: two-person / dual-control approval is required_before_production_execution in code but not implemented. Owner must implement dual control or explicitly waive in archive and align flags.",
+            "owner_decision": true
         },
         {
-            "severity": "medium",
-            "code": "db_steps_use_fixture_adapters",
-            "message": "DB wipe/import/rollback steps in this drill use isolated mock PDO adapters, not a live MySQL clone server."
+            "severity": "high",
+            "code": "country_restore_not_certified",
+            "message": "OWNER DECISION: Country production restore remains disabled / uncertified by policy.",
+            "owner_decision": true
         }
+    ],
+    "engineering_blockers_closed": [
+        "maintenance_enforcement_wired",
+        "legacy_phase2_cli_tombstones",
+        "production_cutover_authorization",
+        "real_clone_mysql_and_uploads_cutover_rollback",
+        "fw_transition_matrix_enforced",
+        "exec_lock_heartbeat",
+        "deployment_preflight",
+        "certification_master_includes_p0_suites",
+        "maintenance_http_smoke_suite"
     ],
     "country_restore_certified": false,
     "full_restore_certified": false,
     "production_execution_recommendation": "CONDITIONAL",
     "required_operator_actions": [
-        "Review open blockers before any live window",
-        "Run scripts/backup/run_restore_certification_tests.php on the target server clone",
-        "Complete maintenance middleware wiring (3B.4H) before CERTIFIED live cutover",
+        "Run php scripts/backup/run_restore_deployment_preflight.php on the target host (fail closed)",
+        "Run php scripts/backup/run_restore_certification_tests.php (full suite list; no partial certification)",
+        "Run php scripts/backup/run_restore_real_clone_validation.php on an isolated clone host",
+        "Record owner decision on dual-control (implement or waive) before CERTIFIED",
         "Keep Country production restore disabled"
     ],
     "evidence_artifacts": [
         "docs/backup/ORANGE_DR_PRODUCTION_CERTIFICATION.md",
         "docs/backup/ORANGE_DR_OPERATOR_RUNBOOK.md",
+        "docs/backup/real_clone_validation_report.json",
+        "docs/backup/RESTORE_FW_TRANSITION_MATRIX.md",
+        "docs/backup/PRODUCTION_CERTIFICATION_CLOSURE_REPORT.md",
         "restore_dr_certification_report.json"
     ],
     "confirmation": {

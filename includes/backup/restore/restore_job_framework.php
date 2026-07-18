@@ -12,6 +12,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/restore_paths.php';
 require_once __DIR__ . '/restore_lock.php';
 require_once __DIR__ . '/restore_audit.php';
+require_once __DIR__ . '/restore_fw_transition_matrix.php';
 
 const ORANGE_RESTORE_FW_DIRNAME = 'framework';
 const ORANGE_RESTORE_FW_JOB_FILE = 'job.json';
@@ -971,6 +972,8 @@ function orange_restore_fw_transition(
         throw new RuntimeException('Invalid restore framework status.');
     }
     $job = orange_restore_fw_read($workRoot, $jobId);
+    $from = (string) ($job['status'] ?? '');
+    orange_restore_fw_assert_transition($from, $status);
     $job['status'] = $status;
     $job['phase'] = $phase;
     $job['progress'] = max(0, min(100, $progress));

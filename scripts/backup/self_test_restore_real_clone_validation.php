@@ -105,6 +105,9 @@ try {
     rcv_self_test(!empty($report['drv']), 'report: DRV block');
     rcv_self_test(!empty($report['shadow_verify']['ok']), 'report: shadow verify ok');
     rcv_self_test(!empty($report['smoke']['ok']), 'report: smoke ok');
+    rcv_self_test(!empty($report['uploads_cutover']['ok']), 'report: uploads cutover ok');
+    rcv_self_test(!empty($report['uploads_rollback']['ok']), 'report: uploads rollback ok');
+    rcv_self_test(!empty($report['db_rollback']['ok']), 'report: db rollback ok');
     rcv_self_test(
         !empty($report['production_isolation_proof']['production_db_differs'])
         && !empty($report['production_isolation_proof']['uploads_differs_from_production']),
@@ -134,7 +137,11 @@ try {
         'live: clone target session != production DB'
     );
     $rows = (int) $pdo->query('SELECT COUNT(*) FROM clone_items')->fetchColumn();
-    rcv_self_test($rows === 2, 'live: restored rows present in clone target');
+    $anchor = (string) $pdo->query('SELECT name FROM clone_items WHERE id=1')->fetchColumn();
+    rcv_self_test(
+        $rows === 1 && $anchor === 'pre_restore_anchor',
+        'live: clone target reflects DB rollback anchor'
+    );
 } catch (Throwable $e) {
     echo 'THROWABLE: ' . $e->getMessage() . PHP_EOL;
     rcv_self_test(false, 'pipeline: completed without exception (' . $e->getMessage() . ')');

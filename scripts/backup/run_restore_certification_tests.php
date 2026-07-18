@@ -48,6 +48,16 @@ $suites = [
     'self_test_production_finalize.php',
     'self_test_restore_dr_drill.php',
     'self_test_backup_admin_nav.php',
+    // P0 + certification closure suites (required; no partial certification).
+    'self_test_maintenance_enforcement.php',
+    'self_test_legacy_restore_fencing.php',
+    'self_test_production_cutover_authorization.php',
+    'self_test_restore_real_clone_validation.php',
+    'self_test_restore_fw_transition_matrix.php',
+    'self_test_exec_lock_heartbeat.php',
+    'self_test_restore_deployment_preflight.php',
+    'self_test_maintenance_http_smoke.php',
+    'self_test_phase2_callsite_fence.php',
 ];
 
 $failed = 0;
