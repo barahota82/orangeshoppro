@@ -349,8 +349,37 @@ function pi_seed_maintenance_active(string $workRoot, string $backupRoot, string
         'restore-test-password',
         (string) (($req['challenge']['nonce'] ?? ''))
     );
+    pi_authorize_production_cutover($workRoot, $backupRoot, $jobId, $seed['admin'], $seed['pdo'], $sourceId);
 
     return $seed;
+}
+
+/**
+ * P0-3 — explicit production cutover authorization for import fixtures.
+ *
+ * @param array<string, mixed> $admin
+ */
+function pi_authorize_production_cutover(
+    string $workRoot,
+    string $backupRoot,
+    string $jobId,
+    array $admin,
+    PDO $pdo,
+    string $packageId
+): void {
+    $challenge = orange_restore_pca_create_challenge($workRoot, $jobId, $backupRoot, $admin, $pdo);
+    orange_restore_pca_finalize(
+        $workRoot,
+        $jobId,
+        $backupRoot,
+        $admin,
+        $pdo,
+        $packageId,
+        (string) ($challenge['required_confirmation_phrase'] ?? ''),
+        (string) ($challenge['nonce'] ?? ''),
+        'restore-test-password',
+        'Owner authorizes production cutover for isolated import self-test'
+    );
 }
 
 final class PiProductionImportMockPdo extends PDO
@@ -496,6 +525,14 @@ function pi_env(string $backupRoot): array
     ];
 }
 
+$piIsDirectCli = PHP_SAPI === 'cli'
+    && isset($_SERVER['SCRIPT_FILENAME'])
+    && realpath((string) $_SERVER['SCRIPT_FILENAME']) === realpath(__FILE__);
+
+if (!$piIsDirectCli) {
+    return;
+}
+
 try {
     $tmpRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_prod_import_' . bin2hex(random_bytes(4));
     $backupRoot = $tmpRoot . DIRECTORY_SEPARATOR . 'backup';
@@ -553,11 +590,32 @@ try {
     pi_self_test(($gates['ok'] ?? true) === false && ($gates['code'] ?? '') === 'maintenance_not_active', 'entry: rejects without maintenance_active');
     pi_retire_job($workRoot, $seedGate['job_id']);
 
-    // --- activate maintenance then request import ---
+    // --- activate maintenance without cutover authorization ---
+    $seedNoAuth = pi_seed_ready_job($workRoot, $backupRoot, $pkgId);
+    $jobNoAuth = $seedNoAuth['job_id'];
+    $reqNoAuth = orange_restore_prod_maint_request($workRoot, $jobNoAuth, $backupRoot, $seedNoAuth['admin']);
+    orange_restore_prod_maint_activate(
+        $workRoot,
+        $jobNoAuth,
+        $backupRoot,
+        $seedNoAuth['admin'],
+        $seedNoAuth['pdo'],
+        'restore-test-password',
+        (string) (($reqNoAuth['challenge']['nonce'] ?? ''))
+    );
+    $gatesNoAuth = orange_restore_prod_import_validate_entry($workRoot, $jobNoAuth, $backupRoot, $fixtureProjectRoot);
+    pi_self_test(
+        ($gatesNoAuth['ok'] ?? true) === false
+        && ($gatesNoAuth['code'] ?? '') === 'production_cutover_authorization_required',
+        'entry: rejects without production cutover authorization'
+    );
+    pi_retire_job($workRoot, $jobNoAuth);
+
+    // --- activate maintenance + authorize then request import ---
     $seed = pi_seed_maintenance_active($workRoot, $backupRoot, $pkgId);
     $jobId = $seed['job_id'];
     $gatesOk = orange_restore_prod_import_validate_entry($workRoot, $jobId, $backupRoot, $fixtureProjectRoot);
-    pi_self_test(($gatesOk['ok'] ?? false) === true, 'entry: all gates pass when maintenance_active + lineage ready');
+    pi_self_test(($gatesOk['ok'] ?? false) === true, 'entry: all gates pass when maintenance_active + lineage + cutover authorization ready');
 
     $req = orange_restore_prod_import_request(
         $workRoot,

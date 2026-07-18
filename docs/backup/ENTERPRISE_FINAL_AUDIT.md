@@ -93,6 +93,7 @@ Country production restore remains correctly blocked in production engines.
 - **Affected files:** `includes/backup/restore/restore_production_import.php`, `includes/backup/restore/restore_shadow_smoke.php`, `docs/backup/PRODUCTION_CUTOVER_AND_ROLLBACK_DESIGN.md`
 - **Recommended fix:** Implement explicit time-bounded `production_cutover_authorized` record (owner-approved) **before** import/uploads CLIs may run; do not treat “allowed=false” as authorization.
 - **Production risk:** Shadow readiness alone can proceed to wipe/import once maintenance is active—missing a final human authorization layer the design called for.
+- **Remediation (P0-3 — 2026-07-18):** **REMEDIATED (authorization layer).** Explicit `production_cutover_authorization.json` bound to job/package/contract/rollback-anchor/approval/session + recent password re-auth. APIs: challenge / finalize / status (no execution). Import entry gate requires valid unexpired (or in-progress consumed) authorization; CLI consumes one-time at start. Module: `restore_production_cutover_authorization.php`. Tests: `self_test_production_cutover_authorization.php`. Note: `production_cutover_allowed` remains false by design (readiness flag ≠ authorization); two-person control remains F-SEC-06.
 
 **NO FINDINGS** for missing terminal statuses themselves (completed/failed/cancelled exist and finalize/rollback cover them).
 
@@ -554,7 +555,7 @@ Country production restore remains correctly blocked in production engines.
 |----------|------|-------------|
 | P0 | Wire maintenance middleware; integration-test write blocking | F-SEC-01, F-PROD-01 |
 | P0 | ~~Remove/disable Phase-2 production cutover CLIs on prod~~ **DONE (P0-2)** | F-ARCH-01, F-CLI-02, F-PROD-02 |
-| P0 | Explicit production cutover authorization before wipe/rename | F-SM-03 |
+| P0 | ~~Explicit production cutover authorization before wipe/rename~~ **DONE (P0-3)** | F-SM-03 |
 | P0 | Live clone drill with real DB/files; refresh certification | F-TEST-02 |
 | P1 | Target host ZipArchive/DRV uploads integrity | F-SEC-04 |
 | P1 | Owner decision on two-person approval | F-SEC-06 |

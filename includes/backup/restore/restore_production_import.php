@@ -18,6 +18,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/restore_job_framework.php';
 require_once __DIR__ . '/restore_production_maintenance.php';
+require_once __DIR__ . '/restore_production_cutover_authorization.php';
 require_once __DIR__ . '/restore_production_target.php';
 require_once __DIR__ . '/restore_merge_maintenance.php';
 require_once __DIR__ . '/restore_merge_staging_export.php';
@@ -227,6 +228,7 @@ function orange_restore_prod_import_validate_entry(
         'shadow_smoke_ready' => false,
         'cutover_readiness_ready' => false,
         'production_cutover_allowed_false' => true,
+        'production_cutover_authorization' => false,
         'version_lock' => false,
         'package_unchanged' => false,
         'approval_unchanged' => false,
@@ -304,6 +306,16 @@ function orange_restore_prod_import_validate_entry(
         return ['ok' => false, 'code' => 'cutover_readiness_not_ready', 'details' => $details];
     }
     $details['production_cutover_allowed_false'] = empty($cutover['production_cutover_allowed']);
+
+    $authGate = orange_restore_pca_validate_for_import($workRoot, $jobId, $backupRoot);
+    $details['production_cutover_authorization'] = (bool) ($authGate['ok'] ?? false);
+    if (!$details['production_cutover_authorization']) {
+        return [
+            'ok' => false,
+            'code' => (string) ($authGate['code'] ?? 'production_cutover_authorization_required'),
+            'details' => $details + (array) ($authGate['details'] ?? []),
+        ];
+    }
 
     // Reject shadow/staging name confusion at gate level.
     $env = orange_backup_load_env_array($projectRoot);
@@ -658,6 +670,9 @@ function orange_restore_prod_import_run_cli(array $options): array
     if (!$gates['ok']) {
         throw new RuntimeException((string) $gates['code']);
     }
+
+    // Consume one-time authorization at CLI entry (before any wipe/import mutation).
+    orange_restore_pca_consume_for_cutover_start($workRoot, $jobId);
 
     orange_restore_prod_maint_ensure_execution_lock($workRoot, $jobId);
 

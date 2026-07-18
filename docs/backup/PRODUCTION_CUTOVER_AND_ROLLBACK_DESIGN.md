@@ -536,6 +536,15 @@ Live cutover is **forbidden** until all boxes are checked:
 - **Tests:** `scripts/backup/self_test_legacy_restore_fencing.php`  
 - **Must not:** compatibility re-enable flags; argv passwords; deleting reusable Phase-2 library functions used by tests/3B  
 
+### 3B.4K — Explicit production cutover authorization record — DONE (P0-3)
+
+- **Code:** `includes/backup/restore/restore_production_cutover_authorization.php`  
+- **Artifact:** `{frameworkJobDir}/production_cutover_authorization.json` (one-time, time-bounded, bound to job/package/fingerprints/contract/rollback-anchor/approval/session)  
+- **APIs (no execution):** `create-cutover-authorization-challenge.php`, `finalize-cutover-authorization.php`, `cutover-authorization.php` (GET)  
+- **Gate:** `orange_restore_prod_import_validate_entry()` requires valid authorization; CLI consumes via `orange_restore_pca_consume_for_cutover_start()` before wipe/import  
+- **Not:** a second final_approval; does not flip `production_cutover_allowed`; does not change DB import/uploads engines beyond the gate/consume  
+- **Tests:** `scripts/backup/self_test_production_cutover_authorization.php`  
+
 ### 3B.4J — Production smoke (post-finalize optional) + cache invalidate
 
 - Post-completion smoke / cache bust (after maintenance released)  
