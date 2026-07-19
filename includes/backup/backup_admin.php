@@ -31,6 +31,8 @@ const ORANGE_BACKUP_ADMIN_VIEWABLE_FILES = [
     'manifest.json',
     'health.json',
     'recovery_validation.json',
+    'country_recovery_validation.json',
+    'country_verify_report.json',
     'dependency_graph.json',
     'table_inventory.json',
 ];
@@ -460,6 +462,21 @@ function orange_backup_admin_read_package_file(string $packagePath, string $file
             'errors' => [],
         ];
     }
+    if ($fileName === 'country_recovery_validation.json') {
+        require_once __DIR__ . '/country_crp_drv.php';
+        $packageId = basename($resolvedPackage);
+        $countryDrv = orange_country_drv_read_report($resolvedPackage, $packageId);
+        if ($countryDrv === null) {
+            return ['ok' => false, 'data' => null, 'raw_text' => null, 'errors' => ['File not found: ' . $fileName]];
+        }
+
+        return [
+            'ok' => true,
+            'data' => orange_backup_admin_redact_secrets($countryDrv),
+            'raw_text' => null,
+            'errors' => [],
+        ];
+    }
     $fullPath = $resolvedPackage . DIRECTORY_SEPARATOR . $fileName;
     $resolvedFile = realpath($fullPath);
     if ($resolvedFile === false || !is_file($resolvedFile)) {
@@ -661,7 +678,15 @@ function orange_backup_admin_summarize_country_package(
 ): array {
     $manifest = orange_backup_admin_read_json_if_exists($packagePath . DIRECTORY_SEPARATOR . 'manifest.json');
     $health = orange_backup_admin_read_json_if_exists($packagePath . DIRECTORY_SEPARATOR . 'health.json');
-    $recovery = orange_backup_admin_read_recovery_validation_report($packagePath, $packageId);
+    // Prefer Phase C5 Country DRV report; fall back to legacy recovery_validation sibling.
+    require_once __DIR__ . '/country_crp_drv.php';
+    $recovery = orange_country_drv_read_report($packagePath, $packageId);
+    if ($recovery === null) {
+        $recovery = orange_backup_admin_read_recovery_validation_report($packagePath, $packageId);
+    }
+    $verifyReport = orange_backup_admin_read_json_if_exists(
+        $packagePath . DIRECTORY_SEPARATOR . 'country_verify_report.json'
+    );
 
     $verification = null;
     if (is_array($recovery)) {
@@ -693,6 +718,17 @@ function orange_backup_admin_summarize_country_package(
     $recoveryScore = orange_backup_admin_recovery_score_from_report($recovery);
     if ($recoveryScore !== null) {
         $summary['recovery_score'] = $recoveryScore;
+    }
+    if (is_array($verifyReport)) {
+        $summary['verify_result'] = (string) ($verifyReport['overall'] ?? '');
+        $summary['verify_engine_version'] = (string) ($verifyReport['verify_engine_version'] ?? '');
+    }
+    if (is_array($recovery) && ($recovery['package_type'] ?? '') === 'country') {
+        $summary['country_drv_result'] = (string) ($recovery['overall_result'] ?? '');
+        $summary['country_drv_score'] = orange_backup_admin_recovery_score_from_report($recovery);
+        $summary['boundary_isolation_valid'] = (bool) ($recovery['boundary_isolation_valid'] ?? false);
+        $summary['collision_analysis_valid'] = (bool) ($recovery['collision_analysis_valid'] ?? false);
+        $summary['execution_performed'] = false;
     }
 
     return orange_backup_admin_redact_secrets($summary);
@@ -1303,6 +1339,30 @@ function orange_backup_admin_verify_package(string $packageType, string $package
  */
 function orange_backup_admin_recovery_validate(string $packagePath): array
 {
+    $manifest = orange_backup_admin_read_json_if_exists($packagePath . DIRECTORY_SEPARATOR . 'manifest.json');
+    $packageType = (string) ($manifest['package_type'] ?? '');
+    if ($packageType === 'country_recovery') {
+        require_once __DIR__ . '/country_crp_drv.php';
+        $result = orange_country_drv_run($packagePath, [
+            'write_report' => true,
+            'package_id' => basename(rtrim($packagePath, "\\/")),
+            'project_root' => orange_backup_project_root(),
+        ]);
+        $report = is_array($result['report'] ?? null) ? $result['report'] : [];
+
+        return orange_backup_admin_redact_secrets([
+            'ok' => (bool) ($result['ok'] ?? false),
+            'overall_result' => (string) ($result['overall_result'] ?? 'fail'),
+            'recovery_score' => (int) ($result['recovery_score'] ?? 0),
+            'package_type' => 'country_recovery',
+            'errors' => $report['errors'] ?? ($result['blocking_reason_codes'] ?? []),
+            'warnings' => $report['warnings'] ?? [],
+            'report_path' => $result['report_path'] ?? null,
+            'report' => $report,
+            'execution_performed' => false,
+        ]);
+    }
+
     $report = orange_recovery_validate_package($packagePath);
     $reportPath = orange_recovery_write_report_file($report);
 

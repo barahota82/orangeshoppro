@@ -431,7 +431,7 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         let html = '';
         const files = type === 'full_disaster'
             ? [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['recovery_validation.json', 'DRV Report']]
-            : [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['recovery_validation.json', 'DRV Report']];
+            : [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['country_verify_report.json', 'Verify'], ['country_recovery_validation.json', 'Country DRV']];
         files.forEach(([file, label]) => {
             html += '<button type="button" class="btn-link rc-view-file" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '" data-file="' + file + '">' + label + '</button> ';
         });
