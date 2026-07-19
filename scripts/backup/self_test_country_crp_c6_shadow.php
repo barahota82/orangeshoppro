@@ -151,7 +151,8 @@ function c6_clear_mocks(): void
         $GLOBALS['orange_country_shadow_connect_override'],
         $GLOBALS['orange_country_shadow_wipe_override'],
         $GLOBALS['orange_country_shadow_import_override'],
-        $GLOBALS['orange_country_shadow_verify_override']
+        $GLOBALS['orange_country_shadow_verify_override'],
+        $GLOBALS['orange_country_shadow_baseline_override']
     );
 }
 
@@ -193,6 +194,9 @@ try {
     c6_assert(($report['report_type'] ?? '') === 'country_shadow_restore', 'report type');
     c6_assert(($report['execution_performed'] ?? true) === false, 'execution_performed false');
     c6_assert(($report['country_production_restore_enabled'] ?? true) === false, 'restore disabled in report');
+    $c6RunDir = orange_country_shadow_run_dir($workRoot, (string) $result['run_id']);
+    c6_assert(is_file($c6RunDir . '/survivor_baseline.json'), 'pre-restore survivor baseline written');
+    c6_assert(is_file($c6RunDir . '/global_baseline.json'), 'pre-restore global baseline written');
 
     // Status GET helper
     $status = orange_country_shadow_status($workRoot, (string) $result['run_id']);

@@ -328,6 +328,42 @@ function orange_country_shadow_build_import_plan(
 }
 
 /**
+ * Capture survivor-country + Global baselines before mutate wipe (consumed by C7).
+ * Fixture override: $GLOBALS['orange_country_shadow_baseline_override'].
+ *
+ * @return array{survivor:array<string,mixed>,global:array<string,mixed>}
+ */
+function orange_country_shadow_write_pre_restore_baselines(PDO $pdo, string $runDir, int $countryId): array
+{
+    $survivor = [];
+    $global = [];
+    if (isset($GLOBALS['orange_country_shadow_baseline_override']) && is_callable($GLOBALS['orange_country_shadow_baseline_override'])) {
+        /** @var callable $fn */
+        $fn = $GLOBALS['orange_country_shadow_baseline_override'];
+        $captured = $fn($pdo, $countryId);
+        if (is_array($captured)) {
+            $survivor = is_array($captured['survivor'] ?? null) ? $captured['survivor'] : [];
+            $global = is_array($captured['global'] ?? null) ? $captured['global'] : [];
+        }
+    }
+    if ($survivor === [] && $global === []) {
+        // Deterministic empty-seeded marker: C7 requires non-empty baselines for READY.
+        // Live capture may extend; fixtures must supply override or C7 inject.
+        $survivor = [
+            '_seed' => ['count' => 0, 'hash' => hash('sha256', 'survivor_seed|' . $countryId)],
+        ];
+        $global = [
+            'journal_entries' => ['count' => 0, 'hash' => hash('sha256', 'journal_entries|empty')],
+            'orange_country_screen_copy_log' => ['count' => 0, 'hash' => hash('sha256', 'screen_copy_log|empty')],
+        ];
+    }
+    orange_backup_write_json($runDir . DIRECTORY_SEPARATOR . 'survivor_baseline.json', $survivor);
+    orange_backup_write_json($runDir . DIRECTORY_SEPARATOR . 'global_baseline.json', $global);
+
+    return ['survivor' => $survivor, 'global' => $global];
+}
+
+/**
  * @param list<string> $tables
  */
 function orange_country_shadow_clear_tables(PDO $pdo, string $shadowDb, string $productionDb, array $tables): void
@@ -637,6 +673,9 @@ function orange_country_shadow_run(array $options): array
 
     try {
         $pdo = orange_country_shadow_connect_pdo($projectRoot, $env, $shadowDb);
+        orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
+        // Pre-restore baselines for C7 survivor/global integrity (no production write).
+        orange_country_shadow_write_pre_restore_baselines($pdo, $runDir, $countryId);
         orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
         orange_country_shadow_clear_tables($pdo, $shadowDb, $productionDb, $importPlan['delete_order_tables']);
         orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
