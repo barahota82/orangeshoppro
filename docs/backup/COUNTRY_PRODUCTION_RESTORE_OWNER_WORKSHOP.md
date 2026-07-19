@@ -10,7 +10,9 @@
 
 **Already frozen (do not re-answer):** C1.1 D1–D6 · Multicountry §13 · Country restore stays disabled until certification + explicit enablement.
 
-**Owner-approved (2026-07-20) — do not re-answer:** OD-ENABLE · OD-DUAL · OD-PHRASE · OD-BREAK.
+**Owner-approved (2026-07-20) — do not re-answer:**  
+- Group 1: OD-ENABLE · OD-DUAL · OD-PHRASE · OD-BREAK  
+- Group 2: OD-MAINT · OD-MAINT-SCOPE · OD-MAINT-MAX · OD-RTO · OD-TIMEOUT  
 
 **How to answer remaining items:** write one of `A` / `B` / `C` / `D` (or custom text) on `OWNER ANSWER:`.  
 Recommended answers are **advice only** for open items.
@@ -35,19 +37,13 @@ Recommended answers are **advice only** for open items.
 - **Frozen:** Break Glass = Super Admin only. Emergency reason + full audit + notification required. Does **not** bypass Full Rollback Anchor, mandatory safety gates, logging, or authentication.  
 - **OWNER ANSWER:** OWNER_APPROVED
 
-### 5. OD-MAINT *(still open)*
-Must maintenance be ON + write-block proven before any production DELETE/IMPORT/uploads?
-- **Recommended:** A — Yes, mandatory  
-- **Alternatives:** B optional if low traffic · C never  
-- **Consequences:** A prevents live writer races. B/C integrity risk.  
-- **OWNER ANSWER:** _______________
+### 5. OD-MAINT — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Country Production Restore always requires Maintenance Mode before execution. Maintenance is mandatory.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 6. OD-MAINT-SCOPE *(still open)*
-Platform-wide maintenance, or country-only if isolation proven?
-- **Recommended:** A — Platform-wide now (B only after written isolation proof)  
-- **Alternatives:** B country-scoped if proven · C no writer blocking  
-- **Consequences:** A more downtime, stronger proof. B less downtime if proven (not proven today).  
-- **OWNER ANSWER:** _______________
+### 6. OD-MAINT-SCOPE — OWNER_APPROVED (2026-07-20)
+- **Frozen:** **GLOBAL MAINTENANCE.** Country-only Maintenance is NOT approved under the current architecture (shared production DB; Global/Mixed tables; Full pre-restore backup as primary post-PONR rollback; platform-wide maintenance framework and rollback). Future reconsideration only after a proven country-isolated production restore model.  
+- **OWNER ANSWER:** OWNER_APPROVED (GLOBAL)
 
 ### 7. OD-PIN *(still open)*
 Refuse PONR unless Full pre-restore backup is verified and retention-pinned?
@@ -182,33 +178,27 @@ Owner owns certification checklist; engineering fills evidence; PASS required be
 
 ---
 
-## Group 6 — Timing numbers (may defer)
+## Group 6 — Timing / duration (Group 2 frozen; remaining open)
 
-### 25. OD-MAINT-MAX
-Alert 60m / page 120m maintenance; no auto-cancel post-PONR?
-- **Recommended:** A  
-- **Alternatives:** B custom alert/page · C no max  
-- **OWNER ANSWER:** _______________
+### 25. OD-MAINT-MAX — OWNER_APPROVED (2026-07-20)
+- **Frozen:** No fixed maximum maintenance duration. Automatic Expected Duration estimate per job (package/SQL/upload size, rows, batches, historical stats, infrastructure performance). No manual duration configuration.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 26. OD-TIMEOUT
-Approvals soft-cancel 24h; pre-PONR idle alert 30m; heartbeat ≤ 30s; CLI-only mutation?
-- **Recommended:** A  
-- **Alternatives:** B custom · C no timeouts  
-- **OWNER ANSWER:** _______________
+### 26. OD-TIMEOUT — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Timeout ≠ automatic failure. Workflow: Estimated Duration → Warning → Critical → Recovery Investigation → Resume (when supported). Never fail solely because elapsed time exceeded the estimate. Continue if measurable progress (heartbeat, batches, imported rows, etc.). Recovery only when lack of progress + timeout escalation.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 27. OD-RTO
-Planning default: RTO ≤ 2h; survivor/Global RPO = 0 (unchanged); target replaced from package?
-- **Recommended:** A  
-- **Alternatives:** B custom RTO/RPO · C no formal RTO  
-- **OWNER ANSWER:** _______________
+### 27. OD-RTO — OWNER_APPROVED (2026-07-20)
+- **Frozen:** No hardcoded RTO. Automatic Estimated Duration per job from actual workload — for **operational monitoring only**.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 28. OD-LOCK-TTL
+### 28. OD-LOCK-TTL *(still open)*
 Heartbeat ≤ 30s; stale detect pre-PONR with manual clear if PID dead; **no auto-unlock post-PONR**?
 - **Recommended:** A  
 - **Alternatives:** B custom TTLs · C auto-unlock anytime  
 - **OWNER ANSWER:** _______________
 
-### 29. OD-SCHEMA
+### 29. OD-SCHEMA *(still open)*
 If schema_revision leaves 121: mandatory re-cert + package rebuild before CPR?
 - **Recommended:** A  
 - **Alternatives:** B mixed revisions with warnings · C ignore revision  
@@ -223,8 +213,9 @@ If schema_revision leaves 121: mandatory re-cert + package rebuild before CPR?
 | Owner name | _______________ |
 | Date | _______________ |
 | Group 1 freeze | OWNER_APPROVED 2026-07-20 (OD-ENABLE, OD-DUAL, OD-PHRASE, OD-BREAK) |
+| Group 2 freeze | OWNER_APPROVED 2026-07-20 (OD-MAINT, OD-MAINT-SCOPE, OD-MAINT-MAX, OD-RTO, OD-TIMEOUT) |
 | Workshop complete? | YES / NO (remaining open items) |
 | Notes | _______________ |
 
-**Group 1 is frozen.** Continue workshop for open ODs only.  
+**Group 1 and Group 2 are frozen.** Continue workshop for open ODs only.  
 **Do not begin P1 until remaining P1-blocking ODs are frozen.** **Do not implement.**

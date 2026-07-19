@@ -10,7 +10,7 @@
 | **Dependencies** | `docs/backup/COUNTRY_PRODUCTION_RESTORE_DECISION_DEPENDENCIES.md` |
 | **C3–C8** | Must not be modified |
 | **Enablement** | Remains **disabled** until certification + explicit OD-ENABLE + implementation + final enterprise approval (OWNER_APPROVED) |
-| **Last owner freeze** | 2026-07-20 — Group 1: OD-ENABLE, OD-DUAL, OD-PHRASE, OD-BREAK |
+| **Last owner freeze** | 2026-07-20 — Group 2: OD-MAINT, OD-MAINT-SCOPE, OD-MAINT-MAX, OD-RTO, OD-TIMEOUT (Group 1 remains frozen) |
 
 ### Frozen inputs (not reopened)
 
@@ -30,7 +30,19 @@
 | **OD-PHRASE** | OWNER_APPROVED (`RESTORE` + password re-auth) |
 | **OD-BREAK** | OWNER_APPROVED (Super Admin only; does not bypass anchor/gates/auth/logging) |
 
+### Owner-approved CPR decisions (Group 2 — 2026-07-20)
+
+| ID | Status |
+|----|--------|
+| **OD-MAINT** | OWNER_APPROVED (Maintenance Mode mandatory before execution) |
+| **OD-MAINT-SCOPE** | OWNER_APPROVED (**GLOBAL MAINTENANCE**; Country-only NOT approved under current architecture) |
+| **OD-MAINT-MAX** | OWNER_APPROVED (no fixed max; automatic Estimated Duration per job) |
+| **OD-RTO** | OWNER_APPROVED (no hardcoded RTO; Estimated Duration for monitoring only) |
+| **OD-TIMEOUT** | OWNER_APPROVED (timeout ≠ failure; progress-aware escalation → investigate/resume) |
+
 **Note:** P0 architecture §8 previously recommended “two distinct Super Admin identities.” That recommendation is **superseded** by OWNER_APPROVED **OD-DUAL** in this register. Do not implement the old dual-Super-Admin model.
+
+**Note (Group 2):** P0 architecture §9 prefers platform-wide maintenance — now **OWNER_APPROVED** as GLOBAL MAINTENANCE (OD-MAINT-SCOPE). Country-only maintenance is not approved under the current shared-DB / Full-anchor rollback architecture.
 
 ### Register rules
 
@@ -181,17 +193,17 @@
 | **2. Title** | Is maintenance mandatory before Country Production PONR? |
 | **3. Exact question** | Must platform maintenance be ON and write-block proven before any production DELETE/IMPORT/uploads apply for CPR? |
 | **4. Options** | **A)** Yes — mandatory. **B)** Optional if traffic is low. **C)** Never use maintenance for Country CPR. |
-| **5. Consequences** | A: aligns Full DR safety chassis. B/C: race with live writers → integrity risk. |
-| **6. Recommended** | **A** |
+| **5. Consequences** | Owner chose mandatory Maintenance Mode (aligns Full DR safety chassis). B/C would race with live writers. |
+| **6. Recommended** | **A** (historical facilitation; now OWNER_APPROVED) |
 | **7. Reason** | Fail closed against concurrent storefront/admin/GL/stock writes. |
 | **8. Security** | Reduces concurrent mutation attacks/errors. |
 | **9. Data integrity** | Critical — prevents mid-restore writes. |
-| **10. Operational** | Downtime window required. |
+| **10. Operational** | Downtime window required (GLOBAL scope — see OD-MAINT-SCOPE). |
 | **11. Rollback** | Maint stays on through rollback. |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Country Production Restore **always** requires Maintenance Mode before execution. Maintenance is **mandatory**. |
+| **15. Frozen policy wording** | *Country Production Restore always requires Maintenance Mode before execution. Maintenance is mandatory. No production DELETE, IMPORT, or uploads apply may begin until Maintenance Mode is ON and write-block is proven.* |
 
 ---
 
@@ -202,18 +214,18 @@
 | **1. ID** | OD-MAINT-SCOPE |
 | **2. Title** | Platform-wide vs country-scoped maintenance |
 | **3. Exact question** | During CPR, should maintenance block **all** mutating traffic platform-wide, or only traffic for the target country if isolation can be proven? |
-| **4. Options** | **A)** Platform-wide maintenance (recommended default). **B)** Country-scoped maintenance only if a written technical proof shows Global/survivor writers cannot contaminate the job (else fall back to A). **C)** No writer blocking beyond DB locks. |
-| **5. Consequences** | A: simplest proof, broader downtime. B: less downtime if proven — **not assumed proven today**. C: unsafe. |
-| **6. Recommended** | **A** now; allow **B** only after explicit isolation proof accepted by owner. |
-| **7. Reason** | Prefer country-scoped **when technically proven safe**; otherwise global maintenance. Isolation is **not** proven in P0. |
-| **8. Security** | A strongest. |
-| **9. Data integrity** | A strongest against Global/shared path races. |
-| **10. Operational** | A: full downtime; B: narrower if proven. |
-| **11. Rollback** | Maint scope should cover rollback window equally. |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | **A)** Platform-wide / GLOBAL maintenance. **B)** Country-scoped only if isolation proven. **C)** No writer blocking beyond DB locks. |
+| **5. Consequences** | Owner approved **GLOBAL**. Country-only is **not** approved under current architecture. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED as GLOBAL.)* |
+| **7. Reason** | Shared production DB, Global/Mixed tables, Full pre-restore backup as primary post-PONR rollback, platform-wide maintenance framework and rollback strategy. |
+| **8. Security** | Strongest — all mutating traffic blocked. |
+| **9. Data integrity** | Prevents survivor/Global contamination and Full-anchor rollback conflict with live survivor writes. |
+| **10. Operational** | Full-platform downtime for CPR window. |
+| **11. Rollback** | GLOBAL maintenance covers Full-anchor rollback window equally. |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | **GLOBAL MAINTENANCE.** After reviewing current Orange architecture and runtime: one shared production database; shared Global and Mixed tables; Full pre-restore backup as primary rollback after PONR; platform-wide maintenance framework; platform-wide rollback strategy. Therefore **Country-only Maintenance is NOT approved** under the current architecture. Future reconsideration allowed only after a future architecture change introduces a fully proven country-isolated production restore model. |
+| **15. Frozen policy wording** | *During Country Production Restore, Maintenance Mode is GLOBAL (platform-wide). All mutating traffic is blocked. Country-only maintenance is not approved under the current architecture. Reconsideration requires a future proven country-isolated production restore model and a new owner decision.* |
 
 ---
 
@@ -224,15 +236,15 @@
 | **1. ID** | OD-MAINT-MAX |
 | **2. Title** | Maximum maintenance window / escalation |
 | **3. Exact question** | What maximum maintenance duration triggers escalation/alert, and what happens if exceeded? |
-| **4. Options** | **A)** Alert at 60 minutes; page at 120; no auto-cancel post-PONR. **B)** Owner numbers: alert `___` / page `___`. **C)** No max. |
-| **5. Consequences** | A: sensible default. B: business-specific. C: risk of forgotten maint. |
-| **6. Recommended** | **A** until OD-RTO refines. |
-| **7. Reason** | Operational visibility without auto-unlock post-PONR. |
-| **8–11** | Ops-focused; integrity unchanged if maint stays on. |
-| **12. Required before** | P1: deferrable. Implementation: yes. Certification: soft. Enablement: soft. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | *(Superseded.)* Historical: A alert 60m / page 120m · B owner numbers · C no max. |
+| **5. Consequences** | No fixed maximum. System auto-estimates Expected Duration per job for monitoring (with OD-RTO / OD-TIMEOUT). |
+| **6. Recommended** | *(Historical facilitation superseded.)* |
+| **7. Reason** | Workload-driven estimate avoids arbitrary hard caps that conflict with real package size. |
+| **8–11** | Ops monitoring; does not auto-cancel post-PONR; pairs with OD-TIMEOUT progress rules. |
+| **12. Required before** | P1: yes (frozen shape). Implementation: yes. Certification: soft. Enablement: soft. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | **No fixed maximum** maintenance duration. The system must **automatically estimate** the expected execution duration for every Production Restore job. Estimation should consider, where applicable: package size; SQL size; upload size; number of rows; number of batches; historical execution statistics; current infrastructure performance. **No manual duration configuration** is required. |
+| **15. Frozen policy wording** | *No fixed maximum maintenance duration exists for Country Production Restore. Every job must receive an automatic Expected Duration estimate from workload signals (package/SQL/upload size, rows, batches, historical stats, infrastructure performance). Manual duration configuration is not required. Exceeding the estimate does not by itself fail the job (see OD-TIMEOUT).* |
 
 ---
 
@@ -243,15 +255,15 @@
 | **1. ID** | OD-RTO |
 | **2. Title** | Business RTO / RPO for Country Production Restore |
 | **3. Exact question** | What maximum downtime (RTO) and data-loss tolerance (RPO) apply to a planned Country Production Restore window? |
-| **4. Options** | **A)** Target RTO ≤ 2 hours; RPO = 0 for non-target countries (survivors/Global unchanged); target country replaced from package. **B)** Owner figures: RTO `___` / RPO notes `___`. **C)** No formal RTO. |
-| **5. Consequences** | Drives OD-FAIL-IMPORT choice (retry vs immediate Full rollback duration). |
-| **6. Recommended** | **A** as planning default; confirm **B** if business differs. |
-| **7. Reason** | Makes failure-policy tradeoffs explicit. |
-| **8–11** | Ops/rollback duration planning. |
-| **12. Required before** | P1: soft. Implementation: soft. Certification: soft. Enablement: soft. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | *(Superseded.)* Historical: A RTO ≤ 2h · B owner figures · C no formal RTO. |
+| **5. Consequences** | No hardcoded RTO. Estimated Duration is operational monitoring only; does not redefine survivor/Global integrity (RPO = 0 for non-target remains architectural). |
+| **6. Recommended** | *(Historical facilitation superseded.)* |
+| **7. Reason** | Duration depends on actual workload; hardcoding misleads operators. |
+| **8–11** | Ops monitoring only; failure/rollback policy remains separate (OD-FAIL-*). |
+| **12. Required before** | P1: yes (frozen shape). Implementation: yes. Certification: soft. Enablement: soft. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | **No fixed Recovery Time Objective** shall be hardcoded. The system shall automatically calculate an **Estimated Duration** for every job based on the actual workload. The calculated estimate is used for **operational monitoring only**. |
+| **15. Frozen policy wording** | *No fixed RTO is hardcoded for Country Production Restore. Each job receives an automatic Estimated Duration based on actual workload. That estimate is for operational monitoring only and must not be treated as a hard fail deadline (see OD-TIMEOUT).* |
 
 ---
 
@@ -260,17 +272,17 @@
 | Field | Content |
 |-------|---------|
 | **1. ID** | OD-TIMEOUT |
-| **2. Title** | Numeric timeouts per CPR phase |
+| **2. Title** | Timeout / escalation model for CPR execution |
 | **3. Exact question** | What timeouts apply to approvals waiting, pre-PONR idle with maint ON, and worker heartbeat interval? |
-| **4. Options** | **A)** Approvals soft-cancel 24h; pre-PONR idle alert 30m; heartbeat ≤ 30s; no HTTP mutation timeouts (CLI). **B)** Owner numbers. **C)** No timeouts. |
-| **5. Consequences** | A: replay prevention for abandoned jobs; safe heartbeats. |
-| **6. Recommended** | **A** |
-| **7. Reason** | Long-running CLI policy; abandon stale pre-PONR jobs. |
-| **8–11** | Ops; post-PONR never auto-cancel. |
-| **12. Required before** | P1: deferrable. Implementation: yes. Certification: soft. Enablement: soft. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | *(Superseded.)* Historical fixed soft-cancel/idle numbers replaced by progress-aware escalation. |
+| **5. Consequences** | Timeout does **not** automatically mean failure. Progress (heartbeat, batches, imported rows, etc.) may allow continuation past estimate. |
+| **6. Recommended** | *(Historical facilitation superseded.)* |
+| **7. Reason** | Long-running CLI restore must not fail solely because wall-clock exceeded an estimate. |
+| **8–11** | Ops; post-PONR never auto-cancel solely on elapsed time; pairs with OD-MAINT-MAX / OD-RTO estimates. |
+| **12. Required before** | P1: yes (frozen shape). Implementation: yes. Certification: soft. Enablement: soft. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Timeout does **NOT** automatically mean failure. Workflow: Estimated Duration → Warning Threshold → Critical Threshold → Recovery Investigation → Resume (when supported). A job must **never** fail simply because elapsed time exceeded the estimate. Timeout handling must consider runtime progress. If the job continues to make measurable progress (heartbeat, completed batches, imported rows, etc.), execution may continue. Only **lack of progress together with timeout escalation** may trigger recovery procedures. |
+| **15. Frozen policy wording** | *CPR timeout handling is progress-aware: Estimated Duration → Warning Threshold → Critical Threshold → Recovery Investigation → Resume (when supported). Exceeding the Estimated Duration alone must never fail the job. Measurable progress (heartbeat, completed batches, imported rows, and equivalent signals) permits continued execution. Recovery procedures may start only when lack of progress coincides with timeout escalation.* |
 
 ---
 
@@ -366,11 +378,11 @@
 | **2. Title** | Recovery when target-slice IMPORT fails |
 | **3. Exact question** | If production IMPORT fails mid-batch, choose the default recovery (no SQL byte-offset resume)? |
 | **4. Options** | **A)** Mark dirty → **re-clear target slice** → re-import from frozen contract **or** Full-anchor rollback (operator chooses with runbook). **B)** Always immediate Full-anchor rollback. **C)** Resume mid-stream SQL. |
-| **5. Consequences** | A: faster RTO possible. B: simplest integrity. C: **rejected** (DDL/partial unsafe). |
+| **5. Consequences** | A: may shorten wall-clock vs always Full rollback. B: simplest integrity. C: **rejected** (DDL/partial unsafe). |
 | **6. Recommended** | **A** with runbook preference; escalate to **B** if re-clear unsafe. |
 | **7. Reason** | No mid-stream resume; explicit triggers; aligns PRODUCTION_IMPORT_SAFETY philosophy adapted to slice. |
 | **8–9** | Integrity: no silent partial country. |
-| **10. Operational** | Tradeoff vs OD-RTO. |
+| **10. Operational** | Duration monitored via OWNER_APPROVED OD-RTO/OD-TIMEOUT estimates — not a hard fail deadline. |
 | **11. Rollback** | Full anchor always available. |
 | **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
 | **13. Status** | PROPOSED |
@@ -639,11 +651,11 @@ These are **already frozen** and must not be contradicted by any OD answer:
 | OD-BREAK | A | **OWNER_APPROVED** | Y | N | Y | Y |
 | OD-PERM | A | A | soft | partial | Y | Y |
 | OD-CERT | A | A | soft | Y | **Y** | **Y** |
-| OD-MAINT | B | A | Y | N | Y | Y |
-| OD-MAINT-SCOPE | B | A | Y | N | Y | Y |
-| OD-MAINT-MAX | B | A | soft | Y | soft | soft |
-| OD-RTO | B | A | soft | Y | soft | soft |
-| OD-TIMEOUT | B | A | soft | Y | soft | soft |
+| OD-MAINT | B | **OWNER_APPROVED** | Y | N | Y | Y |
+| OD-MAINT-SCOPE | B | **OWNER_APPROVED** (GLOBAL) | Y | N | Y | Y |
+| OD-MAINT-MAX | B | **OWNER_APPROVED** (auto estimate) | Y | N | soft | soft |
+| OD-RTO | B | **OWNER_APPROVED** (estimate only) | Y | N | soft | soft |
+| OD-TIMEOUT | B | **OWNER_APPROVED** (progress-aware) | Y | N | soft | soft |
 | OD-RUNBOOK | B | A | soft | Y | Y | Y |
 | OD-PIN | C | A | Y | N | Y | Y |
 | OD-ROLLBACK-CLI | C | A | Y | N | Y | Y |
@@ -665,4 +677,4 @@ These are **already frozen** and must not be contradicted by any OD answer:
 
 ---
 
-*End of Owner Decision Register — P0b. Group 1 frozen OWNER_APPROVED (OD-ENABLE, OD-DUAL, OD-PHRASE, OD-BREAK). Remaining statuses PROPOSED. No P1. No implementation.*
+*End of Owner Decision Register — P0b. Group 1 + Group 2 frozen OWNER_APPROVED (OD-ENABLE, OD-DUAL, OD-PHRASE, OD-BREAK, OD-MAINT, OD-MAINT-SCOPE, OD-MAINT-MAX, OD-RTO, OD-TIMEOUT). Remaining statuses PROPOSED. No P1. No implementation.*
