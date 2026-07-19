@@ -20,7 +20,7 @@ require_once __DIR__ . '/restore_country_shadow.php';
 require_once __DIR__ . '/restore_shadow_db.php';
 require_once __DIR__ . '/restore_paths.php';
 
-const ORANGE_COUNTRY_SHADOW_VERIFY_ENGINE_VERSION = '1.2';
+const ORANGE_COUNTRY_SHADOW_VERIFY_ENGINE_VERSION = '1.3';
 const ORANGE_COUNTRY_SHADOW_VERIFY_REPORT_FILE = 'country_shadow_verification_report.json';
 const ORANGE_COUNTRY_SHADOW_VERIFY_META_FILE = 'country_shadow_verification.json';
 const ORANGE_COUNTRY_SHADOW_SURVIVOR_BASELINE_FILE = 'survivor_baseline.json';
@@ -63,8 +63,11 @@ function orange_country_shadow_verify_run(array $options): array
     if (is_array($options['env'] ?? null)) {
         $env = array_merge($env, $options['env']);
     }
-    if (isset($GLOBALS['orange_country_shadow_env_override']) && is_array($GLOBALS['orange_country_shadow_env_override'])) {
-        $env = array_merge($env, $GLOBALS['orange_country_shadow_env_override']);
+    $envOverride = function_exists('orange_country_shadow_override_value')
+        ? orange_country_shadow_override_value('orange_country_shadow_env_override')
+        : null;
+    if (is_array($envOverride)) {
+        $env = array_merge($env, $envOverride);
     }
 
     $runDir = orange_country_shadow_run_dir($workRoot, $jobId);
@@ -702,12 +705,24 @@ function orange_country_shadow_verify_run(array $options): array
     if (array_key_exists('uploads_ok', $probe) && $probe['uploads_ok'] === false) {
         $upOk = false;
     }
-    $uploadsZip = $packagePath . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip';
-    if (!is_file($uploadsZip)) {
-        $add('up_zip', 'FAIL', 'uploads_archive_missing', 'uploads_country.zip missing', true);
-        $upOk = false;
-    } elseif ($upOk) {
-        $add('uploads', 'PASS', null, 'Upload archive/path integrity OK');
+    if (function_exists('orange_country_shadow_verify_uploads_integrity') && $packagePath !== '') {
+        $upCheck = orange_country_shadow_verify_uploads_integrity($packagePath);
+        if (!$upCheck['ok']) {
+            foreach ($upCheck['codes'] as $code) {
+                $add('up_' . md5((string) $code), 'FAIL', (string) $code, (string) ($upCheck['detail'] ?? 'upload failure'), true);
+            }
+            $upOk = false;
+        } elseif ($upOk) {
+            $add('uploads', 'PASS', null, (string) ($upCheck['detail'] ?? 'Upload archive/path integrity OK'));
+        }
+    } else {
+        $uploadsZip = $packagePath . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip';
+        if (!is_file($uploadsZip)) {
+            $add('up_zip', 'FAIL', 'uploads_archive_missing', 'uploads_country.zip missing', true);
+            $upOk = false;
+        } elseif ($upOk) {
+            $add('uploads', 'PASS', null, 'Upload archive/path integrity OK');
+        }
     }
     $integrity['upload_reference_integrity'] = $upOk ? 'PASS' : 'FAIL';
 
@@ -865,10 +880,11 @@ function orange_country_shadow_verify_load_probe(
     int $countryId = 0,
     string $packagePath = ''
 ): array {
-    if (isset($GLOBALS['orange_country_shadow_c7_probe_override']) && is_callable($GLOBALS['orange_country_shadow_c7_probe_override'])) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_country_shadow_c7_probe_override'];
-        $probe = $fn($projectRoot, $env, $shadowDb, $inject);
+    $probeOverride = function_exists('orange_country_shadow_override_callable')
+        ? orange_country_shadow_override_callable('orange_country_shadow_c7_probe_override')
+        : null;
+    if ($probeOverride !== null) {
+        $probe = $probeOverride($projectRoot, $env, $shadowDb, $inject);
         if (is_array($probe)) {
             if (!isset($probe['probe_mode'])) {
                 $probe['probe_mode'] = 'override';

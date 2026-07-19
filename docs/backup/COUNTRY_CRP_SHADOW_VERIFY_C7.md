@@ -15,6 +15,12 @@
 **F-01 / EA-02:** C7 must not treat baseline as current. Missing live `survivor_current` / `global_current` → `survivor_probe_unavailable` / `global_probe_unavailable` (FAIL). Global/`journal_entries` proven by **baseline delta/hash**, never by requiring empty tables.  
 **F-03 / EA-03:** Live SQL pillars: accounting, FIFO, composites, dependency, commercial, catalog, sequences, uploads (zip path safety), ID preservation, schema. Inject hooks remain for regression only. Fail closed when a live pillar is unproven.
 
+**Final Hardening (engine 1.3):**
+- **N3-02:** Schema drift uses `config/country_restore_schema_expectations.json` (revision + expected tables/columns/indexes/constraints). Stable codes: `schema_revision_mismatch`, `schema_table_missing`, `schema_column_missing`, `schema_index_missing`, `schema_constraint_missing`, `schema_expectations_missing`.
+- **N3-03:** Stock/FIFO ownership verifies warehouse ownership, stock ownership, FIFO graph, and cross-country references (`fifo_cross_country_reference`, `stock_movement_leakage`, …). Dead SQL removed.
+- **N3-07:** Uploads allow legitimately empty packages when `uploads_file_count=0` in manifest/inventory (empty zip or no zip). Still fails when expected files are missing.
+- **N3-06:** Probe/env overrides gated — CLI self-tests only (see C6 doc).
+
 C7 entry requires C6 status `ready` / `country_shadow_restore_ready` (re-verify also allowed from C7 result states), C4 Verify **PASS**, C5 Country DRV **pass** with score ≥ 85, unchanged package fingerprint / boundary / dependency versions, consistent `country_id`, and proven Shadow DB ≠ production.
 
 ## Survivor-country preservation proof

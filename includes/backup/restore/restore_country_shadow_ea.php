@@ -226,10 +226,11 @@ function orange_country_shadow_clear_target_slice_strict(
     array $matrix,
     string $projectRoot
 ): array {
-    if (isset($GLOBALS['orange_country_shadow_wipe_override']) && is_callable($GLOBALS['orange_country_shadow_wipe_override'])) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_country_shadow_wipe_override'];
-        $fn($pdo, $shadowDb, $tables);
+    $wipeOverride = function_exists('orange_country_shadow_override_callable')
+        ? orange_country_shadow_override_callable('orange_country_shadow_wipe_override')
+        : null;
+    if ($wipeOverride !== null) {
+        $wipeOverride($pdo, $shadowDb, $tables);
 
         return ['ok' => true, 'codes' => [], 'cleared' => $tables];
     }
@@ -403,12 +404,28 @@ function orange_country_shadow_verify_target_slice(
         }
     }
 
-    $checks[] = [
-        'id' => 'batch_integrity',
-        'status' => 'PASS',
-        'code' => null,
-        'detail' => 'target_slice batches tables=' . (string) count($importPlan['tables']),
-    ];
+    // N3-01: survivor baseline re-validation after import (gate ordering unchanged: after target/global checks)
+    if (function_exists('orange_country_shadow_verify_survivor_baseline_post_import')) {
+        $surv = orange_country_shadow_verify_survivor_baseline_post_import($pdo, $countryId, $projectRoot, $runDir);
+        foreach ($surv['checks'] as $chk) {
+            $checks[] = $chk;
+        }
+        foreach ($surv['codes'] as $code) {
+            $codes[] = (string) $code;
+        }
+    }
+
+    // N3-05: real batch dependency verification
+    if (function_exists('orange_country_shadow_verify_batch_integrity')) {
+        $batch = orange_country_shadow_verify_batch_integrity($importPlan, $matrix, is_array($manifest) ? $manifest : []);
+        foreach ($batch['checks'] as $chk) {
+            $checks[] = $chk;
+        }
+        foreach ($batch['codes'] as $code) {
+            $codes[] = (string) $code;
+        }
+    }
+
     $checks[] = [
         'id' => 'shadow_model',
         'status' => 'PASS',
@@ -417,7 +434,6 @@ function orange_country_shadow_verify_target_slice(
     ];
 
     orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
-    unset($manifest);
 
     return [
         'ok' => $codes === [],
@@ -562,70 +578,15 @@ function orange_country_shadow_sql_integrity_checks_v2(PDO $pdo, int $countryId,
         }
     }
 
-    // Stock / FIFO (target warehouses)
-    if (orange_country_shadow_table_exists($pdo, 'warehouse_variant_stock')
-        && orange_country_shadow_table_exists($pdo, 'warehouses')
-    ) {
-        try {
-            $st = $pdo->prepare(
-                'SELECT COUNT(*) FROM warehouse_variant_stock s
-                 LEFT JOIN warehouses w ON w.id = s.warehouse_id
-                 WHERE w.id IS NULL OR (w.country_id = ? AND w.country_id IS NULL)'
-            );
-            $st->execute([$countryId]);
-            // orphan stock or null warehouse
-            $st = $pdo->query(
-                'SELECT COUNT(*) FROM warehouse_variant_stock s
-                 LEFT JOIN warehouses w ON w.id = s.warehouse_id WHERE w.id IS NULL'
-            );
-            if ($st && (int) $st->fetchColumn() > 0) {
-                $fifoCodes[] = 'stock_warehouse_ownership_mismatch';
-                $fifoOk = false;
-            }
-        } catch (Throwable) {
-        }
-    }
-    if (orange_country_shadow_table_exists($pdo, 'inventory_cost_consumptions')
-        && orange_country_shadow_table_exists($pdo, 'inventory_cost_layers')
-    ) {
-        try {
-            $orph = (int) $pdo->query(
-                'SELECT COUNT(*) FROM inventory_cost_consumptions c
-                 LEFT JOIN inventory_cost_layers l ON l.id = c.layer_id WHERE l.id IS NULL'
-            )->fetchColumn();
-            if ($orph > 0) {
-                $fifoCodes[] = 'incomplete_fifo_graph';
-                $fifoOk = false;
-            }
-        } catch (Throwable) {
-        }
-        foreach ([['qty', 'qty'], ['remaining_qty', 'qty']] as [$layerCol, $consCol]) {
-            if (!orange_country_shadow_table_has_column($pdo, 'inventory_cost_layers', $layerCol)) {
-                continue;
-            }
-            if (!orange_country_shadow_table_has_column($pdo, 'inventory_cost_consumptions', $consCol)
-                && !orange_country_shadow_table_has_column($pdo, 'inventory_cost_consumptions', 'qty')
-            ) {
-                continue;
-            }
-            $cCol = orange_country_shadow_table_has_column($pdo, 'inventory_cost_consumptions', 'qty') ? 'qty' : $consCol;
-            try {
-                $over = (int) $pdo->query(
-                    'SELECT COUNT(*) FROM (
-                        SELECT c.layer_id, SUM(c.`' . str_replace('`', '``', $cCol) . '`) AS consumed,
-                               MAX(l.`' . str_replace('`', '``', $layerCol) . '`) AS layer_qty
-                        FROM inventory_cost_consumptions c
-                        INNER JOIN inventory_cost_layers l ON l.id = c.layer_id
-                        GROUP BY c.layer_id
-                        HAVING consumed > layer_qty + 0.0001
-                     ) x'
-                )->fetchColumn();
-                if ($over > 0) {
-                    $fifoCodes[] = 'fifo_layer_overconsumed';
-                    $fifoOk = false;
-                }
-                break;
-            } catch (Throwable) {
+    // Stock / FIFO ownership (N3-03) — warehouse, stock, FIFO, cross-country; no dead SQL
+    if (function_exists('orange_country_shadow_verify_stock_fifo_ownership')) {
+        $stock = orange_country_shadow_verify_stock_fifo_ownership($pdo, $countryId);
+        foreach ($stock['codes'] as $code) {
+            $fifoCodes[] = (string) $code;
+            $fifoOk = false;
+            if (in_array((string) $code, ['incomplete_fifo_graph', 'incomplete_stock_composite'], true)) {
+                $compCodes[] = (string) $code;
+                $compOk = false;
             }
         }
     }
@@ -764,33 +725,16 @@ function orange_country_shadow_sql_integrity_checks_v2(PDO $pdo, int $countryId,
         }
     }
 
-    // Uploads — zip present + path safety
-    if ($packagePath !== '') {
-        $zipPath = $packagePath . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip';
-        if (!is_file($zipPath)) {
-            $upCodes[] = 'uploads_archive_missing';
-            $upOk = false;
-        } elseif (class_exists('ZipArchive')) {
-            $zip = new ZipArchive();
-            if ($zip->open($zipPath) !== true) {
-                $upCodes[] = 'upload_owner_mismatch';
-                $upOk = false;
-            } else {
-                for ($i = 0; $i < $zip->numFiles; $i++) {
-                    $name = (string) $zip->getNameIndex($i);
-                    if ($name === '' || str_contains($name, '..') || str_starts_with($name, '/') || str_contains($name, '\\..')) {
-                        $upCodes[] = 'upload_owner_mismatch';
-                        $upOk = false;
-                        break;
-                    }
-                }
-                $zip->close();
+    // Uploads — N3-07 empty-by-inventory supported
+    if (function_exists('orange_country_shadow_verify_uploads_integrity')) {
+        $up = orange_country_shadow_verify_uploads_integrity($packagePath);
+        if (!$up['ok']) {
+            foreach ($up['codes'] as $code) {
+                $upCodes[] = (string) $code;
             }
-        } else {
-            $upCodes[] = 'uploads_archive_missing';
             $upOk = false;
         }
-    } else {
+    } elseif ($packagePath === '') {
         $upCodes[] = 'uploads_archive_missing';
         $upOk = false;
     }
@@ -816,22 +760,25 @@ function orange_country_shadow_sql_integrity_checks_v2(PDO $pdo, int $countryId,
         }
     }
 
-    // Schema — required mutate tables used by import plan may be absent; check core set
-    foreach (['orders', 'accounts'] as $need) {
-        if (!orange_country_shadow_table_exists($pdo, $need)) {
-            // Only fail if matrix expects them exportable — soft when fixture minimal
-            if (isset($matrixTables[$need])) {
-                // presence optional for empty packages
+    // Schema — N3-02 real drift detection
+    if (function_exists('orange_country_shadow_verify_schema_drift')) {
+        $schema = orange_country_shadow_verify_schema_drift(
+            $pdo,
+            $projectRoot,
+            [],
+            $matrix,
+            ['orders', 'accounts', 'warehouses', 'products']
+        );
+        if (!$schema['ok']) {
+            $schemaOk = false;
+            foreach ($schema['codes'] as $code) {
+                $schemaCodes[] = (string) $code;
+            }
+            if ($schemaCodes === []) {
+                $schemaCodes[] = 'schema_mismatch';
             }
         }
-    }
-    try {
-        $revExpected = (int) ($matrix['schema_revision'] ?? 121);
-        if ($revExpected <= 0) {
-            $schemaCodes[] = 'schema_mismatch';
-            $schemaOk = false;
-        }
-    } catch (Throwable) {
+    } else {
         $schemaCodes[] = 'schema_mismatch';
         $schemaOk = false;
     }

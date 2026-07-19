@@ -23,8 +23,9 @@ require_once __DIR__ . '/restore_staging_target.php';
 require_once __DIR__ . '/restore_sql_runner.php';
 require_once __DIR__ . '/restore_country_staging.php';
 require_once __DIR__ . '/restore_paths.php';
+require_once __DIR__ . '/restore_country_shadow_final_hardening.php';
 
-const ORANGE_COUNTRY_SHADOW_ENGINE_VERSION = '1.2';
+const ORANGE_COUNTRY_SHADOW_ENGINE_VERSION = '1.3';
 const ORANGE_COUNTRY_SHADOW_ENV_DB = 'ORANGE_RESTORE_COUNTRY_SHADOW_DB';
 const ORANGE_COUNTRY_SHADOW_DEFAULT_DB = 'orange_country_shadow';
 const ORANGE_COUNTRY_SHADOW_REPORT_FILE = 'country_shadow_restore_report.json';
@@ -59,10 +60,9 @@ function orange_country_shadow_db_name(array $env, string $projectRoot): string
 
 function orange_country_shadow_production_db_name(string $projectRoot): string
 {
-    if (isset($GLOBALS['orange_country_shadow_production_db_override'])
-        && is_string($GLOBALS['orange_country_shadow_production_db_override'])
-        && trim($GLOBALS['orange_country_shadow_production_db_override']) !== '') {
-        return trim($GLOBALS['orange_country_shadow_production_db_override']);
+    $prodOverride = orange_country_shadow_override_value('orange_country_shadow_production_db_override');
+    if (is_string($prodOverride) && trim($prodOverride) !== '') {
+        return trim($prodOverride);
     }
 
     return orange_restore_production_db_name($projectRoot);
@@ -101,7 +101,7 @@ function orange_country_shadow_assert_not_production(PDO $pdo, string $shadowDb,
         throw new RuntimeException('country_shadow_db_equals_production');
     }
     // Fixture/self-test mode: name fence only (no MySQL SESSION DATABASE()).
-    if (!empty($GLOBALS['orange_country_shadow_skip_session_assert'])) {
+    if (!empty(orange_country_shadow_override_value('orange_country_shadow_skip_session_assert'))) {
         return;
     }
     $current = (string) ($pdo->query('SELECT DATABASE()')->fetchColumn() ?: '');
@@ -118,10 +118,9 @@ function orange_country_shadow_assert_not_production(PDO $pdo, string $shadowDb,
  */
 function orange_country_shadow_connect_pdo(string $projectRoot, array $env, string $shadowDb): PDO
 {
-    if (isset($GLOBALS['orange_country_shadow_connect_override']) && is_callable($GLOBALS['orange_country_shadow_connect_override'])) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_country_shadow_connect_override'];
-        $pdo = $fn($projectRoot, $env, $shadowDb);
+    $connectOverride = orange_country_shadow_override_callable('orange_country_shadow_connect_override');
+    if ($connectOverride !== null) {
+        $pdo = $connectOverride($projectRoot, $env, $shadowDb);
         if (!$pdo instanceof PDO) {
             throw new RuntimeException('country_shadow_connect_override_invalid');
         }
@@ -391,10 +390,9 @@ function orange_country_shadow_import_sql(
     string $shadowDb,
     string $productionDb
 ): array {
-    if (isset($GLOBALS['orange_country_shadow_import_override']) && is_callable($GLOBALS['orange_country_shadow_import_override'])) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_country_shadow_import_override'];
-        $result = $fn($pdo, $importFiles, $shadowDb, $productionDb);
+    $importOverride = orange_country_shadow_override_callable('orange_country_shadow_import_override');
+    if ($importOverride !== null) {
+        $result = $importOverride($pdo, $importFiles, $shadowDb, $productionDb);
 
         return is_array($result) ? $result : ['ok' => false, 'files_imported' => 0, 'statements_executed' => 0, 'error' => 'import_override_invalid'];
     }
@@ -428,10 +426,9 @@ function orange_country_shadow_verify(
     string $projectRoot = '',
     string $runDir = ''
 ): array {
-    if (isset($GLOBALS['orange_country_shadow_verify_override']) && is_callable($GLOBALS['orange_country_shadow_verify_override'])) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_country_shadow_verify_override'];
-        $result = $fn($pdo, $shadowDb, $countryId, $manifest, $importPlan, $packagePath);
+    $verifyOverride = orange_country_shadow_override_callable('orange_country_shadow_verify_override');
+    if ($verifyOverride !== null) {
+        $result = $verifyOverride($pdo, $shadowDb, $countryId, $manifest, $importPlan, $packagePath);
 
         return is_array($result) ? $result : ['ok' => false, 'codes' => ['verify_override_invalid'], 'checks' => [], 'row_counts' => []];
     }
@@ -480,8 +477,9 @@ function orange_country_shadow_run(array $options): array
     if (is_array($options['env'] ?? null)) {
         $env = array_merge($env, $options['env']);
     }
-    if (isset($GLOBALS['orange_country_shadow_env_override']) && is_array($GLOBALS['orange_country_shadow_env_override'])) {
-        $env = array_merge($env, $GLOBALS['orange_country_shadow_env_override']);
+    $envOverride = orange_country_shadow_override_value('orange_country_shadow_env_override');
+    if (is_array($envOverride)) {
+        $env = array_merge($env, $envOverride);
     }
 
     $resolved = orange_country_drv_resolve_package_id(

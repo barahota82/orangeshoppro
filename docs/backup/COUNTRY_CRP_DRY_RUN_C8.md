@@ -40,7 +40,8 @@ Reject unless all hold:
 - **No** imports / deletes  
 - **F-04 / EA-04:** Impact requires a **certified read-only production inventory** (`production_inventory_snapshot.json` with `certified_read_only=true`, or inject / gated live SELECT counts). Missing → `production_inventory_snapshot_missing`.  
 - Rows to delete/replace use **production target counts** from that inventory (not C6 shadow counts alone). Package inventory drives inserts.  
-- Outside-target impacts are **proven** from inventory + restore plan (`outside_target_impact_proof`). Missing survivor/global inventory keys fail closed (non-zero impact), never silent defaults.  
+- Outside-target impacts are **proven** from inventory + restore plan (`outside_target_impact_proof`). Missing survivor/global inventory keys fail closed (non-zero impact), never silent defaults.
+- **N3-04 (engine 1.3):** Proof is explicit from **restore plan + certified inventory** (enumerated survivor/global tables + row totals, plan exclusion flags). `simulation_execution=false` — does **not** simulate production execution. Proof method: `restore_plan_plus_certified_inventory`.  
 
 Predicted impacts that must stay **zero** for SAFE:
 

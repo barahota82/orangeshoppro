@@ -1,0 +1,98 @@
+{
+  "expectations_version": "1.0",
+  "schema_revision": 121,
+  "core_tables": [
+    "orders",
+    "order_items",
+    "accounts",
+    "admins",
+    "admin_permissions",
+    "warehouses",
+    "warehouse_variant_stock",
+    "inventory_cost_layers",
+    "inventory_cost_consumptions",
+    "products",
+    "product_variants",
+    "customers",
+    "journal_vouchers",
+    "journal_lines",
+    "document_sequences"
+  ],
+  "tables": {
+    "orders": {
+      "required_columns": ["id", "country_id"],
+      "required_indexes": [{"name": "idx_orders_country_id", "columns": ["country_id"]}],
+      "required_constraints": []
+    },
+    "order_items": {
+      "required_columns": ["id", "order_id"],
+      "required_indexes": [],
+      "required_constraints": []
+    },
+    "accounts": {
+      "required_columns": ["id", "country_id"],
+      "required_indexes": [{"name": "idx_accounts_country_id", "columns": ["country_id"]}],
+      "required_constraints": []
+    },
+    "admins": {
+      "required_columns": ["id", "country_id"],
+      "required_indexes": [{"name": "idx_admins_country_id", "columns": ["country_id"]}],
+      "required_constraints": []
+    },
+    "admin_permissions": {
+      "required_columns": ["id", "admin_id"],
+      "required_indexes": [],
+      "required_constraints": []
+    },
+    "warehouses": {
+      "required_columns": ["id", "country_id"],
+      "required_indexes": [{"name": "idx_warehouses_country_id", "columns": ["country_id"]}],
+      "required_constraints": []
+    },
+    "warehouse_variant_stock": {
+      "required_columns": ["id", "warehouse_id"],
+      "required_indexes": [],
+      "required_constraints": []
+    },
+    "inventory_cost_layers": {
+      "required_columns": ["id", "warehouse_id", "qty"],
+      "required_indexes": [],
+      "required_constraints": []
+    },
+    "inventory_cost_consumptions": {
+      "required_columns": ["id", "layer_id", "qty"],
+      "required_indexes": [],
+      "required_constraints": []
+    },
+    "products": {
+      "required_columns": ["id", "country_id"],
+      "required_indexes": [{"name": "idx_products_country_id", "columns": ["country_id"]}],
+      "required_constraints": []
+    },
+    "product_variants": {
+      "required_columns": ["id", "product_id"],
+      "required_indexes": [],
+      "required_constraints": []
+    },
+    "customers": {
+      "required_columns": ["id", "country_id"],
+      "required_indexes": [{"name": "idx_customers_country_id", "columns": ["country_id"]}],
+      "required_constraints": []
+    },
+    "journal_vouchers": {
+      "required_columns": ["id", "country_id"],
+      "required_indexes": [{"name": "idx_journal_vouchers_country_id", "columns": ["country_id"]}],
+      "required_constraints": []
+    },
+    "journal_lines": {
+      "required_columns": ["id"],
+      "required_indexes": [],
+      "required_constraints": []
+    },
+    "document_sequences": {
+      "required_columns": ["id", "scope", "next_value"],
+      "required_indexes": [],
+      "required_constraints": []
+    }
+  }
+}

@@ -167,6 +167,7 @@ function s2_build_package(string $projectRoot, string $dir, int $countryId = 1):
         'drv_version' => ORANGE_COUNTRY_EXPORT_DRV_VERSION,
         'verify_version' => ORANGE_COUNTRY_EXPORT_VERIFY_VERSION,
         'export_backend' => ORANGE_COUNTRY_EXPORT_BACKEND,
+        'uploads_file_count' => 0,
         'registry_version' => '1.0',
         'restore_batches' => $batches,
         'package_fingerprint' => '',
@@ -192,9 +193,9 @@ mkdir($workRoot, 0777, true);
 try {
     s2_assert(ORANGE_COUNTRY_RESTORE_PRODUCTION_ENABLED === false, 'production restore remains disabled');
     s2_assert(ORANGE_COUNTRY_SHADOW_MODEL === 'seeded_multicountry_target_slice', 'architecture constant');
-    s2_assert(ORANGE_COUNTRY_SHADOW_ENGINE_VERSION === '1.2', 'C6 engine 1.2');
-    s2_assert(ORANGE_COUNTRY_SHADOW_VERIFY_ENGINE_VERSION === '1.2', 'C7 engine 1.2');
-    s2_assert(ORANGE_COUNTRY_DRY_RUN_ENGINE_VERSION === '1.2', 'C8 engine 1.2');
+    s2_assert(version_compare(ORANGE_COUNTRY_SHADOW_ENGINE_VERSION, '1.2', '>='), 'C6 engine >= 1.2');
+    s2_assert(version_compare(ORANGE_COUNTRY_SHADOW_VERIFY_ENGINE_VERSION, '1.2', '>='), 'C7 engine >= 1.2');
+    s2_assert(version_compare(ORANGE_COUNTRY_DRY_RUN_ENGINE_VERSION, '1.2', '>='), 'C8 engine >= 1.2');
 
     // EA-05: unresolved ownership fails closed
     $threw = false;

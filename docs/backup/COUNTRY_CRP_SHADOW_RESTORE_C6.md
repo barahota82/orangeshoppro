@@ -58,11 +58,24 @@ Stored in `country_shadow_restore.json` under `{workRoot}/country_shadow/{run_id
 
 - **Target-scoped** row counts vs inventory (`country_id = target` / ownership resolver)
 - Survivor-country rows are **allowed** and must not be treated as leakage
+- **N3-01:** After import, **re-validate** `survivor_baseline.json` (count/hash) against a fresh live survivor capture — fail `survivor_country_row_deleted` / `survivor_country_row_modified` / `survivor_baseline_missing`. Gate ordering unchanged (after target + global checks).
 - NULL `country_id` is still forbidden on country_id columns
 - Global / never-export tables (`journal_entries`, screen-copy log) are checked against **pre-clear baseline deltas**, not emptiness
 - Target-scoped composites (admins/permissions)
-- Batch integrity + `shadow_model` marker
+- **N3-05:** Real restore-batch dependency verification (`batch_order_violation`, `dependency_batch_missing`) — not a placeholder PASS
+- `shadow_model` marker
 - Clear uses matrix ownership resolvers only (fail closed on `unresolved_ownership`)
+- Engine version **1.3** (Final Quality Hardening)
+
+## Test overrides (N3-06)
+
+`$GLOBALS` test hooks (`connect` / `wipe` / `import` / `verify` / `baseline` / `probe` / `lock` / `env` / `production_db` / `skip_session_assert` / dry-run inventory) are available **only** when:
+
+1. `ORANGE_COUNTRY_RESTORE_PRODUCTION_ENABLED === false`
+2. `PHP_SAPI === 'cli'`
+3. `ORANGE_CRP_ALLOW_TEST_OVERRIDES === true` **or** the running script is `scripts/backup/self_test_country_crp_*.php`
+
+They are unavailable over HTTP and unavailable if production restore were ever enabled.
 
 ## Report
 
@@ -89,6 +102,7 @@ Status only. **No execution.**
 
 ```bash
 php scripts/backup/self_test_country_crp_c6_shadow.php
+php scripts/backup/self_test_country_crp_final_hardening.php
 ```
 
 Fixture databases / mocks only. Never production.

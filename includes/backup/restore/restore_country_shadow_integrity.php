@@ -15,6 +15,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../backup_paths.php';
 require_once __DIR__ . '/../country_boundary_matrix_lib.php';
 require_once __DIR__ . '/../country_export.php';
+require_once __DIR__ . '/restore_country_shadow_final_hardening.php';
 require_once __DIR__ . '/restore_country_shadow_ea.php';
 
 const ORANGE_COUNTRY_SHADOW_MODEL = 'seeded_multicountry_target_slice';
@@ -38,10 +39,9 @@ function orange_country_shadow_lock_path(string $workRoot): string
  */
 function orange_country_shadow_acquire_lock(string $workRoot, string $runId, string $shadowDb): array
 {
-    if (isset($GLOBALS['orange_country_shadow_lock_override']) && is_callable($GLOBALS['orange_country_shadow_lock_override'])) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_country_shadow_lock_override'];
-        $result = $fn('acquire', $workRoot, $runId, $shadowDb);
+    $lockOverride = orange_country_shadow_override_callable('orange_country_shadow_lock_override');
+    if ($lockOverride !== null) {
+        $result = $lockOverride('acquire', $workRoot, $runId, $shadowDb);
 
         return is_array($result)
             ? $result
@@ -81,10 +81,9 @@ function orange_country_shadow_acquire_lock(string $workRoot, string $runId, str
 
 function orange_country_shadow_release_lock(string $workRoot, ?string $expectedRunId = null): void
 {
-    if (isset($GLOBALS['orange_country_shadow_lock_override']) && is_callable($GLOBALS['orange_country_shadow_lock_override'])) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_country_shadow_lock_override'];
-        $fn('release', $workRoot, $expectedRunId ?? '', '');
+    $lockOverride = orange_country_shadow_override_callable('orange_country_shadow_lock_override');
+    if ($lockOverride !== null) {
+        $lockOverride('release', $workRoot, $expectedRunId ?? '', '');
 
         return;
     }
@@ -161,10 +160,9 @@ function orange_country_shadow_table_exists(PDO $pdo, string $table): bool
  */
 function orange_country_shadow_capture_live_baselines(PDO $pdo, int $countryId, string $projectRoot): array
 {
-    if (isset($GLOBALS['orange_country_shadow_baseline_override']) && is_callable($GLOBALS['orange_country_shadow_baseline_override'])) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_country_shadow_baseline_override'];
-        $captured = $fn($pdo, $countryId);
+    $baselineOverride = orange_country_shadow_override_callable('orange_country_shadow_baseline_override');
+    if ($baselineOverride !== null) {
+        $captured = $baselineOverride($pdo, $countryId);
         $survivor = is_array($captured['survivor'] ?? null) ? $captured['survivor'] : [];
         $global = is_array($captured['global'] ?? null) ? $captured['global'] : [];
 
@@ -270,10 +268,9 @@ function orange_country_shadow_live_probe(
     string $projectRoot,
     string $packagePath = ''
 ): array {
-    if (isset($GLOBALS['orange_country_shadow_c7_probe_override']) && is_callable($GLOBALS['orange_country_shadow_c7_probe_override'])) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_country_shadow_c7_probe_override'];
-        $probe = $fn($projectRoot, [], '', []);
+    $probeOverride = orange_country_shadow_override_callable('orange_country_shadow_c7_probe_override');
+    if ($probeOverride !== null) {
+        $probe = $probeOverride($projectRoot, [], '', []);
 
         return is_array($probe) ? $probe : [];
     }
@@ -394,12 +391,9 @@ function orange_country_dry_run_load_production_inventory(
             'global_counts' => is_array($inv['global_counts'] ?? null) ? $inv['global_counts'] : [],
         ];
     }
-    if (isset($GLOBALS['orange_country_dry_run_production_inventory_override'])
-        && is_callable($GLOBALS['orange_country_dry_run_production_inventory_override'])
-    ) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_country_dry_run_production_inventory_override'];
-        $inv = $fn($projectRoot, $workRoot, $runId, $countryId, $env);
+    $invOverride = orange_country_shadow_override_callable('orange_country_dry_run_production_inventory_override');
+    if ($invOverride !== null) {
+        $inv = $invOverride($projectRoot, $workRoot, $runId, $countryId, $env);
 
         return is_array($inv) ? $inv : [
             'ok' => false,

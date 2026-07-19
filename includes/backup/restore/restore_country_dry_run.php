@@ -20,7 +20,7 @@ require_once __DIR__ . '/restore_country_shadow.php';
 require_once __DIR__ . '/restore_country_shadow_verify.php';
 require_once __DIR__ . '/restore_paths.php';
 
-const ORANGE_COUNTRY_DRY_RUN_ENGINE_VERSION = '1.2';
+const ORANGE_COUNTRY_DRY_RUN_ENGINE_VERSION = '1.3';
 const ORANGE_COUNTRY_DRY_RUN_REPORT_FILE = 'country_dry_run_report.json';
 const ORANGE_COUNTRY_DRY_RUN_META_FILE = 'country_dry_run.json';
 
@@ -57,8 +57,11 @@ function orange_country_dry_run_execute(array $options): array
     if (is_array($options['env'] ?? null)) {
         $env = array_merge($env, $options['env']);
     }
-    if (isset($GLOBALS['orange_country_shadow_env_override']) && is_array($GLOBALS['orange_country_shadow_env_override'])) {
-        $env = array_merge($env, $GLOBALS['orange_country_shadow_env_override']);
+    $envOverride = function_exists('orange_country_shadow_override_value')
+        ? orange_country_shadow_override_value('orange_country_shadow_env_override')
+        : null;
+    if (is_array($envOverride)) {
+        $env = array_merge($env, $envOverride);
     }
 
     $runDir = orange_country_shadow_run_dir($workRoot, $jobId);
@@ -535,86 +538,23 @@ function orange_country_dry_run_compute_impact(
         }
     }
 
-    // EA-04: prove outside-target impact from inventory + restore plan (never silent defaults).
-    $survivorCounts = is_array($prodInv['survivor_counts'] ?? null) ? $prodInv['survivor_counts'] : null;
-    $globalCounts = is_array($prodInv['global_counts'] ?? null) ? $prodInv['global_counts'] : null;
-    $impactProof = [
-        'survivor_proof' => null,
-        'global_proof' => null,
-        'journal_entries_proof' => null,
-        'full_only_proof' => null,
-    ];
-
-    if (isset($inject['survivor_country_impact'])) {
-        $survivorImpact = (int) $inject['survivor_country_impact'];
-        $impactProof['survivor_proof'] = 'inject';
-    } elseif ($survivorCounts === null) {
-        $survivorImpact = 1; // fail closed — unproven
-        $impactProof['survivor_proof'] = 'unproven_missing_survivor_inventory';
-    } else {
-        // Target-slice restore plan never deletes survivor rows by ownership model.
-        $survivorImpact = 0;
-        foreach ($tablesAffected as $tName) {
-            $class = (string) (($tablesMeta[$tName]['classification'] ?? ''));
-            if ($class === 'Global') {
-                $survivorImpact = max($survivorImpact, 1);
-            }
-        }
-        $impactProof['survivor_proof'] = 'target_slice_ownership_excludes_survivors';
-    }
-
-    if (isset($inject['global_impact'])) {
-        $globalImpact = (int) $inject['global_impact'];
-        $impactProof['global_proof'] = 'inject';
-    } elseif ($globalCounts === null) {
-        $globalImpact = 1;
-        $impactProof['global_proof'] = 'unproven_missing_global_inventory';
-    } else {
-        $globalImpact = 0;
-        foreach ($tablesAffected as $tName) {
-            if (in_array((string) $tName, ORANGE_CRP_NEVER_EXPORT_TABLES, true)
-                || (($tablesMeta[$tName]['classification'] ?? '') === 'Global')
-            ) {
-                $globalImpact = max($globalImpact, 1);
-            }
-        }
-        foreach (array_keys($invTables) as $tName) {
-            if (in_array((string) $tName, ORANGE_CRP_NEVER_EXPORT_TABLES, true)) {
-                $globalImpact = max($globalImpact, 1);
-            }
-        }
-        $impactProof['global_proof'] = 'restore_plan_excludes_global_tables';
-    }
-
-    if (isset($inject['journal_entries_impact'])) {
-        $jeImpact = (int) $inject['journal_entries_impact'];
-        $impactProof['journal_entries_proof'] = 'inject';
-    } elseif ($globalCounts === null || !array_key_exists('journal_entries', $globalCounts)) {
-        $jeImpact = 1;
-        $impactProof['journal_entries_proof'] = 'unproven_missing_journal_entries_inventory';
-    } else {
-        $jeImpact = 0;
-        if (isset($invTables['journal_entries']) || in_array('journal_entries', $tablesAffected, true)) {
-            $jeImpact = 1;
-        }
-        $impactProof['journal_entries_proof'] = 'journal_entries_absent_from_restore_plan';
-    }
-
-    if (isset($inject['full_only_impact'])) {
-        $fullOnlyImpact = (int) $inject['full_only_impact'];
-        $impactProof['full_only_proof'] = 'inject';
-    } elseif ($globalCounts === null) {
-        $fullOnlyImpact = 1;
-        $impactProof['full_only_proof'] = 'unproven_missing_global_inventory';
-    } else {
-        $fullOnlyImpact = 0;
-        foreach (ORANGE_CRP_NEVER_EXPORT_TABLES as $never) {
-            if (isset($invTables[$never]) || in_array($never, $tablesAffected, true)) {
-                $fullOnlyImpact = 1;
-            }
-        }
-        $impactProof['full_only_proof'] = 'full_only_absent_from_restore_plan';
-    }
+    // EA-04 / N3-04: explicit outside-target proof from restore plan + certified inventory (no production execution).
+    $outside = function_exists('orange_country_dry_run_build_outside_target_proof')
+        ? orange_country_dry_run_build_outside_target_proof($prodInv, $tablesAffected, $tablesMeta, $invTables, $inject)
+        : [
+            'survivor_country_impact' => 1,
+            'global_impact' => 1,
+            'journal_entries_impact' => 1,
+            'full_only_impact' => 1,
+            'outside_target_impact_proof' => ['survivor_proof' => 'unproven_helper_missing'],
+        ];
+    $survivorImpact = (int) $outside['survivor_country_impact'];
+    $globalImpact = (int) $outside['global_impact'];
+    $jeImpact = (int) $outside['journal_entries_impact'];
+    $fullOnlyImpact = (int) $outside['full_only_impact'];
+    $impactProof = is_array($outside['outside_target_impact_proof'] ?? null)
+        ? $outside['outside_target_impact_proof']
+        : [];
 
     $uploadsReplace = 0;
     $uploadsAdd = 0;
