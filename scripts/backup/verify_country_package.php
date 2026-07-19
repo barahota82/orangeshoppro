@@ -3,10 +3,11 @@
 declare(strict_types=1);
 
 /**
- * Read-only verification for a Country Recovery Package (CRP).
+ * Phase C4 — Verify a Country Recovery Package (CRP). VERIFY ONLY — no restore.
  *
  * Usage:
  *   php scripts/backup/verify_country_package.php --package=PATH
+ *   php scripts/backup/verify_country_package.php --package=PATH --no-write-report
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -15,41 +16,52 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $packagePath = '';
+$writeReport = true;
 foreach ($_SERVER['argv'] ?? [] as $arg) {
     if (str_starts_with($arg, '--package=')) {
         $packagePath = trim(substr($arg, strlen('--package=')));
     }
+    if ($arg === '--no-write-report') {
+        $writeReport = false;
+    }
 }
 
 if ($packagePath === '') {
-    fwrite(STDERR, "Usage: php verify_country_package.php --package=PATH\n");
+    fwrite(STDERR, "Usage: php verify_country_package.php --package=PATH [--no-write-report]\n");
     exit(2);
 }
 
 $projectRoot = dirname(__DIR__, 2);
-require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_validate.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'country_crp_verify.php';
 
-$result = orange_country_export_verify_package($packagePath);
+$result = orange_crp_verify_run($packagePath, [
+    'write_report' => $writeReport,
+    'project_root' => $projectRoot,
+]);
 
-foreach ($result['warnings'] as $warning) {
-    fwrite(STDOUT, "WARN: {$warning}\n");
+echo 'overall=' . $result['overall'] . "\n";
+if ($result['report_path'] !== null) {
+    echo 'report=' . $result['report_path'] . "\n";
+}
+foreach ($result['warnings'] as $code) {
+    fwrite(STDOUT, "WARN: {$code}\n");
+}
+foreach ($result['codes'] as $code) {
+    fwrite(STDERR, "FAIL: {$code}\n");
 }
 
-if (!$result['ok']) {
-    foreach ($result['errors'] as $error) {
-        fwrite(STDERR, "ERROR: {$error}\n");
-    }
+if ($result['overall'] === 'FAIL') {
     exit(1);
 }
 
-echo "OK: country recovery package verified.\n";
+echo "OK: country recovery package verify {$result['overall']}.\n";
 if (is_array($result['manifest'])) {
     echo 'package_type=' . (string) ($result['manifest']['package_type'] ?? '') . "\n";
     echo 'country_id=' . (string) ($result['manifest']['country_id'] ?? '') . "\n";
-    echo 'country_code=' . (string) ($result['manifest']['country_code'] ?? '') . "\n";
     echo 'schema_revision=' . (string) ($result['manifest']['schema_revision'] ?? '') . "\n";
-    echo 'registry_version=' . (string) ($result['manifest']['registry_version'] ?? '') . "\n";
-    echo 'package_status=' . (string) ($result['manifest']['package_status'] ?? '') . "\n";
+    echo 'boundary_policy_version=' . (string) ($result['manifest']['boundary_policy_version'] ?? '') . "\n";
+    echo 'dependency_graph_version=' . (string) ($result['manifest']['dependency_graph_version'] ?? '') . "\n";
+    echo 'package_fingerprint=' . (string) ($result['manifest']['package_fingerprint'] ?? '') . "\n";
 }
 
 exit(0);

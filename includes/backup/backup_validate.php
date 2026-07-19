@@ -327,108 +327,39 @@ function orange_country_export_build_health(array $healthInput): array
 }
 
 /**
- * @return array{ok:bool,errors:list<string>,warnings:list<string>,manifest:?array<string,mixed>}
+ * Compatibility wrapper — delegates to Phase C4 CRP verify engine.
+ *
+ * @return array{
+ *   ok:bool,
+ *   errors:list<string>,
+ *   warnings:list<string>,
+ *   manifest:?array<string,mixed>,
+ *   overall?:string,
+ *   report_path?:?string,
+ *   report?:array<string,mixed>
+ * }
  */
 function orange_country_export_verify_package(string $packageRoot): array
 {
-    $errors = [];
-    $warnings = [];
-    $manifestPath = $packageRoot . DIRECTORY_SEPARATOR . 'manifest.json';
-    if (!is_file($manifestPath)) {
-        return ['ok' => false, 'errors' => ['Missing manifest.json'], 'warnings' => [], 'manifest' => null];
-    }
-    $manifest = json_decode((string) file_get_contents($manifestPath), true);
-    if (!is_array($manifest)) {
-        return ['ok' => false, 'errors' => ['Invalid manifest.json'], 'warnings' => [], 'manifest' => null];
-    }
-    if (($manifest['package_type'] ?? '') !== 'country_recovery') {
-        $errors[] = 'package_type must be country_recovery';
-    }
-    foreach ([
-        'manifest.json',
-        'health.json',
-        'checksums.sha256',
-        'dependency_graph.json',
-        'table_inventory.json',
-        'id_snapshot.json',
-        'country.sql.gz',
-        'files/uploads_country.zip',
-    ] as $required) {
-        $abs = $packageRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $required);
-        if (!is_file($abs)) {
-            $errors[] = 'Missing required file: ' . $required;
-        }
-    }
-    if (($manifest['boundary_policy_version'] ?? '') !== 'C1.1') {
-        $errors[] = 'manifest.boundary_policy_version must be C1.1';
-    }
-    if (($manifest['dependency_graph_version'] ?? '') !== 'C2') {
-        $errors[] = 'manifest.dependency_graph_version must be C2';
-    }
-    if (trim((string) ($manifest['package_fingerprint'] ?? '')) === '') {
-        $errors[] = 'manifest.package_fingerprint missing';
-    }
-    if (!is_array($manifest['restore_batches'] ?? null)) {
-        $errors[] = 'manifest.restore_batches missing';
-    }
-    $sqlDir = $packageRoot . DIRECTORY_SEPARATOR . 'sql';
-    if (!is_dir($sqlDir)) {
-        $errors[] = 'Missing sql/ directory';
-    } else {
-        $sqlFiles = glob($sqlDir . DIRECTORY_SEPARATOR . '*.sql') ?: [];
-        if ($sqlFiles === []) {
-            $errors[] = 'sql/ directory has no .sql chunks';
-        }
-        foreach ($sqlFiles as $sqlFile) {
-            $content = (string) file_get_contents($sqlFile);
-            foreach (ORANGE_COUNTRY_EXPORT_FORBIDDEN_SQL_TABLES as $forbidden) {
-                if (preg_match('/INSERT INTO `' . preg_quote($forbidden, '/') . '`/i', $content)) {
-                    $errors[] = 'Forbidden global table data in SQL: ' . $forbidden;
-                }
-            }
-        }
-    }
-    $gzPath = $packageRoot . DIRECTORY_SEPARATOR . 'country.sql.gz';
-    if (is_file($gzPath) && function_exists('gzopen')) {
-        $gz = @gzopen($gzPath, 'rb');
-        if ($gz !== false) {
-            $sample = (string) gzread($gz, 1024 * 1024);
-            gzclose($gz);
-            foreach (ORANGE_COUNTRY_EXPORT_FORBIDDEN_SQL_TABLES as $forbidden) {
-                if (preg_match('/INSERT INTO `' . preg_quote($forbidden, '/') . '`/i', $sample)) {
-                    $errors[] = 'Forbidden table in country.sql.gz: ' . $forbidden;
-                }
-            }
-        }
-    }
-    $checksum = orange_backup_verify_checksums($packageRoot);
-    if (!$checksum['ok']) {
-        $errors = array_merge($errors, $checksum['errors']);
-    }
-    $healthPath = $packageRoot . DIRECTORY_SEPARATOR . 'health.json';
-    if (is_file($healthPath)) {
-        $health = json_decode((string) file_get_contents($healthPath), true);
-        if (is_array($health)) {
-            if (($health['package_status'] ?? '') === 'failed') {
-                $errors[] = 'health.json package_status=failed';
-            }
-            if ((int) ($health['country_id'] ?? 0) !== (int) ($manifest['country_id'] ?? -1)) {
-                $errors[] = 'health country_id mismatch with manifest';
-            }
-        }
-    }
-    $inventoryPath = $packageRoot . DIRECTORY_SEPARATOR . 'table_inventory.json';
-    if (is_file($inventoryPath)) {
-        $inventory = json_decode((string) file_get_contents($inventoryPath), true);
-        if (is_array($inventory) && !empty($inventory['other_country_markers'])) {
-            $errors[] = 'table_inventory contains other-country markers';
-        }
+    require_once __DIR__ . '/country_crp_verify.php';
+
+    $result = orange_crp_verify_run($packageRoot, [
+        'write_report' => true,
+        'project_root' => orange_backup_project_root(),
+    ]);
+
+    $errors = $result['codes'];
+    if ($result['overall'] === 'FAIL' && $errors === []) {
+        $errors = ['verify_failed'];
     }
 
     return [
-        'ok' => $errors === [],
+        'ok' => (bool) $result['ok'] && $result['overall'] !== 'FAIL',
         'errors' => $errors,
-        'warnings' => $warnings,
-        'manifest' => $manifest,
+        'warnings' => $result['warnings'],
+        'manifest' => $result['manifest'],
+        'overall' => $result['overall'],
+        'report_path' => $result['report_path'],
+        'report' => $result['report'],
     ];
 }
