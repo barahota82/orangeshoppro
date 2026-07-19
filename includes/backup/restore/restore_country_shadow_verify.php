@@ -20,7 +20,7 @@ require_once __DIR__ . '/restore_country_shadow.php';
 require_once __DIR__ . '/restore_shadow_db.php';
 require_once __DIR__ . '/restore_paths.php';
 
-const ORANGE_COUNTRY_SHADOW_VERIFY_ENGINE_VERSION = '1.1';
+const ORANGE_COUNTRY_SHADOW_VERIFY_ENGINE_VERSION = '1.2';
 const ORANGE_COUNTRY_SHADOW_VERIFY_REPORT_FILE = 'country_shadow_verification_report.json';
 const ORANGE_COUNTRY_SHADOW_VERIFY_META_FILE = 'country_shadow_verification.json';
 const ORANGE_COUNTRY_SHADOW_SURVIVOR_BASELINE_FILE = 'survivor_baseline.json';
@@ -317,8 +317,15 @@ function orange_country_shadow_verify_run(array $options): array
         $add('db_identity', 'PASS', null, 'Shadow DB identity OK');
     }
 
-    // F-01: live probe required (no tautological baseline fallback).
-    $probe = orange_country_shadow_verify_load_probe($projectRoot, $env, $shadowDb, $inject, $countryId);
+    // F-01 / EA-03: live probe required (no tautological baseline fallback).
+    $probe = orange_country_shadow_verify_load_probe(
+        $projectRoot,
+        $env,
+        $shadowDb,
+        $inject,
+        $countryId,
+        $packagePath
+    );
     $hasInjectCurrents = is_array($inject['survivor_current'] ?? null) && is_array($inject['global_current'] ?? null);
     $probeUsable = (($probe['probe_mode'] ?? '') !== '')
         || is_array($probe['survivor_current'] ?? null)
@@ -463,7 +470,7 @@ function orange_country_shadow_verify_run(array $options): array
     }
     $integrity['global_state_integrity'] = $globalOk ? 'PASS' : 'FAIL';
 
-    // --- 4. Dependency ---
+    // --- 4. Dependency (EA-03 live SQL) ---
     $depOk = true;
     if (!empty($inject['missing_parent'])) {
         $add('dep_parent', 'FAIL', 'missing_dependency_parent', 'Missing dependency parent', true);
@@ -473,8 +480,19 @@ function orange_country_shadow_verify_run(array $options): array
         $add('dep_fk', 'FAIL', 'cross_country_fk', 'Cross-country FK leakage', true);
         $depOk = false;
     }
+    foreach ((array) ($probe['dependency_codes'] ?? []) as $code) {
+        $add('dep_sql_' . md5((string) $code), 'FAIL', (string) $code, 'Live SQL dependency failure', true);
+        $depOk = false;
+    }
+    if (array_key_exists('dependency_ok', $probe) && $probe['dependency_ok'] === false) {
+        $depOk = false;
+    }
+    if (!array_key_exists('dependency_ok', $probe) && ($probe['probe_mode'] ?? '') === 'live') {
+        $add('dep_unproven', 'FAIL', 'dependency_not_proven', 'Dependency integrity not proven', true);
+        $depOk = false;
+    }
     if ($depOk) {
-        $add('dependency', 'PASS', null, 'Dependency graph OK');
+        $add('dependency', 'PASS', null, 'Dependency graph OK (live SQL)');
     }
     $integrity['dependency_integrity'] = $depOk ? 'PASS' : 'FAIL';
 
@@ -560,7 +578,7 @@ function orange_country_shadow_verify_run(array $options): array
     }
     $integrity['stock_fifo_integrity'] = $stockOk ? 'PASS' : 'FAIL';
 
-    // --- 8. Commercial ---
+    // --- 8. Commercial (EA-03 live) ---
     $commOk = true;
     foreach (['missing_order_item' => 'missing_order_item', 'payment_orphan' => 'payment_orphan'] as $inj => $code) {
         if (!empty($inject[$inj])) {
@@ -568,22 +586,44 @@ function orange_country_shadow_verify_run(array $options): array
             $commOk = false;
         }
     }
+    foreach ((array) ($probe['commercial_codes'] ?? []) as $code) {
+        $add('comm_sql_' . md5((string) $code), 'FAIL', (string) $code, 'Live commercial failure', true);
+        $commOk = false;
+    }
+    if (array_key_exists('commercial_ok', $probe) && $probe['commercial_ok'] === false) {
+        $commOk = false;
+    }
+    if (!array_key_exists('commercial_ok', $probe) && ($probe['probe_mode'] ?? '') === 'live') {
+        $add('comm_unproven', 'FAIL', 'commercial_not_proven', 'Commercial integrity not proven', true);
+        $commOk = false;
+    }
     if ($commOk) {
-        $add('commercial', 'PASS', null, 'Commercial integrity OK');
+        $add('commercial', 'PASS', null, 'Commercial integrity OK (live SQL)');
     }
     $integrity['commercial_integrity'] = $commOk ? 'PASS' : 'FAIL';
 
-    // --- 9. Catalog ---
+    // --- 9. Catalog (EA-03 live) ---
     $catOk = true;
     if (!empty($inject['product_collision'])) {
         $add('cat_coll', 'FAIL', 'product_collision', 'Product/variant collision', true);
         $catOk = false;
     }
     if (!empty($inject['taxonomy_mutation'])) {
-        $catOk = false; // already blocked under global
+        $catOk = false;
+    }
+    foreach ((array) ($probe['catalog_codes'] ?? []) as $code) {
+        $add('cat_sql_' . md5((string) $code), 'FAIL', (string) $code, 'Live catalog failure', true);
+        $catOk = false;
+    }
+    if (array_key_exists('catalog_ok', $probe) && $probe['catalog_ok'] === false) {
+        $catOk = false;
+    }
+    if (!array_key_exists('catalog_ok', $probe) && ($probe['probe_mode'] ?? '') === 'live') {
+        $add('cat_unproven', 'FAIL', 'catalog_not_proven', 'Catalog integrity not proven', true);
+        $catOk = false;
     }
     if ($catOk && !in_array('global_taxonomy_mutation', $blockers, true)) {
-        $add('catalog', 'PASS', null, 'Catalog integrity OK');
+        $add('catalog', 'PASS', null, 'Catalog integrity OK (live SQL)');
         $integrity['catalog_integrity'] = 'PASS';
     } else {
         $integrity['catalog_integrity'] = 'FAIL';
@@ -603,7 +643,7 @@ function orange_country_shadow_verify_run(array $options): array
     }
     $integrity['admin_permissions_integrity'] = $adminOk && !in_array('incomplete_admin_composite', $blockers, true) ? 'PASS' : 'FAIL';
 
-    // --- 11. Company documents ---
+    // --- 11. Company documents (EA-03 live) ---
     $docOk = true;
     foreach (['unknown_document_owner' => 'unknown_polymorphic_document_owner', 'document_other_country' => 'document_owned_by_another_country'] as $inj => $code) {
         if (!empty($inject[$inj])) {
@@ -611,12 +651,19 @@ function orange_country_shadow_verify_run(array $options): array
             $docOk = false;
         }
     }
+    foreach ((array) ($probe['documents_codes'] ?? []) as $code) {
+        $add('doc_sql_' . md5((string) $code), 'FAIL', (string) $code, 'Live documents failure', true);
+        $docOk = false;
+    }
+    if (array_key_exists('documents_ok', $probe) && $probe['documents_ok'] === false) {
+        $docOk = false;
+    }
     if ($docOk) {
         $add('documents', 'PASS', null, 'Company documents integrity OK');
     }
     $integrity['company_documents_integrity'] = $docOk ? 'PASS' : 'FAIL';
 
-    // --- 12. Sequences ---
+    // --- 12. Sequences (EA-03 live) ---
     $seqOk = true;
     foreach (['sequence_lowered' => 'sequence_lowered', 'sequence_namespace_collision' => 'sequence_namespace_collision'] as $inj => $code) {
         if (!empty($inject[$inj])) {
@@ -624,12 +671,23 @@ function orange_country_shadow_verify_run(array $options): array
             $seqOk = false;
         }
     }
+    foreach ((array) ($probe['sequences_codes'] ?? []) as $code) {
+        $add('seq_sql_' . md5((string) $code), 'FAIL', (string) $code, 'Live sequence failure', true);
+        $seqOk = false;
+    }
+    if (array_key_exists('sequences_ok', $probe) && $probe['sequences_ok'] === false) {
+        $seqOk = false;
+    }
+    if (!array_key_exists('sequences_ok', $probe) && ($probe['probe_mode'] ?? '') === 'live') {
+        $add('seq_unproven', 'FAIL', 'sequences_not_proven', 'Sequence integrity not proven', true);
+        $seqOk = false;
+    }
     if ($seqOk) {
-        $add('sequences', 'PASS', null, 'Sequences integrity OK');
+        $add('sequences', 'PASS', null, 'Sequences integrity OK (live SQL)');
     }
     $integrity['sequences_integrity'] = $seqOk ? 'PASS' : 'FAIL';
 
-    // --- 13. Uploads references ---
+    // --- 13. Uploads (EA-03 live content/path) ---
     $upOk = true;
     foreach (['missing_upload_reference' => 'missing_upload_reference', 'upload_owner_mismatch' => 'upload_owner_mismatch'] as $inj => $code) {
         if (!empty($inject[$inj])) {
@@ -637,16 +695,23 @@ function orange_country_shadow_verify_run(array $options): array
             $upOk = false;
         }
     }
+    foreach ((array) ($probe['uploads_codes'] ?? []) as $code) {
+        $add('up_sql_' . md5((string) $code), 'FAIL', (string) $code, 'Live upload failure', true);
+        $upOk = false;
+    }
+    if (array_key_exists('uploads_ok', $probe) && $probe['uploads_ok'] === false) {
+        $upOk = false;
+    }
     $uploadsZip = $packagePath . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip';
     if (!is_file($uploadsZip)) {
         $add('up_zip', 'FAIL', 'uploads_archive_missing', 'uploads_country.zip missing', true);
         $upOk = false;
     } elseif ($upOk) {
-        $add('uploads', 'PASS', null, 'Upload references OK (no extract)');
+        $add('uploads', 'PASS', null, 'Upload archive/path integrity OK');
     }
     $integrity['upload_reference_integrity'] = $upOk ? 'PASS' : 'FAIL';
 
-    // --- 14. ID preservation ---
+    // --- 14. ID preservation (EA-03 live) ---
     $idOk = true;
     foreach (['pk_collision' => 'pk_collision', 'auto_increment_too_low' => 'auto_increment_too_low'] as $inj => $code) {
         if (!empty($inject[$inj])) {
@@ -654,17 +719,40 @@ function orange_country_shadow_verify_run(array $options): array
             $idOk = false;
         }
     }
+    foreach ((array) ($probe['id_preservation_codes'] ?? []) as $code) {
+        $add('id_sql_' . md5((string) $code), 'FAIL', (string) $code, 'Live ID failure', true);
+        $idOk = false;
+    }
+    if (array_key_exists('id_preservation_ok', $probe) && $probe['id_preservation_ok'] === false) {
+        $idOk = false;
+    }
+    if (!array_key_exists('id_preservation_ok', $probe) && ($probe['probe_mode'] ?? '') === 'live') {
+        $add('id_unproven', 'FAIL', 'id_preservation_not_proven', 'ID preservation not proven', true);
+        $idOk = false;
+    }
     if ($idOk) {
-        $add('ids', 'PASS', null, 'ID preservation OK');
+        $add('ids', 'PASS', null, 'ID preservation OK (live SQL)');
     }
     $integrity['id_preservation_integrity'] = $idOk ? 'PASS' : 'FAIL';
 
-    // --- 15. Schema ---
+    // --- 15. Schema (EA-03) ---
     $schemaOk = true;
     if (!empty($inject['schema_mismatch'])) {
         $add('schema', 'FAIL', 'schema_mismatch', 'Schema mismatch', true);
         $schemaOk = false;
-    } else {
+    }
+    foreach ((array) ($probe['schema_codes'] ?? []) as $code) {
+        $add('schema_sql_' . md5((string) $code), 'FAIL', (string) $code, 'Schema failure', true);
+        $schemaOk = false;
+    }
+    if (array_key_exists('schema_ok', $probe) && $probe['schema_ok'] === false) {
+        $schemaOk = false;
+    }
+    if (!array_key_exists('schema_ok', $probe) && ($probe['probe_mode'] ?? '') === 'live') {
+        $add('schema_unproven', 'FAIL', 'schema_not_proven', 'Schema integrity not proven', true);
+        $schemaOk = false;
+    }
+    if ($schemaOk) {
         $add('schema', 'PASS', null, 'Schema integrity OK');
     }
     $integrity['schema_integrity'] = $schemaOk ? 'PASS' : 'FAIL';
@@ -722,6 +810,13 @@ function orange_country_shadow_verify_score(array $integrity, array $blockers, a
         'accounting_integrity',
         'stock_fifo_integrity',
         'composite_integrity',
+        'dependency_integrity',
+        'commercial_integrity',
+        'catalog_integrity',
+        'sequences_integrity',
+        'upload_reference_integrity',
+        'id_preservation_integrity',
+        'schema_integrity',
     ];
     foreach ($requiredPass as $key) {
         if (($integrity[$key] ?? 'FAIL') !== 'PASS') {
@@ -767,7 +862,8 @@ function orange_country_shadow_verify_load_probe(
     array $env,
     string $shadowDb,
     array $inject,
-    int $countryId = 0
+    int $countryId = 0,
+    string $packagePath = ''
 ): array {
     if (isset($GLOBALS['orange_country_shadow_c7_probe_override']) && is_callable($GLOBALS['orange_country_shadow_c7_probe_override'])) {
         /** @var callable $fn */
@@ -791,14 +887,14 @@ function orange_country_shadow_verify_load_probe(
 
         return $probe;
     }
-    // F-01/F-03: live read-only probe against Country Shadow DB (never production).
+    // Live read-only probe against Country Shadow DB (never production).
     try {
         $pdo = orange_country_shadow_connect_pdo($projectRoot, $env, $shadowDb);
         if ($countryId <= 0) {
             return ['probe_mode' => '', 'error' => 'country_id_required'];
         }
 
-        return orange_country_shadow_live_probe($pdo, $countryId, $projectRoot);
+        return orange_country_shadow_live_probe($pdo, $countryId, $projectRoot, $packagePath);
     } catch (Throwable $e) {
         return ['probe_mode' => '', 'error' => 'live_probe_connect_failed'];
     }

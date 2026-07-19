@@ -196,9 +196,9 @@ try {
     s1_assert(($impact['production_inventory_source'] ?? '') === 'certified_snapshot', 'F-04 impact records source');
 
     // Engine versions bumped for remediation
-    s1_assert(ORANGE_COUNTRY_SHADOW_ENGINE_VERSION === '1.1', 'C6 engine 1.1');
-    s1_assert(ORANGE_COUNTRY_SHADOW_VERIFY_ENGINE_VERSION === '1.1', 'C7 engine 1.1');
-    s1_assert(ORANGE_COUNTRY_DRY_RUN_ENGINE_VERSION === '1.1', 'C8 engine 1.1');
+    s1_assert(version_compare(ORANGE_COUNTRY_SHADOW_ENGINE_VERSION, '1.1', '>='), 'C6 engine >= 1.1');
+    s1_assert(version_compare(ORANGE_COUNTRY_SHADOW_VERIFY_ENGINE_VERSION, '1.1', '>='), 'C7 engine >= 1.1');
+    s1_assert(version_compare(ORANGE_COUNTRY_DRY_RUN_ENGINE_VERSION, '1.1', '>='), 'C8 engine >= 1.1');
 
 } catch (Throwable $e) {
     echo 'FAIL: exception ' . $e->getMessage() . "\n";

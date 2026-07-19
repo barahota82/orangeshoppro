@@ -12,8 +12,8 @@
 | **C6** | Import CRP into isolated Country Shadow DB; write restore report; capture **live survivor** and **Global** baselines **before** target-slice clear (`seeded_multicountry_target_slice`) |
 | **C7** | Consume C6 result only — **no re-import**; **live probe** vs baselines (F-01); read-only SQL for accounting/FIFO/composites (F-03); score readiness for Dry Run |
 
-**F-01:** C7 must not treat baseline as current. Missing live `survivor_current` / `global_current` → `survivor_probe_unavailable` / `global_probe_unavailable` (FAIL).  
-**F-03:** Accounting, FIFO, and composites use live SQL probe codes (`accounting_codes`, `stock_fifo_codes`, `composite_codes`); inject hooks remain for regression only.
+**F-01 / EA-02:** C7 must not treat baseline as current. Missing live `survivor_current` / `global_current` → `survivor_probe_unavailable` / `global_probe_unavailable` (FAIL). Global/`journal_entries` proven by **baseline delta/hash**, never by requiring empty tables.  
+**F-03 / EA-03:** Live SQL pillars: accounting, FIFO, composites, dependency, commercial, catalog, sequences, uploads (zip path safety), ID preservation, schema. Inject hooks remain for regression only. Fail closed when a live pillar is unproven.
 
 C7 entry requires C6 status `ready` / `country_shadow_restore_ready` (re-verify also allowed from C7 result states), C4 Verify **PASS**, C5 Country DRV **pass** with score ≥ 85, unchanged package fingerprint / boundary / dependency versions, consistent `country_id`, and proven Shadow DB ≠ production.
 

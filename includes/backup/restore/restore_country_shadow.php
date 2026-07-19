@@ -24,7 +24,7 @@ require_once __DIR__ . '/restore_sql_runner.php';
 require_once __DIR__ . '/restore_country_staging.php';
 require_once __DIR__ . '/restore_paths.php';
 
-const ORANGE_COUNTRY_SHADOW_ENGINE_VERSION = '1.1';
+const ORANGE_COUNTRY_SHADOW_ENGINE_VERSION = '1.2';
 const ORANGE_COUNTRY_SHADOW_ENV_DB = 'ORANGE_RESTORE_COUNTRY_SHADOW_DB';
 const ORANGE_COUNTRY_SHADOW_DEFAULT_DB = 'orange_country_shadow';
 const ORANGE_COUNTRY_SHADOW_REPORT_FILE = 'country_shadow_restore_report.json';
@@ -370,7 +370,15 @@ function orange_country_shadow_clear_tables(
     if ($countryId <= 0) {
         throw new RuntimeException('country_shadow_clear_requires_country_id');
     }
-    orange_country_shadow_clear_target_slice($pdo, $shadowDb, $productionDb, $tables, $countryId, $matrix);
+    orange_country_shadow_clear_target_slice(
+        $pdo,
+        $shadowDb,
+        $productionDb,
+        $tables,
+        $countryId,
+        $matrix,
+        $projectRoot
+    );
 }
 
 /**
@@ -416,7 +424,9 @@ function orange_country_shadow_verify(
     int $countryId,
     array $manifest,
     array $importPlan,
-    string $packagePath
+    string $packagePath,
+    string $projectRoot = '',
+    string $runDir = ''
 ): array {
     if (isset($GLOBALS['orange_country_shadow_verify_override']) && is_callable($GLOBALS['orange_country_shadow_verify_override'])) {
         /** @var callable $fn */
@@ -425,116 +435,22 @@ function orange_country_shadow_verify(
 
         return is_array($result) ? $result : ['ok' => false, 'codes' => ['verify_override_invalid'], 'checks' => [], 'row_counts' => []];
     }
-
-    $codes = [];
-    $checks = [];
-    $rowCounts = [];
-    orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
-
-    $inventory = json_decode((string) @file_get_contents($packagePath . DIRECTORY_SEPARATOR . 'table_inventory.json'), true);
-    $expected = is_array($inventory['tables'] ?? null) ? $inventory['tables'] : [];
-
-    foreach ($importPlan['tables'] as $table) {
-        $table = (string) $table;
-        try {
-            $st = $pdo->query('SELECT COUNT(*) FROM `' . str_replace('`', '``', $table) . '`');
-            $count = (int) ($st ? $st->fetchColumn() : 0);
-        } catch (Throwable) {
-            $codes[] = 'row_count_query_failed';
-            $checks[] = ['id' => 'count_' . $table, 'status' => 'FAIL', 'code' => 'row_count_query_failed', 'detail' => $table];
-            continue;
-        }
-        $rowCounts[$table] = $count;
-        $exp = (int) ($expected[$table] ?? -1);
-        if ($exp >= 0 && $count !== $exp) {
-            $codes[] = 'row_count_mismatch';
-            $checks[] = ['id' => 'count_' . $table, 'status' => 'FAIL', 'code' => 'row_count_mismatch', 'detail' => $table];
-        } else {
-            $checks[] = ['id' => 'count_' . $table, 'status' => 'PASS', 'code' => null, 'detail' => $table . '=' . (string) $count];
-        }
-
-        // Ownership / leakage: if table has country_id, all rows must match target
-        try {
-            $colSt = $pdo->query('SHOW COLUMNS FROM `' . str_replace('`', '``', $table) . '` LIKE \'country_id\'');
-            $hasCountry = $colSt && $colSt->fetch(PDO::FETCH_ASSOC);
-            if ($hasCountry) {
-                $bad = $pdo->prepare('SELECT COUNT(*) FROM `' . str_replace('`', '``', $table) . '` WHERE country_id IS NULL OR country_id <> ?');
-                $bad->execute([$countryId]);
-                $badCount = (int) $bad->fetchColumn();
-                if ($badCount > 0) {
-                    $codes[] = 'country_leakage_in_shadow';
-                    $checks[] = ['id' => 'own_' . $table, 'status' => 'FAIL', 'code' => 'country_leakage_in_shadow', 'detail' => $table];
-                } else {
-                    $checks[] = ['id' => 'own_' . $table, 'status' => 'PASS', 'code' => null, 'detail' => 'ownership OK'];
-                }
-            }
-        } catch (Throwable) {
-            // ignore schema probe failures for optional ownership
-        }
+    if ($projectRoot === '') {
+        $projectRoot = dirname(__DIR__, 3);
     }
 
-    // Composite: admin_permissions require admins
-    if ((int) ($rowCounts['admin_permissions'] ?? 0) > 0 && (int) ($rowCounts['admins'] ?? 0) === 0) {
-        $codes[] = 'composite_admins_permissions_mismatch';
-        $checks[] = ['id' => 'composite_admins', 'status' => 'FAIL', 'code' => 'composite_admins_permissions_mismatch', 'detail' => 'admins missing'];
-    }
-    if ((int) ($rowCounts['expenses'] ?? 0) > 0 && (int) ($rowCounts['accounts'] ?? 0) === 0) {
-        $codes[] = 'composite_expenses_accounts_mismatch';
-        $checks[] = ['id' => 'composite_expenses', 'status' => 'FAIL', 'code' => 'composite_expenses_accounts_mismatch', 'detail' => 'accounts missing'];
-    }
-    if ((int) ($rowCounts['journal_lines'] ?? 0) > 0 && (int) ($rowCounts['journal_vouchers'] ?? 0) === 0) {
-        $codes[] = 'composite_gl_mismatch';
-        $checks[] = ['id' => 'composite_gl', 'status' => 'FAIL', 'code' => 'composite_gl_mismatch', 'detail' => 'vouchers missing'];
-    }
-
-    // Forbidden tables must stay empty / absent
-    foreach (ORANGE_CRP_NEVER_EXPORT_TABLES as $never) {
-        try {
-            $st = $pdo->query('SELECT COUNT(*) FROM `' . str_replace('`', '``', $never) . '`');
-            $c = (int) ($st ? $st->fetchColumn() : 0);
-            if ($c > 0) {
-                $codes[] = 'forbidden_table_populated';
-                $checks[] = ['id' => 'never_' . $never, 'status' => 'FAIL', 'code' => 'forbidden_table_populated', 'detail' => $never];
-            }
-        } catch (Throwable) {
-            // table may not exist in shadow — OK
-        }
-    }
-
-    // Batch integrity: imported tables ⊆ mutate set
-    $checks[] = [
-        'id' => 'batch_integrity',
-        'status' => 'PASS',
-        'code' => null,
-        'detail' => 'batches 1-6 import order applied tables=' . (string) count($importPlan['tables']),
-    ];
-
-    // FK soft check: journal_lines.voucher_id in journal_vouchers
-    if ((int) ($rowCounts['journal_lines'] ?? 0) > 0 && (int) ($rowCounts['journal_vouchers'] ?? 0) > 0) {
-        try {
-            $orphans = (int) $pdo->query(
-                'SELECT COUNT(*) FROM journal_lines jl LEFT JOIN journal_vouchers jv ON jv.id = jl.voucher_id WHERE jv.id IS NULL'
-            )->fetchColumn();
-            if ($orphans > 0) {
-                $codes[] = 'fk_integrity_failed';
-                $checks[] = ['id' => 'fk_jl', 'status' => 'FAIL', 'code' => 'fk_integrity_failed', 'detail' => 'journal_lines orphans'];
-            } else {
-                $checks[] = ['id' => 'fk_jl', 'status' => 'PASS', 'code' => null, 'detail' => 'journal_lines FK OK'];
-            }
-        } catch (Throwable) {
-            // optional
-        }
-    }
-
-    orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
-    $codes = array_values(array_unique($codes));
-
-    return [
-        'ok' => $codes === [],
-        'codes' => $codes,
-        'checks' => $checks,
-        'row_counts' => $rowCounts,
-    ];
+    // EA-01: target-slice verify for seeded_multicountry_target_slice
+    return orange_country_shadow_verify_target_slice(
+        $pdo,
+        $shadowDb,
+        $productionDb,
+        $countryId,
+        $manifest,
+        $importPlan,
+        $packagePath,
+        $projectRoot,
+        $runDir
+    );
 }
 
 /**
@@ -705,7 +621,9 @@ function orange_country_shadow_run(array $options): array
             $countryId,
             $manifest,
             $importPlan,
-            $packagePath
+            $packagePath,
+            $projectRoot,
+            $runDir
         );
         if (!$verify['ok']) {
             return $fail('shadow_verify_failed', [

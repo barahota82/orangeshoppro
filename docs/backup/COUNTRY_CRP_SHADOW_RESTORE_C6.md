@@ -54,14 +54,15 @@ country_shadow_restore_pending
 
 Stored in `country_shadow_restore.json` under `{workRoot}/country_shadow/{run_id}/`.
 
-## Verification (post-import)
+## Verification (post-import) — `seeded_multicountry_target_slice`
 
-- Row counts vs inventory
-- Ownership / `country_id` leakage
-- Composite units (admins/permissions, expenses/accounts, GL vouchers/lines)
-- Forbidden tables remain unpopulated
-- Batch integrity
-- Soft FK checks where applicable
+- **Target-scoped** row counts vs inventory (`country_id = target` / ownership resolver)
+- Survivor-country rows are **allowed** and must not be treated as leakage
+- NULL `country_id` is still forbidden on country_id columns
+- Global / never-export tables (`journal_entries`, screen-copy log) are checked against **pre-clear baseline deltas**, not emptiness
+- Target-scoped composites (admins/permissions)
+- Batch integrity + `shadow_model` marker
+- Clear uses matrix ownership resolvers only (fail closed on `unresolved_ownership`)
 
 ## Report
 

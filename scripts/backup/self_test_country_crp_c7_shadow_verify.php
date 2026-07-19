@@ -157,26 +157,48 @@ function c7_install_c6_mocks(): void
             ],
         ];
     };
-    // F-01: live probe matching baselines (never fall back to baseline as current).
+    // Live probe matching baselines + EA-03 pillar oks (fixture override).
     $GLOBALS['orange_country_shadow_c7_probe_override'] = static function () {
-        return [
-            'probe_mode' => 'override',
-            'survivor_current' => [
-                'orders' => ['count' => 2, 'hash' => hash('sha256', 'survivor_orders')],
-            ],
-            'global_current' => [
-                'journal_entries' => ['count' => 0, 'hash' => hash('sha256', 'je0')],
-                'product_taxonomy_nodes' => ['count' => 3, 'hash' => hash('sha256', 'tax3')],
-            ],
-            'boundary_violations' => [],
-            'accounting_ok' => true,
-            'stock_fifo_ok' => true,
-            'composite_ok' => true,
-            'accounting_codes' => [],
-            'stock_fifo_codes' => [],
-            'composite_codes' => [],
-        ];
+        return c7_probe_ok();
     };
+}
+
+/** @return array<string, mixed> */
+function c7_probe_ok(): array
+{
+    return [
+        'probe_mode' => 'override',
+        'survivor_current' => [
+            'orders' => ['count' => 2, 'hash' => hash('sha256', 'survivor_orders')],
+        ],
+        'global_current' => [
+            'journal_entries' => ['count' => 0, 'hash' => hash('sha256', 'je0')],
+            'product_taxonomy_nodes' => ['count' => 3, 'hash' => hash('sha256', 'tax3')],
+        ],
+        'boundary_violations' => [],
+        'accounting_ok' => true,
+        'stock_fifo_ok' => true,
+        'composite_ok' => true,
+        'dependency_ok' => true,
+        'commercial_ok' => true,
+        'catalog_ok' => true,
+        'sequences_ok' => true,
+        'uploads_ok' => true,
+        'id_preservation_ok' => true,
+        'schema_ok' => true,
+        'documents_ok' => true,
+        'accounting_codes' => [],
+        'stock_fifo_codes' => [],
+        'composite_codes' => [],
+        'dependency_codes' => [],
+        'commercial_codes' => [],
+        'catalog_codes' => [],
+        'sequences_codes' => [],
+        'uploads_codes' => [],
+        'id_preservation_codes' => [],
+        'schema_codes' => [],
+        'documents_codes' => [],
+    ];
 }
 
 function c7_clear_mocks(): void
@@ -312,28 +334,28 @@ try {
     );
     $GLOBALS['orange_country_shadow_c7_probe_override'] = $prevProbe;
 
-    // F-03: live SQL accounting failure via probe codes
+    // F-03 / EA-02: live SQL accounting failure via probe codes
     $GLOBALS['orange_country_shadow_c7_probe_override'] = static function () {
-        return [
-            'probe_mode' => 'override',
-            'survivor_current' => [
-                'orders' => ['count' => 2, 'hash' => hash('sha256', 'survivor_orders')],
-            ],
-            'global_current' => [
-                'journal_entries' => ['count' => 0, 'hash' => hash('sha256', 'je0')],
-                'product_taxonomy_nodes' => ['count' => 3, 'hash' => hash('sha256', 'tax3')],
-            ],
-            'accounting_ok' => false,
-            'accounting_codes' => ['gl_graph_unbalanced'],
-            'stock_fifo_ok' => true,
-            'composite_ok' => true,
-            'stock_fifo_codes' => [],
-            'composite_codes' => [],
-            'boundary_violations' => [],
-        ];
+        $p = c7_probe_ok();
+        $p['accounting_ok'] = false;
+        $p['accounting_codes'] = ['gl_graph_unbalanced'];
+
+        return $p;
     };
     $r = c7_run_verify($projectRoot, $backupRoot, $workRoot, $jobId);
     c7_assert(c7_has($r, 'gl_graph_unbalanced'), 'F-03 live SQL accounting code fails C7');
+    $GLOBALS['orange_country_shadow_c7_probe_override'] = $prevProbe;
+
+    // EA-03: dependency live failure
+    $GLOBALS['orange_country_shadow_c7_probe_override'] = static function () {
+        $p = c7_probe_ok();
+        $p['dependency_ok'] = false;
+        $p['dependency_codes'] = ['missing_dependency_parent'];
+
+        return $p;
+    };
+    $r = c7_run_verify($projectRoot, $backupRoot, $workRoot, $jobId);
+    c7_assert(c7_has($r, 'missing_dependency_parent'), 'EA-03 live dependency failure');
     $GLOBALS['orange_country_shadow_c7_probe_override'] = $prevProbe;
 
     // Global table changed

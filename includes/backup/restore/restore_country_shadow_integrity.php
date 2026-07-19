@@ -3,18 +3,19 @@
 declare(strict_types=1);
 
 /**
- * Country Shadow integrity helpers (Remediation Sprint 1).
+ * Country Shadow integrity helpers (Remediation Sprint 1 + Sprint 2).
  *
- * Shadow model (F-02): seeded multi-country-capable Country Shadow DB.
+ * Shadow model: seeded_multicountry_target_slice
  * - Target-slice clear only (never full-table wipe of mutate tables)
- * - Global / never-export tables never cleared
- * - Live survivor/global baselines + probes (F-01)
- * - Read-only SQL accounting/FIFO/composite checks (F-03)
+ * - Global / never-export tables never cleared; proven by baseline delta
+ * - Live survivor/global baselines + probes
+ * - Read-only SQL integrity pillars (accounting/FIFO/composites + EA-03)
  */
 
 require_once __DIR__ . '/../backup_paths.php';
 require_once __DIR__ . '/../country_boundary_matrix_lib.php';
 require_once __DIR__ . '/../country_export.php';
+require_once __DIR__ . '/restore_country_shadow_ea.php';
 
 const ORANGE_COUNTRY_SHADOW_MODEL = 'seeded_multicountry_target_slice';
 const ORANGE_COUNTRY_SHADOW_LOCK_STALE_SECONDS = 7200;
@@ -266,7 +267,8 @@ function orange_country_shadow_write_live_baselines(PDO $pdo, string $runDir, in
 function orange_country_shadow_live_probe(
     PDO $pdo,
     int $countryId,
-    string $projectRoot
+    string $projectRoot,
+    string $packagePath = ''
 ): array {
     if (isset($GLOBALS['orange_country_shadow_c7_probe_override']) && is_callable($GLOBALS['orange_country_shadow_c7_probe_override'])) {
         /** @var callable $fn */
@@ -277,7 +279,7 @@ function orange_country_shadow_live_probe(
     }
 
     $baselines = orange_country_shadow_capture_live_baselines($pdo, $countryId, $projectRoot);
-    $sql = orange_country_shadow_sql_integrity_checks($pdo, $countryId);
+    $sql = orange_country_shadow_sql_integrity_checks($pdo, $countryId, $projectRoot, $packagePath);
 
     return [
         'probe_mode' => 'live',
@@ -288,9 +290,25 @@ function orange_country_shadow_live_probe(
         'accounting_ok' => $sql['accounting_ok'],
         'stock_fifo_ok' => $sql['stock_fifo_ok'],
         'composite_ok' => $sql['composite_ok'],
+        'dependency_ok' => $sql['dependency_ok'],
+        'commercial_ok' => $sql['commercial_ok'],
+        'catalog_ok' => $sql['catalog_ok'],
+        'sequences_ok' => $sql['sequences_ok'],
+        'uploads_ok' => $sql['uploads_ok'],
+        'id_preservation_ok' => $sql['id_preservation_ok'],
+        'schema_ok' => $sql['schema_ok'],
+        'documents_ok' => $sql['documents_ok'],
         'accounting_codes' => $sql['accounting_codes'],
         'stock_fifo_codes' => $sql['stock_fifo_codes'],
         'composite_codes' => $sql['composite_codes'],
+        'dependency_codes' => $sql['dependency_codes'],
+        'commercial_codes' => $sql['commercial_codes'],
+        'catalog_codes' => $sql['catalog_codes'],
+        'sequences_codes' => $sql['sequences_codes'],
+        'uploads_codes' => $sql['uploads_codes'],
+        'id_preservation_codes' => $sql['id_preservation_codes'],
+        'schema_codes' => $sql['schema_codes'],
+        'documents_codes' => $sql['documents_codes'],
     ];
 }
 
@@ -299,224 +317,21 @@ function orange_country_shadow_live_probe(
  *
  * @return array<string, mixed>
  */
-function orange_country_shadow_sql_integrity_checks(PDO $pdo, int $countryId): array
-{
-    $boundary = [];
-    $acctCodes = [];
-    $fifoCodes = [];
-    $compCodes = [];
-    $acctOk = true;
-    $fifoOk = true;
-    $compOk = true;
-
-    // Boundary: no NULL/other country on country_id mutate tables that have rows for target
-    foreach (['orders', 'accounts', 'warehouses', 'admins', 'products', 'customers'] as $table) {
-        if (!orange_country_shadow_table_exists($pdo, $table) || !orange_country_shadow_table_has_column($pdo, $table, 'country_id')) {
-            continue;
-        }
-        try {
-            // Survivors may coexist; NULL country_id is never valid ownership.
-            $st = $pdo->query(
-                'SELECT COUNT(*) FROM `' . str_replace('`', '``', $table) . '` WHERE country_id IS NULL'
-            );
-            if ($st && (int) $st->fetchColumn() > 0) {
-                $boundary[] = 'null_ownership_leakage';
-            }
-        } catch (Throwable) {
-        }
+function orange_country_shadow_sql_integrity_checks(
+    PDO $pdo,
+    int $countryId,
+    string $projectRoot = '',
+    string $packagePath = ''
+): array {
+    if ($projectRoot === '') {
+        $projectRoot = dirname(__DIR__, 3);
     }
 
-    // Composites
-    $count = static function (PDO $pdo, string $table): int {
-        if (!orange_country_shadow_table_exists($pdo, $table)) {
-            return 0;
-        }
-        try {
-            return (int) $pdo->query('SELECT COUNT(*) FROM `' . str_replace('`', '``', $table) . '`')->fetchColumn();
-        } catch (Throwable) {
-            return 0;
-        }
-    };
-
-    if ($count($pdo, 'admin_permissions') > 0 && $count($pdo, 'admins') === 0) {
-        $compCodes[] = 'incomplete_admin_composite';
-        $compOk = false;
-    }
-    if ($count($pdo, 'admin_permissions') > 0 && orange_country_shadow_table_exists($pdo, 'admins')) {
-        try {
-            $orph = (int) $pdo->query(
-                'SELECT COUNT(*) FROM admin_permissions ap
-                 LEFT JOIN admins a ON a.id = ap.admin_id WHERE a.id IS NULL'
-            )->fetchColumn();
-            if ($orph > 0) {
-                $compCodes[] = 'incomplete_admin_composite';
-                $compOk = false;
-            }
-        } catch (Throwable) {
-        }
-    }
-    if ($count($pdo, 'journal_lines') > 0 && $count($pdo, 'journal_vouchers') === 0) {
-        $compCodes[] = 'incomplete_gl_composite';
-        $compOk = false;
-    }
-    if ($count($pdo, 'expenses') > 0 && $count($pdo, 'accounts') === 0) {
-        $compCodes[] = 'incomplete_expenses_composite';
-        $compOk = false;
-    }
-    if ($count($pdo, 'order_items') > 0 && $count($pdo, 'orders') === 0) {
-        $compCodes[] = 'missing_order_item';
-        $compOk = false;
-    }
-    if ($count($pdo, 'warehouse_variant_stock') > 0 && $count($pdo, 'warehouses') === 0) {
-        $compCodes[] = 'incomplete_fifo_graph';
-        $compOk = false;
-    }
-    if ($count($pdo, 'inventory_cost_consumptions') > 0 && $count($pdo, 'inventory_cost_layers') === 0) {
-        $compCodes[] = 'incomplete_fifo_graph';
-        $compOk = false;
-        $fifoOk = false;
-    }
-
-    // Accounting: journal_entries must stay empty / unused; vouchers balanced
-    if ($count($pdo, 'journal_entries') > 0) {
-        $acctCodes[] = 'journal_entries_changed';
-        $acctOk = false;
-    }
-    if ($count($pdo, 'journal_lines') > 0 && $count($pdo, 'accounts') === 0) {
-        $acctCodes[] = 'missing_account';
-        $acctOk = false;
-    }
-    if (orange_country_shadow_table_exists($pdo, 'journal_vouchers')
-        && orange_country_shadow_table_exists($pdo, 'journal_lines')
-    ) {
-        try {
-            $sql = 'SELECT v.id
-                 FROM journal_vouchers v
-                 LEFT JOIN journal_lines l ON l.journal_voucher_id = v.id OR l.voucher_id = v.id
-                 GROUP BY v.id
-                 HAVING ABS(COALESCE(SUM(l.debit),0) - COALESCE(SUM(l.credit),0)) > 0.0001
-                 LIMIT 5';
-            $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
-            if (count($rows) > 0) {
-                $acctCodes[] = 'gl_graph_unbalanced';
-                $acctOk = false;
-            }
-        } catch (Throwable) {
-            try {
-                $sql = 'SELECT v.id
-                     FROM journal_vouchers v
-                     LEFT JOIN journal_lines l ON l.voucher_id = v.id
-                     GROUP BY v.id
-                     HAVING ABS(COALESCE(SUM(l.debit),0) - COALESCE(SUM(l.credit),0)) > 0.0001
-                     LIMIT 5';
-                $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
-                if (count($rows) > 0) {
-                    $acctCodes[] = 'gl_graph_unbalanced';
-                    $acctOk = false;
-                }
-            } catch (Throwable) {
-                // schema variance — if lines exist require explicit balance probe success later
-                if ($count($pdo, 'journal_lines') > 0) {
-                    $acctCodes[] = 'accounting_boundary_not_proven';
-                    $acctOk = false;
-                }
-            }
-        }
-    }
-
-    // Stock / FIFO
-    if (orange_country_shadow_table_exists($pdo, 'warehouses')
-        && orange_country_shadow_table_has_column($pdo, 'warehouses', 'country_id')
-        && orange_country_shadow_table_exists($pdo, 'warehouse_variant_stock')
-    ) {
-        try {
-            $leak = (int) $pdo->query(
-                'SELECT COUNT(*) FROM warehouse_variant_stock s
-                 INNER JOIN warehouses w ON w.id = s.warehouse_id
-                 WHERE w.country_id IS NULL OR w.country_id <> ' . (int) $countryId
-            )->fetchColumn();
-            // In multi-country shadow, stock for other countries is OK; only NULL warehouse country is leak for target ops.
-            // Check target warehouses only for ownership mismatch of stock pointing to wrong country when filtering target.
-            $nullWh = (int) $pdo->query(
-                'SELECT COUNT(*) FROM warehouse_variant_stock s
-                 LEFT JOIN warehouses w ON w.id = s.warehouse_id
-                 WHERE w.id IS NULL'
-            )->fetchColumn();
-            if ($nullWh > 0) {
-                $fifoCodes[] = 'stock_warehouse_ownership_mismatch';
-                $fifoOk = false;
-            }
-            unset($leak);
-        } catch (Throwable) {
-        }
-    }
-
-    if (orange_country_shadow_table_exists($pdo, 'inventory_cost_layers')) {
-        foreach (['remaining_qty', 'qty_remaining'] as $col) {
-            if (!orange_country_shadow_table_has_column($pdo, 'inventory_cost_layers', $col)) {
-                continue;
-            }
-            try {
-                $neg = (int) $pdo->query(
-                    'SELECT COUNT(*) FROM inventory_cost_layers WHERE `' . str_replace('`', '``', $col) . '` < 0'
-                )->fetchColumn();
-                if ($neg > 0) {
-                    $fifoCodes[] = 'incomplete_fifo_graph';
-                    $fifoOk = false;
-                }
-                break;
-            } catch (Throwable) {
-            }
-        }
-    }
-
-    if (orange_country_shadow_table_exists($pdo, 'inventory_cost_consumptions')
-        && orange_country_shadow_table_exists($pdo, 'inventory_cost_layers')
-    ) {
-        try {
-            $over = (int) $pdo->query(
-                'SELECT COUNT(*) FROM (
-                    SELECT c.layer_id, SUM(c.qty) AS consumed, MAX(l.qty) AS layer_qty
-                    FROM inventory_cost_consumptions c
-                    INNER JOIN inventory_cost_layers l ON l.id = c.layer_id
-                    GROUP BY c.layer_id
-                    HAVING consumed > layer_qty + 0.0001
-                 ) x'
-            )->fetchColumn();
-            if ($over > 0) {
-                $fifoCodes[] = 'fifo_layer_overconsumed';
-                $fifoOk = false;
-            }
-        } catch (Throwable) {
-            // try remaining_qty style
-            try {
-                $orph = (int) $pdo->query(
-                    'SELECT COUNT(*) FROM inventory_cost_consumptions c
-                     LEFT JOIN inventory_cost_layers l ON l.id = c.layer_id
-                     WHERE l.id IS NULL'
-                )->fetchColumn();
-                if ($orph > 0) {
-                    $fifoCodes[] = 'incomplete_fifo_graph';
-                    $fifoOk = false;
-                }
-            } catch (Throwable) {
-            }
-        }
-    }
-
-    return [
-        'boundary_violations' => array_values(array_unique($boundary)),
-        'accounting_ok' => $acctOk,
-        'stock_fifo_ok' => $fifoOk,
-        'composite_ok' => $compOk,
-        'accounting_codes' => array_values(array_unique($acctCodes)),
-        'stock_fifo_codes' => array_values(array_unique($fifoCodes)),
-        'composite_codes' => array_values(array_unique($compCodes)),
-    ];
+    return orange_country_shadow_sql_integrity_checks_v2($pdo, $countryId, $projectRoot, $packagePath);
 }
 
 /**
- * Target-slice clear (F-02). Never full-table wipe. Never touch Global/never-export.
+ * Target-slice clear (EA-05). Matrix ownership resolvers only. Fail closed.
  *
  * @param list<string> $tables delete order
  * @param array<string, mixed> $matrix
@@ -527,97 +342,24 @@ function orange_country_shadow_clear_target_slice(
     string $productionDb,
     array $tables,
     int $countryId,
-    array $matrix
+    array $matrix,
+    string $projectRoot = ''
 ): void {
-    if (isset($GLOBALS['orange_country_shadow_wipe_override']) && is_callable($GLOBALS['orange_country_shadow_wipe_override'])) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_country_shadow_wipe_override'];
-        $fn($pdo, $shadowDb, $tables);
-
-        return;
+    if ($projectRoot === '') {
+        $projectRoot = dirname(__DIR__, 3);
     }
-
-    orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
-    /** @var array<string, array<string, mixed>> $matrixTables */
-    $matrixTables = is_array($matrix['tables'] ?? null) ? $matrix['tables'] : [];
-
-    $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
-    foreach ($tables as $tableName) {
-        orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
-        $table = (string) $tableName;
-        if (in_array($table, ORANGE_CRP_NEVER_EXPORT_TABLES, true)) {
-            continue;
-        }
-        $meta = is_array($matrixTables[$table] ?? null) ? $matrixTables[$table] : [];
-        if (($meta['classification'] ?? '') === 'Global') {
-            continue;
-        }
-        if (!orange_country_shadow_table_exists($pdo, $table)) {
-            continue;
-        }
-        $quoted = '`' . str_replace('`', '``', $table) . '`';
-        $resolver = (string) ($meta['ownership_resolver'] ?? '');
-
-        try {
-            if ($table === 'document_sequences' || $resolver === 'special_namespace') {
-                $like = '%\\_c' . $countryId;
-                $pdo->prepare('DELETE FROM ' . $quoted . ' WHERE `scope` LIKE ? ESCAPE \'\\\\\'')->execute([$like]);
-                continue;
-            }
-            if ($resolver === 'admin_ownership' || $table === 'admin_permissions') {
-                if (orange_country_shadow_table_exists($pdo, 'admins')) {
-                    $pdo->prepare(
-                        'DELETE FROM ' . $quoted . ' WHERE admin_id IN (SELECT id FROM admins WHERE country_id = ?)'
-                    )->execute([$countryId]);
-                }
-                continue;
-            }
-            if (orange_country_shadow_table_has_column($pdo, $table, 'country_id')) {
-                $pdo->prepare('DELETE FROM ' . $quoted . ' WHERE country_id = ?')->execute([$countryId]);
-                continue;
-            }
-            if ($resolver === 'account_ownership' && orange_country_shadow_table_exists($pdo, 'accounts')) {
-                $pdo->prepare(
-                    'DELETE FROM ' . $quoted . ' WHERE account_id IN (SELECT id FROM accounts WHERE country_id = ?)'
-                )->execute([$countryId]);
-                continue;
-            }
-            if ($resolver === 'parent_fk') {
-                // Best-effort: common parent patterns; skip full wipe
-                foreach ([
-                    ['order_items', 'orders', 'order_id'],
-                    ['journal_lines', 'journal_vouchers', 'voucher_id'],
-                    ['journal_lines', 'journal_vouchers', 'journal_voucher_id'],
-                    ['warehouse_variant_stock', 'warehouses', 'warehouse_id'],
-                    ['inventory_cost_layers', 'warehouses', 'warehouse_id'],
-                    ['inventory_cost_consumptions', 'inventory_cost_layers', 'layer_id'],
-                ] as [$child, $parent, $fk]) {
-                    if ($table !== $child || !orange_country_shadow_table_exists($pdo, $parent)) {
-                        continue;
-                    }
-                    if (orange_country_shadow_table_has_column($pdo, $parent, 'country_id')) {
-                        $pdo->prepare(
-                            'DELETE FROM ' . $quoted . ' WHERE `' . str_replace('`', '``', $fk) . '` IN (
-                                SELECT id FROM `' . str_replace('`', '``', $parent) . '` WHERE country_id = ?
-                             )'
-                        )->execute([$countryId]);
-                    }
-                    break;
-                }
-                continue;
-            }
-            // Unknown ownership without country_id: do NOT full-table delete (F-02)
-        } catch (Throwable $e) {
-            // continue other tables; caller verify will catch residue
-            unset($e);
-        }
+    $result = orange_country_shadow_clear_target_slice_strict(
+        $pdo,
+        $shadowDb,
+        $productionDb,
+        $tables,
+        $countryId,
+        $matrix,
+        $projectRoot
+    );
+    if (!$result['ok']) {
+        throw new RuntimeException((string) (($result['codes'][0] ?? 'unresolved_ownership')));
     }
-    try {
-        $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
-    } catch (Throwable) {
-        // SQLite
-    }
-    orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
 }
 
 /**
