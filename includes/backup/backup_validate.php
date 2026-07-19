@@ -17,6 +17,9 @@ const ORANGE_COUNTRY_EXPORT_FORBIDDEN_SQL_TABLES = [
     'orange_catalog_schema_checkpoint',
     'admin_sessions',
     'logs',
+    // C3 frozen boundary — never in CRP SQL
+    'journal_entries',
+    'orange_country_screen_copy_log',
 ];
 
 /**
@@ -122,17 +125,22 @@ function orange_country_export_validate_row_country_scope(
         }
     }
     if ($type === 'country_scope_or') {
-        $columns = is_array($rule['columns'] ?? null) ? $rule['columns'] : [];
-        $matched = false;
-        foreach ($columns as $column) {
-            $column = (string) $column;
-            if (array_key_exists($column, $row) && (int) $row[$column] === $countryId) {
-                $matched = true;
-                break;
-            }
+        return ['country_scope_or forbidden under frozen boundary policy for ' . $tableName];
+    }
+    if ($type === 'special_sequence_namespace') {
+        $scope = (string) ($row['scope'] ?? '');
+        $suffix = '_c' . $countryId;
+        if ($scope === '' || !str_ends_with($scope, $suffix)) {
+            return ['sequence_namespace_violation: scope=' . $scope . ' for country_id=' . $countryId];
         }
-        if (!$matched && $columns !== []) {
-            return ['Cross-country scope mismatch in ' . $tableName . ' id=' . ($row['id'] ?? '?')];
+    }
+    // D2 NULL leakage: any country_id column present must be exact target (never NULL).
+    if (array_key_exists('country_id', $row)) {
+        if ($row['country_id'] === null) {
+            return ['null_country_id_leakage in ' . $tableName . ' id=' . ($row['id'] ?? '?')];
+        }
+        if ((int) $row['country_id'] !== $countryId) {
+            return ['wrong_country in ' . $tableName . ' id=' . ($row['id'] ?? '?')];
         }
     }
 
@@ -185,10 +193,11 @@ function orange_country_export_compute_trial_balance(PDO $pdo, int $countryId, a
         return ['debit' => 0.0, 'credit' => 0.0, 'difference' => 0.0];
     }
     $placeholders = implode(',', array_fill(0, count($voucherIds), '?'));
+    // Schema truth: journal_lines.voucher_id (not journal_voucher_id — C1.1 drift).
     $sql = 'SELECT COALESCE(SUM(jl.debit), 0) AS debit_total, COALESCE(SUM(jl.credit), 0) AS credit_total
             FROM journal_lines jl
-            INNER JOIN journal_vouchers jv ON jv.id = jl.journal_voucher_id
-            WHERE jl.journal_voucher_id IN (' . $placeholders . ') AND jv.country_id = ?';
+            INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
+            WHERE jl.voucher_id IN (' . $placeholders . ') AND jv.country_id = ?';
     $params = array_merge($voucherIds, [$countryId]);
     $st = $pdo->prepare($sql);
     $st->execute($params);
@@ -342,12 +351,25 @@ function orange_country_export_verify_package(string $packageRoot): array
         'dependency_graph.json',
         'table_inventory.json',
         'id_snapshot.json',
+        'country.sql.gz',
         'files/uploads_country.zip',
     ] as $required) {
         $abs = $packageRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $required);
         if (!is_file($abs)) {
             $errors[] = 'Missing required file: ' . $required;
         }
+    }
+    if (($manifest['boundary_policy_version'] ?? '') !== 'C1.1') {
+        $errors[] = 'manifest.boundary_policy_version must be C1.1';
+    }
+    if (($manifest['dependency_graph_version'] ?? '') !== 'C2') {
+        $errors[] = 'manifest.dependency_graph_version must be C2';
+    }
+    if (trim((string) ($manifest['package_fingerprint'] ?? '')) === '') {
+        $errors[] = 'manifest.package_fingerprint missing';
+    }
+    if (!is_array($manifest['restore_batches'] ?? null)) {
+        $errors[] = 'manifest.restore_batches missing';
     }
     $sqlDir = $packageRoot . DIRECTORY_SEPARATOR . 'sql';
     if (!is_dir($sqlDir)) {
@@ -362,6 +384,19 @@ function orange_country_export_verify_package(string $packageRoot): array
             foreach (ORANGE_COUNTRY_EXPORT_FORBIDDEN_SQL_TABLES as $forbidden) {
                 if (preg_match('/INSERT INTO `' . preg_quote($forbidden, '/') . '`/i', $content)) {
                     $errors[] = 'Forbidden global table data in SQL: ' . $forbidden;
+                }
+            }
+        }
+    }
+    $gzPath = $packageRoot . DIRECTORY_SEPARATOR . 'country.sql.gz';
+    if (is_file($gzPath) && function_exists('gzopen')) {
+        $gz = @gzopen($gzPath, 'rb');
+        if ($gz !== false) {
+            $sample = (string) gzread($gz, 1024 * 1024);
+            gzclose($gz);
+            foreach (ORANGE_COUNTRY_EXPORT_FORBIDDEN_SQL_TABLES as $forbidden) {
+                if (preg_match('/INSERT INTO `' . preg_quote($forbidden, '/') . '`/i', $sample)) {
+                    $errors[] = 'Forbidden table in country.sql.gz: ' . $forbidden;
                 }
             }
         }

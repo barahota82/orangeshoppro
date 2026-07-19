@@ -1,0 +1,735 @@
+{
+    "matrix_version":  "1.0",
+    "boundary_policy_version":  "C1.1",
+    "dependency_graph_version":  "C2",
+    "schema_revision":  121,
+    "package_type":  "country_recovery",
+    "generated_for_phase":  "C3",
+    "never_export":  [
+                         "journal_entries",
+                         "orange_country_screen_copy_log"
+                     ],
+    "mutate_table_count":  80,
+    "tables":  {
+                   "accounts":  {
+                                    "classification":  "Country Scoped",
+                                    "restore_mode":  "replace",
+                                    "restore_batch":  1,
+                                    "delete_batch":  6,
+                                    "ownership_resolver":  "direct_country_id",
+                                    "special_handler":  null,
+                                    "exportable":  true
+                                },
+                   "admin_permissions":  {
+                                             "classification":  "Mixed",
+                                             "restore_mode":  "replace",
+                                             "restore_batch":  2,
+                                             "delete_batch":  5,
+                                             "ownership_resolver":  "admin_ownership",
+                                             "special_handler":  "admins_permissions_composite",
+                                             "exportable":  true
+                                         },
+                   "admins":  {
+                                  "classification":  "Country Scoped",
+                                  "restore_mode":  "replace",
+                                  "restore_batch":  1,
+                                  "delete_batch":  6,
+                                  "ownership_resolver":  "direct_country_id",
+                                  "special_handler":  "admins_permissions_composite",
+                                  "exportable":  true
+                              },
+                   "analytical_dimension":  {
+                                                "classification":  "Country Scoped",
+                                                "restore_mode":  "replace",
+                                                "restore_batch":  1,
+                                                "delete_batch":  6,
+                                                "ownership_resolver":  "direct_country_id",
+                                                "special_handler":  null,
+                                                "exportable":  true
+                                            },
+                   "analytical_dimension_value":  {
+                                                      "classification":  "Mixed",
+                                                      "restore_mode":  "replace",
+                                                      "restore_batch":  2,
+                                                      "delete_batch":  5,
+                                                      "ownership_resolver":  "parent_fk",
+                                                      "special_handler":  null,
+                                                      "exportable":  true
+                                                  },
+                   "bank_reconciliation":  {
+                                               "classification":  "Country Scoped",
+                                               "restore_mode":  "replace",
+                                               "restore_batch":  2,
+                                               "delete_batch":  5,
+                                               "ownership_resolver":  "direct_country_id",
+                                               "special_handler":  null,
+                                               "exportable":  true
+                                           },
+                   "bank_reconciliation_line":  {
+                                                    "classification":  "Mixed",
+                                                    "restore_mode":  "replace",
+                                                    "restore_batch":  3,
+                                                    "delete_batch":  4,
+                                                    "ownership_resolver":  "parent_fk",
+                                                    "special_handler":  null,
+                                                    "exportable":  true
+                                                },
+                   "cart_bogo_promotions":  {
+                                                "classification":  "Country Scoped",
+                                                "restore_mode":  "replace",
+                                                "restore_batch":  1,
+                                                "delete_batch":  6,
+                                                "ownership_resolver":  "direct_country_id",
+                                                "special_handler":  null,
+                                                "exportable":  true
+                                            },
+                   "cart_combo_promotions":  {
+                                                 "classification":  "Country Scoped",
+                                                 "restore_mode":  "replace",
+                                                 "restore_batch":  1,
+                                                 "delete_batch":  6,
+                                                 "ownership_resolver":  "direct_country_id",
+                                                 "special_handler":  null,
+                                                 "exportable":  true
+                                             },
+                   "cart_gift_promotions":  {
+                                                "classification":  "Country Scoped",
+                                                "restore_mode":  "replace",
+                                                "restore_batch":  1,
+                                                "delete_batch":  6,
+                                                "ownership_resolver":  "direct_country_id",
+                                                "special_handler":  null,
+                                                "exportable":  true
+                                            },
+                   "cart_promotions":  {
+                                           "classification":  "Country Scoped",
+                                           "restore_mode":  "replace",
+                                           "restore_batch":  1,
+                                           "delete_batch":  6,
+                                           "ownership_resolver":  "direct_country_id",
+                                           "special_handler":  null,
+                                           "exportable":  true
+                                       },
+                   "channels":  {
+                                    "classification":  "Country Scoped",
+                                    "restore_mode":  "replace",
+                                    "restore_batch":  1,
+                                    "delete_batch":  6,
+                                    "ownership_resolver":  "direct_country_id",
+                                    "special_handler":  null,
+                                    "exportable":  true
+                                },
+                   "company_bank_accounts":  {
+                                                 "classification":  "Country Scoped",
+                                                 "restore_mode":  "replace",
+                                                 "restore_batch":  1,
+                                                 "delete_batch":  6,
+                                                 "ownership_resolver":  "direct_country_id",
+                                                 "special_handler":  null,
+                                                 "exportable":  true
+                                             },
+                   "company_settings":  {
+                                            "classification":  "Country Scoped",
+                                            "restore_mode":  "replace",
+                                            "restore_batch":  1,
+                                            "delete_batch":  6,
+                                            "ownership_resolver":  "direct_country_id",
+                                            "special_handler":  null,
+                                            "exportable":  true
+                                        },
+                   "customer_addresses":  {
+                                              "classification":  "Mixed",
+                                              "restore_mode":  "replace",
+                                              "restore_batch":  2,
+                                              "delete_batch":  5,
+                                              "ownership_resolver":  "parent_fk",
+                                              "special_handler":  null,
+                                              "exportable":  true
+                                          },
+                   "customers":  {
+                                     "classification":  "Country Scoped",
+                                     "restore_mode":  "replace",
+                                     "restore_batch":  1,
+                                     "delete_batch":  6,
+                                     "ownership_resolver":  "direct_country_id",
+                                     "special_handler":  null,
+                                     "exportable":  true
+                                 },
+                   "delivery_agents":  {
+                                           "classification":  "Country Scoped",
+                                           "restore_mode":  "replace",
+                                           "restore_batch":  1,
+                                           "delete_batch":  6,
+                                           "ownership_resolver":  "direct_country_id",
+                                           "special_handler":  null,
+                                           "exportable":  true
+                                       },
+                   "delivery_areas":  {
+                                          "classification":  "Country Scoped",
+                                          "restore_mode":  "replace",
+                                          "restore_batch":  1,
+                                          "delete_batch":  6,
+                                          "ownership_resolver":  "direct_country_id",
+                                          "special_handler":  null,
+                                          "exportable":  true
+                                      },
+                   "delivery_fee_promotion_areas":  {
+                                                        "classification":  "Mixed",
+                                                        "restore_mode":  "replace",
+                                                        "restore_batch":  2,
+                                                        "delete_batch":  5,
+                                                        "ownership_resolver":  "parent_fk",
+                                                        "special_handler":  null,
+                                                        "exportable":  true
+                                                    },
+                   "delivery_fee_promotion_governorates":  {
+                                                               "classification":  "Mixed",
+                                                               "restore_mode":  "replace",
+                                                               "restore_batch":  2,
+                                                               "delete_batch":  5,
+                                                               "ownership_resolver":  "parent_fk",
+                                                               "special_handler":  null,
+                                                               "exportable":  true
+                                                           },
+                   "delivery_fee_promotions":  {
+                                                   "classification":  "Country Scoped",
+                                                   "restore_mode":  "replace",
+                                                   "restore_batch":  1,
+                                                   "delete_batch":  6,
+                                                   "ownership_resolver":  "direct_country_id",
+                                                   "special_handler":  null,
+                                                   "exportable":  true
+                                               },
+                   "delivery_governorates":  {
+                                                 "classification":  "Country Scoped",
+                                                 "restore_mode":  "replace",
+                                                 "restore_batch":  1,
+                                                 "delete_batch":  6,
+                                                 "ownership_resolver":  "direct_country_id",
+                                                 "special_handler":  null,
+                                                 "exportable":  true
+                                             },
+                   "department_countries":  {
+                                                "classification":  "Country Scoped",
+                                                "restore_mode":  "replace",
+                                                "restore_batch":  1,
+                                                "delete_batch":  6,
+                                                "ownership_resolver":  "direct_country_id",
+                                                "special_handler":  null,
+                                                "exportable":  true
+                                            },
+                   "document_public_tokens":  {
+                                                  "classification":  "Country Scoped",
+                                                  "restore_mode":  "replace",
+                                                  "restore_batch":  1,
+                                                  "delete_batch":  6,
+                                                  "ownership_resolver":  "direct_country_id",
+                                                  "special_handler":  null,
+                                                  "exportable":  true
+                                              },
+                   "document_sequences":  {
+                                              "classification":  "Mixed",
+                                              "restore_mode":  "special",
+                                              "restore_batch":  6,
+                                              "delete_batch":  1,
+                                              "ownership_resolver":  "special_namespace",
+                                              "special_handler":  "seq_country_namespace",
+                                              "exportable":  true
+                                          },
+                   "expenses":  {
+                                    "classification":  "Mixed",
+                                    "restore_mode":  "replace",
+                                    "restore_batch":  2,
+                                    "delete_batch":  5,
+                                    "ownership_resolver":  "account_ownership",
+                                    "special_handler":  "expenses_via_accounts",
+                                    "exportable":  true
+                                },
+                   "fiscal_years":  {
+                                        "classification":  "Country Scoped",
+                                        "restore_mode":  "replace",
+                                        "restore_batch":  1,
+                                        "delete_batch":  6,
+                                        "ownership_resolver":  "direct_country_id",
+                                        "special_handler":  null,
+                                        "exportable":  true
+                                    },
+                   "inventory_cost_consumptions":  {
+                                                       "classification":  "Mixed",
+                                                       "restore_mode":  "replace",
+                                                       "restore_batch":  5,
+                                                       "delete_batch":  2,
+                                                       "ownership_resolver":  "parent_fk",
+                                                       "special_handler":  null,
+                                                       "exportable":  true
+                                                   },
+                   "inventory_cost_layers":  {
+                                                 "classification":  "Country Scoped",
+                                                 "restore_mode":  "replace",
+                                                 "restore_batch":  4,
+                                                 "delete_batch":  3,
+                                                 "ownership_resolver":  "direct_country_id",
+                                                 "special_handler":  null,
+                                                 "exportable":  true
+                                             },
+                   "inventory_reconciliation":  {
+                                                    "classification":  "Country Scoped",
+                                                    "restore_mode":  "replace",
+                                                    "restore_batch":  2,
+                                                    "delete_batch":  5,
+                                                    "ownership_resolver":  "direct_country_id",
+                                                    "special_handler":  null,
+                                                    "exportable":  true
+                                                },
+                   "inventory_reconciliation_line":  {
+                                                         "classification":  "Mixed",
+                                                         "restore_mode":  "replace",
+                                                         "restore_batch":  3,
+                                                         "delete_batch":  4,
+                                                         "ownership_resolver":  "parent_fk",
+                                                         "special_handler":  null,
+                                                         "exportable":  true
+                                                     },
+                   "journal_lines":  {
+                                         "classification":  "Mixed",
+                                         "restore_mode":  "replace",
+                                         "restore_batch":  3,
+                                         "delete_batch":  4,
+                                         "ownership_resolver":  "parent_fk",
+                                         "special_handler":  null,
+                                         "exportable":  true
+                                     },
+                   "journal_types":  {
+                                         "classification":  "Country Scoped",
+                                         "restore_mode":  "replace",
+                                         "restore_batch":  1,
+                                         "delete_batch":  6,
+                                         "ownership_resolver":  "direct_country_id",
+                                         "special_handler":  null,
+                                         "exportable":  true
+                                     },
+                   "journal_vouchers":  {
+                                            "classification":  "Country Scoped",
+                                            "restore_mode":  "replace",
+                                            "restore_batch":  2,
+                                            "delete_batch":  5,
+                                            "ownership_resolver":  "direct_country_id",
+                                            "special_handler":  null,
+                                            "exportable":  true
+                                        },
+                   "loyalty_ledger":  {
+                                          "classification":  "Country Scoped",
+                                          "restore_mode":  "replace",
+                                          "restore_batch":  1,
+                                          "delete_batch":  6,
+                                          "ownership_resolver":  "direct_country_id",
+                                          "special_handler":  null,
+                                          "exportable":  true
+                                      },
+                   "loyalty_settings":  {
+                                            "classification":  "Country Scoped",
+                                            "restore_mode":  "replace",
+                                            "restore_batch":  1,
+                                            "delete_batch":  6,
+                                            "ownership_resolver":  "direct_country_id",
+                                            "special_handler":  null,
+                                            "exportable":  true
+                                        },
+                   "offers":  {
+                                  "classification":  "Mixed",
+                                  "restore_mode":  "replace",
+                                  "restore_batch":  2,
+                                  "delete_batch":  5,
+                                  "ownership_resolver":  "parent_fk",
+                                  "special_handler":  null,
+                                  "exportable":  true
+                              },
+                   "opening_stock_voucher":  {
+                                                 "classification":  "Country Scoped",
+                                                 "restore_mode":  "replace",
+                                                 "restore_batch":  1,
+                                                 "delete_batch":  6,
+                                                 "ownership_resolver":  "direct_country_id",
+                                                 "special_handler":  null,
+                                                 "exportable":  true
+                                             },
+                   "opening_stock_voucher_line":  {
+                                                      "classification":  "Mixed",
+                                                      "restore_mode":  "replace",
+                                                      "restore_batch":  2,
+                                                      "delete_batch":  5,
+                                                      "ownership_resolver":  "parent_fk",
+                                                      "special_handler":  null,
+                                                      "exportable":  true
+                                                  },
+                   "orange_company_documents":  {
+                                                    "classification":  "Mixed",
+                                                    "restore_mode":  "replace",
+                                                    "restore_batch":  3,
+                                                    "delete_batch":  4,
+                                                    "ownership_resolver":  "polymorphic_owner_validation",
+                                                    "special_handler":  "polymorphic_company_documents",
+                                                    "exportable":  true
+                                                },
+                   "orange_edit_lock_registry":  {
+                                                     "classification":  "Country Scoped",
+                                                     "restore_mode":  "replace",
+                                                     "restore_batch":  1,
+                                                     "delete_batch":  6,
+                                                     "ownership_resolver":  "direct_country_id",
+                                                     "special_handler":  null,
+                                                     "exportable":  true
+                                                 },
+                   "orange_gl_account_settings":  {
+                                                      "classification":  "Country Scoped",
+                                                      "restore_mode":  "replace",
+                                                      "restore_batch":  2,
+                                                      "delete_batch":  5,
+                                                      "ownership_resolver":  "direct_country_id",
+                                                      "special_handler":  null,
+                                                      "exportable":  true
+                                                  },
+                   "orange_gl_journal_type_rules":  {
+                                                        "classification":  "Country Scoped",
+                                                        "restore_mode":  "replace",
+                                                        "restore_batch":  2,
+                                                        "delete_batch":  5,
+                                                        "ownership_resolver":  "direct_country_id",
+                                                        "special_handler":  null,
+                                                        "exportable":  true
+                                                    },
+                   "orange_gl_pending_movements":  {
+                                                       "classification":  "Mixed",
+                                                       "restore_mode":  "replace",
+                                                       "restore_batch":  3,
+                                                       "delete_batch":  4,
+                                                       "ownership_resolver":  "parent_fk",
+                                                       "special_handler":  null,
+                                                       "exportable":  true
+                                                   },
+                   "orange_gl_setting_alloc":  {
+                                                   "classification":  "Country Scoped",
+                                                   "restore_mode":  "replace",
+                                                   "restore_batch":  1,
+                                                   "delete_batch":  6,
+                                                   "ownership_resolver":  "direct_country_id",
+                                                   "special_handler":  null,
+                                                   "exportable":  true
+                                               },
+                   "orange_gl_voucher_slots":  {
+                                                   "classification":  "Country Scoped",
+                                                   "restore_mode":  "replace",
+                                                   "restore_batch":  3,
+                                                   "delete_batch":  4,
+                                                   "ownership_resolver":  "direct_country_id",
+                                                   "special_handler":  "gl_voucher_slots_country",
+                                                   "exportable":  true
+                                               },
+                   "orange_invoice_extra_lines":  {
+                                                      "classification":  "Country Scoped",
+                                                      "restore_mode":  "replace",
+                                                      "restore_batch":  3,
+                                                      "delete_batch":  4,
+                                                      "ownership_resolver":  "direct_country_id",
+                                                      "special_handler":  null,
+                                                      "exportable":  true
+                                                  },
+                   "orange_invoice_line_presets":  {
+                                                       "classification":  "Country Scoped",
+                                                       "restore_mode":  "replace",
+                                                       "restore_batch":  2,
+                                                       "delete_batch":  5,
+                                                       "ownership_resolver":  "direct_country_id",
+                                                       "special_handler":  null,
+                                                       "exportable":  true
+                                                   },
+                   "order_items":  {
+                                       "classification":  "Mixed",
+                                       "restore_mode":  "replace",
+                                       "restore_batch":  4,
+                                       "delete_batch":  3,
+                                       "ownership_resolver":  "parent_fk",
+                                       "special_handler":  null,
+                                       "exportable":  true
+                                   },
+                   "orders":  {
+                                  "classification":  "Country Scoped",
+                                  "restore_mode":  "replace",
+                                  "restore_batch":  2,
+                                  "delete_batch":  5,
+                                  "ownership_resolver":  "direct_country_id",
+                                  "special_handler":  null,
+                                  "exportable":  true
+                              },
+                   "party_subledger":  {
+                                           "classification":  "Mixed",
+                                           "restore_mode":  "replace",
+                                           "restore_batch":  3,
+                                           "delete_batch":  4,
+                                           "ownership_resolver":  "parent_fk",
+                                           "special_handler":  null,
+                                           "exportable":  true
+                                       },
+                   "party_subledger_allocations":  {
+                                                       "classification":  "Mixed",
+                                                       "restore_mode":  "replace",
+                                                       "restore_batch":  3,
+                                                       "delete_batch":  4,
+                                                       "ownership_resolver":  "parent_fk",
+                                                       "special_handler":  null,
+                                                       "exportable":  true
+                                                   },
+                   "payment_methods":  {
+                                           "classification":  "Country Scoped",
+                                           "restore_mode":  "replace",
+                                           "restore_batch":  1,
+                                           "delete_batch":  6,
+                                           "ownership_resolver":  "direct_country_id",
+                                           "special_handler":  null,
+                                           "exportable":  true
+                                       },
+                   "payment_transactions":  {
+                                                "classification":  "Country Scoped",
+                                                "restore_mode":  "replace",
+                                                "restore_batch":  1,
+                                                "delete_batch":  6,
+                                                "ownership_resolver":  "direct_country_id",
+                                                "special_handler":  null,
+                                                "exportable":  true
+                                            },
+                   "product_attribute_values":  {
+                                                    "classification":  "Mixed",
+                                                    "restore_mode":  "replace",
+                                                    "restore_batch":  2,
+                                                    "delete_batch":  5,
+                                                    "ownership_resolver":  "parent_fk",
+                                                    "special_handler":  null,
+                                                    "exportable":  true
+                                                },
+                   "product_channels":  {
+                                            "classification":  "Mixed",
+                                            "restore_mode":  "replace",
+                                            "restore_batch":  2,
+                                            "delete_batch":  5,
+                                            "ownership_resolver":  "parent_fk",
+                                            "special_handler":  null,
+                                            "exportable":  true
+                                        },
+                   "product_colorway_images":  {
+                                                   "classification":  "Mixed",
+                                                   "restore_mode":  "replace",
+                                                   "restore_batch":  3,
+                                                   "delete_batch":  4,
+                                                   "ownership_resolver":  "parent_fk",
+                                                   "special_handler":  null,
+                                                   "exportable":  true
+                                               },
+                   "product_colorways":  {
+                                             "classification":  "Mixed",
+                                             "restore_mode":  "replace",
+                                             "restore_batch":  2,
+                                             "delete_batch":  5,
+                                             "ownership_resolver":  "parent_fk",
+                                             "special_handler":  null,
+                                             "exportable":  true
+                                         },
+                   "product_images":  {
+                                          "classification":  "Mixed",
+                                          "restore_mode":  "replace",
+                                          "restore_batch":  2,
+                                          "delete_batch":  5,
+                                          "ownership_resolver":  "parent_fk",
+                                          "special_handler":  null,
+                                          "exportable":  true
+                                      },
+                   "product_variants":  {
+                                            "classification":  "Mixed",
+                                            "restore_mode":  "replace",
+                                            "restore_batch":  3,
+                                            "delete_batch":  4,
+                                            "ownership_resolver":  "parent_fk",
+                                            "special_handler":  null,
+                                            "exportable":  true
+                                        },
+                   "products":  {
+                                    "classification":  "Country Scoped",
+                                    "restore_mode":  "replace",
+                                    "restore_batch":  1,
+                                    "delete_batch":  6,
+                                    "ownership_resolver":  "direct_country_id",
+                                    "special_handler":  null,
+                                    "exportable":  true
+                                },
+                   "promo_pause_log":  {
+                                           "classification":  "Country Scoped",
+                                           "restore_mode":  "replace",
+                                           "restore_batch":  1,
+                                           "delete_batch":  6,
+                                           "ownership_resolver":  "direct_country_id",
+                                           "special_handler":  null,
+                                           "exportable":  true
+                                       },
+                   "promotion_always_on_history":  {
+                                                       "classification":  "Country Scoped",
+                                                       "restore_mode":  "replace",
+                                                       "restore_batch":  1,
+                                                       "delete_batch":  6,
+                                                       "ownership_resolver":  "direct_country_id",
+                                                       "special_handler":  null,
+                                                       "exportable":  true
+                                                   },
+                   "purchase_items":  {
+                                          "classification":  "Mixed",
+                                          "restore_mode":  "replace",
+                                          "restore_batch":  4,
+                                          "delete_batch":  3,
+                                          "ownership_resolver":  "parent_fk",
+                                          "special_handler":  null,
+                                          "exportable":  true
+                                      },
+                   "purchase_return_items":  {
+                                                 "classification":  "Mixed",
+                                                 "restore_mode":  "replace",
+                                                 "restore_batch":  4,
+                                                 "delete_batch":  3,
+                                                 "ownership_resolver":  "parent_fk",
+                                                 "special_handler":  null,
+                                                 "exportable":  true
+                                             },
+                   "purchase_returns":  {
+                                            "classification":  "Mixed",
+                                            "restore_mode":  "replace",
+                                            "restore_batch":  3,
+                                            "delete_batch":  4,
+                                            "ownership_resolver":  "parent_fk",
+                                            "special_handler":  null,
+                                            "exportable":  true
+                                        },
+                   "purchases":  {
+                                     "classification":  "Country Scoped",
+                                     "restore_mode":  "replace",
+                                     "restore_batch":  2,
+                                     "delete_batch":  5,
+                                     "ownership_resolver":  "direct_country_id",
+                                     "special_handler":  null,
+                                     "exportable":  true
+                                 },
+                   "sales_return_items":  {
+                                              "classification":  "Mixed",
+                                              "restore_mode":  "replace",
+                                              "restore_batch":  4,
+                                              "delete_batch":  3,
+                                              "ownership_resolver":  "parent_fk",
+                                              "special_handler":  null,
+                                              "exportable":  true
+                                          },
+                   "sales_returns":  {
+                                         "classification":  "Country Scoped",
+                                         "restore_mode":  "replace",
+                                         "restore_batch":  3,
+                                         "delete_batch":  4,
+                                         "ownership_resolver":  "direct_country_id",
+                                         "special_handler":  null,
+                                         "exportable":  true
+                                     },
+                   "stock_adjustment_voucher":  {
+                                                    "classification":  "Country Scoped",
+                                                    "restore_mode":  "replace",
+                                                    "restore_batch":  1,
+                                                    "delete_batch":  6,
+                                                    "ownership_resolver":  "direct_country_id",
+                                                    "special_handler":  null,
+                                                    "exportable":  true
+                                                },
+                   "stock_adjustment_voucher_gl":  {
+                                                       "classification":  "Mixed",
+                                                       "restore_mode":  "replace",
+                                                       "restore_batch":  2,
+                                                       "delete_batch":  5,
+                                                       "ownership_resolver":  "parent_fk",
+                                                       "special_handler":  null,
+                                                       "exportable":  true
+                                                   },
+                   "stock_adjustment_voucher_line":  {
+                                                         "classification":  "Mixed",
+                                                         "restore_mode":  "replace",
+                                                         "restore_batch":  2,
+                                                         "delete_batch":  5,
+                                                         "ownership_resolver":  "parent_fk",
+                                                         "special_handler":  null,
+                                                         "exportable":  true
+                                                     },
+                   "stock_movements":  {
+                                           "classification":  "Country Scoped",
+                                           "restore_mode":  "replace",
+                                           "restore_batch":  4,
+                                           "delete_batch":  3,
+                                           "ownership_resolver":  "direct_country_id",
+                                           "special_handler":  null,
+                                           "exportable":  true
+                                       },
+                   "storefront_accounts":  {
+                                               "classification":  "Country Scoped",
+                                               "restore_mode":  "replace",
+                                               "restore_batch":  1,
+                                               "delete_batch":  6,
+                                               "ownership_resolver":  "direct_country_id",
+                                               "special_handler":  null,
+                                               "exportable":  true
+                                           },
+                   "storefront_copy_lines":  {
+                                                 "classification":  "Country Scoped",
+                                                 "restore_mode":  "replace",
+                                                 "restore_batch":  1,
+                                                 "delete_batch":  6,
+                                                 "ownership_resolver":  "direct_country_id",
+                                                 "special_handler":  null,
+                                                 "exportable":  true
+                                             },
+                   "storefront_phone_merge_requests":  {
+                                                           "classification":  "Country Scoped",
+                                                           "restore_mode":  "replace",
+                                                           "restore_batch":  1,
+                                                           "delete_batch":  6,
+                                                           "ownership_resolver":  "direct_country_id",
+                                                           "special_handler":  null,
+                                                           "exportable":  true
+                                                       },
+                   "storefront_promo_messages":  {
+                                                     "classification":  "Country Scoped",
+                                                     "restore_mode":  "replace",
+                                                     "restore_batch":  1,
+                                                     "delete_batch":  6,
+                                                     "ownership_resolver":  "direct_country_id",
+                                                     "special_handler":  null,
+                                                     "exportable":  true
+                                                 },
+                   "suppliers":  {
+                                     "classification":  "Country Scoped",
+                                     "restore_mode":  "replace",
+                                     "restore_batch":  1,
+                                     "delete_batch":  6,
+                                     "ownership_resolver":  "direct_country_id",
+                                     "special_handler":  null,
+                                     "exportable":  true
+                                 },
+                   "warehouse_variant_stock":  {
+                                                   "classification":  "Mixed",
+                                                   "restore_mode":  "replace",
+                                                   "restore_batch":  4,
+                                                   "delete_batch":  3,
+                                                   "ownership_resolver":  "warehouse_ownership",
+                                                   "special_handler":  null,
+                                                   "exportable":  true
+                                               },
+                   "warehouses":  {
+                                      "classification":  "Country Scoped",
+                                      "restore_mode":  "replace",
+                                      "restore_batch":  1,
+                                      "delete_batch":  6,
+                                      "ownership_resolver":  "direct_country_id",
+                                      "special_handler":  null,
+                                      "exportable":  true
+                                  }
+               }
+}

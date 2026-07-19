@@ -155,17 +155,25 @@ mkdir($pkg);
 mkdir($pkg . DIRECTORY_SEPARATOR . 'sql');
 mkdir($pkg . DIRECTORY_SEPARATOR . 'files');
 file_put_contents($pkg . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR . '001_orders.sql', "-- rows=0\n");
+file_put_contents($pkg . DIRECTORY_SEPARATOR . 'country.sql.gz', "\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\x03"); // minimal gzip header bytes; verify scans when gzopen works
 orange_country_uploads_write_empty_zip($pkg . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip');
 $manifest = [
     'package_type' => 'country_recovery',
-    'package_version' => '1.0',
+    'package_version' => ORANGE_COUNTRY_EXPORT_PACKAGE_VERSION,
     'generated_at' => gmdate('c'),
+    'export_time' => gmdate('c'),
     'country_id' => 1,
     'country_code' => 'kw',
     'country_label' => 'Kuwait',
     'schema_revision' => 121,
+    'boundary_policy_version' => 'C1.1',
+    'dependency_graph_version' => 'C2',
+    'drv_version' => ORANGE_COUNTRY_EXPORT_DRV_VERSION,
+    'verify_version' => ORANGE_COUNTRY_EXPORT_VERIFY_VERSION,
     'registry_version' => '1.0',
-    'export_backend' => 'php_country_export',
+    'export_backend' => ORANGE_COUNTRY_EXPORT_BACKEND,
+    'restore_batches' => [1 => ['orders']],
+    'package_fingerprint' => str_repeat('ab', 32),
     'package_status' => 'healthy',
 ];
 orange_backup_write_json($pkg . DIRECTORY_SEPARATOR . 'manifest.json', $manifest);
@@ -188,6 +196,7 @@ orange_backup_write_checksums($pkg, [
     'dependency_graph.json',
     'table_inventory.json',
     'id_snapshot.json',
+    'country.sql.gz',
     'files/uploads_country.zip',
     'sql/001_orders.sql',
 ]);

@@ -8,11 +8,14 @@ require_once __DIR__ . '/backup_pdo_export.php';
 require_once __DIR__ . '/backup_table_registry_lib.php';
 require_once __DIR__ . '/backup_validate.php';
 require_once __DIR__ . '/uploads_collector.php';
+require_once __DIR__ . '/country_boundary_matrix_lib.php';
 
-const ORANGE_COUNTRY_EXPORT_PACKAGE_VERSION = '1.0';
+const ORANGE_COUNTRY_EXPORT_PACKAGE_VERSION = '2.0';
 const ORANGE_COUNTRY_EXPORT_PACKAGE_TYPE = 'country_recovery';
-const ORANGE_COUNTRY_EXPORT_BACKEND = 'php_country_export';
+const ORANGE_COUNTRY_EXPORT_BACKEND = 'php_country_export_c3';
 const ORANGE_COUNTRY_EXPORT_CHUNK_ROWS = 500;
+const ORANGE_COUNTRY_EXPORT_DRV_VERSION = '1.1';
+const ORANGE_COUNTRY_EXPORT_VERIFY_VERSION = '2.0';
 
 /** @var list<string> */
 const ORANGE_COUNTRY_EXPORT_UPLOAD_DISCOVERY_TABLES = [
@@ -86,17 +89,26 @@ function orange_country_export_run(PDO $pdo, array $options): array
         $validationWarnings = [];
         $otherCountryMarkers = [];
 
-        $exportTables = orange_backup_registry_exportable_tables($registry);
+        $boundaryMatrix = orange_country_boundary_matrix_load($projectRoot);
+        $exportPlan = orange_country_boundary_matrix_export_plan($boundaryMatrix, $registry);
         $dbName = defined('DB_NAME') ? (string) DB_NAME : '';
+        /** @var array<int, array{batch:int,tables:list<string>,row_counts:array<string,int>}> $batchMeta */
+        $batchMeta = [];
 
-        foreach ($exportTables as $entry) {
+        foreach ($exportPlan as $entry) {
             $tableName = $entry['table'];
             $meta = $entry['meta'];
+            $matrixRow = $entry['matrix'];
+            $batchNo = (int) ($matrixRow['restore_batch'] ?? 0);
+            if (in_array($tableName, ORANGE_CRP_NEVER_EXPORT_TABLES, true)) {
+                throw new RuntimeException('global_mutate_forbidden: attempted export of ' . $tableName);
+            }
+
             $depErrors = orange_country_export_validate_parent_dependency($tableName, $meta, $idSnapshot);
             if ($depErrors !== []) {
                 $validationErrors = array_merge($validationErrors, $depErrors);
                 if ((bool) ($meta['integrity_critical'] ?? false)) {
-                    throw new RuntimeException('Missing required parent for ' . $tableName);
+                    throw new RuntimeException('Missing required parent for ' . $tableName . ': ' . implode('; ', $depErrors));
                 }
             }
 
@@ -116,12 +128,26 @@ function orange_country_export_run(PDO $pdo, array $options): array
             }
             $validationErrors = array_merge($validationErrors, $result['errors']);
             $validationWarnings = array_merge($validationWarnings, $result['warnings']);
-            if ($result['errors'] !== [] && (bool) ($meta['integrity_critical'] ?? false)) {
-                throw new RuntimeException('Critical validation failed for ' . $tableName . ': ' . implode('; ', $result['errors']));
+            if ($result['errors'] !== []) {
+                throw new RuntimeException(
+                    'Export policy violation for ' . $tableName . ': ' . implode('; ', $result['errors'])
+                );
             }
+            if (!isset($batchMeta[$batchNo])) {
+                $batchMeta[$batchNo] = ['batch' => $batchNo, 'tables' => [], 'row_counts' => []];
+            }
+            $batchMeta[$batchNo]['tables'][] = $tableName;
+            $batchMeta[$batchNo]['row_counts'][$tableName] = $result['row_count'];
+        }
+
+        $compositeErrors = orange_crp_export_validate_composites($idSnapshot, $rowCounts);
+        if ($compositeErrors !== []) {
+            throw new RuntimeException('Composite inconsistency: ' . implode('; ', $compositeErrors));
         }
 
         orange_country_export_write_session_file($sqlDir . DIRECTORY_SEPARATOR . '999_session_postamble.sql', false);
+        $countrySqlGz = $tempDir . DIRECTORY_SEPARATOR . 'country.sql.gz';
+        orange_crp_export_write_country_sql_gz($sqlDir, $countrySqlGz);
 
         $trialBalance = orange_country_export_compute_trial_balance($pdo, $countryId, $idSnapshot);
         if (abs($trialBalance['difference']) > ORANGE_COUNTRY_EXPORT_TRIAL_BALANCE_TOLERANCE) {
@@ -144,15 +170,22 @@ function orange_country_export_run(PDO $pdo, array $options): array
         }
 
         $counts = orange_country_export_summary_counts($rowCounts);
-        $dependencyGraph = orange_country_export_build_dependency_graph($registry);
+        $restoreBatches = orange_country_boundary_matrix_restore_batches($boundaryMatrix);
+        ksort($batchMeta);
+        $dependencyGraph = orange_country_export_build_dependency_graph_c3($boundaryMatrix, $registry, $restoreBatches);
         $tableInventory = [
             'country_id' => $countryId,
             'country_code' => $country['code'],
             'schema_revision' => ORANGE_CATALOG_SCHEMA_PHP_REVISION,
+            'boundary_policy_version' => ORANGE_COUNTRY_BOUNDARY_POLICY_VERSION,
+            'dependency_graph_version' => ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION,
             'registry_version' => (string) ($registry['registry_version'] ?? ''),
             'tables' => $rowCounts,
+            'classification_summary' => orange_crp_export_classification_summary($rowCounts, $boundaryMatrix),
             'ownership_summary' => orange_country_export_row_counts_by_ownership($rowCounts, $registry),
+            'restore_batches' => $restoreBatches,
             'other_country_markers' => $otherCountryMarkers,
+            'never_export' => ORANGE_CRP_NEVER_EXPORT_TABLES,
         ];
 
         orange_backup_write_json($tempDir . DIRECTORY_SEPARATOR . 'dependency_graph.json', $dependencyGraph);
@@ -186,22 +219,34 @@ function orange_country_export_run(PDO $pdo, array $options): array
 
         orange_backup_write_json($tempDir . DIRECTORY_SEPARATOR . 'health.json', $health);
 
+        $exportTime = gmdate('c');
         $manifest = [
             'package_type' => ORANGE_COUNTRY_EXPORT_PACKAGE_TYPE,
             'package_version' => ORANGE_COUNTRY_EXPORT_PACKAGE_VERSION,
-            'generated_at' => gmdate('c'),
+            'generated_at' => $exportTime,
+            'export_time' => $exportTime,
             'country_id' => $countryId,
             'country_code' => $country['code'],
             'country_label' => $country['label'],
             'schema_revision' => ORANGE_CATALOG_SCHEMA_PHP_REVISION,
+            'boundary_policy_version' => ORANGE_COUNTRY_BOUNDARY_POLICY_VERSION,
+            'dependency_graph_version' => ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION,
+            'matrix_version' => (string) ($boundaryMatrix['matrix_version'] ?? ''),
             'registry_version' => (string) ($registry['registry_version'] ?? ''),
+            'drv_version' => ORANGE_COUNTRY_EXPORT_DRV_VERSION,
+            'verify_version' => ORANGE_COUNTRY_EXPORT_VERIFY_VERSION,
             'git_commit' => orange_backup_git_commit_hash($projectRoot),
             'source_database' => $dbName,
             'export_backend' => ORANGE_COUNTRY_EXPORT_BACKEND,
             'row_counts' => $rowCounts,
             'ownership_summary' => $tableInventory['ownership_summary'],
+            'classification_summary' => $tableInventory['classification_summary'],
+            'restore_batches' => $restoreBatches,
+            'restore_batch_export' => array_values($batchMeta),
+            'country_sql_archive' => 'country.sql.gz',
             'sql_directory' => 'sql/',
             'uploads_archive' => 'files/uploads_country.zip',
+            'uploads_file_count' => (int) ($uploads['collected'] ?? 0),
             'checksums_file' => 'checksums.sha256',
             'health_report_file' => 'health.json',
             'dependency_graph_file' => 'dependency_graph.json',
@@ -209,9 +254,16 @@ function orange_country_export_run(PDO $pdo, array $options): array
             'id_snapshot_file' => 'id_snapshot.json',
             'package_status' => (string) ($health['package_status'] ?? 'healthy'),
             'maintenance_notes' => [],
+            'never_export' => ORANGE_CRP_NEVER_EXPORT_TABLES,
         ];
         orange_backup_write_json($tempDir . DIRECTORY_SEPARATOR . 'manifest.json', $manifest);
 
+        $checksumTargets = orange_backup_collect_package_files($tempDir);
+        orange_backup_write_checksums($tempDir, $checksumTargets);
+        $packageFingerprint = orange_crp_export_package_fingerprint($tempDir, $manifest);
+        $manifest['package_fingerprint'] = $packageFingerprint;
+        orange_backup_write_json($tempDir . DIRECTORY_SEPARATOR . 'manifest.json', $manifest);
+        // Refresh checksums after fingerprint written into manifest.
         $checksumTargets = orange_backup_collect_package_files($tempDir);
         orange_backup_write_checksums($tempDir, $checksumTargets);
 
@@ -337,12 +389,16 @@ function orange_country_export_build_query(string $tableName, array $meta, int $
 
     return match ($type) {
         'country_id' => [
+            // D2: exact equality only — never COALESCE / IS NULL.
             'sql' => 'SELECT * FROM ' . $tableSql . ' WHERE ' . orange_backup_pdo_quote_identifier((string) ($rule['column'] ?? 'country_id')) . ' = ?',
             'params' => [$countryId],
         ],
-        'country_scope_or' => orange_country_export_build_country_scope_or_query($tableName, $rule, $countryId),
+        'special_sequence_namespace' => orange_crp_export_build_sequence_namespace_query($countryId),
         'parent_rows' => orange_country_export_build_parent_rows_query($tableName, $rule, $idSnapshot),
         'custom_sql' => orange_country_export_build_custom_sql_query($tableName, $rule, $countryId),
+        'country_scope_or' => throw new RuntimeException(
+            'country_scope_or forbidden under frozen boundary policy (table=' . $tableName . ')'
+        ),
         default => throw new RuntimeException('Unsupported extraction rule type for ' . $tableName . ': ' . $type),
     };
 }
@@ -499,6 +555,8 @@ function orange_country_export_summary_counts(array $rowCounts): array
 }
 
 /**
+ * Legacy graph builder (registry-only). Prefer orange_country_export_build_dependency_graph_c3().
+ *
  * @return array{nodes:list<array<string,mixed>>,edges:list<array<string,mixed>>}
  */
 function orange_country_export_build_dependency_graph(array $registry): array
@@ -506,6 +564,9 @@ function orange_country_export_build_dependency_graph(array $registry): array
     $nodes = [];
     $edges = [];
     foreach (orange_backup_registry_exportable_tables($registry) as $entry) {
+        if (in_array($entry['table'], ORANGE_CRP_NEVER_EXPORT_TABLES, true)) {
+            continue;
+        }
         $nodes[] = [
             'table' => $entry['table'],
             'ownership_type' => $entry['meta']['ownership_type'] ?? '',
@@ -523,6 +584,170 @@ function orange_country_export_build_dependency_graph(array $registry): array
     }
 
     return ['nodes' => $nodes, 'edges' => $edges];
+}
+
+/**
+ * @param array<string, mixed> $matrix
+ * @param array<string, mixed> $registry
+ * @param array<int, list<string>> $restoreBatches
+ * @return array<string, mixed>
+ */
+function orange_country_export_build_dependency_graph_c3(
+    array $matrix,
+    array $registry,
+    array $restoreBatches
+): array {
+    $plan = orange_country_boundary_matrix_export_plan($matrix, $registry);
+    $nodes = [];
+    $edges = [];
+    foreach ($plan as $entry) {
+        $table = $entry['table'];
+        $meta = $entry['meta'];
+        $m = $entry['matrix'];
+        $nodes[] = [
+            'table' => $table,
+            'classification' => (string) ($m['classification'] ?? ''),
+            'restore_mode' => (string) ($m['restore_mode'] ?? ''),
+            'restore_batch' => (int) ($m['restore_batch'] ?? 0),
+            'delete_batch' => (int) ($m['delete_batch'] ?? 0),
+            'ownership_resolver' => (string) ($m['ownership_resolver'] ?? ''),
+            'special_handler' => $m['special_handler'] ?? null,
+            'ownership_type' => $meta['ownership_type'] ?? '',
+            'export_order' => (int) ($meta['export_order'] ?? 0),
+            'integrity_critical' => (bool) ($meta['integrity_critical'] ?? false),
+        ];
+        $parent = $meta['parent_dependency'] ?? null;
+        if (is_array($parent) && ($parent['table'] ?? '') !== '') {
+            $edges[] = [
+                'from' => $table,
+                'to' => (string) $parent['table'],
+                'foreign_key' => (string) ($parent['foreign_key'] ?? ''),
+            ];
+        }
+    }
+
+    return [
+        'boundary_policy_version' => ORANGE_COUNTRY_BOUNDARY_POLICY_VERSION,
+        'dependency_graph_version' => ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION,
+        'schema_revision' => (int) ($matrix['schema_revision'] ?? 121),
+        'restore_batches' => $restoreBatches,
+        'nodes' => $nodes,
+        'edges' => $edges,
+    ];
+}
+
+/**
+ * @return array{sql:string,params:list<mixed>}
+ */
+function orange_crp_export_build_sequence_namespace_query(int $countryId): array
+{
+    // D3: only scopes ending with _c{country_id}. LIKE '_' is wildcard — escape it.
+    return [
+        'sql' => 'SELECT * FROM `document_sequences` WHERE `scope` LIKE ? ESCAPE \'\\\\\'',
+        'params' => ['%\\_c' . $countryId],
+    ];
+}
+
+/**
+ * Concatenate sql/*.sql chunks into country.sql.gz (C3 package contract).
+ */
+function orange_crp_export_write_country_sql_gz(string $sqlDir, string $destinationGz): void
+{
+    if (!function_exists('gzopen')) {
+        throw new RuntimeException('gzopen unavailable for country.sql.gz');
+    }
+    $files = glob($sqlDir . DIRECTORY_SEPARATOR . '*.sql') ?: [];
+    sort($files, SORT_STRING);
+    if ($files === []) {
+        throw new RuntimeException('No SQL chunks to pack into country.sql.gz');
+    }
+    $out = gzopen($destinationGz, 'wb9');
+    if ($out === false) {
+        throw new RuntimeException('Cannot open country.sql.gz for writing');
+    }
+    foreach ($files as $file) {
+        $raw = file_get_contents($file);
+        if ($raw === false) {
+            gzclose($out);
+            throw new RuntimeException('Cannot read SQL chunk: ' . basename($file));
+        }
+        gzwrite($out, $raw);
+        if (!str_ends_with($raw, "\n")) {
+            gzwrite($out, "\n");
+        }
+    }
+    gzclose($out);
+}
+
+/**
+ * @param array<string, list<int>> $idSnapshot
+ * @param array<string, int> $rowCounts
+ * @return list<string>
+ */
+function orange_crp_export_validate_composites(array $idSnapshot, array $rowCounts): array
+{
+    $errors = [];
+    $adminIds = $idSnapshot['admins'] ?? [];
+    $permCount = (int) ($rowCounts['admin_permissions'] ?? 0);
+    if ($adminIds === [] && $permCount > 0) {
+        $errors[] = 'admin_permissions_composite_incomplete: permissions without target admins';
+    }
+    $accountIds = $idSnapshot['accounts'] ?? [];
+    $expenseCount = (int) ($rowCounts['expenses'] ?? 0);
+    if ($expenseCount > 0 && $accountIds === []) {
+        $errors[] = 'composite_unit_incomplete: expenses without accounts';
+    }
+    $voucherIds = $idSnapshot['journal_vouchers'] ?? [];
+    $slotCount = (int) ($rowCounts['orange_gl_voucher_slots'] ?? 0);
+    if ($slotCount > 0 && $voucherIds === []) {
+        $errors[] = 'composite_unit_incomplete: voucher slots without journal_vouchers';
+    }
+    $seqCount = (int) ($rowCounts['document_sequences'] ?? 0);
+    if ($seqCount < 0) {
+        $errors[] = 'sequence_namespace_violation';
+    }
+
+    return $errors;
+}
+
+/**
+ * @param array<string, int> $rowCounts
+ * @param array<string, mixed> $matrix
+ * @return array<string, int>
+ */
+function orange_crp_export_classification_summary(array $rowCounts, array $matrix): array
+{
+    $summary = ['Country Scoped' => 0, 'Mixed' => 0];
+    /** @var array<string, array<string, mixed>> $tables */
+    $tables = is_array($matrix['tables'] ?? null) ? $matrix['tables'] : [];
+    foreach ($rowCounts as $table => $count) {
+        $class = (string) ($tables[$table]['classification'] ?? '');
+        if (isset($summary[$class])) {
+            $summary[$class] += (int) $count;
+        }
+    }
+
+    return $summary;
+}
+
+/**
+ * @param array<string, mixed> $manifest
+ */
+function orange_crp_export_package_fingerprint(string $packageRoot, array $manifest): string
+{
+    $parts = [
+        'v=' . (string) ($manifest['package_version'] ?? ''),
+        'c=' . (string) ($manifest['country_id'] ?? ''),
+        's=' . (string) ($manifest['schema_revision'] ?? ''),
+        'bp=' . (string) ($manifest['boundary_policy_version'] ?? ''),
+        'dg=' . (string) ($manifest['dependency_graph_version'] ?? ''),
+    ];
+    foreach (['country.sql.gz', 'files/uploads_country.zip', 'table_inventory.json', 'dependency_graph.json'] as $rel) {
+        $abs = $packageRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel);
+        $parts[] = $rel . '=' . (is_file($abs) ? (hash_file('sha256', $abs) ?: '') : 'missing');
+    }
+
+    return hash('sha256', implode('|', $parts));
 }
 
 /**

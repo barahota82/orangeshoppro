@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 /**
- * Country Recovery Package (CRP) export CLI — Phase 1B.2.
+ * Country Recovery Package (CRP) export CLI — Phase C3 (export only).
+ *
+ * Uses frozen boundary matrix (C1.1/C2). Does not run Country Restore.
  *
  * Usage:
  *   php scripts/backup/export_country.php --country-id=N
