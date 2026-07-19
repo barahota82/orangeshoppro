@@ -380,8 +380,9 @@ Stable machine codes for future Country tooling (design contract — not impleme
 
 1. **`COUNTRY_RESTORE_BOUNDARY_POLICY.md`** (this file) — frozen policy rules  
 2. **`COUNTRY_BOUNDARY_VALIDATION.md`** — approved 117-table corrected matrix (D1)  
-3. **`COUNTRY_RESTORE_ARCHITECTURE.md`** — historical C0 narrative only  
-4. `backup_table_registry.json` — operational registry; must be corrected to match schema+this policy before execution; until then schema+this policy win on conflicts  
+3. **`COUNTRY_DEPENDENCY_GRAPH.md`** — Phase C2 frozen restore/delete/rollback batch design (from this policy; not C0)  
+4. **`COUNTRY_RESTORE_ARCHITECTURE.md`** — historical C0 narrative only  
+5. `backup_table_registry.json` — operational registry; must be corrected to match schema+this policy before execution; until then schema+this policy win on conflicts  
 
 ---
 
