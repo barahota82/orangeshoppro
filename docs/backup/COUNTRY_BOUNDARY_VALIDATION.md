@@ -1,11 +1,14 @@
 # Country Restore Boundary Validation (Phase C1)
 
-**Status:** ARCHITECTURE VALIDATION ONLY — no implementation, no restore engine, no production changes  
+**Status:** VALIDATION COMPLETE — corrected matrix **approved and frozen** by Phase C1.1 (D1)  
 **Date:** 2026-07-19  
-**Input (C0):** `docs/backup/COUNTRY_RESTORE_ARCHITECTURE.md`  
+**Input (C0):** `docs/backup/COUNTRY_RESTORE_ARCHITECTURE.md` (historical only)  
+**Frozen policy (C1.1):** `docs/backup/COUNTRY_RESTORE_BOUNDARY_POLICY.md` — authoritative rules (NULL, special handlers, composites, fail-closed codes)  
 **Schema truth:** `scripts/orange_db.sql` — **117** tables, **87** FK constraints (ALTER TABLE)  
 **Registry:** `config/backup_table_registry.json` — v1.0 / schema_revision **121**  
 **Also read:** accounting mapping, unified taxonomy, multi-country vision, stock/FIFO/order policy, Full DR restore design
+
+**Country Restore boundary policy is frozen for dependency-graph design, but Country Restore is not yet certified or enabled.**
 
 ---
 
@@ -22,7 +25,10 @@ Therefore this phase **does not** declare:
 
 > Country Restore Boundary Model validated.
 
-Instead it produces the **Corrected Country Restore Boundary Classification** (section «Corrected classification»). After owner decisions in section «Owner decisions required», that corrected matrix — not unmodified C0 — becomes the candidate source of truth for later Country phases.
+Instead it produces the **Corrected Country Restore Boundary Classification** (section «Corrected classification»).
+
+**Phase C1.1 update:** Owner decisions **D1–D6** are resolved. The corrected matrix below is the **authoritative classification SoT**; policy rules live in `COUNTRY_RESTORE_BOUNDARY_POLICY.md`.
+
 
 ### Method (attempt to disprove)
 
@@ -285,7 +291,7 @@ Columns: `table` · `current classification` · `Validated?` · `new classificat
 
 ## Corrected classification
 
-Use this matrix as the **candidate source of truth** after owner decisions. C0 remains historical design context.
+**Authoritative under D1 (C1.1).** C0 remains historical design context only. Policy freeze: `docs/backup/COUNTRY_RESTORE_BOUNDARY_POLICY.md`.
 
 | table | corrected classification | restore mode | replace | merge | ignore | special handler | notes |
 |-------|--------------------------|--------------|---------|-------|--------|-----------------|-------|
@@ -422,7 +428,7 @@ Use this matrix as the **candidate source of truth** after owner decisions. C0 r
 
 | ID | Risk | Severity | Likelihood | Detection | Mitigation (design) |
 |----|------|----------|------------|-----------|---------------------|
-| R1 | Country admin replace without dmin_permissions | High | High | Authz smoke after shadow | Composite restore admins+permissions |
+| R1 | Country admin replace without dmin_permissions | High | High | Authz smoke after shadow | Composite restore admins+permissions |
 | R2 | document_sequences desync after CRP | High | High | Compare max voucher serial vs sequence | Special scope _c{N} handler |
 | R3 | orange_country_screen_copy_log OR-delete hits other country | Critical | Medium | Pre/post counts on sibling country | Reclassify Global / never mutate |
 | R4 | NULL country_id rows deleted or left orphan | High | Medium | Leakage probes | Predicate country_id = :target only |
@@ -447,43 +453,44 @@ Scoring notes: deducted for Critical/High reclass findings, nullable country_id 
 
 ---
 
-## Open questions
-
-1. Should NULL country_id rows on ccounts / products / channels / etc. be treated as illegal data (fail cert) or as intentional legacy shared rows (exclude from CRP delete)?  
-2. For document_sequences, do any **non-suffixed** scopes still exist in production that are country-meaningful?  
-3. Should orange_country_screen_copy_log be retained forever on CRP (ignore) or archived out-of-band?  
-4. Is journal_entries still written by any live path, or fully superseded by journal_vouchers/journal_lines?  
-5. When replacing country dmins, must Super Admin dual-control identities be proven non-members of that slice?  
-6. Who fixes registry FK column mismatches (definitions generator) before C2+?
-
----
-
 ## Owner decisions required
 
-| # | Decision | Options | Recommendation |
-|---|----------|---------|----------------|
-| D1 | Accept C1 corrected matrix as SoT (superseding C0 for the 7 tables) | Accept / Reject / Amend | **Accept** |
-| D2 | NULL country_id policy for CRP | Fail closed / Exclude NULL / Treat NULL as Global | **Fail closed** if NULL count > 0 on integrity-critical tables; else exclude NULL from delete |
-| D3 | document_sequences handler | Special _c{N} upsert / Ignore entirely / Full-table forbid only | **Special _c{N} upsert** aligned to package |
-| D4 | dmin_permissions with country admins | Composite replace / Ignore permissions | **Composite replace** |
-| D5 | orange_country_screen_copy_log | Global ignore / Country OR-replace | **Global ignore** |
-| D6 | journal_entries | Mixed ignore Full-only / Attempt country filter | **Mixed + ignore (Full-only)** |
+**Resolved in Phase C1.1** — see `docs/backup/COUNTRY_RESTORE_BOUNDARY_POLICY.md` §1.
 
-Until D1–D6 are answered, later Country implementation phases must not treat unmodified C0 as final law.
+| # | Decision | Disposition (C1.1) |
+|---|----------|--------------------|
+| D1 | Corrected matrix as SoT | **APPROVED** |
+| D2 | NULL `country_id` policy | **APPROVED** — exact equality only; NULL excluded |
+| D3 | `document_sequences` handler | **APPROVED** — special country namespace handler |
+| D4 | `admins` + `admin_permissions` | **APPROVED** — composite unit |
+| D5 | `orange_country_screen_copy_log` | **APPROVED** — Global / ignore |
+| D6 | `journal_entries` | **APPROVED** — Full-only / CRP ignore |
+
+Open items that remain are non-blocking architecture questions listed in the C1.1 policy — they do **not** reopen D1–D6.
 
 ---
 
 ## Explicit non-validation statement
 
-Because classifications changed under adversarial review:
+Because classifications changed under adversarial review in C1:
 
-**Country Restore Boundary Model validated.** ← **NOT declared.**
+**Country Restore Boundary Model validated.** ← **NOT declared in C1.**
 
-**Declared instead:**
+**Declared in C1:** Country Restore Boundary Model challenged; corrected classification produced.
 
-**Country Restore Boundary Model challenged; corrected classification produced (Phase C1).**
+**Declared in C1.1:** Corrected classification **approved (D1)** and boundary **policy frozen** in `docs/backup/COUNTRY_RESTORE_BOUNDARY_POLICY.md`. Country Restore is **not** certified or enabled.
 
-C0 remains useful design narrative; **boundary SoT for subsequent phases = this document’s corrected matrix**, subject to owner decisions D1–D6.
+---
+
+## Open questions (post C1.1)
+
+D1–D6 are closed. Residual non-blocking questions (see C1.1 policy):
+
+1. Exact allowlist of `orange_company_documents.entity_table` values beyond the documented set.
+2. Whether any production `document_sequences.scope` values use a country convention other than `_c{id}`.
+3. Timing of registry drift correction vs dependency-graph phase.
+4. Whether `journal_entries` is still written by any live path (informational; CRP ignore stands regardless).
+5. Country certification suite details for composite units.
 
 ---
 
@@ -491,14 +498,15 @@ C0 remains useful design narrative; **boundary SoT for subsequent phases = this 
 
 | Evidence | Location |
 |----------|----------|
-| FK Global→Country | dmin_permissions→dmins; journal_entries→ccounts/iscal_years; audit/logs/sessions→dmins |
-| Sequence country suffix | includes/document_sequences.php (scope .= '_c' . countryId) |
-| Copy log two-country columns | orange_country_screen_copy_log CREATE TABLE |
-| Voucher slots country_id | orange_gl_voucher_slots CREATE TABLE |
-| C0 matrix | docs/backup/COUNTRY_RESTORE_ARCHITECTURE.md §3 |
-| Registry | config/backup_table_registry.json |
-| Schema | scripts/orange_db.sql |
+| FK Global→Country | `admin_permissions`→`admins`; `journal_entries`→`accounts`/`fiscal_years`; audit/logs/sessions→`admins` |
+| Sequence country suffix | `includes/document_sequences.php` (`scope .= '_c' . countryId`) |
+| Copy log two-country columns | `orange_country_screen_copy_log` CREATE TABLE |
+| Voucher slots `country_id` | `orange_gl_voucher_slots` CREATE TABLE |
+| C0 matrix (historical) | `docs/backup/COUNTRY_RESTORE_ARCHITECTURE.md` §3 |
+| Frozen policy | `docs/backup/COUNTRY_RESTORE_BOUNDARY_POLICY.md` |
+| Registry | `config/backup_table_registry.json` |
+| Schema | `scripts/orange_db.sql` |
 
 ---
 
-*End of Phase C1 — Country Restore Boundary Validation (documentation only).*
+*End of Phase C1 — Country Restore Boundary Validation (documentation only; decisions frozen in C1.1).*

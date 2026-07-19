@@ -1,6 +1,6 @@
 # Country Restore Architecture (Phase C0)
 
-**Status:** DESIGN ONLY — no implementation in this phase  
+**Status:** HISTORICAL DESIGN INPUT ONLY — superseded as boundary SoT by Phase C1.1  
 **Date:** 2026-07-19  
 **Schema truth:** `scripts/orange_db.sql` (local mysqldump) — **117** `CREATE TABLE`  
 **Authoritative registry:** `config/backup_table_registry.json` — `registry_version` **1.0**, `schema_revision` **121**, `table_count` **117**  
@@ -8,9 +8,14 @@
 **Related Full DR (engineering-complete platform):** `docs/backup/RESTORE_EXECUTION_DESIGN.md`, restore engine / rollback / approval / shadow / certification artifacts under `docs/backup/` and `includes/backup/restore/`  
 **Policy inputs:** `docs/archive/ORANGE_OWNER_MULTICOUNTRY_VISION.txt`, `ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt`, `ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt`, `ORANGE_STOCK_ORDER_POLICY.txt`
 
-**Non-goals of C0:** no Country production enablement, no code patches, no refactor, no feature work. This document is the signed table-boundary / restore-mode design required before any future Country Restore implementation phases.
+**Boundary SoT (frozen — Phase C1.1):** `docs/backup/COUNTRY_RESTORE_BOUNDARY_POLICY.md`  
+**Approved classification matrix (D1):** `docs/backup/COUNTRY_BOUNDARY_VALIDATION.md` § Corrected classification  
 
-**Predecessor constraint (Full DR Round 3):** Country Restore production remains **disabled** until a separate Country certification program closes. C0 produces the architecture that program will certify against.
+**Do not** treat this C0 document’s §3 matrix as the Country Restore source of truth. C1 challenged it; C1.1 froze owner policy on the corrected matrix.
+
+**Non-goals of C0:** no Country production enablement, no code patches, no refactor, no feature work. This document is retained as design narrative / history.
+
+**Predecessor constraint (Full DR Round 3):** Country Restore production remains **disabled** until a separate Country certification program closes.
 
 ---
 
