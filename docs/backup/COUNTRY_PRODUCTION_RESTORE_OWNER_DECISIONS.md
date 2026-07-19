@@ -9,7 +9,8 @@
 | **Workshop** | `docs/backup/COUNTRY_PRODUCTION_RESTORE_OWNER_WORKSHOP.md` |
 | **Dependencies** | `docs/backup/COUNTRY_PRODUCTION_RESTORE_DECISION_DEPENDENCIES.md` |
 | **C3–C8** | Must not be modified |
-| **Enablement** | Remains **disabled** until certification + explicit OD-ENABLE |
+| **Enablement** | Remains **disabled** until certification + explicit OD-ENABLE + implementation + final enterprise approval (OWNER_APPROVED) |
+| **Last owner freeze** | 2026-07-20 — Group 1: OD-ENABLE, OD-DUAL, OD-PHRASE, OD-BREAK |
 
 ### Frozen inputs (not reopened)
 
@@ -20,11 +21,22 @@
 | Full DR **OD-2** | Country production restore disabled until Country certification |
 | CRP Final Audit | C8 SAFE ≠ cutover auth; FA-01…FA-03 residuals inform OD-FA-* |
 
+### Owner-approved CPR decisions (Group 1 — 2026-07-20)
+
+| ID | Status |
+|----|--------|
+| **OD-ENABLE** | OWNER_APPROVED |
+| **OD-DUAL** | OWNER_APPROVED (Super Admin / Country Admin workflows — **not** dual Super Admin) |
+| **OD-PHRASE** | OWNER_APPROVED (`RESTORE` + password re-auth) |
+| **OD-BREAK** | OWNER_APPROVED (Super Admin only; does not bypass anchor/gates/auth/logging) |
+
+**Note:** P0 architecture §8 previously recommended “two distinct Super Admin identities.” That recommendation is **superseded** by OWNER_APPROVED **OD-DUAL** in this register. Do not implement the old dual-Super-Admin model.
+
 ### Register rules
 
-- Every status below is **PROPOSED** until the owner fills **Final owner answer**.  
-- **Recommended** is facilitator advice, **not** an assumed approval.  
-- Do not guess. Do not implement from recommendations alone.
+- Status **OWNER_APPROVED** = frozen owner policy; do not reopen without a new owner decision.  
+- Remaining decisions stay **PROPOSED** until the owner answers.  
+- Facilitation “Recommended” is historical advice only where status is still PROPOSED.
 
 ### OD count
 
@@ -43,38 +55,38 @@
 | **3. Exact question** | May the production enablement flag become true only after (a) Country Production certification PASS **and** (b) an explicit owner enablement order, remaining false until then? |
 | **4. Options** | **A)** Yes — false until cert PASS + explicit order. **B)** Allow enablement after drills without formal certification. **C)** Allow temporary enablement for emergencies without cert. |
 | **5. Consequences** | A: safest; matches P0/OD-2. B: weakens cert program. C: break-glass without OD-BREAK discipline. |
-| **6. Recommended** | **A** |
+| **6. Recommended** | **A** (historical facilitation) |
 | **7. Reason** | Fail closed; production restore disabled by default; aligns Full DR OD-2 and P0. |
 | **8. Security** | Prevents accidental/unauthorized production mutation path. |
 | **9. Data integrity** | Ensures certified gates exist before live apply. |
 | **10. Operational** | Clear go-live ceremony. |
 | **11. Rollback** | N/A pre-enable; post-enable still requires Full anchor pins. |
 | **12. Required before** | P1: yes (design disabled-default). Implementation: yes. Certification: defines post-cert gate. **Enablement: blocks.** |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank until approved)_ — Draft: *Country Production Restore enablement remains false until Country Production certification PASS and an explicit owner enablement order are both recorded.* |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Country Production Restore remains **disabled by default**. Enablement is allowed **only after all** of: (1) Certification PASS; (2) Explicit Owner enablement; (3) Production Restore **implementation completed**; (4) Final Enterprise approval. |
+| **15. Frozen policy wording** | *Country Production Restore remains disabled by default. The enablement flag may become true only after Certification PASS, an explicit Owner enablement order, completion of Country Production Restore implementation, and Final Enterprise approval. Until then the flag stays false.* |
 
 ---
 
-### OD-DUAL — Dual control for PONR
+### OD-DUAL — Approval / execution authority (Super Admin ↔ Country Admin)
 
 | Field | Content |
 |-------|---------|
 | **1. ID** | OD-DUAL |
-| **2. Title** | Dual control for irreversible Country Production actions |
+| **2. Title** | Who may create vs approve/execute Country Production Restore |
 | **3. Exact question** | Must Country Production Restore require two distinct identities (job creator ≠ PONR authorizer), or do you explicitly waive dual control in writing? |
-| **4. Options** | **A)** Implement dual control (mandatory). **B)** Explicit written waiver (single Super Admin may authorize). **C)** Dual control only for first N production uses. |
-| **5. Consequences** | A: stronger governance. B: faster ops, higher insider risk; must not silently inherit Full DR waiver. C: complex state. |
-| **6. Recommended** | **A** |
-| **7. Reason** | Dual control for irreversible production actions; separate from Full DR OD-1. |
-| **8. Security** | Reduces single-person malicious/mistaken cutover. |
-| **9. Data integrity** | Indirect — better process control. |
-| **10. Operational** | Needs second person available in window. |
-| **11. Rollback** | Unaffected. |
+| **4. Options** | *(Superseded by owner policy below.)* Historical: A dual Super Admin · B waiver · C first-N only. |
+| **5. Consequences** | Owner model: Super Admin may run end-to-end (Workflow A) with mandatory technical protections; Country Admin may prepare C3–C8 only and cannot execute (Workflow B). |
+| **6. Recommended** | *(Superseded)* Former “dual Super Admin” recommendation is **withdrawn**. |
+| **7. Reason** | Owner-approved role model matches Orange’s one global Super Admin + Country Admins. |
+| **8. Security** | Country Admin cannot execute production restore; Super Admin retains sole execution authority. Workflow A still requires anchor, gates, maint, phrase, re-auth, audit, one-time auth. |
+| **9. Data integrity** | Mandatory gates + Full Rollback Anchor remain in both workflows. |
+| **10. Operational** | Workflow A: single Super Admin path. Workflow B: pending Super Admin approval queue. |
+| **11. Rollback** | Full Rollback Anchor mandatory in both workflows; break-glass cannot bypass anchor (OD-BREAK). |
 | **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | **Replace** prior dual-Super-Admin recommendation. Roles: **one global Super Admin**; **one or more Country Admins**. **Workflow A** — If Super Admin creates and manages the Production Restore request from the beginning: no second approver required; Super Admin performs final execution; **still mandatory:** Full Rollback Anchor, all mandatory gates PASS, Maintenance Mode, Confirmation Phrase, password re-authentication, complete Audit Log, one-time authorization. **Workflow B** — If Country Admin creates the Country Recovery Package and requests Production Restore: Country Admin may prepare package and complete C3–C8; Country Admin **cannot** execute Production Restore; request enters **Pending Super Admin Approval**; **only Super Admin** may approve and execute Production Restore. |
+| **15. Frozen policy wording** | *CPR authority uses one global Super Admin and Country Admins. Workflow A: Super Admin may create, approve, and execute end-to-end without a second human approver, but Full Rollback Anchor, mandatory gates PASS, Maintenance Mode, Confirmation Phrase `RESTORE`, password re-authentication, complete audit log, and one-time authorization remain mandatory. Workflow B: Country Admin may prepare the package and complete C3–C8 only; the job enters Pending Super Admin Approval; only the Super Admin may approve and execute Production Restore. Country Admins must never execute Production Restore.* |
 
 ---
 
@@ -85,36 +97,38 @@
 | **1. ID** | OD-PHRASE |
 | **2. Title** | PONR re-authentication phrase |
 | **3. Exact question** | What re-auth factors and exact confirmation phrase are required immediately before Country Production PONR? |
-| **4. Options** | **A)** Super Admin password re-auth + phrase `COUNTRY_RESTORE` (distinct from Full DR). **B)** Same phrase as Full DR (`RESTORE`). **C)** Password only, no phrase. **D)** Owner-specified phrase: `________`. |
-| **5. Consequences** | A: clear mental separation Full vs Country. B: risk of operator confusion. C: weaker. D: custom. |
-| **6. Recommended** | **A** |
-| **7. Reason** | One-time authorization clarity; reduce cross-product mistakes. |
-| **8. Security** | Extra intentionality gate. |
+| **4. Options** | **A)** phrase `COUNTRY_RESTORE`. **B)** phrase `RESTORE` (same token as Full DR). **C)** password only. **D)** custom. |
+| **5. Consequences** | Owner chose **B** + mandatory password re-auth in Workflow A and B. |
+| **6. Recommended** | *(Historical A withdrawn.)* |
+| **7. Reason** | Owner-approved shared phrase `RESTORE` with mandatory typing + password re-auth. |
+| **8. Security** | Intentionality gate; does not replace role checks (OD-DUAL). |
 | **9–11** | Integrity/ops/rollback: process only. |
-| **12. Required before** | P1: deferrable detail. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Confirmation phrase is **`RESTORE`**. Phrase is **mandatory**. Super Admin must **type** it before execution. Required in **both Workflow A and Workflow B**. Password re-authentication remains mandatory (per OD-DUAL protections). |
+| **15. Frozen policy wording** | *Before Country Production Restore execution, the Super Admin must re-authenticate with password and type the confirmation phrase `RESTORE`. The phrase is mandatory in Workflow A and Workflow B. One-time authorization applies; phrase acceptance does not bypass gates, anchor, maintenance, or audit.* |
 
 ---
 
-### OD-BREAK — Break-glass single control
+### OD-BREAK — Break-glass (Super Admin emergency)
 
 | Field | Content |
 |-------|---------|
 | **1. ID** | OD-BREAK |
-| **2. Title** | Emergency single-control path |
+| **2. Title** | Emergency Break Glass path |
 | **3. Exact question** | If dual control is implemented, is a break-glass single-control path allowed, and what post-incident review is mandatory? |
-| **4. Options** | **A)** Allowed only with distinct break-glass flag + mandatory incident report within 72h. **B)** Never allow single-control. **C)** Allowed silently whenever second person unavailable. |
-| **5. Consequences** | A: controlled emergency. B: may block true emergencies. C: defeats dual control. |
-| **6. Recommended** | **A** if OD-DUAL=A; **B** if OD-DUAL=B (waiver already covers). |
-| **7. Reason** | Explicit rollback/incident triggers; no silent single-control. |
-| **8. Security** | Audited exception. |
-| **9–11** | Integrity/ops: emergency continuity; rollback still Full anchor. |
-| **12. Required before** | P1: soft. Implementation: yes if dual control. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | *(Superseded by owner policy.)* |
+| **5. Consequences** | Break Glass is Super Admin only; cannot skip anchor/gates/logging/authentication. |
+| **6. Recommended** | *(Historical facilitation superseded.)* |
+| **7. Reason** | Owner-approved emergency path with hard non-bypass list. |
+| **8. Security** | Audited Super Admin emergency; no silent bypass of safety chassis. |
+| **9. Data integrity** | Full Rollback Anchor and mandatory safety gates still required. |
+| **10. Operational** | Emergency reason + notification required. |
+| **11. Rollback** | Anchor not bypassable. |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Emergency Break Glass available **only to the Super Admin**. Requirements: emergency reason mandatory; full audit log; notification. **Does NOT bypass:** Full Rollback Anchor; mandatory safety gates; logging; authentication. |
+| **15. Frozen policy wording** | *Emergency Break Glass is available only to the Super Admin. An emergency reason, full audit log, and notification are mandatory. Break Glass does not bypass Full Rollback Anchor, mandatory safety gates, logging, or authentication.* |
 
 ---
 
@@ -125,10 +139,10 @@
 | **1. ID** | OD-PERM |
 | **2. Title** | Who may view / create / approve CPR jobs |
 | **3. Exact question** | Which roles may (1) view CPR status, (2) create CPR jobs, (3) approve CPR, (4) authorize PONR / release maintenance — and may country-scoped admins act only for their country? |
-| **4. Options** | **A)** View: restore viewers (country-scoped). Create: restore operators. Approve: distinct approver role. PONR/maint release: Super Admin only. Country scope enforced. **B)** Any Super Admin may do all steps alone. **C)** Owner-defined matrix: `________`. |
-| **5. Consequences** | A: least privilege + dual control. B: conflicts with OD-DUAL=A. C: custom. |
-| **6. Recommended** | **A** |
-| **7. Reason** | Fail closed; country isolation of authority. |
+| **4. Options** | **A)** Align with OWNER_APPROVED OD-DUAL: Country Admin may prepare C3–C8 / request restore; Super Admin only approves/executes/releases maint; viewers country-scoped. **B)** Broader roles. **C)** Owner-defined matrix. |
+| **5. Consequences** | Must not contradict OD-DUAL Workflow A/B. Super Admin may execute alone under Workflow A protections. |
+| **6. Recommended** | **A** (align to frozen OD-DUAL) |
+| **7. Reason** | Fail closed; country isolation; match owner-approved authority model. |
 | **8. Security** | Prevents cross-country authorization. |
 | **9–11** | Integrity/ops/rollback: process. |
 | **12. Required before** | P1: soft. Implementation: yes. Certification: yes. Enablement: yes. |
@@ -267,10 +281,10 @@
 | **1. ID** | OD-RUNBOOK |
 | **2. Title** | Required human sign-offs in the CPR runbook |
 | **3. Exact question** | Which human sign-offs are mandatory before PONR and before maintenance release? |
-| **4. Options** | **A)** Pre-PONR: operator checklist + approver + owner/delegate. Post-success: Super Admin maint release. **B)** Operator only. **C)** Owner-defined list. |
-| **5. Consequences** | A: matches dual control + acceptance. B: weak. |
-| **6. Recommended** | **A** |
-| **7. Reason** | Explicit operational accountability. |
+| **4. Options** | **A)** Align to OD-DUAL: Workflow A — Super Admin checklist + phrase/`RESTORE`/re-auth before execute; Workflow B — Country Admin prep sign-off then Super Admin approval/execute; post-success Super Admin maint release. **B)** Operator only. **C)** Owner-defined list. |
+| **5. Consequences** | Must match OWNER_APPROVED OD-DUAL (not dual Super Admin). B: weak. |
+| **6. Recommended** | **A** (align to frozen OD-DUAL) |
+| **7. Reason** | Explicit operational accountability under Super Admin / Country Admin model. |
 | **8–11** | Process. |
 | **12. Required before** | P1: soft. Implementation: yes. Certification: yes. Enablement: yes. |
 | **13. Status** | PROPOSED |
@@ -619,10 +633,10 @@ These are **already frozen** and must not be contradicted by any OD answer:
 
 | ID | Group | Recommended | Blocks P1? | Deferrable detail? | Blocks cert? | Blocks enable? |
 |----|-------|-------------|:----------:|:------------------:|:------------:|:--------------:|
-| OD-ENABLE | A | A | Y | N | Y | **Y** |
-| OD-DUAL | A | A | Y | N | Y | Y |
-| OD-PHRASE | A | A | soft | Y | Y | Y |
-| OD-BREAK | A | A | soft | partial | Y | Y |
+| OD-ENABLE | A | **OWNER_APPROVED** | Y | N | Y | **Y** |
+| OD-DUAL | A | **OWNER_APPROVED** (WF-A/B) | Y | N | Y | Y |
+| OD-PHRASE | A | **OWNER_APPROVED** (`RESTORE`) | Y | N | Y | Y |
+| OD-BREAK | A | **OWNER_APPROVED** | Y | N | Y | Y |
 | OD-PERM | A | A | soft | partial | Y | Y |
 | OD-CERT | A | A | soft | Y | **Y** | **Y** |
 | OD-MAINT | B | A | Y | N | Y | Y |
@@ -651,4 +665,4 @@ These are **already frozen** and must not be contradicted by any OD answer:
 
 ---
 
-*End of Owner Decision Register — P0b. All statuses PROPOSED. Owner answers via workshop document in a later phase. No P1. No implementation.*
+*End of Owner Decision Register — P0b. Group 1 frozen OWNER_APPROVED (OD-ENABLE, OD-DUAL, OD-PHRASE, OD-BREAK). Remaining statuses PROPOSED. No P1. No implementation.*
