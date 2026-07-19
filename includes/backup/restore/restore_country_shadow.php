@@ -24,7 +24,7 @@ require_once __DIR__ . '/restore_sql_runner.php';
 require_once __DIR__ . '/restore_country_staging.php';
 require_once __DIR__ . '/restore_paths.php';
 
-const ORANGE_COUNTRY_SHADOW_ENGINE_VERSION = '1.0';
+const ORANGE_COUNTRY_SHADOW_ENGINE_VERSION = '1.1';
 const ORANGE_COUNTRY_SHADOW_ENV_DB = 'ORANGE_RESTORE_COUNTRY_SHADOW_DB';
 const ORANGE_COUNTRY_SHADOW_DEFAULT_DB = 'orange_country_shadow';
 const ORANGE_COUNTRY_SHADOW_REPORT_FILE = 'country_shadow_restore_report.json';
@@ -328,62 +328,49 @@ function orange_country_shadow_build_import_plan(
 }
 
 /**
- * Capture survivor-country + Global baselines before mutate wipe (consumed by C7).
- * Fixture override: $GLOBALS['orange_country_shadow_baseline_override'].
+ * Capture survivor-country + Global baselines before target-slice clear (F-01).
+ * Shadow model (F-02): seeded multi-country; never synthetic empty seed as "proof".
  *
- * @return array{survivor:array<string,mixed>,global:array<string,mixed>}
+ * @return array{survivor:array<string,mixed>,global:array<string,mixed>,capture_mode:string}
  */
-function orange_country_shadow_write_pre_restore_baselines(PDO $pdo, string $runDir, int $countryId): array
-{
-    $survivor = [];
-    $global = [];
-    if (isset($GLOBALS['orange_country_shadow_baseline_override']) && is_callable($GLOBALS['orange_country_shadow_baseline_override'])) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_country_shadow_baseline_override'];
-        $captured = $fn($pdo, $countryId);
-        if (is_array($captured)) {
-            $survivor = is_array($captured['survivor'] ?? null) ? $captured['survivor'] : [];
-            $global = is_array($captured['global'] ?? null) ? $captured['global'] : [];
-        }
+function orange_country_shadow_write_pre_restore_baselines(
+    PDO $pdo,
+    string $runDir,
+    int $countryId,
+    string $projectRoot = ''
+): array {
+    if ($projectRoot === '') {
+        $projectRoot = dirname(__DIR__, 3);
     }
-    if ($survivor === [] && $global === []) {
-        // Deterministic empty-seeded marker: C7 requires non-empty baselines for READY.
-        // Live capture may extend; fixtures must supply override or C7 inject.
-        $survivor = [
-            '_seed' => ['count' => 0, 'hash' => hash('sha256', 'survivor_seed|' . $countryId)],
-        ];
-        $global = [
-            'journal_entries' => ['count' => 0, 'hash' => hash('sha256', 'journal_entries|empty')],
-            'orange_country_screen_copy_log' => ['count' => 0, 'hash' => hash('sha256', 'screen_copy_log|empty')],
-        ];
-    }
-    orange_backup_write_json($runDir . DIRECTORY_SEPARATOR . 'survivor_baseline.json', $survivor);
-    orange_backup_write_json($runDir . DIRECTORY_SEPARATOR . 'global_baseline.json', $global);
 
-    return ['survivor' => $survivor, 'global' => $global];
+    return orange_country_shadow_write_live_baselines($pdo, $runDir, $countryId, $projectRoot);
 }
 
 /**
+ * Target-slice clear only (F-02). Full-table DELETE of mutate tables is forbidden.
+ *
  * @param list<string> $tables
+ * @param array<string, mixed>|null $matrix
  */
-function orange_country_shadow_clear_tables(PDO $pdo, string $shadowDb, string $productionDb, array $tables): void
-{
-    if (isset($GLOBALS['orange_country_shadow_wipe_override']) && is_callable($GLOBALS['orange_country_shadow_wipe_override'])) {
-        /** @var callable $fn */
-        $fn = $GLOBALS['orange_country_shadow_wipe_override'];
-        $fn($pdo, $shadowDb, $tables);
-
-        return;
+function orange_country_shadow_clear_tables(
+    PDO $pdo,
+    string $shadowDb,
+    string $productionDb,
+    array $tables,
+    int $countryId = 0,
+    ?array $matrix = null,
+    string $projectRoot = ''
+): void {
+    if ($projectRoot === '') {
+        $projectRoot = dirname(__DIR__, 3);
     }
-    orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
-    $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
-    foreach ($tables as $tableName) {
-        orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
-        $quoted = '`' . str_replace('`', '``', $tableName) . '`';
-        $pdo->exec('DELETE FROM ' . $quoted);
+    if ($matrix === null) {
+        $matrix = orange_country_boundary_matrix_load($projectRoot);
     }
-    $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
-    orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
+    if ($countryId <= 0) {
+        throw new RuntimeException('country_shadow_clear_requires_country_id');
+    }
+    orange_country_shadow_clear_target_slice($pdo, $shadowDb, $productionDb, $tables, $countryId, $matrix);
 }
 
 /**
@@ -669,15 +656,34 @@ function orange_country_shadow_run(array $options): array
 
     $meta['status'] = ORANGE_COUNTRY_SHADOW_STATUS_RUNNING;
     $meta['country_id'] = $countryId;
+    $meta['shadow_model'] = ORANGE_COUNTRY_SHADOW_MODEL;
     orange_backup_write_json($runDir . DIRECTORY_SEPARATOR . ORANGE_COUNTRY_SHADOW_META_FILE, $meta);
+
+    $lock = orange_country_shadow_acquire_lock($workRoot, $runId, $shadowDb);
+    if (!$lock['ok']) {
+        return $fail((string) ($lock['code'] ?? 'country_shadow_lock_held'), [
+            'country_id' => $countryId,
+            'codes' => [(string) ($lock['code'] ?? 'country_shadow_lock_held')],
+        ]);
+    }
 
     try {
         $pdo = orange_country_shadow_connect_pdo($projectRoot, $env, $shadowDb);
         orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
-        // Pre-restore baselines for C7 survivor/global integrity (no production write).
-        orange_country_shadow_write_pre_restore_baselines($pdo, $runDir, $countryId);
+        // F-01: live survivor/global baselines before target-slice clear.
+        orange_country_shadow_write_pre_restore_baselines($pdo, $runDir, $countryId, $projectRoot);
         orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
-        orange_country_shadow_clear_tables($pdo, $shadowDb, $productionDb, $importPlan['delete_order_tables']);
+        // F-02: country-scoped target-slice clear only.
+        $matrix = orange_country_boundary_matrix_load($projectRoot);
+        orange_country_shadow_clear_tables(
+            $pdo,
+            $shadowDb,
+            $productionDb,
+            $importPlan['delete_order_tables'],
+            $countryId,
+            $matrix,
+            $projectRoot
+        );
         orange_country_shadow_assert_not_production($pdo, $shadowDb, $productionDb);
         $importResult = orange_country_shadow_import_sql($pdo, $importPlan['import_files'], $shadowDb, $productionDb);
         if (!$importResult['ok']) {
@@ -732,6 +738,7 @@ function orange_country_shadow_run(array $options): array
             'verify_engine_version' => ORANGE_CRP_VERIFY_ENGINE_VERSION,
             'drv_engine_version' => ORANGE_COUNTRY_DRV_ENGINE_VERSION,
             'shadow_db' => $shadowDb,
+            'shadow_model' => ORANGE_COUNTRY_SHADOW_MODEL,
             'status' => ORANGE_COUNTRY_SHADOW_STATUS_READY,
             'overall_result' => 'pass',
             'tables_restored' => count($importPlan['tables']),
@@ -764,6 +771,8 @@ function orange_country_shadow_run(array $options): array
         }
 
         return $fail($code, ['country_id' => $countryId, 'codes' => [$code]]);
+    } finally {
+        orange_country_shadow_release_lock($workRoot, $runId);
     }
 }
 
@@ -799,3 +808,5 @@ function orange_country_shadow_status(string $workRoot, string $runId): array
         'country_production_restore_enabled' => false,
     ];
 }
+
+require_once __DIR__ . '/restore_country_shadow_integrity.php';

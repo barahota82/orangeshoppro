@@ -38,7 +38,8 @@ Reject unless all hold:
 - **No** production writes  
 - **No** shadow writes  
 - **No** imports / deletes  
-- Impact derived from: boundary matrix, package inventory / id snapshot, C6 row counts, C7 integrity, uploads zip entry count  
+- **F-04:** Impact requires a **certified read-only production inventory** (`production_inventory_snapshot.json` with `certified_read_only=true`, or inject / gated live SELECT counts). Missing → `production_inventory_snapshot_missing`.  
+- Rows to delete/replace use **production target counts** from that inventory (not C6 shadow counts alone). Package inventory drives inserts.  
 
 Predicted impacts that must stay **zero**:
 
@@ -62,6 +63,8 @@ Key fields:
 | `special_handlers` | e.g. sequences, admins composite |
 | `estimated_duration` | Heuristic duration |
 | `survivor_country_impact` / `global_impact` | Must be `0` for SAFE |
+| `production_inventory_source` | `certified_snapshot` \| `inject` \| `live_read_only` |
+| `production_target_row_total` | Sum of production target-country row counts |
 | `blocking_reason_codes` | Stable FAIL codes |
 | `simulation_only` | Always `true` |
 

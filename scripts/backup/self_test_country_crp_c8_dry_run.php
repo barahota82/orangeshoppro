@@ -156,6 +156,25 @@ function c8_install_mocks(): void
             ],
         ];
     };
+    $GLOBALS['orange_country_shadow_c7_probe_override'] = static function () {
+        return [
+            'probe_mode' => 'override',
+            'survivor_current' => [
+                'orders' => ['count' => 2, 'hash' => hash('sha256', 'survivor_orders')],
+            ],
+            'global_current' => [
+                'journal_entries' => ['count' => 0, 'hash' => hash('sha256', 'je0')],
+                'product_taxonomy_nodes' => ['count' => 3, 'hash' => hash('sha256', 'tax3')],
+            ],
+            'boundary_violations' => [],
+            'accounting_ok' => true,
+            'stock_fifo_ok' => true,
+            'composite_ok' => true,
+            'accounting_codes' => [],
+            'stock_fifo_codes' => [],
+            'composite_codes' => [],
+        ];
+    };
 }
 
 function c8_clear_mocks(): void
@@ -169,7 +188,9 @@ function c8_clear_mocks(): void
         $GLOBALS['orange_country_shadow_import_override'],
         $GLOBALS['orange_country_shadow_verify_override'],
         $GLOBALS['orange_country_shadow_baseline_override'],
-        $GLOBALS['orange_country_shadow_c7_probe_override']
+        $GLOBALS['orange_country_shadow_c7_probe_override'],
+        $GLOBALS['orange_country_shadow_lock_override'],
+        $GLOBALS['orange_country_dry_run_production_inventory_override']
     );
 }
 
@@ -225,6 +246,20 @@ try {
     ]);
     c8_assert(($c7['overall_result'] ?? '') === 'READY', 'C7 READY for dry-run entry');
 
+    // F-04: missing certified production inventory → FAIL
+    $missingInv = c8_run($projectRoot, $backupRoot, $workRoot, $jobId);
+    c8_assert(c8_has($missingInv, 'production_inventory_snapshot_missing'), 'F-04 missing production inventory fails');
+
+    // F-04: write certified read-only snapshot then SAFE
+    orange_country_dry_run_write_certified_snapshot(
+        $workRoot,
+        $jobId,
+        1,
+        ['orders' => 5, 'accounts' => 2],
+        ['orders' => 9],
+        ['journal_entries' => 0, 'product_taxonomy_nodes' => 3]
+    );
+
     // SAFE
     $safe = c8_run($projectRoot, $backupRoot, $workRoot, $jobId);
     c8_assert(($safe['overall_result'] ?? '') === 'SAFE', 'SAFE dry-run');
@@ -238,6 +273,8 @@ try {
     c8_assert(($rep['execution_performed'] ?? true) === false, 'execution_performed false');
     c8_assert(($rep['simulation_only'] ?? false) === true, 'simulation_only true');
     c8_assert((int) ($rep['rows_to_insert'] ?? 0) >= 1, 'rows_to_insert calculated');
+    c8_assert(($rep['production_inventory_source'] ?? '') === 'certified_snapshot', 'F-04 impact uses certified snapshot');
+    c8_assert((int) ($rep['rows_to_delete'] ?? 0) >= 5, 'F-04 rows_to_delete from production target counts');
     c8_assert(is_array($rep['composite_units'] ?? null) && count($rep['composite_units']) >= 1, 'composite_units present');
     c8_assert(is_array($rep['special_handlers'] ?? null), 'special_handlers present');
     c8_assert(isset($rep['estimated_duration']), 'estimated_duration present');

@@ -20,7 +20,7 @@ require_once __DIR__ . '/restore_country_shadow.php';
 require_once __DIR__ . '/restore_country_shadow_verify.php';
 require_once __DIR__ . '/restore_paths.php';
 
-const ORANGE_COUNTRY_DRY_RUN_ENGINE_VERSION = '1.0';
+const ORANGE_COUNTRY_DRY_RUN_ENGINE_VERSION = '1.1';
 const ORANGE_COUNTRY_DRY_RUN_REPORT_FILE = 'country_dry_run_report.json';
 const ORANGE_COUNTRY_DRY_RUN_META_FILE = 'country_dry_run.json';
 
@@ -301,12 +301,44 @@ function orange_country_dry_run_execute(array $options): array
     }
     $add('versions', 'PASS', null, 'Fingerprint and policy versions unchanged');
 
-    // --- Impact simulation (read-only; no DB/shadow writes) ---
+    // --- Impact simulation (F-04: certified production inventory; no writes) ---
     $matrix = orange_country_boundary_matrix_load($projectRoot);
     $inventory = orange_country_dry_run_read_json($packagePath . DIRECTORY_SEPARATOR . 'table_inventory.json');
     $idSnapshot = orange_country_dry_run_read_json($packagePath . DIRECTORY_SEPARATOR . 'id_snapshot.json');
     $c6Report = orange_country_dry_run_read_json(
         $runDir . DIRECTORY_SEPARATOR . ORANGE_COUNTRY_SHADOW_REPORT_FILE
+    );
+
+    $prodInv = orange_country_dry_run_load_production_inventory(
+        $projectRoot,
+        $workRoot,
+        $jobId,
+        $countryId,
+        $env,
+        $inject
+    );
+    if (!$prodInv['ok']) {
+        $add(
+            'prod_inv',
+            'FAIL',
+            (string) ($prodInv['code'] ?? 'production_inventory_snapshot_missing'),
+            'Certified read-only production inventory required for dry-run impact',
+            true
+        );
+
+        return $finish(ORANGE_COUNTRY_DRY_RUN_STATUS_FAILED, 'FAIL', $emptyImpact, [
+            'package_id' => $packageId,
+            'country_id' => $countryId,
+            'schema_revision' => (int) ($manifest['schema_revision'] ?? 0),
+            'package_fingerprint' => $fingerprint,
+            'c7_readiness_score' => (int) ($c7['readiness_score'] ?? 0),
+        ]);
+    }
+    $add(
+        'prod_inv',
+        'PASS',
+        null,
+        'Production inventory source: ' . (string) ($prodInv['source'] ?? 'unknown')
     );
 
     $impact = orange_country_dry_run_compute_impact(
@@ -317,7 +349,8 @@ function orange_country_dry_run_execute(array $options): array
         $c7,
         $packagePath,
         $countryId,
-        $inject
+        $inject,
+        $prodInv
     );
 
     // Predicted contamination / safety failures
@@ -426,6 +459,7 @@ function orange_country_dry_run_execute(array $options): array
  * @param array<string, mixed> $c6Report
  * @param array<string, mixed> $c7
  * @param array<string, mixed> $inject
+ * @param array<string, mixed> $prodInv certified / inject production inventory
  * @return array<string, mixed>
  */
 function orange_country_dry_run_compute_impact(
@@ -436,14 +470,17 @@ function orange_country_dry_run_compute_impact(
     array $c7,
     string $packagePath,
     int $countryId,
-    array $inject
+    array $inject,
+    array $prodInv = []
 ): array {
     $tablesMeta = is_array($matrix['tables'] ?? null) ? $matrix['tables'] : [];
     $invTables = is_array($inventory['tables'] ?? null) ? $inventory['tables'] : [];
-    $c6Counts = is_array($c6Report['row_counts'] ?? null) ? $c6Report['row_counts'] : [];
+    // F-04: production target counts drive delete/replace impact (not C6 shadow counts alone).
+    $prodTarget = is_array($prodInv['target_counts'] ?? null) ? $prodInv['target_counts'] : [];
     if (is_array($inject['target_row_counts'] ?? null)) {
-        $c6Counts = $inject['target_row_counts'];
+        $prodTarget = $inject['target_row_counts'];
     }
+    $c6Counts = is_array($c6Report['row_counts'] ?? null) ? $c6Report['row_counts'] : [];
 
     $tablesAffected = [];
     $rowsInsert = 0;
@@ -463,9 +500,9 @@ function orange_country_dry_run_compute_impact(
         if (!in_array($mode, ['replace', 'special'], true)) {
             continue;
         }
-        // Only count mutate/exportable tables with package presence or known target rows
+        // Only count mutate/exportable tables with package presence or known production target rows
         $pkgCount = (int) ($invTables[$tableName] ?? 0);
-        $curCount = (int) ($c6Counts[$tableName] ?? 0);
+        $curCount = (int) ($prodTarget[$tableName] ?? ($c6Counts[$tableName] ?? 0));
         $inSnapshot = !empty($idSnapshot['tables'][$tableName]);
         if ($pkgCount <= 0 && $curCount <= 0 && !$inSnapshot) {
             continue;
@@ -491,12 +528,18 @@ function orange_country_dry_run_compute_impact(
         foreach ($invTables as $t => $cnt) {
             $tablesAffected[] = (string) $t;
             $n = (int) $cnt;
-            $cur = (int) ($c6Counts[$t] ?? $n);
+            $cur = (int) ($prodTarget[$t] ?? ($c6Counts[$t] ?? $n));
             $rowsInsert += $n;
             $rowsDelete += $cur;
             $rowsReplace += min($n, $cur);
         }
     }
+
+    // Country-scoped model: outside-target impact is zero unless inject forces a regression case.
+    $survivorImpact = (int) ($inject['survivor_country_impact'] ?? 0);
+    $globalImpact = (int) ($inject['global_impact'] ?? 0);
+    $jeImpact = (int) ($inject['journal_entries_impact'] ?? 0);
+    $fullOnlyImpact = (int) ($inject['full_only_impact'] ?? 0);
 
     $uploadsReplace = 0;
     $uploadsAdd = 0;
@@ -544,10 +587,21 @@ function orange_country_dry_run_compute_impact(
         'special_handlers' => $specialHandlers,
         'estimated_duration_seconds' => $seconds,
         'estimated_duration' => orange_country_dry_run_duration_human($seconds),
-        'survivor_country_impact' => (int) ($inject['survivor_country_impact'] ?? 0),
-        'global_impact' => (int) ($inject['global_impact'] ?? 0),
-        'journal_entries_impact' => (int) ($inject['journal_entries_impact'] ?? 0),
-        'full_only_impact' => (int) ($inject['full_only_impact'] ?? 0),
+        'survivor_country_impact' => $survivorImpact,
+        'global_impact' => $globalImpact,
+        'journal_entries_impact' => $jeImpact,
+        'full_only_impact' => $fullOnlyImpact,
+        'production_inventory_source' => (string) ($prodInv['source'] ?? 'unknown'),
+        'production_target_row_total' => array_sum(array_map('intval', $prodTarget)),
+        'production_survivor_row_total' => array_sum(array_map(
+            'intval',
+            is_array($prodInv['survivor_counts'] ?? null) ? $prodInv['survivor_counts'] : []
+        )),
+        'production_global_row_total' => array_sum(array_map(
+            'intval',
+            is_array($prodInv['global_counts'] ?? null) ? $prodInv['global_counts'] : []
+        )),
+        'shadow_model' => ORANGE_COUNTRY_SHADOW_MODEL,
         'target_country_change_summary' => [
             'tables' => count(array_unique($tablesAffected)),
             'rows_insert' => $rowsInsert,

@@ -157,6 +157,26 @@ function c7_install_c6_mocks(): void
             ],
         ];
     };
+    // F-01: live probe matching baselines (never fall back to baseline as current).
+    $GLOBALS['orange_country_shadow_c7_probe_override'] = static function () {
+        return [
+            'probe_mode' => 'override',
+            'survivor_current' => [
+                'orders' => ['count' => 2, 'hash' => hash('sha256', 'survivor_orders')],
+            ],
+            'global_current' => [
+                'journal_entries' => ['count' => 0, 'hash' => hash('sha256', 'je0')],
+                'product_taxonomy_nodes' => ['count' => 3, 'hash' => hash('sha256', 'tax3')],
+            ],
+            'boundary_violations' => [],
+            'accounting_ok' => true,
+            'stock_fifo_ok' => true,
+            'composite_ok' => true,
+            'accounting_codes' => [],
+            'stock_fifo_codes' => [],
+            'composite_codes' => [],
+        ];
+    };
 }
 
 function c7_clear_mocks(): void
@@ -170,7 +190,8 @@ function c7_clear_mocks(): void
         $GLOBALS['orange_country_shadow_import_override'],
         $GLOBALS['orange_country_shadow_verify_override'],
         $GLOBALS['orange_country_shadow_baseline_override'],
-        $GLOBALS['orange_country_shadow_c7_probe_override']
+        $GLOBALS['orange_country_shadow_c7_probe_override'],
+        $GLOBALS['orange_country_shadow_lock_override']
     );
 }
 
@@ -267,13 +288,53 @@ try {
     $r = c7_run_verify($projectRoot, $backupRoot, $workRoot, $jobId, ['survivor_deleted' => true]);
     c7_assert(c7_has($r, 'survivor_country_row_deleted'), 'survivor-country row deleted');
 
-    // Survivor-country row modified
+    // Survivor-country row modified (inject current ≠ baseline; probe still supplies global)
     $r = c7_run_verify($projectRoot, $backupRoot, $workRoot, $jobId, [
         'survivor_current' => [
             'orders' => ['count' => 2, 'hash' => 'tampered'],
         ],
+        'global_current' => [
+            'journal_entries' => ['count' => 0, 'hash' => hash('sha256', 'je0')],
+            'product_taxonomy_nodes' => ['count' => 3, 'hash' => hash('sha256', 'tax3')],
+        ],
     ]);
     c7_assert(c7_has($r, 'survivor_country_row_modified'), 'survivor-country row modified');
+
+    // F-01: missing live currents → refuse tautological PASS
+    $prevProbe = $GLOBALS['orange_country_shadow_c7_probe_override'] ?? null;
+    $GLOBALS['orange_country_shadow_c7_probe_override'] = static function () {
+        return ['probe_mode' => 'override']; // no survivor_current / global_current
+    };
+    $r = c7_run_verify($projectRoot, $backupRoot, $workRoot, $jobId);
+    c7_assert(
+        c7_has($r, 'survivor_probe_unavailable') || c7_has($r, 'global_probe_unavailable'),
+        'F-01 refuses PASS without live probe currents'
+    );
+    $GLOBALS['orange_country_shadow_c7_probe_override'] = $prevProbe;
+
+    // F-03: live SQL accounting failure via probe codes
+    $GLOBALS['orange_country_shadow_c7_probe_override'] = static function () {
+        return [
+            'probe_mode' => 'override',
+            'survivor_current' => [
+                'orders' => ['count' => 2, 'hash' => hash('sha256', 'survivor_orders')],
+            ],
+            'global_current' => [
+                'journal_entries' => ['count' => 0, 'hash' => hash('sha256', 'je0')],
+                'product_taxonomy_nodes' => ['count' => 3, 'hash' => hash('sha256', 'tax3')],
+            ],
+            'accounting_ok' => false,
+            'accounting_codes' => ['gl_graph_unbalanced'],
+            'stock_fifo_ok' => true,
+            'composite_ok' => true,
+            'stock_fifo_codes' => [],
+            'composite_codes' => [],
+            'boundary_violations' => [],
+        ];
+    };
+    $r = c7_run_verify($projectRoot, $backupRoot, $workRoot, $jobId);
+    c7_assert(c7_has($r, 'gl_graph_unbalanced'), 'F-03 live SQL accounting code fails C7');
+    $GLOBALS['orange_country_shadow_c7_probe_override'] = $prevProbe;
 
     // Global table changed
     $r = c7_run_verify($projectRoot, $backupRoot, $workRoot, $jobId, ['global_changed' => true]);

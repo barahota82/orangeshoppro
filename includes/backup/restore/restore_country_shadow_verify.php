@@ -20,7 +20,7 @@ require_once __DIR__ . '/restore_country_shadow.php';
 require_once __DIR__ . '/restore_shadow_db.php';
 require_once __DIR__ . '/restore_paths.php';
 
-const ORANGE_COUNTRY_SHADOW_VERIFY_ENGINE_VERSION = '1.0';
+const ORANGE_COUNTRY_SHADOW_VERIFY_ENGINE_VERSION = '1.1';
 const ORANGE_COUNTRY_SHADOW_VERIFY_REPORT_FILE = 'country_shadow_verification_report.json';
 const ORANGE_COUNTRY_SHADOW_VERIFY_META_FILE = 'country_shadow_verification.json';
 const ORANGE_COUNTRY_SHADOW_SURVIVOR_BASELINE_FILE = 'survivor_baseline.json';
@@ -317,8 +317,18 @@ function orange_country_shadow_verify_run(array $options): array
         $add('db_identity', 'PASS', null, 'Shadow DB identity OK');
     }
 
-    // Connect probe (read-only verification)
-    $probe = orange_country_shadow_verify_load_probe($projectRoot, $env, $shadowDb, $inject);
+    // F-01: live probe required (no tautological baseline fallback).
+    $probe = orange_country_shadow_verify_load_probe($projectRoot, $env, $shadowDb, $inject, $countryId);
+    $hasInjectCurrents = is_array($inject['survivor_current'] ?? null) && is_array($inject['global_current'] ?? null);
+    $probeUsable = (($probe['probe_mode'] ?? '') !== '')
+        || is_array($probe['survivor_current'] ?? null)
+        || $hasInjectCurrents
+        || is_array($inject['probe'] ?? null);
+    if (!$probeUsable) {
+        $add('probe', 'FAIL', 'live_probe_unavailable', 'Live shadow probe unavailable', true);
+    } else {
+        $add('probe', 'PASS', null, 'Shadow probe available (' . (string) ($probe['probe_mode'] ?? ($hasInjectCurrents ? 'inject_currents' : 'inject')) . ')');
+    }
 
     // --- 2. Boundary ---
     $targetOk = true;
@@ -341,10 +351,7 @@ function orange_country_shadow_verify_run(array $options): array
         }
     }
     if ($targetOk && empty($blockers)) {
-        // soft pass when no inject/probe issues
-        if (!array_intersect($blockers, ['target_country_row_missing', 'cross_country_row_inserted', 'null_ownership_leakage'])) {
-            $add('boundary', 'PASS', null, 'Boundary checks OK');
-        }
+        $add('boundary', 'PASS', null, 'Boundary checks OK');
     }
     $integrity['target_country_integrity'] = (
         !in_array('target_country_row_missing', $blockers, true)
@@ -353,20 +360,26 @@ function orange_country_shadow_verify_run(array $options): array
         && $targetOk
     ) ? 'PASS' : 'FAIL';
 
-    // --- 3. Survivor preservation ---
+    // --- 3. Survivor preservation (live current required) ---
     $survivorBaseline = orange_country_shadow_verify_read_json(
         $runDir . DIRECTORY_SEPARATOR . ORANGE_COUNTRY_SHADOW_SURVIVOR_BASELINE_FILE
     );
     if ($survivorBaseline === [] && is_array($inject['survivor_baseline'] ?? null)) {
         $survivorBaseline = $inject['survivor_baseline'];
     }
-    $survivorCurrent = is_array($inject['survivor_current'] ?? null)
-        ? $inject['survivor_current']
-        : (is_array($probe['survivor_current'] ?? null) ? $probe['survivor_current'] : $survivorBaseline);
+    $survivorCurrent = null;
+    if (is_array($inject['survivor_current'] ?? null)) {
+        $survivorCurrent = $inject['survivor_current'];
+    } elseif (is_array($probe['survivor_current'] ?? null)) {
+        $survivorCurrent = $probe['survivor_current'];
+    }
 
     $survivorOk = true;
     if ($survivorBaseline === []) {
         $add('survivor_baseline', 'FAIL', 'survivor_baseline_missing', 'Survivor baseline missing — cannot prove preservation', true);
+        $survivorOk = false;
+    } elseif ($survivorCurrent === null) {
+        $add('survivor_probe', 'FAIL', 'survivor_probe_unavailable', 'Live survivor probe missing — refuse tautological PASS', true);
         $survivorOk = false;
     } else {
         if (!empty($inject['survivor_deleted'])) {
@@ -392,25 +405,31 @@ function orange_country_shadow_verify_run(array $options): array
             }
         }
         if ($survivorOk) {
-            $add('survivor', 'PASS', null, 'Survivor-country integrity OK');
+            $add('survivor', 'PASS', null, 'Survivor-country integrity OK (live probe)');
         }
     }
     $integrity['survivor_country_integrity'] = $survivorOk ? 'PASS' : 'FAIL';
 
-    // --- Global state ---
+    // --- Global state (live current required) ---
     $globalBaseline = orange_country_shadow_verify_read_json(
         $runDir . DIRECTORY_SEPARATOR . ORANGE_COUNTRY_SHADOW_GLOBAL_BASELINE_FILE
     );
     if ($globalBaseline === [] && is_array($inject['global_baseline'] ?? null)) {
         $globalBaseline = $inject['global_baseline'];
     }
-    $globalCurrent = is_array($inject['global_current'] ?? null)
-        ? $inject['global_current']
-        : (is_array($probe['global_current'] ?? null) ? $probe['global_current'] : $globalBaseline);
+    $globalCurrent = null;
+    if (is_array($inject['global_current'] ?? null)) {
+        $globalCurrent = $inject['global_current'];
+    } elseif (is_array($probe['global_current'] ?? null)) {
+        $globalCurrent = $probe['global_current'];
+    }
 
     $globalOk = true;
     if ($globalBaseline === []) {
         $add('global_baseline', 'FAIL', 'global_baseline_missing', 'Global baseline missing', true);
+        $globalOk = false;
+    } elseif ($globalCurrent === null) {
+        $add('global_probe', 'FAIL', 'global_probe_unavailable', 'Live global probe missing — refuse tautological PASS', true);
         $globalOk = false;
     } else {
         if (!empty($inject['global_changed'])) {
@@ -439,7 +458,7 @@ function orange_country_shadow_verify_run(array $options): array
             }
         }
         if ($globalOk) {
-            $add('global', 'PASS', null, 'Global-state integrity OK');
+            $add('global', 'PASS', null, 'Global-state integrity OK (live probe)');
         }
     }
     $integrity['global_state_integrity'] = $globalOk ? 'PASS' : 'FAIL';
@@ -459,7 +478,7 @@ function orange_country_shadow_verify_run(array $options): array
     }
     $integrity['dependency_integrity'] = $depOk ? 'PASS' : 'FAIL';
 
-    // --- 5. Composites ---
+    // --- 5. Composites (F-03: live SQL + inject regression hooks) ---
     $compositeOk = true;
     $compositeMap = [
         'incomplete_admin_composite' => 'incomplete_admin_composite',
@@ -481,12 +500,19 @@ function orange_country_shadow_verify_run(array $options): array
         $add('comp_missing', 'FAIL', 'missing_composite_member', 'Missing composite member', true);
         $compositeOk = false;
     }
+    foreach ((array) ($probe['composite_codes'] ?? []) as $code) {
+        $add('comp_sql_' . md5((string) $code), 'FAIL', (string) $code, 'Live SQL composite failure', true);
+        $compositeOk = false;
+    }
+    if (array_key_exists('composite_ok', $probe) && $probe['composite_ok'] === false) {
+        $compositeOk = false;
+    }
     if ($compositeOk) {
-        $add('composites', 'PASS', null, 'Composite units complete');
+        $add('composites', 'PASS', null, 'Composite units complete (live SQL)');
     }
     $integrity['composite_integrity'] = $compositeOk ? 'PASS' : 'FAIL';
 
-    // --- 6. Accounting ---
+    // --- 6. Accounting (F-03 live SQL) ---
     $acctOk = true;
     foreach (['gl_imbalance' => 'gl_graph_unbalanced', 'missing_account' => 'missing_account', 'accounting_uncertainty' => 'accounting_boundary_not_proven'] as $inj => $code) {
         if (!empty($inject[$inj])) {
@@ -494,12 +520,19 @@ function orange_country_shadow_verify_run(array $options): array
             $acctOk = false;
         }
     }
+    foreach ((array) ($probe['accounting_codes'] ?? []) as $code) {
+        $add('acct_sql_' . md5((string) $code), 'FAIL', (string) $code, 'Live SQL accounting failure', true);
+        $acctOk = false;
+    }
+    if (array_key_exists('accounting_ok', $probe) && $probe['accounting_ok'] === false) {
+        $acctOk = false;
+    }
     if ($acctOk) {
-        $add('accounting', 'PASS', null, 'Accounting integrity OK');
+        $add('accounting', 'PASS', null, 'Accounting integrity OK (live SQL)');
     }
     $integrity['accounting_integrity'] = $acctOk ? 'PASS' : 'FAIL';
 
-    // --- 7. Stock/FIFO ---
+    // --- 7. Stock/FIFO (F-03 live SQL) ---
     $stockOk = true;
     foreach ([
         'warehouse_ownership_mismatch' => 'stock_warehouse_ownership_mismatch',
@@ -512,11 +545,18 @@ function orange_country_shadow_verify_run(array $options): array
             $stockOk = false;
         }
     }
+    foreach ((array) ($probe['stock_fifo_codes'] ?? []) as $code) {
+        $add('stock_sql_' . md5((string) $code), 'FAIL', (string) $code, 'Live SQL stock/FIFO failure', true);
+        $stockOk = false;
+    }
+    if (array_key_exists('stock_fifo_ok', $probe) && $probe['stock_fifo_ok'] === false) {
+        $stockOk = false;
+    }
     if (!empty($inject['legacy_mirror_diff'])) {
         $add('stock_mirror', 'WARNING', 'legacy_mirror_difference', 'Legacy stock mirror difference');
     }
     if ($stockOk) {
-        $add('stock_fifo', 'PASS', null, 'Stock/FIFO integrity OK');
+        $add('stock_fifo', 'PASS', null, 'Stock/FIFO integrity OK (live SQL)');
     }
     $integrity['stock_fifo_integrity'] = $stockOk ? 'PASS' : 'FAIL';
 
@@ -726,20 +766,42 @@ function orange_country_shadow_verify_load_probe(
     string $projectRoot,
     array $env,
     string $shadowDb,
-    array $inject
+    array $inject,
+    int $countryId = 0
 ): array {
     if (isset($GLOBALS['orange_country_shadow_c7_probe_override']) && is_callable($GLOBALS['orange_country_shadow_c7_probe_override'])) {
         /** @var callable $fn */
         $fn = $GLOBALS['orange_country_shadow_c7_probe_override'];
         $probe = $fn($projectRoot, $env, $shadowDb, $inject);
+        if (is_array($probe)) {
+            if (!isset($probe['probe_mode'])) {
+                $probe['probe_mode'] = 'override';
+            }
 
-        return is_array($probe) ? $probe : [];
+            return $probe;
+        }
+
+        return [];
     }
     if (is_array($inject['probe'] ?? null)) {
-        return $inject['probe'];
+        $probe = $inject['probe'];
+        if (!isset($probe['probe_mode'])) {
+            $probe['probe_mode'] = 'inject';
+        }
+
+        return $probe;
     }
-    // Default empty probe — fixture tests supply inject/baselines; live path may extend later.
-    return [];
+    // F-01/F-03: live read-only probe against Country Shadow DB (never production).
+    try {
+        $pdo = orange_country_shadow_connect_pdo($projectRoot, $env, $shadowDb);
+        if ($countryId <= 0) {
+            return ['probe_mode' => '', 'error' => 'country_id_required'];
+        }
+
+        return orange_country_shadow_live_probe($pdo, $countryId, $projectRoot);
+    } catch (Throwable $e) {
+        return ['probe_mode' => '', 'error' => 'live_probe_connect_failed'];
+    }
 }
 
 /** @return array<string, mixed> */

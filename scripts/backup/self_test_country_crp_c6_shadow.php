@@ -194,9 +194,12 @@ try {
     c6_assert(($report['report_type'] ?? '') === 'country_shadow_restore', 'report type');
     c6_assert(($report['execution_performed'] ?? true) === false, 'execution_performed false');
     c6_assert(($report['country_production_restore_enabled'] ?? true) === false, 'restore disabled in report');
+    c6_assert(($report['shadow_model'] ?? '') === ORANGE_COUNTRY_SHADOW_MODEL, 'F-02 shadow_model recorded');
+    c6_assert(($report['shadow_model'] ?? '') === 'seeded_multicountry_target_slice', 'F-02 target-slice model');
     $c6RunDir = orange_country_shadow_run_dir($workRoot, (string) $result['run_id']);
     c6_assert(is_file($c6RunDir . '/survivor_baseline.json'), 'pre-restore survivor baseline written');
     c6_assert(is_file($c6RunDir . '/global_baseline.json'), 'pre-restore global baseline written');
+    c6_assert(is_file($c6RunDir . '/baseline_capture_meta.json'), 'F-01 baseline capture meta written');
 
     // Status GET helper
     $status = orange_country_shadow_status($workRoot, (string) $result['run_id']);

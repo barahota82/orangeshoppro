@@ -29,12 +29,16 @@ Reject when any of:
 
 ## Shadow strategy
 
+**Shadow model (Remediation Sprint 1 / F-02):** `seeded_multicountry_target_slice`
+
 | Item | Value |
 |------|--------|
 | Target DB | `ORANGE_RESTORE_COUNTRY_SHADOW_DB` (default `orange_country_shadow`) |
 | Credentials | Staging restore credentials (never production DSN) |
 | Safety | Before every destructive step: session DB ≠ production and session DB = shadow |
-| Clear | DELETE mutate tables in reverse batch order (shadow sandbox only) |
+| Clear | **Target-slice only** — `DELETE … WHERE country_id = ?` (and scoped ownership resolvers). **Never** full-table wipe of mutate tables. Global / never-export never cleared. |
+| Lock | Exclusive `flock` on `.country_shadow_restore.lock` (F-05); code `country_shadow_lock_held` |
+| Baselines | Live survivor + Global capture **before** clear → `survivor_baseline.json` / `global_baseline.json` / `baseline_capture_meta.json` (F-01) |
 | Import | SQL chunks in restore batches **1→6** (matrix + dependency graph) |
 | Scope | Country Scoped + Mixed exportable tables only; never Global / Full-only / `journal_entries` |
 
