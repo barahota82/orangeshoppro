@@ -227,6 +227,28 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     </dl>
     <div id="rc_country_shadow_blockers" class="muted" style="margin-top:8px;"></div>
 </div>
+<div class="rc-section card" id="rc_country_dry_run_section">
+    <h3>Country Dry Run (C8) — عرض فقط</h3>
+    <p class="rc-readonly-banner" role="status" style="margin:0 0 10px;">
+        <strong>محاكاة استعادة الدولة فقط.</strong>
+        لا كتابة إنتاج، لا كتابة ظل، لا Import / Restore / Execute / Approval / Maintenance / Rollback.
+        التشغيل عبر CLI: <code>country_dry_run.php --job=…</code>
+    </p>
+    <div class="rc-actions" style="margin-bottom:10px;">
+        <label for="rc_c8_job_id" class="muted">Job / run_id</label>
+        <input type="text" id="rc_c8_job_id" placeholder="kw_YYYY-MM-DD_HHMMSS" style="min-width:220px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;">
+        <button type="button" class="btn-link" id="rc_c8_load_btn">عرض تقرير Dry Run</button>
+    </div>
+    <dl id="rc_country_dry_run" class="rc-status-strip">
+        <div><dt>النتيجة</dt><dd>—</dd></div>
+        <div><dt>Tables</dt><dd>—</dd></div>
+        <div><dt>Rows insert/delete</dt><dd>—</dd></div>
+        <div><dt>Survivor impact</dt><dd>—</dd></div>
+        <div><dt>Global impact</dt><dd>—</dd></div>
+        <div><dt>Duration</dt><dd>—</dd></div>
+    </dl>
+    <div id="rc_country_dry_run_blockers" class="muted" style="margin-top:8px;"></div>
+</div>
 <?php endif; ?>
 
 <div class="rc-section card">
@@ -294,10 +316,10 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     const badge = (status) => {
         const s = String(status || '').toLowerCase();
         let cls = 'rc-badge--muted';
-        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed' || s === 'approved_waiting_execution' || s === 'pre_restore_backup_ready' || s === 'shadow_restore_ready' || s === 'shadow_verified' || s === 'shadow_files_ready' || s === 'shadow_smoke_ready' || s === 'cutover_readiness_ready' || s === 'country_shadow_verified' || s === 'ready') cls = 'rc-badge--success';
-        else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval' || s === 'waiting_confirmation' || s === 'execution_plan_ready' || s === 'pre_restore_backup_pending' || s === 'shadow_restore_pending' || s === 'shadow_not_ready' || s === 'shadow_smoke_pending' || s === 'shadow_smoke_warning' || s === 'cutover_readiness_manual_review' || s === 'country_shadow_warning') cls = 'rc-badge--warning';
-        else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible' || s === 'dry_failed' || s === 'execution_failed' || s === 'execution_cancelled' || s === 'cancelled' || s === 'pre_restore_backup_failed' || s === 'shadow_restore_failed' || s === 'shadow_files_failed' || s === 'shadow_smoke_failed' || s === 'cutover_readiness_blocked' || s === 'country_shadow_not_ready') cls = 'rc-badge--failed';
-        else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge') || s === 'execution_precheck' || s === 'dry_running' || s === 'pre_restore_backup_running' || s === 'pre_restore_backup_verifying' || s === 'shadow_restore_running' || s === 'shadow_restore_verifying' || s === 'shadow_verifying' || s === 'shadow_files_running' || s === 'shadow_files_verifying' || s === 'shadow_smoke_running' || s === 'country_shadow_verifying') cls = 'rc-badge--running';
+        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed' || s === 'approved_waiting_execution' || s === 'pre_restore_backup_ready' || s === 'shadow_restore_ready' || s === 'shadow_verified' || s === 'shadow_files_ready' || s === 'shadow_smoke_ready' || s === 'cutover_readiness_ready' || s === 'country_shadow_verified' || s === 'ready' || s === 'country_dry_run_safe' || s === 'safe') cls = 'rc-badge--success';
+        else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval' || s === 'waiting_confirmation' || s === 'execution_plan_ready' || s === 'pre_restore_backup_pending' || s === 'shadow_restore_pending' || s === 'shadow_not_ready' || s === 'shadow_smoke_pending' || s === 'shadow_smoke_warning' || s === 'cutover_readiness_manual_review' || s === 'country_shadow_warning' || s === 'country_dry_run_warning') cls = 'rc-badge--warning';
+        else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible' || s === 'dry_failed' || s === 'execution_failed' || s === 'execution_cancelled' || s === 'cancelled' || s === 'pre_restore_backup_failed' || s === 'shadow_restore_failed' || s === 'shadow_files_failed' || s === 'shadow_smoke_failed' || s === 'cutover_readiness_blocked' || s === 'country_shadow_not_ready' || s === 'country_dry_run_failed') cls = 'rc-badge--failed';
+        else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge') || s === 'execution_precheck' || s === 'dry_running' || s === 'pre_restore_backup_running' || s === 'pre_restore_backup_verifying' || s === 'shadow_restore_running' || s === 'shadow_restore_verifying' || s === 'shadow_verifying' || s === 'shadow_files_running' || s === 'shadow_files_verifying' || s === 'shadow_smoke_running' || s === 'country_shadow_verifying' || s === 'country_dry_run_running') cls = 'rc-badge--running';
         let label = status || '—';
         if (s === 'awaiting_final_approval') label = 'بانتظار الموافقة النهائية';
         if (s === 'approved_waiting_execution') label = 'معتمدة — بانتظار التنفيذ';
@@ -305,6 +327,11 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         if (s === 'country_shadow_verified') label = 'ظل الدولة موثّق (C7 READY)';
         if (s === 'country_shadow_warning') label = 'ظل الدولة — تحذير (C7)';
         if (s === 'country_shadow_not_ready') label = 'ظل الدولة غير جاهز (C7)';
+        if (s === 'country_dry_run_running') label = 'جارٍ محاكاة Country Dry Run (C8)';
+        if (s === 'country_dry_run_safe') label = 'Country Dry Run آمن (SAFE)';
+        if (s === 'country_dry_run_warning') label = 'Country Dry Run — تحذير';
+        if (s === 'country_dry_run_failed') label = 'Country Dry Run فشل';
+        if (s === 'safe') label = 'SAFE';
         if (s === 'pre_restore_backup_pending') label = 'بانتظار تشغيل عامل CLI';
         if (s === 'pre_restore_backup_running') label = 'جارٍ إنشاء النسخة الاحتياطية';
         if (s === 'pre_restore_backup_verifying') label = 'جارٍ التحقق';
@@ -1593,6 +1620,57 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     if (el('rc_c7_load_btn')) {
         el('rc_c7_load_btn').addEventListener('click', function () {
             loadCountryShadowVerify();
+        });
+    }
+
+    async function loadCountryDryRun() {
+        const jobId = (el('rc_c8_job_id') && el('rc_c8_job_id').value || '').trim();
+        const strip = el('rc_country_dry_run');
+        const blockersEl = el('rc_country_dry_run_blockers');
+        if (!strip) return;
+        if (!jobId) {
+            showAlert('أدخل job / run_id لعرض تقرير Country Dry Run.', false);
+            return;
+        }
+        try {
+            setBusy(true, 'جاري تحميل Country Dry Run…');
+            const j = await apiGet('country-dry-run-status.php?job_id=' + encodeURIComponent(jobId));
+            const s = j.summary || {};
+            const result = String(s.overall_result || (j.report && j.report.overall_result) || '—');
+            strip.innerHTML =
+                '<div><dt>النتيجة</dt><dd>' + badge(result) + '</dd></div>' +
+                '<div><dt>Tables</dt><dd>' + String(s.tables_affected_count != null ? s.tables_affected_count : '—') + '</dd></div>' +
+                '<div><dt>Rows insert/delete</dt><dd>' + String(s.rows_to_insert != null ? s.rows_to_insert : '—') + ' / ' + String(s.rows_to_delete != null ? s.rows_to_delete : '—') + '</dd></div>' +
+                '<div><dt>Survivor impact</dt><dd>' + badge(String(s.survivor_country_impact != null ? s.survivor_country_impact : '—')) + '</dd></div>' +
+                '<div><dt>Global impact</dt><dd>' + badge(String(s.global_impact != null ? s.global_impact : '—')) + '</dd></div>' +
+                '<div><dt>Duration</dt><dd>' + String(s.estimated_duration || '—') + '</dd></div>';
+            const blockers = Array.isArray(s.blocking_reason_codes) ? s.blocking_reason_codes : [];
+            const warnings = Array.isArray(s.warnings) ? s.warnings : [];
+            if (blockersEl) {
+                blockersEl.textContent = 'Blockers: ' + (blockers.length ? blockers.join(', ') : 'none')
+                    + ' | Warnings: ' + (warnings.length ? warnings.join(', ') : 'none')
+                    + ' | simulation_only | execution_performed=false | writes=0';
+            }
+            openView('Country Dry Run — ' + jobId, JSON.stringify({
+                status: j.status || '',
+                summary: s,
+                report: j.report || null,
+                execution_performed: false,
+                production_db_writes: 0,
+                shadow_db_writes: 0,
+                country_production_restore_enabled: false,
+                warning: j.warning || 'Country Dry Run status only — simulation.'
+            }, null, 2));
+        } catch (e) {
+            showAlert(e.message || 'تعذر تحميل تقرير Country Dry Run', false);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    if (el('rc_c8_load_btn')) {
+        el('rc_c8_load_btn').addEventListener('click', function () {
+            loadCountryDryRun();
         });
     }
 
