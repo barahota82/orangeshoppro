@@ -136,7 +136,7 @@ Provide a complete, Owner-reviewable **evidence pack** proving that Country Prod
 |------|-------|
 | Certification objectives & non-goals | This WP §7–§8 |
 | Evidence pack catalog | This WP §8 |
-| Checklist items (machine + human) | Later WP-P2-02 |
+| Checklist items (machine + human) | WP-P2-02 COMPLETE — `CPR-P2-WP02-CERT_CHECKLIST` |
 | Drill scenario catalog | Later WP-P2-03 |
 | Evidence assembly / pack schemas | Later WP-P2-04 |
 | Owner submission & PASS/FAIL package | Later WP-P2-05 |
@@ -211,7 +211,7 @@ Each catalog entry is a **required evidence class** for a complete CPR certifica
 | WP | Title | Primary artifact | Status |
 |----|-------|------------------|--------|
 | **WP-P2-01** | P2 Certification Design Control Plane | `COUNTRY_PRODUCTION_RESTORE_P2_ARTIFACT_INDEX.md` | **COMPLETE** |
-| **WP-P2-02** | Certification checklist (machine + Owner human review) | `COUNTRY_PRODUCTION_RESTORE_P2_02_CERT_CHECKLIST.md` | PENDING |
+| **WP-P2-02** | Certification checklist (machine + Owner human review) | `COUNTRY_PRODUCTION_RESTORE_P2_02_CERT_CHECKLIST.md` | **COMPLETE** |
 | **WP-P2-03** | Drill scenario catalog (incl. rollback) | `COUNTRY_PRODUCTION_RESTORE_P2_03_DRILL_SCENARIOS.md` | PENDING |
 | **WP-P2-04** | Evidence pack assembly schemas | `COUNTRY_PRODUCTION_RESTORE_P2_04_EVIDENCE_PACK_SCHEMAS.md` | PENDING |
 | **WP-P2-05** | Owner submission & PASS/FAIL decision package | `COUNTRY_PRODUCTION_RESTORE_P2_05_OWNER_DECISION_PACKAGE.md` | PENDING |
