@@ -16,8 +16,10 @@
 - Foundational Integrity Principle (integrity > privilege; no Super Admin gate bypass; system-enforced)  
 - Group 1: OD-ENABLE · OD-DUAL · OD-PHRASE · OD-BREAK  
 - Group 2 (Maintenance & timing): OD-MAINT · OD-MAINT-SCOPE · OD-MAINT-MAX · OD-RTO · OD-TIMEOUT  
-- Group 3: OD-PIN · OD-ROLLBACK · OD-FAIL-DELETE · OD-FAIL-IMPORT (+ Maintenance State on failure pause)  
+- Group 3: OD-PIN · OD-ROLLBACK · OD-FAIL-DELETE · OD-FAIL-IMPORT · OD-UPLOADS (+ Maintenance State on failure pause)  
 - Gates & Integrity (workshop Group 2): OD-C8 · OD-VERIFY-WARN · OD-INV · OD-FA-RESOLVER · OD-FA-STOCK · OD-FA-SCHEMA  
+- Group 4: OD-LOCK-CROSS · OD-LOCK-SHADOW  
+- Isolation Principle (recovery scope; survivor safety; fail if isolation unproven)  
 
 **How to answer remaining items:** write one of `A` / `B` / `C` / `D` (or custom text) on `OWNER ANSWER:`.  
 Recommended answers are **advice only** for open items.
@@ -102,30 +104,21 @@ Recommended answers are **advice only** for open items.
 - **Frozen:** While paused for failure, Maintenance Mode remains active. Normal operation returns only after Super Admin successfully completes Resume **or** Rollback. Users must never regain access while restore is incomplete.  
 - **OWNER ANSWER:** OWNER_APPROVED
 
-### 17. OD-UPLOADS *(still open)*
-Scoped allowlisted uploads apply with pre-image; never full `uploads/` root rename?
-- **Recommended:** A — Scoped apply + pre-image  
-- **Alternatives:** B full-tree two-phase rename · C in-place no pre-image  
-- **Consequences:** B risks other countries’ files.  
-- **OWNER ANSWER:** _______________
+### 17. OD-UPLOADS — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Strictly scoped country uploads only; scoped pre-image before modify; never full-tree replace / never touch survivor uploads / never outside approved scope. If integrity not guaranteed → fail immediately; Global Maint ON; Super Admin Resume or Rollback only. No best-effort / partial acceptance.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
 ---
 
-## Group 4 — Locks (answer before P1)
+## Group 4 — Locks
 
-### 18. OD-LOCK-CROSS
-CPR and Full DR mutually exclusive?
-- **Recommended:** A — Exclusive  
-- **Alternatives:** B parallel · C CPR yields to Full only  
-- **Consequences:** B dangerous.  
-- **OWNER ANSWER:** _______________
+### 18. OD-LOCK-CROSS — OWNER_APPROVED (2026-07-20)
+- **Frozen:** CPR and Full DR mutually exclusive. Active one blocks the other until finished. No override / parallel / Super Admin bypass.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 19. OD-LOCK-SHADOW
-Serialize CPR with C6 Country Shadow on same host/work root?
-- **Recommended:** A — Serialize  
-- **Alternatives:** B parallel if isolated · C always allow C6  
-- **Consequences:** A simplest ops safety.  
-- **OWNER ANSWER:** _______________
+### 19. OD-LOCK-SHADOW — OWNER_APPROVED (2026-07-20)
+- **Frozen:** CPR and C6 mutually exclusive and serialized on the same production deployment. No concurrent shared resources/work roots/DBs/verification contexts. Second refused if one running. No override / parallel.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
 ---
 
@@ -193,10 +186,11 @@ If schema_revision leaves 121: mandatory re-cert + package rebuild before CPR?
 | Date | _______________ |
 | Group 1 freeze | OWNER_APPROVED 2026-07-20 (OD-ENABLE, OD-DUAL, OD-PHRASE, OD-BREAK) |
 | Group 2 (Maint) freeze | OWNER_APPROVED 2026-07-20 (OD-MAINT, OD-MAINT-SCOPE, OD-MAINT-MAX, OD-RTO, OD-TIMEOUT) |
-| Group 3 freeze | OWNER_APPROVED 2026-07-20 (OD-PIN, OD-ROLLBACK, OD-FAIL-DELETE, OD-FAIL-IMPORT + Maintenance State) |
+| Group 3 freeze | OWNER_APPROVED 2026-07-20 (OD-PIN, OD-ROLLBACK, OD-FAIL-DELETE, OD-FAIL-IMPORT, OD-UPLOADS + Maintenance State) |
 | Gates & Integrity freeze | OWNER_APPROVED 2026-07-20 (OD-C8, OD-VERIFY-WARN, OD-INV, OD-FA-* + Integrity Principle) |
-| Workshop complete? | YES / NO (remaining open items) |
+| Group 4 freeze | OWNER_APPROVED 2026-07-20 (OD-LOCK-CROSS, OD-LOCK-SHADOW + Isolation Principle) |
+| Workshop complete? | YES / NO (remaining open / deferrable items) |
 | Notes | _______________ |
 
-**Groups 1–3 and Gates & Integrity are frozen.** Continue workshop for open ODs only.  
-**Do not begin P1 until remaining P1-blocking ODs are frozen.** **Do not implement.**
+**Groups 1–4 and Gates & Integrity are frozen.** P1-blocking OD minimum set is complete; remaining open items are deferrable detail only.  
+**Do not begin P1 until the Owner explicitly authorizes P1.** **Do not implement.**

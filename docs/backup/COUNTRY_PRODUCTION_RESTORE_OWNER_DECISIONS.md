@@ -12,7 +12,7 @@
 | **Global Restore ops clarification** | `docs/backup/GLOBAL_RESTORE_OPERATIONAL_POLICY.md` (**not** a new OD; platform-wide maint UX for any Restore) |
 | **C3–C8** | Must not be modified |
 | **Enablement** | Remains **disabled** until certification + explicit OD-ENABLE + implementation + final enterprise approval (OWNER_APPROVED) |
-| **Last owner freeze** | 2026-07-20 — Gates & Integrity (workshop Group 2): OD-C8, OD-VERIFY-WARN, OD-INV, OD-FA-RESOLVER, OD-FA-STOCK, OD-FA-SCHEMA + Integrity Principle |
+| **Last owner freeze** | 2026-07-20 — Group 3 remaining + Group 4: OD-UPLOADS, OD-LOCK-CROSS, OD-LOCK-SHADOW + Isolation Principle |
 
 ### Frozen inputs (not reopened)
 
@@ -33,7 +33,17 @@
 - The **system itself** must enforce these rules.  
 - If a required proof is missing, the requested operation **shall not execute**.  
 
-This principle governs every decision in Gates & Integrity (workshop Group 2) and must not be contradicted by later ODs or implementation.
+This principle governs Gates & Integrity and must not be contradicted by later ODs or implementation.
+
+### Foundational Owner Principle — Recovery scope isolation (OWNER_APPROVED — 2026-07-20)
+
+**OWNER_APPROVED** for the entire Orange platform:
+
+- Production Restore shall **never** modify data outside the explicitly approved recovery scope.  
+- No operation may endanger survivor countries or unrelated platform resources.  
+- If safe isolation cannot be proven, the operation shall **fail**.  
+
+This principle governs Group 3 remaining (OD-UPLOADS) and Group 4 (OD-LOCK-*) and must not be contradicted by later ODs or implementation.
 
 ### Owner-approved CPR decisions (Group 1 — Enablement & control — 2026-07-20)
 
@@ -54,7 +64,7 @@ This principle governs every decision in Gates & Integrity (workshop Group 2) an
 | **OD-RTO** | OWNER_APPROVED (no hardcoded RTO; Estimated Duration for monitoring only) |
 | **OD-TIMEOUT** | OWNER_APPROVED (timeout ≠ failure; progress-aware escalation → investigate/resume) |
 
-### Owner-approved CPR decisions (Group 3 — Backup / failure / rollback — 2026-07-20)
+### Owner-approved CPR decisions (Group 3 — Backup / failure / rollback / uploads — 2026-07-20)
 
 | ID | Status |
 |----|--------|
@@ -63,6 +73,7 @@ This principle governs every decision in Gates & Integrity (workshop Group 2) an
 | **OD-FAIL-DELETE** | OWNER_APPROVED (no auto-rollback; pause for Super Admin Resume/Rollback) |
 | **OD-FAIL-IMPORT** | OWNER_APPROVED (no auto-rollback; pause for Super Admin Resume/Rollback) |
 | **Maintenance State (on failure pause)** | OWNER_APPROVED (Maintenance stays ON until Super Admin completes Resume or Rollback) |
+| **OD-UPLOADS** | OWNER_APPROVED (strictly scoped uploads; pre-image; never full-tree; fail → Global Maint + Resume/Rollback) |
 
 ### Owner-approved CPR decisions (Gates & Integrity — workshop Group 2 — 2026-07-20)
 
@@ -75,20 +86,29 @@ This principle governs every decision in Gates & Integrity (workshop Group 2) an
 | **OD-FA-STOCK** | OWNER_APPROVED (mandatory warehouse/stock/FIFO/cross-country checks; no soft warning) |
 | **OD-FA-SCHEMA** | OWNER_APPROVED (mandatory revision/tables/columns/indexes/constraints; no fixture soft-skip on prod/cert) |
 
+### Owner-approved CPR decisions (Group 4 — Locks — 2026-07-20)
+
+| ID | Status |
+|----|--------|
+| **OD-LOCK-CROSS** | OWNER_APPROVED (CPR and Full DR mutually exclusive; no parallel; no override/bypass) |
+| **OD-LOCK-SHADOW** | OWNER_APPROVED (CPR and C6 mutually exclusive / serialized; no concurrent shared resources) |
+
 **Note:** P0 architecture §8 previously recommended “two distinct Super Admin identities.” That recommendation is **superseded** by OWNER_APPROVED **OD-DUAL** in this register. Do not implement the old dual-Super-Admin model.
 
 **Note (Group 2 — Maintenance):** P0 architecture §9 prefers platform-wide maintenance — now **OWNER_APPROVED** as GLOBAL MAINTENANCE (OD-MAINT-SCOPE). Country-only maintenance is not approved under the current shared-DB / Full-anchor rollback architecture.
 
-**Note (Group 3):** OD-PIN owner workflow is: Maintenance Mode → **new** Full Backup for this session → verify → pin → continue. Existing backups must never be reused as the CPR rollback anchor. Failure after delete/import does **not** auto-rollback; Super Admin chooses Resume (when safe) or the dedicated dashboard **Rollback** action. P0 catalog **OD-ROLLBACK-CLI** is frozen under owner ID **OD-ROLLBACK** (dedicated Super Admin dashboard action, available only on failure pause, security parity with Production Restore, never automatic).
+**Note (Group 3):** OD-PIN owner workflow is: Maintenance Mode → **new** Full Backup for this session → verify → pin → continue. Existing backups must never be reused as the CPR rollback anchor. Failure after delete/import does **not** auto-rollback; Super Admin chooses Resume (when safe) or the dedicated dashboard **Rollback** action. P0 catalog **OD-ROLLBACK-CLI** is frozen under owner ID **OD-ROLLBACK**. **OD-UPLOADS** is strictly scoped; full-tree replace is forbidden.
 
 **Note (Gates & Integrity):** Proof-driven production philosophy — Production Restore shall never rely on user judgement, manual override, administrator privilege, or best-effort execution. If integrity cannot be proven, the operation shall not execute. Aligns with `GLOBAL_RESTORE_OPERATIONAL_POLICY.md` and Super Admin Operational Model.
+
+**Note (Group 4 + Isolation Principle):** Production Isolation philosophy — scoped recovery, proven survivor isolation, exclusive execution, zero concurrent recovery operations, zero uncontrolled file replacement. Prefer proven integrity over speed or convenience.
 
 ### Register rules
 
 - Status **OWNER_APPROVED** = frozen owner policy; do not reopen without a new owner decision.  
 - Remaining decisions stay **PROPOSED** until the owner answers.  
 - Facilitation “Recommended” is historical advice only where status is still PROPOSED.  
-- Foundational Integrity Principle is OWNER_APPROVED and binds all gates.
+- Foundational Integrity Principle and Recovery Scope Isolation Principle are OWNER_APPROVED and bind gates, uploads, and locks.
 
 ### OD count
 
@@ -525,25 +545,23 @@ This principle governs every decision in Gates & Integrity (workshop Group 2) an
 |-------|---------|
 | **1. ID** | OD-UPLOADS |
 | **2. Title** | How country-scoped uploads are applied on production |
-| **3. Exact question** | How should `uploads_country.zip` be applied to production without harming survivor countries’ files? |
-| **4. Options** | **A)** Scoped allowlisted paths only: stage → per-file/subtree replace with pre-image snapshot under work root; **never** full `uploads/` root two-phase rename. **B)** Full uploads root two-phase rename (Full DR style). **C)** In-place overwrite without pre-image. |
-| **5. Consequences** | A: country-safe. B: contaminates/moves entire tree — **not recommended**. C: weak rollback assist. |
-| **6. Recommended** | **A** |
-| **7. Reason** | Country-scoped safety; no silent path bleed; pre-image assists file rollback alongside Full anchor. |
-| **8. Security** | Path allowlist critical. |
-| **9. Data integrity** | Protects survivor files. |
-| **10. Operational** | More steps than Full rename. |
-| **11. Rollback** | Full anchor primary; pre-image secondary for files. |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **3. Exact question** | How should `uploads_country.zip` be applied to production without harming survivor countries' files? |
+| **4. Options** | *(Superseded.)* Historical B full-tree and C no-pre-image rejected. |
+| **5. Consequences** | Strictly scoped restore + pre-image; fail → Global Maint + Resume/Rollback only. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED.)* |
+| **7. Reason** | Isolation Principle; survivor uploads must remain untouched. |
+| **8. Security** | Path allowlist / approved recovery scope critical. |
+| **9. Data integrity** | Protects survivor files; no uncontrolled replacement. |
+| **10. Operational** | Scoped apply under GLOBAL Maint. |
+| **11. Rollback** | Full session Backup primary; scoped pre-image assists; Super Admin Resume/Rollback on fail. |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Country uploads shall always be restored using a **strictly scoped** strategy. The system shall **NEVER**: replace the entire uploads tree; delete uploads belonging to other countries; modify files outside the approved recovery scope. Before applying uploads, the system shall create a **scoped pre-image** of every file that may be modified. Only the target country's approved upload scope may be restored. Survivor-country uploads shall remain untouched. If upload integrity cannot be guaranteed: Production Restore shall **immediately fail**; platform remains in Global Maintenance; Super Admin only Resume (when safely supported) or Rollback. **No** best-effort upload recovery. **No** partial acceptance. |
+| **15. Frozen policy wording** | *Country uploads are restored only with a strictly scoped strategy. Full uploads-tree replace, deletion of other countries' uploads, and modification outside the approved recovery scope are forbidden. Before apply, a scoped pre-image of every file that may be modified is mandatory. Only the target country's approved upload scope may be restored; survivor-country uploads remain untouched. If upload integrity cannot be guaranteed, Production Restore fails immediately, Global Maintenance remains ON, and the Super Admin may choose only Resume (when safely supported) or Rollback. Best-effort upload recovery and partial acceptance are forbidden.* |
 
-*Note: P0 mention `OD-UPLOADS-FULLTREE` is **not** a separate decision — it is option **B** here and is **not recommended**.*
+*Note: P0 mention `OD-UPLOADS-FULLTREE` (full-tree rename) is **rejected** by this OWNER_APPROVED decision.*
 
 ---
-
-## Group F — Locks and concurrency
 
 ### OD-LOCK-CROSS — Exclusion vs Full DR
 
@@ -552,17 +570,17 @@ This principle governs every decision in Gates & Integrity (workshop Group 2) an
 | **1. ID** | OD-LOCK-CROSS |
 | **2. Title** | CPR vs Full Disaster Restore concurrency |
 | **3. Exact question** | Must CPR and Full DR restore be mutually exclusive on the same deployment? |
-| **4. Options** | **A)** Yes — exclusive (either may hold global restore exclusion). **B)** Allow parallel. **C)** CPR yields to Full only. |
-| **5. Consequences** | A: safe. B: catastrophic interaction risk. C: OK if exclusive in practice. |
-| **6. Recommended** | **A** |
-| **7. Reason** | One production mutation program at a time. |
+| **4. Options** | *(Superseded.)* Historical parallel options rejected. |
+| **5. Consequences** | Mutually exclusive; active job blocks the other until complete; no override/bypass. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED.)* |
+| **7. Reason** | Isolation Principle; one production mutation program at a time. |
 | **8–9** | Integrity under concurrent cutovers. |
 | **10. Operational** | Serialize windows. |
 | **11. Rollback** | Avoid interleaved rollbacks. |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Country Production Restore and Full Disaster Recovery shall be **mutually exclusive**. The platform shall never execute both simultaneously. If one is active, the other is **blocked** until the active operation has completely finished. **No** override. **No** parallel execution. **No** Super Admin bypass. |
+| **15. Frozen policy wording** | *Country Production Restore and Full Disaster Recovery are mutually exclusive. They must never run simultaneously. If one is active, the other is blocked until the active operation has completely finished. Override, parallel execution, and Super Admin bypass are forbidden.* |
 
 ---
 
@@ -573,15 +591,15 @@ This principle governs every decision in Gates & Integrity (workshop Group 2) an
 | **1. ID** | OD-LOCK-SHADOW |
 | **2. Title** | CPR vs Country Shadow (C6) concurrency |
 | **3. Exact question** | May C6 Country Shadow Restore run concurrently with a CPR production job on the same host/work root? |
-| **4. Options** | **A)** Serialize — forbid concurrent C6 while CPR lock/maint held (and vice versa for production job). **B)** Allow parallel (separate DBs). **C)** Allow C6 always. |
-| **5. Consequences** | A: simplest ops safety. B: possible if proven isolated — still risks shared backup root/locks. |
-| **6. Recommended** | **A** |
-| **7. Reason** | Reduce operational confusion and shared work-root races. |
+| **4. Options** | *(Superseded.)* Historical parallel options rejected. |
+| **5. Consequences** | Serialized / mutually exclusive on same production deployment; shared resources never concurrent. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED.)* |
+| **7. Reason** | Isolation Principle; shared work roots/DBs/verification contexts. |
 | **8–11** | Ops safety; integrity of gates. |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: soft. Enablement: soft. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Country Production Restore and Country Shadow (C6) shall be **mutually exclusive** and **serialized**. The platform shall never allow them to execute simultaneously on the same production deployment. Shared runtime resources, working directories, databases, and verification contexts shall never be used concurrently. If one is already running, the second shall be **refused**. **No** override. **No** parallel execution. |
+| **15. Frozen policy wording** | *Country Production Restore and Country Shadow (C6) are mutually exclusive and must be serialized. They must never execute simultaneously on the same production deployment. Shared runtime resources, working directories, databases, and verification contexts must never be used concurrently. If one is already running, the second is refused. Override and parallel execution are forbidden.* |
 
 ---
 
@@ -679,7 +697,9 @@ These are **already frozen** and must not be contradicted by any OD answer:
 6. C1.1 D1–D6 and multicountry §13.  
 7. C3–C8 not modified by CPR program.  
 8. **Integrity Principle (OWNER_APPROVED):** System/Data Integrity > user privileges; no Super Admin bypass of production safety gates; system-enforced; missing proof → do not execute.  
-9. **Proof-driven Production Restore:** never rely on user judgement, manual override, administrator privilege, or best-effort execution.
+9. **Proof-driven Production Restore:** never rely on user judgement, manual override, administrator privilege, or best-effort execution.  
+10. **Isolation Principle (OWNER_APPROVED):** never modify outside approved recovery scope; never endanger survivors/unrelated resources; fail if safe isolation unproven.  
+11. **Production Isolation:** scoped recovery; exclusive execution; zero concurrent recovery ops; zero uncontrolled file replacement.
 
 ---
 
@@ -707,9 +727,9 @@ These are **already frozen** and must not be contradicted by any OD answer:
 | OD-VERIFY-WARN | D | **OWNER_APPROVED** (fail-closed) | Y | N | Y | Y |
 | OD-SCHEMA | D | A | soft | Y | Y | Y |
 | OD-INV | D | **OWNER_APPROVED** (certified snapshot) | Y | N | Y | Y |
-| OD-UPLOADS | E | A | Y | N | Y | Y |
-| OD-LOCK-CROSS | F | A | Y | N | Y | Y |
-| OD-LOCK-SHADOW | F | A | Y | N | soft | soft |
+| OD-UPLOADS | E | **OWNER_APPROVED** (scoped + pre-image) | Y | N | Y | Y |
+| OD-LOCK-CROSS | F | **OWNER_APPROVED** (exclusive vs Full DR) | Y | N | Y | Y |
+| OD-LOCK-SHADOW | F | **OWNER_APPROVED** (exclusive vs C6) | Y | N | Y | Y |
 | OD-LOCK-TTL | F | A | soft | Y | soft | soft |
 | OD-FA-RESOLVER | G | **OWNER_APPROVED** | Y | N | Y | Y |
 | OD-FA-STOCK | G | **OWNER_APPROVED** | Y | N | Y | Y |
@@ -719,4 +739,4 @@ These are **already frozen** and must not be contradicted by any OD answer:
 
 ---
 
-*End of Owner Decision Register — P0b. Groups 1–3 + Gates & Integrity (workshop Group 2) frozen OWNER_APPROVED. Remaining statuses PROPOSED. No P1. No implementation.*
+*End of Owner Decision Register — P0b. Groups 1–4 + Gates & Integrity frozen OWNER_APPROVED (P1-blocking OD minimum set complete). Remaining PROPOSED are deferrable detail only. No P1. No implementation.*
