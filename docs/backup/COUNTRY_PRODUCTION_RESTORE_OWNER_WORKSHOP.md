@@ -7,6 +7,7 @@
 | **Dependencies** | `COUNTRY_PRODUCTION_RESTORE_DECISION_DEPENDENCIES.md` |
 | **Architecture** | `COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` |
 | **Super Admin UX clarification** | `COUNTRY_PRODUCTION_RESTORE_SUPER_ADMIN_OPERATIONAL_MODEL.md` (not a new OD) |
+| **Global Restore ops clarification** | `GLOBAL_RESTORE_OPERATIONAL_POLICY.md` (not a new OD) |
 | **Date** | 2026-07-20 |
 
 **Already frozen (do not re-answer):** C1.1 D1–D6 · Multicountry §13 · Country restore stays disabled until certification + explicit enablement.

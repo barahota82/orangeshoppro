@@ -2,6 +2,8 @@
 
 Concise checklist for operators. No passwords or absolute private paths.
 
+**Related (ops clarification, no new Owner Decisions):** `docs/backup/GLOBAL_RESTORE_OPERATIONAL_POLICY.md` — when any production Restore enters Maintenance, the entire platform is in Global Maintenance (storefronts / Country Admins / writers suspended; Super Admin Restore Management only until Maintenance release).
+
 ## Pre-flight checklist
 
 - [ ] Owner approved the maintenance window
