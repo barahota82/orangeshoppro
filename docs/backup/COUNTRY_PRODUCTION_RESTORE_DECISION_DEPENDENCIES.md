@@ -4,9 +4,9 @@
 **Date:** 2026-07-20  
 **Purpose:** Show what each Owner Decision unlocks or blocks — so the workshop order is not arbitrary.  
 **Companion:** `COUNTRY_PRODUCTION_RESTORE_OWNER_DECISIONS.md` · `COUNTRY_PRODUCTION_RESTORE_OWNER_WORKSHOP.md`  
-**Frozen OWNER_APPROVED (2026-07-20):** Integrity Principle · Isolation Principle · Group 1 · Group 2 Maint · Group 3 (incl. OD-UPLOADS) · Gates & Integrity · Group 4 (OD-LOCK-CROSS · OD-LOCK-SHADOW)  
-**Not yet frozen (deferrable only):** OD-PERM · OD-RUNBOOK · OD-CERT · OD-SCHEMA · OD-LOCK-TTL  
-**P1-blocking OD minimum set:** complete (no remaining hard P1 blockers in this register)  
+**Frozen OWNER_APPROVED (2026-07-20):** Integrity Principle · Isolation Principle · Operational Governance Principle · Group 1 · Group 2 Maint · Group 3 · Gates & Integrity · Group 4 (incl. OD-LOCK-TTL) · Final Governance (OD-PERM · OD-RUNBOOK · OD-CERT · OD-SCHEMA)  
+**Not yet frozen:** *(none — all named OD-* in the register are OWNER_APPROVED)*  
+**P0b Owner Decision workshop:** **complete**  
 **Do not start P1** until the Owner explicitly authorizes P1. **Do not implement.**
 
 ---
@@ -28,8 +28,8 @@
 P0 Architecture          [DONE — docs only]
         │
         ▼
-P0b Owner Decisions      [Integrity + Isolation + Groups 1–4 + Gates frozen]
-        │                 Remaining: deferrable detail only
+P0b Owner Decisions      [COMPLETE — all OD-* + principles OWNER_APPROVED]
+        │
         ▼
 P1 Contracts             [Owner must explicitly authorize — then start]
         │
@@ -39,7 +39,7 @@ P1 Contracts             [Owner must explicitly authorize — then start]
         └──► P5 Certification / runbook / enablement
 ```
 
-**Rule:** Frozen ODs (Integrity, Isolation, Groups 1–4, Gates & Integrity) are fixed for P1+. Remaining PROPOSED items are soft/deferrable and may be settled during P1–P5 without blocking P1 authorization.
+**Rule:** All named OD-* and foundational principles are frozen for P1+. **P1 still requires an explicit Owner authorization to start.**
 
 ---
 
@@ -51,6 +51,7 @@ P1 Contracts             [Owner must explicitly authorize — then start]
 |-----------|--------|---------|----------------------|
 | **Integrity Principle** | **OWNER_APPROVED** | Fail-closed gates; no Super Admin safety bypass; OD-C8 / VERIFY-WARN / INV / FA-* | — |
 | **Isolation Principle** | **OWNER_APPROVED** | OD-UPLOADS · OD-LOCK-* · survivor-safe apply; fail if isolation unproven | — |
+| **Governance Principle** | **OWNER_APPROVED** | OD-PERM · OD-RUNBOOK · OD-CERT · OD-LOCK-TTL · OD-SCHEMA; governance never weakens Integrity/Isolation/Global Restore Policy | — |
 
 ### Group 1 — Enablement & authority (OWNER_APPROVED)
 
@@ -75,9 +76,9 @@ P1 Contracts             [Owner must explicitly authorize — then start]
 
 | Decision | Status | Unlocks | Blocks if unresolved |
 |----------|--------|---------|----------------------|
-| **OD-PERM** | PROPOSED A | Soft — capability names | Soft for P4 |
-| **OD-CERT** | PROPOSED A | Soft — certification checklist | Soft for P5 |
-| **OD-RUNBOOK** | PROPOSED B | Soft — runbook depth | Soft for P5 |
+| **OD-PERM** | **OWNER_APPROVED** | Capability matrix = OD-DUAL; Country Admin view/prepare/request only | — (frozen) |
+| **OD-CERT** | **OWNER_APPROVED** | Owner PASS/FAIL; engineering evidence only; blocks enablement | — (frozen) |
+| **OD-RUNBOOK** | **OWNER_APPROVED** | Mandatory pre-PONR Super Admin checklist; maint release gated | — (frozen) |
 | **OD-PIN** | **OWNER_APPROVED** | New Full Backup pin; surgical success path | — (frozen) |
 | **OD-ROLLBACK** | **OWNER_APPROVED** | Super Admin dashboard Rollback (fail-pause only; never automatic) | — (frozen) |
 | **OD-FAIL-DELETE** | **OWNER_APPROVED** | Delete-failure pause (no auto-RB) | — (frozen) |
@@ -90,19 +91,19 @@ P1 Contracts             [Owner must explicitly authorize — then start]
 |----------|--------|---------|----------------------|
 | **OD-C8** | **OWNER_APPROVED** | Preflight SAFE-only gate | — (frozen) |
 | **OD-VERIFY-WARN** | **OWNER_APPROVED** | Post-apply fail-closed | — (frozen) |
-| **OD-SCHEMA** | PROPOSED A | Soft — schema tolerance wording | Soft for P1 |
+| **OD-SCHEMA** | **OWNER_APPROVED** | Schema revision change → invalidate cert; rebuild + new cert + C8 SAFE; Owner PASS + Enable again | — (frozen) |
 | **OD-INV** | **OWNER_APPROVED** | Inventory binding to certified snapshot | — (frozen) |
 | **OD-FA-RESOLVER** | **OWNER_APPROVED** | Matrix-driven apply resolver | — (frozen) |
 | **OD-FA-STOCK** | **OWNER_APPROVED** | Strict stock restore | — (frozen) |
 | **OD-FA-SCHEMA** | **OWNER_APPROVED** | Strict schema / no silent reshape | — (frozen) |
 
-### Group 4 — Cross-feature locks (OWNER_APPROVED for CROSS + SHADOW)
+### Group 4 — Cross-feature locks (OWNER_APPROVED)
 
 | Decision | Status | Unlocks | Blocks if unresolved |
 |----------|--------|---------|----------------------|
 | **OD-LOCK-CROSS** | **OWNER_APPROVED** | Mutual exclusion CPR ↔ Full DR; no bypass | — (frozen) |
 | **OD-LOCK-SHADOW** | **OWNER_APPROVED** | Mutual exclusion CPR ↔ C6; serialized; no shared concurrent resources | — (frozen) |
-| **OD-LOCK-TTL** | PROPOSED A | Soft — heartbeat / stale TTL numbers | Soft for P2 |
+| **OD-LOCK-TTL** | **OWNER_APPROVED** | Heartbeat; Super Admin audited pre-PONR clear only; no post-PONR auto-release | — (frozen) |
 
 ---
 
@@ -115,26 +116,28 @@ Isolation Principle (OWNER_APPROVED)
         │
         ├──► OD-UPLOADS (OWNER_APPROVED)     scoped + pre-image; never full-tree; fail-closed
         ├──► OD-LOCK-CROSS (OWNER_APPROVED)  CPR ⊥ Full DR
-        └──► OD-LOCK-SHADOW (OWNER_APPROVED) CPR ⊥ C6
+        ├──► OD-LOCK-SHADOW (OWNER_APPROVED) CPR ⊥ C6
+        └──► OD-LOCK-TTL (OWNER_APPROVED)    heartbeat; no post-PONR auto-unlock
 ```
-
-**Meaning:** Production Restore never endangers survivors; never runs concurrent with Full DR or Country Shadow; uploads never replace the whole tree.
 
 ### Chain B — “Can we turn it on?” (OWNER_APPROVED)
 
 ```
-OD-ENABLE (OWNER_APPROVED) ──► certification gate + explicit enable
+OD-CERT (OWNER_APPROVED) ──► Owner PASS/FAIL; engineering evidence only
         │
-        └──► OD-CERT (soft) ──► P5 packaging only
+        └──► OD-ENABLE (OWNER_APPROVED) ──► explicit enable after PASS + Owner approval
+                │
+                └──► OD-SCHEMA (OWNER_APPROVED) ──► schema change invalidates; full re-auth cycle
 ```
 
-### Chain C — “Who may start restore?” (OWNER_APPROVED)
+### Chain C — “Who may operate restore?” (OWNER_APPROVED)
 
 ```
 OD-DUAL (OWNER_APPROVED) ──► dual-control UX (WF-A/B)
+OD-PERM (OWNER_APPROVED) ──► Country Admin view/prepare/request; Super Admin alone mutate control plane
 OD-PHRASE (OWNER_APPROVED) ──► typed RESTORE
 OD-BREAK (OWNER_APPROVED) ──► break-glass path
-OD-PERM (soft) ──► capability naming in P4
+OD-RUNBOOK (OWNER_APPROVED) ──► mandatory pre-PONR checklist; maint release gated
 ```
 
 ### Chain D — “What happens when it breaks?” (OWNER_APPROVED)
@@ -168,13 +171,14 @@ Integrity Principle (OWNER_APPROVED)
         └──► OD-FA-* (matrix / stock / schema)
 ```
 
-### Chain G — Remaining soft items (do not block P1 authorization)
+### Chain G — Governance layer (OWNER_APPROVED)
 
 ```
-OD-PERM · OD-RUNBOOK · OD-CERT · OD-SCHEMA · OD-LOCK-TTL
+Governance Principle (OWNER_APPROVED)
+        │
+        ├──► OD-PERM · OD-RUNBOOK · OD-CERT · OD-LOCK-TTL · OD-SCHEMA
+        └──► Never weakens Integrity / Isolation / Global Restore Operational Policy
 ```
-
-Settle during P1–P5 or a short deferrable workshop. **Do not start P1 until Owner authorizes.**
 
 ---
 
@@ -182,11 +186,11 @@ Settle during P1–P5 or a short deferrable workshop. **Do not start P1 until Ow
 
 | Workstream | Hard prerequisites (all frozen) | Soft / remaining |
 |------------|--------------------------------|------------------|
-| **P1 Contracts** | Integrity · Isolation · Groups 1–4 hard ODs · Gates & Integrity | OD-SCHEMA, OD-LOCK-TTL numbers, OD-PERM/CERT/RUNBOOK |
-| **P2 Controllers / locks** | OD-LOCK-CROSS · OD-LOCK-SHADOW · OD-TIMEOUT · OD-MAINT* | OD-LOCK-TTL |
+| **P1 Contracts** | All OD-* + Integrity · Isolation · Governance Principles | — (Owner must still authorize P1 start) |
+| **P2 Controllers / locks** | OD-LOCK-CROSS · OD-LOCK-SHADOW · OD-LOCK-TTL · OD-TIMEOUT · OD-MAINT* | — |
 | **P3 Apply / uploads / RB** | OD-PIN · OD-ROLLBACK · OD-FAIL-* · OD-UPLOADS · OD-FA-* · Isolation | — |
-| **P4 Admin UX** | OD-DUAL · OD-PHRASE · OD-BREAK · OD-MAINT · Super Admin Model | OD-PERM |
-| **P5 Certification** | OD-ENABLE · OD-C8 · OD-VERIFY-WARN · OD-INV | OD-CERT · OD-RUNBOOK |
+| **P4 Admin UX** | OD-DUAL · OD-PERM · OD-PHRASE · OD-BREAK · OD-RUNBOOK · OD-MAINT · Super Admin Model | — |
+| **P5 Certification** | OD-ENABLE · OD-CERT · OD-SCHEMA · OD-C8 · OD-VERIFY-WARN · OD-INV · OD-RUNBOOK | — |
 
 ---
 
@@ -194,10 +198,10 @@ Settle during P1–P5 or a short deferrable workshop. **Do not start P1 until Ow
 
 | ID | Temporary assumption | Expires when | Risk if wrong |
 |----|---------------------|--------------|---------------|
-| ASM-01 | ~~Dual-control default A~~ | **CLOSED** — OD-DUAL OWNER_APPROVED (WF-A/B; not dual Super Admin) | — |
+| ASM-01 | ~~Dual-control default A~~ | **CLOSED** — OD-DUAL OWNER_APPROVED | — |
 | ASM-02 | ~~Typed phrase = `RESTORE`~~ | **CLOSED** — OD-PHRASE OWNER_APPROVED | — |
 | ASM-03 | ~~Maintenance = platform-wide~~ | **CLOSED** — OD-MAINT-SCOPE = GLOBAL OWNER_APPROVED | — |
-| ASM-04 | ~~Rollback = Owner-triggered~~ | **CLOSED** — OD-ROLLBACK OWNER_APPROVED (dashboard; fail-pause; never automatic) | — |
+| ASM-04 | ~~Rollback = Owner-triggered~~ | **CLOSED** — OD-ROLLBACK OWNER_APPROVED | — |
 | ASM-05 | ~~C8 SAFE-only~~ | **CLOSED** — OD-C8 OWNER_APPROVED | — |
 | ASM-06 | ~~Post-apply WARN fails closed~~ | **CLOSED** — OD-VERIFY-WARN OWNER_APPROVED | — |
 | ASM-07 | ~~Uploads = scoped + pre-image~~ | **CLOSED** — OD-UPLOADS OWNER_APPROVED | — |
@@ -207,8 +211,14 @@ Settle during P1–P5 or a short deferrable workshop. **Do not start P1 until Ow
 | ASM-11 | FA matrix / stock / schema strict | **CLOSED** — OD-FA-* OWNER_APPROVED | — |
 | ASM-12 | Integrity > privilege; no gate bypass | **CLOSED** — Integrity Principle OWNER_APPROVED | — |
 | ASM-13 | Never modify outside approved recovery scope | **CLOSED** — Isolation Principle OWNER_APPROVED | — |
+| ASM-14 | ~~Permissions align OD-DUAL~~ | **CLOSED** — OD-PERM OWNER_APPROVED | — |
+| ASM-15 | ~~Mandatory Super Admin runbook~~ | **CLOSED** — OD-RUNBOOK OWNER_APPROVED | — |
+| ASM-16 | ~~Owner owns certification PASS~~ | **CLOSED** — OD-CERT OWNER_APPROVED | — |
+| ASM-17 | ~~No post-PONR auto-unlock~~ | **CLOSED** — OD-LOCK-TTL OWNER_APPROVED | — |
+| ASM-18 | ~~Schema change → re-cert + re-enable~~ | **CLOSED** — OD-SCHEMA OWNER_APPROVED | — |
+| ASM-19 | Governance never weakens prior principles | **CLOSED** — Governance Principle OWNER_APPROVED | — |
 
-**Rule:** Closed assumptions must match OWNER_APPROVED text. No open hard assumptions remain for P1-blocking ODs.
+**Rule:** Closed assumptions must match OWNER_APPROVED text. No open OD assumptions remain in this register.
 
 ---
 
@@ -218,15 +228,17 @@ After freezing any group, verify:
 
 1. **OD-MAINT-SCOPE vs OD-ENABLE** — GLOBAL freeze matches Global Restore Operational Policy (all storefronts + Country Admins).
 2. **OD-DUAL vs OD-BREAK** — dual-control is WF-A/B (not two Super Admins); break-glass remains exceptional.
-3. **OD-ROLLBACK vs OD-PIN** — pin = new Full Backup; Rollback = Super Admin dashboard only after fail-pause; never automatic.
-4. **OD-FAIL-* vs OD-ROLLBACK** — delete/import failure → pause + Maintain; Rollback only via dashboard.
-5. **OD-C8 vs OD-VERIFY-WARN** — both fail-closed; no Super Admin override (Integrity Principle).
-6. **OD-INV vs OD-ENABLE** — inventory/certification bind before enablement.
-7. **OD-FA-* vs Isolation** — apply stays inside approved country scope; survivors untouched.
-8. **OD-UPLOADS vs Isolation** — scoped uploads + pre-image; never full-tree; fail → Resume/Rollback only.
-9. **OD-LOCK-CROSS vs OD-LOCK-SHADOW** — CPR exclusive vs Full DR and vs C6; no parallel; no bypass.
-10. **OD-TIMEOUT vs OD-RTO** — progress-aware stuck detection vs soft planning target (no hard SLA abort).
-11. **No decision silently re-enables Production Restore** before certification + OD-ENABLE path.
+3. **OD-PERM vs OD-DUAL** — Country Admin never approve/execute/resume/rollback/release maint/enable-disable.
+4. **OD-ROLLBACK vs OD-PIN** — pin = new Full Backup; Rollback = Super Admin dashboard only after fail-pause; never automatic.
+5. **OD-FAIL-* vs OD-ROLLBACK** — delete/import failure → pause + Maintain; Rollback only via dashboard.
+6. **OD-C8 vs OD-VERIFY-WARN** — both fail-closed; no Super Admin override (Integrity Principle).
+7. **OD-CERT vs OD-ENABLE** — Owner PASS + Owner approval + explicit enablement; engineering never final-approves.
+8. **OD-RUNBOOK vs OD-MAINT** — Global Maint never released until Runbook successfully completed.
+9. **OD-SCHEMA vs OD-CERT / OD-ENABLE** — schema revision change invalidates cert; no auto re-enable; Owner PASS + Enable again.
+10. **OD-UPLOADS vs Isolation** — scoped uploads + pre-image; never full-tree; fail → Resume/Rollback only.
+11. **OD-LOCK-CROSS vs OD-LOCK-SHADOW vs OD-LOCK-TTL** — exclusive locks; no post-PONR auto-release.
+12. **Governance Principle** — no OD may weaken Integrity, Isolation, or Global Restore Operational Policy.
+13. **No decision silently re-enables Production Restore** before certification + OD-ENABLE path.
 
 ---
 
@@ -240,7 +252,7 @@ After freezing any group, verify:
 | 3 | Group 3 (PIN/RB/FAIL + UPLOADS) | **OWNER_APPROVED** 2026-07-20 |
 | 3b | Gates & Integrity | **OWNER_APPROVED** 2026-07-20 |
 | 4 | Group 4 (LOCK-CROSS + LOCK-SHADOW) + Isolation Principle | **OWNER_APPROVED** 2026-07-20 |
-| — | Deferrable: OD-PERM · OD-RUNBOOK · OD-CERT · OD-SCHEMA · OD-LOCK-TTL | Open (soft) |
+| 5 | Final Governance (OD-PERM · OD-RUNBOOK · OD-CERT · OD-LOCK-TTL · OD-SCHEMA) + Governance Principle | **OWNER_APPROVED** 2026-07-20 |
 | — | **P1** | **Blocked until Owner explicitly authorizes** |
 
 ---
@@ -249,9 +261,10 @@ After freezing any group, verify:
 
 | Class | Items | P1 impact |
 |-------|-------|-----------|
-| **Hard P1 blockers** | *(none — minimum OD set complete)* | — |
-| Soft / deferrable | OD-PERM · OD-RUNBOOK · OD-CERT · OD-SCHEMA · OD-LOCK-TTL | May proceed after Owner authorizes P1; settle in P1–P5 |
-| Already frozen | Integrity · Isolation · Group 1 · Group 2 Maint · Group 3 · Gates & Integrity · Group 4 CROSS/SHADOW | Do not re-open without Owner revision |
+| **Hard P1 blockers (OD register)** | *(none — all OD-* OWNER_APPROVED)* | — |
+| Soft / deferrable OD-* | *(none)* | — |
+| Already frozen | All principles + all named OD-* | Do not re-open without Owner revision |
+| **P1 start gate** | Explicit Owner authorization to begin P1 | Required even though OD workshop is complete |
 
 **P1 still requires an explicit Owner authorization to start** — OD completeness is necessary but not sufficient.
 
@@ -267,8 +280,9 @@ After freezing any group, verify:
 | 0.4 | 2026-07-20 | Group 3 PIN/RB/FAIL frozen |
 | 0.5 | 2026-07-20 | OD-ROLLBACK refined (dashboard; fail-pause; never automatic) |
 | 0.6 | 2026-07-20 | Gates & Integrity + Integrity Principle frozen |
-| 0.7 | 2026-07-20 | Group 3 OD-UPLOADS + Group 4 LOCK-CROSS/SHADOW + Isolation Principle frozen OWNER_APPROVED; P1-blocking OD minimum set complete; remaining soft only |
+| 0.7 | 2026-07-20 | Group 3 OD-UPLOADS + Group 4 LOCK-CROSS/SHADOW + Isolation Principle frozen OWNER_APPROVED |
+| 0.8 | 2026-07-20 | Final Governance: OD-PERM · OD-RUNBOOK · OD-CERT · OD-LOCK-TTL · OD-SCHEMA + Governance Principle OWNER_APPROVED; P0b OD workshop complete |
 
 ---
 
-*End of Decision Dependencies — P0b. Documentation only. No P1. No implementation.*
+*End of Decision Dependencies — P0b. Documentation only. Workshop complete. No P1. No implementation.*

@@ -14,15 +14,16 @@
 
 **Owner-approved (2026-07-20) — do not re-answer:**  
 - Foundational Integrity Principle (integrity > privilege; no Super Admin gate bypass; system-enforced)  
+- Isolation Principle (recovery scope; survivor safety; fail if isolation unproven)  
+- Operational Governance Principle (governance never weakens Integrity/Isolation/Global Restore Policy; enforces integrity; no contradiction of prior OWNER_APPROVED)  
 - Group 1: OD-ENABLE · OD-DUAL · OD-PHRASE · OD-BREAK  
 - Group 2 (Maintenance & timing): OD-MAINT · OD-MAINT-SCOPE · OD-MAINT-MAX · OD-RTO · OD-TIMEOUT  
 - Group 3: OD-PIN · OD-ROLLBACK · OD-FAIL-DELETE · OD-FAIL-IMPORT · OD-UPLOADS (+ Maintenance State on failure pause)  
 - Gates & Integrity (workshop Group 2): OD-C8 · OD-VERIFY-WARN · OD-INV · OD-FA-RESOLVER · OD-FA-STOCK · OD-FA-SCHEMA  
-- Group 4: OD-LOCK-CROSS · OD-LOCK-SHADOW  
-- Isolation Principle (recovery scope; survivor safety; fail if isolation unproven)  
+- Group 4: OD-LOCK-CROSS · OD-LOCK-SHADOW · OD-LOCK-TTL  
+- Final Governance: OD-PERM · OD-RUNBOOK · OD-CERT · OD-SCHEMA  
 
-**How to answer remaining items:** write one of `A` / `B` / `C` / `D` (or custom text) on `OWNER ANSWER:`.  
-Recommended answers are **advice only** for open items.
+**Workshop status:** All named OD-* items are frozen OWNER_APPROVED. No open OWNER ANSWER fields remain for OD-* in this pack.
 
 ---
 
@@ -122,7 +123,7 @@ Recommended answers are **advice only** for open items.
 
 ---
 
-## Group 5 — Governance details (may defer past P1 start)
+## Group 5 — Governance details (Final Governance — OWNER_APPROVED)
 
 ### 20. OD-PHRASE — OWNER_APPROVED (moved from Group 1; do not re-answer)
 - See Group 1 item 3. Phrase **`RESTORE`** + password re-auth. Required in Workflow A and B.
@@ -130,27 +131,21 @@ Recommended answers are **advice only** for open items.
 ### 21. OD-BREAK — OWNER_APPROVED (moved from Group 1; do not re-answer)
 - See Group 1 item 4. Super Admin only; does not bypass Full Rollback Anchor, mandatory gates, logging, or authentication.
 
-### 22. OD-PERM *(still open — must align with OD-DUAL)*
-Country Admin may prepare C3–C8 / request restore; Super Admin only approves/executes/releases maint; viewers country-scoped?
-- **Recommended:** A — Align to OWNER_APPROVED OD-DUAL  
-- **Alternatives:** B broader roles · C custom matrix  
-- **OWNER ANSWER:** _______________
+### 22. OD-PERM — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Country Admin may view own-country CPR status, prepare C3–C8, and request restore. Country Admin shall never approve/execute/resume/rollback Production Restore, release Global Maintenance, or enable/disable Production Restore. Super Admin alone may approve, execute, resume, Rollback, release Global Maintenance, and enable/disable CPR. No authority model may contradict OD-DUAL.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 23. OD-RUNBOOK *(still open — must align with OD-DUAL)*
-Sign-offs: Workflow A Super Admin end-to-end protections; Workflow B Country Admin prep then Super Admin approval/execute; Super Admin maint release?
-- **Recommended:** A — Align to OWNER_APPROVED OD-DUAL  
-- **Alternatives:** B operator only · C custom  
-- **OWNER ANSWER:** _______________
+### 23. OD-RUNBOOK — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Mandatory operational Runbook every Production Restore. Before PONR, Super Admin completes audited checklist including at minimum: Package ID; Target Country; C8 = SAFE; Certified Inventory Snapshot; Session Full Backup ID; Global Maintenance active. Global Maintenance never released until Runbook successfully completed.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 24. OD-CERT
-Owner owns certification checklist; engineering fills evidence; PASS required before enablement?
-- **Recommended:** A  
-- **Alternatives:** B engineering self-cert · C skip formal cert  
-- **OWNER ANSWER:** _______________
+### 24. OD-CERT — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Owner is final PASS/FAIL authority. Engineering produces evidence/reports/artifacts only — never final certification approval. CPR remains disabled until Certification PASS + explicit Owner approval + explicit Production Enablement.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
 ---
 
-## Group 6 — Timing / duration (Group 2 frozen; remaining open)
+## Group 6 — Timing / duration / locks / schema (OWNER_APPROVED)
 
 ### 25. OD-MAINT-MAX — OWNER_APPROVED (2026-07-20)
 - **Frozen:** No fixed maximum maintenance duration. Automatic Expected Duration estimate per job (package/SQL/upload size, rows, batches, historical stats, infrastructure performance). No manual duration configuration.  
@@ -164,17 +159,13 @@ Owner owns certification checklist; engineering fills evidence; PASS required be
 - **Frozen:** No hardcoded RTO. Automatic Estimated Duration per job from actual workload — for **operational monitoring only**.  
 - **OWNER ANSWER:** OWNER_APPROVED
 
-### 28. OD-LOCK-TTL *(still open)*
-Heartbeat ≤ 30s; stale detect pre-PONR with manual clear if PID dead; **no auto-unlock post-PONR**?
-- **Recommended:** A  
-- **Alternatives:** B custom TTLs · C auto-unlock anytime  
-- **OWNER ANSWER:** _______________
+### 28. OD-LOCK-TTL — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Heartbeat monitoring for restore locks. Pre-PONR: Super Admin–only manual clear of stale locks; every manual unlock fully audited. Post-PONR: automatic lock release permanently forbidden — no timeout, worker failure, crash, or other circumstance may auto-release. System Integrity > automatic recovery.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 29. OD-SCHEMA *(still open)*
-If schema_revision leaves 121: mandatory re-cert + package rebuild before CPR?
-- **Recommended:** A  
-- **Alternatives:** B mixed revisions with warnings · C ignore revision  
-- **OWNER ANSWER:** _______________
+### 29. OD-SCHEMA — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Any Production Schema Revision change invalidates prior CPR certification. Before CPR may be used again: package rebuild + new Certification + new C8 SAFE. Those steps do **not** auto re-enable. CPR stays disabled until Owner reviews new cert, grants PASS, and explicitly Enables again. Every major schema evolution = full new production authorization cycle.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
 ---
 
@@ -189,8 +180,9 @@ If schema_revision leaves 121: mandatory re-cert + package rebuild before CPR?
 | Group 3 freeze | OWNER_APPROVED 2026-07-20 (OD-PIN, OD-ROLLBACK, OD-FAIL-DELETE, OD-FAIL-IMPORT, OD-UPLOADS + Maintenance State) |
 | Gates & Integrity freeze | OWNER_APPROVED 2026-07-20 (OD-C8, OD-VERIFY-WARN, OD-INV, OD-FA-* + Integrity Principle) |
 | Group 4 freeze | OWNER_APPROVED 2026-07-20 (OD-LOCK-CROSS, OD-LOCK-SHADOW + Isolation Principle) |
-| Workshop complete? | YES / NO (remaining open / deferrable items) |
-| Notes | _______________ |
+| Final Governance freeze | OWNER_APPROVED 2026-07-20 (OD-PERM, OD-RUNBOOK, OD-CERT, OD-LOCK-TTL, OD-SCHEMA + Governance Principle) |
+| Workshop complete? | **YES** (all named OD-* frozen OWNER_APPROVED) |
+| Notes | P1 still requires explicit Owner authorization to start |
 
-**Groups 1–4 and Gates & Integrity are frozen.** P1-blocking OD minimum set is complete; remaining open items are deferrable detail only.  
+**P0b Owner Decision workshop is complete.** All named OD-* decisions and foundational principles are frozen OWNER_APPROVED.  
 **Do not begin P1 until the Owner explicitly authorizes P1.** **Do not implement.**

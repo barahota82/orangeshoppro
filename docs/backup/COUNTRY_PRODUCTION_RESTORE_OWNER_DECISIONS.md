@@ -12,7 +12,7 @@
 | **Global Restore ops clarification** | `docs/backup/GLOBAL_RESTORE_OPERATIONAL_POLICY.md` (**not** a new OD; platform-wide maint UX for any Restore) |
 | **C3–C8** | Must not be modified |
 | **Enablement** | Remains **disabled** until certification + explicit OD-ENABLE + implementation + final enterprise approval (OWNER_APPROVED) |
-| **Last owner freeze** | 2026-07-20 — Group 3 remaining + Group 4: OD-UPLOADS, OD-LOCK-CROSS, OD-LOCK-SHADOW + Isolation Principle |
+| **Last owner freeze** | 2026-07-20 — Final Governance: OD-PERM, OD-RUNBOOK, OD-CERT, OD-LOCK-TTL, OD-SCHEMA + Governance Principle |
 
 ### Frozen inputs (not reopened)
 
@@ -44,6 +44,16 @@ This principle governs Gates & Integrity and must not be contradicted by later O
 - If safe isolation cannot be proven, the operation shall **fail**.  
 
 This principle governs Group 3 remaining (OD-UPLOADS) and Group 4 (OD-LOCK-*) and must not be contradicted by later ODs or implementation.
+
+### Foundational Owner Principle — Operational governance (OWNER_APPROVED — 2026-07-20)
+
+**OWNER_APPROVED** for the entire Orange platform:
+
+- Operational governance shall **never** weaken the previously approved Integrity Principle, Isolation Principle, or Global Restore Operational Policy.  
+- Governance exists to **enforce** system integrity, not to bypass it.  
+- No governance decision may contradict any previously frozen OWNER_APPROVED decision.  
+
+This principle governs OD-PERM, OD-RUNBOOK, OD-CERT, OD-LOCK-TTL, and OD-SCHEMA and must not be contradicted by later ODs or implementation.
 
 ### Owner-approved CPR decisions (Group 1 — Enablement & control — 2026-07-20)
 
@@ -92,6 +102,16 @@ This principle governs Group 3 remaining (OD-UPLOADS) and Group 4 (OD-LOCK-*) an
 |----|--------|
 | **OD-LOCK-CROSS** | OWNER_APPROVED (CPR and Full DR mutually exclusive; no parallel; no override/bypass) |
 | **OD-LOCK-SHADOW** | OWNER_APPROVED (CPR and C6 mutually exclusive / serialized; no concurrent shared resources) |
+| **OD-LOCK-TTL** | OWNER_APPROVED (heartbeat; Super Admin manual pre-PONR clear only; **no** post-PONR auto-release under any circumstance) |
+
+### Owner-approved CPR decisions (Final Governance — 2026-07-20)
+
+| ID | Status |
+|----|--------|
+| **OD-PERM** | OWNER_APPROVED (Country Admin view/prepare/request only; Super Admin alone approve/execute/resume/rollback/release maint/enable-disable; aligns OD-DUAL) |
+| **OD-RUNBOOK** | OWNER_APPROVED (mandatory pre-PONR Super Admin checklist; fully audited; Global Maint not released until Runbook complete) |
+| **OD-CERT** | OWNER_APPROVED (Owner is final PASS/FAIL; engineering evidence only; disabled until PASS + Owner approval + explicit enablement) |
+| **OD-SCHEMA** | OWNER_APPROVED (any production schema revision change invalidates cert; rebuild + new cert + new C8 SAFE; no auto re-enable — Owner PASS + Enable again) |
 
 **Note:** P0 architecture §8 previously recommended “two distinct Super Admin identities.” That recommendation is **superseded** by OWNER_APPROVED **OD-DUAL** in this register. Do not implement the old dual-Super-Admin model.
 
@@ -103,12 +123,14 @@ This principle governs Group 3 remaining (OD-UPLOADS) and Group 4 (OD-LOCK-*) an
 
 **Note (Group 4 + Isolation Principle):** Production Isolation philosophy — scoped recovery, proven survivor isolation, exclusive execution, zero concurrent recovery operations, zero uncontrolled file replacement. Prefer proven integrity over speed or convenience.
 
+**Note (Final Governance + Governance Principle):** Governance completes the CPR policy layer — integrity before privilege; proof before execution; isolation before convenience; Owner authorization before production enablement. No production restore may rely on assumptions, administrator judgement, privilege overrides, or best-effort execution. Only proven system integrity may authorize execution. All named OD-* in this register are now OWNER_APPROVED.
+
 ### Register rules
 
 - Status **OWNER_APPROVED** = frozen owner policy; do not reopen without a new owner decision.  
-- Remaining decisions stay **PROPOSED** until the owner answers.  
-- Facilitation “Recommended” is historical advice only where status is still PROPOSED.  
-- Foundational Integrity Principle and Recovery Scope Isolation Principle are OWNER_APPROVED and bind gates, uploads, and locks.
+- All named OD-* decisions in this register are **OWNER_APPROVED** (Final Governance freeze 2026-07-20).  
+- Facilitation “Recommended” is historical advice only.  
+- Foundational Integrity, Isolation, and Operational Governance Principles are OWNER_APPROVED and bind gates, uploads, locks, permissions, runbook, certification, and schema re-authorization.
 
 ### OD count
 
@@ -211,16 +233,16 @@ This principle governs Group 3 remaining (OD-UPLOADS) and Group 4 (OD-LOCK-*) an
 | **1. ID** | OD-PERM |
 | **2. Title** | Who may view / create / approve CPR jobs |
 | **3. Exact question** | Which roles may (1) view CPR status, (2) create CPR jobs, (3) approve CPR, (4) authorize PONR / release maintenance — and may country-scoped admins act only for their country? |
-| **4. Options** | **A)** Align with OWNER_APPROVED OD-DUAL: Country Admin may prepare C3–C8 / request restore; Super Admin only approves/executes/releases maint; viewers country-scoped. **B)** Broader roles. **C)** Owner-defined matrix. |
-| **5. Consequences** | Must not contradict OD-DUAL Workflow A/B. Super Admin may execute alone under Workflow A protections. |
-| **6. Recommended** | **A** (align to frozen OD-DUAL) |
-| **7. Reason** | Fail closed; country isolation; match owner-approved authority model. |
-| **8. Security** | Prevents cross-country authorization. |
-| **9–11** | Integrity/ops/rollback: process. |
-| **12. Required before** | P1: soft. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | *(Superseded.)* Historical B broader roles and C custom matrix rejected. |
+| **5. Consequences** | Permanent permission model aligned to OD-DUAL; Country Admin never mutates production restore control plane. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED.)* |
+| **7. Reason** | Fail closed; country isolation; match frozen OD-DUAL; Governance Principle. |
+| **8. Security** | Prevents cross-country authorization and Country Admin privilege escalation. |
+| **9–11** | Integrity/ops/rollback: Super Admin alone for execute/resume/rollback/maint release/enable-disable. |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | The Production Restore permission model is permanently defined as follows. **Country Admin may:** view Country Production Restore status for their own country; prepare C3–C8; request Country Production Restore. **Country Admin shall never:** approve, execute, resume, or rollback Production Restore; release Global Maintenance; enable or disable Production Restore. **Super Admin alone may:** approve, execute, resume Production Restore; execute Rollback; release Global Maintenance; enable or disable Country Production Restore. No additional authority model shall be introduced that contradicts frozen **OD-DUAL**. |
+| **15. Frozen policy wording** | *Country Admin may view CPR status for their own country, prepare C3–C8, and request Country Production Restore. Country Admin shall never approve, execute, resume, or rollback Production Restore; never release Global Maintenance; never enable or disable Production Restore. Super Admin alone may approve, execute, and resume Production Restore; execute Rollback; release Global Maintenance; and enable or disable Country Production Restore. No additional authority model may contradict OD-DUAL.* |
 
 ---
 
@@ -231,15 +253,15 @@ This principle governs Group 3 remaining (OD-UPLOADS) and Group 4 (OD-LOCK-*) an
 | **1. ID** | OD-CERT |
 | **2. Title** | Country Production certification evidence pack |
 | **3. Exact question** | Who owns the Country Production certification checklist, and must certification PASS before any enablement? |
-| **4. Options** | **A)** Owner owns checklist; engineering fills evidence; PASS mandatory before OD-ENABLE. **B)** Engineering self-certifies without owner sign-off. **C)** Skip formal certification; rely on drills only. |
-| **5. Consequences** | A: matches P0 roadmap P8→P9. B/C: weaken governance. |
-| **6. Recommended** | **A** |
-| **7. Reason** | Explicit enablement after proof. |
-| **8–11** | Security/integrity/ops/rollback: cert proves drills including rollback. |
-| **12. Required before** | P1: soft (program design in P2). Implementation: before cert phase. **Certification: blocks.** **Enablement: blocks.** |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | *(Superseded.)* Historical B engineering self-cert and C skip formal cert rejected. |
+| **5. Consequences** | Owner is final PASS/FAIL; engineering never grants final certification approval; CPR stays disabled until PASS + Owner approval + explicit enablement. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED.)* |
+| **7. Reason** | Explicit enablement after proof; Governance Principle; aligns OD-ENABLE. |
+| **8–11** | Security/integrity/ops/rollback: cert proves drills including rollback; Owner alone closes PASS. |
+| **12. Required before** | P1: yes (frozen). Implementation: before cert phase. **Certification: blocks.** **Enablement: blocks.** |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | The Owner is the final **PASS / FAIL** authority for Country Production Restore Certification. Engineering is responsible for producing technical evidence, verification reports, and certification artifacts. Engineering shall **never** grant the final certification approval. Production Restore shall remain disabled until: Certification PASS; explicit Owner approval; explicit Production Enablement. |
+| **15. Frozen policy wording** | *The Owner is the final PASS/FAIL authority for Country Production Restore Certification. Engineering produces technical evidence, verification reports, and certification artifacts, and shall never grant final certification approval. Production Restore remains disabled until Certification PASS, explicit Owner approval, and explicit Production Enablement.* |
 
 ---
 
@@ -353,15 +375,15 @@ This principle governs Group 3 remaining (OD-UPLOADS) and Group 4 (OD-LOCK-*) an
 | **1. ID** | OD-RUNBOOK |
 | **2. Title** | Required human sign-offs in the CPR runbook |
 | **3. Exact question** | Which human sign-offs are mandatory before PONR and before maintenance release? |
-| **4. Options** | **A)** Align to OD-DUAL: Workflow A — Super Admin checklist + phrase/`RESTORE`/re-auth before execute; Workflow B — Country Admin prep sign-off then Super Admin approval/execute; post-success Super Admin maint release. **B)** Operator only. **C)** Owner-defined list. |
-| **5. Consequences** | Must match OWNER_APPROVED OD-DUAL (not dual Super Admin). B: weak. |
-| **6. Recommended** | **A** (align to frozen OD-DUAL) |
-| **7. Reason** | Explicit operational accountability under Super Admin / Country Admin model. |
-| **8–11** | Process. |
-| **12. Required before** | P1: soft. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | *(Superseded.)* Historical B operator-only and C custom list rejected as primary policy. |
+| **5. Consequences** | Mandatory audited Super Admin pre-PONR checklist; Global Maint not released until Runbook complete. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED with explicit minimum checklist.)* |
+| **7. Reason** | Explicit operational accountability; Governance Principle; aligns OD-DUAL / Super Admin model. |
+| **8–11** | Process + audit; maint release gated on Runbook completion. |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Every Production Restore shall follow a **mandatory** operational Runbook. Before PONR, the Super Admin shall explicitly complete the operational checklist. The checklist shall include at minimum: Restore Package ID; Target Country; C8 Overall Result = SAFE; Certified Inventory Snapshot; Session Full Backup ID; verification that Global Maintenance is active. The Runbook shall be fully audited. Global Maintenance shall **never** be released until the Runbook has been successfully completed. |
+| **15. Frozen policy wording** | *Every Production Restore follows a mandatory operational Runbook. Before PONR, the Super Admin must explicitly complete an audited checklist including at minimum: Restore Package ID; Target Country; C8 Overall Result = SAFE; Certified Inventory Snapshot; Session Full Backup ID; verification that Global Maintenance is active. Global Maintenance shall never be released until the Runbook has been successfully completed.* |
 
 ---
 
@@ -502,17 +524,17 @@ This principle governs Group 3 remaining (OD-UPLOADS) and Group 4 (OD-LOCK-*) an
 | **1. ID** | OD-SCHEMA |
 | **2. Title** | Process when schema_revision leaves 121 |
 | **3. Exact question** | If live schema_revision changes from 121, must Country CPR re-certify (matrix/expectations/package) before any production job? |
-| **4. Options** | **A)** Yes — mandatory re-cert + package rebuild. **B)** Allow mixed revisions with warnings. **C)** Ignore revision. |
-| **5. Consequences** | A: fail closed. B/C: drift risk. |
-| **6. Recommended** | **A** |
-| **7. Reason** | Schema drift is a production blocker; no silent proceed. |
+| **4. Options** | *(Superseded.)* Historical B mixed revisions with warnings and C ignore revision rejected. |
+| **5. Consequences** | Any production schema revision change invalidates prior CPR certification; full new authorization cycle required; no auto re-enable. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED.)* |
+| **7. Reason** | Schema drift is a production blocker; aligns OD-FA-SCHEMA / Integrity / OD-CERT / OD-ENABLE. |
 | **8–9** | Integrity. |
-| **10. Operational** | Re-cert cost on upgrades. |
+| **10. Operational** | Re-cert + Owner PASS + explicit Enable again on every major schema evolution. |
 | **11. Rollback** | Unaffected. |
-| **12. Required before** | P1: soft. Implementation: when revision changes. Certification: yes on change. Enablement: must match cert revision. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **12. Required before** | P1: yes (frozen). Implementation: when revision changes. Certification: yes on change. Enablement: must match cert revision + new Enable. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Any Production Schema Revision change **invalidates** the previous Country Production Restore certification. Before Production Restore may be used again, the following are mandatory: package rebuild; new Certification; new C8 SAFE verification. Successful completion of those steps shall **NOT** automatically re-enable Production Restore. Production Restore shall remain disabled until: the Owner explicitly reviews the new certification; the Owner grants PASS; the Owner explicitly performs Enable again. Every major schema evolution therefore requires a completely new production authorization cycle. |
+| **15. Frozen policy wording** | *Any Production Schema Revision change invalidates the previous Country Production Restore certification. Before CPR may be used again: package rebuild, new Certification, and new C8 SAFE verification are mandatory. Those steps do not automatically re-enable Production Restore. CPR remains disabled until the Owner explicitly reviews the new certification, grants PASS, and explicitly performs Enable again. Every major schema evolution requires a completely new production authorization cycle.* |
 
 ---
 
@@ -610,15 +632,15 @@ This principle governs Group 3 remaining (OD-UPLOADS) and Group 4 (OD-LOCK-*) an
 | **1. ID** | OD-LOCK-TTL |
 | **2. Title** | Lock heartbeat TTL and stale handling |
 | **3. Exact question** | What heartbeat interval and stale TTL apply, and is post-PONR auto-unlock forbidden? |
-| **4. Options** | **A)** Heartbeat ≤ 30s; stale detect ~5–15 minutes pre-PONR with documented manual clear if PID dead; **post-PONR no auto-unlock**. **B)** Owner TTLs. **C)** Auto-unlock anytime. |
-| **5. Consequences** | A: matches Full DR post-PONR discipline. C: dangerous. |
-| **6. Recommended** | **A** |
-| **7. Reason** | Replay/concurrency safety; no silent unlock after irreversible start. |
-| **8–11** | Ops/incident. |
-| **12. Required before** | P1: soft. Implementation: yes. Certification: soft. Enablement: soft. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | *(Superseded.)* Historical C auto-unlock anytime rejected. |
+| **5. Consequences** | Heartbeat monitoring; Super Admin–only audited pre-PONR manual clear; post-PONR auto-release permanently forbidden under every circumstance. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED.)* |
+| **7. Reason** | System Integrity > automatic recovery; aligns OD-LOCK-CROSS/SHADOW and Isolation Principle. |
+| **8–11** | Ops/incident; post-PONR stuck lock requires human Super Admin path, never silent unlock. |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Restore execution locks shall use **heartbeat monitoring**. **Pre-PONR:** stale locks may be manually cleared **only** by the Super Admin; every manual unlock shall be fully audited. **Post-PONR:** automatic lock release is **permanently forbidden**. No timeout, worker failure, crash, or other circumstance shall automatically release a post-PONR lock. System Integrity has higher priority than automatic recovery. |
+| **15. Frozen policy wording** | *Restore execution locks use heartbeat monitoring. Pre-PONR, stale locks may be manually cleared only by the Super Admin, and every manual unlock must be fully audited. Post-PONR, automatic lock release is permanently forbidden — no timeout, worker failure, crash, or other circumstance may automatically release a post-PONR lock. System Integrity has higher priority than automatic recovery.* |
 
 ---
 
@@ -699,7 +721,9 @@ These are **already frozen** and must not be contradicted by any OD answer:
 8. **Integrity Principle (OWNER_APPROVED):** System/Data Integrity > user privileges; no Super Admin bypass of production safety gates; system-enforced; missing proof → do not execute.  
 9. **Proof-driven Production Restore:** never rely on user judgement, manual override, administrator privilege, or best-effort execution.  
 10. **Isolation Principle (OWNER_APPROVED):** never modify outside approved recovery scope; never endanger survivors/unrelated resources; fail if safe isolation unproven.  
-11. **Production Isolation:** scoped recovery; exclusive execution; zero concurrent recovery ops; zero uncontrolled file replacement.
+11. **Production Isolation:** scoped recovery; exclusive execution; zero concurrent recovery ops; zero uncontrolled file replacement.  
+12. **Governance Principle (OWNER_APPROVED):** governance never weakens Integrity, Isolation, or Global Restore Operational Policy; governance enforces integrity and must not contradict prior OWNER_APPROVED decisions.  
+13. **Governance layer complete:** OD-PERM · OD-RUNBOOK · OD-CERT · OD-LOCK-TTL · OD-SCHEMA are OWNER_APPROVED; CPR remains disabled until cert PASS + Owner approval + explicit enablement; schema revision change requires a full new authorization cycle.
 
 ---
 
@@ -711,32 +735,32 @@ These are **already frozen** and must not be contradicted by any OD answer:
 | OD-DUAL | A | **OWNER_APPROVED** (WF-A/B) | Y | N | Y | Y |
 | OD-PHRASE | A | **OWNER_APPROVED** (`RESTORE`) | Y | N | Y | Y |
 | OD-BREAK | A | **OWNER_APPROVED** | Y | N | Y | Y |
-| OD-PERM | A | A | soft | partial | Y | Y |
-| OD-CERT | A | A | soft | Y | **Y** | **Y** |
+| OD-PERM | A | **OWNER_APPROVED** (OD-DUAL capabilities) | Y | N | Y | Y |
+| OD-CERT | A | **OWNER_APPROVED** (Owner PASS/FAIL) | Y | N | **Y** | **Y** |
 | OD-MAINT | B | **OWNER_APPROVED** | Y | N | Y | Y |
 | OD-MAINT-SCOPE | B | **OWNER_APPROVED** (GLOBAL) | Y | N | Y | Y |
 | OD-MAINT-MAX | B | **OWNER_APPROVED** (auto estimate) | Y | N | soft | soft |
 | OD-RTO | B | **OWNER_APPROVED** (estimate only) | Y | N | soft | soft |
 | OD-TIMEOUT | B | **OWNER_APPROVED** (progress-aware) | Y | N | soft | soft |
-| OD-RUNBOOK | B | A | soft | Y | Y | Y |
+| OD-RUNBOOK | B | **OWNER_APPROVED** (mandatory checklist) | Y | N | Y | Y |
 | OD-PIN | C | **OWNER_APPROVED** (new Full Backup) | Y | N | Y | Y |
 | OD-ROLLBACK | C | **OWNER_APPROVED** (dashboard action; fail-pause only) | Y | N | Y | Y |
 | OD-FAIL-DELETE | C | **OWNER_APPROVED** (pause; no auto-RB) | Y | N | Y | Y |
 | OD-FAIL-IMPORT | C | **OWNER_APPROVED** (pause; no auto-RB) | Y | N | Y | Y |
 | OD-C8 | D | **OWNER_APPROVED** (SAFE only) | Y | N | Y | Y |
 | OD-VERIFY-WARN | D | **OWNER_APPROVED** (fail-closed) | Y | N | Y | Y |
-| OD-SCHEMA | D | A | soft | Y | Y | Y |
+| OD-SCHEMA | D | **OWNER_APPROVED** (invalidate + re-auth cycle) | Y | N | Y | Y |
 | OD-INV | D | **OWNER_APPROVED** (certified snapshot) | Y | N | Y | Y |
 | OD-UPLOADS | E | **OWNER_APPROVED** (scoped + pre-image) | Y | N | Y | Y |
 | OD-LOCK-CROSS | F | **OWNER_APPROVED** (exclusive vs Full DR) | Y | N | Y | Y |
 | OD-LOCK-SHADOW | F | **OWNER_APPROVED** (exclusive vs C6) | Y | N | Y | Y |
-| OD-LOCK-TTL | F | A | soft | Y | soft | soft |
+| OD-LOCK-TTL | F | **OWNER_APPROVED** (no post-PONR auto-unlock) | Y | N | Y | Y |
 | OD-FA-RESOLVER | G | **OWNER_APPROVED** | Y | N | Y | Y |
 | OD-FA-STOCK | G | **OWNER_APPROVED** | Y | N | Y | Y |
 | OD-FA-SCHEMA | G | **OWNER_APPROVED** | Y | N | Y | Y |
 
-**Total: 27**
+**Total: 27** (all OWNER_APPROVED)
 
 ---
 
-*End of Owner Decision Register — P0b. Groups 1–4 + Gates & Integrity frozen OWNER_APPROVED (P1-blocking OD minimum set complete). Remaining PROPOSED are deferrable detail only. No P1. No implementation.*
+*End of Owner Decision Register — P0b. All named OD-* decisions and foundational principles are frozen OWNER_APPROVED (Final Governance complete). No PROPOSED OD-* remain in this register. No P1. No implementation.*
