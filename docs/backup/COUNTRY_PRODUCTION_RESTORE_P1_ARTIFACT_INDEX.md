@@ -253,6 +253,7 @@ No architectural insufficiency discovered during WP-P1-01. No escalation require
 | 1.4 | 2026-07-21 | WP-P1-05 marked COMPLETE in inventory (§7) |
 | 1.5 | 2026-07-21 | WP-P1-06 marked COMPLETE in inventory (§7) |
 | 1.6 | 2026-07-21 | WP-P1-07 marked COMPLETE in inventory (§7) |
+| 1.7 | 2026-07-21 | WP-P1-08 marked COMPLETE in inventory (§7) |
 
 **Artifact-ID:** `CPR-P1-WP01-ARTIFACT_INDEX`
 
