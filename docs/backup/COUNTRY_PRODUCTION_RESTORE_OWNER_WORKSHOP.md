@@ -13,6 +13,7 @@
 **Owner-approved (2026-07-20) — do not re-answer:**  
 - Group 1: OD-ENABLE · OD-DUAL · OD-PHRASE · OD-BREAK  
 - Group 2: OD-MAINT · OD-MAINT-SCOPE · OD-MAINT-MAX · OD-RTO · OD-TIMEOUT  
+- Group 3: OD-PIN · OD-ROLLBACK · OD-FAIL-DELETE · OD-FAIL-IMPORT (+ Maintenance State on failure pause)  
 
 **How to answer remaining items:** write one of `A` / `B` / `C` / `D` (or custom text) on `OWNER ANSWER:`.  
 Recommended answers are **advice only** for open items.
@@ -45,12 +46,9 @@ Recommended answers are **advice only** for open items.
 - **Frozen:** **GLOBAL MAINTENANCE.** Country-only Maintenance is NOT approved under the current architecture (shared production DB; Global/Mixed tables; Full pre-restore backup as primary post-PONR rollback; platform-wide maintenance framework and rollback). Future reconsideration only after a proven country-isolated production restore model.  
 - **OWNER ANSWER:** OWNER_APPROVED (GLOBAL)
 
-### 7. OD-PIN *(still open)*
-Refuse PONR unless Full pre-restore backup is verified and retention-pinned?
-- **Recommended:** A — Yes, mandatory pin  
-- **Alternatives:** B best-effort · C no pin  
-- **Consequences:** A enables Full rollback. B/C Critical if failure after PONR.  
-- **OWNER ANSWER:** _______________
+### 7. OD-PIN — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Every CPR must auto-create a **NEW** Full Backup (never reuse existing). Workflow: Maintenance Mode → create fresh Full Backup → verify → pin → continue only after success.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
 ---
 
@@ -100,30 +98,25 @@ On production/cert clones: strict schema expectations, no fixture soft-skip?
 
 ---
 
-## Group 3 — Failure & rollback (answer before P1)
+## Group 3 — Failure & rollback
 
-### 14. OD-FAIL-DELETE
-If DELETE fails after PONR: finish safe deletes if possible; else Full-anchor rollback; never import while dirty-unknown?
-- **Recommended:** A — That policy  
-- **Alternatives:** B immediate Full rollback always · C continue to import  
-- **Consequences:** C unsafe.  
-- **OWNER ANSWER:** _______________
+### 14. OD-FAIL-DELETE — OWNER_APPROVED (2026-07-20)
+- **Frozen:** No automatic rollback after delete-phase failure. Keep Maintenance ON; preserve state; show failure reason, completed phase, execution status; pause for Super Admin: Resume (when supported) or Rollback to session Full Backup.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 15. OD-FAIL-IMPORT
-If IMPORT fails: no mid-stream resume; re-clear target slice + re-import **or** Full-anchor rollback?
-- **Recommended:** A — Re-clear/re-import or Full rollback  
-- **Alternatives:** B always Full rollback · C mid-stream SQL resume  
-- **Consequences:** C rejected for integrity.  
-- **OWNER ANSWER:** _______________
+### 15. OD-FAIL-IMPORT — OWNER_APPROVED (2026-07-20)
+- **Frozen:** No automatic rollback on import failure. Keep Maintenance ON; preserve state; show progress %, completed batches, failure reason, stage; pause for Super Admin: Resume (only if stage safely supports) or Rollback to session Full Backup.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 16. OD-ROLLBACK-CLI
-CPR wrapper that invokes Full DR rollback against pinned Full anchor (not country-inverse as primary)?
-- **Recommended:** A — CPR wrapper → Full rollback primitives  
-- **Alternatives:** B operators run Full CLI directly · C country-inverse primary  
-- **Consequences:** C conflicts with P0 philosophy.  
-- **OWNER ANSWER:** _______________
+### 16. OD-ROLLBACK — OWNER_APPROVED (2026-07-20; was OD-ROLLBACK-CLI)
+- **Frozen:** Super Admin only via administrative interface. Same controls as Production Restore: re-auth, confirmation phrase, audit, permission validation, complete execution logging. Never available to Country Admins.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 17. OD-UPLOADS
+### 16b. Maintenance State on failure pause — OWNER_APPROVED (2026-07-20)
+- **Frozen:** While paused for failure, Maintenance Mode remains active. Normal operation returns only after Super Admin successfully completes Resume **or** Rollback. Users must never regain access while restore is incomplete.  
+- **OWNER ANSWER:** OWNER_APPROVED
+
+### 17. OD-UPLOADS *(still open)*
 Scoped allowlisted uploads apply with pre-image; never full `uploads/` root rename?
 - **Recommended:** A — Scoped apply + pre-image  
 - **Alternatives:** B full-tree two-phase rename · C in-place no pre-image  
@@ -214,8 +207,9 @@ If schema_revision leaves 121: mandatory re-cert + package rebuild before CPR?
 | Date | _______________ |
 | Group 1 freeze | OWNER_APPROVED 2026-07-20 (OD-ENABLE, OD-DUAL, OD-PHRASE, OD-BREAK) |
 | Group 2 freeze | OWNER_APPROVED 2026-07-20 (OD-MAINT, OD-MAINT-SCOPE, OD-MAINT-MAX, OD-RTO, OD-TIMEOUT) |
+| Group 3 freeze | OWNER_APPROVED 2026-07-20 (OD-PIN, OD-ROLLBACK, OD-FAIL-DELETE, OD-FAIL-IMPORT + Maintenance State) |
 | Workshop complete? | YES / NO (remaining open items) |
 | Notes | _______________ |
 
-**Group 1 and Group 2 are frozen.** Continue workshop for open ODs only.  
+**Groups 1–3 are frozen.** Continue workshop for open ODs only.  
 **Do not begin P1 until remaining P1-blocking ODs are frozen.** **Do not implement.**

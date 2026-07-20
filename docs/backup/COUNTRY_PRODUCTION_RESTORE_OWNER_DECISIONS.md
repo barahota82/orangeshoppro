@@ -10,7 +10,7 @@
 | **Dependencies** | `docs/backup/COUNTRY_PRODUCTION_RESTORE_DECISION_DEPENDENCIES.md` |
 | **C3–C8** | Must not be modified |
 | **Enablement** | Remains **disabled** until certification + explicit OD-ENABLE + implementation + final enterprise approval (OWNER_APPROVED) |
-| **Last owner freeze** | 2026-07-20 — Group 2: OD-MAINT, OD-MAINT-SCOPE, OD-MAINT-MAX, OD-RTO, OD-TIMEOUT (Group 1 remains frozen) |
+| **Last owner freeze** | 2026-07-20 — Group 3: OD-PIN, OD-ROLLBACK, OD-FAIL-DELETE, OD-FAIL-IMPORT (+ Maintenance State on pause) |
 
 ### Frozen inputs (not reopened)
 
@@ -40,9 +40,21 @@
 | **OD-RTO** | OWNER_APPROVED (no hardcoded RTO; Estimated Duration for monitoring only) |
 | **OD-TIMEOUT** | OWNER_APPROVED (timeout ≠ failure; progress-aware escalation → investigate/resume) |
 
+### Owner-approved CPR decisions (Group 3 — 2026-07-20)
+
+| ID | Status |
+|----|--------|
+| **OD-PIN** | OWNER_APPROVED (new session Full Backup under Maintenance → verify → pin; never reuse existing) |
+| **OD-ROLLBACK** | OWNER_APPROVED (Super Admin admin UI only; same security controls as Production Restore; never Country Admin) — P0 catalog ID was **OD-ROLLBACK-CLI** |
+| **OD-FAIL-DELETE** | OWNER_APPROVED (no auto-rollback; pause for Super Admin Resume/Rollback) |
+| **OD-FAIL-IMPORT** | OWNER_APPROVED (no auto-rollback; pause for Super Admin Resume/Rollback) |
+| **Maintenance State (on failure pause)** | OWNER_APPROVED (Maintenance stays ON until Super Admin completes Resume or Rollback) |
+
 **Note:** P0 architecture §8 previously recommended “two distinct Super Admin identities.” That recommendation is **superseded** by OWNER_APPROVED **OD-DUAL** in this register. Do not implement the old dual-Super-Admin model.
 
 **Note (Group 2):** P0 architecture §9 prefers platform-wide maintenance — now **OWNER_APPROVED** as GLOBAL MAINTENANCE (OD-MAINT-SCOPE). Country-only maintenance is not approved under the current shared-DB / Full-anchor rollback architecture.
+
+**Note (Group 3):** OD-PIN owner workflow is: Maintenance Mode → **new** Full Backup for this session → verify → pin → continue. Existing backups must never be reused as the CPR rollback anchor. Failure after delete/import does **not** auto-rollback; Super Admin chooses Resume (when safe) or Rollback. P0 catalog **OD-ROLLBACK-CLI** is frozen under owner ID **OD-ROLLBACK** (admin-interface initiation + security parity with Production Restore).
 
 ### Register rules
 
@@ -52,7 +64,7 @@
 
 ### OD count
 
-**27** decisions (26 from P0 catalog + **OD-MAINT** called out in P0 §4 but missing from the catalog table).
+**27** decisions (26 from P0 catalog + **OD-MAINT** called out in P0 §4 but missing from the catalog table). Owner ID **OD-ROLLBACK** freezes the historical catalog item **OD-ROLLBACK-CLI**.
 
 ---
 
@@ -307,45 +319,45 @@
 
 ## Group C — Backup and rollback
 
-### OD-PIN — Retention pin for Full rollback anchor
+### OD-PIN — Session Full Backup create / verify / pin
 
 | Field | Content |
 |-------|---------|
 | **1. ID** | OD-PIN |
-| **2. Title** | Pin Full pre-restore backup against retention deletion |
+| **2. Title** | New Full Backup as CPR rollback anchor (create, verify, pin) |
 | **3. Exact question** | Must a verified Full pre-restore backup be retention-pinned for the CPR job duration (and until rollback window closes), refusing PONR if pin fails? |
-| **4. Options** | **A)** Yes — pin mandatory; refuse PONR without pin. **B)** Best-effort pin; allow PONR if pin fails. **C)** No pin. |
-| **5. Consequences** | A: rollback possible. B/C: Critical risk if failure after PONR. |
-| **6. Recommended** | **A** |
-| **7. Reason** | Pinned Full rollback anchor; fail closed. |
-| **8. Security** | Protects recovery path. |
-| **9. Data integrity** | Enables platform restore to pre-CPR point. |
-| **10. Operational** | Disk retention cost. |
-| **11. Rollback** | **Primary rollback depends on this.** |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | *(Superseded by owner policy.)* Historical: A pin mandatory · B best-effort · C no pin. |
+| **5. Consequences** | Every CPR session creates a **new** Full Backup under Maintenance; existing backups never reused; PONR forbidden without verified+pinned session anchor. |
+| **6. Recommended** | *(Historical A superseded by stronger owner workflow.)* |
+| **7. Reason** | Fail closed; rollback path bound to this restore session only. |
+| **8. Security** | Protects recovery path; prevents silent reuse of stale anchors. |
+| **9. Data integrity** | Enables platform restore to the pre-mutation point for **this** session. |
+| **10. Operational** | Disk cost of a fresh Full Backup per CPR; aligns with OD-MAINT GLOBAL. |
+| **11. Rollback** | **Primary rollback depends on this session’s pinned Full Backup.** |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Every Country Production Restore **MUST** begin by **automatically creating a NEW Full Backup**. Existing backups shall **never** be reused for this purpose, regardless of age or validity. Workflow: (1) Enter Maintenance Mode; (2) Automatically create a fresh Full Backup; (3) Verify backup integrity; (4) Pin the backup; (5) Continue only after successful completion. Production Restore must never begin without a newly created, verified and pinned Full Backup generated specifically for that restore session. |
+| **15. Frozen policy wording** | *Every Country Production Restore session must automatically create a new Full Backup after Maintenance Mode is entered. Existing backups must never be reused as the CPR rollback anchor. The session Full Backup must be integrity-verified and retention-pinned before Production Restore mutation continues. CPR must never begin without that newly created, verified, and pinned Full Backup.* |
 
 ---
 
-### OD-ROLLBACK-CLI — Rollback worker shape
+### OD-ROLLBACK — Rollback authority and controls (P0 catalog: OD-ROLLBACK-CLI)
 
 | Field | Content |
 |-------|---------|
-| **1. ID** | OD-ROLLBACK-CLI |
-| **2. Title** | Full DR rollback reuse vs CPR-specific wrapper |
+| **1. ID** | OD-ROLLBACK (historical P0 catalog ID: **OD-ROLLBACK-CLI**) |
+| **2. Title** | Who may initiate CPR rollback and under which controls |
 | **3. Exact question** | After CPR PONR failure, should rollback invoke the existing Full DR rollback worker against the pinned Full anchor, or a CPR-specific wrapper that only orchestrates the same Full rollback? |
-| **4. Options** | **A)** CPR wrapper CLI that calls Full rollback primitives (recommended). **B)** Operators run Full DR rollback CLI directly with documented job linkage. **C)** Country-only inverse delete/import as primary rollback. |
-| **5. Consequences** | A: clear CPR UX + reuse proven Full path. B: workable but error-prone. C: **rejected by P0 philosophy** (not primary). |
-| **6. Recommended** | **A** |
-| **7. Reason** | Explicit rollback triggers; Full anchor primary; avoid false “country undo”. |
-| **8–10** | Security/integrity/ops: reuse Full DR proof. |
-| **11. Rollback** | Defines operator path. |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | *(Superseded.)* Historical CLI-shape options replaced by owner authority model. |
+| **5. Consequences** | Rollback = Super Admin via admin UI only; same security controls as Production Restore; Country Admins never; target is the session Full Backup from OD-PIN. |
+| **6. Recommended** | *(Historical CLI wrapper recommendation superseded for authority; Full-anchor primary rollback philosophy remains.)* |
+| **7. Reason** | Explicit Super Admin trigger; security parity with Production Restore; aligns OD-DUAL / OD-PHRASE. |
+| **8–10** | Security: re-auth + phrase + permissions + audit + execution logging. Integrity: Full Backup from this session. Ops: admin UI path. |
+| **11. Rollback** | Defines who/how; uses OD-PIN session Full Backup. |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Rollback shall be initiated **only by the Super Admin** through the **administrative interface**. Rollback shall require the **same security controls** as Production Restore, including: re-authentication; confirmation phrase; audit logging; permission validation; complete execution logging. Rollback is **never** available to Country Admins. |
+| **15. Frozen policy wording** | *CPR Rollback may be initiated only by the Super Admin through the administrative interface. It requires the same controls as Production Restore: re-authentication, confirmation phrase, audit logging, permission validation, and complete execution logging. Country Admins must never initiate rollback. Rollback targets the Full Backup created and pinned for the current restore session (OD-PIN).* |
 
 ---
 
@@ -356,17 +368,17 @@
 | **1. ID** | OD-FAIL-DELETE |
 | **2. Title** | Recovery when target-slice DELETE fails mid-way |
 | **3. Exact question** | If production target-slice DELETE fails after PONR has started, what is the mandatory recovery? |
-| **4. Options** | **A)** Mark dirty → attempt complete remaining safe deletes → if not clean, **Full-anchor rollback**; never start import while dirty-unknown. **B)** Immediate Full-anchor rollback without finishing deletes. **C)** Continue to import anyway. |
-| **5. Consequences** | A: balanced. B: always Full restore (longer). C: **unsafe**. |
-| **6. Recommended** | **A** |
-| **7. Reason** | Fail closed; explicit rollback trigger when uncertain. |
-| **8–9** | Integrity: prevent import onto unknown partial delete. |
-| **10. Operational** | May extend window. |
-| **11. Rollback** | Full anchor when not clean. |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | *(Superseded.)* Historical auto-finish-delete / immediate rollback options replaced by pause-for-Super-Admin. |
+| **5. Consequences** | No automatic rollback. Maintenance stays ON. Super Admin chooses Resume (when supported) or Rollback to session Full Backup. |
+| **6. Recommended** | *(Historical facilitation superseded.)* |
+| **7. Reason** | Explicit Super Admin decision; avoids silent Full restore; preserves state for investigation. |
+| **8–9** | Integrity: never continue blindly; never auto-rollback without Super Admin. |
+| **10. Operational** | Pause under GLOBAL Maintenance until Resume or Rollback completes. |
+| **11. Rollback** | Available as explicit Super Admin action (OD-ROLLBACK) to OD-PIN session Full Backup — not automatic. |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | If Production Restore fails after the target country’s data has been deleted: the system shall **NOT** automatically execute a rollback. Instead: keep Maintenance Mode enabled; preserve the current restore state; display the failure reason; display the completed phase; display execution status. The workflow pauses and waits for an explicit Super Admin decision. Available actions: Resume (when supported by the restore stage); Rollback to the Full Backup created immediately before this Production Restore. |
+| **15. Frozen policy wording** | *On delete-phase failure after target data deletion has begun: do not auto-rollback. Keep Maintenance Mode ON, preserve restore state, and surface failure reason, completed phase, and execution status. Pause for explicit Super Admin choice: Resume (only when the stage safely supports it) or Rollback to the session Full Backup (OD-PIN). Users must not regain normal access while the job remains incomplete.* |
 
 ---
 
@@ -377,17 +389,17 @@
 | **1. ID** | OD-FAIL-IMPORT |
 | **2. Title** | Recovery when target-slice IMPORT fails |
 | **3. Exact question** | If production IMPORT fails mid-batch, choose the default recovery (no SQL byte-offset resume)? |
-| **4. Options** | **A)** Mark dirty → **re-clear target slice** → re-import from frozen contract **or** Full-anchor rollback (operator chooses with runbook). **B)** Always immediate Full-anchor rollback. **C)** Resume mid-stream SQL. |
-| **5. Consequences** | A: may shorten wall-clock vs always Full rollback. B: simplest integrity. C: **rejected** (DDL/partial unsafe). |
-| **6. Recommended** | **A** with runbook preference; escalate to **B** if re-clear unsafe. |
-| **7. Reason** | No mid-stream resume; explicit triggers; aligns PRODUCTION_IMPORT_SAFETY philosophy adapted to slice. |
-| **8–9** | Integrity: no silent partial country. |
-| **10. Operational** | Duration monitored via OWNER_APPROVED OD-RTO/OD-TIMEOUT estimates — not a hard fail deadline. |
-| **11. Rollback** | Full anchor always available. |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | *(Superseded.)* Historical auto re-clear/re-import vs immediate Full rollback replaced by pause-for-Super-Admin. |
+| **5. Consequences** | No automatic rollback. Maintenance stays ON. Display progress %, completed batches, failure reason, stage. Super Admin chooses Resume (if safe) or Rollback. |
+| **6. Recommended** | *(Historical facilitation superseded.)* |
+| **7. Reason** | Explicit Super Admin decision; progress-aware pause; no silent auto-rollback. |
+| **8–9** | Integrity: no silent partial country; no unsafe mid-stream resume unless stage supports it. |
+| **10. Operational** | Duration monitored via OD-RTO/OD-TIMEOUT; failure pause separate from timeout policy. |
+| **11. Rollback** | Explicit Super Admin action (OD-ROLLBACK) to OD-PIN session Full Backup — not automatic. |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | If Production Restore fails during data import: the system shall **NOT** automatically execute a rollback. Instead: keep Maintenance Mode enabled; preserve execution state; display progress percentage; display completed batches; display failure reason; display current execution stage. The workflow pauses and waits for an explicit Super Admin decision. Available actions: Resume (only if the current restore stage safely supports continuation); Rollback to the Full Backup created immediately before this Production Restore. |
+| **15. Frozen policy wording** | *On import-phase failure: do not auto-rollback. Keep Maintenance Mode ON, preserve execution state, and surface progress percentage, completed batches, failure reason, and current stage. Pause for explicit Super Admin choice: Resume (only if the stage safely supports continuation) or Rollback to the session Full Backup (OD-PIN). Users must not regain normal access while the job remains incomplete.* |
 
 ---
 
@@ -657,10 +669,10 @@ These are **already frozen** and must not be contradicted by any OD answer:
 | OD-RTO | B | **OWNER_APPROVED** (estimate only) | Y | N | soft | soft |
 | OD-TIMEOUT | B | **OWNER_APPROVED** (progress-aware) | Y | N | soft | soft |
 | OD-RUNBOOK | B | A | soft | Y | Y | Y |
-| OD-PIN | C | A | Y | N | Y | Y |
-| OD-ROLLBACK-CLI | C | A | Y | N | Y | Y |
-| OD-FAIL-DELETE | C | A | Y | N | Y | Y |
-| OD-FAIL-IMPORT | C | A | Y | N | Y | Y |
+| OD-PIN | C | **OWNER_APPROVED** (new Full Backup) | Y | N | Y | Y |
+| OD-ROLLBACK | C | **OWNER_APPROVED** (was OD-ROLLBACK-CLI) | Y | N | Y | Y |
+| OD-FAIL-DELETE | C | **OWNER_APPROVED** (pause; no auto-RB) | Y | N | Y | Y |
+| OD-FAIL-IMPORT | C | **OWNER_APPROVED** (pause; no auto-RB) | Y | N | Y | Y |
 | OD-C8 | D | A | Y | N | Y | Y |
 | OD-VERIFY-WARN | D | A | Y | N | Y | Y |
 | OD-SCHEMA | D | A | soft | Y | Y | Y |
@@ -677,4 +689,4 @@ These are **already frozen** and must not be contradicted by any OD answer:
 
 ---
 
-*End of Owner Decision Register — P0b. Group 1 + Group 2 frozen OWNER_APPROVED (OD-ENABLE, OD-DUAL, OD-PHRASE, OD-BREAK, OD-MAINT, OD-MAINT-SCOPE, OD-MAINT-MAX, OD-RTO, OD-TIMEOUT). Remaining statuses PROPOSED. No P1. No implementation.*
+*End of Owner Decision Register — P0b. Groups 1–3 frozen OWNER_APPROVED (incl. OD-PIN, OD-ROLLBACK, OD-FAIL-DELETE, OD-FAIL-IMPORT + Maintenance State on pause). Remaining statuses PROPOSED. No P1. No implementation.*
