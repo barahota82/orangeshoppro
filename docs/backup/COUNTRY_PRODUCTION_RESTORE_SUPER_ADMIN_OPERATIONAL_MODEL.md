@@ -104,7 +104,7 @@ This document:
 - Does **not** start P1.  
 - Does **not** modify C3–C8.
 
-**Next steps remain:** finish remaining open Owner Decisions → then P1 detailed design when authorized.
+**Next steps:** Owner Decision workshop is complete (all OD-* OWNER_APPROVED). P1 detailed design begins only when the Owner **explicitly authorizes** P1. Architecture narrative SoT for policy remains the Owner Decision Register.
 
 ---
 
