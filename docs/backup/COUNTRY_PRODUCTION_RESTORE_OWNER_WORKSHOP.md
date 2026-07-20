@@ -13,9 +13,11 @@
 **Already frozen (do not re-answer):** C1.1 D1–D6 · Multicountry §13 · Country restore stays disabled until certification + explicit enablement.
 
 **Owner-approved (2026-07-20) — do not re-answer:**  
+- Foundational Integrity Principle (integrity > privilege; no Super Admin gate bypass; system-enforced)  
 - Group 1: OD-ENABLE · OD-DUAL · OD-PHRASE · OD-BREAK  
-- Group 2: OD-MAINT · OD-MAINT-SCOPE · OD-MAINT-MAX · OD-RTO · OD-TIMEOUT  
+- Group 2 (Maintenance & timing): OD-MAINT · OD-MAINT-SCOPE · OD-MAINT-MAX · OD-RTO · OD-TIMEOUT  
 - Group 3: OD-PIN · OD-ROLLBACK · OD-FAIL-DELETE · OD-FAIL-IMPORT (+ Maintenance State on failure pause)  
+- Gates & Integrity (workshop Group 2): OD-C8 · OD-VERIFY-WARN · OD-INV · OD-FA-RESOLVER · OD-FA-STOCK · OD-FA-SCHEMA  
 
 **How to answer remaining items:** write one of `A` / `B` / `C` / `D` (or custom text) on `OWNER ANSWER:`.  
 Recommended answers are **advice only** for open items.
@@ -54,49 +56,31 @@ Recommended answers are **advice only** for open items.
 
 ---
 
-## Group 2 — Gates & integrity (answer before P1)
+## Group 2 — Gates & integrity
 
-### 8. OD-C8
-Allow CPR entry only when C8 = SAFE?
-- **Recommended:** A — SAFE only  
-- **Alternatives:** B WARNING + per-job waiver · C FAIL + waiver  
-- **Consequences:** A cleanest entry. C unsafe.  
-- **OWNER ANSWER:** _______________
+### 8. OD-C8 — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Production Restore only when C8 Overall Result = **SAFE**. No WARNING/FAIL override, waiver, Continue Anyway, or Super Admin bypass. If not SAFE: do not start; correct package; re-run C8.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 9. OD-VERIFY-WARN
-After apply, fail closed (rollback) on accounting / ownership / FIFO / schema / survivor / Global issues — no soft accept?
-- **Recommended:** A — Fail closed on those categories  
-- **Alternatives:** B owner waive warnings · C best-effort accept  
-- **Consequences:** A may rollback more; protects integrity.  
-- **OWNER ANSWER:** _______________
+### 9. OD-VERIFY-WARN — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Post-apply integrity fail-closed. Failure in accounting / ownership / FIFO / stock / schema / survivor / Global → session **FAILED**; Global Maint stays ON; storefronts and Country Admins unavailable; Super Admin may only Resume (if safe) or Rollback. No success-with-warnings / ignore / accept / override.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 10. OD-INV
-Require certified read-only production inventory snapshot before CPR?
-- **Recommended:** A — Certified snapshot mandatory  
-- **Alternatives:** B live SELECT only under maint · C uncertified OK  
-- **Consequences:** A immutable evidence. C unsafe.  
-- **OWNER ANSWER:** _______________
+### 10. OD-INV — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Certified Immutable Production Inventory Snapshot mandatory before every Production Restore (read-only, certified, immutable, cryptographically bound to session, retained for audit/forensics). Live reads may only verify the snapshot — never replace it.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 11. OD-FA-RESOLVER
-Engine must use matrix `ownership_resolver` first (never country_id-column override)?
-- **Recommended:** A — Matrix-resolver-first  
-- **Alternatives:** B keep column short-circuit · C per-table exceptions  
-- **Consequences:** A closes FA-01. B keeps footgun.  
-- **OWNER ANSWER:** _______________
+### 11. OD-FA-RESOLVER — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Always use certified Ownership Resolver Matrix. Never guess ownership. Never country_id shortcuts. If unproven → fail before execution. No best-effort ownership.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 12. OD-FA-STOCK
-Strict stock/FIFO/cross-country verification post-apply, fail closed?
-- **Recommended:** A — Strict  
-- **Alternatives:** B soft warnings · C skip FIFO  
-- **Consequences:** A protects §13 stock separation.  
-- **OWNER ANSWER:** _______________
+### 12. OD-FA-STOCK — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Mandatory warehouse ownership, stock ownership, FIFO integrity, cross-country stock references. Any failure immediately fails the session. No soft warning / ignore / best-effort.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
-### 13. OD-FA-SCHEMA
-On production/cert clones: strict schema expectations, no fixture soft-skip?
-- **Recommended:** A — Strict on prod/cert  
-- **Alternatives:** B soft-skip everywhere · C columns only  
-- **Consequences:** A closes FA-03.  
-- **OWNER ANSWER:** _______________
+### 13. OD-FA-SCHEMA — OWNER_APPROVED (2026-07-20)
+- **Frozen:** Mandatory schema revision + tables/columns/indexes/constraints. Any mismatch fails the session. No fixture soft-skip in Production or Certification. Schema integrity over execution.  
+- **OWNER ANSWER:** OWNER_APPROVED
 
 ---
 
@@ -208,10 +192,11 @@ If schema_revision leaves 121: mandatory re-cert + package rebuild before CPR?
 | Owner name | _______________ |
 | Date | _______________ |
 | Group 1 freeze | OWNER_APPROVED 2026-07-20 (OD-ENABLE, OD-DUAL, OD-PHRASE, OD-BREAK) |
-| Group 2 freeze | OWNER_APPROVED 2026-07-20 (OD-MAINT, OD-MAINT-SCOPE, OD-MAINT-MAX, OD-RTO, OD-TIMEOUT) |
+| Group 2 (Maint) freeze | OWNER_APPROVED 2026-07-20 (OD-MAINT, OD-MAINT-SCOPE, OD-MAINT-MAX, OD-RTO, OD-TIMEOUT) |
 | Group 3 freeze | OWNER_APPROVED 2026-07-20 (OD-PIN, OD-ROLLBACK, OD-FAIL-DELETE, OD-FAIL-IMPORT + Maintenance State) |
+| Gates & Integrity freeze | OWNER_APPROVED 2026-07-20 (OD-C8, OD-VERIFY-WARN, OD-INV, OD-FA-* + Integrity Principle) |
 | Workshop complete? | YES / NO (remaining open items) |
 | Notes | _______________ |
 
-**Groups 1–3 are frozen.** Continue workshop for open ODs only.  
+**Groups 1–3 and Gates & Integrity are frozen.** Continue workshop for open ODs only.  
 **Do not begin P1 until remaining P1-blocking ODs are frozen.** **Do not implement.**

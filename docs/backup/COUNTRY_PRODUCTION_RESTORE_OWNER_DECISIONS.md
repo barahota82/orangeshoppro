@@ -12,7 +12,7 @@
 | **Global Restore ops clarification** | `docs/backup/GLOBAL_RESTORE_OPERATIONAL_POLICY.md` (**not** a new OD; platform-wide maint UX for any Restore) |
 | **C3–C8** | Must not be modified |
 | **Enablement** | Remains **disabled** until certification + explicit OD-ENABLE + implementation + final enterprise approval (OWNER_APPROVED) |
-| **Last owner freeze** | 2026-07-20 — Group 3: OD-PIN, OD-ROLLBACK, OD-FAIL-DELETE, OD-FAIL-IMPORT (+ Maintenance State on pause) |
+| **Last owner freeze** | 2026-07-20 — Gates & Integrity (workshop Group 2): OD-C8, OD-VERIFY-WARN, OD-INV, OD-FA-RESOLVER, OD-FA-STOCK, OD-FA-SCHEMA + Integrity Principle |
 
 ### Frozen inputs (not reopened)
 
@@ -23,7 +23,19 @@
 | Full DR **OD-2** | Country production restore disabled until Country certification |
 | CRP Final Audit | C8 SAFE ≠ cutover auth; FA-01…FA-03 residuals inform OD-FA-* |
 
-### Owner-approved CPR decisions (Group 1 — 2026-07-20)
+### Foundational Owner Principle — Integrity over privilege (OWNER_APPROVED — 2026-07-20)
+
+**OWNER_APPROVED** for the entire Orange platform:
+
+- System Integrity and Data Integrity always have **higher priority** than user privileges.  
+- **No user**, including the Super Admin, may bypass any production safety gate.  
+- These are **mandatory runtime enforcement rules**, not operational recommendations.  
+- The **system itself** must enforce these rules.  
+- If a required proof is missing, the requested operation **shall not execute**.  
+
+This principle governs every decision in Gates & Integrity (workshop Group 2) and must not be contradicted by later ODs or implementation.
+
+### Owner-approved CPR decisions (Group 1 — Enablement & control — 2026-07-20)
 
 | ID | Status |
 |----|--------|
@@ -32,7 +44,7 @@
 | **OD-PHRASE** | OWNER_APPROVED (`RESTORE` + password re-auth) |
 | **OD-BREAK** | OWNER_APPROVED (Super Admin only; does not bypass anchor/gates/auth/logging) |
 
-### Owner-approved CPR decisions (Group 2 — 2026-07-20)
+### Owner-approved CPR decisions (Group 2 — Maintenance & timing — 2026-07-20)
 
 | ID | Status |
 |----|--------|
@@ -42,7 +54,7 @@
 | **OD-RTO** | OWNER_APPROVED (no hardcoded RTO; Estimated Duration for monitoring only) |
 | **OD-TIMEOUT** | OWNER_APPROVED (timeout ≠ failure; progress-aware escalation → investigate/resume) |
 
-### Owner-approved CPR decisions (Group 3 — 2026-07-20)
+### Owner-approved CPR decisions (Group 3 — Backup / failure / rollback — 2026-07-20)
 
 | ID | Status |
 |----|--------|
@@ -52,17 +64,31 @@
 | **OD-FAIL-IMPORT** | OWNER_APPROVED (no auto-rollback; pause for Super Admin Resume/Rollback) |
 | **Maintenance State (on failure pause)** | OWNER_APPROVED (Maintenance stays ON until Super Admin completes Resume or Rollback) |
 
+### Owner-approved CPR decisions (Gates & Integrity — workshop Group 2 — 2026-07-20)
+
+| ID | Status |
+|----|--------|
+| **OD-C8** | OWNER_APPROVED (SAFE only; no WARNING/FAIL waiver; no Super Admin bypass) |
+| **OD-VERIFY-WARN** | OWNER_APPROVED (integrity fail-closed → session FAILED; Global Maint stays ON; Resume or Rollback only) |
+| **OD-INV** | OWNER_APPROVED (certified immutable inventory snapshot mandatory; live reads verify only) |
+| **OD-FA-RESOLVER** | OWNER_APPROVED (certified Ownership Resolver Matrix only; no country_id shortcuts; fail if unproven) |
+| **OD-FA-STOCK** | OWNER_APPROVED (mandatory warehouse/stock/FIFO/cross-country checks; no soft warning) |
+| **OD-FA-SCHEMA** | OWNER_APPROVED (mandatory revision/tables/columns/indexes/constraints; no fixture soft-skip on prod/cert) |
+
 **Note:** P0 architecture §8 previously recommended “two distinct Super Admin identities.” That recommendation is **superseded** by OWNER_APPROVED **OD-DUAL** in this register. Do not implement the old dual-Super-Admin model.
 
-**Note (Group 2):** P0 architecture §9 prefers platform-wide maintenance — now **OWNER_APPROVED** as GLOBAL MAINTENANCE (OD-MAINT-SCOPE). Country-only maintenance is not approved under the current shared-DB / Full-anchor rollback architecture.
+**Note (Group 2 — Maintenance):** P0 architecture §9 prefers platform-wide maintenance — now **OWNER_APPROVED** as GLOBAL MAINTENANCE (OD-MAINT-SCOPE). Country-only maintenance is not approved under the current shared-DB / Full-anchor rollback architecture.
 
 **Note (Group 3):** OD-PIN owner workflow is: Maintenance Mode → **new** Full Backup for this session → verify → pin → continue. Existing backups must never be reused as the CPR rollback anchor. Failure after delete/import does **not** auto-rollback; Super Admin chooses Resume (when safe) or the dedicated dashboard **Rollback** action. P0 catalog **OD-ROLLBACK-CLI** is frozen under owner ID **OD-ROLLBACK** (dedicated Super Admin dashboard action, available only on failure pause, security parity with Production Restore, never automatic).
+
+**Note (Gates & Integrity):** Proof-driven production philosophy — Production Restore shall never rely on user judgement, manual override, administrator privilege, or best-effort execution. If integrity cannot be proven, the operation shall not execute. Aligns with `GLOBAL_RESTORE_OPERATIONAL_POLICY.md` and Super Admin Operational Model.
 
 ### Register rules
 
 - Status **OWNER_APPROVED** = frozen owner policy; do not reopen without a new owner decision.  
 - Remaining decisions stay **PROPOSED** until the owner answers.  
-- Facilitation “Recommended” is historical advice only where status is still PROPOSED.
+- Facilitation “Recommended” is historical advice only where status is still PROPOSED.  
+- Foundational Integrity Principle is OWNER_APPROVED and binds all gates.
 
 ### OD count
 
@@ -414,17 +440,17 @@
 | **1. ID** | OD-C8 |
 | **2. Title** | Must C8 be SAFE, or may WARNING proceed? |
 | **3. Exact question** | May Country Production Restore start only when C8 `overall_result = SAFE`, or may WARNING proceed with written waiver? |
-| **4. Options** | **A)** SAFE only. **B)** WARNING allowed with owner waiver per job. **C)** FAIL allowed with waiver. |
-| **5. Consequences** | A: strongest. B: flexibility for non-integrity warnings only — must not waive survivor/Global/accounting. C: unsafe. |
-| **6. Recommended** | **A** |
-| **7. Reason** | No warning acceptance for material risk; C8 SAFE ≠ auth but must be clean entry. |
-| **8–9** | Integrity: keep contamination impacts at 0. |
-| **10. Operational** | May block marginal packages. |
-| **11. Rollback** | N/A pre-PONR. |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **4. Options** | *(Superseded.)* Historical: A SAFE only · B WARNING + waiver · C FAIL + waiver. |
+| **5. Consequences** | SAFE only; no overrides; package must be corrected and C8 re-run. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED with zero-bypass.)* |
+| **7. Reason** | Integrity Principle: no Super Admin bypass of missing proof. |
+| **8–9** | Integrity: contamination impacts must stay at 0. |
+| **10. Operational** | CPR unavailable until C8 SAFE. |
+| **11. Rollback** | N/A pre-start. |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Production Restore may begin **only** when C8 Overall Result = **SAFE**. **No** WARNING override. **No** FAIL override. **No** waiver. **No** Continue Anyway. **No** Super Admin bypass. If C8 is not SAFE: Production Restore shall **not** start; the package must be corrected; C8 must be executed again; Production Restore becomes available only after C8 returns SAFE. |
+| **15. Frozen policy wording** | *Production Restore may begin only when C8 Overall Result equals SAFE. WARNING override, FAIL override, waiver, Continue Anyway, and Super Admin bypass are forbidden. If C8 is not SAFE, Production Restore must not start; the package must be corrected and C8 re-executed; Production Restore becomes available only after C8 returns SAFE.* |
 
 ---
 
@@ -433,19 +459,19 @@
 | Field | Content |
 |-------|---------|
 | **1. ID** | OD-VERIFY-WARN |
-| **2. Title** | Post-apply soft warnings |
+| **2. Title** | Post-apply integrity verification (fail-closed) |
 | **3. Exact question** | After production apply, may any verification warning be accepted without rollback for accounting, ownership, stock/FIFO, schema, survivor, or Global integrity? |
-| **4. Options** | **A)** No — those categories fail closed → rollback. Non-integrity cosmetic warnings only if explicitly listed later. **B)** Allow warnings with owner waive. **C)** Best-effort accept. |
-| **5. Consequences** | A: matches recommendation principles. B/C: integrity risk. |
-| **6. Recommended** | **A** |
-| **7. Reason** | No warning acceptance for accounting, ownership, stock/FIFO, schema, survivor, or Global integrity. |
+| **4. Options** | *(Superseded.)* Historical soft-accept / waive options rejected. |
+| **5. Consequences** | Integrity failure → session FAILED; Global Maintenance remains; Super Admin Resume or Rollback only. |
+| **6. Recommended** | *(Historical A strengthened to OWNER_APPROVED zero-override.)* |
+| **7. Reason** | Integrity Principle + Global Restore Operational Policy. |
 | **8–9** | Critical integrity. |
-| **10. Operational** | May force rollback more often. |
-| **11. Rollback** | Explicit trigger on those fails. |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **10. Operational** | Storefronts and Country Admins stay unavailable; Super Admin Restore Management only. |
+| **11. Rollback** | Explicit Super Admin Rollback (OD-ROLLBACK); not automatic; not “success with warnings.” |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Post-apply integrity verification is **fail-closed**. Any integrity failure involving Accounting, Ownership, FIFO, Stock, Schema, Survivor integrity, or Global integrity shall **immediately** mark the Production Restore session as **FAILED**. Platform remains in Global Maintenance. Normal operation shall **not** resume. Customer storefronts and Country Admin dashboards remain unavailable. Only Super Admin Restore Management remains available. Super Admin may choose only **Resume** (when stage safely supports continuation) or **Rollback**. Forbidden: Success with warnings; Ignore verification; Accept anyway; override. |
+| **15. Frozen policy wording** | *Post-apply integrity verification is fail-closed. Failure in accounting, ownership, FIFO, stock, schema, survivor integrity, or Global integrity immediately marks the session FAILED, keeps Global Maintenance ON, and keeps storefronts and Country Admin dashboards unavailable. Only the Super Admin Restore Management interface remains available, and only Resume (when safely supported) or Rollback may be chosen. Success with warnings, ignore verification, accept anyway, and any override are forbidden.* |
 
 ---
 
@@ -475,19 +501,19 @@
 | Field | Content |
 |-------|---------|
 | **1. ID** | OD-INV |
-| **2. Title** | Certified production inventory capture |
+| **2. Title** | Certified immutable production inventory snapshot |
 | **3. Exact question** | Before CPR, must impact/gates use a `certified_read_only=true` inventory snapshot, live read-only SELECTs under maintenance, or either? |
-| **4. Options** | **A)** Certified snapshot mandatory (capture under controlled window); live SELECT only to refresh/verify snapshot, not as unaudited source. **B)** Live SELECT only under maint. **C)** Uncertified counts OK. |
-| **5. Consequences** | A: immutable evidence. B: acceptable if audited. C: unsafe. |
-| **6. Recommended** | **A** |
-| **7. Reason** | Immutable approvals/reports; aligns C8 certified inventory. |
+| **4. Options** | *(Superseded.)* Historical: A certified snapshot · B live SELECT only · C uncertified. |
+| **5. Consequences** | Certified immutable snapshot mandatory; live reads verify only; bound to session for audit/forensics. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED.)* |
+| **7. Reason** | Proof-driven; immutable evidence for approvals and forensics. |
 | **8–9** | Integrity of impact proof. |
-| **10. Operational** | Snapshot step in runbook. |
-| **11. Rollback** | Snapshot aids forensics. |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **10. Operational** | Snapshot step before Production Restore mutation. |
+| **11. Rollback** | Snapshot retained for forensic investigation. |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | A **Certified Immutable Production Inventory Snapshot** is **mandatory** before every Production Restore. The snapshot shall be: read-only; certified; immutable; cryptographically bound to the restore session; retained for audit; retained for forensic investigation. Live database reads may **only verify** the certified snapshot; they shall **never replace** it. |
+| **15. Frozen policy wording** | *Before every Production Restore, a Certified Immutable Production Inventory Snapshot is mandatory. It must be read-only, certified, immutable, cryptographically bound to the restore session, and retained for audit and forensic investigation. Live database reads may only verify that snapshot and must never replace it.* |
 
 ---
 
@@ -587,17 +613,17 @@
 | **1. ID** | OD-FA-RESOLVER |
 | **2. Title** | Membership resolver precedence (CRP Final Audit FA-01) |
 | **3. Exact question** | Must the future CPR production engine honor **matrix `ownership_resolver` first**, and never let “table has `country_id` column” override `parent_fk` / `admin_ownership` / other resolvers? |
-| **4. Options** | **A)** Yes — matrix-resolver-first mandatory (fail closed on unresolved). **B)** Keep country_id-column short-circuit. **C)** Per-table exceptions list. |
-| **5. Consequences** | A: closes FA-01 for production. B: retains architectural footgun. C: needs explicit table list. |
-| **6. Recommended** | **A** |
-| **7. Reason** | No silent ownership mistakes; C1.1 matrix is law. |
+| **4. Options** | *(Superseded.)* Historical B/C rejected. |
+| **5. Consequences** | Certified Ownership Resolver Matrix only; fail before execution if unproven; no best-effort. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED.)* |
+| **7. Reason** | C1.1 matrix is law; Integrity Principle forbids guessing. |
 | **8–9** | Critical country isolation / integrity. |
-| **10. Operational** | Engine design constraint. |
-| **11. Rollback** | Fewer bad applies. |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **10. Operational** | Engine must refuse unproven membership. |
+| **11. Rollback** | Fail before execution when possible. |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Production Restore shall **always** use the certified Ownership Resolver Matrix. It shall **never** guess ownership. It shall **never** fall back to country_id shortcuts. If ownership cannot be proven with certainty: Production Restore shall **fail before execution**. The system shall **never** attempt a best-effort ownership decision. |
+| **15. Frozen policy wording** | *Production Restore must always use the certified Ownership Resolver Matrix. Guessing ownership and country_id shortcuts are forbidden. If ownership cannot be proven with certainty, Production Restore must fail before execution. Best-effort ownership decisions are forbidden.* |
 
 ---
 
@@ -608,16 +634,16 @@
 | **1. ID** | OD-FA-STOCK |
 | **2. Title** | Strict stock/FIFO ownership verification (FA-02) |
 | **3. Exact question** | Must CPR post-apply verification enforce warehouse ownership, stock ownership, FIFO graph completeness, and cross-country reference checks with **no** dead/unexecuted predicates? |
-| **4. Options** | **A)** Yes — strict suite; fail closed. **B)** Soft warnings OK. **C)** Skip FIFO checks. |
-| **5. Consequences** | A: matches principles. B/C: stock integrity risk. |
-| **6. Recommended** | **A** |
-| **7. Reason** | No warning acceptance for stock/FIFO; multicountry §13. |
+| **4. Options** | *(Superseded.)* Historical soft-warning / skip rejected. |
+| **5. Consequences** | Mandatory warehouse/stock/FIFO/cross-country checks; any failure fails the session. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED.)* |
+| **7. Reason** | Multicountry §13; Integrity Principle. |
 | **8–9** | Critical. |
-| **10–11** | May force rollback; correct. |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **10–11** | Session FAILED → Global Maint + Super Admin Resume/Rollback path (OD-VERIFY-WARN). |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Stock and FIFO verification are **mandatory**. Required: warehouse ownership; stock ownership; FIFO integrity; cross-country stock references. Any verification failure shall **immediately fail** the Production Restore session. **No** soft warning. **No** ignore mode. **No** best-effort completion. |
+| **15. Frozen policy wording** | *Stock and FIFO verification are mandatory, including warehouse ownership, stock ownership, FIFO integrity, and cross-country stock references. Any failure immediately fails the Production Restore session. Soft warning, ignore mode, and best-effort completion are forbidden.* |
 
 ---
 
@@ -628,16 +654,16 @@
 | **1. ID** | OD-FA-SCHEMA |
 | **2. Title** | No fixture soft-skip on production schema gates (FA-03) |
 | **3. Exact question** | On production (and certification clones), must schema expectations enforce revision + required tables/columns/indexes/constraints **without** “zero-index fixture skip” soft-PASS? |
-| **4. Options** | **A)** Yes — strict on production/cert clones. Soft-skip allowed only in non-production unit fixtures. **B)** Soft-skip everywhere. **C)** Columns only, never indexes. |
-| **5. Consequences** | A: closes FA-03 for prod. B: weak. C: partial. |
-| **6. Recommended** | **A** |
-| **7. Reason** | No schema warning/soft-pass on production integrity path. |
+| **4. Options** | *(Superseded.)* Historical soft-skip / columns-only rejected for prod/cert. |
+| **5. Consequences** | Mandatory schema revision + tables/columns/indexes/constraints; mismatch fails session; no fixture soft-skip on prod/cert. |
+| **6. Recommended** | *(Historical A; now OWNER_APPROVED.)* |
+| **7. Reason** | Schema integrity over execution; Integrity Principle. |
 | **8–9** | Critical. |
-| **10–11** | Re-cert on schema change (OD-SCHEMA). |
-| **12. Required before** | P1: yes. Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | PROPOSED |
-| **14. Final owner answer** | _(blank)_ |
-| **15. Frozen policy wording** | _(blank)_ |
+| **10–11** | Ties to future OD-SCHEMA on revision change; fail closed. |
+| **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
+| **14. Final owner answer** | Production Schema verification is **mandatory**. Verification shall include: Schema Revision; required tables; required columns; required indexes; required constraints. Any mismatch shall **immediately fail** the Production Restore session. Fixture-style soft skip is **never** permitted in Production or Certification environments. Schema integrity shall always take priority over execution. |
+| **15. Frozen policy wording** | *Production schema verification is mandatory and must include schema revision, required tables, columns, indexes, and constraints. Any mismatch immediately fails the Production Restore session. Fixture-style soft skip is never permitted in Production or Certification environments. Schema integrity always takes priority over execution.* |
 
 ---
 
@@ -651,7 +677,9 @@ These are **already frozen** and must not be contradicted by any OD answer:
 4. One-time authorization; fingerprint re-check before PONR.  
 5. Replay prevention via job state machine.  
 6. C1.1 D1–D6 and multicountry §13.  
-7. C3–C8 not modified by CPR program.
+7. C3–C8 not modified by CPR program.  
+8. **Integrity Principle (OWNER_APPROVED):** System/Data Integrity > user privileges; no Super Admin bypass of production safety gates; system-enforced; missing proof → do not execute.  
+9. **Proof-driven Production Restore:** never rely on user judgement, manual override, administrator privilege, or best-effort execution.
 
 ---
 
@@ -675,20 +703,20 @@ These are **already frozen** and must not be contradicted by any OD answer:
 | OD-ROLLBACK | C | **OWNER_APPROVED** (dashboard action; fail-pause only) | Y | N | Y | Y |
 | OD-FAIL-DELETE | C | **OWNER_APPROVED** (pause; no auto-RB) | Y | N | Y | Y |
 | OD-FAIL-IMPORT | C | **OWNER_APPROVED** (pause; no auto-RB) | Y | N | Y | Y |
-| OD-C8 | D | A | Y | N | Y | Y |
-| OD-VERIFY-WARN | D | A | Y | N | Y | Y |
+| OD-C8 | D | **OWNER_APPROVED** (SAFE only) | Y | N | Y | Y |
+| OD-VERIFY-WARN | D | **OWNER_APPROVED** (fail-closed) | Y | N | Y | Y |
 | OD-SCHEMA | D | A | soft | Y | Y | Y |
-| OD-INV | D | A | Y | N | Y | Y |
+| OD-INV | D | **OWNER_APPROVED** (certified snapshot) | Y | N | Y | Y |
 | OD-UPLOADS | E | A | Y | N | Y | Y |
 | OD-LOCK-CROSS | F | A | Y | N | Y | Y |
 | OD-LOCK-SHADOW | F | A | Y | N | soft | soft |
 | OD-LOCK-TTL | F | A | soft | Y | soft | soft |
-| OD-FA-RESOLVER | G | A | Y | N | Y | Y |
-| OD-FA-STOCK | G | A | Y | N | Y | Y |
-| OD-FA-SCHEMA | G | A | Y | N | Y | Y |
+| OD-FA-RESOLVER | G | **OWNER_APPROVED** | Y | N | Y | Y |
+| OD-FA-STOCK | G | **OWNER_APPROVED** | Y | N | Y | Y |
+| OD-FA-SCHEMA | G | **OWNER_APPROVED** | Y | N | Y | Y |
 
 **Total: 27**
 
 ---
 
-*End of Owner Decision Register — P0b. Groups 1–3 frozen OWNER_APPROVED (incl. OD-PIN, OD-ROLLBACK, OD-FAIL-DELETE, OD-FAIL-IMPORT + Maintenance State on pause). Remaining statuses PROPOSED. No P1. No implementation.*
+*End of Owner Decision Register — P0b. Groups 1–3 + Gates & Integrity (workshop Group 2) frozen OWNER_APPROVED. Remaining statuses PROPOSED. No P1. No implementation.*
