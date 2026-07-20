@@ -153,7 +153,7 @@ Status legend: `PLANNED` = not yet created · `COMPLETE` = WP delivered · `N/A`
 | WP-P1-11 | CPR-P1-WP11-VERIFY_REPORTS | `COUNTRY_PRODUCTION_RESTORE_P1_11_VERIFY_REPORTS.md` | **COMPLETE** |
 | WP-P1-12 | CPR-P1-WP12-AUDIT_METRICS_ALERTS | `COUNTRY_PRODUCTION_RESTORE_P1_12_AUDIT_METRICS_ALERTS.md` | **COMPLETE** |
 | WP-P1-13 | CPR-P1-WP13-ENABLEMENT_CERT_HOOKS | `COUNTRY_PRODUCTION_RESTORE_P1_13_ENABLEMENT_CERT_HOOKS.md` | **COMPLETE** |
-| WP-P1-14 | CPR-P1-WP14-INTEGRATION_BASELINE | `COUNTRY_PRODUCTION_RESTORE_P1_14_INTEGRATION_BASELINE.md` | PLANNED |
+| WP-P1-14 | CPR-P1-WP14-INTEGRATION_BASELINE | `COUNTRY_PRODUCTION_RESTORE_P1_14_INTEGRATION_BASELINE.md` | **COMPLETE** |
 
 **Drift control:** Later WPs must not introduce primary filenames absent from this table without updating **this index** in the same WP’s Owner-authorized change (still without modifying architecture/register).
 
@@ -259,6 +259,7 @@ No architectural insufficiency discovered during WP-P1-01. No escalation require
 | 1.10 | 2026-07-21 | WP-P1-11 marked COMPLETE in inventory (§7) |
 | 1.11 | 2026-07-21 | WP-P1-12 marked COMPLETE in inventory (§7) |
 | 1.12 | 2026-07-21 | WP-P1-13 marked COMPLETE in inventory (§7) |
+| 1.13 | 2026-07-21 | WP-P1-14 marked COMPLETE — P1 Design Baseline freeze |
 
 **Artifact-ID:** `CPR-P1-WP01-ARTIFACT_INDEX`
 
