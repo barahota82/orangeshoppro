@@ -141,7 +141,7 @@ Status legend: `PLANNED` = not yet created · `COMPLETE` = WP delivered · `N/A`
 | WP | Artifact-ID | Planned primary file | Status |
 |----|-------------|----------------------|--------|
 | WP-P1-01 | CPR-P1-WP01-ARTIFACT_INDEX | `COUNTRY_PRODUCTION_RESTORE_P1_ARTIFACT_INDEX.md` | **COMPLETE** |
-| WP-P1-02 | CPR-P1-WP02-EXECUTION_CONTRACT | `COUNTRY_PRODUCTION_RESTORE_P1_02_EXECUTION_CONTRACT.md` | PLANNED |
+| WP-P1-02 | CPR-P1-WP02-EXECUTION_CONTRACT | `COUNTRY_PRODUCTION_RESTORE_P1_02_EXECUTION_CONTRACT.md` | **COMPLETE** |
 | WP-P1-03 | CPR-P1-WP03-STATE_TRANSITION_MATRIX | `COUNTRY_PRODUCTION_RESTORE_P1_03_STATE_TRANSITION_MATRIX.md` | PLANNED |
 | WP-P1-04 | CPR-P1-WP04-CHECKPOINT_SCHEMAS | `COUNTRY_PRODUCTION_RESTORE_P1_04_CHECKPOINT_SCHEMAS.md` | PLANNED |
 | WP-P1-05 | CPR-P1-WP05-LOCK_FORMATS | `COUNTRY_PRODUCTION_RESTORE_P1_05_LOCK_FORMATS.md` | PLANNED |
@@ -247,6 +247,7 @@ No architectural insufficiency discovered during WP-P1-01. No escalation require
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-07-21 | WP-P1-01 complete — Design Control Plane / Artifact Index |
+| 1.1 | 2026-07-21 | WP-P1-02 marked COMPLETE in inventory (§7) |
 
 **Artifact-ID:** `CPR-P1-WP01-ARTIFACT_INDEX`
 
