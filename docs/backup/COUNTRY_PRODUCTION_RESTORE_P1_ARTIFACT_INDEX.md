@@ -248,6 +248,7 @@ No architectural insufficiency discovered during WP-P1-01. No escalation require
 |---------|------|-------|
 | 1.0 | 2026-07-21 | WP-P1-01 complete — Design Control Plane / Artifact Index |
 | 1.1 | 2026-07-21 | WP-P1-02 marked COMPLETE in inventory (§7) |
+| 1.2 | 2026-07-21 | WP-P1-03 marked COMPLETE in inventory (§7) |
 
 **Artifact-ID:** `CPR-P1-WP01-ARTIFACT_INDEX`
 
