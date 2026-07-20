@@ -140,7 +140,7 @@ Provide a complete, Owner-reviewable **evidence pack** proving that Country Prod
 | Drill scenario catalog | WP-P2-03 COMPLETE — `CPR-P2-WP03-DRILL_SCENARIOS` |
 | Evidence assembly / pack schemas | WP-P2-04 COMPLETE — `CPR-P2-WP04-EVIDENCE_PACK_SCHEMAS` |
 | Owner submission & PASS/FAIL package | WP-P2-05 COMPLETE — `CPR-P2-WP05-OWNER_DECISION_PACKAGE` |
-| Schema-revision re-cert cycle binding | Later WP-P2-06 (OD-SCHEMA) |
+| Schema-revision re-cert cycle binding | WP-P2-06 COMPLETE — `CPR-P2-WP06-SCHEMA_RECERT_CYCLE` |
 | P2 integration freeze | Later WP-P2-07 |
 
 ### 7.4 Out of scope (P2)
@@ -215,7 +215,7 @@ Each catalog entry is a **required evidence class** for a complete CPR certifica
 | **WP-P2-03** | Drill scenario catalog (incl. rollback) | `COUNTRY_PRODUCTION_RESTORE_P2_03_DRILL_SCENARIOS.md` | **COMPLETE** |
 | **WP-P2-04** | Evidence pack assembly schemas | `COUNTRY_PRODUCTION_RESTORE_P2_04_EVIDENCE_PACK_SCHEMAS.md` | **COMPLETE** |
 | **WP-P2-05** | Owner submission & PASS/FAIL decision package | `COUNTRY_PRODUCTION_RESTORE_P2_05_OWNER_DECISION_PACKAGE.md` | **COMPLETE** |
-| **WP-P2-06** | Schema-revision re-cert cycle (OD-SCHEMA) | `COUNTRY_PRODUCTION_RESTORE_P2_06_SCHEMA_RECERT_CYCLE.md` | PENDING |
+| **WP-P2-06** | Schema-revision re-cert cycle (OD-SCHEMA) | `COUNTRY_PRODUCTION_RESTORE_P2_06_SCHEMA_RECERT_CYCLE.md` | **COMPLETE** |
 | **WP-P2-07** | P2 integration review & certification design freeze | `COUNTRY_PRODUCTION_RESTORE_P2_07_INTEGRATION_BASELINE.md` | PENDING |
 
 **Execution rule (Owner):** One WP at a time → Verify AC → Commit → Push → **STOP** → wait for approval before next WP.
