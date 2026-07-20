@@ -109,7 +109,7 @@ On production/cert clones: strict schema expectations, no fixture soft-skip?
 - **OWNER ANSWER:** OWNER_APPROVED
 
 ### 16. OD-ROLLBACK — OWNER_APPROVED (2026-07-20; was OD-ROLLBACK-CLI)
-- **Frozen:** Super Admin only via administrative interface. Same controls as Production Restore: re-auth, confirmation phrase, audit, permission validation, complete execution logging. Never available to Country Admins.  
+- **Frozen:** Super Admin dashboard provides a **dedicated Rollback action** for failed CPR sessions. Visible only to Super Admin. Available **only when** the session is paused because of failure. Same controls as Production Restore: re-auth, confirmation phrase, permission validation, complete audit logging, complete execution logging. Country Admins never. **Never automatic** — always an explicit Super Admin decision.  
 - **OWNER ANSWER:** OWNER_APPROVED
 
 ### 16b. Maintenance State on failure pause — OWNER_APPROVED (2026-07-20)

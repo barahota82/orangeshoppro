@@ -45,7 +45,7 @@
 | ID | Status |
 |----|--------|
 | **OD-PIN** | OWNER_APPROVED (new session Full Backup under Maintenance → verify → pin; never reuse existing) |
-| **OD-ROLLBACK** | OWNER_APPROVED (Super Admin admin UI only; same security controls as Production Restore; never Country Admin) — P0 catalog ID was **OD-ROLLBACK-CLI** |
+| **OD-ROLLBACK** | OWNER_APPROVED (dedicated Super Admin dashboard Rollback action; visible only when session paused on failure; never automatic; never Country Admin) — P0 catalog ID was **OD-ROLLBACK-CLI** |
 | **OD-FAIL-DELETE** | OWNER_APPROVED (no auto-rollback; pause for Super Admin Resume/Rollback) |
 | **OD-FAIL-IMPORT** | OWNER_APPROVED (no auto-rollback; pause for Super Admin Resume/Rollback) |
 | **Maintenance State (on failure pause)** | OWNER_APPROVED (Maintenance stays ON until Super Admin completes Resume or Rollback) |
@@ -54,7 +54,7 @@
 
 **Note (Group 2):** P0 architecture §9 prefers platform-wide maintenance — now **OWNER_APPROVED** as GLOBAL MAINTENANCE (OD-MAINT-SCOPE). Country-only maintenance is not approved under the current shared-DB / Full-anchor rollback architecture.
 
-**Note (Group 3):** OD-PIN owner workflow is: Maintenance Mode → **new** Full Backup for this session → verify → pin → continue. Existing backups must never be reused as the CPR rollback anchor. Failure after delete/import does **not** auto-rollback; Super Admin chooses Resume (when safe) or Rollback. P0 catalog **OD-ROLLBACK-CLI** is frozen under owner ID **OD-ROLLBACK** (admin-interface initiation + security parity with Production Restore).
+**Note (Group 3):** OD-PIN owner workflow is: Maintenance Mode → **new** Full Backup for this session → verify → pin → continue. Existing backups must never be reused as the CPR rollback anchor. Failure after delete/import does **not** auto-rollback; Super Admin chooses Resume (when safe) or the dedicated dashboard **Rollback** action. P0 catalog **OD-ROLLBACK-CLI** is frozen under owner ID **OD-ROLLBACK** (dedicated Super Admin dashboard action, available only on failure pause, security parity with Production Restore, never automatic).
 
 ### Register rules
 
@@ -346,18 +346,18 @@
 | Field | Content |
 |-------|---------|
 | **1. ID** | OD-ROLLBACK (historical P0 catalog ID: **OD-ROLLBACK-CLI**) |
-| **2. Title** | Who may initiate CPR rollback and under which controls |
+| **2. Title** | Dedicated Super Admin dashboard Rollback action for failed CPR sessions |
 | **3. Exact question** | After CPR PONR failure, should rollback invoke the existing Full DR rollback worker against the pinned Full anchor, or a CPR-specific wrapper that only orchestrates the same Full rollback? |
-| **4. Options** | *(Superseded.)* Historical CLI-shape options replaced by owner authority model. |
-| **5. Consequences** | Rollback = Super Admin via admin UI only; same security controls as Production Restore; Country Admins never; target is the session Full Backup from OD-PIN. |
+| **4. Options** | *(Superseded.)* Historical CLI-shape options replaced by owner dashboard-action model. |
+| **5. Consequences** | Dedicated Rollback action on Super Admin dashboard; Super Admin only; visible/available only when CPR session is paused because of failure; never automatic; same security controls as Production Restore; Country Admins never; target is OD-PIN session Full Backup. |
 | **6. Recommended** | *(Historical CLI wrapper recommendation superseded for authority; Full-anchor primary rollback philosophy remains.)* |
-| **7. Reason** | Explicit Super Admin trigger; security parity with Production Restore; aligns OD-DUAL / OD-PHRASE. |
-| **8–10** | Security: re-auth + phrase + permissions + audit + execution logging. Integrity: Full Backup from this session. Ops: admin UI path. |
-| **11. Rollback** | Defines who/how; uses OD-PIN session Full Backup. |
+| **7. Reason** | Explicit Super Admin decision via dedicated UI action; security parity with Production Restore; aligns OD-DUAL / OD-PHRASE / OD-FAIL-*. |
+| **8–10** | Security: re-auth + phrase + permissions + complete audit + complete execution logging. Integrity: Full Backup from this session. Ops: dashboard action only when paused on failure. |
+| **11. Rollback** | Defines who/how/when; uses OD-PIN session Full Backup; never automatic. |
 | **12. Required before** | P1: yes (frozen). Implementation: yes. Certification: yes. Enablement: yes. |
-| **13. Status** | **OWNER_APPROVED** (2026-07-20) |
-| **14. Final owner answer** | Rollback shall be initiated **only by the Super Admin** through the **administrative interface**. Rollback shall require the **same security controls** as Production Restore, including: re-authentication; confirmation phrase; audit logging; permission validation; complete execution logging. Rollback is **never** available to Country Admins. |
-| **15. Frozen policy wording** | *CPR Rollback may be initiated only by the Super Admin through the administrative interface. It requires the same controls as Production Restore: re-authentication, confirmation phrase, audit logging, permission validation, and complete execution logging. Country Admins must never initiate rollback. Rollback targets the Full Backup created and pinned for the current restore session (OD-PIN).* |
+| **13. Status** | **OWNER_APPROVED** (2026-07-20; wording refined) |
+| **14. Final owner answer** | The Super Admin dashboard shall provide a **dedicated Rollback action** for failed Country Production Restore sessions. This action shall be **visible only to the Super Admin**. The Rollback action becomes available **only when a Production Restore session is paused because of failure**. Executing Rollback shall require the **same security controls** as Production Restore, including: re-authentication; confirmation phrase; permission validation; complete audit logging; complete execution logging. Country Admins must **never** have access to this action. Rollback is **never** executed automatically. Rollback always requires an **explicit Super Admin decision**. |
+| **15. Frozen policy wording** | *The Super Admin dashboard provides a dedicated Rollback action for failed Country Production Restore sessions. The action is visible only to the Super Admin and becomes available only when a Production Restore session is paused because of failure. Executing Rollback requires the same security controls as Production Restore: re-authentication, confirmation phrase, permission validation, complete audit logging, and complete execution logging. Country Admins must never have access to this action. Rollback is never executed automatically and always requires an explicit Super Admin decision. Rollback targets the Full Backup created and pinned for the current restore session (OD-PIN).* |
 
 ---
 
@@ -670,7 +670,7 @@ These are **already frozen** and must not be contradicted by any OD answer:
 | OD-TIMEOUT | B | **OWNER_APPROVED** (progress-aware) | Y | N | soft | soft |
 | OD-RUNBOOK | B | A | soft | Y | Y | Y |
 | OD-PIN | C | **OWNER_APPROVED** (new Full Backup) | Y | N | Y | Y |
-| OD-ROLLBACK | C | **OWNER_APPROVED** (was OD-ROLLBACK-CLI) | Y | N | Y | Y |
+| OD-ROLLBACK | C | **OWNER_APPROVED** (dashboard action; fail-pause only) | Y | N | Y | Y |
 | OD-FAIL-DELETE | C | **OWNER_APPROVED** (pause; no auto-RB) | Y | N | Y | Y |
 | OD-FAIL-IMPORT | C | **OWNER_APPROVED** (pause; no auto-RB) | Y | N | Y | Y |
 | OD-C8 | D | A | Y | N | Y | Y |

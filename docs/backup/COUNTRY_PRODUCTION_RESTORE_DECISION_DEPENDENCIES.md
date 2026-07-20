@@ -19,7 +19,7 @@
 
 **Group 3 (aligned with P0 Full-anchor philosophy + Final Enterprise Audit fail-closed ops + Groups 1–2):**
 - **OD-PIN** — After Maintenance ON: **automatically create a NEW Full Backup** for this session → verify → pin. **Never reuse** existing backups. CPR must not continue without that session anchor.
-- **OD-ROLLBACK** (P0 catalog: OD-ROLLBACK-CLI) — Super Admin via **admin UI** only; same security controls as Production Restore (re-auth, phrase, audit, permissions, execution logging); never Country Admin; rolls back to OD-PIN session Full Backup.
+- **OD-ROLLBACK** (P0 catalog: OD-ROLLBACK-CLI) — Dedicated **Super Admin dashboard Rollback action**; visible only to Super Admin; available **only when** CPR is paused on failure; same security controls as Production Restore (re-auth, phrase, permissions, complete audit + execution logging); never Country Admin; **never automatic**; always explicit Super Admin decision; rolls back to OD-PIN session Full Backup.
 - **OD-FAIL-DELETE** / **OD-FAIL-IMPORT** — **No automatic rollback.** Pause under Maintenance; surface status; Super Admin chooses Resume (when safe) or Rollback.
 - **Maintenance State on failure pause** — Maintenance stays ON until Super Admin successfully completes Resume or Rollback; users must never regain access while restore is incomplete.
 
@@ -63,7 +63,7 @@ OD-ENABLE [OWNER_APPROVED]
 | **OD-RTO** | No hardcoded RTO; Estimated Duration for monitoring only |
 | **OD-TIMEOUT** | Progress-aware escalation; never fail on elapsed-vs-estimate alone |
 | **OD-PIN** | Maint → auto **new** Full Backup → verify → pin; never reuse existing |
-| **OD-ROLLBACK** | Super Admin admin UI; same controls as Production Restore; never Country Admin |
+| **OD-ROLLBACK** | Dedicated Super Admin dashboard Rollback action; fail-pause only; never automatic; same controls as Production Restore; never Country Admin |
 | **OD-FAIL-DELETE** | No auto-rollback; pause; Super Admin Resume/Rollback |
 | **OD-FAIL-IMPORT** | No auto-rollback; pause; Super Admin Resume/Rollback |
 | **Maintenance State (pause)** | Maint ON until successful Resume or Rollback |
@@ -111,7 +111,7 @@ OD-ENABLE [OWNER_APPROVED]
 | **OD-DUAL** / **OD-PHRASE** / **OD-BREAK** | Authority / phrase / break-glass drills |
 | **OD-MAINT** / **OD-MAINT-SCOPE** | GLOBAL Maintenance + write-block proof |
 | **OD-PIN** | Cert proves **new** session Full Backup create → verify → pin (no reuse) |
-| **OD-ROLLBACK** | Cert proves Super Admin admin-UI rollback with full security controls |
+| **OD-ROLLBACK** | Cert proves dedicated Super Admin dashboard Rollback action (fail-pause only) with full security controls; never automatic |
 | **OD-FAIL-DELETE** / **OD-FAIL-IMPORT** | Cert proves pause (no auto-rollback) + Super Admin Resume/Rollback paths |
 | **Maintenance State** | Cert proves users stay blocked until Resume or Rollback succeeds |
 | **OD-C8** / **OD-VERIFY-WARN** / **OD-FA-*** | Gate strictness |
@@ -146,7 +146,7 @@ Enablement is **last**. Flag stays **false by default**.
 | OD-PIN after Maint vs older P0 diagrams with backup before Maint | Sequence mismatch | **Resolved OWNER_APPROVED:** Maint → new Full Backup → verify → pin → continue |
 | OD-FAIL-* auto-rollback vs Super Admin decision | Silent Full restore | **Resolved:** no auto-rollback; pause for Super Admin |
 | OD-FAIL-IMPORT “re-clear/re-import” as default vs pause | Historical recommendation | **Superseded** by pause + Resume/Rollback choice |
-| OD-ROLLBACK-CLI CLI-only vs admin UI | Operator path | **Resolved as OD-ROLLBACK:** Super Admin administrative interface; security parity with Production Restore |
+| OD-ROLLBACK-CLI CLI-only vs admin UI | Operator path | **Resolved as OD-ROLLBACK:** dedicated Super Admin dashboard Rollback action; available only on failure pause; never automatic; security parity with Production Restore |
 | Country Admin rollback | Violates OD-DUAL | **Forbidden** by OD-ROLLBACK |
 | Failure pause vs releasing Maintenance | Users regain access mid-dirty | **Forbidden** — Maintenance State stays ON until Resume or Rollback succeeds |
 | OD-TIMEOUT progress continue vs delete/import failure pause | Different signals | Timeout progress ≠ failure pause; both keep GLOBAL Maint as required |
