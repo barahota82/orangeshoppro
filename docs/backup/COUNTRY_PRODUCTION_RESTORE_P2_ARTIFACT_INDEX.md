@@ -141,7 +141,7 @@ Provide a complete, Owner-reviewable **evidence pack** proving that Country Prod
 | Evidence assembly / pack schemas | WP-P2-04 COMPLETE — `CPR-P2-WP04-EVIDENCE_PACK_SCHEMAS` |
 | Owner submission & PASS/FAIL package | WP-P2-05 COMPLETE — `CPR-P2-WP05-OWNER_DECISION_PACKAGE` |
 | Schema-revision re-cert cycle binding | WP-P2-06 COMPLETE — `CPR-P2-WP06-SCHEMA_RECERT_CYCLE` |
-| P2 integration freeze | Later WP-P2-07 |
+| P2 integration freeze | WP-P2-07 COMPLETE — `CPR-P2-WP07-INTEGRATION_BASELINE` |
 
 ### 7.4 Out of scope (P2)
 
