@@ -8,6 +8,7 @@
 | **Parent architecture** | `docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` (committed `b28abb81`) |
 | **Workshop** | `docs/backup/COUNTRY_PRODUCTION_RESTORE_OWNER_WORKSHOP.md` |
 | **Dependencies** | `docs/backup/COUNTRY_PRODUCTION_RESTORE_DECISION_DEPENDENCIES.md` |
+| **Super Admin UX clarification** | `docs/backup/COUNTRY_PRODUCTION_RESTORE_SUPER_ADMIN_OPERATIONAL_MODEL.md` (**not** a new OD; does not amend OWNER_APPROVED text) |
 | **C3–C8** | Must not be modified |
 | **Enablement** | Remains **disabled** until certification + explicit OD-ENABLE + implementation + final enterprise approval (OWNER_APPROVED) |
 | **Last owner freeze** | 2026-07-20 — Group 3: OD-PIN, OD-ROLLBACK, OD-FAIL-DELETE, OD-FAIL-IMPORT (+ Maintenance State on pause) |

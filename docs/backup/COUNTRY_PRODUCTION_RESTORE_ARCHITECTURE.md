@@ -803,6 +803,8 @@ Any drift → abort pre-PONR.
 - `docs/backup/COUNTRY_DEPENDENCY_GRAPH.md`  
 - `docs/backup/COUNTRY_CRP_EXPORT_ENGINE_C3.md` … `COUNTRY_CRP_DRY_RUN_C8.md`  
 - `docs/backup/COUNTRY_RESTORE_ARCHITECTURE.md` (C0 historical)  
+- `docs/backup/COUNTRY_PRODUCTION_RESTORE_OWNER_DECISIONS.md` (P0b register)  
+- `docs/backup/COUNTRY_PRODUCTION_RESTORE_SUPER_ADMIN_OPERATIONAL_MODEL.md` (UX clarification; **no new ODs**)  
 - `docs/backup/RESTORE_EXECUTION_DESIGN.md`  
 - `docs/backup/PRODUCTION_CUTOVER_AND_ROLLBACK_DESIGN.md`  
 - `docs/backup/PRODUCTION_IMPORT_SAFETY.md`  

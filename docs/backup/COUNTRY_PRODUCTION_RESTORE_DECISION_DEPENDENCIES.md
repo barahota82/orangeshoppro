@@ -6,10 +6,13 @@
 | **Phase** | P0b |
 | **Date** | 2026-07-20 |
 | **Companion** | `COUNTRY_PRODUCTION_RESTORE_OWNER_DECISIONS.md`, `COUNTRY_PRODUCTION_RESTORE_OWNER_WORKSHOP.md` |
+| **Super Admin UX clarification** | `COUNTRY_PRODUCTION_RESTORE_SUPER_ADMIN_OPERATIONAL_MODEL.md` (**no new ODs**; does not amend OWNER_APPROVED text) |
 | **Parent** | `COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` (P0 tip `b28abb81`) |
 | **Last owner freeze** | 2026-07-20 — Group 3: OD-PIN, OD-ROLLBACK, OD-FAIL-DELETE, OD-FAIL-IMPORT (+ Maintenance State) → **OWNER_APPROVED** |
 
 **No implementation.** Remaining open ODs answered later. **Do not start P1** until remaining P1-blocking ODs are frozen.
+
+**UX clarification (2026-07-20):** Super Admin dashboard is the complete normal operational interface for CPR (no SSH/CLI for normal ops); Production Restore action auto-runs Maint → new Full Backup → verify → pin → begin (presents OD-PIN); live/paused management screen; Resume / Rollback / View Logs per already OWNER_APPROVED controls. See `COUNTRY_PRODUCTION_RESTORE_SUPER_ADMIN_OPERATIONAL_MODEL.md`.
 
 ### Architectural reference note (OWNER_APPROVED Groups 1–3)
 
