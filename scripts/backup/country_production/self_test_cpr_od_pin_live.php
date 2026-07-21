@@ -172,7 +172,7 @@ $env = $bundle['env'];
 $base = $bundle['base'];
 
 try {
-    cpr_op('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P4-05-lock-live');
+    cpr_op('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P4-06-gates-live');
 
     // --- Happy path ---
     $setup = cpr_op_setup_cp4($env);
