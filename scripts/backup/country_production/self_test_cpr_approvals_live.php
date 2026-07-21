@@ -346,7 +346,7 @@ try {
     );
     cpr_ap('contract_fingerprint_bound', (string) ($live['contract_fingerprint'] ?? '') !== '');
     cpr_ap('enablement_remains_false', ($live['enablement_flag_observed'] ?? null) === false);
-    cpr_ap('scaffold_version_current', ORANGE_CPR_SCAFFOLD_VERSION === 'P4-04-od-pin-live');
+    cpr_ap('scaffold_version_current', ORANGE_CPR_SCAFFOLD_VERSION === 'P4-05-lock-live');
 
     $contract = orange_cpr_contract_read($e1['cpr'], $setup['job_id']);
     cpr_ap(
