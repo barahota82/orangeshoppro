@@ -108,14 +108,29 @@ Every completed major phase shall contain:
 
 ---
 
+## P5
+
+| Field | Value |
+|-------|--------|
+| **Phase Name** | PONR Execution Baseline Complete |
+| **Completion Summary** | Production Apply path completed through CP9; integration baseline frozen; Enterprise Audit PASSED. |
+| **Git Tag** | `P5-PONR-Execution-Baseline` |
+| **Baseline Commit** | `b4c7a7394dcaddbd4288d7a8c951be85c9751a90` |
+| **Enterprise Audit Result** | **PASSED** |
+| **Sign-Off Result** | **APPROVED** (`P5 PONR EXECUTION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P6 ONLY`) |
+| **Completion Date** | 2026-07-22 |
+| **Status** | **COMPLETE** |
+
+---
+
 ## Current Project Status
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P4 COMPLETE** |
-| **Current State** | **READY FOR P5** |
+| **Current Phase** | **P5 COMPLETE** |
+| **Current State** | **READY FOR P6** |
 
-*(Update the Current Project Status block when the active phase changes. Append new phase sections for P5–P9; do not rewrite P0–P4 above.)*
+*(Update the Current Project Status block when the active phase changes. Append new phase sections for P6–P9; do not rewrite P0–P5 above.)*
 
 ---
 
