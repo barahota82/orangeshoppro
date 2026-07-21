@@ -18,7 +18,7 @@ const ORANGE_CPR_AUDIT_FILENAME = 'audit.jsonl';
 const ORANGE_CPR_CHECKPOINTS_DIRNAME = 'checkpoints';
 const ORANGE_CPR_CHECKPOINTS_TMP_DIRNAME = '.tmp';
 const ORANGE_CPR_CHECKPOINTS_MANIFEST = 'MANIFEST.json';
-const ORANGE_CPR_SCAFFOLD_VERSION = 'P6-01-control-plane';
+const ORANGE_CPR_SCAFFOLD_VERSION = 'P6-02-post-verify';
 const ORANGE_CPR_GATES_DIRNAME = 'gates';
 const ORANGE_CPR_AUTH_DIRNAME = 'auth';
 const ORANGE_CPR_AUTH_LIVE_DIRNAME = 'auth_live';
@@ -28,6 +28,7 @@ const ORANGE_CPR_DELETE_LIVE_DIRNAME = 'delete_live';
 const ORANGE_CPR_IMPORT_LIVE_DIRNAME = 'import_live';
 const ORANGE_CPR_SPECIAL_LIVE_DIRNAME = 'special_handlers';
 const ORANGE_CPR_UPLOADS_LIVE_DIRNAME = 'uploads_apply';
+const ORANGE_CPR_POST_VERIFY_DIRNAME = 'post_verify';
 const ORANGE_CPR_APPROVALS_DIRNAME = 'approvals';
 const ORANGE_CPR_MAINT_DIRNAME = 'maintenance';
 const ORANGE_CPR_MAINT_STATE_FILENAME = 'maint_state.json';
@@ -273,6 +274,11 @@ function orange_cpr_special_live_directory(string $cprRoot, string $jobId): stri
 function orange_cpr_uploads_live_directory(string $cprRoot, string $jobId): string
 {
     return orange_cpr_job_directory($cprRoot, $jobId) . DIRECTORY_SEPARATOR . ORANGE_CPR_UPLOADS_LIVE_DIRNAME;
+}
+
+function orange_cpr_post_verify_directory(string $cprRoot, string $jobId): string
+{
+    return orange_cpr_job_directory($cprRoot, $jobId) . DIRECTORY_SEPARATOR . ORANGE_CPR_POST_VERIFY_DIRNAME;
 }
 
 function orange_cpr_pipeline_directory(string $cprRoot, string $jobId): string

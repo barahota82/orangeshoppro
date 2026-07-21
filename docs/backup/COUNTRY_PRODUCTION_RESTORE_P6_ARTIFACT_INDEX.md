@@ -184,7 +184,7 @@ Prefer `orange_cpr_*` prefixes consistent with P3–P5 helpers; never reuse Full
 | WP | Title | Primary artifact | Status |
 |----|-------|------------------|--------|
 | **WP-P6-01** | P6 Control Plane & Artifact Index | `COUNTRY_PRODUCTION_RESTORE_P6_ARTIFACT_INDEX.md` | **COMPLETE** |
-| **WP-P6-02** | Post-Verify Engine (CP10 / Arch §19) | `COUNTRY_PRODUCTION_RESTORE_P6_02_POST_VERIFY.md` | PENDING |
+| **WP-P6-02** | Post-Verify Engine (CP10 / Arch §19) | `COUNTRY_PRODUCTION_RESTORE_P6_02_POST_VERIFY.md` | **COMPLETE** |
 | **WP-P6-03** | Success Finalize (CP11) | `COUNTRY_PRODUCTION_RESTORE_P6_03_SUCCESS_FINALIZE.md` | PENDING |
 | **WP-P6-04** | Session Full-Anchor Rollback Integration (OD-ROLLBACK) | `COUNTRY_PRODUCTION_RESTORE_P6_04_ROLLBACK_INTEGRATION.md` | PENDING |
 | **WP-P6-05** | Maintenance Release / Closeout (CP12) | `COUNTRY_PRODUCTION_RESTORE_P6_05_MAINT_RELEASE.md` | PENDING |
@@ -304,9 +304,10 @@ Foundational principles (always in force):
 ## 14. Stop rule
 
 **WP-P6-01 COMPLETE** (control plane).  
+**WP-P6-02 COMPLETE** (Post-Verify / CP10).  
 Commit → Push → **STOP.**  
-Do **not** begin **WP-P6-02** until Owner explicitly reviews and approves the next Work Package.
+Do **not** begin **WP-P6-03** until Owner explicitly reviews and approves the next Work Package.
 
 ---
 
-*End of WP-P6-01 — P6 Control Plane & Artifact Index.*
+*End of P6 Artifact Index (updated through WP-P6-02).*
