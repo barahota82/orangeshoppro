@@ -2,17 +2,34 @@
 
 | Field | Value |
 |-------|--------|
-| **Document role** | **Historical milestone record only** — not an implementation specification |
+| **Document role** | **Permanent historical release record** — not an implementation specification |
 | **Project** | Country Production Restore (CPR) |
-| **Date** | 2026-07-21 |
-| **Maintainer rule** | Append a section when a baseline is officially completed and tagged; never redesign Architecture or Owner Decisions here |
+| **Maintainer rule** | **Append-only.** Never delete historical entries. Never rewrite previous completed releases. Future phases (P4–P9) shall be appended, not edited. |
 
 ---
 
 ## Purpose
 
-Maintain the official milestone history of the CPR project.  
-This document records every officially completed project baseline.
+Maintain the permanent release history of the CPR project.  
+This document is **historical only**.  
+It records every officially completed project milestone.
+
+---
+
+## Entry format (required fields)
+
+Every completed major phase shall contain:
+
+| Field |
+|-------|
+| Phase Name |
+| Completion Summary |
+| Git Tag |
+| Baseline Commit |
+| Enterprise Audit Result |
+| Sign-Off Result |
+| Completion Date |
+| Status |
 
 ---
 
@@ -20,10 +37,14 @@ This document records every officially completed project baseline.
 
 | Field | Value |
 |-------|--------|
-| **Name** | Architecture Complete |
-| **Summary** | Architecture frozen. |
-| **Status** | **COMPLETE** |
+| **Phase Name** | Architecture Complete |
+| **Completion Summary** | Architecture frozen. |
 | **Git Tag** | `P0-P0b-Final` |
+| **Baseline Commit** | `e6c19ef13ff2ea8335b63d8464dd9724f868abe6` |
+| **Enterprise Audit Result** | **PASS** |
+| **Sign-Off Result** | **APPROVED** |
+| **Completion Date** | 2026-07-20 |
+| **Status** | **COMPLETE** |
 
 ---
 
@@ -31,10 +52,14 @@ This document records every officially completed project baseline.
 
 | Field | Value |
 |-------|--------|
-| **Name** | Design Baseline Complete |
-| **Summary** | Implementation contracts completed. |
-| **Status** | **COMPLETE** |
+| **Phase Name** | Design Baseline Complete |
+| **Completion Summary** | Implementation contracts completed. |
 | **Git Tag** | `P1-Design-Baseline` |
+| **Baseline Commit** | `56580dabb34e953e2756ea5b1a15e8a49c0f9814` |
+| **Enterprise Audit Result** | **PASS** |
+| **Sign-Off Result** | **APPROVED** |
+| **Completion Date** | 2026-07-21 |
+| **Status** | **COMPLETE** |
 
 ---
 
@@ -42,10 +67,14 @@ This document records every officially completed project baseline.
 
 | Field | Value |
 |-------|--------|
-| **Name** | Certification Framework Complete |
-| **Summary** | Certification design completed. |
-| **Status** | **COMPLETE** |
+| **Phase Name** | Certification Framework Complete |
+| **Completion Summary** | Certification design completed. |
 | **Git Tag** | `P2-Design-Baseline` |
+| **Baseline Commit** | `4cadc687db3d223c8eb57f281c2cae330f4f0589` |
+| **Enterprise Audit Result** | **PASS** |
+| **Sign-Off Result** | **APPROVED** |
+| **Completion Date** | 2026-07-21 |
+| **Status** | **COMPLETE** |
 
 ---
 
@@ -53,20 +82,26 @@ This document records every officially completed project baseline.
 
 | Field | Value |
 |-------|--------|
-| **Name** | Engine Baseline Complete |
-| **Summary** | Engine scaffold completed. |
-| **Status** | **COMPLETE** |
+| **Phase Name** | Engine Baseline Complete |
+| **Completion Summary** | Engine scaffold completed. |
 | **Git Tag** | `P3-Engine-Baseline` |
+| **Baseline Commit** | `7a7f8c99b32321c3d558aa432cb6085432a8ce0b` |
+| **Enterprise Audit Result** | **PASS** |
+| **Sign-Off Result** | **APPROVED** (`P3 ENGINE BASELINE APPROVED` / `READY FOR P4 IMPLEMENTATION`) |
+| **Completion Date** | 2026-07-21 |
+| **Status** | **COMPLETE** |
 
 ---
 
-## Current Project State
+## Current Project Status
 
 | Field | Value |
 |-------|--------|
 | **Current Phase** | **P4** |
-| **Current Status** | **READY TO BEGIN** |
+| **Current State** | **READY TO BEGIN** |
+
+*(Update the Current Project Status block when the active phase changes. Append new phase sections for P4–P9; do not rewrite P0–P3 above.)*
 
 ---
 
-*End of Release History — historical record only; do not use for implementation.*
+*End of Release History — append-only historical record; never use for implementation.*
