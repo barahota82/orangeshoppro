@@ -93,14 +93,29 @@ Every completed major phase shall contain:
 
 ---
 
+## P4
+
+| Field | Value |
+|-------|--------|
+| **Phase Name** | Pre-PONR Live Baseline Complete |
+| **Completion Summary** | Pre-PONR live path completed through CP-A; integration baseline frozen; Enterprise Audit PASSED. |
+| **Git Tag** | `P4-PrePONR-Baseline` |
+| **Baseline Commit** | `6bc09bcbe97f2ef6de0dcc4e3fb552481d04842c` |
+| **Enterprise Audit Result** | **PASSED** |
+| **Sign-Off Result** | **APPROVED** (`P4 PRE-PONR LIVE BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P5 ONLY`) |
+| **Completion Date** | 2026-07-21 |
+| **Status** | **COMPLETE** |
+
+---
+
 ## Current Project Status
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P4** |
-| **Current State** | **READY TO BEGIN** |
+| **Current Phase** | **P4 COMPLETE** |
+| **Current State** | **READY FOR P5** |
 
-*(Update the Current Project Status block when the active phase changes. Append new phase sections for P4–P9; do not rewrite P0–P3 above.)*
+*(Update the Current Project Status block when the active phase changes. Append new phase sections for P5–P9; do not rewrite P0–P4 above.)*
 
 ---
 

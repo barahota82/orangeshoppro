@@ -28,8 +28,8 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P3 COMPLETE** |
-| **Overall State** | **READY FOR P4** |
+| **Current Phase** | **P4 COMPLETE** |
+| **Overall State** | **READY FOR P5** |
 
 ---
 
@@ -41,6 +41,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | ✓ **P1** | Design Baseline |
 | ✓ **P2** | Certification Baseline |
 | ✓ **P3** | Engine Baseline |
+| ✓ **P4** | Pre-PONR Live Baseline |
 
 ---
 
@@ -52,6 +53,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | `P1-Design-Baseline` |
 | `P2-Design-Baseline` |
 | `P3-Engine-Baseline` |
+| `P4-PrePONR-Baseline` |
 
 ---
 
@@ -79,6 +81,9 @@ Every approved baseline tag (annotated; on `origin`):
 | `P1-Design-Baseline` | `56580dab` |
 | `P2-Design-Baseline` | `4cadc687` |
 | `P3-Engine-Baseline` | `7a7f8c99` |
+| `P4-PrePONR-Baseline` | `6bc09bcb` |
+
+**P4 baseline commit (full):** `6bc09bcbe97f2ef6de0dcc4e3fb552481d04842c`
 
 ---
 
@@ -90,6 +95,7 @@ Every approved baseline tag (annotated; on `origin`):
 | P1 Audit | **PASS** |
 | P2 Audit | **PASS** |
 | P3 Audit | **PASS** |
+| P4 Enterprise Audit | **PASSED** |
 
 ---
 
@@ -107,13 +113,11 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P4**
+**P5**
 
 ### Next Work Package
 
-**WP-P4-01**
-
-*(Do not begin until Owner explicitly authorizes P4.)*
+*(Do not begin until Owner explicitly authorizes P5.)*
 
 ---
 
@@ -124,7 +128,9 @@ Every approved baseline tag (annotated; on `origin`):
 | OWNER_APPROVED Register | `docs/backup/COUNTRY_PRODUCTION_RESTORE_OWNER_DECISIONS.md` |
 | Architecture (frozen) | `docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` |
 | Release history | `docs/backup/COUNTRY_PRODUCTION_RESTORE_RELEASE_HISTORY.md` |
-| P3 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P3_ARTIFACT_INDEX.md` |
+| P4 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_ARTIFACT_INDEX.md` |
+| P4 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_ENTERPRISE_AUDIT.md` |
+| P4 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_PHASE_SIGN_OFF.md` |
 
 ---
 
