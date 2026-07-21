@@ -180,7 +180,7 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with existing
 | **WP-P3-05** | Lock engine & concurrency enforcement | `COUNTRY_PRODUCTION_RESTORE_P3_05_LOCK_SCAFFOLD.md` | **COMPLETE** |
 | **WP-P3-06** | Pre-PONR gate evaluation engine | `COUNTRY_PRODUCTION_RESTORE_P3_06_GATE_EVALUATOR.md` | **COMPLETE** |
 | **WP-P3-07** | Pre-PONR Authorization & Contract Freeze Engine | `COUNTRY_PRODUCTION_RESTORE_P3_07_AUTHORITY_SCAFFOLD.md` | **COMPLETE** |
-| **WP-P3-08** | Audit / metrics / alert emit scaffolding | `COUNTRY_PRODUCTION_RESTORE_P3_08_AUDIT_SCAFFOLD.md` | PENDING |
+| **WP-P3-08** | Mutation Engine Skeleton (No Production Mutation) | `COUNTRY_PRODUCTION_RESTORE_P3_08_MUTATION_SKELETON.md` | **COMPLETE** |
 | **WP-P3-09** | P3 integration review & scaffolding baseline freeze | `COUNTRY_PRODUCTION_RESTORE_P3_09_INTEGRATION_BASELINE.md` | PENDING |
 
 **Execution rule (Owner):** One WP at a time → Verify AC → Commit → Push → **STOP** → wait for approval before next WP.
@@ -198,7 +198,7 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with existing
 | WP-P3-05 | OD-LOCK-CROSS/SHADOW/TTL | P1-05 | — | §15–§16 (scaffold) |
 | WP-P3-06 | OD-C8, OD-ENABLE, OD-FA-*, OD-INV, … | P1-08 | P2-02 CG-M04 | §37 gates (scaffold) |
 | WP-P3-07 | OD-DUAL, OD-PHRASE, OD-BREAK, OD-PERM, OD-RUNBOOK | P1-06 | — | §26–§27 |
-| WP-P3-08 | Audit expectations | P1-12 | P2-06 audit types (register at code) | §20–§24 |
+| WP-P3-08 | Mutation skeleton (no production mutation); audit/checkpoint hooks | P1-02 §5.3; P1-12 hooks | — | §6 pipeline |
 | WP-P3-09 | All cited | All P3 + baselines | Freeze | Freeze |
 
 ---
@@ -253,9 +253,9 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with existing
 
 ## 13. Stop rule
 
-**WP-P3-01…WP-P3-07 COMPLETE** (through pre-PONR authorization & contract freeze).  
+**WP-P3-01…WP-P3-08 COMPLETE** (through mutation-engine skeleton; no production mutation).  
 Commit → Push → **STOP.**  
-Do **not** begin WP-P3-08 until Owner explicitly approves the next Work Package.
+Do **not** begin WP-P3-09 until Owner explicitly approves the next Work Package.
 
 ---
 
