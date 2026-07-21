@@ -18,8 +18,9 @@ const ORANGE_CPR_AUDIT_FILENAME = 'audit.jsonl';
 const ORANGE_CPR_CHECKPOINTS_DIRNAME = 'checkpoints';
 const ORANGE_CPR_CHECKPOINTS_TMP_DIRNAME = '.tmp';
 const ORANGE_CPR_CHECKPOINTS_MANIFEST = 'MANIFEST.json';
-const ORANGE_CPR_SCAFFOLD_VERSION = 'P3-06-gate-evaluator';
+const ORANGE_CPR_SCAFFOLD_VERSION = 'P3-07-authority-engine';
 const ORANGE_CPR_GATES_DIRNAME = 'gates';
+const ORANGE_CPR_AUTH_DIRNAME = 'auth';
 const ORANGE_CPR_LOCK_FILENAME = '.country_production_restore.lock';
 const ORANGE_CPR_SHADOW_DIRNAME = 'country_shadow';
 const ORANGE_CPR_SHADOW_LOCK_FILENAME = '.country_shadow_restore.lock';
@@ -188,6 +189,11 @@ function orange_cpr_lock_manual_clear_audit_directory(string $cprRoot, string $j
 function orange_cpr_gates_directory(string $cprRoot, string $jobId): string
 {
     return orange_cpr_job_directory($cprRoot, $jobId) . DIRECTORY_SEPARATOR . ORANGE_CPR_GATES_DIRNAME;
+}
+
+function orange_cpr_auth_directory(string $cprRoot, string $jobId): string
+{
+    return orange_cpr_job_directory($cprRoot, $jobId) . DIRECTORY_SEPARATOR . ORANGE_CPR_AUTH_DIRNAME;
 }
 
 function orange_cpr_checkpoints_directory(string $cprRoot, string $jobId): string
