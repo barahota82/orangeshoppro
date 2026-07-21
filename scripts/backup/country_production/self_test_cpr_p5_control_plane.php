@@ -28,7 +28,7 @@ $docsRoot = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'docs' . DIRECTORY_SEPAR
 $indexPath = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P5_ARTIFACT_INDEX.md';
 
 try {
-    cpr_p5cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-03-import-live');
+    cpr_p5cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-04-special-handlers');
     cpr_p5cp('artifact_index_exists', is_file($indexPath));
 
     $ids = orange_cpr_p5_work_package_ids();
@@ -61,7 +61,7 @@ try {
     $snap = orange_cpr_p5_control_plane_snapshot();
     cpr_p5cp('delete_engine_implemented', !empty($snap['production_delete_engine_implemented']));
     cpr_p5cp('import_engine_implemented', !empty($snap['production_import_engine_implemented']));
-    cpr_p5cp('no_special_handlers_yet', empty($snap['special_handlers_engine_implemented']));
+    cpr_p5cp('special_handlers_implemented', !empty($snap['special_handlers_engine_implemented']));
     cpr_p5cp('no_uploads_engine_yet', empty($snap['uploads_apply_engine_implemented']));
     cpr_p5cp('no_p6_started', empty($snap['p6_started']));
     cpr_p5cp('architecture_not_modified_flag', empty($snap['architecture_modified']));
@@ -83,9 +83,9 @@ try {
     // Index content smoke checks
     $index = is_file($indexPath) ? (string) file_get_contents($indexPath) : '';
     cpr_p5cp('index_has_artifact_id', str_contains($index, 'CPR-P5-WP01-ARTIFACT_INDEX'));
-    cpr_p5cp('index_lists_wp_p5_03', str_contains($index, 'WP-P5-03'));
-    cpr_p5cp('index_wp_p5_03_complete', str_contains($index, 'WP-P5-03') && str_contains($index, 'COMPLETE'));
-    cpr_p5cp('index_stop_blocks_p5_04', str_contains($index, 'Do **not** begin **WP-P5-04**'));
+    cpr_p5cp('index_lists_wp_p5_04', str_contains($index, 'WP-P5-04'));
+    cpr_p5cp('index_wp_p5_04_complete', str_contains($index, 'WP-P5-04') && str_contains($index, 'COMPLETE'));
+    cpr_p5cp('index_stop_blocks_p5_05', str_contains($index, 'Do **not** begin **WP-P5-05**'));
     cpr_p5cp('index_enablement_false', str_contains($index, 'hard false'));
 } catch (Throwable $e) {
     cpr_p5cp('exception', false, $e->getMessage());

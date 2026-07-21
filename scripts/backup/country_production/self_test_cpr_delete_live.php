@@ -334,7 +334,7 @@ $bundle = cpr_dl_env();
 $base = $bundle['base'];
 
 try {
-    cpr_dl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-03-import-live');
+    cpr_dl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-04-special-handlers');
 
     $slot = cpr_dl_fresh_env($base);
     $env = $slot['env'];
