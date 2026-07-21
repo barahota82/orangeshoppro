@@ -18,7 +18,12 @@ const ORANGE_CPR_AUDIT_FILENAME = 'audit.jsonl';
 const ORANGE_CPR_CHECKPOINTS_DIRNAME = 'checkpoints';
 const ORANGE_CPR_CHECKPOINTS_TMP_DIRNAME = '.tmp';
 const ORANGE_CPR_CHECKPOINTS_MANIFEST = 'MANIFEST.json';
-const ORANGE_CPR_SCAFFOLD_VERSION = 'P3-04-checkpoint-engine';
+const ORANGE_CPR_SCAFFOLD_VERSION = 'P3-05-lock-engine';
+const ORANGE_CPR_LOCK_FILENAME = '.country_production_restore.lock';
+const ORANGE_CPR_SHADOW_DIRNAME = 'country_shadow';
+const ORANGE_CPR_SHADOW_LOCK_FILENAME = '.country_shadow_restore.lock';
+const ORANGE_CPR_FW_LOCK_FILENAME = '.restore_framework.lock';
+const ORANGE_CPR_ORCH_LOCK_FILENAME = '.restore_execution_orchestrator.lock';
 
 /**
  * Resolve CPR runtime root.
@@ -101,7 +106,82 @@ function orange_cpr_audit_file_path(string $cprRoot, string $jobId): string
 
 function orange_cpr_lock_file_path(string $cprRoot): string
 {
-    return rtrim($cprRoot, DIRECTORY_SEPARATOR . '/\\') . DIRECTORY_SEPARATOR . '.country_production_restore.lock';
+    return rtrim($cprRoot, DIRECTORY_SEPARATOR . '/\\') . DIRECTORY_SEPARATOR . ORANGE_CPR_LOCK_FILENAME;
+}
+
+/**
+ * Restore work root used for Full DR / C6 peer lock observation (P1-05 §4).
+ *
+ * @param array<string, mixed> $env
+ */
+function orange_cpr_resolve_peer_restore_work_root(array $env, ?string $cprRoot = null): string
+{
+    $configured = trim((string) ($env['ORANGE_RESTORE_WORK_DIR'] ?? ''));
+    if ($configured !== '') {
+        require_once __DIR__ . '/../backup_paths.php';
+        $root = orange_backup_normalize_directory_path($configured);
+        if (!is_dir($root) && !@mkdir($root, 0775, true) && !is_dir($root)) {
+            throw new RuntimeException('ORANGE_RESTORE_WORK_DIR cannot be created.');
+        }
+
+        return realpath($root) ?: $root;
+    }
+
+    $cprRoot ??= orange_cpr_resolve_work_root($env);
+    $base = basename(rtrim(str_replace('\\', '/', $cprRoot), '/'));
+    if (strcasecmp($base, ORANGE_CPR_DIRNAME) === 0) {
+        $parent = dirname($cprRoot);
+
+        return realpath($parent) ?: $parent;
+    }
+
+    // Standalone CPR work dir (tests): peers live beside it under parent.
+    $parent = dirname($cprRoot);
+
+    return realpath($parent) ?: $parent;
+}
+
+/**
+ * @param array<string, mixed> $env
+ * @return list<string>
+ */
+function orange_cpr_full_dr_lock_paths(array $env, ?string $cprRoot = null): array
+{
+    $work = orange_cpr_resolve_peer_restore_work_root($env, $cprRoot);
+
+    return [
+        $work . DIRECTORY_SEPARATOR . ORANGE_RESTORE_LOCK_FILENAME,
+        $work . DIRECTORY_SEPARATOR . ORANGE_CPR_FW_LOCK_FILENAME,
+        $work . DIRECTORY_SEPARATOR . ORANGE_CPR_ORCH_LOCK_FILENAME,
+    ];
+}
+
+/**
+ * @param array<string, mixed> $env
+ */
+function orange_cpr_c6_lock_path(array $env, ?string $cprRoot = null): string
+{
+    $work = orange_cpr_resolve_peer_restore_work_root($env, $cprRoot);
+
+    return $work . DIRECTORY_SEPARATOR . ORANGE_CPR_SHADOW_DIRNAME
+        . DIRECTORY_SEPARATOR . ORANGE_CPR_SHADOW_LOCK_FILENAME;
+}
+
+/**
+ * @param array<string, mixed> $env
+ */
+function orange_cpr_backup_runner_lock_path(array $env): string
+{
+    require_once __DIR__ . '/../backup_environment.php';
+    $backupRoot = orange_backup_resolve_root($env, null);
+
+    return rtrim($backupRoot, DIRECTORY_SEPARATOR . '/\\')
+        . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, ORANGE_BACKUP_LOCK_RELATIVE);
+}
+
+function orange_cpr_lock_manual_clear_audit_directory(string $cprRoot, string $jobId): string
+{
+    return orange_cpr_job_directory($cprRoot, $jobId) . DIRECTORY_SEPARATOR . 'audit';
 }
 
 function orange_cpr_checkpoints_directory(string $cprRoot, string $jobId): string
