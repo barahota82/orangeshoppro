@@ -181,7 +181,7 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with existing
 | **WP-P3-06** | Pre-PONR gate evaluation engine | `COUNTRY_PRODUCTION_RESTORE_P3_06_GATE_EVALUATOR.md` | **COMPLETE** |
 | **WP-P3-07** | Pre-PONR Authorization & Contract Freeze Engine | `COUNTRY_PRODUCTION_RESTORE_P3_07_AUTHORITY_SCAFFOLD.md` | **COMPLETE** |
 | **WP-P3-08** | Mutation Engine Skeleton (No Production Mutation) | `COUNTRY_PRODUCTION_RESTORE_P3_08_MUTATION_SKELETON.md` | **COMPLETE** |
-| **WP-P3-09** | P3 integration review & scaffolding baseline freeze | `COUNTRY_PRODUCTION_RESTORE_P3_09_INTEGRATION_BASELINE.md` | PENDING |
+| **WP-P3-09** | P3 Integration Review & Engine Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P3_09_INTEGRATION_BASELINE.md` | **COMPLETE** |
 
 **Execution rule (Owner):** One WP at a time → Verify AC → Commit → Push → **STOP** → wait for approval before next WP.
 
@@ -253,9 +253,10 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with existing
 
 ## 13. Stop rule
 
-**WP-P3-01…WP-P3-08 COMPLETE** (through mutation-engine skeleton; no production mutation).  
+**WP-P3-01…WP-P3-09 COMPLETE.**  
+**P3 ENGINE BASELINE FROZEN** — see `COUNTRY_PRODUCTION_RESTORE_P3_09_INTEGRATION_BASELINE.md` (verdict A).  
 Commit → Push → **STOP.**  
-Do **not** begin WP-P3-09 until Owner explicitly approves the next Work Package.
+Do **not** begin **P4** until Owner explicitly authorizes the next phase.
 
 ---
 
