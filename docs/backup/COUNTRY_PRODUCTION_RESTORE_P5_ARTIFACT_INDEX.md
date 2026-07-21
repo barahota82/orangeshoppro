@@ -312,9 +312,9 @@ Foundational principles (always in force):
 **WP-P5-04 COMPLETE** (Special Handlers) — see `COUNTRY_PRODUCTION_RESTORE_P5_04_SPECIAL_HANDLERS.md`.  
 **WP-P5-05 COMPLETE** (Country Uploads Apply / OD-UPLOADS) — see `COUNTRY_PRODUCTION_RESTORE_P5_05_UPLOADS_APPLY.md`.  
 **WP-P5-06 COMPLETE** (P5 Integration Baseline Freeze) — see `COUNTRY_PRODUCTION_RESTORE_P5_06_INTEGRATION_BASELINE.md`.  
-**P5 phase COMPLETE — awaiting Owner review.**  
+**P5 ENTERPRISE AUDIT COMPLETE — PASSED** — see `COUNTRY_PRODUCTION_RESTORE_P5_ENTERPRISE_AUDIT.md` (audited tip `e1e68760`).  
+**P5 phase COMPLETE — awaiting Owner review for Git Tag / P6.**  
 Commit → Push → **STOP.**  
-Do **not** start **Enterprise Audit**.  
 Do **not** create a **Git Tag**.  
 Do **not** begin **P6**.  
 
@@ -322,4 +322,4 @@ Wait for Owner review and explicit approval before any next step.
 
 ---
 
-*End of WP-P5-01 — P5 Control Plane & Artifact Index (updated inventory through WP-P5-06).*
+*End of WP-P5-01 — P5 Control Plane & Artifact Index (updated through P5 Enterprise Audit PASSED).*
