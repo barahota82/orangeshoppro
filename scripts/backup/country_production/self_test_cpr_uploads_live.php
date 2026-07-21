@@ -3,16 +3,17 @@
 declare(strict_types=1);
 
 /**
- * Self-test: CPR Live Special Handlers (WP-P5-04).
- * Run: php scripts/backup/country_production/self_test_cpr_special_handlers_live.php
+ * Self-test: CPR Live Country Uploads Apply (WP-P5-05).
+ * Run: php scripts/backup/country_production/self_test_cpr_uploads_live.php
  */
 
-require_once dirname(__DIR__, 3) . '/includes/backup/country_production/cpr_special_handlers_live.php';
+require_once dirname(__DIR__, 3) . '/includes/backup/country_production/cpr_uploads_live.php';
+require_once dirname(__DIR__, 3) . '/includes/backup/country_production/cpr_p5_control_plane.php';
 
 $pass = 0;
 $fail = 0;
 
-function cpr_sh(string $name, bool $ok, string $detail = ''): void
+function cpr_ul(string $name, bool $ok, string $detail = ''): void
 {
     global $pass, $fail;
     if ($ok) {
@@ -27,7 +28,7 @@ function cpr_sh(string $name, bool $ok, string $detail = ''): void
 /**
  * @return array{env:array<string,mixed>,cpr:string}
  */
-function cpr_sh_fresh_env(string $base): array
+function cpr_ul_fresh_env(string $base): array
 {
     $id = bin2hex(random_bytes(3));
     $restoreWork = $base . DIRECTORY_SEPARATOR . 'rw_' . $id;
@@ -49,7 +50,7 @@ function cpr_sh_fresh_env(string $base): array
     ];
 }
 
-function cpr_sh_cleanup(string $base): void
+function cpr_ul_cleanup(string $base): void
 {
     if (!is_dir($base)) {
         return;
@@ -67,7 +68,7 @@ function cpr_sh_cleanup(string $base): void
 /**
  * @return array<string, mixed>
  */
-function cpr_sh_slice(): array
+function cpr_ul_slice(): array
 {
     return [
         'country_id' => 1,
@@ -84,12 +85,12 @@ function cpr_sh_slice(): array
 }
 
 /**
- * Full CPA → DELETE → IMPORT fixture (reuses proven P5 path).
+ * Full path through Special Handlers / CP8.
  *
  * @param array<string, mixed> $env
  * @return array<string, mixed>
  */
-function cpr_sh_setup_through_import(array $env): array
+function cpr_ul_setup_through_special(array $env): array
 {
     $reports = [
         'c4' => ['overall' => 'PASS', 'pkg' => 'x'],
@@ -111,8 +112,8 @@ function cpr_sh_setup_through_import(array $env): array
             'execution_performed' => false,
         ],
     ];
-    $fp = hash('sha256', 'fp-sh-' . bin2hex(random_bytes(4)));
-    $pkgId = 'pkg-sh-' . substr($fp, 0, 8);
+    $fp = hash('sha256', 'fp-ul-' . bin2hex(random_bytes(4)));
+    $pkgId = 'pkg-ul-' . substr($fp, 0, 8);
     $job = orange_cpr_job_create($env, [
         'package_id' => $pkgId,
         'package_fingerprint' => $fp,
@@ -177,20 +178,20 @@ function cpr_sh_setup_through_import(array $env): array
     }
     $acq = orange_cpr_lock_live_acquire($env, $jid, [
         'actor_admin_id' => 7, 'actor_is_super_admin' => true,
-        'owner_class' => 'super_admin_procedure', 'worker_id' => 'sh-worker',
+        'owner_class' => 'super_admin_procedure', 'worker_id' => 'ul-worker',
     ]);
     if (empty($acq['ok'])) {
         throw new RuntimeException('lock');
     }
     $lease = (string) ($acq['lease_token'] ?? '');
-    $worker = (string) ($acq['worker_id'] ?? 'sh-worker');
+    $worker = (string) ($acq['worker_id'] ?? 'ul-worker');
     $sessionId = (string) ($pin['session_full_backup_id'] ?? '');
 
     orange_cpr_checkpoint_create($env, $jid, 'runbook_pre_ponr', [
         'restore_package_id' => $pkgId, 'target_country_id' => 1, 'target_country_code' => 'KW',
         'c8_overall_result' => 'SAFE', 'certified_inventory_snapshot_id' => 'inv-1',
         'session_full_backup_id' => $sessionId, 'global_maintenance_active' => true,
-        'completed_by_admin_id' => 7, 'completed_at' => gmdate('c'), 'audit_record_id' => 'aud-sh-1',
+        'completed_by_admin_id' => 7, 'completed_at' => gmdate('c'), 'audit_record_id' => 'aud-ul-1',
     ], ['written_by' => 'super_admin']);
     orange_cpr_checkpoint_create($env, $jid, 'CP5', [
         'survivor_baseline_hash' => str_repeat('s', 32),
@@ -267,7 +268,7 @@ function cpr_sh_setup_through_import(array $env): array
 
     $del = orange_cpr_delete_live_run($env, $jid, [
         'actor_admin_id' => 7, 'actor_is_super_admin' => true,
-        'lease_token' => $lease, 'worker_id' => $worker, 'target_slice' => cpr_sh_slice(),
+        'lease_token' => $lease, 'worker_id' => $worker, 'target_slice' => cpr_ul_slice(),
     ]);
     if (empty($del['ok'])) {
         throw new RuntimeException('delete: ' . (string) ($del['code'] ?? ''));
@@ -280,6 +281,17 @@ function cpr_sh_setup_through_import(array $env): array
     if (empty($imp['ok'])) {
         throw new RuntimeException('import: ' . (string) ($imp['code'] ?? ''));
     }
+    $sh = orange_cpr_special_live_run($env, $jid, [
+        'actor_admin_id' => 7, 'actor_is_super_admin' => true,
+        'lease_token' => $lease, 'worker_id' => $worker,
+        'run_all_handlers' => true,
+        'sequence_package' => ['inv_c1' => 10, 'ord_c1' => 5, 'other_c2' => 99],
+        'sequence_surviving' => ['inv_c1' => 12, 'ord_c1' => 3],
+        'sequence_observed_max' => ['inv_c1' => 11, 'ord_c1' => 4],
+    ]);
+    if (empty($sh['ok'])) {
+        throw new RuntimeException('special: ' . (string) ($sh['code'] ?? ''));
+    }
 
     return [
         'job_id' => $jid,
@@ -288,7 +300,66 @@ function cpr_sh_setup_through_import(array $env): array
         'package_fingerprint' => $fp,
         'cpr_root' => $cprRoot,
         'session_full_backup_id' => $sessionId,
+        'package_id' => $pkgId,
     ];
+}
+
+/**
+ * @param list<string> $paths
+ * @return array<string, mixed>
+ */
+function cpr_ul_build_manifest(string $jobId, string $fp, array $paths, array $overrides = []): array
+{
+    $normalized = [];
+    foreach ($paths as $p) {
+        $n = orange_cpr_uploads_live_normalize_path($p);
+        if ($n === null) {
+            throw new RuntimeException('bad path in test: ' . $p);
+        }
+        $normalized[] = $n;
+    }
+    sort($normalized, SORT_STRING);
+    $canonical = [
+        'job_id' => $jobId,
+        'country_id' => 1,
+        'package_fingerprint' => $fp,
+        'schema_revision' => 121,
+        'paths' => $normalized,
+    ];
+    $sha = hash('sha256', (string) json_encode($canonical, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    $base = [
+        'manifest_id' => 'um-' . substr(hash('sha256', $jobId . $fp), 0, 12),
+        'job_id' => $jobId,
+        'country_id' => 1,
+        'package_fingerprint' => $fp,
+        'schema_revision' => 121,
+        'paths' => $normalized,
+        'manifest_sha256' => $sha,
+        'manifest_sealed' => true,
+        'require_non_empty' => true,
+    ];
+
+    return array_merge($base, $overrides);
+}
+
+/**
+ * @param list<string> $paths
+ * @return list<array<string, mixed>>
+ */
+function cpr_ul_artifacts(array $paths, int $countryId = 1): array
+{
+    $out = [];
+    foreach ($paths as $i => $p) {
+        $content = 'blob-' . $p . '-' . (string) $i;
+        $out[] = [
+            'relative_path' => $p,
+            'country_id' => $countryId,
+            'content' => $content,
+            'sha256' => hash('sha256', $content),
+        ];
+    }
+
+    return $out;
 }
 
 /**
@@ -296,206 +367,182 @@ function cpr_sh_setup_through_import(array $env): array
  * @param array<string, mixed> $extra
  * @return array<string, mixed>
  */
-function cpr_sh_req(array $setup, array $extra = []): array
+function cpr_ul_req(array $setup, array $extra = []): array
 {
+    $paths = [
+        'countries/kw/products/a.jpg',
+        'countries/kw/products/b.jpg',
+        'c1/docs/note.txt',
+    ];
+    $manifest = cpr_ul_build_manifest(
+        (string) $setup['job_id'],
+        (string) $setup['package_fingerprint'],
+        $paths
+    );
+
     return array_merge([
         'actor_admin_id' => 7,
         'actor_is_super_admin' => true,
         'lease_token' => (string) $setup['lease_token'],
         'worker_id' => (string) $setup['worker_id'],
-        'run_all_handlers' => true,
-        'sequence_package' => [
-            'inv_c1' => 10,
-            'ord_c1' => 5,
-            'other_c2' => 99,
-        ],
-        'sequence_surviving' => [
-            'inv_c1' => 12,
-            'ord_c1' => 3,
-        ],
-        'sequence_observed_max' => [
-            'inv_c1' => 11,
-            'ord_c1' => 4,
-        ],
+        'schema_revision' => 121,
+        'upload_manifest' => $manifest,
+        'upload_artifacts' => cpr_ul_artifacts($manifest['paths']),
     ], $extra);
 }
 
-$base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p504_' . bin2hex(random_bytes(4));
+$base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p505_' . bin2hex(random_bytes(4));
 @mkdir($base, 0775, true);
 
 try {
-    cpr_sh('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-05-uploads-live');
-    cpr_sh(
-        'catalog_order',
-        orange_cpr_special_handlers_executable_order() === [
-            'admins_permissions_composite',
-            'expenses_via_accounts',
-            'polymorphic_company_documents',
-            'gl_voucher_slots_country',
-            'seq_country_namespace',
-        ]
+    cpr_ul('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-05-uploads-live');
+    cpr_ul('dirname_constant', ORANGE_CPR_UPLOADS_LIVE_DIRNAME === 'uploads_apply');
+
+    $src = (string) file_get_contents(dirname(__DIR__, 3) . '/includes/backup/country_production/cpr_uploads_live.php');
+    cpr_ul(
+        'no_production_sql_in_engine',
+        !preg_match('/\bdb\s*\(|PDO::|mysqli_|DELETE FROM|INSERT INTO|UPDATE\s+\w+/i', $src)
     );
 
-    $importSrc = (string) file_get_contents(dirname(__DIR__, 3) . '/includes/backup/country_production/cpr_import_live.php');
-    cpr_sh(
-        'import_engine_remains_generic',
-        !str_contains($importSrc, 'seq_country_namespace')
-        && !str_contains($importSrc, 'admins_permissions_composite')
-        && !str_contains($importSrc, 'orange_cpr_special_live_run')
-    );
+    // Valid upload path
+    $slot = cpr_ul_fresh_env($base);
+    $setup = cpr_ul_setup_through_special($slot['env']);
+    $run = orange_cpr_uploads_live_run($slot['env'], (string) $setup['job_id'], cpr_ul_req($setup));
+    cpr_ul('valid_upload_path', !empty($run['ok']) && !empty($run['files_applied_count']), (string) ($run['code'] ?? $run['message'] ?? ''));
+    cpr_ul('cp9_exists', orange_cpr_checkpoint_exists((string) $setup['cpr_root'], (string) $setup['job_id'], 'CP9'));
+    cpr_ul('sealed_upload_report', is_array($run['upload_report'] ?? null) && orange_cpr_auth_verify_seal($run['upload_report']));
+    cpr_ul('sealed_upload_manifest', is_array($run['upload_manifest'] ?? null) && orange_cpr_auth_verify_seal($run['upload_manifest']));
+    cpr_ul('state_uploads_applying', ($run['job_state'] ?? '') === 'cpr_uploads_applying');
+    cpr_ul('production_sql_disabled', ($run['production_sql_executed'] ?? true) === false);
+    cpr_ul('production_uploads_not_mutated', ($run['production_uploads_mutated'] ?? true) === false);
+    cpr_ul('scoped_only', !empty($run['scoped_only']));
+    cpr_ul('recovery_metadata', is_array($run['recovery_metadata'] ?? null)
+        && ($run['recovery_metadata']['execution_status'] ?? '') === 'uploads_complete');
 
-    // Valid handler execution
-    $slot = cpr_sh_fresh_env($base);
-    $setup = cpr_sh_setup_through_import($slot['env']);
-    $run = orange_cpr_special_live_run($slot['env'], (string) $setup['job_id'], cpr_sh_req($setup));
-    cpr_sh('valid_handler_execution', !empty($run['ok']) && !empty($run['counters_not_lowered_ack']), (string) ($run['code'] ?? $run['message'] ?? ''));
-    cpr_sh('cp8_exists', orange_cpr_checkpoint_exists((string) $setup['cpr_root'], (string) $setup['job_id'], 'CP8'));
-    cpr_sh('sealed_report', is_array($run['special_report'] ?? null) && orange_cpr_auth_verify_seal($run['special_report']));
-    cpr_sh('sealed_manifest', is_array($run['mutation_manifest'] ?? null) && orange_cpr_auth_verify_seal($run['mutation_manifest']));
-    cpr_sh('fingerprint_integrity', !empty($run['mutation_manifest']['manifest_fingerprint']));
-    cpr_sh('state_remains_importing', ($run['job_state'] ?? '') === 'cpr_importing');
-    cpr_sh('no_production_sql', ($run['production_sql_executed'] ?? true) === false);
-    cpr_sh('uploads_not_executed', empty($run['uploads_executed']));
-    cpr_sh('import_engine_not_modified_flag', empty($run['import_engine_modified']));
-
-    $idem = orange_cpr_special_live_run($slot['env'], (string) $setup['job_id'], cpr_sh_req($setup));
-    cpr_sh('idempotent_complete', !empty($idem['ok']) && !empty($idem['idempotent']));
+    $idem = orange_cpr_uploads_live_run($slot['env'], (string) $setup['job_id'], cpr_ul_req($setup));
+    cpr_ul('idempotent_complete', !empty($idem['ok']) && !empty($idem['idempotent']));
 
     $auditPath = orange_cpr_job_directory((string) $setup['cpr_root'], (string) $setup['job_id'])
         . DIRECTORY_SEPARATOR . ORANGE_CPR_AUDIT_FILENAME;
     $auditRaw = is_file($auditPath) ? (string) file_get_contents($auditPath) : '';
-    cpr_sh('audit_start', str_contains($auditRaw, 'cpr.special_live_start'));
-    cpr_sh('audit_handler_complete', str_contains($auditRaw, 'cpr.special_live_handler_complete'));
-    cpr_sh('audit_complete', str_contains($auditRaw, 'cpr.special_live_complete'));
+    cpr_ul('audit_start', str_contains($auditRaw, 'cpr.uploads_live_start'));
+    cpr_ul('audit_complete', str_contains($auditRaw, 'cpr.uploads_live_complete'));
+    cpr_ul('audit_integrity_no_sql', !str_contains($auditRaw, 'production_sql_executed":true'));
 
-    // Unknown handler
-    $slotU = cpr_sh_fresh_env($base);
-    $setupU = cpr_sh_setup_through_import($slotU['env']);
-    $unk = orange_cpr_special_live_run($slotU['env'], (string) $setupU['job_id'], cpr_sh_req($setupU, [
-        'handler_id' => 'not_a_real_handler',
-        'run_all_handlers' => false,
-    ]));
-    cpr_sh('unknown_handler', empty($unk['ok']) && ($unk['code'] ?? '') === ORANGE_CPR_SPECIALLIVE_ERR_UNKNOWN, (string) ($unk['code'] ?? ''));
+    // Missing manifest
+    $slotM = cpr_ul_fresh_env($base);
+    $setupM = cpr_ul_setup_through_special($slotM['env']);
+    $reqM = cpr_ul_req($setupM);
+    unset($reqM['upload_manifest']);
+    $miss = orange_cpr_uploads_live_run($slotM['env'], (string) $setupM['job_id'], $reqM);
+    cpr_ul('missing_manifest', empty($miss['ok']) && ($miss['code'] ?? '') === ORANGE_CPR_UPLOADSLIVE_ERR_MANIFEST, (string) ($miss['code'] ?? ''));
 
-    // Excluded handler
-    $excl = orange_cpr_special_live_run($slotU['env'], (string) $setupU['job_id'], cpr_sh_req($setupU, [
-        'handler_id' => 'full_only_journal_entries',
-        'run_all_handlers' => false,
-    ]));
-    cpr_sh('excluded_handler', empty($excl['ok']) && ($excl['code'] ?? '') === ORANGE_CPR_SPECIALLIVE_ERR_EXCLUDED, (string) ($excl['code'] ?? ''));
+    // Corrupt manifest
+    $reqC = cpr_ul_req($setupM);
+    unset($reqC['upload_manifest']['paths']);
+    $corr = orange_cpr_uploads_live_run($slotM['env'], (string) $setupM['job_id'], $reqC);
+    cpr_ul('corrupt_manifest', empty($corr['ok']) && ($corr['code'] ?? '') === ORANGE_CPR_UPLOADSLIVE_ERR_MANIFEST_CORRUPT, (string) ($corr['code'] ?? ''));
 
-    // Handler failure + recovery metadata
-    $slotF = cpr_sh_fresh_env($base);
-    $setupF = cpr_sh_setup_through_import($slotF['env']);
-    $failH = orange_cpr_special_live_run($slotF['env'], (string) $setupF['job_id'], cpr_sh_req($setupF, [
-        'fail_handler' => 'expenses_via_accounts',
+    // Country mismatch (path for another country)
+    $slotX = cpr_ul_fresh_env($base);
+    $setupX = cpr_ul_setup_through_special($slotX['env']);
+    $pathsX = ['countries/sa/products/x.jpg'];
+    $manX = cpr_ul_build_manifest((string) $setupX['job_id'], (string) $setupX['package_fingerprint'], $pathsX);
+    // Force country_id match so fingerprint path uses wrong country prefix check
+    $xc = orange_cpr_uploads_live_run($slotX['env'], (string) $setupX['job_id'], cpr_ul_req($setupX, [
+        'upload_manifest' => $manX,
+        'upload_artifacts' => cpr_ul_artifacts($pathsX),
     ]));
-    cpr_sh(
-        'handler_failure',
-        empty($failH['ok'])
-        && ($failH['code'] ?? '') === ORANGE_CPR_SPECIALLIVE_ERR_FAIL
-        && is_array($failH['recovery_metadata'] ?? null)
-        && ($failH['recovery_metadata']['failed_handler'] ?? '') === 'expenses_via_accounts',
-        (string) ($failH['code'] ?? '')
-    );
+    cpr_ul('country_mismatch', empty($xc['ok']) && ($xc['code'] ?? '') === ORANGE_CPR_UPLOADSLIVE_ERR_COUNTRY, (string) ($xc['code'] ?? ''));
 
-    // Recovery / resume after failure
-    $resume = orange_cpr_special_live_run($slotF['env'], (string) $setupF['job_id'], cpr_sh_req($setupF, [
-        'resume_authorized' => true,
-        'resume_from_handler' => 'expenses_via_accounts',
+    // Contract mismatch (wrong job_id on manifest)
+    $manJ = cpr_ul_build_manifest('wrong-job', (string) $setupX['package_fingerprint'], [
+        'countries/kw/products/a.jpg',
+    ]);
+    $cm = orange_cpr_uploads_live_run($slotX['env'], (string) $setupX['job_id'], cpr_ul_req($setupX, [
+        'upload_manifest' => $manJ,
+        'upload_artifacts' => cpr_ul_artifacts($manJ['paths']),
     ]));
-    cpr_sh(
-        'recovery_after_handler_failure',
-        !empty($resume['ok']) && orange_cpr_checkpoint_exists((string) $setupF['cpr_root'], (string) $setupF['job_id'], 'CP8'),
-        (string) ($resume['code'] ?? $resume['message'] ?? '')
-    );
+    cpr_ul('contract_mismatch', empty($cm['ok']) && ($cm['code'] ?? '') === ORANGE_CPR_UPLOADSLIVE_ERR_CONTRACT, (string) ($cm['code'] ?? ''));
+
+    // Fingerprint mismatch
+    $manF = cpr_ul_build_manifest((string) $setupX['job_id'], (string) $setupX['package_fingerprint'], [
+        'countries/kw/products/a.jpg',
+    ]);
+    $manF['manifest_sha256'] = str_repeat('0', 64);
+    $fpFail = orange_cpr_uploads_live_run($slotX['env'], (string) $setupX['job_id'], cpr_ul_req($setupX, [
+        'upload_manifest' => $manF,
+        'upload_artifacts' => cpr_ul_artifacts($manF['paths']),
+    ]));
+    cpr_ul('fingerprint_mismatch', empty($fpFail['ok']) && ($fpFail['code'] ?? '') === ORANGE_CPR_UPLOADSLIVE_ERR_FINGERPRINT, (string) ($fpFail['code'] ?? ''));
 
     // Replay attempt
-    $replay = orange_cpr_special_live_run($slotF['env'], (string) $setupF['job_id'], cpr_sh_req($setupF, [
+    $replay = orange_cpr_uploads_live_run($slot['env'], (string) $setup['job_id'], cpr_ul_req($setup, [
         'force_replay' => true,
     ]));
-    cpr_sh('replay_attempt', empty($replay['ok']) && ($replay['code'] ?? '') === ORANGE_CPR_SPECIALLIVE_ERR_REPLAY, (string) ($replay['code'] ?? ''));
+    cpr_ul('replay_attempt', empty($replay['ok']) && ($replay['code'] ?? '') === ORANGE_CPR_UPLOADSLIVE_ERR_REPLAY, (string) ($replay['code'] ?? ''));
 
-    // Out-of-order
-    $slotO = cpr_sh_fresh_env($base);
-    $setupO = cpr_sh_setup_through_import($slotO['env']);
-    $ooo = orange_cpr_special_live_run($slotO['env'], (string) $setupO['job_id'], cpr_sh_req($setupO, [
-        'force_handler_order' => [
-            'seq_country_namespace',
-            'admins_permissions_composite',
-            'expenses_via_accounts',
-            'polymorphic_company_documents',
-            'gl_voucher_slots_country',
-        ],
+    // Resume from sealed checkpoint
+    $slotR = cpr_ul_fresh_env($base);
+    $setupR = cpr_ul_setup_through_special($slotR['env']);
+    $partial = orange_cpr_uploads_live_run($slotR['env'], (string) $setupR['job_id'], cpr_ul_req($setupR, [
+        'stop_after_index' => 0,
     ]));
-    cpr_sh('out_of_order_execution', empty($ooo['ok']) && ($ooo['code'] ?? '') === ORANGE_CPR_SPECIALLIVE_ERR_ORDER, (string) ($ooo['code'] ?? ''));
-
-    // Dependency violation (skip to seq without priors — probe single handler)
-    $dep = orange_cpr_special_live_run($slotO['env'], (string) $setupO['job_id'], cpr_sh_req($setupO, [
-        'handler_id' => 'seq_country_namespace',
-        'run_all_handlers' => false,
+    $resume = orange_cpr_uploads_live_run($slotR['env'], (string) $setupR['job_id'], cpr_ul_req($setupR, [
+        'resume_from_index' => 1,
     ]));
-    cpr_sh(
-        'dependency_violation',
-        empty($dep['ok']) && in_array(($dep['code'] ?? ''), [
-            ORANGE_CPR_SPECIALLIVE_ERR_DEPENDENCY,
-            ORANGE_CPR_SPECIALLIVE_ERR_ORDER,
-        ], true),
-        (string) ($dep['code'] ?? '')
-    );
-
-    // Resume from sealed checkpoint (stop after first handler)
-    $slotR = cpr_sh_fresh_env($base);
-    $setupR = cpr_sh_setup_through_import($slotR['env']);
-    $partial = orange_cpr_special_live_run($slotR['env'], (string) $setupR['job_id'], cpr_sh_req($setupR, [
-        'stop_after_handler' => 'admins_permissions_composite',
-    ]));
-    $resume2 = orange_cpr_special_live_run($slotR['env'], (string) $setupR['job_id'], cpr_sh_req($setupR, [
-        'resume_from_handler' => 'expenses_via_accounts',
-    ]));
-    cpr_sh(
+    cpr_ul(
         'resume_from_sealed_checkpoint',
         !empty($partial['ok'])
-        && (int) count($partial['completed_handlers'] ?? []) === 1
-        && !empty($resume2['ok'])
-        && orange_cpr_checkpoint_exists((string) $setupR['cpr_root'], (string) $setupR['job_id'], 'CP8'),
-        (string) (($resume2['code'] ?? '') . '/' . ($partial['code'] ?? ''))
+        && empty($partial['uploads_complete'])
+        && !empty($resume['ok'])
+        && orange_cpr_checkpoint_exists((string) $setupR['cpr_root'], (string) $setupR['job_id'], 'CP9'),
+        (string) (($resume['code'] ?? '') . '/' . ($partial['code'] ?? ''))
     );
 
-    // Cross-country / out-of-slice
-    $slotS = cpr_sh_fresh_env($base);
-    $setupS = cpr_sh_setup_through_import($slotS['env']);
-    $xc = orange_cpr_special_live_run($slotS['env'], (string) $setupS['job_id'], cpr_sh_req($setupS, [
-        'force_country_id' => 9,
+    // Upload ordering (forced non-deterministic order refused)
+    $slotO = cpr_ul_fresh_env($base);
+    $setupO = cpr_ul_setup_through_special($slotO['env']);
+    $reqO = cpr_ul_req($setupO);
+    $sorted = $reqO['upload_manifest']['paths'];
+    $wrongOrder = array_reverse($sorted);
+    $ooo = orange_cpr_uploads_live_run($slotO['env'], (string) $setupO['job_id'], cpr_ul_req($setupO, [
+        'force_path_order' => $wrongOrder,
     ]));
-    cpr_sh('cross_country_refused', empty($xc['ok']) && ($xc['code'] ?? '') === ORANGE_CPR_SPECIALLIVE_ERR_SCOPE, (string) ($xc['code'] ?? ''));
-
-    // Counter lower forbidden
-    $slotC = cpr_sh_fresh_env($base);
-    $setupC = cpr_sh_setup_through_import($slotC['env']);
-    $cnt = orange_cpr_special_live_run($slotC['env'], (string) $setupC['job_id'], cpr_sh_req($setupC, [
-        'force_lower_counter' => 'inv_c1',
-    ]));
-    cpr_sh('counter_not_lowered', empty($cnt['ok']) && ($cnt['code'] ?? '') === ORANGE_CPR_SPECIALLIVE_ERR_COUNTER, (string) ($cnt['code'] ?? ''));
+    cpr_ul('upload_ordering', empty($ooo['ok']) && ($ooo['code'] ?? '') === ORANGE_CPR_UPLOADSLIVE_ERR_ORDER, (string) ($ooo['code'] ?? ''));
 
     // Privilege bypass
-    $slotP = cpr_sh_fresh_env($base);
-    $setupP = cpr_sh_setup_through_import($slotP['env']);
-    $nonSa = orange_cpr_special_live_run($slotP['env'], (string) $setupP['job_id'], cpr_sh_req($setupP, [
+    $slotP = cpr_ul_fresh_env($base);
+    $setupP = cpr_ul_setup_through_special($slotP['env']);
+    $nonSa = orange_cpr_uploads_live_run($slotP['env'], (string) $setupP['job_id'], cpr_ul_req($setupP, [
         'actor_is_super_admin' => false,
     ]));
-    cpr_sh('privilege_bypass_denied', empty($nonSa['ok']) && ($nonSa['code'] ?? '') === ORANGE_CPR_SPECIALLIVE_ERR_ACTOR);
+    cpr_ul('privilege_bypass_denied', empty($nonSa['ok']) && ($nonSa['code'] ?? '') === ORANGE_CPR_UPLOADSLIVE_ERR_ACTOR);
 
-    $uploads = orange_cpr_special_live_run($slotP['env'], (string) $setupP['job_id'], cpr_sh_req($setupP, [
-        'execute_uploads' => true,
+    // Fail-closed inject + recovery metadata
+    $slotF = cpr_ul_fresh_env($base);
+    $setupF = cpr_ul_setup_through_special($slotF['env']);
+    $failA = orange_cpr_uploads_live_run($slotF['env'], (string) $setupF['job_id'], cpr_ul_req($setupF, [
+        'fail_at_index' => 1,
     ]));
-    cpr_sh('uploads_disabled', empty($uploads['ok']) && ($uploads['code'] ?? '') === ORANGE_CPR_SPECIALLIVE_ERR_UPLOADS);
+    cpr_ul(
+        'fail_closed_recovery_metadata',
+        empty($failA['ok'])
+        && is_array($failA['recovery_metadata'] ?? null)
+        && !empty($failA['fail_closed'])
+        && ($failA['production_sql_executed'] ?? true) === false,
+        (string) ($failA['code'] ?? '')
+    );
 
-    cpr_sh('ops_enablement_still_false', orange_cpr_enablement_flag_read($slot['env']) === false);
+    cpr_ul('ops_enablement_still_false', orange_cpr_enablement_flag_read($slot['env']) === false);
+    cpr_ul(
+        'control_plane_uploads_flag',
+        !empty(orange_cpr_p5_control_plane_snapshot()['uploads_apply_engine_implemented'])
+    );
 } catch (Throwable $e) {
-    cpr_sh('exception', false, $e->getMessage());
+    cpr_ul('exception', false, $e->getMessage() . ' @ ' . $e->getFile() . ':' . (string) $e->getLine());
 } finally {
-    cpr_sh_cleanup($base);
+    cpr_ul_cleanup($base);
 }
 
 echo "\nResult: {$pass} passed, {$fail} failed\n";

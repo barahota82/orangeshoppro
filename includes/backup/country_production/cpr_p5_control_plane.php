@@ -97,7 +97,7 @@ function orange_cpr_p5_control_plane_snapshot(): array
         'production_delete_engine_implemented' => true,
         'production_import_engine_implemented' => true,
         'special_handlers_engine_implemented' => true,
-        'uploads_apply_engine_implemented' => false,
+        'uploads_apply_engine_implemented' => true,
         'enablement_flag_observed' => false,
         'ponr_mutation_executed' => false,
         'production_mutation' => false,

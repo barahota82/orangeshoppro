@@ -192,7 +192,7 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with P3/P4 he
 | **WP-P5-02** | PONR Target-Slice DELETE Engine | `COUNTRY_PRODUCTION_RESTORE_P5_02_TARGET_SLICE_DELETE.md` | **COMPLETE** |
 | **WP-P5-03** | Target-Slice IMPORT Engine (batches 1→6) | `COUNTRY_PRODUCTION_RESTORE_P5_03_TARGET_SLICE_IMPORT.md` | **COMPLETE** |
 | **WP-P5-04** | Special Handlers Engine | `COUNTRY_PRODUCTION_RESTORE_P5_04_SPECIAL_HANDLERS.md` | **COMPLETE** |
-| **WP-P5-05** | Country Uploads Apply (OD-UPLOADS) | `COUNTRY_PRODUCTION_RESTORE_P5_05_UPLOADS_APPLY.md` | PENDING |
+| **WP-P5-05** | Country Uploads Apply (OD-UPLOADS) | `COUNTRY_PRODUCTION_RESTORE_P5_05_UPLOADS_APPLY.md` | **COMPLETE** |
 | **WP-P5-06** | P5 Integration Review & Production Apply Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P5_06_INTEGRATION_BASELINE.md` | PENDING |
 
 **Execution rule (Owner):** One WP at a time → Verify AC → Commit → Push → **STOP** → wait for approval before next WP.
@@ -310,9 +310,10 @@ Foundational principles (always in force):
 **WP-P5-02 COMPLETE** (PONR Target-Slice DELETE) — see `COUNTRY_PRODUCTION_RESTORE_P5_02_TARGET_SLICE_DELETE.md`.  
 **WP-P5-03 COMPLETE** (Target-Slice IMPORT Batches 1→6) — see `COUNTRY_PRODUCTION_RESTORE_P5_03_TARGET_SLICE_IMPORT.md`.  
 **WP-P5-04 COMPLETE** (Special Handlers) — see `COUNTRY_PRODUCTION_RESTORE_P5_04_SPECIAL_HANDLERS.md`.  
+**WP-P5-05 COMPLETE** (Country Uploads Apply / OD-UPLOADS) — see `COUNTRY_PRODUCTION_RESTORE_P5_05_UPLOADS_APPLY.md`.  
 Commit → Push → **STOP.**  
-Do **not** begin **WP-P5-05** until Owner explicitly reviews and approves the next Work Package.
+Do **not** begin **WP-P5-06** until Owner explicitly reviews and approves the next Work Package.
 
 ---
 
-*End of WP-P5-01 — P5 Control Plane & Artifact Index (updated inventory through WP-P5-04).*
+*End of WP-P5-01 — P5 Control Plane & Artifact Index (updated inventory through WP-P5-05).*
