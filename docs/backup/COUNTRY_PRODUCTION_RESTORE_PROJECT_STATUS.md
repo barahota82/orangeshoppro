@@ -2,10 +2,19 @@
 
 | Field | Value |
 |-------|--------|
-| **Document role** | **Status snapshot only** — not an implementation specification |
+| **Document role** | **Official live project dashboard** — status only; never an implementation specification |
 | **Project** | Country Production Restore (CPR) |
-| **Date** | 2026-07-21 |
-| **Maintainer rule** | Update this file when phase/baseline/status changes; never use it as an engine design doc |
+| **Last updated** | 2026-07-21 |
+| **Update rule** | Update this document **only after** an officially approved major phase completion (P4…P9). Do not use for engine design. |
+
+---
+
+## Purpose
+
+This document is the official **live status** of the CPR project.  
+It must always represent the **CURRENT** state of the project.
+
+Whenever a major phase (**P4…P9**) is completed, this document shall be updated accordingly.
 
 ---
 
@@ -19,32 +28,30 @@
 
 | Field | Value |
 |-------|--------|
-| **Phase** | **P3 COMPLETE** |
+| **Current Phase** | **P3 COMPLETE** |
 | **Overall State** | **READY FOR P4** |
-| **Implementation phase** | Engine scaffolding complete; production apply engines not started |
-| **Next phase** | **P4** |
 
 ---
 
 ## Completed Phases
 
-| Phase | Name | Status |
-|-------|------|--------|
-| ✓ **P0** | Architecture | Complete (frozen) |
-| ✓ **P1** | Design Baseline | Complete (frozen) |
-| ✓ **P2** | Certification Baseline | Complete (frozen) |
-| ✓ **P3** | Engine Baseline | Complete (frozen) |
+| Phase | Name |
+|-------|------|
+| ✓ **P0** | Architecture |
+| ✓ **P1** | Design Baseline |
+| ✓ **P2** | Certification Baseline |
+| ✓ **P3** | Engine Baseline |
 
 ---
 
 ## Current Frozen Baselines
 
-| Baseline | Git tag |
-|----------|---------|
-| P0 Architecture / P0b sync | `P0-P0b-Final` |
-| P1 Design Baseline | `P1-Design-Baseline` |
-| P2 Certification / Design Baseline | `P2-Design-Baseline` |
-| P3 Engine Baseline | `P3-Engine-Baseline` |
+| Git tag |
+|---------|
+| `P0-P0b-Final` |
+| `P1-Design-Baseline` |
+| `P2-Design-Baseline` |
+| `P3-Engine-Baseline` |
 
 ---
 
@@ -58,13 +65,13 @@
 | PONR Execution | **Not Implemented** |
 | Production Mutation | **Disabled** |
 | Architecture | **Frozen** |
-| Owner Decisions (OWNER_APPROVED Register) | **Frozen** |
+| Owner Decisions | **Frozen** |
 
 ---
 
 ## Current Git Tags
 
-Approved project baseline tags (annotated; on `origin`):
+Every approved baseline tag (annotated; on `origin`):
 
 | Tag | Points to commit (peeled) |
 |-----|---------------------------|
@@ -75,14 +82,14 @@ Approved project baseline tags (annotated; on `origin`):
 
 ---
 
-## Current Enterprise Status
+## Enterprise Status
 
 | Audit | Result |
 |-------|--------|
 | Architecture Audit | **PASS** |
 | P1 Audit | **PASS** |
 | P2 Audit | **PASS** |
-| P3 Audit (Enterprise Audit — P3 Engine Baseline) | **PASS** |
+| P3 Audit | **PASS** |
 
 ---
 
@@ -102,9 +109,7 @@ Approved project baseline tags (annotated; on `origin`):
 
 **P4**
 
----
-
-## Next Work Package
+### Next Work Package
 
 **WP-P4-01**
 
@@ -112,15 +117,15 @@ Approved project baseline tags (annotated; on `origin`):
 
 ---
 
-## Control-plane references (read-only pointers)
+## Read-only pointers (not implementation)
 
-| Reference | Path / tag |
-|-----------|------------|
-| Policy SoT | `docs/backup/COUNTRY_PRODUCTION_RESTORE_OWNER_DECISIONS.md` |
+| Reference | Path |
+|-----------|------|
+| OWNER_APPROVED Register | `docs/backup/COUNTRY_PRODUCTION_RESTORE_OWNER_DECISIONS.md` |
 | Architecture (frozen) | `docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` |
+| Release history | `docs/backup/COUNTRY_PRODUCTION_RESTORE_RELEASE_HISTORY.md` |
 | P3 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P3_ARTIFACT_INDEX.md` |
-| P3 integration freeze | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P3_09_INTEGRATION_BASELINE.md` |
 
 ---
 
-*End of Project Status Snapshot — update on phase transitions only.*
+*End of live Project Status Snapshot — update only after officially approved phase completion.*
