@@ -318,7 +318,7 @@ $base = $bundle['base'];
 $cprRoot = $bundle['cpr'];
 
 try {
-    cpr_gl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P4-08-witnesses-live');
+    cpr_gl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P4-09-integration-baseline');
 
     // --- Every mandatory gate FAIL (P3 predicates via evaluate_one; fail-inducing ctx) ---
     $gateFailCount = 0;

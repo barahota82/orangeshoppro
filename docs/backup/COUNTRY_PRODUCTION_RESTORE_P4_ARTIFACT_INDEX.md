@@ -186,7 +186,7 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with P3 helpe
 | **WP-P4-06** | Pre-PONR Gate suite live evaluation | `COUNTRY_PRODUCTION_RESTORE_P4_06_GATE_LIVE.md` | **COMPLETE** |
 | **WP-P4-07** | Authority / Runbook / Phrase live ceremony | `COUNTRY_PRODUCTION_RESTORE_P4_07_AUTHORITY_RUNBOOK_LIVE.md` | **COMPLETE** |
 | **WP-P4-08** | Pre-PONR Witnesses (CP5) & CP-A last reversible | `COUNTRY_PRODUCTION_RESTORE_P4_08_WITNESSES_CPA.md` | **COMPLETE** |
-| **WP-P4-09** | P4 Integration Review & Pre-PONR Path Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P4_09_INTEGRATION_BASELINE.md` | PENDING |
+| **WP-P4-09** | P4 Integration Review & Pre-PONR Path Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P4_09_INTEGRATION_BASELINE.md` | **COMPLETE** |
 
 **Execution rule (Owner):** One WP at a time → Verify AC → Commit → Push → **STOP** → wait for approval before next WP.
 
@@ -310,9 +310,14 @@ Foundational principles (always in force):
 **WP-P4-06 COMPLETE** (Live Gate Evaluation & Pre-PONR Readiness) — see `COUNTRY_PRODUCTION_RESTORE_P4_06_GATE_LIVE.md`.  
 **WP-P4-07 COMPLETE** (Live Authority / Runbook / RESTORE Ceremony) — see `COUNTRY_PRODUCTION_RESTORE_P4_07_AUTHORITY_RUNBOOK_LIVE.md`.  
 **WP-P4-08 COMPLETE** (Live Witnesses CP5 & CP-A Pre-PONR Freeze) — see `COUNTRY_PRODUCTION_RESTORE_P4_08_WITNESSES_CPA.md`.  
+**WP-P4-09 COMPLETE** (P4 Integration Baseline Freeze & Phase Sign-Off) — see `COUNTRY_PRODUCTION_RESTORE_P4_09_INTEGRATION_BASELINE.md`.  
+**P4 INTEGRATION BASELINE FROZEN.**  
 Commit → Push → **STOP.**  
-Do **not** begin WP-P4-09 until Owner explicitly reviews and approves the next Work Package.
+Do **not** start **Enterprise Audit**.  
+Do **not** create a **Git Tag**.  
+Do **not** begin **P5**.  
+Wait for Owner review and explicit approval before any next step.
 
 ---
 
-*End of WP-P4-01 — P4 Control Plane & Artifact Index (updated inventory status through WP-P4-08).*
+*End of WP-P4-01 — P4 Control Plane & Artifact Index (updated inventory status through WP-P4-09).*
