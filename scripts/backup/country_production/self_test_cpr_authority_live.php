@@ -352,7 +352,7 @@ $base = $bundle['base'];
 $cprRoot = $bundle['cpr'];
 
 try {
-    cpr_al('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P4-07-authority-live');
+    cpr_al('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P4-08-witnesses-live');
 
     // --- Valid authorization (full ceremony) ---
     $setup = cpr_al_setup_gated($env);

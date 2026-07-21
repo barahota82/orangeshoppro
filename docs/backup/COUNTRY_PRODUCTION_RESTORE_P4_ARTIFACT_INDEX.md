@@ -185,7 +185,7 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with P3 helpe
 | **WP-P4-05** | CPR Lock live pre-PONR path | `COUNTRY_PRODUCTION_RESTORE_P4_05_LOCK_LIVE.md` | **COMPLETE** |
 | **WP-P4-06** | Pre-PONR Gate suite live evaluation | `COUNTRY_PRODUCTION_RESTORE_P4_06_GATE_LIVE.md` | **COMPLETE** |
 | **WP-P4-07** | Authority / Runbook / Phrase live ceremony | `COUNTRY_PRODUCTION_RESTORE_P4_07_AUTHORITY_RUNBOOK_LIVE.md` | **COMPLETE** |
-| **WP-P4-08** | Pre-PONR Witnesses (CP5) & CP-A last reversible | `COUNTRY_PRODUCTION_RESTORE_P4_08_WITNESSES_CPA.md` | PENDING |
+| **WP-P4-08** | Pre-PONR Witnesses (CP5) & CP-A last reversible | `COUNTRY_PRODUCTION_RESTORE_P4_08_WITNESSES_CPA.md` | **COMPLETE** |
 | **WP-P4-09** | P4 Integration Review & Pre-PONR Path Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P4_09_INTEGRATION_BASELINE.md` | PENDING |
 
 **Execution rule (Owner):** One WP at a time → Verify AC → Commit → Push → **STOP** → wait for approval before next WP.
@@ -291,7 +291,7 @@ Foundational principles (always in force):
 | AC3 | P4 roadmap objective recorded: Anchor, approvals, maint, witnesses (through CP-A) | **PASS** §1, §4 |
 | AC4 | Pre-PONR path charter in/out of scope defined | **PASS** §4 |
 | AC5 | Naming, storage, citation, change control defined | **PASS** §5–§6, §11–§12 |
-| AC6 | P4 WP inventory WP-P4-01…09 listed; WP-P4-01…07 COMPLETE when authorized | **PASS** §7 |
+| AC6 | P4 WP inventory WP-P4-01…09 listed; WP-P4-01…08 COMPLETE when authorized | **PASS** §7 |
 | AC7 | Every WP maps to OWNER_APPROVED / P0 / P1 / P2 / P3 / Architecture | **PASS** §9 |
 | AC8 | Dependencies and execution order defined | **PASS** §8 |
 | AC9 | Artifact names defined for every WP | **PASS** §7 |
@@ -309,9 +309,10 @@ Foundational principles (always in force):
 **WP-P4-05 COMPLETE** (Live Pre-PONR Lock) — see `COUNTRY_PRODUCTION_RESTORE_P4_05_LOCK_LIVE.md`.  
 **WP-P4-06 COMPLETE** (Live Gate Evaluation & Pre-PONR Readiness) — see `COUNTRY_PRODUCTION_RESTORE_P4_06_GATE_LIVE.md`.  
 **WP-P4-07 COMPLETE** (Live Authority / Runbook / RESTORE Ceremony) — see `COUNTRY_PRODUCTION_RESTORE_P4_07_AUTHORITY_RUNBOOK_LIVE.md`.  
+**WP-P4-08 COMPLETE** (Live Witnesses CP5 & CP-A Pre-PONR Freeze) — see `COUNTRY_PRODUCTION_RESTORE_P4_08_WITNESSES_CPA.md`.  
 Commit → Push → **STOP.**  
-Do **not** begin WP-P4-08 until Owner explicitly reviews and approves the next Work Package.
+Do **not** begin WP-P4-09 until Owner explicitly reviews and approves the next Work Package.
 
 ---
 
-*End of WP-P4-01 — P4 Control Plane & Artifact Index (updated inventory status through WP-P4-07).*
+*End of WP-P4-01 — P4 Control Plane & Artifact Index (updated inventory status through WP-P4-08).*
