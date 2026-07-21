@@ -180,7 +180,7 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with P3 helpe
 |----|-------|------------------|--------|
 | **WP-P4-01** | P4 Control Plane & Artifact Index | `COUNTRY_PRODUCTION_RESTORE_P4_ARTIFACT_INDEX.md` | **COMPLETE** |
 | **WP-P4-02** | Approvals & execution-contract `pre_ponr` live path | `COUNTRY_PRODUCTION_RESTORE_P4_02_APPROVALS_CONTRACT_LIVE.md` | **COMPLETE** |
-| **WP-P4-03** | GLOBAL Maintenance live path (CP4) | `COUNTRY_PRODUCTION_RESTORE_P4_03_MAINTENANCE_LIVE.md` | PENDING |
+| **WP-P4-03** | GLOBAL Maintenance live path (CP4) | `COUNTRY_PRODUCTION_RESTORE_P4_03_MAINTENANCE_LIVE.md` | **COMPLETE** |
 | **WP-P4-04** | Session Full Backup & OD-PIN live path (CP1) | `COUNTRY_PRODUCTION_RESTORE_P4_04_OD_PIN_LIVE.md` | PENDING |
 | **WP-P4-05** | CPR Lock live pre-PONR path | `COUNTRY_PRODUCTION_RESTORE_P4_05_LOCK_LIVE.md` | PENDING |
 | **WP-P4-06** | Pre-PONR Gate suite live evaluation | `COUNTRY_PRODUCTION_RESTORE_P4_06_GATE_LIVE.md` | PENDING |
@@ -291,7 +291,7 @@ Foundational principles (always in force):
 | AC3 | P4 roadmap objective recorded: Anchor, approvals, maint, witnesses (through CP-A) | **PASS** §1, §4 |
 | AC4 | Pre-PONR path charter in/out of scope defined | **PASS** §4 |
 | AC5 | Naming, storage, citation, change control defined | **PASS** §5–§6, §11–§12 |
-| AC6 | P4 WP inventory WP-P4-01…09 listed; WP-P4-01 and WP-P4-02 COMPLETE when authorized | **PASS** §7 |
+| AC6 | P4 WP inventory WP-P4-01…09 listed; WP-P4-01…03 COMPLETE when authorized | **PASS** §7 |
 | AC7 | Every WP maps to OWNER_APPROVED / P0 / P1 / P2 / P3 / Architecture | **PASS** §9 |
 | AC8 | Dependencies and execution order defined | **PASS** §8 |
 | AC9 | Artifact names defined for every WP | **PASS** §7 |
@@ -304,9 +304,10 @@ Foundational principles (always in force):
 
 **WP-P4-01 COMPLETE** (control plane).  
 **WP-P4-02 COMPLETE** (live approvals / pre-PONR contract) — see `COUNTRY_PRODUCTION_RESTORE_P4_02_APPROVALS_CONTRACT_LIVE.md`.  
+**WP-P4-03 COMPLETE** (GLOBAL Maintenance live / CP4) — see `COUNTRY_PRODUCTION_RESTORE_P4_03_MAINTENANCE_LIVE.md`.  
 Commit → Push → **STOP.**  
-Do **not** begin WP-P4-03 until Owner explicitly approves the next Work Package.
+Do **not** begin WP-P4-04 until Owner explicitly reviews and approves the next Work Package.
 
 ---
 
-*End of WP-P4-01 — P4 Control Plane & Artifact Index (updated inventory status for WP-P4-02).*
+*End of WP-P4-01 — P4 Control Plane & Artifact Index (updated inventory status through WP-P4-03).*
