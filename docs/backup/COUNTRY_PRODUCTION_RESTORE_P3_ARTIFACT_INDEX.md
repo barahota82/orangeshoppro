@@ -174,7 +174,7 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with existing
 | WP | Title | Primary artifact | Status |
 |----|-------|------------------|--------|
 | **WP-P3-01** | P3 Engine Scaffolding Control Plane | `COUNTRY_PRODUCTION_RESTORE_P3_ARTIFACT_INDEX.md` | **COMPLETE** |
-| **WP-P3-02** | Job framework scaffolding (identity, persist, list/cancel) | `COUNTRY_PRODUCTION_RESTORE_P3_02_JOB_FRAMEWORK.md` (+ code when authorized) | PENDING |
+| **WP-P3-02** | Job framework scaffolding (identity, persist, list/cancel) | `COUNTRY_PRODUCTION_RESTORE_P3_02_JOB_FRAMEWORK.md` | **COMPLETE** |
 | **WP-P3-03** | Pre-PONR state machine scaffolding | `COUNTRY_PRODUCTION_RESTORE_P3_03_STATE_SCAFFOLD.md` | PENDING |
 | **WP-P3-04** | Pre-PONR checkpoint scaffolding | `COUNTRY_PRODUCTION_RESTORE_P3_04_CHECKPOINT_SCAFFOLD.md` | PENDING |
 | **WP-P3-05** | Lock scaffolding (CROSS/SHADOW/TTL pre-PONR) | `COUNTRY_PRODUCTION_RESTORE_P3_05_LOCK_SCAFFOLD.md` | PENDING |
@@ -253,10 +253,10 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with existing
 
 ## 13. Stop rule
 
-**WP-P3-01 COMPLETE.**  
+**WP-P3-01 COMPLETE** (control plane). **WP-P3-02 COMPLETE** (job framework scaffolding).  
 Commit → Push → **STOP.**  
-Do **not** begin WP-P3-02 until Owner explicitly approves the next Work Package.
+Do **not** begin WP-P3-03 until Owner explicitly approves the next Work Package.
 
 ---
 
-*End of WP-P3-01 — P3 Engine Scaffolding Control Plane.*
+*End of WP-P3-01 — P3 Engine Scaffolding Control Plane (inventory updated as later WPs complete).*
