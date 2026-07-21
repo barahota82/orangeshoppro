@@ -86,6 +86,7 @@ Every approved baseline tag (annotated; on `origin`):
 | `P4-PrePONR-Baseline` | `6bc09bcb` |
 | `P5-PONR-Execution-Baseline` | `b4c7a739` |
 
+**P4 baseline commit (full):** `6bc09bcbe97f2ef6de0dcc4e3fb552481d04842c`  
 **P5 baseline commit (full):** `b4c7a7394dcaddbd4288d7a8c951be85c9751a90`
 
 ---
@@ -100,6 +101,15 @@ Every approved baseline tag (annotated; on `origin`):
 | P3 Audit | **PASS** |
 | P4 Enterprise Audit | **PASSED** |
 | P5 Enterprise Audit | **PASSED** |
+
+---
+
+## Phase Sign-Off Status
+
+| Phase | Sign-Off | Verdict (from phase sign-off) |
+|-------|----------|-------------------------------|
+| **P4** | **APPROVED** | `P4 PRE-PONR LIVE BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P5 ONLY` |
+| **P5** | **APPROVED** | `P5 PONR EXECUTION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P6 ONLY` |
 
 ---
 
@@ -134,6 +144,9 @@ Every approved baseline tag (annotated; on `origin`):
 | Architecture (frozen) | `docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` |
 | Release history | `docs/backup/COUNTRY_PRODUCTION_RESTORE_RELEASE_HISTORY.md` |
 | P6 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_ARTIFACT_INDEX.md` |
+| P4 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_ARTIFACT_INDEX.md` |
+| P4 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_ENTERPRISE_AUDIT.md` |
+| P4 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_PHASE_SIGN_OFF.md` |
 | P5 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P5_ARTIFACT_INDEX.md` |
 | P5 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P5_ENTERPRISE_AUDIT.md` |
 | P5 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P5_PHASE_SIGN_OFF.md` |
