@@ -193,7 +193,7 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with P3/P4 he
 | **WP-P5-03** | Target-Slice IMPORT Engine (batches 1→6) | `COUNTRY_PRODUCTION_RESTORE_P5_03_TARGET_SLICE_IMPORT.md` | **COMPLETE** |
 | **WP-P5-04** | Special Handlers Engine | `COUNTRY_PRODUCTION_RESTORE_P5_04_SPECIAL_HANDLERS.md` | **COMPLETE** |
 | **WP-P5-05** | Country Uploads Apply (OD-UPLOADS) | `COUNTRY_PRODUCTION_RESTORE_P5_05_UPLOADS_APPLY.md` | **COMPLETE** |
-| **WP-P5-06** | P5 Integration Review & Production Apply Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P5_06_INTEGRATION_BASELINE.md` | PENDING |
+| **WP-P5-06** | P5 Integration Review & Production Apply Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P5_06_INTEGRATION_BASELINE.md` | **COMPLETE** |
 
 **Execution rule (Owner):** One WP at a time → Verify AC → Commit → Push → **STOP** → wait for approval before next WP.
 
@@ -311,9 +311,15 @@ Foundational principles (always in force):
 **WP-P5-03 COMPLETE** (Target-Slice IMPORT Batches 1→6) — see `COUNTRY_PRODUCTION_RESTORE_P5_03_TARGET_SLICE_IMPORT.md`.  
 **WP-P5-04 COMPLETE** (Special Handlers) — see `COUNTRY_PRODUCTION_RESTORE_P5_04_SPECIAL_HANDLERS.md`.  
 **WP-P5-05 COMPLETE** (Country Uploads Apply / OD-UPLOADS) — see `COUNTRY_PRODUCTION_RESTORE_P5_05_UPLOADS_APPLY.md`.  
+**WP-P5-06 COMPLETE** (P5 Integration Baseline Freeze) — see `COUNTRY_PRODUCTION_RESTORE_P5_06_INTEGRATION_BASELINE.md`.  
+**P5 phase COMPLETE — awaiting Owner review.**  
 Commit → Push → **STOP.**  
-Do **not** begin **WP-P5-06** until Owner explicitly reviews and approves the next Work Package.
+Do **not** start **Enterprise Audit**.  
+Do **not** create a **Git Tag**.  
+Do **not** begin **P6**.  
+
+Wait for Owner review and explicit approval before any next step.
 
 ---
 
-*End of WP-P5-01 — P5 Control Plane & Artifact Index (updated inventory through WP-P5-05).*
+*End of WP-P5-01 — P5 Control Plane & Artifact Index (updated inventory through WP-P5-06).*
