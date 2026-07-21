@@ -172,7 +172,7 @@ $env = $bundle['env'];
 $base = $bundle['base'];
 
 try {
-    cpr_ml('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-02-delete-live');
+    cpr_ml('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-03-import-live');
 
     // --- Happy path: activate CP4 ---
     $setup = cpr_ml_setup_frozen($env);

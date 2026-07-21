@@ -95,7 +95,7 @@ function orange_cpr_p5_control_plane_snapshot(): array
         'checkpoint_ids' => orange_cpr_p5_checkpoint_ids(),
         'wp_p5_01_complete' => true,
         'production_delete_engine_implemented' => true,
-        'production_import_engine_implemented' => false,
+        'production_import_engine_implemented' => true,
         'special_handlers_engine_implemented' => false,
         'uploads_apply_engine_implemented' => false,
         'enablement_flag_observed' => false,

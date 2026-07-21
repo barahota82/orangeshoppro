@@ -368,7 +368,7 @@ $base = $bundle['base'];
 $cprRoot = $bundle['cpr'];
 
 try {
-    cpr_wl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-02-delete-live');
+    cpr_wl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-03-import-live');
 
     // --- Complete valid witness path ---
     $setup = cpr_wl_setup_authorized($env);
