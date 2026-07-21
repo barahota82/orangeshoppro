@@ -95,7 +95,7 @@ function orange_cpr_p6_control_plane_snapshot(): array
         'checkpoint_ids' => orange_cpr_p6_checkpoint_ids(),
         'wp_p6_01_complete' => true,
         'post_verify_engine_implemented' => true,
-        'success_finalize_engine_implemented' => false,
+        'success_finalize_engine_implemented' => true,
         'rollback_integration_engine_implemented' => false,
         'maint_release_engine_implemented' => false,
         'p6_integration_baseline_complete' => false,
@@ -151,22 +151,21 @@ function orange_cpr_p6_control_plane_assert(array $env): array
     }
 
     $snap = orange_cpr_p6_control_plane_snapshot();
-    if (empty($snap['post_verify_engine_implemented'])) {
+    if (empty($snap['post_verify_engine_implemented']) || empty($snap['success_finalize_engine_implemented'])) {
         return [
             'ok' => false,
-            'code' => 'p6_post_verify_missing',
-            'message' => 'WP-P6-02 post-verify engine must be marked implemented.',
+            'code' => 'p6_required_engines_missing',
+            'message' => 'WP-P6-02/03 engines must be marked implemented.',
             'fail_closed' => true,
         ];
     }
-    if (!empty($snap['success_finalize_engine_implemented'])
-        || !empty($snap['rollback_integration_engine_implemented'])
+    if (!empty($snap['rollback_integration_engine_implemented'])
         || !empty($snap['maint_release_engine_implemented'])
     ) {
         return [
             'ok' => false,
             'code' => 'p6_engines_premature',
-            'message' => 'WP-P6-02 must not mark finalize/rollback/maint-release engines implemented.',
+            'message' => 'WP-P6-03 must not mark rollback/maint-release engines implemented.',
             'fail_closed' => true,
         ];
     }
@@ -174,7 +173,7 @@ function orange_cpr_p6_control_plane_assert(array $env): array
     return [
         'ok' => true,
         'code' => 'ok',
-        'message' => 'P6 control plane hard rules hold; post-verify implemented; later engines deferred.',
+        'message' => 'P6 control plane hard rules hold; post-verify + success finalize implemented; later engines deferred.',
         'snapshot' => $snap,
         'enablement_flag_observed' => false,
         'production_mutation' => false,

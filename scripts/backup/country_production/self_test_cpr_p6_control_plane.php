@@ -28,7 +28,7 @@ $docsRoot = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'docs' . DIRECTORY_SEPAR
 $indexPath = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P6_ARTIFACT_INDEX.md';
 
 try {
-    cpr_p6cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-02-post-verify');
+    cpr_p6cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-03-success-finalize');
     cpr_p6cp('artifact_index_exists', is_file($indexPath));
 
     $ids = orange_cpr_p6_work_package_ids();
@@ -61,7 +61,7 @@ try {
     $snap = orange_cpr_p6_control_plane_snapshot();
     cpr_p6cp('wp_p6_01_complete_flag', !empty($snap['wp_p6_01_complete']));
     cpr_p6cp('post_verify_engine_implemented', !empty($snap['post_verify_engine_implemented']));
-    cpr_p6cp('no_success_finalize_yet', empty($snap['success_finalize_engine_implemented']));
+    cpr_p6cp('success_finalize_engine_implemented', !empty($snap['success_finalize_engine_implemented']));
     cpr_p6cp('no_rollback_engine_yet', empty($snap['rollback_integration_engine_implemented']));
     cpr_p6cp('no_maint_release_yet', empty($snap['maint_release_engine_implemented']));
     cpr_p6cp('no_p6_integration_yet', empty($snap['p6_integration_baseline_complete']));
@@ -88,9 +88,9 @@ try {
     cpr_p6cp('index_has_artifact_id', str_contains($index, 'CPR-P6-WP01-ARTIFACT_INDEX'));
     cpr_p6cp('index_lists_wp_p6_02', str_contains($index, 'WP-P6-02'));
     cpr_p6cp('index_wp_p6_01_complete', str_contains($index, '**WP-P6-01 COMPLETE**'));
-    cpr_p6cp('index_wp_p6_02_complete', str_contains($index, 'COUNTRY_PRODUCTION_RESTORE_P6_02_POST_VERIFY.md')
-        && str_contains($index, '**COMPLETE**'));
-    cpr_p6cp('index_stop_blocks_p6_03', str_contains($index, 'Do **not** begin **WP-P6-03**'));
+    cpr_p6cp('index_wp_p6_02_complete', str_contains($index, 'COUNTRY_PRODUCTION_RESTORE_P6_02_POST_VERIFY.md'));
+    cpr_p6cp('index_wp_p6_03_complete', str_contains($index, '**WP-P6-03 COMPLETE**'));
+    cpr_p6cp('index_stop_blocks_p6_04', str_contains($index, 'Do **not** begin **WP-P6-04**'));
     cpr_p6cp('index_enablement_false', str_contains($index, 'hard false'));
     cpr_p6cp('index_preserves_p5_contracts', str_contains($index, 'Preserves all contracts frozen in P0–P5')
         || str_contains($index, 'Preserve P0–P5 contracts'));

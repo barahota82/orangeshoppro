@@ -378,7 +378,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p602_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_pv('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-02-post-verify');
+    cpr_pv('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-03-success-finalize');
     cpr_pv('dirname_constant', ORANGE_CPR_POST_VERIFY_DIRNAME === 'post_verify');
     cpr_pv('control_plane_flag', !empty(orange_cpr_p6_control_plane_snapshot()['post_verify_engine_implemented']));
 
@@ -507,10 +507,15 @@ try {
     $design = $docs . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P6_02_POST_VERIFY.md';
     $index = (string) file_get_contents($docs . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P6_ARTIFACT_INDEX.md');
     cpr_pv('design_doc_exists', is_file($design));
-    cpr_pv('index_wp_p6_02_complete', str_contains($index, 'WP-P6-02') && str_contains($index, '**WP-P6-02 COMPLETE**')
-        || (str_contains($index, 'Post-Verify Engine') && str_contains($index, '**COMPLETE**')));
-    // More precise: table row COMPLETE for P6-02
-    cpr_pv('index_stop_blocks_p6_03', str_contains($index, 'Do **not** begin **WP-P6-03**'));
+    cpr_pv(
+        'index_wp_p6_02_complete',
+        str_contains($index, 'COUNTRY_PRODUCTION_RESTORE_P6_02_POST_VERIFY.md')
+        && str_contains($index, '**WP-P6-02 COMPLETE**')
+    );
+    cpr_pv('design_stop_rule_present', str_contains(
+        (string) file_get_contents($design),
+        'Do **not** begin **WP-P6-03**'
+    ));
     cpr_pv('ops_enablement_still_false', orange_cpr_enablement_flag_read($env) === false);
 } catch (Throwable $e) {
     cpr_pv('exception', false, $e->getMessage());
