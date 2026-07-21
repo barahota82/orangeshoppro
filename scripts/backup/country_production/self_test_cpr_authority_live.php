@@ -21,7 +21,7 @@ function cpr_al(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " — {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
     }
 }
 
@@ -352,7 +352,7 @@ $base = $bundle['base'];
 $cprRoot = $bundle['cpr'];
 
 try {
-    cpr_al('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-01-control-plane');
+    cpr_al('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-02-delete-live');
 
     // --- Valid authorization (full ceremony) ---
     $setup = cpr_al_setup_gated($env);

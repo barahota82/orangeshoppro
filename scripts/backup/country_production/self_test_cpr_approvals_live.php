@@ -21,7 +21,7 @@ function cpr_ap(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " — {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
     }
 }
 
@@ -346,7 +346,7 @@ try {
     );
     cpr_ap('contract_fingerprint_bound', (string) ($live['contract_fingerprint'] ?? '') !== '');
     cpr_ap('enablement_remains_false', ($live['enablement_flag_observed'] ?? null) === false);
-    cpr_ap('scaffold_version_current', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-01-control-plane');
+    cpr_ap('scaffold_version_current', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-02-delete-live');
 
     $contract = orange_cpr_contract_read($e1['cpr'], $setup['job_id']);
     cpr_ap(
@@ -362,7 +362,7 @@ try {
         (string) ($dup['code'] ?? '')
     );
 
-    // ===== Dual deny — actor =====
+    // ===== Dual deny â€” actor =====
     $e2 = cpr_ap_env();
     $bases[] = $e2['base'];
     $s = cpr_ap_setup($e2['env'], 2, 'KW', 'A');
@@ -376,7 +376,7 @@ try {
         (string) ($r['code'] ?? '')
     );
 
-    // ===== Dual deny — WF-B missing approval =====
+    // ===== Dual deny â€” WF-B missing approval =====
     $e3 = cpr_ap_env();
     $bases[] = $e3['base'];
     $s = cpr_ap_setup($e3['env'], 3, 'BH', 'B');

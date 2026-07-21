@@ -21,7 +21,7 @@ function cpr_op(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " — {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
     }
 }
 
@@ -88,7 +88,7 @@ function cpr_op_fps(string $pkgFp): array
 }
 
 /**
- * Job with CP0–CP4 via live maint activate (ready for OD-PIN).
+ * Job with CP0â€“CP4 via live maint activate (ready for OD-PIN).
  *
  * @param array<string, mixed> $env
  * @return array{job_id:string}
@@ -172,7 +172,7 @@ $env = $bundle['env'];
 $base = $bundle['base'];
 
 try {
-    cpr_op('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-01-control-plane');
+    cpr_op('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P5-02-delete-live');
 
     // --- Happy path ---
     $setup = cpr_op_setup_cp4($env);
