@@ -319,42 +319,45 @@ function orange_cpr_job_list(array $env, ?int $countryIdFilter = null): array
 }
 
 /**
- * Cancel a pre-PONR job → cpr_cancelled_pre_ponr (P1-03 T24 family).
+ * Cancel a pre-PONR job → cpr_cancelled_pre_ponr (P1-03 T22/T24/T24E family via state engine).
  *
  * @param array<string, mixed> $env
  * @return array<string, mixed>
  */
 function orange_cpr_job_cancel(array $env, string $jobId, ?int $actorAdminId = null, string $reason = 'cancelled'): array
 {
+    require_once __DIR__ . '/cpr_state_engine.php';
+
     orange_cpr_assert_enablement_false_for_scaffold($env);
     $cprRoot = orange_cpr_resolve_work_root($env);
     $job = orange_cpr_job_read($cprRoot, $jobId);
-    $state = (string) ($job['state'] ?? '');
-    orange_cpr_assert_not_forbidden_state($state);
-
-    if (!in_array($state, orange_cpr_scaffold_cancellable_states(), true)) {
-        throw new RuntimeException('CPR job not cancellable from state: ' . $state);
-    }
     if (!empty($job['ponr_crossed'])) {
-        throw new RuntimeException('CPR scaffold cannot cancel post-PONR jobs.');
+        throw new RuntimeException('CPR scaffold cannot cancel post-PONR jobs via pre-PONR cancel.');
     }
 
-    $job['state'] = ORANGE_CPR_STATE_CANCELLED_PRE_PONR;
-    $job['updated_at'] = gmdate('c');
-    $job['cancelled_at'] = $job['updated_at'];
-    $job['cancel_reason'] = $reason;
-    $job['cancelled_by_admin_id'] = $actorAdminId;
-    orange_cpr_job_write($cprRoot, $jobId, $job);
-    orange_cpr_audit_append($cprRoot, $jobId, [
-        'event_type' => 'cpr.job_cancel',
-        'job_id' => $jobId,
-        'from_state' => $state,
-        'to_state' => ORANGE_CPR_STATE_CANCELLED_PRE_PONR,
+    $trigger = 'cancel_pre_ponr';
+    $state = (string) ($job['state'] ?? '');
+    if ($state === 'cpr_maintenance_on' || $state === 'cpr_pre_ponr') {
+        $trigger = 'cancel_or_estop';
+    }
+
+    $result = orange_cpr_transition_apply($env, $jobId, ORANGE_CPR_STATE_CANCELLED_PRE_PONR, [
+        'actor' => ORANGE_CPR_ACTOR_SUPER_ADMIN,
         'actor_admin_id' => $actorAdminId,
+        'trigger' => $trigger,
         'reason' => $reason,
     ]);
+    if (empty($result['ok'])) {
+        throw new RuntimeException(
+            'CPR job cancel rejected: ' . (string) ($result['code'] ?? 'error')
+            . ' — ' . (string) ($result['message'] ?? '')
+        );
+    }
 
-    return $job;
+    /** @var array<string, mixed> $cancelled */
+    $cancelled = $result['job'];
+
+    return $cancelled;
 }
 
 /**
