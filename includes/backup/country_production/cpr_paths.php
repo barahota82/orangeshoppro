@@ -15,7 +15,10 @@ const ORANGE_CPR_DIRNAME = 'country_production';
 const ORANGE_CPR_JOB_FILENAME = 'job.json';
 const ORANGE_CPR_CONTRACT_FILENAME = 'execution_contract.json';
 const ORANGE_CPR_AUDIT_FILENAME = 'audit.jsonl';
-const ORANGE_CPR_SCAFFOLD_VERSION = 'P3-02-job-framework';
+const ORANGE_CPR_CHECKPOINTS_DIRNAME = 'checkpoints';
+const ORANGE_CPR_CHECKPOINTS_TMP_DIRNAME = '.tmp';
+const ORANGE_CPR_CHECKPOINTS_MANIFEST = 'MANIFEST.json';
+const ORANGE_CPR_SCAFFOLD_VERSION = 'P3-04-checkpoint-engine';
 
 /**
  * Resolve CPR runtime root.
@@ -99,4 +102,44 @@ function orange_cpr_audit_file_path(string $cprRoot, string $jobId): string
 function orange_cpr_lock_file_path(string $cprRoot): string
 {
     return rtrim($cprRoot, DIRECTORY_SEPARATOR . '/\\') . DIRECTORY_SEPARATOR . '.country_production_restore.lock';
+}
+
+function orange_cpr_checkpoints_directory(string $cprRoot, string $jobId): string
+{
+    return orange_cpr_job_directory($cprRoot, $jobId) . DIRECTORY_SEPARATOR . ORANGE_CPR_CHECKPOINTS_DIRNAME;
+}
+
+function orange_cpr_checkpoints_tmp_directory(string $cprRoot, string $jobId): string
+{
+    return orange_cpr_checkpoints_directory($cprRoot, $jobId)
+        . DIRECTORY_SEPARATOR . ORANGE_CPR_CHECKPOINTS_TMP_DIRNAME;
+}
+
+function orange_cpr_checkpoints_manifest_path(string $cprRoot, string $jobId): string
+{
+    return orange_cpr_checkpoints_directory($cprRoot, $jobId)
+        . DIRECTORY_SEPARATOR . ORANGE_CPR_CHECKPOINTS_MANIFEST;
+}
+
+/**
+ * Atomic-ish replace within the same directory (Windows-safe unlink+rename pattern).
+ */
+function orange_cpr_atomic_rename_replace(string $tmpPath, string $finalPath): void
+{
+    if (!is_file($tmpPath)) {
+        throw new RuntimeException('Atomic rename source missing: ' . $tmpPath);
+    }
+    $finalDir = dirname($finalPath);
+    if (!is_dir($finalDir) && !@mkdir($finalDir, 0775, true) && !is_dir($finalDir)) {
+        throw new RuntimeException('Cannot create checkpoint directory.');
+    }
+    if (is_file($finalPath)) {
+        if (!@unlink($finalPath)) {
+            throw new RuntimeException('Cannot replace existing checkpoint file.');
+        }
+    }
+    if (!@rename($tmpPath, $finalPath)) {
+        @unlink($tmpPath);
+        throw new RuntimeException('Atomic rename to checkpoint final path failed.');
+    }
 }

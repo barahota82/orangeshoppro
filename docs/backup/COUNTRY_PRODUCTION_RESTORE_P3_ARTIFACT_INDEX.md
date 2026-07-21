@@ -176,7 +176,7 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with existing
 | **WP-P3-01** | P3 Engine Scaffolding Control Plane | `COUNTRY_PRODUCTION_RESTORE_P3_ARTIFACT_INDEX.md` | **COMPLETE** |
 | **WP-P3-02** | Job framework scaffolding (identity, persist, list/cancel) | `COUNTRY_PRODUCTION_RESTORE_P3_02_JOB_FRAMEWORK.md` | **COMPLETE** |
 | **WP-P3-03** | State engine & transition enforcement | `COUNTRY_PRODUCTION_RESTORE_P3_03_STATE_SCAFFOLD.md` | **COMPLETE** |
-| **WP-P3-04** | Pre-PONR checkpoint scaffolding | `COUNTRY_PRODUCTION_RESTORE_P3_04_CHECKPOINT_SCAFFOLD.md` | PENDING |
+| **WP-P3-04** | Checkpoint engine & persistence | `COUNTRY_PRODUCTION_RESTORE_P3_04_CHECKPOINT_SCAFFOLD.md` | **COMPLETE** |
 | **WP-P3-05** | Lock scaffolding (CROSS/SHADOW/TTL pre-PONR) | `COUNTRY_PRODUCTION_RESTORE_P3_05_LOCK_SCAFFOLD.md` | PENDING |
 | **WP-P3-06** | Gate evaluator scaffolding (G01–G30, fail-closed) | `COUNTRY_PRODUCTION_RESTORE_P3_06_GATE_EVALUATOR.md` | PENDING |
 | **WP-P3-07** | Authority / permissions / auth-challenge scaffolding | `COUNTRY_PRODUCTION_RESTORE_P3_07_AUTHORITY_SCAFFOLD.md` | PENDING |
@@ -194,7 +194,7 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with existing
 | WP-P3-01 | OD-ENABLE, OD-CERT, OD-PERM, Integrity | P1-01…14 freeze | P2-01…07 freeze | Roadmap P3; §4 safety |
 | WP-P3-02 | OD-DUAL, OD-PERM | P1-02 | — | §14 identity |
 | WP-P3-03 | OD-FAIL-*; OD-ROLLBACK; OD-PERM | P1-03 · P1-09 | — | §12 states (enforced scaffold) |
-| WP-P3-04 | OD-PIN (storage only; live pin ceremony P4) | P1-04 | — | §18 checkpoints |
+| WP-P3-04 | OD-PIN; OD-RUNBOOK evidence bind | P1-04 | — | §18 checkpoints (scaffold) |
 | WP-P3-05 | OD-LOCK-* | P1-05 | — | §15–§16 |
 | WP-P3-06 | OD-C8, OD-ENABLE, OD-FA-*, OD-INV, … | P1-08 | P2-02 CG-M04 | §37 gates |
 | WP-P3-07 | OD-DUAL, OD-PHRASE, OD-BREAK, OD-PERM, OD-RUNBOOK | P1-06 | — | §26–§27 |
@@ -253,9 +253,9 @@ Prefer `orange_cpr_*` / `country_production_*` prefixes consistent with existing
 
 ## 13. Stop rule
 
-**WP-P3-01 COMPLETE** (control plane). **WP-P3-02 COMPLETE** (job framework). **WP-P3-03 COMPLETE** (state engine).  
+**WP-P3-01…WP-P3-04 COMPLETE** (through checkpoint engine).  
 Commit → Push → **STOP.**  
-Do **not** begin WP-P3-04 until Owner explicitly approves the next Work Package.
+Do **not** begin WP-P3-05 until Owner explicitly approves the next Work Package.
 
 ---
 
