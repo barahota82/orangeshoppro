@@ -312,12 +312,11 @@ Foundational principles (always in force):
 **WP-P4-08 COMPLETE** (Live Witnesses CP5 & CP-A Pre-PONR Freeze) — see `COUNTRY_PRODUCTION_RESTORE_P4_08_WITNESSES_CPA.md`.  
 **WP-P4-09 COMPLETE** (P4 Integration Baseline Freeze & Phase Sign-Off) — see `COUNTRY_PRODUCTION_RESTORE_P4_09_INTEGRATION_BASELINE.md`.  
 **P4 INTEGRATION BASELINE FROZEN.**  
-Commit → Push → **STOP.**  
-Do **not** start **Enterprise Audit**.  
-Do **not** create a **Git Tag**.  
+**P4 ENTERPRISE AUDIT COMPLETE — PASSED** — see `COUNTRY_PRODUCTION_RESTORE_P4_ENTERPRISE_AUDIT.md` (audited tip `2bfdad1c`).  
+Do **not** create a **Git Tag** until Owner explicitly authorizes.  
 Do **not** begin **P5**.  
 Wait for Owner review and explicit approval before any next step.
 
 ---
 
-*End of WP-P4-01 — P4 Control Plane & Artifact Index (updated inventory status through WP-P4-09).*
+*End of WP-P4-01 — P4 Control Plane & Artifact Index (updated through P4 Enterprise Audit PASSED).*
