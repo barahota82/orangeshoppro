@@ -98,7 +98,7 @@ function orange_cpr_p6_control_plane_snapshot(): array
         'success_finalize_engine_implemented' => true,
         'rollback_integration_engine_implemented' => true,
         'maint_release_engine_implemented' => true,
-        'p6_integration_baseline_complete' => false,
+        'p6_integration_baseline_complete' => true,
         'enablement_flag_observed' => false,
         'ponr_mutation_executed' => false,
         'production_mutation' => false,
@@ -155,19 +155,20 @@ function orange_cpr_p6_control_plane_assert(array $env): array
         || empty($snap['success_finalize_engine_implemented'])
         || empty($snap['rollback_integration_engine_implemented'])
         || empty($snap['maint_release_engine_implemented'])
+        || empty($snap['p6_integration_baseline_complete'])
     ) {
         return [
             'ok' => false,
             'code' => 'p6_required_engines_missing',
-            'message' => 'WP-P6-02…05 engines must be marked implemented.',
+            'message' => 'WP-P6-02…06 engines/baseline must be marked implemented/complete.',
             'fail_closed' => true,
         ];
     }
-    if (!empty($snap['p6_integration_baseline_complete']) || !empty($snap['p7_started'])) {
+    if (!empty($snap['p7_started'])) {
         return [
             'ok' => false,
             'code' => 'p6_engines_premature',
-            'message' => 'WP-P6-05 must not mark P6 integration baseline or P7 started.',
+            'message' => 'WP-P6-06 must not mark P7 started.',
             'fail_closed' => true,
         ];
     }
@@ -175,7 +176,7 @@ function orange_cpr_p6_control_plane_assert(array $env): array
     return [
         'ok' => true,
         'code' => 'ok',
-        'message' => 'P6 control plane hard rules hold; verify/finalize/rollback/maint-release implemented; integration freeze deferred.',
+        'message' => 'P6 control plane hard rules hold; verify/rollback integration baseline frozen; P7 withheld.',
         'snapshot' => $snap,
         'enablement_flag_observed' => false,
         'production_mutation' => false,

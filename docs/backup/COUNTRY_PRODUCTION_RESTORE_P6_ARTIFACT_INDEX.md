@@ -154,15 +154,20 @@ A P6 build is successful when:
 | Path | Role |
 |------|------|
 | `includes/backup/country_production/cpr_p6_control_plane.php` | WP-P6-01 registry |
-| `includes/backup/country_production/cpr_*_live.php` (P3–P5) | Consumed substrate — do not fork |
-| Future `cpr_post_verify_live.php` / rollback / closeout modules | WP-P6-02+ only |
+| `includes/backup/country_production/cpr_*_live.php` (P3–P6) | Consumed substrate — do not fork |
+| `includes/backup/country_production/cpr_post_verify_live.php` | WP-P6-02 |
+| `includes/backup/country_production/cpr_success_finalize_live.php` | WP-P6-03 |
+| `includes/backup/country_production/cpr_rollback_live.php` | WP-P6-04 |
+| `includes/backup/country_production/cpr_maint_release_live.php` | WP-P6-05 |
+| `includes/backup/country_production/cpr_p6_integration.php` | WP-P6-06 integration freeze |
 
-### 5.3 Runtime (later WPs)
+### 5.3 Runtime
 
 | Path | Role |
 |------|------|
 | `{job}/checkpoints/CP10_*.json` … `CP12_*.json` | Architecture §18 |
-| `{job}/post_verify/` · rollback evidence | Sealed verify/rollback reports (later WPs) |
+| `{job}/post_verify/` · `success_finalize/` · `rollback/` · `maint_release/` | Sealed verify/rollback/closeout reports |
+| `{job}/integration_live/cpr_p6_integration_*` | Sealed P6 integration freeze reports |
 
 ---
 
@@ -188,7 +193,7 @@ Prefer `orange_cpr_*` prefixes consistent with P3–P5 helpers; never reuse Full
 | **WP-P6-03** | Success Finalize (CP11) | `COUNTRY_PRODUCTION_RESTORE_P6_03_SUCCESS_FINALIZE.md` | **COMPLETE** |
 | **WP-P6-04** | Session Full-Anchor Rollback Integration (OD-ROLLBACK) | `COUNTRY_PRODUCTION_RESTORE_P6_04_ROLLBACK_INTEGRATION.md` | **COMPLETE** |
 | **WP-P6-05** | Maintenance Release / Closeout (CP12) | `COUNTRY_PRODUCTION_RESTORE_P6_05_MAINT_RELEASE.md` | **COMPLETE** |
-| **WP-P6-06** | P6 Integration Review & Verify/Rollback Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P6_06_INTEGRATION_BASELINE.md` | PENDING |
+| **WP-P6-06** | P6 Integration Review & Verify/Rollback Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P6_06_INTEGRATION_BASELINE.md` | **COMPLETE** |
 
 **Execution rule (Owner):** One WP at a time → Verify AC → Commit → Push → **STOP** → wait for approval before next WP.
 
@@ -308,9 +313,16 @@ Foundational principles (always in force):
 **WP-P6-03 COMPLETE** (Success Finalize / CP11).  
 **WP-P6-04 COMPLETE** (Session Full-Anchor Rollback / OD-ROLLBACK).  
 **WP-P6-05 COMPLETE** (Maintenance Release / CP12).  
+**WP-P6-06 COMPLETE** (P6 Integration Baseline Freeze).  
+**P6 INTEGRATION BASELINE FROZEN.**  
 Commit → Push → **STOP.**  
-Do **not** begin **WP-P6-06** until Owner explicitly reviews and approves the next Work Package.
+
+Do **not** start **Enterprise Audit**.  
+Do **not** create a **Git Tag**.  
+Do **not** begin **P7**.  
+
+Wait for Owner review and explicit approval before any next step.
 
 ---
 
-*End of P6 Artifact Index (updated through WP-P6-05).*
+*End of P6 Artifact Index (updated through WP-P6-06).*

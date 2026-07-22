@@ -137,7 +137,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p604_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_rb('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-05-maint-release');
+    cpr_rb('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-06-integration-baseline');
     cpr_rb('dirname_constant', ORANGE_CPR_ROLLBACK_DIRNAME === 'rollback');
     cpr_rb(
         'control_plane_flag',

@@ -188,15 +188,15 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p605_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_mr('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-05-maint-release');
+    cpr_mr('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-06-integration-baseline');
     cpr_mr('dirname_constant', ORANGE_CPR_MAINT_RELEASE_DIRNAME === 'maint_release');
     cpr_mr(
         'control_plane_flag',
         !empty(orange_cpr_p6_control_plane_snapshot()['maint_release_engine_implemented'])
     );
     cpr_mr(
-        'control_plane_no_p6_integration_yet',
-        empty(orange_cpr_p6_control_plane_snapshot()['p6_integration_baseline_complete'])
+        'control_plane_p6_integration_complete',
+        !empty(orange_cpr_p6_control_plane_snapshot()['p6_integration_baseline_complete'])
     );
 
     // --- Valid release after CP11 ---

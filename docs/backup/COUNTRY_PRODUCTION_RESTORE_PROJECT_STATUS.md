@@ -28,8 +28,8 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P6 IN PROGRESS** |
-| **Overall State** | **WP-P6-05 COMPLETE — AWAITING OWNER APPROVAL FOR WP-P6-06** |
+| **Current Phase** | **P6 COMPLETE — AWAITING OWNER REVIEW** |
+| **Overall State** | **WP-P6-06 COMPLETE — P6 INTEGRATION BASELINE FROZEN — AWAITING OWNER FOR ENTERPRISE AUDIT / TAG / P7** |
 
 ---
 
@@ -127,12 +127,12 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P6** (authorized; WP-P6-01 control plane complete)
+**P6** implementation + integration freeze **COMPLETE** — awaiting Owner review.
 
-### Next Work Package
+### Next authorized step (Owner gate only)
 
-**WP-P6-06** — P6 Integration Review & Verify/Rollback Baseline Freeze  
-*(Do **not** begin until Owner explicitly reviews and approves WP-P6-05 / next WP.)*
+**Enterprise Audit** → Git Tag → **P7** (clone drills)  
+*(Do **not** start Enterprise Audit, create a Git Tag, or begin P7 until Owner explicitly approves.)*
 
 ---
 
