@@ -153,14 +153,29 @@ Every completed major phase shall contain:
 
 ---
 
+## P8
+
+| Field | Value |
+|-------|--------|
+| **Phase Name** | Owner Certification Baseline Complete |
+| **Completion Summary** | Control plane / Owner Submission Package / Owner Cert PASS/FAIL / sealed `cpr_certification_result` / Integration Freeze; WP-P8-01…04 complete; Enterprise Audit PASSED; phase closed. |
+| **Git Tag** | `P8-OwnerCert-Baseline` |
+| **Baseline Commit** | `2f1778f90e542c403ebaf745c02018cc8f482bba` |
+| **Enterprise Audit Result** | **PASSED** (`COUNTRY_PRODUCTION_RESTORE_P8_ENTERPRISE_AUDIT.md`) |
+| **Sign-Off Result** | **APPROVED** (`P8 OWNER CERTIFICATION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P9 ONLY`) |
+| **Completion Date** | 2026-07-22 |
+| **Status** | **COMPLETE** |
+
+---
+
 ## Current Project Status
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P8 IN PROGRESS** |
-| **Current State** | **P8 OWNER CERTIFICATION BASELINE FROZEN — ENTERPRISE AUDIT PASSED — AWAITING OWNER AUTHORIZATION FOR GIT TAG (NO P9)** |
+| **Current Phase** | **P8 COMPLETE** |
+| **Current State** | **P8 OWNER CERTIFICATION BASELINE FROZEN — ENTERPRISE AUDIT PASSED — PHASE CLOSED — AWAITING OWNER-AUTHORIZED P9 ONLY** |
 
-*(Update the Current Project Status block when the active phase changes. Append new phase sections for P8–P9; do not rewrite P0–P7 above.)*
+*(Update the Current Project Status block when the active phase changes. Append new phase sections for P9; do not rewrite P0–P8 above.)*
 
 ---
 

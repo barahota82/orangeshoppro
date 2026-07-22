@@ -28,8 +28,8 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P8 — ENTERPRISE AUDIT PASSED — AWAITING OWNER TAG / SIGN-OFF** |
-| **Overall State** | **P8 OWNER CERTIFICATION BASELINE FROZEN — ENTERPRISE AUDIT PASSED — AWAITING OWNER AUTHORIZATION FOR GIT TAG (NO P9)** |
+| **Current Phase** | **P8 COMPLETE** |
+| **Overall State** | **P8 OWNER CERTIFICATION BASELINE FROZEN — ENTERPRISE AUDIT PASSED — PHASE CLOSED — AWAITING OWNER-AUTHORIZED P9 ONLY** |
 
 ---
 
@@ -45,6 +45,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | ✓ **P5** | PONR Execution Baseline |
 | ✓ **P6** | Verify + Rollback Post-Execution Baseline |
 | ✓ **P7** | Clone-Drill Evidence Baseline |
+| ✓ **P8** | Owner Certification Baseline |
 
 ---
 
@@ -60,6 +61,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | `P5-PONR-Execution-Baseline` |
 | `P6-VerifyRollback-Baseline` |
 | `P7-CloneDrill-Evidence-Baseline` |
+| `P8-OwnerCert-Baseline` |
 
 ---
 
@@ -73,7 +75,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Production SQL execution | **Disabled** |
 | Production upload mutation | **Disabled** |
 | Clone drills (P7) | **Implemented** (enablement-FALSE sealed clone-drill evidence path) |
-| Owner Cert (P8) | **WP-P8-04 COMPLETE — Enterprise Audit PASSED; Git Tag / P9 withheld** |
+| Owner Cert (P8) | **Implemented** (enablement-FALSE sealed Owner Certification baseline; PASS ≠ enable; FAIL ≠ auto-rollback) |
 | Architecture | **Frozen** |
 | Owner Decisions | **Frozen** |
 
@@ -93,11 +95,13 @@ Every approved baseline tag (annotated; on `origin`):
 | `P5-PONR-Execution-Baseline` | `b4c7a739` |
 | `P6-VerifyRollback-Baseline` | `9aa0fbbc` |
 | `P7-CloneDrill-Evidence-Baseline` | `6ea00101` |
+| `P8-OwnerCert-Baseline` | `2f1778f9` |
 
 **P4 baseline commit (full):** `6bc09bcbe97f2ef6de0dcc4e3fb552481d04842c`  
 **P5 baseline commit (full):** `b4c7a7394dcaddbd4288d7a8c951be85c9751a90`  
 **P6 baseline commit (full):** `9aa0fbbcf39823ef9a2dac368551b170e1e01eb8`  
-**P7 baseline commit (full):** `6ea0010170dfb5fdb08b8c373632bbeac17469c4`
+**P7 baseline commit (full):** `6ea0010170dfb5fdb08b8c373632bbeac17469c4`  
+**P8 baseline commit (full):** `2f1778f90e542c403ebaf745c02018cc8f482bba`
 
 ---
 
@@ -113,6 +117,7 @@ Every approved baseline tag (annotated; on `origin`):
 | P5 Enterprise Audit | **PASSED** |
 | P6 Enterprise Audit | **PASSED** |
 | P7 Enterprise Audit | **PASSED** |
+| P8 Enterprise Audit | **PASSED** |
 
 ---
 
@@ -124,6 +129,7 @@ Every approved baseline tag (annotated; on `origin`):
 | **P5** | **APPROVED** | `P5 PONR EXECUTION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P6 ONLY` |
 | **P6** | **APPROVED** | `P6 VERIFY/ROLLBACK POST-EXECUTION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P7 ONLY` |
 | **P7** | **APPROVED** | `P7 CLONE-DRILL EVIDENCE BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P8 ONLY` |
+| **P8** | **APPROVED** | `P8 OWNER CERTIFICATION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P9 ONLY` |
 
 ---
 
@@ -141,12 +147,12 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P8** (Owner Cert PASS/FAIL) — **Enterprise Audit PASSED**; Git Tag / phase sign-off / P9 Owner-gated.
+**P9** (Enablement / production gate) — **Owner-gated only**.
 
 ### Next gated step (Owner only)
 
-**P8 Git Tag / Phase Sign-Off** (then P9 only if authorized)  
-*(Do **not** create the Git Tag or begin P9 until Owner explicitly authorizes.)*
+**P9** only if authorized  
+*(Do **not** begin P9 until Owner explicitly authorizes.)*
 
 ---
 
@@ -158,6 +164,8 @@ Every approved baseline tag (annotated; on `origin`):
 | Architecture (frozen) | `docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` |
 | Release history | `docs/backup/COUNTRY_PRODUCTION_RESTORE_RELEASE_HISTORY.md` |
 | P8 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md` |
+| P8 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_ENTERPRISE_AUDIT.md` |
+| P8 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_PHASE_SIGN_OFF.md` |
 | P7 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P7_ARTIFACT_INDEX.md` |
 | P7 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P7_ENTERPRISE_AUDIT.md` |
 | P7 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P7_PHASE_SIGN_OFF.md` |
