@@ -168,14 +168,45 @@ Every completed major phase shall contain:
 
 ---
 
+## P9
+
+| Field | Value |
+|-------|--------|
+| **Phase Name** | Enablement Baseline Complete |
+| **Completion Summary** | Control plane / E5 preconditions + Owner enablement order / Super Admin Enable-Disable + schema force-disable / Integration Freeze; WP-P9-01…04 complete; FINAL Enterprise Audit PASSED (Owner-approved); phase closed; CPR v1.0 complete. |
+| **Git Tag** | `CPR-v1.0` |
+| **Baseline Commit** | `46129185397ba3df3539742c32f5ec39ddf1e13d` |
+| **Enterprise Audit Result** | **PASSED** (`COUNTRY_PRODUCTION_RESTORE_FINAL_ENTERPRISE_AUDIT.md`) |
+| **Sign-Off Result** | **APPROVED** (`P9 ENABLEMENT BASELINE APPROVED` / `CPR v1.0 READY FOR OFFICIAL PROJECT COMPLETION`) |
+| **Completion Date** | 2026-07-22 |
+| **Status** | **COMPLETE** |
+
+---
+
+## CPR v1.0
+
+| Field | Value |
+|-------|--------|
+| **Project Name** | Country Production Restore |
+| **Version** | **v1.0** |
+| **Completion Summary** | All phases P0→P9 COMPLETE; all Enterprise Audits recorded; all phase Sign-Offs APPROVED; final Git Tag `CPR-v1.0` recorded. |
+| **Git Tag** | `CPR-v1.0` |
+| **Baseline Commit** | `46129185397ba3df3539742c32f5ec39ddf1e13d` |
+| **Project Completion Document** | `COUNTRY_PRODUCTION_RESTORE_CPR_V1_PROJECT_COMPLETION.md` |
+| **Completion Date** | 2026-07-22 |
+| **Status** | **COMPLETE** |
+
+---
+
 ## Current Project Status
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P9 IN PROGRESS** (implementation + FINAL audit documented; closure Owner-gated) |
-| **Current State** | **WP-P9-04 COMPLETE — FINAL ENTERPRISE AUDIT PASSED (DOCUMENTATION CONSISTENCY RESTORED) — AWAITING OWNER APPROVAL OF AUDIT BEFORE TAG / SIGN-OFF** |
+| **Current Phase** | **P9 COMPLETE** |
+| **Current State** | **CPR v1.0 COMPLETE** |
+| **Final Git Tag** | `CPR-v1.0` → `46129185` |
 
-*(Update the Current Project Status block when the active phase changes. Append new phase sections for P9 when COMPLETE; do not rewrite P0–P8 above.)*
+*(CPR v1.0 closed. Append-only history above; do not rewrite P0–P8.)*
 
 ---
 

@@ -295,14 +295,16 @@ Every later P9 design/code change must cite at least one of:
 **WP-P9-03 COMPLETE** (Super Admin Enable/Disable & Schema Force-Disable).  
 **WP-P9-04 COMPLETE** (P9 Integration Review & Enablement Baseline Freeze).  
 
-**FINAL Enterprise Audit:** documented in `COUNTRY_PRODUCTION_RESTORE_FINAL_ENTERPRISE_AUDIT.md` (**PASSED**; documentation consistency restored; Owner approval of the audit verdict still pending).  
+**FINAL Enterprise Audit:** `COUNTRY_PRODUCTION_RESTORE_FINAL_ENTERPRISE_AUDIT.md` — **PASSED** (Owner-approved).  
+**P9 Phase Sign-Off:** `COUNTRY_PRODUCTION_RESTORE_P9_PHASE_SIGN_OFF.md` — **APPROVED**.  
+**CPR v1.0 Project Completion:** `COUNTRY_PRODUCTION_RESTORE_CPR_V1_PROJECT_COMPLETION.md` — **COMPLETE**.  
+**Final Git Tag:** `CPR-v1.0`.  
 
-Historical WP-P9-04 freeze text retained for evidence: Do **not** start the Enterprise Audit.  
+Historical WP-P9-04 freeze text retained for evidence:  
+Do **not** start the Enterprise Audit.  
 Do **not** create the Git Tag.  
-Do **not** produce the P9 Phase Sign-Off.  
 Do **not** declare the project complete.  
-
-Wait for Owner approval of the FINAL audit verdict before Tag / Sign-Off / closure.
+*(Those freeze lines are superseded by the Owner-authorized FINAL closing sequence that created Tag `CPR-v1.0`, P9 Sign-Off, and CPR v1.0 COMPLETE.)*
 
 ---
 

@@ -28,8 +28,10 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P9 IN PROGRESS** (implementation + FINAL audit documented; closure Owner-gated) |
-| **Overall State** | **WP-P9-04 COMPLETE — FINAL ENTERPRISE AUDIT PASSED (DOCUMENTATION CONSISTENCY RESTORED) — AWAITING OWNER APPROVAL OF AUDIT BEFORE TAG / SIGN-OFF** |
+| **Current Phase** | **P9 COMPLETE** |
+| **Overall State** | **CPR v1.0 COMPLETE** |
+| **Project version** | **v1.0** |
+| **Final Git Tag** | `CPR-v1.0` → `46129185` |
 
 ---
 
@@ -46,6 +48,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | ✓ **P6** | Verify + Rollback Post-Execution Baseline |
 | ✓ **P7** | Clone-Drill Evidence Baseline |
 | ✓ **P8** | Owner Certification Baseline |
+| ✓ **P9** | Enablement Baseline |
 
 ---
 
@@ -62,6 +65,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | `P6-VerifyRollback-Baseline` |
 | `P7-CloneDrill-Evidence-Baseline` |
 | `P8-OwnerCert-Baseline` |
+| `CPR-v1.0` |
 
 ---
 
@@ -69,16 +73,17 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 
 | Item | Status |
 |------|--------|
-| Enablement | **FALSE** |
-| DELETE / IMPORT / Special / Uploads engines | **Implemented** (enablement-FALSE sealed path) |
-| Post-Verify / Finalize / Rollback / Maint Release | **Implemented** (enablement-FALSE sealed path through CP12) |
-| Production SQL execution | **Disabled** |
-| Production upload mutation | **Disabled** |
-| Clone drills (P7) | **Implemented** (enablement-FALSE sealed clone-drill evidence path) |
-| Owner Cert (P8) | **Implemented** (enablement-FALSE sealed Owner Certification baseline; PASS ≠ enable; FAIL ≠ auto-rollback) |
-| Enablement (P9) | **WP-P9-04 COMPLETE** (integration baseline frozen; Cert→E5→Enable→Disable/Schema FD chain verified) |
+| Enablement | **Implemented** (OD-ENABLE path; sole ops-flag writer WP-P9-03) |
+| DELETE / IMPORT / Special / Uploads engines | **Implemented** |
+| Post-Verify / Finalize / Rollback / Maint Release | **Implemented** |
+| Production SQL execution | **Disabled** (P9 enablement modules; production apply remains gated) |
+| Production upload mutation | **Disabled** (P9 enablement modules; production apply remains gated) |
+| Clone drills (P7) | **Implemented** |
+| Owner Cert (P8) | **Implemented** |
+| Enablement (P9) | **COMPLETE** (baseline frozen; FINAL audit PASSED; phase signed off) |
 | Architecture | **Frozen** |
 | Owner Decisions | **Frozen** |
+| CPR project | **v1.0 COMPLETE** |
 
 ---
 
@@ -97,12 +102,14 @@ Every approved baseline tag (annotated; on `origin`):
 | `P6-VerifyRollback-Baseline` | `9aa0fbbc` |
 | `P7-CloneDrill-Evidence-Baseline` | `6ea00101` |
 | `P8-OwnerCert-Baseline` | `2f1778f9` |
+| `CPR-v1.0` | `46129185` |
 
 **P4 baseline commit (full):** `6bc09bcbe97f2ef6de0dcc4e3fb552481d04842c`  
 **P5 baseline commit (full):** `b4c7a7394dcaddbd4288d7a8c951be85c9751a90`  
 **P6 baseline commit (full):** `9aa0fbbcf39823ef9a2dac368551b170e1e01eb8`  
 **P7 baseline commit (full):** `6ea0010170dfb5fdb08b8c373632bbeac17469c4`  
-**P8 baseline commit (full):** `2f1778f90e542c403ebaf745c02018cc8f482bba`
+**P8 baseline commit (full):** `2f1778f90e542c403ebaf745c02018cc8f482bba`  
+**CPR v1.0 baseline commit (full):** `46129185397ba3df3539742c32f5ec39ddf1e13d`
 
 ---
 
@@ -119,7 +126,7 @@ Every approved baseline tag (annotated; on `origin`):
 | P6 Enterprise Audit | **PASSED** |
 | P7 Enterprise Audit | **PASSED** |
 | P8 Enterprise Audit | **PASSED** |
-| FINAL CPR Enterprise Audit (P0–P9) | **PASSED** (documented; Owner approval of verdict pending) |
+| FINAL CPR Enterprise Audit (P0–P9) | **PASSED** (Owner-approved) |
 
 ---
 
@@ -132,7 +139,7 @@ Every approved baseline tag (annotated; on `origin`):
 | **P6** | **APPROVED** | `P6 VERIFY/ROLLBACK POST-EXECUTION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P7 ONLY` |
 | **P7** | **APPROVED** | `P7 CLONE-DRILL EVIDENCE BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P8 ONLY` |
 | **P8** | **APPROVED** | `P8 OWNER CERTIFICATION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P9 ONLY` |
-| **P9** | **Not yet produced** | Awaiting Owner approval of FINAL Enterprise Audit → Tag → Sign-Off |
+| **P9** | **APPROVED** | `P9 ENABLEMENT BASELINE APPROVED` / `CPR v1.0 READY FOR OFFICIAL PROJECT COMPLETION` |
 
 ---
 
@@ -150,18 +157,10 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P9** (Enablement / OD-ENABLE path) — **WP-P9-01…04 COMPLETE**; P9 enablement baseline frozen; FINAL Enterprise Audit documented **PASSED**.
+**None.** CPR **v1.0** is **COMPLETE**.
 
-### Next gated steps (Owner only)
-
-1. Owner **approve** the FINAL Enterprise Audit verdict.  
-2. Create the final **Git Tag** (Owner-authorized only).  
-3. Produce the **P9 Phase Sign-Off** (Owner-authorized only).  
-4. Update Project Status / Release History for official CPR v1.0 closure.  
-
-Do **not** create the Git Tag.  
-Do **not** produce the P9 Phase Sign-Off.  
-Do **not** declare CPR v1.0 complete.
+Official completion record: `docs/backup/COUNTRY_PRODUCTION_RESTORE_CPR_V1_PROJECT_COMPLETION.md`  
+Final Git Tag: `CPR-v1.0`
 
 ---
 
@@ -172,12 +171,13 @@ Do **not** declare CPR v1.0 complete.
 | OWNER_APPROVED Register | `docs/backup/COUNTRY_PRODUCTION_RESTORE_OWNER_DECISIONS.md` |
 | Architecture (frozen) | `docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` |
 | Release history | `docs/backup/COUNTRY_PRODUCTION_RESTORE_RELEASE_HISTORY.md` |
+| CPR v1.0 Project Completion | `docs/backup/COUNTRY_PRODUCTION_RESTORE_CPR_V1_PROJECT_COMPLETION.md` |
 | P9 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P9_ARTIFACT_INDEX.md` |
 | P9-02 Enablement Preconditions | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P9_02_ENABLEMENT_PRECONDITIONS.md` |
 | P9-03 Enablement Actions | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P9_03_ENABLEMENT_ACTIONS.md` |
 | P9-04 Integration Baseline | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P9_04_INTEGRATION_BASELINE.md` |
 | FINAL CPR Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_FINAL_ENTERPRISE_AUDIT.md` |
-| P9 Phase Sign-Off | **Not yet produced** (Owner-gated after audit approval + Tag) |
+| P9 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P9_PHASE_SIGN_OFF.md` |
 | P8 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md` |
 | P8 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_ENTERPRISE_AUDIT.md` |
 | P8 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_PHASE_SIGN_OFF.md` |
@@ -196,4 +196,4 @@ Do **not** declare CPR v1.0 complete.
 
 ---
 
-*End of live Project Status Snapshot — update only after officially approved phase completion.*
+*End of live Project Status Snapshot — CPR v1.0 COMPLETE.*
