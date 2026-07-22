@@ -529,23 +529,34 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     function renderOverview(o) {
         const ov = o.overview || {};
         lastOverview = ov;
-        const last = ov.last_successful_full || ov.latest_full || {};
-        const latestFull = (o.full_snapshots && o.full_snapshots[0]) ? o.full_snapshots[0] : last;
-        const countryBatch = ov.latest_country_batch || {};
-        // FC-01 Case B: length = stored country package files (not unique countries)
-        const storedCountryPackages = Array.isArray(o.country_packages) ? o.country_packages.length : 0;
+        const lastSuccess = ov.last_successful_full || {};
+        const latestFull = ov.latest_full || ((o.full_snapshots && o.full_snapshots[0]) ? o.full_snapshots[0] : {});
+        const latestCountryPkg = ov.latest_country_batch || {};
+        // Prefer overview filesystem totals; fall back only if older API payload.
+        const storedCountryPackages = (ov.stored_country_packages_total !== undefined && ov.stored_country_packages_total !== null)
+            ? Number(ov.stored_country_packages_total)
+            : (Array.isArray(o.country_packages) ? o.country_packages.length : 0);
+        const countriesWithPackages = (ov.countries_with_packages !== undefined && ov.countries_with_packages !== null)
+            ? Number(ov.countries_with_packages)
+            : null;
+        const fullSnapshotsTotal = (ov.full_snapshots_total !== undefined && ov.full_snapshots_total !== null)
+            ? Number(ov.full_snapshots_total)
+            : (Array.isArray(o.full_snapshots) ? o.full_snapshots.length : null);
+        const latestDrv = (latestFull.recovery_score !== undefined && latestFull.recovery_score !== null)
+            ? Number(latestFull.recovery_score)
+            : Number(ov.latest_recovery_score ?? 0);
         const st = ov.storage || {};
         const h = lastRootHealth || o.backup_root_health || {};
 
         const flatCards = [
-            ['آخر Full ناجح', fmtTimestampDisplay(last.generated_at)],
-            ['حالة Full الأخير', esc(last.package_status || '—')],
-            ['Country Batch الأخير', fmtTimestampDisplay(countryBatch.generated_at)],
+            ['آخر Full ناجح', fmtTimestampDisplay(lastSuccess.generated_at)],
+            ['حالة أحدث Full', esc(latestFull.package_status || '—')],
+            ['أحدث حزمة دولة', fmtTimestampDisplay(latestCountryPkg.generated_at)],
             ['دول قابلة للاسترداد', esc(String(ov.recoverable_countries ?? '—'))],
             ['BackupRoot', esc(ov.backup_root_status || '—')],
-            ['Retention (يوم)', esc(String(ov.retention_days ?? '—'))],
+            ['Retention (أيام)', esc(String(ov.retention_days ?? '—'))],
             ['Backend', esc(ov.selected_backend || '—')],
-            ['DRV Score', esc(String(ov.latest_recovery_score ?? 0))],
+            ['DRV لآخر Full', esc(String(latestDrv))],
             ['إجمالي التخزين', esc((ov.storage || {}).total_human || '—')]
         ];
         el('bc_overview_flat').innerHTML = flatCards.map(([t, v]) =>
@@ -561,38 +572,40 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         el('bc_overview').innerHTML =
             '<article class="bc-op-card"><h3>صحة النسخ</h3><div class="bc-op-rows">' +
                 rowHtml('الحالة العامة', overallCardBadge, true) +
-                rowHtml('Backup Root', badge(ov.backup_root_status || (h.readable ? 'ok' : '—')), true) +
+                rowHtml('Backup Root (writable؟)', badge(ov.backup_root_status || (h.readable ? 'ok' : '—')), true) +
                 rowHtml('موجود / قراءة / كتابة',
                     healthBadge(!!h.exists, 'موجود', 'غير موجود') + ' ' +
                     healthBadge(!!h.readable, 'قراءة', 'لا قراءة') + ' ' +
                     healthBadge(!!h.writable, 'كتابة', 'لا كتابة'), true) +
                 rowHtml('التشغيل اليدوي', healthBadge(manualActionsAvailable, 'متاح', 'غير متاح'), true) +
-                rowHtml('Backend', esc(ov.selected_backend || '—')) +
+                rowHtml('Backend المحدد', esc(ov.selected_backend || '—')) +
             '</div></article>' +
             '<article class="bc-op-card"><h3>الحماية</h3><div class="bc-op-rows">' +
-                rowHtml('آخر Full ناجح', fmtTimestampDisplay(last.generated_at)) +
-                rowHtml('حالة Full الأخير', badge(last.package_status), true) +
-                rowHtml('آخر Country Batch', fmtTimestampDisplay(countryBatch.generated_at)) +
-                rowHtml('دول قابلة للاسترداد', esc(String(ov.recoverable_countries ?? '—')), true) +
-                rowHtml('حزم الدول المخزّنة / Stored Country Packages', esc(String(storedCountryPackages)), true) +
-                rowHtml('DRV Score', esc(String(ov.latest_recovery_score ?? 0))) +
+                rowHtml('آخر Full ناجح (healthy)', fmtTimestampDisplay(lastSuccess.generated_at)) +
+                rowHtml('أحدث Full — الحالة', badge(latestFull.package_status), true) +
+                rowHtml('أحدث حزمة دولة', fmtTimestampDisplay(latestCountryPkg.generated_at)) +
+                rowHtml('دول قابلة للاسترداد (CRP selected)', esc(String(ov.recoverable_countries ?? '—')), true) +
+                rowHtml('دول لديها حزم على القرص', esc(countriesWithPackages === null ? '—' : String(countriesWithPackages)), true) +
+                rowHtml('حزم الدول المخزّنة (ملفات finalized)', esc(String(storedCountryPackages)), true) +
+                rowHtml('لقطات Full المخزّنة', esc(fullSnapshotsTotal === null ? '—' : String(fullSnapshotsTotal)), true) +
+                rowHtml('DRV لآخر Full', esc(String(latestDrv))) +
             '</div></article>' +
             '<article class="bc-op-card"><h3>التخزين والاحتفاظ</h3><div class="bc-op-rows">' +
-                rowHtml('إجمالي التخزين', esc(st.total_human || '—')) +
-                rowHtml('Snapshots', esc(st.snapshots_human || '—')) +
-                rowHtml('Country Packages', esc(st.country_packages_human || '—')) +
-                rowHtml('Logs', esc(st.logs_human || '—')) +
-                rowHtml('Retention', esc((ov.retention_days !== undefined && ov.retention_days !== null && ov.retention_days !== '') ? (String(ov.retention_days) + ' يوم') : '—'), true) +
+                rowHtml('إجمالي الحجم (Snapshots+Countries+Logs)', esc(st.total_human || '—')) +
+                rowHtml('حجم مجلد Snapshots', esc(st.snapshots_human || '—')) +
+                rowHtml('حجم مجلد Country Packages', esc(st.country_packages_human || '—')) +
+                rowHtml('حجم مجلد Logs', esc(st.logs_human || '—')) +
+                rowHtml('Retention (ORANGE_BACKUP_RETENTION_DAYS)', esc((ov.retention_days !== undefined && ov.retention_days !== null && ov.retention_days !== '') ? (String(ov.retention_days) + ' يوم') : '—'), true) +
             '</div></article>';
 
         el('bc_latest_full').innerHTML =
-            '<div><dt>آخر Full</dt><dd>' + fmtTimestampDisplay(latestFull.generated_at) + '</dd></div>' +
-            '<div><dt>الحالة</dt><dd>' + badge(latestFull.package_status || last.package_status) + '</dd></div>' +
+            '<div><dt>أحدث Full</dt><dd>' + fmtTimestampDisplay(latestFull.generated_at) + '</dd></div>' +
+            '<div><dt>الحالة</dt><dd>' + badge(latestFull.package_status) + '</dd></div>' +
             '<div><dt>Schema</dt><dd>' + esc(String(latestFull.schema_revision ?? '—')) + '</dd></div>' +
-            '<div><dt>DRV Score</dt><dd>' + esc(String(latestFull.recovery_score ?? ov.latest_recovery_score ?? 0)) + '</dd></div>';
+            '<div><dt>DRV لآخر Full</dt><dd>' + esc(String(latestDrv)) + '</dd></div>';
         el('bc_country_discovery').innerHTML =
             '<div><dt>دول قابلة للاسترداد</dt><dd>' + esc(String(ov.recoverable_countries ?? '—')) + '</dd></div>' +
-            '<div><dt>آخر Country Batch</dt><dd>' + (fmtTimestampDisplay(countryBatch.generated_at)) + '</dd></div>' +
+            '<div><dt>أحدث حزمة دولة</dt><dd>' + (fmtTimestampDisplay(latestCountryPkg.generated_at)) + '</dd></div>' +
             '<div><dt>حزم الدول المخزّنة</dt><dd>' + storedCountryPackages + '</dd></div>';
 
         const rootPath = ov.backup_root || '—';
@@ -609,11 +622,11 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             ? String(retentionRaw) + ' يوم'
             : '—';
         const kpis = [
-            ['Snapshots', st.snapshots_human || '—'],
-            ['Country Packages', st.country_packages_human || '—'],
-            ['Logs', st.logs_human || '—'],
-            ['Total', st.total_human || '—'],
-            ['Retention', retentionLabel]
+            ['حجم Snapshots', st.snapshots_human || '—'],
+            ['حجم Country Packages', st.country_packages_human || '—'],
+            ['حجم Logs', st.logs_human || '—'],
+            ['الإجمالي', st.total_human || '—'],
+            ['Retention (أيام)', retentionLabel]
         ];
         el('bc_storage_kpis').innerHTML = kpis.map(([t, v]) =>
             '<div class="bc-kpi-card"><h4>' + esc(t) + '</h4><div class="bc-val" dir="ltr">' + esc(v) + '</div></div>'

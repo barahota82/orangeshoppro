@@ -860,13 +860,11 @@ function orange_backup_admin_collect_overview(PDO $pdo, string $projectRoot, ?ar
         }
     }
 
-    $latestRecoveryScore = 0;
-    foreach ($fullSnapshots as $snap) {
-        $score = (int) ($snap['recovery_score'] ?? 0);
-        if ($score > $latestRecoveryScore) {
-            $latestRecoveryScore = $score;
-        }
-    }
+    // Field name is latest_recovery_score: use the newest full snapshot's DRV score
+    // (from recovery_validation report), not the historical maximum across packages.
+    $latestRecoveryScore = isset($latestFull['recovery_score']) && is_numeric($latestFull['recovery_score'])
+        ? (int) $latestFull['recovery_score']
+        : 0;
 
     $discovery = orange_crp_batch_discover_countries($pdo);
     $recoverableCount = count($discovery['selected'] ?? []);
@@ -876,6 +874,15 @@ function orange_backup_admin_collect_overview(PDO $pdo, string $projectRoot, ?ar
 
     $countryPackages = orange_backup_admin_list_country_packages($pdo, $backupRoot, 1);
     $latestCountry = $countryPackages[0] ?? null;
+
+    // Accurate filesystem inventory (not the capped list.php payload length).
+    $countryCodesOnDisk = orange_backup_retention_list_country_codes($backupRoot);
+    $storedCountryPackagesTotal = 0;
+    foreach ($countryCodesOnDisk as $countryCode) {
+        $container = $countryRoot . DIRECTORY_SEPARATOR . $countryCode;
+        $storedCountryPackagesTotal += count(orange_backup_retention_list_finalized_dirs($container));
+    }
+    $fullSnapshotsTotal = count(orange_backup_retention_list_finalized_dirs($snapshotsDir));
 
     $fullLock = orange_backup_admin_full_lock_status($backupRoot);
     $countryLock = orange_backup_admin_country_lock_status($backupRoot);
@@ -899,6 +906,9 @@ function orange_backup_admin_collect_overview(PDO $pdo, string $projectRoot, ?ar
         'retention_days' => $retentionDays,
         'selected_backend' => $backend,
         'recoverable_countries' => $recoverableCount,
+        'countries_with_packages' => count($countryCodesOnDisk),
+        'stored_country_packages_total' => $storedCountryPackagesTotal,
+        'full_snapshots_total' => $fullSnapshotsTotal,
         'latest_recovery_score' => $latestRecoveryScore,
         'last_successful_full' => $lastSuccessfulFull,
         'latest_full' => $latestFull,
