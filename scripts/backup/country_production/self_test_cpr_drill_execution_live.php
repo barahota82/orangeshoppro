@@ -128,7 +128,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p703_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_dx('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-03-enablement-actions');
+    cpr_dx('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-04-integration-baseline');
     cpr_dx('dirname_constant', ORANGE_CPR_DRILL_EXECUTION_DIRNAME === 'drill_execution');
     cpr_dx(
         'catalog_count',

@@ -29,7 +29,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Field | Value |
 |-------|--------|
 | **Current Phase** | **P9 IN PROGRESS** |
-| **Overall State** | **WP-P9-03 COMPLETE — SA ENABLE/DISABLE + SCHEMA FORCE-DISABLE LIVE — AWAITING OWNER APPROVAL BEFORE WP-P9-04** |
+| **Overall State** | **WP-P9-04 COMPLETE — P9 ENABLEMENT BASELINE FROZEN — AWAITING OWNER APPROVAL BEFORE ENTERPRISE AUDIT / TAG / SIGN-OFF** |
 
 ---
 
@@ -76,7 +76,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Production upload mutation | **Disabled** |
 | Clone drills (P7) | **Implemented** (enablement-FALSE sealed clone-drill evidence path) |
 | Owner Cert (P8) | **Implemented** (enablement-FALSE sealed Owner Certification baseline; PASS ≠ enable; FAIL ≠ auto-rollback) |
-| Enablement (P9) | **WP-P9-03 COMPLETE** (SA Enable/Disable + schema force-disable; sealed ops-state flag writer) |
+| Enablement (P9) | **WP-P9-04 COMPLETE** (integration baseline frozen; Cert→E5→Enable→Disable/Schema FD chain verified) |
 | Architecture | **Frozen** |
 | Owner Decisions | **Frozen** |
 

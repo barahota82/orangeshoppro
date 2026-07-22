@@ -127,7 +127,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p802_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_osub('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-03-enablement-actions');
+    cpr_osub('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-04-integration-baseline');
     cpr_osub('dirname_constant', ORANGE_CPR_OWNER_SUBMISSION_DIRNAME === 'owner_submission');
     cpr_osub(
         'section_order_count',

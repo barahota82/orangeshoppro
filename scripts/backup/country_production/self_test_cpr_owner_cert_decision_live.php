@@ -166,7 +166,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p803_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_ocert('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-03-enablement-actions');
+    cpr_ocert('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-04-integration-baseline');
     cpr_ocert('dirname_constant', ORANGE_CPR_CERTIFICATION_DIRNAME === 'certification');
     cpr_ocert('cg_h_count', count(orange_cpr_owner_cert_cg_h_ids()) === 6);
     cpr_ocert(

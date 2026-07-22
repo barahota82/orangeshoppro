@@ -196,7 +196,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p903_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_eact('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-03-enablement-actions');
+    cpr_eact('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-04-integration-baseline');
     cpr_eact(
         'control_plane_action_flag',
         !empty(orange_cpr_p9_control_plane_snapshot()['enablement_action_engine_implemented'])
@@ -390,7 +390,8 @@ try {
         is_file($docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P9_03_ENABLEMENT_ACTIONS.md')
     );
     cpr_eact('index_wp_p9_03_complete', str_contains($index, '**WP-P9-03 COMPLETE**'));
-    cpr_eact('index_stop_blocks_wp04', str_contains($index, 'Do **not** begin **WP-P9-04**'));
+    cpr_eact('index_wp_p9_04_complete_after_p9_04', str_contains($index, '**WP-P9-04 COMPLETE**'));
+    cpr_eact('index_stop_blocks_enterprise_audit', str_contains($index, 'Do **not** start the Enterprise Audit'));
 } catch (Throwable $e) {
     cpr_eact('exception', false, $e->getMessage());
 }

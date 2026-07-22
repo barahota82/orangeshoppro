@@ -193,7 +193,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p902_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_epre('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-03-enablement-actions');
+    cpr_epre('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-04-integration-baseline');
     cpr_epre('dirname_constant', ORANGE_CPR_ENABLEMENT_DIRNAME === 'enablement');
     cpr_epre(
         'control_plane_preconditions_flag',
@@ -424,6 +424,7 @@ try {
     $indexBody = is_file($index) ? (string) file_get_contents($index) : '';
     cpr_epre('index_wp_p9_02_complete', str_contains($indexBody, '**WP-P9-02 COMPLETE**'));
     cpr_epre('index_wp_p9_03_complete_after_p9_03', str_contains($indexBody, '**WP-P9-03 COMPLETE**'));
+    cpr_epre('index_wp_p9_04_complete_after_p9_04', str_contains($indexBody, '**WP-P9-04 COMPLETE**'));
 } catch (Throwable $e) {
     cpr_epre('exception', false, $e->getMessage());
 }

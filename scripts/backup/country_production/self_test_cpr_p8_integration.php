@@ -72,7 +72,7 @@ $base = $bundle['base'];
 $clone = $bundle['clone'];
 
 try {
-    cpr_p8i('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-03-enablement-actions');
+    cpr_p8i('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-04-integration-baseline');
     cpr_p8i(
         'stage_order',
         orange_cpr_p8_integration_stage_order() === [

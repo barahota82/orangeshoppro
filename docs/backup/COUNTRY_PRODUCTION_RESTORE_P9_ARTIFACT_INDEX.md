@@ -86,7 +86,7 @@ This Work Package:
 | P9 control registry PHP (`cpr_p9_control_plane.php`) + self-test | **Yes** — inventory / hard-rule registry only |
 | WP-P9-02 Enablement Preconditions & Owner Enablement Order | **COMPLETE** — `cpr_enablement_preconditions_live.php` |
 | WP-P9-03 Super Admin Enable/Disable + schema force-disable hooks | **COMPLETE** — `cpr_enablement_action_live.php` |
-| WP-P9-04 integration baseline freeze | **No** until Owner approves WP-P9-03 |
+| WP-P9-04 integration baseline freeze | **COMPLETE** — `cpr_p9_integration.php` |
 | Enterprise Audit / Git Tag / Phase Sign-Off / project closure | **No** until Owner explicitly authorizes after P9 implementation |
 | Owner enablement order sealing | **COMPLETE** in WP-P9-02 |
 | Ops enablement flag write / flip true | **COMPLETE** in WP-P9-03 only (sealed ops state) |
@@ -156,7 +156,7 @@ This Work Package:
 | `includes/backup/country_production/cpr_p9_control_plane.php` | WP-P9-01 registry |
 | `includes/backup/country_production/cpr_enablement_preconditions_live.php` | WP-P9-02 Enablement Preconditions & Owner Order |
 | `includes/backup/country_production/cpr_enablement_action_live.php` | WP-P9-03 Super Admin Enable/Disable + schema force-disable |
-| `includes/backup/country_production/cpr_p9_integration.php` | WP-P9-04 (planned) |
+| `includes/backup/country_production/cpr_p9_integration.php` | WP-P9-04 Integration Baseline Freeze |
 | `includes/backup/country_production/cpr_enablement.php` | Existing read/assert substrate — writers remain P9-03 |
 | `includes/backup/country_production/cpr_*` (P3–P8) | Consumed substrate — do not fork |
 
@@ -189,7 +189,7 @@ Prefer `orange_cpr_*` prefixes consistent with P3–P8 helpers; never reuse Full
 | **WP-P9-01** | P9 Control Plane & Artifact Index | `COUNTRY_PRODUCTION_RESTORE_P9_ARTIFACT_INDEX.md` | **COMPLETE** |
 | **WP-P9-02** | Enablement Preconditions & Owner Enablement Order (P1-13 §6 / OD-ENABLE → E5; flag still false) | `COUNTRY_PRODUCTION_RESTORE_P9_02_ENABLEMENT_PRECONDITIONS.md` | **COMPLETE** |
 | **WP-P9-03** | Super Admin Enable/Disable + Schema Invalidation Force-Disable Hooks (P1-13 §7–§8 / OD-PERM / OD-SCHEMA) | `COUNTRY_PRODUCTION_RESTORE_P9_03_ENABLEMENT_ACTIONS.md` | **COMPLETE** |
-| **WP-P9-04** | P9 Integration Review & Enablement Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P9_04_INTEGRATION_BASELINE.md` | PENDING |
+| **WP-P9-04** | P9 Integration Review & Enablement Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P9_04_INTEGRATION_BASELINE.md` | **COMPLETE** |
 
 **Execution rule (Owner):** One WP at a time → Verify AC → Commit → Push → **STOP** → wait for approval before next WP.
 
@@ -293,14 +293,14 @@ Every later P9 design/code change must cite at least one of:
 **WP-P9-01 COMPLETE** (P9 enablement control plane).  
 **WP-P9-02 COMPLETE** (Enablement Preconditions & Owner Enablement Order).  
 **WP-P9-03 COMPLETE** (Super Admin Enable/Disable & Schema Force-Disable).  
+**WP-P9-04 COMPLETE** (P9 Integration Review & Enablement Baseline Freeze).  
 Commit → Push → **STOP.**  
 
-Do **not** begin **WP-P9-04**.  
 Do **not** start the Enterprise Audit.  
 Do **not** create the Git Tag.  
-Do **not** treat CPR project as closed.
+Do **not** declare the project complete.  
 
-Wait for Owner review and explicit approval before WP-P9-04.
+Wait for Owner review and approval.
 
 ---
 
@@ -341,4 +341,20 @@ Wait for Owner review and explicit approval before WP-P9-04.
 
 ---
 
-*End of P9 Artifact Index (updated WP-P9-03).*
+## 16. Acceptance criteria (WP-P9-04)
+
+| # | Criterion | Result |
+|---|-----------|--------|
+| AC1 | All P9 live modules integrated into one verified enablement chain | **PASS** — `cpr_p9_integration.php` |
+| AC2 | Complete execution order verified (Cert → E5 → Enable → ops → Disable/Schema FD → freeze) | **PASS** |
+| AC3 | Prerequisite / enable-disable / schema / contract / job / permission / fingerprint verified | **PASS** |
+| AC4 | Audit + recovery integrity; no orphans; no replay; no privilege bypass | **PASS** |
+| AC5 | P9 Integration Baseline document + Freeze report + inventory + verification report | **PASS** |
+| AC6 | Updated P9 Artifact Index + phase completion status | **PASS** |
+| AC7 | No new business logic; Architecture / OWNER_APPROVED unchanged; no production SQL/uploads | **PASS** |
+| AC8 | No Enterprise Audit; no Git Tag; no Sign-Off; project not declared complete | **PASS** |
+| AC9 | Self-tests + PHP lint + full CPR suite green | **PASS** |
+
+---
+
+*End of P9 Artifact Index (updated WP-P9-04).*

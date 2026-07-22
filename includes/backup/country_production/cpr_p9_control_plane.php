@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * CPR P9 Control Plane registry (WP-P9-01; flags updated through WP-P9-03).
+ * CPR P9 Control Plane registry (WP-P9-01; flags updated through WP-P9-04).
  *
- * Enablement action engine marked complete after WP-P9-03.
- * Still no integration freeze, Enterprise Audit, Git Tag, or project closure.
+ * Enablement integration baseline marked complete after WP-P9-04.
+ * Still no Enterprise Audit, Git Tag, Phase Sign-Off, or project closure.
  *
  * @see docs/backup/COUNTRY_PRODUCTION_RESTORE_P9_ARTIFACT_INDEX.md
  */
@@ -16,7 +16,7 @@ require_once __DIR__ . '/cpr_enablement.php';
 require_once __DIR__ . '/cpr_mutation_engine.php';
 
 const ORANGE_CPR_P9_CONTROL_SCHEMA = 'cpr_p9_control_plane/1';
-const ORANGE_CPR_P9_CONTROL_VERSION = 'P9-03-1.0';
+const ORANGE_CPR_P9_CONTROL_VERSION = 'P9-04-1.0';
 
 /**
  * @return list<string>
@@ -74,7 +74,7 @@ function orange_cpr_p9_control_plane_snapshot(): array
         'wp_p9_01_complete' => true,
         'enablement_preconditions_engine_implemented' => true,
         'enablement_action_engine_implemented' => true,
-        'p9_integration_baseline_complete' => false,
+        'p9_integration_baseline_complete' => true,
         'enablement_flag_observed' => false,
         'enablement_flag_write_authorized' => true,
         'ops_flag_flipped_true' => false,
@@ -106,9 +106,7 @@ function orange_cpr_p9_control_plane_snapshot(): array
  */
 function orange_cpr_p9_control_plane_assert(array $env): array
 {
-    // Control-plane assert uses env-only view when no CPR work root/ops state.
     $envOnly = $env;
-    // Prefer explicit false for registry assert unless caller tests refuse-true.
     if (!array_key_exists('ORANGE_COUNTRY_RESTORE_PRODUCTION_ENABLED', $envOnly)
         && !array_key_exists('country_production_restore_enabled', $envOnly)
     ) {
@@ -133,16 +131,16 @@ function orange_cpr_p9_control_plane_assert(array $env): array
         || empty($snap['enablement_action_engine_implemented'])
         || empty($snap['enablement_flag_write_authorized'])
         || empty($snap['only_wp_p9_03_may_change_flag'])
+        || empty($snap['p9_integration_baseline_complete'])
     ) {
         return [
             'ok' => false,
             'code' => 'p9_control_incomplete',
-            'message' => 'WP-P9-01…03 control plane + preconditions + action engines must be complete.',
+            'message' => 'WP-P9-01…04 control plane + preconditions + action + integration freeze must be complete.',
             'fail_closed' => true,
         ];
     }
-    if (!empty($snap['p9_integration_baseline_complete'])
-        || !empty($snap['enterprise_audit_started'])
+    if (!empty($snap['enterprise_audit_started'])
         || !empty($snap['git_tag_created'])
         || !empty($snap['phase_sign_off_started'])
         || !empty($snap['project_closed'])
@@ -150,7 +148,7 @@ function orange_cpr_p9_control_plane_assert(array $env): array
         return [
             'ok' => false,
             'code' => 'p9_boundary_violation',
-            'message' => 'WP-P9-03 must not claim integration freeze, Audit, Tag, Sign-Off, or project closure.',
+            'message' => 'WP-P9-04 must not claim Enterprise Audit, Git Tag, Sign-Off, or project closure.',
             'fail_closed' => true,
         ];
     }
@@ -172,11 +170,9 @@ function orange_cpr_p9_control_plane_assert(array $env): array
         ];
     }
 
-    // Refuse when caller forces ops-true without going through sealed action path artifacts.
     if (!empty($env['ORANGE_COUNTRY_RESTORE_PRODUCTION_ENABLED'])
         || !empty($env['country_production_restore_enabled'])
     ) {
-        // Only when no sealed ops state authorizes it under a resolvable CPR root.
         $authorized = false;
         try {
             require_once __DIR__ . '/cpr_paths.php';
@@ -199,7 +195,7 @@ function orange_cpr_p9_control_plane_assert(array $env): array
     return [
         'ok' => true,
         'code' => 'ok',
-        'message' => 'P9 control plane hard rules hold; WP-P9-03 complete; integration freeze withheld.',
+        'message' => 'P9 control plane hard rules hold; WP-P9-04 integration baseline complete; Audit/Tag/Sign-Off withheld.',
         'snapshot' => $snap,
         'enablement_flag_observed' => false,
         'production_mutation' => false,
@@ -207,6 +203,7 @@ function orange_cpr_p9_control_plane_assert(array $env): array
         'ponr_mutation_executed' => false,
         'enterprise_audit_started' => false,
         'git_tag_created' => false,
+        'phase_sign_off_started' => false,
         'project_closed' => false,
         'env_probe' => $envOnly,
     ];

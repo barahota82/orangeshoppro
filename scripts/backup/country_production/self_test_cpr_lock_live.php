@@ -190,7 +190,7 @@ $shadow = $bundle['shadow'];
 $backupLocks = $bundle['backup_locks'];
 
 try {
-    cpr_ll('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-03-enablement-actions');
+    cpr_ll('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-04-integration-baseline');
 
     // Prepare both jobs before any CPR lock is held (maint/OD-PIN refuse peer lock conflict).
     $setup = cpr_ll_setup_pinned($env);
