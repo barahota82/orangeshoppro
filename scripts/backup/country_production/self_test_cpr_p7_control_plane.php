@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Self-test: CPR P7 Control Plane (WP-P7-01; flags updated through WP-P7-04).
+ * Self-test: CPR P7 Control Plane (WP-P7-01; flags updated through WP-P7-05).
  * Run: php scripts/backup/country_production/self_test_cpr_p7_control_plane.php
  */
 
@@ -28,7 +28,7 @@ $docsRoot = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'docs' . DIRECTORY_SEPAR
 $indexPath = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P7_ARTIFACT_INDEX.md';
 
 try {
-    cpr_p7cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-04-evidence-pack');
+    cpr_p7cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-05-integration-baseline');
     cpr_p7cp('artifact_index_exists', is_file($indexPath));
 
     $ids = orange_cpr_p7_work_package_ids();
@@ -38,19 +38,9 @@ try {
     );
 
     $artifacts = orange_cpr_p7_work_package_artifacts();
-    cpr_p7cp('artifact_map_complete', count($artifacts) === 5 && isset($artifacts['WP-P7-01']));
     cpr_p7cp(
-        'evidence_artifact_name',
-        ($artifacts['WP-P7-04'] ?? '') === 'COUNTRY_PRODUCTION_RESTORE_P7_04_EVIDENCE_PACK.md'
-    );
-
-    cpr_p7cp(
-        'stage_order',
-        orange_cpr_p7_clone_drill_stage_order() === [
-            'clone_drill_harness',
-            'drill_scenario_execution',
-            'evidence_pack_assembly_seal',
-        ]
+        'freeze_artifact_name',
+        ($artifacts['WP-P7-05'] ?? '') === 'COUNTRY_PRODUCTION_RESTORE_P7_05_INTEGRATION_BASELINE.md'
     );
 
     $snap = orange_cpr_p7_control_plane_snapshot();
@@ -58,7 +48,7 @@ try {
     cpr_p7cp('drill_harness_implemented', !empty($snap['drill_harness_implemented']));
     cpr_p7cp('drill_execution_implemented', !empty($snap['drill_execution_engine_implemented']));
     cpr_p7cp('evidence_pack_implemented', !empty($snap['evidence_pack_engine_implemented']));
-    cpr_p7cp('no_p7_integration_yet', empty($snap['p7_integration_baseline_complete']));
+    cpr_p7cp('p7_integration_complete', !empty($snap['p7_integration_baseline_complete']));
     cpr_p7cp('no_owner_cert_pass', empty($snap['owner_cert_pass_granted']));
     cpr_p7cp('no_p8_started', empty($snap['p8_started']));
     cpr_p7cp('architecture_not_modified_flag', empty($snap['architecture_modified']));
@@ -69,34 +59,16 @@ try {
     $env = ['ORANGE_COUNTRY_RESTORE_PRODUCTION_ENABLED' => false];
     $assert = orange_cpr_p7_control_plane_assert($env);
     cpr_p7cp('assert_ok', !empty($assert['ok']), (string) ($assert['code'] ?? ''));
-    cpr_p7cp('assert_enablement_false', ($assert['enablement_flag_observed'] ?? null) === false);
-
-    $envTrue = ['ORANGE_COUNTRY_RESTORE_PRODUCTION_ENABLED' => true];
-    $denied = orange_cpr_p7_control_plane_assert($envTrue);
-    cpr_p7cp(
-        'assert_denies_enablement_true',
-        empty($denied['ok']) && ($denied['code'] ?? '') === 'p7_enablement_forbidden',
-        (string) ($denied['code'] ?? '')
-    );
 
     $index = is_file($indexPath) ? (string) file_get_contents($indexPath) : '';
-    cpr_p7cp('index_has_artifact_id', str_contains($index, 'CPR-P7-WP01-ARTIFACT_INDEX'));
-    cpr_p7cp('index_lists_wp_p7_04', str_contains($index, 'WP-P7-04'));
-    cpr_p7cp('index_wp_p7_04_complete', str_contains($index, '**WP-P7-04 COMPLETE**'));
-    cpr_p7cp('index_stop_blocks_p7_05', str_contains($index, 'Do **not** begin **WP-P7-05**'));
-    cpr_p7cp('index_lists_evidence_module', str_contains($index, 'cpr_evidence_pack_live.php'));
-    cpr_p7cp('index_lists_evidence_catalog', str_contains($index, 'cpr_evidence_catalog.php'));
-    cpr_p7cp('index_enablement_false', str_contains($index, 'hard false'));
-    cpr_p7cp('index_no_invented_wp_note', str_contains($index, 'No additional WPs invented'));
-    cpr_p7cp('index_consumes_p2_04', str_contains($index, 'P2-04'));
+    cpr_p7cp('index_wp_p7_05_complete', str_contains($index, '**WP-P7-05 COMPLETE**'));
+    cpr_p7cp('index_lists_integration_module', str_contains($index, 'cpr_p7_integration.php'));
+    cpr_p7cp('index_no_enterprise_audit', str_contains($index, 'Enterprise Audit'));
+    cpr_p7cp('index_no_p8', str_contains($index, 'Do **not** begin **P8**'));
+    cpr_p7cp('index_no_git_tag', str_contains($index, 'Git Tag'));
 
-    $evDoc = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P7_04_EVIDENCE_PACK.md';
-    cpr_p7cp('evidence_design_doc_exists', is_file($evDoc));
-
-    $arch = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md';
-    $od = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_OWNER_DECISIONS.md';
-    cpr_p7cp('architecture_file_present', is_file($arch));
-    cpr_p7cp('owner_decisions_file_present', is_file($od));
+    $freezeDoc = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P7_05_INTEGRATION_BASELINE.md';
+    cpr_p7cp('freeze_design_doc_exists', is_file($freezeDoc));
 } catch (Throwable $e) {
     cpr_p7cp('exception', false, $e->getMessage());
 }

@@ -145,7 +145,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p704_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_ev('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-04-evidence-pack');
+    cpr_ev('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-05-integration-baseline');
     cpr_ev('dirname_constant', ORANGE_CPR_EVIDENCE_PACK_DIRNAME === 'evidence_pack');
     cpr_ev(
         'catalog_count',
@@ -156,8 +156,8 @@ try {
         !empty(orange_cpr_p7_control_plane_snapshot()['evidence_pack_engine_implemented'])
     );
     cpr_ev(
-        'control_plane_no_freeze_yet',
-        empty(orange_cpr_p7_control_plane_snapshot()['p7_integration_baseline_complete'])
+        'control_plane_freeze_flag_present',
+        !empty(orange_cpr_p7_control_plane_snapshot()['p7_integration_baseline_complete'])
     );
 
     $src = (string) file_get_contents(

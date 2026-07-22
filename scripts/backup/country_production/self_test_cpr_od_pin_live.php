@@ -172,7 +172,7 @@ $env = $bundle['env'];
 $base = $bundle['base'];
 
 try {
-    cpr_op('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-04-evidence-pack');
+    cpr_op('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-05-integration-baseline');
 
     // --- Happy path ---
     $setup = cpr_op_setup_cp4($env);

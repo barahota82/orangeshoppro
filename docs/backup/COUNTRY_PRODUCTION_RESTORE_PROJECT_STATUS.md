@@ -29,7 +29,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Field | Value |
 |-------|--------|
 | **Current Phase** | **P7 IN PROGRESS** |
-| **Overall State** | **WP-P7-04 COMPLETE — AWAITING OWNER APPROVAL FOR WP-P7-05** |
+| **Overall State** | **WP-P7-05 COMPLETE — P7 CLONE-DRILL EVIDENCE BASELINE FROZEN — AWAITING OWNER REVIEW (NO ENTERPRISE AUDIT / TAG / P8)** |
 
 ---
 
@@ -134,12 +134,13 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P7** (authorized; WP-P7-04 evidence pack sealed)
+**P7** (WP-P7-01…05 complete; clone-drill evidence baseline frozen)
 
-### Next Work Package
+### Next gated step (Owner only)
 
-**WP-P7-05** — P7 Integration Review & Clone-Drill Evidence Baseline Freeze  
-*(Do **not** begin until Owner explicitly reviews and approves WP-P7-04 / next WP.)*
+**Enterprise Audit** (then optional Git Tag / phase closure) — **not started**.  
+**P8** Owner Cert — **not started**.  
+*(Do **not** begin Enterprise Audit, Git Tag, or P8 until Owner explicitly authorizes.)*
 
 ---
 

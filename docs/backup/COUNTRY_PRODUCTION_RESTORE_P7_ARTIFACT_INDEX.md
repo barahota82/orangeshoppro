@@ -80,10 +80,12 @@ This Work Package:
 | WP-P7-02 clone drill harness (after Owner approval of WP-P7-01) | **Yes** — delivered in WP-P7-02 |
 | WP-P7-03 drill scenario execution (after Owner approval of WP-P7-02) | **Yes** — delivered in WP-P7-03 |
 | WP-P7-04 evidence pack assembly (after Owner approval of WP-P7-03) | **Yes** — delivered in WP-P7-04 |
-| WP-P7-05 integration baseline freeze | **No** until Owner approves next WP |
+| WP-P7-05 integration baseline freeze (after Owner approval of WP-P7-04) | **Yes** — delivered in WP-P7-05 |
+| Enterprise Audit / Git Tag / P8 | **No** until Owner explicitly authorizes |
 | **Clone drill harness** | **COMPLETE** in WP-P7-02 (`cpr_drill_harness_live.php`) |
 | **Drill scenario execution** | **COMPLETE** in WP-P7-03 (`cpr_drill_execution_live.php` + `cpr_drill_catalog.php`) |
 | **Evidence pack assembly / seal** | **COMPLETE** in WP-P7-04 (`cpr_evidence_pack_live.php` + `cpr_evidence_catalog.php`) |
+| **P7 integration baseline freeze** | **COMPLETE** in WP-P7-05 (`cpr_p7_integration.php`) |
 | Owner Cert PASS/FAIL | **No** — P8 / OD-CERT |
 | Enablement flag flip | **No** — P9 / OD-ENABLE |
 | Architecture or Owner Decision edits | **No** |
@@ -93,7 +95,8 @@ This Work Package:
 **WP-P7-01 coding:** Control-plane registry only.  
 **WP-P7-02 coding:** Clone drill harness & environment binding only.  
 **WP-P7-03 coding:** DS-* scenario execution only.  
-**WP-P7-04 coding:** Evidence pack assembly & seal only — **no** P7 freeze / Owner Cert.
+**WP-P7-04 coding:** Evidence pack assembly & seal only.  
+**WP-P7-05 coding:** Integration orchestration + verify + freeze artifacts only — **no** Enterprise Audit / Git Tag / P8 / Owner Cert PASS.
 
 ---
 
@@ -156,6 +159,7 @@ This Work Package:
 | `includes/backup/country_production/cpr_drill_execution_live.php` | WP-P7-03 DS-* scenario execution |
 | `includes/backup/country_production/cpr_evidence_catalog.php` | WP-P7-04 frozen EV-01…EV-14 catalog |
 | `includes/backup/country_production/cpr_evidence_pack_live.php` | WP-P7-04 evidence pack assembly & seal |
+| `includes/backup/country_production/cpr_p7_integration.php` | WP-P7-05 chain orchestration + freeze report |
 | `includes/backup/country_production/cpr_*_live.php` (P3–P6) | Consumed substrate — do not fork |
 
 ### 5.3 Runtime (later WPs)
@@ -165,6 +169,7 @@ This Work Package:
 | `{job}/drill_harness/` | Sealed environment binding + harness reports (WP-P7-02) |
 | `{job}/drill_execution/` | Sealed per-scenario + aggregate drill reports (WP-P7-03) |
 | `{job}/evidence_pack/` | Sealed EV-01…EV-14 pack + manifest + seal (WP-P7-04) |
+| `{job}/integration_live/` | Sealed P7 integration freeze report (WP-P7-05) |
 
 ---
 
@@ -189,7 +194,7 @@ Prefer `orange_cpr_*` prefixes consistent with P3–P6 helpers; never reuse Full
 | **WP-P7-02** | Clone Drill Harness & Environment Binding | `COUNTRY_PRODUCTION_RESTORE_P7_02_DRILL_HARNESS.md` | **COMPLETE** |
 | **WP-P7-03** | Drill Scenario Execution (P2-03 DS-*) | `COUNTRY_PRODUCTION_RESTORE_P7_03_DRILL_EXECUTION.md` | **COMPLETE** |
 | **WP-P7-04** | Evidence Pack Assembly & Seal (P2-04 / EV-01…EV-14) | `COUNTRY_PRODUCTION_RESTORE_P7_04_EVIDENCE_PACK.md` | **COMPLETE** |
-| **WP-P7-05** | P7 Integration Review & Clone-Drill Evidence Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P7_05_INTEGRATION_BASELINE.md` | PENDING |
+| **WP-P7-05** | P7 Integration Review & Clone-Drill Evidence Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P7_05_INTEGRATION_BASELINE.md` | **COMPLETE** |
 
 **Execution rule (Owner):** One WP at a time → Verify AC → Commit → Push → **STOP** → wait for approval before next WP.
 
@@ -307,9 +312,14 @@ Foundational principles (always in force):
 
 ## 14. Stop rule
 
-**WP-P7-04 COMPLETE** (EV-01…EV-14 evidence pack assembly & seal).  
+**WP-P7-05 COMPLETE** (P7 clone-drill evidence baseline freeze).  
 Commit → Push → **STOP.**  
-Do **not** begin **WP-P7-05** until Owner explicitly reviews and approves the next Work Package.
+
+Do **not** start the **Enterprise Audit**.  
+Do **not** create the **Git Tag**.  
+Do **not** begin **P8**.  
+
+Wait for Owner review and approval.
 
 ---
 
@@ -368,4 +378,21 @@ Do **not** begin **WP-P7-05** until Owner explicitly reviews and approves the ne
 
 ---
 
-*End of P7 Artifact Index (updated WP-P7-04).*
+## 18. Acceptance criteria (WP-P7-05)
+
+| # | Criterion | Result |
+|---|-----------|--------|
+| AC1 | All P7 live modules integrated into one verified chain | **PASS** — `cpr_p7_integration.php` |
+| AC2 | Canonical Harness→Binding→DS-*→Reports→EV→Pack order verified | **PASS** |
+| AC3 | Isolation / ordering / contract / identity / fingerprints / audit / recovery verified | **PASS** |
+| AC4 | No orphan artifacts; no duplicate evidence; no replay; no privilege bypass | **PASS** |
+| AC5 | No production resource access | **PASS** |
+| AC6 | Integration Baseline + Freeze report + inventory + verification report produced | **PASS** |
+| AC7 | Artifact Index + phase status updated | **PASS** |
+| AC8 | Enablement FALSE; Architecture/OD unchanged; no new business logic | **PASS** |
+| AC9 | No Enterprise Audit; no Git Tag; no P8 | **PASS** |
+| AC10 | Self-tests + PHP lint + full CPR suite green | **PASS** |
+
+---
+
+*End of P7 Artifact Index (updated WP-P7-05).*
