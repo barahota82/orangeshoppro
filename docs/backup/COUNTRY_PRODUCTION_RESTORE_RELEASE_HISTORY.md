@@ -158,7 +158,7 @@ Every completed major phase shall contain:
 | Field | Value |
 |-------|--------|
 | **Current Phase** | **P8 IN PROGRESS** |
-| **Current State** | **WP-P8-01 COMPLETE — P8 CONTROL PLANE OPEN — AWAITING OWNER APPROVAL BEFORE WP-P8-02** |
+| **Current State** | **WP-P8-02 COMPLETE — OWNER SUBMISSION SEALED — AWAITING OWNER APPROVAL BEFORE WP-P8-03** |
 
 *(Update the Current Project Status block when the active phase changes. Append new phase sections for P8–P9; do not rewrite P0–P7 above.)*
 

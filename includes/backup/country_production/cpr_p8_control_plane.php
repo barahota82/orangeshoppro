@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * CPR P8 Control Plane registry (WP-P8-01).
+ * CPR P8 Control Plane registry (WP-P8-01; flags updated through WP-P8-02).
  *
- * Inventory / hard-rule helpers only — no Owner Submission sealer,
- * no Owner Cert PASS/FAIL writer, no enablement flip.
+ * Inventory / hard-rule helpers — Owner Submission marked implemented after WP-P8-02.
+ * Still no Owner Cert PASS/FAIL writer and no enablement flip.
  *
  * @see docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md
  * @see docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md roadmap P8
@@ -17,7 +17,7 @@ require_once __DIR__ . '/cpr_enablement.php';
 require_once __DIR__ . '/cpr_mutation_engine.php';
 
 const ORANGE_CPR_P8_CONTROL_SCHEMA = 'cpr_p8_control_plane/1';
-const ORANGE_CPR_P8_CONTROL_VERSION = 'P8-01-1.0';
+const ORANGE_CPR_P8_CONTROL_VERSION = 'P8-02-1.0';
 
 /**
  * Official P8 Work Package IDs (discovered from Architecture + P2 — not invented).
@@ -79,7 +79,7 @@ function orange_cpr_p8_control_plane_snapshot(): array
         'artifacts' => orange_cpr_p8_work_package_artifacts(),
         'certification_stage_order' => orange_cpr_p8_certification_stage_order(),
         'wp_p8_01_complete' => true,
-        'owner_submission_engine_implemented' => false,
+        'owner_submission_engine_implemented' => true,
         'owner_cert_decision_engine_implemented' => false,
         'p8_integration_baseline_complete' => false,
         'enablement_flag_observed' => false,
@@ -97,7 +97,7 @@ function orange_cpr_p8_control_plane_snapshot(): array
 }
 
 /**
- * Assert WP-P8-01 hard rules for control-plane operations (fail-closed).
+ * Assert P8 control-plane hard rules (fail-closed) after WP-P8-02.
  *
  * @param array<string, mixed> $env
  * @return array<string, mixed>
@@ -131,28 +131,27 @@ function orange_cpr_p8_control_plane_assert(array $env): array
         return [
             'ok' => false,
             'code' => 'p8_mutation_refuse_broken',
-            'message' => 'Mutation refuse helpers must remain fail-closed in WP-P8-01.',
+            'message' => 'Mutation refuse helpers must remain fail-closed in P8.',
             'fail_closed' => true,
         ];
     }
 
     $snap = orange_cpr_p8_control_plane_snapshot();
-    if (empty($snap['wp_p8_01_complete'])) {
+    if (empty($snap['wp_p8_01_complete']) || empty($snap['owner_submission_engine_implemented'])) {
         return [
             'ok' => false,
             'code' => 'p8_control_incomplete',
-            'message' => 'WP-P8-01 must mark control plane complete.',
+            'message' => 'WP-P8-01/02 control plane + Owner Submission engine must be marked complete/implemented.',
             'fail_closed' => true,
         ];
     }
-    if (!empty($snap['owner_submission_engine_implemented'])
-        || !empty($snap['owner_cert_decision_engine_implemented'])
+    if (!empty($snap['owner_cert_decision_engine_implemented'])
         || !empty($snap['p8_integration_baseline_complete'])
     ) {
         return [
             'ok' => false,
             'code' => 'p8_engines_premature',
-            'message' => 'WP-P8-01 must not mark WP-P8-02…04 engines/freeze implemented.',
+            'message' => 'WP-P8-02 must not mark WP-P8-03/04 engines/freeze implemented.',
             'fail_closed' => true,
         ];
     }
@@ -160,7 +159,7 @@ function orange_cpr_p8_control_plane_assert(array $env): array
         return [
             'ok' => false,
             'code' => 'p8_boundary_violation',
-            'message' => 'WP-P8-01 must not grant Owner Cert PASS or start P9.',
+            'message' => 'P8 must not grant Owner Cert PASS or start P9.',
             'fail_closed' => true,
         ];
     }
@@ -176,7 +175,7 @@ function orange_cpr_p8_control_plane_assert(array $env): array
     return [
         'ok' => true,
         'code' => 'ok',
-        'message' => 'P8 control plane hard rules hold; Owner Submission / Cert decision / P9 withheld.',
+        'message' => 'P8 control plane hard rules hold; Owner Submission implemented; Cert decision / P9 withheld.',
         'snapshot' => $snap,
         'enablement_flag_observed' => false,
         'production_mutation' => false,

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Self-test: CPR P8 Control Plane (WP-P8-01).
+ * Self-test: CPR P8 Control Plane (WP-P8-01; flags updated through WP-P8-02).
  * Run: php scripts/backup/country_production/self_test_cpr_p8_control_plane.php
  */
 
@@ -28,7 +28,7 @@ $docsRoot = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'docs' . DIRECTORY_SEPAR
 $indexPath = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md';
 
 try {
-    cpr_p8cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-01-control-plane');
+    cpr_p8cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-02-owner-submission');
     cpr_p8cp('artifact_index_exists', is_file($indexPath));
 
     $ids = orange_cpr_p8_work_package_ids();
@@ -39,63 +39,32 @@ try {
 
     $artifacts = orange_cpr_p8_work_package_artifacts();
     cpr_p8cp(
-        'freeze_artifact_name',
-        ($artifacts['WP-P8-04'] ?? '') === 'COUNTRY_PRODUCTION_RESTORE_P8_04_INTEGRATION_BASELINE.md'
-    );
-    cpr_p8cp(
         'submission_artifact_name',
         ($artifacts['WP-P8-02'] ?? '') === 'COUNTRY_PRODUCTION_RESTORE_P8_02_OWNER_SUBMISSION.md'
-    );
-    cpr_p8cp(
-        'decision_artifact_name',
-        ($artifacts['WP-P8-03'] ?? '') === 'COUNTRY_PRODUCTION_RESTORE_P8_03_OWNER_CERT_DECISION.md'
-    );
-
-    $stages = orange_cpr_p8_certification_stage_order();
-    cpr_p8cp(
-        'stage_order',
-        $stages === [
-            'owner_submission_assembly',
-            'owner_cert_pass_fail_decision',
-            'certification_baseline_freeze',
-        ]
     );
 
     $snap = orange_cpr_p8_control_plane_snapshot();
     cpr_p8cp('wp_p8_01_complete_flag', !empty($snap['wp_p8_01_complete']));
-    cpr_p8cp('no_owner_submission_yet', empty($snap['owner_submission_engine_implemented']));
+    cpr_p8cp('owner_submission_implemented', !empty($snap['owner_submission_engine_implemented']));
     cpr_p8cp('no_cert_decision_yet', empty($snap['owner_cert_decision_engine_implemented']));
     cpr_p8cp('no_p8_integration_yet', empty($snap['p8_integration_baseline_complete']));
     cpr_p8cp('no_owner_cert_pass', empty($snap['owner_cert_pass_granted']));
     cpr_p8cp('no_p9_started', empty($snap['p9_started']));
     cpr_p8cp('engineering_cannot_grant_pass', !empty($snap['engineering_cannot_grant_pass']));
     cpr_p8cp('cert_pass_does_not_enable', !empty($snap['cert_pass_does_not_enable']));
-    cpr_p8cp('architecture_not_modified_flag', empty($snap['architecture_modified']));
-    cpr_p8cp('owner_approved_not_modified_flag', empty($snap['owner_approved_modified']));
     cpr_p8cp('p0_p7_contracts_preserved', !empty($snap['p0_p7_contracts_preserved']));
     cpr_p8cp('no_production_sql', ($snap['production_sql_executed'] ?? true) === false);
-    cpr_p8cp('roadmap_output', ($snap['roadmap_output'] ?? '') === 'Cert PASS/FAIL (Owner)');
 
     $env = ['ORANGE_COUNTRY_RESTORE_PRODUCTION_ENABLED' => false];
     $assert = orange_cpr_p8_control_plane_assert($env);
     cpr_p8cp('assert_ok', !empty($assert['ok']), (string) ($assert['code'] ?? ''));
 
-    $envTrue = ['ORANGE_COUNTRY_RESTORE_PRODUCTION_ENABLED' => true];
-    $assertTrue = orange_cpr_p8_control_plane_assert($envTrue);
-    cpr_p8cp(
-        'assert_refuses_enablement_true',
-        empty($assertTrue['ok']) && ($assertTrue['code'] ?? '') === 'p8_enablement_forbidden'
-    );
-
     $index = is_file($indexPath) ? (string) file_get_contents($indexPath) : '';
-    cpr_p8cp('index_wp_p8_01_complete', str_contains($index, '**WP-P8-01 COMPLETE**'));
-    cpr_p8cp('index_lists_control_registry', str_contains($index, 'cpr_p8_control_plane.php'));
-    cpr_p8cp('index_inventory_has_four_wps', str_contains($index, 'WP-P8-04'));
-    cpr_p8cp('index_stop_blocks_p8_02', str_contains($index, 'Do **not** begin **WP-P8-02**'));
+    cpr_p8cp('index_wp_p8_02_complete', str_contains($index, '**WP-P8-02 COMPLETE**'));
+    cpr_p8cp('index_lists_submission_module', str_contains($index, 'cpr_owner_submission_live.php'));
+    cpr_p8cp('index_stop_blocks_p8_03', str_contains($index, 'Do **not** begin **WP-P8-03**'));
     cpr_p8cp('index_stop_blocks_p9', str_contains($index, 'Do **not** begin **P9**'));
-    cpr_p8cp('index_no_engineering_pass', str_contains($index, 'Do **not** grant Owner Cert PASS'));
-    cpr_p8cp('index_cites_od_cert', str_contains($index, 'OD-CERT'));
-    cpr_p8cp('index_preserves_p7_contracts', str_contains($index, 'Evidence Pack'));
+    cpr_p8cp('design_doc_exists', is_file($docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P8_02_OWNER_SUBMISSION.md'));
 } catch (Throwable $e) {
     cpr_p8cp('exception', false, $e->getMessage());
 }

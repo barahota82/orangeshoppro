@@ -352,7 +352,7 @@ $base = $bundle['base'];
 $cprRoot = $bundle['cpr'];
 
 try {
-    cpr_al('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-01-control-plane');
+    cpr_al('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-02-owner-submission');
 
     // --- Valid authorization (full ceremony) ---
     $setup = cpr_al_setup_gated($env);

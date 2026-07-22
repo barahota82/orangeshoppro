@@ -79,17 +79,19 @@ This Work Package:
 |----------|-----------------|
 | P8 **control-plane artifacts** for WP-P8-01 | **Yes** — this WP |
 | P8 control registry PHP (`cpr_p8_control_plane.php`) + self-test | **Yes** — inventory / hard-rule registry only |
-| WP-P8-02 Owner Submission assembly (after Owner approval of WP-P8-01) | **No** until Owner approves WP-P8-01 |
+| WP-P8-02 Owner Submission assembly (after Owner approval of WP-P8-01) | **Yes** — delivered in WP-P8-02 |
 | WP-P8-03 Owner Cert PASS/FAIL decision recording | **No** until prior WP approved |
 | WP-P8-04 integration baseline freeze | **No** until prior WP approved |
 | Enterprise Audit / Git Tag / P9 | **No** until Owner explicitly authorizes |
+| **Owner Submission assembly** | **COMPLETE** in WP-P8-02 (`cpr_owner_submission_live.php`) |
 | Owner Cert PASS granted by engineering | **No** — forbidden (OD-CERT) |
 | Enablement flag flip | **No** — P9 / OD-ENABLE |
 | Architecture or Owner Decision edits | **No** |
 | C3–C8 engine edits | **No** |
 | P0–P7 frozen baseline / engine edits | **No** (except confirmed defects) |
 
-**WP-P8-01 coding:** Control-plane registry only — **no** Owner Submission sealer, **no** certification_result PASS writer, **no** P9 enablement.
+**WP-P8-01 coding:** Control-plane registry only.  
+**WP-P8-02 coding:** Owner Submission assembly & seal only — **no** Owner Cert PASS/FAIL writer, **no** P9 enablement.
 
 ---
 
@@ -146,8 +148,9 @@ This Work Package:
 | Path | Role |
 |------|------|
 | `includes/backup/country_production/cpr_p8_control_plane.php` | WP-P8-01 registry |
+| `includes/backup/country_production/cpr_owner_submission_live.php` | WP-P8-02 Owner Submission assembly & seal |
 | `includes/backup/country_production/cpr_*` (P3–P7) | Consumed substrate — do not fork |
-| Later P8 live modules | Named when WP-P8-02+ is authorized |
+| Later P8 live modules | Named when WP-P8-03+ is authorized |
 
 ### 5.3 Runtime (later WPs)
 
@@ -177,7 +180,7 @@ Prefer `orange_cpr_*` prefixes consistent with P3–P7 helpers; never reuse Full
 | WP | Title | Primary artifact | Status |
 |----|-------|------------------|--------|
 | **WP-P8-01** | P8 Control Plane & Artifact Index | `COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md` | **COMPLETE** |
-| **WP-P8-02** | Owner Submission Package Assembly (P2-05 / sealed P7 evidence) | `COUNTRY_PRODUCTION_RESTORE_P8_02_OWNER_SUBMISSION.md` | **NOT STARTED** |
+| **WP-P8-02** | Owner Submission Package Assembly (P2-05 / sealed P7 evidence) | `COUNTRY_PRODUCTION_RESTORE_P8_02_OWNER_SUBMISSION.md` | **COMPLETE** |
 | **WP-P8-03** | Owner Certification Decision (PASS/FAIL) & `cpr_certification_result` | `COUNTRY_PRODUCTION_RESTORE_P8_03_OWNER_CERT_DECISION.md` | **NOT STARTED** |
 | **WP-P8-04** | P8 Integration Review & Certification Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P8_04_INTEGRATION_BASELINE.md` | **NOT STARTED** |
 
@@ -291,15 +294,33 @@ Foundational principles (always in force):
 ## 14. Stop rule
 
 **WP-P8-01 COMPLETE** (P8 certification control plane).  
+**WP-P8-02 COMPLETE** (Owner Submission Package Assembly).  
 Commit → Push → **STOP.**  
 
-Do **not** begin **WP-P8-02**.  
+Do **not** begin **WP-P8-03**.  
 Do **not** begin **P9**.  
 Do **not** grant Owner Cert PASS.  
 Do **not** flip enablement.  
 
-Wait for Owner review and approval of WP-P8-01.
+Wait for Owner review and approval of WP-P8-02.
 
 ---
 
-*End of P8 Artifact Index (WP-P8-01).*
+## 15. Acceptance criteria (WP-P8-02)
+
+| # | Criterion | Result |
+|---|-----------|--------|
+| AC1 | Owner Submission assembly engine implemented | **PASS** — `cpr_owner_submission_live.php` |
+| AC2 | Assembles only from sealed P7 evidence / drills / freeze | **PASS** |
+| AC3 | Consumes P2-05 metadata; no evidence mutation | **PASS** |
+| AC4 | Integrates state / checkpoint / recovery / audit / contract / job / country | **PASS** |
+| AC5 | Rejects missing/stale/corrupt/modified/replayed; fail-closed | **PASS** |
+| AC6 | Deterministic section order; sealed package + sealed manifest | **PASS** |
+| AC7 | Certification fingerprints + audit + recovery metadata | **PASS** |
+| AC8 | No privilege bypass; no cross-country | **PASS** |
+| AC9 | Enablement FALSE; Architecture/OD unchanged; no Owner PASS/FAIL | **PASS** |
+| AC10 | Self-tests + lint + full CPR suite green | **PASS** |
+
+---
+
+*End of P8 Artifact Index (updated WP-P8-02).*

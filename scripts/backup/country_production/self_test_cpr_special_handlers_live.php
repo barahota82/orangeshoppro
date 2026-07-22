@@ -324,7 +324,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p504_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_sh('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-01-control-plane');
+    cpr_sh('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-02-owner-submission');
     cpr_sh(
         'catalog_order',
         orange_cpr_special_handlers_executable_order() === [

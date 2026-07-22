@@ -29,7 +29,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Field | Value |
 |-------|--------|
 | **Current Phase** | **P8 IN PROGRESS** |
-| **Overall State** | **WP-P8-01 COMPLETE — P8 CONTROL PLANE OPEN — AWAITING OWNER APPROVAL BEFORE WP-P8-02** |
+| **Overall State** | **WP-P8-02 COMPLETE — OWNER SUBMISSION SEALED — AWAITING OWNER APPROVAL BEFORE WP-P8-03** |
 
 ---
 
@@ -73,7 +73,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Production SQL execution | **Disabled** |
 | Production upload mutation | **Disabled** |
 | Clone drills (P7) | **Implemented** (enablement-FALSE sealed clone-drill evidence path) |
-| Owner Cert (P8) | **WP-P8-01 control plane complete; submission/decision engines not started** |
+| Owner Cert (P8) | **WP-P8-02 Owner Submission complete; decision engine not started** |
 | Architecture | **Frozen** |
 | Owner Decisions | **Frozen** |
 
@@ -141,12 +141,12 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P8** (Owner Cert PASS/FAIL) — **WP-P8-01 COMPLETE**; WP-P8-02+ Owner-gated.
+**P8** (Owner Cert PASS/FAIL) — **WP-P8-02 COMPLETE**; WP-P8-03+ Owner-gated.
 
 ### Next gated step (Owner only)
 
-**WP-P8-02** (Owner Submission Package Assembly)  
-*(Do **not** begin WP-P8-02 until Owner explicitly approves WP-P8-01.)*
+**WP-P8-03** (Owner Certification Decision PASS/FAIL)  
+*(Do **not** begin WP-P8-03 until Owner explicitly approves WP-P8-02.)*
 
 ---
 
