@@ -22,117 +22,123 @@ $apiBase = storefront_public_path('/admin/api/backup');
 orange_admin_render_page_title_with_country('إدارة النسخ الاحتياطي', $pdo);
 ?>
 <style>
-/* Orange Enterprise Backup Center V2 — page-scoped only */
+/* Orange Enterprise Backup Center V2.1 — Owner Review — page-scoped only */
 .bc-v2{--bc-border:#e2e8f0;--bc-muted:#64748b;--bc-surface:#fff;--bc-soft:#f8fafc;--bc-ink:#0f172a;--bc-ok:#047857;--bc-warn:#b45309;--bc-bad:#b91c1c;--bc-info:#1d4ed8}
 .bc-v2 *{box-sizing:border-box}
-.bc-header{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;padding:16px 18px;background:var(--bc-surface);border:1px solid var(--bc-border);border-radius:12px}
+.bc-header{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;padding:14px 16px;background:var(--bc-surface);border:1px solid var(--bc-border);border-radius:12px}
 .bc-header-main{min-width:0;flex:1}
-.bc-header-kicker{margin:0 0 4px;font-size:.78rem;font-weight:600;color:var(--bc-muted);letter-spacing:.02em}
-.bc-header-sub{margin:0;font-size:.92rem;color:var(--bc-muted);line-height:1.5;max-width:42rem}
+.bc-header-kicker{margin:0 0 4px;font-size:.78rem;font-weight:600;color:var(--bc-muted)}
+.bc-header-sub{margin:0;font-size:.9rem;color:var(--bc-muted);line-height:1.45;max-width:42rem}
 .bc-header-status{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .bc-header-status-label{font-size:.75rem;color:var(--bc-muted)}
-.bc-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.bc-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
 @media (max-width:1024px){.bc-overview{grid-template-columns:1fr}}
-.bc-op-card{background:var(--bc-surface);border:1px solid var(--bc-border);border-radius:12px;padding:14px 16px;min-width:0}
-.bc-op-card h3{margin:0 0 12px;font-size:.95rem;font-weight:700;color:var(--bc-ink)}
-.bc-op-rows{display:grid;gap:10px}
-.bc-op-row{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px;padding-bottom:8px;border-bottom:1px solid #f1f5f9}
+.bc-op-card{background:var(--bc-surface);border:1px solid var(--bc-border);border-radius:12px;padding:12px 14px;min-width:0}
+.bc-op-card h3{margin:0 0 10px;font-size:.92rem;font-weight:700;color:var(--bc-ink)}
+.bc-op-rows{display:grid;gap:8px}
+.bc-op-row{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px;padding-bottom:6px;border-bottom:1px solid #f1f5f9}
 .bc-op-row:last-child{border-bottom:0;padding-bottom:0}
-.bc-op-row dt{margin:0;font-size:.8rem;color:var(--bc-muted)}
-.bc-op-row dd{margin:0;font-size:.95rem;font-weight:650;color:var(--bc-ink);text-align:left;direction:ltr;unicode-bidi:isolate}
+.bc-op-row dt{margin:0;font-size:.78rem;color:var(--bc-muted)}
+.bc-op-row dd{margin:0;font-size:.9rem;font-weight:650;color:var(--bc-ink);text-align:left;direction:ltr;unicode-bidi:isolate}
 .bc-op-row dd.bc-rtl{direction:rtl;unicode-bidi:embed;text-align:right}
-.bc-primary-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;padding:14px 16px;background:var(--bc-surface);border:1px solid var(--bc-border);border-radius:12px}
+.bc-primary-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:12px 14px;background:var(--bc-surface);border:1px solid var(--bc-border);border-radius:12px}
 .bc-primary-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.bc-primary-hint{margin:0;font-size:.82rem;color:var(--bc-muted);max-width:28rem;line-height:1.45}
-.bc-btn-primary{display:inline-flex;align-items:center;justify-content:center;min-height:var(--admin-btn-min-h,36px);padding:var(--admin-btn-pad-y,7px) var(--admin-btn-pad-x,14px);border:0;border-radius:var(--radius-sm,10px);background:var(--primary,#ea580c);color:#fff!important;font-weight:600;cursor:pointer;font:inherit}
+.bc-primary-hint{margin:0;font-size:.8rem;color:var(--bc-muted);max-width:28rem;line-height:1.4}
+.bc-btn-primary{display:inline-flex;align-items:center;justify-content:center;min-height:var(--admin-btn-min-h,36px);padding:var(--admin-btn-pad-y,7px) var(--admin-btn-pad-x,14px);border:0;border-radius:var(--radius-sm,10px);background:var(--primary,#ea580c);color:#fff!important;font-weight:600;cursor:pointer;font:inherit;font-size:.86rem}
 .bc-btn-primary:hover{background:var(--primary-hover,#c2410c)}
 .bc-btn-primary:disabled,.bc-btn-secondary:disabled,.bc-btn-ghost:disabled{opacity:.55;cursor:not-allowed}
-.bc-btn-secondary{display:inline-flex;align-items:center;justify-content:center;min-height:var(--admin-btn-min-h,36px);padding:var(--admin-btn-pad-y,7px) var(--admin-btn-pad-x,14px);border:1px solid #cbd5e1;border-radius:var(--radius-sm,10px);background:#fff;color:#334155!important;font-weight:600;cursor:pointer;font:inherit}
+.bc-btn-secondary{display:inline-flex;align-items:center;justify-content:center;min-height:var(--admin-btn-min-h,36px);padding:var(--admin-btn-pad-y,7px) var(--admin-btn-pad-x,14px);border:1px solid #cbd5e1;border-radius:var(--radius-sm,10px);background:#fff;color:#334155!important;font-weight:600;cursor:pointer;font:inherit;font-size:.86rem}
 .bc-btn-secondary:hover{background:#f8fafc;border-color:#94a3b8}
-.bc-btn-ghost{display:inline-flex;align-items:center;justify-content:center;min-height:var(--admin-btn-min-h,36px);padding:6px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155!important;font-weight:600;cursor:pointer;font:inherit;font-size:.86rem}
+.bc-btn-ghost{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:5px 11px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155!important;font-weight:600;cursor:pointer;font:inherit;font-size:.82rem;white-space:nowrap}
 .bc-btn-ghost:hover{background:#f1f5f9}
 .bc-btn-danger-soft{border-color:#fecaca;color:#991b1b!important;background:#fff}
 .bc-btn-danger-soft:hover{background:#fef2f2}
-.bc-section{margin-bottom:16px}
-.bc-panel{background:var(--bc-surface);border:1px solid var(--bc-border);border-radius:12px;padding:14px 16px}
-.bc-panel-title{margin:0 0 12px;font-size:1rem;font-weight:700}
-.bc-seg{display:inline-flex;flex-wrap:wrap;gap:0;margin:0 0 14px;padding:3px;background:var(--bc-soft);border:1px solid var(--bc-border);border-radius:10px}
-.bc-tab{padding:8px 16px;border:0;border-radius:8px;background:transparent;color:#475569;cursor:pointer;font-weight:600;font:inherit}
-.bc-tab:hover{color:var(--bc-ink);background:#fff}
-.bc-tab.is-active{background:#fff;color:var(--primary,#ea580c);box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.bc-link{background:none;border:0;padding:0;margin:0;color:var(--primary,#ea580c);font:inherit;font-size:.82rem;font-weight:650;text-decoration:underline;cursor:pointer;white-space:nowrap}
+.bc-link:hover{color:var(--primary-hover,#c2410c)}
+.bc-section{margin-bottom:14px}
+.bc-panel{background:var(--bc-surface);border:1px solid var(--bc-border);border-radius:12px;padding:12px 14px}
+.bc-panel-title{margin:0 0 10px;font-size:.95rem;font-weight:700}
+.bc-panel-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.bc-seg{display:inline-flex;flex-wrap:nowrap;gap:0;margin:0;padding:3px;background:var(--bc-soft);border:1px solid var(--bc-border);border-radius:999px}
+.bc-tab{padding:7px 16px;border:0;border-radius:999px;background:transparent;color:#475569;cursor:pointer;font-weight:650;font:inherit;font-size:.86rem;transition:background .15s,color .15s,box-shadow .15s}
+.bc-tab:hover{color:var(--bc-ink)}
+.bc-tab.is-active{background:#fff;color:var(--primary,#ea580c);box-shadow:0 1px 3px rgba(15,23,42,.1)}
 .bc-tab-panel{display:none}
 .bc-tab-panel.is-active{display:block}
 .bc-status-strip{display:none!important}
-.bc-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:650;line-height:1.4;border:1px solid transparent;white-space:nowrap}
+.bc-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:999px;font-size:.76rem;font-weight:650;line-height:1.4;border:1px solid transparent;white-space:nowrap}
 .bc-badge--success{background:#ecfdf5;color:var(--bc-ok);border-color:#a7f3d0}
 .bc-badge--warning{background:#fffbeb;color:var(--bc-warn);border-color:#fde68a}
 .bc-badge--failed{background:#fef2f2;color:var(--bc-bad);border-color:#fecaca}
 .bc-badge--running{background:#eff6ff;color:var(--bc-info);border-color:#bfdbfe}
 .bc-badge--muted{background:#f3f4f6;color:#4b5563;border-color:#e5e7eb}
+.bc-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 auto}
 .bc-root-warning{display:none;margin-bottom:12px;padding:12px 14px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e}
 .bc-progress{display:none;margin:0 0 12px;padding:10px 14px;border-radius:10px;background:#eff6ff;color:#1e3a8a;font-weight:600}
 .bc-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.bc-table{width:100%;border-collapse:collapse;font-size:.9rem}
-.bc-table th,.bc-table td{padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:right;vertical-align:middle}
-.bc-table th{font-size:.78rem;font-weight:700;color:var(--bc-muted);background:var(--bc-soft);white-space:nowrap}
-.bc-table tbody tr:hover{background:#fafafa}
-.bc-table .bc-col-actions{width:1%;white-space:nowrap}
-.bc-mono{font-family:ui-monospace,Consolas,monospace;font-size:.82rem;word-break:break-word}
-.bc-ts{display:inline-flex;flex-wrap:nowrap;align-items:baseline;gap:.35em;font-family:ui-monospace,Consolas,monospace;font-size:.82rem;line-height:1.45;white-space:nowrap}
+.bc-table{width:100%;border-collapse:collapse;font-size:.88rem}
+.bc-table th,.bc-table td{padding:9px 11px;border-bottom:1px solid #f1f5f9;text-align:right;vertical-align:middle}
+.bc-table th{font-size:.76rem;font-weight:700;color:var(--bc-muted);background:var(--bc-soft);white-space:nowrap}
+.bc-mono{font-family:ui-monospace,Consolas,monospace;font-size:.8rem;word-break:break-word}
+.bc-ts{display:inline-flex;flex-wrap:nowrap;align-items:baseline;gap:.35em;font-family:ui-monospace,Consolas,monospace;font-size:.8rem;line-height:1.4;white-space:nowrap}
 .bc-ts-date,.bc-ts-time{white-space:nowrap}
-.bc-ts-cell{vertical-align:middle;min-width:0}
-@media (max-width:900px){
-  .bc-ts{flex-wrap:wrap;gap:0;white-space:normal}
-  .bc-ts-date,.bc-ts-time{display:block}
-  .bc-hide-sm{display:none!important}
-  .bc-table th,.bc-table td{padding:8px 10px}
-}
-.bc-collapsible{border:1px solid var(--bc-border);border-radius:12px;background:var(--bc-surface);margin-bottom:16px}
-.bc-collapsible>summary{cursor:pointer;list-style:none;padding:14px 16px;font-weight:700;font-size:.95rem;display:flex;align-items:center;justify-content:space-between;gap:10px}
-.bc-collapsible>summary::-webkit-details-marker{display:none}
-.bc-collapsible>summary::after{content:'▾';color:var(--bc-muted);font-size:.85rem}
+@media (max-width:900px){.bc-ts{flex-wrap:wrap;gap:0;white-space:normal}.bc-ts-date,.bc-ts-time{display:block}}
+/* Accordion cards — same interaction family as Scheduled Operations */
+.bc-acc-list{display:flex;flex-direction:column;gap:8px}
+.bc-acc-item,.bc-collapsible{border:1px solid var(--bc-border);border-radius:12px;background:var(--bc-surface)}
+.bc-acc-item>summary,.bc-collapsible>summary{cursor:pointer;list-style:none;padding:12px 14px;font-weight:650;font-size:.9rem;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.bc-acc-item>summary::-webkit-details-marker,.bc-collapsible>summary::-webkit-details-marker{display:none}
+.bc-acc-chevron{display:inline-flex;width:1.1em;color:var(--bc-muted);font-size:.85rem;flex:0 0 auto}
+.bc-acc-item>summary .bc-acc-chevron::before{content:'▶'}
+.bc-acc-item[open]>summary .bc-acc-chevron::before{content:'▼'}
+.bc-collapsible>summary::after{content:'▾';color:var(--bc-muted);font-size:.85rem;margin-inline-start:auto}
 .bc-collapsible[open]>summary::after{content:'▴'}
-.bc-collapsible-body{padding:0 16px 16px;border-top:1px solid #f1f5f9}
+.bc-acc-title{font-weight:700;color:var(--bc-ink);min-width:7rem}
+.bc-acc-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1;min-width:0}
+.bc-acc-actions-inline{display:flex;align-items:center;gap:8px;margin-inline-start:auto}
+.bc-acc-body,.bc-collapsible-body{padding:0 14px 12px;border-top:1px solid #f1f5f9}
+.bc-acc-body{padding-top:10px}
+.bc-action-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.bc-action-row .bc-btn-ghost,.bc-action-row .bc-link{flex:0 0 auto}
+.bc-collapsible{margin-bottom:14px}
+.bc-collapsible>summary{justify-content:space-between}
 .bc-collapsible .card-hint{margin:10px 0 0}
+.bc-history-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid #f1f5f9}
+.bc-history-footer p{margin:0;font-size:.8rem;color:var(--bc-muted)}
 .bc-sec-nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
-.bc-sec-nav-btn{padding:7px 12px;border:1px solid var(--bc-border);border-radius:999px;background:#fff;color:#475569;font-weight:600;cursor:pointer;font:inherit;font-size:.86rem}
+.bc-sec-nav-btn{padding:7px 12px;border:1px solid var(--bc-border);border-radius:999px;background:#fff;color:#475569;font-weight:600;cursor:pointer;font:inherit;font-size:.84rem}
 .bc-sec-nav-btn.is-active{border-color:var(--primary,#ea580c);color:var(--primary,#ea580c);background:var(--primary-soft,rgba(234,88,12,.1))}
-.bc-storage{display:flex;flex-direction:column;gap:14px}
+.bc-storage{display:flex;flex-direction:column;gap:12px}
 .bc-storage-path-row{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px}
-.bc-storage-path{margin:0;font-family:ui-monospace,Consolas,monospace;font-size:.82rem;line-height:1.55;color:#334155;word-break:break-all;overflow-wrap:anywhere;max-width:100%;flex:1 1 200px;min-width:0}
+.bc-storage-path{margin:0;font-family:ui-monospace,Consolas,monospace;font-size:.8rem;line-height:1.5;color:#334155;word-break:break-all;overflow-wrap:anywhere;max-width:100%;flex:1 1 200px;min-width:0}
 .bc-storage-path--ellipsis{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .bc-storage-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
-.bc-kpi-card{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:88px;padding:12px;background:var(--bc-soft);border:1px solid var(--bc-border);border-radius:10px}
-.bc-kpi-card h4{margin:0 0 8px;font-size:.82rem;color:var(--bc-muted);font-weight:650}
-.bc-kpi-card .bc-val{font-size:1.05rem;font-weight:700;word-break:break-word;direction:ltr;unicode-bidi:isolate}
+.bc-kpi-card{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:80px;padding:10px;background:var(--bc-soft);border:1px solid var(--bc-border);border-radius:10px}
+.bc-kpi-card h4{margin:0 0 6px;font-size:.78rem;color:var(--bc-muted);font-weight:650}
+.bc-kpi-card .bc-val{font-size:1rem;font-weight:700;word-break:break-word;direction:ltr;unicode-bidi:isolate}
 @media (max-width:1024px){.bc-storage-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media (max-width:640px){.bc-storage-kpis{grid-template-columns:1fr 1fr}.bc-primary-bar{flex-direction:column;align-items:stretch}}
+@media (max-width:640px){.bc-storage-kpis{grid-template-columns:1fr 1fr}.bc-primary-bar{flex-direction:column;align-items:stretch}.bc-acc-actions-inline{width:100%;margin-inline-start:0}}
 .bc-modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:5000;padding:16px}
 .bc-modal{background:#fff;border-radius:12px;max-width:520px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
 .bc-modal h3{margin:0 0 10px}
 .bc-pre{max-height:360px;overflow:auto;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;font-size:.78rem;white-space:pre-wrap;word-break:break-word}
 .bc-drawer-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.4);display:none;z-index:5100}
 .bc-drawer{position:fixed;top:0;bottom:0;left:0;width:min(440px,94vw);background:#fff;box-shadow:8px 0 32px rgba(15,23,42,.18);z-index:5200;display:none;flex-direction:column;overflow:hidden}
-.bc-drawer.is-open,.bc-drawer-backdrop.is-open{display:flex}
+.bc-drawer.is-open{display:flex}
 .bc-drawer-backdrop.is-open{display:block}
 .bc-drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--bc-border)}
 .bc-drawer-head h3{margin:0;font-size:1.05rem}
 .bc-drawer-body{padding:16px 18px;overflow:auto;flex:1}
-.bc-drawer-group{margin-bottom:18px}
-.bc-drawer-group h4{margin:0 0 10px;font-size:.82rem;font-weight:700;color:var(--bc-muted);text-transform:none;letter-spacing:.01em}
-.bc-drawer-meta{display:grid;gap:8px;margin:0}
-.bc-drawer-meta div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:.9rem}
+.bc-drawer-group{margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #f1f5f9}
+.bc-drawer-group:last-child{border-bottom:0;margin-bottom:0;padding-bottom:0}
+.bc-drawer-group h4{margin:0 0 10px;font-size:.8rem;font-weight:700;color:var(--bc-muted)}
+.bc-drawer-meta{display:grid;gap:6px;margin:0}
+.bc-drawer-meta div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #f8fafc;font-size:.88rem}
 .bc-drawer-meta dt{margin:0;color:var(--bc-muted)}
 .bc-drawer-meta dd{margin:0;font-weight:600;text-align:left;direction:ltr;unicode-bidi:isolate;word-break:break-word}
-.bc-action-grid{display:flex;flex-wrap:wrap;gap:8px}
-.bc-action-grid .btn-link,.bc-action-grid button.btn-link,.bc-action-grid .bc-btn-ghost{margin:0}
-.bc-actions{display:flex;flex-wrap:wrap;gap:8px}
-#bc_logs_table .btn-link,#bc_storage_copy_btn{display:inline-flex;align-items:center;justify-content:center;padding:6px 12px;min-height:32px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155!important;font-weight:600;cursor:pointer;text-decoration:none}
-#bc_logs_table .btn-link:hover,#bc_storage_copy_btn:hover{background:#f1f5f9}
-.bc-adv-block{display:none;margin-top:12px;padding-top:12px;border-top:1px dashed #e2e8f0}
-.bc-adv-block.is-open{display:block}
+.bc-action-grid{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .bc-muted{color:var(--bc-muted)}
-.bc-overview-hidden{display:none!important}
+.bc-overview-hidden,.bc-sr-only-mount{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 #bc_root_health{display:none!important}
 </style>
 
@@ -142,7 +148,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     <?php /* Embedded for UI self-test + progressive disclosure fallback; JS overwrites from API when shown. */ ?>
     <div id="bc_root_warning" class="bc-root-warning" role="status" aria-live="polite">مسار النسخ الاحتياطي قابل للقراءة لكنه غير قابل للكتابة بواسطة PHP الخاص بالموقع. يمكن عرض النسخ الحالية، لكن التشغيل اليدوي متوقف حتى يتم ضبط صلاحيات المجلد.</div>
 
-    <!-- SECTION 1 — Header -->
     <header class="bc-header">
         <div class="bc-header-main">
             <p class="bc-header-kicker">Orange Enterprise Backup Center V2</p>
@@ -154,7 +159,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         </div>
     </header>
 
-    <!-- Hidden legacy root-health mount (still updated for API parity / progressive disclosure) -->
     <dl id="bc_root_health" aria-hidden="true">
         <div><dt>المسار موجود</dt><dd>…</dd></div>
         <div><dt>قابل للقراءة</dt><dd>…</dd></div>
@@ -162,7 +166,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         <div><dt>التشغيل اليدوي</dt><dd>…</dd></div>
     </dl>
 
-    <!-- SECTION 2 — Operational overview -->
+    <!-- Dashboard summary KPIs only (no history list here) -->
     <section class="bc-section" aria-label="نظرة تشغيلية">
         <div id="bc_overview" class="bc-overview" aria-live="polite">
             <article class="bc-op-card">
@@ -170,34 +174,33 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 <div class="bc-op-rows"><div class="bc-op-row"><dt>جاري التحميل…</dt><dd>—</dd></div></div>
             </article>
         </div>
-        <!-- Preserve flat overview values for engineering/advanced (filled by JS) -->
         <div id="bc_overview_flat" class="bc-overview-hidden" aria-hidden="true"></div>
     </section>
 
-    <!-- SECTION 3 — Primary actions -->
     <section class="bc-primary-bar" aria-label="إجراءات رئيسية">
         <div class="bc-primary-actions">
             <?php if ($canRun): ?>
-            <button type="button" class="bc-btn-primary" id="bc_run_full_btn" data-action="run_full">تشغيل Full Backup</button>
-            <button type="button" class="bc-btn-primary bc-btn-danger-soft" id="bc_run_countries_btn" data-action="run_countries">تشغيل All Recoverable Countries</button>
+            <button type="button" class="bc-btn-secondary" id="bc_run_full_btn" data-action="run_full">تشغيل Full Backup</button>
+            <button type="button" class="bc-btn-secondary bc-btn-danger-soft" id="bc_run_countries_btn" data-action="run_countries">تشغيل All Recoverable Countries</button>
             <?php endif; ?>
             <button type="button" class="bc-btn-secondary" id="bc_refresh_btn">تحديث البيانات</button>
         </div>
-        <p class="bc-primary-hint">عمليات التشغيل الثقيلة تتطلب تأكيداً. تأكد من صحة Backup Root قبل التشغيل اليدوي.</p>
+        <p class="bc-primary-hint">الزر البرتقالي الأساسي داخل كل نسخة هو «التفاصيل». التشغيل اليدوي يتطلب تأكيداً.</p>
     </section>
 
-    <!-- Secondary section switcher: history vs storage/logs -->
     <nav class="bc-sec-nav" aria-label="أقسام ثانوية">
-        <button type="button" class="bc-sec-nav-btn is-active" id="bc_sec_history_btn" data-bc-sec="history">سجل النسخ</button>
+        <button type="button" class="bc-sec-nav-btn is-active" id="bc_sec_history_btn" data-bc-sec="history">النسخ الأخيرة</button>
         <button type="button" class="bc-sec-nav-btn" id="bc_sec_storage_btn" data-bc-sec="storage">التخزين والسجلات</button>
     </nav>
 
     <div id="bc_sec_history" class="bc-sec-panel">
-        <!-- SECTION 4 — Backup type tabs -->
         <section class="bc-section bc-panel">
-            <div class="bc-seg" role="tablist" aria-label="نوع النسخ الاحتياطي">
-                <button type="button" class="bc-tab is-active" role="tab" id="bc_tab_full_btn" aria-controls="bc_tab_full" aria-selected="true" data-bc-tab="full">النسخ الشامل (Full)</button>
-                <button type="button" class="bc-tab" role="tab" id="bc_tab_country_btn" aria-controls="bc_tab_country" aria-selected="false" data-bc-tab="country">نسخ الدول (Country)</button>
+            <div class="bc-panel-head">
+                <h3 class="bc-panel-title" style="margin:0" id="bc_list_heading">آخر العمليات</h3>
+                <div class="bc-seg" role="tablist" aria-label="نوع النسخ الاحتياطي">
+                    <button type="button" class="bc-tab is-active" role="tab" id="bc_tab_full_btn" aria-controls="bc_tab_full" aria-selected="true" data-bc-tab="full">Full Backup</button>
+                    <button type="button" class="bc-tab" role="tab" id="bc_tab_country_btn" aria-controls="bc_tab_country" aria-selected="false" data-bc-tab="country">Country Backup</button>
+                </div>
             </div>
 
             <div id="bc_tab_full" class="bc-tab-panel is-active" role="tabpanel" aria-labelledby="bc_tab_full_btn">
@@ -207,21 +210,14 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                     <div><dt>Schema</dt><dd>…</dd></div>
                     <div><dt>DRV Score</dt><dd>…</dd></div>
                 </dl>
-                <div class="bc-table-wrap">
-                    <table class="bc-table" id="bc_full_table">
-                        <thead>
-                            <tr>
-                                <th>التاريخ والوقت</th>
-                                <th>الحالة</th>
-                                <th>قابلية الاستخدام</th>
-                                <th>Schema</th>
-                                <th class="bc-hide-sm">الحجم</th>
-                                <th>DRV</th>
-                                <th class="bc-col-actions">التفاصيل</th>
-                            </tr>
-                        </thead>
-                        <tbody><tr><td colspan="7" class="bc-muted">…</td></tr></tbody>
-                    </table>
+                <!-- Dashboard: last 5 only -->
+                <div id="bc_full_recent" class="bc-acc-list" data-bc-mode="recent"></div>
+                <!-- Full archive: shown only after View Full History -->
+                <div id="bc_full_history" class="bc-acc-list" data-bc-mode="archive" hidden></div>
+                <div class="bc-history-footer">
+                    <p id="bc_full_list_hint">عرض آخر 5 عمليات Full Backup</p>
+                    <button type="button" class="bc-btn-secondary" id="bc_view_full_history_btn" data-bc-history-type="full">عرض السجل الكامل / View Full History</button>
+                    <button type="button" class="bc-btn-secondary" id="bc_back_recent_full_btn" data-bc-history-type="full" hidden>العودة لآخر العمليات</button>
                 </div>
             </div>
 
@@ -229,39 +225,34 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 <dl id="bc_country_discovery" class="bc-status-strip" aria-hidden="true">
                     <div><dt>دول قابلة للاسترداد</dt><dd>…</dd></div>
                     <div><dt>آخر Country Batch</dt><dd>…</dd></div>
-                    <div><dt>حزم مسجّلة</dt><dd>…</dd></div>
+                    <div><dt>حزم الدول المخزّنة</dt><dd>…</dd></div>
                 </dl>
-                <div class="bc-table-wrap">
-                    <table class="bc-table" id="bc_country_table">
-                        <thead>
-                            <tr>
-                                <th>الدولة</th>
-                                <th>التاريخ والوقت</th>
-                                <th class="bc-hide-sm">معرّف الحزمة</th>
-                                <th>الحالة</th>
-                                <th>قابلية الاستخدام</th>
-                                <th>Schema</th>
-                                <th>DRV</th>
-                                <th class="bc-col-actions">التفاصيل</th>
-                            </tr>
-                        </thead>
-                        <tbody><tr><td colspan="8" class="bc-muted">…</td></tr></tbody>
-                    </table>
+                <div id="bc_country_recent" class="bc-acc-list" data-bc-mode="recent"></div>
+                <div id="bc_country_history" class="bc-acc-list" data-bc-mode="archive" hidden></div>
+                <div class="bc-history-footer">
+                    <p id="bc_country_list_hint">عرض آخر 5 حزم Country Backup</p>
+                    <button type="button" class="bc-btn-secondary" id="bc_view_country_history_btn" data-bc-history-type="country">عرض السجل الكامل / View Full History</button>
+                    <button type="button" class="bc-btn-secondary" id="bc_back_recent_country_btn" data-bc-history-type="country" hidden>العودة لآخر العمليات</button>
                 </div>
+            </div>
+
+            <!-- Hidden legacy table mounts (still filled; progressive disclosure / no capability loss) -->
+            <div class="bc-sr-only-mount" aria-hidden="true">
+                <table id="bc_full_table"><thead><tr><th>الوقت</th><th>الحالة</th><th>Schema</th><th>Backend</th><th>Dump</th><th>Uploads</th><th>DRV</th><th>إجراءات</th></tr></thead><tbody></tbody></table>
+                <table id="bc_country_table"><thead><tr><th>الدولة</th><th>الوقت</th><th>الحزمة</th><th>الحالة</th><th>Schema</th><th>Registry</th><th>DRV</th><th>إجراءات</th></tr></thead><tbody></tbody></table>
             </div>
         </section>
     </div>
 
     <div id="bc_sec_storage" class="bc-sec-panel" hidden>
-        <!-- SECTION 10 — Storage and logs -->
         <section class="bc-section bc-panel">
             <h3 class="bc-panel-title">التخزين والاحتفاظ</h3>
             <div class="bc-storage" id="bc_storage">
                 <div>
-                    <h4 style="margin:0 0 8px;font-size:.9rem;">Backup Root</h4>
+                    <h4 style="margin:0 0 8px;font-size:.88rem;">Backup Root</h4>
                     <div class="bc-storage-path-row">
                         <p id="bc_storage_path" class="bc-storage-path" title="">—</p>
-                        <button type="button" class="btn-link bc-storage-copy" id="bc_storage_copy_btn" hidden>نسخ المسار</button>
+                        <button type="button" class="btn-link bc-btn-ghost bc-storage-copy" id="bc_storage_copy_btn" hidden>نسخ المسار</button>
                     </div>
                 </div>
                 <div class="bc-storage-kpis" id="bc_storage_kpis">
@@ -281,7 +272,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         </section>
     </div>
 
-    <!-- SECTION 9 — Scheduled tasks (collapsed) -->
     <details class="bc-collapsible" id="bc_schedule_details">
         <summary>
             <span>المهام المجدولة / Scheduled Operations</span>
@@ -298,7 +288,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     </details>
 </div>
 
-<!-- SECTION 6/7 — Details drawer -->
 <div id="bc_drawer_backdrop" class="bc-drawer-backdrop" aria-hidden="true"></div>
 <aside id="bc_details_drawer" class="bc-drawer" role="dialog" aria-modal="true" aria-labelledby="bc_drawer_title" aria-hidden="true">
     <div class="bc-drawer-head">
@@ -336,8 +325,15 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     const CSRF = <?php echo json_encode($csrfToken, JSON_UNESCAPED_UNICODE); ?>;
     const CAN_RUN = <?php echo $canRun ? 'true' : 'false'; ?>;
     const CAN_VERIFY = <?php echo $canVerify ? 'true' : 'false'; ?>;
+    const RECENT_LIMIT = 5;
 
-    let state = { full: [], country: [], busy: false, pendingAction: null };
+    let state = {
+        full: [],
+        country: [],
+        busy: false,
+        pendingAction: null,
+        archiveMode: { full: false, country: false }
+    };
     let manualActionsAvailable = true;
     let recoveryCheckRequiresWrite = true;
     let rootHealthWarning = '';
@@ -365,6 +361,11 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         const timePart = m[2] + (offset ? ' ' + offset : '');
         return '<time class="bc-ts" datetime="' + esc(s) + '" title="' + esc(s) + '"><span class="bc-ts-date">' + esc(m[1]) + '</span><span class="bc-ts-time">' + esc(timePart) + '</span></time>';
     };
+    const fmtDateOnly = (raw) => {
+        const s = String(raw || '').trim();
+        const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+        return m ? m[1] : (s || '—');
+    };
     const statusTone = (status) => {
         const s = String(status || '').toLowerCase();
         if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'ok' || s === 'ready') return 'success';
@@ -377,25 +378,24 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         const tone = statusTone(status);
         return '<span class="bc-badge bc-badge--' + tone + '">' + esc(status || '—') + '</span>';
     };
-    /** Recoverability label from existing package_status only — no new calculation. */
-    const recoverabilityBadge = (status) => {
+    /** Recoverability from existing package_status / healthy flag only — no new calculation. */
+    const recoverabilityBadge = (pkg) => {
+        const status = pkg && typeof pkg === 'object' ? (pkg.package_status || '') : pkg;
+        const healthyFlag = pkg && typeof pkg === 'object' ? pkg.healthy : undefined;
         const s = String(status || '').toLowerCase();
-        let label = '—';
-        let tone = 'muted';
-        if (s === 'healthy' || s === 'success' || s === 'pass') {
-            label = 'قابل للاستخدام';
-            tone = 'success';
-        } else if (s === 'warning' || s === 'warn') {
-            label = 'يحتاج مراجعة';
-            tone = 'warning';
-        } else if (s === 'failed' || s === 'fail' || s === 'error') {
-            label = 'غير سليم';
-            tone = 'failed';
-        } else if (status) {
-            label = String(status);
-            tone = statusTone(status);
+        if (healthyFlag === true || s === 'healthy' || s === 'success' || s === 'pass') {
+            return '<span class="bc-badge bc-badge--success" title="Recoverable"><span class="bc-dot" aria-hidden="true"></span>Recoverable</span>';
         }
-        return '<span class="bc-badge bc-badge--' + tone + '">' + esc(label) + '</span>';
+        if (s === 'warning' || s === 'warn') {
+            return '<span class="bc-badge bc-badge--warning"><span class="bc-dot" aria-hidden="true"></span>يحتاج مراجعة</span>';
+        }
+        if (s === 'failed' || s === 'fail' || s === 'error' || healthyFlag === false) {
+            return '<span class="bc-badge bc-badge--failed"><span class="bc-dot" aria-hidden="true"></span>غير سليم</span>';
+        }
+        if (status) {
+            return '<span class="bc-badge bc-badge--' + statusTone(status) + '">' + esc(String(status)) + '</span>';
+        }
+        return '<span class="bc-badge bc-badge--muted">—</span>';
     };
     const showAlert = (msg, ok) => {
         const box = el('bc_alert');
@@ -411,9 +411,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         const runDisabled = !manualActionsAvailable || state.busy;
         ['bc_run_full_btn', 'bc_run_countries_btn'].forEach((id) => {
             const b = el(id);
-            if (!b) {
-                return;
-            }
+            if (!b) return;
             b.disabled = runDisabled;
             if (!manualActionsAvailable) {
                 b.title = rootHealthWarning || 'التشغيل اليدوي غير متاح';
@@ -421,9 +419,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 b.removeAttribute('title');
             }
         });
-        if (el('bc_refresh_btn')) {
-            el('bc_refresh_btn').disabled = state.busy;
-        }
+        if (el('bc_refresh_btn')) el('bc_refresh_btn').disabled = state.busy;
         document.querySelectorAll('.bc-drv').forEach((btn) => {
             if (recoveryCheckRequiresWrite && !manualActionsAvailable) {
                 btn.disabled = true;
@@ -481,7 +477,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         } else if (root === 'warning' || lastSt === 'warning' || lastSt === 'warn' || !manualActionsAvailable) {
             label = 'يحتاج مراجعة';
             tone = 'warning';
-        } else if (root === 'healthy' || root === 'ok' || lastSt === 'healthy' || lastSt === 'success' || lastSt === 'pass') {
+        } else if (root === 'healthy' || root === 'ok' || root === 'writable' || lastSt === 'healthy' || lastSt === 'success' || lastSt === 'pass') {
             label = 'سليم';
             tone = 'success';
         } else if (root || last.package_status) {
@@ -536,11 +532,11 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         const last = ov.last_successful_full || ov.latest_full || {};
         const latestFull = (o.full_snapshots && o.full_snapshots[0]) ? o.full_snapshots[0] : last;
         const countryBatch = ov.latest_country_batch || {};
-        const countryCount = Array.isArray(o.country_packages) ? o.country_packages.length : 0;
+        // FC-01 Case B: length = stored country package files (not unique countries)
+        const storedCountryPackages = Array.isArray(o.country_packages) ? o.country_packages.length : 0;
         const st = ov.storage || {};
         const h = lastRootHealth || o.backup_root_health || {};
 
-        // Flat legacy values preserved (engineering / progressive disclosure)
         const flatCards = [
             ['آخر Full ناجح', fmtTimestampDisplay(last.generated_at)],
             ['حالة Full الأخير', esc(last.package_status || '—')],
@@ -578,7 +574,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 rowHtml('حالة Full الأخير', badge(last.package_status), true) +
                 rowHtml('آخر Country Batch', fmtTimestampDisplay(countryBatch.generated_at)) +
                 rowHtml('دول قابلة للاسترداد', esc(String(ov.recoverable_countries ?? '—')), true) +
-                rowHtml('حزم دول مسجّلة', esc(String(countryCount)), true) +
+                rowHtml('حزم الدول المخزّنة / Stored Country Packages', esc(String(storedCountryPackages)), true) +
                 rowHtml('DRV Score', esc(String(ov.latest_recovery_score ?? 0))) +
             '</div></article>' +
             '<article class="bc-op-card"><h3>التخزين والاحتفاظ</h3><div class="bc-op-rows">' +
@@ -597,7 +593,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         el('bc_country_discovery').innerHTML =
             '<div><dt>دول قابلة للاسترداد</dt><dd>' + esc(String(ov.recoverable_countries ?? '—')) + '</dd></div>' +
             '<div><dt>آخر Country Batch</dt><dd>' + (fmtTimestampDisplay(countryBatch.generated_at)) + '</dd></div>' +
-            '<div><dt>حزم مسجّلة</dt><dd>' + countryCount + '</dd></div>';
+            '<div><dt>حزم الدول المخزّنة</dt><dd>' + storedCountryPackages + '</dd></div>';
 
         const rootPath = ov.backup_root || '—';
         const pathEl = el('bc_storage_path');
@@ -607,9 +603,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             pathEl.title = rootPath !== '—' ? rootPath : '';
             pathEl.classList.toggle('bc-storage-path--ellipsis', rootPath.length > 96);
         }
-        if (copyBtn) {
-            copyBtn.hidden = !rootPath || rootPath === '—';
-        }
+        if (copyBtn) copyBtn.hidden = !rootPath || rootPath === '—';
         const retentionRaw = ov.retention_days;
         const retentionLabel = retentionRaw !== undefined && retentionRaw !== null && retentionRaw !== ''
             ? String(retentionRaw) + ' يوم'
@@ -630,21 +624,38 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         ).join('');
     }
 
-    function actionButtons(pkg, type) {
+    function viewFileControl(type, id, cc, file, label, asLink) {
+        const cls = asLink ? 'bc-link bc-view-file' : 'bc-btn-ghost bc-view-file';
+        const tag = asLink ? 'a' : 'button';
+        const extra = asLink ? ' href="#"' : ' type="button"';
+        return '<' + tag + extra + ' class="' + cls + '" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '" data-file="' + esc(file) + '">' + esc(label) + '</' + tag + '>';
+    }
+
+    /** Expanded action row — buttons hidden until accordion opens. */
+    function actionRowHtml(pkg, type) {
         const id = pkg.package_id;
         const cc = pkg.country_code || '';
-        let html = '';
-        const viewFiles = type === 'full_disaster' || type === 'full'
-            ? [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['recovery_validation.json', 'DRV Report']]
-            : [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['dependency_graph.json', 'Graph'], ['table_inventory.json', 'Inventory'], ['country_verify_report.json', 'Verify'], ['country_recovery_validation.json', 'Country DRV']];
-        viewFiles.forEach(([file, label]) => {
-            html += '<button type="button" class="btn-link bc-btn-ghost bc-view-file" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '" data-file="' + esc(file) + '">' + label + '</button> ';
-        });
+        const isFull = type === 'full_disaster' || type === 'full';
+        let html = viewFileControl(type, id, cc, 'manifest.json', 'Manifest', true);
+        html += viewFileControl(type, id, cc, 'health.json', 'Health', false);
+        if (isFull) {
+            html += viewFileControl(type, id, cc, 'recovery_validation.json', 'DRV Report', false);
+        } else {
+            html += viewFileControl(type, id, cc, 'table_inventory.json', 'Inventory', false);
+            html += viewFileControl(type, id, cc, 'dependency_graph.json', 'Graph', false);
+            html += viewFileControl(type, id, cc, 'country_verify_report.json', 'Verify Report', false);
+            html += viewFileControl(type, id, cc, 'country_recovery_validation.json', 'Country DRV', false);
+        }
         if (CAN_VERIFY) {
-            html += '<button type="button" class="btn-link bc-btn-ghost bc-verify" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">Verify</button> ';
-            html += '<button type="button" class="btn-link bc-btn-ghost bc-drv" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">DRV</button>';
+            html += '<button type="button" class="bc-btn-ghost bc-verify" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">Verify</button>';
+            html += '<button type="button" class="bc-btn-ghost bc-drv" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">DRV</button>';
         }
         return html;
+    }
+
+    /** Legacy flat action buttons (hidden table mounts — capability preservation). */
+    function actionButtons(pkg, type) {
+        return actionRowHtml(pkg, type);
     }
 
     function sizeSummary(pkg) {
@@ -655,6 +666,80 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         if (dump > 0) return fmtBytes(dump);
         if (uploads > 0) return fmtBytes(uploads);
         return '—';
+    }
+
+    function accordionItemHtml(pkg, type, idx) {
+        const isFull = type === 'full_disaster';
+        const title = isFull
+            ? 'Full Backup'
+            : ('Country Backup' + (pkg.country_code ? ' — ' + pkg.country_code : ''));
+        const statusLabel = pkg.package_status || '—';
+        return (
+            '<details class="bc-acc-item" data-bc-acc="1">' +
+            '<summary>' +
+                '<span class="bc-acc-chevron" aria-hidden="true"></span>' +
+                '<span class="bc-acc-title">' + esc(title) + '</span>' +
+                '<span class="bc-acc-meta">' +
+                    '<span class="bc-mono" dir="ltr">' + esc(fmtDateOnly(pkg.generated_at)) + '</span>' +
+                    badge(statusLabel) +
+                    recoverabilityBadge(pkg) +
+                '</span>' +
+                '<span class="bc-acc-actions-inline">' +
+                    '<button type="button" class="bc-btn-primary bc-open-details" data-idx="' + idx + '" data-type="' + esc(type) + '">التفاصيل</button>' +
+                '</span>' +
+            '</summary>' +
+            '<div class="bc-acc-body">' +
+                '<div class="bc-action-row">' + actionRowHtml(pkg, type) + '</div>' +
+            '</div>' +
+            '</details>'
+        );
+    }
+
+    function renderAccordionList(container, list, type, limit) {
+        if (!container) return;
+        const items = typeof limit === 'number' ? list.slice(0, limit) : list;
+        if (!items.length) {
+            container.innerHTML = '<p class="bc-muted" style="margin:0;padding:8px 0;">لا توجد عناصر.</p>';
+            return;
+        }
+        // Map back to original index for Details / actions
+        container.innerHTML = items.map((p) => {
+            const idx = list.indexOf(p);
+            return accordionItemHtml(p, type, idx);
+        }).join('');
+    }
+
+    function syncHistoryModeUi(kind) {
+        const isArchive = !!state.archiveMode[kind];
+        if (kind === 'full') {
+            el('bc_full_recent').hidden = isArchive;
+            el('bc_full_history').hidden = !isArchive;
+            el('bc_view_full_history_btn').hidden = isArchive;
+            el('bc_back_recent_full_btn').hidden = !isArchive;
+            el('bc_full_list_hint').textContent = isArchive
+                ? ('السجل الكامل: ' + state.full.length + ' عملية')
+                : 'عرض آخر 5 عمليات Full Backup';
+        } else {
+            el('bc_country_recent').hidden = isArchive;
+            el('bc_country_history').hidden = !isArchive;
+            el('bc_view_country_history_btn').hidden = isArchive;
+            el('bc_back_recent_country_btn').hidden = !isArchive;
+            el('bc_country_list_hint').textContent = isArchive
+                ? ('السجل الكامل: ' + state.country.length + ' حزمة')
+                : 'عرض آخر 5 حزم Country Backup';
+        }
+        const heading = el('bc_list_heading');
+        if (heading) {
+            const anyArchive = state.archiveMode.full || state.archiveMode.country;
+            heading.textContent = anyArchive ? 'السجل الكامل / Full History' : 'آخر العمليات';
+        }
+    }
+
+    function setArchiveMode(kind, on) {
+        state.archiveMode[kind] = !!on;
+        syncHistoryModeUi(kind);
+        // Collapse all accordion items when switching modes
+        document.querySelectorAll('.bc-acc-item[open]').forEach((d) => { d.open = false; });
     }
 
     function closeDrawer() {
@@ -672,49 +757,56 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 
     function openDetails(pkg, type) {
         const isFull = type === 'full_disaster';
-        const title = isFull ? 'تفاصيل Full Backup' : 'تفاصيل Country Package';
-        el('bc_drawer_title').textContent = title;
+        el('bc_drawer_title').textContent = isFull ? 'تفاصيل Full Backup' : 'تفاصيل Country Package';
         el('bc_drawer_sub').textContent = pkg.package_id || '';
-        const validationFiles = isFull
-            ? [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['recovery_validation.json', 'DRV Report']]
-            : [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['dependency_graph.json', 'Graph'], ['table_inventory.json', 'Inventory'], ['country_verify_report.json', 'Verify'], ['country_recovery_validation.json', 'Country DRV']];
-        let validationHtml = '';
-        validationFiles.forEach(([file, label]) => {
-            validationHtml += '<button type="button" class="btn-link bc-btn-ghost bc-view-file" data-type="' + esc(type) + '" data-id="' + esc(pkg.package_id) + '" data-cc="' + esc(pkg.country_code || '') + '" data-file="' + esc(file) + '">' + label + '</button>';
-        });
-        let runHtml = '';
+        const id = pkg.package_id;
+        const cc = pkg.country_code || '';
+
+        let validationHtml = viewFileControl(type, id, cc, 'health.json', 'Health', false);
         if (CAN_VERIFY) {
-            runHtml += '<button type="button" class="btn-link bc-btn-ghost bc-verify" data-type="' + esc(type) + '" data-id="' + esc(pkg.package_id) + '" data-cc="' + esc(pkg.country_code || '') + '">Verify</button>';
-            runHtml += '<button type="button" class="btn-link bc-btn-ghost bc-drv" data-type="' + esc(type) + '" data-id="' + esc(pkg.package_id) + '" data-cc="' + esc(pkg.country_code || '') + '">DRV</button>';
+            validationHtml += '<button type="button" class="bc-btn-ghost bc-verify" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">Verify</button>';
+            validationHtml += '<button type="button" class="bc-btn-ghost bc-drv" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">DRV</button>';
+        }
+
+        let diagnosticsHtml = viewFileControl(type, id, cc, 'manifest.json', 'Manifest', true);
+        if (isFull) {
+            diagnosticsHtml += viewFileControl(type, id, cc, 'recovery_validation.json', 'DRV Report', false);
+        } else {
+            diagnosticsHtml += viewFileControl(type, id, cc, 'dependency_graph.json', 'Graph', false);
+            diagnosticsHtml += viewFileControl(type, id, cc, 'table_inventory.json', 'Inventory', false);
+            diagnosticsHtml += viewFileControl(type, id, cc, 'country_verify_report.json', 'Verify Report', false);
+            diagnosticsHtml += viewFileControl(type, id, cc, 'country_recovery_validation.json', 'Country DRV', false);
         }
 
         el('bc_drawer_body').innerHTML =
-            '<div class="bc-drawer-group"><h4>الملخص / SUMMARY</h4><dl class="bc-drawer-meta">' +
+            '<div class="bc-drawer-group"><h4>Summary</h4><dl class="bc-drawer-meta">' +
                 '<div><dt>التاريخ</dt><dd>' + fmtTimestampDisplay(pkg.generated_at) + '</dd></div>' +
                 '<div><dt>النوع</dt><dd>' + esc(isFull ? 'full_disaster' : 'country_recovery') + '</dd></div>' +
                 (isFull ? '' : '<div><dt>الدولة</dt><dd>' + esc((pkg.country_code || '') + (pkg.country_name ? ' — ' + pkg.country_name : '')) + '</dd></div>') +
                 '<div><dt>الحالة</dt><dd>' + badge(pkg.package_status) + '</dd></div>' +
-                '<div><dt>قابلية الاستخدام</dt><dd>' + recoverabilityBadge(pkg.package_status) + '</dd></div>' +
+                '<div><dt>Recoverable</dt><dd>' + recoverabilityBadge(pkg) + '</dd></div>' +
                 '<div><dt>Schema</dt><dd>' + esc(String(pkg.schema_revision ?? '—')) + '</dd></div>' +
                 '<div><dt>Backend</dt><dd>' + esc(pkg.backend || '—') + '</dd></div>' +
-                '<div><dt>Dump</dt><dd>' + esc(fmtBytes(pkg.dump_size_bytes)) + '</dd></div>' +
-                '<div><dt>Uploads</dt><dd>' + esc(fmtBytes(pkg.uploads_size_bytes)) + '</dd></div>' +
                 '<div><dt>DRV Score</dt><dd>' + esc(String(pkg.recovery_score || 0)) + '</dd></div>' +
                 '<div><dt>Registry</dt><dd>' + esc(pkg.registry_version || '—') + '</dd></div>' +
                 '<div><dt>Package ID</dt><dd class="bc-mono">' + esc(pkg.package_id || '—') + '</dd></div>' +
             '</dl></div>' +
-            '<div class="bc-drawer-group"><h4>التحقق والصحة / VALIDATION &amp; HEALTH</h4>' +
-                '<div class="bc-action-grid">' + validationHtml + runHtml + '</div></div>' +
-            '<div class="bc-drawer-group"><h4>ملفات وتقني / FILES &amp; TECHNICAL</h4>' +
-                '<p class="bc-muted" style="margin:0 0 8px;font-size:.82rem;">عرض الملفات التقنية عبر الأزرار أعلاه (Manifest / Health / Graph / Inventory / Reports).</p>' +
-                '<dl class="bc-drawer-meta">' +
-                '<div><dt>Dump size</dt><dd>' + esc(fmtBytes(pkg.dump_size_bytes)) + '</dd></div>' +
-                '<div><dt>Uploads size</dt><dd>' + esc(fmtBytes(pkg.uploads_size_bytes)) + '</dd></div>' +
-                '<div><dt>Backend</dt><dd>' + esc(pkg.backend || '—') + '</dd></div>' +
-                '<div><dt>Registry</dt><dd>' + esc(pkg.registry_version || '—') + '</dd></div>' +
-                '</dl></div>' +
-            '<div class="bc-drawer-group"><h4>سجلات وتدقيق / LOGS &amp; AUDIT</h4>' +
-                '<p class="bc-muted" style="margin:0;font-size:.82rem;">تقارير DRV/Verify تُعرض من أزرار Validation. سجلات النظام من قسم «التخزين والسجلات».</p></div>';
+            '<div class="bc-drawer-group"><h4>Validation</h4>' +
+                '<div class="bc-action-grid">' + validationHtml + '</div></div>' +
+            '<div class="bc-drawer-group"><h4>Diagnostics</h4>' +
+                '<div class="bc-action-grid">' + diagnosticsHtml + '</div></div>' +
+            '<div class="bc-drawer-group"><h4>Storage</h4><dl class="bc-drawer-meta">' +
+                '<div><dt>Dump</dt><dd>' + esc(fmtBytes(pkg.dump_size_bytes)) + '</dd></div>' +
+                '<div><dt>Uploads</dt><dd>' + esc(fmtBytes(pkg.uploads_size_bytes)) + '</dd></div>' +
+                '<div><dt>Total</dt><dd>' + esc(sizeSummary(pkg)) + '</dd></div>' +
+            '</dl></div>' +
+            '<div class="bc-drawer-group"><h4>Logs</h4>' +
+                '<p class="bc-muted" style="margin:0 0 8px;font-size:.82rem;">تقارير التحقق تظهر عبر Diagnostics. سجلات النظام من قسم «التخزين والسجلات».</p>' +
+                '<div class="bc-action-grid">' +
+                (isFull
+                    ? viewFileControl(type, id, cc, 'recovery_validation.json', 'DRV Report', false)
+                    : viewFileControl(type, id, cc, 'country_recovery_validation.json', 'Country DRV', false)) +
+                '</div></div>';
 
         el('bc_details_drawer').classList.add('is-open');
         el('bc_details_drawer').setAttribute('aria-hidden', 'false');
@@ -726,35 +818,40 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     function renderTables(data) {
         state.full = data.full_snapshots || [];
         state.country = data.country_packages || [];
+
+        renderAccordionList(el('bc_full_recent'), state.full, 'full_disaster', RECENT_LIMIT);
+        renderAccordionList(el('bc_full_history'), state.full, 'full_disaster', null);
+        renderAccordionList(el('bc_country_recent'), state.country, 'country_recovery', RECENT_LIMIT);
+        renderAccordionList(el('bc_country_history'), state.country, 'country_recovery', null);
+        syncHistoryModeUi('full');
+        syncHistoryModeUi('country');
+
+        // Hidden legacy tables — full data + all actions preserved
         el('bc_full_table').querySelector('tbody').innerHTML = state.full.length
             ? state.full.map((p, idx) =>
-                '<tr data-bc-pkg-idx="' + idx + '" data-bc-pkg-type="full_disaster">' +
-                '<td class="bc-ts-cell">' + fmtTimestampDisplay(p.generated_at) + '</td>' +
-                '<td>' + badge(p.package_status) + '</td>' +
-                '<td>' + recoverabilityBadge(p.package_status) + '</td>' +
-                '<td>' + esc(String(p.schema_revision ?? '—')) + '</td>' +
-                '<td class="bc-hide-sm" dir="ltr">' + esc(sizeSummary(p)) + '</td>' +
-                '<td dir="ltr">' + esc(String(p.recovery_score || 0)) + '</td>' +
-                '<td class="bc-col-actions"><button type="button" class="bc-btn-ghost bc-open-details" data-idx="' + idx + '" data-type="full_disaster">التفاصيل</button>' +
-                '<span class="bc-actions" hidden aria-hidden="true">' + actionButtons(p, 'full_disaster') + '</span></td></tr>'
+                '<tr><td>' + fmtTimestampDisplay(p.generated_at) + '</td><td>' + badge(p.package_status) + '</td><td>' +
+                esc(String(p.schema_revision ?? '')) + '</td><td>' + esc(p.backend || '') + '</td><td>' +
+                esc(fmtBytes(p.dump_size_bytes)) + '</td><td>' + esc(fmtBytes(p.uploads_size_bytes)) + '</td><td>' +
+                esc(String(p.recovery_score || 0)) + '</td><td class="bc-actions">' + actionButtons(p, 'full_disaster') +
+                ' <button type="button" class="bc-btn-primary bc-open-details" data-idx="' + idx + '" data-type="full_disaster">التفاصيل</button></td></tr>'
             ).join('')
-            : '<tr><td colspan="7" class="bc-muted">لا توجد لقطات.</td></tr>';
+            : '<tr><td colspan="8" class="bc-muted">لا توجد لقطات.</td></tr>';
         el('bc_country_table').querySelector('tbody').innerHTML = state.country.length
             ? state.country.map((p, idx) =>
-                '<tr data-bc-pkg-idx="' + idx + '" data-bc-pkg-type="country_recovery">' +
-                '<td>' + esc((p.country_code || '') + (p.country_name ? ' — ' + p.country_name : '')) + '</td>' +
-                '<td class="bc-ts-cell">' + fmtTimestampDisplay(p.generated_at) + '</td>' +
-                '<td class="bc-hide-sm bc-mono">' + esc(p.package_id || '') + '</td>' +
-                '<td>' + badge(p.package_status) + '</td>' +
-                '<td>' + recoverabilityBadge(p.package_status) + '</td>' +
-                '<td>' + esc(String(p.schema_revision ?? '—')) + '</td>' +
-                '<td dir="ltr">' + esc(String(p.recovery_score || 0)) + '</td>' +
-                '<td class="bc-col-actions"><button type="button" class="bc-btn-ghost bc-open-details" data-idx="' + idx + '" data-type="country_recovery">التفاصيل</button>' +
-                '<span class="bc-actions" hidden aria-hidden="true">' + actionButtons(p, 'country_recovery') + '</span></td></tr>'
+                '<tr><td>' + esc((p.country_code || '') + (p.country_name ? ' — ' + p.country_name : '')) +
+                '</td><td>' + fmtTimestampDisplay(p.generated_at) + '</td><td>' + esc(p.package_id || '') +
+                '</td><td>' + badge(p.package_status) + '</td><td>' + esc(String(p.schema_revision ?? '')) +
+                '</td><td>' + esc(p.registry_version || '') + '</td><td>' + esc(String(p.recovery_score || 0)) +
+                '</td><td class="bc-actions">' + actionButtons(p, 'country_recovery') +
+                ' <button type="button" class="bc-btn-primary bc-open-details" data-idx="' + idx + '" data-type="country_recovery">التفاصيل</button></td></tr>'
             ).join('')
             : '<tr><td colspan="8" class="bc-muted">لا توجد حزم دول.</td></tr>';
+
         el('bc_logs_table').querySelector('tbody').innerHTML = (data.logs || []).map((log) =>
-            '<tr><td><code class="bc-mono">' + esc(log.name) + '</code></td><td>' + esc(log.category) + '</td><td dir="ltr">' + esc(fmtBytes(log.size_bytes)) + '</td><td class="bc-ts-cell">' + fmtTimestampDisplay(new Date(log.mtime * 1000).toISOString()) + '</td><td><button type="button" class="btn-link bc-log-tail" data-log="' + esc(log.name) + '">عرض</button></td></tr>'
+            '<tr><td><code class="bc-mono">' + esc(log.name) + '</code></td><td>' + esc(log.category) +
+            '</td><td dir="ltr">' + esc(fmtBytes(log.size_bytes)) + '</td><td>' +
+            fmtTimestampDisplay(new Date(log.mtime * 1000).toISOString()) +
+            '</td><td><button type="button" class="bc-btn-ghost bc-log-tail" data-log="' + esc(log.name) + '">عرض</button></td></tr>'
         ).join('');
         applyActionAvailability();
     }
@@ -798,16 +895,18 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     el('bc_view_close').addEventListener('click', () => { el('bc_view_modal').style.display = 'none'; });
     el('bc_drawer_close').addEventListener('click', closeDrawer);
     el('bc_drawer_backdrop').addEventListener('click', closeDrawer);
-
     el('bc_refresh_btn').addEventListener('click', loadAll);
+
+    el('bc_view_full_history_btn').addEventListener('click', () => setArchiveMode('full', true));
+    el('bc_back_recent_full_btn').addEventListener('click', () => setArchiveMode('full', false));
+    el('bc_view_country_history_btn').addEventListener('click', () => setArchiveMode('country', true));
+    el('bc_back_recent_country_btn').addEventListener('click', () => setArchiveMode('country', false));
 
     const storageCopyBtn = el('bc_storage_copy_btn');
     if (storageCopyBtn) {
         storageCopyBtn.addEventListener('click', async () => {
             const path = el('bc_storage_path')?.textContent?.trim() || '';
-            if (!path || path === '—') {
-                return;
-            }
+            if (!path || path === '—') return;
             const prevLabel = storageCopyBtn.textContent;
             try {
                 if (navigator.clipboard?.writeText) {
@@ -861,32 +960,54 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         ));
     }
 
+    // BC-02: only one backup accordion open at a time
+    document.body.addEventListener('toggle', (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLDetailsElement) || !t.classList.contains('bc-acc-item')) return;
+        if (!t.open) return;
+        document.querySelectorAll('details.bc-acc-item[open]').forEach((other) => {
+            if (other !== t) other.open = false;
+        });
+    }, true);
+
     document.body.addEventListener('click', async (ev) => {
         const t = ev.target;
         if (!(t instanceof HTMLElement)) return;
 
-        if (t.classList.contains('bc-open-details')) {
-            const idx = Number(t.dataset.idx);
-            const type = t.dataset.type || 'full_disaster';
-            const pkg = type === 'full_disaster' ? state.full[idx] : state.country[idx];
-            if (pkg) openDetails(pkg, type);
-            return;
+        // Keep Details / action clicks from toggling the accordion unexpectedly
+        if (t.closest('.bc-open-details') || t.closest('.bc-action-row') || t.closest('.bc-acc-actions-inline')) {
+            if (t.classList.contains('bc-open-details') || t.closest('.bc-open-details')) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const btn = t.classList.contains('bc-open-details') ? t : t.closest('.bc-open-details');
+                const idx = Number(btn.dataset.idx);
+                const type = btn.dataset.type || 'full_disaster';
+                const pkg = type === 'full_disaster' ? state.full[idx] : state.country[idx];
+                if (pkg) openDetails(pkg, type);
+                return;
+            }
+            if (t.closest('.bc-acc-actions-inline') && !t.classList.contains('bc-open-details')) {
+                ev.stopPropagation();
+            }
         }
 
-        if (t.classList.contains('bc-view-file')) {
+        if (t.classList.contains('bc-view-file') || (t.closest && t.closest('.bc-view-file'))) {
+            const btn = t.classList.contains('bc-view-file') ? t : t.closest('.bc-view-file');
+            ev.preventDefault();
             const q = new URLSearchParams({
                 action: 'view_file',
-                package_type: t.dataset.type || '',
-                package_id: t.dataset.id || '',
-                country_code: t.dataset.cc || '',
-                file: t.dataset.file || ''
+                package_type: btn.dataset.type || '',
+                package_id: btn.dataset.id || '',
+                country_code: btn.dataset.cc || '',
+                file: btn.dataset.file || ''
             });
             try {
                 const res = await apiGet('status.php?' + q.toString());
-                el('bc_view_title').textContent = t.dataset.file || 'file';
+                el('bc_view_title').textContent = btn.dataset.file || 'file';
                 el('bc_view_pre').textContent = res.data ? JSON.stringify(res.data, null, 2) : (res.raw_text || '');
                 el('bc_view_modal').style.display = 'flex';
             } catch (e) { showAlert(e.message, false); }
+            return;
         }
         if (t.classList.contains('bc-log-tail')) {
             try {
@@ -895,6 +1016,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 el('bc_view_pre').textContent = res.tail || '';
                 el('bc_view_modal').style.display = 'flex';
             } catch (e) { showAlert(e.message, false); }
+            return;
         }
         if (t.classList.contains('bc-verify') && CAN_VERIFY) {
             setBusy(true, 'Verify…');
@@ -908,6 +1030,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 await loadAll();
             } catch (e) { showAlert(e.message, false); }
             finally { setBusy(false); }
+            return;
         }
         if (t.classList.contains('bc-drv') && CAN_VERIFY) {
             setBusy(true, 'DRV…');
@@ -938,6 +1061,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         countryPanel.classList.toggle('is-active', !isFull);
         fullPanel.hidden = !isFull;
         countryPanel.hidden = isFull;
+        document.querySelectorAll('.bc-acc-item[open]').forEach((d) => { d.open = false; });
     }
 
     document.querySelectorAll('[data-bc-tab]').forEach((btn) => {
