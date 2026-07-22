@@ -526,6 +526,192 @@ function orange_backup_admin_dir_size_bytes(string $dir): int
     return $total;
 }
 
+/**
+ * Cheap filesystem inventory (directory names only — no JSON / package inspection).
+ *
+ * @return array{
+ *   countries_with_packages:int,
+ *   stored_country_packages_total:int,
+ *   full_snapshots_total:int
+ * }
+ */
+function orange_backup_admin_package_inventory_counts(string $backupRoot): array
+{
+    $snapshotsDir = orange_backup_path_inside_root($backupRoot, 'snapshots');
+    $countryRoot = orange_backup_path_inside_root($backupRoot, 'country_packages');
+    $countryCodes = orange_backup_retention_list_country_codes($backupRoot);
+    $storedCountryPackagesTotal = 0;
+    foreach ($countryCodes as $countryCode) {
+        $storedCountryPackagesTotal += count(
+            orange_backup_admin_list_finalized_dirs_cached($countryRoot . DIRECTORY_SEPARATOR . $countryCode)
+        );
+    }
+
+    return [
+        'countries_with_packages' => count($countryCodes),
+        'stored_country_packages_total' => $storedCountryPackagesTotal,
+        'full_snapshots_total' => count(orange_backup_admin_list_finalized_dirs_cached($snapshotsDir)),
+    ];
+}
+
+/**
+ * Request-scoped memo for finalized package directory listings.
+ *
+ * @return list<array{name:string,path:string,mtime:int,age_seconds:int}>
+ */
+function orange_backup_admin_list_finalized_dirs_cached(string $containerDir): array
+{
+    static $memo = [];
+    if (!array_key_exists($containerDir, $memo)) {
+        $memo[$containerDir] = orange_backup_retention_list_finalized_dirs($containerDir);
+    }
+
+    /** @var list<array{name:string,path:string,mtime:int,age_seconds:int}> */
+    return $memo[$containerDir];
+}
+
+/**
+ * Storage byte totals with mtime/count signature cache under BackupRoot/locks.
+ * Values match recursive orange_backup_admin_dir_size_bytes() when cache misses.
+ *
+ * @param array{countries_with_packages?:int,stored_country_packages_total?:int,full_snapshots_total?:int}|null $inventory
+ * @return array{
+ *   snapshots_bytes:int,
+ *   country_packages_bytes:int,
+ *   logs_bytes:int,
+ *   total_bytes:int,
+ *   snapshots_human:string,
+ *   country_packages_human:string,
+ *   logs_human:string,
+ *   total_human:string
+ * }
+ */
+function orange_backup_admin_collect_storage_totals(string $backupRoot, ?array $inventory = null): array
+{
+    $snapshotsDir = orange_backup_path_inside_root($backupRoot, 'snapshots');
+    $countryRoot = orange_backup_path_inside_root($backupRoot, 'country_packages');
+    $logsDir = orange_backup_path_inside_root($backupRoot, 'logs');
+
+    $inventory = $inventory ?? orange_backup_admin_package_inventory_counts($backupRoot);
+    $signature = [
+        'snapshots_mtime' => is_dir($snapshotsDir) ? (int) (filemtime($snapshotsDir) ?: 0) : 0,
+        'country_mtime' => is_dir($countryRoot) ? (int) (filemtime($countryRoot) ?: 0) : 0,
+        'logs_mtime' => is_dir($logsDir) ? (int) (filemtime($logsDir) ?: 0) : 0,
+        'full_snapshots_total' => $inventory['full_snapshots_total'],
+        'stored_country_packages_total' => $inventory['stored_country_packages_total'],
+        'countries_with_packages' => $inventory['countries_with_packages'],
+    ];
+
+    $cachePath = orange_backup_path_inside_root(
+        $backupRoot,
+        'locks' . DIRECTORY_SEPARATOR . 'admin_ui_storage_cache.json'
+    );
+    if (is_file($cachePath) && is_readable($cachePath)) {
+        $raw = file_get_contents($cachePath);
+        $cached = is_string($raw) ? json_decode($raw, true) : null;
+        if (
+            is_array($cached)
+            && isset($cached['signature'], $cached['storage'])
+            && is_array($cached['signature'])
+            && is_array($cached['storage'])
+            && $cached['signature'] === $signature
+        ) {
+            /** @var array<string, mixed> $storage */
+            $storage = $cached['storage'];
+
+            return [
+                'snapshots_bytes' => (int) ($storage['snapshots_bytes'] ?? 0),
+                'country_packages_bytes' => (int) ($storage['country_packages_bytes'] ?? 0),
+                'logs_bytes' => (int) ($storage['logs_bytes'] ?? 0),
+                'total_bytes' => (int) ($storage['total_bytes'] ?? 0),
+                'snapshots_human' => (string) ($storage['snapshots_human'] ?? '0 B'),
+                'country_packages_human' => (string) ($storage['country_packages_human'] ?? '0 B'),
+                'logs_human' => (string) ($storage['logs_human'] ?? '0 B'),
+                'total_human' => (string) ($storage['total_human'] ?? '0 B'),
+            ];
+        }
+    }
+
+    $snapshotsBytes = orange_backup_admin_dir_size_bytes($snapshotsDir);
+    $countryBytes = orange_backup_admin_dir_size_bytes($countryRoot);
+    $logsBytes = orange_backup_admin_dir_size_bytes($logsDir);
+    $totalBytes = $snapshotsBytes + $countryBytes + $logsBytes;
+    $storage = [
+        'snapshots_bytes' => $snapshotsBytes,
+        'country_packages_bytes' => $countryBytes,
+        'logs_bytes' => $logsBytes,
+        'total_bytes' => $totalBytes,
+        'snapshots_human' => orange_backup_admin_format_bytes($snapshotsBytes),
+        'country_packages_human' => orange_backup_admin_format_bytes($countryBytes),
+        'logs_human' => orange_backup_admin_format_bytes($logsBytes),
+        'total_human' => orange_backup_admin_format_bytes($totalBytes),
+    ];
+
+    $locksDir = dirname($cachePath);
+    if (!is_dir($locksDir)) {
+        @mkdir($locksDir, 0775, true);
+    }
+    if (is_dir($locksDir) && is_writable($locksDir)) {
+        $payload = json_encode(
+            [
+                'version' => 1,
+                'signature' => $signature,
+                'storage' => $storage,
+                'cached_at' => gmdate('c'),
+            ],
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        );
+        if (is_string($payload)) {
+            @file_put_contents($cachePath, $payload . "\n", LOCK_EX);
+        }
+    }
+
+    return $storage;
+}
+
+/**
+ * Find newest healthy full package, reusing summaries already loaded for the UI.
+ *
+ * @param list<array<string, mixed>> $alreadySummarized
+ * @return array<string, mixed>|null
+ */
+function orange_backup_admin_find_last_successful_full(string $backupRoot, array $alreadySummarized, int $maxInspect = 50): ?array
+{
+    foreach ($alreadySummarized as $snap) {
+        if (!empty($snap['healthy'])) {
+            return $snap;
+        }
+    }
+
+    $seen = [];
+    foreach ($alreadySummarized as $snap) {
+        $id = (string) ($snap['package_id'] ?? '');
+        if ($id !== '') {
+            $seen[$id] = true;
+        }
+    }
+
+    $snapshotsDir = orange_backup_path_inside_root($backupRoot, 'snapshots');
+    $dirs = orange_backup_admin_list_finalized_dirs_cached($snapshotsDir);
+    $inspected = 0;
+    foreach ($dirs as $dir) {
+        if ($inspected >= $maxInspect) {
+            break;
+        }
+        $inspected++;
+        $name = (string) ($dir['name'] ?? '');
+        if ($name === '' || isset($seen[$name])) {
+            continue;
+        }
+        $summary = orange_backup_admin_summarize_full_package((string) $dir['path'], $name);
+        if (!empty($summary['healthy'])) {
+            return $summary;
+        }
+    }
+
+    return null;
+}
+
 function orange_backup_admin_format_bytes(int $bytes): string
 {
     if ($bytes < 1024) {
@@ -740,7 +926,7 @@ function orange_backup_admin_summarize_country_package(
 function orange_backup_admin_list_full_snapshots(string $backupRoot, int $limit = 20): array
 {
     $snapshotsDir = orange_backup_path_inside_root($backupRoot, 'snapshots');
-    $dirs = orange_backup_retention_list_finalized_dirs($snapshotsDir);
+    $dirs = orange_backup_admin_list_finalized_dirs_cached($snapshotsDir);
     $out = [];
     foreach (array_slice($dirs, 0, max(1, $limit)) as $dir) {
         $out[] = orange_backup_admin_summarize_full_package($dir['path'], $dir['name']);
@@ -766,7 +952,7 @@ function orange_backup_admin_list_country_packages(PDO $pdo, string $backupRoot,
             $countryMeta = orange_country_row_by_code($pdo, strtoupper($countryCode), false);
         }
         $container = $countryRoot . DIRECTORY_SEPARATOR . $countryCode;
-        $dirs = orange_backup_retention_list_finalized_dirs($container);
+        $dirs = orange_backup_admin_list_finalized_dirs_cached($container);
         $latest = array_slice($dirs, 0, max(1, $perCountryLimit));
         if ($latest === []) {
             continue;
@@ -834,10 +1020,20 @@ function orange_backup_admin_log_category(string $fileName): string
 }
 
 /**
+ * @param array{
+ *   full_snapshots?: list<array<string, mixed>>,
+ *   country_packages?: list<array<string, mixed>>,
+ *   inventory?: array{countries_with_packages:int,stored_country_packages_total:int,full_snapshots_total:int},
+ *   storage?: array<string, mixed>
+ * }|null $preloaded Reuse list.php package rows to avoid duplicate disk/JSON work.
  * @return array<string, mixed>
  */
-function orange_backup_admin_collect_overview(PDO $pdo, string $projectRoot, ?array $viewCtx = null): array
-{
+function orange_backup_admin_collect_overview(
+    PDO $pdo,
+    string $projectRoot,
+    ?array $viewCtx = null,
+    ?array $preloaded = null
+): array {
     $viewCtx = $viewCtx ?? orange_backup_admin_context_for_view($projectRoot);
     $backupRoot = $viewCtx['backup_root'];
     $env = $viewCtx['env'];
@@ -846,22 +1042,13 @@ function orange_backup_admin_collect_overview(PDO $pdo, string $projectRoot, ?ar
     );
     $retentionDays = orange_backup_retention_days($env);
 
-    $snapshotsDir = orange_backup_path_inside_root($backupRoot, 'snapshots');
-    $countryRoot = orange_backup_path_inside_root($backupRoot, 'country_packages');
-    $logsDir = orange_backup_path_inside_root($backupRoot, 'logs');
-
-    $fullSnapshots = orange_backup_admin_list_full_snapshots($backupRoot, 50);
+    $fullSnapshots = isset($preloaded['full_snapshots']) && is_array($preloaded['full_snapshots'])
+        ? $preloaded['full_snapshots']
+        : orange_backup_admin_list_full_snapshots($backupRoot, 20);
     $latestFull = $fullSnapshots[0] ?? null;
-    $lastSuccessfulFull = null;
-    foreach ($fullSnapshots as $snap) {
-        if (!empty($snap['healthy'])) {
-            $lastSuccessfulFull = $snap;
-            break;
-        }
-    }
+    $lastSuccessfulFull = orange_backup_admin_find_last_successful_full($backupRoot, $fullSnapshots, 50);
 
-    // Field name is latest_recovery_score: use the newest full snapshot's DRV score
-    // (from recovery_validation report), not the historical maximum across packages.
+    // Field name is latest_recovery_score: newest full snapshot's DRV score.
     $latestRecoveryScore = isset($latestFull['recovery_score']) && is_numeric($latestFull['recovery_score'])
         ? (int) $latestFull['recovery_score']
         : 0;
@@ -872,32 +1059,21 @@ function orange_backup_admin_collect_overview(PDO $pdo, string $projectRoot, ?ar
     $report = orange_backup_collect_environment_report($projectRoot);
     $backend = (string) ($report['selected_backend'] ?? '');
 
-    $countryPackages = orange_backup_admin_list_country_packages($pdo, $backupRoot, 1);
+    $countryPackages = isset($preloaded['country_packages']) && is_array($preloaded['country_packages'])
+        ? $preloaded['country_packages']
+        : orange_backup_admin_list_country_packages($pdo, $backupRoot, 5);
     $latestCountry = $countryPackages[0] ?? null;
 
-    // Accurate filesystem inventory (not the capped list.php payload length).
-    $countryCodesOnDisk = orange_backup_retention_list_country_codes($backupRoot);
-    $storedCountryPackagesTotal = 0;
-    foreach ($countryCodesOnDisk as $countryCode) {
-        $container = $countryRoot . DIRECTORY_SEPARATOR . $countryCode;
-        $storedCountryPackagesTotal += count(orange_backup_retention_list_finalized_dirs($container));
-    }
-    $fullSnapshotsTotal = count(orange_backup_retention_list_finalized_dirs($snapshotsDir));
+    $inventory = isset($preloaded['inventory']) && is_array($preloaded['inventory'])
+        ? $preloaded['inventory']
+        : orange_backup_admin_package_inventory_counts($backupRoot);
+
+    $storage = isset($preloaded['storage']) && is_array($preloaded['storage'])
+        ? $preloaded['storage']
+        : orange_backup_admin_collect_storage_totals($backupRoot);
 
     $fullLock = orange_backup_admin_full_lock_status($backupRoot);
     $countryLock = orange_backup_admin_country_lock_status($backupRoot);
-
-    $storage = [
-        'snapshots_bytes' => orange_backup_admin_dir_size_bytes($snapshotsDir),
-        'country_packages_bytes' => orange_backup_admin_dir_size_bytes($countryRoot),
-        'logs_bytes' => orange_backup_admin_dir_size_bytes($logsDir),
-        'total_bytes' => 0,
-    ];
-    $storage['total_bytes'] = $storage['snapshots_bytes'] + $storage['country_packages_bytes'] + $storage['logs_bytes'];
-    $storage['snapshots_human'] = orange_backup_admin_format_bytes($storage['snapshots_bytes']);
-    $storage['country_packages_human'] = orange_backup_admin_format_bytes($storage['country_packages_bytes']);
-    $storage['logs_human'] = orange_backup_admin_format_bytes($storage['logs_bytes']);
-    $storage['total_human'] = orange_backup_admin_format_bytes($storage['total_bytes']);
 
     return [
         'backup_root' => $backupRoot,
@@ -906,9 +1082,9 @@ function orange_backup_admin_collect_overview(PDO $pdo, string $projectRoot, ?ar
         'retention_days' => $retentionDays,
         'selected_backend' => $backend,
         'recoverable_countries' => $recoverableCount,
-        'countries_with_packages' => count($countryCodesOnDisk),
-        'stored_country_packages_total' => $storedCountryPackagesTotal,
-        'full_snapshots_total' => $fullSnapshotsTotal,
+        'countries_with_packages' => (int) ($inventory['countries_with_packages'] ?? 0),
+        'stored_country_packages_total' => (int) ($inventory['stored_country_packages_total'] ?? 0),
+        'full_snapshots_total' => (int) ($inventory['full_snapshots_total'] ?? 0),
         'latest_recovery_score' => $latestRecoveryScore,
         'last_successful_full' => $lastSuccessfulFull,
         'latest_full' => $latestFull,

@@ -778,7 +778,11 @@ function orange_backup_process_alive(int $pid): bool
  */
 function orange_backup_collect_environment_report(string $projectRoot): array
 {
+    static $requestCache = [];
     $projectRoot = realpath($projectRoot) ?: $projectRoot;
+    if (isset($requestCache[$projectRoot]) && is_array($requestCache[$projectRoot])) {
+        return $requestCache[$projectRoot];
+    }
     $env = orange_backup_load_env_array($projectRoot);
     $uploadsPath = $projectRoot . DIRECTORY_SEPARATOR . 'uploads';
     $rootConfigured = orange_backup_root_configured($env);
@@ -913,7 +917,7 @@ function orange_backup_collect_environment_report(string $projectRoot): array
         && $databaseConnected
         && $selectedBackend !== null;
 
-    return [
+    $report = [
         'php_version' => PHP_VERSION,
         'php_sapi' => PHP_SAPI,
         'project_root' => $projectRoot,
@@ -951,6 +955,9 @@ function orange_backup_collect_environment_report(string $projectRoot): array
         'warnings' => $warnings,
         'blockers' => $blockers,
     ];
+    $requestCache[$projectRoot] = $report;
+
+    return $report;
 }
 
 function orange_backup_select_backend(string $projectRoot): ?string

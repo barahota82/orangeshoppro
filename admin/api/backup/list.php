@@ -14,7 +14,20 @@ try {
     $projectRoot = backup_admin_api_project_root();
     $ctx = orange_backup_admin_context_for_view($projectRoot);
     $rootHealth = $ctx['root_health'];
-    $overview = orange_backup_admin_collect_overview($pdo, $projectRoot, $ctx);
+    $backupRoot = $ctx['backup_root'];
+
+    // Single-pass package loads shared with overview (avoids duplicate JSON/FS inspections).
+    $fullSnapshots = orange_backup_admin_list_full_snapshots($backupRoot, 20);
+    $countryPackages = orange_backup_admin_list_country_packages($pdo, $backupRoot, 5);
+    $inventory = orange_backup_admin_package_inventory_counts($backupRoot);
+    $storage = orange_backup_admin_collect_storage_totals($backupRoot, $inventory);
+
+    $overview = orange_backup_admin_collect_overview($pdo, $projectRoot, $ctx, [
+        'full_snapshots' => $fullSnapshots,
+        'country_packages' => $countryPackages,
+        'inventory' => $inventory,
+        'storage' => $storage,
+    ]);
     $manualAvailable = !empty($rootHealth['manual_actions_available']);
 
     json_response([
@@ -30,9 +43,9 @@ try {
         ],
         'csrf_token' => orange_backup_admin_csrf_token(),
         'overview' => $overview,
-        'full_snapshots' => orange_backup_admin_list_full_snapshots($ctx['backup_root'], 20),
-        'country_packages' => orange_backup_admin_list_country_packages($pdo, $ctx['backup_root'], 5),
-        'logs' => orange_backup_admin_list_logs($ctx['backup_root'], 40),
+        'full_snapshots' => $fullSnapshots,
+        'country_packages' => $countryPackages,
+        'logs' => orange_backup_admin_list_logs($backupRoot, 40),
     ]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, backup_admin_api_safe_message($e));
