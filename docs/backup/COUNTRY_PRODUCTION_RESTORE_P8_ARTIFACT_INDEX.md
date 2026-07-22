@@ -80,7 +80,7 @@ This Work Package:
 | P8 **control-plane artifacts** for WP-P8-01 | **Yes** — this WP |
 | P8 control registry PHP (`cpr_p8_control_plane.php`) + self-test | **Yes** — inventory / hard-rule registry only |
 | WP-P8-02 Owner Submission assembly (after Owner approval of WP-P8-01) | **Yes** — delivered in WP-P8-02 |
-| WP-P8-03 Owner Cert PASS/FAIL decision recording | **No** until prior WP approved |
+| WP-P8-03 Owner Cert PASS/FAIL decision recording | **COMPLETE** in WP-P8-03 (`cpr_owner_cert_decision_live.php`) |
 | WP-P8-04 integration baseline freeze | **No** until prior WP approved |
 | Enterprise Audit / Git Tag / P9 | **No** until Owner explicitly authorizes |
 | **Owner Submission assembly** | **COMPLETE** in WP-P8-02 (`cpr_owner_submission_live.php`) |
@@ -91,7 +91,8 @@ This Work Package:
 | P0–P7 frozen baseline / engine edits | **No** (except confirmed defects) |
 
 **WP-P8-01 coding:** Control-plane registry only.  
-**WP-P8-02 coding:** Owner Submission assembly & seal only — **no** Owner Cert PASS/FAIL writer, **no** P9 enablement.
+**WP-P8-02 coding:** Owner Submission assembly & seal only — **no** Owner Cert PASS/FAIL writer, **no** P9 enablement.  
+**WP-P8-03 coding:** Owner Cert PASS/FAIL decision & sealed `cpr_certification_result` only — **no** P8 freeze, **no** P9 enablement; PASS does not enable; FAIL does not auto-rollback.
 
 ---
 
@@ -149,8 +150,9 @@ This Work Package:
 |------|------|
 | `includes/backup/country_production/cpr_p8_control_plane.php` | WP-P8-01 registry |
 | `includes/backup/country_production/cpr_owner_submission_live.php` | WP-P8-02 Owner Submission assembly & seal |
+| `includes/backup/country_production/cpr_owner_cert_decision_live.php` | WP-P8-03 Owner Cert PASS/FAIL + `cpr_certification_result` |
 | `includes/backup/country_production/cpr_*` (P3–P7) | Consumed substrate — do not fork |
-| Later P8 live modules | Named when WP-P8-03+ is authorized |
+| Later P8 live modules | Named when WP-P8-04 is authorized |
 
 ### 5.3 Runtime (later WPs)
 
@@ -181,7 +183,7 @@ Prefer `orange_cpr_*` prefixes consistent with P3–P7 helpers; never reuse Full
 |----|-------|------------------|--------|
 | **WP-P8-01** | P8 Control Plane & Artifact Index | `COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md` | **COMPLETE** |
 | **WP-P8-02** | Owner Submission Package Assembly (P2-05 / sealed P7 evidence) | `COUNTRY_PRODUCTION_RESTORE_P8_02_OWNER_SUBMISSION.md` | **COMPLETE** |
-| **WP-P8-03** | Owner Certification Decision (PASS/FAIL) & `cpr_certification_result` | `COUNTRY_PRODUCTION_RESTORE_P8_03_OWNER_CERT_DECISION.md` | **NOT STARTED** |
+| **WP-P8-03** | Owner Certification Decision (PASS/FAIL) & `cpr_certification_result` | `COUNTRY_PRODUCTION_RESTORE_P8_03_OWNER_CERT_DECISION.md` | **COMPLETE** |
 | **WP-P8-04** | P8 Integration Review & Certification Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P8_04_INTEGRATION_BASELINE.md` | **NOT STARTED** |
 
 **Execution rule (Owner):** One WP at a time → Verify AC → Commit → Push → **STOP** → wait for approval before next WP.
@@ -295,14 +297,14 @@ Foundational principles (always in force):
 
 **WP-P8-01 COMPLETE** (P8 certification control plane).  
 **WP-P8-02 COMPLETE** (Owner Submission Package Assembly).  
+**WP-P8-03 COMPLETE** (Owner Certification Decision PASS/FAIL).  
 Commit → Push → **STOP.**  
 
-Do **not** begin **WP-P8-03**.  
+Do **not** begin **WP-P8-04**.  
 Do **not** begin **P9**.  
-Do **not** grant Owner Cert PASS.  
 Do **not** flip enablement.  
 
-Wait for Owner review and approval of WP-P8-02.
+Wait for Owner review and approval of WP-P8-03.
 
 ---
 
@@ -323,4 +325,22 @@ Wait for Owner review and approval of WP-P8-02.
 
 ---
 
-*End of P8 Artifact Index (updated WP-P8-02).*
+## 16. Acceptance criteria (WP-P8-03)
+
+| # | Criterion | Result |
+|---|-----------|--------|
+| AC1 | Owner Certification decision engine implemented | **PASS** — `cpr_owner_cert_decision_live.php` |
+| AC2 | Executes only against sealed Owner Submission | **PASS** |
+| AC3 | Result strictly PASS or FAIL; ceremony required; mutually exclusive | **PASS** |
+| AC4 | Integrates state / checkpoint / recovery / audit / contract / job / country | **PASS** |
+| AC5 | Rejects missing/corrupt/replay/duplicate/contract/country; fail-closed | **PASS** |
+| AC6 | Sealed decision + sealed manifest + sealed `cpr_certification_result` | **PASS** |
+| AC7 | Certification fingerprints + audit + recovery metadata | **PASS** |
+| AC8 | No privilege bypass; no cross-country; engineering cannot decide | **PASS** |
+| AC9 | Enablement FALSE; PASS does not enable; FAIL does not auto-rollback | **PASS** |
+| AC10 | Architecture / OWNER_APPROVED unchanged; no production SQL/uploads | **PASS** |
+| AC11 | Self-tests + lint + full CPR suite green | **PASS** |
+
+---
+
+*End of P8 Artifact Index (updated WP-P8-03).*

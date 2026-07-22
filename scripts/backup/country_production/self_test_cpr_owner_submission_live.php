@@ -127,7 +127,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p802_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_osub('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-02-owner-submission');
+    cpr_osub('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-03-owner-cert-decision');
     cpr_osub('dirname_constant', ORANGE_CPR_OWNER_SUBMISSION_DIRNAME === 'owner_submission');
     cpr_osub(
         'section_order_count',
@@ -138,8 +138,12 @@ try {
         !empty(orange_cpr_p8_control_plane_snapshot()['owner_submission_engine_implemented'])
     );
     cpr_osub(
-        'control_plane_no_decision_yet',
-        empty(orange_cpr_p8_control_plane_snapshot()['owner_cert_decision_engine_implemented'])
+        'control_plane_decision_implemented_after_p8_03',
+        !empty(orange_cpr_p8_control_plane_snapshot()['owner_cert_decision_engine_implemented'])
+    );
+    cpr_osub(
+        'control_plane_no_freeze_yet',
+        empty(orange_cpr_p8_control_plane_snapshot()['p8_integration_baseline_complete'])
     );
 
     $src = (string) file_get_contents(
@@ -347,7 +351,8 @@ try {
     );
     $index = (string) file_get_contents($docs . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md');
     cpr_osub('index_wp_p8_02_complete', str_contains($index, '**WP-P8-02 COMPLETE**'));
-    cpr_osub('index_stop_blocks_p8_03', str_contains($index, 'Do **not** begin **WP-P8-03**'));
+    cpr_osub('index_wp_p8_03_complete', str_contains($index, '**WP-P8-03 COMPLETE**'));
+    cpr_osub('index_stop_blocks_p8_04', str_contains($index, 'Do **not** begin **WP-P8-04**'));
 
     $assert = orange_cpr_p8_control_plane_assert(['ORANGE_COUNTRY_RESTORE_PRODUCTION_ENABLED' => false]);
     cpr_osub('control_plane_assert_ok', !empty($assert['ok']), (string) ($assert['code'] ?? ''));

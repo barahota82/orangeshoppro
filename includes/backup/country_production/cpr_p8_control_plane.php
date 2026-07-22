@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * CPR P8 Control Plane registry (WP-P8-01; flags updated through WP-P8-02).
+ * CPR P8 Control Plane registry (WP-P8-01; flags updated through WP-P8-03).
  *
- * Inventory / hard-rule helpers — Owner Submission marked implemented after WP-P8-02.
- * Still no Owner Cert PASS/FAIL writer and no enablement flip.
+ * Inventory / hard-rule helpers — Owner Cert decision marked implemented after WP-P8-03.
+ * Still no P8 integration freeze and no enablement flip.
  *
  * @see docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md
  * @see docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md roadmap P8
@@ -17,7 +17,7 @@ require_once __DIR__ . '/cpr_enablement.php';
 require_once __DIR__ . '/cpr_mutation_engine.php';
 
 const ORANGE_CPR_P8_CONTROL_SCHEMA = 'cpr_p8_control_plane/1';
-const ORANGE_CPR_P8_CONTROL_VERSION = 'P8-02-1.0';
+const ORANGE_CPR_P8_CONTROL_VERSION = 'P8-03-1.0';
 
 /**
  * Official P8 Work Package IDs (discovered from Architecture + P2 — not invented).
@@ -80,15 +80,17 @@ function orange_cpr_p8_control_plane_snapshot(): array
         'certification_stage_order' => orange_cpr_p8_certification_stage_order(),
         'wp_p8_01_complete' => true,
         'owner_submission_engine_implemented' => true,
-        'owner_cert_decision_engine_implemented' => false,
+        'owner_cert_decision_engine_implemented' => true,
         'p8_integration_baseline_complete' => false,
         'enablement_flag_observed' => false,
         'ponr_mutation_executed' => false,
         'production_mutation' => false,
         'production_sql_executed' => false,
+        // Control-plane must never claim a global engineering-granted pass.
         'owner_cert_pass_granted' => false,
         'engineering_cannot_grant_pass' => true,
         'cert_pass_does_not_enable' => true,
+        'fail_does_not_auto_rollback' => true,
         'p9_started' => false,
         'architecture_modified' => false,
         'owner_approved_modified' => false,
@@ -97,7 +99,7 @@ function orange_cpr_p8_control_plane_snapshot(): array
 }
 
 /**
- * Assert P8 control-plane hard rules (fail-closed) after WP-P8-02.
+ * Assert P8 control-plane hard rules (fail-closed) after WP-P8-03.
  *
  * @param array<string, mixed> $env
  * @return array<string, mixed>
@@ -137,21 +139,22 @@ function orange_cpr_p8_control_plane_assert(array $env): array
     }
 
     $snap = orange_cpr_p8_control_plane_snapshot();
-    if (empty($snap['wp_p8_01_complete']) || empty($snap['owner_submission_engine_implemented'])) {
-        return [
-            'ok' => false,
-            'code' => 'p8_control_incomplete',
-            'message' => 'WP-P8-01/02 control plane + Owner Submission engine must be marked complete/implemented.',
-            'fail_closed' => true,
-        ];
-    }
-    if (!empty($snap['owner_cert_decision_engine_implemented'])
-        || !empty($snap['p8_integration_baseline_complete'])
+    if (empty($snap['wp_p8_01_complete'])
+        || empty($snap['owner_submission_engine_implemented'])
+        || empty($snap['owner_cert_decision_engine_implemented'])
     ) {
         return [
             'ok' => false,
+            'code' => 'p8_control_incomplete',
+            'message' => 'WP-P8-01/02/03 control plane + submission + Owner Cert engines must be marked implemented.',
+            'fail_closed' => true,
+        ];
+    }
+    if (!empty($snap['p8_integration_baseline_complete'])) {
+        return [
+            'ok' => false,
             'code' => 'p8_engines_premature',
-            'message' => 'WP-P8-02 must not mark WP-P8-03/04 engines/freeze implemented.',
+            'message' => 'WP-P8-03 must not mark WP-P8-04 integration freeze complete.',
             'fail_closed' => true,
         ];
     }
@@ -159,15 +162,18 @@ function orange_cpr_p8_control_plane_assert(array $env): array
         return [
             'ok' => false,
             'code' => 'p8_boundary_violation',
-            'message' => 'P8 must not grant Owner Cert PASS or start P9.',
+            'message' => 'P8 control plane must not claim global Owner Cert PASS grant or start P9.',
             'fail_closed' => true,
         ];
     }
-    if (empty($snap['engineering_cannot_grant_pass']) || empty($snap['cert_pass_does_not_enable'])) {
+    if (empty($snap['engineering_cannot_grant_pass'])
+        || empty($snap['cert_pass_does_not_enable'])
+        || empty($snap['fail_does_not_auto_rollback'])
+    ) {
         return [
             'ok' => false,
             'code' => 'p8_od_cert_split_broken',
-            'message' => 'OD-CERT / OD-ENABLE split constants must remain true.',
+            'message' => 'OD-CERT / OD-ENABLE / no-auto-rollback constants must remain true.',
             'fail_closed' => true,
         ];
     }
@@ -175,7 +181,7 @@ function orange_cpr_p8_control_plane_assert(array $env): array
     return [
         'ok' => true,
         'code' => 'ok',
-        'message' => 'P8 control plane hard rules hold; Owner Submission implemented; Cert decision / P9 withheld.',
+        'message' => 'P8 control plane hard rules hold; Owner Cert decision implemented; freeze / P9 withheld.',
         'snapshot' => $snap,
         'enablement_flag_observed' => false,
         'production_mutation' => false,
