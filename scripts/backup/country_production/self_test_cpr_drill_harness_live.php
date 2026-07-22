@@ -112,15 +112,15 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p702_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_dh('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-02-drill-harness');
+    cpr_dh('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-03-drill-execution');
     cpr_dh('dirname_constant', ORANGE_CPR_DRILL_HARNESS_DIRNAME === 'drill_harness');
     cpr_dh(
         'control_plane_harness_flag',
         !empty(orange_cpr_p7_control_plane_snapshot()['drill_harness_implemented'])
     );
     cpr_dh(
-        'control_plane_no_execution_yet',
-        empty(orange_cpr_p7_control_plane_snapshot()['drill_execution_engine_implemented'])
+        'control_plane_execution_flag_present',
+        !empty(orange_cpr_p7_control_plane_snapshot()['drill_execution_engine_implemented'])
     );
 
     $src = (string) file_get_contents(

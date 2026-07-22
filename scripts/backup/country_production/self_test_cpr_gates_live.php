@@ -318,7 +318,7 @@ $base = $bundle['base'];
 $cprRoot = $bundle['cpr'];
 
 try {
-    cpr_gl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-02-drill-harness');
+    cpr_gl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-03-drill-execution');
 
     // --- Every mandatory gate FAIL (P3 predicates via evaluate_one; fail-inducing ctx) ---
     $gateFailCount = 0;

@@ -172,7 +172,7 @@ $env = $bundle['env'];
 $base = $bundle['base'];
 
 try {
-    cpr_ml('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-02-drill-harness');
+    cpr_ml('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-03-drill-execution');
 
     // --- Happy path: activate CP4 ---
     $setup = cpr_ml_setup_frozen($env);

@@ -334,7 +334,7 @@ $bundle = cpr_dl_env();
 $base = $bundle['base'];
 
 try {
-    cpr_dl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-02-drill-harness');
+    cpr_dl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-03-drill-execution');
 
     $slot = cpr_dl_fresh_env($base);
     $env = $slot['env'];
