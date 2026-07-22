@@ -84,12 +84,12 @@ This Work Package:
 |----------|-----------------|
 | P9 **control-plane artifacts** for WP-P9-01 | **Yes** — this WP |
 | P9 control registry PHP (`cpr_p9_control_plane.php`) + self-test | **Yes** — inventory / hard-rule registry only |
-| WP-P9-02 Enablement Preconditions & Owner Enablement Order | **No** until Owner approves WP-P9-01 |
-| WP-P9-03 Super Admin Enable/Disable + schema force-disable hooks | **No** until Owner approves prior WP |
+| WP-P9-02 Enablement Preconditions & Owner Enablement Order | **COMPLETE** — `cpr_enablement_preconditions_live.php` |
+| WP-P9-03 Super Admin Enable/Disable + schema force-disable hooks | **No** until Owner approves WP-P9-02 |
 | WP-P9-04 integration baseline freeze | **No** until Owner approves prior WP |
 | Enterprise Audit / Git Tag / Phase Sign-Off / project closure | **No** until Owner explicitly authorizes after P9 implementation |
-| Owner enablement order sealing | **No** in WP-P9-01 |
-| Ops enablement flag write / flip true | **No** in WP-P9-01 |
+| Owner enablement order sealing | **COMPLETE** in WP-P9-02 (flag still FALSE) |
+| Ops enablement flag write / flip true | **No** — WP-P9-03 only |
 | Architecture or Owner Decision edits | **No** |
 | C3–C8 engine edits | **No** |
 | P0–P8 frozen baseline / engine edits | **No** (except confirmed defects; scaffold version bump only) |
@@ -154,7 +154,7 @@ This Work Package:
 | Path | Role |
 |------|------|
 | `includes/backup/country_production/cpr_p9_control_plane.php` | WP-P9-01 registry |
-| `includes/backup/country_production/cpr_enablement_preconditions_live.php` | WP-P9-02 (planned) |
+| `includes/backup/country_production/cpr_enablement_preconditions_live.php` | WP-P9-02 Enablement Preconditions & Owner Order |
 | `includes/backup/country_production/cpr_enablement_action_live.php` | WP-P9-03 (planned) |
 | `includes/backup/country_production/cpr_p9_integration.php` | WP-P9-04 (planned) |
 | `includes/backup/country_production/cpr_enablement.php` | Existing read/assert substrate — writers remain P9-03 |
@@ -187,7 +187,7 @@ Prefer `orange_cpr_*` prefixes consistent with P3–P8 helpers; never reuse Full
 | WP | Title | Primary artifact | Status |
 |----|-------|------------------|--------|
 | **WP-P9-01** | P9 Control Plane & Artifact Index | `COUNTRY_PRODUCTION_RESTORE_P9_ARTIFACT_INDEX.md` | **COMPLETE** |
-| **WP-P9-02** | Enablement Preconditions & Owner Enablement Order (P1-13 §6 / OD-ENABLE → E5; flag still false) | `COUNTRY_PRODUCTION_RESTORE_P9_02_ENABLEMENT_PRECONDITIONS.md` | PENDING |
+| **WP-P9-02** | Enablement Preconditions & Owner Enablement Order (P1-13 §6 / OD-ENABLE → E5; flag still false) | `COUNTRY_PRODUCTION_RESTORE_P9_02_ENABLEMENT_PRECONDITIONS.md` | **COMPLETE** |
 | **WP-P9-03** | Super Admin Enable/Disable + Schema Invalidation Force-Disable Hooks (P1-13 §7–§8 / OD-PERM / OD-SCHEMA) | `COUNTRY_PRODUCTION_RESTORE_P9_03_ENABLEMENT_ACTIONS.md` | PENDING |
 | **WP-P9-04** | P9 Integration Review & Enablement Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P9_04_INTEGRATION_BASELINE.md` | PENDING |
 
@@ -291,16 +291,35 @@ Every later P9 design/code change must cite at least one of:
 ## 13. Stop rule
 
 **WP-P9-01 COMPLETE** (P9 enablement control plane).  
+**WP-P9-02 COMPLETE** (Enablement Preconditions & Owner Enablement Order).  
 Commit → Push → **STOP.**  
 
-Do **not** begin **WP-P9-02**.  
+Do **not** begin **WP-P9-03**.  
 Do **not** flip enablement.  
 Do **not** start the Enterprise Audit.  
 Do **not** create the Git Tag.  
 Do **not** treat CPR project as closed.
 
-Wait for Owner review and explicit approval before WP-P9-02.
+Wait for Owner review and explicit approval before WP-P9-03.
 
 ---
 
-*End of P9 Artifact Index (WP-P9-01).*
+## 14. Acceptance criteria (WP-P9-02)
+
+| # | Criterion | Result |
+|---|-----------|--------|
+| AC1 | Enablement Preconditions engine implemented | **PASS** — `cpr_enablement_preconditions_live.php` |
+| AC2 | Owner Enablement Order validated per P1-13 §6.4 | **PASS** |
+| AC3 | All four OD-ENABLE prerequisites verified | **PASS** |
+| AC4 | Integrates cert / state / checkpoint / recovery / audit / contract / job / schema / permissions | **PASS** |
+| AC5 | Rejects missing/corrupt/cert/schema/permission/replay; fail-closed | **PASS** |
+| AC6 | Sealed preconditions + manifest + Owner order | **PASS** |
+| AC7 | Audit + recovery metadata integrity | **PASS** |
+| AC8 | No privilege bypass; no cross-country; no partial/auto enablement | **PASS** |
+| AC9 | Enablement remains FALSE after E5; no production SQL/uploads | **PASS** |
+| AC10 | Architecture / OWNER_APPROVED unchanged; no SA Enable | **PASS** |
+| AC11 | Self-tests + lint + full CPR suite green | **PASS** |
+
+---
+
+*End of P9 Artifact Index (updated WP-P9-02).*

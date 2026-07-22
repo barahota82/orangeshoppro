@@ -29,7 +29,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Field | Value |
 |-------|--------|
 | **Current Phase** | **P9 IN PROGRESS** |
-| **Overall State** | **WP-P9-01 COMPLETE — P9 CONTROL PLANE OPEN — AWAITING OWNER APPROVAL BEFORE WP-P9-02** |
+| **Overall State** | **WP-P9-02 COMPLETE — ENABLEMENT PRECONDITIONS / OWNER ORDER SEALED AT E5 — FLAG FALSE — AWAITING OWNER APPROVAL BEFORE WP-P9-03** |
 
 ---
 
@@ -76,7 +76,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Production upload mutation | **Disabled** |
 | Clone drills (P7) | **Implemented** (enablement-FALSE sealed clone-drill evidence path) |
 | Owner Cert (P8) | **Implemented** (enablement-FALSE sealed Owner Certification baseline; PASS ≠ enable; FAIL ≠ auto-rollback) |
-| Enablement (P9) | **WP-P9-01 control plane complete; preconditions / SA Enable engines not started** |
+| Enablement (P9) | **WP-P9-02 COMPLETE** (E5 sealed; ops flag FALSE; SA Enable not started) |
 | Architecture | **Frozen** |
 | Owner Decisions | **Frozen** |
 
@@ -148,12 +148,12 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P9** (Enablement / OD-ENABLE path) — **WP-P9-01 COMPLETE**; WP-P9-02+ Owner-gated.
+**P9** (Enablement / OD-ENABLE path) — **WP-P9-02 COMPLETE**; WP-P9-03+ Owner-gated.
 
 ### Next gated step (Owner only)
 
-**WP-P9-02** (Enablement Preconditions & Owner Enablement Order)  
-*(Do **not** begin WP-P9-02 until Owner explicitly approves WP-P9-01.)*
+**WP-P9-03** (Super Admin Enable/Disable + Schema Invalidation Force-Disable Hooks)  
+*(Do **not** begin WP-P9-03 until Owner explicitly approves WP-P9-02.)*
 
 ---
 

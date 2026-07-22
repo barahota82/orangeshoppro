@@ -172,7 +172,7 @@ $env = $bundle['env'];
 $base = $bundle['base'];
 
 try {
-    cpr_ml('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
+    cpr_ml('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-02-enablement-preconditions');
 
     // --- Happy path: activate CP4 ---
     $setup = cpr_ml_setup_frozen($env);

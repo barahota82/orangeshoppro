@@ -73,7 +73,7 @@ $cprRoot = $bundle['cpr'];
 $clone = $bundle['clone'];
 
 try {
-    cpr_p7i('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
+    cpr_p7i('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-02-enablement-preconditions');
     cpr_p7i(
         'stage_order',
         orange_cpr_p7_integration_stage_order() === [

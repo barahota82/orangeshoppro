@@ -378,7 +378,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p602_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_pv('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
+    cpr_pv('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-02-enablement-preconditions');
     cpr_pv('dirname_constant', ORANGE_CPR_POST_VERIFY_DIRNAME === 'post_verify');
     cpr_pv('control_plane_flag', !empty(orange_cpr_p6_control_plane_snapshot()['post_verify_engine_implemented']));
 
