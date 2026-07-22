@@ -77,17 +77,19 @@ This Work Package:
 |----------|-----------------|
 | P7 **control-plane artifacts** for WP-P7-01 | **Yes** — this WP |
 | P7 control registry PHP (`cpr_p7_control_plane.php`) + self-test | **Yes** — inventory / hard-rule registry only |
-| WP-P7-02+ drill harness / scenario runner / evidence sealer | **No** until Owner approves each next WP |
-| **Clone drill harness** | **No** in WP-P7-01 |
-| **Drill scenario execution** | **No** in WP-P7-01 |
-| **Evidence pack assembly / seal** | **No** in WP-P7-01 |
+| WP-P7-02 clone drill harness (after Owner approval of WP-P7-01) | **Yes** — delivered in WP-P7-02 |
+| WP-P7-03+ scenario runner / evidence sealer | **No** until Owner approves each next WP |
+| **Clone drill harness** | **COMPLETE** in WP-P7-02 (`cpr_drill_harness_live.php`) |
+| **Drill scenario execution** | **No** until WP-P7-03 |
+| **Evidence pack assembly / seal** | **No** until WP-P7-04 |
 | Owner Cert PASS/FAIL | **No** — P8 / OD-CERT |
 | Enablement flag flip | **No** — P9 / OD-ENABLE |
 | Architecture or Owner Decision edits | **No** |
 | C3–C8 engine edits | **No** |
 | P0–P6 frozen baseline / engine edits | **No** (except confirmed defects) |
 
-**WP-P7-01 coding:** Control-plane registry only — **no** drill / evidence engines.
+**WP-P7-01 coding:** Control-plane registry only.  
+**WP-P7-02 coding:** Clone drill harness & environment binding only — **no** DS-* scenario execution / evidence sealer.
 
 ---
 
@@ -145,14 +147,16 @@ This Work Package:
 | Path | Role |
 |------|------|
 | `includes/backup/country_production/cpr_p7_control_plane.php` | WP-P7-01 registry |
+| `includes/backup/country_production/cpr_drill_harness_live.php` | WP-P7-02 clone drill harness & environment binding |
 | `includes/backup/country_production/cpr_*_live.php` (P3–P6) | Consumed substrate — do not fork |
-| Future drill / evidence modules | WP-P7-02+ only |
+| Future scenario / evidence modules | WP-P7-03+ only |
 
 ### 5.3 Runtime (later WPs)
 
 | Path | Role |
 |------|------|
-| `{job}/drill_*/` · evidence pack dirs | Sealed drill reports / evidence packs (later WPs) |
+| `{job}/drill_harness/` | Sealed environment binding + harness reports (WP-P7-02) |
+| `{job}/drill_*/` · evidence pack dirs | Scenario / evidence packs (WP-P7-03+) |
 
 ---
 
@@ -174,7 +178,7 @@ Prefer `orange_cpr_*` prefixes consistent with P3–P6 helpers; never reuse Full
 | WP | Title | Primary artifact | Status |
 |----|-------|------------------|--------|
 | **WP-P7-01** | P7 Control Plane & Artifact Index | `COUNTRY_PRODUCTION_RESTORE_P7_ARTIFACT_INDEX.md` | **COMPLETE** |
-| **WP-P7-02** | Clone Drill Harness & Environment Binding | `COUNTRY_PRODUCTION_RESTORE_P7_02_DRILL_HARNESS.md` | PENDING |
+| **WP-P7-02** | Clone Drill Harness & Environment Binding | `COUNTRY_PRODUCTION_RESTORE_P7_02_DRILL_HARNESS.md` | **COMPLETE** |
 | **WP-P7-03** | Drill Scenario Execution (P2-03 DS-*) | `COUNTRY_PRODUCTION_RESTORE_P7_03_DRILL_EXECUTION.md` | PENDING |
 | **WP-P7-04** | Evidence Pack Assembly & Seal (P2-04 / EV-01…EV-14) | `COUNTRY_PRODUCTION_RESTORE_P7_04_EVIDENCE_PACK.md` | PENDING |
 | **WP-P7-05** | P7 Integration Review & Clone-Drill Evidence Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P7_05_INTEGRATION_BASELINE.md` | PENDING |
@@ -266,6 +270,7 @@ Foundational principles (always in force):
 | Owner Cert PASS/FAIL | **No** — P8 |
 | C3–C8 edits | **No** |
 | Start WP-P7-02 before Owner approval of WP-P7-01 | **No** |
+| Start WP-P7-03 before Owner approval of WP-P7-02 | **No** |
 | Invent WPs beyond §7 inventory | **No** |
 
 ---
@@ -292,10 +297,30 @@ Foundational principles (always in force):
 
 ## 14. Stop rule
 
-**WP-P7-01 COMPLETE** (control plane).  
+**WP-P7-02 COMPLETE** (clone drill harness & environment binding).  
 Commit → Push → **STOP.**  
-Do **not** begin **WP-P7-02** until Owner explicitly reviews and approves the next Work Package.
+Do **not** begin **WP-P7-03** until Owner explicitly reviews and approves the next Work Package.
 
 ---
 
-*End of P7 Artifact Index (WP-P7-01).*
+## 15. Acceptance criteria (WP-P7-02)
+
+| # | Criterion | Result |
+|---|-----------|--------|
+| AC1 | Clone Drill Harness implemented | **PASS** — `cpr_drill_harness_live.php` |
+| AC2 | Isolated Drill Environment binding | **PASS** |
+| AC3 | Operates exclusively against approved clone environment | **PASS** |
+| AC4 | Never interacts with production resources | **PASS** |
+| AC5 | Binds job identity, execution contract, country, schema revision, clone env | **PASS** |
+| AC6 | Isolation + fail-closed mismatches | **PASS** |
+| AC7 | Production endpoint detection; deterministic validation | **PASS** |
+| AC8 | No replay; no privilege bypass | **PASS** |
+| AC9 | Sealed binding + harness reports | **PASS** |
+| AC10 | Audit events + recovery metadata | **PASS** |
+| AC11 | Enablement FALSE; no production SQL/uploads; Architecture/OD unchanged | **PASS** |
+| AC12 | No DS-* execution; WP-P7-03 not started | **PASS** |
+| AC13 | Self-tests + lint + full CPR suite green | **PASS** |
+
+---
+
+*End of P7 Artifact Index (updated WP-P7-02).*

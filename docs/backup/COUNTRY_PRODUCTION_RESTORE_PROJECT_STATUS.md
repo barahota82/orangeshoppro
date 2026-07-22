@@ -29,7 +29,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Field | Value |
 |-------|--------|
 | **Current Phase** | **P7 IN PROGRESS** |
-| **Overall State** | **WP-P7-01 COMPLETE — AWAITING OWNER APPROVAL FOR WP-P7-02** |
+| **Overall State** | **WP-P7-02 COMPLETE — AWAITING OWNER APPROVAL FOR WP-P7-03** |
 
 ---
 
@@ -134,12 +134,12 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P7** (authorized; WP-P7-01 control plane complete)
+**P7** (authorized; WP-P7-02 clone drill harness complete)
 
 ### Next Work Package
 
-**WP-P7-02** — Clone Drill Harness & Environment Binding  
-*(Do **not** begin until Owner explicitly reviews and approves WP-P7-01 / next WP.)*
+**WP-P7-03** — Drill Scenario Execution (P2-03 DS-*)  
+*(Do **not** begin until Owner explicitly reviews and approves WP-P7-02 / next WP.)*
 
 ---
 

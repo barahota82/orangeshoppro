@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Self-test: CPR P7 Control Plane (WP-P7-01).
+ * Self-test: CPR P7 Control Plane (WP-P7-01; harness flag updated WP-P7-02).
  * Run: php scripts/backup/country_production/self_test_cpr_p7_control_plane.php
  */
 
@@ -28,7 +28,7 @@ $docsRoot = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'docs' . DIRECTORY_SEPAR
 $indexPath = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P7_ARTIFACT_INDEX.md';
 
 try {
-    cpr_p7cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-01-control-plane');
+    cpr_p7cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-02-drill-harness');
     cpr_p7cp('artifact_index_exists', is_file($indexPath));
 
     $ids = orange_cpr_p7_work_package_ids();
@@ -42,6 +42,10 @@ try {
     cpr_p7cp(
         'index_artifact_name',
         ($artifacts['WP-P7-01'] ?? '') === 'COUNTRY_PRODUCTION_RESTORE_P7_ARTIFACT_INDEX.md'
+    );
+    cpr_p7cp(
+        'harness_artifact_name',
+        ($artifacts['WP-P7-02'] ?? '') === 'COUNTRY_PRODUCTION_RESTORE_P7_02_DRILL_HARNESS.md'
     );
 
     cpr_p7cp(
@@ -63,7 +67,7 @@ try {
 
     $snap = orange_cpr_p7_control_plane_snapshot();
     cpr_p7cp('wp_p7_01_complete_flag', !empty($snap['wp_p7_01_complete']));
-    cpr_p7cp('no_drill_harness_yet', empty($snap['drill_harness_implemented']));
+    cpr_p7cp('drill_harness_implemented', !empty($snap['drill_harness_implemented']));
     cpr_p7cp('no_drill_execution_yet', empty($snap['drill_execution_engine_implemented']));
     cpr_p7cp('no_evidence_pack_yet', empty($snap['evidence_pack_engine_implemented']));
     cpr_p7cp('no_p7_integration_yet', empty($snap['p7_integration_baseline_complete']));
@@ -90,8 +94,9 @@ try {
     $index = is_file($indexPath) ? (string) file_get_contents($indexPath) : '';
     cpr_p7cp('index_has_artifact_id', str_contains($index, 'CPR-P7-WP01-ARTIFACT_INDEX'));
     cpr_p7cp('index_lists_wp_p7_02', str_contains($index, 'WP-P7-02'));
-    cpr_p7cp('index_wp_p7_01_complete', str_contains($index, '**WP-P7-01 COMPLETE**'));
-    cpr_p7cp('index_stop_blocks_p7_02', str_contains($index, 'Do **not** begin **WP-P7-02**'));
+    cpr_p7cp('index_wp_p7_02_complete', str_contains($index, '**WP-P7-02 COMPLETE**'));
+    cpr_p7cp('index_stop_blocks_p7_03', str_contains($index, 'Do **not** begin **WP-P7-03**'));
+    cpr_p7cp('index_lists_harness_module', str_contains($index, 'cpr_drill_harness_live.php'));
     cpr_p7cp('index_enablement_false', str_contains($index, 'hard false'));
     cpr_p7cp(
         'index_preserves_p6_contracts',
@@ -105,9 +110,12 @@ try {
 
     $src = (string) file_get_contents(dirname(__DIR__, 3) . '/includes/backup/country_production/cpr_p7_control_plane.php');
     cpr_p7cp(
-        'no_drill_engine_in_control_plane',
-        !preg_match('/function orange_cpr_p7_(drill|evidence)_/i', $src)
+        'no_scenario_engine_in_control_plane',
+        !preg_match('/function orange_cpr_p7_(drill_scenario|evidence)_/i', $src)
     );
+
+    $harnessDoc = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P7_02_DRILL_HARNESS.md';
+    cpr_p7cp('harness_design_doc_exists', is_file($harnessDoc));
 
     $arch = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md';
     $od = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_OWNER_DECISIONS.md';
