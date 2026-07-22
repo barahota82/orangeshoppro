@@ -125,7 +125,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p603_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_sf('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-03-success-finalize');
+    cpr_sf('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-04-rollback');
     cpr_sf('dirname_constant', ORANGE_CPR_SUCCESS_FINALIZE_DIRNAME === 'success_finalize');
     cpr_sf(
         'control_plane_flag',
@@ -231,7 +231,10 @@ try {
         str_contains($index, 'COUNTRY_PRODUCTION_RESTORE_P6_03_SUCCESS_FINALIZE.md')
         && str_contains($index, '**WP-P6-03 COMPLETE**')
     );
-    cpr_sf('index_stop_blocks_p6_04', str_contains($index, 'Do **not** begin **WP-P6-04**'));
+    cpr_sf('design_stop_rule_present', str_contains(
+        (string) file_get_contents($design),
+        'Do **not** begin **WP-P6-04**'
+    ));
     cpr_sf('ops_enablement_still_false', orange_cpr_enablement_flag_read($env) === false);
 } catch (Throwable $e) {
     cpr_sf('exception', false, $e->getMessage());

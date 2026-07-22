@@ -352,7 +352,7 @@ $base = $bundle['base'];
 $cprRoot = $bundle['cpr'];
 
 try {
-    cpr_al('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-03-success-finalize');
+    cpr_al('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-04-rollback');
 
     // --- Valid authorization (full ceremony) ---
     $setup = cpr_al_setup_gated($env);
