@@ -302,12 +302,13 @@ Foundational principles (always in force):
 **WP-P8-04 COMPLETE** (P8 Integration Review & Certification Baseline Freeze).  
 Commit → Push → **STOP.**  
 
-Do **not** start the Enterprise Audit.  
+**P8 Enterprise Audit:** **PASSED** (`COUNTRY_PRODUCTION_RESTORE_P8_ENTERPRISE_AUDIT.md`).  
+
 Do **not** create the Git Tag.  
 Do **not** begin **P9**.  
 Do **not** flip enablement.  
 
-Wait for Owner review and approval of WP-P8-04.
+Wait for Owner review. Tag / phase sign-off / P9 require **explicit** Owner authorization.
 
 ---
 
