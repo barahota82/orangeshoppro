@@ -145,7 +145,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p704_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_ev('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-02-enablement-preconditions');
+    cpr_ev('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-03-enablement-actions');
     cpr_ev('dirname_constant', ORANGE_CPR_EVIDENCE_PACK_DIRNAME === 'evidence_pack');
     cpr_ev(
         'catalog_count',

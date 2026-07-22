@@ -173,7 +173,7 @@ Every completed major phase shall contain:
 | Field | Value |
 |-------|--------|
 | **Current Phase** | **P9 IN PROGRESS** |
-| **Current State** | **WP-P9-02 COMPLETE — ENABLEMENT PRECONDITIONS / OWNER ORDER SEALED AT E5 — FLAG FALSE — AWAITING OWNER APPROVAL BEFORE WP-P9-03** |
+| **Current State** | **WP-P9-03 COMPLETE — SA ENABLE/DISABLE + SCHEMA FORCE-DISABLE LIVE — AWAITING OWNER APPROVAL BEFORE WP-P9-04** |
 
 *(Update the Current Project Status block when the active phase changes. Append new phase sections for P9 when COMPLETE; do not rewrite P0–P8 above.)*
 

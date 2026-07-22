@@ -193,15 +193,15 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p902_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_epre('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-02-enablement-preconditions');
+    cpr_epre('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-03-enablement-actions');
     cpr_epre('dirname_constant', ORANGE_CPR_ENABLEMENT_DIRNAME === 'enablement');
     cpr_epre(
         'control_plane_preconditions_flag',
         !empty(orange_cpr_p9_control_plane_snapshot()['enablement_preconditions_engine_implemented'])
     );
     cpr_epre(
-        'control_plane_no_action_engine',
-        empty(orange_cpr_p9_control_plane_snapshot()['enablement_action_engine_implemented'])
+        'control_plane_action_engine_after_p9_03',
+        !empty(orange_cpr_p9_control_plane_snapshot()['enablement_action_engine_implemented'])
     );
     cpr_epre(
         'control_plane_e5_does_not_enable',
@@ -423,7 +423,7 @@ try {
     cpr_epre('design_doc_exists', is_file($design));
     $indexBody = is_file($index) ? (string) file_get_contents($index) : '';
     cpr_epre('index_wp_p9_02_complete', str_contains($indexBody, '**WP-P9-02 COMPLETE**'));
-    cpr_epre('index_stop_blocks_wp03', str_contains($indexBody, 'Do **not** begin **WP-P9-03**'));
+    cpr_epre('index_wp_p9_03_complete_after_p9_03', str_contains($indexBody, '**WP-P9-03 COMPLETE**'));
 } catch (Throwable $e) {
     cpr_epre('exception', false, $e->getMessage());
 }

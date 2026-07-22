@@ -334,7 +334,7 @@ $bundle = cpr_dl_env();
 $base = $bundle['base'];
 
 try {
-    cpr_dl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-02-enablement-preconditions');
+    cpr_dl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-03-enablement-actions');
 
     $slot = cpr_dl_fresh_env($base);
     $env = $slot['env'];

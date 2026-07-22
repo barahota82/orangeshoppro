@@ -374,7 +374,7 @@ $bundle = cpr_il_env();
 $base = $bundle['base'];
 
 try {
-    cpr_il('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-02-enablement-preconditions');
+    cpr_il('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-03-enablement-actions');
     cpr_il('batch_catalog_six', orange_cpr_import_batch_numbers() === [1, 2, 3, 4, 5, 6]);
     cpr_il('batch1_has_products', in_array('products', orange_cpr_import_batch_tables(1), true));
     cpr_il('batch6_document_sequences', orange_cpr_import_batch_tables(6) === ['document_sequences']);
