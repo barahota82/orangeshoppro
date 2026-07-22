@@ -97,7 +97,7 @@ function orange_cpr_p6_control_plane_snapshot(): array
         'post_verify_engine_implemented' => true,
         'success_finalize_engine_implemented' => true,
         'rollback_integration_engine_implemented' => true,
-        'maint_release_engine_implemented' => false,
+        'maint_release_engine_implemented' => true,
         'p6_integration_baseline_complete' => false,
         'enablement_flag_observed' => false,
         'ponr_mutation_executed' => false,
@@ -154,19 +154,20 @@ function orange_cpr_p6_control_plane_assert(array $env): array
     if (empty($snap['post_verify_engine_implemented'])
         || empty($snap['success_finalize_engine_implemented'])
         || empty($snap['rollback_integration_engine_implemented'])
+        || empty($snap['maint_release_engine_implemented'])
     ) {
         return [
             'ok' => false,
             'code' => 'p6_required_engines_missing',
-            'message' => 'WP-P6-02/03/04 engines must be marked implemented.',
+            'message' => 'WP-P6-02…05 engines must be marked implemented.',
             'fail_closed' => true,
         ];
     }
-    if (!empty($snap['maint_release_engine_implemented']) || !empty($snap['p7_started'])) {
+    if (!empty($snap['p6_integration_baseline_complete']) || !empty($snap['p7_started'])) {
         return [
             'ok' => false,
             'code' => 'p6_engines_premature',
-            'message' => 'WP-P6-04 must not mark maint-release or P7 started.',
+            'message' => 'WP-P6-05 must not mark P6 integration baseline or P7 started.',
             'fail_closed' => true,
         ];
     }
@@ -174,7 +175,7 @@ function orange_cpr_p6_control_plane_assert(array $env): array
     return [
         'ok' => true,
         'code' => 'ok',
-        'message' => 'P6 control plane hard rules hold; post-verify + success finalize + rollback implemented; maint-release deferred.',
+        'message' => 'P6 control plane hard rules hold; verify/finalize/rollback/maint-release implemented; integration freeze deferred.',
         'snapshot' => $snap,
         'enablement_flag_observed' => false,
         'production_mutation' => false,

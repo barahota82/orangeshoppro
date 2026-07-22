@@ -29,7 +29,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Field | Value |
 |-------|--------|
 | **Current Phase** | **P6 IN PROGRESS** |
-| **Overall State** | **WP-P6-04 COMPLETE — AWAITING OWNER APPROVAL FOR WP-P6-05** |
+| **Overall State** | **WP-P6-05 COMPLETE — AWAITING OWNER APPROVAL FOR WP-P6-06** |
 
 ---
 
@@ -67,7 +67,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | DELETE / IMPORT / Special / Uploads engines | **Implemented** (enablement-FALSE sealed path) |
 | Production SQL execution | **Disabled** |
 | Production upload mutation | **Disabled** |
-| Post-apply verify (P6) | **WP-P6-02…04 Post-Verify + Success Finalize + Rollback; maint still ON** |
+| Post-apply verify (P6) | **WP-P6-02…05 complete through CP12 maint release; enablement still FALSE** |
 | Architecture | **Frozen** |
 | Owner Decisions | **Frozen** |
 
@@ -131,8 +131,8 @@ Every approved baseline tag (annotated; on `origin`):
 
 ### Next Work Package
 
-**WP-P6-05** — Maintenance Release / Closeout (CP12)  
-*(Do **not** begin until Owner explicitly reviews and approves WP-P6-04 / next WP.)*
+**WP-P6-06** — P6 Integration Review & Verify/Rollback Baseline Freeze  
+*(Do **not** begin until Owner explicitly reviews and approves WP-P6-05 / next WP.)*
 
 ---
 

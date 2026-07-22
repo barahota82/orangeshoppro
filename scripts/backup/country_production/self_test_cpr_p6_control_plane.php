@@ -28,7 +28,7 @@ $docsRoot = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'docs' . DIRECTORY_SEPAR
 $indexPath = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P6_ARTIFACT_INDEX.md';
 
 try {
-    cpr_p6cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-04-rollback');
+    cpr_p6cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-05-maint-release');
     cpr_p6cp('artifact_index_exists', is_file($indexPath));
 
     $ids = orange_cpr_p6_work_package_ids();
@@ -63,7 +63,7 @@ try {
     cpr_p6cp('post_verify_engine_implemented', !empty($snap['post_verify_engine_implemented']));
     cpr_p6cp('success_finalize_engine_implemented', !empty($snap['success_finalize_engine_implemented']));
     cpr_p6cp('rollback_engine_implemented', !empty($snap['rollback_integration_engine_implemented']));
-    cpr_p6cp('no_maint_release_yet', empty($snap['maint_release_engine_implemented']));
+    cpr_p6cp('maint_release_engine_implemented', !empty($snap['maint_release_engine_implemented']));
     cpr_p6cp('no_p6_integration_yet', empty($snap['p6_integration_baseline_complete']));
     cpr_p6cp('no_p7_started', empty($snap['p7_started']));
     cpr_p6cp('architecture_not_modified_flag', empty($snap['architecture_modified']));
@@ -91,7 +91,8 @@ try {
     cpr_p6cp('index_wp_p6_02_complete', str_contains($index, 'COUNTRY_PRODUCTION_RESTORE_P6_02_POST_VERIFY.md'));
     cpr_p6cp('index_wp_p6_03_complete', str_contains($index, '**WP-P6-03 COMPLETE**'));
     cpr_p6cp('index_wp_p6_04_complete', str_contains($index, '**WP-P6-04 COMPLETE**'));
-    cpr_p6cp('index_stop_blocks_p6_05', str_contains($index, 'Do **not** begin **WP-P6-05**'));
+    cpr_p6cp('index_wp_p6_05_complete', str_contains($index, '**WP-P6-05 COMPLETE**'));
+    cpr_p6cp('index_stop_blocks_p6_06', str_contains($index, 'Do **not** begin **WP-P6-06**'));
     cpr_p6cp('index_enablement_false', str_contains($index, 'hard false'));
     cpr_p6cp('index_preserves_p5_contracts', str_contains($index, 'Preserves all contracts frozen in P0–P5')
         || str_contains($index, 'Preserve P0–P5 contracts'));

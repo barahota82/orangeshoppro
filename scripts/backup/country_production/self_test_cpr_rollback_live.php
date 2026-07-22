@@ -137,15 +137,20 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p604_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_rb('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-04-rollback');
+    cpr_rb('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P6-05-maint-release');
     cpr_rb('dirname_constant', ORANGE_CPR_ROLLBACK_DIRNAME === 'rollback');
     cpr_rb(
         'control_plane_flag',
         !empty(orange_cpr_p6_control_plane_snapshot()['rollback_integration_engine_implemented'])
     );
     cpr_rb(
-        'control_plane_no_maint_release',
-        empty(orange_cpr_p6_control_plane_snapshot()['maint_release_engine_implemented'])
+        'design_stop_rule_present',
+        str_contains(
+            (string) file_get_contents(
+                dirname(__DIR__, 3) . '/docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_04_ROLLBACK_INTEGRATION.md'
+            ),
+            'Do **not** begin **WP-P6-05**'
+        )
     );
 
     // --- Valid rollback ---

@@ -187,7 +187,7 @@ Prefer `orange_cpr_*` prefixes consistent with P3–P5 helpers; never reuse Full
 | **WP-P6-02** | Post-Verify Engine (CP10 / Arch §19) | `COUNTRY_PRODUCTION_RESTORE_P6_02_POST_VERIFY.md` | **COMPLETE** |
 | **WP-P6-03** | Success Finalize (CP11) | `COUNTRY_PRODUCTION_RESTORE_P6_03_SUCCESS_FINALIZE.md` | **COMPLETE** |
 | **WP-P6-04** | Session Full-Anchor Rollback Integration (OD-ROLLBACK) | `COUNTRY_PRODUCTION_RESTORE_P6_04_ROLLBACK_INTEGRATION.md` | **COMPLETE** |
-| **WP-P6-05** | Maintenance Release / Closeout (CP12) | `COUNTRY_PRODUCTION_RESTORE_P6_05_MAINT_RELEASE.md` | PENDING |
+| **WP-P6-05** | Maintenance Release / Closeout (CP12) | `COUNTRY_PRODUCTION_RESTORE_P6_05_MAINT_RELEASE.md` | **COMPLETE** |
 | **WP-P6-06** | P6 Integration Review & Verify/Rollback Baseline Freeze | `COUNTRY_PRODUCTION_RESTORE_P6_06_INTEGRATION_BASELINE.md` | PENDING |
 
 **Execution rule (Owner):** One WP at a time → Verify AC → Commit → Push → **STOP** → wait for approval before next WP.
@@ -307,9 +307,10 @@ Foundational principles (always in force):
 **WP-P6-02 COMPLETE** (Post-Verify / CP10).  
 **WP-P6-03 COMPLETE** (Success Finalize / CP11).  
 **WP-P6-04 COMPLETE** (Session Full-Anchor Rollback / OD-ROLLBACK).  
+**WP-P6-05 COMPLETE** (Maintenance Release / CP12).  
 Commit → Push → **STOP.**  
-Do **not** begin **WP-P6-05** until Owner explicitly reviews and approves the next Work Package.
+Do **not** begin **WP-P6-06** until Owner explicitly reviews and approves the next Work Package.
 
 ---
 
-*End of P6 Artifact Index (updated through WP-P6-04).*
+*End of P6 Artifact Index (updated through WP-P6-05).*
