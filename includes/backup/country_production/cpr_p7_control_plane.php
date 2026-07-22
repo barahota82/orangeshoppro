@@ -97,7 +97,7 @@ function orange_cpr_p7_control_plane_snapshot(): array
         'wp_p7_01_complete' => true,
         'drill_harness_implemented' => true,
         'drill_execution_engine_implemented' => true,
-        'evidence_pack_engine_implemented' => false,
+        'evidence_pack_engine_implemented' => true,
         'p7_integration_baseline_complete' => false,
         'enablement_flag_observed' => false,
         'ponr_mutation_executed' => false,
@@ -160,23 +160,25 @@ function orange_cpr_p7_control_plane_assert(array $env): array
             'fail_closed' => true,
         ];
     }
-    if (empty($snap['drill_harness_implemented']) || empty($snap['drill_execution_engine_implemented'])) {
+    if (empty($snap['drill_harness_implemented'])
+        || empty($snap['drill_execution_engine_implemented'])
+        || empty($snap['evidence_pack_engine_implemented'])
+    ) {
         return [
             'ok' => false,
             'code' => 'p7_required_engines_missing',
-            'message' => 'WP-P7-02 harness and WP-P7-03 drill execution must be marked implemented.',
+            'message' => 'WP-P7-02…WP-P7-04 engines must be marked implemented (harness, execution, evidence pack).',
             'fail_closed' => true,
         ];
     }
-    if (!empty($snap['evidence_pack_engine_implemented'])
-        || !empty($snap['p7_integration_baseline_complete'])
+    if (!empty($snap['p7_integration_baseline_complete'])
         || !empty($snap['owner_cert_pass_granted'])
         || !empty($snap['p8_started'])
     ) {
         return [
             'ok' => false,
             'code' => 'p7_engines_premature',
-            'message' => 'WP-P7-03 must not mark evidence pack engine, P7 freeze, Owner Cert PASS, or P8 started.',
+            'message' => 'WP-P7-04 must not mark P7 freeze, Owner Cert PASS, or P8 started.',
             'fail_closed' => true,
         ];
     }
@@ -184,7 +186,7 @@ function orange_cpr_p7_control_plane_assert(array $env): array
     return [
         'ok' => true,
         'code' => 'ok',
-        'message' => 'P7 control plane hard rules hold; harness+scenario execution implemented; evidence deferred; P8/enablement withheld.',
+        'message' => 'P7 control plane hard rules hold; harness+execution+evidence implemented; freeze/P8 deferred; enablement withheld.',
         'snapshot' => $snap,
         'enablement_flag_observed' => false,
         'production_mutation' => false,

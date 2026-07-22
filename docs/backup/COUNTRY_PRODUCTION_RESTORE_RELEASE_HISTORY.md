@@ -143,7 +143,7 @@ Every completed major phase shall contain:
 | Field | Value |
 |-------|--------|
 | **Current Phase** | **P7 IN PROGRESS** |
-| **Current State** | **WP-P7-03 COMPLETE — AWAITING OWNER APPROVAL FOR WP-P7-04** |
+| **Current State** | **WP-P7-04 COMPLETE — AWAITING OWNER APPROVAL FOR WP-P7-05** |
 
 *(Update the Current Project Status block when the active phase changes. Append new phase sections for P6–P9; do not rewrite P0–P5 above.)*
 

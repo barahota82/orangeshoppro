@@ -128,7 +128,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p703_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_dx('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-03-drill-execution');
+    cpr_dx('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-04-evidence-pack');
     cpr_dx('dirname_constant', ORANGE_CPR_DRILL_EXECUTION_DIRNAME === 'drill_execution');
     cpr_dx(
         'catalog_count',
@@ -140,8 +140,8 @@ try {
         !empty(orange_cpr_p7_control_plane_snapshot()['drill_execution_engine_implemented'])
     );
     cpr_dx(
-        'control_plane_no_evidence_yet',
-        empty(orange_cpr_p7_control_plane_snapshot()['evidence_pack_engine_implemented'])
+        'control_plane_evidence_flag_present',
+        !empty(orange_cpr_p7_control_plane_snapshot()['evidence_pack_engine_implemented'])
     );
 
     $src = (string) file_get_contents(

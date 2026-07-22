@@ -71,7 +71,7 @@ $base = $bundle['base'];
 $cprRoot = $bundle['cpr'];
 
 try {
-    cpr_p4i('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-03-drill-execution');
+    cpr_p4i('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-04-evidence-pack');
     cpr_p4i(
         'stage_order_complete',
         orange_cpr_p4_integration_stage_order() === [

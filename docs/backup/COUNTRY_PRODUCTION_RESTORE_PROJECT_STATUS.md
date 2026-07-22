@@ -29,7 +29,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Field | Value |
 |-------|--------|
 | **Current Phase** | **P7 IN PROGRESS** |
-| **Overall State** | **WP-P7-03 COMPLETE — AWAITING OWNER APPROVAL FOR WP-P7-04** |
+| **Overall State** | **WP-P7-04 COMPLETE — AWAITING OWNER APPROVAL FOR WP-P7-05** |
 
 ---
 
@@ -134,12 +134,12 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P7** (authorized; WP-P7-03 DS-* scenario execution complete)
+**P7** (authorized; WP-P7-04 evidence pack sealed)
 
 ### Next Work Package
 
-**WP-P7-04** — Evidence Pack Assembly & Seal (P2-04 / EV-01…EV-14)  
-*(Do **not** begin until Owner explicitly reviews and approves WP-P7-03 / next WP.)*
+**WP-P7-05** — P7 Integration Review & Clone-Drill Evidence Baseline Freeze  
+*(Do **not** begin until Owner explicitly reviews and approves WP-P7-04 / next WP.)*
 
 ---
 
