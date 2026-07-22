@@ -82,10 +82,10 @@ Do **not** execute Super Admin Enable. Do **not** write the enablement flag true
 
 ## 5. Stop rule
 
-**WP-P9-02 COMPLETE.**  
-Commit → Push → **STOP.**  
-Do **not** begin **WP-P9-03** until Owner explicitly reviews and approves the next Work Package.  
-Do **not** flip enablement.
+**WP-P9-02 COMPLETE** (delivered; enablement flag remained FALSE).  
+
+**Live status (supersedes the original inter-WP freeze text):** WP-P9-03 and WP-P9-04 are **COMPLETE**. Live stop guidance is `COUNTRY_PRODUCTION_RESTORE_P9_ARTIFACT_INDEX.md` §13 and Project Status — await Owner approval of the FINAL Enterprise Audit before Git Tag / P9 Phase Sign-Off / project closure.  
+Do **not** flip enablement outside the WP-P9-03 sealed ops-state path.
 
 ---
 

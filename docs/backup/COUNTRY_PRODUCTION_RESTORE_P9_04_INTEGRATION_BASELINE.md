@@ -163,14 +163,15 @@ Orchestrated chain self-test proves Cert → E5 → Enable → Disable → Schem
 
 ## 7. Stop rule
 
-**WP-P9-04 COMPLETE.**  
-Commit → Push → **STOP.**  
+**WP-P9-04 COMPLETE** (P9 enablement baseline frozen).  
 
-Do **not** start the Enterprise Audit.  
+**Live status:** FINAL Enterprise Audit is documented in `COUNTRY_PRODUCTION_RESTORE_FINAL_ENTERPRISE_AUDIT.md` (**PASSED**; Owner approval of the audit verdict still pending).  
+Historical freeze text retained for evidence: Do **not** start the Enterprise Audit.  
 Do **not** create the Git Tag.  
+Do **not** produce the P9 Phase Sign-Off.  
 Do **not** declare the project complete.  
 
-Wait for Owner review and approval.
+Wait for Owner approval of the FINAL audit verdict before Tag / Sign-Off / closure.
 
 ---
 

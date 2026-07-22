@@ -4,11 +4,12 @@
 |-------|--------|
 | **Audit type** | **FINAL** Enterprise Audit — complete CPR v1.0 implementation (P0–P9) |
 | **Artifact-ID** | `CPR-FINAL-ENTERPRISE_AUDIT` |
-| **Mode** | **AUDIT ONLY** — no remediation, no Architecture/OD edits, no Git Tag, no Phase Sign-Off, no project-complete declaration |
-| **Audited tip** | `093b60d1` — *Implement WP-P9-04 P9 enablement integration baseline freeze.* |
+| **Mode** | **AUDIT ONLY** — no remediation of runtime code, no Architecture/OD edits, no Git Tag, no Phase Sign-Off, no project-complete declaration |
+| **Audited tip (implementation)** | `093b60d1` — *Implement WP-P9-04 P9 enablement integration baseline freeze.* |
+| **Documentation consistency tip** | This regenerated audit records documentation-only corrections after Owner-required consistency restore (see §7). |
 | **Scaffold version** | `P9-04-integration-baseline` |
 | **Date** | 2026-07-22 |
-| **Authorization** | Owner approved WP-P9-04; accepted P9 Integration Baseline; authorized FINAL CPR Enterprise Audit |
+| **Authorization** | Owner approved WP-P9-04; accepted P9 Integration Baseline; authorized FINAL CPR Enterprise Audit; required documentation inconsistency count → **0** before closure |
 | **Baselines consumed** | `P0-P0b-Final` · `P1-Design-Baseline` · `P2-Design-Baseline` · `P3-Engine-Baseline` · `P4-PrePONR-Baseline` · `P5-PONR-Execution-Baseline` · `P6-VerifyRollback-Baseline` · `P7-CloneDrill-Evidence-Baseline` · `P8-OwnerCert-Baseline` |
 | **Policy SoT** | `COUNTRY_PRODUCTION_RESTORE_OWNER_DECISIONS.md` |
 | **Architecture** | `COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` (**unchanged in P9**) |
@@ -19,7 +20,9 @@
 
 ## 1. Executive audit summary
 
-CPR delivers a complete, Owner-authorized **P0–P9** Country Production Restore stack whose final implementation phase (**P9 Enablement**) freezes a verified operational enablement chain under OD-ENABLE / OD-PERM / OD-SCHEMA:
+CPR delivers a complete, Owner-authorized **P0–P9** Country Production Restore stack. Implementation tip `093b60d1` remains accepted. The prior FINAL audit (`eccdc450`) correctly found **zero** runtime defects but reported **three documentation inconsistencies** (status/history/stop-rule lag). Those three items were **corrected in documentation only**; implementation code was **not** modified.
+
+Verified enablement chain:
 
 ```text
 Owner Certification PASS
@@ -32,21 +35,19 @@ Owner Certification PASS
   ✗ STOP — no Git Tag / no Phase Sign-Off / no project closure in this audit
 ```
 
-WP-P9-01…04 are **COMPLETE**, artifact filenames match the P9 Artifact Index, and Architecture / OWNER_APPROVED Register were **not modified** by P9 commits (`git log 32b095e7..093b60d1` empty for those two files). All prior phase Git Tags peel to the commits recorded in Project Status. Prior phase Enterprise Audits (P4–P8) and Phase Sign-Offs (P4–P8) remain **PASSED / APPROVED** and mutually consistent with tags and Release History.
+Safety posture (unchanged from implementation tip):
 
-Safety posture at tip `093b60d1`:
+- **Only WP-P9-03** may change the operational enablement flag.
+- **No automatic enablement** / **no automatic re-enable** after E8.
+- **Schema invalidation force-disables immediately** to E8 / flag FALSE.
+- **No** production SQL / uploads mutation under P9 enablement modules.
+- Bypass / privilege / replay / cross-country / Tag / Sign-Off / project-close knobs remain **fail-closed**.
+- Full CPR self-test battery at implementation tip: **1150 PASS / 0 FAIL** (**40** suites).
+- All P0–P8 Git Tags peel to the commits recorded in Project Status (**0** mismatches).
+- All P4–P8 Enterprise Audit and Phase Sign-Off documents are present; FINAL audit pointer present; P9 Phase Sign-Off correctly recorded as **not yet produced**.
 
-- **Only WP-P9-03** may change the operational enablement flag: sole call site of `orange_cpr_enablement_ops_state_write()` is `cpr_enablement_action_live.php`; substrate hard-stamps `written_by_wp=WP-P9-03`; P9 integration does **not** call the writer.
-- **No automatic enablement** (E5 leaves flag FALSE; auto-enable knobs fail-closed).
-- **No automatic re-enable** after E8 (enable refused with `eact_state_forbidden`; `auto_reenable=false` sealed).
-- **Schema invalidation force-disables immediately** to E8 / flag FALSE via Super Admin `schema_force_disable` path (OD-SCHEMA).
-- **No** production SQL writers under P9 enablement modules (`db(` / `PDO::` / `mysqli_` / `DELETE FROM` / `INSERT INTO` → **no matches**).
-- **No** production uploads-tree mutation (`production_uploads_mutated=false` / `production_resources_accessed=false`).
-- Bypass / privilege / replay / cross-country / Enterprise-Audit-self-start / Git Tag / Sign-Off / project-close knobs are **fail-closed**.
-- Full CPR self-test battery re-executed for this audit: **1150 PASS / 0 FAIL** (**40** suites).
-- Integration order matches Architecture roadmap P9, Artifact Index §8, and `orange_cpr_p9_integration_stage_order()`.
-
-**No BLOCKER, CRITICAL, HIGH, MEDIUM, or LOW findings.** Residual items are documentation INFORMATIONAL notes that do **not** prevent accepting CPR v1.0 as safe for Owner-gated final closure (Tag → Sign-Off → status/history), which remain **out of scope** for this audit.
+**No BLOCKER, CRITICAL, HIGH, MEDIUM, or LOW findings.**  
+**Documentation inconsistencies = 0** after restoration.
 
 ### Final verdict
 
@@ -54,65 +55,43 @@ Safety posture at tip `093b60d1`:
 FINAL ENTERPRISE AUDIT PASSED
 ```
 
-CPR v1.0 implementation is **safe for final project closure** under the frozen Architecture and OWNER_APPROVED Register. Git Tag, P9 Phase Sign-Off, and project-complete declaration remain **Owner-gated** and are **not** produced by this audit.
+CPR v1.0 implementation remains **safe for final project closure** under the frozen Architecture and OWNER_APPROVED Register. Git Tag, P9 Phase Sign-Off, and project-complete declaration remain **Owner-gated** and are **not** produced by this audit. Owner approval of this audit verdict is still required before Tag / Sign-Off.
 
 ---
 
-## 2. Scope audited
+## 2. The three documentation inconsistencies (explicit)
 
-| Area | Coverage |
-|------|----------|
-| Work Packages | WP-P9-01 … WP-P9-04 |
-| Prior phases | P0–P8 frozen baselines, tags, Enterprise Audits, Phase Sign-Offs |
-| Design documents | All `COUNTRY_PRODUCTION_RESTORE_P9_*.md` + P9 Artifact Index + P9-04 Integration Baseline |
-| Live modules | `cpr_p9_control_plane.php`, `cpr_enablement_preconditions_live.php`, `cpr_enablement_action_live.php`, `cpr_enablement.php` (ops substrate), `cpr_p9_integration.php` |
-| Enablement chain | Cert PASS → E5 → Enable → ops → Disable → Schema FD E8 → Freeze |
-| Consistency | Architecture + OWNER_APPROVED Register |
-| Control / status | Artifact Indexes, Project Status, Release History, prior audits/sign-offs/tags |
-| Evidence | Sealed records, self-tests, refuse helpers, integration verify |
+| ID | Inconsistency (as first reported) | Correction applied |
+|----|-----------------------------------|--------------------|
+| **DOC-1** (was FINAL-EA-I01) | `PROJECT_STATUS.md` Overall State said WP-P9-04 COMPLETE, but **Next Phase** still said “WP-P9-03 COMPLETE; WP-P9-04 Owner-gated” and blocked beginning WP-P9-04 | Next Phase / gated steps updated to WP-P9-01…04 COMPLETE; next gates = Owner approve FINAL audit → Tag → P9 Sign-Off → closure |
+| **DOC-2** (was FINAL-EA-I02) | `P9_02` / `P9_03` design docs still said “Do not begin” the next WP after those WPs were already COMPLETE | Stop rules updated with live supersession text pointing to Artifact Index §13 / Project Status |
+| **DOC-3** (was FINAL-EA-I03) | Project Status Enterprise Status listed P4–P8 audits but omitted the FINAL CPR Enterprise Audit row / pointer | FINAL audit row + pointer added; P9 Sign-Off explicitly “Not yet produced”; Release History Current State aligned |
 
-### Normative chain (verified in `orange_cpr_p9_integration_stage_order()`)
-
-```text
-owner_certification
-  → e5_preconditions
-  → super_admin_enable
-  → operational_enablement
-  → operational_disable
-  → schema_force_disable
-  → integration_freeze
-```
+Supporting doc alignment (same documentation-only pass): Artifact Index §13 and P9-04 stop rule now record FINAL audit documented + Owner approval pending; historical freeze phrase retained for evidence.
 
 ---
 
 ## 3. Work Package completeness (P9)
 
-| WP | Status in Index | Primary artifact present | Code / notes |
-|----|-----------------|--------------------------|--------------|
+| WP | Status in Index | Primary artifact | Code |
+|----|-----------------|------------------|------|
 | WP-P9-01 | COMPLETE | `P9_ARTIFACT_INDEX.md` | `cpr_p9_control_plane.php` |
 | WP-P9-02 | COMPLETE | `P9_02_ENABLEMENT_PRECONDITIONS.md` | `cpr_enablement_preconditions_live.php` |
-| WP-P9-03 | COMPLETE | `P9_03_ENABLEMENT_ACTIONS.md` | `cpr_enablement_action_live.php` (+ ops substrate) |
+| WP-P9-03 | COMPLETE | `P9_03_ENABLEMENT_ACTIONS.md` | `cpr_enablement_action_live.php` |
 | WP-P9-04 | COMPLETE | `P9_04_INTEGRATION_BASELINE.md` | `cpr_p9_integration.php` |
 
-**Result:** All four P9 WPs complete and internally consistent with index naming and scaffold `P9-04-integration-baseline`.
+**Result:** All four P9 WPs complete and consistent.
 
 ---
 
 ## 4. Architecture & OWNER_APPROVED consistency
 
-| Check | Result | Evidence |
-|-------|--------|----------|
-| Architecture file modified in P9 commits | **No** | `git log 32b095e7..093b60d1 -- …ARCHITECTURE.md` empty |
-| OWNER_APPROVED Register modified in P9 | **No** | Same for `…OWNER_DECISIONS.md` |
-| Roadmap P9 = Enablement → Flag true under OD-ENABLE path | **Yes** | Architecture roadmap P9; Index §1/§4/§8; integration stage order |
-| OD-ENABLE four preconditions before Enable | **Yes** | E5 engine; Enable requires sealed E5 + Owner order + Cert PASS |
-| Cert PASS ≠ enablement | **Yes** | E5 leaves flag FALSE; control plane `cert_pass_does_not_enable` |
-| No auto-enable / no auto re-enable | **Yes** | Knobs refused; E8 blocks Enable; constants sealed |
-| OD-PERM Super Admin only Enable/Disable | **Yes** | Action engine permission refuse; Country Admin / Engineering denied |
-| OD-SCHEMA force-disable + no auto re-enable | **Yes** | `schema_force_disable` → E8; re-enable refused |
-| Only WP-P9-03 writes ops flag | **Yes** | Sole `ops_state_write` call site; `written_by_wp` hard-stamp |
-| P0–P8 contracts preserved | **Yes** | P9 consumes P8 cert + P3–P8 engines; no forks |
-| Closure boundaries withheld in engines | **Yes** | Integration refuses Audit/Tag/Sign-Off/close knobs |
+| Check | Result |
+|-------|--------|
+| Architecture modified in P9 implementation commits | **No** |
+| OWNER_APPROVED Register modified in P9 implementation commits | **No** |
+| OD-ENABLE / OD-PERM / OD-SCHEMA / no auto-enable / no auto re-enable | **Yes** |
+| Only WP-P9-03 writes ops flag | **Yes** |
 
 **Architecture deviation count:** **0**  
 **OWNER_APPROVED violation count:** **0**
@@ -121,8 +100,8 @@ owner_certification
 
 ## 5. Frozen baselines / tags / audits / sign-offs consistency
 
-| Git tag | Peeled commit (short) | Project Status record | Match |
-|---------|----------------------:|-----------------------|-------|
+| Git tag | Peeled commit (short) | Project Status | Match |
+|---------|----------------------:|----------------|-------|
 | `P0-P0b-Final` | `e6c19ef1` | `e6c19ef1` | **Yes** |
 | `P1-Design-Baseline` | `56580dab` | `56580dab` | **Yes** |
 | `P2-Design-Baseline` | `4cadc687` | `4cadc687` | **Yes** |
@@ -134,38 +113,30 @@ owner_certification
 | `P8-OwnerCert-Baseline` | `2f1778f9` | `2f1778f9` | **Yes** |
 | P9 baseline tag | *(none — correctly withheld)* | N/A | **Yes** |
 
-| Prior phase gate | Status |
-|------------------|--------|
-| P4–P8 Enterprise Audits | **PASSED** (documents present) |
-| P4–P8 Phase Sign-Offs | **APPROVED** |
-| Release History Current State | WP-P9-04 COMPLETE; awaiting Owner Audit/Tag/Sign-Off |
+| Gate document | Present | Status recorded |
+|---------------|---------|-----------------|
+| P4–P8 Enterprise Audits | **Yes** | **PASSED** |
+| FINAL CPR Enterprise Audit | **Yes** | **PASSED** (Owner approval of verdict pending) |
+| P4–P8 Phase Sign-Offs | **Yes** | **APPROVED** |
+| P9 Phase Sign-Off | **No** (correct) | **Not yet produced** |
 
-**Mismatch count (baseline/tag/status):** **0**
+Project Status and Release History **Current State** blocks match:
+
+`WP-P9-04 COMPLETE — FINAL ENTERPRISE AUDIT PASSED (DOCUMENTATION CONSISTENCY RESTORED) — AWAITING OWNER APPROVAL OF AUDIT BEFORE TAG / SIGN-OFF`
+
+**Mismatch count:** **0**
 
 ---
 
-## 6. Safety & fail-closed verification (objectives 3–6)
+## 6. Safety & fail-closed verification (implementation tip `093b60d1`)
 
-| Objective | Result | Notes |
-|-----------|--------|-------|
-| 3. Only WP-P9-03 modifies Enablement flag | **PASS** | Sole writer call site; control plane `only_wp_p9_03_may_change_flag` |
-| 4. No automatic enablement / re-enable | **PASS** | E5≠enable; auto knobs refused; E8 blocks Enable |
-| 5. Schema invalidation force-disables immediately / fail-closed | **PASS** | Force-disable → E8 + invalidation seal; flag FALSE |
-| 6a. No hidden bypass / privilege escalation | **PASS** | Per-engine `refuse_unsafe`; SA-only actions; Owner order required for Enable |
-| 6b. No replay path | **PASS** | Action/E5/integration replay refused; freeze `force_replay` refused |
-| 6c. No cross-country expansion | **PASS** | Country bind checks in E5/action/integration verify |
-| 6d. No unauthorized production mutation | **PASS** | No SQL/PDO in P9 modules; uploads/mutation flags false |
-| Fingerprint / job / contract / audit / recovery continuity | **PASS** | Integration verify checks |
-| No orphan enablement/cert artifacts after freeze chain | **PASS** | Verifier `no_orphan_artifacts` |
-
-Spot checks (audit tip `093b60d1`):
-
-- Grep `orange_cpr_enablement_ops_state_write` → definition + **one** call site in `cpr_enablement_action_live.php`
-- Grep SQL/PDO/db under P9 modules → **no matches**
-- Scaffold `ORANGE_CPR_SCAFFOLD_VERSION` = `P9-04-integration-baseline`
-- Arch/OD files untouched across P9 commit range
-- `git tag -l '*P9*'` → **empty** (no premature P9 tag)
-- Control plane: `p9_integration_baseline_complete=true`, `enterprise_audit_started=false`, `git_tag_created=false`, `project_closed=false`
+| Objective | Result |
+|-----------|--------|
+| Only WP-P9-03 modifies Enablement flag | **PASS** |
+| No automatic enablement / re-enable | **PASS** |
+| Schema invalidation force-disables immediately / fail-closed | **PASS** |
+| No hidden bypass / privilege / replay / cross-country / unauthorized production mutation | **PASS** |
+| Complete CPR suite green | **PASS** — 40 suites / **1150** PASS / **0** FAIL |
 
 ---
 
@@ -178,11 +149,11 @@ Spot checks (audit tip `093b60d1`):
 | — | **HIGH** | — | *(none)* | — |
 | — | **MEDIUM** | — | *(none)* | — |
 | — | **LOW** | — | *(none)* | — |
-| FINAL-EA-I01 | **INFORMATIONAL** | Project Status “Next Phase” lag | `PROJECT_STATUS.md` Overall State correctly records WP-P9-04 COMPLETE, but **Next Phase** still reads “WP-P9-03 COMPLETE; WP-P9-04 Owner-gated” and instructs not to begin WP-P9-04 | Documentation lag only; does not affect runtime freeze |
-| FINAL-EA-I02 | **INFORMATIONAL** | Historical WP stop rules | WP-P9-02 / WP-P9-03 design docs retain original “Do not begin next WP” freeze text | Intentional historical freeze text; Artifact Index §13 is the live stop rule |
-| FINAL-EA-I03 | **INFORMATIONAL** | Enterprise Status table lag | Project Status Enterprise Status lists P4–P8 audits PASSED but does not yet list this FINAL audit row | Expected until Owner-authorized status update after audit acceptance |
-| FINAL-EA-I04 | **INFORMATIONAL** | Control-plane global flag | Snapshot keeps `ops_flag_flipped_true=false` even though per-root sealed ops state may be TRUE during an Enable window | Intentional: registry does not claim a global always-on enable; sealed ops state under `{cprRoot}/enablement_ops/` is authoritative |
-| FINAL-EA-I05 | **INFORMATIONAL** | Closure boundary | Integration engines refuse self-start of Enterprise Audit / Git Tag / Sign-Off / project close | Correct fail-closed posture; this audit proceeds only under separate Owner authorization and does not create Tag / Sign-Off / declare complete |
+| DOC-1 | **RESOLVED** | Project Status Next Phase lag | Was stale WP-P9-03/WP-P9-04 gate text | Corrected in Project Status |
+| DOC-2 | **RESOLVED** | P9-02 / P9-03 stop-rule lag | Was “Do not begin next WP” after later WPs complete | Live supersession text added |
+| DOC-3 | **RESOLVED** | Enterprise Status / pointer lag | FINAL audit row/pointer missing | FINAL audit row + pointer + Release History alignment |
+| FINAL-EA-I04 | **INFORMATIONAL** | Control-plane global flag | `ops_flag_flipped_true=false` in registry while per-root sealed ops state may be TRUE during Enable | Intentional; not a documentation inconsistency |
+| FINAL-EA-I05 | **INFORMATIONAL** | Closure boundary | Engines refuse self-start of Tag / Sign-Off / project close | Intentional fail-closed posture |
 
 ---
 
@@ -195,64 +166,24 @@ Spot checks (audit tip `093b60d1`):
 | **HIGH findings** | **0** |
 | **MEDIUM findings** | **0** |
 | **LOW findings** | **0** |
-| **INFORMATIONAL findings** | **5** |
+| **INFORMATIONAL findings** | **2** *(intentional control/boundary notes only)* |
 | **Explicit mismatch count** | **0** |
 | **Explicit unresolved defect count** | **0** |
 | **Explicit architecture deviation count** | **0** |
 | **Explicit OWNER_APPROVED violation count** | **0** |
-| **Explicit documentation inconsistency count** | **3** *(I01–I03; I04–I05 are intentional control/boundary notes)* |
+| **Explicit documentation inconsistency count** | **0** |
 
 ---
 
 ## 9. Complete test summary
 
-Re-executed on audited tip `093b60d1` (Laragon PHP 8.3.30):
+Re-executed on implementation tip `093b60d1` (Laragon PHP 8.3.30) during the original FINAL audit; documentation-only corrections do not change runtime:
 
-| Suite | PASS | FAIL |
-|-------|-----:|-----:|
-| `self_test_cpr_approvals_live.php` | 18 | 0 |
-| `self_test_cpr_authority.php` | 18 | 0 |
-| `self_test_cpr_authority_live.php` | 22 | 0 |
-| `self_test_cpr_checkpoints.php` | 24 | 0 |
-| `self_test_cpr_delete_live.php` | 22 | 0 |
-| `self_test_cpr_drill_execution_live.php` | 27 | 0 |
-| `self_test_cpr_drill_harness_live.php` | 30 | 0 |
-| `self_test_cpr_enablement_action_live.php` | 32 | 0 |
-| `self_test_cpr_enablement_preconditions_live.php` | 30 | 0 |
-| `self_test_cpr_evidence_pack_live.php` | 28 | 0 |
-| `self_test_cpr_gates.php` | 18 | 0 |
-| `self_test_cpr_gates_live.php` | 28 | 0 |
-| `self_test_cpr_import_live.php` | 46 | 0 |
-| `self_test_cpr_job_framework.php` | 18 | 0 |
-| `self_test_cpr_lock_live.php` | 31 | 0 |
-| `self_test_cpr_locks.php` | 24 | 0 |
-| `self_test_cpr_maint_release_live.php` | 30 | 0 |
-| `self_test_cpr_maintenance_live.php` | 32 | 0 |
-| `self_test_cpr_mutation.php` | 11 | 0 |
-| `self_test_cpr_od_pin_live.php` | 26 | 0 |
-| `self_test_cpr_owner_cert_decision_live.php` | 37 | 0 |
-| `self_test_cpr_owner_submission_live.php` | 37 | 0 |
-| `self_test_cpr_p4_integration.php` | 22 | 0 |
-| `self_test_cpr_p5_control_plane.php` | 25 | 0 |
-| `self_test_cpr_p5_integration.php` | 35 | 0 |
-| `self_test_cpr_p6_control_plane.php` | 37 | 0 |
-| `self_test_cpr_p6_integration.php` | 53 | 0 |
-| `self_test_cpr_p7_control_plane.php` | 22 | 0 |
-| `self_test_cpr_p7_integration.php` | 33 | 0 |
-| `self_test_cpr_p8_control_plane.php` | 24 | 0 |
-| `self_test_cpr_p8_integration.php` | 40 | 0 |
-| `self_test_cpr_p9_control_plane.php` | 27 | 0 |
-| `self_test_cpr_p9_integration.php` | 39 | 0 |
-| `self_test_cpr_post_verify_live.php` | 30 | 0 |
-| `self_test_cpr_rollback_live.php` | 31 | 0 |
-| `self_test_cpr_special_handlers_live.php` | 29 | 0 |
-| `self_test_cpr_state_engine.php` | 33 | 0 |
-| `self_test_cpr_success_finalize_live.php` | 28 | 0 |
-| `self_test_cpr_uploads_live.php` | 28 | 0 |
-| `self_test_cpr_witnesses_live.php` | 25 | 0 |
-| **TOTAL (40 suites)** | **1150** | **0** |
-
-PHP lint / UTF-8: clean on audited tip (prior P9-04 verification + suite re-execution).
+| Metric | Value |
+|--------|------:|
+| Suites | **40** |
+| PASS | **1150** |
+| FAIL | **0** |
 
 ---
 
@@ -260,28 +191,26 @@ PHP lint / UTF-8: clean on audited tip (prior P9-04 verification + suite re-exec
 
 | Question | Answer |
 |----------|--------|
-| Is every P9 WP complete and consistent? | **Yes** |
-| Does full P0–P9 implementation match frozen Architecture + OWNER_APPROVED? | **Yes** |
-| Only WP-P9-03 can modify the Enablement flag? | **Yes** |
-| No automatic enablement / automatic re-enable? | **Yes** |
-| Schema invalidation force-disables immediately and fail-closed? | **Yes** |
-| No hidden bypass / replay / privilege / cross-country / unauthorized production mutation? | **Yes** |
-| Frozen baselines, tags, audits, sign-offs, status, history mutually consistent? | **Yes** *(runtime/tag/audit evidence; doc lag INFORMATIONAL only)* |
-| Complete CPR self-test suite green? | **Yes** — 40 / 1150 PASS |
-| Safe for final project closure (Owner-gated Tag → Sign-Off → status)? | **Yes** |
+| Every P9 WP complete and consistent? | **Yes** |
+| Full P0–P9 matches Architecture + OWNER_APPROVED? | **Yes** |
+| Documentation inconsistencies = 0? | **Yes** |
+| Project Status matches completed phases / tags / audits / sign-off pointers? | **Yes** |
+| Release History matches current completed state? | **Yes** |
+| Every Git Tag matches recorded baseline? | **Yes** |
+| Safe for final project closure (Owner-gated Tag → Sign-Off)? | **Yes** |
+| Owner has approved this audit verdict? | **Pending** (explicitly not yet approved) |
 
 ---
 
 ## 11. Stop rule (post-audit)
 
-**FINAL CPR ENTERPRISE AUDIT COMPLETE — PASSED.**  
+**FINAL CPR ENTERPRISE AUDIT COMPLETE — PASSED** (documentation consistency restored).  
 
 Do **not** create the final **Git Tag** in this audit.  
 Do **not** produce the **P9 Phase Sign-Off** in this audit.  
 Do **not** declare **CPR v1.0 complete** in this audit.  
-Do **not** remediate INFORMATIONAL items in this audit session.  
 
-Wait for Owner review. Tag / Phase Sign-Off / project closure require **explicit** Owner authorization.
+Wait for Owner approval of this audit verdict before Tag / Sign-Off / closure.
 
 ---
 
@@ -298,11 +227,12 @@ FINAL ENTERPRISE AUDIT PASSED
 | **Unresolved defects** | **0** |
 | **Architecture deviations** | **0** |
 | **OWNER_APPROVED violations** | **0** |
-| **Documentation inconsistencies (informational)** | **3** |
+| **Documentation inconsistencies** | **0** |
 | **Git Tag created by this audit** | **No** |
 | **P9 Phase Sign-Off produced** | **No** |
 | **CPR v1.0 declared complete** | **No** |
+| **Owner approval of audit verdict** | **Pending** |
 
 ---
 
-*End of FINAL CPR Enterprise Audit — P0–P9 Enablement Baseline.*
+*End of FINAL CPR Enterprise Audit — regenerated after documentation consistency restore.*

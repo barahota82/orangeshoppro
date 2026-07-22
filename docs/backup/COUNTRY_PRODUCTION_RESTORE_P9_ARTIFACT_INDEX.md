@@ -294,13 +294,15 @@ Every later P9 design/code change must cite at least one of:
 **WP-P9-02 COMPLETE** (Enablement Preconditions & Owner Enablement Order).  
 **WP-P9-03 COMPLETE** (Super Admin Enable/Disable & Schema Force-Disable).  
 **WP-P9-04 COMPLETE** (P9 Integration Review & Enablement Baseline Freeze).  
-Commit → Push → **STOP.**  
 
-Do **not** start the Enterprise Audit.  
+**FINAL Enterprise Audit:** documented in `COUNTRY_PRODUCTION_RESTORE_FINAL_ENTERPRISE_AUDIT.md` (**PASSED**; documentation consistency restored; Owner approval of the audit verdict still pending).  
+
+Historical WP-P9-04 freeze text retained for evidence: Do **not** start the Enterprise Audit.  
 Do **not** create the Git Tag.  
+Do **not** produce the P9 Phase Sign-Off.  
 Do **not** declare the project complete.  
 
-Wait for Owner review and approval.
+Wait for Owner approval of the FINAL audit verdict before Tag / Sign-Off / closure.
 
 ---
 

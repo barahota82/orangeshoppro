@@ -84,9 +84,9 @@ E5/E6 + schema FD  → E8_schema_invalidated (flag false; no auto re-enable)
 
 ## 5. Stop rule
 
-**WP-P9-03 COMPLETE.**  
-Commit → Push → **STOP.**  
-Do **not** begin **WP-P9-04** until Owner explicitly reviews and approves the next Work Package.
+**WP-P9-03 COMPLETE** (sole sealed writer of the operational enablement flag).  
+
+**Live status (supersedes the original inter-WP freeze text):** WP-P9-04 is **COMPLETE**. Live stop guidance is `COUNTRY_PRODUCTION_RESTORE_P9_ARTIFACT_INDEX.md` §13 and Project Status — await Owner approval of the FINAL Enterprise Audit before Git Tag / P9 Phase Sign-Off / project closure.
 
 ---
 

@@ -28,8 +28,8 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P9 IN PROGRESS** |
-| **Overall State** | **WP-P9-04 COMPLETE — P9 ENABLEMENT BASELINE FROZEN — AWAITING OWNER APPROVAL BEFORE ENTERPRISE AUDIT / TAG / SIGN-OFF** |
+| **Current Phase** | **P9 IN PROGRESS** (implementation + FINAL audit documented; closure Owner-gated) |
+| **Overall State** | **WP-P9-04 COMPLETE — FINAL ENTERPRISE AUDIT PASSED (DOCUMENTATION CONSISTENCY RESTORED) — AWAITING OWNER APPROVAL OF AUDIT BEFORE TAG / SIGN-OFF** |
 
 ---
 
@@ -119,6 +119,7 @@ Every approved baseline tag (annotated; on `origin`):
 | P6 Enterprise Audit | **PASSED** |
 | P7 Enterprise Audit | **PASSED** |
 | P8 Enterprise Audit | **PASSED** |
+| FINAL CPR Enterprise Audit (P0–P9) | **PASSED** (documented; Owner approval of verdict pending) |
 
 ---
 
@@ -131,6 +132,7 @@ Every approved baseline tag (annotated; on `origin`):
 | **P6** | **APPROVED** | `P6 VERIFY/ROLLBACK POST-EXECUTION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P7 ONLY` |
 | **P7** | **APPROVED** | `P7 CLONE-DRILL EVIDENCE BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P8 ONLY` |
 | **P8** | **APPROVED** | `P8 OWNER CERTIFICATION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P9 ONLY` |
+| **P9** | **Not yet produced** | Awaiting Owner approval of FINAL Enterprise Audit → Tag → Sign-Off |
 
 ---
 
@@ -148,12 +150,18 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P9** (Enablement / OD-ENABLE path) — **WP-P9-03 COMPLETE**; WP-P9-04 Owner-gated.
+**P9** (Enablement / OD-ENABLE path) — **WP-P9-01…04 COMPLETE**; P9 enablement baseline frozen; FINAL Enterprise Audit documented **PASSED**.
 
-### Next gated step (Owner only)
+### Next gated steps (Owner only)
 
-**WP-P9-04** (P9 Integration Review & Enablement Baseline Freeze)  
-*(Do **not** begin WP-P9-04 until Owner explicitly approves WP-P9-03.)*
+1. Owner **approve** the FINAL Enterprise Audit verdict.  
+2. Create the final **Git Tag** (Owner-authorized only).  
+3. Produce the **P9 Phase Sign-Off** (Owner-authorized only).  
+4. Update Project Status / Release History for official CPR v1.0 closure.  
+
+Do **not** create the Git Tag.  
+Do **not** produce the P9 Phase Sign-Off.  
+Do **not** declare CPR v1.0 complete.
 
 ---
 
@@ -165,6 +173,11 @@ Every approved baseline tag (annotated; on `origin`):
 | Architecture (frozen) | `docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` |
 | Release history | `docs/backup/COUNTRY_PRODUCTION_RESTORE_RELEASE_HISTORY.md` |
 | P9 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P9_ARTIFACT_INDEX.md` |
+| P9-02 Enablement Preconditions | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P9_02_ENABLEMENT_PRECONDITIONS.md` |
+| P9-03 Enablement Actions | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P9_03_ENABLEMENT_ACTIONS.md` |
+| P9-04 Integration Baseline | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P9_04_INTEGRATION_BASELINE.md` |
+| FINAL CPR Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_FINAL_ENTERPRISE_AUDIT.md` |
+| P9 Phase Sign-Off | **Not yet produced** (Owner-gated after audit approval + Tag) |
 | P8 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md` |
 | P8 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_ENTERPRISE_AUDIT.md` |
 | P8 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_PHASE_SIGN_OFF.md` |
@@ -174,12 +187,12 @@ Every approved baseline tag (annotated; on `origin`):
 | P6 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_ARTIFACT_INDEX.md` |
 | P6 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_ENTERPRISE_AUDIT.md` |
 | P6 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_PHASE_SIGN_OFF.md` |
-| P4 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_ARTIFACT_INDEX.md` |
-| P4 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_ENTERPRISE_AUDIT.md` |
-| P4 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_PHASE_SIGN_OFF.md` |
 | P5 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P5_ARTIFACT_INDEX.md` |
 | P5 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P5_ENTERPRISE_AUDIT.md` |
 | P5 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P5_PHASE_SIGN_OFF.md` |
+| P4 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_ARTIFACT_INDEX.md` |
+| P4 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_ENTERPRISE_AUDIT.md` |
+| P4 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_PHASE_SIGN_OFF.md` |
 
 ---
 
