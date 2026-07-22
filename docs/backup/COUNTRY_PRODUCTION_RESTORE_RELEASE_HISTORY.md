@@ -127,14 +127,14 @@ Every completed major phase shall contain:
 
 | Field | Value |
 |-------|--------|
-| **Phase Name** | Verify + Rollback Integration Baseline Frozen |
-| **Completion Summary** | Post-verify / success finalize / OD-ROLLBACK / maint release (CP10–CP12) integrated; WP-P6-01…06 complete; P6 Integration Baseline frozen. Enterprise Audit / Git Tag / P7 withheld pending Owner. |
-| **Git Tag** | **NOT CREATED** (Owner gate) |
-| **Baseline Commit** | `32df2a22` (WP-P6-06 integration freeze tip audited) |
-| **Enterprise Audit Result** | **PASSED** (`COUNTRY_PRODUCTION_RESTORE_P6_ENTERPRISE_AUDIT.md`) |
-| **Sign-Off Result** | **AWAITING OWNER REVIEW** (`P6 VERIFY/ROLLBACK BASELINE APPROVED` / ready for Owner-authorized Tag / P7 only) |
+| **Phase Name** | Verify + Rollback Post-Execution Baseline Complete |
+| **Completion Summary** | Post-verify / success finalize / OD-ROLLBACK / maint release (CP10–CP12) integrated; WP-P6-01…06 complete; Integration Baseline frozen; Enterprise Audit PASSED; phase closed. |
+| **Git Tag** | `P6-VerifyRollback-Baseline` |
+| **Baseline Commit** | `9aa0fbbcf39823ef9a2dac368551b170e1e01eb8` |
+| **Enterprise Audit Result** | **PASSED** |
+| **Sign-Off Result** | **APPROVED** (`P6 VERIFY/ROLLBACK POST-EXECUTION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P7 ONLY`) |
 | **Completion Date** | 2026-07-22 |
-| **Status** | **ENTERPRISE AUDIT PASSED — AWAITING OWNER FOR TAG / P7** |
+| **Status** | **COMPLETE** |
 
 ---
 
@@ -142,8 +142,8 @@ Every completed major phase shall contain:
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P6 COMPLETE — ENTERPRISE AUDIT PASSED** |
-| **Current State** | **P6 ENTERPRISE AUDIT PASSED — AWAITING OWNER FOR GIT TAG / P7** |
+| **Current Phase** | **P6 COMPLETE** |
+| **Current State** | **P6 POST-EXECUTION BASELINE FROZEN — READY FOR OWNER-AUTHORIZED P7 ONLY** |
 
 *(Update the Current Project Status block when the active phase changes. Append new phase sections for P6–P9; do not rewrite P0–P5 above.)*
 
