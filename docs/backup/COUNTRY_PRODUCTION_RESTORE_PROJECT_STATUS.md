@@ -28,8 +28,8 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P7 COMPLETE — ENTERPRISE AUDIT PASSED** |
-| **Overall State** | **P7 ENTERPRISE AUDIT PASSED — AWAITING OWNER FOR GIT TAG / P8** |
+| **Current Phase** | **P7 COMPLETE** |
+| **Overall State** | **P7 CLONE-DRILL EVIDENCE BASELINE FROZEN — READY FOR OWNER-AUTHORIZED P8 ONLY** |
 
 ---
 
@@ -44,6 +44,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | ✓ **P4** | Pre-PONR Live Baseline |
 | ✓ **P5** | PONR Execution Baseline |
 | ✓ **P6** | Verify + Rollback Post-Execution Baseline |
+| ✓ **P7** | Clone-Drill Evidence Baseline |
 
 ---
 
@@ -58,6 +59,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | `P4-PrePONR-Baseline` |
 | `P5-PONR-Execution-Baseline` |
 | `P6-VerifyRollback-Baseline` |
+| `P7-CloneDrill-Evidence-Baseline` |
 
 ---
 
@@ -71,6 +73,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Production SQL execution | **Disabled** |
 | Production upload mutation | **Disabled** |
 | Clone drills (P7) | **Implemented** (enablement-FALSE sealed clone-drill evidence path) |
+| Owner Cert (P8) | **Not started** |
 | Architecture | **Frozen** |
 | Owner Decisions | **Frozen** |
 
@@ -89,10 +92,12 @@ Every approved baseline tag (annotated; on `origin`):
 | `P4-PrePONR-Baseline` | `6bc09bcb` |
 | `P5-PONR-Execution-Baseline` | `b4c7a739` |
 | `P6-VerifyRollback-Baseline` | `9aa0fbbc` |
+| `P7-CloneDrill-Evidence-Baseline` | `6ea00101` |
 
 **P4 baseline commit (full):** `6bc09bcbe97f2ef6de0dcc4e3fb552481d04842c`  
 **P5 baseline commit (full):** `b4c7a7394dcaddbd4288d7a8c951be85c9751a90`  
-**P6 baseline commit (full):** `9aa0fbbcf39823ef9a2dac368551b170e1e01eb8`
+**P6 baseline commit (full):** `9aa0fbbcf39823ef9a2dac368551b170e1e01eb8`  
+**P7 baseline commit (full):** `6ea0010170dfb5fdb08b8c373632bbeac17469c4`
 
 ---
 
@@ -118,7 +123,7 @@ Every approved baseline tag (annotated; on `origin`):
 | **P4** | **APPROVED** | `P4 PRE-PONR LIVE BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P5 ONLY` |
 | **P5** | **APPROVED** | `P5 PONR EXECUTION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P6 ONLY` |
 | **P6** | **APPROVED** | `P6 VERIFY/ROLLBACK POST-EXECUTION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P7 ONLY` |
-| **P7** | **AWAITING OWNER** | Enterprise Audit **PASSED**; Tag / phase sign-off / P8 Owner-gated |
+| **P7** | **APPROVED** | `P7 CLONE-DRILL EVIDENCE BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P8 ONLY` |
 
 ---
 
@@ -136,12 +141,12 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P7** Enterprise Audit **PASSED** — awaiting Owner for Tag / phase sign-off / P8.
+**P8** (Owner Cert PASS/FAIL) — **not started**.
 
 ### Next gated step (Owner only)
 
-**Git Tag** → **P8** (Owner Cert PASS/FAIL)  
-*(Do **not** create a Git Tag or begin P8 until Owner explicitly authorizes.)*
+**P8**  
+*(Do **not** begin P8 until Owner explicitly authorizes the next phase.)*
 
 ---
 
@@ -154,6 +159,7 @@ Every approved baseline tag (annotated; on `origin`):
 | Release history | `docs/backup/COUNTRY_PRODUCTION_RESTORE_RELEASE_HISTORY.md` |
 | P7 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P7_ARTIFACT_INDEX.md` |
 | P7 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P7_ENTERPRISE_AUDIT.md` |
+| P7 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P7_PHASE_SIGN_OFF.md` |
 | P6 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_ARTIFACT_INDEX.md` |
 | P6 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_ENTERPRISE_AUDIT.md` |
 | P6 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_PHASE_SIGN_OFF.md` |
