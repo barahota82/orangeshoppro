@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Self-test: CPR P8 Control Plane (WP-P8-01; flags updated through WP-P8-03).
+ * Self-test: CPR P8 Control Plane (WP-P8-01; flags updated through WP-P8-04).
  * Run: php scripts/backup/country_production/self_test_cpr_p8_control_plane.php
  */
 
@@ -28,7 +28,7 @@ $docsRoot = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'docs' . DIRECTORY_SEPAR
 $indexPath = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md';
 
 try {
-    cpr_p8cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-03-owner-cert-decision');
+    cpr_p8cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
     cpr_p8cp('artifact_index_exists', is_file($indexPath));
 
     $ids = orange_cpr_p8_work_package_ids();
@@ -39,17 +39,19 @@ try {
 
     $artifacts = orange_cpr_p8_work_package_artifacts();
     cpr_p8cp(
-        'cert_decision_artifact_name',
-        ($artifacts['WP-P8-03'] ?? '') === 'COUNTRY_PRODUCTION_RESTORE_P8_03_OWNER_CERT_DECISION.md'
+        'integration_artifact_name',
+        ($artifacts['WP-P8-04'] ?? '') === 'COUNTRY_PRODUCTION_RESTORE_P8_04_INTEGRATION_BASELINE.md'
     );
 
     $snap = orange_cpr_p8_control_plane_snapshot();
     cpr_p8cp('wp_p8_01_complete_flag', !empty($snap['wp_p8_01_complete']));
     cpr_p8cp('owner_submission_implemented', !empty($snap['owner_submission_engine_implemented']));
     cpr_p8cp('owner_cert_decision_implemented', !empty($snap['owner_cert_decision_engine_implemented']));
-    cpr_p8cp('no_p8_integration_yet', empty($snap['p8_integration_baseline_complete']));
+    cpr_p8cp('p8_integration_complete', !empty($snap['p8_integration_baseline_complete']));
     cpr_p8cp('no_global_owner_cert_pass_claim', empty($snap['owner_cert_pass_granted']));
     cpr_p8cp('no_p9_started', empty($snap['p9_started']));
+    cpr_p8cp('no_enterprise_audit', empty($snap['enterprise_audit_started']));
+    cpr_p8cp('no_git_tag', empty($snap['git_tag_created']));
     cpr_p8cp('engineering_cannot_grant_pass', !empty($snap['engineering_cannot_grant_pass']));
     cpr_p8cp('cert_pass_does_not_enable', !empty($snap['cert_pass_does_not_enable']));
     cpr_p8cp('fail_does_not_auto_rollback', !empty($snap['fail_does_not_auto_rollback']));
@@ -61,13 +63,14 @@ try {
     cpr_p8cp('assert_ok', !empty($assert['ok']), (string) ($assert['code'] ?? ''));
 
     $index = is_file($indexPath) ? (string) file_get_contents($indexPath) : '';
-    cpr_p8cp('index_wp_p8_03_complete', str_contains($index, '**WP-P8-03 COMPLETE**'));
-    cpr_p8cp('index_lists_cert_module', str_contains($index, 'cpr_owner_cert_decision_live.php'));
-    cpr_p8cp('index_stop_blocks_p8_04', str_contains($index, 'Do **not** begin **WP-P8-04**'));
+    cpr_p8cp('index_wp_p8_04_complete', str_contains($index, '**WP-P8-04 COMPLETE**'));
+    cpr_p8cp('index_lists_integration_module', str_contains($index, 'cpr_p8_integration.php'));
+    cpr_p8cp('index_stop_blocks_enterprise_audit', str_contains($index, 'Do **not** start the Enterprise Audit'));
+    cpr_p8cp('index_stop_blocks_git_tag', str_contains($index, 'Do **not** create the Git Tag'));
     cpr_p8cp('index_stop_blocks_p9', str_contains($index, 'Do **not** begin **P9**'));
     cpr_p8cp(
         'design_doc_exists',
-        is_file($docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P8_03_OWNER_CERT_DECISION.md')
+        is_file($docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P8_04_INTEGRATION_BASELINE.md')
     );
 } catch (Throwable $e) {
     cpr_p8cp('exception', false, $e->getMessage());

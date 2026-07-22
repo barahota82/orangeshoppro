@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * CPR P8 Control Plane registry (WP-P8-01; flags updated through WP-P8-03).
+ * CPR P8 Control Plane registry (WP-P8-01; flags updated through WP-P8-04).
  *
- * Inventory / hard-rule helpers — Owner Cert decision marked implemented after WP-P8-03.
- * Still no P8 integration freeze and no enablement flip.
+ * Inventory / hard-rule helpers — P8 integration baseline marked complete after WP-P8-04.
+ * Still no Enterprise Audit, Git Tag, or P9 enablement.
  *
  * @see docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md
  * @see docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md roadmap P8
@@ -17,7 +17,7 @@ require_once __DIR__ . '/cpr_enablement.php';
 require_once __DIR__ . '/cpr_mutation_engine.php';
 
 const ORANGE_CPR_P8_CONTROL_SCHEMA = 'cpr_p8_control_plane/1';
-const ORANGE_CPR_P8_CONTROL_VERSION = 'P8-03-1.0';
+const ORANGE_CPR_P8_CONTROL_VERSION = 'P8-04-1.0';
 
 /**
  * Official P8 Work Package IDs (discovered from Architecture + P2 — not invented).
@@ -81,7 +81,7 @@ function orange_cpr_p8_control_plane_snapshot(): array
         'wp_p8_01_complete' => true,
         'owner_submission_engine_implemented' => true,
         'owner_cert_decision_engine_implemented' => true,
-        'p8_integration_baseline_complete' => false,
+        'p8_integration_baseline_complete' => true,
         'enablement_flag_observed' => false,
         'ponr_mutation_executed' => false,
         'production_mutation' => false,
@@ -91,6 +91,8 @@ function orange_cpr_p8_control_plane_snapshot(): array
         'engineering_cannot_grant_pass' => true,
         'cert_pass_does_not_enable' => true,
         'fail_does_not_auto_rollback' => true,
+        'enterprise_audit_started' => false,
+        'git_tag_created' => false,
         'p9_started' => false,
         'architecture_modified' => false,
         'owner_approved_modified' => false,
@@ -99,7 +101,7 @@ function orange_cpr_p8_control_plane_snapshot(): array
 }
 
 /**
- * Assert P8 control-plane hard rules (fail-closed) after WP-P8-03.
+ * Assert P8 control-plane hard rules (fail-closed) after WP-P8-04.
  *
  * @param array<string, mixed> $env
  * @return array<string, mixed>
@@ -142,27 +144,24 @@ function orange_cpr_p8_control_plane_assert(array $env): array
     if (empty($snap['wp_p8_01_complete'])
         || empty($snap['owner_submission_engine_implemented'])
         || empty($snap['owner_cert_decision_engine_implemented'])
+        || empty($snap['p8_integration_baseline_complete'])
     ) {
         return [
             'ok' => false,
             'code' => 'p8_control_incomplete',
-            'message' => 'WP-P8-01/02/03 control plane + submission + Owner Cert engines must be marked implemented.',
+            'message' => 'WP-P8-01…04 control plane + submission + Owner Cert + integration freeze must be complete.',
             'fail_closed' => true,
         ];
     }
-    if (!empty($snap['p8_integration_baseline_complete'])) {
-        return [
-            'ok' => false,
-            'code' => 'p8_engines_premature',
-            'message' => 'WP-P8-03 must not mark WP-P8-04 integration freeze complete.',
-            'fail_closed' => true,
-        ];
-    }
-    if (!empty($snap['owner_cert_pass_granted']) || !empty($snap['p9_started'])) {
+    if (!empty($snap['owner_cert_pass_granted'])
+        || !empty($snap['p9_started'])
+        || !empty($snap['enterprise_audit_started'])
+        || !empty($snap['git_tag_created'])
+    ) {
         return [
             'ok' => false,
             'code' => 'p8_boundary_violation',
-            'message' => 'P8 control plane must not claim global Owner Cert PASS grant or start P9.',
+            'message' => 'P8 control plane must not claim global Owner Cert PASS, Enterprise Audit, Git Tag, or P9.',
             'fail_closed' => true,
         ];
     }
@@ -181,12 +180,15 @@ function orange_cpr_p8_control_plane_assert(array $env): array
     return [
         'ok' => true,
         'code' => 'ok',
-        'message' => 'P8 control plane hard rules hold; Owner Cert decision implemented; freeze / P9 withheld.',
+        'message' => 'P8 control plane hard rules hold; integration baseline frozen; Audit/Tag/P9 withheld.',
         'snapshot' => $snap,
         'enablement_flag_observed' => false,
         'production_mutation' => false,
         'production_sql_executed' => false,
         'ponr_mutation_executed' => false,
         'owner_cert_pass_granted' => false,
+        'enterprise_audit_started' => false,
+        'git_tag_created' => false,
+        'p9_started' => false,
     ];
 }

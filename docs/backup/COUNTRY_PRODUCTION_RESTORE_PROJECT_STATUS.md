@@ -29,7 +29,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Field | Value |
 |-------|--------|
 | **Current Phase** | **P8 IN PROGRESS** |
-| **Overall State** | **WP-P8-03 COMPLETE — OWNER CERT DECISION SEALED — AWAITING OWNER APPROVAL BEFORE WP-P8-04** |
+| **Overall State** | **WP-P8-04 COMPLETE — P8 CERTIFICATION BASELINE FROZEN — AWAITING OWNER REVIEW (NO ENTERPRISE AUDIT / TAG / P9)** |
 
 ---
 
@@ -73,7 +73,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Production SQL execution | **Disabled** |
 | Production upload mutation | **Disabled** |
 | Clone drills (P7) | **Implemented** (enablement-FALSE sealed clone-drill evidence path) |
-| Owner Cert (P8) | **WP-P8-03 Owner Cert decision complete; P8 freeze not started** |
+| Owner Cert (P8) | **WP-P8-04 COMPLETE — P8 certification baseline frozen; Audit/Tag/P9 withheld** |
 | Architecture | **Frozen** |
 | Owner Decisions | **Frozen** |
 
@@ -141,12 +141,12 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P8** (Owner Cert PASS/FAIL) — **WP-P8-03 COMPLETE**; WP-P8-04+ Owner-gated.
+**P8** (Owner Cert PASS/FAIL) — **WP-P8-04 COMPLETE**; Enterprise Audit / Git Tag / P9 Owner-gated.
 
 ### Next gated step (Owner only)
 
-**WP-P8-04** (P8 Integration Review & Certification Baseline Freeze)  
-*(Do **not** begin WP-P8-04 until Owner explicitly approves WP-P8-03.)*
+**P8 Enterprise Audit / Git Tag / Sign-Off** (then P9 only if authorized)  
+*(Do **not** start the Enterprise Audit, create the Git Tag, or begin P9 until Owner explicitly authorizes.)*
 
 ---
 

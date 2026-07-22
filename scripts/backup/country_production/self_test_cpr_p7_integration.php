@@ -73,7 +73,7 @@ $cprRoot = $bundle['cpr'];
 $clone = $bundle['clone'];
 
 try {
-    cpr_p7i('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-03-owner-cert-decision');
+    cpr_p7i('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
     cpr_p7i(
         'stage_order',
         orange_cpr_p7_integration_stage_order() === [
