@@ -28,8 +28,8 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P6 COMPLETE** |
-| **Overall State** | **P6 POST-EXECUTION BASELINE FROZEN — READY FOR OWNER-AUTHORIZED P7 ONLY** |
+| **Current Phase** | **P7 IN PROGRESS** |
+| **Overall State** | **WP-P7-01 COMPLETE — AWAITING OWNER APPROVAL FOR WP-P7-02** |
 
 ---
 
@@ -134,12 +134,12 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P7** (clone drills / real-clone proof) — **not started**.
+**P7** (authorized; WP-P7-01 control plane complete)
 
-### Next authorized step (Owner gate only)
+### Next Work Package
 
-**P7**  
-*(Do **not** begin P7 until Owner explicitly authorizes the next phase.)*
+**WP-P7-02** — Clone Drill Harness & Environment Binding  
+*(Do **not** begin until Owner explicitly reviews and approves WP-P7-01 / next WP.)*
 
 ---
 
@@ -150,6 +150,7 @@ Every approved baseline tag (annotated; on `origin`):
 | OWNER_APPROVED Register | `docs/backup/COUNTRY_PRODUCTION_RESTORE_OWNER_DECISIONS.md` |
 | Architecture (frozen) | `docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` |
 | Release history | `docs/backup/COUNTRY_PRODUCTION_RESTORE_RELEASE_HISTORY.md` |
+| P7 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P7_ARTIFACT_INDEX.md` |
 | P6 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_ARTIFACT_INDEX.md` |
 | P6 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_ENTERPRISE_AUDIT.md` |
 | P6 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_PHASE_SIGN_OFF.md` |

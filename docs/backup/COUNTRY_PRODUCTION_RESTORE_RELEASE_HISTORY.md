@@ -142,8 +142,8 @@ Every completed major phase shall contain:
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P6 COMPLETE** |
-| **Current State** | **P6 POST-EXECUTION BASELINE FROZEN — READY FOR OWNER-AUTHORIZED P7 ONLY** |
+| **Current Phase** | **P7 IN PROGRESS** |
+| **Current State** | **WP-P7-01 COMPLETE — AWAITING OWNER APPROVAL FOR WP-P7-02** |
 
 *(Update the Current Project Status block when the active phase changes. Append new phase sections for P6–P9; do not rewrite P0–P5 above.)*
 
