@@ -20,7 +20,7 @@ function cpr_dl(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " — {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
     }
 }
 
@@ -334,7 +334,7 @@ $bundle = cpr_dl_env();
 $base = $bundle['base'];
 
 try {
-    cpr_dl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_dl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
 
     $slot = cpr_dl_fresh_env($base);
     $env = $slot['env'];
@@ -459,7 +459,7 @@ try {
     ]);
     cpr_dl('lock_loss', empty($lockLoss['ok']) && ($lockLoss['code'] ?? '') === ORANGE_CPR_DELETELIVE_ERR_LOCK, (string) ($lockLoss['code'] ?? ''));
 
-    // Gate failure — remove gates_live artifacts after CP-A setup
+    // Gate failure â€” remove gates_live artifacts after CP-A setup
     $slotG = cpr_dl_fresh_env($base);
     $setupG = cpr_dl_setup_cpa($slotG['env']);
     $gDir = orange_cpr_gates_live_directory((string) $setupG['cpr_root'], (string) $setupG['job_id']);

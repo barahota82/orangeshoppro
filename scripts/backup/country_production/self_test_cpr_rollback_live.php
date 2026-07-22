@@ -22,7 +22,7 @@ function cpr_rb(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " — {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
     }
 }
 
@@ -67,7 +67,7 @@ function cpr_rb_cleanup(string $base): void
 }
 
 /**
- * P5 through CP9 + Post-Verify FAIL → cpr_paused_verify_failed.
+ * P5 through CP9 + Post-Verify FAIL â†’ cpr_paused_verify_failed.
  *
  * @param array<string, mixed> $env
  * @return array<string, mixed>
@@ -137,7 +137,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p604_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_rb('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_rb('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
     cpr_rb('dirname_constant', ORANGE_CPR_ROLLBACK_DIRNAME === 'rollback');
     cpr_rb(
         'control_plane_flag',

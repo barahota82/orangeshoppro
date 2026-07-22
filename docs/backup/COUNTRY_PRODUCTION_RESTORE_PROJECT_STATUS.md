@@ -28,8 +28,8 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P8 COMPLETE** |
-| **Overall State** | **P8 OWNER CERTIFICATION BASELINE FROZEN — ENTERPRISE AUDIT PASSED — PHASE CLOSED — AWAITING OWNER-AUTHORIZED P9 ONLY** |
+| **Current Phase** | **P9 IN PROGRESS** |
+| **Overall State** | **WP-P9-01 COMPLETE — P9 CONTROL PLANE OPEN — AWAITING OWNER APPROVAL BEFORE WP-P9-02** |
 
 ---
 
@@ -76,6 +76,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Production upload mutation | **Disabled** |
 | Clone drills (P7) | **Implemented** (enablement-FALSE sealed clone-drill evidence path) |
 | Owner Cert (P8) | **Implemented** (enablement-FALSE sealed Owner Certification baseline; PASS ≠ enable; FAIL ≠ auto-rollback) |
+| Enablement (P9) | **WP-P9-01 control plane complete; preconditions / SA Enable engines not started** |
 | Architecture | **Frozen** |
 | Owner Decisions | **Frozen** |
 
@@ -147,12 +148,12 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P9** (Enablement / production gate) — **Owner-gated only**.
+**P9** (Enablement / OD-ENABLE path) — **WP-P9-01 COMPLETE**; WP-P9-02+ Owner-gated.
 
 ### Next gated step (Owner only)
 
-**P9** only if authorized  
-*(Do **not** begin P9 until Owner explicitly authorizes.)*
+**WP-P9-02** (Enablement Preconditions & Owner Enablement Order)  
+*(Do **not** begin WP-P9-02 until Owner explicitly approves WP-P9-01.)*
 
 ---
 
@@ -163,6 +164,7 @@ Every approved baseline tag (annotated; on `origin`):
 | OWNER_APPROVED Register | `docs/backup/COUNTRY_PRODUCTION_RESTORE_OWNER_DECISIONS.md` |
 | Architecture (frozen) | `docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` |
 | Release history | `docs/backup/COUNTRY_PRODUCTION_RESTORE_RELEASE_HISTORY.md` |
+| P9 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P9_ARTIFACT_INDEX.md` |
 | P8 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md` |
 | P8 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_ENTERPRISE_AUDIT.md` |
 | P8 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_PHASE_SIGN_OFF.md` |

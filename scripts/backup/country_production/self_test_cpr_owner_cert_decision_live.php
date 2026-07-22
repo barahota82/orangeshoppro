@@ -20,7 +20,7 @@ function cpr_ocert(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " — {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
     }
 }
 
@@ -166,7 +166,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p803_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_ocert('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_ocert('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
     cpr_ocert('dirname_constant', ORANGE_CPR_CERTIFICATION_DIRNAME === 'certification');
     cpr_ocert('cg_h_count', count(orange_cpr_owner_cert_cg_h_ids()) === 6);
     cpr_ocert(
@@ -279,7 +279,7 @@ try {
         $ctxF['env'],
         cpr_ocert_req($prepF['job_id'], $prepF['fp'], 'FAIL', [
             'cg_h_reviews' => $hFail,
-            'rationale' => 'Owner FAIL — rollback adequacy not accepted.',
+            'rationale' => 'Owner FAIL â€” rollback adequacy not accepted.',
         ])
     );
     cpr_ocert('valid_fail_decision', !empty($runFail['ok']) && ($runFail['result'] ?? '') === 'FAIL', (string) ($runFail['code'] ?? ''));
@@ -422,7 +422,7 @@ try {
     $index = (string) file_get_contents($docs . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md');
     cpr_ocert('index_wp_p8_03_complete', str_contains($index, '**WP-P8-03 COMPLETE**'));
     cpr_ocert('index_wp_p8_04_complete', str_contains($index, '**WP-P8-04 COMPLETE**'));
-    cpr_ocert('index_stop_blocks_enterprise_audit', str_contains($index, 'Do **not** start the Enterprise Audit'));
+    cpr_ocert('index_records_enterprise_audit_passed', str_contains($index, '**P8 Enterprise Audit:** **PASSED**'));
 
     $assert = orange_cpr_p8_control_plane_assert(['ORANGE_COUNTRY_RESTORE_PRODUCTION_ENABLED' => false]);
     cpr_ocert('control_plane_assert_ok', !empty($assert['ok']), (string) ($assert['code'] ?? ''));

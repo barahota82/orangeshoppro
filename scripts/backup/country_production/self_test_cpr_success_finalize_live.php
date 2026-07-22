@@ -22,7 +22,7 @@ function cpr_sf(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " — {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
     }
 }
 
@@ -125,7 +125,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p603_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_sf('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_sf('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
     cpr_sf('dirname_constant', ORANGE_CPR_SUCCESS_FINALIZE_DIRNAME === 'success_finalize');
     cpr_sf(
         'control_plane_flag',

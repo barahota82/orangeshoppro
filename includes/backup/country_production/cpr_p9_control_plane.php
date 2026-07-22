@@ -1,0 +1,205 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * CPR P9 Control Plane registry (WP-P9-01).
+ *
+ * Inventory / hard-rule helpers only. Does not issue Owner enablement orders,
+ * flip the ops flag, start Enterprise Audit, or create Git Tags.
+ *
+ * @see docs/backup/COUNTRY_PRODUCTION_RESTORE_P9_ARTIFACT_INDEX.md
+ * @see docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md roadmap P9
+ */
+
+require_once __DIR__ . '/cpr_paths.php';
+require_once __DIR__ . '/cpr_enablement.php';
+require_once __DIR__ . '/cpr_mutation_engine.php';
+
+const ORANGE_CPR_P9_CONTROL_SCHEMA = 'cpr_p9_control_plane/1';
+const ORANGE_CPR_P9_CONTROL_VERSION = 'P9-01-1.0';
+
+/**
+ * Official P9 Work Package IDs (discovered from Architecture + P1-13 / OD-* — not invented).
+ *
+ * @return list<string>
+ */
+function orange_cpr_p9_work_package_ids(): array
+{
+    return [
+        'WP-P9-01',
+        'WP-P9-02',
+        'WP-P9-03',
+        'WP-P9-04',
+    ];
+}
+
+/**
+ * Primary artifact filenames for each P9 WP.
+ *
+ * @return array<string, string>
+ */
+function orange_cpr_p9_work_package_artifacts(): array
+{
+    return [
+        'WP-P9-01' => 'COUNTRY_PRODUCTION_RESTORE_P9_ARTIFACT_INDEX.md',
+        'WP-P9-02' => 'COUNTRY_PRODUCTION_RESTORE_P9_02_ENABLEMENT_PRECONDITIONS.md',
+        'WP-P9-03' => 'COUNTRY_PRODUCTION_RESTORE_P9_03_ENABLEMENT_ACTIONS.md',
+        'WP-P9-04' => 'COUNTRY_PRODUCTION_RESTORE_P9_04_INTEGRATION_BASELINE.md',
+    ];
+}
+
+/**
+ * Architecture roadmap P9 / P1-13 enablement stage order (P9 engines only).
+ *
+ * @return list<string>
+ */
+function orange_cpr_p9_enablement_stage_order(): array
+{
+    return [
+        'enablement_preconditions_and_owner_order',
+        'super_admin_enable_disable_and_schema_force_disable',
+        'enablement_baseline_freeze',
+    ];
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function orange_cpr_p9_control_plane_snapshot(): array
+{
+    return [
+        'schema_version' => ORANGE_CPR_P9_CONTROL_SCHEMA,
+        'engine_version' => ORANGE_CPR_P9_CONTROL_VERSION,
+        'scaffold_version' => ORANGE_CPR_SCAFFOLD_VERSION,
+        'phase' => 'P9',
+        'phase_name' => 'Enablement',
+        'roadmap_output' => 'Flag true under OD-ENABLE path',
+        'work_packages' => orange_cpr_p9_work_package_ids(),
+        'artifacts' => orange_cpr_p9_work_package_artifacts(),
+        'enablement_stage_order' => orange_cpr_p9_enablement_stage_order(),
+        'wp_p9_01_complete' => true,
+        'enablement_preconditions_engine_implemented' => false,
+        'enablement_action_engine_implemented' => false,
+        'p9_integration_baseline_complete' => false,
+        'enablement_flag_observed' => false,
+        'enablement_flag_write_authorized' => false,
+        'ops_flag_flipped_true' => false,
+        'auto_enable_forbidden' => true,
+        'auto_reenable_forbidden' => true,
+        'cert_pass_does_not_enable' => true,
+        'four_preconditions_required' => true,
+        'super_admin_only_enable_disable' => true,
+        'country_admin_cannot_enable' => true,
+        'engineering_cannot_enable' => true,
+        'ponr_mutation_executed' => false,
+        'production_mutation' => false,
+        'production_sql_executed' => false,
+        'enterprise_audit_started' => false,
+        'git_tag_created' => false,
+        'phase_sign_off_started' => false,
+        'project_closed' => false,
+        'architecture_modified' => false,
+        'owner_approved_modified' => false,
+        'p0_p8_contracts_preserved' => true,
+    ];
+}
+
+/**
+ * Assert P9 control-plane hard rules (fail-closed) after WP-P9-01.
+ *
+ * @param array<string, mixed> $env
+ * @return array<string, mixed>
+ */
+function orange_cpr_p9_control_plane_assert(array $env): array
+{
+    try {
+        orange_cpr_assert_enablement_false_for_scaffold($env);
+    } catch (RuntimeException $e) {
+        return [
+            'ok' => false,
+            'code' => 'p9_enablement_forbidden',
+            'message' => $e->getMessage(),
+            'fail_closed' => true,
+        ];
+    }
+
+    if (orange_cpr_enablement_flag_read($env)) {
+        return [
+            'ok' => false,
+            'code' => 'p9_enablement_forbidden',
+            'message' => 'Ops enablement must remain FALSE during WP-P9-01 (control plane only; OD-ENABLE path not executed).',
+            'fail_closed' => true,
+        ];
+    }
+
+    $delete = orange_cpr_mutation_refuse_delete();
+    $import = orange_cpr_mutation_refuse_import();
+    $ponr = orange_cpr_mutation_refuse_ponr_execution();
+    if (!empty($delete['ok']) || !empty($import['ok']) || !empty($ponr['ok'])) {
+        return [
+            'ok' => false,
+            'code' => 'p9_mutation_refuse_broken',
+            'message' => 'Mutation refuse helpers must remain fail-closed in WP-P9-01.',
+            'fail_closed' => true,
+        ];
+    }
+
+    $snap = orange_cpr_p9_control_plane_snapshot();
+    if (empty($snap['wp_p9_01_complete'])) {
+        return [
+            'ok' => false,
+            'code' => 'p9_control_incomplete',
+            'message' => 'WP-P9-01 control plane must be complete.',
+            'fail_closed' => true,
+        ];
+    }
+    if (!empty($snap['enablement_preconditions_engine_implemented'])
+        || !empty($snap['enablement_action_engine_implemented'])
+        || !empty($snap['p9_integration_baseline_complete'])
+        || !empty($snap['ops_flag_flipped_true'])
+        || !empty($snap['enablement_flag_write_authorized'])
+        || !empty($snap['enterprise_audit_started'])
+        || !empty($snap['git_tag_created'])
+        || !empty($snap['phase_sign_off_started'])
+        || !empty($snap['project_closed'])
+    ) {
+        return [
+            'ok' => false,
+            'code' => 'p9_boundary_violation',
+            'message' => 'WP-P9-01 must not claim later P9 engines, flag flip, Enterprise Audit, Git Tag, Sign-Off, or project closure.',
+            'fail_closed' => true,
+        ];
+    }
+    if (empty($snap['auto_enable_forbidden'])
+        || empty($snap['auto_reenable_forbidden'])
+        || empty($snap['cert_pass_does_not_enable'])
+        || empty($snap['four_preconditions_required'])
+        || empty($snap['super_admin_only_enable_disable'])
+        || empty($snap['country_admin_cannot_enable'])
+        || empty($snap['engineering_cannot_enable'])
+        || empty($snap['p0_p8_contracts_preserved'])
+    ) {
+        return [
+            'ok' => false,
+            'code' => 'p9_od_enable_invariants_broken',
+            'message' => 'OD-ENABLE / OD-PERM / OD-SCHEMA / P0–P8 preservation constants must remain true.',
+            'fail_closed' => true,
+        ];
+    }
+
+    return [
+        'ok' => true,
+        'code' => 'ok',
+        'message' => 'P9 control plane hard rules hold; WP-P9-02+ and flag flip withheld.',
+        'snapshot' => $snap,
+        'enablement_flag_observed' => false,
+        'production_mutation' => false,
+        'production_sql_executed' => false,
+        'ponr_mutation_executed' => false,
+        'ops_flag_flipped_true' => false,
+        'enterprise_audit_started' => false,
+        'git_tag_created' => false,
+        'project_closed' => false,
+    ];
+}

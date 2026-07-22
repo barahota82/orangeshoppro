@@ -21,7 +21,7 @@ function cpr_gl(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " أ¢â‚¬â€‌ {$detail}" : '') . "\n";
     }
 }
 
@@ -259,7 +259,7 @@ function cpr_gl_setup_ready(array $env): array
         throw new RuntimeException('lock setup failed: ' . (string) ($acq['code'] ?? ''));
     }
 
-    // Scaffold runbook + CP5 (G27/G28) â€” witnesses live in WP-P4-08; predicates require checkpoints.
+    // Scaffold runbook + CP5 (G27/G28) أ¢â‚¬â€‌ witnesses live in WP-P4-08; predicates require checkpoints.
     orange_cpr_checkpoint_create($env, $jid, 'runbook_pre_ponr', [
         'restore_package_id' => $pkgId,
         'target_country_id' => 1,
@@ -318,7 +318,7 @@ $base = $bundle['base'];
 $cprRoot = $bundle['cpr'];
 
 try {
-    cpr_gl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_gl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
 
     // --- Every mandatory gate FAIL (P3 predicates via evaluate_one; fail-inducing ctx) ---
     $gateFailCount = 0;
@@ -558,8 +558,8 @@ try {
     $setupC8 = cpr_gl_setup_ready($env);
     $badC8 = $setupC8['reports'];
     $badC8['c8'] = array_merge($badC8['c8'], ['overall_result' => 'UNSAFE']);
-    // C8 change also breaks fingerprint â€” validate_evidence checks C8 SAFE before hash loop for c8...
-    // Actually order: C8 SAFE check first, then hash loop. UNSAFE â†’ gatelive_c8_not_safe.
+    // C8 change also breaks fingerprint أ¢â‚¬â€‌ validate_evidence checks C8 SAFE before hash loop for c8...
+    // Actually order: C8 SAFE check first, then hash loop. UNSAFE أ¢â€ â€™ gatelive_c8_not_safe.
     $c8fail = orange_cpr_gates_live_evaluate($env, $setupC8['job_id'], cpr_gl_req($setupC8, [
         'reports' => $badC8,
     ]));
@@ -588,7 +588,7 @@ try {
         'worker_id' => (string) $setupInv['worker_id'],
     ]);
 
-    // --- Suite FAIL path (evidence enablement false â†’ G01 FAIL, still seals live report) ---
+    // --- Suite FAIL path (evidence enablement false أ¢â€ â€™ G01 FAIL, still seals live report) ---
     $setupFail = cpr_gl_setup_ready($env);
     $suiteFail = orange_cpr_gates_live_evaluate($env, $setupFail['job_id'], cpr_gl_req($setupFail, [
         'enablement' => false,

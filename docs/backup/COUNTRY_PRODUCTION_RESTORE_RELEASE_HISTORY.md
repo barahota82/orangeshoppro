@@ -172,10 +172,10 @@ Every completed major phase shall contain:
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P8 COMPLETE** |
-| **Current State** | **P8 OWNER CERTIFICATION BASELINE FROZEN — ENTERPRISE AUDIT PASSED — PHASE CLOSED — AWAITING OWNER-AUTHORIZED P9 ONLY** |
+| **Current Phase** | **P9 IN PROGRESS** |
+| **Current State** | **WP-P9-01 COMPLETE — P9 CONTROL PLANE OPEN — AWAITING OWNER APPROVAL BEFORE WP-P9-02** |
 
-*(Update the Current Project Status block when the active phase changes. Append new phase sections for P9; do not rewrite P0–P8 above.)*
+*(Update the Current Project Status block when the active phase changes. Append new phase sections for P9 when COMPLETE; do not rewrite P0–P8 above.)*
 
 ---
 

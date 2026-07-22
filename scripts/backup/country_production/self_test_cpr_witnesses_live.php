@@ -21,7 +21,7 @@ function cpr_wl(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " أ¢â‚¬â€‌ {$detail}" : '') . "\n";
     }
 }
 
@@ -368,7 +368,7 @@ $base = $bundle['base'];
 $cprRoot = $bundle['cpr'];
 
 try {
-    cpr_wl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_wl('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
 
     // --- Complete valid witness path ---
     $setup = cpr_wl_setup_authorized($env);

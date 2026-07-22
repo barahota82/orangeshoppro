@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Self-test: CPR Live Target-Slice IMPORT Batches 1→6 (WP-P5-03).
+ * Self-test: CPR Live Target-Slice IMPORT Batches 1â†’6 (WP-P5-03).
  * Run: php scripts/backup/country_production/self_test_cpr_import_live.php
  */
 
@@ -20,7 +20,7 @@ function cpr_il(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " — {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
     }
 }
 
@@ -374,12 +374,12 @@ $bundle = cpr_il_env();
 $base = $bundle['base'];
 
 try {
-    cpr_il('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_il('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
     cpr_il('batch_catalog_six', orange_cpr_import_batch_numbers() === [1, 2, 3, 4, 5, 6]);
     cpr_il('batch1_has_products', in_array('products', orange_cpr_import_batch_tables(1), true));
     cpr_il('batch6_document_sequences', orange_cpr_import_batch_tables(6) === ['document_sequences']);
 
-    // Valid complete 1→6
+    // Valid complete 1â†’6
     $slot = cpr_il_fresh_env($base);
     $setup = cpr_il_setup_cpa($slot['env']);
     cpr_il_setup_post_delete($slot['env'], $setup);

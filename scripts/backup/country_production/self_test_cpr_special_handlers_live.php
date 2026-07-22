@@ -20,7 +20,7 @@ function cpr_sh(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " — {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
     }
 }
 
@@ -84,7 +84,7 @@ function cpr_sh_slice(): array
 }
 
 /**
- * Full CPA → DELETE → IMPORT fixture (reuses proven P5 path).
+ * Full CPA â†’ DELETE â†’ IMPORT fixture (reuses proven P5 path).
  *
  * @param array<string, mixed> $env
  * @return array<string, mixed>
@@ -324,7 +324,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p504_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_sh('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_sh('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
     cpr_sh(
         'catalog_order',
         orange_cpr_special_handlers_executable_order() === [
@@ -430,7 +430,7 @@ try {
     ]));
     cpr_sh('out_of_order_execution', empty($ooo['ok']) && ($ooo['code'] ?? '') === ORANGE_CPR_SPECIALLIVE_ERR_ORDER, (string) ($ooo['code'] ?? ''));
 
-    // Dependency violation (skip to seq without priors — probe single handler)
+    // Dependency violation (skip to seq without priors â€” probe single handler)
     $dep = orange_cpr_special_live_run($slotO['env'], (string) $setupO['job_id'], cpr_sh_req($setupO, [
         'handler_id' => 'seq_country_namespace',
         'run_all_handlers' => false,

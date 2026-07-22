@@ -20,7 +20,7 @@ function cpr_p8cp(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " — {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
     }
 }
 
@@ -28,7 +28,7 @@ $docsRoot = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'docs' . DIRECTORY_SEPAR
 $indexPath = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md';
 
 try {
-    cpr_p8cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_p8cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
     cpr_p8cp('artifact_index_exists', is_file($indexPath));
 
     $ids = orange_cpr_p8_work_package_ids();
@@ -65,7 +65,7 @@ try {
     $index = is_file($indexPath) ? (string) file_get_contents($indexPath) : '';
     cpr_p8cp('index_wp_p8_04_complete', str_contains($index, '**WP-P8-04 COMPLETE**'));
     cpr_p8cp('index_lists_integration_module', str_contains($index, 'cpr_p8_integration.php'));
-    cpr_p8cp('index_stop_blocks_enterprise_audit', str_contains($index, 'Do **not** start the Enterprise Audit'));
+    cpr_p8cp('index_records_enterprise_audit_passed', str_contains($index, '**P8 Enterprise Audit:** **PASSED**'));
     cpr_p8cp('index_stop_blocks_git_tag', str_contains($index, 'Do **not** create the Git Tag'));
     cpr_p8cp('index_stop_blocks_p9', str_contains($index, 'Do **not** begin **P9**'));
     cpr_p8cp(

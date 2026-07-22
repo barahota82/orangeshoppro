@@ -21,7 +21,7 @@ function cpr_ml(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " أ¢â‚¬â€‌ {$detail}" : '') . "\n";
     }
 }
 
@@ -88,7 +88,7 @@ function cpr_ml_fps(string $pkgFp): array
 }
 
 /**
- * Job frozen with CP0/CP2/CP3 â€” ready for live maint/CP4 (no CP1).
+ * Job frozen with CP0/CP2/CP3 أ¢â‚¬â€‌ ready for live maint/CP4 (no CP1).
  *
  * @param array<string, mixed> $env
  * @return array{job_id:string,package_fingerprint:string}
@@ -172,7 +172,7 @@ $env = $bundle['env'];
 $base = $bundle['base'];
 
 try {
-    cpr_ml('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_ml('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
 
     // --- Happy path: activate CP4 ---
     $setup = cpr_ml_setup_frozen($env);

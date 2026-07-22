@@ -21,7 +21,7 @@ function cpr_ul(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " — {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
     }
 }
 
@@ -395,7 +395,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p505_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_ul('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_ul('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
     cpr_ul('dirname_constant', ORANGE_CPR_UPLOADS_LIVE_DIRNAME === 'uploads_apply');
 
     $src = (string) file_get_contents(dirname(__DIR__, 3) . '/includes/backup/country_production/cpr_uploads_live.php');

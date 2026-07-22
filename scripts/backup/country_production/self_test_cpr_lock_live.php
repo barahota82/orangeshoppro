@@ -21,7 +21,7 @@ function cpr_ll(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " أ¢â‚¬â€‌ {$detail}" : '') . "\n";
     }
 }
 
@@ -94,7 +94,7 @@ function cpr_ll_fps(string $pkgFp): array
 }
 
 /**
- * Job through CP4 + OD-PIN â†’ cpr_pre_ponr (ready for live lock).
+ * Job through CP4 + OD-PIN أ¢â€ â€™ cpr_pre_ponr (ready for live lock).
  *
  * @param array<string, mixed> $env
  * @return array{job_id:string}
@@ -190,7 +190,7 @@ $shadow = $bundle['shadow'];
 $backupLocks = $bundle['backup_locks'];
 
 try {
-    cpr_ll('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_ll('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
 
     // Prepare both jobs before any CPR lock is held (maint/OD-PIN refuse peer lock conflict).
     $setup = cpr_ll_setup_pinned($env);

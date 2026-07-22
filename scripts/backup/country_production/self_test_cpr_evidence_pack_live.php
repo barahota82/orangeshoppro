@@ -20,7 +20,7 @@ function cpr_ev(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " — {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
     }
 }
 
@@ -145,7 +145,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p704_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_ev('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_ev('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
     cpr_ev('dirname_constant', ORANGE_CPR_EVIDENCE_PACK_DIRNAME === 'evidence_pack');
     cpr_ev(
         'catalog_count',
@@ -169,7 +169,7 @@ try {
         && str_contains($src, "'production_resources_accessed' => false")
     );
 
-    // --- Valid EV-01…EV-14 assembly ---
+    // --- Valid EV-01â€¦EV-14 assembly ---
     $ctx = cpr_ev_fresh_env($base);
     $env = $ctx['env'];
     $cloneEnv = cpr_ev_clone_env($ctx['clone_root']);
@@ -303,7 +303,7 @@ try {
     $raw4 = json_decode((string) file_get_contents($path4), true);
     if (is_array($raw4)) {
         $raw4['title'] = 'tampered-corrupt';
-        // leave content_sha256 stale → corrupt
+        // leave content_sha256 stale â†’ corrupt
         cpr_ev_rewrite_latest($path4, $raw4);
     }
     $corrupt = orange_cpr_evidence_pack_live_run(
@@ -316,7 +316,7 @@ try {
         (string) ($corrupt['code'] ?? '')
     );
 
-    // --- Modified evidence (re-seal after content change → fingerprint mismatch) ---
+    // --- Modified evidence (re-seal after content change â†’ fingerprint mismatch) ---
     $ctx5 = cpr_ev_fresh_env($base);
     $ce5 = cpr_ev_clone_env($ctx5['clone_root']);
     $p5 = cpr_ev_prepare_drills($ctx5['env'], $ce5);

@@ -20,7 +20,7 @@ function cpr_p7i(string $name, bool $ok, string $detail = ''): void
         echo "PASS  {$name}\n";
     } else {
         ++$fail;
-        echo "FAIL  {$name}" . ($detail !== '' ? " — {$detail}" : '') . "\n";
+        echo "FAIL  {$name}" . ($detail !== '' ? " â€” {$detail}" : '') . "\n";
     }
 }
 
@@ -73,7 +73,7 @@ $cprRoot = $bundle['cpr'];
 $clone = $bundle['clone'];
 
 try {
-    cpr_p7i('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-04-integration-baseline');
+    cpr_p7i('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P9-01-control-plane');
     cpr_p7i(
         'stage_order',
         orange_cpr_p7_integration_stage_order() === [
