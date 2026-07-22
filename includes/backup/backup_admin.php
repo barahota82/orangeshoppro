@@ -936,15 +936,24 @@ function orange_backup_admin_list_full_snapshots(string $backupRoot, int $limit 
 }
 
 /**
+ * List finalized country packages (identity = full directory name YYYY-MM-DD_HHMMSS).
+ *
+ * Aligned with Full snapshot discovery: every finalized package directory is a distinct
+ * record. Same calendar day packages are never collapsed.
+ *
+ * @param int|null $perCountryLimit null/0 = no per-country cap (Backup Center full history).
+ *                                  Positive = keep only the newest N dirs per country code
+ *                                  (used by restore pickers that want a short list).
  * @return list<array<string, mixed>>
  */
-function orange_backup_admin_list_country_packages(PDO $pdo, string $backupRoot, int $perCountryLimit = 5): array
+function orange_backup_admin_list_country_packages(PDO $pdo, string $backupRoot, ?int $perCountryLimit = null): array
 {
     require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'countries.php';
 
     $countryRoot = orange_backup_path_inside_root($backupRoot, 'country_packages');
     $codes = orange_backup_retention_list_country_codes($backupRoot);
     $out = [];
+    $cap = ($perCountryLimit !== null && $perCountryLimit > 0) ? $perCountryLimit : null;
 
     foreach ($codes as $countryCode) {
         $countryMeta = null;
@@ -952,12 +961,13 @@ function orange_backup_admin_list_country_packages(PDO $pdo, string $backupRoot,
             $countryMeta = orange_country_row_by_code($pdo, strtoupper($countryCode), false);
         }
         $container = $countryRoot . DIRECTORY_SEPARATOR . $countryCode;
+        // Full package ids (date_time) — sorted newest-first; no date-key dedupe.
         $dirs = orange_backup_admin_list_finalized_dirs_cached($container);
-        $latest = array_slice($dirs, 0, max(1, $perCountryLimit));
-        if ($latest === []) {
+        $selected = $cap === null ? $dirs : array_slice($dirs, 0, $cap);
+        if ($selected === []) {
             continue;
         }
-        foreach ($latest as $dir) {
+        foreach ($selected as $dir) {
             $out[] = orange_backup_admin_summarize_country_package(
                 $dir['path'],
                 $dir['name'],
@@ -1061,7 +1071,7 @@ function orange_backup_admin_collect_overview(
 
     $countryPackages = isset($preloaded['country_packages']) && is_array($preloaded['country_packages'])
         ? $preloaded['country_packages']
-        : orange_backup_admin_list_country_packages($pdo, $backupRoot, 5);
+        : orange_backup_admin_list_country_packages($pdo, $backupRoot, null);
     $latestCountry = $countryPackages[0] ?? null;
 
     $inventory = isset($preloaded['inventory']) && is_array($preloaded['inventory'])

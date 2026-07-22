@@ -17,8 +17,10 @@ try {
     $backupRoot = $ctx['backup_root'];
 
     // Single-pass package loads shared with overview (avoids duplicate JSON/FS inspections).
+    // Country: no per-country cap — every finalized package id (YYYY-MM-DD_HHMMSS) is returned,
+    // matching Full snapshot discovery (identity = full directory name, not calendar date).
     $fullSnapshots = orange_backup_admin_list_full_snapshots($backupRoot, 20);
-    $countryPackages = orange_backup_admin_list_country_packages($pdo, $backupRoot, 5);
+    $countryPackages = orange_backup_admin_list_country_packages($pdo, $backupRoot, null);
     $inventory = orange_backup_admin_package_inventory_counts($backupRoot);
     $storage = orange_backup_admin_collect_storage_totals($backupRoot, $inventory);
 

@@ -65,6 +65,10 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 .bc-tab.is-active{background:#fff;color:var(--primary,#ea580c);box-shadow:0 1px 3px rgba(15,23,42,.1)}
 .bc-tab-panel{display:none}
 .bc-tab-panel.is-active{display:block}
+/* Prevent author display:flex from overriding the HTML hidden attribute (duplicate lists). */
+.bc-acc-list[hidden],.bc-tab-panel[hidden],.bc-sec-panel[hidden]{display:none!important}
+.bc-mode-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:.78rem;font-weight:650;border:1px solid var(--bc-border);background:var(--bc-soft);color:var(--bc-muted)}
+.bc-mode-pill.is-active{border-color:var(--primary,#ea580c);color:var(--primary,#ea580c);background:var(--primary-soft,rgba(234,88,12,.1))}
 .bc-status-strip{display:none!important}
 .bc-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:999px;font-size:.76rem;font-weight:650;line-height:1.4;border:1px solid transparent;white-space:nowrap}
 .bc-badge--success{background:#ecfdf5;color:var(--bc-ok);border-color:#a7f3d0}
@@ -210,10 +214,11 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                     <div><dt>Schema</dt><dd>…</dd></div>
                     <div><dt>DRV Score</dt><dd>…</dd></div>
                 </dl>
-                <!-- Dashboard: last 5 only -->
-                <div id="bc_full_recent" class="bc-acc-list" data-bc-mode="recent"></div>
-                <!-- Full archive: shown only after View Full History -->
-                <div id="bc_full_history" class="bc-acc-list" data-bc-mode="archive" hidden></div>
+                <div class="bc-panel-head" style="margin-bottom:8px">
+                    <span id="bc_full_mode_pill" class="bc-mode-pill is-active">آخر العمليات (5)</span>
+                </div>
+                <!-- Single list: content swaps between latest-5 and full history (no dual DOM). -->
+                <div id="bc_full_list" class="bc-acc-list" data-bc-mode="recent"></div>
                 <div class="bc-history-footer">
                     <p id="bc_full_list_hint">عرض آخر 5 عمليات Full Backup</p>
                     <button type="button" class="bc-btn-secondary" id="bc_view_full_history_btn" data-bc-history-type="full">عرض السجل الكامل / View Full History</button>
@@ -227,8 +232,11 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                     <div><dt>آخر Country Batch</dt><dd>…</dd></div>
                     <div><dt>حزم الدول المخزّنة</dt><dd>…</dd></div>
                 </dl>
-                <div id="bc_country_recent" class="bc-acc-list" data-bc-mode="recent"></div>
-                <div id="bc_country_history" class="bc-acc-list" data-bc-mode="archive" hidden></div>
+                <div class="bc-panel-head" style="margin-bottom:8px">
+                    <span id="bc_country_mode_pill" class="bc-mode-pill is-active">آخر العمليات (5)</span>
+                </div>
+                <!-- Single list: content swaps between latest-5 and full history (no dual DOM). -->
+                <div id="bc_country_list" class="bc-acc-list" data-bc-mode="recent"></div>
                 <div class="bc-history-footer">
                     <p id="bc_country_list_hint">عرض آخر 5 حزم Country Backup</p>
                     <button type="button" class="bc-btn-secondary" id="bc_view_country_history_btn" data-bc-history-type="country">عرض السجل الكامل / View Full History</button>
@@ -687,13 +695,15 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             ? 'Full Backup'
             : ('Country Backup' + (pkg.country_code ? ' — ' + pkg.country_code : ''));
         const statusLabel = pkg.package_status || '—';
+        // Identity = full package_id (YYYY-MM-DD_HHMMSS), never date-only.
+        const identity = String(pkg.package_id || '').trim() || fmtDateOnly(pkg.generated_at);
         return (
-            '<details class="bc-acc-item" data-bc-acc="1">' +
+            '<details class="bc-acc-item" data-bc-acc="1" data-package-id="' + esc(identity) + '">' +
             '<summary>' +
                 '<span class="bc-acc-chevron" aria-hidden="true"></span>' +
                 '<span class="bc-acc-title">' + esc(title) + '</span>' +
                 '<span class="bc-acc-meta">' +
-                    '<span class="bc-mono" dir="ltr">' + esc(fmtDateOnly(pkg.generated_at)) + '</span>' +
+                    '<span class="bc-mono" dir="ltr" title="' + esc(identity) + '">' + esc(identity) + '</span>' +
                     badge(statusLabel) +
                     recoverabilityBadge(pkg) +
                 '</span>' +
@@ -708,38 +718,56 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         );
     }
 
-    function renderAccordionList(container, list, type, limit) {
+    function renderAccordionList(container, sourceList, type, limit) {
         if (!container) return;
-        const items = typeof limit === 'number' ? list.slice(0, limit) : list;
+        const items = typeof limit === 'number' ? sourceList.slice(0, limit) : sourceList;
         if (!items.length) {
             container.innerHTML = '<p class="bc-muted" style="margin:0;padding:8px 0;">لا توجد عناصر.</p>';
             return;
         }
-        // Map back to original index for Details / actions
+        // Index into the full source array so Details/actions stay correct in both modes.
         container.innerHTML = items.map((p) => {
-            const idx = list.indexOf(p);
+            const idx = sourceList.indexOf(p);
             return accordionItemHtml(p, type, idx);
         }).join('');
     }
 
-    function syncHistoryModeUi(kind) {
+    /** Render the active mode into the single list card (latest 5 OR full history). */
+    function renderActiveBackupList(kind) {
         const isArchive = !!state.archiveMode[kind];
         if (kind === 'full') {
-            el('bc_full_recent').hidden = isArchive;
-            el('bc_full_history').hidden = !isArchive;
+            const source = state.full;
+            renderAccordionList(el('bc_full_list'), source, 'full_disaster', isArchive ? null : RECENT_LIMIT);
             el('bc_view_full_history_btn').hidden = isArchive;
             el('bc_back_recent_full_btn').hidden = !isArchive;
             el('bc_full_list_hint').textContent = isArchive
-                ? ('السجل الكامل: ' + state.full.length + ' عملية')
-                : 'عرض آخر 5 عمليات Full Backup';
+                ? ('السجل الكامل: ' + source.length + ' حزمة (من القائمة المحمّلة)')
+                : ('آخر ' + Math.min(RECENT_LIMIT, source.length) + ' عمليات Full Backup');
+            const pill = el('bc_full_mode_pill');
+            if (pill) {
+                pill.textContent = isArchive ? ('السجل الكامل (' + source.length + ')') : ('آخر العمليات (' + Math.min(RECENT_LIMIT, source.length) + ')');
+                pill.classList.toggle('is-active', true);
+            }
+            const listEl = el('bc_full_list');
+            if (listEl) listEl.setAttribute('data-bc-mode', isArchive ? 'archive' : 'recent');
         } else {
-            el('bc_country_recent').hidden = isArchive;
-            el('bc_country_history').hidden = !isArchive;
+            const source = state.country;
+            renderAccordionList(el('bc_country_list'), source, 'country_recovery', isArchive ? null : RECENT_LIMIT);
             el('bc_view_country_history_btn').hidden = isArchive;
             el('bc_back_recent_country_btn').hidden = !isArchive;
+            const diskTotal = (lastOverview && lastOverview.stored_country_packages_total !== undefined)
+                ? Number(lastOverview.stored_country_packages_total)
+                : source.length;
             el('bc_country_list_hint').textContent = isArchive
-                ? ('السجل الكامل: ' + state.country.length + ' حزمة')
-                : 'عرض آخر 5 حزم Country Backup';
+                ? ('السجل الكامل: ' + source.length + ' حزمة finalized (القرص: ' + diskTotal + ')')
+                : ('آخر ' + Math.min(RECENT_LIMIT, source.length) + ' حزم Country Backup — كل حزمة = package_id كامل');
+            const pill = el('bc_country_mode_pill');
+            if (pill) {
+                pill.textContent = isArchive ? ('السجل الكامل (' + source.length + ')') : ('آخر العمليات (' + Math.min(RECENT_LIMIT, source.length) + ')');
+                pill.classList.toggle('is-active', true);
+            }
+            const listEl = el('bc_country_list');
+            if (listEl) listEl.setAttribute('data-bc-mode', isArchive ? 'archive' : 'recent');
         }
         const heading = el('bc_list_heading');
         if (heading) {
@@ -750,8 +778,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 
     function setArchiveMode(kind, on) {
         state.archiveMode[kind] = !!on;
-        syncHistoryModeUi(kind);
-        // Collapse all accordion items when switching modes
+        renderActiveBackupList(kind);
         document.querySelectorAll('.bc-acc-item[open]').forEach((d) => { d.open = false; });
     }
 
@@ -831,13 +858,11 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     function renderTables(data) {
         state.full = data.full_snapshots || [];
         state.country = data.country_packages || [];
+        lastOverview = data.overview || lastOverview;
 
-        renderAccordionList(el('bc_full_recent'), state.full, 'full_disaster', RECENT_LIMIT);
-        renderAccordionList(el('bc_full_history'), state.full, 'full_disaster', null);
-        renderAccordionList(el('bc_country_recent'), state.country, 'country_recovery', RECENT_LIMIT);
-        renderAccordionList(el('bc_country_history'), state.country, 'country_recovery', null);
-        syncHistoryModeUi('full');
-        syncHistoryModeUi('country');
+        // One list per type; mode controls which slice is painted into that list.
+        renderActiveBackupList('full');
+        renderActiveBackupList('country');
 
         // Hidden legacy tables — full data + all actions preserved
         el('bc_full_table').querySelector('tbody').innerHTML = state.full.length
