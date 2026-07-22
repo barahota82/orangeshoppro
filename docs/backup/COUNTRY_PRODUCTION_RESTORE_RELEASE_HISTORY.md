@@ -157,8 +157,8 @@ Every completed major phase shall contain:
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P7 COMPLETE** |
-| **Current State** | **P7 CLONE-DRILL EVIDENCE BASELINE FROZEN — READY FOR OWNER-AUTHORIZED P8 ONLY** |
+| **Current Phase** | **P8 IN PROGRESS** |
+| **Current State** | **WP-P8-01 COMPLETE — P8 CONTROL PLANE OPEN — AWAITING OWNER APPROVAL BEFORE WP-P8-02** |
 
 *(Update the Current Project Status block when the active phase changes. Append new phase sections for P8–P9; do not rewrite P0–P7 above.)*
 

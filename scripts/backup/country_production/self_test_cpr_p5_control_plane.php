@@ -28,7 +28,7 @@ $docsRoot = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'docs' . DIRECTORY_SEPAR
 $indexPath = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P5_ARTIFACT_INDEX.md';
 
 try {
-    cpr_p5cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-05-integration-baseline');
+    cpr_p5cp('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-01-control-plane');
     cpr_p5cp('artifact_index_exists', is_file($indexPath));
 
     $ids = orange_cpr_p5_work_package_ids();

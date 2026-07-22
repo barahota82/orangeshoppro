@@ -28,8 +28,8 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P7 COMPLETE** |
-| **Overall State** | **P7 CLONE-DRILL EVIDENCE BASELINE FROZEN — READY FOR OWNER-AUTHORIZED P8 ONLY** |
+| **Current Phase** | **P8 IN PROGRESS** |
+| **Overall State** | **WP-P8-01 COMPLETE — P8 CONTROL PLANE OPEN — AWAITING OWNER APPROVAL BEFORE WP-P8-02** |
 
 ---
 
@@ -73,7 +73,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Production SQL execution | **Disabled** |
 | Production upload mutation | **Disabled** |
 | Clone drills (P7) | **Implemented** (enablement-FALSE sealed clone-drill evidence path) |
-| Owner Cert (P8) | **Not started** |
+| Owner Cert (P8) | **WP-P8-01 control plane complete; submission/decision engines not started** |
 | Architecture | **Frozen** |
 | Owner Decisions | **Frozen** |
 
@@ -141,12 +141,12 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P8** (Owner Cert PASS/FAIL) — **not started**.
+**P8** (Owner Cert PASS/FAIL) — **WP-P8-01 COMPLETE**; WP-P8-02+ Owner-gated.
 
 ### Next gated step (Owner only)
 
-**P8**  
-*(Do **not** begin P8 until Owner explicitly authorizes the next phase.)*
+**WP-P8-02** (Owner Submission Package Assembly)  
+*(Do **not** begin WP-P8-02 until Owner explicitly approves WP-P8-01.)*
 
 ---
 
@@ -157,6 +157,7 @@ Every approved baseline tag (annotated; on `origin`):
 | OWNER_APPROVED Register | `docs/backup/COUNTRY_PRODUCTION_RESTORE_OWNER_DECISIONS.md` |
 | Architecture (frozen) | `docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` |
 | Release history | `docs/backup/COUNTRY_PRODUCTION_RESTORE_RELEASE_HISTORY.md` |
+| P8 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P8_ARTIFACT_INDEX.md` |
 | P7 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P7_ARTIFACT_INDEX.md` |
 | P7 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P7_ENTERPRISE_AUDIT.md` |
 | P7 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P7_PHASE_SIGN_OFF.md` |

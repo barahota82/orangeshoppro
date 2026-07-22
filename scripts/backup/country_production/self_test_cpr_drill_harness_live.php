@@ -112,7 +112,7 @@ $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_cpr_p702_' . bin2hex(
 @mkdir($base, 0775, true);
 
 try {
-    cpr_dh('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P7-05-integration-baseline');
+    cpr_dh('scaffold_version', ORANGE_CPR_SCAFFOLD_VERSION === 'P8-01-control-plane');
     cpr_dh('dirname_constant', ORANGE_CPR_DRILL_HARNESS_DIRNAME === 'drill_harness');
     cpr_dh(
         'control_plane_harness_flag',
