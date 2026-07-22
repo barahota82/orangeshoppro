@@ -315,14 +315,14 @@ Foundational principles (always in force):
 **WP-P6-05 COMPLETE** (Maintenance Release / CP12).  
 **WP-P6-06 COMPLETE** (P6 Integration Baseline Freeze).  
 **P6 INTEGRATION BASELINE FROZEN.**  
+**P6 ENTERPRISE AUDIT COMPLETE — PASSED** (`COUNTRY_PRODUCTION_RESTORE_P6_ENTERPRISE_AUDIT.md`).  
 Commit → Push → **STOP.**  
 
-Do **not** start **Enterprise Audit**.  
 Do **not** create a **Git Tag**.  
 Do **not** begin **P7**.  
 
-Wait for Owner review and explicit approval before any next step.
+Wait for Owner review and explicit approval before Tag / phase sign-off / P7.
 
 ---
 
-*End of P6 Artifact Index (updated through WP-P6-06).*
+*End of P6 Artifact Index (updated through P6 Enterprise Audit).*

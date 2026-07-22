@@ -93,7 +93,10 @@ try {
     cpr_p6cp('index_wp_p6_04_complete', str_contains($index, '**WP-P6-04 COMPLETE**'));
     cpr_p6cp('index_wp_p6_05_complete', str_contains($index, '**WP-P6-05 COMPLETE**'));
     cpr_p6cp('index_wp_p6_06_complete', str_contains($index, '**WP-P6-06 COMPLETE**'));
-    cpr_p6cp('index_stop_blocks_enterprise_audit', str_contains($index, 'Do **not** start **Enterprise Audit**'));
+    cpr_p6cp(
+        'index_enterprise_audit_passed',
+        str_contains($index, 'P6 ENTERPRISE AUDIT COMPLETE') && str_contains($index, 'PASSED')
+    );
     cpr_p6cp('index_stop_blocks_git_tag', str_contains($index, 'Do **not** create a **Git Tag**'));
     cpr_p6cp('index_stop_blocks_p7', str_contains($index, 'Do **not** begin **P7**'));
     cpr_p6cp('index_enablement_false', str_contains($index, 'hard false'));

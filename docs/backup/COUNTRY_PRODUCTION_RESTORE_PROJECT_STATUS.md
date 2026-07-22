@@ -28,8 +28,8 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P6 COMPLETE — AWAITING OWNER REVIEW** |
-| **Overall State** | **WP-P6-06 COMPLETE — P6 INTEGRATION BASELINE FROZEN — AWAITING OWNER FOR ENTERPRISE AUDIT / TAG / P7** |
+| **Current Phase** | **P6 COMPLETE — ENTERPRISE AUDIT PASSED** |
+| **Overall State** | **P6 ENTERPRISE AUDIT PASSED — AWAITING OWNER FOR GIT TAG / P7** |
 
 ---
 
@@ -101,6 +101,7 @@ Every approved baseline tag (annotated; on `origin`):
 | P3 Audit | **PASS** |
 | P4 Enterprise Audit | **PASSED** |
 | P5 Enterprise Audit | **PASSED** |
+| P6 Enterprise Audit | **PASSED** |
 
 ---
 
@@ -110,6 +111,7 @@ Every approved baseline tag (annotated; on `origin`):
 |-------|----------|-------------------------------|
 | **P4** | **APPROVED** | `P4 PRE-PONR LIVE BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P5 ONLY` |
 | **P5** | **APPROVED** | `P5 PONR EXECUTION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P6 ONLY` |
+| **P6** | **AWAITING OWNER** | Enterprise Audit **PASSED**; Tag / phase sign-off / P7 Owner-gated |
 
 ---
 
@@ -127,12 +129,12 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P6** implementation + integration freeze **COMPLETE** — awaiting Owner review.
+**P6** Enterprise Audit **PASSED** — awaiting Owner for Tag / phase sign-off / P7.
 
 ### Next authorized step (Owner gate only)
 
-**Enterprise Audit** → Git Tag → **P7** (clone drills)  
-*(Do **not** start Enterprise Audit, create a Git Tag, or begin P7 until Owner explicitly approves.)*
+**Git Tag** → **P7** (clone drills)  
+*(Do **not** create a Git Tag or begin P7 until Owner explicitly approves.)*
 
 ---
 
@@ -144,6 +146,7 @@ Every approved baseline tag (annotated; on `origin`):
 | Architecture (frozen) | `docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` |
 | Release history | `docs/backup/COUNTRY_PRODUCTION_RESTORE_RELEASE_HISTORY.md` |
 | P6 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_ARTIFACT_INDEX.md` |
+| P6 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_ENTERPRISE_AUDIT.md` |
 | P4 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_ARTIFACT_INDEX.md` |
 | P4 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_ENTERPRISE_AUDIT.md` |
 | P4 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P4_PHASE_SIGN_OFF.md` |
