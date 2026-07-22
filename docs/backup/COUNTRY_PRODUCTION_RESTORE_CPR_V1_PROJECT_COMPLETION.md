@@ -9,7 +9,7 @@
 | **Status** | **COMPLETE** |
 | **Date** | 2026-07-22 |
 | **Git Tag** | `CPR-v1.0` |
-| **Baseline Commit** | `46129185397ba3df3539742c32f5ec39ddf1e13d` |
+| **Baseline Commit** | `a365c1a69e5c40249ee76f7088b2d9d5e8e124dd` |
 | **FINAL Enterprise Audit** | **PASSED** · Owner-approved |
 | **P9 Phase Sign-Off** | **APPROVED** — `COUNTRY_PRODUCTION_RESTORE_P9_PHASE_SIGN_OFF.md` |
 | **Authorization** | Owner accepted FINAL Enterprise Audit and authorized FINAL project closing sequence |

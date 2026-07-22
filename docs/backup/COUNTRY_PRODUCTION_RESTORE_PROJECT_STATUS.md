@@ -31,7 +31,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | **Current Phase** | **P9 COMPLETE** |
 | **Overall State** | **CPR v1.0 COMPLETE** |
 | **Project version** | **v1.0** |
-| **Final Git Tag** | `CPR-v1.0` → `46129185` |
+| **Final Git Tag** | `CPR-v1.0` → `a365c1a6` |
 
 ---
 
@@ -102,14 +102,14 @@ Every approved baseline tag (annotated; on `origin`):
 | `P6-VerifyRollback-Baseline` | `9aa0fbbc` |
 | `P7-CloneDrill-Evidence-Baseline` | `6ea00101` |
 | `P8-OwnerCert-Baseline` | `2f1778f9` |
-| `CPR-v1.0` | `46129185` |
+| `CPR-v1.0` | `a365c1a6` |
 
 **P4 baseline commit (full):** `6bc09bcbe97f2ef6de0dcc4e3fb552481d04842c`  
 **P5 baseline commit (full):** `b4c7a7394dcaddbd4288d7a8c951be85c9751a90`  
 **P6 baseline commit (full):** `9aa0fbbcf39823ef9a2dac368551b170e1e01eb8`  
 **P7 baseline commit (full):** `6ea0010170dfb5fdb08b8c373632bbeac17469c4`  
 **P8 baseline commit (full):** `2f1778f90e542c403ebaf745c02018cc8f482bba`  
-**CPR v1.0 baseline commit (full):** `46129185397ba3df3539742c32f5ec39ddf1e13d`
+**CPR v1.0 baseline commit (full):** `a365c1a69e5c40249ee76f7088b2d9d5e8e124dd`
 
 ---
 

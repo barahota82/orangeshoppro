@@ -8,7 +8,7 @@
 | **Status** | **COMPLETE · APPROVED** |
 | **Date** | 2026-07-22 |
 | **Git Tag (phase / project final)** | `CPR-v1.0` |
-| **Baseline Commit** | `46129185397ba3df3539742c32f5ec39ddf1e13d` |
+| **Baseline Commit** | `a365c1a69e5c40249ee76f7088b2d9d5e8e124dd` |
 | **Integration freeze tip** | `093b60d1` (WP-P9-04) |
 | **FINAL Enterprise Audit** | **PASSED** — `COUNTRY_PRODUCTION_RESTORE_FINAL_ENTERPRISE_AUDIT.md` (Owner-approved) |
 | **Authorization** | Owner approved WP-P9-04; accepted FINAL Enterprise Audit; authorized FINAL CPR v1.0 project closure |
@@ -37,8 +37,8 @@ This sign-off confirms:
 | Item | Value |
 |------|--------|
 | **Git Tag** | `CPR-v1.0` |
-| **Tagged commit (full)** | `46129185397ba3df3539742c32f5ec39ddf1e13d` |
-| **Tagged commit (short)** | `46129185` |
+| **Tagged commit (full)** | `a365c1a69e5c40249ee76f7088b2d9d5e8e124dd` |
+| **Tagged commit (short)** | `a365c1a6` |
 | **Tag subject** | CPR v1.0 Complete — P9 Enablement Baseline (FINAL Enterprise Audit PASSED) |
 | **Integration freeze tip** | `093b60d1` |
 | **FINAL audit doc tip** | `3e26ab5f` |
