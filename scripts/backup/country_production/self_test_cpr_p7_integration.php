@@ -237,8 +237,9 @@ try {
     $indexText = is_file($index) ? (string) file_get_contents($index) : '';
     cpr_p7i('index_wp_p7_05_complete', str_contains($indexText, '**WP-P7-05 COMPLETE**'));
     cpr_p7i(
-        'index_stop_blocks_audit_tag_p8',
-        str_contains($indexText, 'Enterprise Audit')
+        'index_enterprise_audit_passed_blocks_tag_p8',
+        str_contains($indexText, 'P7 ENTERPRISE AUDIT COMPLETE')
+        && str_contains($indexText, 'PASSED')
         && str_contains($indexText, 'Do **not** begin **P8**')
         && str_contains($indexText, 'Git Tag')
     );

@@ -138,14 +138,29 @@ Every completed major phase shall contain:
 
 ---
 
+## P7
+
+| Field | Value |
+|-------|--------|
+| **Phase Name** | Clone-Drill Evidence Baseline Complete |
+| **Completion Summary** | Clone harness / DS-* drill execution / EV-01…EV-14 evidence pack integrated; WP-P7-01…05 complete; Integration Baseline frozen; Enterprise Audit PASSED; Tag / P8 withheld pending Owner. |
+| **Git Tag** | **NOT CREATED** (Owner gate) |
+| **Baseline Commit** | `3abbb09e` (WP-P7-05 integration freeze tip audited) |
+| **Enterprise Audit Result** | **PASSED** (`COUNTRY_PRODUCTION_RESTORE_P7_ENTERPRISE_AUDIT.md`) |
+| **Sign-Off Result** | **AWAITING OWNER REVIEW** (`P7 CLONE-DRILL EVIDENCE BASELINE APPROVED` / ready for Owner-authorized Tag / P8 only) |
+| **Completion Date** | 2026-07-22 |
+| **Status** | **ENTERPRISE AUDIT PASSED — AWAITING OWNER FOR TAG / P8** |
+
+---
+
 ## Current Project Status
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P7 IN PROGRESS** |
-| **Current State** | **WP-P7-05 COMPLETE — P7 CLONE-DRILL EVIDENCE BASELINE FROZEN — AWAITING OWNER REVIEW (NO ENTERPRISE AUDIT / TAG / P8)** |
+| **Current Phase** | **P7 COMPLETE — ENTERPRISE AUDIT PASSED** |
+| **Current State** | **P7 ENTERPRISE AUDIT PASSED — AWAITING OWNER FOR GIT TAG / P8** |
 
-*(Update the Current Project Status block when the active phase changes. Append new phase sections for P6–P9; do not rewrite P0–P5 above.)*
+*(Update the Current Project Status block when the active phase changes. Append new phase sections for P7–P9; do not rewrite P0–P6 above.)*
 
 ---
 

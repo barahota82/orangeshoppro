@@ -63,9 +63,12 @@ try {
     $index = is_file($indexPath) ? (string) file_get_contents($indexPath) : '';
     cpr_p7cp('index_wp_p7_05_complete', str_contains($index, '**WP-P7-05 COMPLETE**'));
     cpr_p7cp('index_lists_integration_module', str_contains($index, 'cpr_p7_integration.php'));
-    cpr_p7cp('index_no_enterprise_audit', str_contains($index, 'Enterprise Audit'));
+    cpr_p7cp(
+        'index_enterprise_audit_passed',
+        str_contains($index, 'P7 ENTERPRISE AUDIT COMPLETE') && str_contains($index, 'PASSED')
+    );
     cpr_p7cp('index_no_p8', str_contains($index, 'Do **not** begin **P8**'));
-    cpr_p7cp('index_no_git_tag', str_contains($index, 'Git Tag'));
+    cpr_p7cp('index_no_git_tag', str_contains($index, 'Do **not** create the **Git Tag**') || str_contains($index, 'Git Tag'));
 
     $freezeDoc = $docsRoot . DIRECTORY_SEPARATOR . 'COUNTRY_PRODUCTION_RESTORE_P7_05_INTEGRATION_BASELINE.md';
     cpr_p7cp('freeze_design_doc_exists', is_file($freezeDoc));

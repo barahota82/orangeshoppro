@@ -312,14 +312,19 @@ Foundational principles (always in force):
 
 ## 14. Stop rule
 
-**WP-P7-05 COMPLETE** (P7 clone-drill evidence baseline freeze).  
+**WP-P7-01 COMPLETE** (control plane).  
+**WP-P7-02 COMPLETE** (Clone Drill Harness).  
+**WP-P7-03 COMPLETE** (DS-* Drill Execution).  
+**WP-P7-04 COMPLETE** (EV-01…EV-14 Evidence Pack).  
+**WP-P7-05 COMPLETE** (P7 Integration Baseline Freeze).  
+**P7 CLONE-DRILL EVIDENCE BASELINE FROZEN.**  
+**P7 ENTERPRISE AUDIT COMPLETE — PASSED** (`COUNTRY_PRODUCTION_RESTORE_P7_ENTERPRISE_AUDIT.md`).  
 Commit → Push → **STOP.**  
 
-Do **not** start the **Enterprise Audit**.  
 Do **not** create the **Git Tag**.  
 Do **not** begin **P8**.  
 
-Wait for Owner review and approval.
+Wait for Owner review and explicit approval before Tag / phase sign-off / P8.
 
 ---
 
@@ -395,4 +400,4 @@ Wait for Owner review and approval.
 
 ---
 
-*End of P7 Artifact Index (updated WP-P7-05).*
+*End of P7 Artifact Index (updated through P7 Enterprise Audit).*

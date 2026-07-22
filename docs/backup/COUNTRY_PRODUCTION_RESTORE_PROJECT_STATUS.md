@@ -28,8 +28,8 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 
 | Field | Value |
 |-------|--------|
-| **Current Phase** | **P7 IN PROGRESS** |
-| **Overall State** | **WP-P7-05 COMPLETE — P7 CLONE-DRILL EVIDENCE BASELINE FROZEN — AWAITING OWNER REVIEW (NO ENTERPRISE AUDIT / TAG / P8)** |
+| **Current Phase** | **P7 COMPLETE — ENTERPRISE AUDIT PASSED** |
+| **Overall State** | **P7 ENTERPRISE AUDIT PASSED — AWAITING OWNER FOR GIT TAG / P8** |
 
 ---
 
@@ -70,7 +70,7 @@ Whenever a major phase (**P4…P9**) is completed, this document shall be update
 | Post-Verify / Finalize / Rollback / Maint Release | **Implemented** (enablement-FALSE sealed path through CP12) |
 | Production SQL execution | **Disabled** |
 | Production upload mutation | **Disabled** |
-| Clone drills (P7) | **Not started** |
+| Clone drills (P7) | **Implemented** (enablement-FALSE sealed clone-drill evidence path) |
 | Architecture | **Frozen** |
 | Owner Decisions | **Frozen** |
 
@@ -107,6 +107,7 @@ Every approved baseline tag (annotated; on `origin`):
 | P4 Enterprise Audit | **PASSED** |
 | P5 Enterprise Audit | **PASSED** |
 | P6 Enterprise Audit | **PASSED** |
+| P7 Enterprise Audit | **PASSED** |
 
 ---
 
@@ -117,6 +118,7 @@ Every approved baseline tag (annotated; on `origin`):
 | **P4** | **APPROVED** | `P4 PRE-PONR LIVE BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P5 ONLY` |
 | **P5** | **APPROVED** | `P5 PONR EXECUTION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P6 ONLY` |
 | **P6** | **APPROVED** | `P6 VERIFY/ROLLBACK POST-EXECUTION BASELINE APPROVED` / `READY FOR OWNER-AUTHORIZED P7 ONLY` |
+| **P7** | **AWAITING OWNER** | Enterprise Audit **PASSED**; Tag / phase sign-off / P8 Owner-gated |
 
 ---
 
@@ -134,13 +136,12 @@ Every approved baseline tag (annotated; on `origin`):
 
 ## Next Phase
 
-**P7** (WP-P7-01…05 complete; clone-drill evidence baseline frozen)
+**P7** Enterprise Audit **PASSED** — awaiting Owner for Tag / phase sign-off / P8.
 
 ### Next gated step (Owner only)
 
-**Enterprise Audit** (then optional Git Tag / phase closure) — **not started**.  
-**P8** Owner Cert — **not started**.  
-*(Do **not** begin Enterprise Audit, Git Tag, or P8 until Owner explicitly authorizes.)*
+**Git Tag** → **P8** (Owner Cert PASS/FAIL)  
+*(Do **not** create a Git Tag or begin P8 until Owner explicitly authorizes.)*
 
 ---
 
@@ -152,6 +153,7 @@ Every approved baseline tag (annotated; on `origin`):
 | Architecture (frozen) | `docs/backup/COUNTRY_PRODUCTION_RESTORE_ARCHITECTURE.md` |
 | Release history | `docs/backup/COUNTRY_PRODUCTION_RESTORE_RELEASE_HISTORY.md` |
 | P7 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P7_ARTIFACT_INDEX.md` |
+| P7 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P7_ENTERPRISE_AUDIT.md` |
 | P6 control plane | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_ARTIFACT_INDEX.md` |
 | P6 Enterprise Audit | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_ENTERPRISE_AUDIT.md` |
 | P6 Phase Sign-Off | `docs/backup/COUNTRY_PRODUCTION_RESTORE_P6_PHASE_SIGN_OFF.md` |
