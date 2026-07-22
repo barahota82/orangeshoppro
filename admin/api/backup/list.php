@@ -16,20 +16,27 @@ try {
     $rootHealth = $ctx['root_health'];
     $backupRoot = $ctx['backup_root'];
 
+    require_once dirname(__DIR__, 3) . '/includes/countries.php';
+    // Country Backup views follow Admin Country Context; Full Backup stays global.
+    $countryContextCode = orange_admin_context_country_code($pdo);
+
     // Single-pass package loads shared with overview (avoids duplicate JSON/FS inspections).
-    // Country: no per-country cap — every finalized package id (YYYY-MM-DD_HHMMSS) is returned,
-    // matching Full snapshot discovery (identity = full directory name, not calendar date).
+    // Full: shared snapshots/ — never filtered by Country Context.
+    // Country: uncapped package ids for the selected context country only (no cross-country leakage).
     $fullSnapshots = orange_backup_admin_list_full_snapshots($backupRoot, 20);
-    $countryPackages = orange_backup_admin_list_country_packages($pdo, $backupRoot, null);
-    $inventory = orange_backup_admin_package_inventory_counts($backupRoot);
-    $storage = orange_backup_admin_collect_storage_totals($backupRoot, $inventory);
+    $countryPackages = orange_backup_admin_list_country_packages($pdo, $backupRoot, null, $countryContextCode);
+    $inventoryScoped = orange_backup_admin_package_inventory_counts($backupRoot, $countryContextCode);
+    // Storage KPIs remain shared BackupRoot totals (global disk), not context-scoped.
+    $inventoryGlobal = orange_backup_admin_package_inventory_counts($backupRoot, null);
+    $storage = orange_backup_admin_collect_storage_totals($backupRoot, $inventoryGlobal);
 
     $overview = orange_backup_admin_collect_overview($pdo, $projectRoot, $ctx, [
         'full_snapshots' => $fullSnapshots,
         'country_packages' => $countryPackages,
-        'inventory' => $inventory,
+        'inventory' => $inventoryScoped,
         'storage' => $storage,
     ]);
+    $overview['country_context_code'] = orange_countries_display_code($countryContextCode);
     $manualAvailable = !empty($rootHealth['manual_actions_available']);
 
     json_response([
@@ -44,6 +51,7 @@ try {
             'recovery_check_requires_write' => true,
         ],
         'csrf_token' => orange_backup_admin_csrf_token(),
+        'country_context_code' => orange_countries_display_code($countryContextCode),
         'overview' => $overview,
         'full_snapshots' => $fullSnapshots,
         'country_packages' => $countryPackages,

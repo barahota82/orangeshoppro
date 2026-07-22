@@ -226,6 +226,7 @@ try {
         $id = (int) ($data['id'] ?? 0);
         $nameAr = orange_country_api_str($data['name_ar'] ?? '', 191);
         $nameEn = orange_country_api_str($data['name_en'] ?? '', 191);
+        $timezone = orange_country_api_str($data['timezone'] ?? '', 64);
         $isActive = !empty($data['is_active']) ? 1 : 0;
 
         if ($id > 0) {
@@ -255,6 +256,19 @@ try {
                 'message' => 'لا توجد عملة تلقائية لرمز الدولة — استخدم اسماً معرّفاً في السجل',
             ], 422);
         }
+        if (!orange_table_has_column($pdo, 'countries', 'timezone')) {
+            json_response([
+                'success' => false,
+                'message' => 'عمود timezone غير جاهز — حدّث المخطط ثم أعد المحاولة',
+            ], 422);
+        }
+        if (!orange_countries_is_valid_iana_timezone($timezone)) {
+            json_response([
+                'success' => false,
+                'code' => 'invalid_timezone',
+                'message' => 'المنطقة الزمنية مطلوبة ويجب أن تكون اسم IANA صالحاً (مثل Asia/Kuwait أو Africa/Cairo)',
+            ], 422);
+        }
 
         if ($id > 0) {
             $dup = $pdo->prepare('SELECT id FROM countries WHERE code = ? AND id <> ? LIMIT 1');
@@ -263,9 +277,9 @@ try {
                 json_response(['success' => false, 'message' => 'رمز الدولة مستخدم'], 409);
             }
             $st = $pdo->prepare(
-                'UPDATE countries SET code = ?, name_ar = ?, name_en = ?, currency_code = ?, is_active = ? WHERE id = ?'
+                'UPDATE countries SET code = ?, name_ar = ?, name_en = ?, currency_code = ?, timezone = ?, is_active = ? WHERE id = ?'
             );
-            $st->execute([$code, $nameAr, $nameEn, $currency, $isActive, $id]);
+            $st->execute([$code, $nameAr, $nameEn, $currency, $timezone, $isActive, $id]);
             $countryId = $id;
         } else {
             $dup = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
@@ -275,9 +289,9 @@ try {
             }
             $sortOrder = orange_countries_next_sort_order($pdo);
             $st = $pdo->prepare(
-                'INSERT INTO countries (code, name_ar, name_en, currency_code, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?)'
+                'INSERT INTO countries (code, name_ar, name_en, currency_code, timezone, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)'
             );
-            $st->execute([$code, $nameAr, $nameEn, $currency, $sortOrder, $isActive]);
+            $st->execute([$code, $nameAr, $nameEn, $currency, $timezone, $sortOrder, $isActive]);
             $countryId = (int) $pdo->lastInsertId();
         }
 

@@ -23,6 +23,7 @@ try {
     if ($packageType === 'full_disaster') {
         $packagePath = orange_backup_admin_resolve_full_package_path($ctx['backup_root'], $packageId);
     } elseif ($packageType === 'country_recovery') {
+        orange_backup_admin_assert_country_package_in_context($pdo, $countryCode);
         $packagePath = orange_backup_admin_resolve_country_package_path($ctx['backup_root'], $countryCode, $packageId);
     } else {
         json_response(['success' => false, 'message' => 'نوع الحزمة غير مدعوم'], 422);

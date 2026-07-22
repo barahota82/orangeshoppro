@@ -64,6 +64,13 @@ foreach ($countries as $c) {
                 }
                 ?>">
         </div>
+        <div class="ctry-timezone">
+            <label for="ctry_timezone">المنطقة الزمنية (IANA) <span style="color:#b45309;">*</span></label>
+            <input type="text" id="ctry_timezone" dir="ltr" lang="en" maxlength="64" autocomplete="off"
+                placeholder="Asia/Kuwait"
+                value="<?php echo $editRow ? htmlspecialchars((string) ($editRow['timezone'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>">
+            <p class="card-hint" style="margin:6px 0 0;font-size:12px;line-height:1.45;">مثال: Asia/Kuwait أو Africa/Cairo أو Europe/London — من إعدادات الدولة وليس من كود التطبيق.</p>
+        </div>
         <div class="ctry-sort">
             <label for="ctry_sort">الترتيب</label>
             <input type="number" id="ctry_sort" class="admin-sort-field admin-sort-field--muted"
@@ -138,6 +145,7 @@ foreach ($countries as $c) {
                     <th>عربي</th>
                     <th>English</th>
                     <th>عملة</th>
+                    <th>Timezone</th>
                     <th>ترتيب</th>
                     <th>نشطة</th>
                     <th>جاهزية</th>
@@ -160,6 +168,7 @@ foreach ($countries as $c) {
                     if ((int) ($rowProv['products_count'] ?? 0) > 0) {
                         $readyCount++;
                     }
+                    $rowTz = trim((string) ($row['timezone'] ?? ''));
                     ?>
                 <tr>
                     <td><?php echo (int) $row['id']; ?></td>
@@ -167,6 +176,7 @@ foreach ($countries as $c) {
                     <td><?php echo htmlspecialchars((string) $row['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td dir="ltr"><?php echo htmlspecialchars((string) $row['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td dir="ltr"><?php echo htmlspecialchars((string) $row['currency_code'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td dir="ltr"><code><?php echo $rowTz !== '' ? htmlspecialchars($rowTz, ENT_QUOTES, 'UTF-8') : '—'; ?></code></td>
                     <td><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
                     <td><?php echo (int) ($row['is_active'] ?? 0) === 1 ? 'نعم' : 'لا'; ?></td>
                     <td><?php echo $readyCount; ?>/4</td>
@@ -322,11 +332,17 @@ async function createCountryTeamUser(countryId) {
 }
 
 async function saveCountry() {
+    var tz = document.getElementById('ctry_timezone').value.trim();
+    if (!tz) {
+        alert('المنطقة الزمنية (IANA) مطلوبة');
+        return;
+    }
     var res = await postJSON('/admin/api/countries/manage.php', {
         action: 'save',
         id: parseInt(document.getElementById('ctry_id').value, 10) || 0,
         name_ar: document.getElementById('ctry_name_ar').value.trim(),
         name_en: document.getElementById('ctry_name_en').value.trim(),
+        timezone: tz,
         is_active: document.getElementById('ctry_is_active').checked ? 1 : 0
     });
     showProvisionReport(res);
@@ -359,13 +375,15 @@ if (window.OrangeAdminPasswordPolicy) {
     grid-template-columns: repeat(12, minmax(0, 1fr));
     grid-template-areas:
         "ar ar ar ar ar ar ar ar ar ar ar ar"
-        "active active currency currency code code en en en en sort sort";
+        "active active currency currency code code en en en en sort sort"
+        "tz tz tz tz tz tz tz tz tz tz tz tz";
     gap: 14px 18px;
     direction: ltr;
 }
 .ctry-form-grid .ctry-sort { grid-area: sort; }
 .ctry-form-grid .ctry-code { grid-area: code; }
 .ctry-form-grid .ctry-currency { grid-area: currency; }
+.ctry-form-grid .ctry-timezone { grid-area: tz; }
 .ctry-form-grid .ctry-active {
     grid-area: active;
     display: flex;
@@ -378,6 +396,7 @@ if (window.OrangeAdminPasswordPolicy) {
 .ctry-form-grid #ctry_name_en,
 .ctry-form-grid #ctry_code,
 .ctry-form-grid #ctry_currency,
+.ctry-form-grid #ctry_timezone,
 .ctry-form-grid #ctry_sort { direction: ltr; text-align: left; }
 .ctry-form-grid .ctry-active-label {
     display: flex;
@@ -397,6 +416,7 @@ if (window.OrangeAdminPasswordPolicy) {
             "sort"
             "code"
             "currency"
+            "tz"
             "active";
     }
 }

@@ -18,6 +18,8 @@ $canRun = orange_backup_admin_may_run($admin, $pdo);
 $canVerify = orange_backup_admin_may_verify($admin, $pdo);
 $csrfToken = orange_backup_admin_csrf_token();
 $apiBase = storefront_public_path('/admin/api/backup');
+$displayTimezone = orange_admin_context_timezone($pdo);
+$countryContextCode = orange_countries_display_code(orange_admin_context_country_code($pdo));
 
 orange_admin_render_page_title_with_country('إدارة النسخ الاحتياطي', $pdo);
 ?>
@@ -31,6 +33,8 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 .bc-header-sub{margin:0;font-size:.9rem;color:var(--bc-muted);line-height:1.45;max-width:42rem}
 .bc-header-status{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .bc-header-status-label{font-size:.75rem;color:var(--bc-muted)}
+.bc-tz-label{margin:8px 0 0;font-size:.78rem;color:var(--bc-muted);line-height:1.4}
+.bc-tz-label code{font-family:ui-monospace,Consolas,monospace;font-size:.78rem;color:#334155;direction:ltr;unicode-bidi:isolate}
 .bc-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
 @media (max-width:1024px){.bc-overview{grid-template-columns:1fr}}
 .bc-op-card{background:var(--bc-surface);border:1px solid var(--bc-border);border-radius:12px;padding:12px 14px;min-width:0}
@@ -86,6 +90,9 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 .bc-mono{font-family:ui-monospace,Consolas,monospace;font-size:.8rem;word-break:break-word}
 .bc-ts{display:inline-flex;flex-wrap:nowrap;align-items:baseline;gap:.35em;font-family:ui-monospace,Consolas,monospace;font-size:.8rem;line-height:1.4;white-space:nowrap}
 .bc-ts-date,.bc-ts-time{white-space:nowrap}
+.bc-ts--raw{color:#92400e}
+.bc-ts-warn{font-size:.72rem;font-weight:650;color:#b45309}
+.bc-acc-when{margin-inline-end:6px}
 @media (max-width:900px){.bc-ts{flex-wrap:wrap;gap:0;white-space:normal}.bc-ts-date,.bc-ts-time{display:block}}
 /* Accordion cards — same interaction family as Scheduled Operations */
 .bc-acc-list{display:flex;flex-direction:column;gap:8px}
@@ -156,6 +163,15 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         <div class="bc-header-main">
             <p class="bc-header-kicker">Orange Enterprise Backup Center V2</p>
             <p class="bc-header-sub">لوحة تشغيل موحّدة لصحة النسخ الاحتياطي، الحماية، والتخزين — للمشرف الأعلى.</p>
+            <p class="bc-tz-label" id="bc_tz_label"><?php
+            if ($displayTimezone !== '') {
+                echo 'جميع التواريخ تُعرض بالتوقيت المحلي للدولة المحددة (12 ساعة AM/PM): <code dir="ltr">'
+                    . htmlspecialchars($displayTimezone, ENT_QUOTES, 'UTF-8')
+                    . '</code>';
+            } else {
+                echo 'تحذير: لم تُضبط المنطقة الزمنية (IANA) في إعدادات الدولة الحالية — عرّفها من شاشة الدول قبل الاعتماد على عرض التواريخ المحلية.';
+            }
+            ?></p>
         </div>
         <div class="bc-header-status">
             <span class="bc-header-status-label">حالة النظام</span>
@@ -227,10 +243,11 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             </div>
 
             <div id="bc_tab_country" class="bc-tab-panel" role="tabpanel" aria-labelledby="bc_tab_country_btn" hidden>
+                <p class="bc-tz-label" id="bc_country_scope_label" style="margin:0 0 10px;">Country Backup معروض لسياق الدولة: <code dir="ltr"><?php echo htmlspecialchars($countryContextCode !== '' ? $countryContextCode : '—', ENT_QUOTES, 'UTF-8'); ?></code> — Full Backup يبقى عاماً.</p>
                 <dl id="bc_country_discovery" class="bc-status-strip" aria-hidden="true">
-                    <div><dt>دول قابلة للاسترداد</dt><dd>…</dd></div>
-                    <div><dt>آخر Country Batch</dt><dd>…</dd></div>
-                    <div><dt>حزم الدول المخزّنة</dt><dd>…</dd></div>
+                    <div><dt>دول قابلة للاسترداد (عام)</dt><dd>…</dd></div>
+                    <div><dt>آخر حزمة للدولة الحالية</dt><dd>…</dd></div>
+                    <div><dt>حزم الدولة الحالية</dt><dd>…</dd></div>
                 </dl>
                 <div class="bc-panel-head" style="margin-bottom:8px">
                     <span id="bc_country_mode_pill" class="bc-mode-pill is-active">آخر العمليات (5)</span>
@@ -322,6 +339,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 <div id="bc_view_modal" class="bc-modal-backdrop" aria-hidden="true">
     <div class="bc-modal" role="dialog" aria-modal="true" style="max-width:760px;">
         <h3 id="bc_view_title">عرض</h3>
+        <p class="bc-tz-label" id="bc_view_tz_note" style="margin:0 0 8px;"></p>
         <pre id="bc_view_pre" class="bc-pre"></pre>
         <div class="admin-form-actions"><button type="button" class="bc-btn-secondary" id="bc_view_close">إغلاق</button></div>
     </div>
@@ -334,6 +352,9 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     const CAN_RUN = <?php echo $canRun ? 'true' : 'false'; ?>;
     const CAN_VERIFY = <?php echo $canVerify ? 'true' : 'false'; ?>;
     const RECENT_LIMIT = 5;
+    /** IANA from Country Configuration (countries.timezone) — presentation only; storage stays UTC. */
+    const DISPLAY_TZ = <?php echo json_encode($displayTimezone, JSON_UNESCAPED_UNICODE); ?>;
+    const COUNTRY_CONTEXT_CODE = <?php echo json_encode($countryContextCode, JSON_UNESCAPED_UNICODE); ?>;
 
     let state = {
         full: [],
@@ -357,22 +378,269 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
         return (n / 1073741824).toFixed(2) + ' GB';
     };
-    const fmtTimestampDisplay = (raw) => {
-        const s = String(raw || '').trim();
-        if (!s) return '—';
-        const m = s.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?$/);
-        if (!m) {
-            return '<time class="bc-ts bc-ts--raw" datetime="' + esc(s) + '" title="' + esc(s) + '">' + esc(s) + '</time>';
+    /**
+     * Single Backup Center timestamp presentation path.
+     *
+     * Proven creation sources (do not invent):
+     * - manifest/API generated_at, health/DRV ISO: gmdate('c') → UTC with offset (+00:00)
+     * - log lines via gmdate('Y-m-d H:i:s'): UTC, offset-naive by design
+     * - log mtime: unix epoch (absolute)
+     * - package_id YYYY-MM-DD_HHMMSS: PHP date() wall clock —
+     *     Country export loads config.php → Asia/Kuwait;
+     *     Full CLI run_full_backup.php does NOT load config.php → php.ini TZ (not proven UTC in-repo).
+     *     Therefore package_id is identity; clock display prefers generated_at (UTC).
+     *     package_id is only parsed as Asia/Kuwait wall time when generated_at is missing
+     *     AND package type is country_recovery (config-loaded creation path).
+     */
+    const ISO_TS_RE = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/;
+    const ISO_TS_GLOBAL_RE = /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g;
+    const PKG_ID_RE = /^(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})(\d{2})$/;
+    const GMDATE_NAIVE_RE = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})$/;
+    /** Country package_id wall zone — proven via config.php date_default_timezone_set + country export. */
+    const PACKAGE_ID_COUNTRY_WALL_TZ = 'Asia/Kuwait';
+
+    const hasDisplayTz = () => typeof DISPLAY_TZ === 'string' && DISPLAY_TZ.trim() !== '';
+
+    const parseIsoAsWritten = (s) => {
+        const m = String(s || '').trim().match(ISO_TS_RE);
+        if (!m) return null;
+        let offset = m[3];
+        if (!offset) return null; // naive ISO — do not invent Z
+        if (offset !== 'Z' && /^[+-]\d{4}$/.test(offset)) {
+            offset = offset.slice(0, 3) + ':' + offset.slice(3);
         }
-        let offset = m[3] || '';
-        if (offset === 'Z') offset = '+00:00';
-        const timePart = m[2] + (offset ? ' ' + offset : '');
-        return '<time class="bc-ts" datetime="' + esc(s) + '" title="' + esc(s) + '"><span class="bc-ts-date">' + esc(m[1]) + '</span><span class="bc-ts-time">' + esc(timePart) + '</span></time>';
+        const iso = m[1] + 'T' + m[2] + (offset === 'Z' ? 'Z' : offset);
+        const d = new Date(iso);
+        return Number.isNaN(d.getTime()) ? null : d;
     };
-    const fmtDateOnly = (raw) => {
+
+    /** gmdate()-style naive strings are UTC by PHP definition (no browser/server TZ). */
+    const parseGmdateNaiveUtc = (s) => {
+        const m = String(s || '').trim().match(GMDATE_NAIVE_RE);
+        if (!m) return null;
+        const d = new Date(m[1] + 'T' + m[2] + 'Z');
+        return Number.isNaN(d.getTime()) ? null : d;
+    };
+
+    const parseUnixEpoch = (raw) => {
         const s = String(raw || '').trim();
-        const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
-        return m ? m[1] : (s || '—');
+        if (!/^\d+(\.\d+)?$/.test(s)) return null;
+        const n = Number(s);
+        if (!Number.isFinite(n)) return null;
+        const ms = n < 1e12 ? n * 1000 : n;
+        const d = new Date(ms);
+        return Number.isNaN(d.getTime()) ? null : d;
+    };
+
+    /**
+     * Interpret YYYY-MM-DD_HHMMSS as wall time in a proven IANA zone, then return UTC Date.
+     * Uses formatToParts inversion via Temporal-free approach: construct as UTC components then
+     * adjust by comparing Intl offset — or use Date with explicit offset from a probe.
+     */
+    const parseWallClockInZone = (dateStr, h, mi, s, wallTz) => {
+        if (!wallTz) return null;
+        try {
+            // Probe: treat components as UTC, then shift by (wall - utc) at that instant.
+            const guess = new Date(Date.UTC(
+                Number(dateStr.slice(0, 4)),
+                Number(dateStr.slice(5, 7)) - 1,
+                Number(dateStr.slice(8, 10)),
+                Number(h), Number(mi), Number(s)
+            ));
+            if (Number.isNaN(guess.getTime())) return null;
+            const fmt = new Intl.DateTimeFormat('en-US', {
+                timeZone: wallTz,
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false, hourCycle: 'h23'
+            });
+            const parts = fmt.formatToParts(guess);
+            const get = (t) => (parts.find((p) => p.type === t) || {}).value || '';
+            const asWall = Date.UTC(
+                Number(get('year')), Number(get('month')) - 1, Number(get('day')),
+                Number(get('hour')), Number(get('minute')), Number(get('second'))
+            );
+            const delta = asWall - guess.getTime();
+            const instant = new Date(guess.getTime() - delta);
+            // Verify round-trip
+            const check = fmt.formatToParts(instant);
+            const cg = (t) => (check.find((p) => p.type === t) || {}).value || '';
+            if (
+                cg('year') + '-' + cg('month') + '-' + cg('day') !== dateStr
+                || cg('hour') !== h || cg('minute') !== mi || cg('second') !== s
+            ) {
+                // One-step correction retry
+                const asWall2 = Date.UTC(
+                    Number(cg('year')), Number(cg('month')) - 1, Number(cg('day')),
+                    Number(cg('hour')), Number(cg('minute')), Number(cg('second'))
+                );
+                const instant2 = new Date(instant.getTime() - (asWall2 - instant.getTime()));
+                return Number.isNaN(instant2.getTime()) ? null : instant2;
+            }
+            return instant;
+        } catch (e) {
+            return null;
+        }
+    };
+
+    const parsePackageIdWall = (raw, wallTz) => {
+        const m = String(raw || '').trim().match(PKG_ID_RE);
+        if (!m) return null;
+        return parseWallClockInZone(m[1], m[2], m[3], m[4], wallTz);
+    };
+
+    /**
+     * @param {string} raw
+     * @param {'generated_at'|'iso_utc'|'gmdate_naive_utc'|'unix'|'package_id_country'|'auto'} source
+     * @returns {{ date: Date|null, error: string|null, source: string }}
+     */
+    const parseBackupInstant = (raw, source) => {
+        const s = String(raw || '').trim();
+        if (!s) return { date: null, error: 'empty', source: source };
+        if (source === 'unix' || (source === 'auto' && /^\d+(\.\d+)?$/.test(s))) {
+            const d = parseUnixEpoch(s);
+            return d ? { date: d, error: null, source: 'unix' } : { date: null, error: 'unix_parse_failed', source: 'unix' };
+        }
+        if (source === 'package_id_country') {
+            const d = parsePackageIdWall(s, PACKAGE_ID_COUNTRY_WALL_TZ);
+            return d
+                ? { date: d, error: null, source: 'package_id_country' }
+                : { date: null, error: 'package_id_wall_parse_failed', source: 'package_id_country' };
+        }
+        if (source === 'generated_at' || source === 'iso_utc' || source === 'auto') {
+            const withOffset = parseIsoAsWritten(s);
+            if (withOffset) return { date: withOffset, error: null, source: 'iso_offset' };
+            // ISO without offset: only accept as UTC when source is explicitly generated_at/iso_utc
+            // (manifest/API from gmdate) — not for auto on unknown text.
+            if ((source === 'generated_at' || source === 'iso_utc') && ISO_TS_RE.test(s) && !s.match(/[Zz]|[+-]\d{2}:?\d{2}$/)) {
+                const m = s.match(ISO_TS_RE);
+                if (m) {
+                    const d = new Date(m[1] + 'T' + m[2] + 'Z');
+                    if (!Number.isNaN(d.getTime())) return { date: d, error: null, source: 'generated_at_naive_utc' };
+                }
+            }
+            if (source === 'gmdate_naive_utc' || source === 'auto' || source === 'generated_at') {
+                const g = parseGmdateNaiveUtc(s);
+                if (g) return { date: g, error: null, source: 'gmdate_naive_utc' };
+            }
+        }
+        if (source === 'gmdate_naive_utc') {
+            const g = parseGmdateNaiveUtc(s);
+            return g ? { date: g, error: null, source: 'gmdate_naive_utc' } : { date: null, error: 'gmdate_parse_failed', source: source };
+        }
+        return { date: null, error: 'unrecognized_timestamp', source: source };
+    };
+
+    /** Explicit 12-hour AM/PM in Country Context TZ — locale en-US, hour12 forced (not browser default). */
+    const formatInDisplayTz = (date) => {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+        if (!hasDisplayTz()) return null;
+        try {
+            const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: DISPLAY_TZ,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: 'numeric',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            }).formatToParts(date);
+            const get = (type) => {
+                const p = parts.find((x) => x.type === type);
+                return p ? p.value : '';
+            };
+            const dateStr = get('year') + '-' + get('month') + '-' + get('day');
+            const hour = get('hour');
+            const minute = get('minute');
+            const second = get('second');
+            const dayPeriod = (get('dayPeriod') || '').toUpperCase();
+            const timeStr = hour + ':' + minute + ':' + second + (dayPeriod ? ' ' + dayPeriod : '');
+            return { dateStr, timeStr, label: dateStr + ' ' + timeStr };
+        } catch (e) {
+            console.warn('[backup_center] formatInDisplayTz failed', e, DISPLAY_TZ);
+            return null;
+        }
+    };
+
+    const fmtTimestampRawWarn = (raw, reason) => {
+        const s = String(raw || '').trim() || '—';
+        if (reason) console.warn('[backup_center] timestamp not converted:', reason, s);
+        return '<time class="bc-ts bc-ts--raw" title="' + esc('unconverted: ' + (reason || 'unknown')) + '">'
+            + esc(s) + ' <span class="bc-ts-warn">(unconverted)</span></time>';
+    };
+
+    /**
+     * Central operator-facing timestamp HTML.
+     * @param {string|number} raw
+     * @param {'generated_at'|'iso_utc'|'gmdate_naive_utc'|'unix'|'package_id_country'|'auto'} [source]
+     */
+    const fmtTimestampDisplay = (raw, source) => {
+        source = source || 'generated_at';
+        const s = String(raw == null ? '' : raw).trim();
+        if (!s) return '—';
+        if (!hasDisplayTz()) {
+            return fmtTimestampRawWarn(s, 'countries.timezone_missing');
+        }
+        const parsed = parseBackupInstant(s, source);
+        if (!parsed.date) {
+            return fmtTimestampRawWarn(s, parsed.error || 'parse_failed');
+        }
+        const local = formatInDisplayTz(parsed.date);
+        if (!local) {
+            return fmtTimestampRawWarn(s, 'display_tz_format_failed');
+        }
+        const title = esc(local.label + ' (' + DISPLAY_TZ + ')');
+        return '<time class="bc-ts" title="' + title + '"><span class="bc-ts-date">' + esc(local.dateStr)
+            + '</span><span class="bc-ts-time">' + esc(local.timeStr) + '</span></time>';
+    };
+
+    const fmtTimestampPlain = (raw, source) => {
+        source = source || 'generated_at';
+        if (!hasDisplayTz()) return String(raw || '').trim();
+        const parsed = parseBackupInstant(String(raw || '').trim(), source);
+        if (!parsed.date) return String(raw || '').trim();
+        const local = formatInDisplayTz(parsed.date);
+        return local ? local.label : String(raw || '').trim();
+    };
+
+    /** Prefer generated_at (UTC); country package_id wall only as last resort. */
+    const fmtPackageWhenDisplay = (pkg, type) => {
+        const generated = String((pkg && pkg.generated_at) || '').trim();
+        if (generated) return fmtTimestampDisplay(generated, 'generated_at');
+        const id = String((pkg && pkg.package_id) || '').trim();
+        if (id && type === 'country_recovery' && PKG_ID_RE.test(id)) {
+            return fmtTimestampDisplay(id, 'package_id_country');
+        }
+        if (id) return fmtTimestampRawWarn(id, 'package_id_not_converted_use_generated_at');
+        return '—';
+    };
+
+    /** Presentation-only: rewrite ISO datetimes (with offset/Z) in viewed JSON/log text. */
+    const localizeTimestampsInText = (text) => {
+        return String(text || '').replace(ISO_TS_GLOBAL_RE, (match) => {
+            // Only convert when explicit offset/Z present, or gmdate-naive UTC pattern.
+            if (/[Zz]|[+-]\d{2}:?\d{2}$/.test(match)) {
+                return fmtTimestampPlain(match, 'iso_utc');
+            }
+            return fmtTimestampPlain(match, 'gmdate_naive_utc');
+        });
+    };
+
+    const showViewContent = (title, bodyText, localizeTimes) => {
+        el('bc_view_title').textContent = title;
+        const note = el('bc_view_tz_note');
+        if (note) {
+            if (!localizeTimes) {
+                note.textContent = '';
+            } else if (!hasDisplayTz()) {
+                note.textContent = 'تحذير: countries.timezone غير مضبوط — عُرض النص الخام دون تحويل.';
+            } else {
+                note.textContent = 'التواريخ في هذا العرض بالتوقيت المحلي (' + DISPLAY_TZ + ') بنظام 12 ساعة — التخزين الداخلي يبقى UTC.';
+            }
+        }
+        el('bc_view_pre').textContent = localizeTimes ? localizeTimestampsInText(bodyText) : String(bodyText || '');
+        el('bc_view_modal').style.display = 'flex';
     };
     const statusTone = (status) => {
         const s = String(status || '').toLowerCase();
@@ -557,10 +825,10 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         const h = lastRootHealth || o.backup_root_health || {};
 
         const flatCards = [
-            ['آخر Full ناجح', fmtTimestampDisplay(lastSuccess.generated_at)],
+            ['آخر Full ناجح', fmtPackageWhenDisplay(lastSuccess, 'full_disaster')],
             ['حالة أحدث Full', esc(latestFull.package_status || '—')],
-            ['أحدث حزمة دولة', fmtTimestampDisplay(latestCountryPkg.generated_at)],
-            ['دول قابلة للاسترداد', esc(String(ov.recoverable_countries ?? '—'))],
+            ['أحدث حزمة دولة (سياق)', fmtPackageWhenDisplay(latestCountryPkg, 'country_recovery')],
+            ['دول قابلة للاسترداد (عام)', esc(String(ov.recoverable_countries ?? '—'))],
             ['BackupRoot', esc(ov.backup_root_status || '—')],
             ['Retention (أيام)', esc(String(ov.retention_days ?? '—'))],
             ['Backend', esc(ov.selected_backend || '—')],
@@ -589,13 +857,13 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 rowHtml('Backend المحدد', esc(ov.selected_backend || '—')) +
             '</div></article>' +
             '<article class="bc-op-card"><h3>الحماية</h3><div class="bc-op-rows">' +
-                rowHtml('آخر Full ناجح (healthy)', fmtTimestampDisplay(lastSuccess.generated_at)) +
+                rowHtml('آخر Full ناجح (healthy)', fmtPackageWhenDisplay(lastSuccess, 'full_disaster')) +
                 rowHtml('أحدث Full — الحالة', badge(latestFull.package_status), true) +
-                rowHtml('أحدث حزمة دولة', fmtTimestampDisplay(latestCountryPkg.generated_at)) +
-                rowHtml('دول قابلة للاسترداد (CRP selected)', esc(String(ov.recoverable_countries ?? '—')), true) +
-                rowHtml('دول لديها حزم على القرص', esc(countriesWithPackages === null ? '—' : String(countriesWithPackages)), true) +
-                rowHtml('حزم الدول المخزّنة (ملفات finalized)', esc(String(storedCountryPackages)), true) +
-                rowHtml('لقطات Full المخزّنة', esc(fullSnapshotsTotal === null ? '—' : String(fullSnapshotsTotal)), true) +
+                rowHtml('أحدث حزمة دولة (سياق الدولة)', fmtPackageWhenDisplay(latestCountryPkg, 'country_recovery')) +
+                rowHtml('دول قابلة للاسترداد (عام — CRP selected)', esc(String(ov.recoverable_countries ?? '—')), true) +
+                rowHtml('الدولة الحالية لديها حزم؟', esc(countriesWithPackages === null ? '—' : (countriesWithPackages > 0 ? 'نعم' : 'لا')), true) +
+                rowHtml('حزم الدولة الحالية (finalized)', esc(String(storedCountryPackages)), true) +
+                rowHtml('لقطات Full المخزّنة (عام)', esc(fullSnapshotsTotal === null ? '—' : String(fullSnapshotsTotal)), true) +
                 rowHtml('DRV لآخر Full', esc(String(latestDrv))) +
             '</div></article>' +
             '<article class="bc-op-card"><h3>التخزين والاحتفاظ</h3><div class="bc-op-rows">' +
@@ -607,14 +875,19 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             '</div></article>';
 
         el('bc_latest_full').innerHTML =
-            '<div><dt>أحدث Full</dt><dd>' + fmtTimestampDisplay(latestFull.generated_at) + '</dd></div>' +
+            '<div><dt>أحدث Full</dt><dd>' + fmtPackageWhenDisplay(latestFull, 'full_disaster') + '</dd></div>' +
             '<div><dt>الحالة</dt><dd>' + badge(latestFull.package_status) + '</dd></div>' +
             '<div><dt>Schema</dt><dd>' + esc(String(latestFull.schema_revision ?? '—')) + '</dd></div>' +
             '<div><dt>DRV لآخر Full</dt><dd>' + esc(String(latestDrv)) + '</dd></div>';
+        const ctxCode = String(o.country_context_code || ov.country_context_code || COUNTRY_CONTEXT_CODE || '—');
+        const scopeLabel = el('bc_country_scope_label');
+        if (scopeLabel) {
+            scopeLabel.innerHTML = 'Country Backup معروض لسياق الدولة: <code dir="ltr">' + esc(ctxCode) + '</code> — Full Backup يبقى عاماً.';
+        }
         el('bc_country_discovery').innerHTML =
-            '<div><dt>دول قابلة للاسترداد</dt><dd>' + esc(String(ov.recoverable_countries ?? '—')) + '</dd></div>' +
-            '<div><dt>أحدث حزمة دولة</dt><dd>' + (fmtTimestampDisplay(latestCountryPkg.generated_at)) + '</dd></div>' +
-            '<div><dt>حزم الدول المخزّنة</dt><dd>' + storedCountryPackages + '</dd></div>';
+            '<div><dt>دول قابلة للاسترداد (عام)</dt><dd>' + esc(String(ov.recoverable_countries ?? '—')) + '</dd></div>' +
+            '<div><dt>أحدث حزمة للدولة الحالية</dt><dd>' + fmtPackageWhenDisplay(latestCountryPkg, 'country_recovery') + '</dd></div>' +
+            '<div><dt>حزم الدولة الحالية</dt><dd>' + storedCountryPackages + '</dd></div>';
 
         const rootPath = ov.backup_root || '—';
         const pathEl = el('bc_storage_path');
@@ -695,15 +968,19 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             ? 'Full Backup'
             : ('Country Backup' + (pkg.country_code ? ' — ' + pkg.country_code : ''));
         const statusLabel = pkg.package_status || '—';
-        // Identity = full package_id (YYYY-MM-DD_HHMMSS), never date-only.
-        const identity = String(pkg.package_id || '').trim() || fmtDateOnly(pkg.generated_at);
+        // Identity stays package_id (unchanged). Operator clock = generated_at via central formatter.
+        const identity = String(pkg.package_id || '').trim();
+        const whenHtml = fmtPackageWhenDisplay(pkg, type);
         return (
             '<details class="bc-acc-item" data-bc-acc="1" data-package-id="' + esc(identity) + '">' +
             '<summary>' +
                 '<span class="bc-acc-chevron" aria-hidden="true"></span>' +
                 '<span class="bc-acc-title">' + esc(title) + '</span>' +
                 '<span class="bc-acc-meta">' +
-                    '<span class="bc-mono" dir="ltr" title="' + esc(identity) + '">' + esc(identity) + '</span>' +
+                    '<span class="bc-acc-when" dir="ltr">' + whenHtml + '</span>' +
+                    (identity
+                        ? '<span class="bc-mono" dir="ltr" title="package_id (identity)">' + esc(identity) + '</span>'
+                        : '') +
                     badge(statusLabel) +
                     recoverabilityBadge(pkg) +
                 '</span>' +
@@ -759,8 +1036,8 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 ? Number(lastOverview.stored_country_packages_total)
                 : source.length;
             el('bc_country_list_hint').textContent = isArchive
-                ? ('السجل الكامل: ' + source.length + ' حزمة finalized (القرص: ' + diskTotal + ')')
-                : ('آخر ' + Math.min(RECENT_LIMIT, source.length) + ' حزم Country Backup — كل حزمة = package_id كامل');
+                ? ('سجل الدولة الحالية فقط: ' + source.length + ' حزمة finalized (عداد السياق: ' + diskTotal + ')')
+                : ('آخر ' + Math.min(RECENT_LIMIT, source.length) + ' حزم للدولة الحالية فقط — بدون دول أخرى');
             const pill = el('bc_country_mode_pill');
             if (pill) {
                 pill.textContent = isArchive ? ('السجل الكامل (' + source.length + ')') : ('آخر العمليات (' + Math.min(RECENT_LIMIT, source.length) + ')');
@@ -820,7 +1097,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 
         el('bc_drawer_body').innerHTML =
             '<div class="bc-drawer-group"><h4>Summary</h4><dl class="bc-drawer-meta">' +
-                '<div><dt>التاريخ</dt><dd>' + fmtTimestampDisplay(pkg.generated_at) + '</dd></div>' +
+                '<div><dt>التاريخ</dt><dd>' + fmtPackageWhenDisplay(pkg, type) + '</dd></div>' +
                 '<div><dt>النوع</dt><dd>' + esc(isFull ? 'full_disaster' : 'country_recovery') + '</dd></div>' +
                 (isFull ? '' : '<div><dt>الدولة</dt><dd>' + esc((pkg.country_code || '') + (pkg.country_name ? ' — ' + pkg.country_name : '')) + '</dd></div>') +
                 '<div><dt>الحالة</dt><dd>' + badge(pkg.package_status) + '</dd></div>' +
@@ -867,7 +1144,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         // Hidden legacy tables — full data + all actions preserved
         el('bc_full_table').querySelector('tbody').innerHTML = state.full.length
             ? state.full.map((p, idx) =>
-                '<tr><td>' + fmtTimestampDisplay(p.generated_at) + '</td><td>' + badge(p.package_status) + '</td><td>' +
+                '<tr><td>' + fmtPackageWhenDisplay(p, 'full_disaster') + '</td><td>' + badge(p.package_status) + '</td><td>' +
                 esc(String(p.schema_revision ?? '')) + '</td><td>' + esc(p.backend || '') + '</td><td>' +
                 esc(fmtBytes(p.dump_size_bytes)) + '</td><td>' + esc(fmtBytes(p.uploads_size_bytes)) + '</td><td>' +
                 esc(String(p.recovery_score || 0)) + '</td><td class="bc-actions">' + actionButtons(p, 'full_disaster') +
@@ -877,7 +1154,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         el('bc_country_table').querySelector('tbody').innerHTML = state.country.length
             ? state.country.map((p, idx) =>
                 '<tr><td>' + esc((p.country_code || '') + (p.country_name ? ' — ' + p.country_name : '')) +
-                '</td><td>' + fmtTimestampDisplay(p.generated_at) + '</td><td>' + esc(p.package_id || '') +
+                '</td><td>' + fmtPackageWhenDisplay(p, 'country_recovery') + '</td><td>' + esc(p.package_id || '') +
                 '</td><td>' + badge(p.package_status) + '</td><td>' + esc(String(p.schema_revision ?? '')) +
                 '</td><td>' + esc(p.registry_version || '') + '</td><td>' + esc(String(p.recovery_score || 0)) +
                 '</td><td class="bc-actions">' + actionButtons(p, 'country_recovery') +
@@ -888,7 +1165,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         el('bc_logs_table').querySelector('tbody').innerHTML = (data.logs || []).map((log) =>
             '<tr><td><code class="bc-mono">' + esc(log.name) + '</code></td><td>' + esc(log.category) +
             '</td><td dir="ltr">' + esc(fmtBytes(log.size_bytes)) + '</td><td>' +
-            fmtTimestampDisplay(new Date(log.mtime * 1000).toISOString()) +
+            fmtTimestampDisplay(log.mtime, 'unix') +
             '</td><td><button type="button" class="bc-btn-ghost bc-log-tail" data-log="' + esc(log.name) + '">عرض</button></td></tr>'
         ).join('');
         applyActionAvailability();
@@ -1041,18 +1318,15 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             });
             try {
                 const res = await apiGet('status.php?' + q.toString());
-                el('bc_view_title').textContent = btn.dataset.file || 'file';
-                el('bc_view_pre').textContent = res.data ? JSON.stringify(res.data, null, 2) : (res.raw_text || '');
-                el('bc_view_modal').style.display = 'flex';
+                const body = res.data ? JSON.stringify(res.data, null, 2) : (res.raw_text || '');
+                showViewContent(btn.dataset.file || 'file', body, true);
             } catch (e) { showAlert(e.message, false); }
             return;
         }
         if (t.classList.contains('bc-log-tail')) {
             try {
                 const res = await apiGet('status.php?action=log_tail&log=' + encodeURIComponent(t.dataset.log || ''));
-                el('bc_view_title').textContent = 'Log: ' + (t.dataset.log || '');
-                el('bc_view_pre').textContent = res.tail || '';
-                el('bc_view_modal').style.display = 'flex';
+                showViewContent('Log: ' + (t.dataset.log || ''), res.tail || '', true);
             } catch (e) { showAlert(e.message, false); }
             return;
         }

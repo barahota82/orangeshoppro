@@ -535,11 +535,14 @@ function orange_backup_admin_dir_size_bytes(string $dir): int
  *   full_snapshots_total:int
  * }
  */
-function orange_backup_admin_package_inventory_counts(string $backupRoot): array
+function orange_backup_admin_package_inventory_counts(string $backupRoot, ?string $onlyCountryCode = null): array
 {
     $snapshotsDir = orange_backup_path_inside_root($backupRoot, 'snapshots');
     $countryRoot = orange_backup_path_inside_root($backupRoot, 'country_packages');
-    $countryCodes = orange_backup_retention_list_country_codes($backupRoot);
+    $countryCodes = orange_backup_admin_filter_country_codes(
+        orange_backup_retention_list_country_codes($backupRoot),
+        $onlyCountryCode
+    );
     $storedCountryPackagesTotal = 0;
     foreach ($countryCodes as $countryCode) {
         $storedCountryPackagesTotal += count(
@@ -552,6 +555,55 @@ function orange_backup_admin_package_inventory_counts(string $backupRoot): array
         'stored_country_packages_total' => $storedCountryPackagesTotal,
         'full_snapshots_total' => count(orange_backup_admin_list_finalized_dirs_cached($snapshotsDir)),
     ];
+}
+
+/**
+ * Normalize market / FS country codes for Backup Center scoping (case-insensitive).
+ */
+function orange_backup_admin_normalize_country_scope_code(string $countryCode): string
+{
+    require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'countries.php';
+
+    // Lowercase first: orange_countries_normalize_code strips via [^a-z0-9] before strtolower.
+    return orange_countries_normalize_code(strtolower(trim($countryCode)));
+}
+
+/**
+ * @param list<string> $countryCodes
+ * @return list<string>
+ */
+function orange_backup_admin_filter_country_codes(array $countryCodes, ?string $onlyCountryCode): array
+{
+    if ($onlyCountryCode === null) {
+        return $countryCodes;
+    }
+    $want = orange_backup_admin_normalize_country_scope_code($onlyCountryCode);
+    if ($want === '') {
+        return [];
+    }
+    $out = [];
+    foreach ($countryCodes as $code) {
+        if (orange_backup_admin_normalize_country_scope_code((string) $code) === $want) {
+            $out[] = $code;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * Country Backup actions (view/verify/DRV) must stay inside Admin Country Context.
+ * Full Backup paths must not call this.
+ */
+function orange_backup_admin_assert_country_package_in_context(PDO $pdo, string $packageCountryCode): void
+{
+    require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'countries.php';
+
+    $ctx = orange_backup_admin_normalize_country_scope_code(orange_admin_context_country_code($pdo));
+    $pkg = orange_backup_admin_normalize_country_scope_code($packageCountryCode);
+    if ($ctx === '' || $pkg === '' || $ctx !== $pkg) {
+        throw new RuntimeException('حزمة الدولة خارج سياق الدولة المحدد في الأدمن.');
+    }
 }
 
 /**
@@ -944,14 +996,23 @@ function orange_backup_admin_list_full_snapshots(string $backupRoot, int $limit 
  * @param int|null $perCountryLimit null/0 = no per-country cap (Backup Center full history).
  *                                  Positive = keep only the newest N dirs per country code
  *                                  (used by restore pickers that want a short list).
+ * @param string|null $onlyCountryCode null = all countries on disk (restore / global tools).
+ *                                    non-empty = Admin Country Context scope (Backup Center Country tab).
  * @return list<array<string, mixed>>
  */
-function orange_backup_admin_list_country_packages(PDO $pdo, string $backupRoot, ?int $perCountryLimit = null): array
-{
+function orange_backup_admin_list_country_packages(
+    PDO $pdo,
+    string $backupRoot,
+    ?int $perCountryLimit = null,
+    ?string $onlyCountryCode = null
+): array {
     require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'countries.php';
 
     $countryRoot = orange_backup_path_inside_root($backupRoot, 'country_packages');
-    $codes = orange_backup_retention_list_country_codes($backupRoot);
+    $codes = orange_backup_admin_filter_country_codes(
+        orange_backup_retention_list_country_codes($backupRoot),
+        $onlyCountryCode
+    );
     $out = [];
     $cap = ($perCountryLimit !== null && $perCountryLimit > 0) ? $perCountryLimit : null;
 

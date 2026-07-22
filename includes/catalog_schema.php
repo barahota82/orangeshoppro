@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 121);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 122);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3183,6 +3183,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_pre_apcu_integrity_v116_through_v119($pdo);
     orange_catalog_migrate_gl_voucher_slots_v120($pdo);
     orange_catalog_migrate_order_items_gl_slot_v121($pdo);
+    orange_catalog_migrate_countries_timezone_v122($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3817,6 +3818,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_pre_apcu_integrity_v116_through_v119($pdo);
     orange_catalog_migrate_gl_voucher_slots_v120($pdo);
     orange_catalog_migrate_order_items_gl_slot_v121($pdo);
+    orange_catalog_migrate_countries_timezone_v122($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -9451,6 +9453,67 @@ function orange_catalog_migrate_gl_voucher_slots_v120(PDO $pdo): void
 /**
  * v121 — Phase 1B: stable order line GL identity (order_items.gl_slot).
  */
+/**
+ * v122 — IANA timezone as Country Configuration (countries.timezone).
+ * One-time backfill for already-deployed market rows only; runtime has no code→timezone map.
+ */
+function orange_catalog_migrate_countries_timezone_v122(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_countries_timezone_v122';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'countries')) {
+        if (!orange_table_has_column($pdo, 'countries', 'timezone')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                "ALTER TABLE countries ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT '' AFTER currency_code"
+            );
+            orange_schema_invalidate_column_check('countries', 'timezone');
+        }
+
+        // Data migration only (empty → configured). Not a runtime application map.
+        if (orange_table_has_column($pdo, 'countries', 'timezone')) {
+            $seedByCode = [
+                'kw' => 'Asia/Kuwait',
+                'eg' => 'Africa/Cairo',
+                'uae' => 'Asia/Dubai',
+                'ksa' => 'Asia/Riyadh',
+                'bh' => 'Asia/Bahrain',
+                'qa' => 'Asia/Qatar',
+                'om' => 'Asia/Muscat',
+                'jo' => 'Asia/Amman',
+                'lb' => 'Asia/Beirut',
+                'iq' => 'Asia/Baghdad',
+                'ma' => 'Africa/Casablanca',
+                'tn' => 'Africa/Tunis',
+                'dz' => 'Africa/Algiers',
+                'ly' => 'Africa/Tripoli',
+                'sd' => 'Africa/Khartoum',
+                'ye' => 'Asia/Aden',
+                'tr' => 'Europe/Istanbul',
+            ];
+            $upd = $pdo->prepare(
+                "UPDATE countries SET timezone = ?
+                 WHERE code = ? AND (timezone IS NULL OR TRIM(timezone) = '')"
+            );
+            foreach ($seedByCode as $code => $tz) {
+                try {
+                    new DateTimeZone($tz);
+                } catch (Throwable $e) {
+                    continue;
+                }
+                $upd->execute([$tz, $code]);
+            }
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
 function orange_catalog_migrate_order_items_gl_slot_v121(PDO $pdo): void
 {
     require_once __DIR__ . '/schema_migrations.php';

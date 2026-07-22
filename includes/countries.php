@@ -5,7 +5,20 @@ declare(strict_types=1);
 require_once __DIR__ . '/catalog_schema.php';
 
 /**
- * @return list<array{id:int, code:string, name_ar:string, name_en:string, currency_code:string, sort_order:int, is_active:int}>
+ * Columns for countries row reads (timezone is Country Configuration — DB only).
+ */
+function orange_countries_row_select_sql(PDO $pdo): string
+{
+    $cols = 'id, code, name_ar, name_en, currency_code, sort_order, is_active';
+    if (orange_table_has_column($pdo, 'countries', 'timezone')) {
+        $cols .= ', timezone';
+    }
+
+    return $cols;
+}
+
+/**
+ * @return list<array{id:int, code:string, name_ar:string, name_en:string, currency_code:string, sort_order:int, is_active:int, timezone?:string}>
  */
 function orange_countries_admin_list(PDO $pdo): array
 {
@@ -13,7 +26,7 @@ function orange_countries_admin_list(PDO $pdo): array
         return [];
     }
     $st = $pdo->query(
-        'SELECT id, code, name_ar, name_en, currency_code, sort_order, is_active
+        'SELECT ' . orange_countries_row_select_sql($pdo) . '
          FROM countries ORDER BY sort_order ASC, id ASC'
     );
 
@@ -169,6 +182,57 @@ function orange_admin_context_phone_dial(PDO $pdo): string
 }
 
 /**
+ * Validate IANA timezone name (Area/Location). Rejects fixed offsets and UTC/GMT/Etc aliases.
+ */
+function orange_countries_is_valid_iana_timezone(string $tz): bool
+{
+    $tz = trim($tz);
+    if ($tz === '' || str_contains($tz, ' ')) {
+        return false;
+    }
+    if (preg_match('/^(?:UTC|GMT|[+-]\d)/i', $tz) || strncmp($tz, 'Etc/', 4) === 0) {
+        return false;
+    }
+    try {
+        new DateTimeZone($tz);
+    } catch (Throwable $e) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * IANA timezone from Country Configuration (countries.timezone). Empty if missing/invalid.
+ * Single source of truth — no application country→timezone map.
+ */
+function orange_country_timezone(PDO $pdo, int $countryId): string
+{
+    if ($countryId <= 0
+        || !orange_table_exists($pdo, 'countries')
+        || !orange_table_has_column($pdo, 'countries', 'timezone')) {
+        return '';
+    }
+    $st = $pdo->prepare('SELECT timezone FROM countries WHERE id = ? LIMIT 1');
+    $st->execute([$countryId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($row)) {
+        return '';
+    }
+    $tz = trim((string) ($row['timezone'] ?? ''));
+
+    return orange_countries_is_valid_iana_timezone($tz) ? $tz : '';
+}
+
+/**
+ * Display timezone for the selected Admin Country Context — from Country Configuration only.
+ */
+function orange_admin_context_timezone(PDO $pdo): string
+{
+    return orange_country_timezone($pdo, orange_admin_context_country_id($pdo));
+}
+
+/**
  * يزيل كود الاتصال الدولي من رقم هاتف للعرض (مثل واتساب القناة) مع الإبقاء على الرقم المحلي.
  * يدعم البادئات: +، 00، ثم كود الدولة. لا يضيف صفراً محلياً.
  */
@@ -291,7 +355,7 @@ function orange_countries_code_for_names(string $nameAr, string $nameEn): string
 }
 
 /**
- * @return array{id:int, code:string, name_ar:string, name_en:string, currency_code:string, is_active:int}|null
+ * @return array{id:int, code:string, name_ar:string, name_en:string, currency_code:string, is_active:int, timezone?:string}|null
  */
 function orange_country_row_by_code(PDO $pdo, string $code, bool $requireActive = false): ?array
 {
@@ -299,7 +363,7 @@ function orange_country_row_by_code(PDO $pdo, string $code, bool $requireActive 
     if ($code === '' || !orange_table_exists($pdo, 'countries')) {
         return null;
     }
-    $sql = 'SELECT id, code, name_ar, name_en, currency_code, sort_order, is_active FROM countries WHERE code = ?';
+    $sql = 'SELECT ' . orange_countries_row_select_sql($pdo) . ' FROM countries WHERE code = ?';
     if ($requireActive) {
         $sql .= ' AND is_active = 1';
     }
@@ -312,14 +376,14 @@ function orange_country_row_by_code(PDO $pdo, string $code, bool $requireActive 
 }
 
 /**
- * @return array{id:int, code:string, name_ar:string, name_en:string, currency_code:string, is_active:int}|null
+ * @return array{id:int, code:string, name_ar:string, name_en:string, currency_code:string, is_active:int, timezone?:string}|null
  */
 function orange_country_row_by_id(PDO $pdo, int $id, bool $requireActive = false): ?array
 {
     if ($id <= 0 || !orange_table_exists($pdo, 'countries')) {
         return null;
     }
-    $sql = 'SELECT id, code, name_ar, name_en, currency_code, sort_order, is_active FROM countries WHERE id = ?';
+    $sql = 'SELECT ' . orange_countries_row_select_sql($pdo) . ' FROM countries WHERE id = ?';
     if ($requireActive) {
         $sql .= ' AND is_active = 1';
     }

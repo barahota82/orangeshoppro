@@ -756,6 +756,10 @@ The following are **not part of Phase 1A / 1B** and must not be assumed availabl
 
 UI may hide tabs/actions by permission; every API enforces `backup_view` / `backup_run` / `backup_verify` independently.
 
+**Timestamp display (presentation only — Owner 2026-07-23; config source Owner 2026-07-23; 12h AM/PM Owner 2026-07-23):** Backup Center shows all operator-facing datetimes in the **IANA timezone stored on the Country Context country** (`countries.timezone` via `orange_admin_context_timezone()`), **12-hour AM/PM** via a single JS path (`fmtTimestampDisplay` / `fmtPackageWhenDisplay`). Clock display uses `manifest.generated_at` (`gmdate('c')` UTC) — not raw `package_id`. Accordion previously showed unconverted `package_id` as the visible time (root cause of “historical UTC”). Missing/invalid `countries.timezone` → raw + warning (no silent UTC fallback). UTC storage / package IDs / APIs / restore/CPR unchanged.
+
+**Country Context scope (Owner 2026-07-23):** **Full Backup** remains **global** (shared `snapshots/`, Run Full, Full history/verify/DRV). **Country Backup views** (list, counters, history, details, manifest/health/verify/DRV for `country_recovery`) follow the **selected Admin Country Context** — no cross-country package leakage. **Run All Recoverable Countries** and shared BackupRoot remain **global**. Restore picker listing is unchanged (still multi-country).
+
 ### Permissions (server-side enforced on every API)
 
 | Key | Purpose |

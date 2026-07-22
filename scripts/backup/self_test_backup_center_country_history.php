@@ -108,12 +108,16 @@ bc_country_hist_assert(
 
 $listSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'list.php');
 bc_country_hist_assert(
-    str_contains($listSource, 'list_country_packages($pdo, $backupRoot, null)'),
-    'Backup Center list.php requests uncapped country packages'
+    str_contains($listSource, 'list_country_packages($pdo, $backupRoot, null, $countryContextCode)'),
+    'Backup Center list.php requests uncapped country packages scoped to Country Context'
 );
 bc_country_hist_assert(
     !str_contains($listSource, 'list_country_packages($pdo, $backupRoot, 5)'),
     'Backup Center list.php no longer hard-caps country packages at 5'
+);
+bc_country_hist_assert(
+    str_contains($listSource, 'list_full_snapshots($backupRoot, 20)'),
+    'Backup Center list.php keeps Full snapshots global (no country scope arg)'
 );
 
 $pageSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'backup_center.php');
