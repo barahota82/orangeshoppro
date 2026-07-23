@@ -57,6 +57,10 @@ try {
         $username !== '' ? $username : 'admin'
     );
 
+    if (empty($result['scheduled']) || empty($result['ok']) || (int) ($result['pid'] ?? 0) <= 0) {
+        throw new RuntimeException('restore_center_spawn_failed');
+    }
+
     $fresh = orange_restore_fw_public_row(orange_restore_fw_read($workRoot, $jobId));
 
     json_response([
@@ -66,6 +70,7 @@ try {
         'scheduled' => true,
         'http_waits_for_worker' => false,
         'worker' => (string) ($result['worker'] ?? $worker),
+        'pid' => (int) ($result['pid'] ?? 0),
         'message' => (string) ($result['message'] ?? 'Worker scheduled.'),
         'job' => $fresh,
         'csrf_token' => orange_backup_admin_csrf_token(),
@@ -76,11 +81,18 @@ try {
     if ($code === 'country_production_restore_not_enabled') {
         $status = 403;
     }
+    $messages = [
+        'restore_center_worker_already_running' => 'عامل هذه المرحلة يعمل بالفعل لهذه المهمة. لن يُشغَّل مجدداً.',
+        'restore_center_spawn_failed' => 'تعذر تشغيل العامل على الخادم. لم تُسجَّل جدولة ناجحة.',
+        'restore_center_mutex_open_failed' => 'تعذر قفل جدولة المرحلة على الخادم.',
+        'restore_center_spawn_launch_cmd_failed' => 'تعذر تجهيز أمر التشغيل المنفصل على Windows.',
+    ];
     json_response([
         'success' => false,
         'code' => $code !== '' ? $code : 'restore_center_worker_failed',
-        'message' => orange_restore_admin_safe_message($e),
+        'message' => $messages[$code] ?? orange_restore_admin_safe_message($e),
         'detached' => false,
+        'scheduled' => false,
         'http_waits_for_worker' => false,
         'csrf_token' => orange_backup_admin_csrf_token(),
     ], $status);

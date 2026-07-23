@@ -873,19 +873,34 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         return j;
     }
 
+    /** In-flight schedule keys (jobId::worker) — UI guard; server enforces atomic lock. */
+    const rcScheduleInFlight = new Set();
+
     /** Schedule approved CLI worker (detached). HTTP returns immediately; poll status via loadAll. */
     async function runRestoreWorker(jobId, workerKey, busyText) {
-        setBusy(true, busyText || 'جاري جدولة التنفيذ على الخادم…');
-        const j = await apiPost('job/run-worker.php', {
-            csrf_token: state.csrf,
-            job_id: jobId,
-            worker: workerKey
-        });
-        if (j.csrf_token) state.csrf = j.csrf_token;
-        if (!j.success) {
-            throw new Error(j.message || 'فشل جدولة المرحلة');
+        const key = String(jobId || '') + '::' + String(workerKey || '');
+        if (!jobId || !workerKey) {
+            throw new Error('معرّف المهمة أو العامل غير صالح');
         }
-        return j;
+        if (rcScheduleInFlight.has(key)) {
+            throw new Error('عامل هذه المرحلة يعمل بالفعل لهذه المهمة. لن يُشغَّل مجدداً.');
+        }
+        rcScheduleInFlight.add(key);
+        setBusy(true, busyText || 'جاري جدولة التنفيذ على الخادم…');
+        try {
+            const j = await apiPost('job/run-worker.php', {
+                csrf_token: state.csrf,
+                job_id: jobId,
+                worker: workerKey
+            });
+            if (j.csrf_token) state.csrf = j.csrf_token;
+            if (!j.success || !j.scheduled) {
+                throw new Error(j.message || 'فشل جدولة المرحلة');
+            }
+            return j;
+        } finally {
+            rcScheduleInFlight.delete(key);
+        }
     }
 
     /** Request metadata step then schedule the matching approved worker (detached). */
