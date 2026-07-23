@@ -110,8 +110,10 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 .rc-pkg-id{font-family:ui-monospace,Consolas,monospace;font-size:.72rem;font-weight:500;color:#94a3b8;direction:ltr;unicode-bidi:isolate}
 .rc-action-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .rc-action-row .rc-btn-ghost,.rc-action-row .btn-link{flex:0 0 auto}
-.rc-action-row--secondary{margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9}
+.rc-action-row--secondary{margin-top:6px}
 .rc-action-row--secondary .btn-link,.rc-action-row--secondary .rc-btn-ghost{opacity:.92;font-weight:600;font-size:.8rem}
+.rc-ops-label{margin:12px 0 6px;font-size:.78rem;font-weight:700;color:var(--rc-muted);letter-spacing:.01em}
+.rc-ops-hint{margin:0 0 8px;font-size:.76rem;color:#94a3b8;line-height:1.4}
 .rc-stage-idle{color:var(--rc-muted);font-weight:600;font-size:.86rem}
 .rc-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;align-items:center}
 .rc-active-job{padding:14px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:12px;margin-bottom:12px}
@@ -928,10 +930,12 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
     function packageExpandedActions(pkg, type) {
         const id = pkg.package_id;
         const cc = pkg.country_code || '';
-        // Primary inside expand: Package Details. Diagnostics stay secondary.
+        // Complete package information (drawer) ≠ accordion operational tools. Owner 2026-07-23
         let html = '<div class="rc-action-row">'
-            + '<button type="button" class="btn-link rc-btn-primary rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">Package Details</button>'
+            + '<button type="button" class="btn-link rc-btn-primary rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">معلومات الحزمة</button>'
             + '</div>';
+        html += '<p class="rc-ops-label">أدوات تشغيلية</p>';
+        html += '<p class="rc-ops-hint">فحص سريع (Manifest / Health / DRV / التحقق) — ليست معلومات الحزمة الكاملة.</p>';
         let secondary = '';
         const files = type === 'full_disaster'
             ? [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['recovery_validation.json', 'DRV Report']]
@@ -952,8 +956,8 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
             return '<button type="button" class="btn-link rc-btn-primary rc-create-job" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">إنشاء مهمة استرداد</button>';
         }
-        // Opens package details view/drawer — NOT accordion toggle (chevron only). Owner 2026-07-23
-        return '<button type="button" class="btn-link rc-btn-primary rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">تفاصيل الحزمة</button>';
+        // Opens complete package information drawer — NOT accordion. Owner 2026-07-23
+        return '<button type="button" class="btn-link rc-btn-primary rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">معلومات الحزمة</button>';
     }
 
     /** Capability-preserving action set (expanded + create when eligible). */
@@ -995,7 +999,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             '</summary>' +
             '<div class="rc-acc-body">' +
                 packageExpandedActions(pkg, type) +
-                '<p class="rc-muted" style="margin:10px 0 0;font-size:.8rem;"><strong>Metadata</strong> — Schema: ' + esc(String(pkg.schema_revision || '—')) +
+                '<p class="rc-muted" style="margin:10px 0 0;font-size:.8rem;"><strong>ملخص سريع</strong> — Schema: ' + esc(String(pkg.schema_revision || '—')) +
                 ' · Backend: ' + esc(String(pkg.backend || '—')) +
                 ' · DRV: ' + drvCell(pkg) +
                 (pkg.registry_version ? (' · Registry: ' + esc(String(pkg.registry_version))) : '') +
@@ -1580,7 +1584,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     '&package_id=' + encodeURIComponent(t.dataset.id || '') +
                     '&country_code=' + encodeURIComponent(t.dataset.cc || '');
                 const j = await apiGet(q);
-                openView('Package details', JSON.stringify(j.package || {}, null, 2));
+                openView('معلومات الحزمة', JSON.stringify(j.package || {}, null, 2));
             } catch (e) {
                 showAlert(e.message || 'تعذر العرض', false);
             } finally {
