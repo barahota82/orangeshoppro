@@ -5,6 +5,7 @@ declare(strict_types=1);
 /**
  * Restore Center orchestration: schedule an approved CLI worker (detached).
  * HTTP returns immediately — does not wait for the worker.
+ * Server-side stage validation + atomic claim (orchestrator layer only).
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
@@ -27,6 +28,11 @@ try {
             'success' => false,
             'code' => 'invalid_worker_request',
             'message' => 'job_id and worker are required.',
+            'scheduled' => false,
+            'diagnostics' => [
+                'code' => 'invalid_worker_request',
+                'reason_ar' => 'معرّف المهمة أو اسم العامل مفقود.',
+            ],
         ], 422);
     }
 
@@ -73,6 +79,10 @@ try {
         'pid' => (int) ($result['pid'] ?? 0),
         'message' => (string) ($result['message'] ?? 'Worker scheduled.'),
         'job' => $fresh,
+        'diagnostics' => is_array($result['diagnostics'] ?? null) ? $result['diagnostics'] : [
+            'code' => 'ok',
+            'reason_ar' => 'تم جدولة العامل بنجاح.',
+        ],
         'csrf_token' => orange_backup_admin_csrf_token(),
     ]);
 } catch (Throwable $e) {
@@ -81,12 +91,35 @@ try {
     if ($code === 'country_production_restore_not_enabled') {
         $status = 403;
     }
+
+    $jobStatus = '';
+    $diagFull = null;
+    try {
+        if (isset($workRoot, $jobId) && is_string($workRoot) && $workRoot !== '' && is_string($jobId) && $jobId !== '') {
+            $jobRow = orange_restore_fw_read($workRoot, $jobId);
+            $jobStatus = (string) ($jobRow['status'] ?? '');
+            $diagFull = orange_restore_center_diagnostics($workRoot, $jobId);
+        }
+    } catch (Throwable $ignored) {
+        $diagFull = null;
+    }
+
     $messages = [
-        'restore_center_worker_already_running' => 'عامل هذه المرحلة يعمل بالفعل لهذه المهمة. لن يُشغَّل مجدداً.',
-        'restore_center_spawn_failed' => 'تعذر تشغيل العامل على الخادم. لم تُسجَّل جدولة ناجحة.',
-        'restore_center_mutex_open_failed' => 'تعذر قفل جدولة المرحلة على الخادم.',
-        'restore_center_spawn_launch_cmd_failed' => 'تعذر تجهيز أمر التشغيل المنفصل على Windows.',
+        'restore_center_invalid_stage' => orange_restore_center_operator_reason_ar(
+            'restore_center_invalid_stage',
+            $jobStatus,
+            isset($worker) ? (string) $worker : ''
+        ),
+        'restore_center_worker_already_running' => orange_restore_center_operator_reason_ar(
+            'restore_center_worker_already_running',
+            $jobStatus,
+            isset($worker) ? (string) $worker : ''
+        ),
+        'restore_center_spawn_failed' => orange_restore_center_operator_reason_ar('restore_center_spawn_failed', $jobStatus),
+        'restore_center_mutex_open_failed' => orange_restore_center_operator_reason_ar('restore_center_mutex_open_failed'),
+        'restore_center_spawn_launch_cmd_failed' => orange_restore_center_operator_reason_ar('restore_center_spawn_launch_cmd_failed'),
     ];
+
     json_response([
         'success' => false,
         'code' => $code !== '' ? $code : 'restore_center_worker_failed',
@@ -94,6 +127,17 @@ try {
         'detached' => false,
         'scheduled' => false,
         'http_waits_for_worker' => false,
+        'diagnostics' => [
+            'code' => $code !== '' ? $code : 'restore_center_worker_failed',
+            'reason_ar' => $messages[$code] ?? orange_restore_center_operator_reason_ar(
+                $code !== '' ? $code : 'restore_center_spawn_failed',
+                $jobStatus,
+                isset($worker) ? (string) $worker : ''
+            ),
+            'job_status' => $jobStatus,
+            'worker' => isset($worker) ? (string) $worker : '',
+            'detail' => $diagFull,
+        ],
         'csrf_token' => orange_backup_admin_csrf_token(),
     ], $status);
 }

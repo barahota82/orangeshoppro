@@ -9,10 +9,13 @@ declare(strict_types=1);
  * HTTP must return immediately — workers run as detached OS processes and
  * must not depend on browser / HTTP connection lifetime.
  *
- * Production rules (Owner rejection → v3):
- * - Atomic one job + one stage = one running worker (orchestration lock; not CLI).
+ * Production rules (Owner final directive):
+ * - Server-side stage validation before any schedule (atomic with claim).
+ * - One job + one stage = one running worker (orchestration lock; not CLI).
  * - Never report scheduled unless spawn + PID verification succeeded.
  * - Full stdin/stdout/stderr detachment from the HTTP process.
+ * - Claim lifecycle reconciled with job status (not PID-only).
+ * - Safe diagnostics for operators (no SSH).
  *
  * Does not implement restore logic, alter gates, or rewrite workers.
  */
@@ -22,8 +25,10 @@ require_once __DIR__ . '/../backup_environment.php';
 require_once __DIR__ . '/restore_job_framework.php';
 require_once __DIR__ . '/restore_production_cli_policy.php';
 
-const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v3-production';
+const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v4-stage-safe';
 const ORANGE_RESTORE_CENTER_WORKER_LOCK_STALE_SECONDS = 21600;
+const ORANGE_RESTORE_CENTER_CLAIM_TRANSITION_GRACE_SECONDS = 120;
+const ORANGE_RESTORE_CENTER_DIAG_LOG_TAIL_BYTES = 8192;
 
 /**
  * Allowlisted Restore Center worker keys → approved repo-relative CLI scripts.
@@ -42,6 +47,135 @@ function orange_restore_center_worker_catalog(): array
         'uploads_cutover' => 'scripts/backup/restore_uploads_cutover.php',
         'rollback' => 'scripts/backup/restore_rollback.php',
         'finalize' => 'scripts/backup/restore_finalize.php',
+    ];
+}
+
+/**
+ * Job statuses from which this worker may be scheduled (mirrors framework requestable + pending + failed retry).
+ * Orchestration-only allowlist — does not change framework transitions.
+ *
+ * @return array<string, list<string>>
+ */
+function orange_restore_center_worker_schedulable_statuses_map(): array
+{
+    return [
+        'pre_restore_backup' => [
+            ORANGE_RESTORE_FW_STATUS_APPROVED_WAITING_EXECUTION,
+            ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_FAILED,
+            ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING,
+        ],
+        'shadow_db' => [
+            ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_READY,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_FAILED,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING,
+        ],
+        'shadow_verify' => [
+            ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_READY,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_NOT_READY,
+        ],
+        'shadow_files' => [
+            ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFIED,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_FAILED,
+        ],
+        'shadow_smoke' => [
+            ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_READY,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_FAILED,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_WARNING,
+            ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_BLOCKED,
+            ORANGE_RESTORE_FW_STATUS_CUTOVER_READINESS_MANUAL_REVIEW,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING,
+        ],
+        'production_import' => [
+            ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE,
+            ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_FAILED,
+            ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_PENDING,
+        ],
+        'uploads_cutover' => [
+            ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY,
+            ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_FAILED,
+            ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_PENDING,
+        ],
+        'rollback' => [
+            ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_READY,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_FAILED,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_PENDING,
+        ],
+        'finalize' => [
+            ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_READY,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_READY,
+            ORANGE_RESTORE_FW_STATUS_RESTORE_FINALIZING,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_FINALIZING,
+        ],
+    ];
+}
+
+/**
+ * Statuses that mean this worker stage is currently in flight (claim may still be live).
+ *
+ * @return array<string, list<string>>
+ */
+function orange_restore_center_worker_inflight_statuses_map(): array
+{
+    return [
+        'pre_restore_backup' => [
+            ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_PENDING,
+            ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_RUNNING,
+            ORANGE_RESTORE_FW_STATUS_PRE_RESTORE_BACKUP_VERIFYING,
+        ],
+        'shadow_db' => [
+            ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_PENDING,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_RUNNING,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_RESTORE_VERIFYING,
+        ],
+        'shadow_verify' => [
+            ORANGE_RESTORE_FW_STATUS_SHADOW_VERIFYING,
+        ],
+        'shadow_files' => [
+            ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_RUNNING,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_FILES_VERIFYING,
+        ],
+        'shadow_smoke' => [
+            ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_PENDING,
+            ORANGE_RESTORE_FW_STATUS_SHADOW_SMOKE_RUNNING,
+        ],
+        'production_import' => [
+            ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_PENDING,
+            ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_RUNNING,
+            ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_VERIFYING,
+        ],
+        'uploads_cutover' => [
+            ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_PENDING,
+            ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_RUNNING,
+            ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_VERIFYING,
+        ],
+        'rollback' => [
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_PENDING,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_DATABASE_RUNNING,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_DATABASE_VERIFYING,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_RUNNING,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_VERIFYING,
+        ],
+        'finalize' => [
+            ORANGE_RESTORE_FW_STATUS_RESTORE_FINALIZING,
+            ORANGE_RESTORE_FW_STATUS_ROLLBACK_FINALIZING,
+        ],
+    ];
+}
+
+/**
+ * @return list<string>
+ */
+function orange_restore_center_terminal_job_statuses(): array
+{
+    return [
+        ORANGE_RESTORE_FW_STATUS_CANCELLED,
+        ORANGE_RESTORE_FW_STATUS_FAILED,
+        ORANGE_RESTORE_FW_STATUS_COMPLETED,
+        ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED,
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED,
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_CANCELLED,
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_FAILED,
     ];
 }
 
@@ -187,35 +321,118 @@ function orange_restore_center_write_run_claim(string $claimPath, array $payload
     }
 }
 
+function orange_restore_center_clear_run_claim(string $claimPath, string $reason = 'released'): void
+{
+    if (!is_file($claimPath)) {
+        return;
+    }
+    $existing = orange_restore_center_read_run_claim($claimPath);
+    if (is_array($existing)) {
+        $existing['state'] = 'released';
+        $existing['released_at'] = gmdate('c');
+        $existing['release_reason'] = $reason;
+        try {
+            orange_restore_center_write_run_claim($claimPath, $existing);
+        } catch (Throwable $e) {
+            // fall through to unlink
+        }
+    }
+    @unlink($claimPath);
+}
+
 /**
- * True when an orchestration claim still represents a live worker for this job+stage.
+ * Server-side stage gate (orchestration only). Throws restore_center_invalid_stage.
+ *
+ * @param array<string, mixed> $job
+ */
+function orange_restore_center_assert_worker_stage_allowed(array $job, string $workerKey): void
+{
+    $status = (string) ($job['status'] ?? '');
+    if ($status === '' || in_array($status, orange_restore_center_terminal_job_statuses(), true)) {
+        throw new RuntimeException('restore_center_invalid_stage');
+    }
+    $map = orange_restore_center_worker_schedulable_statuses_map();
+    $allowed = $map[$workerKey] ?? [];
+    if ($allowed === [] || !in_array($status, $allowed, true)) {
+        throw new RuntimeException('restore_center_invalid_stage');
+    }
+}
+
+/**
+ * Whether an existing claim must block a new schedule (job status + PID, not PID alone).
  *
  * @param array<string, mixed>|null $claim
+ * @param array<string, mixed> $job
  */
-function orange_restore_center_run_claim_is_active(?array $claim): bool
+function orange_restore_center_claim_blocks_schedule(?array $claim, array $job, string $workerKey): bool
 {
     if ($claim === null) {
         return false;
     }
-    $pid = (int) ($claim['pid'] ?? 0);
-    $startedAt = strtotime((string) ($claim['started_at'] ?? ''));
-    $age = $startedAt === false ? 0 : (time() - $startedAt);
-
-    if ($pid > 0 && orange_restore_center_process_alive($pid)) {
-        return true;
-    }
-
-    // If PID liveness cannot be probed, keep the claim until stale timeout (fail-closed).
-    if ($pid > 0 && !orange_restore_center_can_probe_process_liveness()) {
-        return $age < ORANGE_RESTORE_CENTER_WORKER_LOCK_STALE_SECONDS;
-    }
-
-    // Probeable PID that is no longer alive → worker finished; allow reschedule.
-    if ($pid > 0) {
+    if ((string) ($claim['state'] ?? 'running') === 'released') {
         return false;
     }
 
-    return $age < 30;
+    $status = (string) ($job['status'] ?? '');
+    $inflightMap = orange_restore_center_worker_inflight_statuses_map();
+    $schedMap = orange_restore_center_worker_schedulable_statuses_map();
+    $inflight = $inflightMap[$workerKey] ?? [];
+    $schedulable = $schedMap[$workerKey] ?? [];
+    $pid = (int) ($claim['pid'] ?? 0);
+    $alive = orange_restore_center_process_alive($pid);
+    $startedAt = strtotime((string) ($claim['started_at'] ?? ''));
+    $age = $startedAt === false ? 0 : (time() - $startedAt);
+    $inInflight = in_array($status, $inflight, true);
+    $inSchedulable = in_array($status, $schedulable, true);
+
+    // Stage finished / moved on — claim must not block indefinitely.
+    if (!$inInflight && !$inSchedulable) {
+        return false;
+    }
+
+    if ($alive) {
+        return true;
+    }
+
+    if ($inInflight) {
+        if ($age >= ORANGE_RESTORE_CENTER_WORKER_LOCK_STALE_SECONDS) {
+            return false;
+        }
+        if (!orange_restore_center_can_probe_process_liveness()) {
+            return true;
+        }
+
+        // PID dead while status still in-flight: short grace, then allow recovery if status still permits.
+        return $age < ORANGE_RESTORE_CENTER_CLAIM_TRANSITION_GRACE_SECONDS;
+    }
+
+    // Schedulable again (failed / pending / entry): brief grace against double-schedule right after spawn.
+    return $age < ORANGE_RESTORE_CENTER_CLAIM_TRANSITION_GRACE_SECONDS;
+}
+
+/**
+ * Reconcile claim file with current job status. Clears completed/stale claims.
+ *
+ * @param array<string, mixed> $job
+ * @return array<string, mixed>|null Active claim or null
+ */
+function orange_restore_center_reconcile_run_claim(
+    string $workRoot,
+    string $jobId,
+    string $workerKey,
+    array $job
+): ?array {
+    $claimPath = orange_restore_center_worker_run_claim_path($workRoot, $jobId, $workerKey);
+    $claim = orange_restore_center_read_run_claim($claimPath);
+    if ($claim === null) {
+        return null;
+    }
+    if (orange_restore_center_claim_blocks_schedule($claim, $job, $workerKey)) {
+        return $claim;
+    }
+    orange_restore_center_clear_run_claim($claimPath, 'reconciled_inactive');
+
+    return null;
 }
 
 /**
@@ -252,9 +469,6 @@ function orange_restore_center_release_schedule_mutex($handle): void
 }
 
 /**
- * Build Windows launch .cmd that fully redirects stdin/stdout/stderr, then start it detached.
- * The tracked PID is the cmd.exe host that stays alive until the PHP worker exits.
- *
  * @param list<string> $command
  * @return array{pid:int,launch_cmd:string}
  */
@@ -353,10 +567,7 @@ function orange_restore_center_spawn_detached_unix(array $command, string $logPa
 }
 
 /**
- * Launch CLI worker detached from the PHP HTTP request (Windows + Unix).
- * Does not wait for worker completion. Returns verified OS pid.
- *
- * @param list<string> $command Absolute php binary + script + --job=…
+ * @param list<string> $command
  * @return array{pid:int,launch_cmd?:string}
  */
 function orange_restore_center_spawn_detached(
@@ -393,6 +604,144 @@ function orange_restore_center_spawn_detached(
 }
 
 /**
+ * Operator-safe Arabic reason for orchestration codes (no paths/secrets).
+ */
+function orange_restore_center_operator_reason_ar(string $code, string $jobStatus = '', string $worker = ''): string
+{
+    $messages = [
+        'restore_center_invalid_stage' => 'لا يمكن جدولة هذا العامل الآن: حالة المهمة الحالية لا تسمح بهذه المرحلة.',
+        'restore_center_worker_already_running' => 'عامل هذه المرحلة يعمل بالفعل لهذه المهمة. لن يُشغَّل مجدداً.',
+        'restore_center_spawn_failed' => 'تعذر تشغيل العامل على الخادم. لم تُسجَّل جدولة ناجحة.',
+        'restore_center_mutex_open_failed' => 'تعذر قفل جدولة المرحلة على الخادم.',
+        'restore_center_spawn_launch_cmd_failed' => 'تعذر تجهيز أمر التشغيل المنفصل على Windows.',
+        'restore_center_unknown_worker' => 'عامل غير معروف في قائمة التنسيق.',
+        'restore_center_worker_not_allowlisted' => 'العامل غير مسموح به في قائمة التنسيق.',
+        'restore_center_worker_script_missing' => 'ملف عامل التنفيذ غير موجود على الخادم.',
+        'restore_center_spawn_log_dir_failed' => 'تعذر إنشاء مجلد سجلات التنسيق للمهمة.',
+    ];
+    $base = $messages[$code] ?? 'تعذر جدولة التنفيذ من مركز الاسترداد.';
+    if ($jobStatus !== '') {
+        $base .= ' الحالة الحالية: ' . $jobStatus . '.';
+    }
+    if ($worker !== '') {
+        $base .= ' المرحلة: ' . $worker . '.';
+    }
+
+    return $base;
+}
+
+/**
+ * Safe diagnostics for Restore Center (no absolute paths, no secrets).
+ *
+ * @return array<string, mixed>
+ */
+function orange_restore_center_diagnostics(string $workRoot, string $jobId): array
+{
+    $job = orange_restore_fw_read($workRoot, $jobId);
+    $status = (string) ($job['status'] ?? '');
+    $workers = [];
+    foreach (array_keys(orange_restore_center_worker_catalog()) as $workerKey) {
+        $claim = orange_restore_center_reconcile_run_claim($workRoot, $jobId, $workerKey, $job);
+        $schedulable = false;
+        try {
+            orange_restore_center_assert_worker_stage_allowed($job, $workerKey);
+            $schedulable = true;
+        } catch (Throwable $e) {
+            $schedulable = false;
+        }
+        $blocking = $claim !== null && orange_restore_center_claim_blocks_schedule($claim, $job, $workerKey);
+        $workers[] = [
+            'worker' => $workerKey,
+            'schedulable_now' => $schedulable && !$blocking,
+            'claim_active' => $blocking,
+            'claim_state' => is_array($claim) ? (string) ($claim['state'] ?? 'running') : 'none',
+            'started_at' => is_array($claim) ? (string) ($claim['started_at'] ?? '') : '',
+            'log_name' => 'orchestrator_' . orange_restore_center_safe_worker_token($workerKey) . '.log',
+        ];
+    }
+
+    $failures = [];
+    $auditPath = orange_restore_fw_audit_file_path($workRoot, $jobId);
+    if (is_file($auditPath)) {
+        $lines = @file($auditPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (is_array($lines)) {
+            $slice = array_slice($lines, -80);
+            foreach (array_reverse($slice) as $line) {
+                $row = json_decode((string) $line, true);
+                if (!is_array($row)) {
+                    continue;
+                }
+                $event = (string) ($row['event'] ?? '');
+                if ($event !== 'restore_center_worker_schedule_failed' && $event !== 'restore_center_worker_scheduled') {
+                    continue;
+                }
+                $code = (string) ($row['code'] ?? ($event === 'restore_center_worker_scheduled' ? 'ok' : 'restore_center_spawn_failed'));
+                $failures[] = [
+                    'event' => $event,
+                    'result' => (string) ($row['result'] ?? ''),
+                    'worker' => (string) ($row['worker'] ?? ''),
+                    'code' => $code,
+                    'reason_ar' => $code === 'ok'
+                        ? 'تم جدولة العامل بنجاح.'
+                        : orange_restore_center_operator_reason_ar($code, $status, (string) ($row['worker'] ?? '')),
+                    'at' => (string) ($row['recorded_at'] ?? $row['at'] ?? $row['timestamp'] ?? ''),
+                ];
+                if (count($failures) >= 12) {
+                    break;
+                }
+            }
+        }
+    }
+
+    $logSnippets = [];
+    foreach (array_keys(orange_restore_center_worker_catalog()) as $workerKey) {
+        $logPath = orange_restore_center_worker_log_path($workRoot, $jobId, $workerKey);
+        if (!is_file($logPath)) {
+            continue;
+        }
+        $size = (int) @filesize($logPath);
+        $raw = '';
+        if ($size > 0) {
+            $fh = @fopen($logPath, 'rb');
+            if (is_resource($fh)) {
+                $start = max(0, $size - ORANGE_RESTORE_CENTER_DIAG_LOG_TAIL_BYTES);
+                if ($start > 0) {
+                    fseek($fh, $start);
+                }
+                $raw = (string) stream_get_contents($fh);
+                fclose($fh);
+            }
+        }
+        $text = function_exists('orange_backup_admin_redact_text')
+            ? orange_backup_admin_redact_text($raw)
+            : $raw;
+        // Strip absolute path-like segments for operator safety.
+        $text = (string) preg_replace('#[A-Za-z]:\\\\[^\s\'"]+#', '[path]', $text);
+        $text = (string) preg_replace('#/(?:var|home|usr|opt|httpdocs|inetpub)[^\s\'"]+#i', '[path]', $text);
+        $logSnippets[] = [
+            'worker' => $workerKey,
+            'log_name' => 'orchestrator_' . orange_restore_center_safe_worker_token($workerKey) . '.log',
+            'tail' => trim($text) !== '' ? trim($text) : '(empty)',
+        ];
+    }
+
+    return [
+        'job_id' => $jobId,
+        'job_status' => $status,
+        'package_type' => (string) ($job['package_type'] ?? ''),
+        'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
+        'workers' => $workers,
+        'recent_orchestration_events' => $failures,
+        'log_tails' => $logSnippets,
+        'notes_ar' => [
+            'التشخيص آمن للعرض من مركز الاسترداد فقط.',
+            'لا تُعرض مسارات الخادم المطلقة ولا الأسرار.',
+            'جدولة العامل تُرفض إذا كانت حالة المهمة لا تسمح بالمرحلة أو إذا كان عامل المرحلة يعمل.',
+        ],
+    ];
+}
+
+/**
  * Schedule an approved restore CLI worker (--job= only). Returns immediately after verified launch.
  *
  * @return array{
@@ -401,9 +750,10 @@ function orange_restore_center_spawn_detached(
  *   scheduled:bool,
  *   worker:string,
  *   script:string,
- *   log_path:string,
  *   pid:int,
- *   message:string
+ *   job_status:string,
+ *   message:string,
+ *   diagnostics:array<string,mixed>
  * }
  */
 function orange_restore_center_run_worker(
@@ -433,14 +783,17 @@ function orange_restore_center_run_worker(
     $mutex = orange_restore_center_acquire_schedule_mutex($workRoot, $jobId, $workerKey);
     $mutexHandle = $mutex['handle'];
     $pid = 0;
+    $jobStatus = '';
 
     try {
-        $existing = orange_restore_center_read_run_claim($claimPath);
-        if (orange_restore_center_run_claim_is_active($existing)) {
+        // Atomic critical section: read job → stage validate → claim reconcile → spawn → claim write.
+        $job = orange_restore_fw_read($workRoot, $jobId);
+        $jobStatus = (string) ($job['status'] ?? '');
+        orange_restore_center_assert_worker_stage_allowed($job, $workerKey);
+
+        $active = orange_restore_center_reconcile_run_claim($workRoot, $jobId, $workerKey, $job);
+        if ($active !== null && orange_restore_center_claim_blocks_schedule($active, $job, $workerKey)) {
             throw new RuntimeException('restore_center_worker_already_running');
-        }
-        if (is_array($existing)) {
-            @unlink($claimPath);
         }
 
         $spawned = orange_restore_center_spawn_detached(
@@ -460,15 +813,14 @@ function orange_restore_center_run_worker(
             'worker' => $workerKey,
             'script' => $relative,
             'pid' => $pid,
+            'state' => 'running',
             'started_at' => gmdate('c'),
+            'job_status_at_schedule' => $jobStatus,
             'operator_username' => $operatorUsername,
-            'log_path' => $logPath,
+            'log_name' => 'orchestrator_' . orange_restore_center_safe_worker_token($workerKey) . '.log',
             'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
             'detached' => true,
         ];
-        if (!empty($spawned['launch_cmd'])) {
-            $claim['launch_cmd'] = (string) $spawned['launch_cmd'];
-        }
         orange_restore_center_write_run_claim($claimPath, $claim);
 
         orange_restore_fw_audit_append($workRoot, $jobId, [
@@ -478,6 +830,7 @@ function orange_restore_center_run_worker(
             'script' => $relative,
             'detached' => true,
             'pid' => $pid,
+            'job_status' => $jobStatus,
             'operator_username' => $operatorUsername,
             'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
         ]);
@@ -491,6 +844,7 @@ function orange_restore_center_run_worker(
                 'script' => $relative,
                 'detached' => true,
                 'code' => $code !== '' ? $code : 'restore_center_spawn_failed',
+                'job_status' => $jobStatus,
                 'operator_username' => $operatorUsername,
                 'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
             ]);
@@ -506,8 +860,14 @@ function orange_restore_center_run_worker(
         'scheduled' => true,
         'worker' => $workerKey,
         'script' => $relative,
-        'log_path' => $logPath,
         'pid' => $pid,
+        'job_status' => $jobStatus,
         'message' => 'Worker scheduled on server. Continues independently of the browser.',
+        'diagnostics' => [
+            'code' => 'ok',
+            'reason_ar' => 'تم جدولة العامل بنجاح. يمكنك متابعة الحالة من مركز الاسترداد.',
+            'job_status' => $jobStatus,
+            'worker' => $workerKey,
+        ],
     ];
 }

@@ -163,7 +163,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 .rc-v2 .rc-acc-actions-inline .btn-link.rc-btn-primary:hover,.rc-v2 .rc-acc-body .btn-link.rc-btn-primary:hover{background:var(--primary-hover,#c2410c)}
 #rc_refresh_btn{background:#fff;color:#334155!important;border:1px solid #cbd5e1}
 #rc_refresh_btn:hover{background:#f8fafc;border-color:#94a3b8}
-#rc_view_close,#rc_detail_close{background:#475569;color:#fff!important}
+#rc_view_close,#rc_detail_close,#rc_orch_diag_close{background:#475569;color:#fff!important}
 </style>
 
 <div class="rc-v2" id="rc_app">
@@ -530,6 +530,15 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
     </div>
 </div>
 
+<div id="rc_orch_diag_modal" class="rc-modal-backdrop" aria-hidden="true">
+    <div class="rc-modal rc-modal--wide" role="dialog" aria-modal="true">
+        <h3 id="rc_orch_diag_title">تشخيص تنسيق الاسترداد</h3>
+        <p class="rc-muted" style="margin:0 0 10px;">عرض تشغيلي آمن لأسباب فشل الجدولة — بدون SSH أو مسارات حساسة.</p>
+        <div id="rc_orch_diag_body"></div>
+        <div class="admin-form-actions"><button type="button" class="btn-secondary" id="rc_orch_diag_close">إغلاق</button></div>
+    </div>
+</div>
+
 <script>
 (function () {
     const API_BASE = <?php echo json_encode($apiBase, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
@@ -868,9 +877,84 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         if (!j.success && r.status >= 400) {
             const err = new Error(j.message || 'Request failed');
             err.code = j.code || '';
+            err.diagnostics = j.diagnostics || null;
             throw err;
         }
         return j;
+    }
+
+    function formatOrchestratorDiagnostics(diag) {
+        if (!diag || typeof diag !== 'object') {
+            return '<p class="muted">لا تتوفر بيانات تشخيص.</p>';
+        }
+        let html = '';
+        html += '<div class="rc-status-strip">';
+        html += '<div><dt>المهمة</dt><dd class="rc-mono">' + esc(diag.job_id || '—') + '</dd></div>';
+        html += '<div><dt>الحالة</dt><dd>' + esc(diag.job_status || '—') + '</dd></div>';
+        html += '<div><dt>إصدار التنسيق</dt><dd class="rc-mono">' + esc(diag.orchestrator_version || '—') + '</dd></div>';
+        html += '</div>';
+        const events = Array.isArray(diag.recent_orchestration_events) ? diag.recent_orchestration_events : [];
+        html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">أحداث الجدولة الأخيرة</h4>';
+        if (!events.length) {
+            html += '<p class="muted">لا توجد أحداث جدولة مسجّلة بعد.</p>';
+        } else {
+            html += '<ul style="margin:0;padding-inline-start:1.2rem;line-height:1.55;">';
+            events.forEach(function (ev) {
+                html += '<li><strong>' + esc(ev.worker || '—') + '</strong> — '
+                    + esc(ev.reason_ar || ev.code || ev.event || '')
+                    + (ev.at ? ' <span class="muted">(' + esc(ev.at) + ')</span>' : '')
+                    + '</li>';
+            });
+            html += '</ul>';
+        }
+        const workers = Array.isArray(diag.workers) ? diag.workers : [];
+        html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">قابلية الجدولة حسب المرحلة</h4>';
+        if (!workers.length) {
+            html += '<p class="muted">—</p>';
+        } else {
+            html += '<table class="admin-table" style="width:100%;font-size:.82rem;"><thead><tr>'
+                + '<th>المرحلة</th><th>قابلة للجدولة الآن</th><th>مطالبة نشطة</th><th>سجل</th>'
+                + '</tr></thead><tbody>';
+            workers.forEach(function (w) {
+                html += '<tr><td class="rc-mono">' + esc(w.worker || '') + '</td>'
+                    + '<td>' + (w.schedulable_now ? 'نعم' : 'لا') + '</td>'
+                    + '<td>' + (w.claim_active ? 'نعم (' + esc(w.claim_state || '') + ')' : 'لا') + '</td>'
+                    + '<td class="rc-mono">' + esc(w.log_name || '') + '</td></tr>';
+            });
+            html += '</tbody></table>';
+        }
+        const tails = Array.isArray(diag.log_tails) ? diag.log_tails : [];
+        if (tails.length) {
+            html += '<h4 style="margin:12px 0 6px;font-size:.9rem;">مقتطفات سجل التنسيق (مُنقّاة)</h4>';
+            tails.forEach(function (t) {
+                html += '<p style="margin:8px 0 4px;"><strong class="rc-mono">' + esc(t.worker || '') + '</strong>'
+                    + ' <span class="muted">' + esc(t.log_name || '') + '</span></p>';
+                html += '<pre class="rc-pre" style="max-height:160px;overflow:auto;white-space:pre-wrap;">'
+                    + esc(t.tail || '') + '</pre>';
+            });
+        }
+        const notes = Array.isArray(diag.notes_ar) ? diag.notes_ar : [];
+        if (notes.length) {
+            html += '<ul class="muted" style="margin:10px 0 0;padding-inline-start:1.2rem;font-size:.8rem;">';
+            notes.forEach(function (n) { html += '<li>' + esc(n) + '</li>'; });
+            html += '</ul>';
+        }
+        return html;
+    }
+
+    async function openOrchestratorDiagnostics(jobId) {
+        if (!jobId) throw new Error('معرّف المهمة غير صالح');
+        setBusy(true, 'جاري تحميل تشخيص التنسيق…');
+        try {
+            const j = await apiGet('job/orchestrator-diagnostics.php?id=' + encodeURIComponent(jobId));
+            if (j.csrf_token) state.csrf = j.csrf_token;
+            el('rc_orch_diag_title').textContent = 'تشخيص تنسيق الاسترداد — ' + jobId;
+            el('rc_orch_diag_body').innerHTML = formatOrchestratorDiagnostics(j.diagnostics || {});
+            el('rc_orch_diag_modal').style.display = 'flex';
+            el('rc_orch_diag_modal').setAttribute('aria-hidden', 'false');
+        } finally {
+            setBusy(false);
+        }
     }
 
     /** In-flight schedule keys (jobId::worker) — UI guard; server enforces atomic lock. */
@@ -895,7 +979,12 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             });
             if (j.csrf_token) state.csrf = j.csrf_token;
             if (!j.success || !j.scheduled) {
-                throw new Error(j.message || 'فشل جدولة المرحلة');
+                const fail = new Error(
+                    (j.diagnostics && j.diagnostics.reason_ar) || j.message || 'فشل جدولة المرحلة'
+                );
+                fail.code = j.code || '';
+                fail.diagnostics = j.diagnostics || null;
+                throw fail;
             }
             return j;
         } finally {
@@ -1361,6 +1450,9 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         let html = opts.omitPrimaryView
             ? ''
             : '<button type="button" class="btn-link rc-fw-view" data-id="' + id + '">View</button> ';
+        if (CAN_FULL && (job.package_type === 'full_disaster' || !job.package_type)) {
+            html += '<button type="button" class="btn-link rc-orch-diag" data-id="' + id + '">تشخيص التنسيق</button> ';
+        }
         if (job.dry_run_available) {
             html += '<button type="button" class="btn-link rc-dry-run" data-job="' + id + '">Run Dry Validation</button> ';
         }
@@ -1622,6 +1714,19 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 
         if (t.id === 'rc_refresh_btn') {
             await loadAll();
+            return;
+        }
+        if (t.id === 'rc_orch_diag_close') {
+            el('rc_orch_diag_modal').style.display = 'none';
+            el('rc_orch_diag_modal').setAttribute('aria-hidden', 'true');
+            return;
+        }
+        if (t.classList.contains('rc-orch-diag')) {
+            try {
+                await openOrchestratorDiagnostics(t.dataset.id || '');
+            } catch (e) {
+                showAlert(e.message || 'تعذر فتح تشخيص التنسيق', false);
+            }
             return;
         }
         if (t.id === 'rc_view_close') {
@@ -2223,7 +2328,15 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 showAlert(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر تنفيذ المرحلة', false);
+                const reason = (e.diagnostics && e.diagnostics.reason_ar) || e.message || 'تعذر تنفيذ المرحلة';
+                showAlert(reason, false);
+                if (e.code === 'restore_center_invalid_stage'
+                    || e.code === 'restore_center_worker_already_running'
+                    || e.code === 'restore_center_spawn_failed') {
+                    try {
+                        await openOrchestratorDiagnostics(t.dataset.id || '');
+                    } catch (ignored) { /* alert already shown */ }
+                }
             } finally {
                 setBusy(false);
             }
