@@ -54,10 +54,11 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 .rc-readiness{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;padding:12px 14px;background:var(--rc-soft);border:1px solid var(--rc-border);border-radius:12px}
 .rc-readiness-label{margin:0;font-size:.8rem;color:var(--rc-muted)}
 .rc-readiness-value{margin:4px 0 0;font-size:1.05rem;font-weight:700;color:var(--rc-ink)}
-.rc-info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.rc-info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:16px}
 @media (max-width:900px){.rc-info-grid{grid-template-columns:1fr}}
-.rc-info-box{padding:12px 14px;border-radius:10px;border:1px solid var(--rc-border);background:#fff;line-height:1.55;font-size:.86rem}
-.rc-info-box h4{margin:0 0 6px;font-size:.82rem;font-weight:700}
+.rc-info-box{padding:14px 16px;border-radius:10px;border:1px solid var(--rc-border);background:#fff;line-height:1.55;font-size:.86rem}
+.rc-info-box h4{margin:0 0 8px;font-size:.82rem;font-weight:700}
+.rc-info-box p{margin:0;line-height:1.6}
 .rc-info-box--warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
 .rc-info-box--info{background:#eff6ff;border-color:#bfdbfe;color:#1e3a8a}
 .rc-info-box--req{background:#f8fafc;border-color:#cbd5e1;color:#334155}
@@ -104,13 +105,25 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 .rc-active-job h4{margin:0 0 8px;font-size:.95rem}
 .rc-active-meta{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:8px}
 .rc-stage-strip{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
-.rc-stage-chip{flex:1 1 140px;min-width:120px;padding:10px 12px;border-radius:10px;border:1px solid var(--rc-border);background:var(--rc-soft);text-align:center}
+.rc-stage-chip{flex:1 1 140px;min-width:120px;padding:10px 12px;border-radius:10px;border:1px solid var(--rc-border);background:var(--rc-soft);text-align:center;cursor:pointer;font:inherit;color:inherit}
+.rc-stage-chip:hover{border-color:#94a3b8;background:#fff}
 .rc-stage-chip strong{display:block;font-size:.78rem;color:var(--rc-muted);margin-bottom:4px}
 .rc-stage-chip span{font-size:.86rem;font-weight:650;color:var(--rc-ink)}
-.rc-stage-chip.is-active{border-color:var(--primary,#ea580c);background:rgba(234,88,12,.08)}
-.rc-stage-panels{display:flex;flex-direction:column;gap:10px}
-.rc-stage-panel{border:1px solid var(--rc-border);border-radius:12px;padding:12px 14px;background:#fff}
-.rc-stage-panel h4{margin:0 0 8px;font-size:.9rem}
+.rc-stage-chip.is-active,.rc-stage-chip.is-selected{border-color:var(--primary,#ea580c);background:rgba(234,88,12,.08)}
+.rc-stage-panels{display:flex;flex-direction:column;gap:8px}
+.rc-stage-acc.rc-acc-item{background:#fff}
+.rc-stage-acc>summary .rc-acc-title{font-size:.9rem}
+.rc-val-stack{display:flex;flex-direction:column;gap:8px}
+.rc-skeleton{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:200% 100%;animation:rc-skel 1.2s ease-in-out infinite}
+.rc-skeleton--lg{height:18px}
+.rc-skeleton-card{padding:14px;border:1px solid var(--rc-border);border-radius:12px;background:#fff}
+.rc-skeleton-card+.rc-skeleton-card{margin-top:8px}
+@keyframes rc-skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.rc-empty{padding:28px 18px;text-align:center;border:1px dashed #cbd5e1;border-radius:12px;background:var(--rc-soft)}
+.rc-empty h4{margin:0 0 6px;font-size:.95rem;font-weight:700;color:var(--rc-ink)}
+.rc-empty p{margin:0;font-size:.86rem;color:var(--rc-muted);line-height:1.5;max-width:28rem;margin-inline:auto}
+.rc-jobs-hist-label{margin:14px 0 8px;font-size:.82rem;font-weight:650;color:var(--rc-muted)}
+.rc-active-job.is-highlight{box-shadow:0 0 0 1px #93c5fd inset}
 .rc-readonly-banner{margin:0 0 10px;padding:10px 12px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;line-height:1.55;font-size:.86rem}
 .rc-modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:5000;padding:16px}
 .rc-modal{background:#fff;border-radius:12px;max-width:520px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
@@ -157,7 +170,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         </div>
         <div class="rc-header-status">
             <span class="rc-header-status-label">جاهزية النظام</span>
-            <span id="rc_readiness_badge" class="rc-badge rc-badge--muted">…</span>
+            <span id="rc_readiness_badge" class="rc-badge rc-badge--muted" aria-busy="true"><span class="rc-skeleton" style="width:5.5rem;display:inline-block;vertical-align:middle"></span></span>
         </div>
     </header>
 
@@ -171,34 +184,36 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             <div class="rc-readiness" id="rc_readiness_summary">
                 <div>
                     <p class="rc-readiness-label">الحالة التشغيلية</p>
-                    <p class="rc-readiness-value" id="rc_readiness_headline">جاري التحميل…</p>
+                    <p class="rc-readiness-value" id="rc_readiness_headline" aria-busy="true"><span class="rc-skeleton rc-skeleton--lg" style="width:10rem;display:inline-block"></span></p>
                 </div>
                 <button type="button" class="rc-btn-secondary" id="rc_refresh_btn">تحديث</button>
             </div>
             <div class="rc-info-grid" aria-label="تحذيرات ومتطلبات">
                 <div class="rc-info-box rc-info-box--warn">
                     <h4>Warnings</h4>
-                    <p style="margin:0">بعد تفعيل الصيانة يمكن طلب استيراد قاعدة الإنتاج عبر CLI فقط. <strong>Application files have NOT been switched.</strong></p>
+                    <p>بعد تفعيل الصيانة يمكن طلب استيراد قاعدة الإنتاج عبر CLI فقط. <strong>Application files have NOT been switched.</strong></p>
                 </div>
                 <div class="rc-info-box rc-info-box--info">
                     <h4>Information</h4>
-                    <p style="margin:0">لا يوجد تبديل ملفات تطبيق، ولا uploads rename، ولا cutover، ولا rollback، ولا إغلاق صيانة في مرحلة العرض وحدها.</p>
+                    <p>لا يوجد تبديل ملفات تطبيق، ولا uploads rename، ولا cutover، ولا rollback، ولا إغلاق صيانة في مرحلة العرض وحدها.</p>
                 </div>
                 <div class="rc-info-box rc-info-box--req">
                     <h4>Requirements</h4>
-                    <p style="margin:0">حزمة مؤهلة + Dry Validation + خطة معتمدة + نسخة احتياطية إلزامية قبل الاسترداد + عمال CLI المعتمدة عند الحاجة.</p>
+                    <p>حزمة مؤهلة + Dry Validation + خطة معتمدة + نسخة احتياطية إلزامية قبل الاسترداد + عمال CLI المعتمدة عند الحاجة.</p>
                 </div>
                 <div class="rc-info-box rc-info-box--blocked">
                     <h4>Blocked</h4>
-                    <p style="margin:0">أي مسار إنتاجي محظور حتى تكتمل البوابات اليدوية؛ القفل العام والصيانة يمنعان التداخل غير الآمن.</p>
+                    <p>أي مسار إنتاجي محظور حتى تكتمل البوابات اليدوية؛ القفل العام والصيانة يمنعان التداخل غير الآمن.</p>
                 </div>
             </div>
-            <div id="rc_overview" class="rc-overview" aria-live="polite">
-                <article class="rc-op-card"><h3>جاري التحميل…</h3></article>
+            <div id="rc_overview" class="rc-overview" aria-live="polite" aria-busy="true">
+                <article class="rc-op-card"><span class="rc-skeleton rc-skeleton--lg" style="width:55%"></span><div class="rc-skeleton" style="width:30%;margin-top:14px"></div></article>
+                <article class="rc-op-card"><span class="rc-skeleton rc-skeleton--lg" style="width:50%"></span><div class="rc-skeleton" style="width:28%;margin-top:14px"></div></article>
+                <article class="rc-op-card"><span class="rc-skeleton rc-skeleton--lg" style="width:60%"></span><div class="rc-skeleton" style="width:32%;margin-top:14px"></div></article>
             </div>
-            <dl id="rc_lock_maintenance" class="rc-status-strip">
-                <div><dt>قفل الاسترداد العام</dt><dd>…</dd></div>
-                <div><dt>وضع الصيانة</dt><dd>…</dd></div>
+            <dl id="rc_lock_maintenance" class="rc-status-strip" aria-busy="true">
+                <div><dt>قفل الاسترداد العام</dt><dd><span class="rc-skeleton" style="width:4rem;display:inline-block"></span></dd></div>
+                <div><dt>وضع الصيانة</dt><dd><span class="rc-skeleton" style="width:4rem;display:inline-block"></span></dd></div>
             </dl>
         </div>
     </section>
@@ -223,13 +238,18 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             </div>
             <?php if ($canFull): ?>
             <div id="rc_tab_full" class="rc-tab-panel is-active" role="tabpanel">
-                <div id="rc_full_list" class="rc-acc-list"></div>
+                <div id="rc_full_list" class="rc-acc-list" aria-busy="true">
+                    <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:35%"></span><div class="rc-skeleton" style="width:70%;margin-top:12px"></div></div>
+                    <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:40%"></span><div class="rc-skeleton" style="width:65%;margin-top:12px"></div></div>
+                </div>
             </div>
             <?php endif; ?>
             <?php if ($canCountry): ?>
             <div id="rc_tab_country" class="rc-tab-panel<?php echo $canFull ? '' : ' is-active'; ?>" role="tabpanel"<?php echo $canFull ? ' hidden' : ''; ?>>
                 <p class="rc-tz-label" style="margin:0 0 10px;">Country packages — سياق الدولة: <code dir="ltr"><?php echo htmlspecialchars($countryContextCode !== '' ? $countryContextCode : '—', ENT_QUOTES, 'UTF-8'); ?></code></p>
-                <div id="rc_country_list" class="rc-acc-list"></div>
+                <div id="rc_country_list" class="rc-acc-list" aria-busy="true">
+                    <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:35%"></span><div class="rc-skeleton" style="width:70%;margin-top:12px"></div></div>
+                </div>
             </div>
             <?php endif; ?>
             <?php if (!$canFull && !$canCountry): ?>
@@ -242,86 +262,109 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         <div class="rc-phase-head">
             <span class="rc-phase-num" aria-hidden="true">3</span>
             <h2 class="rc-phase-title" id="rc_phase3_title">Validation</h2>
-            <p class="rc-phase-hint">شهادة الجاهزية وعروض C7/C8 عند صلاحية الدولة.</p>
+            <p class="rc-phase-hint">أقسام قابلة للطي — شهادة الجاهزية وC7/C8 عند صلاحية الدولة.</p>
         </div>
-        <div class="rc-panel" id="rc_certification_section">
-            <h3 class="rc-panel-title">شهادة جاهزية الاسترداد</h3>
-            <p id="rc_cert_banner" class="rc-readonly-banner" role="status">
-                عرض فقط — لا يُشغَّل تمرين الاسترداد من الواجهة. الأمر CLI: <code>run_restore_dr_drill.php</code>
-            </p>
-            <dl id="rc_cert_status" class="rc-status-strip">
-                <div><dt>Full Restore</dt><dd>…</dd></div>
-                <div><dt>تمرين التراجع</dt><dd>…</dd></div>
-                <div><dt>العزل</dt><dd>…</dd></div>
-                <div><dt>Commit</dt><dd>…</dd></div>
-                <div><dt>تاريخ الاختبار</dt><dd>…</dd></div>
-                <div><dt>Country Restore</dt><dd>غير معتمد للإنتاج</dd></div>
-            </dl>
-            <div id="rc_cert_blockers" class="muted" style="margin-top:8px;"></div>
+        <div class="rc-val-stack">
+            <details class="rc-acc-item rc-val-acc" data-rc-acc="val" id="rc_certification_section">
+                <summary>
+                    <span class="rc-acc-chevron" aria-hidden="true"></span>
+                    <span class="rc-acc-title">شهادة جاهزية الاسترداد</span>
+                    <span class="rc-acc-meta"><span class="rc-muted">عرض فقط — CLI drill</span></span>
+                </summary>
+                <div class="rc-acc-body">
+                    <p id="rc_cert_banner" class="rc-readonly-banner" role="status">
+                        عرض فقط — لا يُشغَّل تمرين الاسترداد من الواجهة. الأمر CLI: <code>run_restore_dr_drill.php</code>
+                    </p>
+                    <dl id="rc_cert_status" class="rc-status-strip" aria-busy="true">
+                        <div><dt>Full Restore</dt><dd><span class="rc-skeleton" style="width:4rem;display:inline-block"></span></dd></div>
+                        <div><dt>تمرين التراجع</dt><dd><span class="rc-skeleton" style="width:3rem;display:inline-block"></span></dd></div>
+                        <div><dt>العزل</dt><dd><span class="rc-skeleton" style="width:3rem;display:inline-block"></span></dd></div>
+                        <div><dt>Commit</dt><dd><span class="rc-skeleton" style="width:5rem;display:inline-block"></span></dd></div>
+                        <div><dt>تاريخ الاختبار</dt><dd><span class="rc-skeleton" style="width:6rem;display:inline-block"></span></dd></div>
+                        <div><dt>Country Restore</dt><dd>غير معتمد للإنتاج</dd></div>
+                    </dl>
+                    <div id="rc_cert_blockers" class="muted" style="margin-top:8px;"></div>
+                </div>
+            </details>
+            <?php if ($canCountry): ?>
+            <details class="rc-acc-item rc-val-acc" data-rc-acc="val" id="rc_country_shadow_section">
+                <summary>
+                    <span class="rc-acc-chevron" aria-hidden="true"></span>
+                    <span class="rc-acc-title">Country Shadow Verification (C7)</span>
+                    <span class="rc-acc-meta"><span class="rc-muted">عرض فقط</span></span>
+                </summary>
+                <div class="rc-acc-body">
+                    <p class="rc-readonly-banner" role="status">
+                        <strong>تحقق ظل الدولة فقط.</strong>
+                        لا Import / Restore / Execute / Approval / Maintenance / Rollback / Production enablement.
+                        التشغيل عبر CLI: <code>verify_country_shadow.php --job=…</code>
+                    </p>
+                    <div class="rc-actions">
+                        <label for="rc_c7_job_id" class="rc-muted">Job / run_id</label>
+                        <input type="text" id="rc_c7_job_id" placeholder="kw_YYYY-MM-DD_HHMMSS" style="min-width:220px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;">
+                        <button type="button" class="btn-link rc-btn-ghost" id="rc_c7_load_btn">عرض تقرير التحقق</button>
+                    </div>
+                    <dl id="rc_country_shadow_verify" class="rc-status-strip">
+                        <div><dt>النتيجة</dt><dd>—</dd></div>
+                        <div><dt>Readiness</dt><dd>—</dd></div>
+                        <div><dt>Target country</dt><dd>—</dd></div>
+                        <div><dt>Survivor countries</dt><dd>—</dd></div>
+                        <div><dt>Global state</dt><dd>—</dd></div>
+                        <div><dt>Accounting</dt><dd>—</dd></div>
+                        <div><dt>Stock / FIFO</dt><dd>—</dd></div>
+                    </dl>
+                    <div id="rc_country_shadow_blockers" class="muted" style="margin-top:8px;"></div>
+                </div>
+            </details>
+            <details class="rc-acc-item rc-val-acc" data-rc-acc="val" id="rc_country_dry_run_section">
+                <summary>
+                    <span class="rc-acc-chevron" aria-hidden="true"></span>
+                    <span class="rc-acc-title">Country Dry Run (C8)</span>
+                    <span class="rc-acc-meta"><span class="rc-muted">عرض فقط</span></span>
+                </summary>
+                <div class="rc-acc-body">
+                    <p class="rc-readonly-banner" role="status">
+                        <strong>محاكاة استعادة الدولة فقط.</strong>
+                        لا كتابة إنتاج، لا كتابة ظل، لا Import / Restore / Execute / Approval / Maintenance / Rollback.
+                        التشغيل عبر CLI: <code>country_dry_run.php --job=…</code>
+                    </p>
+                    <div class="rc-actions">
+                        <label for="rc_c8_job_id" class="rc-muted">Job / run_id</label>
+                        <input type="text" id="rc_c8_job_id" placeholder="kw_YYYY-MM-DD_HHMMSS" style="min-width:220px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;">
+                        <button type="button" class="btn-link rc-btn-ghost" id="rc_c8_load_btn">عرض تقرير Dry Run</button>
+                    </div>
+                    <dl id="rc_country_dry_run" class="rc-status-strip">
+                        <div><dt>النتيجة</dt><dd>—</dd></div>
+                        <div><dt>Tables</dt><dd>—</dd></div>
+                        <div><dt>Rows insert/delete</dt><dd>—</dd></div>
+                        <div><dt>Survivor impact</dt><dd>—</dd></div>
+                        <div><dt>Global impact</dt><dd>—</dd></div>
+                        <div><dt>Duration</dt><dd>—</dd></div>
+                    </dl>
+                    <div id="rc_country_dry_run_blockers" class="muted" style="margin-top:8px;"></div>
+                </div>
+            </details>
+            <?php endif; ?>
         </div>
-        <?php if ($canCountry): ?>
-        <div class="rc-panel" id="rc_country_shadow_section" style="margin-top:10px;">
-            <h3 class="rc-panel-title">Country Shadow Verification (C7) — عرض فقط</h3>
-            <p class="rc-readonly-banner" role="status">
-                <strong>تحقق ظل الدولة فقط.</strong>
-                لا Import / Restore / Execute / Approval / Maintenance / Rollback / Production enablement.
-                التشغيل عبر CLI: <code>verify_country_shadow.php --job=…</code>
-            </p>
-            <div class="rc-actions">
-                <label for="rc_c7_job_id" class="rc-muted">Job / run_id</label>
-                <input type="text" id="rc_c7_job_id" placeholder="kw_YYYY-MM-DD_HHMMSS" style="min-width:220px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;">
-                <button type="button" class="btn-link rc-btn-ghost" id="rc_c7_load_btn">عرض تقرير التحقق</button>
-            </div>
-            <dl id="rc_country_shadow_verify" class="rc-status-strip">
-                <div><dt>النتيجة</dt><dd>—</dd></div>
-                <div><dt>Readiness</dt><dd>—</dd></div>
-                <div><dt>Target country</dt><dd>—</dd></div>
-                <div><dt>Survivor countries</dt><dd>—</dd></div>
-                <div><dt>Global state</dt><dd>—</dd></div>
-                <div><dt>Accounting</dt><dd>—</dd></div>
-                <div><dt>Stock / FIFO</dt><dd>—</dd></div>
-            </dl>
-            <div id="rc_country_shadow_blockers" class="muted" style="margin-top:8px;"></div>
-        </div>
-        <div class="rc-panel" id="rc_country_dry_run_section" style="margin-top:10px;">
-            <h3 class="rc-panel-title">Country Dry Run (C8) — عرض فقط</h3>
-            <p class="rc-readonly-banner" role="status">
-                <strong>محاكاة استعادة الدولة فقط.</strong>
-                لا كتابة إنتاج، لا كتابة ظل، لا Import / Restore / Execute / Approval / Maintenance / Rollback.
-                التشغيل عبر CLI: <code>country_dry_run.php --job=…</code>
-            </p>
-            <div class="rc-actions">
-                <label for="rc_c8_job_id" class="rc-muted">Job / run_id</label>
-                <input type="text" id="rc_c8_job_id" placeholder="kw_YYYY-MM-DD_HHMMSS" style="min-width:220px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;">
-                <button type="button" class="btn-link rc-btn-ghost" id="rc_c8_load_btn">عرض تقرير Dry Run</button>
-            </div>
-            <dl id="rc_country_dry_run" class="rc-status-strip">
-                <div><dt>النتيجة</dt><dd>—</dd></div>
-                <div><dt>Tables</dt><dd>—</dd></div>
-                <div><dt>Rows insert/delete</dt><dd>—</dd></div>
-                <div><dt>Survivor impact</dt><dd>—</dd></div>
-                <div><dt>Global impact</dt><dd>—</dd></div>
-                <div><dt>Duration</dt><dd>—</dd></div>
-            </dl>
-            <div id="rc_country_dry_run_blockers" class="muted" style="margin-top:8px;"></div>
-        </div>
-        <?php endif; ?>
     </section>
 
     <section class="rc-phase" aria-labelledby="rc_phase4_title">
         <div class="rc-phase-head">
             <span class="rc-phase-num" aria-hidden="true">4</span>
             <h2 class="rc-phase-title" id="rc_phase4_title">Create / Operate Restore Jobs</h2>
-            <p class="rc-phase-hint">لوحة تشغيل — المهمة النشطة أولاً، ثم قائمة المهام.</p>
+            <p class="rc-phase-hint">مركز التشغيل — المهمة النشطة أولاً، ثم السجل.</p>
         </div>
         <div class="rc-panel">
-            <div id="rc_active_job" class="rc-active-job" hidden>
+            <div id="rc_active_job" class="rc-active-job is-highlight" hidden>
                 <h4>المهمة النشطة / الحالية</h4>
                 <div class="rc-active-meta" id="rc_active_job_meta"></div>
                 <div class="rc-actions" id="rc_active_job_actions"></div>
             </div>
             <h3 class="rc-panel-title">Restore Jobs</h3>
-            <div id="rc_jobs_list" class="rc-acc-list"></div>
+            <p class="rc-jobs-hist-label" id="rc_jobs_hist_label" hidden>سجل المهام</p>
+            <div id="rc_jobs_list" class="rc-acc-list" aria-busy="true">
+                <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:45%"></span><div class="rc-skeleton" style="width:75%;margin-top:12px"></div></div>
+            </div>
             <table id="rc_jobs_table" hidden aria-hidden="true"><tbody></tbody></table>
         </div>
     </section>
@@ -330,77 +373,107 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         <div class="rc-phase-head">
             <span class="rc-phase-num" aria-hidden="true">5</span>
             <h2 class="rc-phase-title" id="rc_phase5_title">Execution workflow</h2>
-            <p class="rc-phase-hint">مراحل التنفيذ كشريط مراحل — Maintenance → DB Import → Uploads Cutover → Rollback → Finalize.</p>
+            <p class="rc-phase-hint">الشريط دائماً ظاهر — تفاصيل المرحلة مطوية إلا عند النقر أو عندما تكون المرحلة نشطة.</p>
         </div>
         <div class="rc-panel">
             <div class="rc-stage-strip" id="rc_stage_strip" aria-label="مراحل التنفيذ">
-                <div class="rc-stage-chip" data-stage="maint"><strong>1 · Maintenance</strong><span id="rc_stage_maint_label">—</span></div>
-                <div class="rc-stage-chip" data-stage="import"><strong>2 · DB Import</strong><span id="rc_stage_import_label">—</span></div>
-                <div class="rc-stage-chip" data-stage="uploads"><strong>3 · Uploads Cutover</strong><span id="rc_stage_uploads_label">—</span></div>
-                <div class="rc-stage-chip" data-stage="rollback"><strong>4 · Rollback</strong><span id="rc_stage_rollback_label">—</span></div>
-                <div class="rc-stage-chip" data-stage="finalize"><strong>5 · Finalize</strong><span id="rc_stage_finalize_label">—</span></div>
+                <button type="button" class="rc-stage-chip" data-stage="maint"><strong>1 · Maintenance</strong><span id="rc_stage_maint_label">—</span></button>
+                <button type="button" class="rc-stage-chip" data-stage="import"><strong>2 · DB Import</strong><span id="rc_stage_import_label">—</span></button>
+                <button type="button" class="rc-stage-chip" data-stage="uploads"><strong>3 · Uploads Cutover</strong><span id="rc_stage_uploads_label">—</span></button>
+                <button type="button" class="rc-stage-chip" data-stage="rollback"><strong>4 · Rollback</strong><span id="rc_stage_rollback_label">—</span></button>
+                <button type="button" class="rc-stage-chip" data-stage="finalize"><strong>5 · Finalize</strong><span id="rc_stage_finalize_label">—</span></button>
             </div>
             <div class="rc-stage-panels">
-                <div class="rc-stage-panel" id="rc_maint_section">
-                    <h4>حالة وضع الصيانة (Production Maintenance)</h4>
-                    <p id="rc_maint_banner" class="rc-readonly-banner" role="status">
-                        <strong>Production restore has NOT started.</strong>
-                    </p>
-                    <dl id="rc_maint_status" class="rc-status-strip">
-                        <div><dt>الحالة</dt><dd>…</dd></div>
-                        <div><dt>الملصق</dt><dd>…</dd></div>
-                        <div><dt>المهمة المرتبطة</dt><dd>…</dd></div>
-                        <div><dt>وقت الطلب</dt><dd>…</dd></div>
-                        <div><dt>وقت التفعيل</dt><dd>…</dd></div>
-                        <div><dt>آخر نبضة</dt><dd>…</dd></div>
-                        <div><dt>Stale</dt><dd>…</dd></div>
-                    </dl>
-                    <div id="rc_maint_policy" class="muted" style="margin-top:8px;"></div>
-                </div>
-                <div class="rc-stage-panel" id="rc_prod_import_section">
-                    <h4>استيراد قاعدة الإنتاج (Production Database Import)</h4>
-                    <p id="rc_prod_import_banner" class="rc-readonly-banner" role="status">
-                        <strong>Application files have NOT been switched.</strong>
-                    </p>
-                    <dl id="rc_prod_import_status" class="rc-status-strip">
-                        <div><dt>الحالة</dt><dd>…</dd></div>
-                        <div><dt>أعلى نقطة تحقق</dt><dd>…</dd></div>
-                        <div><dt>CLI</dt><dd>…</dd></div>
-                    </dl>
-                </div>
-                <div class="rc-stage-panel" id="rc_uploads_cutover_section">
-                    <h4>تحويل ملفات الرفع (Production Uploads Cutover)</h4>
-                    <p id="rc_uploads_cutover_banner" class="rc-readonly-banner" role="status">
-                        <strong>Maintenance remains active. Restore is NOT completed. Rollback was NOT executed.</strong>
-                    </p>
-                    <dl id="rc_uploads_cutover_status" class="rc-status-strip">
-                        <div><dt>الحالة</dt><dd>…</dd></div>
-                        <div><dt>أعلى نقطة تحقق</dt><dd>…</dd></div>
-                        <div><dt>CLI</dt><dd>…</dd></div>
-                    </dl>
-                </div>
-                <div class="rc-stage-panel" id="rc_rollback_section">
-                    <h4>التراجع الإنتاجي (Production Rollback)</h4>
-                    <p id="rc_rollback_banner" class="rc-readonly-banner" role="status">
-                        <strong>Maintenance remains active. Restore is NOT completed. Rollback anchor retained.</strong>
-                    </p>
-                    <dl id="rc_rollback_status" class="rc-status-strip">
-                        <div><dt>الحالة</dt><dd>…</dd></div>
-                        <div><dt>أعلى نقطة تحقق</dt><dd>…</dd></div>
-                        <div><dt>CLI</dt><dd>…</dd></div>
-                    </dl>
-                </div>
-                <div class="rc-stage-panel" id="rc_finalize_section">
-                    <h4>الإنهاء وإطلاق الصيانة (Finalize &amp; Maintenance Release)</h4>
-                    <p id="rc_finalize_banner" class="rc-readonly-banner" role="status">
-                        <strong>Finalization releases maintenance after restore or rollback success. Forensic artifacts retained.</strong>
-                    </p>
-                    <dl id="rc_finalize_status" class="rc-status-strip">
-                        <div><dt>الحالة</dt><dd>…</dd></div>
-                        <div><dt>الصيانة</dt><dd>…</dd></div>
-                        <div><dt>CLI</dt><dd>…</dd></div>
-                    </dl>
-                </div>
+                <details class="rc-acc-item rc-stage-acc" data-rc-acc="stage" data-stage="maint" id="rc_maint_section">
+                    <summary>
+                        <span class="rc-acc-chevron" aria-hidden="true"></span>
+                        <span class="rc-acc-title">Production Maintenance</span>
+                        <span class="rc-acc-meta"><span class="rc-muted">تفاصيل المرحلة</span></span>
+                    </summary>
+                    <div class="rc-acc-body">
+                        <p id="rc_maint_banner" class="rc-readonly-banner" role="status">
+                            <strong>Production restore has NOT started.</strong>
+                        </p>
+                        <dl id="rc_maint_status" class="rc-status-strip">
+                            <div><dt>الحالة</dt><dd>—</dd></div>
+                            <div><dt>الملصق</dt><dd>—</dd></div>
+                            <div><dt>المهمة المرتبطة</dt><dd>—</dd></div>
+                            <div><dt>وقت الطلب</dt><dd>—</dd></div>
+                            <div><dt>وقت التفعيل</dt><dd>—</dd></div>
+                            <div><dt>آخر نبضة</dt><dd>—</dd></div>
+                            <div><dt>Stale</dt><dd>—</dd></div>
+                        </dl>
+                        <div id="rc_maint_policy" class="muted" style="margin-top:8px;"></div>
+                    </div>
+                </details>
+                <details class="rc-acc-item rc-stage-acc" data-rc-acc="stage" data-stage="import" id="rc_prod_import_section">
+                    <summary>
+                        <span class="rc-acc-chevron" aria-hidden="true"></span>
+                        <span class="rc-acc-title">Production Database Import</span>
+                        <span class="rc-acc-meta"><span class="rc-muted">تفاصيل المرحلة</span></span>
+                    </summary>
+                    <div class="rc-acc-body">
+                        <p id="rc_prod_import_banner" class="rc-readonly-banner" role="status">
+                            <strong>Application files have NOT been switched.</strong>
+                        </p>
+                        <dl id="rc_prod_import_status" class="rc-status-strip">
+                            <div><dt>الحالة</dt><dd>—</dd></div>
+                            <div><dt>أعلى نقطة تحقق</dt><dd>—</dd></div>
+                            <div><dt>CLI</dt><dd>—</dd></div>
+                        </dl>
+                    </div>
+                </details>
+                <details class="rc-acc-item rc-stage-acc" data-rc-acc="stage" data-stage="uploads" id="rc_uploads_cutover_section">
+                    <summary>
+                        <span class="rc-acc-chevron" aria-hidden="true"></span>
+                        <span class="rc-acc-title">Production Uploads Cutover</span>
+                        <span class="rc-acc-meta"><span class="rc-muted">تفاصيل المرحلة</span></span>
+                    </summary>
+                    <div class="rc-acc-body">
+                        <p id="rc_uploads_cutover_banner" class="rc-readonly-banner" role="status">
+                            <strong>Maintenance remains active. Restore is NOT completed. Rollback was NOT executed.</strong>
+                        </p>
+                        <dl id="rc_uploads_cutover_status" class="rc-status-strip">
+                            <div><dt>الحالة</dt><dd>—</dd></div>
+                            <div><dt>أعلى نقطة تحقق</dt><dd>—</dd></div>
+                            <div><dt>CLI</dt><dd>—</dd></div>
+                        </dl>
+                    </div>
+                </details>
+                <details class="rc-acc-item rc-stage-acc" data-rc-acc="stage" data-stage="rollback" id="rc_rollback_section">
+                    <summary>
+                        <span class="rc-acc-chevron" aria-hidden="true"></span>
+                        <span class="rc-acc-title">Production Rollback</span>
+                        <span class="rc-acc-meta"><span class="rc-muted">تفاصيل المرحلة</span></span>
+                    </summary>
+                    <div class="rc-acc-body">
+                        <p id="rc_rollback_banner" class="rc-readonly-banner" role="status">
+                            <strong>Maintenance remains active. Restore is NOT completed. Rollback anchor retained.</strong>
+                        </p>
+                        <dl id="rc_rollback_status" class="rc-status-strip">
+                            <div><dt>الحالة</dt><dd>—</dd></div>
+                            <div><dt>أعلى نقطة تحقق</dt><dd>—</dd></div>
+                            <div><dt>CLI</dt><dd>—</dd></div>
+                        </dl>
+                    </div>
+                </details>
+                <details class="rc-acc-item rc-stage-acc" data-rc-acc="stage" data-stage="finalize" id="rc_finalize_section">
+                    <summary>
+                        <span class="rc-acc-chevron" aria-hidden="true"></span>
+                        <span class="rc-acc-title">Finalize &amp; Maintenance Release</span>
+                        <span class="rc-acc-meta"><span class="rc-muted">تفاصيل المرحلة</span></span>
+                    </summary>
+                    <div class="rc-acc-body">
+                        <p id="rc_finalize_banner" class="rc-readonly-banner" role="status">
+                            <strong>Finalization releases maintenance after restore or rollback success. Forensic artifacts retained.</strong>
+                        </p>
+                        <dl id="rc_finalize_status" class="rc-status-strip">
+                            <div><dt>الحالة</dt><dd>—</dd></div>
+                            <div><dt>الصيانة</dt><dd>—</dd></div>
+                            <div><dt>CLI</dt><dd>—</dd></div>
+                        </dl>
+                    </div>
+                </details>
             </div>
         </div>
     </section>
@@ -450,7 +523,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
     const DISPLAY_TZ = <?php echo json_encode($displayTimezone, JSON_UNESCAPED_UNICODE); ?>;
     const COUNTRY_CONTEXT_CODE = <?php echo json_encode($countryContextCode, JSON_UNESCAPED_UNICODE); ?>;
 
-    let state = { full: [], country: [], jobs: [], busy: false, csrf: '', lastOverview: null, lastMaintenance: null };
+    let state = { full: [], country: [], jobs: [], busy: false, csrf: '', lastOverview: null, lastMaintenance: null, openedStage: '' };
 
     const el = (id) => document.getElementById(id);
     const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -875,21 +948,23 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         return html;
     }
 
+    function emptyStateHtml(title, body) {
+        return '<div class="rc-empty"><h4>' + esc(title) + '</h4><p>' + esc(body) + '</p></div>';
+    }
+
     function packageAccordionHtml(pkg, type) {
-        const isFull = type === 'full_disaster';
-        const title = isFull
-            ? 'Full Restore Package'
-            : ('Country Restore Package' + (pkg.country_code ? ' — ' + pkg.country_code : ''));
         const identity = String(pkg.package_id || '').trim();
         const whenHtml = fmtPackageWhenDisplay(pkg, type);
+        const pkgLabel = type === 'full_disaster'
+            ? (identity || 'Full package')
+            : ((pkg.country_code ? pkg.country_code + ' / ' : '') + (identity || 'Country package'));
         return (
-            '<details class="rc-acc-item" data-rc-acc="1" data-package-id="' + esc(identity) + '">' +
+            '<details class="rc-acc-item" data-rc-acc="pkg" data-package-id="' + esc(identity) + '">' +
             '<summary>' +
                 '<span class="rc-acc-chevron" aria-hidden="true"></span>' +
-                '<span class="rc-acc-title">' + esc(title) + '</span>' +
                 '<span class="rc-acc-meta">' +
-                    '<span class="rc-acc-when" dir="ltr">' + whenHtml + '</span>' +
-                    (identity ? '<span class="rc-mono" dir="ltr" title="package_id">' + esc(identity) + '</span>' : '') +
+                    '<span class="rc-acc-when" dir="ltr" title="Time">' + whenHtml + '</span>' +
+                    '<span class="rc-mono" dir="ltr" title="Package">' + esc(pkgLabel) + '</span>' +
                     badge(pkg.package_status || '—') +
                     eligibilityBadge(pkg) +
                 '</span>' +
@@ -897,10 +972,11 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             '</summary>' +
             '<div class="rc-acc-body">' +
                 '<div class="rc-action-row">' + packageExpandedActions(pkg, type) + '</div>' +
-                '<p class="rc-muted" style="margin:8px 0 0;font-size:.8rem;">Schema: ' + esc(String(pkg.schema_revision || '—')) +
+                '<p class="rc-muted" style="margin:10px 0 0;font-size:.8rem;"><strong>Metadata</strong> — Schema: ' + esc(String(pkg.schema_revision || '—')) +
                 ' · Backend: ' + esc(String(pkg.backend || '—')) +
                 ' · DRV: ' + drvCell(pkg) +
                 (pkg.registry_version ? (' · Registry: ' + esc(String(pkg.registry_version))) : '') +
+                (pkg.country_name ? (' · ' + esc(String(pkg.country_name))) : '') +
                 '</p>' +
             '</div>' +
             '</details>'
@@ -914,7 +990,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         const viewBtn = '<button type="button" class="btn-link rc-btn-primary rc-fw-view" data-id="' + id + '">View</button>';
         const actions = jobActions(job, { omitPrimaryView: true });
         return (
-            '<details class="rc-acc-item" data-rc-acc="1" data-job-id="' + esc(id) + '">' +
+            '<details class="rc-acc-item" data-rc-acc="job" data-job-id="' + esc(id) + '">' +
             '<summary>' +
                 '<span class="rc-acc-chevron" aria-hidden="true"></span>' +
                 '<span class="rc-acc-title"><code>' + esc(id) + '</code></span>' +
@@ -932,6 +1008,28 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             '</div>' +
             '</details>'
         );
+    }
+
+    function openStagePanel(stageKey) {
+        state.openedStage = String(stageKey || '');
+        document.querySelectorAll('details.rc-stage-acc').forEach((d) => {
+            d.open = state.openedStage !== '' && d.getAttribute('data-stage') === state.openedStage;
+        });
+        document.querySelectorAll('.rc-stage-chip').forEach((chip) => {
+            chip.classList.toggle('is-selected', chip.getAttribute('data-stage') === state.openedStage);
+        });
+    }
+
+    function detectActiveStage(maint, jobs) {
+        const active = pickActiveJob(jobs);
+        const st = String((active && active.status) || '').toLowerCase();
+        const m = maint || {};
+        if (st.includes('finaliz') || (active && (active.is_restore_completed || active.is_rollback_completed))) return 'finalize';
+        if (st.includes('rollback') && !st.includes('finaliz')) return 'rollback';
+        if (st.includes('uploads_cutover')) return 'uploads';
+        if (st.includes('production_import')) return 'import';
+        if (m.maintenance_active || m.maintenance_ready || st.includes('maintenance')) return 'maint';
+        return '';
     }
 
     function pickActiveJob(jobs) {
@@ -964,29 +1062,40 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             if (node) node.textContent = label;
             if (chip) chip.classList.toggle('is-active', !!on);
         };
-        setChip('maint', m.maintenance_active ? 'Active' : (m.maintenance_ready ? 'Ready' : (m.state || 'inactive')), !!(m.maintenance_active || m.maintenance_ready || st.includes('maintenance')));
-        setChip('import', st.includes('production_import') ? String(active.status || '…') : '—', st.includes('production_import'));
-        setChip('uploads', st.includes('uploads_cutover') ? String(active.status || '…') : '—', st.includes('uploads_cutover'));
-        setChip('rollback', (st.includes('rollback') && !st.includes('finaliz')) ? String(active.status || '…') : '—', st.includes('rollback') && !st.includes('finaliz'));
-        setChip('finalize', (st.includes('finaliz') || st.includes('completed')) ? String((active && active.status) || '…') : '—', st.includes('finaliz') || !!(active && (active.is_restore_completed || active.is_rollback_completed)));
+        setChip('maint', m.maintenance_active ? 'Active' : (m.maintenance_ready ? 'Ready' : (m.state || 'Waiting')), !!(m.maintenance_active || m.maintenance_ready || st.includes('maintenance')));
+        setChip('import', st.includes('production_import') ? String(active.status || 'Running') : 'Waiting', st.includes('production_import'));
+        setChip('uploads', st.includes('uploads_cutover') ? String(active.status || 'Running') : 'Waiting', st.includes('uploads_cutover'));
+        setChip('rollback', (st.includes('rollback') && !st.includes('finaliz')) ? String(active.status || 'Running') : 'Waiting', st.includes('rollback') && !st.includes('finaliz'));
+        setChip('finalize', (st.includes('finaliz') || st.includes('completed')) ? String((active && active.status) || 'Completed') : 'Waiting', st.includes('finaliz') || !!(active && (active.is_restore_completed || active.is_rollback_completed)));
+
+        const activeStage = detectActiveStage(m, jobs);
+        if (activeStage) {
+            openStagePanel(activeStage);
+        } else if (!state.openedStage) {
+            document.querySelectorAll('details.rc-stage-acc').forEach((d) => { d.open = false; });
+        }
     }
 
     function renderActiveJob(jobs) {
         const box = el('rc_active_job');
         const meta = el('rc_active_job_meta');
         const acts = el('rc_active_job_actions');
-        const job = pickActiveJob(jobs);
+        const hist = el('rc_jobs_hist_label');
+        const list = Array.isArray(jobs) ? jobs : [];
+        const job = pickActiveJob(list);
         if (!box || !meta || !acts) return;
         if (!job) {
             box.hidden = true;
             meta.innerHTML = '';
             acts.innerHTML = '';
+            if (hist) hist.hidden = true;
             if (el('rc_mon_active')) el('rc_mon_active').textContent = '—';
             if (el('rc_mon_phase')) el('rc_mon_phase').textContent = '—';
             if (el('rc_mon_progress')) el('rc_mon_progress').textContent = '—';
             return;
         }
         box.hidden = false;
+        if (hist) hist.hidden = list.length <= 1;
         meta.innerHTML =
             '<span><strong>Job</strong> <code>' + esc(job.job_id || '') + '</code></span>' +
             '<span>' + badge(job.status) + '</span>' +
@@ -995,7 +1104,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             '<span class="rc-muted">' + esc(String(job.message || '')) + '</span>';
         acts.innerHTML = '<button type="button" class="btn-link rc-btn-primary rc-fw-view" data-id="' + esc(job.job_id || '') + '">View</button> '
             + '<div class="rc-action-row" style="margin:0">' + jobActions(job, { omitPrimaryView: true }) + '</div>';
-        if (el('rc_mon_jobs')) el('rc_mon_jobs').textContent = String(jobs.length);
+        if (el('rc_mon_jobs')) el('rc_mon_jobs').textContent = String(list.length);
         if (el('rc_mon_active')) el('rc_mon_active').textContent = job.job_id || '—';
         if (el('rc_mon_phase')) el('rc_mon_phase').textContent = job.phase || '—';
         if (el('rc_mon_progress')) el('rc_mon_progress').textContent = String(job.progress ?? 0) + '%';
@@ -1008,19 +1117,25 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         if (data.csrf_token) state.csrf = data.csrf_token;
 
         if (CAN_FULL && el('rc_full_list')) {
+            el('rc_full_list').removeAttribute('aria-busy');
             el('rc_full_list').innerHTML = state.full.length
                 ? state.full.map((p) => packageAccordionHtml(p, 'full_disaster')).join('')
-                : '<p class="rc-muted" style="margin:0;padding:8px 0;">لا توجد حزم Full.</p>';
+                : emptyStateHtml('لا توجد حزم Full', 'بعد إنشاء Full Backup ستظهر الحزم المؤهلة للاسترداد هنا.');
         }
         if (CAN_COUNTRY && el('rc_country_list')) {
+            el('rc_country_list').removeAttribute('aria-busy');
             el('rc_country_list').innerHTML = state.country.length
                 ? state.country.map((p) => packageAccordionHtml(p, 'country_recovery')).join('')
-                : '<p class="rc-muted" style="margin:0;padding:8px 0;">لا توجد حزم دول.</p>';
+                : emptyStateHtml('لا توجد حزم دول', 'لا توجد حزم Country ضمن السياق الحالي جاهزة للاسترداد.');
         }
         if (el('rc_jobs_list')) {
+            el('rc_jobs_list').removeAttribute('aria-busy');
             el('rc_jobs_list').innerHTML = state.jobs.length
                 ? state.jobs.map((j) => jobAccordionHtml(j)).join('')
-                : '<p class="rc-muted" style="margin:0;padding:8px 0;">لا توجد Restore Jobs.</p>';
+                : emptyStateHtml(
+                    'لا توجد Restore Jobs بعد',
+                    'اختر حزمة مؤهلة من القسم 2 ثم أنشئ مهمة استرداد. ستظهر المهمة النشطة والتقدم هنا.'
+                );
         }
         if (el('rc_jobs_table') && el('rc_jobs_table').querySelector('tbody')) {
             el('rc_jobs_table').querySelector('tbody').innerHTML = state.jobs.length
@@ -1034,6 +1149,10 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         renderActiveJob(state.jobs);
         updateStageStrip(state.lastMaintenance || data.maintenance || {}, state.jobs);
         if (el('rc_mon_jobs')) el('rc_mon_jobs').textContent = String(state.jobs.length);
+        if (el('rc_overview')) el('rc_overview').removeAttribute('aria-busy');
+        if (el('rc_lock_maintenance')) el('rc_lock_maintenance').removeAttribute('aria-busy');
+        if (el('rc_readiness_badge')) el('rc_readiness_badge').removeAttribute('aria-busy');
+        if (el('rc_readiness_headline')) el('rc_readiness_headline').removeAttribute('aria-busy');
     }
 
     function renderStructuredDetail(obj) {
@@ -1161,76 +1280,6 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             + ' | ' + (st.warning || 'Production restore has NOT started.');
     }
 
-DRY_    const badge = (status) => {
-        const s = String(status || '').toLowerCase();
-        let cls = 'rc-badge--muted';
-        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed' || s === 'approved_waiting_execution' || s === 'pre_restore_backup_ready' || s === 'shadow_restore_ready' || s === 'shadow_verified' || s === 'shadow_files_ready' || s === 'shadow_smoke_ready' || s === 'cutover_readiness_ready' || s === 'country_shadow_verified' || s === 'ready' || s === 'country_dry_run_safe' || s === 'safe') cls = 'rc-badge--success';
-        else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval' || s === 'waiting_confirmation' || s === 'execution_plan_ready' || s === 'pre_restore_backup_pending' || s === 'shadow_restore_pending' || s === 'shadow_not_ready' || s === 'shadow_smoke_pending' || s === 'shadow_smoke_warning' || s === 'cutover_readiness_manual_review' || s === 'country_shadow_warning' || s === 'country_dry_run_warning') cls = 'rc-badge--warning';
-        else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible' || s === 'dry_failed' || s === 'execution_failed' || s === 'execution_cancelled' || s === 'cancelled' || s === 'pre_restore_backup_failed' || s === 'shadow_restore_failed' || s === 'shadow_files_failed' || s === 'shadow_smoke_failed' || s === 'cutover_readiness_blocked' || s === 'country_shadow_not_ready' || s === 'country_dry_run_failed') cls = 'rc-badge--failed';
-        else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge') || s === 'execution_precheck' || s === 'dry_running' || s === 'pre_restore_backup_running' || s === 'pre_restore_backup_verifying' || s === 'shadow_restore_running' || s === 'shadow_restore_verifying' || s === 'shadow_verifying' || s === 'shadow_files_running' || s === 'shadow_files_verifying' || s === 'shadow_smoke_running' || s === 'country_shadow_verifying' || s === 'country_dry_run_running') cls = 'rc-badge--running';
-        let label = status || '—';
-        if (s === 'awaiting_final_approval') label = 'بانتظار الموافقة النهائية';
-        if (s === 'approved_waiting_execution') label = 'معتمدة — بانتظار التنفيذ';
-        if (s === 'country_shadow_verifying') label = 'جارٍ تحقق ظل الدولة (C7)';
-        if (s === 'country_shadow_verified') label = 'ظل الدولة موثّق (C7 READY)';
-        if (s === 'country_shadow_warning') label = 'ظل الدولة — تحذير (C7)';
-        if (s === 'country_shadow_not_ready') label = 'ظل الدولة غير جاهز (C7)';
-        if (s === 'country_dry_run_running') label = 'جارٍ محاكاة Country Dry Run (C8)';
-        if (s === 'country_dry_run_safe') label = 'Country Dry Run آمن (SAFE)';
-        if (s === 'country_dry_run_warning') label = 'Country Dry Run — تحذير';
-        if (s === 'country_dry_run_failed') label = 'Country Dry Run فشل';
-        if (s === 'safe') label = 'SAFE';
-        if (s === 'pre_restore_backup_pending') label = 'بانتظار تشغيل عامل CLI';
-        if (s === 'pre_restore_backup_running') label = 'جارٍ إنشاء النسخة الاحتياطية';
-        if (s === 'pre_restore_backup_verifying') label = 'جارٍ التحقق';
-        if (s === 'pre_restore_backup_ready') label = 'النسخة الاحتياطية جاهزة وآمنة للرجوع';
-        if (s === 'pre_restore_backup_failed') label = 'فشل إعداد النسخة الاحتياطية';
-        if (s === 'shadow_restore_pending') label = 'بانتظار تشغيل عامل CLI لقاعدة الظل';
-        if (s === 'shadow_restore_running') label = 'جارٍ استيراد قاعدة الظل';
-        if (s === 'shadow_restore_verifying') label = 'جارٍ التحقق من قاعدة الظل';
-        if (s === 'shadow_restore_ready') label = 'قاعدة الظل جاهزة (الإنتاج لم يُمس)';
-        if (s === 'shadow_restore_failed') label = 'فشل استعادة قاعدة الظل';
-        if (s === 'shadow_verifying') label = 'جارٍ التحقق العميق من قاعدة الظل';
-        if (s === 'shadow_verified') label = 'قاعدة الظل موثّقة وجاهزة (بدون قطع إنتاج)';
-        if (s === 'shadow_not_ready') label = 'قاعدة الظل غير جاهزة للقطع';
-        if (s === 'shadow_files_running') label = 'جارٍ استخراج ملفات الظل';
-        if (s === 'shadow_files_verifying') label = 'جارٍ التحقق من ملفات الظل';
-        if (s === 'shadow_files_ready') label = 'ملفات الظل جاهزة (الإنتاج لم يُمس)';
-        if (s === 'shadow_files_failed') label = 'فشل استخراج ملفات الظل';
-        if (s === 'shadow_smoke_pending') label = 'بانتظار تشغيل اختبار CLI';
-        if (s === 'shadow_smoke_running') label = 'جارٍ اختبار قاعدة البيانات والملفات المعزولة';
-        if (s === 'shadow_smoke_ready') label = 'البيئة المعزولة جاهزة';
-        if (s === 'shadow_smoke_warning') label = 'تحتاج مراجعة يدوية';
-        if (s === 'shadow_smoke_failed') label = 'البيئة غير جاهزة';
-        if (s === 'cutover_readiness_ready') label = 'البيئة المعزولة جاهزة';
-        if (s === 'cutover_readiness_manual_review') label = 'تحتاج مراجعة يدوية';
-        if (s === 'cutover_readiness_blocked') label = 'البيئة غير جاهزة';
-        return '<span class="rc-badge ' + cls + '">' + label + '</span>';
-    };
-    const eligibilityBadge = (pkg) => {
-        const status = String(pkg.eligibility_status || pkg.restore_eligibility || '');
-        const labelAr = pkg.eligibility_reason_label_ar || '';
-        let text = 'غير مؤهلة';
-        let cls = 'rc-badge--failed';
-        if (status === 'eligible') {
-            text = 'مؤهلة';
-            cls = 'rc-badge--success';
-        } else if (status === 'unknown') {
-            text = 'غير محسومة';
-            cls = 'rc-badge--warning';
-        }
-        const title = labelAr ? ' title="' + String(labelAr).replace(/"/g, '&quot;') + '"' : '';
-        return '<span class="rc-badge ' + cls + '"' + title + '>' + text + '</span>';
-    };
-    const drvCell = (pkg) => {
-        const result = String(pkg.drv_result || '').toLowerCase();
-        if (result === 'pass') return badge('PASS');
-        if (result === 'fail') return badge('FAIL');
-        if (result === 'missing') return '—';
-        const score = pkg.drv_score;
-        if (score === null || score === undefined || score === '') return '—';
-        return String(score);
-    };
 
     function jobActions(job, opts) {
         opts = opts || {};
@@ -1406,6 +1455,7 @@ DRY_    const badge = (status) => {
         const box = el('rc_cert_status');
         const blockersEl = el('rc_cert_blockers');
         if (!box) return;
+        box.removeAttribute('aria-busy');
         if (!cert || !cert.available) {
             box.innerHTML =
                 '<div><dt>Full Restore</dt><dd>لا يوجد تقرير</dd></div>' +
@@ -2344,20 +2394,43 @@ DRY_    const badge = (status) => {
         });
     }
 
-    // Package / job accordion: only one open at a time
+    // Accordion groups: one open within pkg / job / stage / val — not across groups
     document.addEventListener('toggle', (ev) => {
         const t = ev.target;
         if (!(t instanceof HTMLDetailsElement) || !t.classList.contains('rc-acc-item')) return;
-        if (!t.open) return;
-        document.querySelectorAll('details.rc-acc-item[open]').forEach((other) => {
+        if (!t.open) {
+            if (t.classList.contains('rc-stage-acc') && state.openedStage === t.getAttribute('data-stage')) {
+                state.openedStage = '';
+            }
+            return;
+        }
+        const group = t.getAttribute('data-rc-acc') || 'pkg';
+        document.querySelectorAll('details.rc-acc-item[data-rc-acc="' + group + '"][open]').forEach((other) => {
             if (other !== t) other.open = false;
         });
+        if (t.classList.contains('rc-stage-acc')) {
+            state.openedStage = t.getAttribute('data-stage') || '';
+            document.querySelectorAll('.rc-stage-chip').forEach((chip) => {
+                chip.classList.toggle('is-selected', chip.getAttribute('data-stage') === state.openedStage);
+            });
+        }
     });
 
     // Keep primary/action clicks from toggling accordion unexpectedly
     document.addEventListener('click', (ev) => {
         const t = ev.target;
         if (!(t instanceof HTMLElement)) return;
+        const stageChip = t.closest('.rc-stage-chip');
+        if (stageChip) {
+            ev.preventDefault();
+            const stage = stageChip.getAttribute('data-stage') || '';
+            if (state.openedStage === stage) {
+                openStagePanel('');
+            } else {
+                openStagePanel(stage);
+            }
+            return;
+        }
         if (t.closest('.rc-acc-actions-inline') || t.closest('.rc-action-row')) {
             // do not stopPropagation for handlers — only prevent summary toggle via details default when clicking buttons
             if (t.closest('summary') && (t.closest('button') || t.closest('a'))) {

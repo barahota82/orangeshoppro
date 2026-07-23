@@ -766,6 +766,8 @@ UI may hide tabs/actions by permission; every API enforces `backup_view` / `back
 
 **Enterprise UX / IA redesign (Owner 2026-07-23 — UI only):** Restore Center (`admin/pages/restore_center.php`) was redesigned to match Backup Center philosophy (`rc-v2` mirrors `bc-v2`: workflow-first phases, package accordion progressive disclosure, readiness headline, execution stage strip, Country Context TZ + 12h AM/PM via `generated_at`). **No** restore engine, Admin API (`admin/api/restore/`), CPR, CSRF, permission, or payload changes.
 
+**Final Enterprise UX polish (Owner 2026-07-23 — UI only):** Execution stage strip stays permanent; stage detail panels collapsed by default and expand on chip click or when stage is active (never all expanded). Validation (Certificate / C7 / C8) collapsible. Package summary shows Time / Package / Status / Eligibility / Primary Action only. Skeleton loading + proper Restore Jobs empty state. **No** API / CPR / workflow / security changes.
+
 ### Permissions (server-side enforced on every API)
 
 | Key | Purpose |
