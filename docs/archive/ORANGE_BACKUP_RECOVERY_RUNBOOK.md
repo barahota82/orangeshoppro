@@ -768,7 +768,7 @@ UI may hide tabs/actions by permission; every API enforces `backup_view` / `back
 
 **Final Enterprise UX polish (Owner 2026-07-23 — UI only):** Execution stage strip stays permanent; stage detail panels collapsed by default and expand on chip click or when stage is active (never all expanded). Validation (Certificate / C7 / C8) collapsible. Package summary shows Time / Package / Status / Eligibility / Primary Action only. Skeleton loading + proper Restore Jobs empty state. **No** API / CPR / workflow / security changes.
 
-**Owner Approved — final UI refinements (Owner 2026-07-23 — UI only):** Accordion open/close is **chevron only**. Accordion body = **أدوات تشغيلية** (quick Manifest/Health/DRV/Verify/Dry tools — not full package info). Complete package drawer/view = **معلومات الحزمة** (not labeled «تفاصيل»). Execution idle labels use Waiting / No activity. Package ID de-emphasized vs operator time. Package header sticky; only details body scrolls. One package expanded at a time unchanged. Restore Center considered Owner Approved after these refinements.
+**Owner Approved — final UI refinements (Owner 2026-07-23 — UI only):** Accordion open/close is **chevron only**. Package summary row = decision only (time / status / eligibility / **إنشاء مهمة استرداد** when eligible) — **no** Package Information on summary. Expanded body = sole **معلومات الحزمة** entry + **أدوات تشغيلية** (Manifest/Health/DRV/Verify/Dry). Execution idle labels use Waiting / No activity. Package ID de-emphasized vs operator time. Package header sticky; only details body scrolls. One package expanded at a time unchanged. Restore Center considered Owner Approved after these refinements.
 
 ### Permissions (server-side enforced on every API)
 

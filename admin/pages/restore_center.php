@@ -930,12 +930,12 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
     function packageExpandedActions(pkg, type) {
         const id = pkg.package_id;
         const cc = pkg.country_code || '';
-        // Complete package information (drawer) ≠ accordion operational tools. Owner 2026-07-23
+        // Sole entry point for Package Information + operational inspection tools. Owner 2026-07-23
         let html = '<div class="rc-action-row">'
             + '<button type="button" class="btn-link rc-btn-primary rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">معلومات الحزمة</button>'
             + '</div>';
         html += '<p class="rc-ops-label">أدوات تشغيلية</p>';
-        html += '<p class="rc-ops-hint">فحص سريع (Manifest / Health / DRV / التحقق) — ليست معلومات الحزمة الكاملة.</p>';
+        html += '<p class="rc-ops-hint">مساحة فحص تشغيلية — Manifest / Health / DRV / التحقق / Dry. معلومات الحزمة من الزر أعلاه فقط.</p>';
         let secondary = '';
         const files = type === 'full_disaster'
             ? [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['recovery_validation.json', 'DRV Report']]
@@ -950,14 +950,14 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         return html;
     }
 
+    /** Summary row: restore decision only. Package Information lives solely in expanded workspace. Owner 2026-07-23 */
     function packagePrimaryAction(pkg, type) {
         const id = pkg.package_id;
         const cc = pkg.country_code || '';
         if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
             return '<button type="button" class="btn-link rc-btn-primary rc-create-job" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">إنشاء مهمة استرداد</button>';
         }
-        // Opens complete package information drawer — NOT accordion. Owner 2026-07-23
-        return '<button type="button" class="btn-link rc-btn-primary rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">معلومات الحزمة</button>';
+        return '';
     }
 
     /** Capability-preserving action set (expanded + create when eligible). */
