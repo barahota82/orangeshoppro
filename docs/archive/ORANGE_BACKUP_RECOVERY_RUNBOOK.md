@@ -762,6 +762,10 @@ UI may hide tabs/actions by permission; every API enforces `backup_view` / `back
 
 **Country Context scope (Owner 2026-07-23):** **Full Backup** remains **global** (shared `snapshots/`, Run Full, Full history/verify/DRV). **Country Backup views** (list, counters, history, details, manifest/health/verify/DRV for `country_recovery`) follow the **selected Admin Country Context** — no cross-country package leakage. **Run All Recoverable Countries** and shared BackupRoot remain **global**. Restore picker listing is unchanged (still multi-country).
 
+### Restore Center / UI
+
+**Enterprise UX / IA redesign (Owner 2026-07-23 — UI only):** Restore Center (`admin/pages/restore_center.php`) was redesigned to match Backup Center philosophy (`rc-v2` mirrors `bc-v2`: workflow-first phases, package accordion progressive disclosure, readiness headline, execution stage strip, Country Context TZ + 12h AM/PM via `generated_at`). **No** restore engine, Admin API (`admin/api/restore/`), CPR, CSRF, permission, or payload changes.
+
 ### Permissions (server-side enforced on every API)
 
 | Key | Purpose |

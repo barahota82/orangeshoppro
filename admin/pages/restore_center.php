@@ -17,267 +17,417 @@ if (!orange_admin_may_restore_center_view($admin, $pdo)) {
 $canFull = orange_admin_may_backup_restore_full($admin, $pdo);
 $canCountry = orange_admin_may_backup_restore_country($admin, $pdo);
 $apiBase = storefront_public_path('/admin/api/restore');
+$displayTimezone = orange_admin_context_timezone($pdo);
+$countryContextCode = orange_countries_display_code(orange_admin_context_country_code($pdo));
 
 orange_admin_render_page_title_with_country('إدارة الاسترداد', $pdo);
 ?>
 <style>
-.rc-readonly-banner{margin:0 0 16px;padding:12px 14px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;line-height:1.65}
-.rc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
-.rc-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px}
-.rc-card h4{margin:0 0 6px;font-size:.95rem}
-.rc-card .rc-val{font-size:1.15rem;font-weight:700}
-.rc-badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.8rem;font-weight:600}
-.rc-badge--success{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
-.rc-badge--warning{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
-.rc-badge--failed{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
-.rc-badge--running{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
-.rc-badge--muted{background:#f3f4f6;color:#4b5563;border:1px solid #e5e7eb}
-.rc-section{margin-bottom:18px}
-.rc-status-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}
-.rc-status-strip dt{font-size:.78rem;color:#64748b;margin:0 0 2px}
-.rc-status-strip dd{margin:0;font-weight:600;font-size:.95rem}
-.rc-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
-td.rc-actions{margin:0;flex-wrap:nowrap;align-items:center;width:1%;white-space:nowrap;vertical-align:middle}
-td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
-@media (max-width:1024px){td.rc-actions{flex-wrap:wrap;white-space:normal;width:auto}}
-.rc-ts{display:inline-flex;flex-wrap:nowrap;align-items:baseline;gap:.35em;font-family:ui-monospace,Consolas,monospace;font-size:.82rem;line-height:1.45;white-space:nowrap}
+/* Orange Enterprise Restore Center V2 — Owner-approved UX/IA — page-scoped only (mirror Backup Center) */
+.rc-v2{--rc-border:#e2e8f0;--rc-muted:#64748b;--rc-surface:#fff;--rc-soft:#f8fafc;--rc-ink:#0f172a;--rc-ok:#047857;--rc-warn:#b45309;--rc-bad:#b91c1c;--rc-info:#1d4ed8}
+.rc-v2 *{box-sizing:border-box}
+.rc-header{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;padding:14px 16px;background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:12px}
+.rc-header-main{min-width:0;flex:1}
+.rc-header-kicker{margin:0 0 4px;font-size:.78rem;font-weight:600;color:var(--rc-muted)}
+.rc-header-sub{margin:0;font-size:.9rem;color:var(--rc-muted);line-height:1.45;max-width:42rem}
+.rc-header-status{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.rc-header-status-label{font-size:.75rem;color:var(--rc-muted)}
+.rc-tz-label{margin:8px 0 0;font-size:.78rem;color:var(--rc-muted);line-height:1.4}
+.rc-tz-label code{font-family:ui-monospace,Consolas,monospace;font-size:.78rem;color:#334155;direction:ltr;unicode-bidi:isolate}
+.rc-phase{margin-bottom:14px}
+.rc-phase-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin:0 0 10px}
+.rc-phase-num{display:inline-flex;align-items:center;justify-content:center;width:1.65rem;height:1.65rem;border-radius:999px;background:var(--primary,#ea580c);color:#fff;font-size:.78rem;font-weight:700}
+.rc-phase-title{margin:0;font-size:1rem;font-weight:700;color:var(--rc-ink)}
+.rc-phase-hint{margin:0;font-size:.8rem;color:var(--rc-muted);flex:1;min-width:12rem}
+.rc-panel{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:12px;padding:12px 14px}
+.rc-panel-title{margin:0 0 10px;font-size:.95rem;font-weight:700}
+.rc-panel-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.rc-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px}
+@media (max-width:1024px){.rc-overview{grid-template-columns:1fr}}
+.rc-op-card{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:12px;padding:12px 14px;min-width:0}
+.rc-op-card h3{margin:0 0 10px;font-size:.92rem;font-weight:700;color:var(--rc-ink)}
+.rc-op-rows{display:grid;gap:8px}
+.rc-op-row{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px;padding-bottom:6px;border-bottom:1px solid #f1f5f9}
+.rc-op-row:last-child{border-bottom:0;padding-bottom:0}
+.rc-op-row dt{margin:0;font-size:.78rem;color:var(--rc-muted)}
+.rc-op-row dd{margin:0;font-size:.9rem;font-weight:650;color:var(--rc-ink);text-align:left;direction:ltr;unicode-bidi:isolate}
+.rc-readiness{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;padding:12px 14px;background:var(--rc-soft);border:1px solid var(--rc-border);border-radius:12px}
+.rc-readiness-label{margin:0;font-size:.8rem;color:var(--rc-muted)}
+.rc-readiness-value{margin:4px 0 0;font-size:1.05rem;font-weight:700;color:var(--rc-ink)}
+.rc-info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px}
+@media (max-width:900px){.rc-info-grid{grid-template-columns:1fr}}
+.rc-info-box{padding:12px 14px;border-radius:10px;border:1px solid var(--rc-border);background:#fff;line-height:1.55;font-size:.86rem}
+.rc-info-box h4{margin:0 0 6px;font-size:.82rem;font-weight:700}
+.rc-info-box--warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
+.rc-info-box--info{background:#eff6ff;border-color:#bfdbfe;color:#1e3a8a}
+.rc-info-box--req{background:#f8fafc;border-color:#cbd5e1;color:#334155}
+.rc-info-box--blocked{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+.rc-btn-primary{display:inline-flex;align-items:center;justify-content:center;min-height:var(--admin-btn-min-h,36px);padding:var(--admin-btn-pad-y,7px) var(--admin-btn-pad-x,14px);border:0;border-radius:var(--radius-sm,10px);background:var(--primary,#ea580c);color:#fff!important;font-weight:600;cursor:pointer;font:inherit;font-size:.86rem}
+.rc-btn-primary:hover{background:var(--primary-hover,#c2410c)}
+.rc-btn-primary:disabled,.rc-btn-secondary:disabled,.rc-btn-ghost:disabled{opacity:.55;cursor:not-allowed}
+.rc-btn-secondary{display:inline-flex;align-items:center;justify-content:center;min-height:var(--admin-btn-min-h,36px);padding:var(--admin-btn-pad-y,7px) var(--admin-btn-pad-x,14px);border:1px solid #cbd5e1;border-radius:var(--radius-sm,10px);background:#fff;color:#334155!important;font-weight:600;cursor:pointer;font:inherit;font-size:.86rem}
+.rc-btn-secondary:hover{background:#f8fafc;border-color:#94a3b8}
+.rc-btn-ghost{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:5px 11px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155!important;font-weight:600;cursor:pointer;font:inherit;font-size:.82rem;white-space:nowrap}
+.rc-btn-ghost:hover{background:#f1f5f9}
+.rc-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:999px;font-size:.76rem;font-weight:650;line-height:1.4;border:1px solid transparent;white-space:nowrap}
+.rc-badge--success{background:#ecfdf5;color:var(--rc-ok);border-color:#a7f3d0}
+.rc-badge--warning{background:#fffbeb;color:var(--rc-warn);border-color:#fde68a}
+.rc-badge--failed{background:#fef2f2;color:var(--rc-bad);border-color:#fecaca}
+.rc-badge--running{background:#eff6ff;color:var(--rc-info);border-color:#bfdbfe}
+.rc-badge--muted{background:#f3f4f6;color:#4b5563;border-color:#e5e7eb}
+.rc-status-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:10px;padding:12px;background:var(--rc-soft);border:1px solid var(--rc-border);border-radius:8px}
+.rc-status-strip dt{font-size:.78rem;color:var(--rc-muted);margin:0 0 2px}
+.rc-status-strip dd{margin:0;font-weight:600;font-size:.92rem}
+.rc-progress{display:none;margin:0 0 12px;padding:10px 14px;border-radius:10px;background:#eff6ff;color:#1e3a8a;font-weight:600}
+.rc-mono{font-family:ui-monospace,Consolas,monospace;font-size:.8rem;word-break:break-word}
+.rc-ts{display:inline-flex;flex-wrap:nowrap;align-items:baseline;gap:.35em;font-family:ui-monospace,Consolas,monospace;font-size:.8rem;line-height:1.4;white-space:nowrap}
 .rc-ts-date,.rc-ts-time{white-space:nowrap}
-.rc-ts-cell{vertical-align:middle;min-width:0}
-@media (max-width:1024px){.rc-ts{flex-wrap:wrap;gap:0;white-space:normal}.rc-ts-date{display:block}.rc-ts-time{display:block;white-space:nowrap}}
-.rc-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:5000}
-.rc-modal{background:#fff;border-radius:12px;max-width:520px;width:92%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+.rc-ts--raw{color:#92400e}
+.rc-ts-warn{font-size:.72rem;font-weight:650;color:#b45309}
+.rc-acc-when{margin-inline-end:6px}
+@media (max-width:900px){.rc-ts{flex-wrap:wrap;gap:0;white-space:normal}.rc-ts-date,.rc-ts-time{display:block}}
+.rc-acc-list{display:flex;flex-direction:column;gap:8px}
+.rc-acc-item{border:1px solid var(--rc-border);border-radius:12px;background:var(--rc-surface)}
+.rc-acc-item>summary{cursor:pointer;list-style:none;padding:12px 14px;font-weight:650;font-size:.9rem;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.rc-acc-item>summary::-webkit-details-marker{display:none}
+.rc-acc-chevron{display:inline-flex;width:1.1em;color:var(--rc-muted);font-size:.85rem;flex:0 0 auto}
+.rc-acc-item>summary .rc-acc-chevron::before{content:'▶'}
+.rc-acc-item[open]>summary .rc-acc-chevron::before{content:'▼'}
+.rc-acc-title{font-weight:700;color:var(--rc-ink);min-width:7rem}
+.rc-acc-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1;min-width:0}
+.rc-acc-actions-inline{display:flex;align-items:center;gap:8px;margin-inline-start:auto}
+.rc-acc-body{padding:10px 14px 12px;border-top:1px solid #f1f5f9}
+.rc-action-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.rc-action-row .rc-btn-ghost,.rc-action-row .btn-link{flex:0 0 auto}
+.rc-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;align-items:center}
+.rc-active-job{padding:14px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:12px;margin-bottom:12px}
+.rc-active-job h4{margin:0 0 8px;font-size:.95rem}
+.rc-active-meta{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:8px}
+.rc-stage-strip{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.rc-stage-chip{flex:1 1 140px;min-width:120px;padding:10px 12px;border-radius:10px;border:1px solid var(--rc-border);background:var(--rc-soft);text-align:center}
+.rc-stage-chip strong{display:block;font-size:.78rem;color:var(--rc-muted);margin-bottom:4px}
+.rc-stage-chip span{font-size:.86rem;font-weight:650;color:var(--rc-ink)}
+.rc-stage-chip.is-active{border-color:var(--primary,#ea580c);background:rgba(234,88,12,.08)}
+.rc-stage-panels{display:flex;flex-direction:column;gap:10px}
+.rc-stage-panel{border:1px solid var(--rc-border);border-radius:12px;padding:12px 14px;background:#fff}
+.rc-stage-panel h4{margin:0 0 8px;font-size:.9rem}
+.rc-readonly-banner{margin:0 0 10px;padding:10px 12px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;line-height:1.55;font-size:.86rem}
+.rc-modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:5000;padding:16px}
+.rc-modal{background:#fff;border-radius:12px;max-width:520px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
 .rc-modal--wide{max-width:860px}
 .rc-modal h3{margin:0 0 10px}
 .rc-pre{max-height:360px;overflow:auto;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;font-size:.78rem;white-space:pre-wrap;word-break:break-word}
-.rc-progress{display:none;margin:12px 0;padding:10px;border-radius:8px;background:#eff6ff;color:#1e3a8a}
-.rc-actions .btn-link,.rc-actions button.btn-link,#rc_refresh_btn{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;background:var(--primary,#ea580c);color:#fff!important;-webkit-text-fill-color:#fff;text-decoration:none;padding:var(--admin-btn-pad-y,7px) var(--admin-btn-pad-x,14px);min-height:var(--admin-btn-min-h,32px);border:0;border-radius:var(--radius-sm,10px);font-weight:600;cursor:pointer}
-.rc-actions .btn-link:hover,.rc-actions button.btn-link:hover,#rc_refresh_btn:hover{background:var(--primary-hover,#c2410c);color:#fff!important}
-#rc_refresh_btn{background:#475569}
-#rc_refresh_btn:hover{background:#334155}
+.rc-drawer-group{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #f1f5f9}
+.rc-drawer-group:last-child{border-bottom:0;margin-bottom:0;padding-bottom:0}
+.rc-drawer-group h4{margin:0 0 8px;font-size:.8rem;font-weight:700;color:var(--rc-muted)}
+.rc-muted{color:var(--rc-muted)}
+.rc-seg{display:inline-flex;flex-wrap:nowrap;gap:0;margin:0;padding:3px;background:var(--rc-soft);border:1px solid var(--rc-border);border-radius:999px}
+.rc-tab{padding:7px 16px;border:0;border-radius:999px;background:transparent;color:#475569;cursor:pointer;font-weight:650;font:inherit;font-size:.86rem}
+.rc-tab.is-active{background:#fff;color:var(--primary,#ea580c);box-shadow:0 1px 3px rgba(15,23,42,.1)}
+.rc-tab-panel{display:none}
+.rc-tab-panel.is-active{display:block}
+.rc-acc-list[hidden],.rc-tab-panel[hidden]{display:none!important}
+@media (max-width:640px){.rc-acc-actions-inline{width:100%;margin-inline-start:0}}
+.rc-v2 .rc-action-row .btn-link,.rc-v2 .rc-actions .btn-link,.rc-v2 button.btn-link.rc-btn-ghost{background:#fff;color:#334155!important;-webkit-text-fill-color:#334155;border:1px solid #cbd5e1;border-radius:8px;padding:5px 11px;min-height:32px;font-weight:600}
+.rc-v2 .rc-action-row .btn-link:hover,.rc-v2 .rc-actions .btn-link:hover{background:#f1f5f9}
+.rc-v2 .rc-acc-actions-inline .btn-link.rc-btn-primary,.rc-v2 .rc-acc-actions-inline button.rc-btn-primary{background:var(--primary,#ea580c);color:#fff!important;-webkit-text-fill-color:#fff;border:0}
+.rc-v2 .rc-acc-actions-inline .btn-link.rc-btn-primary:hover{background:var(--primary-hover,#c2410c)}
+#rc_refresh_btn{background:#fff;color:#334155!important;border:1px solid #cbd5e1}
+#rc_refresh_btn:hover{background:#f8fafc;border-color:#94a3b8}
 #rc_view_close,#rc_detail_close{background:#475569;color:#fff!important}
-@media (max-width:768px){.rc-grid{grid-template-columns:1fr}}
 </style>
 
-<p class="rc-readonly-banner" role="status">
-    <strong>تنبيه:</strong> بعد تفعيل الصيانة يمكن طلب استيراد قاعدة الإنتاج عبر CLI فقط.
-    <strong>Application files have NOT been switched.</strong>
-    لا يوجد تبديل ملفات تطبيق، ولا uploads rename، ولا cutover، ولا rollback، ولا إغلاق صيانة في هذه المرحلة.
-</p>
+<div class="rc-v2" id="rc_app">
+    <div id="rc_progress" class="rc-progress" role="status" aria-live="polite">جاري التحميل…</div>
+    <div id="rc_alert" class="card" style="display:none;margin-bottom:12px;"></div>
 
-<div class="rc-section card" id="rc_maint_section">
-    <h3>حالة وضع الصيانة (Production Maintenance)</h3>
-    <p id="rc_maint_banner" class="rc-readonly-banner" style="margin:0 0 10px;" role="status">
-        <strong>Production restore has NOT started.</strong>
-    </p>
-    <dl id="rc_maint_status" class="rc-status-strip">
-        <div><dt>الحالة</dt><dd>…</dd></div>
-        <div><dt>الملصق</dt><dd>…</dd></div>
-        <div><dt>المهمة المرتبطة</dt><dd>…</dd></div>
-        <div><dt>وقت الطلب</dt><dd>…</dd></div>
-        <div><dt>وقت التفعيل</dt><dd>…</dd></div>
-        <div><dt>آخر نبضة</dt><dd>…</dd></div>
-        <div><dt>Stale</dt><dd>…</dd></div>
-    </dl>
-    <div id="rc_maint_policy" class="muted" style="margin-top:8px;"></div>
-</div>
+    <header class="rc-header">
+        <div class="rc-header-main">
+            <p class="rc-header-kicker">Orange Enterprise Restore Center V2</p>
+            <p class="rc-header-sub">مسار عمل موحّد لجاهزية النظام، اختيار الحزمة، التحقق، تشغيل مهام الاسترداد، ومراحل التنفيذ — للمشرف الأعلى.</p>
+            <p class="rc-tz-label" id="rc_tz_label"><?php
+            if ($displayTimezone !== '') {
+                echo 'جميع التواريخ تُعرض بالتوقيت المحلي للدولة المحددة (12 ساعة AM/PM): <code dir="ltr">'
+                    . htmlspecialchars($displayTimezone, ENT_QUOTES, 'UTF-8')
+                    . '</code>';
+            } else {
+                echo 'تحذير: لم تُضبط المنطقة الزمنية (IANA) في إعدادات الدولة الحالية — عرّفها من شاشة الدول قبل الاعتماد على عرض التواريخ المحلية.';
+            }
+            ?></p>
+        </div>
+        <div class="rc-header-status">
+            <span class="rc-header-status-label">جاهزية النظام</span>
+            <span id="rc_readiness_badge" class="rc-badge rc-badge--muted">…</span>
+        </div>
+    </header>
 
-<div class="rc-section card" id="rc_prod_import_section">
-    <h3>استيراد قاعدة الإنتاج (Production Database Import)</h3>
-    <p id="rc_prod_import_banner" class="rc-readonly-banner" style="margin:0 0 10px;" role="status">
-        <strong>Application files have NOT been switched.</strong>
-    </p>
-    <dl id="rc_prod_import_status" class="rc-status-strip">
-        <div><dt>الحالة</dt><dd>…</dd></div>
-        <div><dt>أعلى نقطة تحقق</dt><dd>…</dd></div>
-        <div><dt>CLI</dt><dd>…</dd></div>
-    </dl>
-</div>
+    <section class="rc-phase" aria-labelledby="rc_phase1_title">
+        <div class="rc-phase-head">
+            <span class="rc-phase-num" aria-hidden="true">1</span>
+            <h2 class="rc-phase-title" id="rc_phase1_title">System Readiness</h2>
+            <p class="rc-phase-hint">ملخص الجاهزية والقفل والصيانة — عرض فقط من بيانات القائمة.</p>
+        </div>
+        <div class="rc-panel">
+            <div class="rc-readiness" id="rc_readiness_summary">
+                <div>
+                    <p class="rc-readiness-label">الحالة التشغيلية</p>
+                    <p class="rc-readiness-value" id="rc_readiness_headline">جاري التحميل…</p>
+                </div>
+                <button type="button" class="rc-btn-secondary" id="rc_refresh_btn">تحديث</button>
+            </div>
+            <div class="rc-info-grid" aria-label="تحذيرات ومتطلبات">
+                <div class="rc-info-box rc-info-box--warn">
+                    <h4>Warnings</h4>
+                    <p style="margin:0">بعد تفعيل الصيانة يمكن طلب استيراد قاعدة الإنتاج عبر CLI فقط. <strong>Application files have NOT been switched.</strong></p>
+                </div>
+                <div class="rc-info-box rc-info-box--info">
+                    <h4>Information</h4>
+                    <p style="margin:0">لا يوجد تبديل ملفات تطبيق، ولا uploads rename، ولا cutover، ولا rollback، ولا إغلاق صيانة في مرحلة العرض وحدها.</p>
+                </div>
+                <div class="rc-info-box rc-info-box--req">
+                    <h4>Requirements</h4>
+                    <p style="margin:0">حزمة مؤهلة + Dry Validation + خطة معتمدة + نسخة احتياطية إلزامية قبل الاسترداد + عمال CLI المعتمدة عند الحاجة.</p>
+                </div>
+                <div class="rc-info-box rc-info-box--blocked">
+                    <h4>Blocked</h4>
+                    <p style="margin:0">أي مسار إنتاجي محظور حتى تكتمل البوابات اليدوية؛ القفل العام والصيانة يمنعان التداخل غير الآمن.</p>
+                </div>
+            </div>
+            <div id="rc_overview" class="rc-overview" aria-live="polite">
+                <article class="rc-op-card"><h3>جاري التحميل…</h3></article>
+            </div>
+            <dl id="rc_lock_maintenance" class="rc-status-strip">
+                <div><dt>قفل الاسترداد العام</dt><dd>…</dd></div>
+                <div><dt>وضع الصيانة</dt><dd>…</dd></div>
+            </dl>
+        </div>
+    </section>
 
-<div class="rc-section card" id="rc_uploads_cutover_section">
-    <h3>تحويل ملفات الرفع (Production Uploads Cutover)</h3>
-    <p id="rc_uploads_cutover_banner" class="rc-readonly-banner" style="margin:0 0 10px;" role="status">
-        <strong>Maintenance remains active. Restore is NOT completed. Rollback was NOT executed.</strong>
-    </p>
-    <dl id="rc_uploads_cutover_status" class="rc-status-strip">
-        <div><dt>الحالة</dt><dd>…</dd></div>
-        <div><dt>أعلى نقطة تحقق</dt><dd>…</dd></div>
-        <div><dt>CLI</dt><dd>…</dd></div>
-    </dl>
-</div>
+    <section class="rc-phase" aria-labelledby="rc_phase2_title">
+        <div class="rc-phase-head">
+            <span class="rc-phase-num" aria-hidden="true">2</span>
+            <h2 class="rc-phase-title" id="rc_phase2_title">Choose Restore Package</h2>
+            <p class="rc-phase-hint">قائمة قابلة للتوسيع — إجراء أساسي واحد لكل حزمة.</p>
+        </div>
+        <div class="rc-panel">
+            <div class="rc-panel-head">
+                <h3 class="rc-panel-title" style="margin:0">الحزم المتاحة</h3>
+                <div class="rc-seg" role="tablist" aria-label="نوع الحزمة">
+                    <?php if ($canFull): ?>
+                    <button type="button" class="rc-tab is-active" id="rc_tab_full_btn" data-rc-tab="full">Full Backup</button>
+                    <?php endif; ?>
+                    <?php if ($canCountry): ?>
+                    <button type="button" class="rc-tab<?php echo $canFull ? '' : ' is-active'; ?>" id="rc_tab_country_btn" data-rc-tab="country">Country Backup</button>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php if ($canFull): ?>
+            <div id="rc_tab_full" class="rc-tab-panel is-active" role="tabpanel">
+                <div id="rc_full_list" class="rc-acc-list"></div>
+            </div>
+            <?php endif; ?>
+            <?php if ($canCountry): ?>
+            <div id="rc_tab_country" class="rc-tab-panel<?php echo $canFull ? '' : ' is-active'; ?>" role="tabpanel"<?php echo $canFull ? ' hidden' : ''; ?>>
+                <p class="rc-tz-label" style="margin:0 0 10px;">Country packages — سياق الدولة: <code dir="ltr"><?php echo htmlspecialchars($countryContextCode !== '' ? $countryContextCode : '—', ENT_QUOTES, 'UTF-8'); ?></code></p>
+                <div id="rc_country_list" class="rc-acc-list"></div>
+            </div>
+            <?php endif; ?>
+            <?php if (!$canFull && !$canCountry): ?>
+            <p class="rc-muted" style="margin:0">لا صلاحية لعرض حزم Full أو Country.</p>
+            <?php endif; ?>
+        </div>
+    </section>
 
-<div class="rc-section card" id="rc_rollback_section">
-    <h3>التراجع الإنتاجي (Production Rollback)</h3>
-    <p id="rc_rollback_banner" class="rc-readonly-banner" style="margin:0 0 10px;" role="status">
-        <strong>Maintenance remains active. Restore is NOT completed. Rollback anchor retained.</strong>
-    </p>
-    <dl id="rc_rollback_status" class="rc-status-strip">
-        <div><dt>الحالة</dt><dd>…</dd></div>
-        <div><dt>أعلى نقطة تحقق</dt><dd>…</dd></div>
-        <div><dt>CLI</dt><dd>…</dd></div>
-    </dl>
-</div>
+    <section class="rc-phase" aria-labelledby="rc_phase3_title">
+        <div class="rc-phase-head">
+            <span class="rc-phase-num" aria-hidden="true">3</span>
+            <h2 class="rc-phase-title" id="rc_phase3_title">Validation</h2>
+            <p class="rc-phase-hint">شهادة الجاهزية وعروض C7/C8 عند صلاحية الدولة.</p>
+        </div>
+        <div class="rc-panel" id="rc_certification_section">
+            <h3 class="rc-panel-title">شهادة جاهزية الاسترداد</h3>
+            <p id="rc_cert_banner" class="rc-readonly-banner" role="status">
+                عرض فقط — لا يُشغَّل تمرين الاسترداد من الواجهة. الأمر CLI: <code>run_restore_dr_drill.php</code>
+            </p>
+            <dl id="rc_cert_status" class="rc-status-strip">
+                <div><dt>Full Restore</dt><dd>…</dd></div>
+                <div><dt>تمرين التراجع</dt><dd>…</dd></div>
+                <div><dt>العزل</dt><dd>…</dd></div>
+                <div><dt>Commit</dt><dd>…</dd></div>
+                <div><dt>تاريخ الاختبار</dt><dd>…</dd></div>
+                <div><dt>Country Restore</dt><dd>غير معتمد للإنتاج</dd></div>
+            </dl>
+            <div id="rc_cert_blockers" class="muted" style="margin-top:8px;"></div>
+        </div>
+        <?php if ($canCountry): ?>
+        <div class="rc-panel" id="rc_country_shadow_section" style="margin-top:10px;">
+            <h3 class="rc-panel-title">Country Shadow Verification (C7) — عرض فقط</h3>
+            <p class="rc-readonly-banner" role="status">
+                <strong>تحقق ظل الدولة فقط.</strong>
+                لا Import / Restore / Execute / Approval / Maintenance / Rollback / Production enablement.
+                التشغيل عبر CLI: <code>verify_country_shadow.php --job=…</code>
+            </p>
+            <div class="rc-actions">
+                <label for="rc_c7_job_id" class="rc-muted">Job / run_id</label>
+                <input type="text" id="rc_c7_job_id" placeholder="kw_YYYY-MM-DD_HHMMSS" style="min-width:220px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;">
+                <button type="button" class="btn-link rc-btn-ghost" id="rc_c7_load_btn">عرض تقرير التحقق</button>
+            </div>
+            <dl id="rc_country_shadow_verify" class="rc-status-strip">
+                <div><dt>النتيجة</dt><dd>—</dd></div>
+                <div><dt>Readiness</dt><dd>—</dd></div>
+                <div><dt>Target country</dt><dd>—</dd></div>
+                <div><dt>Survivor countries</dt><dd>—</dd></div>
+                <div><dt>Global state</dt><dd>—</dd></div>
+                <div><dt>Accounting</dt><dd>—</dd></div>
+                <div><dt>Stock / FIFO</dt><dd>—</dd></div>
+            </dl>
+            <div id="rc_country_shadow_blockers" class="muted" style="margin-top:8px;"></div>
+        </div>
+        <div class="rc-panel" id="rc_country_dry_run_section" style="margin-top:10px;">
+            <h3 class="rc-panel-title">Country Dry Run (C8) — عرض فقط</h3>
+            <p class="rc-readonly-banner" role="status">
+                <strong>محاكاة استعادة الدولة فقط.</strong>
+                لا كتابة إنتاج، لا كتابة ظل، لا Import / Restore / Execute / Approval / Maintenance / Rollback.
+                التشغيل عبر CLI: <code>country_dry_run.php --job=…</code>
+            </p>
+            <div class="rc-actions">
+                <label for="rc_c8_job_id" class="rc-muted">Job / run_id</label>
+                <input type="text" id="rc_c8_job_id" placeholder="kw_YYYY-MM-DD_HHMMSS" style="min-width:220px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;">
+                <button type="button" class="btn-link rc-btn-ghost" id="rc_c8_load_btn">عرض تقرير Dry Run</button>
+            </div>
+            <dl id="rc_country_dry_run" class="rc-status-strip">
+                <div><dt>النتيجة</dt><dd>—</dd></div>
+                <div><dt>Tables</dt><dd>—</dd></div>
+                <div><dt>Rows insert/delete</dt><dd>—</dd></div>
+                <div><dt>Survivor impact</dt><dd>—</dd></div>
+                <div><dt>Global impact</dt><dd>—</dd></div>
+                <div><dt>Duration</dt><dd>—</dd></div>
+            </dl>
+            <div id="rc_country_dry_run_blockers" class="muted" style="margin-top:8px;"></div>
+        </div>
+        <?php endif; ?>
+    </section>
 
-<div class="rc-section card" id="rc_finalize_section">
-    <h3>الإنهاء وإطلاق الصيانة (Finalize & Maintenance Release)</h3>
-    <p id="rc_finalize_banner" class="rc-readonly-banner" style="margin:0 0 10px;" role="status">
-        <strong>Finalization releases maintenance after restore or rollback success. Forensic artifacts retained.</strong>
-    </p>
-    <dl id="rc_finalize_status" class="rc-status-strip">
-        <div><dt>الحالة</dt><dd>…</dd></div>
-        <div><dt>الصيانة</dt><dd>…</dd></div>
-        <div><dt>CLI</dt><dd>…</dd></div>
-    </dl>
-</div>
+    <section class="rc-phase" aria-labelledby="rc_phase4_title">
+        <div class="rc-phase-head">
+            <span class="rc-phase-num" aria-hidden="true">4</span>
+            <h2 class="rc-phase-title" id="rc_phase4_title">Create / Operate Restore Jobs</h2>
+            <p class="rc-phase-hint">لوحة تشغيل — المهمة النشطة أولاً، ثم قائمة المهام.</p>
+        </div>
+        <div class="rc-panel">
+            <div id="rc_active_job" class="rc-active-job" hidden>
+                <h4>المهمة النشطة / الحالية</h4>
+                <div class="rc-active-meta" id="rc_active_job_meta"></div>
+                <div class="rc-actions" id="rc_active_job_actions"></div>
+            </div>
+            <h3 class="rc-panel-title">Restore Jobs</h3>
+            <div id="rc_jobs_list" class="rc-acc-list"></div>
+            <table id="rc_jobs_table" hidden aria-hidden="true"><tbody></tbody></table>
+        </div>
+    </section>
 
-<div class="rc-section card" id="rc_certification_section">
-    <h3>شهادة جاهزية الاسترداد</h3>
-    <p id="rc_cert_banner" class="rc-readonly-banner" style="margin:0 0 10px;" role="status">
-        عرض فقط — لا يُشغَّل تمرين الاسترداد من الواجهة. الأمر CLI: <code>run_restore_dr_drill.php</code>
-    </p>
-    <dl id="rc_cert_status" class="rc-status-strip">
-        <div><dt>Full Restore</dt><dd>…</dd></div>
-        <div><dt>تمرين التراجع</dt><dd>…</dd></div>
-        <div><dt>العزل</dt><dd>…</dd></div>
-        <div><dt>Commit</dt><dd>…</dd></div>
-        <div><dt>تاريخ الاختبار</dt><dd>…</dd></div>
-        <div><dt>Country Restore</dt><dd>غير معتمد للإنتاج</dd></div>
-    </dl>
-    <div id="rc_cert_blockers" class="muted" style="margin-top:8px;"></div>
-</div>
+    <section class="rc-phase" aria-labelledby="rc_phase5_title">
+        <div class="rc-phase-head">
+            <span class="rc-phase-num" aria-hidden="true">5</span>
+            <h2 class="rc-phase-title" id="rc_phase5_title">Execution workflow</h2>
+            <p class="rc-phase-hint">مراحل التنفيذ كشريط مراحل — Maintenance → DB Import → Uploads Cutover → Rollback → Finalize.</p>
+        </div>
+        <div class="rc-panel">
+            <div class="rc-stage-strip" id="rc_stage_strip" aria-label="مراحل التنفيذ">
+                <div class="rc-stage-chip" data-stage="maint"><strong>1 · Maintenance</strong><span id="rc_stage_maint_label">—</span></div>
+                <div class="rc-stage-chip" data-stage="import"><strong>2 · DB Import</strong><span id="rc_stage_import_label">—</span></div>
+                <div class="rc-stage-chip" data-stage="uploads"><strong>3 · Uploads Cutover</strong><span id="rc_stage_uploads_label">—</span></div>
+                <div class="rc-stage-chip" data-stage="rollback"><strong>4 · Rollback</strong><span id="rc_stage_rollback_label">—</span></div>
+                <div class="rc-stage-chip" data-stage="finalize"><strong>5 · Finalize</strong><span id="rc_stage_finalize_label">—</span></div>
+            </div>
+            <div class="rc-stage-panels">
+                <div class="rc-stage-panel" id="rc_maint_section">
+                    <h4>حالة وضع الصيانة (Production Maintenance)</h4>
+                    <p id="rc_maint_banner" class="rc-readonly-banner" role="status">
+                        <strong>Production restore has NOT started.</strong>
+                    </p>
+                    <dl id="rc_maint_status" class="rc-status-strip">
+                        <div><dt>الحالة</dt><dd>…</dd></div>
+                        <div><dt>الملصق</dt><dd>…</dd></div>
+                        <div><dt>المهمة المرتبطة</dt><dd>…</dd></div>
+                        <div><dt>وقت الطلب</dt><dd>…</dd></div>
+                        <div><dt>وقت التفعيل</dt><dd>…</dd></div>
+                        <div><dt>آخر نبضة</dt><dd>…</dd></div>
+                        <div><dt>Stale</dt><dd>…</dd></div>
+                    </dl>
+                    <div id="rc_maint_policy" class="muted" style="margin-top:8px;"></div>
+                </div>
+                <div class="rc-stage-panel" id="rc_prod_import_section">
+                    <h4>استيراد قاعدة الإنتاج (Production Database Import)</h4>
+                    <p id="rc_prod_import_banner" class="rc-readonly-banner" role="status">
+                        <strong>Application files have NOT been switched.</strong>
+                    </p>
+                    <dl id="rc_prod_import_status" class="rc-status-strip">
+                        <div><dt>الحالة</dt><dd>…</dd></div>
+                        <div><dt>أعلى نقطة تحقق</dt><dd>…</dd></div>
+                        <div><dt>CLI</dt><dd>…</dd></div>
+                    </dl>
+                </div>
+                <div class="rc-stage-panel" id="rc_uploads_cutover_section">
+                    <h4>تحويل ملفات الرفع (Production Uploads Cutover)</h4>
+                    <p id="rc_uploads_cutover_banner" class="rc-readonly-banner" role="status">
+                        <strong>Maintenance remains active. Restore is NOT completed. Rollback was NOT executed.</strong>
+                    </p>
+                    <dl id="rc_uploads_cutover_status" class="rc-status-strip">
+                        <div><dt>الحالة</dt><dd>…</dd></div>
+                        <div><dt>أعلى نقطة تحقق</dt><dd>…</dd></div>
+                        <div><dt>CLI</dt><dd>…</dd></div>
+                    </dl>
+                </div>
+                <div class="rc-stage-panel" id="rc_rollback_section">
+                    <h4>التراجع الإنتاجي (Production Rollback)</h4>
+                    <p id="rc_rollback_banner" class="rc-readonly-banner" role="status">
+                        <strong>Maintenance remains active. Restore is NOT completed. Rollback anchor retained.</strong>
+                    </p>
+                    <dl id="rc_rollback_status" class="rc-status-strip">
+                        <div><dt>الحالة</dt><dd>…</dd></div>
+                        <div><dt>أعلى نقطة تحقق</dt><dd>…</dd></div>
+                        <div><dt>CLI</dt><dd>…</dd></div>
+                    </dl>
+                </div>
+                <div class="rc-stage-panel" id="rc_finalize_section">
+                    <h4>الإنهاء وإطلاق الصيانة (Finalize &amp; Maintenance Release)</h4>
+                    <p id="rc_finalize_banner" class="rc-readonly-banner" role="status">
+                        <strong>Finalization releases maintenance after restore or rollback success. Forensic artifacts retained.</strong>
+                    </p>
+                    <dl id="rc_finalize_status" class="rc-status-strip">
+                        <div><dt>الحالة</dt><dd>…</dd></div>
+                        <div><dt>الصيانة</dt><dd>…</dd></div>
+                        <div><dt>CLI</dt><dd>…</dd></div>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </section>
 
-<div id="rc_progress" class="rc-progress" role="status" aria-live="polite">جاري التحميل…</div>
-<div id="rc_alert" class="card" style="display:none;margin-bottom:12px;"></div>
-
-<div class="rc-section card">
-    <h3>نظرة عامة</h3>
-    <div id="rc_overview" class="rc-grid">
-        <div class="rc-card"><h4>جاري التحميل…</h4></div>
-    </div>
-    <dl id="rc_lock_maintenance" class="rc-status-strip">
-        <div><dt>قفل الاسترداد العام</dt><dd>…</dd></div>
-        <div><dt>وضع الصيانة</dt><dd>…</dd></div>
-    </dl>
-</div>
-
-<?php if ($canFull): ?>
-<div class="rc-section card">
-    <h3>حزم Full Backup المتاحة للاسترداد</h3>
-    <div class="table-wrap">
-        <table id="rc_full_table">
-            <thead>
-                <tr>
-                    <th>الوقت</th>
-                    <th>الحزمة</th>
-                    <th>الحالة</th>
-                    <th>Schema</th>
-                    <th>Backend</th>
-                    <th>DRV</th>
-                    <th>أهلية الاسترداد</th>
-                    <th>إجراءات</th>
-                </tr>
-            </thead>
-            <tbody><tr><td colspan="8" class="muted">…</td></tr></tbody>
-        </table>
-    </div>
-</div>
-<?php endif; ?>
-
-<?php if ($canCountry): ?>
-<div class="rc-section card">
-    <h3>حزم Country المتاحة للاسترداد</h3>
-    <div class="table-wrap">
-        <table id="rc_country_table">
-            <thead>
-                <tr>
-                    <th>الدولة</th>
-                    <th>الوقت</th>
-                    <th>الحزمة</th>
-                    <th>الحالة</th>
-                    <th>Schema</th>
-                    <th>Registry</th>
-                    <th>DRV</th>
-                    <th>أهلية الاسترداد</th>
-                    <th>إجراءات</th>
-                </tr>
-            </thead>
-            <tbody><tr><td colspan="9" class="muted">…</td></tr></tbody>
-        </table>
-    </div>
-</div>
-<div class="rc-section card" id="rc_country_shadow_section">
-    <h3>Country Shadow Verification (C7) — عرض فقط</h3>
-    <p class="rc-readonly-banner" role="status" style="margin:0 0 10px;">
-        <strong>تحقق ظل الدولة فقط.</strong>
-        لا Import / Restore / Execute / Approval / Maintenance / Rollback / Production enablement.
-        التشغيل عبر CLI: <code>verify_country_shadow.php --job=…</code>
-    </p>
-    <div class="rc-actions" style="margin-bottom:10px;">
-        <label for="rc_c7_job_id" class="muted">Job / run_id</label>
-        <input type="text" id="rc_c7_job_id" placeholder="kw_YYYY-MM-DD_HHMMSS" style="min-width:220px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;">
-        <button type="button" class="btn-link" id="rc_c7_load_btn">عرض تقرير التحقق</button>
-    </div>
-    <dl id="rc_country_shadow_verify" class="rc-status-strip">
-        <div><dt>النتيجة</dt><dd>—</dd></div>
-        <div><dt>Readiness</dt><dd>—</dd></div>
-        <div><dt>Target country</dt><dd>—</dd></div>
-        <div><dt>Survivor countries</dt><dd>—</dd></div>
-        <div><dt>Global state</dt><dd>—</dd></div>
-        <div><dt>Accounting</dt><dd>—</dd></div>
-        <div><dt>Stock / FIFO</dt><dd>—</dd></div>
-    </dl>
-    <div id="rc_country_shadow_blockers" class="muted" style="margin-top:8px;"></div>
-</div>
-<div class="rc-section card" id="rc_country_dry_run_section">
-    <h3>Country Dry Run (C8) — عرض فقط</h3>
-    <p class="rc-readonly-banner" role="status" style="margin:0 0 10px;">
-        <strong>محاكاة استعادة الدولة فقط.</strong>
-        لا كتابة إنتاج، لا كتابة ظل، لا Import / Restore / Execute / Approval / Maintenance / Rollback.
-        التشغيل عبر CLI: <code>country_dry_run.php --job=…</code>
-    </p>
-    <div class="rc-actions" style="margin-bottom:10px;">
-        <label for="rc_c8_job_id" class="muted">Job / run_id</label>
-        <input type="text" id="rc_c8_job_id" placeholder="kw_YYYY-MM-DD_HHMMSS" style="min-width:220px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;">
-        <button type="button" class="btn-link" id="rc_c8_load_btn">عرض تقرير Dry Run</button>
-    </div>
-    <dl id="rc_country_dry_run" class="rc-status-strip">
-        <div><dt>النتيجة</dt><dd>—</dd></div>
-        <div><dt>Tables</dt><dd>—</dd></div>
-        <div><dt>Rows insert/delete</dt><dd>—</dd></div>
-        <div><dt>Survivor impact</dt><dd>—</dd></div>
-        <div><dt>Global impact</dt><dd>—</dd></div>
-        <div><dt>Duration</dt><dd>—</dd></div>
-    </dl>
-    <div id="rc_country_dry_run_blockers" class="muted" style="margin-top:8px;"></div>
-</div>
-<?php endif; ?>
-
-<div class="rc-section card">
-    <h3>Restore Jobs</h3>
-    <div class="rc-actions">
-        <button type="button" class="btn-secondary" id="rc_refresh_btn">تحديث</button>
-    </div>
-    <div class="table-wrap">
-        <table id="rc_jobs_table">
-            <thead>
-                <tr>
-                    <th>Job ID</th>
-                    <th>Package</th>
-                    <th>Created</th>
-                    <th>Status</th>
-                    <th>Phase</th>
-                    <th>Progress</th>
-                    <th>Message</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody><tr><td colspan="8" class="muted">…</td></tr></tbody>
-        </table>
-    </div>
+    <section class="rc-phase" aria-labelledby="rc_phase6_title">
+        <div class="rc-phase-head">
+            <span class="rc-phase-num" aria-hidden="true">6</span>
+            <h2 class="rc-phase-title" id="rc_phase6_title">Monitoring</h2>
+            <p class="rc-phase-hint">تقدم المهمة والتفاصيل — استخدم View داخل قائمة المهام أو المهمة النشطة.</p>
+        </div>
+        <div class="rc-panel">
+            <p class="rc-muted" style="margin:0 0 8px;" id="rc_monitor_hint">بعد التحديث تظهر المهمة النشطة أعلاه؛ تفاصيل JSON عبر أزرار View.</p>
+            <div id="rc_monitor_snapshot" class="rc-status-strip">
+                <div><dt>Jobs</dt><dd id="rc_mon_jobs">—</dd></div>
+                <div><dt>Active</dt><dd id="rc_mon_active">—</dd></div>
+                <div><dt>Phase</dt><dd id="rc_mon_phase">—</dd></div>
+                <div><dt>Progress</dt><dd id="rc_mon_progress">—</dd></div>
+            </div>
+        </div>
+    </section>
 </div>
 
 <div id="rc_view_modal" class="rc-modal-backdrop" aria-hidden="true">
     <div class="rc-modal" role="dialog" aria-modal="true" style="max-width:760px;">
         <h3 id="rc_view_title">عرض</h3>
+        <p class="rc-tz-label" id="rc_view_tz_note" style="margin:0 0 8px;"></p>
+        <div id="rc_view_structured" style="display:none;"></div>
         <pre id="rc_view_pre" class="rc-pre"></pre>
         <div class="admin-form-actions"><button type="button" class="btn-secondary" id="rc_view_close">إغلاق</button></div>
     </div>
@@ -296,23 +446,224 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
     const API_BASE = <?php echo json_encode($apiBase, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
     const CAN_FULL = <?php echo $canFull ? 'true' : 'false'; ?>;
     const CAN_COUNTRY = <?php echo $canCountry ? 'true' : 'false'; ?>;
+    /** IANA from Country Configuration (countries.timezone) — presentation only; storage stays UTC. */
+    const DISPLAY_TZ = <?php echo json_encode($displayTimezone, JSON_UNESCAPED_UNICODE); ?>;
+    const COUNTRY_CONTEXT_CODE = <?php echo json_encode($countryContextCode, JSON_UNESCAPED_UNICODE); ?>;
 
-    let state = { full: [], country: [], jobs: [], busy: false, csrf: '' };
+    let state = { full: [], country: [], jobs: [], busy: false, csrf: '', lastOverview: null, lastMaintenance: null };
 
     const el = (id) => document.getElementById(id);
-    const fmtTimestampDisplay = (raw) => {
-        const s = String(raw || '').trim();
-        if (!s) return '—';
-        const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-        const m = s.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?$/);
-        if (!m) {
-            return '<time class="rc-ts rc-ts--raw" datetime="' + esc(s) + '" title="' + esc(s) + '">' + esc(s) + '</time>';
+    const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+    const ISO_TS_RE = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/;
+    const ISO_TS_GLOBAL_RE = /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g;
+    const PKG_ID_RE = /^(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})(\d{2})$/;
+    const GMDATE_NAIVE_RE = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})$/;
+    const PACKAGE_ID_COUNTRY_WALL_TZ = 'Asia/Kuwait';
+
+    const hasDisplayTz = () => typeof DISPLAY_TZ === 'string' && DISPLAY_TZ.trim() !== '';
+
+    const parseIsoAsWritten = (s) => {
+        const m = String(s || '').trim().match(ISO_TS_RE);
+        if (!m) return null;
+        let offset = m[3];
+        if (!offset) return null;
+        if (offset !== 'Z' && /^[+-]\d{4}$/.test(offset)) {
+            offset = offset.slice(0, 3) + ':' + offset.slice(3);
         }
-        let offset = m[3] || '';
-        if (offset === 'Z') offset = '+00:00';
-        const timePart = m[2] + (offset ? ' ' + offset : '');
-        return '<time class="rc-ts" datetime="' + esc(s) + '" title="' + esc(s) + '"><span class="rc-ts-date">' + esc(m[1]) + '</span><span class="rc-ts-time">' + esc(timePart) + '</span></time>';
+        const iso = m[1] + 'T' + m[2] + (offset === 'Z' ? 'Z' : offset);
+        const d = new Date(iso);
+        return Number.isNaN(d.getTime()) ? null : d;
     };
+
+    const parseGmdateNaiveUtc = (s) => {
+        const m = String(s || '').trim().match(GMDATE_NAIVE_RE);
+        if (!m) return null;
+        const d = new Date(m[1] + 'T' + m[2] + 'Z');
+        return Number.isNaN(d.getTime()) ? null : d;
+    };
+
+    const parseUnixEpoch = (raw) => {
+        const s = String(raw || '').trim();
+        if (!/^\d+(\.\d+)?$/.test(s)) return null;
+        const n = Number(s);
+        if (!Number.isFinite(n)) return null;
+        const ms = n < 1e12 ? n * 1000 : n;
+        const d = new Date(ms);
+        return Number.isNaN(d.getTime()) ? null : d;
+    };
+
+    const parseWallClockInZone = (dateStr, h, mi, s, wallTz) => {
+        if (!wallTz) return null;
+        try {
+            const guess = new Date(Date.UTC(
+                Number(dateStr.slice(0, 4)),
+                Number(dateStr.slice(5, 7)) - 1,
+                Number(dateStr.slice(8, 10)),
+                Number(h), Number(mi), Number(s)
+            ));
+            if (Number.isNaN(guess.getTime())) return null;
+            const fmt = new Intl.DateTimeFormat('en-US', {
+                timeZone: wallTz,
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false, hourCycle: 'h23'
+            });
+            const parts = fmt.formatToParts(guess);
+            const get = (t) => (parts.find((p) => p.type === t) || {}).value || '';
+            const asWall = Date.UTC(
+                Number(get('year')), Number(get('month')) - 1, Number(get('day')),
+                Number(get('hour')), Number(get('minute')), Number(get('second'))
+            );
+            const delta = asWall - guess.getTime();
+            const instant = new Date(guess.getTime() - delta);
+            const check = fmt.formatToParts(instant);
+            const cg = (t) => (check.find((p) => p.type === t) || {}).value || '';
+            if (
+                cg('year') + '-' + cg('month') + '-' + cg('day') !== dateStr
+                || cg('hour') !== h || cg('minute') !== mi || cg('second') !== s
+            ) {
+                const asWall2 = Date.UTC(
+                    Number(cg('year')), Number(cg('month')) - 1, Number(cg('day')),
+                    Number(cg('hour')), Number(cg('minute')), Number(cg('second'))
+                );
+                const instant2 = new Date(instant.getTime() - (asWall2 - instant.getTime()));
+                return Number.isNaN(instant2.getTime()) ? null : instant2;
+            }
+            return instant;
+        } catch (e) {
+            return null;
+        }
+    };
+
+    const parsePackageIdWall = (raw, wallTz) => {
+        const m = String(raw || '').trim().match(PKG_ID_RE);
+        if (!m) return null;
+        return parseWallClockInZone(m[1], m[2], m[3], m[4], wallTz);
+    };
+
+    const parseBackupInstant = (raw, source) => {
+        const s = String(raw || '').trim();
+        if (!s) return { date: null, error: 'empty', source: source };
+        if (source === 'unix' || (source === 'auto' && /^\d+(\.\d+)?$/.test(s))) {
+            const d = parseUnixEpoch(s);
+            return d ? { date: d, error: null, source: 'unix' } : { date: null, error: 'unix_parse_failed', source: 'unix' };
+        }
+        if (source === 'package_id_country') {
+            const d = parsePackageIdWall(s, PACKAGE_ID_COUNTRY_WALL_TZ);
+            return d
+                ? { date: d, error: null, source: 'package_id_country' }
+                : { date: null, error: 'package_id_wall_parse_failed', source: 'package_id_country' };
+        }
+        if (source === 'generated_at' || source === 'iso_utc' || source === 'auto') {
+            const withOffset = parseIsoAsWritten(s);
+            if (withOffset) return { date: withOffset, error: null, source: 'iso_offset' };
+            if ((source === 'generated_at' || source === 'iso_utc') && ISO_TS_RE.test(s) && !s.match(/[Zz]|[+-]\d{2}:?\d{2}$/)) {
+                const m = s.match(ISO_TS_RE);
+                if (m) {
+                    const d = new Date(m[1] + 'T' + m[2] + 'Z');
+                    if (!Number.isNaN(d.getTime())) return { date: d, error: null, source: 'generated_at_naive_utc' };
+                }
+            }
+            if (source === 'gmdate_naive_utc' || source === 'auto' || source === 'generated_at') {
+                const g = parseGmdateNaiveUtc(s);
+                if (g) return { date: g, error: null, source: 'gmdate_naive_utc' };
+            }
+        }
+        if (source === 'gmdate_naive_utc') {
+            const g = parseGmdateNaiveUtc(s);
+            return g ? { date: g, error: null, source: 'gmdate_naive_utc' } : { date: null, error: 'gmdate_parse_failed', source: source };
+        }
+        return { date: null, error: 'unrecognized_timestamp', source: source };
+    };
+
+    const formatInDisplayTz = (date) => {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+        if (!hasDisplayTz()) return null;
+        try {
+            const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: DISPLAY_TZ,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: 'numeric',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            }).formatToParts(date);
+            const get = (type) => {
+                const p = parts.find((x) => x.type === type);
+                return p ? p.value : '';
+            };
+            const dateStr = get('year') + '-' + get('month') + '-' + get('day');
+            const hour = get('hour');
+            const minute = get('minute');
+            const second = get('second');
+            const dayPeriod = (get('dayPeriod') || '').toUpperCase();
+            const timeStr = hour + ':' + minute + ':' + second + (dayPeriod ? ' ' + dayPeriod : '');
+            return { dateStr, timeStr, label: dateStr + ' ' + timeStr };
+        } catch (e) {
+            console.warn('[restore_center] formatInDisplayTz failed', e, DISPLAY_TZ);
+            return null;
+        }
+    };
+
+    const fmtTimestampRawWarn = (raw, reason) => {
+        const s = String(raw || '').trim() || '—';
+        if (reason) console.warn('[restore_center] timestamp not converted:', reason, s);
+        return '<time class="rc-ts rc-ts--raw" title="' + esc('unconverted: ' + (reason || 'unknown')) + '">'
+            + esc(s) + ' <span class="rc-ts-warn">(unconverted)</span></time>';
+    };
+
+    const fmtTimestampDisplay = (raw, source) => {
+        source = source || 'generated_at';
+        const s = String(raw == null ? '' : raw).trim();
+        if (!s) return '—';
+        if (!hasDisplayTz()) {
+            return fmtTimestampRawWarn(s, 'countries.timezone_missing');
+        }
+        const parsed = parseBackupInstant(s, source);
+        if (!parsed.date) {
+            return fmtTimestampRawWarn(s, parsed.error || 'parse_failed');
+        }
+        const local = formatInDisplayTz(parsed.date);
+        if (!local) {
+            return fmtTimestampRawWarn(s, 'display_tz_format_failed');
+        }
+        const title = esc(local.label + ' (' + DISPLAY_TZ + ')');
+        return '<time class="rc-ts" title="' + title + '"><span class="rc-ts-date">' + esc(local.dateStr)
+            + '</span><span class="rc-ts-time">' + esc(local.timeStr) + '</span></time>';
+    };
+
+    const fmtTimestampPlain = (raw, source) => {
+        source = source || 'generated_at';
+        if (!hasDisplayTz()) return String(raw || '').trim();
+        const parsed = parseBackupInstant(String(raw || '').trim(), source);
+        if (!parsed.date) return String(raw || '').trim();
+        const local = formatInDisplayTz(parsed.date);
+        return local ? local.label : String(raw || '').trim();
+    };
+
+    const fmtPackageWhenDisplay = (pkg, type) => {
+        const generated = String((pkg && pkg.generated_at) || '').trim();
+        if (generated) return fmtTimestampDisplay(generated, 'generated_at');
+        const id = String((pkg && pkg.package_id) || '').trim();
+        if (id && type === 'country_recovery' && PKG_ID_RE.test(id)) {
+            return fmtTimestampDisplay(id, 'package_id_country');
+        }
+        if (id) return fmtTimestampRawWarn(id, 'package_id_not_converted_use_generated_at');
+        return '—';
+    };
+
+    const localizeTimestampsInText = (text) => {
+        return String(text || '').replace(ISO_TS_GLOBAL_RE, (match) => {
+            if (/[Zz]|[+-]\d{2}:?\d{2}$/.test(match)) {
+                return fmtTimestampPlain(match, 'iso_utc');
+            }
+            return fmtTimestampPlain(match, 'gmdate_naive_utc');
+        });
+    };
+
     const badge = (status) => {
         const s = String(status || '').toLowerCase();
         let cls = 'rc-badge--muted';
@@ -383,6 +734,7 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         if (score === null || score === undefined || score === '') return '—';
         return String(score);
     };
+
     const showAlert = (msg, ok) => {
         const box = el('rc_alert');
         box.style.display = 'block';
@@ -432,8 +784,32 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         return j;
     }
 
+    function deriveReadiness(ov, maint) {
+        const counts = (ov && ov.job_counts) || {};
+        const lock = (ov && ov.restore_lock) || {};
+        const m = maint || (ov && ov.maintenance) || {};
+        if (m.maintenance_active || m.active) {
+            return { key: 'maintenance', label: 'Maintenance Active', tone: 'failed' };
+        }
+        if (lock.held) {
+            return { key: 'blocked', label: 'Blocked', tone: 'failed' };
+        }
+        if (Number(counts.awaiting_owner_approval || 0) > 0) {
+            return { key: 'waiting', label: 'Waiting Approval', tone: 'warning' };
+        }
+        if (Number(counts.active_in_progress || 0) > 0) {
+            return { key: 'running', label: 'Validation Required', tone: 'running' };
+        }
+        if (Number(counts.failed_jobs || 0) > 0 && Number(counts.active_in_progress || 0) === 0
+            && Number(counts.awaiting_owner_approval || 0) === 0) {
+            return { key: 'validation', label: 'Validation Required', tone: 'warning' };
+        }
+        return { key: 'ready', label: 'System Ready', tone: 'success' };
+    }
+
     function renderOverview(data) {
         const ov = data.overview || {};
+        state.lastOverview = ov;
         const counts = ov.job_counts || {};
         const cards = [
             ['إجمالي Restore Jobs', String(counts.total_jobs ?? 0)],
@@ -445,17 +821,323 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
             ['مسترجعة (rolled back)', String(counts.rolled_back_jobs ?? 0)]
         ];
         el('rc_overview').innerHTML = cards.map(([t, v]) =>
-            '<div class="rc-card"><h4>' + t + '</h4><div class="rc-val">' + v + '</div></div>'
+            '<article class="rc-op-card"><h3>' + t + '</h3><div class="rc-op-rows"><div class="rc-op-row"><dt>العدد</dt><dd>' + v + '</dd></div></div></article>'
         ).join('');
         const lock = ov.restore_lock || {};
         const maint = ov.maintenance || {};
         el('rc_lock_maintenance').innerHTML =
             '<div><dt>قفل الاسترداد العام</dt><dd>' + (lock.held ? badge('held — ' + (lock.job_id || '')) : badge('متاح')) + '</dd></div>' +
             '<div><dt>وضع الصيانة (قديم/دمج)</dt><dd>' + (maint.active ? badge('active — ' + (maint.job_id || '')) : badge('غير مفعّل')) + '</dd></div>';
+        const ready = deriveReadiness(ov, state.lastMaintenance || maint);
+        const badgeEl = el('rc_readiness_badge');
+        if (badgeEl) {
+            badgeEl.className = 'rc-badge rc-badge--' + ready.tone;
+            badgeEl.textContent = ready.label;
+        }
+        const head = el('rc_readiness_headline');
+        if (head) head.textContent = ready.label;
+    }
+
+    function packageExpandedActions(pkg, type) {
+        const id = pkg.package_id;
+        const cc = pkg.country_code || '';
+        let html = '';
+        const files = type === 'full_disaster'
+            ? [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['recovery_validation.json', 'DRV Report']]
+            : [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['country_verify_report.json', 'Verify'], ['country_recovery_validation.json', 'Country DRV']];
+        files.forEach(([file, label]) => {
+            html += '<button type="button" class="btn-link rc-btn-ghost rc-view-file" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '" data-file="' + file + '">' + label + '</button> ';
+        });
+        html += '<button type="button" class="btn-link rc-btn-ghost rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">Package Details</button>';
+        if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
+            html += ' <button type="button" class="btn-link rc-btn-ghost rc-dry-run" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">Dry Validation</button>';
+        }
+        return html;
+    }
+
+    function packagePrimaryAction(pkg, type) {
+        const id = pkg.package_id;
+        const cc = pkg.country_code || '';
+        if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
+            return '<button type="button" class="btn-link rc-btn-primary rc-create-job" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">إنشاء مهمة استرداد</button>';
+        }
+        return '<button type="button" class="btn-link rc-btn-primary rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">عرض الحزمة</button>';
+    }
+
+    /** Capability-preserving action set (expanded + create when eligible). */
+    function packageActions(pkg, type) {
+        const id = pkg.package_id;
+        const cc = pkg.country_code || '';
+        let html = packageExpandedActions(pkg, type);
+        if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
+            html += ' <button type="button" class="btn-link rc-create-job" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">إنشاء مهمة</button>';
+        }
+        return html;
+    }
+
+    function packageAccordionHtml(pkg, type) {
+        const isFull = type === 'full_disaster';
+        const title = isFull
+            ? 'Full Restore Package'
+            : ('Country Restore Package' + (pkg.country_code ? ' — ' + pkg.country_code : ''));
+        const identity = String(pkg.package_id || '').trim();
+        const whenHtml = fmtPackageWhenDisplay(pkg, type);
+        return (
+            '<details class="rc-acc-item" data-rc-acc="1" data-package-id="' + esc(identity) + '">' +
+            '<summary>' +
+                '<span class="rc-acc-chevron" aria-hidden="true"></span>' +
+                '<span class="rc-acc-title">' + esc(title) + '</span>' +
+                '<span class="rc-acc-meta">' +
+                    '<span class="rc-acc-when" dir="ltr">' + whenHtml + '</span>' +
+                    (identity ? '<span class="rc-mono" dir="ltr" title="package_id">' + esc(identity) + '</span>' : '') +
+                    badge(pkg.package_status || '—') +
+                    eligibilityBadge(pkg) +
+                '</span>' +
+                '<span class="rc-acc-actions-inline">' + packagePrimaryAction(pkg, type) + '</span>' +
+            '</summary>' +
+            '<div class="rc-acc-body">' +
+                '<div class="rc-action-row">' + packageExpandedActions(pkg, type) + '</div>' +
+                '<p class="rc-muted" style="margin:8px 0 0;font-size:.8rem;">Schema: ' + esc(String(pkg.schema_revision || '—')) +
+                ' · Backend: ' + esc(String(pkg.backend || '—')) +
+                ' · DRV: ' + drvCell(pkg) +
+                (pkg.registry_version ? (' · Registry: ' + esc(String(pkg.registry_version))) : '') +
+                '</p>' +
+            '</div>' +
+            '</details>'
+        );
+    }
+
+    function jobAccordionHtml(job) {
+        const id = String(job.job_id || '');
+        const pkgLabel = (job.package_type || '') + (job.country_code ? ' / ' + job.country_code : '') + ' / ' + (job.package_id || '—');
+        const dryBadge = job.dry_run_overall_result ? ' ' + dryResultBadge(job.dry_run_overall_result) : '';
+        const viewBtn = '<button type="button" class="btn-link rc-btn-primary rc-fw-view" data-id="' + id + '">View</button>';
+        const actions = jobActions(job, { omitPrimaryView: true });
+        return (
+            '<details class="rc-acc-item" data-rc-acc="1" data-job-id="' + esc(id) + '">' +
+            '<summary>' +
+                '<span class="rc-acc-chevron" aria-hidden="true"></span>' +
+                '<span class="rc-acc-title"><code>' + esc(id) + '</code></span>' +
+                '<span class="rc-acc-meta">' +
+                    '<span class="rc-acc-when" dir="ltr">' + fmtTimestampDisplay(job.created_at, 'generated_at') + '</span>' +
+                    badge(job.status) + dryBadge +
+                    '<span class="rc-muted">' + esc(String(job.phase || '—')) + ' · ' + esc(String(job.progress ?? 0)) + '%</span>' +
+                '</span>' +
+                '<span class="rc-acc-actions-inline">' + viewBtn + '</span>' +
+            '</summary>' +
+            '<div class="rc-acc-body">' +
+                '<p class="rc-muted" style="margin:0 0 8px;font-size:.82rem;">Package: ' + esc(pkgLabel) + '</p>' +
+                '<p style="margin:0 0 8px;font-size:.86rem;">' + esc(String(job.message || '—')) + '</p>' +
+                '<div class="rc-action-row">' + actions + '</div>' +
+            '</div>' +
+            '</details>'
+        );
+    }
+
+    function pickActiveJob(jobs) {
+        const list = Array.isArray(jobs) ? jobs : [];
+        const active = list.find((j) => {
+            const s = String(j.status || '').toLowerCase();
+            return j.is_maintenance_active || j.is_maintenance_ready
+                || s.includes('running') || s.includes('pending') || s.includes('progress')
+                || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval'
+                || s === 'approved_waiting_execution' || s === 'execution_precheck'
+                || s === 'dry_running';
+        });
+        return active || list[0] || null;
+    }
+
+    function updateStageStrip(maint, jobs) {
+        const active = pickActiveJob(jobs);
+        const st = String((active && active.status) || '').toLowerCase();
+        const m = maint || {};
+        const setChip = (stage, label, on) => {
+            const chip = document.querySelector('.rc-stage-chip[data-stage="' + stage + '"]');
+            const map = {
+                maint: 'rc_stage_maint_label',
+                import: 'rc_stage_import_label',
+                uploads: 'rc_stage_uploads_label',
+                rollback: 'rc_stage_rollback_label',
+                finalize: 'rc_stage_finalize_label'
+            };
+            const node = el(map[stage]);
+            if (node) node.textContent = label;
+            if (chip) chip.classList.toggle('is-active', !!on);
+        };
+        setChip('maint', m.maintenance_active ? 'Active' : (m.maintenance_ready ? 'Ready' : (m.state || 'inactive')), !!(m.maintenance_active || m.maintenance_ready || st.includes('maintenance')));
+        setChip('import', st.includes('production_import') ? String(active.status || '…') : '—', st.includes('production_import'));
+        setChip('uploads', st.includes('uploads_cutover') ? String(active.status || '…') : '—', st.includes('uploads_cutover'));
+        setChip('rollback', (st.includes('rollback') && !st.includes('finaliz')) ? String(active.status || '…') : '—', st.includes('rollback') && !st.includes('finaliz'));
+        setChip('finalize', (st.includes('finaliz') || st.includes('completed')) ? String((active && active.status) || '…') : '—', st.includes('finaliz') || !!(active && (active.is_restore_completed || active.is_rollback_completed)));
+    }
+
+    function renderActiveJob(jobs) {
+        const box = el('rc_active_job');
+        const meta = el('rc_active_job_meta');
+        const acts = el('rc_active_job_actions');
+        const job = pickActiveJob(jobs);
+        if (!box || !meta || !acts) return;
+        if (!job) {
+            box.hidden = true;
+            meta.innerHTML = '';
+            acts.innerHTML = '';
+            if (el('rc_mon_active')) el('rc_mon_active').textContent = '—';
+            if (el('rc_mon_phase')) el('rc_mon_phase').textContent = '—';
+            if (el('rc_mon_progress')) el('rc_mon_progress').textContent = '—';
+            return;
+        }
+        box.hidden = false;
+        meta.innerHTML =
+            '<span><strong>Job</strong> <code>' + esc(job.job_id || '') + '</code></span>' +
+            '<span>' + badge(job.status) + '</span>' +
+            '<span><strong>Phase</strong> ' + esc(String(job.phase || '—')) + '</span>' +
+            '<span><strong>Progress</strong> ' + esc(String(job.progress ?? 0)) + '%</span>' +
+            '<span class="rc-muted">' + esc(String(job.message || '')) + '</span>';
+        acts.innerHTML = '<button type="button" class="btn-link rc-btn-primary rc-fw-view" data-id="' + esc(job.job_id || '') + '">View</button> '
+            + '<div class="rc-action-row" style="margin:0">' + jobActions(job, { omitPrimaryView: true }) + '</div>';
+        if (el('rc_mon_jobs')) el('rc_mon_jobs').textContent = String(jobs.length);
+        if (el('rc_mon_active')) el('rc_mon_active').textContent = job.job_id || '—';
+        if (el('rc_mon_phase')) el('rc_mon_phase').textContent = job.phase || '—';
+        if (el('rc_mon_progress')) el('rc_mon_progress').textContent = String(job.progress ?? 0) + '%';
+    }
+
+    function renderTables(data) {
+        state.full = data.full_packages || [];
+        state.country = data.country_packages || [];
+        state.jobs = data.framework_jobs || data.jobs || [];
+        if (data.csrf_token) state.csrf = data.csrf_token;
+
+        if (CAN_FULL && el('rc_full_list')) {
+            el('rc_full_list').innerHTML = state.full.length
+                ? state.full.map((p) => packageAccordionHtml(p, 'full_disaster')).join('')
+                : '<p class="rc-muted" style="margin:0;padding:8px 0;">لا توجد حزم Full.</p>';
+        }
+        if (CAN_COUNTRY && el('rc_country_list')) {
+            el('rc_country_list').innerHTML = state.country.length
+                ? state.country.map((p) => packageAccordionHtml(p, 'country_recovery')).join('')
+                : '<p class="rc-muted" style="margin:0;padding:8px 0;">لا توجد حزم دول.</p>';
+        }
+        if (el('rc_jobs_list')) {
+            el('rc_jobs_list').innerHTML = state.jobs.length
+                ? state.jobs.map((j) => jobAccordionHtml(j)).join('')
+                : '<p class="rc-muted" style="margin:0;padding:8px 0;">لا توجد Restore Jobs.</p>';
+        }
+        if (el('rc_jobs_table') && el('rc_jobs_table').querySelector('tbody')) {
+            el('rc_jobs_table').querySelector('tbody').innerHTML = state.jobs.length
+                ? state.jobs.map((j) => {
+                    const pkgLabel = (j.package_type || '') + (j.country_code ? ' / ' + j.country_code : '') + ' / ' + (j.package_id || '—');
+                    const dryBadge = j.dry_run_overall_result ? ' ' + dryResultBadge(j.dry_run_overall_result) : '';
+                    return '<tr><td><code>' + j.job_id + '</code></td><td>' + pkgLabel + '</td><td class="rc-ts-cell">' + fmtTimestampDisplay(j.created_at, 'generated_at') + '</td><td>' + badge(j.status) + dryBadge + '</td><td>' + (j.phase || '—') + '</td><td>' + String(j.progress ?? 0) + '%</td><td>' + (j.message || '—') + '</td><td class="rc-actions">' + jobActions(j) + '</td></tr>';
+                }).join('')
+                : '<tr><td colspan="8" class="muted">لا توجد Restore Jobs.</td></tr>';
+        }
+        renderActiveJob(state.jobs);
+        updateStageStrip(state.lastMaintenance || data.maintenance || {}, state.jobs);
+        if (el('rc_mon_jobs')) el('rc_mon_jobs').textContent = String(state.jobs.length);
+    }
+
+    function renderStructuredDetail(obj) {
+        const sections = [];
+        const push = (title, data) => {
+            if (data === undefined || data === null || data === '') return;
+            if (typeof data === 'object' && !Array.isArray(data) && !Object.keys(data).length) return;
+            if (Array.isArray(data) && !data.length) return;
+            const text = (typeof data === 'string') ? data : JSON.stringify(data, null, 2);
+            sections.push('<div class="rc-drawer-group"><h4>' + esc(title) + '</h4><pre class="rc-pre" style="max-height:180px;">' + esc(localizeTimestampsInText(text)) + '</pre></div>');
+        };
+        push('Summary', {
+            job_id: obj.job_id || obj.id || undefined,
+            status: obj.status || obj.status_label || undefined,
+            package_id: obj.package_id || (obj.package && obj.package.package_id) || undefined,
+            phase: obj.phase || undefined,
+            progress: obj.progress,
+            message: obj.message || obj.warning || undefined
+        });
+        push('Validation', obj.validation || obj.dry_run || obj.report || obj.cutover_readiness || undefined);
+        push('Diagnostics', {
+            cli_needed: obj.cli_needed,
+            cli_command: obj.cli_command || ((obj.meta || {}).cli_command),
+            highest_checkpoint: obj.highest_checkpoint,
+            production_touched: obj.production_touched,
+            execution_started: obj.execution_started,
+            files_switched: obj.files_switched,
+            rollback_executed: obj.rollback_executed
+        });
+        push('Manifest / Health / DRV', obj.manifest || obj.health || obj.drv || obj.package || undefined);
+        push('Logs / Timeline', obj.timeline || obj.checkpoint_history || obj.artifacts || undefined);
+        push('Package Metadata', obj.meta || obj.record || obj.contract || obj.maintenance || undefined);
+        if (!sections.length) return '';
+        return sections.join('');
+    }
+
+    function openView(title, content) {
+        el('rc_view_title').textContent = title;
+        const note = el('rc_view_tz_note');
+        if (note) {
+            if (!hasDisplayTz()) {
+                note.textContent = 'تحذير: countries.timezone غير مضبوط — عُرض النص الخام دون تحويل.';
+            } else {
+                note.textContent = 'التواريخ في هذا العرض بالتوقيت المحلي (' + DISPLAY_TZ + ') بنظام 12 ساعة — التخزين الداخلي يبقى UTC.';
+            }
+        }
+        const body = String(content || '');
+        let structured = '';
+        try {
+            const obj = JSON.parse(body);
+            if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+                structured = renderStructuredDetail(obj);
+            }
+        } catch (e) { /* plain */ }
+        const host = el('rc_view_structured');
+        if (structured && host) {
+            host.style.display = 'block';
+            host.innerHTML = structured;
+            el('rc_view_pre').style.display = 'block';
+            el('rc_view_pre').textContent = localizeTimestampsInText(body);
+        } else {
+            if (host) { host.style.display = 'none'; host.innerHTML = ''; }
+            el('rc_view_pre').style.display = 'block';
+            el('rc_view_pre').textContent = localizeTimestampsInText(body);
+        }
+        el('rc_view_modal').style.display = 'flex';
+    }
+
+    function renderJobDetail(job) {
+        const lines = [];
+        lines.push('Job ID: ' + job.job_id);
+        lines.push('Status: ' + job.status);
+        lines.push('Package checksum: ' + ((job.package || {}).checksum || '—'));
+        lines.push('Staging manifest checksum: ' + ((job.staging || {}).manifest_checksum || '—'));
+        lines.push('Rollback anchor checksum: ' + ((job.rollback_anchor || {}).checksum || '—'));
+        lines.push('Approval status: ' + ((job.approval || {}).status || '—'));
+        lines.push('Token consumed: ' + (((job.approval || {}).token_consumed) ? 'yes' : 'no'));
+        lines.push('Maintenance active: ' + (((job.maintenance || {}).active) ? 'yes' : 'no'));
+        lines.push('Lock held: ' + (((job.lock || {}).held) ? 'yes' : 'no'));
+        lines.push('DB cutover completed: ' + ((job.database_cutover || {}).completed_at || '—'));
+        lines.push('Uploads cutover completed: ' + ((job.uploads_cutover || {}).completed_at || '—'));
+        lines.push('Post-validation: ' + ((job.post_validation || {}).passed_at || '—'));
+        lines.push('\n--- Timeline ---');
+        (job.timeline || []).forEach((t) => {
+            lines.push((t.at || '') + '  ' + (t.event || '') + (t.result ? ' (' + t.result + ')' : ''));
+        });
+        lines.push('\n--- Rollback checkpoints ---');
+        lines.push(JSON.stringify(job.rollback_checkpoints || {}, null, 2));
+        return lines.join('\n');
+    }
+
+    function openJobDetail(job) {
+        el('rc_detail_title').textContent = 'تفاصيل المهمة — ' + job.job_id;
+        const structured = renderStructuredDetail(job);
+        const raw = localizeTimestampsInText(renderJobDetail(job));
+        el('rc_detail_body').innerHTML =
+            (structured || '') +
+            '<div class="rc-drawer-group"><h4>Full Detail</h4><pre class="rc-pre">' + esc(raw) + '</pre></div>';
+        el('rc_detail_modal').style.display = 'flex';
     }
 
     function renderMaintenance(m) {
         const st = m || {};
+        state.lastMaintenance = st;
         if (!el('rc_maint_status')) return;
         let label = st.label || st.state || 'inactive';
         if (st.maintenance_active) label = 'Maintenance Active';
@@ -479,35 +1161,83 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
             + ' | ' + (st.warning || 'Production restore has NOT started.');
     }
 
-    function packageActions(pkg, type) {
-        const id = pkg.package_id;
-        const cc = pkg.country_code || '';
-        let html = '';
-        const files = type === 'full_disaster'
-            ? [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['recovery_validation.json', 'DRV Report']]
-            : [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['country_verify_report.json', 'Verify'], ['country_recovery_validation.json', 'Country DRV']];
-        files.forEach(([file, label]) => {
-            html += '<button type="button" class="btn-link rc-view-file" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '" data-file="' + file + '">' + label + '</button> ';
-        });
-        html += '<button type="button" class="btn-link rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">عرض تفاصيل الحزمة</button>';
-        if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
-            html += ' <button type="button" class="btn-link rc-create-job" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">إنشاء مهمة</button>';
-            html += ' <button type="button" class="btn-link rc-dry-run" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">Run Dry Validation</button>';
+DRY_    const badge = (status) => {
+        const s = String(status || '').toLowerCase();
+        let cls = 'rc-badge--muted';
+        if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'eligible' || s === 'completed' || s === 'dry_completed' || s === 'approved_waiting_execution' || s === 'pre_restore_backup_ready' || s === 'shadow_restore_ready' || s === 'shadow_verified' || s === 'shadow_files_ready' || s === 'shadow_smoke_ready' || s === 'cutover_readiness_ready' || s === 'country_shadow_verified' || s === 'ready' || s === 'country_dry_run_safe' || s === 'safe') cls = 'rc-badge--success';
+        else if (s === 'warning' || s === 'warn' || s === 'awaiting_owner_approval' || s === 'awaiting_final_approval' || s === 'waiting_confirmation' || s === 'execution_plan_ready' || s === 'pre_restore_backup_pending' || s === 'shadow_restore_pending' || s === 'shadow_not_ready' || s === 'shadow_smoke_pending' || s === 'shadow_smoke_warning' || s === 'cutover_readiness_manual_review' || s === 'country_shadow_warning' || s === 'country_dry_run_warning') cls = 'rc-badge--warning';
+        else if (s === 'failed' || s === 'fail' || s === 'error' || s === 'not_eligible' || s === 'dry_failed' || s === 'execution_failed' || s === 'execution_cancelled' || s === 'cancelled' || s === 'pre_restore_backup_failed' || s === 'shadow_restore_failed' || s === 'shadow_files_failed' || s === 'shadow_smoke_failed' || s === 'cutover_readiness_blocked' || s === 'country_shadow_not_ready' || s === 'country_dry_run_failed') cls = 'rc-badge--failed';
+        else if (s === 'running' || s.includes('progress') || s.includes('staging') || s.includes('merge') || s === 'execution_precheck' || s === 'dry_running' || s === 'pre_restore_backup_running' || s === 'pre_restore_backup_verifying' || s === 'shadow_restore_running' || s === 'shadow_restore_verifying' || s === 'shadow_verifying' || s === 'shadow_files_running' || s === 'shadow_files_verifying' || s === 'shadow_smoke_running' || s === 'country_shadow_verifying' || s === 'country_dry_run_running') cls = 'rc-badge--running';
+        let label = status || '—';
+        if (s === 'awaiting_final_approval') label = 'بانتظار الموافقة النهائية';
+        if (s === 'approved_waiting_execution') label = 'معتمدة — بانتظار التنفيذ';
+        if (s === 'country_shadow_verifying') label = 'جارٍ تحقق ظل الدولة (C7)';
+        if (s === 'country_shadow_verified') label = 'ظل الدولة موثّق (C7 READY)';
+        if (s === 'country_shadow_warning') label = 'ظل الدولة — تحذير (C7)';
+        if (s === 'country_shadow_not_ready') label = 'ظل الدولة غير جاهز (C7)';
+        if (s === 'country_dry_run_running') label = 'جارٍ محاكاة Country Dry Run (C8)';
+        if (s === 'country_dry_run_safe') label = 'Country Dry Run آمن (SAFE)';
+        if (s === 'country_dry_run_warning') label = 'Country Dry Run — تحذير';
+        if (s === 'country_dry_run_failed') label = 'Country Dry Run فشل';
+        if (s === 'safe') label = 'SAFE';
+        if (s === 'pre_restore_backup_pending') label = 'بانتظار تشغيل عامل CLI';
+        if (s === 'pre_restore_backup_running') label = 'جارٍ إنشاء النسخة الاحتياطية';
+        if (s === 'pre_restore_backup_verifying') label = 'جارٍ التحقق';
+        if (s === 'pre_restore_backup_ready') label = 'النسخة الاحتياطية جاهزة وآمنة للرجوع';
+        if (s === 'pre_restore_backup_failed') label = 'فشل إعداد النسخة الاحتياطية';
+        if (s === 'shadow_restore_pending') label = 'بانتظار تشغيل عامل CLI لقاعدة الظل';
+        if (s === 'shadow_restore_running') label = 'جارٍ استيراد قاعدة الظل';
+        if (s === 'shadow_restore_verifying') label = 'جارٍ التحقق من قاعدة الظل';
+        if (s === 'shadow_restore_ready') label = 'قاعدة الظل جاهزة (الإنتاج لم يُمس)';
+        if (s === 'shadow_restore_failed') label = 'فشل استعادة قاعدة الظل';
+        if (s === 'shadow_verifying') label = 'جارٍ التحقق العميق من قاعدة الظل';
+        if (s === 'shadow_verified') label = 'قاعدة الظل موثّقة وجاهزة (بدون قطع إنتاج)';
+        if (s === 'shadow_not_ready') label = 'قاعدة الظل غير جاهزة للقطع';
+        if (s === 'shadow_files_running') label = 'جارٍ استخراج ملفات الظل';
+        if (s === 'shadow_files_verifying') label = 'جارٍ التحقق من ملفات الظل';
+        if (s === 'shadow_files_ready') label = 'ملفات الظل جاهزة (الإنتاج لم يُمس)';
+        if (s === 'shadow_files_failed') label = 'فشل استخراج ملفات الظل';
+        if (s === 'shadow_smoke_pending') label = 'بانتظار تشغيل اختبار CLI';
+        if (s === 'shadow_smoke_running') label = 'جارٍ اختبار قاعدة البيانات والملفات المعزولة';
+        if (s === 'shadow_smoke_ready') label = 'البيئة المعزولة جاهزة';
+        if (s === 'shadow_smoke_warning') label = 'تحتاج مراجعة يدوية';
+        if (s === 'shadow_smoke_failed') label = 'البيئة غير جاهزة';
+        if (s === 'cutover_readiness_ready') label = 'البيئة المعزولة جاهزة';
+        if (s === 'cutover_readiness_manual_review') label = 'تحتاج مراجعة يدوية';
+        if (s === 'cutover_readiness_blocked') label = 'البيئة غير جاهزة';
+        return '<span class="rc-badge ' + cls + '">' + label + '</span>';
+    };
+    const eligibilityBadge = (pkg) => {
+        const status = String(pkg.eligibility_status || pkg.restore_eligibility || '');
+        const labelAr = pkg.eligibility_reason_label_ar || '';
+        let text = 'غير مؤهلة';
+        let cls = 'rc-badge--failed';
+        if (status === 'eligible') {
+            text = 'مؤهلة';
+            cls = 'rc-badge--success';
+        } else if (status === 'unknown') {
+            text = 'غير محسومة';
+            cls = 'rc-badge--warning';
         }
-        return html;
-    }
+        const title = labelAr ? ' title="' + String(labelAr).replace(/"/g, '&quot;') + '"' : '';
+        return '<span class="rc-badge ' + cls + '"' + title + '>' + text + '</span>';
+    };
+    const drvCell = (pkg) => {
+        const result = String(pkg.drv_result || '').toLowerCase();
+        if (result === 'pass') return badge('PASS');
+        if (result === 'fail') return badge('FAIL');
+        if (result === 'missing') return '—';
+        const score = pkg.drv_score;
+        if (score === null || score === undefined || score === '') return '—';
+        return String(score);
+    };
 
-    function dryResultBadge(result) {
-        const r = String(result || '').toUpperCase();
-        if (r === 'PASS') return '<span class="rc-badge rc-badge--success">PASS</span>';
-        if (r === 'WARNING') return '<span class="rc-badge rc-badge--warning">WARNING</span>';
-        if (r === 'FAIL') return '<span class="rc-badge rc-badge--failed">FAIL</span>';
-        return '<span class="rc-badge rc-badge--muted">—</span>';
-    }
-
-    function jobActions(job) {
+    function jobActions(job, opts) {
+        opts = opts || {};
         const id = job.job_id;
-        let html = '<button type="button" class="btn-link rc-fw-view" data-id="' + id + '">View</button> ';
+        let html = opts.omitPrimaryView
+            ? ''
+            : '<button type="button" class="btn-link rc-fw-view" data-id="' + id + '">View</button> ';
         if (job.dry_run_available) {
             html += '<button type="button" class="btn-link rc-dry-run" data-job="' + id + '">Run Dry Validation</button> ';
         }
@@ -672,66 +1402,6 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
         return html;
     }
 
-    function renderTables(data) {
-        state.full = data.full_packages || [];
-        state.country = data.country_packages || [];
-        state.jobs = data.framework_jobs || data.jobs || [];
-        if (data.csrf_token) state.csrf = data.csrf_token;
-
-        if (CAN_FULL && el('rc_full_table')) {
-            el('rc_full_table').querySelector('tbody').innerHTML = state.full.length
-                ? state.full.map((p) => '<tr><td class="rc-ts-cell">' + fmtTimestampDisplay(p.generated_at) + '</td><td>' + p.package_id + '</td><td>' + badge(p.package_status) + '</td><td>' + p.schema_revision + '</td><td>' + (p.backend || '') + '</td><td>' + drvCell(p) + '</td><td>' + eligibilityBadge(p) + '</td><td class="rc-actions">' + packageActions(p, 'full_disaster') + '</td></tr>').join('')
-                : '<tr><td colspan="8" class="muted">لا توجد حزم Full.</td></tr>';
-        }
-        if (CAN_COUNTRY && el('rc_country_table')) {
-            el('rc_country_table').querySelector('tbody').innerHTML = state.country.length
-                ? state.country.map((p) => '<tr><td>' + (p.country_code || '') + (p.country_name ? ' — ' + p.country_name : '') + '</td><td class="rc-ts-cell">' + fmtTimestampDisplay(p.generated_at) + '</td><td>' + p.package_id + '</td><td>' + badge(p.package_status) + '</td><td>' + p.schema_revision + '</td><td>' + (p.registry_version || '') + '</td><td>' + drvCell(p) + '</td><td>' + eligibilityBadge(p) + '</td><td class="rc-actions">' + packageActions(p, 'country_recovery') + '</td></tr>').join('')
-                : '<tr><td colspan="9" class="muted">لا توجد حزم دول.</td></tr>';
-        }
-        el('rc_jobs_table').querySelector('tbody').innerHTML = state.jobs.length
-            ? state.jobs.map((j) => {
-                const pkgLabel = (j.package_type || '') + (j.country_code ? ' / ' + j.country_code : '') + ' / ' + (j.package_id || '—');
-                const dryBadge = j.dry_run_overall_result ? ' ' + dryResultBadge(j.dry_run_overall_result) : '';
-                return '<tr><td><code>' + j.job_id + '</code></td><td>' + pkgLabel + '</td><td class="rc-ts-cell">' + fmtTimestampDisplay(j.created_at) + '</td><td>' + badge(j.status) + dryBadge + '</td><td>' + (j.phase || '—') + '</td><td>' + String(j.progress ?? 0) + '%</td><td>' + (j.message || '—') + '</td><td class="rc-actions">' + jobActions(j) + '</td></tr>';
-            }).join('')
-            : '<tr><td colspan="8" class="muted">لا توجد Restore Jobs.</td></tr>';
-    }
-
-    function openView(title, content) {
-        el('rc_view_title').textContent = title;
-        el('rc_view_pre').textContent = content;
-        el('rc_view_modal').style.display = 'flex';
-    }
-
-    function renderJobDetail(job) {
-        const lines = [];
-        lines.push('Job ID: ' + job.job_id);
-        lines.push('Status: ' + job.status);
-        lines.push('Package checksum: ' + ((job.package || {}).checksum || '—'));
-        lines.push('Staging manifest checksum: ' + ((job.staging || {}).manifest_checksum || '—'));
-        lines.push('Rollback anchor checksum: ' + ((job.rollback_anchor || {}).checksum || '—'));
-        lines.push('Approval status: ' + ((job.approval || {}).status || '—'));
-        lines.push('Token consumed: ' + (((job.approval || {}).token_consumed) ? 'yes' : 'no'));
-        lines.push('Maintenance active: ' + (((job.maintenance || {}).active) ? 'yes' : 'no'));
-        lines.push('Lock held: ' + (((job.lock || {}).held) ? 'yes' : 'no'));
-        lines.push('DB cutover completed: ' + ((job.database_cutover || {}).completed_at || '—'));
-        lines.push('Uploads cutover completed: ' + ((job.uploads_cutover || {}).completed_at || '—'));
-        lines.push('Post-validation: ' + ((job.post_validation || {}).passed_at || '—'));
-        lines.push('\n--- Timeline ---');
-        (job.timeline || []).forEach((t) => {
-            lines.push((t.at || '') + '  ' + (t.event || '') + (t.result ? ' (' + t.result + ')' : ''));
-        });
-        lines.push('\n--- Rollback checkpoints ---');
-        lines.push(JSON.stringify(job.rollback_checkpoints || {}, null, 2));
-        return lines.join('\n');
-    }
-
-    function openJobDetail(job) {
-        el('rc_detail_title').textContent = 'تفاصيل المهمة — ' + job.job_id;
-        el('rc_detail_body').innerHTML = '<pre class="rc-pre">' + renderJobDetail(job).replace(/</g, '&lt;') + '</pre>';
-        el('rc_detail_modal').style.display = 'flex';
-    }
-
     function renderCertification(cert) {
         const box = el('rc_cert_status');
         const blockersEl = el('rc_cert_blockers');
@@ -756,7 +1426,7 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
             '<div><dt>تمرين التراجع</dt><dd>' + (cert.rollback_drill_ok ? 'ناجح' : 'فشل / غير متوفر') + '</dd></div>' +
             '<div><dt>العزل</dt><dd>' + (cert.production_isolation_ok ? 'مثبت' : 'غير مثبت') + '</dd></div>' +
             '<div><dt>Commit</dt><dd>' + (cert.tested_commit || '—') + '</dd></div>' +
-            '<div><dt>تاريخ الاختبار</dt><dd>' + (cert.tested_at || '—') + '</dd></div>' +
+            '<div><dt>تاريخ الاختبار</dt><dd class="rc-ts-cell">' + (cert.tested_at ? fmtTimestampDisplay(cert.tested_at, 'generated_at') : '—') + '</dd></div>' +
             '<div><dt>Country Restore</dt><dd>غير معتمد للإنتاج</dd></div>';
         const blockers = Array.isArray(cert.open_blockers) ? cert.open_blockers : [];
         if (blockersEl) {
@@ -1673,6 +2343,45 @@ td.rc-actions .btn-link,td.rc-actions button.btn-link{flex-shrink:0}
             loadCountryDryRun();
         });
     }
+
+    // Package / job accordion: only one open at a time
+    document.addEventListener('toggle', (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLDetailsElement) || !t.classList.contains('rc-acc-item')) return;
+        if (!t.open) return;
+        document.querySelectorAll('details.rc-acc-item[open]').forEach((other) => {
+            if (other !== t) other.open = false;
+        });
+    });
+
+    // Keep primary/action clicks from toggling accordion unexpectedly
+    document.addEventListener('click', (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLElement)) return;
+        if (t.closest('.rc-acc-actions-inline') || t.closest('.rc-action-row')) {
+            // do not stopPropagation for handlers — only prevent summary toggle via details default when clicking buttons
+            if (t.closest('summary') && (t.closest('button') || t.closest('a'))) {
+                ev.preventDefault();
+            }
+        }
+        if (t.matches('.rc-tab') || t.classList.contains('rc-tab')) {
+            const tab = t.getAttribute('data-rc-tab');
+            if (!tab) return;
+            document.querySelectorAll('.rc-tab').forEach((b) => b.classList.toggle('is-active', b.getAttribute('data-rc-tab') === tab));
+            const fullPanel = el('rc_tab_full');
+            const countryPanel = el('rc_tab_country');
+            if (fullPanel) {
+                const on = tab === 'full';
+                fullPanel.classList.toggle('is-active', on);
+                fullPanel.hidden = !on;
+            }
+            if (countryPanel) {
+                const on = tab === 'country';
+                countryPanel.classList.toggle('is-active', on);
+                countryPanel.hidden = !on;
+            }
+        }
+    }, true);
 
     loadAll();
 })();
