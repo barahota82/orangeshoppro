@@ -85,7 +85,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 .rc-ts-date,.rc-ts-time{white-space:nowrap}
 .rc-ts--raw{color:#92400e}
 .rc-ts-warn{font-size:.72rem;font-weight:650;color:#b45309}
-.rc-acc-when{margin-inline-end:6px}
+.rc-acc-when{margin-inline-end:8px;font-weight:700}
 @media (max-width:900px){.rc-ts{flex-wrap:wrap;gap:0;white-space:normal}.rc-ts-date,.rc-ts-time{display:block}}
 .rc-acc-list{display:flex;flex-direction:column;gap:8px}
 .rc-acc-item{border:1px solid var(--rc-border);border-radius:12px;background:var(--rc-surface)}
@@ -98,8 +98,16 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 .rc-acc-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1;min-width:0}
 .rc-acc-actions-inline{display:flex;align-items:center;gap:8px;margin-inline-start:auto}
 .rc-acc-body{padding:10px 14px 12px;border-top:1px solid #f1f5f9}
+/* Package expand: header + chevron stay visible; only details scroll */
+.rc-acc-item[data-rc-acc="pkg"]>summary{position:relative;z-index:1;background:var(--rc-surface);border-radius:12px}
+.rc-acc-item[data-rc-acc="pkg"][open]>summary{border-radius:12px 12px 0 0}
+.rc-acc-item[data-rc-acc="pkg"]>.rc-acc-body{max-height:min(240px,42vh);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.rc-pkg-id{font-family:ui-monospace,Consolas,monospace;font-size:.72rem;font-weight:500;color:#94a3b8;direction:ltr;unicode-bidi:isolate}
 .rc-action-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .rc-action-row .rc-btn-ghost,.rc-action-row .btn-link{flex:0 0 auto}
+.rc-action-row--secondary{margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9}
+.rc-action-row--secondary .btn-link,.rc-action-row--secondary .rc-btn-ghost{opacity:.92;font-weight:600;font-size:.8rem}
+.rc-stage-idle{color:var(--rc-muted);font-weight:600;font-size:.86rem}
 .rc-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;align-items:center}
 .rc-active-job{padding:14px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:12px;margin-bottom:12px}
 .rc-active-job h4{margin:0 0 8px;font-size:.95rem}
@@ -143,8 +151,9 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 @media (max-width:640px){.rc-acc-actions-inline{width:100%;margin-inline-start:0}}
 .rc-v2 .rc-action-row .btn-link,.rc-v2 .rc-actions .btn-link,.rc-v2 button.btn-link.rc-btn-ghost{background:#fff;color:#334155!important;-webkit-text-fill-color:#334155;border:1px solid #cbd5e1;border-radius:8px;padding:5px 11px;min-height:32px;font-weight:600}
 .rc-v2 .rc-action-row .btn-link:hover,.rc-v2 .rc-actions .btn-link:hover{background:#f1f5f9}
-.rc-v2 .rc-acc-actions-inline .btn-link.rc-btn-primary,.rc-v2 .rc-acc-actions-inline button.rc-btn-primary{background:var(--primary,#ea580c);color:#fff!important;-webkit-text-fill-color:#fff;border:0}
-.rc-v2 .rc-acc-actions-inline .btn-link.rc-btn-primary:hover{background:var(--primary-hover,#c2410c)}
+.rc-v2 .rc-acc-actions-inline .btn-link.rc-btn-primary,.rc-v2 .rc-acc-actions-inline button.rc-btn-primary,
+.rc-v2 .rc-acc-body .btn-link.rc-btn-primary,.rc-v2 .rc-acc-body button.rc-btn-primary{background:var(--primary,#ea580c);color:#fff!important;-webkit-text-fill-color:#fff;border:0}
+.rc-v2 .rc-acc-actions-inline .btn-link.rc-btn-primary:hover,.rc-v2 .rc-acc-body .btn-link.rc-btn-primary:hover{background:var(--primary-hover,#c2410c)}
 #rc_refresh_btn{background:#fff;color:#334155!important;border:1px solid #cbd5e1}
 #rc_refresh_btn:hover{background:#f8fafc;border-color:#94a3b8}
 #rc_view_close,#rc_detail_close{background:#475569;color:#fff!important}
@@ -377,11 +386,11 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         </div>
         <div class="rc-panel">
             <div class="rc-stage-strip" id="rc_stage_strip" aria-label="مراحل التنفيذ">
-                <button type="button" class="rc-stage-chip" data-stage="maint"><strong>1 · Maintenance</strong><span id="rc_stage_maint_label">—</span></button>
-                <button type="button" class="rc-stage-chip" data-stage="import"><strong>2 · DB Import</strong><span id="rc_stage_import_label">—</span></button>
-                <button type="button" class="rc-stage-chip" data-stage="uploads"><strong>3 · Uploads Cutover</strong><span id="rc_stage_uploads_label">—</span></button>
-                <button type="button" class="rc-stage-chip" data-stage="rollback"><strong>4 · Rollback</strong><span id="rc_stage_rollback_label">—</span></button>
-                <button type="button" class="rc-stage-chip" data-stage="finalize"><strong>5 · Finalize</strong><span id="rc_stage_finalize_label">—</span></button>
+                <button type="button" class="rc-stage-chip" data-stage="maint"><strong>1 · Maintenance</strong><span id="rc_stage_maint_label" class="rc-stage-idle">Waiting</span></button>
+                <button type="button" class="rc-stage-chip" data-stage="import"><strong>2 · DB Import</strong><span id="rc_stage_import_label" class="rc-stage-idle">Waiting</span></button>
+                <button type="button" class="rc-stage-chip" data-stage="uploads"><strong>3 · Uploads Cutover</strong><span id="rc_stage_uploads_label" class="rc-stage-idle">Waiting</span></button>
+                <button type="button" class="rc-stage-chip" data-stage="rollback"><strong>4 · Rollback</strong><span id="rc_stage_rollback_label" class="rc-stage-idle">Waiting</span></button>
+                <button type="button" class="rc-stage-chip" data-stage="finalize"><strong>5 · Finalize</strong><span id="rc_stage_finalize_label" class="rc-stage-idle">Waiting</span></button>
             </div>
             <div class="rc-stage-panels">
                 <details class="rc-acc-item rc-stage-acc" data-rc-acc="stage" data-stage="maint" id="rc_maint_section">
@@ -395,13 +404,13 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                             <strong>Production restore has NOT started.</strong>
                         </p>
                         <dl id="rc_maint_status" class="rc-status-strip">
-                            <div><dt>الحالة</dt><dd>—</dd></div>
-                            <div><dt>الملصق</dt><dd>—</dd></div>
-                            <div><dt>المهمة المرتبطة</dt><dd>—</dd></div>
-                            <div><dt>وقت الطلب</dt><dd>—</dd></div>
-                            <div><dt>وقت التفعيل</dt><dd>—</dd></div>
-                            <div><dt>آخر نبضة</dt><dd>—</dd></div>
-                            <div><dt>Stale</dt><dd>—</dd></div>
+                            <div><dt>الحالة</dt><dd class="rc-stage-idle">No activity</dd></div>
+                            <div><dt>الملصق</dt><dd class="rc-stage-idle">Waiting</dd></div>
+                            <div><dt>المهمة المرتبطة</dt><dd class="rc-stage-idle">No activity</dd></div>
+                            <div><dt>وقت الطلب</dt><dd class="rc-stage-idle">No activity</dd></div>
+                            <div><dt>وقت التفعيل</dt><dd class="rc-stage-idle">No activity</dd></div>
+                            <div><dt>آخر نبضة</dt><dd class="rc-stage-idle">No activity</dd></div>
+                            <div><dt>Stale</dt><dd class="rc-stage-idle">No activity</dd></div>
                         </dl>
                         <div id="rc_maint_policy" class="muted" style="margin-top:8px;"></div>
                     </div>
@@ -417,9 +426,9 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                             <strong>Application files have NOT been switched.</strong>
                         </p>
                         <dl id="rc_prod_import_status" class="rc-status-strip">
-                            <div><dt>الحالة</dt><dd>—</dd></div>
-                            <div><dt>أعلى نقطة تحقق</dt><dd>—</dd></div>
-                            <div><dt>CLI</dt><dd>—</dd></div>
+                            <div><dt>الحالة</dt><dd class="rc-stage-idle">Waiting</dd></div>
+                            <div><dt>أعلى نقطة تحقق</dt><dd class="rc-stage-idle">No activity</dd></div>
+                            <div><dt>CLI</dt><dd class="rc-stage-idle">No activity</dd></div>
                         </dl>
                     </div>
                 </details>
@@ -434,9 +443,9 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                             <strong>Maintenance remains active. Restore is NOT completed. Rollback was NOT executed.</strong>
                         </p>
                         <dl id="rc_uploads_cutover_status" class="rc-status-strip">
-                            <div><dt>الحالة</dt><dd>—</dd></div>
-                            <div><dt>أعلى نقطة تحقق</dt><dd>—</dd></div>
-                            <div><dt>CLI</dt><dd>—</dd></div>
+                            <div><dt>الحالة</dt><dd class="rc-stage-idle">Waiting</dd></div>
+                            <div><dt>أعلى نقطة تحقق</dt><dd class="rc-stage-idle">No activity</dd></div>
+                            <div><dt>CLI</dt><dd class="rc-stage-idle">No activity</dd></div>
                         </dl>
                     </div>
                 </details>
@@ -451,9 +460,9 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                             <strong>Maintenance remains active. Restore is NOT completed. Rollback anchor retained.</strong>
                         </p>
                         <dl id="rc_rollback_status" class="rc-status-strip">
-                            <div><dt>الحالة</dt><dd>—</dd></div>
-                            <div><dt>أعلى نقطة تحقق</dt><dd>—</dd></div>
-                            <div><dt>CLI</dt><dd>—</dd></div>
+                            <div><dt>الحالة</dt><dd class="rc-stage-idle">Waiting</dd></div>
+                            <div><dt>أعلى نقطة تحقق</dt><dd class="rc-stage-idle">No activity</dd></div>
+                            <div><dt>CLI</dt><dd class="rc-stage-idle">No activity</dd></div>
                         </dl>
                     </div>
                 </details>
@@ -468,9 +477,9 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                             <strong>Finalization releases maintenance after restore or rollback success. Forensic artifacts retained.</strong>
                         </p>
                         <dl id="rc_finalize_status" class="rc-status-strip">
-                            <div><dt>الحالة</dt><dd>—</dd></div>
-                            <div><dt>الصيانة</dt><dd>—</dd></div>
-                            <div><dt>CLI</dt><dd>—</dd></div>
+                            <div><dt>الحالة</dt><dd class="rc-stage-idle">Waiting</dd></div>
+                            <div><dt>الصيانة</dt><dd class="rc-stage-idle">No activity</dd></div>
+                            <div><dt>CLI</dt><dd class="rc-stage-idle">No activity</dd></div>
                         </dl>
                     </div>
                 </details>
@@ -914,17 +923,21 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
     function packageExpandedActions(pkg, type) {
         const id = pkg.package_id;
         const cc = pkg.country_code || '';
-        let html = '';
+        // Primary inside expand: Package Details. Diagnostics stay secondary.
+        let html = '<div class="rc-action-row">'
+            + '<button type="button" class="btn-link rc-btn-primary rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">Package Details</button>'
+            + '</div>';
+        let secondary = '';
         const files = type === 'full_disaster'
             ? [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['recovery_validation.json', 'DRV Report']]
             : [['manifest.json', 'Manifest'], ['health.json', 'Health'], ['country_verify_report.json', 'Verify'], ['country_recovery_validation.json', 'Country DRV']];
         files.forEach(([file, label]) => {
-            html += '<button type="button" class="btn-link rc-btn-ghost rc-view-file" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '" data-file="' + file + '">' + label + '</button> ';
+            secondary += '<button type="button" class="btn-link rc-btn-ghost rc-view-file" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '" data-file="' + file + '">' + label + '</button> ';
         });
-        html += '<button type="button" class="btn-link rc-btn-ghost rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">Package Details</button>';
         if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
-            html += ' <button type="button" class="btn-link rc-btn-ghost rc-dry-run" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">Dry Validation</button>';
+            secondary += '<button type="button" class="btn-link rc-btn-ghost rc-dry-run" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">Dry Validation</button>';
         }
+        html += '<div class="rc-action-row rc-action-row--secondary">' + secondary + '</div>';
         return html;
     }
 
@@ -934,7 +947,8 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
             return '<button type="button" class="btn-link rc-btn-primary rc-create-job" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">إنشاء مهمة استرداد</button>';
         }
-        return '<button type="button" class="btn-link rc-btn-primary rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">عرض الحزمة</button>';
+        // Expands the package accordion (details open) — wording Owner 2026-07-23
+        return '<button type="button" class="btn-link rc-btn-primary rc-pkg-expand" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">تفاصيل الحزمة</button>';
     }
 
     /** Capability-preserving action set (expanded + create when eligible). */
@@ -955,28 +969,33 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
     function packageAccordionHtml(pkg, type) {
         const identity = String(pkg.package_id || '').trim();
         const whenHtml = fmtPackageWhenDisplay(pkg, type);
-        const pkgLabel = type === 'full_disaster'
-            ? (identity || 'Full package')
-            : ((pkg.country_code ? pkg.country_code + ' / ' : '') + (identity || 'Country package'));
+        const countryBit = (!type || type === 'full_disaster')
+            ? ''
+            : (pkg.country_code ? String(pkg.country_code) + ' · ' : '');
+        // Time primary; package_id secondary identifier only
+        const idHtml = identity
+            ? '<span class="rc-pkg-id" dir="ltr" title="package_id (identifier)">' + esc(countryBit + identity) + '</span>'
+            : '';
         return (
             '<details class="rc-acc-item" data-rc-acc="pkg" data-package-id="' + esc(identity) + '">' +
             '<summary>' +
                 '<span class="rc-acc-chevron" aria-hidden="true"></span>' +
                 '<span class="rc-acc-meta">' +
                     '<span class="rc-acc-when" dir="ltr" title="Time">' + whenHtml + '</span>' +
-                    '<span class="rc-mono" dir="ltr" title="Package">' + esc(pkgLabel) + '</span>' +
+                    idHtml +
                     badge(pkg.package_status || '—') +
                     eligibilityBadge(pkg) +
                 '</span>' +
                 '<span class="rc-acc-actions-inline">' + packagePrimaryAction(pkg, type) + '</span>' +
             '</summary>' +
             '<div class="rc-acc-body">' +
-                '<div class="rc-action-row">' + packageExpandedActions(pkg, type) + '</div>' +
+                packageExpandedActions(pkg, type) +
                 '<p class="rc-muted" style="margin:10px 0 0;font-size:.8rem;"><strong>Metadata</strong> — Schema: ' + esc(String(pkg.schema_revision || '—')) +
                 ' · Backend: ' + esc(String(pkg.backend || '—')) +
                 ' · DRV: ' + drvCell(pkg) +
                 (pkg.registry_version ? (' · Registry: ' + esc(String(pkg.registry_version))) : '') +
                 (pkg.country_name ? (' · ' + esc(String(pkg.country_name))) : '') +
+                (identity ? (' · ID: <span class="rc-pkg-id">' + esc(identity) + '</span>') : '') +
                 '</p>' +
             '</div>' +
             '</details>'
@@ -1988,8 +2007,8 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 if (el('rc_prod_import_status')) {
                     el('rc_prod_import_status').innerHTML =
                         '<div><dt>الحالة</dt><dd>' + badge('Production Import Pending') + '</dd></div>'
-                        + '<div><dt>أعلى نقطة تحقق</dt><dd>—</dd></div>'
-                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || '—') + '</code></dd></div>';
+                        + '<div><dt>أعلى نقطة تحقق</dt><dd class="rc-stage-idle">No activity</dd></div>'
+                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || 'No activity') + '</code></dd></div>';
                 }
                 await loadAll();
             } catch (e) {
@@ -2006,9 +2025,9 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 const j = await apiGet('job/production-import.php?id=' + encodeURIComponent(t.dataset.id || ''));
                 if (el('rc_prod_import_status')) {
                     el('rc_prod_import_status').innerHTML =
-                        '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || '—') + '</dd></div>'
-                        + '<div><dt>أعلى نقطة تحقق</dt><dd>' + (j.highest_checkpoint || '—') + '</dd></div>'
-                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '—') + '</dd></div>';
+                        '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || 'Waiting') + '</dd></div>'
+                        + '<div><dt>أعلى نقطة تحقق</dt><dd>' + (j.highest_checkpoint || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>'
+                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>';
                 }
                 openView('Production Import — ' + (t.dataset.id || ''), JSON.stringify({
                     status_label: j.status_label || '',
@@ -2049,8 +2068,8 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 if (el('rc_uploads_cutover_status')) {
                     el('rc_uploads_cutover_status').innerHTML =
                         '<div><dt>الحالة</dt><dd>' + badge('Uploads Cutover Pending') + '</dd></div>'
-                        + '<div><dt>أعلى نقطة تحقق</dt><dd>—</dd></div>'
-                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || '—') + '</code></dd></div>';
+                        + '<div><dt>أعلى نقطة تحقق</dt><dd class="rc-stage-idle">No activity</dd></div>'
+                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || 'No activity') + '</code></dd></div>';
                 }
                 await loadAll();
             } catch (e) {
@@ -2067,9 +2086,9 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 const j = await apiGet('job/uploads-cutover.php?id=' + encodeURIComponent(t.dataset.id || ''));
                 if (el('rc_uploads_cutover_status')) {
                     el('rc_uploads_cutover_status').innerHTML =
-                        '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || '—') + '</dd></div>'
-                        + '<div><dt>أعلى نقطة تحقق</dt><dd>' + (j.highest_checkpoint || '—') + '</dd></div>'
-                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '—') + '</dd></div>';
+                        '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || 'Waiting') + '</dd></div>'
+                        + '<div><dt>أعلى نقطة تحقق</dt><dd>' + (j.highest_checkpoint || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>'
+                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>';
                 }
                 openView('Uploads Cutover — ' + (t.dataset.id || ''), JSON.stringify({
                     status_label: j.status_label || '',
@@ -2110,8 +2129,8 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 if (el('rc_rollback_status')) {
                     el('rc_rollback_status').innerHTML =
                         '<div><dt>الحالة</dt><dd>' + badge('Rollback Pending') + '</dd></div>'
-                        + '<div><dt>أعلى نقطة تحقق</dt><dd>—</dd></div>'
-                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || '—') + '</code></dd></div>';
+                        + '<div><dt>أعلى نقطة تحقق</dt><dd class="rc-stage-idle">No activity</dd></div>'
+                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || 'No activity') + '</code></dd></div>';
                 }
                 await loadAll();
             } catch (e) {
@@ -2128,9 +2147,9 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 const j = await apiGet('job/rollback.php?id=' + encodeURIComponent(t.dataset.id || ''));
                 if (el('rc_rollback_status')) {
                     el('rc_rollback_status').innerHTML =
-                        '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || '—') + '</dd></div>'
-                        + '<div><dt>أعلى نقطة تحقق</dt><dd>' + (j.highest_checkpoint || '—') + '</dd></div>'
-                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '—') + '</dd></div>';
+                        '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || 'Waiting') + '</dd></div>'
+                        + '<div><dt>أعلى نقطة تحقق</dt><dd>' + (j.highest_checkpoint || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>'
+                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>';
                 }
                 openView('Rollback — ' + (t.dataset.id || ''), JSON.stringify({
                     status_label: j.status_label || '',
@@ -2171,7 +2190,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     el('rc_finalize_status').innerHTML =
                         '<div><dt>الحالة</dt><dd>' + badge('Finalizing') + '</dd></div>'
                         + '<div><dt>الصيانة</dt><dd>pending release</dd></div>'
-                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || '—') + '</code></dd></div>';
+                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || 'No activity') + '</code></dd></div>';
                 }
                 await loadAll();
             } catch (e) {
@@ -2188,9 +2207,9 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 const j = await apiGet('job/finalize.php?id=' + encodeURIComponent(t.dataset.id || ''));
                 if (el('rc_finalize_status')) {
                     el('rc_finalize_status').innerHTML =
-                        '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || '—') + '</dd></div>'
+                        '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || 'Waiting') + '</dd></div>'
                         + '<div><dt>الصيانة</dt><dd>' + (j.maintenance_released ? 'Maintenance Released' : 'active') + '</dd></div>'
-                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '—') + '</dd></div>';
+                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>';
                 }
                 openView('Finalize — ' + (t.dataset.id || ''), JSON.stringify({
                     status_label: j.status_label || '',
@@ -2428,6 +2447,22 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 openStagePanel('');
             } else {
                 openStagePanel(stage);
+            }
+            return;
+        }
+        const expandBtn = t.closest('.rc-pkg-expand');
+        if (expandBtn) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            const details = expandBtn.closest('details.rc-acc-item[data-rc-acc="pkg"]');
+            if (details) {
+                document.querySelectorAll('details.rc-acc-item[data-rc-acc="pkg"][open]').forEach((other) => {
+                    if (other !== details) other.open = false;
+                });
+                details.open = true;
+                try {
+                    details.querySelector('summary')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                } catch (e) { /* ignore */ }
             }
             return;
         }
