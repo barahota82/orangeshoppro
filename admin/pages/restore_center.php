@@ -98,10 +98,15 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 .rc-acc-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1;min-width:0}
 .rc-acc-actions-inline{display:flex;align-items:center;gap:8px;margin-inline-start:auto}
 .rc-acc-body{padding:10px 14px 12px;border-top:1px solid #f1f5f9}
-/* Package expand: header + chevron stay visible; only details scroll */
-.rc-acc-item[data-rc-acc="pkg"]>summary{position:relative;z-index:1;background:var(--rc-surface);border-radius:12px}
+/* Package accordion: header fixed in card; only body scrolls; sticky if page scrolls */
+.rc-acc-item[data-rc-acc="pkg"]{overflow:visible}
+.rc-acc-item[data-rc-acc="pkg"][open]{display:flex;flex-direction:column;max-height:min(340px,58vh)}
+.rc-acc-item[data-rc-acc="pkg"]>summary{position:sticky;top:0;z-index:3;flex:0 0 auto;background:var(--rc-surface);border-radius:12px;box-shadow:0 1px 0 #f1f5f9}
 .rc-acc-item[data-rc-acc="pkg"][open]>summary{border-radius:12px 12px 0 0}
-.rc-acc-item[data-rc-acc="pkg"]>.rc-acc-body{max-height:min(240px,42vh);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.rc-acc-item[data-rc-acc="pkg"][open]>.rc-acc-body{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.rc-acc-item[data-rc-acc="pkg"]:not([open])>.rc-acc-body{display:none}
+.rc-acc-item[data-rc-acc="pkg"] .rc-acc-chevron{cursor:pointer;padding:4px;margin:-4px;border-radius:6px}
+.rc-acc-item[data-rc-acc="pkg"] .rc-acc-chevron:hover{color:var(--rc-ink);background:#f1f5f9}
 .rc-pkg-id{font-family:ui-monospace,Consolas,monospace;font-size:.72rem;font-weight:500;color:#94a3b8;direction:ltr;unicode-bidi:isolate}
 .rc-action-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .rc-action-row .rc-btn-ghost,.rc-action-row .btn-link{flex:0 0 auto}
@@ -947,8 +952,8 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
             return '<button type="button" class="btn-link rc-btn-primary rc-create-job" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">إنشاء مهمة استرداد</button>';
         }
-        // Expands the package accordion (details open) — wording Owner 2026-07-23
-        return '<button type="button" class="btn-link rc-btn-primary rc-pkg-expand" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">تفاصيل الحزمة</button>';
+        // Opens package details view/drawer — NOT accordion toggle (chevron only). Owner 2026-07-23
+        return '<button type="button" class="btn-link rc-btn-primary rc-pkg-detail" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">تفاصيل الحزمة</button>';
     }
 
     /** Capability-preserving action set (expanded + create when eligible). */
@@ -2450,24 +2455,19 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             }
             return;
         }
-        const expandBtn = t.closest('.rc-pkg-expand');
-        if (expandBtn) {
-            ev.preventDefault();
-            ev.stopPropagation();
-            const details = expandBtn.closest('details.rc-acc-item[data-rc-acc="pkg"]');
-            if (details) {
-                document.querySelectorAll('details.rc-acc-item[data-rc-acc="pkg"][open]').forEach((other) => {
-                    if (other !== details) other.open = false;
-                });
-                details.open = true;
-                try {
-                    details.querySelector('summary')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                } catch (e) { /* ignore */ }
+        // Package accordion: open/close ONLY via chevron — never via summary, meta, or primary buttons
+        const pkgDetails = t.closest('details.rc-acc-item[data-rc-acc="pkg"]');
+        if (pkgDetails) {
+            const onSummary = t.closest('summary');
+            if (onSummary && onSummary.parentElement === pkgDetails) {
+                const onChevron = !!t.closest('.rc-acc-chevron');
+                if (!onChevron) {
+                    // Buttons/links in header must not toggle; non-chevron summary clicks also must not toggle
+                    ev.preventDefault();
+                }
             }
-            return;
         }
         if (t.closest('.rc-acc-actions-inline') || t.closest('.rc-action-row')) {
-            // do not stopPropagation for handlers — only prevent summary toggle via details default when clicking buttons
             if (t.closest('summary') && (t.closest('button') || t.closest('a'))) {
                 ev.preventDefault();
             }
