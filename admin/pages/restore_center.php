@@ -873,9 +873,9 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         return j;
     }
 
-    /** Invoke approved CLI worker via Restore Center orchestrator (no operator SSH/CLI). */
+    /** Schedule approved CLI worker (detached). HTTP returns immediately; poll status via loadAll. */
     async function runRestoreWorker(jobId, workerKey, busyText) {
-        setBusy(true, busyText || 'جاري تنفيذ مرحلة الاسترداد من مركز الاسترداد…');
+        setBusy(true, busyText || 'جاري جدولة التنفيذ على الخادم…');
         const j = await apiPost('job/run-worker.php', {
             csrf_token: state.csrf,
             job_id: jobId,
@@ -883,12 +883,12 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         });
         if (j.csrf_token) state.csrf = j.csrf_token;
         if (!j.success) {
-            throw new Error(j.message || 'فشل تنفيذ المرحلة');
+            throw new Error(j.message || 'فشل جدولة المرحلة');
         }
         return j;
     }
 
-    /** Request metadata step then run the matching approved worker from Restore Center. */
+    /** Request metadata step then schedule the matching approved worker (detached). */
     async function requestThenRunWorker(requestPath, workerKey, jobId, busyRequest, busyRun) {
         setBusy(true, busyRequest || 'جاري التحضير…');
         const req = await apiPost(requestPath, {
@@ -899,8 +899,10 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         if (req.cli_needed === false && !String((req.job || {}).status || '').endsWith('_pending')) {
             return req;
         }
-        return runRestoreWorker(jobId, workerKey, busyRun || 'جاري التنفيذ من مركز الاسترداد…');
+        return runRestoreWorker(jobId, workerKey, busyRun || 'جاري جدولة التنفيذ على الخادم…');
     }
+
+    const RC_SCHEDULED_MSG = 'تم جدولة التنفيذ على الخادم. يمكنك إغلاق المتصفح بأمان — تابع الحالة من مركز الاسترداد.';
 
     function deriveReadiness(ov, maint) {
         const counts = (ov && ov.job_counts) || {};
@@ -1787,7 +1789,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     'جاري طلب إعداد النسخة الاحتياطية…',
                     'جاري تنفيذ النسخة الاحتياطية من مركز الاسترداد…'
                 );
-                showAlert('اكتملت مرحلة النسخة الاحتياطية الإلزامية من مركز الاسترداد.', true);
+                showAlert(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
                 showAlert(e.message || 'تعذر تنفيذ النسخة الاحتياطية', false);
@@ -1824,7 +1826,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     'جاري طلب استعادة قاعدة الظل…',
                     'جاري تنفيذ استعادة قاعدة الظل من مركز الاسترداد…'
                 );
-                showAlert('اكتملت استعادة قاعدة الظل من مركز الاسترداد (الإنتاج لم يُمس).', true);
+                showAlert(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
                 showAlert(e.message || 'تعذر تنفيذ استعادة الظل', false);
@@ -1908,7 +1910,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     'جاري طلب اختبارات الجاهزية المعزولة…',
                     'جاري تنفيذ اختبارات الجاهزية من مركز الاسترداد…'
                 );
-                showAlert('اكتملت اختبارات الجاهزية المعزولة من مركز الاسترداد.', true);
+                showAlert(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
                 showAlert(e.message || 'تعذر تنفيذ اختبارات الجاهزية', false);
@@ -2032,7 +2034,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     'جاري طلب استيراد قاعدة الإنتاج…',
                     'جاري تنفيذ استيراد قاعدة الإنتاج من مركز الاسترداد…'
                 );
-                showAlert('اكتمل استيراد قاعدة الإنتاج من مركز الاسترداد. ملفات التطبيق لم تُحوَّل بعد.', true);
+                showAlert(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
                 showAlert(e.message || 'تعذر تنفيذ استيراد الإنتاج', false);
@@ -2083,7 +2085,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     'جاري طلب تحويل ملفات الرفع…',
                     'جاري تنفيذ تحويل ملفات الرفع من مركز الاسترداد…'
                 );
-                showAlert('اكتمل تحويل ملفات الرفع من مركز الاسترداد. الصيانة ما زالت نشطة.', true);
+                showAlert(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
                 showAlert(e.message || 'تعذر تنفيذ تحويل الرفع', false);
@@ -2134,7 +2136,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     'جاري طلب التراجع الإنتاجي…',
                     'جاري تنفيذ التراجع الإنتاجي من مركز الاسترداد…'
                 );
-                showAlert('اكتمل التراجع الإنتاجي من مركز الاسترداد. الصيانة ما زالت نشطة.', true);
+                showAlert(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
                 showAlert(e.message || 'تعذر تنفيذ التراجع', false);
@@ -2185,7 +2187,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     'جاري طلب الإنهاء…',
                     'جاري تنفيذ الإنهاء / إطلاق الصيانة من مركز الاسترداد…'
                 );
-                showAlert('اكتمل الإنهاء من مركز الاسترداد.', true);
+                showAlert(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
                 showAlert(e.message || 'تعذر تنفيذ الإنهاء', false);
@@ -2203,7 +2205,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     worker,
                     'جاري تنفيذ المرحلة من مركز الاسترداد…'
                 );
-                showAlert('اكتملت المرحلة من مركز الاسترداد.', true);
+                showAlert(RC_SCHEDULED_MSG, true);
                 await loadAll();
             } catch (e) {
                 showAlert(e.message || 'تعذر تنفيذ المرحلة', false);

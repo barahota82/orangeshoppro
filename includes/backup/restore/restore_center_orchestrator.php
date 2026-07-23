@@ -3,10 +3,11 @@
 declare(strict_types=1);
 
 /**
- * Restore Center orchestration layer (Owner 2026-07-23).
+ * Restore Center orchestration layer (Owner 2026-07-24).
  *
- * Invokes already-approved restore CLI workers from Admin HTTP using the same
- * scripts/backup entrypoints operators previously ran manually.
+ * Schedules already-approved restore CLI workers from Admin HTTP.
+ * HTTP must return immediately — workers run as detached OS processes and
+ * must not depend on browser / HTTP connection lifetime.
  * Does not implement restore logic, alter gates, or rewrite workers.
  */
 
@@ -15,8 +16,7 @@ require_once __DIR__ . '/../backup_environment.php';
 require_once __DIR__ . '/restore_job_framework.php';
 require_once __DIR__ . '/restore_production_cli_policy.php';
 
-const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v1';
-const ORANGE_RESTORE_CENTER_WORKER_TIMEOUT_SECONDS = 7200;
+const ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION = '3B.4-rc-orchestrator-v2-detached';
 
 /**
  * Allowlisted Restore Center worker keys → approved repo-relative CLI scripts.
@@ -87,16 +87,72 @@ function orange_restore_center_resolve_worker_script(string $projectRoot, string
     return $realScript;
 }
 
+function orange_restore_center_worker_log_path(string $workRoot, string $jobId, string $workerKey): string
+{
+    $safeWorker = preg_replace('/[^a-z0-9_]+/i', '_', $workerKey) ?: 'worker';
+    $dir = orange_restore_fw_job_directory($workRoot, $jobId);
+
+    return $dir . DIRECTORY_SEPARATOR . 'orchestrator_' . $safeWorker . '.log';
+}
+
 /**
- * Spawn an approved restore CLI worker with --job= only (no paths/SQL/passwords).
+ * Launch CLI worker detached from the PHP HTTP request (Windows + Unix).
+ * Does not wait for completion. Does not supervise the child.
+ *
+ * @param list<string> $command Absolute php binary + script + --job=…
+ */
+function orange_restore_center_spawn_detached(array $command, string $logPath): void
+{
+    if (count($command) < 3) {
+        throw new RuntimeException('restore_center_spawn_invalid_command');
+    }
+
+    $logDir = dirname($logPath);
+    if (!is_dir($logDir) && !@mkdir($logDir, 0775, true) && !is_dir($logDir)) {
+        throw new RuntimeException('restore_center_spawn_log_dir_failed');
+    }
+
+    $phpBinary = (string) $command[0];
+    $script = (string) $command[1];
+    $jobArg = (string) $command[2];
+    if (!str_starts_with($jobArg, '--job=')) {
+        throw new RuntimeException('restore_center_spawn_job_arg_rejected');
+    }
+
+    if (PHP_OS_FAMILY === 'Windows') {
+        // start /B returns immediately; child outlives the HTTP PHP process.
+        // Empty "" title is required so the first quoted path is not treated as window title.
+        $cmdline = 'start /B "" '
+            . escapeshellarg($phpBinary) . ' '
+            . escapeshellarg($script) . ' '
+            . escapeshellarg($jobArg)
+            . ' >> ' . escapeshellarg($logPath) . ' 2>&1';
+        $handle = @popen($cmdline, 'r');
+        if (!is_resource($handle)) {
+            throw new RuntimeException('restore_center_spawn_failed');
+        }
+        pclose($handle);
+
+        return;
+    }
+
+    $cmdline = escapeshellarg($phpBinary) . ' '
+        . escapeshellarg($script) . ' '
+        . escapeshellarg($jobArg)
+        . ' >> ' . escapeshellarg($logPath) . ' 2>&1 &';
+    exec('nohup ' . $cmdline);
+}
+
+/**
+ * Schedule an approved restore CLI worker (--job= only). Returns immediately.
  *
  * @return array{
  *   ok:bool,
+ *   detached:bool,
+ *   scheduled:bool,
  *   worker:string,
  *   script:string,
- *   exit_code:int,
- *   stdout:string,
- *   stderr:string,
+ *   log_path:string,
  *   message:string
  * }
  */
@@ -121,60 +177,30 @@ function orange_restore_center_run_worker(
     $relative = orange_restore_center_assert_worker_key($workerKey);
     $script = orange_restore_center_resolve_worker_script($projectRoot, $relative);
     $phpBinary = orange_backup_admin_resolve_cli_php_binary($projectRoot);
+    $logPath = orange_restore_center_worker_log_path($workRoot, $jobId, $workerKey);
 
     orange_restore_fw_audit_append($workRoot, $jobId, [
-        'event' => 'restore_center_worker_invoke_started',
+        'event' => 'restore_center_worker_scheduled',
         'result' => 'ok',
         'worker' => $workerKey,
         'script' => $relative,
+        'detached' => true,
         'operator_username' => $operatorUsername,
         'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
     ]);
 
-    if (function_exists('set_time_limit')) {
-        @set_time_limit(ORANGE_RESTORE_CENTER_WORKER_TIMEOUT_SECONDS + 60);
-    }
-
-    $capture = orange_backup_run_command_capture(
+    orange_restore_center_spawn_detached(
         [$phpBinary, $script, '--job=' . $jobId],
-        ORANGE_RESTORE_CENTER_WORKER_TIMEOUT_SECONDS
+        $logPath
     );
-    $exitCode = (int) ($capture['exit_code'] ?? 1);
-    $stdout = (string) ($capture['stdout'] ?? '');
-    $stderr = (string) ($capture['stderr'] ?? '');
-    $ok = $exitCode === 0;
-
-    orange_restore_fw_audit_append($workRoot, $jobId, [
-        'event' => 'restore_center_worker_invoke_finished',
-        'result' => $ok ? 'ok' : 'fail',
-        'worker' => $workerKey,
-        'script' => $relative,
-        'exit_code' => $exitCode,
-        'operator_username' => $operatorUsername,
-        'orchestrator_version' => ORANGE_RESTORE_CENTER_ORCHESTRATOR_VERSION,
-    ]);
-
-    if (!$ok) {
-        $excerpt = trim($stderr !== '' ? $stderr : $stdout);
-        if ($excerpt !== '') {
-            error_log(
-                '[orange restore center orchestrator] worker=' . $workerKey
-                . ' job=' . $jobId
-                . ' exit=' . $exitCode
-                . ' ' . orange_backup_admin_sanitize_cli_excerpt($excerpt, 800)
-            );
-        }
-    }
 
     return [
-        'ok' => $ok,
+        'ok' => true,
+        'detached' => true,
+        'scheduled' => true,
         'worker' => $workerKey,
         'script' => $relative,
-        'exit_code' => $exitCode,
-        'stdout' => orange_backup_admin_sanitize_cli_excerpt($stdout, 4000),
-        'stderr' => orange_backup_admin_sanitize_cli_excerpt($stderr, 2000),
-        'message' => $ok
-            ? 'Worker completed from Restore Center.'
-            : 'Worker failed (exit ' . $exitCode . ').',
+        'log_path' => $logPath,
+        'message' => 'Worker scheduled on server. Continues independently of the browser.',
     ];
 }

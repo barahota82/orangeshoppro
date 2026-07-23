@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 /**
- * Restore Center orchestration: invoke an approved CLI worker for a job.
- * Does not rewrite restore logic — spawns existing scripts/backup workers only.
+ * Restore Center orchestration: schedule an approved CLI worker (detached).
+ * HTTP returns immediately — does not wait for the worker.
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
@@ -60,14 +60,16 @@ try {
     $fresh = orange_restore_fw_public_row(orange_restore_fw_read($workRoot, $jobId));
 
     json_response([
-        'success' => (bool) ($result['ok'] ?? false),
+        'success' => true,
         'orchestrated' => true,
+        'detached' => true,
+        'scheduled' => true,
+        'http_waits_for_worker' => false,
         'worker' => (string) ($result['worker'] ?? $worker),
-        'exit_code' => (int) ($result['exit_code'] ?? 1),
-        'message' => (string) ($result['message'] ?? ''),
+        'message' => (string) ($result['message'] ?? 'Worker scheduled.'),
         'job' => $fresh,
         'csrf_token' => orange_backup_admin_csrf_token(),
-    ], !empty($result['ok']) ? 200 : 409);
+    ]);
 } catch (Throwable $e) {
     $code = trim($e->getMessage());
     $status = 422;
@@ -78,6 +80,8 @@ try {
         'success' => false,
         'code' => $code !== '' ? $code : 'restore_center_worker_failed',
         'message' => orange_restore_admin_safe_message($e),
+        'detached' => false,
+        'http_waits_for_worker' => false,
         'csrf_token' => orange_backup_admin_csrf_token(),
     ], $status);
 }
