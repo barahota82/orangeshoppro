@@ -873,6 +873,35 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         return j;
     }
 
+    /** Invoke approved CLI worker via Restore Center orchestrator (no operator SSH/CLI). */
+    async function runRestoreWorker(jobId, workerKey, busyText) {
+        setBusy(true, busyText || 'جاري تنفيذ مرحلة الاسترداد من مركز الاسترداد…');
+        const j = await apiPost('job/run-worker.php', {
+            csrf_token: state.csrf,
+            job_id: jobId,
+            worker: workerKey
+        });
+        if (j.csrf_token) state.csrf = j.csrf_token;
+        if (!j.success) {
+            throw new Error(j.message || 'فشل تنفيذ المرحلة');
+        }
+        return j;
+    }
+
+    /** Request metadata step then run the matching approved worker from Restore Center. */
+    async function requestThenRunWorker(requestPath, workerKey, jobId, busyRequest, busyRun) {
+        setBusy(true, busyRequest || 'جاري التحضير…');
+        const req = await apiPost(requestPath, {
+            csrf_token: state.csrf,
+            job_id: jobId
+        });
+        if (req.csrf_token) state.csrf = req.csrf_token;
+        if (req.cli_needed === false && !String((req.job || {}).status || '').endsWith('_pending')) {
+            return req;
+        }
+        return runRestoreWorker(jobId, workerKey, busyRun || 'جاري التنفيذ من مركز الاسترداد…');
+    }
+
     function deriveReadiness(ov, maint) {
         const counts = (ov && ov.job_counts) || {};
         const lock = (ov && ov.restore_lock) || {};
@@ -1337,25 +1366,40 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             html += '<button type="button" class="btn-link rc-exec-contract" data-id="' + id + '">View Execution Contract</button> ';
         }
         if (job.pre_restore_backup_requestable) {
-            html += '<button type="button" class="btn-link rc-pre-backup-req" data-id="' + id + '">إعداد النسخة الاحتياطية الإلزامية قبل الاسترداد</button> ';
+            html += '<button type="button" class="btn-link rc-pre-backup-req" data-id="' + id + '">تنفيذ النسخة الاحتياطية الإلزامية قبل الاسترداد</button> ';
+        }
+        if (job.status === 'pre_restore_backup_pending') {
+            html += '<button type="button" class="btn-link rc-run-worker" data-id="' + id + '" data-worker="pre_restore_backup">متابعة النسخة الاحتياطية</button> ';
         }
         if (job.has_pre_restore_backup) {
             html += '<button type="button" class="btn-link rc-pre-backup-view" data-id="' + id + '">عرض حالة النسخة الاحتياطية</button> ';
         }
         if (job.shadow_restore_requestable) {
-            html += '<button type="button" class="btn-link rc-shadow-req" data-id="' + id + '">استعادة قاعدة الظل (Shadow DB)</button> ';
+            html += '<button type="button" class="btn-link rc-shadow-req" data-id="' + id + '">تنفيذ استعادة قاعدة الظل</button> ';
+        }
+        if (job.status === 'shadow_restore_pending') {
+            html += '<button type="button" class="btn-link rc-run-worker" data-id="' + id + '" data-worker="shadow_db">متابعة استعادة الظل</button> ';
         }
         if (job.has_shadow_restore) {
             html += '<button type="button" class="btn-link rc-shadow-view" data-id="' + id + '">عرض تقرير قاعدة الظل</button> ';
         }
+        if (job.shadow_verification_runnable) {
+            html += '<button type="button" class="btn-link rc-run-worker" data-id="' + id + '" data-worker="shadow_verify">تنفيذ تحقق قاعدة الظل</button> ';
+        }
         if (job.shadow_verification_runnable || job.has_shadow_verification) {
             html += '<button type="button" class="btn-link rc-shadow-verify-view" data-id="' + id + '">عرض تحقق الجاهزية (Shadow)</button> ';
+        }
+        if (job.shadow_files_runnable) {
+            html += '<button type="button" class="btn-link rc-run-worker" data-id="' + id + '" data-worker="shadow_files">تنفيذ استخراج ملفات الظل</button> ';
         }
         if (job.shadow_files_runnable || job.has_shadow_files) {
             html += '<button type="button" class="btn-link rc-shadow-files-view" data-id="' + id + '">عرض ملفات الظل</button> ';
         }
         if (job.shadow_smoke_requestable) {
-            html += '<button type="button" class="btn-link rc-shadow-smoke-req" data-id="' + id + '">تشغيل اختبارات الجاهزية المعزولة</button> ';
+            html += '<button type="button" class="btn-link rc-shadow-smoke-req" data-id="' + id + '">تنفيذ اختبارات الجاهزية المعزولة</button> ';
+        }
+        if (job.status === 'shadow_smoke_pending') {
+            html += '<button type="button" class="btn-link rc-run-worker" data-id="' + id + '" data-worker="shadow_smoke">متابعة اختبارات الجاهزية</button> ';
         }
         if (job.has_shadow_smoke || job.has_cutover_readiness) {
             html += '<button type="button" class="btn-link rc-shadow-smoke-view" data-id="' + id + '">عرض اختبار الجاهزية / قرار التحويل</button> ';
@@ -1373,12 +1417,16 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         if (job.is_maintenance_active) {
             html += '<span class="rc-badge rc-badge--failed">Maintenance Active</span> ';
             html += '<strong>Production restore has NOT started.</strong> ';
+            html += '<button type="button" class="btn-link rc-btn-primary rc-pca-authorize" data-id="' + id + '" data-pkg="' + (job.package_id || '') + '">تفويض تحويل الإنتاج</button> ';
         }
         if (job.is_maintenance_ready || job.is_maintenance_active || job.maintenance_requestable) {
             html += '<button type="button" class="btn-link rc-maint-state" data-id="' + id + '">حالة الصيانة</button> ';
         }
         if (job.production_import_requestable) {
-            html += '<button type="button" class="btn-link rc-prod-import-req" data-id="' + id + '">طلب استيراد قاعدة الإنتاج</button> ';
+            html += '<button type="button" class="btn-link rc-prod-import-req" data-id="' + id + '">تنفيذ استيراد قاعدة الإنتاج</button> ';
+        }
+        if (job.status === 'production_import_pending' || job.is_production_import_failed) {
+            html += '<button type="button" class="btn-link rc-run-worker" data-id="' + id + '" data-worker="production_import">متابعة استيراد الإنتاج</button> ';
         }
         if (job.has_production_import || job.is_production_import_ready || job.is_production_import_failed) {
             html += '<button type="button" class="btn-link rc-prod-import-view" data-id="' + id + '">حالة استيراد الإنتاج</button> ';
@@ -1402,7 +1450,10 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             html += '<strong class="muted">Application files have NOT been switched.</strong> ';
         }
         if (job.uploads_cutover_requestable) {
-            html += '<button type="button" class="btn-link rc-uploads-cutover-req" data-id="' + id + '">طلب تحويل ملفات الرفع</button> ';
+            html += '<button type="button" class="btn-link rc-uploads-cutover-req" data-id="' + id + '">تنفيذ تحويل ملفات الرفع</button> ';
+        }
+        if (job.status === 'uploads_cutover_pending' || job.is_uploads_cutover_failed) {
+            html += '<button type="button" class="btn-link rc-run-worker" data-id="' + id + '" data-worker="uploads_cutover">متابعة تحويل الرفع</button> ';
         }
         if (job.has_uploads_cutover || job.is_uploads_cutover_ready || job.is_uploads_cutover_failed) {
             html += '<button type="button" class="btn-link rc-uploads-cutover-view" data-id="' + id + '">حالة تحويل الرفع</button> ';
@@ -1426,7 +1477,10 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             html += '<strong class="muted">Maintenance remains active. Restore is NOT completed.</strong> ';
         }
         if (job.rollback_requestable) {
-            html += '<button type="button" class="btn-link rc-rollback-req" data-id="' + id + '">طلب التراجع الإنتاجي</button> ';
+            html += '<button type="button" class="btn-link rc-rollback-req" data-id="' + id + '">تنفيذ التراجع الإنتاجي</button> ';
+        }
+        if (job.status === 'rollback_pending' || job.is_rollback_failed) {
+            html += '<button type="button" class="btn-link rc-run-worker" data-id="' + id + '" data-worker="rollback">متابعة التراجع</button> ';
         }
         if (job.has_rollback || job.is_rollback_ready || job.is_rollback_failed) {
             html += '<button type="button" class="btn-link rc-rollback-view" data-id="' + id + '">حالة التراجع</button> ';
@@ -1450,7 +1504,10 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             html += '<strong class="muted">Maintenance remains active. Restore is NOT completed. Anchor retained.</strong> ';
         }
         if (job.finalize_requestable) {
-            html += '<button type="button" class="btn-link rc-finalize-req" data-id="' + id + '">طلب الإنهاء / إطلاق الصيانة</button> ';
+            html += '<button type="button" class="btn-link rc-finalize-req" data-id="' + id + '">تنفيذ الإنهاء / إطلاق الصيانة</button> ';
+        }
+        if (job.status === 'restore_finalizing' || job.status === 'rollback_finalizing') {
+            html += '<button type="button" class="btn-link rc-run-worker" data-id="' + id + '" data-worker="finalize">متابعة الإنهاء</button> ';
         }
         if (job.has_finalize || job.is_restore_completed || job.is_rollback_completed) {
             html += '<button type="button" class="btn-link rc-finalize-view" data-id="' + id + '">حالة الإنهاء</button> ';
@@ -1723,27 +1780,17 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 
         if (t.classList.contains('rc-pre-backup-req')) {
             try {
-                setBusy(true, 'جاري طلب إعداد النسخة الاحتياطية…');
-                const j = await apiPost('job/request-pre-restore-backup.php', {
-                    csrf_token: state.csrf,
-                    job_id: t.dataset.id || ''
-                });
-                if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert(
-                    (j.message || 'تم الطلب') + (j.cli_needed ? ' — يلزم تشغيل عامل CLI.' : ''),
-                    true
+                await requestThenRunWorker(
+                    'job/request-pre-restore-backup.php',
+                    'pre_restore_backup',
+                    t.dataset.id || '',
+                    'جاري طلب إعداد النسخة الاحتياطية…',
+                    'جاري تنفيذ النسخة الاحتياطية من مركز الاسترداد…'
                 );
-                if (j.record) {
-                    openView('النسخة الاحتياطية قبل الاسترداد — ' + (t.dataset.id || ''), JSON.stringify({
-                        record: j.record,
-                        cli_needed: !!j.cli_needed,
-                        execution_started: false,
-                        warning: j.warning || 'لن يبدأ الاسترداد قبل إنشاء نسخة Full احتياطية موثقة ومثبتة ضد الحذف.'
-                    }, null, 2));
-                }
+                showAlert('اكتملت مرحلة النسخة الاحتياطية الإلزامية من مركز الاسترداد.', true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر الطلب', false);
+                showAlert(e.message || 'تعذر تنفيذ النسخة الاحتياطية', false);
             } finally {
                 setBusy(false);
             }
@@ -1770,28 +1817,17 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 
         if (t.classList.contains('rc-shadow-req')) {
             try {
-                setBusy(true, 'جاري طلب استعادة قاعدة الظل…');
-                const j = await apiPost('job/request-shadow-restore.php', {
-                    csrf_token: state.csrf,
-                    job_id: t.dataset.id || ''
-                });
-                if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert(
-                    (j.message || 'تم الطلب') + (j.cli_needed ? ' — يلزم تشغيل عامل CLI.' : ''),
-                    true
+                await requestThenRunWorker(
+                    'job/request-shadow-restore.php',
+                    'shadow_db',
+                    t.dataset.id || '',
+                    'جاري طلب استعادة قاعدة الظل…',
+                    'جاري تنفيذ استعادة قاعدة الظل من مركز الاسترداد…'
                 );
-                if (j.meta) {
-                    openView('قاعدة الظل — ' + (t.dataset.id || ''), JSON.stringify({
-                        meta: j.meta,
-                        cli_needed: !!j.cli_needed,
-                        production_touched: false,
-                        execution_started: false,
-                        warning: j.warning || 'Shadow restore only — production database will not be modified.'
-                    }, null, 2));
-                }
+                showAlert('اكتملت استعادة قاعدة الظل من مركز الاسترداد (الإنتاج لم يُمس).', true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر الطلب', false);
+                showAlert(e.message || 'تعذر تنفيذ استعادة الظل', false);
             } finally {
                 setBusy(false);
             }
@@ -1865,29 +1901,17 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 
         if (t.classList.contains('rc-shadow-smoke-req')) {
             try {
-                setBusy(true, 'جاري طلب اختبارات الجاهزية المعزولة…');
-                const j = await apiPost('job/request-shadow-smoke.php', {
-                    csrf_token: state.csrf,
-                    job_id: t.dataset.id || ''
-                });
-                if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert(
-                    (j.message || 'تم الطلب') + (j.cli_needed ? ' — يلزم تشغيل عامل CLI.' : ''),
-                    true
+                await requestThenRunWorker(
+                    'job/request-shadow-smoke.php',
+                    'shadow_smoke',
+                    t.dataset.id || '',
+                    'جاري طلب اختبارات الجاهزية المعزولة…',
+                    'جاري تنفيذ اختبارات الجاهزية من مركز الاسترداد…'
                 );
-                if (j.meta) {
-                    openView('اختبار الجاهزية المعزولة — ' + (t.dataset.id || ''), JSON.stringify({
-                        meta: j.meta,
-                        cli_needed: !!j.cli_needed,
-                        production_touched: false,
-                        production_cutover_allowed: false,
-                        execution_started: false,
-                        warning: j.warning || 'لم يتم تعديل قاعدة الإنتاج أو ملفات الإنتاج، ولا يزال التحويل إلى الإنتاج غير مسموح.'
-                    }, null, 2));
-                }
+                showAlert('اكتملت اختبارات الجاهزية المعزولة من مركز الاسترداد.', true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر الطلب', false);
+                showAlert(e.message || 'تعذر تنفيذ اختبارات الجاهزية', false);
             } finally {
                 setBusy(false);
             }
@@ -2001,27 +2025,17 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 
         if (t.classList.contains('rc-prod-import-req')) {
             try {
-                setBusy(true, 'جاري طلب استيراد قاعدة الإنتاج…');
-                const j = await apiPost('job/request-production-import.php', {
-                    csrf_token: state.csrf,
-                    job_id: t.dataset.id || ''
-                });
-                if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert(
-                    (j.message || 'Production Import Pending')
-                    + ' — Application files have NOT been switched.'
-                    + (j.cli_command ? (' CLI: ' + j.cli_command) : ''),
-                    true
+                await requestThenRunWorker(
+                    'job/request-production-import.php',
+                    'production_import',
+                    t.dataset.id || '',
+                    'جاري طلب استيراد قاعدة الإنتاج…',
+                    'جاري تنفيذ استيراد قاعدة الإنتاج من مركز الاسترداد…'
                 );
-                if (el('rc_prod_import_status')) {
-                    el('rc_prod_import_status').innerHTML =
-                        '<div><dt>الحالة</dt><dd>' + badge('Production Import Pending') + '</dd></div>'
-                        + '<div><dt>أعلى نقطة تحقق</dt><dd class="rc-stage-idle">No activity</dd></div>'
-                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || 'No activity') + '</code></dd></div>';
-                }
+                showAlert('اكتمل استيراد قاعدة الإنتاج من مركز الاسترداد. ملفات التطبيق لم تُحوَّل بعد.', true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر طلب استيراد الإنتاج', false);
+                showAlert(e.message || 'تعذر تنفيذ استيراد الإنتاج', false);
             } finally {
                 setBusy(false);
             }
@@ -2036,7 +2050,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     el('rc_prod_import_status').innerHTML =
                         '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || 'Waiting') + '</dd></div>'
                         + '<div><dt>أعلى نقطة تحقق</dt><dd>' + (j.highest_checkpoint || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>'
-                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>';
+                        + '<div><dt>التنفيذ</dt><dd>من مركز الاسترداد</dd></div>';
                 }
                 openView('Production Import — ' + (t.dataset.id || ''), JSON.stringify({
                     status_label: j.status_label || '',
@@ -2062,27 +2076,17 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 
         if (t.classList.contains('rc-uploads-cutover-req')) {
             try {
-                setBusy(true, 'جاري طلب تحويل ملفات الرفع…');
-                const j = await apiPost('job/request-uploads-cutover.php', {
-                    csrf_token: state.csrf,
-                    job_id: t.dataset.id || ''
-                });
-                if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert(
-                    (j.message || 'Uploads Cutover Pending')
-                    + ' — Maintenance remains active. Restore is NOT completed.'
-                    + (j.cli_command ? (' CLI: ' + j.cli_command) : ''),
-                    true
+                await requestThenRunWorker(
+                    'job/request-uploads-cutover.php',
+                    'uploads_cutover',
+                    t.dataset.id || '',
+                    'جاري طلب تحويل ملفات الرفع…',
+                    'جاري تنفيذ تحويل ملفات الرفع من مركز الاسترداد…'
                 );
-                if (el('rc_uploads_cutover_status')) {
-                    el('rc_uploads_cutover_status').innerHTML =
-                        '<div><dt>الحالة</dt><dd>' + badge('Uploads Cutover Pending') + '</dd></div>'
-                        + '<div><dt>أعلى نقطة تحقق</dt><dd class="rc-stage-idle">No activity</dd></div>'
-                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || 'No activity') + '</code></dd></div>';
-                }
+                showAlert('اكتمل تحويل ملفات الرفع من مركز الاسترداد. الصيانة ما زالت نشطة.', true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر طلب تحويل الرفع', false);
+                showAlert(e.message || 'تعذر تنفيذ تحويل الرفع', false);
             } finally {
                 setBusy(false);
             }
@@ -2097,7 +2101,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     el('rc_uploads_cutover_status').innerHTML =
                         '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || 'Waiting') + '</dd></div>'
                         + '<div><dt>أعلى نقطة تحقق</dt><dd>' + (j.highest_checkpoint || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>'
-                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>';
+                        + '<div><dt>التنفيذ</dt><dd>من مركز الاسترداد</dd></div>';
                 }
                 openView('Uploads Cutover — ' + (t.dataset.id || ''), JSON.stringify({
                     status_label: j.status_label || '',
@@ -2123,27 +2127,17 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 
         if (t.classList.contains('rc-rollback-req')) {
             try {
-                setBusy(true, 'جاري طلب التراجع الإنتاجي…');
-                const j = await apiPost('job/request-rollback.php', {
-                    csrf_token: state.csrf,
-                    job_id: t.dataset.id || ''
-                });
-                if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert(
-                    (j.message || 'Rollback Pending')
-                    + ' — Maintenance remains active. Restore is NOT completed. Anchor retained.'
-                    + (j.cli_command ? (' CLI: ' + j.cli_command) : ''),
-                    true
+                await requestThenRunWorker(
+                    'job/request-rollback.php',
+                    'rollback',
+                    t.dataset.id || '',
+                    'جاري طلب التراجع الإنتاجي…',
+                    'جاري تنفيذ التراجع الإنتاجي من مركز الاسترداد…'
                 );
-                if (el('rc_rollback_status')) {
-                    el('rc_rollback_status').innerHTML =
-                        '<div><dt>الحالة</dt><dd>' + badge('Rollback Pending') + '</dd></div>'
-                        + '<div><dt>أعلى نقطة تحقق</dt><dd class="rc-stage-idle">No activity</dd></div>'
-                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || 'No activity') + '</code></dd></div>';
-                }
+                showAlert('اكتمل التراجع الإنتاجي من مركز الاسترداد. الصيانة ما زالت نشطة.', true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر طلب التراجع', false);
+                showAlert(e.message || 'تعذر تنفيذ التراجع', false);
             } finally {
                 setBusy(false);
             }
@@ -2158,7 +2152,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     el('rc_rollback_status').innerHTML =
                         '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || 'Waiting') + '</dd></div>'
                         + '<div><dt>أعلى نقطة تحقق</dt><dd>' + (j.highest_checkpoint || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>'
-                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>';
+                        + '<div><dt>التنفيذ</dt><dd>من مركز الاسترداد</dd></div>';
                 }
                 openView('Rollback — ' + (t.dataset.id || ''), JSON.stringify({
                     status_label: j.status_label || '',
@@ -2184,26 +2178,81 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 
         if (t.classList.contains('rc-finalize-req')) {
             try {
-                setBusy(true, 'جاري طلب الإنهاء…');
-                const j = await apiPost('job/request-finalize.php', {
+                await requestThenRunWorker(
+                    'job/request-finalize.php',
+                    'finalize',
+                    t.dataset.id || '',
+                    'جاري طلب الإنهاء…',
+                    'جاري تنفيذ الإنهاء / إطلاق الصيانة من مركز الاسترداد…'
+                );
+                showAlert('اكتمل الإنهاء من مركز الاسترداد.', true);
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر تنفيذ الإنهاء', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-run-worker')) {
+            try {
+                const worker = t.dataset.worker || '';
+                await runRestoreWorker(
+                    t.dataset.id || '',
+                    worker,
+                    'جاري تنفيذ المرحلة من مركز الاسترداد…'
+                );
+                showAlert('اكتملت المرحلة من مركز الاسترداد.', true);
+                await loadAll();
+            } catch (e) {
+                showAlert(e.message || 'تعذر تنفيذ المرحلة', false);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
+        if (t.classList.contains('rc-pca-authorize')) {
+            try {
+                setBusy(true, 'جاري تجهيز تفويض تحويل الإنتاج…');
+                const ch = await apiPost('job/create-cutover-authorization-challenge.php', {
                     csrf_token: state.csrf,
                     job_id: t.dataset.id || ''
                 });
-                if (j.csrf_token) state.csrf = j.csrf_token;
-                showAlert(
-                    (j.message || 'Finalize Pending')
-                    + (j.cli_command ? (' CLI: ' + j.cli_command) : ''),
-                    true
+                if (ch.csrf_token) state.csrf = ch.csrf_token;
+                const challenge = ch.challenge || {};
+                const phrase = challenge.required_confirmation_phrase || '';
+                const typed = window.prompt(
+                    'تفويض تحويل الإنتاج — أعد كتابة العبارة بالضبط.\n\nالعبارة:\n' + phrase + '\n\nالصق العبارة هنا:',
+                    ''
                 );
-                if (el('rc_finalize_status')) {
-                    el('rc_finalize_status').innerHTML =
-                        '<div><dt>الحالة</dt><dd>' + badge('Finalizing') + '</dd></div>'
-                        + '<div><dt>الصيانة</dt><dd>pending release</dd></div>'
-                        + '<div><dt>CLI</dt><dd><code>' + (j.cli_command || 'No activity') + '</code></dd></div>';
+                if (typed === null) return;
+                const password = window.prompt('كلمة مرور إعادة التحقق (مطلوبة):', '');
+                if (password === null || password === '') {
+                    showAlert('recent_authentication_not_available', false);
+                    return;
                 }
+                const reason = window.prompt('سبب التفويض (8 أحرف على الأقل):', '');
+                if (reason === null || String(reason).trim().length < 8) {
+                    showAlert('authorization_reason_required', false);
+                    return;
+                }
+                setBusy(true, 'جاري اعتماد تفويض تحويل الإنتاج…');
+                const j = await apiPost('job/finalize-cutover-authorization.php', {
+                    csrf_token: state.csrf,
+                    job_id: t.dataset.id || '',
+                    package_id: t.dataset.pkg || challenge.package_id || '',
+                    confirmation_phrase: typed,
+                    nonce: challenge.nonce || '',
+                    password: password,
+                    authorization_reason: reason
+                });
+                if (j.csrf_token) state.csrf = j.csrf_token;
+                showAlert('تم تفويض تحويل الإنتاج. يمكن الآن تنفيذ استيراد قاعدة الإنتاج من مركز الاسترداد.', true);
                 await loadAll();
             } catch (e) {
-                showAlert(e.message || 'تعذر طلب الإنهاء', false);
+                showAlert(e.message || 'تعذر تفويض تحويل الإنتاج', false);
             } finally {
                 setBusy(false);
             }
@@ -2218,7 +2267,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                     el('rc_finalize_status').innerHTML =
                         '<div><dt>الحالة</dt><dd>' + badge(j.status_label || ((j.job || {}).status) || 'Waiting') + '</dd></div>'
                         + '<div><dt>الصيانة</dt><dd>' + (j.maintenance_released ? 'Maintenance Released' : 'active') + '</dd></div>'
-                        + '<div><dt>CLI</dt><dd>' + (((j.meta || {}).cli_command) || '<span class="rc-stage-idle">No activity</span>') + '</dd></div>';
+                        + '<div><dt>التنفيذ</dt><dd>من مركز الاسترداد</dd></div>';
                 }
                 openView('Finalize — ' + (t.dataset.id || ''), JSON.stringify({
                     status_label: j.status_label || '',

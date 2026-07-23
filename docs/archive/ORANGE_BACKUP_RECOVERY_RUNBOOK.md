@@ -770,6 +770,8 @@ UI may hide tabs/actions by permission; every API enforces `backup_view` / `back
 
 **Owner Approved — final UI refinements (Owner 2026-07-23 — UI only):** Accordion open/close is **chevron only**. Package summary row = decision only (time / status / eligibility / **إنشاء مهمة استرداد** when eligible) — **no** Package Information on summary. Expanded body = sole **معلومات الحزمة** entry + **أدوات تشغيلية** (Manifest/Health/DRV/Verify/Dry). Execution idle labels use Waiting / No activity. Package ID de-emphasized vs operator time. Package header sticky; only details body scrolls. One package expanded at a time unchanged. Restore Center considered Owner Approved after these refinements.
 
+**Owner Architecture — Restore Center self-contained orchestration (Owner 2026-07-23):** Restore Center is the **only** operational interface for restore. Operators must **not** use SSH/terminal/manual CLI. Existing approved workers remain the executors; Restore Center orchestrates them via `admin/api/restore/job/run-worker.php` + `includes/backup/restore/restore_center_orchestrator.php` (allowlisted `scripts/backup/*` spawn with `--job=` only — same pattern as Backup Center full-run). Production Cutover Authorization is exposed in the UI using existing APIs (`create-cutover-authorization-challenge.php` / `finalize-cutover-authorization.php`). **No** restore engine / gate / transition / worker script rewrites.
+
 ### Permissions (server-side enforced on every API)
 
 | Key | Purpose |
