@@ -235,6 +235,49 @@ if ($backend === null && !empty($envReport['pdo_fallback_ready'])) {
     self_test(!empty($envReport['can_run_full_backup']), 'php_pdo backend enables can_run_full_backup');
 }
 
+// Owner 2026-07-23: NEW package IDs use UTC only (not PHP default TZ / OS wall clock).
+$savedTz = date_default_timezone_get();
+date_default_timezone_set('Pacific/Kiritimati'); // UTC+14 — diverges from UTC wall clock
+$utcBefore = gmdate('Y-m-d_His');
+$fullId = orange_backup_snapshot_name();
+$utcAfter = gmdate('Y-m-d_His');
+$localWall = date('Y-m-d_His');
+self_test(
+    preg_match('/^\d{4}-\d{2}-\d{2}_\d{6}$/', $fullId) === 1,
+    'full package id format Y-m-d_His'
+);
+self_test(
+    $fullId === $utcBefore || $fullId === $utcAfter,
+    'full package id matches UTC gmdate'
+);
+self_test(
+    $fullId !== $localWall,
+    'full package id ignores PHP default timezone wall clock'
+);
+date_default_timezone_set($savedTz);
+
+$countryExportSrc = (string) file_get_contents(
+    $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'country_export.php'
+);
+self_test(
+    str_contains($countryExportSrc, "\$timestamp = gmdate('Y-m-d_His')"),
+    'country package id timestamp uses gmdate UTC'
+);
+self_test(
+    !preg_match("/\\\$timestamp\\s*=\\s*date\\('Y-m-d_His'\\)/", $countryExportSrc),
+    'country package id timestamp does not use date() wall clock'
+);
+
+$psSrc = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'orange_backup.ps1');
+self_test(
+    str_contains($psSrc, "[DateTime]::UtcNow.ToString('yyyy-MM-dd_HHmmss')"),
+    'PowerShell full package id uses UtcNow'
+);
+self_test(
+    !preg_match('/function Get-SnapshotFolderName\s*\{\s*return \(Get-Date -Format/', $psSrc),
+    'PowerShell full package id does not use Get-Date local'
+);
+
 // Lock prevents concurrent backup (same process pid marked active)
 $lockRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_bak_lock_' . bin2hex(random_bytes(4));
 mkdir($lockRoot);

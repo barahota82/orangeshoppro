@@ -246,9 +246,14 @@ function orange_backup_run_mysqldump(string $mysqldumpPath, string $defaultsFile
     }
 }
 
+/**
+ * Canonical Full Backup package folder id (NEW packages only).
+ * Owner 2026-07-23: UTC only — never PHP default TZ / OS / Country Context.
+ * Format unchanged: Y-m-d_His. Historical local-named packages remain valid.
+ */
 function orange_backup_snapshot_name(): string
 {
-    return date('Y-m-d_His');
+    return gmdate('Y-m-d_His');
 }
 
 function orange_backup_apply_retention(

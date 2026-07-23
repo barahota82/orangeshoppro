@@ -53,7 +53,9 @@ function orange_country_export_run(PDO $pdo, array $options): array
 
     $country = orange_country_export_load_country($pdo, $countryId);
     $countryCode = $country['code'] !== '' ? $country['code'] : ('c' . $countryId);
-    $timestamp = date('Y-m-d_His');
+    // Owner 2026-07-23: package id time segment is UTC only (canonical identity).
+    // Do not use PHP default TZ, Country Context, or countries.timezone here.
+    $timestamp = gmdate('Y-m-d_His');
     $finalDir = $outputOverride !== ''
         ? $outputOverride
         : $backupRoot . DIRECTORY_SEPARATOR . 'country_packages' . DIRECTORY_SEPARATOR . $countryCode . DIRECTORY_SEPARATOR . $timestamp;

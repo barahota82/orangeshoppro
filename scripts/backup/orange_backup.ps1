@@ -456,7 +456,9 @@ function Get-GitCommitHash {
 }
 
 function Get-SnapshotFolderName {
-    return (Get-Date -Format 'yyyy-MM-dd_HHmmss')
+    # Owner 2026-07-23: UTC only for Full Backup package id (canonical identity).
+    # Do not use Windows OS local timezone. Format unchanged for discovery/restore.
+    return ([DateTime]::UtcNow.ToString('yyyy-MM-dd_HHmmss'))
 }
 
 function Invoke-RetentionCleanup {
