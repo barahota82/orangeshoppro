@@ -216,12 +216,12 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 
     <div id="bc_sec_history" class="bc-sec-panel">
         <section class="bc-section bc-panel">
-            <div class="bc-panel-head">
-                <h3 class="bc-panel-title" style="margin:0" id="bc_list_heading">آخر العمليات</h3>
+            <div class="bc-panel-head" style="margin-bottom:10px">
                 <div class="bc-seg" role="tablist" aria-label="نوع النسخ الاحتياطي">
-                    <button type="button" class="bc-tab is-active" role="tab" id="bc_tab_full_btn" aria-controls="bc_tab_full" aria-selected="true" data-bc-tab="full">Full Backup</button>
-                    <button type="button" class="bc-tab" role="tab" id="bc_tab_country_btn" aria-controls="bc_tab_country" aria-selected="false" data-bc-tab="country">Country Backup</button>
+                    <button type="button" class="bc-tab is-active" role="tab" id="bc_tab_full_btn" aria-controls="bc_tab_full" aria-selected="true" data-bc-tab="full">النسخة الكاملة</button>
+                    <button type="button" class="bc-tab" role="tab" id="bc_tab_country_btn" aria-controls="bc_tab_country" aria-selected="false" data-bc-tab="country">نسخة الدولة</button>
                 </div>
+                <span id="bc_pkg_mode_pill" class="bc-mode-pill is-active">آخر العمليات (5)</span>
             </div>
 
             <div id="bc_tab_full" class="bc-tab-panel is-active" role="tabpanel" aria-labelledby="bc_tab_full_btn">
@@ -231,9 +231,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                     <div><dt>Schema</dt><dd>…</dd></div>
                     <div><dt>DRV Score</dt><dd>…</dd></div>
                 </dl>
-                <div class="bc-panel-head" style="margin-bottom:8px">
-                    <span id="bc_full_mode_pill" class="bc-mode-pill is-active">آخر العمليات (5)</span>
-                </div>
                 <!-- Single list: content swaps between latest-5 and full history (no dual DOM). -->
                 <div id="bc_full_list" class="bc-acc-list" data-bc-mode="recent"></div>
                 <div class="bc-history-footer">
@@ -244,14 +241,12 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             </div>
 
             <div id="bc_tab_country" class="bc-tab-panel" role="tabpanel" aria-labelledby="bc_tab_country_btn" hidden>
+                <p class="bc-tz-label" style="margin:0 0 10px;">سياق الدولة: <code dir="ltr"><?php echo htmlspecialchars($countryContextCode !== '' ? $countryContextCode : '—', ENT_QUOTES, 'UTF-8'); ?></code></p>
                 <dl id="bc_country_discovery" class="bc-status-strip" aria-hidden="true">
                     <div><dt>دول قابلة للاسترداد (عام)</dt><dd>…</dd></div>
                     <div><dt>آخر حزمة للدولة الحالية</dt><dd>…</dd></div>
                     <div><dt>حزم الدولة الحالية</dt><dd>…</dd></div>
                 </dl>
-                <div class="bc-panel-head" style="margin-bottom:8px">
-                    <span id="bc_country_mode_pill" class="bc-mode-pill is-active">آخر العمليات (5)</span>
-                </div>
                 <!-- Single list: content swaps between latest-5 and full history (no dual DOM). -->
                 <div id="bc_country_list" class="bc-acc-list" data-bc-mode="recent"></div>
                 <div class="bc-history-footer">
@@ -1020,6 +1015,22 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         }).join('');
     }
 
+    function activeBackupKind() {
+        const countryBtn = el('bc_tab_country_btn');
+        return (countryBtn && countryBtn.classList.contains('is-active')) ? 'country' : 'full';
+    }
+
+    function updatePkgModePill(kind) {
+        const pill = el('bc_pkg_mode_pill');
+        if (!pill || activeBackupKind() !== kind) return;
+        const isArchive = !!state.archiveMode[kind];
+        const source = kind === 'country' ? state.country : state.full;
+        pill.textContent = isArchive
+            ? ('السجل الكامل (' + source.length + ')')
+            : ('آخر العمليات (' + Math.min(RECENT_LIMIT, source.length) + ')');
+        pill.classList.add('is-active');
+    }
+
     /** Render the active mode into the single list card (latest 5 OR full history). */
     function renderActiveBackupList(kind) {
         const isArchive = !!state.archiveMode[kind];
@@ -1031,11 +1042,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             el('bc_full_list_hint').textContent = isArchive
                 ? ('السجل الكامل: ' + source.length)
                 : ('آخر ' + Math.min(RECENT_LIMIT, source.length) + ' عمليات');
-            const pill = el('bc_full_mode_pill');
-            if (pill) {
-                pill.textContent = isArchive ? ('السجل الكامل (' + source.length + ')') : ('آخر العمليات (' + Math.min(RECENT_LIMIT, source.length) + ')');
-                pill.classList.toggle('is-active', true);
-            }
             const listEl = el('bc_full_list');
             if (listEl) listEl.setAttribute('data-bc-mode', isArchive ? 'archive' : 'recent');
         } else {
@@ -1046,19 +1052,10 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             el('bc_country_list_hint').textContent = isArchive
                 ? ('السجل الكامل للدولة الحالية: ' + source.length)
                 : ('آخر ' + Math.min(RECENT_LIMIT, source.length) + ' عمليات');
-            const pill = el('bc_country_mode_pill');
-            if (pill) {
-                pill.textContent = isArchive ? ('السجل الكامل (' + source.length + ')') : ('آخر العمليات (' + Math.min(RECENT_LIMIT, source.length) + ')');
-                pill.classList.toggle('is-active', true);
-            }
             const listEl = el('bc_country_list');
             if (listEl) listEl.setAttribute('data-bc-mode', isArchive ? 'archive' : 'recent');
         }
-        const heading = el('bc_list_heading');
-        if (heading) {
-            const anyArchive = state.archiveMode.full || state.archiveMode.country;
-            heading.textContent = anyArchive ? 'السجل الكامل / Full History' : 'آخر العمليات';
-        }
+        updatePkgModePill(kind);
     }
 
     function setArchiveMode(kind, on) {
@@ -1354,6 +1351,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         countryPanel.classList.toggle('is-active', !isFull);
         fullPanel.hidden = !isFull;
         countryPanel.hidden = isFull;
+        updatePkgModePill(isFull ? 'full' : 'country');
         document.querySelectorAll('.bc-acc-item[open]').forEach((d) => { d.open = false; });
     }
 
