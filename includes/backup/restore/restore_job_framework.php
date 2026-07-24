@@ -166,15 +166,65 @@ function orange_restore_fw_active_statuses(): array
 }
 
 /**
+ * Statuses where job cancel is forbidden (Owner 2026-07-24).
+ * Boundary = first production-mutating / irreversible stage and everything after,
+ * plus already-terminal outcomes. Pre-production stages remain cancellable.
+ *
+ * @return list<string>
+ */
+function orange_restore_fw_non_cancellable_statuses(): array
+{
+    return [
+        // Production mutation begins at maintenance request / activation and continues through cutover/rollback/finalize.
+        ORANGE_RESTORE_FW_STATUS_MAINTENANCE_REQUESTED,
+        ORANGE_RESTORE_FW_STATUS_MAINTENANCE_VALIDATING,
+        ORANGE_RESTORE_FW_STATUS_MAINTENANCE_ACTIVE,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_PENDING,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_VERIFYING,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_READY,
+        ORANGE_RESTORE_FW_STATUS_PRODUCTION_IMPORT_FAILED,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_PENDING,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_VERIFYING,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_READY,
+        ORANGE_RESTORE_FW_STATUS_UPLOADS_CUTOVER_FAILED,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_PENDING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_DATABASE_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_DATABASE_VERIFYING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_RUNNING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_FILES_VERIFYING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_READY,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_FAILED,
+        ORANGE_RESTORE_FW_STATUS_RESTORE_FINALIZING,
+        ORANGE_RESTORE_FW_STATUS_RESTORE_COMPLETED,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_FINALIZING,
+        ORANGE_RESTORE_FW_STATUS_ROLLBACK_COMPLETED,
+        // Terminal / finished outcomes — not cancelable again.
+        ORANGE_RESTORE_FW_STATUS_EXECUTION_COMPLETED,
+        ORANGE_RESTORE_FW_STATUS_CANCELLED,
+        ORANGE_RESTORE_FW_STATUS_FAILED,
+        ORANGE_RESTORE_FW_STATUS_COMPLETED,
+    ];
+}
+
+/**
+ * Authoritative cancellable statuses: every allowed status before production mutation.
+ * UI must use job.cancellable from orange_restore_fw_public_row() — do not hardcode a parallel list.
+ *
  * @return list<string>
  */
 function orange_restore_fw_cancellable_statuses(): array
 {
-    return [
-        ORANGE_RESTORE_FW_STATUS_QUEUED,
-        ORANGE_RESTORE_FW_STATUS_PREPARING,
-        ORANGE_RESTORE_FW_STATUS_WAITING_CONFIRMATION,
-    ];
+    $blocked = array_fill_keys(orange_restore_fw_non_cancellable_statuses(), true);
+    $out = [];
+    foreach (orange_restore_fw_allowed_statuses() as $status) {
+        if (!isset($blocked[$status])) {
+            $out[] = $status;
+        }
+    }
+
+    return $out;
 }
 
 /**

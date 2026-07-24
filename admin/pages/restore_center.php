@@ -239,7 +239,7 @@ body.rc-modal-open{overflow:hidden!important}
     <header class="rc-header">
         <div class="rc-header-main">
             <p class="rc-header-kicker">معالج استرداد أورنج</p>
-            <p class="rc-header-sub">رحلة استرداد خطوة بخطوة. خطوة واحدة نشطة فقط — النظام يحدّد الزر التالي. لا تتصفّح الصفحة بحثاً عن إجراء.</p>
+            <p class="rc-header-sub">رحلة استرداد خطوة بخطوة.</p>
             <p class="rc-tz-label" id="rc_tz_label"><?php
             if ($displayTimezone !== '') {
                 echo 'التواريخ بالتوقيت المحلي (12 ساعة): <code dir="ltr">'
@@ -1824,8 +1824,9 @@ body.rc-modal-open{overflow:hidden!important}
             }
         }
         if (el('rc_guide_primary')) el('rc_guide_primary').innerHTML = g.primaryHtml || '';
-        // Cancel LEFT on same workflow-card action row — only while framework job.cancellable (Owner 2026-07-24).
-        // Reuses existing rc-fw-cancel → confirm → job/cancel.php. Never in header/rail/details/menus.
+        // Cancel LEFT on same workflow-card action row — visibility from framework job.cancellable only
+        // (orange_restore_fw_cancellable_statuses / pre-production boundary). No UI status allowlist.
+        // Reuses existing rc-fw-cancel → confirm → job/cancel.php.
         if (el('rc_guide_cancel')) {
             const canCancel = !!(job && job.cancellable && String(job.job_id || '').trim() !== '');
             el('rc_guide_cancel').innerHTML = canCancel
