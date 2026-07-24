@@ -165,7 +165,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     <header class="bc-header">
         <div class="bc-header-main">
             <p class="bc-header-kicker">مركز النسخ الاحتياطي</p>
-            <p class="bc-header-sub">لوحة تشغيل موحّدة لصحة النسخ الاحتياطي، الحماية، والتخزين — للمشرف الأعلى.</p>
             <p class="bc-tz-label" id="bc_tz_label"><?php
             if ($displayTimezone !== '') {
                 echo 'جميع التواريخ تُعرض بالتوقيت المحلي للدولة المحددة (12 ساعة AM/PM): <code dir="ltr">'
