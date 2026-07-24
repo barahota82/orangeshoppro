@@ -192,7 +192,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     <section class="bc-section" aria-label="نظرة تشغيلية">
         <div id="bc_overview" class="bc-overview" aria-live="polite">
             <article class="bc-op-card">
-                <h3>صحة النسخ</h3>
+                <h3>صحة النسخ الاحتياطية</h3>
                 <div class="bc-op-rows"><div class="bc-op-row"><dt>جاري التحميل…</dt><dd>—</dd></div></div>
             </article>
         </div>
@@ -848,7 +848,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             : badge(ov.backup_root_status);
 
         el('bc_overview').innerHTML =
-            '<article class="bc-op-card"><h3>صحة النسخ</h3><div class="bc-op-rows">' +
+            '<article class="bc-op-card"><h3>صحة النسخ الاحتياطية</h3><div class="bc-op-rows">' +
                 rowHtml('الحالة العامة', overallCardBadge, true) +
                 rowHtml('Backup Root (writable؟)', badge(ov.backup_root_status || (h.readable ? 'ok' : '—')), true) +
                 rowHtml('موجود / قراءة / كتابة',
