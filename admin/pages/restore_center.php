@@ -98,15 +98,14 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 .rc-acc-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1;min-width:0}
 .rc-acc-actions-inline{display:flex;align-items:center;gap:8px;margin-inline-start:auto}
 .rc-acc-body{padding:10px 14px 12px;border-top:1px solid #f1f5f9}
-/* Package accordion: header fixed in card; only body scrolls; sticky if page scrolls */
-.rc-acc-item[data-rc-acc="pkg"]{overflow:visible}
-.rc-acc-item[data-rc-acc="pkg"][open]{display:flex;flex-direction:column;max-height:min(340px,58vh)}
-.rc-acc-item[data-rc-acc="pkg"]>summary{position:sticky;top:0;z-index:3;flex:0 0 auto;background:var(--rc-surface);border-radius:12px;box-shadow:0 1px 0 #f1f5f9}
-.rc-acc-item[data-rc-acc="pkg"][open]>summary{border-radius:12px 12px 0 0}
-.rc-acc-item[data-rc-acc="pkg"][open]>.rc-acc-body{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-.rc-acc-item[data-rc-acc="pkg"]:not([open])>.rc-acc-body{display:none}
+/* Expandable panels — identical model to Backup Center: capped panel + sticky summary */
+.rc-acc-item[open]{max-height:min(420px,58vh);overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.rc-acc-item[open]>summary{position:sticky;top:0;z-index:3;background:var(--rc-surface);box-shadow:0 1px 0 #f1f5f9}
 .rc-acc-item[data-rc-acc="pkg"] .rc-acc-chevron{cursor:pointer;padding:4px;margin:-4px;border-radius:6px}
 .rc-acc-item[data-rc-acc="pkg"] .rc-acc-chevron:hover{color:var(--rc-ink);background:#f1f5f9}
+/* Legacy reference block: same sticky collapse control */
+.rc-legacy-ref[open]{max-height:min(420px,58vh);overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.rc-legacy-ref[open]>summary{position:sticky;top:0;z-index:3;background:var(--rc-soft,#f8fafc);box-shadow:0 1px 0 #e2e8f0}
 .rc-pkg-id{font-family:ui-monospace,Consolas,monospace;font-size:.72rem;font-weight:500;color:#94a3b8;direction:ltr;unicode-bidi:isolate}
 .rc-action-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .rc-action-row .rc-btn-ghost,.rc-action-row .btn-link{flex:0 0 auto}
@@ -164,29 +163,45 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 #rc_refresh_btn{background:#fff;color:#334155!important;border:1px solid #cbd5e1}
 #rc_refresh_btn:hover{background:#f8fafc;border-color:#94a3b8}
 #rc_view_close,#rc_detail_close,#rc_orch_diag_close{background:#475569;color:#fff!important}
-/* Guided operator workflow (Owner 2026-07-24) — presentation only */
-.rc-guide{display:grid;grid-template-columns:minmax(220px,280px) minmax(0,1fr);gap:14px;margin-bottom:14px}
-@media (max-width:960px){.rc-guide{grid-template-columns:1fr}}
-.rc-guide-rail{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:12px;padding:12px;max-height:min(70vh,640px);overflow:auto}
-.rc-guide-rail h3{margin:0 0 10px;font-size:.9rem}
-.rc-guide-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
-.rc-guide-step{display:flex;gap:8px;align-items:flex-start;padding:8px 8px;border-radius:8px;border:1px solid transparent;font-size:.82rem;line-height:1.35}
+/* True step-by-step restore wizard (Owner 2026-07-24) — presentation only */
+.rc-wizard{display:grid;grid-template-columns:minmax(240px,300px) minmax(0,1fr);gap:16px;margin-bottom:8px}
+@media (max-width:960px){.rc-wizard{grid-template-columns:1fr}}
+.rc-wizard-rail{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:14px;padding:14px;max-height:min(78vh,720px);overflow:auto}
+.rc-wizard-rail h3{margin:0 0 4px;font-size:1rem}
+.rc-wizard-rail-hint{margin:0 0 12px;font-size:.78rem;color:var(--rc-muted);line-height:1.4}
+.rc-guide-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;position:relative}
+.rc-guide-steps::before{content:'';position:absolute;top:12px;bottom:12px;inset-inline-start:17px;width:2px;background:#e2e8f0;z-index:0}
+.rc-guide-step{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:10px;border:1px solid transparent;font-size:.82rem;line-height:1.35;position:relative;z-index:1;background:var(--rc-surface)}
 .rc-guide-step.is-done{color:var(--rc-ok);background:#ecfdf5;border-color:#a7f3d0}
-.rc-guide-step.is-current{color:var(--rc-ink);background:#fff7ed;border-color:#fdba74;font-weight:700}
-.rc-guide-step.is-locked{color:#94a3b8;background:var(--rc-soft)}
+.rc-guide-step.is-current{color:var(--rc-ink);background:#fff7ed;border-color:#fdba74;font-weight:700;box-shadow:0 0 0 1px rgba(234,88,12,.12)}
+.rc-guide-step.is-locked{color:#94a3b8;background:#f8fafc}
 .rc-guide-step.is-blocked{color:var(--rc-bad);background:#fef2f2;border-color:#fecaca}
-.rc-guide-mark{flex:0 0 1.4rem;font-weight:700;text-align:center}
-.rc-guide-main{min-width:0}
-.rc-guide-now{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:12px;padding:14px 16px;margin-bottom:12px}
-.rc-guide-now-kicker{margin:0 0 4px;font-size:.78rem;color:var(--rc-muted);font-weight:650}
-.rc-guide-now-title{margin:0 0 8px;font-size:1.15rem;font-weight:750;color:var(--rc-ink)}
-.rc-guide-now-body{margin:0 0 12px;font-size:.9rem;color:#334155;line-height:1.55}
-.rc-guide-now-block{margin:0 0 12px;padding:10px 12px;border-radius:8px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:.86rem;line-height:1.5}
+.rc-guide-mark{flex:0 0 1.5rem;width:1.5rem;height:1.5rem;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:.78rem;background:#fff;border:1px solid currentColor}
+.rc-wizard-main{min-width:0;display:flex;flex-direction:column;gap:12px}
+.rc-wizard-hero{background:linear-gradient(180deg,#fff 0%,#fffaf5 100%);border:2px solid #fdba74;border-radius:16px;padding:18px 20px;box-shadow:0 10px 28px rgba(15,23,42,.06)}
+.rc-wizard-stepnum{display:inline-flex;align-items:center;gap:8px;margin:0 0 10px;padding:4px 10px;border-radius:999px;background:#fff7ed;border:1px solid #fed7aa;font-size:.78rem;font-weight:700;color:#c2410c}
+.rc-guide-now-kicker{margin:0 0 4px;font-size:.8rem;color:var(--rc-muted);font-weight:700;letter-spacing:.02em}
+.rc-guide-now-title{margin:0 0 10px;font-size:1.35rem;font-weight:800;color:var(--rc-ink);line-height:1.3}
+.rc-guide-now-body{margin:0 0 14px;font-size:.95rem;color:#334155;line-height:1.6;max-width:40rem}
+.rc-guide-now-block{margin:0 0 14px;padding:12px 14px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:.9rem;line-height:1.55}
 .rc-guide-primary{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.rc-guide-primary .rc-btn-primary,.rc-guide-primary .btn-link.rc-btn-primary{font-size:.95rem;min-height:40px;padding:8px 18px}
-.rc-guide-secondary{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
-.rc-guide-workspace{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:12px;padding:12px 14px}
+.rc-guide-primary .rc-btn-primary,.rc-guide-primary .btn-link.rc-btn-primary{font-size:1rem;min-height:44px;padding:10px 22px}
+.rc-guide-primary .rc-btn-primary:only-child,.rc-guide-primary .btn-link.rc-btn-primary:only-child{min-width:min(100%,280px)}
+.rc-wizard-more{margin-top:12px;border-top:1px dashed #e2e8f0;padding-top:8px}
+.rc-wizard-more>summary{cursor:pointer;font-size:.8rem;color:var(--rc-muted);font-weight:650;list-style:none}
+.rc-wizard-more>summary::-webkit-details-marker{display:none}
+.rc-guide-secondary{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}
+.rc-guide-workspace{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:14px;padding:14px}
 .rc-guide-workspace[hidden]{display:none!important}
+.rc-guide-workspace-title{margin:0 0 10px;font-size:.92rem;font-weight:700}
+.rc-pkg-pick{border:1px solid var(--rc-border);border-radius:12px;padding:12px 14px;background:#fff;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.rc-pkg-pick+ .rc-pkg-pick{margin-top:8px}
+.rc-pkg-pick:hover{border-color:#fdba74}
+.rc-pkg-pick.is-selected{border-color:var(--primary,#ea580c);box-shadow:0 0 0 2px rgba(234,88,12,.15);background:#fff7ed}
+.rc-pkg-pick-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.rc-pkg-pick .rc-acc-actions-inline,.rc-pkg-pick .rc-create-job{display:none!important}
+.rc-job-context{padding:12px 14px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:12px}
+.rc-job-context h4{margin:0 0 8px;font-size:.9rem}
 .rc-legacy-ref{margin-top:14px}
 .rc-legacy-ref>summary{cursor:pointer;font-weight:650;color:var(--rc-muted);padding:8px 0}
 .rc-dash-hide{display:none!important}
@@ -198,43 +213,48 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 
     <header class="rc-header">
         <div class="rc-header-main">
-            <p class="rc-header-kicker">مركز استرداد أورنج</p>
-            <p class="rc-header-sub">مسار موجَّه خطوة بخطوة — النظام يحدّد الإجراء التالي المطلوب. لا تخمّن الزر التالي.</p>
+            <p class="rc-header-kicker">معالج استرداد أورنج</p>
+            <p class="rc-header-sub">رحلة استرداد خطوة بخطوة. خطوة واحدة نشطة فقط — النظام يحدّد الزر التالي. لا تتصفّح الصفحة بحثاً عن إجراء.</p>
             <p class="rc-tz-label" id="rc_tz_label"><?php
             if ($displayTimezone !== '') {
-                echo 'جميع التواريخ تُعرض بالتوقيت المحلي للدولة المحددة (نظام 12 ساعة): <code dir="ltr">'
+                echo 'التواريخ بالتوقيت المحلي (12 ساعة): <code dir="ltr">'
                     . htmlspecialchars($displayTimezone, ENT_QUOTES, 'UTF-8')
                     . '</code>';
             } else {
-                echo 'تحذير: لم تُضبط المنطقة الزمنية في إعدادات الدولة الحالية — عرّفها من شاشة الدول قبل الاعتماد على عرض التواريخ المحلية.';
+                echo 'تحذير: لم تُضبط المنطقة الزمنية للدولة الحالية.';
             }
             ?></p>
         </div>
         <div class="rc-header-status">
-            <span class="rc-header-status-label">حالة المسار</span>
+            <span class="rc-header-status-label">موقعك في الرحلة</span>
             <span id="rc_readiness_badge" class="rc-badge rc-badge--muted" aria-busy="true"><span class="rc-skeleton" style="width:5.5rem;display:inline-block;vertical-align:middle"></span></span>
-            <button type="button" class="rc-btn-secondary" id="rc_refresh_btn" style="margin-top:6px;">تحديث</button>
+            <button type="button" class="rc-btn-secondary" id="rc_refresh_btn" style="margin-top:6px;">تحديث الحالة</button>
         </div>
     </header>
 
-    <div class="rc-guide" id="rc_guided_root">
-        <aside class="rc-guide-rail" aria-label="خطوات مسار الاسترداد">
-            <h3>مسار الاسترداد</h3>
+    <div class="rc-wizard" id="rc_guided_root">
+        <aside class="rc-wizard-rail" aria-label="رحلة الاسترداد">
+            <h3>رحلة الاسترداد</h3>
+            <p class="rc-wizard-rail-hint">✔ مكتمل · ▶ مطلوب الآن · 🔒 مقفل · ! محظور</p>
             <ol class="rc-guide-steps" id="rc_guide_steps"></ol>
         </aside>
-        <div class="rc-guide-main">
-            <div class="rc-guide-now" id="rc_guide_now" aria-live="polite">
-                <p class="rc-guide-now-kicker" id="rc_guide_kicker">الخطوة الحالية</p>
+        <div class="rc-wizard-main">
+            <section class="rc-wizard-hero" id="rc_guide_now" aria-live="polite">
+                <div class="rc-wizard-stepnum" id="rc_wizard_stepnum">الخطوة —</div>
+                <p class="rc-guide-now-kicker" id="rc_guide_kicker">▶ مطلوب الآن</p>
                 <h2 class="rc-guide-now-title" id="rc_guide_title">جاري تحديد الخطوة التالية…</h2>
                 <p class="rc-guide-now-body" id="rc_guide_body"></p>
                 <div class="rc-guide-now-block" id="rc_guide_block" hidden></div>
                 <div class="rc-guide-primary" id="rc_guide_primary"></div>
-                <div class="rc-guide-secondary" id="rc_guide_secondary"></div>
-            </div>
+                <details class="rc-wizard-more">
+                    <summary>تفاصيل إضافية (اختيارية)</summary>
+                    <div class="rc-guide-secondary" id="rc_guide_secondary"></div>
+                </details>
+            </section>
 
             <div class="rc-guide-workspace" id="rc_ws_packages">
-                <div class="rc-panel-head">
-                    <h3 class="rc-panel-title" style="margin:0">الحزم المتاحة — اختر حزمة مؤهلة</h3>
+                <h3 class="rc-guide-workspace-title">اختر حزمة لهذه الخطوة</h3>
+                <div class="rc-panel-head" style="margin-bottom:10px">
                     <div class="rc-seg" role="tablist" aria-label="نوع الحزمة">
                         <?php if ($canFull): ?>
                         <button type="button" class="rc-tab is-active" id="rc_tab_full_btn" data-rc-tab="full">النسخة الكاملة</button>
@@ -253,25 +273,25 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 <?php endif; ?>
                 <?php if ($canCountry): ?>
                 <div id="rc_tab_country" class="rc-tab-panel<?php echo $canFull ? '' : ' is-active'; ?>" role="tabpanel"<?php echo $canFull ? ' hidden' : ''; ?>>
-                    <p class="rc-tz-label" style="margin:0 0 10px;">حزم الدولة — سياق الدولة: <code dir="ltr"><?php echo htmlspecialchars($countryContextCode !== '' ? $countryContextCode : '—', ENT_QUOTES, 'UTF-8'); ?></code></p>
+                    <p class="rc-tz-label" style="margin:0 0 10px;">سياق الدولة: <code dir="ltr"><?php echo htmlspecialchars($countryContextCode !== '' ? $countryContextCode : '—', ENT_QUOTES, 'UTF-8'); ?></code></p>
                     <div id="rc_country_list" class="rc-acc-list" aria-busy="true">
                         <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:35%"></span><div class="rc-skeleton" style="width:70%;margin-top:12px"></div></div>
                     </div>
                 </div>
                 <?php endif; ?>
                 <?php if (!$canFull && !$canCountry): ?>
-                <p class="rc-muted" style="margin:0">لا صلاحية لعرض حزم النسخة الكاملة أو نسخة الدولة.</p>
+                <p class="rc-muted" style="margin:0">لا صلاحية لعرض الحزم.</p>
                 <?php endif; ?>
             </div>
 
             <div class="rc-guide-workspace" id="rc_ws_job" hidden>
-                <div id="rc_active_job" class="rc-active-job is-highlight" hidden>
-                    <h4>المهمة المرتبطة بالمسار</h4>
+                <div id="rc_active_job" class="rc-job-context" hidden>
+                    <h4>سياق المهمة الحالية</h4>
                     <div class="rc-active-meta" id="rc_active_job_meta"></div>
                     <div class="rc-actions" id="rc_active_job_actions" hidden aria-hidden="true"></div>
                 </div>
-                <p class="rc-jobs-hist-label" id="rc_jobs_hist_label" hidden>سجل المهام</p>
-                <div id="rc_jobs_list" class="rc-acc-list" aria-busy="true"></div>
+                <p class="rc-jobs-hist-label rc-dash-hide" id="rc_jobs_hist_label" hidden>سجل المهام</p>
+                <div id="rc_jobs_list" class="rc-dash-hide" hidden aria-hidden="true"></div>
                 <table id="rc_jobs_table" hidden aria-hidden="true"><tbody></tbody></table>
             </div>
         </div>
@@ -283,8 +303,10 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
     <div id="rc_overview" class="rc-dash-hide" aria-hidden="true"></div>
     <dl id="rc_lock_maintenance" class="rc-dash-hide" aria-hidden="true"></dl>
 
-    <details class="rc-legacy-ref">
-        <summary>مراجع إضافية (ليست مسار التنفيذ الأساسي)</summary>
+    <!-- Dashboard/reference mounts kept for API renderers — not operator navigation -->
+    <div class="rc-dash-hide" aria-hidden="true">
+    <details class="rc-legacy-ref" open>
+        <summary>مراجع داخلية</summary>
     <section class="rc-phase" aria-labelledby="rc_phase3_title">
         <div class="rc-phase-head">
             <span class="rc-phase-num" aria-hidden="true">i</span>
@@ -501,6 +523,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         </div>
     </section>
     </details>
+    </div>
 </div>
 
 <div id="rc_view_modal" class="rc-modal-backdrop" aria-hidden="true">
@@ -539,7 +562,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
     const DISPLAY_TZ = <?php echo json_encode($displayTimezone, JSON_UNESCAPED_UNICODE); ?>;
     const COUNTRY_CONTEXT_CODE = <?php echo json_encode($countryContextCode, JSON_UNESCAPED_UNICODE); ?>;
 
-    let state = { full: [], country: [], jobs: [], busy: false, csrf: '', lastOverview: null, lastMaintenance: null, openedStage: '', guidedAllowCreateJob: false };
+    let state = { full: [], country: [], jobs: [], busy: false, csrf: '', lastOverview: null, lastMaintenance: null, openedStage: '', guidedAllowCreateJob: false, selectedPackage: null };
 
     const el = (id) => document.getElementById(id);
     const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -1136,27 +1159,14 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         return html;
     }
 
-    /** Summary row: restore decision only while guided step "create job" is current. */
+    /** Wizard: create lives only in the single primary CTA — never on package rows. */
     function packagePrimaryAction(pkg, type) {
-        const id = pkg.package_id;
-        const cc = pkg.country_code || '';
-        if ((pkg.eligibility_status || pkg.restore_eligibility) !== 'eligible') {
-            return '';
-        }
-        // Visible only when guided workflow is on create_job (state set by renderGuidedWorkflow).
-        const hide = state.guidedAllowCreateJob === false ? ' hidden' : '';
-        return '<button type="button" class="btn-link rc-btn-primary rc-create-job" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '"' + hide + '>إنشاء مهمة استرداد</button>';
+        return '';
     }
 
-    /** Capability-preserving action set (expanded + create when eligible). */
+    /** Inspection-only helpers (not wizard primary path). */
     function packageActions(pkg, type) {
-        const id = pkg.package_id;
-        const cc = pkg.country_code || '';
-        let html = packageExpandedActions(pkg, type);
-        if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
-            html += ' <button type="button" class="btn-link rc-create-job" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">إنشاء مهمة</button>';
-        }
-        return html;
+        return packageExpandedActions(pkg, type);
     }
 
     function emptyStateHtml(title, body) {
@@ -1169,33 +1179,31 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         const countryBit = (!type || type === 'full_disaster')
             ? ''
             : (pkg.country_code ? String(pkg.country_code) + ' · ' : '');
-        // Time primary; package_id secondary identifier only
         const idHtml = identity
-            ? '<span class="rc-pkg-id" dir="ltr" title="package_id (identifier)">' + esc(countryBit + identity) + '</span>'
+            ? '<span class="rc-pkg-id" dir="ltr" title="package_id">' + esc(countryBit + identity) + '</span>'
             : '';
+        const eligible = (pkg.eligibility_status || pkg.restore_eligibility) === 'eligible';
+        const sel = state.selectedPackage;
+        const isSelected = !!(sel && sel.id === identity && sel.type === type);
+        // Wizard package picker — selection only; primary create is in hero CTA.
         return (
-            '<details class="rc-acc-item" data-rc-acc="pkg" data-package-id="' + esc(identity) + '">' +
-            '<summary>' +
-                '<span class="rc-acc-chevron" aria-hidden="true"></span>' +
-                '<span class="rc-acc-meta">' +
-                    '<span class="rc-acc-when" dir="ltr" title="الوقت">' + whenHtml + '</span>' +
+            '<div class="rc-pkg-pick' + (isSelected ? ' is-selected' : '') + (eligible ? '' : ' is-ineligible') + '"' +
+            ' role="button" tabindex="0"' +
+            ' data-rc-pkg-pick="1" data-type="' + esc(type) + '" data-id="' + esc(identity) + '" data-cc="' + esc(pkg.country_code || '') + '"' +
+            ' data-eligible="' + (eligible ? '1' : '0') + '"' +
+            ' aria-pressed="' + (isSelected ? 'true' : 'false') + '">' +
+                '<div class="rc-pkg-pick-top">' +
+                    '<span class="rc-acc-when" dir="ltr">' + whenHtml + '</span>' +
                     idHtml +
                     badge(pkg.package_status || '—') +
                     eligibilityBadge(pkg) +
-                '</span>' +
-                '<span class="rc-acc-actions-inline">' + packagePrimaryAction(pkg, type) + '</span>' +
-            '</summary>' +
-            '<div class="rc-acc-body">' +
-                packageExpandedActions(pkg, type) +
-                '<p class="rc-muted" style="margin:10px 0 0;font-size:.8rem;"><strong>ملخص سريع</strong> — المخطط: ' + esc(String(pkg.schema_revision || '—')) +
+                    (isSelected ? '<span class="rc-badge rc-badge--warning">مختارة</span>' : '') +
+                '</div>' +
+                '<p class="rc-muted" style="margin:8px 0 0;font-size:.8rem;">المخطط: ' + esc(String(pkg.schema_revision || '—')) +
                 ' · الخلفية: ' + esc(String(pkg.backend || '—')) +
-                ' · تقرير الاسترداد: ' + drvCell(pkg) +
-                (pkg.registry_version ? (' · السجل: ' + esc(String(pkg.registry_version))) : '') +
                 (pkg.country_name ? (' · ' + esc(String(pkg.country_name))) : '') +
-                (identity ? (' · المعرّف: <span class="rc-pkg-id">' + esc(identity) + '</span>') : '') +
                 '</p>' +
-            '</div>' +
-            '</details>'
+            '</div>'
         );
     }
 
@@ -1324,29 +1332,39 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         };
 
         if (!job) {
-            if (!pkgs.length) {
-                setCurrent(0, 'لا توجد حزم معروضة بعد. حدّث الصفحة أو أنشئ نسخة احتياطية أولاً.');
-                blockReason = pkgs.length === 0 ? 'لا حزم متاحة للعرض في السياق الحالي.' : '';
-                if (blockReason) states[0] = 'blocked';
-            } else if (!eligible.length) {
-                setCurrent(0, 'اختر حزمة من القائمة أدناه. لا توجد حزم مؤهلة حالياً لإنشاء مهمة.');
-                blockReason = 'لا توجد حزمة مؤهلة للاسترداد. راجع أهلية الحزمة أولاً.';
-                states[0] = 'blocked';
-            } else {
-                states[0] = 'done';
-                setCurrent(1, 'افتح حزمة مؤهلة من القائمة ثم اضغط «إنشاء مهمة استرداد». هذا هو الإجراء التالي الوحيد.');
-                if (eligible.length === 1) {
-                    const p = eligible[0];
-                    const type = (p.package_type === 'country_recovery' || p.country_code) ? 'country_recovery' : 'full_disaster';
-                    primaryHtml = guidedBtn('rc-create-job', {
-                        'data-type': type,
-                        'data-id': p.package_id || '',
-                        'data-cc': p.country_code || ''
-                    }, 'إنشاء مهمة استرداد', true);
-                }
-            }
             showPackages = true;
             showJob = false;
+            // Auto-select sole eligible package so the operator has one clear next action.
+            if (!state.selectedPackage && eligible.length === 1) {
+                const p = eligible[0];
+                const pickType = (String(p.package_type || '') === 'country_recovery')
+                    ? 'country_recovery'
+                    : 'full_disaster';
+                state.selectedPackage = { id: String(p.package_id || ''), type: pickType, cc: String(p.country_code || '') };
+            }
+            const sel = state.selectedPackage;
+            const selOk = !!(sel && sel.id && eligible.some((p) => String(p.package_id || '') === sel.id));
+
+            if (!pkgs.length) {
+                setCurrent(0, 'ابدأ من هنا: لا توجد حزم بعد. أنشئ نسخة احتياطية ثم حدّث الحالة.');
+                blockReason = 'لا حزم متاحة في السياق الحالي.';
+                states[0] = 'blocked';
+            } else if (!eligible.length) {
+                setCurrent(0, 'ابدأ من هنا: اختر حزمة مؤهلة من القائمة. لا توجد حزم مؤهلة حالياً.');
+                blockReason = 'لا توجد حزمة مؤهلة للاسترداد.';
+                states[0] = 'blocked';
+            } else if (!selOk) {
+                setCurrent(0, 'ابدأ من هنا: اضغط على حزمة مؤهلة واحدة من القائمة لتحديدها. لن يظهر زر الإنشاء إلا بعد الاختيار.');
+                primaryHtml = '';
+            } else {
+                states[0] = 'done';
+                setCurrent(1, 'الحزمة محددة. اضغط الزر الوحيد أدناه لإنشاء مهمة الاسترداد — لا يوجد إجراء آخر الآن.');
+                primaryHtml = guidedBtn('rc-create-job', {
+                    'data-type': sel.type,
+                    'data-id': sel.id,
+                    'data-cc': sel.cc || ''
+                }, 'إنشاء مهمة استرداد', true);
+            }
             return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
         }
 
@@ -1648,9 +1666,19 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
     }
 
+    function wizardPackageList() {
+        if (CAN_FULL && CAN_COUNTRY) {
+            const countryTab = el('rc_tab_country');
+            const onCountry = countryTab && countryTab.classList.contains('is-active');
+            return onCountry ? (state.country || []) : (state.full || []);
+        }
+        if (CAN_COUNTRY && !CAN_FULL) return state.country || [];
+        return state.full || [];
+    }
+
     function renderGuidedWorkflow() {
         const job = pickActiveJob(state.jobs || []);
-        const pkgs = CAN_FULL ? (state.full || []) : (state.country || []);
+        const pkgs = wizardPackageList();
         const g = resolveGuidedWorkflow(job, pkgs);
         const stepsEl = el('rc_guide_steps');
         if (stepsEl) {
@@ -1665,7 +1693,15 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             }).join('');
         }
         const step = GUIDED_STEPS[g.current] || GUIDED_STEPS[0];
-        if (el('rc_guide_kicker')) el('rc_guide_kicker').textContent = (g.states[g.current] === 'done' && step.key === 'completed') ? 'النتيجة' : 'الإجراء المطلوب الآن';
+        const doneAll = (g.states[g.current] === 'done' && step.key === 'completed');
+        if (el('rc_wizard_stepnum')) {
+            el('rc_wizard_stepnum').textContent = doneAll
+                ? 'اكتملت الرحلة'
+                : ('الخطوة ' + (g.current + 1) + ' من ' + GUIDED_STEPS.length);
+        }
+        if (el('rc_guide_kicker')) {
+            el('rc_guide_kicker').textContent = doneAll ? 'النتيجة' : (g.blockReason ? '! محظور الآن' : '▶ مطلوب الآن');
+        }
         if (el('rc_guide_title')) el('rc_guide_title').textContent = step.title;
         if (el('rc_guide_body')) el('rc_guide_body').textContent = g.body || '';
         const block = el('rc_guide_block');
@@ -1680,21 +1716,25 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         }
         if (el('rc_guide_primary')) el('rc_guide_primary').innerHTML = g.primaryHtml || '';
         if (el('rc_guide_secondary')) el('rc_guide_secondary').innerHTML = g.secondaryHtml || '';
+        const more = document.querySelector('#rc_guided_root .rc-wizard-more');
+        if (more) more.hidden = !String(g.secondaryHtml || '').trim();
         const wsPkg = el('rc_ws_packages');
         const wsJob = el('rc_ws_job');
         if (wsPkg) wsPkg.hidden = !g.showPackages;
         if (wsJob) wsJob.hidden = !g.showJob;
         if (el('rc_readiness_badge')) {
             const b = el('rc_readiness_badge');
-            b.className = 'rc-badge ' + (g.blockReason ? 'rc-badge--failed' : (step.key === 'completed' ? 'rc-badge--success' : 'rc-badge--warning'));
-            b.textContent = step.key === 'completed' ? 'مكتمل' : ('الخطوة ' + (g.current + 1) + ' من ' + GUIDED_STEPS.length);
+            b.className = 'rc-badge ' + (g.blockReason ? 'rc-badge--failed' : (doneAll ? 'rc-badge--success' : 'rc-badge--warning'));
+            b.textContent = doneAll ? 'مكتمل' : ('الخطوة ' + (g.current + 1) + ' من ' + GUIDED_STEPS.length);
         }
         if (el('rc_readiness_headline')) el('rc_readiness_headline').textContent = step.title;
-        // Package-row create CTAs only when create_job is current and primary panel does not already own the button.
-        const primaryOwnsCreate = /rc-create-job/.test(g.primaryHtml || '');
-        state.guidedAllowCreateJob = !!(g.showPackages && g.current === 1 && !g.blockReason && !primaryOwnsCreate);
-        document.querySelectorAll('.rc-acc-actions-inline .rc-create-job').forEach((btn) => {
-            btn.hidden = !state.guidedAllowCreateJob;
+        state.guidedAllowCreateJob = false;
+        document.querySelectorAll('.rc-pkg-pick').forEach((node) => {
+            const id = node.getAttribute('data-id') || '';
+            const type = node.getAttribute('data-type') || '';
+            const on = !!(state.selectedPackage && state.selectedPackage.id === id && state.selectedPackage.type === type);
+            node.classList.toggle('is-selected', on);
+            node.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
     }
 
@@ -3146,6 +3186,21 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 ev.preventDefault();
             }
         }
+        const pkgPick = t.closest('[data-rc-pkg-pick="1"]');
+        if (pkgPick) {
+            ev.preventDefault();
+            if (pkgPick.getAttribute('data-eligible') !== '1') {
+                showAlert('هذه الحزمة غير مؤهلة للاسترداد. اختر حزمة مؤهلة.', false);
+                return;
+            }
+            state.selectedPackage = {
+                id: pkgPick.getAttribute('data-id') || '',
+                type: pkgPick.getAttribute('data-type') || 'full_disaster',
+                cc: pkgPick.getAttribute('data-cc') || ''
+            };
+            renderGuidedWorkflow();
+            return;
+        }
         if (t.matches('.rc-tab') || t.classList.contains('rc-tab')) {
             const tab = t.getAttribute('data-rc-tab');
             if (!tab) return;
@@ -3162,6 +3217,9 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 countryPanel.classList.toggle('is-active', on);
                 countryPanel.hidden = !on;
             }
+            // Switching package type clears selection so the wizard stays sequential.
+            state.selectedPackage = null;
+            renderGuidedWorkflow();
         }
     }, true);
 

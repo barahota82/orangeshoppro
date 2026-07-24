@@ -109,6 +109,9 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 .bc-acc-actions-inline{display:flex;align-items:center;gap:8px;margin-inline-start:auto}
 .bc-acc-body,.bc-collapsible-body{padding:0 14px 12px;border-top:1px solid #f1f5f9}
 .bc-acc-body{padding-top:10px}
+/* Expandable panels: capped height; sticky summary (collapse always reachable); panel scrolls (Owner 2026-07-24) */
+.bc-acc-item[open],.bc-collapsible[open]{max-height:min(420px,58vh);overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.bc-acc-item[open]>summary,.bc-collapsible[open]>summary{position:sticky;top:0;z-index:3;background:var(--bc-surface);box-shadow:0 1px 0 #f1f5f9}
 .bc-action-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .bc-action-row .bc-btn-ghost,.bc-action-row .bc-link{flex:0 0 auto}
 .bc-collapsible{margin-bottom:14px}
