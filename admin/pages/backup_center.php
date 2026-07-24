@@ -207,7 +207,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             <?php endif; ?>
             <button type="button" class="bc-btn-secondary" id="bc_refresh_btn">تحديث البيانات</button>
         </div>
-        <p class="bc-primary-hint">الزر البرتقالي الأساسي داخل كل نسخة هو «التفاصيل». التشغيل اليدوي يتطلب تأكيداً.</p>
     </section>
 
     <nav class="bc-sec-nav" aria-label="أقسام ثانوية">
@@ -275,15 +274,8 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         <section class="bc-section bc-panel">
             <h3 class="bc-panel-title">التخزين والاحتفاظ</h3>
             <div class="bc-storage" id="bc_storage">
-                <div>
-                    <h4 style="margin:0 0 8px;font-size:.88rem;">Backup Root</h4>
-                    <div class="bc-storage-path-row">
-                        <p id="bc_storage_path" class="bc-storage-path" title="">—</p>
-                        <button type="button" class="btn-link bc-btn-ghost bc-storage-copy" id="bc_storage_copy_btn" hidden>نسخ المسار</button>
-                    </div>
-                </div>
                 <div class="bc-storage-kpis" id="bc_storage_kpis">
-                    <div class="bc-kpi-card"><h4>Snapshots</h4><div class="bc-val">—</div></div>
+                    <div class="bc-kpi-card"><h4>حجم اللقطات</h4><div class="bc-val">—</div></div>
                 </div>
             </div>
         </section>
@@ -923,25 +915,17 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             '<div><dt>أحدث حزمة للدولة الحالية</dt><dd>' + fmtPackageWhenDisplay(latestCountryPkg, 'country_recovery') + '</dd></div>' +
             '<div><dt>حزم الدولة الحالية</dt><dd>' + storedCountryPackages + '</dd></div>';
 
-        const rootPath = ov.backup_root || '—';
-        const pathEl = el('bc_storage_path');
-        const copyBtn = el('bc_storage_copy_btn');
-        if (pathEl) {
-            pathEl.textContent = rootPath;
-            pathEl.title = rootPath !== '—' ? rootPath : '';
-            pathEl.classList.toggle('bc-storage-path--ellipsis', rootPath.length > 96);
-        }
-        if (copyBtn) copyBtn.hidden = !rootPath || rootPath === '—';
+        // Owner security: never render backup_root filesystem path in Backup Center UI.
         const retentionRaw = ov.retention_days;
         const retentionLabel = retentionRaw !== undefined && retentionRaw !== null && retentionRaw !== ''
-            ? String(retentionRaw) + ' يوم'
+            ? String(retentionRaw) + ' يوماً'
             : '—';
         const kpis = [
-            ['حجم Snapshots', st.snapshots_human || '—'],
-            ['حجم Country Packages', st.country_packages_human || '—'],
-            ['حجم Logs', st.logs_human || '—'],
-            ['الإجمالي', st.total_human || '—'],
-            ['Retention (أيام)', retentionLabel]
+            ['حجم اللقطات', st.snapshots_human || '—'],
+            ['حجم حزم الدول', st.country_packages_human || '—'],
+            ['حجم السجلات', st.logs_human || '—'],
+            ['إجمالي الحجم', st.total_human || '—'],
+            ['مدة الاحتفاظ', retentionLabel]
         ];
         el('bc_storage_kpis').innerHTML = kpis.map(([t, v]) =>
             '<div class="bc-kpi-card"><h4>' + esc(t) + '</h4><div class="bc-val" dir="ltr">' + esc(v) + '</div></div>'
@@ -1251,33 +1235,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     el('bc_view_country_history_btn').addEventListener('click', () => setArchiveMode('country', true));
     el('bc_back_recent_country_btn').addEventListener('click', () => setArchiveMode('country', false));
 
-    const storageCopyBtn = el('bc_storage_copy_btn');
-    if (storageCopyBtn) {
-        storageCopyBtn.addEventListener('click', async () => {
-            const path = el('bc_storage_path')?.textContent?.trim() || '';
-            if (!path || path === '—') return;
-            const prevLabel = storageCopyBtn.textContent;
-            try {
-                if (navigator.clipboard?.writeText) {
-                    await navigator.clipboard.writeText(path);
-                } else {
-                    const ta = document.createElement('textarea');
-                    ta.value = path;
-                    ta.setAttribute('readonly', '');
-                    ta.style.position = 'absolute';
-                    ta.style.left = '-9999px';
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(ta);
-                }
-                storageCopyBtn.textContent = 'تم النسخ';
-                setTimeout(() => { storageCopyBtn.textContent = prevLabel; }, 2000);
-            } catch (e) {
-                showAlert('تعذر نسخ المسار.', false);
-            }
-        });
-    }
     if (CAN_RUN) {
         el('bc_run_full_btn').addEventListener('click', () => confirmAction(
             'تشغيل Full Disaster Backup',
