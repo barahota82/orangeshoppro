@@ -238,7 +238,7 @@ body.rc-modal-open{overflow:hidden!important}
 
     <header class="rc-header">
         <div class="rc-header-main">
-            <p class="rc-header-kicker">معالج استرداد أورنج</p>
+            <p class="rc-header-kicker">معالج استرداد</p>
             <p class="rc-header-sub">رحلة استرداد خطوة بخطوة.</p>
             <p class="rc-tz-label" id="rc_tz_label"><?php
             if ($displayTimezone !== '') {
@@ -964,6 +964,14 @@ body.rc-modal-open{overflow:hidden!important}
         }
         const title = labelAr ? ' title="' + String(labelAr).replace(/"/g, '&quot;') + '"' : '';
         return '<span class="rc-badge ' + cls + '"' + title + '>' + text + '</span>';
+    };
+    /** Dry-run overall result badge for history/accordion (PASS / WARNING / FAIL). */
+    const dryResultBadge = (result) => {
+        const r = String(result || '').toUpperCase();
+        if (r === 'PASS') return '<span class="rc-badge rc-badge--success">PASS</span>';
+        if (r === 'WARNING') return '<span class="rc-badge rc-badge--warning">WARNING</span>';
+        if (r === 'FAIL') return '<span class="rc-badge rc-badge--failed">FAIL</span>';
+        return '<span class="rc-badge rc-badge--muted">—</span>';
     };
     const drvCell = (pkg) => {
         const result = String(pkg.drv_result || '').toLowerCase();
@@ -3150,14 +3158,16 @@ body.rc-modal-open{overflow:hidden!important}
                     job_id: t.dataset.id || ''
                 });
                 if (j.csrf_token) state.csrf = j.csrf_token;
-                // Clear current journey so wizard returns to Step 1 (package select); cancelled job → history.
+                // Success only: clear client journey so cancelled job cannot remain current.
+                // Authoritative reload + active-job rule (resumable only) → Step 1 when none left.
                 state.selectedPackage = null;
                 state.currentJourneyJob = null;
                 state.openedStage = '';
                 state.guidedAllowCreateJob = false;
-                showAlert('تم إلغاء المهمة.', true);
                 await loadAll();
+                showAlert('تم إلغاء المهمة. يمكنك الآن اختيار حزمة استرداد جديدة.', true);
             } catch (e) {
+                // Failure: keep current job and wizard step; show API/safe reason only.
                 showAlert(e.message || 'تعذر الإلغاء', false);
             } finally {
                 setBusy(false);
