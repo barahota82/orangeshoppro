@@ -164,6 +164,32 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 #rc_refresh_btn{background:#fff;color:#334155!important;border:1px solid #cbd5e1}
 #rc_refresh_btn:hover{background:#f8fafc;border-color:#94a3b8}
 #rc_view_close,#rc_detail_close,#rc_orch_diag_close{background:#475569;color:#fff!important}
+/* Guided operator workflow (Owner 2026-07-24) — presentation only */
+.rc-guide{display:grid;grid-template-columns:minmax(220px,280px) minmax(0,1fr);gap:14px;margin-bottom:14px}
+@media (max-width:960px){.rc-guide{grid-template-columns:1fr}}
+.rc-guide-rail{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:12px;padding:12px;max-height:min(70vh,640px);overflow:auto}
+.rc-guide-rail h3{margin:0 0 10px;font-size:.9rem}
+.rc-guide-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.rc-guide-step{display:flex;gap:8px;align-items:flex-start;padding:8px 8px;border-radius:8px;border:1px solid transparent;font-size:.82rem;line-height:1.35}
+.rc-guide-step.is-done{color:var(--rc-ok);background:#ecfdf5;border-color:#a7f3d0}
+.rc-guide-step.is-current{color:var(--rc-ink);background:#fff7ed;border-color:#fdba74;font-weight:700}
+.rc-guide-step.is-locked{color:#94a3b8;background:var(--rc-soft)}
+.rc-guide-step.is-blocked{color:var(--rc-bad);background:#fef2f2;border-color:#fecaca}
+.rc-guide-mark{flex:0 0 1.4rem;font-weight:700;text-align:center}
+.rc-guide-main{min-width:0}
+.rc-guide-now{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+.rc-guide-now-kicker{margin:0 0 4px;font-size:.78rem;color:var(--rc-muted);font-weight:650}
+.rc-guide-now-title{margin:0 0 8px;font-size:1.15rem;font-weight:750;color:var(--rc-ink)}
+.rc-guide-now-body{margin:0 0 12px;font-size:.9rem;color:#334155;line-height:1.55}
+.rc-guide-now-block{margin:0 0 12px;padding:10px 12px;border-radius:8px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:.86rem;line-height:1.5}
+.rc-guide-primary{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.rc-guide-primary .rc-btn-primary,.rc-guide-primary .btn-link.rc-btn-primary{font-size:.95rem;min-height:40px;padding:8px 18px}
+.rc-guide-secondary{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
+.rc-guide-workspace{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:12px;padding:12px 14px}
+.rc-guide-workspace[hidden]{display:none!important}
+.rc-legacy-ref{margin-top:14px}
+.rc-legacy-ref>summary{cursor:pointer;font-weight:650;color:var(--rc-muted);padding:8px 0}
+.rc-dash-hide{display:none!important}
 </style>
 
 <div class="rc-v2" id="rc_app">
@@ -173,7 +199,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
     <header class="rc-header">
         <div class="rc-header-main">
             <p class="rc-header-kicker">مركز استرداد أورنج</p>
-            <p class="rc-header-sub">مسار عمل موحّد لجاهزية النظام، اختيار الحزمة، التحقق، تشغيل مهام الاسترداد، ومراحل التنفيذ — للمشرف الأعلى.</p>
+            <p class="rc-header-sub">مسار موجَّه خطوة بخطوة — النظام يحدّد الإجراء التالي المطلوب. لا تخمّن الزر التالي.</p>
             <p class="rc-tz-label" id="rc_tz_label"><?php
             if ($displayTimezone !== '') {
                 echo 'جميع التواريخ تُعرض بالتوقيت المحلي للدولة المحددة (نظام 12 ساعة): <code dir="ltr">'
@@ -185,100 +211,85 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             ?></p>
         </div>
         <div class="rc-header-status">
-            <span class="rc-header-status-label">جاهزية النظام</span>
+            <span class="rc-header-status-label">حالة المسار</span>
             <span id="rc_readiness_badge" class="rc-badge rc-badge--muted" aria-busy="true"><span class="rc-skeleton" style="width:5.5rem;display:inline-block;vertical-align:middle"></span></span>
+            <button type="button" class="rc-btn-secondary" id="rc_refresh_btn" style="margin-top:6px;">تحديث</button>
         </div>
     </header>
 
-    <section class="rc-phase" aria-labelledby="rc_phase1_title">
-        <div class="rc-phase-head">
-            <span class="rc-phase-num" aria-hidden="true">1</span>
-            <h2 class="rc-phase-title" id="rc_phase1_title">جاهزية النظام</h2>
-            <p class="rc-phase-hint">ملخص الجاهزية والقفل والصيانة — معلومات من بيانات القائمة.</p>
-        </div>
-        <div class="rc-panel">
-            <div class="rc-readiness" id="rc_readiness_summary">
-                <div>
-                    <p class="rc-readiness-label">الحالة التشغيلية</p>
-                    <p class="rc-readiness-value" id="rc_readiness_headline" aria-busy="true"><span class="rc-skeleton rc-skeleton--lg" style="width:10rem;display:inline-block"></span></p>
-                </div>
-                <button type="button" class="rc-btn-secondary" id="rc_refresh_btn">تحديث</button>
+    <div class="rc-guide" id="rc_guided_root">
+        <aside class="rc-guide-rail" aria-label="خطوات مسار الاسترداد">
+            <h3>مسار الاسترداد</h3>
+            <ol class="rc-guide-steps" id="rc_guide_steps"></ol>
+        </aside>
+        <div class="rc-guide-main">
+            <div class="rc-guide-now" id="rc_guide_now" aria-live="polite">
+                <p class="rc-guide-now-kicker" id="rc_guide_kicker">الخطوة الحالية</p>
+                <h2 class="rc-guide-now-title" id="rc_guide_title">جاري تحديد الخطوة التالية…</h2>
+                <p class="rc-guide-now-body" id="rc_guide_body"></p>
+                <div class="rc-guide-now-block" id="rc_guide_block" hidden></div>
+                <div class="rc-guide-primary" id="rc_guide_primary"></div>
+                <div class="rc-guide-secondary" id="rc_guide_secondary"></div>
             </div>
-            <div class="rc-info-grid" aria-label="تحذيرات ومتطلبات">
-                <div class="rc-info-box rc-info-box--warn">
-                    <h4>تحذيرات</h4>
-                    <p>بعد تفعيل الصيانة يمكن طلب استيراد قاعدة الإنتاج من مركز الاسترداد. <strong>ملفات التطبيق لم تُبدَّل بعد.</strong></p>
-                </div>
-                <div class="rc-info-box rc-info-box--info">
-                    <h4>معلومات</h4>
-                    <p>في مرحلة المعلومات وحدها: لا تبديل لملفات التطبيق، ولا تحويل لملفات الرفع، ولا تراجع، ولا إغلاق للصيانة.</p>
-                </div>
-                <div class="rc-info-box rc-info-box--req">
-                    <h4>المتطلبات</h4>
-                    <p>حزمة مؤهلة + تحقق تشغيلي + خطة معتمدة + نسخة احتياطية إلزامية قبل الاسترداد + إتمام المراحل المعتمدة من مركز الاسترداد عند الحاجة.</p>
-                </div>
-                <div class="rc-info-box rc-info-box--blocked">
-                    <h4>محظور</h4>
-                    <p>أي مسار إنتاجي محظور حتى تكتمل البوابات اليدوية؛ القفل العام والصيانة يمنعان التداخل غير الآمن.</p>
-                </div>
-            </div>
-            <div id="rc_overview" class="rc-overview" aria-live="polite" aria-busy="true">
-                <article class="rc-op-card"><span class="rc-skeleton rc-skeleton--lg" style="width:55%"></span><div class="rc-skeleton" style="width:30%;margin-top:14px"></div></article>
-                <article class="rc-op-card"><span class="rc-skeleton rc-skeleton--lg" style="width:50%"></span><div class="rc-skeleton" style="width:28%;margin-top:14px"></div></article>
-                <article class="rc-op-card"><span class="rc-skeleton rc-skeleton--lg" style="width:60%"></span><div class="rc-skeleton" style="width:32%;margin-top:14px"></div></article>
-            </div>
-            <dl id="rc_lock_maintenance" class="rc-status-strip" aria-busy="true">
-                <div><dt>قفل الاسترداد العام</dt><dd><span class="rc-skeleton" style="width:4rem;display:inline-block"></span></dd></div>
-                <div><dt>وضع الصيانة</dt><dd><span class="rc-skeleton" style="width:4rem;display:inline-block"></span></dd></div>
-            </dl>
-        </div>
-    </section>
 
-    <section class="rc-phase" aria-labelledby="rc_phase2_title">
-        <div class="rc-phase-head">
-            <span class="rc-phase-num" aria-hidden="true">2</span>
-            <h2 class="rc-phase-title" id="rc_phase2_title">اختيار حزمة الاسترداد</h2>
-            <p class="rc-phase-hint">قائمة قابلة للتوسيع — إجراء أساسي واحد لكل حزمة.</p>
-        </div>
-        <div class="rc-panel">
-            <div class="rc-panel-head">
-                <h3 class="rc-panel-title" style="margin:0">الحزم المتاحة</h3>
-                <div class="rc-seg" role="tablist" aria-label="نوع الحزمة">
-                    <?php if ($canFull): ?>
-                    <button type="button" class="rc-tab is-active" id="rc_tab_full_btn" data-rc-tab="full">النسخة الكاملة</button>
-                    <?php endif; ?>
-                    <?php if ($canCountry): ?>
-                    <button type="button" class="rc-tab<?php echo $canFull ? '' : ' is-active'; ?>" id="rc_tab_country_btn" data-rc-tab="country">نسخة الدولة</button>
-                    <?php endif; ?>
+            <div class="rc-guide-workspace" id="rc_ws_packages">
+                <div class="rc-panel-head">
+                    <h3 class="rc-panel-title" style="margin:0">الحزم المتاحة — اختر حزمة مؤهلة</h3>
+                    <div class="rc-seg" role="tablist" aria-label="نوع الحزمة">
+                        <?php if ($canFull): ?>
+                        <button type="button" class="rc-tab is-active" id="rc_tab_full_btn" data-rc-tab="full">النسخة الكاملة</button>
+                        <?php endif; ?>
+                        <?php if ($canCountry): ?>
+                        <button type="button" class="rc-tab<?php echo $canFull ? '' : ' is-active'; ?>" id="rc_tab_country_btn" data-rc-tab="country">نسخة الدولة</button>
+                        <?php endif; ?>
+                    </div>
                 </div>
-            </div>
-            <?php if ($canFull): ?>
-            <div id="rc_tab_full" class="rc-tab-panel is-active" role="tabpanel">
-                <div id="rc_full_list" class="rc-acc-list" aria-busy="true">
-                    <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:35%"></span><div class="rc-skeleton" style="width:70%;margin-top:12px"></div></div>
-                    <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:40%"></span><div class="rc-skeleton" style="width:65%;margin-top:12px"></div></div>
+                <?php if ($canFull): ?>
+                <div id="rc_tab_full" class="rc-tab-panel is-active" role="tabpanel">
+                    <div id="rc_full_list" class="rc-acc-list" aria-busy="true">
+                        <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:35%"></span><div class="rc-skeleton" style="width:70%;margin-top:12px"></div></div>
+                    </div>
                 </div>
-            </div>
-            <?php endif; ?>
-            <?php if ($canCountry): ?>
-            <div id="rc_tab_country" class="rc-tab-panel<?php echo $canFull ? '' : ' is-active'; ?>" role="tabpanel"<?php echo $canFull ? ' hidden' : ''; ?>>
-                <p class="rc-tz-label" style="margin:0 0 10px;">حزم الدولة — سياق الدولة: <code dir="ltr"><?php echo htmlspecialchars($countryContextCode !== '' ? $countryContextCode : '—', ENT_QUOTES, 'UTF-8'); ?></code></p>
-                <div id="rc_country_list" class="rc-acc-list" aria-busy="true">
-                    <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:35%"></span><div class="rc-skeleton" style="width:70%;margin-top:12px"></div></div>
+                <?php endif; ?>
+                <?php if ($canCountry): ?>
+                <div id="rc_tab_country" class="rc-tab-panel<?php echo $canFull ? '' : ' is-active'; ?>" role="tabpanel"<?php echo $canFull ? ' hidden' : ''; ?>>
+                    <p class="rc-tz-label" style="margin:0 0 10px;">حزم الدولة — سياق الدولة: <code dir="ltr"><?php echo htmlspecialchars($countryContextCode !== '' ? $countryContextCode : '—', ENT_QUOTES, 'UTF-8'); ?></code></p>
+                    <div id="rc_country_list" class="rc-acc-list" aria-busy="true">
+                        <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:35%"></span><div class="rc-skeleton" style="width:70%;margin-top:12px"></div></div>
+                    </div>
                 </div>
+                <?php endif; ?>
+                <?php if (!$canFull && !$canCountry): ?>
+                <p class="rc-muted" style="margin:0">لا صلاحية لعرض حزم النسخة الكاملة أو نسخة الدولة.</p>
+                <?php endif; ?>
             </div>
-            <?php endif; ?>
-            <?php if (!$canFull && !$canCountry): ?>
-            <p class="rc-muted" style="margin:0">لا صلاحية لعرض حزم النسخة الكاملة أو نسخة الدولة.</p>
-            <?php endif; ?>
-        </div>
-    </section>
 
+            <div class="rc-guide-workspace" id="rc_ws_job" hidden>
+                <div id="rc_active_job" class="rc-active-job is-highlight" hidden>
+                    <h4>المهمة المرتبطة بالمسار</h4>
+                    <div class="rc-active-meta" id="rc_active_job_meta"></div>
+                    <div class="rc-actions" id="rc_active_job_actions" hidden aria-hidden="true"></div>
+                </div>
+                <p class="rc-jobs-hist-label" id="rc_jobs_hist_label" hidden>سجل المهام</p>
+                <div id="rc_jobs_list" class="rc-acc-list" aria-busy="true"></div>
+                <table id="rc_jobs_table" hidden aria-hidden="true"><tbody></tbody></table>
+            </div>
+        </div>
+    </div>
+
+    <div id="rc_readiness_summary" class="rc-dash-hide" aria-hidden="true">
+        <p class="rc-readiness-value" id="rc_readiness_headline"></p>
+    </div>
+    <div id="rc_overview" class="rc-dash-hide" aria-hidden="true"></div>
+    <dl id="rc_lock_maintenance" class="rc-dash-hide" aria-hidden="true"></dl>
+
+    <details class="rc-legacy-ref">
+        <summary>مراجع إضافية (ليست مسار التنفيذ الأساسي)</summary>
     <section class="rc-phase" aria-labelledby="rc_phase3_title">
         <div class="rc-phase-head">
-            <span class="rc-phase-num" aria-hidden="true">3</span>
-            <h2 class="rc-phase-title" id="rc_phase3_title">التحقق التشغيلي</h2>
-            <p class="rc-phase-hint">أقسام قابلة للطي — شهادة الجاهزية وتحقق ظل الدولة ومحاكاة الاستعادة عند صلاحية الدولة.</p>
+            <span class="rc-phase-num" aria-hidden="true">i</span>
+            <h2 class="rc-phase-title" id="rc_phase3_title">مراجع التحقق</h2>
+            <p class="rc-phase-hint">شهادة الجاهزية وتقارير الدولة — للعرض عند الحاجة فقط.</p>
         </div>
         <div class="rc-val-stack">
             <details class="rc-acc-item rc-val-acc" data-rc-acc="val" id="rc_certification_section">
@@ -364,32 +375,11 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         </div>
     </section>
 
-    <section class="rc-phase" aria-labelledby="rc_phase4_title">
-        <div class="rc-phase-head">
-            <span class="rc-phase-num" aria-hidden="true">4</span>
-            <h2 class="rc-phase-title" id="rc_phase4_title">إنشاء وتشغيل مهام الاسترداد</h2>
-            <p class="rc-phase-hint">مركز التشغيل — المهمة النشطة أولاً، ثم السجل.</p>
-        </div>
-        <div class="rc-panel">
-            <div id="rc_active_job" class="rc-active-job is-highlight" hidden>
-                <h4>المهمة النشطة / الحالية</h4>
-                <div class="rc-active-meta" id="rc_active_job_meta"></div>
-                <div class="rc-actions" id="rc_active_job_actions"></div>
-            </div>
-            <h3 class="rc-panel-title">مهام الاسترداد</h3>
-            <p class="rc-jobs-hist-label" id="rc_jobs_hist_label" hidden>سجل المهام</p>
-            <div id="rc_jobs_list" class="rc-acc-list" aria-busy="true">
-                <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:45%"></span><div class="rc-skeleton" style="width:75%;margin-top:12px"></div></div>
-            </div>
-            <table id="rc_jobs_table" hidden aria-hidden="true"><tbody></tbody></table>
-        </div>
-    </section>
-
     <section class="rc-phase" aria-labelledby="rc_phase5_title">
         <div class="rc-phase-head">
-            <span class="rc-phase-num" aria-hidden="true">5</span>
-            <h2 class="rc-phase-title" id="rc_phase5_title">مسار التنفيذ</h2>
-            <p class="rc-phase-hint">الشريط دائماً ظاهر — معلومات المرحلة مطوية إلا عند النقر أو عندما تكون المرحلة نشطة.</p>
+            <span class="rc-phase-num" aria-hidden="true">i</span>
+            <h2 class="rc-phase-title" id="rc_phase5_title">حالة مراحل الإنتاج (مرجع)</h2>
+            <p class="rc-phase-hint">معلومات حالة فقط — الإجراء التالي يظهر أعلى المسار الموجَّه.</p>
         </div>
         <div class="rc-panel">
             <div class="rc-stage-strip" id="rc_stage_strip" aria-label="مراحل التنفيذ">
@@ -496,12 +486,12 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
 
     <section class="rc-phase" aria-labelledby="rc_phase6_title">
         <div class="rc-phase-head">
-            <span class="rc-phase-num" aria-hidden="true">6</span>
-            <h2 class="rc-phase-title" id="rc_phase6_title">المراقبة</h2>
-            <p class="rc-phase-hint">تقدم المهمة والتفاصيل — استخدم «عرض» داخل قائمة المهام أو المهمة النشطة.</p>
+            <span class="rc-phase-num" aria-hidden="true">i</span>
+            <h2 class="rc-phase-title" id="rc_phase6_title">ملخص سريع</h2>
+            <p class="rc-phase-hint">أرقام مرجعية فقط.</p>
         </div>
         <div class="rc-panel">
-            <p class="rc-muted" style="margin:0 0 8px;" id="rc_monitor_hint">بعد التحديث تظهر المهمة النشطة أعلاه؛ التفاصيل عبر أزرار «عرض».</p>
+            <p class="rc-muted" style="margin:0 0 8px;" id="rc_monitor_hint">التقدم الفعلي يُدار من المسار الموجَّه أعلاه.</p>
             <div id="rc_monitor_snapshot" class="rc-status-strip">
                 <div><dt>المهام</dt><dd id="rc_mon_jobs">—</dd></div>
                 <div><dt>النشطة</dt><dd id="rc_mon_active">—</dd></div>
@@ -510,6 +500,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             </div>
         </div>
     </section>
+    </details>
 </div>
 
 <div id="rc_view_modal" class="rc-modal-backdrop" aria-hidden="true">
@@ -548,7 +539,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
     const DISPLAY_TZ = <?php echo json_encode($displayTimezone, JSON_UNESCAPED_UNICODE); ?>;
     const COUNTRY_CONTEXT_CODE = <?php echo json_encode($countryContextCode, JSON_UNESCAPED_UNICODE); ?>;
 
-    let state = { full: [], country: [], jobs: [], busy: false, csrf: '', lastOverview: null, lastMaintenance: null, openedStage: '' };
+    let state = { full: [], country: [], jobs: [], busy: false, csrf: '', lastOverview: null, lastMaintenance: null, openedStage: '', guidedAllowCreateJob: false };
 
     const el = (id) => document.getElementById(id);
     const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -1120,14 +1111,8 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         el('rc_lock_maintenance').innerHTML =
             '<div><dt>قفل الاسترداد العام</dt><dd>' + (lock.held ? badge('مقفل — ' + (lock.job_id || '')) : badge('متاح')) + '</dd></div>' +
             '<div><dt>وضع الصيانة</dt><dd>' + (maint.active ? badge('مفعّل — ' + (maint.job_id || '')) : badge('غير مفعّل')) + '</dd></div>';
-        const ready = deriveReadiness(ov, state.lastMaintenance || maint);
-        const badgeEl = el('rc_readiness_badge');
-        if (badgeEl) {
-            badgeEl.className = 'rc-badge rc-badge--' + ready.tone;
-            badgeEl.textContent = ready.label;
-        }
-        const head = el('rc_readiness_headline');
-        if (head) head.textContent = ready.label;
+        // Header badge/headline are owned by renderGuidedWorkflow (operator path), not overview counts.
+        void deriveReadiness(ov, state.lastMaintenance || maint);
     }
 
     function packageExpandedActions(pkg, type) {
@@ -1146,21 +1131,21 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         files.forEach(([file, label]) => {
             secondary += '<button type="button" class="btn-link rc-btn-ghost rc-view-file" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '" data-file="' + file + '">' + label + '</button> ';
         });
-        if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
-            secondary += '<button type="button" class="btn-link rc-btn-ghost rc-dry-run" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">التحقق التشغيلي</button>';
-        }
+        // Package-level dry-run omitted from guided path — dry validation is the job step after create.
         html += '<div class="rc-action-row rc-action-row--secondary">' + secondary + '</div>';
         return html;
     }
 
-    /** Summary row: restore decision only. Package Information lives solely in expanded workspace. Owner 2026-07-23 */
+    /** Summary row: restore decision only while guided step "create job" is current. */
     function packagePrimaryAction(pkg, type) {
         const id = pkg.package_id;
         const cc = pkg.country_code || '';
-        if ((pkg.eligibility_status || pkg.restore_eligibility) === 'eligible') {
-            return '<button type="button" class="btn-link rc-btn-primary rc-create-job" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '">إنشاء مهمة استرداد</button>';
+        if ((pkg.eligibility_status || pkg.restore_eligibility) !== 'eligible') {
+            return '';
         }
-        return '';
+        // Visible only when guided workflow is on create_job (state set by renderGuidedWorkflow).
+        const hide = state.guidedAllowCreateJob === false ? ' hidden' : '';
+        return '<button type="button" class="btn-link rc-btn-primary rc-create-job" data-type="' + type + '" data-id="' + id + '" data-cc="' + cc + '"' + hide + '>إنشاء مهمة استرداد</button>';
     }
 
     /** Capability-preserving action set (expanded + create when eligible). */
@@ -1218,8 +1203,8 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         const id = String(job.job_id || '');
         const pkgLabel = (job.package_type || '') + (job.country_code ? ' / ' + job.country_code : '') + ' / ' + (job.package_id || '—');
         const dryBadge = job.dry_run_overall_result ? ' ' + dryResultBadge(job.dry_run_overall_result) : '';
-        const viewBtn = '<button type="button" class="btn-link rc-btn-primary rc-fw-view" data-id="' + id + '">عرض</button>';
-        const actions = jobActions(job, { omitPrimaryView: true });
+        const viewBtn = '<button type="button" class="btn-link rc-btn-ghost rc-fw-view" data-id="' + id + '">عرض التفاصيل</button>';
+        // History is reference-only — stage CTAs live solely in the guided primary panel.
         return (
             '<details class="rc-acc-item" data-rc-acc="job" data-job-id="' + esc(id) + '">' +
             '<summary>' +
@@ -1234,8 +1219,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             '</summary>' +
             '<div class="rc-acc-body">' +
                 '<p class="rc-muted" style="margin:0 0 8px;font-size:.82rem;">الحزمة: ' + esc(pkgLabel) + '</p>' +
-                '<p style="margin:0 0 8px;font-size:.86rem;">' + esc(String(job.message || '—')) + '</p>' +
-                '<div class="rc-action-row">' + actions + '</div>' +
+                '<p style="margin:0;font-size:.86rem;">' + esc(String(job.message || '—')) + '</p>' +
             '</div>' +
             '</details>'
         );
@@ -1274,6 +1258,444 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 || s === 'dry_running';
         });
         return active || list[0] || null;
+    }
+
+    /** Owner guided restore path (presentation order). Shadow files included — required by existing gates. */
+    const GUIDED_STEPS = [
+        { key: 'select_package', title: 'اختيار حزمة الاسترداد' },
+        { key: 'create_job', title: 'إنشاء مهمة استرداد' },
+        { key: 'dry_validation', title: 'التحقق التشغيلي' },
+        { key: 'prepare_plan', title: 'إعداد خطة الاسترداد' },
+        { key: 'final_approval', title: 'الموافقة النهائية' },
+        { key: 'pre_backup', title: 'النسخة الاحتياطية الإلزامية قبل الاسترداد' },
+        { key: 'shadow_restore', title: 'استعادة قاعدة الظل' },
+        { key: 'shadow_verify', title: 'تحقق قاعدة الظل' },
+        { key: 'shadow_files', title: 'استخراج ملفات الظل' },
+        { key: 'shadow_smoke', title: 'اختبارات الجاهزية المعزولة' },
+        { key: 'maintenance', title: 'تفعيل الصيانة' },
+        { key: 'pca', title: 'تفويض تحويل الإنتاج' },
+        { key: 'prod_import', title: 'استيراد قاعدة الإنتاج' },
+        { key: 'uploads', title: 'تحويل ملفات الرفع' },
+        { key: 'finalize', title: 'إنهاء الاسترداد' },
+        { key: 'completed', title: 'اكتمل الاسترداد' }
+    ];
+
+    function guidedBtn(cls, attrs, label, primary) {
+        const a = Object.keys(attrs || {}).map((k) => k + '="' + esc(String(attrs[k])) + '"').join(' ');
+        const c = primary ? ('btn-link rc-btn-primary ' + cls) : ('btn-link rc-btn-ghost ' + cls);
+        return '<button type="button" class="' + c + '" ' + a + '>' + esc(label) + '</button>';
+    }
+
+    function stIncludes(job, part) {
+        return String((job && job.status) || '').toLowerCase().includes(part);
+    }
+
+    function isRunningish(job, prefix) {
+        const s = String((job && job.status) || '').toLowerCase();
+        return s === prefix + '_pending' || s === prefix + '_running' || s === prefix + '_verifying'
+            || (prefix === 'shadow_restore' && (s === 'shadow_restore_pending' || s === 'shadow_restore_running' || s === 'shadow_restore_verifying'))
+            || (prefix === 'rollback' && s.includes('rollback') && !s.includes('finaliz'));
+    }
+
+    /**
+     * Resolve single current guided step + one primary action (UI only).
+     * @returns {{current:number,states:string[],blockReason:string,body:string,primaryHtml:string,secondaryHtml:string,showPackages:boolean,showJob:boolean}}
+     */
+    function resolveGuidedWorkflow(job, packages) {
+        const pkgs = Array.isArray(packages) ? packages : [];
+        const eligible = pkgs.filter((p) => (p.eligibility_status || p.restore_eligibility) === 'eligible');
+        const n = GUIDED_STEPS.length;
+        const states = new Array(n).fill('locked');
+        let current = 0;
+        let blockReason = '';
+        let body = '';
+        let primaryHtml = '';
+        let secondaryHtml = '';
+        let showPackages = true;
+        let showJob = false;
+
+        const markDone = (idx) => { for (let i = 0; i <= idx && i < n; i++) states[i] = 'done'; };
+        const setCurrent = (idx, msg) => {
+            current = idx;
+            for (let i = 0; i < idx; i++) if (states[i] !== 'blocked') states[i] = 'done';
+            states[idx] = 'current';
+            for (let i = idx + 1; i < n; i++) states[i] = 'locked';
+            body = msg || '';
+        };
+
+        if (!job) {
+            if (!pkgs.length) {
+                setCurrent(0, 'لا توجد حزم معروضة بعد. حدّث الصفحة أو أنشئ نسخة احتياطية أولاً.');
+                blockReason = pkgs.length === 0 ? 'لا حزم متاحة للعرض في السياق الحالي.' : '';
+                if (blockReason) states[0] = 'blocked';
+            } else if (!eligible.length) {
+                setCurrent(0, 'اختر حزمة من القائمة أدناه. لا توجد حزم مؤهلة حالياً لإنشاء مهمة.');
+                blockReason = 'لا توجد حزمة مؤهلة للاسترداد. راجع أهلية الحزمة أولاً.';
+                states[0] = 'blocked';
+            } else {
+                states[0] = 'done';
+                setCurrent(1, 'افتح حزمة مؤهلة من القائمة ثم اضغط «إنشاء مهمة استرداد». هذا هو الإجراء التالي الوحيد.');
+                if (eligible.length === 1) {
+                    const p = eligible[0];
+                    const type = (p.package_type === 'country_recovery' || p.country_code) ? 'country_recovery' : 'full_disaster';
+                    primaryHtml = guidedBtn('rc-create-job', {
+                        'data-type': type,
+                        'data-id': p.package_id || '',
+                        'data-cc': p.country_code || ''
+                    }, 'إنشاء مهمة استرداد', true);
+                }
+            }
+            showPackages = true;
+            showJob = false;
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+
+        showPackages = false;
+        showJob = true;
+        const id = job.job_id || '';
+        secondaryHtml = guidedBtn('rc-fw-view', { 'data-id': id }, 'عرض تفاصيل المهمة', false);
+        if (CAN_FULL && (job.package_type === 'full_disaster' || !job.package_type)) {
+            secondaryHtml += guidedBtn('rc-orch-diag', { 'data-id': id }, 'تشخيص التشغيل', false);
+        }
+
+        // Completed happy path
+        if (job.is_restore_completed || job.is_execution_finished || String(job.status || '') === 'restore_completed') {
+            markDone(n - 1);
+            states[n - 1] = 'done';
+            current = n - 1;
+            body = 'اكتمل مسار الاسترداد. الصيانة تُطلق عبر خطوة الإنهاء إن لم تكن قد أُطلقت.';
+            primaryHtml = '';
+            if (job.has_finalize || job.is_restore_completed) {
+                secondaryHtml += guidedBtn('rc-finalize-view', { 'data-id': id }, 'عرض حالة الإنهاء', false);
+            }
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+
+        // Rollback branch — guided as blocked finalize with rollback action
+        if (job.rollback_requestable || job.status === 'rollback_pending' || job.is_rollback_failed
+            || (stIncludes(job, 'rollback') && !stIncludes(job, 'finaliz') && !job.is_rollback_completed)) {
+            markDone(13); // through uploads conceptually may vary
+            setCurrent(14, 'مسار التراجع نشط. نفّذ أو تابع التراجع ثم الإنهاء حسب الحالة.');
+            if (job.rollback_requestable) {
+                primaryHtml = guidedBtn('rc-rollback-req', { 'data-id': id }, 'تنفيذ التراجع الإنتاجي', true);
+            } else if (job.status === 'rollback_pending' || job.is_rollback_failed) {
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'rollback' }, 'متابعة التراجع', true);
+            } else if (job.finalize_requestable || job.status === 'rollback_finalizing') {
+                setCurrent(14, 'التراجع جاهز للإنهاء.');
+                if (job.status === 'rollback_finalizing') {
+                    primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'finalize' }, 'متابعة الإنهاء', true);
+                } else {
+                    primaryHtml = guidedBtn('rc-finalize-req', { 'data-id': id }, 'تنفيذ الإنهاء / إطلاق الصيانة', true);
+                }
+            } else {
+                blockReason = 'التراجع قيد التنفيذ. حدّث الصفحة بعد اكتمال المرحلة.';
+                states[14] = 'blocked';
+            }
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+
+        // Step progression for happy path
+        markDone(1); // job exists => package selected + created
+        states[0] = 'done';
+        states[1] = 'done';
+
+        const dryDone = !!(job.has_dry_run_report || job.dry_run_overall_result || String(job.status || '').includes('dry_completed') || job.prepare_execution_available || job.has_execution_plan || job.final_approval_available || job.is_approved_waiting_execution || job.pre_restore_backup_requestable || job.has_pre_restore_backup);
+        const planDone = !!(job.has_execution_plan || job.final_approval_available || job.is_approved_waiting_execution || job.pre_restore_backup_requestable || job.has_pre_restore_backup);
+        const approved = !!(job.is_approved_waiting_execution || job.pre_restore_backup_requestable || job.has_pre_restore_backup || job.shadow_restore_requestable || job.has_shadow_restore || stIncludes(job, 'pre_restore') || stIncludes(job, 'shadow') || stIncludes(job, 'maintenance') || stIncludes(job, 'production') || stIncludes(job, 'uploads') || stIncludes(job, 'finaliz'));
+        const backupDone = !!(job.has_pre_restore_backup || job.is_pre_restore_backup_ready || job.shadow_restore_requestable || job.has_shadow_restore || stIncludes(job, 'shadow') || (job.status || '').includes('pre_restore_backup_ready'));
+        const shadowDbDone = !!(job.has_shadow_restore && (job.shadow_verification_runnable || job.has_shadow_verification || job.shadow_files_runnable || job.has_shadow_files || job.shadow_smoke_requestable || job.has_shadow_smoke))
+            || !!(job.status === 'shadow_restore_ready' || job.status === 'shadow_verified' || job.status === 'shadow_files_ready' || job.has_shadow_verification || job.has_shadow_files || job.has_shadow_smoke);
+        const shadowVerifyDone = !!(job.has_shadow_verification || job.shadow_files_runnable || job.has_shadow_files || job.shadow_smoke_requestable || job.has_shadow_smoke || job.status === 'shadow_verified' || job.status === 'shadow_files_ready');
+        const shadowFilesDone = !!(job.has_shadow_files || job.shadow_smoke_requestable || job.has_shadow_smoke || job.status === 'shadow_files_ready' || job.status === 'shadow_smoke_ready' || job.status === 'cutover_readiness_ready');
+        const smokeDone = !!(job.has_shadow_smoke || job.has_cutover_readiness || job.maintenance_requestable || job.is_maintenance_ready || job.is_maintenance_active || job.production_import_requestable);
+        const maintActive = !!(job.is_maintenance_active);
+        const maintReady = !!(job.is_maintenance_ready || job.maintenance_activatable);
+        const pcaDone = !!(job.production_import_requestable || job.has_production_import || job.is_production_import_ready || stIncludes(job, 'production_import') || stIncludes(job, 'uploads') || stIncludes(job, 'finaliz'));
+        // PCA done when import becomes requestable (or later). Import done when uploads path opens or import ready.
+        const importDone = !!(
+            job.uploads_cutover_requestable
+            || job.has_uploads_cutover
+            || job.is_uploads_cutover_ready
+            || job.finalize_requestable
+            || (job.is_production_import_ready && !job.is_production_import_failed)
+            || (job.has_production_import && !job.is_production_import_failed && (job.uploads_cutover_requestable || job.is_production_import_ready))
+        );
+        const uploadsDone = !!(job.is_uploads_cutover_ready || job.finalize_requestable || job.status === 'uploads_cutover_ready');
+
+        if (!dryDone && job.dry_run_available) {
+            setCurrent(2, 'نفّذ التحقق التشغيلي للمهمة. هذا هو الإجراء التالي الوحيد.');
+            primaryHtml = guidedBtn('rc-dry-run', { 'data-job': id }, 'تنفيذ التحقق التشغيلي', true);
+            if (job.has_dry_run_report) secondaryHtml += guidedBtn('rc-dry-report', { 'data-id': id }, 'عرض تقرير التحقق', false);
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        if (!dryDone && String(job.status || '') === 'dry_running') {
+            setCurrent(2, 'التحقق التشغيلي جارٍ. انتظر ثم حدّث الصفحة.');
+            blockReason = 'التحقق قيد التنفيذ — لا يوجد زر إضافي الآن.';
+            states[2] = 'blocked';
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        if (!dryDone) {
+            setCurrent(2, 'بانتظار توفر التحقق التشغيلي.');
+            blockReason = 'التحقق التشغيلي غير متاح بعد لهذه المهمة.';
+            states[2] = 'blocked';
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        states[2] = 'done';
+
+        if (!planDone && job.prepare_execution_available) {
+            setCurrent(3, 'أعد خطة الاسترداد. هذا هو الإجراء التالي الوحيد.');
+            primaryHtml = guidedBtn('rc-prepare-exec', { 'data-id': id }, 'إعداد خطة الاسترداد', true);
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        if (!planDone) {
+            setCurrent(3, 'بانتظار إعداد الخطة.');
+            blockReason = 'إعداد الخطة غير متاح بعد. أكمل التحقق التشغيلي أولاً.';
+            states[3] = 'blocked';
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        states[3] = 'done';
+        if (job.has_execution_plan) secondaryHtml += guidedBtn('rc-exec-plan', { 'data-id': id }, 'عرض خطة الاسترداد', false);
+
+        if (!approved && job.final_approval_available) {
+            setCurrent(4, 'قدّم الموافقة النهائية على الخطة. هذا هو الإجراء التالي الوحيد.');
+            primaryHtml = guidedBtn('rc-final-approve', { 'data-id': id, 'data-pkg': job.package_id || '' }, 'الموافقة النهائية', true);
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        if (!approved) {
+            setCurrent(4, 'بانتظار الموافقة النهائية.');
+            blockReason = 'الموافقة النهائية غير متاحة بعد. أكمل إعداد الخطة أولاً.';
+            states[4] = 'blocked';
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        states[4] = 'done';
+
+        if (!backupDone) {
+            if (job.pre_restore_backup_requestable) {
+                setCurrent(5, 'نفّذ النسخة الاحتياطية الإلزامية قبل الاسترداد.');
+                primaryHtml = guidedBtn('rc-pre-backup-req', { 'data-id': id }, 'تنفيذ النسخة الاحتياطية الإلزامية قبل الاسترداد', true);
+            } else if (job.status === 'pre_restore_backup_pending' || job.is_pre_restore_backup_failed) {
+                setCurrent(5, 'تابع تنفيذ النسخة الاحتياطية.');
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'pre_restore_backup' }, 'متابعة النسخة الاحتياطية', true);
+            } else if (isRunningish(job, 'pre_restore_backup') || stIncludes(job, 'pre_restore_backup_running') || stIncludes(job, 'pre_restore_backup_verifying')) {
+                setCurrent(5, 'النسخة الاحتياطية جارية. انتظر ثم حدّث.');
+                blockReason = 'التنفيذ جارٍ — لا تضغط إجراءات أخرى.';
+                states[5] = 'blocked';
+            } else {
+                setCurrent(5, 'بانتظار النسخة الاحتياطية الإلزامية.');
+                blockReason = 'خطوة النسخة الاحتياطية غير جاهزة للتنفيذ بعد.';
+                states[5] = 'blocked';
+            }
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        states[5] = 'done';
+
+        if (!shadowDbDone) {
+            if (job.shadow_restore_requestable) {
+                setCurrent(6, 'نفّذ استعادة قاعدة الظل.');
+                primaryHtml = guidedBtn('rc-shadow-req', { 'data-id': id }, 'تنفيذ استعادة قاعدة الظل', true);
+            } else if (job.status === 'shadow_restore_pending' || job.is_shadow_restore_failed) {
+                setCurrent(6, 'تابع استعادة قاعدة الظل.');
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_db' }, 'متابعة استعادة الظل', true);
+            } else if (stIncludes(job, 'shadow_restore_running') || stIncludes(job, 'shadow_restore_verifying')) {
+                setCurrent(6, 'استعادة الظل جارية. انتظر ثم حدّث.');
+                blockReason = 'التنفيذ جارٍ.';
+                states[6] = 'blocked';
+            } else {
+                setCurrent(6, 'بانتظار استعادة قاعدة الظل.');
+                blockReason = 'استعادة الظل غير متاحة بعد. أكمل النسخة الاحتياطية أولاً.';
+                states[6] = 'blocked';
+            }
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        states[6] = 'done';
+
+        if (!shadowVerifyDone) {
+            if (job.shadow_verification_runnable) {
+                setCurrent(7, 'نفّذ تحقق قاعدة الظل.');
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_verify' }, 'تنفيذ تحقق قاعدة الظل', true);
+            } else if (job.status === 'shadow_verifying') {
+                setCurrent(7, 'تحقق الظل جارٍ. انتظر ثم حدّث.');
+                blockReason = 'التنفيذ جارٍ.';
+                states[7] = 'blocked';
+            } else if (job.status === 'shadow_not_ready') {
+                setCurrent(7, 'قاعدة الظل غير جاهزة.');
+                blockReason = 'التحقق أظهر أن الظل غير جاهز. راجع التقرير ثم أعد المحاولة عند التوفر.';
+                states[7] = 'blocked';
+                secondaryHtml += guidedBtn('rc-shadow-verify-view', { 'data-id': id }, 'عرض تحقق الجاهزية', false);
+            } else {
+                setCurrent(7, 'بانتظار تحقق قاعدة الظل.');
+                blockReason = 'تحقق الظل غير متاح بعد.';
+                states[7] = 'blocked';
+            }
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        states[7] = 'done';
+
+        if (!shadowFilesDone) {
+            if (job.shadow_files_runnable) {
+                setCurrent(8, 'نفّذ استخراج ملفات الظل.');
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_files' }, 'تنفيذ استخراج ملفات الظل', true);
+            } else if (stIncludes(job, 'shadow_files_running') || stIncludes(job, 'shadow_files_verifying')) {
+                setCurrent(8, 'استخراج ملفات الظل جارٍ. انتظر ثم حدّث.');
+                blockReason = 'التنفيذ جارٍ.';
+                states[8] = 'blocked';
+            } else if (job.status === 'shadow_files_failed') {
+                setCurrent(8, 'فشل استخراج ملفات الظل — أعد التنفيذ.');
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_files' }, 'إعادة استخراج ملفات الظل', true);
+            } else {
+                setCurrent(8, 'بانتظار استخراج ملفات الظل.');
+                blockReason = 'استخراج ملفات الظل غير متاح بعد. أكمل تحقق الظل أولاً.';
+                states[8] = 'blocked';
+            }
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        states[8] = 'done';
+
+        if (!smokeDone) {
+            if (job.shadow_smoke_requestable) {
+                setCurrent(9, 'نفّذ اختبارات الجاهزية المعزولة.');
+                primaryHtml = guidedBtn('rc-shadow-smoke-req', { 'data-id': id }, 'تنفيذ اختبارات الجاهزية المعزولة', true);
+            } else if (job.status === 'shadow_smoke_pending' || job.status === 'shadow_smoke_failed') {
+                setCurrent(9, 'تابع اختبارات الجاهزية.');
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'shadow_smoke' }, 'متابعة اختبارات الجاهزية', true);
+            } else if (stIncludes(job, 'shadow_smoke_running')) {
+                setCurrent(9, 'اختبارات الجاهزية جارية. انتظر ثم حدّث.');
+                blockReason = 'التنفيذ جارٍ.';
+                states[9] = 'blocked';
+            } else {
+                setCurrent(9, 'بانتظار اختبارات الجاهزية.');
+                blockReason = 'اختبارات الجاهزية غير متاحة بعد.';
+                states[9] = 'blocked';
+            }
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        states[9] = 'done';
+
+        if (!maintActive) {
+            if (job.maintenance_requestable && !maintReady) {
+                setCurrent(10, 'اطلب تفعيل الصيانة.');
+                primaryHtml = guidedBtn('rc-maint-req', { 'data-id': id }, 'طلب تفعيل الصيانة', true);
+            } else if (maintReady || job.maintenance_activatable) {
+                setCurrent(10, 'فعّل الصيانة الآن. استرداد الإنتاج لم يبدأ بعد.');
+                primaryHtml = guidedBtn('rc-maint-activate', { 'data-id': id }, 'تفعيل الصيانة', true);
+            } else {
+                setCurrent(10, 'بانتظار الصيانة.');
+                blockReason = 'طلب/تفعيل الصيانة غير متاح بعد. أكمل اختبارات الجاهزية أولاً.';
+                states[10] = 'blocked';
+            }
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        states[10] = 'done';
+
+        if (!pcaDone) {
+            setCurrent(11, 'فوض تحويل الإنتاج قبل استيراد قاعدة الإنتاج. استرداد الإنتاج لم يبدأ بعد.');
+            primaryHtml = guidedBtn('rc-pca-authorize', { 'data-id': id, 'data-pkg': job.package_id || '' }, 'تفويض تحويل الإنتاج', true);
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        states[11] = 'done';
+
+        if (!importDone) {
+            if (job.production_import_requestable) {
+                setCurrent(12, 'نفّذ استيراد قاعدة الإنتاج.');
+                primaryHtml = guidedBtn('rc-prod-import-req', { 'data-id': id }, 'تنفيذ استيراد قاعدة الإنتاج', true);
+            } else if (job.status === 'production_import_pending' || job.is_production_import_failed) {
+                setCurrent(12, 'تابع استيراد الإنتاج.');
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'production_import' }, 'متابعة استيراد الإنتاج', true);
+            } else if (stIncludes(job, 'production_import_running') || stIncludes(job, 'production_import_verifying')) {
+                setCurrent(12, 'استيراد الإنتاج جارٍ. انتظر ثم حدّث.');
+                blockReason = 'التنفيذ جارٍ.';
+                states[12] = 'blocked';
+            } else {
+                setCurrent(12, 'بانتظار استيراد قاعدة الإنتاج.');
+                blockReason = 'الاستيراد غير متاح. أكمل تفويض تحويل الإنتاج والصيانة النشطة أولاً.';
+                states[12] = 'blocked';
+            }
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        states[12] = 'done';
+
+        if (!uploadsDone) {
+            if (job.uploads_cutover_requestable) {
+                setCurrent(13, 'نفّذ تحويل ملفات الرفع.');
+                primaryHtml = guidedBtn('rc-uploads-cutover-req', { 'data-id': id }, 'تنفيذ تحويل ملفات الرفع', true);
+            } else if (job.status === 'uploads_cutover_pending' || job.is_uploads_cutover_failed) {
+                setCurrent(13, 'تابع تحويل الرفع.');
+                primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'uploads_cutover' }, 'متابعة تحويل الرفع', true);
+            } else if (stIncludes(job, 'uploads_cutover_running') || stIncludes(job, 'uploads_cutover_verifying')) {
+                setCurrent(13, 'تحويل الرفع جارٍ. انتظر ثم حدّث.');
+                blockReason = 'التنفيذ جارٍ.';
+                states[13] = 'blocked';
+            } else {
+                setCurrent(13, 'بانتظار تحويل ملفات الرفع.');
+                blockReason = 'تحويل الرفع غير متاح بعد. أكمل استيراد الإنتاج أولاً.';
+                states[13] = 'blocked';
+            }
+            return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+        }
+        states[13] = 'done';
+
+        if (job.finalize_requestable) {
+            setCurrent(14, 'أنهِ الاسترداد وأطلق الصيانة.');
+            primaryHtml = guidedBtn('rc-finalize-req', { 'data-id': id }, 'تنفيذ الإنهاء / إطلاق الصيانة', true);
+        } else if (job.status === 'restore_finalizing' || job.status === 'rollback_finalizing') {
+            setCurrent(14, 'تابع الإنهاء.');
+            primaryHtml = guidedBtn('rc-run-worker', { 'data-id': id, 'data-worker': 'finalize' }, 'متابعة الإنهاء', true);
+        } else {
+            setCurrent(14, 'بانتظار الإنهاء.');
+            blockReason = 'الإنهاء غير متاح بعد. أكمل تحويل الرفع أولاً.';
+            states[14] = 'blocked';
+        }
+        return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
+    }
+
+    function renderGuidedWorkflow() {
+        const job = pickActiveJob(state.jobs || []);
+        const pkgs = CAN_FULL ? (state.full || []) : (state.country || []);
+        const g = resolveGuidedWorkflow(job, pkgs);
+        const stepsEl = el('rc_guide_steps');
+        if (stepsEl) {
+            stepsEl.innerHTML = GUIDED_STEPS.map((step, idx) => {
+                const st = g.states[idx] || 'locked';
+                let mark = '🔒';
+                let cls = 'is-locked';
+                if (st === 'done') { mark = '✔'; cls = 'is-done'; }
+                if (st === 'current') { mark = '▶'; cls = 'is-current'; }
+                if (st === 'blocked') { mark = '!'; cls = 'is-blocked'; }
+                return '<li class="rc-guide-step ' + cls + '"><span class="rc-guide-mark" aria-hidden="true">' + mark + '</span><span><strong>' + (idx + 1) + '.</strong> ' + esc(step.title) + '</span></li>';
+            }).join('');
+        }
+        const step = GUIDED_STEPS[g.current] || GUIDED_STEPS[0];
+        if (el('rc_guide_kicker')) el('rc_guide_kicker').textContent = (g.states[g.current] === 'done' && step.key === 'completed') ? 'النتيجة' : 'الإجراء المطلوب الآن';
+        if (el('rc_guide_title')) el('rc_guide_title').textContent = step.title;
+        if (el('rc_guide_body')) el('rc_guide_body').textContent = g.body || '';
+        const block = el('rc_guide_block');
+        if (block) {
+            if (g.blockReason) {
+                block.hidden = false;
+                block.textContent = 'محظور: ' + g.blockReason;
+            } else {
+                block.hidden = true;
+                block.textContent = '';
+            }
+        }
+        if (el('rc_guide_primary')) el('rc_guide_primary').innerHTML = g.primaryHtml || '';
+        if (el('rc_guide_secondary')) el('rc_guide_secondary').innerHTML = g.secondaryHtml || '';
+        const wsPkg = el('rc_ws_packages');
+        const wsJob = el('rc_ws_job');
+        if (wsPkg) wsPkg.hidden = !g.showPackages;
+        if (wsJob) wsJob.hidden = !g.showJob;
+        if (el('rc_readiness_badge')) {
+            const b = el('rc_readiness_badge');
+            b.className = 'rc-badge ' + (g.blockReason ? 'rc-badge--failed' : (step.key === 'completed' ? 'rc-badge--success' : 'rc-badge--warning'));
+            b.textContent = step.key === 'completed' ? 'مكتمل' : ('الخطوة ' + (g.current + 1) + ' من ' + GUIDED_STEPS.length);
+        }
+        if (el('rc_readiness_headline')) el('rc_readiness_headline').textContent = step.title;
+        // Package-row create CTAs only when create_job is current and primary panel does not already own the button.
+        const primaryOwnsCreate = /rc-create-job/.test(g.primaryHtml || '');
+        state.guidedAllowCreateJob = !!(g.showPackages && g.current === 1 && !g.blockReason && !primaryOwnsCreate);
+        document.querySelectorAll('.rc-acc-actions-inline .rc-create-job').forEach((btn) => {
+            btn.hidden = !state.guidedAllowCreateJob;
+        });
     }
 
     function updateStageStrip(maint, jobs) {
@@ -1333,8 +1755,8 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
             '<span><strong>المرحلة</strong> ' + esc(String(job.phase || '—')) + '</span>' +
             '<span><strong>التقدم</strong> ' + esc(String(job.progress ?? 0)) + '%</span>' +
             '<span class="rc-muted">' + esc(String(job.message || '')) + '</span>';
-        acts.innerHTML = '<button type="button" class="btn-link rc-btn-primary rc-fw-view" data-id="' + esc(job.job_id || '') + '">عرض</button> '
-            + '<div class="rc-action-row" style="margin:0">' + jobActions(job, { omitPrimaryView: true }) + '</div>';
+        // Guided workflow owns the single primary action — do not dump stage CTAs here.
+        acts.innerHTML = '';
         if (el('rc_mon_jobs')) el('rc_mon_jobs').textContent = String(list.length);
         if (el('rc_mon_active')) el('rc_mon_active').textContent = job.job_id || '—';
         if (el('rc_mon_phase')) el('rc_mon_phase').textContent = job.phase || '—';
@@ -1365,7 +1787,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
                 ? state.jobs.map((j) => jobAccordionHtml(j)).join('')
                 : emptyStateHtml(
                     'لا توجد مهام استرداد بعد',
-                    'اختر حزمة مؤهلة من القسم 2 ثم أنشئ مهمة استرداد. ستظهر المهمة النشطة والتقدم هنا.'
+                    'اتبع المسار الموجَّه أعلاه: اختر حزمة مؤهلة ثم أنشئ مهمة استرداد.'
                 );
         }
         if (el('rc_jobs_table') && el('rc_jobs_table').querySelector('tbody')) {
@@ -1379,6 +1801,7 @@ orange_admin_render_page_title_with_country('إدارة الاسترداد', $pd
         }
         renderActiveJob(state.jobs);
         updateStageStrip(state.lastMaintenance || data.maintenance || {}, state.jobs);
+        renderGuidedWorkflow();
         if (el('rc_mon_jobs')) el('rc_mon_jobs').textContent = String(state.jobs.length);
         if (el('rc_overview')) el('rc_overview').removeAttribute('aria-busy');
         if (el('rc_lock_maintenance')) el('rc_lock_maintenance').removeAttribute('aria-busy');
