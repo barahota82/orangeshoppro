@@ -244,7 +244,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             </div>
 
             <div id="bc_tab_country" class="bc-tab-panel" role="tabpanel" aria-labelledby="bc_tab_country_btn" hidden>
-                <p class="bc-tz-label" id="bc_country_scope_label" style="margin:0 0 10px;">Country Backup معروض لسياق الدولة: <code dir="ltr"><?php echo htmlspecialchars($countryContextCode !== '' ? $countryContextCode : '—', ENT_QUOTES, 'UTF-8'); ?></code> — Full Backup يبقى عاماً.</p>
                 <dl id="bc_country_discovery" class="bc-status-strip" aria-hidden="true">
                     <div><dt>دول قابلة للاسترداد (عام)</dt><dd>…</dd></div>
                     <div><dt>آخر حزمة للدولة الحالية</dt><dd>…</dd></div>
@@ -348,7 +347,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     const RECENT_LIMIT = 5;
     /** IANA from Country Configuration (countries.timezone) — presentation only; storage stays UTC. */
     const DISPLAY_TZ = <?php echo json_encode($displayTimezone, JSON_UNESCAPED_UNICODE); ?>;
-    const COUNTRY_CONTEXT_CODE = <?php echo json_encode($countryContextCode, JSON_UNESCAPED_UNICODE); ?>;
 
     let state = {
         full: [],
@@ -905,11 +903,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             '<div><dt>الحالة</dt><dd>' + badge(latestFull.package_status) + '</dd></div>' +
             '<div><dt>Schema</dt><dd>' + esc(String(latestFull.schema_revision ?? '—')) + '</dd></div>' +
             '<div><dt>DRV لآخر Full</dt><dd>' + esc(String(latestDrv)) + '</dd></div>';
-        const ctxCode = String(o.country_context_code || ov.country_context_code || COUNTRY_CONTEXT_CODE || '—');
-        const scopeLabel = el('bc_country_scope_label');
-        if (scopeLabel) {
-            scopeLabel.innerHTML = 'Country Backup معروض لسياق الدولة: <code dir="ltr">' + esc(ctxCode) + '</code> — Full Backup يبقى عاماً.';
-        }
         el('bc_country_discovery').innerHTML =
             '<div><dt>دول قابلة للاسترداد (عام)</dt><dd>' + esc(String(ov.recoverable_countries ?? '—')) + '</dd></div>' +
             '<div><dt>أحدث حزمة للدولة الحالية</dt><dd>' + fmtPackageWhenDisplay(latestCountryPkg, 'country_recovery') + '</dd></div>' +
