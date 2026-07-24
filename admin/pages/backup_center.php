@@ -237,7 +237,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 <!-- Single list: content swaps between latest-5 and full history (no dual DOM). -->
                 <div id="bc_full_list" class="bc-acc-list" data-bc-mode="recent"></div>
                 <div class="bc-history-footer">
-                    <p id="bc_full_list_hint">عرض آخر 5 عمليات Full Backup</p>
+                    <p id="bc_full_list_hint">آخر 5 عمليات</p>
                     <button type="button" class="bc-btn-secondary" id="bc_view_full_history_btn" data-bc-history-type="full">عرض السجل الكامل</button>
                     <button type="button" class="bc-btn-secondary" id="bc_back_recent_full_btn" data-bc-history-type="full" hidden>العودة لآخر العمليات</button>
                 </div>
@@ -255,7 +255,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 <!-- Single list: content swaps between latest-5 and full history (no dual DOM). -->
                 <div id="bc_country_list" class="bc-acc-list" data-bc-mode="recent"></div>
                 <div class="bc-history-footer">
-                    <p id="bc_country_list_hint">عرض آخر 5 حزم Country Backup</p>
+                    <p id="bc_country_list_hint">آخر 5 عمليات</p>
                     <button type="button" class="bc-btn-secondary" id="bc_view_country_history_btn" data-bc-history-type="country">عرض السجل الكامل</button>
                     <button type="button" class="bc-btn-secondary" id="bc_back_recent_country_btn" data-bc-history-type="country" hidden>العودة لآخر العمليات</button>
                 </div>
@@ -1030,7 +1030,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             el('bc_back_recent_full_btn').hidden = !isArchive;
             el('bc_full_list_hint').textContent = isArchive
                 ? ('السجل الكامل: ' + source.length)
-                : ('آخر ' + Math.min(RECENT_LIMIT, source.length) + ' عمليات Full Backup');
+                : ('آخر ' + Math.min(RECENT_LIMIT, source.length) + ' عمليات');
             const pill = el('bc_full_mode_pill');
             if (pill) {
                 pill.textContent = isArchive ? ('السجل الكامل (' + source.length + ')') : ('آخر العمليات (' + Math.min(RECENT_LIMIT, source.length) + ')');
@@ -1045,7 +1045,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             el('bc_back_recent_country_btn').hidden = !isArchive;
             el('bc_country_list_hint').textContent = isArchive
                 ? ('السجل الكامل للدولة الحالية: ' + source.length)
-                : ('آخر ' + Math.min(RECENT_LIMIT, source.length) + ' حزم للدولة الحالية فقط — بدون دول أخرى');
+                : ('آخر ' + Math.min(RECENT_LIMIT, source.length) + ' عمليات');
             const pill = el('bc_country_mode_pill');
             if (pill) {
                 pill.textContent = isArchive ? ('السجل الكامل (' + source.length + ')') : ('آخر العمليات (' + Math.min(RECENT_LIMIT, source.length) + ')');
