@@ -825,7 +825,29 @@ function orange_restore_fw_public_row(array $job): array
         'framework_version' => (string) ($job['framework_version'] ?? ORANGE_RESTORE_FW_VERSION),
         'execution_enabled' => false,
         'production_cutover_allowed' => false,
+        // Presentation flags from authoritative transition terminal set (UI journey vs history).
+        'is_terminal' => in_array($status, orange_restore_fw_transition_terminal_statuses(), true),
+        'is_resumable' => !in_array($status, orange_restore_fw_transition_terminal_statuses(), true),
     ];
+}
+
+/**
+ * Newest non-terminal framework job for Restore Center wizard journey.
+ * Distinct from orange_restore_fw_find_active_job() (early create-mutex statuses only).
+ *
+ * @return array<string, mixed>|null Public row, or null when only terminal/history jobs exist.
+ */
+function orange_restore_fw_find_resumable_job(string $workRoot): ?array
+{
+    $terminals = orange_restore_fw_transition_terminal_statuses();
+    foreach (orange_restore_fw_list_jobs($workRoot) as $row) {
+        $status = (string) ($row['status'] ?? '');
+        if ($status !== '' && !in_array($status, $terminals, true)) {
+            return $row;
+        }
+    }
+
+    return null;
 }
 
 /**

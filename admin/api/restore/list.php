@@ -49,6 +49,22 @@ try {
         'country_packages' => $countryPackages,
         'framework_jobs' => orange_restore_admin_fw_list_jobs($workRoot, $mayFull, $mayCountry),
         'jobs' => orange_restore_admin_fw_list_jobs($workRoot, $mayFull, $mayCountry),
+        // Wizard journey job only — terminal/history jobs never selected here (Owner 2026-07-24).
+        'current_journey_job' => (static function () use ($workRoot, $mayFull, $mayCountry): ?array {
+            $job = orange_restore_fw_find_resumable_job($workRoot);
+            if ($job === null) {
+                return null;
+            }
+            $type = (string) ($job['package_type'] ?? '');
+            if ($type === 'full_disaster' && !$mayFull) {
+                return null;
+            }
+            if ($type === 'country_recovery' && !$mayCountry) {
+                return null;
+            }
+
+            return $job;
+        })(),
         'legacy_engine_jobs' => orange_restore_admin_list_jobs($workRoot, $mayFull, $mayCountry),
         'maintenance' => orange_restore_admin_fw_maintenance_status($workRoot),
     ]);
