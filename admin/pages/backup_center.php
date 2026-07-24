@@ -901,11 +901,11 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 rowHtml('قيمة DRV لآخر نسخة كاملة', esc(String(latestDrv))) +
             '</div></article>' +
             '<article class="bc-op-card"><h3>التخزين والاحتفاظ</h3><div class="bc-op-rows">' +
-                rowHtml('إجمالي الحجم (Snapshots+Countries+Logs)', esc(st.total_human || '—')) +
-                rowHtml('حجم مجلد Snapshots', esc(st.snapshots_human || '—')) +
-                rowHtml('حجم مجلد Country Packages', esc(st.country_packages_human || '—')) +
-                rowHtml('حجم مجلد Logs', esc(st.logs_human || '—')) +
-                rowHtml('Retention (ORANGE_BACKUP_RETENTION_DAYS)', esc((ov.retention_days !== undefined && ov.retention_days !== null && ov.retention_days !== '') ? (String(ov.retention_days) + ' يوم') : '—'), true) +
+                rowHtml('إجمالي مساحة التخزين', esc(st.total_human || '—')) +
+                rowHtml('حجم مجلد اللقطات', esc(st.snapshots_human || '—')) +
+                rowHtml('حجم مجلد حزم الدول', esc(st.country_packages_human || '—')) +
+                rowHtml('حجم مجلد السجلات', esc(st.logs_human || '—')) +
+                rowHtml('مدة الاحتفاظ بالنسخ الاحتياطية', esc((ov.retention_days !== undefined && ov.retention_days !== null && ov.retention_days !== '') ? (String(ov.retention_days) + ' يوماً') : '—'), true) +
             '</div></article>';
 
         el('bc_latest_full').innerHTML =
