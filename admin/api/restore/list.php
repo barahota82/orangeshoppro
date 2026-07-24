@@ -18,16 +18,22 @@ try {
     $backupRoot = $ctx['backup_root'];
     $workRoot = $ctx['work_root'];
 
+    require_once dirname(__DIR__, 3) . '/includes/countries.php';
+    // Country packages follow Admin Country Context (same rule as Backup Center).
+    // Full packages stay global. Uncapped country list so Step 1 can show latest-5 after
+    // eligibility/context filtering (not a global limit before filter).
+    $countryContextCode = orange_admin_context_country_code($pdo);
+
     $fullPackages = [];
     if ($mayFull) {
-        foreach (orange_backup_admin_list_full_snapshots($backupRoot, 50) as $pkg) {
+        foreach (orange_backup_admin_list_full_snapshots($backupRoot, 100) as $pkg) {
             $fullPackages[] = orange_restore_admin_public_package_row($pkg, 'full_disaster');
         }
     }
 
     $countryPackages = [];
     if ($mayCountry) {
-        foreach (orange_backup_admin_list_country_packages($pdo, $backupRoot, 10) as $pkg) {
+        foreach (orange_backup_admin_list_country_packages($pdo, $backupRoot, null, $countryContextCode) as $pkg) {
             $countryPackages[] = orange_restore_admin_public_package_row($pkg, 'country_recovery');
         }
     }
@@ -44,6 +50,7 @@ try {
             'can_create_job' => $mayFull || $mayCountry,
             'can_cancel_job' => $mayFull || $mayCountry,
         ],
+        'country_context_code' => orange_countries_display_code($countryContextCode),
         'overview' => orange_restore_admin_collect_overview($workRoot),
         'full_packages' => $fullPackages,
         'country_packages' => $countryPackages,

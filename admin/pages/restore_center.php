@@ -222,6 +222,11 @@ body.rc-modal-open{overflow:hidden!important}
 .rc-pkg-pick.is-ineligible{cursor:default;opacity:.92}
 .rc-pkg-pick-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .rc-pkg-pick-actions{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
+/* Step 1 package list modes — mirror Backup Center history footer (Owner 2026-07-24) */
+.rc-mode-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:.78rem;font-weight:650;border:1px solid var(--rc-border);background:var(--rc-soft,#fff7ed);color:var(--rc-muted)}
+.rc-mode-pill.is-active{border-color:var(--primary,#ea580c);color:var(--primary,#ea580c);background:rgba(234,88,12,.1)}
+.rc-pkg-list-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid #f1f5f9}
+.rc-pkg-list-footer p{margin:0;font-size:.8rem;color:var(--rc-muted)}
 .rc-job-context{padding:12px 14px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:12px}
 .rc-job-context h4{margin:0 0 8px;font-size:.9rem}
 .rc-history{margin-top:16px;background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:14px;padding:14px}
@@ -289,19 +294,30 @@ body.rc-modal-open{overflow:hidden!important}
                         <button type="button" class="rc-tab<?php echo $canFull ? '' : ' is-active'; ?>" id="rc_tab_country_btn" data-rc-tab="country">نسخة الدولة</button>
                         <?php endif; ?>
                     </div>
+                    <span id="rc_pkg_mode_pill" class="rc-mode-pill is-active">آخر 5 حزم</span>
                 </div>
                 <?php if ($canFull): ?>
                 <div id="rc_tab_full" class="rc-tab-panel is-active" role="tabpanel">
-                    <div id="rc_full_list" class="rc-acc-list" aria-busy="true">
+                    <div id="rc_full_list" class="rc-acc-list" aria-busy="true" data-rc-pkg-mode="latest5">
                         <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:35%"></span><div class="rc-skeleton" style="width:70%;margin-top:12px"></div></div>
+                    </div>
+                    <div class="rc-pkg-list-footer" id="rc_full_list_footer">
+                        <p id="rc_full_list_hint">آخر 5 حزم مؤهلة</p>
+                        <button type="button" class="rc-btn-secondary" id="rc_view_all_full_btn" data-rc-pkg-kind="full">عرض جميع الحزم</button>
+                        <button type="button" class="rc-btn-secondary" id="rc_back_latest_full_btn" data-rc-pkg-kind="full" hidden>العودة إلى آخر 5 حزم</button>
                     </div>
                 </div>
                 <?php endif; ?>
                 <?php if ($canCountry): ?>
                 <div id="rc_tab_country" class="rc-tab-panel<?php echo $canFull ? '' : ' is-active'; ?>" role="tabpanel"<?php echo $canFull ? ' hidden' : ''; ?>>
                     <p class="rc-tz-label" style="margin:0 0 10px;">سياق الدولة: <code dir="ltr"><?php echo htmlspecialchars($countryContextCode !== '' ? $countryContextCode : '—', ENT_QUOTES, 'UTF-8'); ?></code></p>
-                    <div id="rc_country_list" class="rc-acc-list" aria-busy="true">
+                    <div id="rc_country_list" class="rc-acc-list" aria-busy="true" data-rc-pkg-mode="latest5">
                         <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:35%"></span><div class="rc-skeleton" style="width:70%;margin-top:12px"></div></div>
+                    </div>
+                    <div class="rc-pkg-list-footer" id="rc_country_list_footer">
+                        <p id="rc_country_list_hint">آخر 5 حزم مؤهلة للدولة الحالية</p>
+                        <button type="button" class="rc-btn-secondary" id="rc_view_all_country_btn" data-rc-pkg-kind="country">عرض جميع الحزم</button>
+                        <button type="button" class="rc-btn-secondary" id="rc_back_latest_country_btn" data-rc-pkg-kind="country" hidden>العودة إلى آخر 5 حزم</button>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -605,6 +621,8 @@ body.rc-modal-open{overflow:hidden!important}
     /** IANA from Country Configuration (countries.timezone) — presentation only; storage stays UTC. */
     const DISPLAY_TZ = <?php echo json_encode($displayTimezone, JSON_UNESCAPED_UNICODE); ?>;
     const COUNTRY_CONTEXT_CODE = <?php echo json_encode($countryContextCode, JSON_UNESCAPED_UNICODE); ?>;
+    /** Step 1 package list — same conceptual limit as Backup Center RECENT_LIMIT. */
+    const PKG_RECENT_LIMIT = 5;
 
     let state = {
         full: [],
@@ -617,7 +635,10 @@ body.rc-modal-open{overflow:hidden!important}
         lastMaintenance: null,
         openedStage: '',
         guidedAllowCreateJob: false,
-        selectedPackage: null
+        selectedPackage: null,
+        /** UI-only Step 1 list mode per tab: 'latest5' | 'all' */
+        packageListMode: { full: 'latest5', country: 'latest5' },
+        countryContextCode: COUNTRY_CONTEXT_CODE
     };
     /** Authoritative framework terminal statuses — same set as orange_restore_fw_transition_terminal_statuses(). */
     const FW_TERMINAL_STATUSES = new Set(<?php echo json_encode(array_values($fwTerminalStatuses), JSON_UNESCAPED_UNICODE); ?>);
@@ -1781,14 +1802,86 @@ body.rc-modal-open{overflow:hidden!important}
         return { current, states, blockReason, body, primaryHtml, secondaryHtml, showPackages, showJob };
     }
 
-    function wizardPackageList() {
+    function isPkgEligible(pkg) {
+        return (pkg && (pkg.eligibility_status || pkg.restore_eligibility) === 'eligible');
+    }
+
+    /** Eligible packages for a Step 1 tab — already country-scoped (country) or global (full) from API. */
+    function eligiblePackagesForKind(kind) {
+        const source = kind === 'country' ? (state.country || []) : (state.full || []);
+        return source.filter(isPkgEligible);
+    }
+
+    function activePackageKind() {
         if (CAN_FULL && CAN_COUNTRY) {
             const countryTab = el('rc_tab_country');
-            const onCountry = countryTab && countryTab.classList.contains('is-active');
-            return onCountry ? (state.country || []) : (state.full || []);
+            return (countryTab && countryTab.classList.contains('is-active')) ? 'country' : 'full';
         }
-        if (CAN_COUNTRY && !CAN_FULL) return state.country || [];
-        return state.full || [];
+        if (CAN_COUNTRY && !CAN_FULL) return 'country';
+        return 'full';
+    }
+
+    function resetPackageListModes() {
+        state.packageListMode = { full: 'latest5', country: 'latest5' };
+    }
+
+    /**
+     * Step 1 list modes (Backup Center pattern):
+     * order = eligibility → scope (server) → newest-first (server) → then latest-5 slice (client).
+     */
+    function renderPackageList(kind) {
+        const isAll = state.packageListMode[kind] === 'all';
+        const eligible = eligiblePackagesForKind(kind);
+        const items = isAll ? eligible : eligible.slice(0, PKG_RECENT_LIMIT);
+        const type = kind === 'country' ? 'country_recovery' : 'full_disaster';
+        const listEl = kind === 'country' ? el('rc_country_list') : el('rc_full_list');
+        const hintEl = kind === 'country' ? el('rc_country_list_hint') : el('rc_full_list_hint');
+        const viewAllBtn = kind === 'country' ? el('rc_view_all_country_btn') : el('rc_view_all_full_btn');
+        const backBtn = kind === 'country' ? el('rc_back_latest_country_btn') : el('rc_back_latest_full_btn');
+        if (!listEl) return;
+
+        listEl.removeAttribute('aria-busy');
+        listEl.setAttribute('data-rc-pkg-mode', isAll ? 'all' : 'latest5');
+        if (!eligible.length) {
+            listEl.innerHTML = kind === 'country'
+                ? emptyStateHtml('لا توجد حزم دول', 'لا توجد حزم دولة ضمن السياق الحالي جاهزة للاسترداد.')
+                : emptyStateHtml('لا توجد حزم كاملة', 'بعد إنشاء النسخة الكاملة ستظهر الحزم المؤهلة للاسترداد هنا.');
+        } else {
+            listEl.innerHTML = items.map((p) => packageAccordionHtml(p, type)).join('');
+        }
+
+        if (hintEl) {
+            if (isAll) {
+                hintEl.textContent = kind === 'country'
+                    ? ('جميع الحزم المؤهلة للدولة الحالية: ' + eligible.length)
+                    : ('جميع الحزم الكاملة المؤهلة: ' + eligible.length);
+            } else {
+                hintEl.textContent = kind === 'country'
+                    ? ('آخر ' + Math.min(PKG_RECENT_LIMIT, eligible.length) + ' حزم مؤهلة للدولة الحالية')
+                    : ('آخر ' + Math.min(PKG_RECENT_LIMIT, eligible.length) + ' حزم كاملة مؤهلة');
+            }
+        }
+        if (viewAllBtn) viewAllBtn.hidden = isAll || eligible.length <= PKG_RECENT_LIMIT;
+        if (backBtn) backBtn.hidden = !isAll;
+
+        const pill = el('rc_pkg_mode_pill');
+        if (pill && activePackageKind() === kind) {
+            pill.textContent = isAll
+                ? ('جميع الحزم (' + eligible.length + ')')
+                : ('آخر ' + Math.min(PKG_RECENT_LIMIT, eligible.length) + ' حزم');
+            pill.classList.add('is-active');
+        }
+    }
+
+    function setPackageListMode(kind, mode) {
+        state.packageListMode[kind] = (mode === 'all') ? 'all' : 'latest5';
+        renderPackageList(kind);
+        renderGuidedWorkflow();
+    }
+
+    /** All eligible packages for the active tab — used by wizard CTA/selection (list display is sliced separately). */
+    function wizardPackageList() {
+        return eligiblePackagesForKind(activePackageKind());
     }
 
     function renderGuidedWorkflow() {
@@ -1950,6 +2043,12 @@ body.rc-modal-open{overflow:hidden!important}
     }
 
     function renderTables(data) {
+        const nextCtx = String(data.country_context_code || COUNTRY_CONTEXT_CODE || '');
+        // Country context change or fresh load → default Step 1 list mode to latest 5.
+        if (nextCtx !== String(state.countryContextCode || '')) {
+            resetPackageListModes();
+        }
+        state.countryContextCode = nextCtx;
         state.full = data.full_packages || [];
         state.country = data.country_packages || [];
         state.jobs = data.framework_jobs || data.jobs || [];
@@ -1958,18 +2057,8 @@ body.rc-modal-open{overflow:hidden!important}
             : pickActiveJob(state.jobs);
         if (data.csrf_token) state.csrf = data.csrf_token;
 
-        if (CAN_FULL && el('rc_full_list')) {
-            el('rc_full_list').removeAttribute('aria-busy');
-            el('rc_full_list').innerHTML = state.full.length
-                ? state.full.map((p) => packageAccordionHtml(p, 'full_disaster')).join('')
-                : emptyStateHtml('لا توجد حزم كاملة', 'بعد إنشاء النسخة الكاملة ستظهر الحزم المؤهلة للاسترداد هنا.');
-        }
-        if (CAN_COUNTRY && el('rc_country_list')) {
-            el('rc_country_list').removeAttribute('aria-busy');
-            el('rc_country_list').innerHTML = state.country.length
-                ? state.country.map((p) => packageAccordionHtml(p, 'country_recovery')).join('')
-                : emptyStateHtml('لا توجد حزم دول', 'لا توجد حزم دولة ضمن السياق الحالي جاهزة للاسترداد.');
-        }
+        if (CAN_FULL) renderPackageList('full');
+        if (CAN_COUNTRY) renderPackageList('country');
         renderHistory(state.jobs);
         renderActiveJob(state.jobs);
         updateStageStrip(state.lastMaintenance || data.maintenance || {}, state.jobs);
@@ -3162,6 +3251,7 @@ body.rc-modal-open{overflow:hidden!important}
                 state.currentJourneyJob = null;
                 state.openedStage = '';
                 state.guidedAllowCreateJob = false;
+                resetPackageListModes();
                 await loadAll();
                 showAlert('تم إلغاء المهمة. يمكنك الآن اختيار حزمة استرداد جديدة.', true);
             } catch (e) {
@@ -3373,7 +3463,19 @@ body.rc-modal-open{overflow:hidden!important}
             }
             // Switching package type clears selection so the wizard stays sequential.
             state.selectedPackage = null;
+            if (tab === 'full' || tab === 'country') {
+                renderPackageList(tab);
+            }
             renderGuidedWorkflow();
+            return;
+        }
+        const pkgKindBtn = t.closest('[data-rc-pkg-kind]');
+        if (pkgKindBtn && (pkgKindBtn.id === 'rc_view_all_full_btn' || pkgKindBtn.id === 'rc_view_all_country_btn'
+            || pkgKindBtn.id === 'rc_back_latest_full_btn' || pkgKindBtn.id === 'rc_back_latest_country_btn')) {
+            ev.preventDefault();
+            const kind = pkgKindBtn.getAttribute('data-rc-pkg-kind') || 'full';
+            const toAll = (pkgKindBtn.id === 'rc_view_all_full_btn' || pkgKindBtn.id === 'rc_view_all_country_btn');
+            setPackageListMode(kind, toAll ? 'all' : 'latest5');
         }
     }, true);
 
