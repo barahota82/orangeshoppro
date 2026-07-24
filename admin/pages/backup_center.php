@@ -685,6 +685,25 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         const cls = ok ? 'bc-badge--success' : 'bc-badge--warning';
         return '<span class="bc-badge ' + cls + '">' + label + '</span>';
     };
+    /** Backup Health card only — localize backup_root_status labels (identifiers unchanged elsewhere). */
+    const backupRootHealthBadge = (status, h) => {
+        const raw = String(status || '').trim();
+        const s = raw.toLowerCase();
+        let label = '';
+        if (s === 'healthy' || s === 'ok') label = 'سليم';
+        else if (s === 'writable') label = 'قابل للكتابة';
+        else if (s === 'not_writable' || s === 'not-writable' || s === 'readonly' || s === 'read_only') label = 'غير قابل للكتابة';
+        else if (!raw && h && h.readable && !h.writable) label = 'غير قابل للكتابة';
+        else if (!raw && h && h.writable) label = 'قابل للكتابة';
+        else if (!raw && h && h.readable) label = 'سليم';
+        else if (!raw) label = '—';
+        else label = raw;
+        const tone = statusTone(
+            label === 'سليم' || label === 'قابل للكتابة' ? 'ok'
+                : (label === 'غير قابل للكتابة' ? 'warning' : s || 'muted')
+        );
+        return '<span class="bc-badge bc-badge--' + tone + '">' + esc(label) + '</span>';
+    };
     const applyActionAvailability = () => {
         const runDisabled = !manualActionsAvailable || state.busy;
         ['bc_run_full_btn', 'bc_run_countries_btn'].forEach((id) => {
@@ -850,13 +869,13 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         el('bc_overview').innerHTML =
             '<article class="bc-op-card"><h3>صحة النسخ الاحتياطية</h3><div class="bc-op-rows">' +
                 rowHtml('الحالة العامة', overallCardBadge, true) +
-                rowHtml('Backup Root (writable؟)', badge(ov.backup_root_status || (h.readable ? 'ok' : '—')), true) +
-                rowHtml('موجود / قراءة / كتابة',
-                    healthBadge(!!h.exists, 'موجود', 'غير موجود') + ' ' +
-                    healthBadge(!!h.readable, 'قراءة', 'لا قراءة') + ' ' +
+                rowHtml('مجلد النسخ الاحتياطية', backupRootHealthBadge(ov.backup_root_status, h), true) +
+                rowHtml('التوفر والصلاحيات',
+                    healthBadge(!!h.exists, 'موجود', 'غير موجود') + ' • ' +
+                    healthBadge(!!h.readable, 'قراءة', 'لا قراءة') + ' • ' +
                     healthBadge(!!h.writable, 'كتابة', 'لا كتابة'), true) +
                 rowHtml('التشغيل اليدوي', healthBadge(manualActionsAvailable, 'متاح', 'غير متاح'), true) +
-                rowHtml('Backend المحدد', esc(ov.selected_backend || '—')) +
+                rowHtml('محرك النسخ الاحتياطية', esc(ov.selected_backend || '—')) +
             '</div></article>' +
             '<article class="bc-op-card"><h3>الحماية</h3><div class="bc-op-rows">' +
                 rowHtml('آخر Full ناجح (healthy)', fmtPackageWhenDisplay(lastSuccess, 'full_disaster')) +
