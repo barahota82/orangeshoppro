@@ -294,7 +294,7 @@ body.rc-modal-open{overflow:hidden!important}
                         <button type="button" class="rc-tab<?php echo $canFull ? '' : ' is-active'; ?>" id="rc_tab_country_btn" data-rc-tab="country">نسخة الدولة</button>
                         <?php endif; ?>
                     </div>
-                    <span id="rc_pkg_mode_pill" class="rc-mode-pill is-active">آخر 5 حزم</span>
+                    <span id="rc_pkg_mode_pill" class="rc-mode-pill is-active">آخر العمليات (5)</span>
                 </div>
                 <?php if ($canFull): ?>
                 <div id="rc_tab_full" class="rc-tab-panel is-active" role="tabpanel">
@@ -302,9 +302,9 @@ body.rc-modal-open{overflow:hidden!important}
                         <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:35%"></span><div class="rc-skeleton" style="width:70%;margin-top:12px"></div></div>
                     </div>
                     <div class="rc-pkg-list-footer" id="rc_full_list_footer">
-                        <p id="rc_full_list_hint">آخر 5 حزم مؤهلة</p>
-                        <button type="button" class="rc-btn-secondary" id="rc_view_all_full_btn" data-rc-pkg-kind="full">عرض جميع الحزم</button>
-                        <button type="button" class="rc-btn-secondary" id="rc_back_latest_full_btn" data-rc-pkg-kind="full" hidden>العودة إلى آخر 5 حزم</button>
+                        <p id="rc_full_list_hint">آخر 5 عمليات</p>
+                        <button type="button" class="rc-btn-secondary" id="rc_view_all_full_btn" data-rc-pkg-kind="full">عرض السجل الكامل</button>
+                        <button type="button" class="rc-btn-secondary" id="rc_back_latest_full_btn" data-rc-pkg-kind="full" hidden>العودة لآخر العمليات</button>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -315,9 +315,9 @@ body.rc-modal-open{overflow:hidden!important}
                         <div class="rc-skeleton-card"><span class="rc-skeleton" style="width:35%"></span><div class="rc-skeleton" style="width:70%;margin-top:12px"></div></div>
                     </div>
                     <div class="rc-pkg-list-footer" id="rc_country_list_footer">
-                        <p id="rc_country_list_hint">آخر 5 حزم مؤهلة للدولة الحالية</p>
-                        <button type="button" class="rc-btn-secondary" id="rc_view_all_country_btn" data-rc-pkg-kind="country">عرض جميع الحزم</button>
-                        <button type="button" class="rc-btn-secondary" id="rc_back_latest_country_btn" data-rc-pkg-kind="country" hidden>العودة إلى آخر 5 حزم</button>
+                        <p id="rc_country_list_hint">آخر 5 عمليات</p>
+                        <button type="button" class="rc-btn-secondary" id="rc_view_all_country_btn" data-rc-pkg-kind="country">عرض السجل الكامل</button>
+                        <button type="button" class="rc-btn-secondary" id="rc_back_latest_country_btn" data-rc-pkg-kind="country" hidden>العودة لآخر العمليات</button>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -1308,8 +1308,15 @@ body.rc-modal-open{overflow:hidden!important}
             : '';
         const eligible = (pkg.eligibility_status || pkg.restore_eligibility) === 'eligible';
         const sel = state.selectedPackage;
-        const isSelected = !!(sel && sel.id === identity && sel.type === type);
+        const isSelected = !!(sel && sel.id === identity && sel.type === type && eligible);
         const createBtn = packagePrimaryAction(pkg, type);
+        // Details stay available for eligible and non-eligible (visibility ≠ eligibility).
+        const detailBtn = identity
+            ? '<button type="button" class="btn-link rc-btn-ghost rc-pkg-detail" data-type="' + esc(type) + '" data-id="' + esc(identity) + '" data-cc="' + esc(pkg.country_code || '') + '">معلومات الحزمة</button>'
+            : '';
+        const actionsHtml = (createBtn || detailBtn)
+            ? ('<div class="rc-pkg-pick-actions">' + createBtn + detailBtn + '</div>')
+            : '';
         return (
             '<div class="rc-pkg-pick' + (isSelected ? ' is-selected' : '') + (eligible ? '' : ' is-ineligible') + '"' +
             (eligible ? ' role="button" tabindex="0"' : ' role="group"') +
@@ -1326,8 +1333,9 @@ body.rc-modal-open{overflow:hidden!important}
                 '<p class="rc-muted" style="margin:8px 0 0;font-size:.8rem;">المخطط: ' + esc(String(pkg.schema_revision || '—')) +
                 ' · الخلفية: ' + esc(String(pkg.backend || '—')) +
                 (pkg.country_name ? (' · ' + esc(String(pkg.country_name))) : '') +
+                (eligible ? '' : (pkg.eligibility_reason_label_ar ? (' · ' + esc(String(pkg.eligibility_reason_label_ar))) : '')) +
                 '</p>' +
-                (createBtn ? '<div class="rc-pkg-pick-actions">' + createBtn + '</div>' : '') +
+                actionsHtml +
             '</div>'
         );
     }
@@ -1806,10 +1814,13 @@ body.rc-modal-open{overflow:hidden!important}
         return (pkg && (pkg.eligibility_status || pkg.restore_eligibility) === 'eligible');
     }
 
-    /** Eligible packages for a Step 1 tab — already country-scoped (country) or global (full) from API. */
-    function eligiblePackagesForKind(kind) {
-        const source = kind === 'country' ? (state.country || []) : (state.full || []);
-        return source.filter(isPkgEligible);
+    /**
+     * Visible packages for a Step 1 tab (Owner 2026-07-24):
+     * show eligible + non-eligible. Country scope / Full global already applied by API.
+     * Eligibility only controls selection — not visibility.
+     */
+    function packagesForKind(kind) {
+        return kind === 'country' ? (state.country || []) : (state.full || []);
     }
 
     function activePackageKind() {
@@ -1826,13 +1837,14 @@ body.rc-modal-open{overflow:hidden!important}
     }
 
     /**
-     * Step 1 list modes (Backup Center pattern):
-     * order = eligibility → scope (server) → newest-first (server) → then latest-5 slice (client).
+     * Step 1 list modes (Backup Center terminology + pattern):
+     * order = country/package scope (server) → newest-first (server) → then latest-5 slice (client).
+     * Non-eligible packages stay visible in both modes.
      */
     function renderPackageList(kind) {
         const isAll = state.packageListMode[kind] === 'all';
-        const eligible = eligiblePackagesForKind(kind);
-        const items = isAll ? eligible : eligible.slice(0, PKG_RECENT_LIMIT);
+        const source = packagesForKind(kind);
+        const items = isAll ? source : source.slice(0, PKG_RECENT_LIMIT);
         const type = kind === 'country' ? 'country_recovery' : 'full_disaster';
         const listEl = kind === 'country' ? el('rc_country_list') : el('rc_full_list');
         const hintEl = kind === 'country' ? el('rc_country_list_hint') : el('rc_full_list_hint');
@@ -1842,10 +1854,10 @@ body.rc-modal-open{overflow:hidden!important}
 
         listEl.removeAttribute('aria-busy');
         listEl.setAttribute('data-rc-pkg-mode', isAll ? 'all' : 'latest5');
-        if (!eligible.length) {
+        if (!source.length) {
             listEl.innerHTML = kind === 'country'
-                ? emptyStateHtml('لا توجد حزم دول', 'لا توجد حزم دولة ضمن السياق الحالي جاهزة للاسترداد.')
-                : emptyStateHtml('لا توجد حزم كاملة', 'بعد إنشاء النسخة الكاملة ستظهر الحزم المؤهلة للاسترداد هنا.');
+                ? emptyStateHtml('لا توجد حزم دول', 'لا توجد حزم دولة ضمن السياق الحالي.')
+                : emptyStateHtml('لا توجد حزم كاملة', 'بعد إنشاء النسخة الكاملة ستظهر الحزم هنا.');
         } else {
             listEl.innerHTML = items.map((p) => packageAccordionHtml(p, type)).join('');
         }
@@ -1853,22 +1865,20 @@ body.rc-modal-open{overflow:hidden!important}
         if (hintEl) {
             if (isAll) {
                 hintEl.textContent = kind === 'country'
-                    ? ('جميع الحزم المؤهلة للدولة الحالية: ' + eligible.length)
-                    : ('جميع الحزم الكاملة المؤهلة: ' + eligible.length);
+                    ? ('السجل الكامل للدولة الحالية: ' + source.length)
+                    : ('السجل الكامل: ' + source.length);
             } else {
-                hintEl.textContent = kind === 'country'
-                    ? ('آخر ' + Math.min(PKG_RECENT_LIMIT, eligible.length) + ' حزم مؤهلة للدولة الحالية')
-                    : ('آخر ' + Math.min(PKG_RECENT_LIMIT, eligible.length) + ' حزم كاملة مؤهلة');
+                hintEl.textContent = 'آخر ' + Math.min(PKG_RECENT_LIMIT, source.length) + ' عمليات';
             }
         }
-        if (viewAllBtn) viewAllBtn.hidden = isAll || eligible.length <= PKG_RECENT_LIMIT;
+        if (viewAllBtn) viewAllBtn.hidden = isAll || source.length <= PKG_RECENT_LIMIT;
         if (backBtn) backBtn.hidden = !isAll;
 
         const pill = el('rc_pkg_mode_pill');
         if (pill && activePackageKind() === kind) {
             pill.textContent = isAll
-                ? ('جميع الحزم (' + eligible.length + ')')
-                : ('آخر ' + Math.min(PKG_RECENT_LIMIT, eligible.length) + ' حزم');
+                ? ('السجل الكامل (' + source.length + ')')
+                : ('آخر العمليات (' + Math.min(PKG_RECENT_LIMIT, source.length) + ')');
             pill.classList.add('is-active');
         }
     }
@@ -1879,9 +1889,9 @@ body.rc-modal-open{overflow:hidden!important}
         renderGuidedWorkflow();
     }
 
-    /** All eligible packages for the active tab — used by wizard CTA/selection (list display is sliced separately). */
+    /** Visible packages for active tab (eligible + non-eligible). Wizard CTA still filters eligible. */
     function wizardPackageList() {
-        return eligiblePackagesForKind(activePackageKind());
+        return packagesForKind(activePackageKind());
     }
 
     function renderGuidedWorkflow() {
