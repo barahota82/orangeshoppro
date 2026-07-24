@@ -194,9 +194,20 @@ body.rc-modal-open{overflow:hidden!important}
 .rc-guide-now-title{margin:0 0 10px;font-size:1.35rem;font-weight:800;color:var(--rc-ink);line-height:1.3}
 .rc-guide-now-body{margin:0 0 14px;font-size:.95rem;color:#334155;line-height:1.6;max-width:40rem}
 .rc-guide-now-block{margin:0 0 14px;padding:12px 14px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:.9rem;line-height:1.55}
-.rc-guide-primary{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+/* Workflow action row: Cancel LEFT · Primary RIGHT (Owner 2026-07-24) — LTR row inside RTL page */
+.rc-guide-actions{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;width:100%;direction:ltr}
+.rc-guide-cancel{display:flex;flex-wrap:wrap;align-items:center;gap:8px;order:1}
+.rc-guide-cancel:empty{display:none}
+.rc-guide-primary{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end;order:2;margin-inline-start:auto}
 .rc-guide-primary .rc-btn-primary,.rc-guide-primary .btn-link.rc-btn-primary{font-size:1rem;min-height:44px;padding:10px 22px}
 .rc-guide-primary .rc-btn-primary:only-child,.rc-guide-primary .btn-link.rc-btn-primary:only-child{min-width:min(100%,280px)}
+.rc-guide-cancel .rc-fw-cancel,.rc-guide-cancel .btn-link.rc-fw-cancel{
+    display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 18px;
+    border:1px solid #cbd5e1;border-radius:var(--radius-sm,10px);background:#fff;color:#334155!important;
+    -webkit-text-fill-color:#334155;font-weight:600;font:inherit;font-size:.92rem;cursor:pointer;text-decoration:none;direction:rtl
+}
+.rc-guide-cancel .rc-fw-cancel:hover{background:#f8fafc;border-color:#94a3b8}
+.rc-guide-primary .btn-link,.rc-guide-primary button{direction:rtl}
 .rc-wizard-more{margin-top:12px;border-top:1px dashed #e2e8f0;padding-top:8px}
 .rc-wizard-more>summary{cursor:pointer;font-size:.8rem;color:var(--rc-muted);font-weight:650;list-style:none}
 .rc-wizard-more>summary::-webkit-details-marker{display:none}
@@ -259,7 +270,10 @@ body.rc-modal-open{overflow:hidden!important}
                 <h2 class="rc-guide-now-title" id="rc_guide_title">جاري تحديد الخطوة التالية…</h2>
                 <p class="rc-guide-now-body" id="rc_guide_body"></p>
                 <div class="rc-guide-now-block" id="rc_guide_block" hidden></div>
-                <div class="rc-guide-primary" id="rc_guide_primary"></div>
+                <div class="rc-guide-actions" id="rc_guide_actions" dir="ltr">
+                    <div class="rc-guide-cancel" id="rc_guide_cancel"></div>
+                    <div class="rc-guide-primary" id="rc_guide_primary"></div>
+                </div>
                 <details class="rc-wizard-more">
                     <summary>تفاصيل إضافية (اختيارية)</summary>
                     <div class="rc-guide-secondary" id="rc_guide_secondary"></div>
@@ -1810,6 +1824,14 @@ body.rc-modal-open{overflow:hidden!important}
             }
         }
         if (el('rc_guide_primary')) el('rc_guide_primary').innerHTML = g.primaryHtml || '';
+        // Cancel LEFT on same workflow-card action row — only while framework job.cancellable (Owner 2026-07-24).
+        // Reuses existing rc-fw-cancel → confirm → job/cancel.php. Never in header/rail/details/menus.
+        if (el('rc_guide_cancel')) {
+            const canCancel = !!(job && job.cancellable && String(job.job_id || '').trim() !== '');
+            el('rc_guide_cancel').innerHTML = canCancel
+                ? '<button type="button" class="btn-link rc-fw-cancel" data-id="' + esc(String(job.job_id || '')) + '">إلغاء المهمة</button>'
+                : '';
+        }
         if (el('rc_guide_secondary')) el('rc_guide_secondary').innerHTML = g.secondaryHtml || '';
         const more = document.querySelector('#rc_guided_root .rc-wizard-more');
         if (more) more.hidden = !String(g.secondaryHtml || '').trim();
@@ -3127,6 +3149,11 @@ body.rc-modal-open{overflow:hidden!important}
                     job_id: t.dataset.id || ''
                 });
                 if (j.csrf_token) state.csrf = j.csrf_token;
+                // Clear current journey so wizard returns to Step 1 (package select); cancelled job → history.
+                state.selectedPackage = null;
+                state.currentJourneyJob = null;
+                state.openedStage = '';
+                state.guidedAllowCreateJob = false;
                 showAlert('تم إلغاء المهمة.', true);
                 await loadAll();
             } catch (e) {
