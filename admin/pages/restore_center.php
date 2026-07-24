@@ -238,8 +238,7 @@ body.rc-modal-open{overflow:hidden!important}
 
     <header class="rc-header">
         <div class="rc-header-main">
-            <p class="rc-header-kicker">معالج استرداد</p>
-            <p class="rc-header-sub">رحلة استرداد خطوة بخطوة.</p>
+            <p class="rc-header-kicker">معالج الاسترداد</p>
             <p class="rc-tz-label" id="rc_tz_label"><?php
             if ($displayTimezone !== '') {
                 echo 'التواريخ بالتوقيت المحلي (12 ساعة): <code dir="ltr">'
@@ -251,7 +250,6 @@ body.rc-modal-open{overflow:hidden!important}
             ?></p>
         </div>
         <div class="rc-header-status">
-            <span class="rc-header-status-label">موقعك في الرحلة</span>
             <span id="rc_readiness_badge" class="rc-badge rc-badge--muted" aria-busy="true"><span class="rc-skeleton" style="width:5.5rem;display:inline-block;vertical-align:middle"></span></span>
             <button type="button" class="rc-btn-secondary" id="rc_refresh_btn" style="margin-top:6px;">تحديث الحالة</button>
         </div>
