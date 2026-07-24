@@ -192,7 +192,7 @@ body.rc-modal-open{overflow:hidden!important}
 .rc-wizard-stepnum{display:inline-flex;align-items:center;gap:8px;margin:0 0 10px;padding:4px 10px;border-radius:999px;background:#fff7ed;border:1px solid #fed7aa;font-size:.78rem;font-weight:700;color:#c2410c}
 .rc-guide-now-kicker{margin:0 0 4px;font-size:.8rem;color:var(--rc-muted);font-weight:700;letter-spacing:.02em}
 .rc-guide-now-title{margin:0 0 10px;font-size:1.35rem;font-weight:800;color:var(--rc-ink);line-height:1.3}
-.rc-guide-now-body{margin:0 0 14px;font-size:.95rem;color:#334155;line-height:1.6;max-width:40rem}
+.rc-guide-now-body{margin:0 0 14px;font-size:.95rem;color:#334155;line-height:1.55;max-width:none}
 .rc-guide-now-block{margin:0 0 14px;padding:12px 14px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:.9rem;line-height:1.55}
 /* Workflow action row: Cancel LEFT · Primary RIGHT (Owner 2026-07-24) — LTR row inside RTL page */
 .rc-guide-actions{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;width:100%;direction:ltr}
