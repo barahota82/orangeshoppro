@@ -685,6 +685,19 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         const cls = ok ? 'bc-badge--success' : 'bc-badge--warning';
         return '<span class="bc-badge ' + cls + '">' + label + '</span>';
     };
+    /** Protection card only — localize package_status for Latest Full Status row. */
+    const protectionPackageStatusBadge = (status) => {
+        const raw = String(status || '').trim();
+        const s = raw.toLowerCase();
+        let label = '';
+        if (!raw) label = 'غير معروفة';
+        else if (s === 'healthy' || s === 'success' || s === 'pass') label = 'سليمة';
+        else if (s === 'warning' || s === 'warn') label = 'تحذير';
+        else if (s === 'failed' || s === 'fail' || s === 'error') label = 'فاشلة';
+        else if (s === 'unknown') label = 'غير معروفة';
+        else label = raw;
+        return '<span class="bc-badge bc-badge--' + statusTone(s || 'unknown') + '">' + esc(label) + '</span>';
+    };
     /** Backup Health card only — localize backup_root_status labels (identifiers unchanged elsewhere). */
     const backupRootHealthBadge = (status, h) => {
         const raw = String(status || '').trim();
@@ -878,14 +891,14 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 rowHtml('محرك النسخ الاحتياطية', esc(ov.selected_backend || '—')) +
             '</div></article>' +
             '<article class="bc-op-card"><h3>الحماية</h3><div class="bc-op-rows">' +
-                rowHtml('آخر Full ناجح (healthy)', fmtPackageWhenDisplay(lastSuccess, 'full_disaster')) +
-                rowHtml('أحدث Full — الحالة', badge(latestFull.package_status), true) +
-                rowHtml('أحدث حزمة دولة (سياق الدولة)', fmtPackageWhenDisplay(latestCountryPkg, 'country_recovery')) +
-                rowHtml('دول قابلة للاسترداد (عام — CRP selected)', esc(String(ov.recoverable_countries ?? '—')), true) +
-                rowHtml('الدولة الحالية لديها حزم؟', esc(countriesWithPackages === null ? '—' : (countriesWithPackages > 0 ? 'نعم' : 'لا')), true) +
-                rowHtml('حزم الدولة الحالية (finalized)', esc(String(storedCountryPackages)), true) +
-                rowHtml('لقطات Full المخزّنة (عام)', esc(fullSnapshotsTotal === null ? '—' : String(fullSnapshotsTotal)), true) +
-                rowHtml('DRV لآخر Full', esc(String(latestDrv))) +
+                rowHtml('آخر نسخة احتياطية كاملة سليمة', fmtPackageWhenDisplay(lastSuccess, 'full_disaster')) +
+                rowHtml('حالة آخر نسخة احتياطية كاملة', protectionPackageStatusBadge(latestFull.package_status), true) +
+                rowHtml('أحدث حزمة للدولة الحالية', fmtPackageWhenDisplay(latestCountryPkg, 'country_recovery')) +
+                rowHtml('الدول المتاحة للاسترداد', esc(String(ov.recoverable_countries ?? '—')), true) +
+                rowHtml('هل توجد حزم للدولة الحالية؟', esc(countriesWithPackages === null ? '—' : (countriesWithPackages > 0 ? 'نعم' : 'لا')), true) +
+                rowHtml('عدد الحزم النهائية للدولة الحالية', esc(String(storedCountryPackages)), true) +
+                rowHtml('إجمالي النسخ الكاملة المخزنة', esc(fullSnapshotsTotal === null ? '—' : String(fullSnapshotsTotal)), true) +
+                rowHtml('قيمة DRV لآخر نسخة كاملة', esc(String(latestDrv))) +
             '</div></article>' +
             '<article class="bc-op-card"><h3>التخزين والاحتفاظ</h3><div class="bc-op-rows">' +
                 rowHtml('إجمالي الحجم (Snapshots+Countries+Logs)', esc(st.total_human || '—')) +
