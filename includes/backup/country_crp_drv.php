@@ -305,9 +305,9 @@ function orange_country_drv_run(string $packageRoot, array $options = []): array
     $matrix = null;
     try {
         $matrix = orange_country_boundary_matrix_load($projectRoot);
-        $expectedSchema = (int) ($matrix['schema_revision'] ?? 121);
+        $expectedSchema = (int) ($matrix['schema_revision'] ?? (defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') ? ORANGE_CATALOG_SCHEMA_PHP_REVISION : 122));
     } catch (Throwable $e) {
-        $expectedSchema = 121;
+        $expectedSchema = defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') ? (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION : 122;
         $add('matrix', 'FAIL', 'boundary_matrix_unreadable', 'Boundary matrix unreadable', true);
     }
     $schemaRev = (int) ($manifest['schema_revision'] ?? 0);

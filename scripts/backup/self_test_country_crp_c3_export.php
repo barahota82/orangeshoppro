@@ -15,6 +15,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__, 2);
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'catalog_schema.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_paths.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_table_registry_lib.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_validate.php';
@@ -40,7 +41,7 @@ try {
     $matrix = orange_country_boundary_matrix_load($projectRoot);
     c3_assert(($matrix['boundary_policy_version'] ?? '') === 'C1.1', 'boundary_policy_version=C1.1');
     c3_assert(($matrix['dependency_graph_version'] ?? '') === 'C2', 'dependency_graph_version=C2');
-    c3_assert((int) ($matrix['schema_revision'] ?? 0) === 121, 'matrix schema_revision=121');
+    c3_assert((int) ($matrix['schema_revision'] ?? 0) === (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION, 'matrix schema_revision matches code');
     c3_assert((int) ($matrix['mutate_table_count'] ?? 0) === 80, 'mutate_table_count=80');
 } catch (Throwable $e) {
     c3_assert(false, 'matrix load: ' . $e->getMessage());

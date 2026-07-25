@@ -193,9 +193,9 @@ function orange_country_shadow_entry_check(string $packagePath, string $packageI
 
     try {
         $matrix = orange_country_boundary_matrix_load($projectRoot);
-        $expectedSchema = (int) ($matrix['schema_revision'] ?? 121);
+        $expectedSchema = (int) ($matrix['schema_revision'] ?? (defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') ? ORANGE_CATALOG_SCHEMA_PHP_REVISION : 122));
     } catch (Throwable) {
-        $expectedSchema = 121;
+        $expectedSchema = defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') ? (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION : 122;
         $codes[] = 'boundary_matrix_unreadable';
     }
     if ((int) ($manifest['schema_revision'] ?? 0) !== $expectedSchema) {

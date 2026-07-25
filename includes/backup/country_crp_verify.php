@@ -115,7 +115,7 @@ function orange_crp_verify_run(string $packageRoot, array $options = []): array
     }
 
     // --- Boundary matrix ---
-    $expectedSchema = 121;
+    $expectedSchema = defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') ? (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION : 122;
     try {
         if (defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
             $expectedSchema = (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION;

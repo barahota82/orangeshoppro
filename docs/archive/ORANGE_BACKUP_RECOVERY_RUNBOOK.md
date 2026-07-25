@@ -889,6 +889,25 @@ php D:\orange\scripts\backup\verify_full_backup.php --package=D:\orange_backups\
 
 ---
 
+## Schema revision 122 sync (2026-07-25) — Country Batch gate
+
+**Incident:** Country Batch failed with  
+`Registry validation failed: schema_revision mismatch (expected 122, got 121)`  
+after code revision advanced to **122** (`countries.timezone`) while backup inventory JSON stayed at **121**.
+
+**تنفيذ (repo sync):**
+- `config/backup_table_registry.json` → `schema_revision` **122**
+- `config/country_restore_boundary_matrix.json` → `schema_revision` **122**
+- `config/country_restore_schema_expectations.json` → `schema_revision` **122**
+- `ORANGE_RECOVERY_VALIDATION_EXPECTED_SCHEMA_REVISION` → **122** (`includes/backup/recovery_validation.php`)
+- Boundary matrix validator follows `ORANGE_CATALOG_SCHEMA_PHP_REVISION` (`includes/backup/country_boundary_matrix_lib.php`)
+
+**Deploy:** `git pull` on server (do not hand-edit only one JSON on the server). Then re-run Country Batch once and confirm a new `country_packages/kw/` package and log `Countries succeeded=1`.
+
+**Note:** Existing CRP packages stamped **121** become schema-incompatible for restore/validation under expected **122** (same class of lockstep as prior revision bumps). Keep Jul-22 packages as historical until a successful 122 export exists.
+
+---
+
 ## Related references
 
 - Operator usage: `scripts/backup/README.md`

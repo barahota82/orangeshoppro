@@ -17,6 +17,7 @@ if (PHP_SAPI !== 'cli') {
 define('ORANGE_CRP_ALLOW_TEST_OVERRIDES', true);
 
 $projectRoot = dirname(__DIR__, 2);
+require_once $projectRoot . '/includes/catalog_schema.php';
 require_once $projectRoot . '/includes/backup/backup_paths.php';
 require_once $projectRoot . '/includes/backup/restore/restore_country_shadow.php';
 require_once $projectRoot . '/includes/backup/restore/restore_country_shadow_verify.php';
@@ -75,7 +76,7 @@ fh_assert(in_array('batch_order_violation', $batchBad['codes'], true), 'N3-05 ba
 
 // N3-02 schema expectations load + revision
 $expectations = orange_country_shadow_schema_expectations_load($projectRoot);
-fh_assert(($expectations['schema_revision'] ?? 0) === 121, 'N3-02 expectations schema_revision=121');
+fh_assert(($expectations['schema_revision'] ?? 0) === (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION, 'N3-02 expectations schema_revision matches code');
 fh_assert(isset($expectations['tables']['orders']['required_columns']), 'N3-02 orders required_columns present');
 
 $pdo = new PDO('sqlite::memory:');
@@ -86,7 +87,7 @@ $pdo->exec('CREATE TABLE products (id INT PRIMARY KEY, country_id INT)');
 $schema = orange_country_shadow_verify_schema_drift(
     $pdo,
     $projectRoot,
-    ['schema_revision' => 121],
+    ['schema_revision' => (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION],
     $matrix,
     ['orders']
 );

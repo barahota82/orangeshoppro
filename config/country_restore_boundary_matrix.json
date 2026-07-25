@@ -2,7 +2,7 @@
     "matrix_version":  "1.0",
     "boundary_policy_version":  "C1.1",
     "dependency_graph_version":  "C2",
-    "schema_revision":  121,
+    "schema_revision":  122,
     "package_type":  "country_recovery",
     "generated_for_phase":  "C3",
     "never_export":  [

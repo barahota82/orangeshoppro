@@ -15,6 +15,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__, 2);
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'catalog_schema.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_paths.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_manifest.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_table_registry_lib.php';
@@ -38,7 +39,7 @@ function crp_self_test(bool $ok, string $label): void
 // Registry load + structure
 try {
     $registry = orange_backup_registry_load($projectRoot);
-    crp_self_test(($registry['schema_revision'] ?? 0) === 121, 'registry schema_revision=121');
+    crp_self_test(($registry['schema_revision'] ?? 0) === ORANGE_CATALOG_SCHEMA_PHP_REVISION, 'registry schema_revision matches code');
     crp_self_test(count($registry['tables'] ?? []) === 117, 'registry table_count=117');
 } catch (Throwable $e) {
     crp_self_test(false, 'registry load: ' . $e->getMessage());
@@ -46,7 +47,7 @@ try {
 
 // Registry mismatch rejection
 $badRegistry = ['registry_version' => '1.0', 'schema_revision' => 99, 'tables' => []];
-$structErrors = orange_backup_registry_validate_structure($badRegistry, 121);
+$structErrors = orange_backup_registry_validate_structure($badRegistry, ORANGE_CATALOG_SCHEMA_PHP_REVISION);
 crp_self_test($structErrors !== [], 'registry mismatch rejection');
 
 // Cross-country reference rejection

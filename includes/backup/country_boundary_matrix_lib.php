@@ -74,8 +74,11 @@ function orange_country_boundary_matrix_validate(array $matrix): array
     if (($matrix['dependency_graph_version'] ?? '') !== ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION) {
         $errors[] = 'dependency_graph_version mismatch';
     }
-    if ((int) ($matrix['schema_revision'] ?? 0) !== 121) {
-        $errors[] = 'schema_revision must be 121';
+    $expectedSchemaRevision = defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')
+        ? (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION
+        : 122;
+    if ((int) ($matrix['schema_revision'] ?? 0) !== $expectedSchemaRevision) {
+        $errors[] = 'schema_revision must be ' . $expectedSchemaRevision;
     }
     $tables = $matrix['tables'] ?? null;
     if (!is_array($tables) || $tables === []) {
