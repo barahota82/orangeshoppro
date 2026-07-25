@@ -167,7 +167,14 @@ function orange_loyalty_post_simple_gl(
     if ($amount <= 0.0001 || $debitId <= 0 || $creditId <= 0) {
         return;
     }
-    $now = date('Y-m-d H:i:s');
+    require_once __DIR__ . '/gl_posting_time.php';
+    if ($countryId <= 0) {
+        throw new RuntimeException('دولة الولاء مطلوبة لترحيل القيد');
+    }
+    $glTimes = orange_gl_posting_times_for_country($pdo, $countryId, null);
+    $voucherDateGl = $glTimes['voucher_date'];
+    $now = $glTimes['document_entered_at'];
+    $movementAt = $glTimes['movement_at'];
     $amount = round($amount, 4);
     $lines = [
         ['account_id' => $debitId, 'debit' => $amount, 'credit' => 0.0, 'memo' => $desc],
@@ -181,8 +188,8 @@ function orange_loyalty_post_simple_gl(
             $lines,
             $key,
             strtoupper($refType) . '-' . $refId,
-            $now,
-            $now,
+            $movementAt,
+            $voucherDateGl,
             $desc,
             $entryType,
             $afterJson
@@ -191,7 +198,7 @@ function orange_loyalty_post_simple_gl(
         return;
     }
     orange_voucher_post($pdo, [
-        'voucher_date' => $now,
+        'voucher_date' => $voucherDateGl,
         'document_entered_at' => $now,
         'description' => $desc,
         'entry_type' => $entryType,
@@ -335,9 +342,14 @@ function orange_loyalty_earn_for_order(PDO $pdo, array $order, int $countryId, f
         'country_id' => $countryId > 0 ? $countryId : null,
         'journal_type_id' => $earnJtId > 0 ? $earnJtId : null,
     ];
+    require_once __DIR__ . '/gl_posting_time.php';
+    if ($countryId <= 0) {
+        throw new RuntimeException('دولة الولاء مطلوبة لترحيل قيد الكسب');
+    }
+    $earnTimes = orange_gl_posting_times_for_country($pdo, $countryId, null);
     $earnHeader = [
-        'voucher_date' => date('Y-m-d H:i:s'),
-        'document_entered_at' => date('Y-m-d H:i:s'),
+        'voucher_date' => $earnTimes['voucher_date'],
+        'document_entered_at' => $earnTimes['document_entered_at'],
         'description' => $desc,
         'entry_type' => 'loyalty_earn',
         'country_id' => $countryId,

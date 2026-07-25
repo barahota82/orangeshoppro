@@ -105,7 +105,13 @@ try {
 
         orange_opening_balance_clear_pending_refs($pdo, $fyId, $ctxCountryId);
 
-        $obDate = $dateIso . ' 10:00:00';
+        require_once __DIR__ . '/../../../includes/gl_posting_time.php';
+        if ($ctxCountryId <= 0) {
+            throw new RuntimeException('دولة الأرصدة الافتتاحية مطلوبة');
+        }
+        $obTimes = orange_gl_posting_times_for_country($pdo, $ctxCountryId, $dateIso);
+        $obDate = $obTimes['voucher_date'];
+        $obMovement = $obTimes['movement_at'];
         $obPendingKey = orange_gl_pending_source_key('opening_balance', $fyId);
         if ($useQueue) {
             $pendingOb = orange_gl_pending_enqueue_multi(
@@ -113,7 +119,7 @@ try {
                 $norm,
                 $obPendingKey,
                 'OBV-' . orange_opening_balance_country_code($pdo, $ctxCountryId),
-                $obDate,
+                $obMovement,
                 $obDate,
                 $statement,
                 'opening_balance'
@@ -124,6 +130,7 @@ try {
         } else {
             orange_voucher_post($pdo, [
                 'voucher_date' => $obDate,
+                'document_entered_at' => $obMovement,
                 'description' => $statement,
                 'entry_type' => 'opening_balance',
                 'country_id' => $ctxCountryId,

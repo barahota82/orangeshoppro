@@ -360,9 +360,10 @@ function orange_year_end_close_void_voucher(PDO $pdo, int $voucherId, bool $reop
 
     $pdo->beginTransaction();
     try {
+        require_once __DIR__ . '/admin_time.php';
         $pdo->prepare(
-            'UPDATE journal_vouchers SET is_void = 1, voided_at = NOW(), yec_locked = 0 WHERE id = ?'
-        )->execute([$voucherId]);
+            'UPDATE journal_vouchers SET is_void = 1, voided_at = ?, yec_locked = 0 WHERE id = ?'
+        )->execute([orange_admin_time_utc_now_mysql(), $voucherId]);
 
         if ($reopenFiscalYear && $fyId > 0) {
             $pdo->prepare('UPDATE fiscal_years SET is_closed = 0, closed_at = NULL WHERE id = ?')
@@ -443,13 +444,15 @@ function orange_year_end_close_finalize(
         )->execute([$voucherId]);
 
         if ($fyId > 0) {
+            require_once __DIR__ . '/admin_time.php';
+            $closedAtUtc = orange_admin_time_utc_now_mysql();
             if (orange_fiscal_years_has_country_column($pdo) && $ctxCountryId > 0) {
                 $pdo->prepare(
-                    'UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND country_id = ? AND is_closed = 0'
-                )->execute([$fyId, $ctxCountryId]);
+                    'UPDATE fiscal_years SET is_closed = 1, closed_at = ? WHERE id = ? AND country_id = ? AND is_closed = 0'
+                )->execute([$closedAtUtc, $fyId, $ctxCountryId]);
             } else {
-                $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND is_closed = 0')
-                    ->execute([$fyId]);
+                $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = ? WHERE id = ? AND is_closed = 0')
+                    ->execute([$closedAtUtc, $fyId]);
             }
         }
         $pdo->commit();

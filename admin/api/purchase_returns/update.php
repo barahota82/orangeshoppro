@@ -339,8 +339,16 @@ try {
         }
     }
 
+    require_once __DIR__ . '/../../../includes/gl_posting_time.php';
+    if ($returnCountryId <= 0) {
+        throw new RuntimeException('دولة المردود مطلوبة لترحيل القيود');
+    }
+    $glTimes = orange_gl_posting_times_for_country($pdo, $returnCountryId, null);
+    $voucherDateGl = $glTimes['voucher_date'];
+    $movementAt = $glTimes['movement_at'];
+    $now = $glTimes['document_entered_at'];
     // منع إعادة الترحيل داخل فترة مالية مغلقة (اتساقاً مع باقي المستندات).
-    orange_fiscal_require_open_for_posting($pdo, date('Y-m-d H:i:s'), $returnCountryId > 0 ? $returnCountryId : null);
+    orange_fiscal_require_open_for_posting($pdo, $glTimes['accounting_ymd'], $returnCountryId);
 
     $glB = orange_gl_purchase_return_posting_bundle($pdo, $type, $supplierId, $returnId, $newTotal, $returnCountryId);
     // عكس خصم الفاتورة المكتسب بحصة المردود (قيد مركّب) — دون مسّ تكلفة المخزن.
@@ -354,7 +362,6 @@ try {
     );
     $pendingKey = orange_gl_pending_source_key('purchase_return', $returnId);
     $srcLabel = trim((string) ($row['return_number'] ?? ('PR-' . $returnId)));
-    $now = date('Y-m-d H:i:s');
     $afterJson = $glB['after_post'] !== null
         ? json_encode($glB['after_post'], JSON_UNESCAPED_UNICODE)
         : null;
@@ -368,8 +375,8 @@ try {
                 $glB['lines'],
                 $pendingKey,
                 $srcLabel,
-                $now,
-                $now,
+                $movementAt,
+                $voucherDateGl,
                 $glB['voucher_description'],
                 'purchase_return',
                 $afterJson
@@ -378,8 +385,8 @@ try {
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingKey,
                 'source_label' => $srcLabel,
-                'movement_at' => $now,
-                'voucher_date' => $now,
+                'movement_at' => $movementAt,
+                'voucher_date' => $voucherDateGl,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
                 'amount' => $newTotal,
@@ -399,7 +406,7 @@ try {
             'journal_type_id' => $pdnJtId > 0 ? $pdnJtId : null,
         ];
         $vHeader = [
-            'voucher_date' => $now,
+            'voucher_date' => $voucherDateGl,
             'document_entered_at' => $now,
             'description' => $glB['voucher_description'],
             'entry_type' => 'purchase_return',

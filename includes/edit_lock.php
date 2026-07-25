@@ -194,17 +194,19 @@ function orange_edit_lock_force_lock(PDO $pdo, string $kind, int $entityId, ?int
     if ($cid === null) {
         $st = $pdo->prepare(
             'UPDATE orange_edit_lock_registry
-             SET is_locked = 1, locked_at = NOW(), locked_by_admin_id = ?
+             SET is_locked = 1, locked_at = ?, locked_by_admin_id = ?
              WHERE doc_kind = ? AND entity_id = ? AND (country_id IS NULL OR country_id = 0)'
         );
-        $st->execute([$aid, $kind, $entityId]);
+        require_once __DIR__ . '/admin_time.php';
+        $st->execute([orange_admin_time_utc_now_mysql(), $aid, $kind, $entityId]);
     } else {
         $st = $pdo->prepare(
             'UPDATE orange_edit_lock_registry
-             SET is_locked = 1, locked_at = NOW(), locked_by_admin_id = ?
+             SET is_locked = 1, locked_at = ?, locked_by_admin_id = ?
              WHERE doc_kind = ? AND entity_id = ? AND country_id = ?'
         );
-        $st->execute([$aid, $kind, $entityId, $cid]);
+        require_once __DIR__ . '/admin_time.php';
+        $st->execute([orange_admin_time_utc_now_mysql(), $aid, $kind, $entityId, $cid]);
     }
 }
 
@@ -332,9 +334,10 @@ function orange_edit_lock_set_by_registry_ids(PDO $pdo, array $admin, array $reg
             }
         }
         if ($lock) {
+            require_once __DIR__ . '/admin_time.php';
             $pdo->prepare(
-                'UPDATE orange_edit_lock_registry SET is_locked = 1, locked_at = NOW(), locked_by_admin_id = ? WHERE id = ?'
-            )->execute([$adminId > 0 ? $adminId : null, $id]);
+                'UPDATE orange_edit_lock_registry SET is_locked = 1, locked_at = ?, locked_by_admin_id = ? WHERE id = ?'
+            )->execute([orange_admin_time_utc_now_mysql(), $adminId > 0 ? $adminId : null, $id]);
             audit_log(
                 'edit_lock_lock',
                 'قفل تعديل: ' . (string) ($row['doc_kind'] ?? '') . ' #' . (int) ($row['entity_id'] ?? 0)

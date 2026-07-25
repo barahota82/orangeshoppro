@@ -143,15 +143,17 @@ s2_assert(!str_contains($sfHome, 'orange_admin_time_'), '22. storefront home unc
 $stockAdj = file_get_contents($root . '/admin/api/stock-adjustment/save.php') ?: '';
 s2_assert(!str_contains($stockAdj, 'orange_admin_time_'), '23. inventory stock-adjustment API not migrated');
 $jv = file_get_contents($root . '/includes/journal_voucher.php') ?: '';
-s2_assert(str_contains($jv, 'updated_at = NOW()'), '24. accounting journal path still NOW() (Step 4)');
+s2_assert(str_contains($jv, 'updated_at = ?') && str_contains($jv, 'orange_admin_time_utc_now_mysql'), '24. accounting journal updated_at UTC (Step 5)');
+s2_assert(!str_contains($jv, 'updated_at = NOW()'), '24. accounting journal no NOW() updated_at');
 
 // Stock/FIFO writers in create still present (business logic untouched markers)
 s2_assert(str_contains($pCreate, 'orange_inventory_cost_layer_add'), '17. purchase FIFO path still present');
 s2_assert(str_contains($prCreate, 'orange_inventory_cost_layers_reduce_for_source'), '17. PR stock path still present');
-s2_assert(str_contains($pCreate, 'orange_gl_purchase_invoice_posting_bundle'), '17. GL path still present (untouched timestamps deferred)');
+s2_assert(str_contains($pCreate, 'orange_gl_purchase_invoice_posting_bundle'), '17. GL path still present');
 
-// Purchases still use postingAt with date() for GL — deferred marker
-s2_assert(str_contains($pCreate, "documentDate . ' ' . date('H:i:s')"), '17. GL postingAt deferred (still document_date + wall clock)');
+// Step 5: GL posting times split (inventory layer wall separate from voucher_date)
+s2_assert(str_contains($pCreate, 'orange_gl_posting_times_for_country'), '17. purchase GL uses gl_posting_times (Step 5)');
+s2_assert(str_contains($pCreate, 'layerWallAt'), '17. purchase inventory layer wall separated from GL');
 
 echo "\n---\nPassed: {$passes}\nFailed: {$failures}\n";
 exit($failures === 0 ? 0 : 1);

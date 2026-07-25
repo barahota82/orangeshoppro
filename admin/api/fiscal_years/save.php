@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/year_end_close.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/admin_settings_country.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 /**
@@ -147,9 +148,9 @@ try {
                         ], 422);
                     }
                     if ($isClosed === 1 && ! $wasClosed) {
-                        $closedAt = date('Y-m-d H:i:s');
+                        $closedAt = orange_admin_time_utc_now_mysql();
                     } elseif ($isClosed === 1 && $wasClosed) {
-                        $closedAt = $prev['closed_at'] ?: date('Y-m-d H:i:s');
+                        $closedAt = $prev['closed_at'] ?: orange_admin_time_utc_now_mysql();
                     } else {
                         $closedAt = null;
                     }
@@ -196,7 +197,8 @@ try {
                     }
                     if ($isClosed === 1) {
                         $newId = (int) $pdo->lastInsertId();
-                        $pdo->prepare('UPDATE fiscal_years SET closed_at = NOW() WHERE id = ?')->execute([$newId]);
+                        $pdo->prepare('UPDATE fiscal_years SET closed_at = ? WHERE id = ?')
+                            ->execute([orange_admin_time_utc_now_mysql(), $newId]);
                     }
                 }
             }
@@ -247,10 +249,11 @@ try {
                         'redirect' => storefront_public_path('/admin/index.php?page=year_end_close_vouchers&id=' . $vid),
                     ]);
                 }
+                $closedAtUtc = orange_admin_time_utc_now_mysql();
                 $u = $fyScoped
-                    ? $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND country_id = ? AND is_closed = 0')
-                    : $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND is_closed = 0');
-                $fyScoped ? $u->execute([$id, $ctxCountryId]) : $u->execute([$id]);
+                    ? $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = ? WHERE id = ? AND country_id = ? AND is_closed = 0')
+                    : $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = ? WHERE id = ? AND is_closed = 0');
+                $fyScoped ? $u->execute([$closedAtUtc, $id, $ctxCountryId]) : $u->execute([$closedAtUtc, $id]);
                 if ($u->rowCount() === 0) {
                     $pdo->rollBack();
                     json_response(['success' => false, 'message' => 'تعذر إغلاق السنة (غير موجودة أو مغلقة مسبقاً)'], 422);
@@ -262,10 +265,11 @@ try {
                     'message' => 'لا توجد إيرادات/مصروفات للإقفال — تم إغلاق السنة إدارياً.',
                 ]);
             }
+            $closedAtUtc = orange_admin_time_utc_now_mysql();
             $u = $fyScoped
-                ? $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND country_id = ? AND is_closed = 0')
-                : $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND is_closed = 0');
-            $fyScoped ? $u->execute([$id, $ctxCountryId]) : $u->execute([$id]);
+                ? $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = ? WHERE id = ? AND country_id = ? AND is_closed = 0')
+                : $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = ? WHERE id = ? AND is_closed = 0');
+            $fyScoped ? $u->execute([$closedAtUtc, $id, $ctxCountryId]) : $u->execute([$closedAtUtc, $id]);
             if ($u->rowCount() === 0) {
                 $pdo->rollBack();
                 json_response(['success' => false, 'message' => 'تعذر إغلاق السنة (غير موجودة أو مغلقة مسبقاً)'], 422);

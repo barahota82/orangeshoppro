@@ -11,6 +11,8 @@ require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
+require_once __DIR__ . '/../../../includes/gl_posting_time.php';
 require_admin_api();
 
 /**
@@ -335,6 +337,14 @@ try {
         if ($description === '') {
             json_response(['success' => false, 'message' => 'بيان السند مطلوب'], 422);
         }
+        $createCountryId = orange_admin_context_country_id($pdo);
+        if ($createCountryId <= 0) {
+            json_response(['success' => false, 'message' => 'دولة السياق مطلوبة لإنشاء قيد يدوي'], 422);
+        }
+        $createTimes = orange_gl_posting_times_for_country($pdo, $createCountryId, substr((string) $date, 0, 10));
+        $voucherDateGl = $createTimes['voucher_date'];
+        $movementAt = $createTimes['movement_at'];
+        $docEnteredUtc = $createTimes['document_entered_at'];
 
         $jtCreate = 0;
         $entryTypeForPost = $entryTypeNorm;
@@ -367,8 +377,8 @@ try {
                         $postLines,
                         $refOut,
                         mb_substr($description, 0, 120),
-                        $date,
-                        $date,
+                        $movementAt,
+                        $voucherDateGl,
                         $description,
                         $entryTypeForPost,
                         null,
@@ -392,10 +402,11 @@ try {
             }
             try {
                 $vid = orange_voucher_post($pdo, array_merge($headerExtra, [
-                    'voucher_date' => $date,
-                    'document_entered_at' => date('Y-m-d H:i:s'),
+                    'voucher_date' => $voucherDateGl,
+                    'document_entered_at' => $docEnteredUtc,
                     'description' => $description,
                     'entry_type' => $entryTypeForPost,
+                    'country_id' => $createCountryId,
                 ]), $postLines);
             } catch (Throwable $e) {
                 orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
@@ -433,8 +444,8 @@ try {
                 $simpleRow = [
                     'reference' => $refOut,
                     'source_label' => mb_substr($description, 0, 120),
-                    'movement_at' => $date,
-                    'voucher_date' => $date,
+                    'movement_at' => $movementAt,
+                    'voucher_date' => $voucherDateGl,
                     'account_debit' => $accountDebit,
                     'account_credit' => $accountCredit,
                     'amount' => $amount,
@@ -463,10 +474,11 @@ try {
         }
         try {
             $vid = orange_voucher_post($pdo, array_merge($headerExtra, [
-                'voucher_date' => $date,
-                'document_entered_at' => date('Y-m-d H:i:s'),
+                'voucher_date' => $voucherDateGl,
+                'document_entered_at' => $docEnteredUtc,
                 'description' => $description,
                 'entry_type' => $entryTypeForPost,
+                'country_id' => $createCountryId,
             ]), [
                 ['account_id' => $accountDebit, 'debit' => $amount, 'credit' => 0, 'memo' => $description],
                 ['account_id' => $accountCredit, 'debit' => 0, 'credit' => $amount, 'memo' => $description],
@@ -524,13 +536,20 @@ try {
         }
         $vd = (string)($v['voucher_date'] ?? '');
         $dateForInput = strlen($vd) >= 10 ? substr($vd, 0, 10) : '';
+        $voucherCountryId = (int) ($v['country_id'] ?? 0);
         $docRaw = '';
         if (!empty($v['document_entered_at'])) {
             $docRaw = (string) $v['document_entered_at'];
-        } else {
-            $docRaw = $vd;
         }
-        $docDisplay = orange_format_datetime_dmY_hi($docRaw !== '' ? $docRaw : date('Y-m-d H:i:s'));
+        $docDisplay = orange_admin_time_display_mysql_utc_for_record($pdo, $docRaw !== '' ? $docRaw : null, $voucherCountryId);
+        $docEnteredUtcIso = '';
+        if ($docRaw !== '') {
+            try {
+                $docEnteredUtcIso = orange_admin_time_parse_mysql_utc_datetime($docRaw)->format('c');
+            } catch (Throwable $e) {
+                $docEnteredUtcIso = '';
+            }
+        }
         $hasDimJoin = orange_table_has_column($pdo, 'journal_lines', 'dimension_value_id')
             && orange_table_exists($pdo, 'analytical_dimension_value');
         if ($hasDimJoin) {
@@ -602,6 +621,8 @@ try {
                 'reference' => (string)($v['reference'] ?? ''),
                 'description' => (string)($v['description'] ?? ''),
                 'document_entered_display' => $docDisplay,
+                'document_entered_at_utc' => $docEnteredUtcIso,
+                'country_id' => $voucherCountryId,
                 'entry_type' => (string) ($v['entry_type'] ?? ''),
                 'editable' => $editableV,
             ],

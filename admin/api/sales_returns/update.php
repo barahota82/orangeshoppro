@@ -284,15 +284,25 @@ try {
     }
 
     $updCountryForLayers = $returnCountryLock > 0 ? $returnCountryLock : orange_admin_context_country_id($pdo);
-    $srWarehouseId = orange_warehouse_default_id_for_country($pdo, $updCountryForLayers);
-    $srPostingAt = date('Y-m-d H:i:s');
+    if ($updCountryForLayers <= 0) {
+        throw new RuntimeException('دولة المردود مطلوبة لترحيل القيود');
+    }
+    require_once __DIR__ . '/../../../includes/gl_posting_time.php';
+    $accountingYmd = null;
     if (orange_table_has_column($pdo, 'sales_returns', 'document_date')) {
         $docDateRow = trim((string) ($row['document_date'] ?? ''));
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $docDateRow)) {
-            $srPostingAt = $docDateRow . ' ' . date('H:i:s');
+            $accountingYmd = $docDateRow;
         }
     }
-    $totals = apply_sales_return_items($pdo, $returnId, $items, $srWarehouseId, $updCountryForLayers, $srPostingAt);
+    $glTimes = orange_gl_posting_times_for_country($pdo, $updCountryForLayers, $accountingYmd);
+    $voucherDateGl = $glTimes['voucher_date'];
+    $movementAt = $glTimes['movement_at'];
+    $now = $glTimes['document_entered_at'];
+    $returnTz = orange_admin_time_timezone_for_country_id($pdo, $updCountryForLayers);
+    $layerWallAt = $glTimes['accounting_ymd'] . ' ' . (new DateTimeImmutable('now', new DateTimeZone($returnTz)))->format('H:i:s');
+    $srWarehouseId = orange_warehouse_default_id_for_country($pdo, $updCountryForLayers);
+    $totals = apply_sales_return_items($pdo, $returnId, $items, $srWarehouseId, $updCountryForLayers, $layerWallAt);
     $revenueTotal = $totals['revenue'];
     $cogsTotal = $totals['cogs'];
 
@@ -307,11 +317,10 @@ try {
         $returnId,
     ]);
 
-    $updCountryId = $returnCountryLock > 0 ? $returnCountryLock : orange_admin_context_country_id($pdo);
+    $updCountryId = $updCountryForLayers;
     orange_sales_return_sync_analytics_for_return($pdo, $returnId, $orderIdOpt, $updCountryId);
 
     $retNum = 'SR-' . $returnId;
-    $now = date('Y-m-d H:i:s');
     $pendingRev = orange_gl_pending_source_key('sales_return', $returnId, 'sale');
     $pendingCogs = orange_gl_pending_source_key('sales_return', $returnId, 'cogs');
 
@@ -385,8 +394,8 @@ try {
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingRev,
                 'source_label' => $retNum,
-                'movement_at' => $now,
-                'voucher_date' => $now,
+                'movement_at' => $movementAt,
+                'voucher_date' => $voucherDateGl,
                 'account_debit' => $glRev['debit'],
                 'account_credit' => $glRev['credit'],
                 'amount' => $revenueTotal,
@@ -417,8 +426,8 @@ try {
                 orange_gl_pending_enqueue_simple($pdo, [
                     'reference' => $pendingRev . '-EX' . $accId,
                     'source_label' => $retNum,
-                    'movement_at' => $now,
-                    'voucher_date' => $now,
+                    'movement_at' => $movementAt,
+                    'voucher_date' => $voucherDateGl,
                     'account_debit' => $exDebit,
                     'account_credit' => $exCredit,
                     'amount' => $exAmount,
@@ -433,8 +442,8 @@ try {
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingCogs,
                 'source_label' => $retNum,
-                'movement_at' => $now,
-                'voucher_date' => $now,
+                'movement_at' => $movementAt,
+                'voucher_date' => $voucherDateGl,
                 'account_debit' => $glCogs['debit'],
                 'account_credit' => $glCogs['credit'],
                 'amount' => $cogsTotal,
@@ -463,7 +472,7 @@ try {
             $glRev,
             $extraRows,
             $customerRefundTotal,
-            $now,
+            $voucherDateGl,
             $now,
             $updCountryId > 0 ? $updCountryId : null
         );

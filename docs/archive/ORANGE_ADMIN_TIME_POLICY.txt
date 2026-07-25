@@ -355,6 +355,47 @@ Stacking / Priority / Usage / Targeting / Customer UI.
 
 
 --------------------------------------------------------------------
+سادساً-ب: Phase 2 / Step 5 — المحاسبة والقيود (2026-07-26)
+--------------------------------------------------------------------
+النطاق: Manual journals + Automated posting writers + Pending GL + Slots
++ Edit locks (locked_at) + Delivery Final Posting accounting times فقط.
+
+### فصل دلالي إلزامي
+- Absolute Moment (UTC MySQL wall عبر admin_time): `document_entered_at`,
+  `updated_at`, `voided_at`, `posted_at`, `closed_at`, `locked_at`,
+  `movement_at`, slot `updated_at`.
+- Accounting Date-only: `journal_vouchers.voucher_date` (عمود DATETIME
+  يُخزَّن كـ `Y-m-d 12:00:00` ليوم دولة القيد — بلا تحويل TZ لليوم).
+- مساعد مركزي: `includes/gl_posting_time.php`
+  (`orange_gl_accounting_voucher_date_mysql`, `orange_gl_posting_times_for_country`).
+
+### سلطة الدولة
+- قيد موجود / ترحيل آلي: `country_id` على القيد أو مستند المصدر.
+- قيد يدوي جديد: Current Country Context فقط عند الإنشاء.
+- ممنوع Fallback صامت إلى Asia/Kuwait / Browser / Context لسجل موجود.
+
+### $postingAt (سابقاً)
+كان يُمرَّر لنفس القيمة إلى `voucher_date` و`movement_at`/`document_entered_at`.
+Step 5 يفصل: voucher_date = يوم محلي؛ movement/document_entered = UTC instant.
+طبقات المخزون تبقى Country-local wall منفصلة (`layerWallAt` / `17:00` للتسوية).
+
+### مؤجّل Phase 3 (إلزامي — لا يُمس في Step 5)
+- `admin/pages/company_documents.php` / أرشيف المستندات
+- `admin/pages/logs.php` / `orange_admin_audit_log`
+- التقارير المالية العامة وفلاتر التقارير الواسعة
+
+### Business Logic freeze
+لا تغيير Debit/Credit / balancing / numbering / slots uniqueness /
+fiscal rules / subledger balances / Idempotency / اختيار الطلبات.
+
+### Backup / Restore / Promotions freeze
+لا إعادة فتح Step 4؛ لا Backup/Restore.
+
+### اختبار
+`php scripts/self_test_admin_time_phase2_step5_accounting.php`
+
+
+--------------------------------------------------------------------
 سابعاً: اختبار
 --------------------------------------------------------------------
 `php scripts/self_test_admin_time_foundation.php`
@@ -363,3 +404,5 @@ Stacking / Priority / Usage / Targeting / Customer UI.
 `php scripts/self_test_admin_time_phase2_step2_purchases_returns.php`
 `php scripts/self_test_admin_time_phase2_step3_inventory_warehouses.php`
 `php scripts/self_test_admin_time_phase2_step4_promotions.php`
+`php scripts/self_test_admin_time_phase2_step4_closure.php`
+`php scripts/self_test_admin_time_phase2_step5_accounting.php`

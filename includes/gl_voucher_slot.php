@@ -11,6 +11,8 @@ require_once __DIR__ . '/journal_voucher.php';
 require_once __DIR__ . '/gl_pending_movements.php';
 require_once __DIR__ . '/party_subledger.php';
 require_once __DIR__ . '/party_allocations.php';
+require_once __DIR__ . '/admin_time.php';
+require_once __DIR__ . '/gl_posting_time.php';
 
 function orange_gl_voucher_slots_ready(PDO $pdo): bool
 {
@@ -297,11 +299,17 @@ function orange_voucher_replace_lines_preserve_identity(
     if (isset($allowedHeaderPatch['voucher_date'])) {
         $candidate = trim((string) $allowedHeaderPatch['voucher_date']);
         if ($candidate !== '') {
-            $voucherDate = strlen($candidate) === 10 ? $candidate . ' 12:00:00' : $candidate;
+            $voucherDate = orange_gl_accounting_voucher_date_mysql($candidate);
         }
     }
     if ($voucherDate === '') {
-        $voucherDate = date('Y-m-d H:i:s');
+        $cidFallback = orange_journal_voucher_resolve_country_id($pdo, $existingVoucherRow);
+        if ($cidFallback <= 0) {
+            throw new RuntimeException('دولة السند مطلوبة لتحديد تاريخ القيد المحاسبي');
+        }
+        $voucherDate = orange_gl_posting_times_for_country($pdo, $cidFallback, null)['voucher_date'];
+    } else {
+        $voucherDate = orange_gl_accounting_voucher_date_mysql($voucherDate);
     }
 
     $description = array_key_exists('description', $allowedHeaderPatch)
@@ -370,13 +378,17 @@ function orange_voucher_replace_lines_preserve_identity(
 
     $hasUpdatedAt = orange_table_has_column($pdo, 'journal_vouchers', 'updated_at');
     $updSql = $hasUpdatedAt
-        ? 'UPDATE journal_vouchers SET voucher_date = ?, description = ?, updated_at = NOW() WHERE id = ?'
+        ? 'UPDATE journal_vouchers SET voucher_date = ?, description = ?, updated_at = ? WHERE id = ?'
         : 'UPDATE journal_vouchers SET voucher_date = ?, description = ? WHERE id = ?';
 
     $chk = $pdo->prepare('SELECT id FROM accounts WHERE id = ? LIMIT 1');
     $pdo->prepare('DELETE FROM journal_lines WHERE voucher_id = ?')->execute([$voucherId]);
     $upd = $pdo->prepare($updSql);
-    $upd->execute([$voucherDate, $description, $voucherId]);
+    if ($hasUpdatedAt) {
+        $upd->execute([$voucherDate, $description, orange_admin_time_utc_now_mysql(), $voucherId]);
+    } else {
+        $upd->execute([$voucherDate, $description, $voucherId]);
+    }
     foreach ($norm as $row) {
         $chk->execute([$row['account_id']]);
         if (!$chk->fetch()) {
@@ -532,8 +544,8 @@ function orange_gl_voucher_slot_rebuild(
         orange_voucher_rebuild_automatic($pdo, $vid, $headerPatch, $lines);
         orange_gl_party_subledger_replace_for_voucher($pdo, $vid, $afterPostJson);
         if (orange_gl_voucher_slots_ready($pdo)) {
-            $pdo->prepare('UPDATE orange_gl_voucher_slots SET updated_at = NOW() WHERE id = ?')
-                ->execute([(int) ($slot['id'] ?? 0)]);
+            $pdo->prepare('UPDATE orange_gl_voucher_slots SET updated_at = ? WHERE id = ?')
+                ->execute([orange_admin_time_utc_now_mysql(), (int) ($slot['id'] ?? 0)]);
         }
         if ($ownTx) {
             $pdo->commit();
@@ -735,15 +747,15 @@ function orange_gl_voucher_slot_void_registered(
     if (orange_table_has_column($pdo, 'journal_vouchers', 'is_void')) {
         $hasVoidedAt = orange_table_has_column($pdo, 'journal_vouchers', 'voided_at');
         if ($hasVoidedAt) {
-            $pdo->prepare('UPDATE journal_vouchers SET is_void = 1, voided_at = NOW() WHERE id = ?')
-                ->execute([$vid]);
+            $pdo->prepare('UPDATE journal_vouchers SET is_void = 1, voided_at = ? WHERE id = ?')
+                ->execute([orange_admin_time_utc_now_mysql(), $vid]);
         } else {
             $pdo->prepare('UPDATE journal_vouchers SET is_void = 1 WHERE id = ?')->execute([$vid]);
         }
     }
     if (orange_table_has_column($pdo, 'orange_gl_voucher_slots', 'updated_at')) {
-        $pdo->prepare('UPDATE orange_gl_voucher_slots SET updated_at = NOW() WHERE id = ?')
-            ->execute([(int) ($slot['id'] ?? 0)]);
+        $pdo->prepare('UPDATE orange_gl_voucher_slots SET updated_at = ? WHERE id = ?')
+            ->execute([orange_admin_time_utc_now_mysql(), (int) ($slot['id'] ?? 0)]);
     }
 }
 
@@ -1309,8 +1321,16 @@ function orange_order_delivery_immediate_post_all_slots(PDO $pdo, array $ctx): v
     $cogsJtId = (int) ($ctx['cogs_jt_id'] ?? 0);
     $cogsDebitId = (int) ($ctx['cogs_debit_id'] ?? 0);
     $cogsCreditId = (int) ($ctx['cogs_credit_id'] ?? 0);
-    $postingAt = (string) ($ctx['posting_at'] ?? date('Y-m-d H:i:s'));
-    $now = (string) ($ctx['document_entered_at'] ?? date('Y-m-d H:i:s'));
+    if ($ofGlCountryId <= 0) {
+        throw new RuntimeException('دولة الطلب مطلوبة لترحيل قيود التسليم الفوري');
+    }
+    $timesFallback = orange_gl_posting_times_for_country($pdo, $ofGlCountryId, null);
+    $postingAt = trim((string) ($ctx['posting_at'] ?? ''));
+    $postingAt = $postingAt !== ''
+        ? orange_gl_accounting_voucher_date_mysql($postingAt)
+        : $timesFallback['voucher_date'];
+    $now = trim((string) ($ctx['document_entered_at'] ?? ''));
+    $now = $now !== '' ? $now : $timesFallback['document_entered_at'];
     $activeGlSlots = is_array($ctx['active_gl_slots'] ?? null) ? $ctx['active_gl_slots'] : [];
 
     $saleDesc = $isOnline

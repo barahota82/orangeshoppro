@@ -447,7 +447,13 @@ function orange_bank_reconciliation_close(
                 ];
             }
 
-            $voucherDate = $periodTo . ' 18:00:00';
+            require_once __DIR__ . '/gl_posting_time.php';
+            if ($countryId <= 0) {
+                throw new InvalidArgumentException('دولة التسوية البنكية مطلوبة');
+            }
+            $glTimes = orange_gl_posting_times_for_country($pdo, $countryId, $periodTo);
+            $voucherDate = $glTimes['voucher_date'];
+            $movementAt = $glTimes['movement_at'];
             $desc = 'تسوية بنك — جلسة #' . $id;
             if (orange_gl_use_pending_queue($pdo)) {
                 $pendingId = orange_gl_pending_enqueue_multi(
@@ -455,7 +461,7 @@ function orange_bank_reconciliation_close(
                     $lines,
                     'bank_recon_' . $id,
                     'BRC-' . $id,
-                    $voucherDate,
+                    $movementAt,
                     $voucherDate,
                     $desc,
                     'general'
@@ -467,6 +473,7 @@ function orange_bank_reconciliation_close(
             } else {
                 $voucherId = orange_voucher_post($pdo, [
                     'voucher_date' => $voucherDate,
+                    'document_entered_at' => $movementAt,
                     'description' => $desc,
                     'entry_type' => 'general',
                     'country_id' => $countryId,
@@ -474,14 +481,16 @@ function orange_bank_reconciliation_close(
             }
         }
 
+        require_once __DIR__ . '/admin_time.php';
         $upd = $pdo->prepare(
             'UPDATE bank_reconciliation SET status = \'closed\', gl_balance = ?, statement_balance = ?,
-                journal_voucher_id = ?, closed_at = NOW() WHERE id = ? AND status = \'draft\''
+                journal_voucher_id = ?, closed_at = ? WHERE id = ? AND status = \'draft\''
         );
         $upd->execute([
             $glBalance,
             $statementBalance,
             $voucherId > 0 ? $voucherId : null,
+            orange_admin_time_utc_now_mysql(),
             $id,
         ]);
         if ($upd->rowCount() === 0) {

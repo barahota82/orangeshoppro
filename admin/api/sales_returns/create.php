@@ -140,8 +140,13 @@ try {
         json_response(['success' => false, 'message' => 'تاريخ المستند غير صالح'], 422);
     }
     orange_fiscal_require_open_for_posting($pdo, $documentDate, $returnCountryId);
-    // GL pending wall — deferred Step 4.
-    $postingAt = $documentDate . ' ' . date('H:i:s');
+    require_once __DIR__ . '/../../../includes/gl_posting_time.php';
+    $returnTz = orange_admin_time_timezone_for_country_id($pdo, $returnCountryId);
+    $layerWallAt = $documentDate . ' ' . (new DateTimeImmutable('now', new DateTimeZone($returnTz)))->format('H:i:s');
+    $glTimes = orange_gl_posting_times_for_country($pdo, $returnCountryId, $documentDate);
+    $voucherDateGl = $glTimes['voucher_date'];
+    $movementAt = $glTimes['movement_at'];
+    $now = $glTimes['document_entered_at'];
 
     $revenueTotal = 0.0;
     $cogsTotal = 0.0;
@@ -252,7 +257,7 @@ try {
             'sale_return',
             $returnId,
             $returnCountryId,
-            $postingAt,
+            $layerWallAt,
             $retNum
         );
         if ($hasVariant) {
@@ -335,7 +340,6 @@ try {
     $extraDelta = round((float) $extraTotals['credit'] - (float) $extraTotals['debit'], 4);
     $customerRefundTotal = round($revenueTotal + $extraDelta, 4);
 
-    $now = date('Y-m-d H:i:s');
     $pendingRev = orange_gl_pending_source_key('sales_return', $returnId, 'sale');
     $pendingCogs = orange_gl_pending_source_key('sales_return', $returnId, 'cogs');
 
@@ -348,8 +352,8 @@ try {
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingRev,
                 'source_label' => $retNum,
-                'movement_at' => $postingAt,
-                'voucher_date' => $postingAt,
+                'movement_at' => $movementAt,
+                'voucher_date' => $voucherDateGl,
                 'account_debit' => $glRev['debit'],
                 'account_credit' => $glRev['credit'],
                 'amount' => $revenueTotal,
@@ -380,8 +384,8 @@ try {
                 orange_gl_pending_enqueue_simple($pdo, [
                     'reference' => $pendingRev . '-EX' . $accId,
                     'source_label' => $retNum,
-                    'movement_at' => $postingAt,
-                    'voucher_date' => $postingAt,
+                    'movement_at' => $movementAt,
+                    'voucher_date' => $voucherDateGl,
                     'account_debit' => $exDebit,
                     'account_credit' => $exCredit,
                     'amount' => $exAmount,
@@ -396,8 +400,8 @@ try {
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingCogs,
                 'source_label' => $retNum,
-                'movement_at' => $postingAt,
-                'voucher_date' => $postingAt,
+                'movement_at' => $movementAt,
+                'voucher_date' => $voucherDateGl,
                 'account_debit' => $glCogs['debit'],
                 'account_credit' => $glCogs['credit'],
                 'amount' => $cogsTotal,
@@ -426,7 +430,7 @@ try {
             $glRev,
             $extraRows,
             $customerRefundTotal,
-            $postingAt,
+            $voucherDateGl,
             $now,
             $returnCountryId > 0 ? $returnCountryId : null
         );

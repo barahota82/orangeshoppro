@@ -191,7 +191,7 @@ $bc = file_get_contents($root . '/admin/pages/backup_center.php') ?: '';
 $rc = file_get_contents($root . '/admin/pages/restore_center.php') ?: '';
 s4c_assert(str_contains($bc, 'fmtTimestampDisplay') && str_contains($rc, 'fmtTimestampDisplay'), 'freeze Backup/Restore untouched');
 $jv = file_get_contents($root . '/includes/journal_voucher.php') ?: '';
-s4c_assert(str_contains($jv, 'updated_at = NOW()'), 'freeze Step 5 accounting not started');
+s4c_assert(str_contains($jv, 'updated_at = ?') && !str_contains($jv, 'updated_at = NOW()'), 'freeze Step 5 accounting complete (UTC writers)');
 
 echo "\n---\nPassed: {$passes}\nFailed: {$failures}\n";
 exit($failures === 0 ? 0 : 1);

@@ -339,11 +339,16 @@ try {
         json_response(['success' => false, 'message' => 'تاريخ المستند غير صالح'], 422);
     }
     orange_fiscal_require_open_for_posting($pdo, $documentDate, $purchaseCountryId);
-    // GL/stock movement wall — deferred Step 3/4.
-    $postingAt = $documentDate . ' ' . date('H:i:s');
+    require_once __DIR__ . '/../../../includes/gl_posting_time.php';
+    $purchaseTz = orange_admin_time_timezone_for_country_id($pdo, $purchaseCountryId);
+    $layerWallAt = $documentDate . ' ' . (new DateTimeImmutable('now', new DateTimeZone($purchaseTz)))->format('H:i:s');
+    $glTimes = orange_gl_posting_times_for_country($pdo, $purchaseCountryId, $documentDate);
+    $voucherDateGl = $glTimes['voucher_date'];
+    $movementAt = $glTimes['movement_at'];
+    $now = $glTimes['document_entered_at'];
     $hasDocumentDateCol = orange_table_has_column($pdo, 'purchases', 'document_date');
 
-    $subtotal = apply_purchase_items($pdo, $purchaseId, $items, $purchaseCountryId, $postingAt);
+    $subtotal = apply_purchase_items($pdo, $purchaseId, $items, $purchaseCountryId, $layerWallAt);
 
     // خصم الفاتورة (يُعالَج كـ «خصم مكتسب» محاسبياً — لا يمسّ تكلفة المخزن).
     $hasInvDiscount = orange_table_has_column($pdo, 'purchases', 'invoice_discount_raw');
@@ -432,7 +437,6 @@ try {
     );
     $pendingKey = orange_gl_pending_source_key('purchase', $purchaseId);
     $srcLabel = 'PIN-' . $purchaseId;
-    $now = date('Y-m-d H:i:s');
     $afterJson = $glB['after_post'] !== null
         ? json_encode($glB['after_post'], JSON_UNESCAPED_UNICODE)
         : null;
@@ -446,8 +450,8 @@ try {
                 $glB['lines'],
                 $pendingKey,
                 $srcLabel,
-                $postingAt,
-                $postingAt,
+                $movementAt,
+                $voucherDateGl,
                 $glB['voucher_description'],
                 'purchase',
                 $afterJson
@@ -456,8 +460,8 @@ try {
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingKey,
                 'source_label' => $srcLabel,
-                'movement_at' => $postingAt,
-                'voucher_date' => $postingAt,
+                'movement_at' => $movementAt,
+                'voucher_date' => $voucherDateGl,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
                 'amount' => $payableTotal,
@@ -477,7 +481,7 @@ try {
             'journal_type_id' => $pinJtId > 0 ? $pinJtId : null,
         ];
         $vHeader = [
-            'voucher_date' => $postingAt,
+            'voucher_date' => $voucherDateGl,
             'document_entered_at' => $now,
             'description' => $glB['voucher_description'],
             'entry_type' => 'purchase',

@@ -70,8 +70,18 @@ if (orange_journal_vouchers_ready($pdo)) {
         $nextJournalVoucherNo = orange_gl_voucher_next_id_preview($pdo, $jvScreenCountryId);
     }
 }
-$jvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
-$jvFormVoucherDateDisplay = orange_format_date_dmY(date('Y-m-d'));
+require_once __DIR__ . '/../../includes/admin_time.php';
+$jvFormDocumentEnteredDisplay = $jvScreenCountryId > 0
+    ? orange_admin_time_display_mysql_utc_for_record($pdo, orange_admin_time_utc_now_mysql(), $jvScreenCountryId)
+    : orange_admin_time_display_mysql_utc_or_dash($pdo, orange_admin_time_utc_now_mysql(), 0);
+try {
+    $jvFormVoucherDateYmd = $jvScreenCountryId > 0
+        ? orange_admin_time_document_date_today_for_country_id($pdo, $jvScreenCountryId)
+        : orange_admin_time_today_ymd_in_iana(orange_admin_time_timezone_for_admin_context($pdo));
+} catch (Throwable $e) {
+    $jvFormVoucherDateYmd = date('Y-m-d');
+}
+$jvFormVoucherDateDisplay = orange_format_date_dmY($jvFormVoucherDateYmd);
 $jvNavReady = orange_journal_vouchers_ready($pdo);
 $jvCountryCode = orange_voucher_country_display_code($pdo, $jvScreenCountryId > 0 ? $jvScreenCountryId : null);
 $jvTypeCode = orange_journal_type_code_from_entry_type($jvPageEt);

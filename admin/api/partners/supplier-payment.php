@@ -15,6 +15,7 @@ require_once __DIR__ . '/../../../includes/date_format.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
+require_once __DIR__ . '/../../../includes/gl_posting_time.php';
 require_admin_api();
 
 try {
@@ -82,6 +83,13 @@ try {
     }
     $cashId = orange_gl_account_id($pdo, 'cash');
 
+    if ($moneyCountryId <= 0) {
+        json_response(['success' => false, 'message' => 'دولة المورد/السياق مطلوبة'], 422);
+    }
+    $glTimes = orange_gl_posting_times_for_country($pdo, $moneyCountryId, substr((string) $date, 0, 10));
+    $voucherDateGl = $glTimes['voucher_date'];
+    $movementAt = $glTimes['movement_at'];
+
     $seq = orange_sequence_next($pdo, 'spay_' . date('Ymd'), $supCountryId);
     $pendingKey = 'src:supplier_payment:' . $supplierId . ':' . date('Ymd') . ':' . str_pad((string) $seq, 5, '0', STR_PAD_LEFT);
 
@@ -109,8 +117,8 @@ try {
             $pendingId = orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingKey,
                 'source_label' => 'SPAY-' . $supplierId,
-                'movement_at' => $date,
-                'voucher_date' => $date,
+                'movement_at' => $movementAt,
+                'voucher_date' => $voucherDateGl,
                 'account_debit' => $apId,
                 'account_credit' => $cashId,
                 'amount' => $amount,
@@ -129,7 +137,8 @@ try {
         }
 
         $vid = orange_voucher_post($pdo, [
-            'voucher_date' => $date,
+            'voucher_date' => $voucherDateGl,
+            'document_entered_at' => $movementAt,
             'description' => $description,
             'entry_type' => 'supplier_payment',
             'country_id' => $supCountryId > 0 ? $supCountryId : null,

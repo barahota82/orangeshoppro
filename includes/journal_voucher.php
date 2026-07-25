@@ -1015,13 +1015,7 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
     if (!orange_journal_vouchers_ready($pdo)) {
         throw new RuntimeException('جداول السندات غير جاهزة.');
     }
-    $date = (string) ($header['voucher_date'] ?? '');
-    if ($date === '') {
-        $date = date('Y-m-d H:i:s');
-    }
-    if (strlen($date) === 10) {
-        $date .= ' 12:00:00';
-    }
+    require_once __DIR__ . '/gl_posting_time.php';
     $description = trim((string) ($header['description'] ?? ''));
     if ($description === '') {
         throw new InvalidArgumentException('بيان السند مطلوب.');
@@ -1032,6 +1026,20 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
     }
 
     $voucherCountryId = orange_journal_voucher_resolve_country_id($pdo, $header);
+    if ($voucherCountryId <= 0) {
+        throw new RuntimeException('دولة القيد مطلوبة لتفسير تاريخ القيد والوقت');
+    }
+    $dateRaw = trim((string) ($header['voucher_date'] ?? ''));
+    try {
+        if ($dateRaw === '') {
+            $times = orange_gl_posting_times_for_country($pdo, $voucherCountryId, null);
+            $date = $times['voucher_date'];
+        } else {
+            $date = orange_gl_accounting_voucher_date_mysql($dateRaw);
+        }
+    } catch (OrangeAdminTimeConfigException $e) {
+        throw new InvalidArgumentException('تاريخ القيد غير صالح لدولة السند');
+    }
     $currencyCode = orange_gl_functional_currency_code($pdo, $voucherCountryId > 0 ? $voucherCountryId : null);
 
     $totalD = 0.0;
@@ -1083,10 +1091,10 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
 
     $docEntered = trim((string) ($header['document_entered_at'] ?? ''));
     if ($docEntered === '' || strlen($docEntered) < 8) {
-        $docEntered = date('Y-m-d H:i:s');
-    }
-    if (strlen($docEntered) === 10) {
-        $docEntered .= ' ' . date('H:i:s');
+        $docEntered = orange_admin_time_utc_now_mysql();
+    } elseif (strlen($docEntered) === 10) {
+        // Date-only entry stamp is invalid for Absolute Moment — use UTC now.
+        $docEntered = orange_admin_time_utc_now_mysql();
     }
 
     $ownTx = !$pdo->inTransaction();
@@ -1248,7 +1256,15 @@ function orange_journal_insert_line(PDO $pdo, array $row): int
     $description = trim((string) ($row['description'] ?? ''));
     $reference = array_key_exists('reference', $row) ? trim((string) $row['reference']) : '';
     $entryType = trim((string) ($row['entry_type'] ?? 'general'));
-    $date = isset($row['date']) && $row['date'] !== '' ? (string) $row['date'] : date('Y-m-d H:i:s');
+    require_once __DIR__ . '/gl_posting_time.php';
+    $date = isset($row['date']) && $row['date'] !== '' ? (string) $row['date'] : '';
+    if ($date === '') {
+        $ctxCid = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+        if ($ctxCid <= 0) {
+            throw new InvalidArgumentException('تاريخ السند ودولة السياق مطلوبان للقيد البسيط.');
+        }
+        $date = orange_gl_posting_times_for_country($pdo, $ctxCid, null)['voucher_date'];
+    }
 
     if ($debit <= 0 || $credit <= 0 || $amount <= 0 || $description === '') {
         throw new InvalidArgumentException('بيانات القيد غير مكتملة (حسابات المدين/الدائن، المبلغ، البيان).');
@@ -1256,6 +1272,7 @@ function orange_journal_insert_line(PDO $pdo, array $row): int
 
     return orange_voucher_post($pdo, [
         'voucher_date' => $date,
+        'document_entered_at' => orange_admin_time_utc_now_mysql(),
         'description' => $description,
         'entry_type' => $entryType !== '' ? $entryType : 'general',
     ], [
@@ -1287,13 +1304,7 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
         throw new InvalidArgumentException('السند غير موجود.');
     }
 
-    $date = (string) ($header['voucher_date'] ?? '');
-    if ($date === '') {
-        $date = date('Y-m-d H:i:s');
-    }
-    if (strlen($date) === 10) {
-        $date .= ' 12:00:00';
-    }
+    require_once __DIR__ . '/gl_posting_time.php';
     $description = trim((string) ($header['description'] ?? ''));
     if ($description === '') {
         throw new InvalidArgumentException('بيان السند مطلوب.');
@@ -1304,6 +1315,19 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
     }
 
     $voucherCountryId = orange_journal_voucher_resolve_country_id($pdo, $header);
+    if ($voucherCountryId <= 0) {
+        throw new RuntimeException('دولة القيد مطلوبة لتفسير تاريخ القيد والوقت');
+    }
+    $dateRaw = trim((string) ($header['voucher_date'] ?? ''));
+    try {
+        if ($dateRaw === '') {
+            $date = orange_gl_posting_times_for_country($pdo, $voucherCountryId, null)['voucher_date'];
+        } else {
+            $date = orange_gl_accounting_voucher_date_mysql($dateRaw);
+        }
+    } catch (OrangeAdminTimeConfigException $e) {
+        throw new InvalidArgumentException('تاريخ القيد غير صالح لدولة السند');
+    }
     $currencyCode = orange_gl_functional_currency_code($pdo, $voucherCountryId > 0 ? $voucherCountryId : null);
 
     $totalD = 0.0;
@@ -1341,13 +1365,17 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
 
     $hasUpdatedAt = orange_table_has_column($pdo, 'journal_vouchers', 'updated_at');
     $updSql = $hasUpdatedAt
-        ? 'UPDATE journal_vouchers SET voucher_date = ?, reference = ?, description = ?, fiscal_year_id = ?, updated_at = NOW() WHERE id = ?'
+        ? 'UPDATE journal_vouchers SET voucher_date = ?, reference = ?, description = ?, fiscal_year_id = ?, updated_at = ? WHERE id = ?'
         : 'UPDATE journal_vouchers SET voucher_date = ?, reference = ?, description = ?, fiscal_year_id = ? WHERE id = ?';
 
     $pdo->beginTransaction();
     try {
         $upd = $pdo->prepare($updSql);
-        $upd->execute([$date, $referenceSql, $description, $fyId, $voucherId]);
+        if ($hasUpdatedAt) {
+            $upd->execute([$date, $referenceSql, $description, $fyId, orange_admin_time_utc_now_mysql(), $voucherId]);
+        } else {
+            $upd->execute([$date, $referenceSql, $description, $fyId, $voucherId]);
+        }
         $pdo->prepare('DELETE FROM journal_lines WHERE voucher_id = ?')->execute([$voucherId]);
         foreach ($norm as $row) {
             $chk->execute([$row['account_id']]);

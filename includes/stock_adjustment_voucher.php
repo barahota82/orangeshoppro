@@ -862,7 +862,19 @@ function orange_stock_adjustment_voucher_approve(PDO $pdo, int $id, ?int $countr
     $queued = false;
     $totalValue = 0.0;
     $ref = 'STK-ADJ-' . $id;
-    $postingAt = ($documentDate !== '' ? $documentDate : date('Y-m-d')) . ' 17:00:00';
+    require_once __DIR__ . '/gl_posting_time.php';
+    if ($countryId <= 0) {
+        throw new InvalidArgumentException('دولة التسوية مطلوبة لترحيل القيد');
+    }
+    $glTimes = orange_gl_posting_times_for_country(
+        $pdo,
+        $countryId,
+        $documentDate !== '' ? $documentDate : null
+    );
+    $voucherDateGl = $glTimes['voucher_date'];
+    $movementAt = $glTimes['movement_at'];
+    // Inventory layer wall: document local day at 17:00 (unchanged Absolute Moment contract for layers).
+    $postingAt = $glTimes['accounting_ymd'] . ' 17:00:00';
 
     $incValue = 0.0;
     $decValue = 0.0;
@@ -995,8 +1007,8 @@ function orange_stock_adjustment_voucher_approve(PDO $pdo, int $id, ?int $countr
                     $glLines,
                     'stock_adj_' . $id,
                     $ref,
-                    $postingAt,
-                    $postingAt,
+                    $movementAt,
+                    $voucherDateGl,
                     $desc,
                     'stock_adjustment'
                 );
@@ -1006,7 +1018,8 @@ function orange_stock_adjustment_voucher_approve(PDO $pdo, int $id, ?int $countr
                 $queued = true;
             } else {
                 $voucherId = orange_voucher_post($pdo, [
-                    'voucher_date' => $postingAt,
+                    'voucher_date' => $voucherDateGl,
+                    'document_entered_at' => $movementAt,
                     'description' => $desc,
                     'entry_type' => 'stock_adjustment',
                     'country_id' => $countryId,

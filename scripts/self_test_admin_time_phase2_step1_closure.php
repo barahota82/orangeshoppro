@@ -155,7 +155,8 @@ c1_assert(
 $stock = file_get_contents($root . '/admin/api/products/update.php') ?: '';
 c1_assert(str_contains($stock, 'updated_at = NOW()'), '17. products/stock path untouched');
 $gl = file_get_contents($root . '/includes/journal_voucher.php') ?: '';
-c1_assert(str_contains($gl, 'updated_at = NOW()'), '17. accounting journal path untouched');
+c1_assert(str_contains($gl, 'updated_at = ?') && str_contains($gl, 'orange_admin_time_utc_now_mysql'), '17. accounting journal updated_at UTC (Step 5)');
+c1_assert(!str_contains($gl, 'updated_at = NOW()'), '17. accounting journal no NOW() updated_at');
 
 // --- 18: no customer UI pages changed for time display ---
 // Storefront pages must not call admin_time display helpers

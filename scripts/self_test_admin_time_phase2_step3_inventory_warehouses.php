@@ -79,8 +79,9 @@ s3_assert(str_contains($osvSrc, 'orange_admin_time_date_only_normalize'), '9. op
 s3_assert(str_contains($sajSrc, 'orange_admin_time_date_only_normalize'), '10. adjustment document_date date-only');
 s3_assert(str_contains($irSrc, 'orange_admin_time_date_only_normalize'), '11. counted_at date-only');
 
-// Shared writers: purchases still pass postingAt to layers; GL postingAt deferred
-s3_assert(str_contains($pCreate, "\$postingAt = \$documentDate . ' ' . date('H:i:s')"), '30. GL postingAt unchanged (Step 4)');
+// Shared writers: purchases pass layer wall to cost layers; GL uses Step 5 split
+s3_assert(str_contains($pCreate, 'orange_gl_posting_times_for_country'), '30. purchase GL posting times (Step 5)');
+s3_assert(str_contains($pCreate, 'layerWallAt'), '30. purchase layer wall separate from GL');
 s3_assert(str_contains($pCreate, 'orange_inventory_cost_layer_add'), '3. purchase receiving writes cost layers');
 s3_assert(str_contains($recv, '422') || str_contains($recv, 'stub') || str_contains($recv, 'غير'), '3. receive.php remains stub');
 
@@ -174,7 +175,8 @@ s3_assert(
 // Quantity / costing / GL freezes (source spot-checks)
 s3_assert(str_contains($whSrc, 'quantity = VALUES(quantity)'), '26. quantity still written (not removed)');
 s3_assert(str_contains($iclSrc, 'qty_remaining = qty_remaining - ?'), '27/29. consume qty path unchanged');
-s3_assert(str_contains($sajSrc, "\$postingAt = (\$documentDate !== '' ? \$documentDate : date('Y-m-d')) . ' 17:00:00'"), '30. GL postingAt for adj deferred');
+s3_assert(str_contains($sajSrc, 'orange_gl_posting_times_for_country'), '30. adjustment GL posting times (Step 5)');
+s3_assert(str_contains($sajSrc, "accounting_ymd'] . ' 17:00:00'"), '30. adjustment layer wall keeps 17:00 local');
 
 // Customer/storefront pages not touched for time display migration markers
 $home = file_get_contents($root . '/pages/home.php') ?: '';

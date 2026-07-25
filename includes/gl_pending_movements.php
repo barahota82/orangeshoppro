@@ -7,6 +7,8 @@ require_once __DIR__ . '/journal_voucher.php';
 require_once __DIR__ . '/party_subledger.php';
 require_once __DIR__ . '/party_allocations.php';
 require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/admin_time.php';
+require_once __DIR__ . '/gl_posting_time.php';
 
 /**
  * طابور الحركات المعلّقة — **افتراضي: معطّل** (ترحيل فوري — ORANGE_EDIT_LOCK_POLICY §5).
@@ -179,12 +181,13 @@ function orange_gl_pending_enqueue_simple(PDO $pdo, array $row): int
     }
     $movementAt = trim((string) ($row['movement_at'] ?? ''));
     if ($movementAt === '') {
-        $movementAt = date('Y-m-d H:i:s');
+        $movementAt = orange_admin_time_utc_now_mysql();
     }
     $voucherDate = trim((string) ($row['voucher_date'] ?? ''));
     if ($voucherDate === '') {
-        $voucherDate = $movementAt;
+        throw new InvalidArgumentException('تاريخ السند المحاسبي (voucher_date) مطلوب للحركة المعلّقة.');
     }
+    $voucherDate = orange_gl_accounting_voucher_date_mysql($voucherDate);
     $entryType = trim((string) ($row['entry_type'] ?? 'general'));
     if ($entryType === '') {
         $entryType = 'general';
@@ -274,6 +277,12 @@ function orange_gl_pending_enqueue_multi(
         throw new InvalidArgumentException('بيان السند المعلّق مطلوب.');
     }
     $entryType = trim($entryType) !== '' ? trim($entryType) : 'general';
+    $movementAt = trim($movementAt) !== '' ? trim($movementAt) : orange_admin_time_utc_now_mysql();
+    $voucherDate = trim($voucherDate);
+    if ($voucherDate === '') {
+        throw new InvalidArgumentException('تاريخ السند المحاسبي (voucher_date) مطلوب للحركة المعلّقة.');
+    }
+    $voucherDate = orange_gl_accounting_voucher_date_mysql($voucherDate);
     $jtHint = (int) ($journalTypeHintId ?? 0);
     $sumD = 0.0;
     $sumC = 0.0;
@@ -512,7 +521,13 @@ function orange_gl_pending_post_by_ids(PDO $pdo, array $ids): array
                 }
                 $docEntered = trim((string) ($row['created_at'] ?? ''));
                 if ($docEntered === '' || strlen($docEntered) < 8) {
-                    $docEntered = date('Y-m-d H:i:s');
+                    $docEntered = orange_admin_time_utc_now_mysql();
+                } else {
+                    // created_at TIMESTAMP session wall → UTC Absolute Moment for document_entered_at.
+                    $unixCreated = orange_admin_time_mysql_timestamp_session_wall_to_unix($pdo, $docEntered);
+                    $docEntered = $unixCreated !== null
+                        ? gmdate('Y-m-d H:i:s', $unixCreated)
+                        : orange_admin_time_utc_now_mysql();
                 }
                 $jtHint = isset($row['journal_type_id']) ? (int) $row['journal_type_id'] : 0;
                 $vh = [
@@ -530,7 +545,12 @@ function orange_gl_pending_post_by_ids(PDO $pdo, array $ids): array
             } else {
                 $docEntered = trim((string) ($row['created_at'] ?? ''));
                 if ($docEntered === '' || strlen($docEntered) < 8) {
-                    $docEntered = date('Y-m-d H:i:s');
+                    $docEntered = orange_admin_time_utc_now_mysql();
+                } else {
+                    $unixCreated = orange_admin_time_mysql_timestamp_session_wall_to_unix($pdo, $docEntered);
+                    $docEntered = $unixCreated !== null
+                        ? gmdate('Y-m-d H:i:s', $unixCreated)
+                        : orange_admin_time_utc_now_mysql();
                 }
                 $jtHintSimple = isset($row['journal_type_id']) ? (int) $row['journal_type_id'] : 0;
                 $vh2 = [
@@ -554,8 +574,8 @@ function orange_gl_pending_post_by_ids(PDO $pdo, array $ids): array
                 orange_gl_apply_voucher_after_post_hooks($pdo, $vid, $hook);
             }
             $pdo->prepare(
-                'UPDATE orange_gl_pending_movements SET status = \'posted\', journal_voucher_id = ?, posted_at = NOW() WHERE id = ?'
-            )->execute([$vid, $id]);
+                'UPDATE orange_gl_pending_movements SET status = \'posted\', journal_voucher_id = ?, posted_at = ? WHERE id = ?'
+            )->execute([$vid, orange_admin_time_utc_now_mysql(), $id]);
             $pdo->commit();
             $posted[] = $id;
         } catch (Throwable $e) {

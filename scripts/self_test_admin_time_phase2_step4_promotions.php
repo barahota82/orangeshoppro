@@ -202,13 +202,13 @@ s4_assert(!str_contains($schedSrc, 'cron') && !str_contains($schedSrc, 'schedule
 
 // Accounting / GL not started (Step 5)
 $jv = file_get_contents($root . '/includes/journal_voucher.php') ?: '';
-s4_assert(str_contains($jv, 'updated_at = NOW()'), '30. accounting still NOW (Step 5 not started)');
+s4_assert(str_contains($jv, 'updated_at = ?') && !str_contains($jv, 'updated_at = NOW()'), '30. accounting journal UTC (Step 5 complete)');
 
 // Policy doc mentions Step 4
 $policy = file_get_contents($root . '/docs/archive/ORANGE_ADMIN_TIME_POLICY.txt') ?: '';
 s4_assert(str_contains($policy, 'Phase 2 Step 4'), '21. policy documents Step 4');
 s4_assert(str_contains($policy, 'is_always_on'), '21. policy permanent semantics');
-s4_assert(str_contains($policy, 'Step 5'), '21. policy confirms Step 5 not in scope');
+s4_assert(str_contains($policy, 'Step 5') && str_contains($policy, 'سادساً-ب'), '21. policy documents Step 5 accounting scope');
 
 echo "\n--- Step 4 core ---\nPassed: {$passes}\nFailed: {$failures}\n";
 

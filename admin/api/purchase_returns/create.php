@@ -168,8 +168,11 @@ try {
         json_response(['success' => false, 'message' => 'تاريخ المستند غير صالح'], 422);
     }
     orange_fiscal_require_open_for_posting($pdo, $documentDate, $returnCountryId);
-    // GL pending wall — deferred Step 4.
-    $postingAt = $documentDate . ' ' . date('H:i:s');
+    require_once __DIR__ . '/../../../includes/gl_posting_time.php';
+    $glTimes = orange_gl_posting_times_for_country($pdo, $returnCountryId, $documentDate);
+    $voucherDateGl = $glTimes['voucher_date'];
+    $movementAt = $glTimes['movement_at'];
+    $now = $glTimes['document_entered_at'];
 
     $tmpNum = 'PR-TMP-' . bin2hex(random_bytes(6));
     $insertCols = 'return_number, purchase_id, supplier_id, type, total, notes';
@@ -301,7 +304,6 @@ try {
         true
     );
     $pendingKey = orange_gl_pending_source_key('purchase_return', $returnId);
-    $now = date('Y-m-d H:i:s');
     $afterJson = $glB['after_post'] !== null
         ? json_encode($glB['after_post'], JSON_UNESCAPED_UNICODE)
         : null;
@@ -313,8 +315,8 @@ try {
                 $glB['lines'],
                 $pendingKey,
                 $retRef,
-                $postingAt,
-                $postingAt,
+                $movementAt,
+                $voucherDateGl,
                 $glB['voucher_description'],
                 'purchase_return',
                 $afterJson
@@ -323,8 +325,8 @@ try {
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $pendingKey,
                 'source_label' => $retRef,
-                'movement_at' => $postingAt,
-                'voucher_date' => $postingAt,
+                'movement_at' => $movementAt,
+                'voucher_date' => $voucherDateGl,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
                 'amount' => $netTotal,
@@ -344,7 +346,7 @@ try {
             'journal_type_id' => $pdnJtId > 0 ? $pdnJtId : null,
         ];
         $vHeader = [
-            'voucher_date' => $postingAt,
+            'voucher_date' => $voucherDateGl,
             'document_entered_at' => $now,
             'description' => $glB['voucher_description'],
             'entry_type' => 'purchase_return',
