@@ -50,7 +50,16 @@ function ocpBindAlwaysOn(prefix) {
 }
 function ocpSetDmyFromIso(fieldId, iso) {
     var el = document.getElementById(fieldId);
-    if (!el || !iso) return;
+    if (!el) return;
+    // Empty clears the field (permanent offers must not show DB fillers in the edit form).
+    if (!iso) {
+        if (typeof orangeSetDmyValueFromIso === 'function') {
+            orangeSetDmyValueFromIso(el, '');
+        } else {
+            el.value = '';
+        }
+        return;
+    }
     var d = String(iso).substring(0, 10);
     if (typeof orangeSetDmyValueFromIso === 'function') {
         orangeSetDmyValueFromIso(el, d);

@@ -295,6 +295,13 @@ Stacking / Priority / Usage / Targeting / Customer UI.
   التقييم يتجاهل التواريخ عند always_on.
 - `storefront_promo_messages`: always_on → `valid_from`/`valid_to` = NULL
   (معمارية nullable محفوظة).
+- Admin/API representation (Closure): للقوائم ونموذج التعديل تُفرَّغ
+  `valid_from`/`valid_to` الظاهرة عند always_on (الـfiller يبقى داخلياً فقط
+  في `valid_from_utc`/`valid_to_utc` إن لزم). القائمة تعرض «تفعيل دائم».
+- `updated_at` TIMESTAMP: غير ظاهر في شاشات/APIs العروض Step 4 (Internal-only).
+
+### اختبار الإغلاق
+`php scripts/self_test_admin_time_phase2_step4_closure.php`
 
 ### Scheduled offer semantics (Date-only admin contract)
 - واجهة الأدمن: تاريخ فقط (Y-m-d / DMY) عبر partials الحالية — بلا ساعة.

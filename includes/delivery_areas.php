@@ -714,7 +714,9 @@ function orange_delivery_promotions_admin_list(PDO $pdo, int $countryId): array
         'delivery_area_id',
         'delivery_areas'
     );
-    foreach ($rows as &$row) {
+    require_once __DIR__ . '/cart_promo_schedule.php';
+    $out = [];
+    foreach ($rows as $row) {
         $pid = (int) ($row['id'] ?? 0);
         $row['id'] = $pid;
         $row['country_id'] = (int) ($row['country_id'] ?? 0);
@@ -728,14 +730,17 @@ function orange_delivery_promotions_admin_list(PDO $pdo, int $countryId): array
         $row['sort_order'] = (int) ($row['sort_order'] ?? 0);
         $row['is_active'] = (int) ($row['is_active'] ?? 0) === 1 ? 1 : 0;
         $row['is_always_on'] = (int) ($row['is_always_on'] ?? 0) === 1 ? 1 : 0;
+        $row['valid_from'] = (string) ($row['valid_from'] ?? '');
+        $row['valid_to'] = (string) ($row['valid_to'] ?? '');
+        $row = orange_cart_promo_admin_localize_schedule_row($pdo, $row, (int) $row['country_id']);
         $row['target_governorate_ids'] = $governorateIdsMap[$pid] ?? [];
         $row['target_area_ids'] = $areaIdsMap[$pid] ?? [];
         $row['target_governorate_names'] = $governorateNamesMap[$pid] ?? [];
         $row['target_area_names'] = $areaNamesMap[$pid] ?? [];
+        $out[] = $row;
     }
-    unset($row);
 
-    return $rows;
+    return $out;
 }
 
 function orange_delivery_promotion_discount_amount(

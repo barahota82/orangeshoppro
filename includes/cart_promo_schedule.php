@@ -271,9 +271,12 @@ function orange_cart_promo_admin_localize_schedule_row(PDO $pdo, array $row, int
 {
     $cid = $countryId > 0 ? $countryId : (int) ($row['country_id'] ?? 0);
     if (orange_promo_always_on_enabled($row)) {
+        // Permanent authority is is_always_on — do not expose NOT NULL technical fillers to admin UI/API.
         $row['schedule_label'] = 'تفعيل دائم';
         $row['valid_from_utc'] = (string) ($row['valid_from'] ?? '');
         $row['valid_to_utc'] = (string) ($row['valid_to'] ?? '');
+        $row['valid_from'] = '';
+        $row['valid_to'] = '';
 
         return $row;
     }
