@@ -20,6 +20,7 @@ require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
 require_once __DIR__ . '/../../../includes/inventory_cost_layers.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -72,11 +73,17 @@ try {
             $pdo->rollBack();
             json_response(['success' => false, 'message' => $e->getMessage()], 403);
         }
-        if (orange_table_has_country_id($pdo, 'purchases')) {
-            $pc = $pdo->prepare('SELECT country_id FROM purchases WHERE id = ? LIMIT 1');
-            $pc->execute([$purchaseIdOpt]);
-            $returnCountryId = (int) ($pc->fetchColumn() ?: $returnCountryId);
+        // دولة المرتجع = دولة Purchase الأصلية (مرجع الوقت والعرض؛ لا يُستبدل بالمورد).
+        $purchaseCid = orange_purchase_return_authority_country_id($pdo, $purchaseIdOpt);
+        if ($purchaseCid <= 0) {
+            $pdo->rollBack();
+            json_response([
+                'success' => false,
+                'code' => 'admin_time_country_id_required',
+                'message' => 'دولة فاتورة الشراء المرجعية مفقودة — تعذر إنشاء المردود',
+            ], 422);
         }
+        $returnCountryId = $purchaseCid;
     }
 
     $hasPriDiscount = orange_table_has_column($pdo, 'purchase_return_items', 'discount_raw');
@@ -121,19 +128,47 @@ try {
             $pdo->rollBack();
             json_response(['success' => false, 'message' => $e->getMessage()], 403);
         }
-        if (orange_table_has_country_id($pdo, 'suppliers')) {
+        // عند وجود Purchase مرتبطة: دولة المورد لا تُستبدل بدولة المستند.
+        // بدون Purchase: يُسمح بدولة المورد إن وُجدت ضمن سياق الدولة.
+        if ($purchaseIdOpt <= 0 && orange_table_has_country_id($pdo, 'suppliers')) {
             $sc = $pdo->prepare('SELECT country_id FROM suppliers WHERE id = ? LIMIT 1');
             $sc->execute([$supplierId]);
-            $returnCountryId = (int) ($sc->fetchColumn() ?: $returnCountryId);
+            $supplierCid = (int) ($sc->fetchColumn() ?: 0);
+            if ($supplierCid > 0) {
+                $returnCountryId = $supplierCid;
+            }
         }
     }
+    if ($returnCountryId <= 0) {
+        $pdo->rollBack();
+        json_response([
+            'success' => false,
+            'code' => 'admin_time_country_id_required',
+            'message' => 'تعذر تحديد دولة مردود المشتريات',
+        ], 422);
+    }
 
-    // تاريخ المستند (مردود المشتريات) = تاريخ ترحيل القيد المحاسبي (منفصل عن created_at).
+    // تاريخ المستند = Date-only لليوم المحلي لدولة المستند (منفصل عن created_at Absolute Instant).
     $documentDate = trim((string)($data['document_date'] ?? ''));
     if ($documentDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $documentDate)) {
-        $documentDate = date('Y-m-d');
+        try {
+            $documentDate = orange_admin_time_document_date_today_for_country_id($pdo, $returnCountryId);
+        } catch (OrangeAdminTimeConfigException $e) {
+            $pdo->rollBack();
+            json_response([
+                'success' => false,
+                'code' => $e->getMessage(),
+                'message' => 'تعذر تحديد التاريخ المحلي لدولة المردود.',
+            ], 422);
+        }
+    }
+    $documentDate = orange_admin_time_date_only_normalize($documentDate);
+    if ($documentDate === '') {
+        $pdo->rollBack();
+        json_response(['success' => false, 'message' => 'تاريخ المستند غير صالح'], 422);
     }
     orange_fiscal_require_open_for_posting($pdo, $documentDate, $returnCountryId);
+    // GL pending wall — deferred Step 4.
     $postingAt = $documentDate . ' ' . date('H:i:s');
 
     $tmpNum = 'PR-TMP-' . bin2hex(random_bytes(6));
@@ -162,6 +197,12 @@ try {
         $insertPlaceholders .= ', ?, ?';
         $insertValues[] = $invoiceDiscountRaw;
         $insertValues[] = $invoiceDiscountAmt;
+    }
+    // TIMESTAMP Absolute Instant عبر Unix epoch (آمن تحت session +03:00).
+    if (orange_table_has_column($pdo, 'purchase_returns', 'created_at')) {
+        $insertCols .= ', created_at';
+        $insertPlaceholders .= ', ' . orange_admin_time_sql_from_unix();
+        $insertValues[] = orange_admin_time_unix_now();
     }
     $pdo->prepare("INSERT INTO purchase_returns ($insertCols) VALUES ($insertPlaceholders)")
         ->execute($insertValues);

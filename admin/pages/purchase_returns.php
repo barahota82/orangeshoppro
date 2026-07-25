@@ -23,6 +23,23 @@ $pr2Caps = orange_admin_caps_for_page($admin, $pdo, 'purchase_returns');
 
 $prCountryId = orange_admin_context_country_id($pdo);
 $prDefaultCurrency = orange_admin_context_currency_code($pdo);
+$pr2DefaultDocDmy = date('d/m/Y');
+$pr2DefaultEntryDisp = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+try {
+    if ($prCountryId > 0) {
+        $pr2TodayYmd = orange_admin_time_document_date_today_for_country_id($pdo, $prCountryId);
+        $pr2DefaultDocDmy = substr($pr2TodayYmd, 8, 2) . '/' . substr($pr2TodayYmd, 5, 2) . '/' . substr($pr2TodayYmd, 0, 4);
+        $pr2DefaultEntryDisp = orange_admin_time_format_instant_for_country_id(
+            $pdo,
+            orange_admin_time_utc_now_iso(),
+            $prCountryId,
+            'ar',
+            'datetime'
+        );
+    }
+} catch (OrangeAdminTimeConfigException $e) {
+    // keep defaults
+}
 $prCurrencyDecimals = orange_currency_decimals_for_code($prDefaultCurrency);
 $prProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $prCountryId);
 $prSuppliersCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', $prCountryId);
@@ -381,7 +398,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         </div>
         <div>
             <label for="pr2_document_date">تاريخ المردود</label>
-            <input type="text" id="pr2_document_date" class="orange-inp-dmy" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('d/m/Y'), ENT_QUOTES, 'UTF-8'); ?>"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="pr2_document_date" class="orange-inp-dmy" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars($pr2DefaultDocDmy, ENT_QUOTES, 'UTF-8'); ?>"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
         </div>
         <div>
             <label for="pr2_type">نوع المردود</label>
@@ -393,7 +410,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         <div>
             <label for="pr2_entry_date">تاريخ الإدخال</label>
             <input type="text" id="pr2_entry_date" class="admin-inp-readonly" readonly tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
-                value="<?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?>"
+                value="<?php echo htmlspecialchars($pr2DefaultEntryDisp, ENT_QUOTES, 'UTF-8'); ?>"
                 title="وقت تسجيل إدخال المستند في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح">
         </div>
         <div>
@@ -1200,7 +1217,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         var docDateEl = document.getElementById('pr2_document_date');
         if (docDateEl) docDateEl.value = (p.document_date ? orangeIsoDateToDmy(String(p.document_date).substr(0, 10)) : '');
         var entryDateEl = document.getElementById('pr2_entry_date');
-        if (entryDateEl && p.created_at) entryDateEl.value = pr2FormatEnteredDisplay(p.created_at);
+        if (entryDateEl) entryDateEl.value = p.created_at_display || (p.created_at ? pr2FormatEnteredDisplay(p.created_at) : '');
         var purEl = document.getElementById('pr2_purchase_ref');
         if (purEl) {
             var pid = parseInt(String(p.purchase_id || '0'), 10) || 0;

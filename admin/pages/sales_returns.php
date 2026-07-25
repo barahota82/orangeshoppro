@@ -22,6 +22,23 @@ $sr2Caps = orange_admin_caps_for_page($admin, $pdo, 'sales_returns');
 
 $srCountryId = orange_admin_context_country_id($pdo);
 $srDefaultCurrency = orange_admin_context_currency_code($pdo);
+$sr2DefaultDocDmy = date('d/m/Y');
+$sr2DefaultEntryDisp = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+try {
+    if ($srCountryId > 0) {
+        $sr2TodayYmd = orange_admin_time_document_date_today_for_country_id($pdo, $srCountryId);
+        $sr2DefaultDocDmy = substr($sr2TodayYmd, 8, 2) . '/' . substr($sr2TodayYmd, 5, 2) . '/' . substr($sr2TodayYmd, 0, 4);
+        $sr2DefaultEntryDisp = orange_admin_time_format_instant_for_country_id(
+            $pdo,
+            orange_admin_time_utc_now_iso(),
+            $srCountryId,
+            'ar',
+            'datetime'
+        );
+    }
+} catch (OrangeAdminTimeConfigException $e) {
+    // keep defaults
+}
 $srCurrencyDecimals = orange_currency_decimals_for_code($srDefaultCurrency);
 $srCurrencyUnit = orange_currency_display_unit($srDefaultCurrency);
 $sr2CustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $srCountryId);
@@ -313,7 +330,7 @@ $sr2DocSerialPreview = $sr2NavReady
         </div>
         <div>
             <label for="sr2_document_date">تاريخ المردود</label>
-            <input type="text" id="sr2_document_date" class="orange-inp-dmy" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars(date('d/m/Y'), ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="text" id="sr2_document_date" class="orange-inp-dmy" dir="ltr" lang="en" title="تاريخ المردود = تاريخ ترحيل القيد المحاسبي" value="<?php echo htmlspecialchars($sr2DefaultDocDmy, ENT_QUOTES, 'UTF-8'); ?>">
         </div>
         <div>
             <label for="sr2_channel">قناة التحصيل</label>
@@ -326,7 +343,7 @@ $sr2DocSerialPreview = $sr2NavReady
         <div>
             <label for="sr2_entry_date">تاريخ الإدخال</label>
             <input type="text" id="sr2_entry_date" class="admin-inp-readonly" readonly tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
-                value="<?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?>"
+                value="<?php echo htmlspecialchars($sr2DefaultEntryDisp, ENT_QUOTES, 'UTF-8'); ?>"
                 title="وقت تسجيل إدخال المستند في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح">
         </div>
         <div>
@@ -1078,7 +1095,7 @@ $sr2DocSerialPreview = $sr2NavReady
         var docDateEl = document.getElementById('sr2_document_date');
         if (docDateEl) docDateEl.value = (p.document_date ? orangeIsoDateToDmy(String(p.document_date).substr(0, 10)) : '');
         var entryDateEl = document.getElementById('sr2_entry_date');
-        if (entryDateEl && p.created_at) entryDateEl.value = sr2FormatEnteredDisplay(p.created_at);
+        if (entryDateEl) entryDateEl.value = p.created_at_display || (p.created_at ? sr2FormatEnteredDisplay(p.created_at) : '');
         var oid = parseInt(String(p.order_id || '0'), 10) || 0;
         var hid = document.getElementById('sr2_order_id');
         if (hid) hid.value = oid > 0 ? String(oid) : '0';

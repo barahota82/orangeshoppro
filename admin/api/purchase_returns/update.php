@@ -325,15 +325,18 @@ try {
         ->execute($params);
 
     $returnCountryId = orange_admin_context_country_id($pdo);
-    if ($purchaseIdOpt > 0 && orange_table_has_country_id($pdo, 'purchases')) {
-        $pc = $pdo->prepare('SELECT country_id FROM purchases WHERE id = ? LIMIT 1');
-        $pc->execute([$purchaseIdOpt]);
-        $returnCountryId = (int) ($pc->fetchColumn() ?: $returnCountryId);
-    }
-    if ($supplierId > 0 && orange_table_has_country_id($pdo, 'suppliers')) {
+    if ($purchaseIdOpt > 0) {
+        $purchaseCid = orange_purchase_return_authority_country_id($pdo, $purchaseIdOpt);
+        if ($purchaseCid > 0) {
+            $returnCountryId = $purchaseCid;
+        }
+    } elseif ($supplierId > 0 && orange_table_has_country_id($pdo, 'suppliers')) {
         $sc = $pdo->prepare('SELECT country_id FROM suppliers WHERE id = ? LIMIT 1');
         $sc->execute([$supplierId]);
-        $returnCountryId = (int) ($sc->fetchColumn() ?: $returnCountryId);
+        $supplierCid = (int) ($sc->fetchColumn() ?: 0);
+        if ($supplierCid > 0) {
+            $returnCountryId = $supplierCid;
+        }
     }
 
     // منع إعادة الترحيل داخل فترة مالية مغلقة (اتساقاً مع باقي المستندات).

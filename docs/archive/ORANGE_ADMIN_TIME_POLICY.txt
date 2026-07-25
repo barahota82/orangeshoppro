@@ -2,8 +2,8 @@ ORANGE — سياسة الوقت المركزية للإدمن (Admin Time Polic
 ================================================================================
 المسار: docs/archive/ORANGE_ADMIN_TIME_POLICY.txt
 تاريخ القرار: 2026-07-25
-آخر تحديث: 2026-07-25 (Phase 2 / Step 1 Closure — Orders & Payments time)
-الحالة: Phase 1 foundation + Phase 2 Step 1 of 4 مغلقة (انظر خامساً-ب وخامساً-ج)
+آخر تحديث: 2026-07-25 (Phase 2 / Step 2 — Purchases & Returns time)
+الحالة: Phase 1 + Phase 2 Step 1 و Step 2 مغلقتان (انظر خامساً-ب/ج/د)
 
 الغرض
 -------
@@ -145,15 +145,62 @@ Customer UI ولا تغيير Business Logic للطلب/الدفع/المخزو�
 
 
 --------------------------------------------------------------------
+خامساً-د: Phase 2 / Step 2 (2026-07-25) — المشتريات والمرتجعات
+--------------------------------------------------------------------
+النطاق: Admin Purchases + Purchase Returns + Sales Returns (Timestamp handling فقط).
+
+### Absolute Moments المرحّلة
+- `purchases.created_at` DATETIME → UTC wall صريح عند الإنشاء
+- `purchases.updated_at` DATETIME → UTC wall صريح عند التعديل (لا NOW())
+- `purchase_returns.created_at` TIMESTAMP → FROM_UNIXTIME(epoch)
+- `sales_returns.created_at` TIMESTAMP → FROM_UNIXTIME(epoch)
+
+### Date-only
+- `purchases.document_date` / `purchase_returns.document_date` /
+  `sales_returns.document_date` → اليوم المحلي لـ IANA دولة المستند؛ بلا تحويل بعد التخزين.
+
+### دولة السجل
+- Purchase: `purchases.country_id`
+- Purchase Return: من Purchase الأصلية (`orange_purchase_return_authority_country_id`) —
+  لا تُستبدل بدولة المورد عند وجود شراء مرجعي
+- Sales Return: `country_id` المباشر أو من Order الأصلي
+  (`orange_sales_return_authority_country_id`)
+- Fail Closed عند غياب دولة السجل للعرض/التاريخ الافتراضي
+
+### فلاتر التاريخ (داخل النطاق)
+- يوم الدولة → حدود UTC: `start <= ts < next_day_start` (DATETIME)
+- TIMESTAMP: عبر `UNIX_TIMESTAMP(col)` مع حدود epoch لنفس النطاق
+- DST-safe لـ Africa/Cairo
+
+### Shared writers الموحّدة (وقت فقط)
+- `admin/api/purchases/create.php` / `update.php`
+- `admin/api/purchase_returns/create.php` (+ authority في update للعرض/GL country)
+- `admin/api/sales_returns/create.php`
+- browse/get APIs + صفحات الإدمن الثلاث (عرض سيرفري؛ لا new Date على نص مبهم)
+
+### مؤجّل Step 3 (مخزون)
+- أوقات `stock_movements` / `inventory_cost_layers` / استلام المشتريات (receive)
+- `$postingAt` المستخدم مع طبقات التكلفة يبقى كما هو لهذه الخطوة
+
+### مؤجّل Step 4 (محاسبة/قيود)
+- أوقات `journal_vouchers` / `journal_lines` / `party_subledger` / pending GL queue
+- `$postingAt = document_date + date('H:i:s')` لمسارات الترحيل — لم يُرحَّل
+
+مجمّد: Backup Center / Restore Center. Step 1 لم يُعاد فتحه.
+
+
+--------------------------------------------------------------------
 سادساً: تنفيذ (مسارات الكود)
 --------------------------------------------------------------------
 - العقود والدوال: `includes/admin_time.php`
   (+ Phase 2: parse/format MySQL UTC DATETIME، day bounds للفلاتر،
-   Unix/FROM_UNIXTIME لـ TIMESTAMP، عرض Fail Closed للسجل)
-- Writers: `includes/payments/payment_core.php`، `includes/order_intake_queue.php`،
+   Unix/FROM_UNIXTIME لـ TIMESTAMP، عرض Fail Closed للسجل،
+   `orange_admin_time_document_date_today_for_country_id`)
+- Writers Step 1: `includes/payments/payment_core.php`، `includes/order_intake_queue.php`،
   `admin/api/order_intake/retry.php`، `retry-bulk-failed.php`
-- Admin API/عرض: `admin/api/payments/review.php`، `admin/pages/payment_review.php`،
-  `orders.php`، `invoice.php`، `order_intake_queue.php`، `online_orders_final_posting.php`
+- Writers Step 2: `admin/api/purchases/*`، `purchase_returns/*`، `sales_returns/*`
+- Authority helpers: `includes/purchase_return_helpers.php`، `includes/sales_return_helpers.php`
+- Admin API/عرض Step 1: payments/orders…؛ Step 2: purchases / purchase_returns / sales_returns pages
 - إعادة استخدام: `orange_country_timezone` / `orange_admin_context_timezone` /
   `orange_countries_is_valid_iana_timezone` (نفس قواعد التحقق)
 - تنسيق العرض القديم للشاشات غير المرحّلة يبقى: `includes/date_format.php`
@@ -165,3 +212,4 @@ Customer UI ولا تغيير Business Logic للطلب/الدفع/المخزو�
 `php scripts/self_test_admin_time_foundation.php`
 `php scripts/self_test_admin_time_phase2_orders_payments.php`
 `php scripts/self_test_admin_time_phase2_step1_closure.php`
+`php scripts/self_test_admin_time_phase2_step2_purchases_returns.php`

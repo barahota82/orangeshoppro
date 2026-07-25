@@ -19,6 +19,7 @@ require_once __DIR__ . '/../../../includes/journal_types.php';
 require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
 require_once __DIR__ . '/../../../includes/inventory_cost_layers.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 function reverse_purchase_stock(PDO $pdo, int $purchaseId, int $countryId): void
@@ -295,18 +296,50 @@ try {
         }
     }
 
-    // تاريخ الفاتورة/المستند = تاريخ ترحيل القيد المحاسبي (يُحفظ عند التعديل، ويُحترم في السنة المالية).
+    // تاريخ الفاتورة/المستند = Date-only لدولة السجل (يُحفظ عند التعديل، ويُحترم في السنة المالية).
     $documentDate = '';
     if (array_key_exists('document_date', $data)) {
         $documentDate = trim((string)($data['document_date'] ?? ''));
     }
+    $recordCountryId = (int) ($purchase['country_id'] ?? 0);
     if ($documentDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $documentDate)) {
         $existingDocDate = trim((string)($purchase['document_date'] ?? ''));
-        $documentDate = ($existingDocDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}/', $existingDocDate))
-            ? substr($existingDocDate, 0, 10)
-            : date('Y-m-d');
+        if ($existingDocDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}/', $existingDocDate)) {
+            $documentDate = substr($existingDocDate, 0, 10);
+        } else {
+            if ($recordCountryId <= 0) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                json_response([
+                    'success' => false,
+                    'code' => 'admin_time_country_id_required',
+                    'message' => 'دولة فاتورة الشراء مفقودة — تعذر تحديد تاريخ المستند',
+                ], 422);
+            }
+            try {
+                $documentDate = orange_admin_time_document_date_today_for_country_id($pdo, $recordCountryId);
+            } catch (OrangeAdminTimeConfigException $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                json_response([
+                    'success' => false,
+                    'code' => $e->getMessage(),
+                    'message' => 'تعذر تحديد التاريخ المحلي لدولة فاتورة الشراء.',
+                ], 422);
+            }
+        }
+    }
+    $documentDate = orange_admin_time_date_only_normalize($documentDate);
+    if ($documentDate === '') {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        json_response(['success' => false, 'message' => 'تاريخ المستند غير صالح'], 422);
     }
     orange_fiscal_require_open_for_posting($pdo, $documentDate, $purchaseCountryId);
+    // GL/stock movement wall — deferred Step 3/4.
     $postingAt = $documentDate . ' ' . date('H:i:s');
     $hasDocumentDateCol = orange_table_has_column($pdo, 'purchases', 'document_date');
 
@@ -363,7 +396,8 @@ try {
         $setCols[] = 'document_date = ?';
         $params[] = $documentDate;
     }
-    $setCols[] = 'updated_at = NOW()';
+    $setCols[] = 'updated_at = ?';
+    $params[] = orange_admin_time_utc_now_mysql();
     $params[] = $purchaseId;
     $pdo->prepare('UPDATE purchases SET ' . implode(', ', $setCols) . ' WHERE id = ?')
         ->execute($params);

@@ -7,6 +7,8 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
 require_once __DIR__ . '/../../../includes/sales_return_analytics.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
+require_once __DIR__ . '/../../../includes/sales_return_helpers.php';
 require_admin_api();
 
 try {
@@ -132,7 +134,10 @@ try {
 
         $sql = 'SELECT sr.id, sr.total, sr.notes, sr.type';
         if ($hasCreatedAt) {
-            $sql .= ', sr.created_at';
+            $sql .= ', sr.created_at, UNIX_TIMESTAMP(sr.created_at) AS created_at_unix';
+        }
+        if (orange_table_has_column($pdo, 'sales_returns', 'country_id')) {
+            $sql .= ', sr.country_id';
         }
         if ($hasReturnNumber) {
             $sql .= ', sr.return_number';
@@ -160,13 +165,24 @@ try {
             $sql .= ' AND sr.id <= ?';
             $params[] = $idTo;
         }
-        if ($hasCreatedAt && $dateFrom !== '') {
-            $sql .= ' AND DATE(sr.created_at) >= ?';
-            $params[] = $dateFrom;
-        }
-        if ($hasCreatedAt && $dateTo !== '') {
-            $sql .= ' AND DATE(sr.created_at) <= ?';
-            $params[] = $dateTo;
+        if ($hasCreatedAt && ($dateFrom !== '' || $dateTo !== '')) {
+            try {
+                $filterTz = orange_admin_time_timezone_for_admin_context($pdo);
+                $range = orange_admin_time_filter_range_mysql_utc($dateFrom, $dateTo, $filterTz);
+                if ($range !== null) {
+                    $startUnix = orange_admin_time_parse_mysql_utc_datetime($range['start_utc_mysql'])->getTimestamp();
+                    $endUnix = orange_admin_time_parse_mysql_utc_datetime($range['end_exclusive_utc_mysql'])->getTimestamp();
+                    $sql .= ' AND UNIX_TIMESTAMP(sr.created_at) >= ? AND UNIX_TIMESTAMP(sr.created_at) < ?';
+                    $params[] = $startUnix;
+                    $params[] = $endUnix;
+                }
+            } catch (OrangeAdminTimeConfigException $e) {
+                json_response([
+                    'success' => false,
+                    'code' => $e->getMessage(),
+                    'message' => 'تعذر تطبيق فلتر التاريخ: منطقة زمنية سياق الدولة غير مضبوطة.',
+                ], 422);
+            }
         }
         if ($ref !== '') {
             if (preg_match('/^SR-(\d+)$/i', $ref, $m)) {
@@ -214,19 +230,30 @@ try {
 
         $results = [];
         foreach ($rows as $row) {
-            $createdRaw = $hasCreatedAt ? (string) ($row['created_at'] ?? '') : '';
             $oid = $hasOrderId ? (int) ($row['order_id'] ?? 0) : 0;
             $invRef = $hasInvoiceRef ? trim((string) ($row['invoice_reference'] ?? '')) : '';
             if ($invRef === '' && $oid > 0) {
                 $invRef = 'INV-C-' . $oid;
             }
             $sk = $hasSourceKind ? trim((string) ($row['source_kind'] ?? '')) : '';
+            $rowCid = orange_sales_return_authority_country_id($pdo, $row);
+            $createdUnix = $hasCreatedAt ? orange_admin_time_unix_or_null($row['created_at_unix'] ?? null) : null;
+            $api = orange_admin_time_api_instant_from_unix($pdo, $createdUnix, $rowCid);
+            if ($api['display'] === '[admin_time_country_id_required]' && $countryId > 0 && $createdUnix !== null) {
+                try {
+                    $api['display'] = orange_admin_time_format_unix_for_admin_context($pdo, $createdUnix);
+                } catch (OrangeAdminTimeConfigException $e) {
+                    $api['display'] = '[' . $e->getMessage() . ']';
+                }
+            }
             $results[] = [
                 'id' => (int) ($row['id'] ?? 0),
                 'reference' => $hasReturnNumber && trim((string) ($row['return_number'] ?? '')) !== ''
                     ? trim((string) $row['return_number'])
                     : ('SR-' . (int) ($row['id'] ?? 0)),
-                'created_at_dmy' => $createdRaw !== '' ? orange_format_date_dmY($createdRaw) : '',
+                'created_at_utc' => $api['utc'],
+                'created_at_display' => $api['display'],
+                'created_at_dmy' => $api['display'],
                 'customer_name' => (string) ($row['customer_name'] ?? ''),
                 'channel_label' => orange_sales_return_payment_type_label((string) ($row['type'] ?? 'cash')),
                 'source_kind_label' => orange_sales_return_source_kind_label($sk),

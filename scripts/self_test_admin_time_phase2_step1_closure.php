@@ -151,11 +151,11 @@ c1_assert(
     '16. payments country isolation'
 );
 
-// --- 17: purchases/inventory/accounting untouched (spot) ---
-$purch = file_get_contents($root . '/admin/api/purchases/update.php') ?: '';
-c1_assert(str_contains($purch, 'updated_at = NOW()'), '17. purchases untouched');
+// --- 17: inventory/accounting untouched (spot; purchases migrated in Step 2) ---
 $stock = file_get_contents($root . '/admin/api/products/update.php') ?: '';
 c1_assert(str_contains($stock, 'updated_at = NOW()'), '17. products/stock path untouched');
+$gl = file_get_contents($root . '/includes/journal_voucher.php') ?: '';
+c1_assert(str_contains($gl, 'updated_at = NOW()'), '17. accounting journal path untouched');
 
 // --- 18: no customer UI pages changed for time display ---
 // Storefront pages must not call admin_time display helpers

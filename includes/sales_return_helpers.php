@@ -7,6 +7,29 @@ require_once __DIR__ . '/countries.php';
 require_once __DIR__ . '/warehouses.php';
 
 /**
+ * دولة سجل مردود المبيعات للوقت/العرض: country_id المباشر إن وُجد، وإلا من Order الأصلي.
+ * 0 = غير قابلة للإثبات → Fail Closed عند العرض.
+ */
+function orange_sales_return_authority_country_id(PDO $pdo, array $header): int
+{
+    $direct = (int) ($header['country_id'] ?? 0);
+    if ($direct > 0) {
+        return $direct;
+    }
+    $orderId = (int) ($header['order_id'] ?? 0);
+    if ($orderId > 0 && orange_table_has_country_id($pdo, 'orders')) {
+        $st = $pdo->prepare('SELECT country_id FROM orders WHERE id = ? LIMIT 1');
+        $st->execute([$orderId]);
+        $cid = (int) ($st->fetchColumn() ?: 0);
+        if ($cid > 0) {
+            return $cid;
+        }
+    }
+
+    return 0;
+}
+
+/**
  * صافي سطر مردود مبيعات (سعر × كمية − خصم السطر).
  */
 function orange_sales_return_line_net(array $item): float

@@ -623,6 +623,18 @@ function orange_admin_time_display_unix_for_record(
 }
 
 /**
+ * Date-only default: local calendar today for an explicit country_id (IANA).
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_document_date_today_for_country_id(PDO $pdo, int $countryId): string
+{
+    return orange_admin_time_today_ymd_in_iana(
+        orange_admin_time_timezone_for_country_id($pdo, $countryId)
+    );
+}
+
+/**
  * Build admin API payload fields for an absolute instant from Unix epoch.
  *
  * @return array{utc:string, display:string}

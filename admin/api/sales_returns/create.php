@@ -22,6 +22,7 @@ require_once __DIR__ . '/../../../includes/warehouses.php';
 require_once __DIR__ . '/../../../includes/inventory_cost_layers.php';
 require_once __DIR__ . '/../../../includes/loyalty.php';
 require_once __DIR__ . '/../../../includes/gl_voucher_slot.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -70,7 +71,16 @@ try {
         if (orange_table_has_country_id($pdo, 'orders')) {
             $oc = $pdo->prepare('SELECT country_id FROM orders WHERE id = ? LIMIT 1');
             $oc->execute([$orderIdOpt]);
-            $returnCountryId = (int) ($oc->fetchColumn() ?: $returnCountryId);
+            $orderCid = (int) ($oc->fetchColumn() ?: 0);
+            if ($orderCid <= 0) {
+                $pdo->rollBack();
+                json_response([
+                    'success' => false,
+                    'code' => 'admin_time_country_id_required',
+                    'message' => 'دولة الطلب المرجعي مفقودة — تعذر إنشاء مردود المبيعات',
+                ], 422);
+            }
+            $returnCountryId = $orderCid;
         }
     }
 
@@ -91,19 +101,46 @@ try {
             $pdo->rollBack();
             json_response(['success' => false, 'message' => $e->getMessage()], 403);
         }
-        if (orange_table_has_country_id($pdo, 'customers')) {
+        // عند وجود Order: دولة العميل لا تستبدل دولة المستند.
+        if ($orderIdOpt <= 0 && orange_table_has_country_id($pdo, 'customers')) {
             $cc = $pdo->prepare('SELECT country_id FROM customers WHERE id = ? LIMIT 1');
             $cc->execute([$customerId]);
-            $returnCountryId = (int) ($cc->fetchColumn() ?: $returnCountryId);
+            $custCid = (int) ($cc->fetchColumn() ?: 0);
+            if ($custCid > 0) {
+                $returnCountryId = $custCid;
+            }
         }
     }
+    if ($returnCountryId <= 0) {
+        $pdo->rollBack();
+        json_response([
+            'success' => false,
+            'code' => 'admin_time_country_id_required',
+            'message' => 'تعذر تحديد دولة مردود المبيعات',
+        ], 422);
+    }
 
-    // تاريخ المستند (مردود المبيعات) = تاريخ ترحيل القيد المحاسبي (منفصل عن created_at).
+    // تاريخ المستند = Date-only لليوم المحلي لدولة المستند (منفصل عن created_at Absolute Instant).
     $documentDate = trim((string)($data['document_date'] ?? ''));
     if ($documentDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $documentDate)) {
-        $documentDate = date('Y-m-d');
+        try {
+            $documentDate = orange_admin_time_document_date_today_for_country_id($pdo, $returnCountryId);
+        } catch (OrangeAdminTimeConfigException $e) {
+            $pdo->rollBack();
+            json_response([
+                'success' => false,
+                'code' => $e->getMessage(),
+                'message' => 'تعذر تحديد التاريخ المحلي لدولة المردود.',
+            ], 422);
+        }
+    }
+    $documentDate = orange_admin_time_date_only_normalize($documentDate);
+    if ($documentDate === '') {
+        $pdo->rollBack();
+        json_response(['success' => false, 'message' => 'تاريخ المستند غير صالح'], 422);
     }
     orange_fiscal_require_open_for_posting($pdo, $documentDate, $returnCountryId);
+    // GL pending wall — deferred Step 4.
     $postingAt = $documentDate . ' ' . date('H:i:s');
 
     $revenueTotal = 0.0;
@@ -154,18 +191,35 @@ try {
     }
 
     $tmpNum = 'SR-TMP-' . bin2hex(random_bytes(6));
-    $pdo->prepare(
-        'INSERT INTO sales_returns (return_number, order_id, customer_id, channel_id, type, total, notes)
-         VALUES (?,?,?,?,?,?,?)'
-    )->execute([
-        $tmpNum,
-        $orderIdOpt > 0 ? $orderIdOpt : null,
-        $customerId > 0 ? $customerId : null,
-        null,
-        $channel,
-        $revenueTotal,
-        $notes !== '' ? $notes : null,
-    ]);
+    $srCreatedUnix = orange_admin_time_unix_now();
+    if (orange_table_has_column($pdo, 'sales_returns', 'created_at')) {
+        $pdo->prepare(
+            'INSERT INTO sales_returns (return_number, order_id, customer_id, channel_id, type, total, notes, created_at)
+             VALUES (?,?,?,?,?,?,?,' . orange_admin_time_sql_from_unix() . ')'
+        )->execute([
+            $tmpNum,
+            $orderIdOpt > 0 ? $orderIdOpt : null,
+            $customerId > 0 ? $customerId : null,
+            null,
+            $channel,
+            $revenueTotal,
+            $notes !== '' ? $notes : null,
+            $srCreatedUnix,
+        ]);
+    } else {
+        $pdo->prepare(
+            'INSERT INTO sales_returns (return_number, order_id, customer_id, channel_id, type, total, notes)
+             VALUES (?,?,?,?,?,?,?)'
+        )->execute([
+            $tmpNum,
+            $orderIdOpt > 0 ? $orderIdOpt : null,
+            $customerId > 0 ? $customerId : null,
+            null,
+            $channel,
+            $revenueTotal,
+            $notes !== '' ? $notes : null,
+        ]);
+    }
     $returnId = (int) $pdo->lastInsertId();
     if (orange_table_has_column($pdo, 'sales_returns', 'currency_code')) {
         $retCur = orange_gl_functional_currency_code($pdo, $returnCountryId);

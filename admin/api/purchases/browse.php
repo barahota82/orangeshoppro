@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -96,6 +97,9 @@ try {
         if ($hasCreatedAt) {
             $sql .= ', p.created_at';
         }
+        if (orange_table_has_column($pdo, 'purchases', 'country_id')) {
+            $sql .= ', p.country_id';
+        }
         if ($hasSupplierInvoice) {
             $sql .= ', p.supplier_invoice_number';
         }
@@ -112,13 +116,22 @@ try {
             $sql .= ' AND p.id <= ?';
             $params[] = $idTo;
         }
-        if ($hasCreatedAt && $dateFrom !== '') {
-            $sql .= ' AND DATE(p.created_at) >= ?';
-            $params[] = $dateFrom;
-        }
-        if ($hasCreatedAt && $dateTo !== '') {
-            $sql .= ' AND DATE(p.created_at) <= ?';
-            $params[] = $dateTo;
+        if ($hasCreatedAt && ($dateFrom !== '' || $dateTo !== '')) {
+            try {
+                $filterTz = orange_admin_time_timezone_for_admin_context($pdo);
+                $range = orange_admin_time_filter_range_mysql_utc($dateFrom, $dateTo, $filterTz);
+                if ($range !== null) {
+                    $sql .= ' AND p.created_at >= ? AND p.created_at < ?';
+                    $params[] = $range['start_utc_mysql'];
+                    $params[] = $range['end_exclusive_utc_mysql'];
+                }
+            } catch (OrangeAdminTimeConfigException $e) {
+                json_response([
+                    'success' => false,
+                    'code' => $e->getMessage(),
+                    'message' => 'تعذر تطبيق فلتر التاريخ: منطقة زمنية سياق الدولة غير مضبوطة.',
+                ], 422);
+            }
         }
         if ($ref !== '') {
             if (preg_match('/^PUR-(\d+)$/i', $ref, $m)) {
@@ -144,12 +157,31 @@ try {
         $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         $results = [];
+        $hasCountryCol = orange_table_has_column($pdo, 'purchases', 'country_id');
         foreach ($rows as $row) {
             $createdRaw = $hasCreatedAt ? (string) ($row['created_at'] ?? '') : '';
+            $rowCid = $hasCountryCol ? (int) ($row['country_id'] ?? 0) : 0;
+            if ($rowCid <= 0) {
+                $rowCid = $countryId;
+            }
+            $createdUtc = '';
+            if ($createdRaw !== '') {
+                try {
+                    $createdUtc = orange_admin_time_parse_mysql_utc_datetime($createdRaw)->format('c');
+                } catch (OrangeAdminTimeConfigException $e) {
+                    $createdUtc = '';
+                }
+            }
+            $createdDisplay = $rowCid > 0
+                ? orange_admin_time_display_mysql_utc_for_record($pdo, $createdRaw, $rowCid)
+                : orange_admin_time_display_mysql_utc_or_dash($pdo, $createdRaw, $countryId);
             $results[] = [
                 'id' => (int) ($row['id'] ?? 0),
                 'reference' => 'PUR-' . (int) ($row['id'] ?? 0),
-                'created_at_dmy' => $createdRaw !== '' ? orange_format_date_dmY($createdRaw) : '',
+                'created_at' => $createdRaw,
+                'created_at_utc' => $createdUtc,
+                'created_at_display' => $createdDisplay,
+                'created_at_dmy' => $createdDisplay,
                 'supplier_name' => (string) ($row['supplier_name'] ?? ''),
                 'supplier_invoice_number' => $hasSupplierInvoice
                     ? trim((string) ($row['supplier_invoice_number'] ?? ''))

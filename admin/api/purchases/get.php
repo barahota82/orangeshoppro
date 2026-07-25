@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 $purchaseId = (int) ($_GET['purchase_id'] ?? 0);
@@ -41,6 +42,9 @@ if ($hasDocumentDate) {
 if (orange_table_has_column($pdo, 'purchases', 'created_at')) {
     $purCols .= ', created_at';
 }
+if (orange_table_has_column($pdo, 'purchases', 'country_id')) {
+    $purCols .= ', country_id';
+}
 $st = $pdo->prepare("SELECT $purCols FROM purchases WHERE id = ? LIMIT 1");
 $st->execute([$purchaseId]);
 $purchase = $st->fetch(PDO::FETCH_ASSOC);
@@ -53,12 +57,10 @@ try {
     json_response(['success' => false, 'message' => $e->getMessage()], 403);
 }
 
-$purchaseCountryId = orange_admin_context_country_id($pdo);
-if (orange_table_has_country_id($pdo, 'purchases')) {
-    $pcSt = $pdo->prepare('SELECT country_id FROM purchases WHERE id = ? LIMIT 1');
-    $pcSt->execute([$purchaseId]);
-    $purchaseCountryId = (int) ($pcSt->fetchColumn() ?: $purchaseCountryId);
-}
+$recordCountryId = (int) ($purchase['country_id'] ?? 0);
+$purchaseCountryId = $recordCountryId > 0
+    ? $recordCountryId
+    : orange_admin_context_country_id($pdo);
 
 $purRef = 'PUR-' . $purchaseId;
 $accRow = orange_accounting_row_by_reference($pdo, $purRef);
@@ -163,6 +165,23 @@ json_response([
         'invoice_discount_amount' => $hasInvDiscount ? (float) ($purchase['invoice_discount_amount'] ?? 0) : 0.0,
         'document_date' => $hasDocumentDate ? (string) ($purchase['document_date'] ?? '') : '',
         'created_at' => (string) ($purchase['created_at'] ?? ''),
+        'created_at_utc' => (static function () use ($purchase): string {
+            $raw = trim((string) ($purchase['created_at'] ?? ''));
+            if ($raw === '') {
+                return '';
+            }
+            try {
+                return orange_admin_time_parse_mysql_utc_datetime($raw)->format('c');
+            } catch (OrangeAdminTimeConfigException $e) {
+                return '';
+            }
+        })(),
+        'created_at_display' => orange_admin_time_display_mysql_utc_for_record(
+            $pdo,
+            (string) ($purchase['created_at'] ?? ''),
+            $recordCountryId
+        ),
+        'country_id' => $recordCountryId,
     ],
     'items' => $items,
     'extra_lines' => $extraOut,

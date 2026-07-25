@@ -5,6 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
+require_once __DIR__ . '/../../../includes/purchase_return_helpers.php';
 require_admin_api();
 
 $pdo = db();
@@ -14,12 +16,21 @@ if ($returnId <= 0) {
     json_response(['success' => false, 'message' => 'معرف غير صالح'], 422);
 }
 
-$st = $pdo->prepare('SELECT * FROM purchase_returns WHERE id = ? LIMIT 1');
+$st = $pdo->prepare(
+    'SELECT pr.*, UNIX_TIMESTAMP(pr.created_at) AS created_at_unix
+     FROM purchase_returns pr WHERE pr.id = ? LIMIT 1'
+);
 $st->execute([$returnId]);
 $header = $st->fetch(PDO::FETCH_ASSOC);
 if (!$header) {
     json_response(['success' => false, 'message' => 'غير موجود'], 404);
 }
+$recordCountryId = orange_purchase_return_authority_country_id(
+    $pdo,
+    (int) ($header['purchase_id'] ?? 0)
+);
+$createdUnix = orange_admin_time_unix_or_null($header['created_at_unix'] ?? null);
+$createdApi = orange_admin_time_api_instant_from_unix($pdo, $createdUnix, $recordCountryId);
 
 try {
     $supplierId = (int) ($header['supplier_id'] ?? 0);
@@ -64,6 +75,9 @@ json_response([
         'return_number' => (string) ($header['return_number'] ?? ''),
         'document_date' => (string) ($header['document_date'] ?? ''),
         'created_at' => (string) ($header['created_at'] ?? ''),
+        'created_at_utc' => $createdApi['utc'],
+        'created_at_display' => $createdApi['display'],
+        'country_id' => $recordCountryId,
     ],
     'items' => array_map(static function (array $row) use ($hasPriDiscount): array {
         $item = [

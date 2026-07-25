@@ -160,9 +160,9 @@ p2_assert(str_contains($payReview, 'paid_at_utc') && str_contains($payReview, 'l
 $cm = file_get_contents($root . '/admin/api/orders/create-manual.php') ?: '';
 p2_assert(str_contains($cm, 'orange_admin_time_today_ymd_in_iana'), '1/12. document_date from country local day');
 
-// Out-of-scope screens not modified for this commit set (spot-check purchases/stock still have NOW if they did)
-$purch = file_get_contents($root . '/admin/api/purchases/update.php') ?: '';
-p2_assert(str_contains($purch, 'updated_at = NOW()'), '17. purchases untouched (still NOW())');
+// Out-of-scope screens not modified for this commit set (spot-check products still have NOW)
+$prod = file_get_contents($root . '/admin/api/products/update.php') ?: '';
+p2_assert(str_contains($prod, 'updated_at = NOW()'), '17. products/stock path untouched (still NOW())');
 
 echo "\n---\nPassed: {$passes}\nFailed: {$failures}\n";
 exit($failures === 0 ? 0 : 1);

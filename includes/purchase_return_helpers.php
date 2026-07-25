@@ -7,6 +7,22 @@ require_once __DIR__ . '/countries.php';
 require_once __DIR__ . '/warehouses.php';
 
 /**
+ * دولة سجل مردود المشتريات للوقت/العرض: من Purchase الأصلية فقط (لا المورد كمرجع بديل).
+ * 0 = غير قابلة للإثبات → Fail Closed عند العرض.
+ */
+function orange_purchase_return_authority_country_id(PDO $pdo, int $purchaseId): int
+{
+    if ($purchaseId <= 0 || !orange_table_has_country_id($pdo, 'purchases')) {
+        return 0;
+    }
+    $st = $pdo->prepare('SELECT country_id FROM purchases WHERE id = ? LIMIT 1');
+    $st->execute([$purchaseId]);
+    $cid = (int) ($st->fetchColumn() ?: 0);
+
+    return $cid > 0 ? $cid : 0;
+}
+
+/**
  * خفض مخزون المتغير عند تسجيل مردود مشتريات (مخزن دولة المنتج).
  *
  * @throws RuntimeException

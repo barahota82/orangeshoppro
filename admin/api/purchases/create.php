@@ -19,6 +19,7 @@ require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
 require_once __DIR__ . '/../../../includes/inventory_cost_layers.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -126,13 +127,33 @@ try {
     $netTotal = $subtotal - $invoiceDiscountAmt;
 
     $purchaseCountryId = orange_admin_context_country_id($pdo);
+    if ($purchaseCountryId <= 0) {
+        json_response([
+            'success' => false,
+            'code' => 'admin_time_country_id_required',
+            'message' => 'دولة السياق مطلوبة لإنشاء فاتورة شراء',
+        ], 422);
+    }
 
-    // تاريخ الفاتورة/المستند القابل للضبط = تاريخ ترحيل القيد المحاسبي (منفصل عن created_at للتدقيق).
+    // تاريخ الفاتورة/المستند = Date-only لليوم المحلي لدولة المستند (منفصل عن created_at UTC).
     $documentDate = trim((string)($data['document_date'] ?? ''));
     if ($documentDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $documentDate)) {
-        $documentDate = date('Y-m-d');
+        try {
+            $documentDate = orange_admin_time_document_date_today_for_country_id($pdo, $purchaseCountryId);
+        } catch (OrangeAdminTimeConfigException $e) {
+            json_response([
+                'success' => false,
+                'code' => $e->getMessage(),
+                'message' => 'تعذر تحديد التاريخ المحلي: منطقة زمنية الدولة غير مضبوطة.',
+            ], 422);
+        }
+    }
+    $documentDate = orange_admin_time_date_only_normalize($documentDate);
+    if ($documentDate === '') {
+        json_response(['success' => false, 'message' => 'تاريخ المستند غير صالح'], 422);
     }
     orange_fiscal_require_open_for_posting($pdo, $documentDate, $purchaseCountryId);
+    // GL/pending movement wall — deferred Step 4 (لا نغيّر دلالة ترحيل القيد هنا).
     $postingAt = $documentDate . ' ' . date('H:i:s');
 
     $hasSupplierInvoiceCol = orange_table_has_column($pdo, 'purchases', 'supplier_invoice_number');
@@ -164,6 +185,12 @@ try {
         $insertCols .= ', document_date';
         $insertPlaceholders .= ', ?';
         $insertValues[] = $documentDate;
+    }
+    // Absolute Moment: UTC wall في DATETIME (لا تعتمد على DEFAULT/CURRENT_TIMESTAMP الجدارية).
+    if (orange_table_has_column($pdo, 'purchases', 'created_at')) {
+        $insertCols .= ', created_at';
+        $insertPlaceholders .= ', ?';
+        $insertValues[] = orange_admin_time_utc_now_mysql();
     }
     orange_sql_append_document_currency_code(
         $pdo,
