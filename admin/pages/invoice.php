@@ -585,8 +585,34 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
                 <div><strong>رقم الفاتورة:</strong> <span style="color:#94a3b8;">يُخصص تلقائياً عند أول عرض</span></div>
             <?php endif; ?>
             <div><strong>رقم الطلب:</strong> <?php echo htmlspecialchars((string)$order['order_number'], ENT_QUOTES, 'UTF-8'); ?></div>
-            <div><strong>تاريخ الطلب:</strong> <?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string)($order['created_at'] ?? '')) ?: '—', ENT_QUOTES, 'UTF-8'); ?></div>
-            <div><strong>طباعة:</strong> <?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?></div>
+            <div><strong>تاريخ الطلب:</strong> <?php
+                $invCountryId = (int) ($order['country_id'] ?? 0);
+                echo htmlspecialchars(
+                    orange_admin_time_display_mysql_utc_or_dash(
+                        $pdo,
+                        (string) ($order['created_at'] ?? ''),
+                        $invCountryId,
+                        'ar',
+                        'datetime'
+                    ),
+                    ENT_QUOTES,
+                    'UTF-8'
+                );
+            ?></div>
+            <div><strong>طباعة:</strong> <?php
+                try {
+                    $printTs = orange_admin_time_format_instant_for_country_id(
+                        $pdo,
+                        orange_admin_time_utc_now_iso(),
+                        $invCountryId > 0 ? $invCountryId : orange_admin_context_country_id($pdo),
+                        'ar',
+                        'datetime'
+                    );
+                } catch (OrangeAdminTimeConfigException $e) {
+                    $printTs = orange_admin_time_utc_now_mysql();
+                }
+                echo htmlspecialchars($printTs, ENT_QUOTES, 'UTF-8');
+            ?></div>
             <?php if ($vat !== ''): ?>
                 <div class="invoice-doc-badge">الرقم الضريبي: <?php echo htmlspecialchars($vat, ENT_QUOTES, 'UTF-8'); ?></div>
             <?php endif; ?>

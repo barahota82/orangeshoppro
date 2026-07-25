@@ -15,6 +15,7 @@ require_once __DIR__ . '/storefront_checkout_promo_lines.php';
 require_once __DIR__ . '/order_intake_queue.php';
 require_once __DIR__ . '/storefront_account.php';
 require_once __DIR__ . '/order_fulfillment.php';
+require_once __DIR__ . '/admin_time.php';
 
 /**
  * @return list<string>
@@ -1163,8 +1164,9 @@ function orange_invoice_edit_apply(PDO $pdo, int $orderId, array $changes, bool 
     $bogoPromoId = $computed['bogoPromoId'];
     $bogoGiftVariantId = $computed['bogoGiftVariantId'];
 
-    $setParts = ['total = ?', 'updated_at = NOW()'];
-    $updParams = [$orderTotal];
+    $utcNow = orange_admin_time_utc_now_mysql();
+    $setParts = ['total = ?', 'updated_at = ?'];
+    $updParams = [$orderTotal, $utcNow];
     if (orange_table_has_column($pdo, 'orders', 'cart_combo_promotion_id')) {
         $setParts[] = 'cart_combo_promotion_id = ?';
         $setParts[] = 'cart_combo_discount = ?';
@@ -1227,8 +1229,8 @@ function orange_invoice_edit_apply(PDO $pdo, int $orderId, array $changes, bool 
     orange_invoice_edit_stamp_frame_groups($pdo, $orderId, $stampGroups);
 
     if ($markCompleted) {
-        $pdo->prepare('UPDATE orders SET status = ?, completed_at = NOW() WHERE id = ?')
-            ->execute(['completed', $orderId]);
+        $pdo->prepare('UPDATE orders SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
+            ->execute(['completed', $utcNow, $utcNow, $orderId]);
         orange_complete_order_fulfillment($pdo, $orderId);
     }
 

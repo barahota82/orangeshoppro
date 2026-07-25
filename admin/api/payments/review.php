@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/payments/payment_core.php';
 require_once __DIR__ . '/../../../includes/upload_paths.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -81,8 +82,13 @@ try {
             json_response(['success' => true, 'results' => []]);
         }
         $hasPaidCol = orange_table_has_column($pdo, 'orders', 'amount_paid');
+        $hasPaidAt = orange_table_has_column($pdo, 'orders', 'paid_at');
+        $hasCreatedAt = orange_table_has_column($pdo, 'orders', 'created_at');
         $sql = 'SELECT o.id, o.order_number, o.customer_name, o.phone, o.total,'
             . ($hasPaidCol ? ' o.amount_paid,' : ' 0 AS amount_paid,')
+            . ($hasPaidAt ? ' o.paid_at,' : ' NULL AS paid_at,')
+            . ($hasCreatedAt ? ' o.created_at,' : ' NULL AS created_at,')
+            . (orange_table_has_column($pdo, 'orders', 'country_id') ? ' o.country_id,' : ' NULL AS country_id,')
             . ' o.payment_status, o.payment_method
                 FROM orders o WHERE 1=1' . $countrySql;
         $params = [];
@@ -102,10 +108,30 @@ try {
         $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
         foreach ($rows as &$r) {
             $r['payment_status_label'] = orange_payment_status_label((string) ($r['payment_status'] ?? ''));
-            $txn = $pdo->prepare('SELECT id, provider_ref, proof_file, amount FROM payment_transactions WHERE order_id = ? ORDER BY id DESC LIMIT 1');
+            $rowCid = (int) ($r['country_id'] ?? 0);
+            if ($rowCid <= 0) {
+                $rowCid = $cid;
+            }
+            // orders.created_at is DATETIME — Phase 2 stores/displays as UTC wall → country IANA.
+            $r['created_at_display'] = orange_admin_time_display_mysql_utc_or_dash(
+                $pdo,
+                (string) ($r['created_at'] ?? ''),
+                $rowCid
+            );
+            // orders.paid_at is TIMESTAMP (session-mediated) — not yet UTC-written via Phase 1;
+            // expose raw only until Owner approves TIMESTAMP/session strategy (see ORANGE_ADMIN_TIME_POLICY).
+            $r['paid_at_raw'] = (string) ($r['paid_at'] ?? '');
+            $r['paid_at_display'] = $r['paid_at_raw'] !== '' ? $r['paid_at_raw'] : '—';
+            $txn = $pdo->prepare(
+                'SELECT id, provider_ref, proof_file, amount, created_at, status
+                 FROM payment_transactions WHERE order_id = ? ORDER BY id DESC LIMIT 1'
+            );
             $txn->execute([(int) $r['id']]);
             $t = $txn->fetch(PDO::FETCH_ASSOC) ?: [];
             $r['last_reference'] = (string) ($t['provider_ref'] ?? '');
+            $r['last_txn_status'] = (string) ($t['status'] ?? '');
+            // payment_transactions.created_at is TIMESTAMP — blocked for UTC rewrite this phase.
+            $r['last_txn_created_at_raw'] = (string) ($t['created_at'] ?? '');
             $pf = trim((string) ($t['proof_file'] ?? ''));
             $txnId = (int) ($t['id'] ?? 0);
             if ($pf !== '' && $txnId > 0) {

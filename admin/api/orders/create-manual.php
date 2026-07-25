@@ -109,10 +109,25 @@ try {
     $orderCountryId = orange_sales_order_country_id_for_channel($pdo, $channelId);
     $orderWarehouseId = orange_warehouse_default_id_for_country($pdo, $orderCountryId);
 
-    // تاريخ الفاتورة/المستند القابل للضبط = تاريخ ترحيل القيد المحاسبي (منفصل عن created_at).
+    // تاريخ الفاتورة/المستند القابل للضبط = تاريخ ترحيل القيد المحاسبي (Date-only؛ منفصل عن created_at UTC).
+    require_once __DIR__ . '/../../../includes/admin_time.php';
     $documentDate = trim((string)($data['document_date'] ?? ''));
     if ($documentDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $documentDate)) {
-        $documentDate = date('Y-m-d');
+        try {
+            $documentDate = orange_admin_time_today_ymd_in_iana(
+                orange_admin_time_timezone_for_country_id($pdo, $orderCountryId)
+            );
+        } catch (OrangeAdminTimeConfigException $e) {
+            json_response([
+                'success' => false,
+                'code' => $e->getMessage(),
+                'message' => 'تعذر تحديد التاريخ المحلي: منطقة زمنية الدولة غير مضبوطة في إعدادات الدولة.',
+            ], 422);
+        }
+    }
+    $documentDate = orange_admin_time_date_only_normalize($documentDate);
+    if ($documentDate === '') {
+        json_response(['success' => false, 'message' => 'تاريخ المستند غير صالح'], 422);
     }
     orange_fiscal_require_open_for_posting($pdo, $documentDate, $orderCountryId);
 
@@ -432,7 +447,8 @@ try {
         $params
     );
     $cols .= ', created_at';
-    $ph .= ', NOW()';
+    $ph .= ', ?';
+    $params[] = orange_admin_time_utc_now_mysql();
 
     $orderStmt = $pdo->prepare("INSERT INTO orders ($cols) VALUES ($ph)");
     $orderStmt->execute($params);

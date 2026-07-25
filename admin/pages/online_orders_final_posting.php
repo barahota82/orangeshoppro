@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/delivery_agents.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -24,6 +25,13 @@ $dateToDisplay = $dateTo !== '' ? orange_format_date_dmY($dateTo) : '';
 $agents = orange_table_exists($pdo, 'delivery_agents')
     ? orange_delivery_agents_admin_list($pdo, $adminCountryId > 0 ? $adminCountryId : null)
     : [];
+
+$filterTz = '';
+try {
+    $filterTz = orange_admin_time_timezone_for_admin_context($pdo);
+} catch (OrangeAdminTimeConfigException $e) {
+    $filterTz = '';
+}
 
 $rows = [];
 $sql = "
@@ -42,13 +50,17 @@ if ($agentFilter > 0 && orange_table_has_column($pdo, 'orders', 'delivery_agent_
     $sql .= ' AND o.delivery_agent_id = ?';
     $params[] = $agentFilter;
 }
-if ($dateFrom !== '' && orange_table_has_column($pdo, 'orders', 'completed_at')) {
-    $sql .= ' AND o.completed_at >= ?';
-    $params[] = $dateFrom . (strlen($dateFrom) <= 10 ? ' 00:00:00' : '');
-}
-if ($dateTo !== '' && orange_table_has_column($pdo, 'orders', 'completed_at')) {
-    $sql .= ' AND o.completed_at <= ?';
-    $params[] = $dateTo . (strlen($dateTo) <= 10 ? ' 23:59:59' : '');
+if ($filterTz !== '' && orange_table_has_column($pdo, 'orders', 'completed_at')) {
+    try {
+        $range = orange_admin_time_filter_range_mysql_utc($dateFrom, $dateTo, $filterTz);
+        if ($range !== null) {
+            $sql .= ' AND o.completed_at >= ? AND o.completed_at < ?';
+            $params[] = $range['start_utc_mysql'];
+            $params[] = $range['end_exclusive_utc_mysql'];
+        }
+    } catch (OrangeAdminTimeConfigException $e) {
+        // Keep unfiltered list rather than inventing server-midnight bounds.
+    }
 }
 $sql .= ' ORDER BY o.completed_at DESC, o.id DESC';
 $st = $pdo->prepare($sql);
@@ -126,9 +138,14 @@ foreach ($candidates as $o) {
                     <td><?php echo htmlspecialchars((string) ($o['customer_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td dir="ltr"><?php echo htmlspecialchars((string) ($o['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo orange_format_money_for_context($ordersMoney, (float) ($o['total'] ?? 0)); ?></td>
-                    <td><?php
+                    <td dir="ltr"><?php
                         $ca = (string) ($o['completed_at'] ?? $o['updated_at'] ?? '');
-                        echo $ca !== '' ? htmlspecialchars($ca, ENT_QUOTES, 'UTF-8') : '—';
+                        $rowCid = (int) ($o['country_id'] ?? 0);
+                        echo htmlspecialchars(
+                            orange_admin_time_display_mysql_utc_or_dash($pdo, $ca, $rowCid > 0 ? $rowCid : $adminCountryId),
+                            ENT_QUOTES,
+                            'UTF-8'
+                        );
                     ?></td>
                 </tr>
                 <?php endforeach; ?>

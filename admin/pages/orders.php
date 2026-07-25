@@ -220,6 +220,7 @@ function orange_admin_orders_action_buttons(array $o): void
                     <th title="تتبّع مصدر الطلب فقط — المخزون للشركة واحد">قناة العملاء</th>
                     <?php if ($hasDeliveryAgentCol): ?><th>المندوب</th><?php endif; ?>
                     <th>الإجمالي</th>
+                    <th>وقت الإنشاء</th>
                     <th>الحالة</th>
                     <th class="col-orders-actions">التحكم</th>
                 </tr>
@@ -273,6 +274,18 @@ function orange_admin_orders_action_buttons(array $o): void
                                 echo '<br><span class="small" title="خصم عرض مجموع السلة">عرض: −' . htmlspecialchars(orange_format_money_for_context($ordersMoney, $pd, false), ENT_QUOTES, 'UTF-8') . '</span>';
                             }
                         }
+                    ?></td>
+                    <td dir="ltr" style="white-space:nowrap;"><?php
+                        $rowCid = (int) ($o['country_id'] ?? 0);
+                        echo htmlspecialchars(
+                            orange_admin_time_display_mysql_utc_or_dash(
+                                $pdo,
+                                (string) ($o['created_at'] ?? ''),
+                                $rowCid > 0 ? $rowCid : $adminCountryId
+                            ),
+                            ENT_QUOTES,
+                            'UTF-8'
+                        );
                     ?></td>
                     <td><?php
                         $stBadge = strtolower(trim((string)($o['status'] ?? '')));

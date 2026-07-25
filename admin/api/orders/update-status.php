@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../includes/order_stock.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/loyalty.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -46,12 +47,15 @@ try {
         orange_loyalty_restore_for_order($pdo, $orderId);
     }
 
+    $utcNow = orange_admin_time_utc_now_mysql();
     $setCompletedAt = ($status === 'completed' && $prevStatus !== 'completed'
         && orange_table_has_column($pdo, 'orders', 'completed_at'));
     if ($setCompletedAt) {
-        $pdo->prepare('UPDATE orders SET status = ?, completed_at = NOW() WHERE id = ?')->execute([$status, $orderId]);
+        $pdo->prepare('UPDATE orders SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
+            ->execute([$status, $utcNow, $utcNow, $orderId]);
     } else {
-        $pdo->prepare('UPDATE orders SET status = ? WHERE id = ?')->execute([$status, $orderId]);
+        $pdo->prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
+            ->execute([$status, $utcNow, $orderId]);
     }
 
     if ($status === 'completed' && $prevStatus !== 'completed') {

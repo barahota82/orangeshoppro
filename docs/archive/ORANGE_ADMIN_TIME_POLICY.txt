@@ -2,7 +2,8 @@ ORANGE — سياسة الوقت المركزية للإدمن (Admin Time Polic
 ================================================================================
 المسار: docs/archive/ORANGE_ADMIN_TIME_POLICY.txt
 تاريخ القرار: 2026-07-25
-الحالة: Phase 1 — Foundation only (لا ترحيل شاشات تشغيلية بعد)
+آخر تحديث: 2026-07-25 (Phase 2 — Admin Orders / Payments DATETIME paths)
+الحالة: Phase 1 foundation + Phase 2 partial migration (انظر خامساً-ب)
 
 الغرض
 -------
@@ -69,7 +70,7 @@ Phase 1 **لا** تستبدل دوالهما ولا تغيّر ملفاتهما.
 - اختبار ذاتي معزول: `scripts/self_test_admin_time_foundation.php`
 - هذا الملف الأرشيفي
 
-لم يتم:
+لم يتم (بعد Phase 1):
 - ترحيل شاشات المبيعات/المشتريات/المخزون/المحاسبة/التقارير/Audit/العملاء
 - تعديل Storefront أو منطق الطلبات/المدفوعات
 - تغيير `date_default_timezone_set` أو `SET time_zone` في `db()`
@@ -77,16 +78,44 @@ Phase 1 **لا** تستبدل دوالهما ولا تغيّر ملفاتهما.
 
 
 --------------------------------------------------------------------
+خامساً-ب: Phase 2 — Admin Orders + Payments (2026-07-25)
+--------------------------------------------------------------------
+النطاق: طلبات الإدمن + أحداث الحالة (عبر تحديث الحالة) + واجهة مراجعة المدفوعات.
+
+ما تم ترحيله (Absolute Moment → كتابة UTC صريحة في أعمدة DATETIME):
+- `orders.created_at` عند الإنشاء اليدوي: `admin/api/orders/create-manual.php`
+- `orders.updated_at` / `orders.completed_at` عند:
+  update / update-status / bulk-update-status / cancel-from-delivery /
+  handover-to-agent / `includes/invoice_edit_helpers.php` (مسار تعديل فاتورة الإدمن)
+- `orders.document_date` (Date-only): اليوم المحلي لدولة الطلب عبر IANA الدولة
+- العرض: قائمة الطلبات، فاتورة الإدمن، قائمة «إنشاء قيود التسليم» —
+  عبر `orange_admin_time_display_mysql_utc_or_dash` + `country_id` للسجل
+- فلاتر من/إلى في `online_orders_final_posting.php`: حدود اليوم المحلي لسياق الدولة → UTC
+  (`start <= completed_at < end_exclusive`)
+- API مراجعة الدفع: حقل `created_at_display` للطلب (DATETIME)؛ الحقول TIMESTAMP تبقى raw
+
+BLOCKER — لم يُرحَّل (يحتاج قرار Owner: Schema أو MySQL session UTC):
+- `orders.paid_at` TIMESTAMP + `paid_at = NOW()` في `includes/payments/payment_core.php`
+  (ملف مشترك مع Storefront؛ TIMESTAMP يعتمد على `SET time_zone = '+03:00'`)
+- `payment_transactions.created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+- `order_intake_queue.created_at` / `updated_at` TIMESTAMP
+- لا Data Migration؛ لا تغيير Schema؛ لا تغيير `date_default_timezone_set` / session TZ
+
+مجمّد كما هو: Backup Center / Restore Center.
+
+
+--------------------------------------------------------------------
 سادساً: تنفيذ (مسارات الكود)
 --------------------------------------------------------------------
 - العقود والدوال: `includes/admin_time.php`
+  (+ Phase 2: parse/format MySQL UTC DATETIME، day bounds للفلاتر)
 - إعادة استخدام: `orange_country_timezone` / `orange_admin_context_timezone` /
   `orange_countries_is_valid_iana_timezone` (نفس قواعد التحقق)
 - تنسيق العرض القديم للشاشات غير المرحّلة يبقى: `includes/date_format.php`
-  (لم يُستبدل في Phase 1)
 
 
 --------------------------------------------------------------------
 سابعاً: اختبار
 --------------------------------------------------------------------
 `php scripts/self_test_admin_time_foundation.php`
+`php scripts/self_test_admin_time_phase2_orders_payments.php`

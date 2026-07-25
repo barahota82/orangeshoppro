@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/loyalty.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -66,17 +67,13 @@ try {
         orange_loyalty_restore_for_order($pdo, $id);
     }
 
-    $completedAtSql = '';
-    if ($status === 'completed' && $prevStatus !== 'completed'
-        && orange_table_has_column($pdo, 'orders', 'completed_at')) {
-        $completedAtSql = ', completed_at = NOW()';
-    }
-
-    $pdo->prepare("
+    $utcNow = orange_admin_time_utc_now_mysql();
+    $setCompletedAt = ($status === 'completed' && $prevStatus !== 'completed'
+        && orange_table_has_column($pdo, 'orders', 'completed_at'));
+    $sql = '
         UPDATE orders
-        SET customer_name = ?, phone = ?, area = ?, address = ?, notes = ?, channel_id = ?, status = ?, updated_at = NOW(){$completedAtSql}
-        WHERE id = ?
-    ")->execute([
+        SET customer_name = ?, phone = ?, area = ?, address = ?, notes = ?, channel_id = ?, status = ?, updated_at = ?';
+    $params = [
         trim((string)($data['customer_name'] ?? $order['customer_name'])),
         $phoneOut,
         trim((string)($data['area'] ?? $order['area'])),
@@ -84,8 +81,15 @@ try {
         trim((string)($data['notes'] ?? $order['notes'])),
         isset($data['channel_id']) ? (int)$data['channel_id'] : (int)$order['channel_id'],
         $status,
-        $id
-    ]);
+        $utcNow,
+    ];
+    if ($setCompletedAt) {
+        $sql .= ', completed_at = ?';
+        $params[] = $utcNow;
+    }
+    $sql .= ' WHERE id = ?';
+    $params[] = $id;
+    $pdo->prepare($sql)->execute($params);
 
     if ($status === 'completed' && $prevStatus !== 'completed') {
         orange_complete_order_fulfillment($pdo, $id);

@@ -317,3 +317,142 @@ function orange_admin_time_business_local_contract(): array
         'note' => 'Country wall clock (delivery slots, working hours). Not an absolute UTC moment; do not run through UTC↔IANA conversion as if it were Absolute Moment. Phase 1 documents only — no slot/hours migration.',
     ];
 }
+
+/**
+ * Parse DATETIME stored as UTC wall (Y-m-d H:i:s or ISO with offset/Z).
+ * Naive strings are treated as UTC — never as PHP default / browser TZ.
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_parse_mysql_utc_datetime(string $value): DateTimeImmutable
+{
+    $value = trim($value);
+    if ($value === '') {
+        throw new OrangeAdminTimeConfigException('admin_time_instant_empty');
+    }
+    if (preg_match('/[Zz]|[+-]\d{2}:?\d{2}$/', $value)) {
+        return orange_admin_time_parse_utc_instant($value);
+    }
+    if (!preg_match('/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})$/', $value, $m)) {
+        throw new OrangeAdminTimeConfigException('admin_time_instant_parse_failed');
+    }
+    try {
+        $dt = new DateTimeImmutable($m[1] . 'T' . $m[2] . '+00:00');
+    } catch (Throwable $e) {
+        throw new OrangeAdminTimeConfigException('admin_time_instant_parse_failed');
+    }
+
+    return $dt->setTimezone(new DateTimeZone('UTC'));
+}
+
+/**
+ * Format a MySQL UTC DATETIME (or ISO instant) for an explicit country_id.
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_format_mysql_utc_for_country_id(
+    PDO $pdo,
+    string $mysqlUtcDatetime,
+    int $countryId,
+    string $lang = 'ar',
+    string $pattern = 'datetime'
+): string {
+    $iso = orange_admin_time_parse_mysql_utc_datetime($mysqlUtcDatetime)->format('c');
+
+    return orange_admin_time_format_instant_for_country_id($pdo, $iso, $countryId, $lang, $pattern);
+}
+
+/**
+ * Format MySQL UTC DATETIME using Current Country Context IANA.
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_format_mysql_utc_for_admin_context(
+    PDO $pdo,
+    string $mysqlUtcDatetime,
+    string $lang = 'ar',
+    string $pattern = 'datetime'
+): string {
+    $iso = orange_admin_time_parse_mysql_utc_datetime($mysqlUtcDatetime)->format('c');
+
+    return orange_admin_time_format_instant_for_admin_context($pdo, $iso, $lang, $pattern);
+}
+
+/**
+ * Local calendar day → UTC MySQL DATETIME bounds for SQL filters:
+ *   start_utc_mysql <= col AND col < end_exclusive_utc_mysql
+ *
+ * @return array{local_ymd:string, start_utc_mysql:string, end_exclusive_utc_mysql:string}
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_day_bounds_mysql_utc(string $localYmd, string $ianaTimezone): array
+{
+    $b = orange_admin_time_day_bounds_utc($localYmd, $ianaTimezone);
+    $start = orange_admin_time_parse_utc_instant($b['start_utc_iso']);
+    $end = orange_admin_time_parse_utc_instant($b['end_exclusive_utc_iso']);
+
+    return [
+        'local_ymd' => $b['local_ymd'],
+        'start_utc_mysql' => $start->format('Y-m-d H:i:s'),
+        'end_exclusive_utc_mysql' => $end->format('Y-m-d H:i:s'),
+    ];
+}
+
+/**
+ * Inclusive local from/to dates → UTC MySQL range for filters (end exclusive next day after $toYmd).
+ *
+ * @return array{start_utc_mysql:string, end_exclusive_utc_mysql:string}|null null if both empty
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_filter_range_mysql_utc(
+    string $fromYmd,
+    string $toYmd,
+    string $ianaTimezone
+): ?array {
+    $from = orange_admin_time_date_only_normalize($fromYmd);
+    $to = orange_admin_time_date_only_normalize($toYmd);
+    if ($from === '' && $to === '') {
+        return null;
+    }
+    if ($from === '') {
+        $from = $to;
+    }
+    if ($to === '') {
+        $to = $from;
+    }
+    if ($from > $to) {
+        [$from, $to] = [$to, $from];
+    }
+    $startB = orange_admin_time_day_bounds_mysql_utc($from, $ianaTimezone);
+    $endB = orange_admin_time_day_bounds_mysql_utc($to, $ianaTimezone);
+
+    return [
+        'start_utc_mysql' => $startB['start_utc_mysql'],
+        'end_exclusive_utc_mysql' => $endB['end_exclusive_utc_mysql'],
+    ];
+}
+
+/**
+ * Safe display helper: empty → "—"; missing country TZ → raw + no silent browser fallback.
+ */
+function orange_admin_time_display_mysql_utc_or_dash(
+    PDO $pdo,
+    ?string $mysqlUtcDatetime,
+    int $countryId,
+    string $lang = 'ar',
+    string $pattern = 'datetime'
+): string {
+    $raw = trim((string) ($mysqlUtcDatetime ?? ''));
+    if ($raw === '') {
+        return '—';
+    }
+    try {
+        if ($countryId > 0) {
+            return orange_admin_time_format_mysql_utc_for_country_id($pdo, $raw, $countryId, $lang, $pattern);
+        }
+
+        return orange_admin_time_format_mysql_utc_for_admin_context($pdo, $raw, $lang, $pattern);
+    } catch (OrangeAdminTimeConfigException $e) {
+        return $raw;
+    }
+}

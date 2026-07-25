@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../includes/order_stock.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/loyalty.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -47,8 +48,8 @@ try {
         orange_loyalty_restore_for_order($pdo, $orderId);
     }
 
-    $pdo->prepare('UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?')
-        ->execute(['cancelled', $orderId]);
+    $pdo->prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
+        ->execute(['cancelled', orange_admin_time_utc_now_mysql(), $orderId]);
 
     $pdo->commit();
 

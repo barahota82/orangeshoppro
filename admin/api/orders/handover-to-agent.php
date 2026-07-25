@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/delivery_agents.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -66,8 +67,8 @@ try {
         if ($src === 'company') {
             throw new RuntimeException('طلب الشركة #' . $orderId . ' خارج مسار توزيع المناديب');
         }
-        $pdo->prepare('UPDATE orders SET delivery_agent_id = ?, updated_at = NOW() WHERE id = ?')
-            ->execute([$agentId, $orderId]);
+        $pdo->prepare('UPDATE orders SET delivery_agent_id = ?, updated_at = ? WHERE id = ?')
+            ->execute([$agentId, orange_admin_time_utc_now_mysql(), $orderId]);
         ++$updated;
     }
 
