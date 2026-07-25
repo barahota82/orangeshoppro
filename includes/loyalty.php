@@ -893,21 +893,25 @@ function orange_loyalty_clawback_for_return(
                 );
             } else {
                 require_once __DIR__ . '/gl_voucher_slot.php';
-                $nowClaw = date('Y-m-d H:i:s');
+                require_once __DIR__ . '/gl_posting_time.php';
+                if ($cid <= 0) {
+                    throw new RuntimeException('دولة الولاء مطلوبة لترحيل قيد استرداد النقاط');
+                }
+                $clawTimes = orange_gl_posting_times_for_country($pdo, $cid, null);
                 $afterJson = orange_gl_after_post_json_with_country(null, $cid);
                 $clawSlot = [
                     'doc_kind' => 'sales_return',
                     'entity_id' => $returnId,
                     'slot_key' => 'loyalty-return-clawback',
                     'entry_type' => 'loyalty_return_clawback',
-                    'country_id' => $cid > 0 ? $cid : null,
+                    'country_id' => $cid,
                 ];
                 $clawHeader = [
-                    'voucher_date' => $nowClaw,
-                    'document_entered_at' => $nowClaw,
+                    'voucher_date' => $clawTimes['voucher_date'],
+                    'document_entered_at' => $clawTimes['document_entered_at'],
                     'description' => 'قيد استرداد نقاط ولاء (متاحة) — مردود مبيعات',
                     'entry_type' => 'loyalty_return_clawback',
-                    'country_id' => $cid > 0 ? $cid : null,
+                    'country_id' => $cid,
                 ];
                 orange_gl_voucher_immediate_post_simple_for_slot(
                     $pdo,

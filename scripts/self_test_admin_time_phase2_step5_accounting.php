@@ -180,6 +180,10 @@ s5_assert(str_contains($yec, 'voided_at = ?') && str_contains($yec, 'closed_at =
 
 s5_assert(str_contains($party, 'INSERT INTO party_subledger'), '11. party_subledger insert unchanged (DEFAULT TIMESTAMP)');
 s5_assert(str_contains($elock, 'locked_at = ?') && !str_contains($elock, 'locked_at = NOW()'), '20. edit lock locked_at UTC');
+s5_assert(str_contains($elock, 'DATE(j.voucher_date)'), '3. edit lock filters voucher_date as calendar DATE');
+s5_assert(str_contains($elock, 'orange_edit_lock_format_saved_at_for_display'), '3b. journal saved_at display strips noon clock');
+s5_assert(!str_contains($loy, "\$nowClaw = date('Y-m-d H:i:s')"), '5. loyalty clawback no ambiguous date() postingAt');
+s5_assert(str_contains($loy, 'orange_gl_posting_times_for_country'), '5b. loyalty clawback uses gl_posting_times');
 
 s5_assert(str_contains($jvPage, 'orange_admin_time_document_date_today_for_country_id'), '7b. manual form default date = country today');
 s5_assert(str_contains($jm, 'DATE(voucher_date)'), '24. operational voucher_date filters remain Date-only');

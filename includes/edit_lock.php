@@ -93,6 +93,39 @@ function orange_edit_lock_resource_for_kind(string $kind): string
 }
 
 /**
+ * Accounting Date-only from journal_vouchers.voucher_date for edit-lock saved_at storage.
+ * Keeps DATETIME column shape without exposing wall-clock semantics (noon contract).
+ */
+function orange_edit_lock_saved_at_from_voucher_date(string $voucherDate): string
+{
+    $raw = trim($voucherDate);
+    if ($raw !== '' && preg_match('/^\d{4}-\d{2}-\d{2}/', $raw)) {
+        return substr($raw, 0, 10) . ' 12:00:00';
+    }
+    require_once __DIR__ . '/admin_time.php';
+
+    return orange_admin_time_utc_now_mysql();
+}
+
+/**
+ * Display helper: journal voucher rows show calendar date only (no 12:00 leak).
+ */
+function orange_edit_lock_format_saved_at_for_display(array $row): string
+{
+    $raw = trim((string) ($row['saved_at'] ?? ''));
+    if ($raw === '') {
+        return '';
+    }
+    if ((int) ($row['journal_voucher_id'] ?? 0) > 0 && strlen($raw) >= 10) {
+        require_once __DIR__ . '/date_format.php';
+
+        return orange_format_date_dmY(substr($raw, 0, 10));
+    }
+
+    return $raw;
+}
+
+/**
  * @param array{doc_kind:string,entity_id:int,country_id?:int|null,reference?:string,label_ar?:string,amount?:float|null,saved_at?:string,journal_voucher_id?:int|null} $row
  */
 function orange_edit_lock_register(PDO $pdo, array $row): void
@@ -616,13 +649,14 @@ function orange_edit_lock_sync_journal_vouchers(PDO $pdo, ?string $df, ?string $
         $sql .= ' AND j.country_id = ?';
         $params[] = $ctxCid;
     }
+    // voucher_date is Accounting Date-only (DATETIME shape Y-m-d 12:00:00) — filter by calendar day.
     if ($df !== null) {
-        $sql .= ' AND j.voucher_date >= ?';
-        $params[] = $df;
+        $sql .= ' AND DATE(j.voucher_date) >= ?';
+        $params[] = substr($df, 0, 10);
     }
     if ($dt !== null) {
-        $sql .= ' AND j.voucher_date <= ?';
-        $params[] = $dt;
+        $sql .= ' AND DATE(j.voucher_date) <= ?';
+        $params[] = substr($dt, 0, 10);
     }
     if ($entryTypes !== null && $entryTypes !== []) {
         if ($entryTypes === ['__orange_unmapped_jt__']) {
@@ -657,7 +691,7 @@ function orange_edit_lock_sync_journal_vouchers(PDO $pdo, ?string $df, ?string $
                 'label_ar' => trim((string) ($row['description'] ?? '')) !== ''
                     ? trim((string) $row['description'])
                     : ('رصيد افتتاحي — سنة #' . $fyId),
-                'saved_at' => (string) ($row['voucher_date'] ?? date('Y-m-d H:i:s')),
+                'saved_at' => orange_edit_lock_saved_at_from_voucher_date((string) ($row['voucher_date'] ?? '')),
                 'journal_voucher_id' => $vid,
             ]);
             continue;
@@ -676,7 +710,7 @@ function orange_edit_lock_sync_journal_vouchers(PDO $pdo, ?string $df, ?string $
             'country_id' => $cid > 0 ? $cid : null,
             'reference' => $ref,
             'label_ar' => $label,
-            'saved_at' => (string) ($row['voucher_date'] ?? date('Y-m-d H:i:s')),
+            'saved_at' => orange_edit_lock_saved_at_from_voucher_date((string) ($row['voucher_date'] ?? '')),
             'journal_voucher_id' => $vid,
         ]);
     }
@@ -740,6 +774,7 @@ function orange_edit_lock_list(
         $kind = (string) ($row['doc_kind'] ?? '');
         $row['kind_label'] = orange_edit_lock_kind_label($kind);
         $row['is_locked'] = (int) ($row['is_locked'] ?? 0) === 1;
+        $row['saved_at'] = orange_edit_lock_format_saved_at_for_display($row);
         $rows[] = $row;
     }
 
@@ -796,7 +831,7 @@ function orange_edit_lock_preview(PDO $pdo, int $registryId): array
             'reference' => (string) ($row['reference'] ?? ''),
             'label_ar' => (string) ($row['label_ar'] ?? ''),
             'is_locked' => (int) ($row['is_locked'] ?? 0) === 1,
-            'saved_at' => (string) ($row['saved_at'] ?? ''),
+            'saved_at' => orange_edit_lock_format_saved_at_for_display($row),
         ],
     ];
 }
@@ -957,7 +992,7 @@ function orange_edit_lock_register_voucher(PDO $pdo, array $voucherRow): void
             (int) ($voucherRow['country_id'] ?? 0) > 0 ? (int) $voucherRow['country_id'] : null,
             trim((string) ($voucherRow['description'] ?? '')),
             $vid,
-            (string) ($voucherRow['voucher_date'] ?? date('Y-m-d H:i:s'))
+            orange_edit_lock_saved_at_from_voucher_date((string) ($voucherRow['voucher_date'] ?? ''))
         );
 
         return;
@@ -969,7 +1004,7 @@ function orange_edit_lock_register_voucher(PDO $pdo, array $voucherRow): void
         'country_id' => $cid > 0 ? $cid : null,
         'reference' => trim((string) ($voucherRow['reference'] ?? '')) !== '' ? trim((string) $voucherRow['reference']) : ('JV-' . $vid),
         'label_ar' => trim((string) ($voucherRow['description'] ?? '')) !== '' ? trim((string) $voucherRow['description']) : ('سند #' . $vid),
-        'saved_at' => (string) ($voucherRow['voucher_date'] ?? date('Y-m-d H:i:s')),
+        'saved_at' => orange_edit_lock_saved_at_from_voucher_date((string) ($voucherRow['voucher_date'] ?? '')),
         'journal_voucher_id' => $vid,
     ]);
 }
