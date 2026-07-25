@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/admin_time.php';
 require_once __DIR__ . '/account_tree.php';
 require_once __DIR__ . '/journal_voucher.php';
 require_once __DIR__ . '/gl_settings.php';
@@ -444,6 +445,36 @@ function orange_stock_adjustment_voucher_get(PDO $pdo, int $id, ?int $countryId 
         );
     }
 
+    $createdUnix = null;
+    try {
+        $createdUnix = orange_admin_time_mysql_timestamp_session_wall_to_unix(
+            $pdo,
+            isset($row['created_at']) ? (string) $row['created_at'] : null
+        );
+    } catch (Throwable $e) {
+        $createdUnix = null;
+    }
+    $createdApi = orange_admin_time_api_instant_from_unix($pdo, $createdUnix, $countryForGl, 'ar', 'datetime');
+    $row['created_at_utc'] = $createdApi['utc'];
+    $row['created_at_display'] = $createdApi['display'];
+    $approvedRaw = trim((string) ($row['approved_at'] ?? ''));
+    $row['approved_at_utc'] = $approvedRaw !== ''
+        ? (static function () use ($approvedRaw): string {
+            try {
+                return orange_admin_time_parse_mysql_utc_datetime($approvedRaw)->format('c');
+            } catch (Throwable $e) {
+                return '';
+            }
+        })()
+        : '';
+    $row['approved_at_display'] = orange_admin_time_display_mysql_utc_for_record(
+        $pdo,
+        $approvedRaw !== '' ? $approvedRaw : null,
+        $countryForGl,
+        'ar',
+        'datetime'
+    );
+
     return [
         'header' => $row,
         'reference' => $reference,
@@ -610,7 +641,8 @@ function orange_stock_adjustment_voucher_save(PDO $pdo, array $headerIn, array $
     }
     $hasTreatmentKind = orange_table_has_column($pdo, 'stock_adjustment_voucher', 'treatment_kind');
 
-    if ($documentDate === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $documentDate)) {
+    $documentDate = orange_admin_time_date_only_normalize($documentDate);
+    if ($documentDate === '') {
         throw new InvalidArgumentException('تاريخ السند مطلوب (يوم/شهر/سنة).');
     }
     if ($lines === []) {
@@ -620,10 +652,14 @@ function orange_stock_adjustment_voucher_save(PDO $pdo, array $headerIn, array $
     if ($countryId === null || $countryId <= 0) {
         $countryId = orange_admin_settings_effective_country_id($pdo);
     }
+    if ($countryId <= 0) {
+        throw new InvalidArgumentException('admin_time_country_id_required');
+    }
     $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
     if ($warehouseId <= 0) {
         throw new RuntimeException('لا يوجد مستودع افتراضي لهذه الدولة.');
     }
+    orange_stock_movement_assert_country_matches_warehouse($pdo, $countryId, $warehouseId);
 
     // أسطر المعالجة المحاسبية (الكارت السفلي) — اختيارية في المسودة، إلزامية ومتوازنة عند الاعتماد.
     $glLines = orange_stock_adjustment_voucher_normalize_gl_lines($pdo, $headerIn['gl_lines'] ?? []);
@@ -686,10 +722,10 @@ function orange_stock_adjustment_voucher_save(PDO $pdo, array $headerIn, array $
         } else {
             $ins = $pdo->prepare(
                 $hasTreatmentKind
-                    ? 'INSERT INTO stock_adjustment_voucher (warehouse_id, status, document_date, notes, treatment_kind, country_id)
-                       VALUES (?, \'draft\', ?, ?, ?, ?)'
-                    : 'INSERT INTO stock_adjustment_voucher (warehouse_id, status, document_date, notes, country_id)
-                       VALUES (?, \'draft\', ?, ?, ?)'
+                    ? 'INSERT INTO stock_adjustment_voucher (warehouse_id, status, document_date, notes, treatment_kind, country_id, created_at)
+                       VALUES (?, \'draft\', ?, ?, ?, ?, ' . orange_admin_time_sql_from_unix() . ')'
+                    : 'INSERT INTO stock_adjustment_voucher (warehouse_id, status, document_date, notes, country_id, created_at)
+                       VALUES (?, \'draft\', ?, ?, ?, ' . orange_admin_time_sql_from_unix() . ')'
             );
             $insParams = [
                 $warehouseId,
@@ -700,6 +736,7 @@ function orange_stock_adjustment_voucher_save(PDO $pdo, array $headerIn, array $
                 $insParams[] = $treatmentKind;
             }
             $insParams[] = $countryId > 0 ? $countryId : null;
+            $insParams[] = orange_admin_time_unix_now();
             $ins->execute($insParams);
             $id = (int) $pdo->lastInsertId();
         }
@@ -978,10 +1015,10 @@ function orange_stock_adjustment_voucher_approve(PDO $pdo, int $id, ?int $countr
         }
 
         $upd = $pdo->prepare(
-            'UPDATE stock_adjustment_voucher SET status = \'approved\', journal_voucher_id = ?, approved_at = NOW()
+            'UPDATE stock_adjustment_voucher SET status = \'approved\', journal_voucher_id = ?, approved_at = ?
              WHERE id = ? AND status = \'draft\''
         );
-        $upd->execute([$voucherId > 0 ? $voucherId : null, $id]);
+        $upd->execute([$voucherId > 0 ? $voucherId : null, orange_admin_time_utc_now_mysql(), $id]);
         if ($upd->rowCount() === 0) {
             throw new RuntimeException('تعذّر اعتماد السند.');
         }

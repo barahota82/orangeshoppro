@@ -4,11 +4,50 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/admin_time.php';
 
 function orange_warehouses_table_exists(PDO $pdo): bool
 {
     return orange_table_exists($pdo, 'warehouses')
         && orange_table_exists($pdo, 'warehouse_variant_stock');
+}
+
+/**
+ * دولة المستودع — مرجع السلطة للسجلات المخزنية المرتبطة بمستودع.
+ *
+ * @throws RuntimeException missing warehouse or country_id
+ */
+function orange_warehouse_authority_country_id(PDO $pdo, int $warehouseId): int
+{
+    $row = orange_warehouse_row_by_id($pdo, $warehouseId);
+    if ($row === null) {
+        throw new RuntimeException('admin_time_warehouse_not_found');
+    }
+    $countryId = (int) ($row['country_id'] ?? 0);
+    if ($countryId <= 0) {
+        throw new RuntimeException('admin_time_warehouse_country_required');
+    }
+
+    return $countryId;
+}
+
+/**
+ * Fail closed when stock movement country_id conflicts with warehouse country.
+ *
+ * @throws RuntimeException
+ */
+function orange_stock_movement_assert_country_matches_warehouse(
+    PDO $pdo,
+    ?int $countryId,
+    ?int $warehouseId
+): void {
+    if ($warehouseId === null || $warehouseId <= 0) {
+        return;
+    }
+    $whCountry = orange_warehouse_authority_country_id($pdo, $warehouseId);
+    if ($countryId !== null && $countryId > 0 && $countryId !== $whCountry) {
+        throw new RuntimeException('admin_time_warehouse_document_country_mismatch');
+    }
 }
 
 /**
@@ -96,11 +135,25 @@ function orange_warehouse_ensure_default_for_country(PDO $pdo, int $countryId): 
     if ($nameEn === '') {
         $nameEn = 'Main warehouse';
     }
-    $ins = $pdo->prepare(
-        'INSERT INTO warehouses (country_id, name_ar, name_en, is_default, is_active, sort_order)
-         VALUES (?, ?, ?, 1, 1, 1)'
-    );
-    $ins->execute([$countryId, $nameAr . ' — مخزن رئيسي', $nameEn . ' — main']);
+    $hasCreatedAt = orange_table_has_column($pdo, 'warehouses', 'created_at');
+    if ($hasCreatedAt) {
+        $ins = $pdo->prepare(
+            'INSERT INTO warehouses (country_id, name_ar, name_en, is_default, is_active, sort_order, created_at)
+             VALUES (?, ?, ?, 1, 1, 1, ' . orange_admin_time_sql_from_unix() . ')'
+        );
+        $ins->execute([
+            $countryId,
+            $nameAr . ' — مخزن رئيسي',
+            $nameEn . ' — main',
+            orange_admin_time_unix_now(),
+        ]);
+    } else {
+        $ins = $pdo->prepare(
+            'INSERT INTO warehouses (country_id, name_ar, name_en, is_default, is_active, sort_order)
+             VALUES (?, ?, ?, 1, 1, 1)'
+        );
+        $ins->execute([$countryId, $nameAr . ' — مخزن رئيسي', $nameEn . ' — main']);
+    }
     $wid = (int) $pdo->lastInsertId();
 
     return $wid > 0 ? $wid : 0;
@@ -205,14 +258,38 @@ function orange_warehouse_apply_variant_delta(
     if ($new < $minQty) {
         throw new RuntimeException('Insufficient stock');
     }
+    orange_warehouse_variant_stock_upsert_quantity($pdo, $warehouseId, $variantId, $new);
+    orange_warehouse_sync_legacy_variant_quantity($pdo, $warehouseId, $variantId, $new);
+
+    return ['old' => $old, 'new' => $new];
+}
+
+/**
+ * Upsert quantity and set updated_at explicitly as UTC MySQL wall (DATETIME).
+ * Avoids ON UPDATE CURRENT_TIMESTAMP writing session +03:00 into a UTC Absolute Moment column.
+ */
+function orange_warehouse_variant_stock_upsert_quantity(
+    PDO $pdo,
+    int $warehouseId,
+    int $variantId,
+    int $quantity
+): void {
+    $hasUpdatedAt = orange_table_has_column($pdo, 'warehouse_variant_stock', 'updated_at');
+    if ($hasUpdatedAt) {
+        $utc = orange_admin_time_utc_now_mysql();
+        $pdo->prepare(
+            'INSERT INTO warehouse_variant_stock (warehouse_id, variant_id, quantity, updated_at)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE quantity = VALUES(quantity), updated_at = VALUES(updated_at)'
+        )->execute([$warehouseId, $variantId, $quantity, $utc]);
+
+        return;
+    }
     $pdo->prepare(
         'INSERT INTO warehouse_variant_stock (warehouse_id, variant_id, quantity)
          VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE quantity = VALUES(quantity)'
-    )->execute([$warehouseId, $variantId, $new]);
-    orange_warehouse_sync_legacy_variant_quantity($pdo, $warehouseId, $variantId, $new);
-
-    return ['old' => $old, 'new' => $new];
+    )->execute([$warehouseId, $variantId, $quantity]);
 }
 
 function orange_warehouse_set_variant_quantity(PDO $pdo, int $warehouseId, int $variantId, int $newQty): array
@@ -237,11 +314,7 @@ function orange_warehouse_set_variant_quantity(PDO $pdo, int $warehouseId, int $
     );
     $sel->execute([$warehouseId, $variantId]);
     $old = (int) ($sel->fetchColumn() ?: 0);
-    $pdo->prepare(
-        'INSERT INTO warehouse_variant_stock (warehouse_id, variant_id, quantity)
-         VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE quantity = VALUES(quantity)'
-    )->execute([$warehouseId, $variantId, $newQty]);
+    orange_warehouse_variant_stock_upsert_quantity($pdo, $warehouseId, $variantId, $newQty);
     orange_warehouse_sync_legacy_variant_quantity($pdo, $warehouseId, $variantId, $newQty);
 
     return ['old' => $old, 'new' => $newQty];
@@ -276,6 +349,24 @@ function orange_stock_movement_insert(PDO $pdo, array $fields): void
     if (!orange_table_exists($pdo, 'stock_movements')) {
         return;
     }
+    $countryId = isset($fields['country_id']) ? (int) $fields['country_id'] : null;
+    if ($countryId !== null && $countryId <= 0) {
+        $countryId = null;
+    }
+    $warehouseId = isset($fields['warehouse_id']) ? (int) $fields['warehouse_id'] : null;
+    if ($warehouseId !== null && $warehouseId <= 0) {
+        $warehouseId = null;
+    }
+    if ($warehouseId !== null) {
+        orange_stock_movement_assert_country_matches_warehouse($pdo, $countryId, $warehouseId);
+        if ($countryId === null && orange_table_has_column($pdo, 'stock_movements', 'country_id')) {
+            $countryId = orange_warehouse_authority_country_id($pdo, $warehouseId);
+        }
+    }
+    $createdAt = trim((string) ($fields['created_at'] ?? ''));
+    if ($createdAt === '') {
+        $createdAt = orange_admin_time_utc_now_mysql();
+    }
     $cols = ['product_id', 'variant_id', 'type', 'qty', 'old_stock', 'new_stock', 'reason', 'created_at'];
     $vals = [
         (int) ($fields['product_id'] ?? 0),
@@ -285,8 +376,9 @@ function orange_stock_movement_insert(PDO $pdo, array $fields): void
         (int) ($fields['old_stock'] ?? 0),
         (int) ($fields['new_stock'] ?? 0),
         (string) ($fields['reason'] ?? ''),
+        $createdAt,
     ];
-    $ph = ['?', '?', '?', '?', '?', '?', '?', 'NOW()'];
+    $ph = ['?', '?', '?', '?', '?', '?', '?', '?'];
     if (orange_table_has_column($pdo, 'stock_movements', 'reference')) {
         $cols[] = 'reference';
         $vals[] = isset($fields['reference']) ? (string) $fields['reference'] : null;
@@ -294,12 +386,12 @@ function orange_stock_movement_insert(PDO $pdo, array $fields): void
     }
     if (orange_table_has_column($pdo, 'stock_movements', 'country_id')) {
         $cols[] = 'country_id';
-        $vals[] = isset($fields['country_id']) ? (int) $fields['country_id'] : null;
+        $vals[] = $countryId;
         $ph[] = '?';
     }
     if (orange_table_has_column($pdo, 'stock_movements', 'warehouse_id')) {
         $cols[] = 'warehouse_id';
-        $vals[] = isset($fields['warehouse_id']) ? (int) $fields['warehouse_id'] : null;
+        $vals[] = $warehouseId;
         $ph[] = '?';
     }
     $sql = 'INSERT INTO stock_movements (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $ph) . ')';

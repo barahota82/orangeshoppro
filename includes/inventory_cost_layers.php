@@ -15,7 +15,14 @@ declare(strict_types=1);
  * - تكلفة الطبقة = صافي تكلفة الوحدة بعد خصم **السطر** فقط (خصم الفاتورة «خصم مكتسب» منفصل لا يدخل هنا).
  * - الاستهلاك من الأقدم (layer_date ثم id) مع قفل صفوف (FOR UPDATE) لمنع سباق الكميات.
  * - بطاقة الصنف (products.cost) إرشادية فقط ولا تُستعمل في التقييم.
+ * - layer_date / created_at / consumed_at: Absolute Moment UTC (Phase 2 Step 3).
+ *   عند تمرير جدار محلي للمستند يُحوَّل عبر IANA دولة المستودع؛ خوارزمية FIFO وترتيب id دون تغيير.
  */
+
+require_once __DIR__ . '/admin_time.php';
+if (is_file(__DIR__ . '/warehouses.php')) {
+    require_once __DIR__ . '/warehouses.php';
+}
 
 if (!function_exists('orange_inventory_cost_layers_table_exists')) {
     function orange_inventory_cost_layers_table_exists(PDO $pdo): bool
@@ -64,8 +71,31 @@ if (!function_exists('orange_inventory_cost_layer_add')) {
             return 0;
         }
         $unitCost = round(max(0.0, $unitCost), 5);
-        $now = date('Y-m-d H:i:s');
-        $layerDate = ($layerDate !== null && $layerDate !== '') ? $layerDate : $now;
+        $resolvedCountry = ($countryId !== null && $countryId > 0) ? $countryId : 0;
+        if ($resolvedCountry <= 0 && function_exists('orange_warehouse_authority_country_id')) {
+            try {
+                $resolvedCountry = orange_warehouse_authority_country_id($pdo, $warehouseId);
+            } catch (Throwable $e) {
+                $resolvedCountry = 0;
+            }
+        }
+        if ($resolvedCountry <= 0) {
+            throw new RuntimeException('admin_time_warehouse_country_required');
+        }
+        if (function_exists('orange_stock_movement_assert_country_matches_warehouse')) {
+            orange_stock_movement_assert_country_matches_warehouse(
+                $pdo,
+                $resolvedCountry,
+                $warehouseId
+            );
+        }
+        $nowUtc = orange_admin_time_utc_now_mysql();
+        $layerWall = ($layerDate !== null && trim($layerDate) !== '') ? trim($layerDate) : '';
+        if ($layerWall !== '') {
+            $layerDateUtc = orange_admin_time_country_local_wall_to_utc_mysql($pdo, $layerWall, $resolvedCountry);
+        } else {
+            $layerDateUtc = $nowUtc;
+        }
 
         $st = $pdo->prepare(
             'INSERT INTO inventory_cost_layers
@@ -74,17 +104,17 @@ if (!function_exists('orange_inventory_cost_layer_add')) {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $st->execute([
-            ($countryId !== null && $countryId > 0) ? $countryId : null,
+            $resolvedCountry,
             $warehouseId,
             $variantId,
             $sourceType,
             ($sourceId !== null && $sourceId > 0) ? $sourceId : null,
-            $layerDate,
+            $layerDateUtc,
             $qty,
             $qty,
             $unitCost,
             mb_substr($note, 0, 191),
-            $now,
+            $nowUtc,
         ]);
 
         return (int) $pdo->lastInsertId();
@@ -119,8 +149,24 @@ if (!function_exists('orange_inventory_cost_layers_consume_fifo')) {
             return $result;
         }
 
-        $now = date('Y-m-d H:i:s');
-        $consumedAt = ($consumedAt !== null && $consumedAt !== '') ? $consumedAt : $now;
+        $resolvedCountry = 0;
+        if (function_exists('orange_warehouse_authority_country_id')) {
+            try {
+                $resolvedCountry = orange_warehouse_authority_country_id($pdo, $warehouseId);
+            } catch (Throwable $e) {
+                $resolvedCountry = 0;
+            }
+        }
+        if ($resolvedCountry <= 0) {
+            throw new RuntimeException('admin_time_warehouse_country_required');
+        }
+        $nowUtc = orange_admin_time_utc_now_mysql();
+        $consumedWall = ($consumedAt !== null && trim($consumedAt) !== '') ? trim($consumedAt) : '';
+        if ($consumedWall !== '') {
+            $consumedAtUtc = orange_admin_time_country_local_wall_to_utc_mysql($pdo, $consumedWall, $resolvedCountry);
+        } else {
+            $consumedAtUtc = $nowUtc;
+        }
         $hasConsTable = orange_inventory_cost_layers_consumptions_table_exists($pdo);
 
         $remaining = $qty;
@@ -169,7 +215,7 @@ if (!function_exists('orange_inventory_cost_layers_consume_fifo')) {
                     $unitCost,
                     $saleSourceType,
                     ($saleSourceId !== null && $saleSourceId > 0) ? $saleSourceId : null,
-                    $consumedAt,
+                    $consumedAtUtc,
                 ]);
             }
         }

@@ -6,6 +6,7 @@ require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/acc10_schema.php';
 require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/admin_time.php';
 require_once __DIR__ . '/admin_settings_country.php';
 require_once __DIR__ . '/opening_stock_lock.php';
 require_once __DIR__ . '/inventory_reconciliation.php';
@@ -279,6 +280,44 @@ function orange_opening_stock_voucher_get(PDO $pdo, int $id, ?int $countryId = n
         }
     }
 
+    $recCountry = (int) ($row['country_id'] ?? 0);
+    if ($recCountry <= 0 && $warehouseId > 0) {
+        try {
+            $recCountry = orange_warehouse_authority_country_id($pdo, $warehouseId);
+        } catch (Throwable $e) {
+            $recCountry = 0;
+        }
+    }
+    $createdUnix = null;
+    try {
+        $createdUnix = orange_admin_time_mysql_timestamp_session_wall_to_unix(
+            $pdo,
+            isset($row['created_at']) ? (string) $row['created_at'] : null
+        );
+    } catch (Throwable $e) {
+        $createdUnix = null;
+    }
+    $createdApi = orange_admin_time_api_instant_from_unix($pdo, $createdUnix, $recCountry, 'ar', 'datetime');
+    $row['created_at_utc'] = $createdApi['utc'];
+    $row['created_at_display'] = $createdApi['display'];
+    $approvedRaw = trim((string) ($row['approved_at'] ?? ''));
+    $row['approved_at_utc'] = $approvedRaw !== ''
+        ? (static function () use ($approvedRaw): string {
+            try {
+                return orange_admin_time_parse_mysql_utc_datetime($approvedRaw)->format('c');
+            } catch (Throwable $e) {
+                return '';
+            }
+        })()
+        : '';
+    $row['approved_at_display'] = orange_admin_time_display_mysql_utc_for_record(
+        $pdo,
+        $approvedRaw !== '' ? $approvedRaw : null,
+        $recCountry,
+        'ar',
+        'datetime'
+    );
+
     return [
         'header' => $row,
         'warehouse_label' => $whLabel,
@@ -424,12 +463,16 @@ function orange_opening_stock_voucher_save(PDO $pdo, array $headerIn, array $lin
     $documentDate = trim((string) ($headerIn['document_date'] ?? ''));
     $notes = trim((string) ($headerIn['notes'] ?? ''));
 
-    if ($documentDate === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $documentDate)) {
+    $documentDate = orange_admin_time_date_only_normalize($documentDate);
+    if ($documentDate === '') {
         throw new InvalidArgumentException('تاريخ السند مطلوب (يوم/شهر/سنة).');
     }
 
     if ($countryId === null || $countryId <= 0) {
         $countryId = orange_admin_settings_effective_country_id($pdo);
+    }
+    if ($countryId <= 0) {
+        throw new InvalidArgumentException('admin_time_country_id_required');
     }
 
     // سند واحد لكل دولة — لا يُنشأ سند ثانٍ.
@@ -451,6 +494,7 @@ function orange_opening_stock_voucher_save(PDO $pdo, array $headerIn, array $lin
     if ($warehouseId <= 0) {
         throw new RuntimeException('لا يوجد مستودع افتراضي لهذه الدولة.');
     }
+    orange_stock_movement_assert_country_matches_warehouse($pdo, $countryId, $warehouseId);
 
     $lines = orange_opening_stock_voucher_normalize_lines($pdo, $warehouseId, $linesIn);
     if ($lines === []) {
@@ -491,14 +535,15 @@ function orange_opening_stock_voucher_save(PDO $pdo, array $headerIn, array $lin
             $pdo->prepare('DELETE FROM opening_stock_voucher_line WHERE voucher_id = ?')->execute([$id]);
         } else {
             $ins = $pdo->prepare(
-                'INSERT INTO opening_stock_voucher (warehouse_id, status, document_date, notes, country_id)
-                 VALUES (?, \'draft\', ?, ?, ?)'
+                'INSERT INTO opening_stock_voucher (warehouse_id, status, document_date, notes, country_id, created_at)
+                 VALUES (?, \'draft\', ?, ?, ?, ' . orange_admin_time_sql_from_unix() . ')'
             );
             $ins->execute([
                 $warehouseId,
                 $documentDate,
                 $notes !== '' ? $notes : null,
                 $countryId > 0 ? $countryId : null,
+                orange_admin_time_unix_now(),
             ]);
             $id = (int) $pdo->lastInsertId();
         }
@@ -597,10 +642,10 @@ function orange_opening_stock_voucher_approve(PDO $pdo, int $id, ?int $countryId
         }
 
         $upd = $pdo->prepare(
-            'UPDATE opening_stock_voucher SET status = \'approved\', approved_at = NOW()
+            'UPDATE opening_stock_voucher SET status = \'approved\', approved_at = ?
              WHERE id = ? AND status = \'draft\''
         );
-        $upd->execute([$id]);
+        $upd->execute([orange_admin_time_utc_now_mysql(), $id]);
         if ($upd->rowCount() === 0) {
             throw new RuntimeException('تعذّر اعتماد السند.');
         }

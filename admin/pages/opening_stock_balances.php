@@ -51,12 +51,35 @@ if ($initialJson === false) {
     $initialJson = '{}';
 }
 
-$documentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$documentEnteredDisplay = '—';
 if ($editSv !== null) {
     $h = $editSv['header'];
     $docAt = trim((string) ($h['created_at'] ?? ''));
+    $recCountry = (int) ($h['country_id'] ?? 0);
+    if ($recCountry <= 0) {
+        $recCountry = (int) $ctxCountryId;
+    }
     if ($docAt !== '') {
-        $documentEnteredDisplay = orange_format_datetime_dmY_hi($docAt);
+        $docUnix = orange_admin_time_mysql_timestamp_session_wall_to_unix($pdo, $docAt);
+        $documentEnteredDisplay = orange_admin_time_display_unix_for_record(
+            $pdo,
+            $docUnix,
+            $recCountry,
+            'ar',
+            'datetime'
+        );
+    }
+} else {
+    try {
+        $documentEnteredDisplay = orange_admin_time_format_instant_for_country_id(
+            $pdo,
+            orange_admin_time_utc_now_iso(),
+            (int) $ctxCountryId,
+            'ar',
+            'datetime'
+        );
+    } catch (Throwable $e) {
+        $documentEnteredDisplay = '—';
     }
 }
 

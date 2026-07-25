@@ -52,6 +52,7 @@ function orange_product_variant_zero_stock_on_matrix_remove(
             $oldStock,
             0,
             $reason,
+            orange_admin_time_utc_now_mysql(),
         ]);
     }
     $pdo->prepare('UPDATE product_variants SET stock_quantity = 0 WHERE id = ? LIMIT 1')->execute([$variantId]);
@@ -209,7 +210,7 @@ function orange_product_sync_variants_matrix(
         "INSERT INTO stock_movements (
             product_id, variant_id, type, qty, old_stock, new_stock, reason, created_at
         ) VALUES (
-            ?, ?, 'manual_adjustment', ?, ?, ?, ?, NOW()
+            ?, ?, 'manual_adjustment', ?, ?, ?, ?, ?
         )"
     );
     $updVar = $pdo->prepare(

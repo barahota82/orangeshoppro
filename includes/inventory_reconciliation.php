@@ -6,6 +6,7 @@ require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/acc10_schema.php';
 require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/admin_time.php';
 require_once __DIR__ . '/account_tree.php';
 require_once __DIR__ . '/journal_voucher.php';
 require_once __DIR__ . '/gl_settings.php';
@@ -396,14 +397,19 @@ function orange_inventory_reconciliation_save(
     if ($warehouseId <= 0) {
         throw new InvalidArgumentException('اختر المستودع.');
     }
-    if ($countedAt === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $countedAt)) {
+    $countedAt = orange_admin_time_date_only_normalize($countedAt);
+    if ($countedAt === '') {
         throw new InvalidArgumentException('تاريخ الجرد مطلوب (YYYY-MM-DD).');
     }
 
     if ($countryId === null || $countryId <= 0) {
         $countryId = orange_admin_settings_effective_country_id($pdo);
     }
+    if ($countryId <= 0) {
+        throw new InvalidArgumentException('admin_time_country_id_required');
+    }
     orange_inventory_reconciliation_assert_warehouse_country($pdo, $warehouseId, $countryId);
+    orange_stock_movement_assert_country_matches_warehouse($pdo, $countryId, $warehouseId);
 
     if ($id > 0) {
         $existing = orange_inventory_reconciliation_get($pdo, $id, $countryId);
@@ -439,14 +445,15 @@ function orange_inventory_reconciliation_save(
             $pdo->prepare('DELETE FROM inventory_reconciliation_line WHERE reconciliation_id = ?')->execute([$id]);
         } else {
             $ins = $pdo->prepare(
-                'INSERT INTO inventory_reconciliation (warehouse_id, status, counted_at, notes, country_id)
-                 VALUES (?, \'draft\', ?, ?, ?)'
+                'INSERT INTO inventory_reconciliation (warehouse_id, status, counted_at, notes, country_id, created_at)
+                 VALUES (?, \'draft\', ?, ?, ?, ' . orange_admin_time_sql_from_unix() . ')'
             );
             $ins->execute([
                 $warehouseId,
                 $countedAt,
                 $notes !== '' ? $notes : null,
                 $countryId > 0 ? $countryId : null,
+                orange_admin_time_unix_now(),
             ]);
             $id = (int) $pdo->lastInsertId();
         }
@@ -508,10 +515,10 @@ function orange_inventory_reconciliation_approve(
     $pdo->beginTransaction();
     try {
         $upd = $pdo->prepare(
-            'UPDATE inventory_reconciliation SET status = \'approved\', journal_voucher_id = NULL, approved_at = NOW()
+            'UPDATE inventory_reconciliation SET status = \'approved\', journal_voucher_id = NULL, approved_at = ?
              WHERE id = ? AND status = \'draft\''
         );
-        $upd->execute([$id]);
+        $upd->execute([orange_admin_time_utc_now_mysql(), $id]);
         if ($upd->rowCount() === 0) {
             throw new RuntimeException('تعذّر إقفال الجرد.');
         }
@@ -572,6 +579,9 @@ function orange_inventory_reconciliation_archive_save(PDO $pdo, array $headerIn,
     if ($countryId === null || $countryId <= 0) {
         $countryId = orange_admin_settings_effective_country_id($pdo);
     }
+    if ($countryId <= 0) {
+        throw new InvalidArgumentException('admin_time_country_id_required');
+    }
 
     // نطاق الجرد: إمّا مخزن وإمّا عهدة مندوب. عند اختيار مندوب يُسند المخزن للافتراضي (لقيد warehouse_id NOT NULL).
     if ($agentId > 0) {
@@ -585,11 +595,13 @@ function orange_inventory_reconciliation_archive_save(PDO $pdo, array $headerIn,
     if ($warehouseId <= 0) {
         throw new InvalidArgumentException('اختر المخزن أو المندوب.');
     }
-    if ($countedAt === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $countedAt)) {
+    $countedAt = orange_admin_time_date_only_normalize($countedAt);
+    if ($countedAt === '') {
         throw new InvalidArgumentException('تاريخ الجرد مطلوب (YYYY-MM-DD).');
     }
 
     orange_inventory_reconciliation_assert_warehouse_country($pdo, $warehouseId, $countryId);
+    orange_stock_movement_assert_country_matches_warehouse($pdo, $countryId, $warehouseId);
 
     $hasAgentCol = orange_table_has_column($pdo, 'inventory_reconciliation', 'delivery_agent_id');
     $hasSortCol = orange_table_has_column($pdo, 'inventory_reconciliation', 'sort_order');
@@ -621,13 +633,14 @@ function orange_inventory_reconciliation_archive_save(PDO $pdo, array $headerIn,
         return $id;
     }
 
-    $cols = 'warehouse_id, status, counted_at, notes, country_id';
-    $ph = '?, \'archived\', ?, ?, ?';
+    $cols = 'warehouse_id, status, counted_at, notes, country_id, created_at';
+    $ph = '?, \'archived\', ?, ?, ?, ' . orange_admin_time_sql_from_unix();
     $args = [
         $warehouseId,
         $countedAt,
         $notes !== '' ? $notes : null,
         $countryId > 0 ? $countryId : null,
+        orange_admin_time_unix_now(),
     ];
     if ($hasAgentCol) {
         $cols .= ', delivery_agent_id';

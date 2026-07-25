@@ -635,6 +635,39 @@ function orange_admin_time_document_date_today_for_country_id(PDO $pdo, int $cou
 }
 
 /**
+ * Convert a country-local wall DATETIME (Y-m-d H:i:s) to UTC MySQL wall for DATETIME storage.
+ * Used when a caller passes document-local wall (e.g. document_date + time) into Absolute Moment columns
+ * such as inventory_cost_layers.layer_date — without changing GL $postingAt semantics (Step 4).
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_country_local_wall_to_utc_mysql(PDO $pdo, string $localWall, int $countryId): string
+{
+    $wall = trim($localWall);
+    if ($wall === '') {
+        throw new OrangeAdminTimeConfigException('admin_time_local_wall_invalid');
+    }
+    if (!preg_match('/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})$/', $wall, $m)) {
+        throw new OrangeAdminTimeConfigException('admin_time_local_wall_invalid');
+    }
+    if ($countryId <= 0) {
+        throw new OrangeAdminTimeConfigException('admin_time_country_id_required');
+    }
+    $ymd = orange_admin_time_date_only_normalize($m[1]);
+    if ($ymd === '') {
+        throw new OrangeAdminTimeConfigException('admin_time_local_wall_invalid');
+    }
+    $tzName = orange_admin_time_timezone_for_country_id($pdo, $countryId);
+    try {
+        $local = new DateTimeImmutable($ymd . ' ' . $m[2], new DateTimeZone($tzName));
+    } catch (Throwable $e) {
+        throw new OrangeAdminTimeConfigException('admin_time_local_wall_invalid');
+    }
+
+    return $local->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+}
+
+/**
  * Build admin API payload fields for an absolute instant from Unix epoch.
  *
  * @return array{utc:string, display:string}
