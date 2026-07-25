@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/admin_time.php';
 
 /**
  * PDO لصفحات الأدمن: يعيد اتصال index.php دون إعادة ترحيل المخطط.
