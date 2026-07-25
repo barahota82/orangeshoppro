@@ -18,6 +18,7 @@ require_once __DIR__ . '/currency.php';
 require_once __DIR__ . '/storefront_payment_settings.php';
 require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/storefront_api_errors.php';
+require_once __DIR__ . '/admin_time.php';
 
 /**
  * نص خطأ آمن لحقل order_intake_queue.error_message (code:… فقط — لا نص PDO/SQL ولا getMessage).
@@ -721,8 +722,10 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $ph,
         $params
     );
+    // Absolute moment: UTC wall in DATETIME (same semantic as admin create-manual).
     $cols .= ', created_at';
-    $ph .= ', NOW()';
+    $ph .= ', ?';
+    $params[] = orange_admin_time_utc_now_mysql();
 
     $orderStmt = $pdo->prepare("INSERT INTO orders ($cols) VALUES ($ph)");
     $orderStmt->execute($params);
@@ -899,8 +902,9 @@ function orange_order_intake_process_next(PDO $pdo, bool $respectAdminCountry = 
             $pdo->exec('ROLLBACK TO SAVEPOINT orange_intake_sp');
             $errText = orange_order_intake_error_for_queue($e);
             $pdo->prepare(
-                'UPDATE order_intake_queue SET status = ?, error_message = ?, attempts = attempts + 1 WHERE id = ?'
-            )->execute(['failed', $errText, $qid]);
+                'UPDATE order_intake_queue SET status = ?, error_message = ?, attempts = attempts + 1, updated_at = '
+                . orange_admin_time_sql_from_unix() . ' WHERE id = ?'
+            )->execute(['failed', $errText, orange_admin_time_unix_now(), $qid]);
             if (function_exists('error_log')) {
                 error_log('[orange] order_intake failed queue_id=' . $qid . ' err=' . $errText);
             }
@@ -910,13 +914,15 @@ function orange_order_intake_process_next(PDO $pdo, bool $respectAdminCountry = 
         }
 
         $pdo->prepare(
-            'UPDATE order_intake_queue SET status = ?, order_id = ?, order_number = ?, whatsapp_url = ?, whatsapp_number = ? WHERE id = ?'
+            'UPDATE order_intake_queue SET status = ?, order_id = ?, order_number = ?, whatsapp_url = ?, whatsapp_number = ?, updated_at = '
+            . orange_admin_time_sql_from_unix() . ' WHERE id = ?'
         )->execute([
             'completed',
             $out['order_id'],
             $out['order_number'],
             $out['whatsapp_url'],
             $out['whatsapp_number'],
+            orange_admin_time_unix_now(),
             $qid,
         ]);
         $pdo->commit();
@@ -948,10 +954,12 @@ function orange_order_intake_enqueue(PDO $pdo, array $data): array
     if ($json === false) {
         throw new RuntimeException('Could not encode checkout payload');
     }
+    $unixNow = orange_admin_time_unix_now();
     $ins = $pdo->prepare(
-        "INSERT INTO order_intake_queue (public_token, status, payload_json) VALUES (?, 'pending', ?)"
+        'INSERT INTO order_intake_queue (public_token, status, payload_json, created_at, updated_at)
+         VALUES (?, \'pending\', ?, ' . orange_admin_time_sql_from_unix() . ', ' . orange_admin_time_sql_from_unix() . ')'
     );
-    $ins->execute([$token, $json]);
+    $ins->execute([$token, $json, $unixNow, $unixNow]);
 
     return ['id' => (int) $pdo->lastInsertId(), 'public_token' => $token];
 }

@@ -36,8 +36,8 @@ $prCountryLabel = orange_admin_page_country_label($pdo);
 <div class="card">
     <div class="table-wrap">
         <table>
-            <thead><tr><th>الطلب</th><th>العميل</th><th>الإجمالي</th><th>مدفوع</th><th>الحالة</th><th>مرجع/إثبات</th><th>إجراءات</th></tr></thead>
-            <tbody id="pr_tbody"><tr><td colspan="7" class="muted">اضغط «بحث».</td></tr></tbody>
+            <thead><tr><th>الطلب</th><th>العميل</th><th>الإجمالي</th><th>مدفوع</th><th>الحالة</th><th>وقت الدفع</th><th>وقت الحركة</th><th>مرجع/إثبات</th><th>إجراءات</th></tr></thead>
+            <tbody id="pr_tbody"><tr><td colspan="9" class="muted">اضغط «بحث».</td></tr></tbody>
         </table>
     </div>
 </div>
@@ -50,21 +50,26 @@ function prSearch() {
     var status = document.getElementById('pr_status').value;
     var q = document.getElementById('pr_q').value.trim();
     var tb = document.getElementById('pr_tbody');
-    tb.innerHTML = '<tr><td colspan="7">جاري البحث…</td></tr>';
+    tb.innerHTML = '<tr><td colspan="9">جاري البحث…</td></tr>';
     prApi({ action: 'search', status: status, q: q }).then(function (r) {
         tb.innerHTML = '';
         var rows = (r && r.results) ? r.results : [];
-        if (!rows.length) { tb.innerHTML = '<tr><td colspan="7" class="muted">لا نتائج</td></tr>'; return; }
+        if (!rows.length) { tb.innerHTML = '<tr><td colspan="9" class="muted">لا نتائج</td></tr>'; return; }
         rows.forEach(function (o) {
             var tr = document.createElement('tr');
             var proof = o.proof_url ? '<a href="' + prEsc(o.proof_url) + '" target="_blank" rel="noopener">عرض الإثبات</a>' : '';
             var ref = o.last_reference ? prEsc(o.last_reference) : '';
+            // Server-formatted country IANA display — do not parse UTC with browser TZ.
+            var paidDisp = prEsc(o.paid_at_display || '—');
+            var txnDisp = prEsc(o.last_txn_created_at_display || '—');
             tr.innerHTML =
                 '<td dir="ltr">' + prEsc(o.order_number || ('#' + o.id)) + '</td>'
                 + '<td>' + prEsc(o.customer_name || '') + '</td>'
                 + '<td dir="ltr">' + prEsc(o.total) + '</td>'
                 + '<td dir="ltr">' + prEsc(o.amount_paid) + '</td>'
                 + '<td>' + prEsc(o.payment_status_label || o.payment_status) + '</td>'
+                + '<td dir="ltr" style="white-space:nowrap;">' + paidDisp + '</td>'
+                + '<td dir="ltr" style="white-space:nowrap;">' + txnDisp + '</td>'
                 + '<td>' + ref + (ref && proof ? ' · ' : '') + proof + '</td>'
                 + '<td class="stock-actions">'
                 + '<button type="button" class="btn btn-secondary" onclick="prConfirm(' + parseInt(o.id,10) + ',' + (parseFloat(o.total)||0) + ')">تأكيد الدفع</button> '
@@ -73,7 +78,7 @@ function prSearch() {
                 + '</td>';
             document.getElementById('pr_tbody').appendChild(tr);
         });
-    }).catch(function (e) { tb.innerHTML = '<tr><td colspan="7">' + prEsc(e.message || String(e)) + '</td></tr>'; });
+    }).catch(function (e) { tb.innerHTML = '<tr><td colspan="9">' + prEsc(e.message || String(e)) + '</td></tr>'; });
 }
 
 function prConfirm(orderId, total) {

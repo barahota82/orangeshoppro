@@ -276,13 +276,20 @@ function orange_admin_orders_action_buttons(array $o): void
                         }
                     ?></td>
                     <td dir="ltr" style="white-space:nowrap;"><?php
+                        // Country-filtered list: prefer record country; context only when column absent on row.
                         $rowCid = (int) ($o['country_id'] ?? 0);
                         echo htmlspecialchars(
-                            orange_admin_time_display_mysql_utc_or_dash(
-                                $pdo,
-                                (string) ($o['created_at'] ?? ''),
-                                $rowCid > 0 ? $rowCid : $adminCountryId
-                            ),
+                            $rowCid > 0
+                                ? orange_admin_time_display_mysql_utc_for_record(
+                                    $pdo,
+                                    (string) ($o['created_at'] ?? ''),
+                                    $rowCid
+                                )
+                                : orange_admin_time_display_mysql_utc_or_dash(
+                                    $pdo,
+                                    (string) ($o['created_at'] ?? ''),
+                                    (int) $adminCountryId
+                                ),
                             ENT_QUOTES,
                             'UTF-8'
                         );

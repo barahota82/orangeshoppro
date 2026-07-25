@@ -118,8 +118,11 @@ $orderStatusAr = [
 ];
 
 if ($orderId > 0) {
+    $paidUnixSel = orange_table_has_column($pdo, 'orders', 'paid_at')
+        ? ', UNIX_TIMESTAMP(o.paid_at) AS paid_at_unix'
+        : ', NULL AS paid_at_unix';
     $stmt = $pdo->prepare('
-        SELECT o.*, c.name AS channel_name
+        SELECT o.*, c.name AS channel_name' . $paidUnixSel . '
         FROM orders o
         LEFT JOIN channels c ON c.id = o.channel_id
         WHERE o.id = ?
@@ -588,7 +591,7 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
             <div><strong>تاريخ الطلب:</strong> <?php
                 $invCountryId = (int) ($order['country_id'] ?? 0);
                 echo htmlspecialchars(
-                    orange_admin_time_display_mysql_utc_or_dash(
+                    orange_admin_time_display_mysql_utc_for_record(
                         $pdo,
                         (string) ($order['created_at'] ?? ''),
                         $invCountryId,
@@ -599,17 +602,28 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
                     'UTF-8'
                 );
             ?></div>
+            <?php
+            $invPaidUnix = orange_admin_time_unix_or_null($order['paid_at_unix'] ?? null);
+            $invPaidAtDisp = orange_admin_time_display_unix_for_record($pdo, $invPaidUnix, $invCountryId);
+            if ($invPaidAtDisp !== '—'):
+            ?>
+            <div><strong>وقت الدفع:</strong> <?php echo htmlspecialchars($invPaidAtDisp, ENT_QUOTES, 'UTF-8'); ?></div>
+            <?php endif; ?>
             <div><strong>طباعة:</strong> <?php
-                try {
-                    $printTs = orange_admin_time_format_instant_for_country_id(
-                        $pdo,
-                        orange_admin_time_utc_now_iso(),
-                        $invCountryId > 0 ? $invCountryId : orange_admin_context_country_id($pdo),
-                        'ar',
-                        'datetime'
-                    );
-                } catch (OrangeAdminTimeConfigException $e) {
-                    $printTs = orange_admin_time_utc_now_mysql();
+                if ($invCountryId <= 0) {
+                    $printTs = '[admin_time_country_id_required]';
+                } else {
+                    try {
+                        $printTs = orange_admin_time_format_instant_for_country_id(
+                            $pdo,
+                            orange_admin_time_utc_now_iso(),
+                            $invCountryId,
+                            'ar',
+                            'datetime'
+                        );
+                    } catch (OrangeAdminTimeConfigException $e) {
+                        $printTs = '[' . $e->getMessage() . ']';
+                    }
                 }
                 echo htmlspecialchars($printTs, ENT_QUOTES, 'UTF-8');
             ?></div>

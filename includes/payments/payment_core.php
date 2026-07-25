@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/payment_schema.php';
 require_once __DIR__ . '/../catalog_schema.php';
+require_once __DIR__ . '/../admin_time.php';
 
 /** @return list<string> */
 function orange_payment_statuses(): array
@@ -113,10 +114,12 @@ function orange_payment_record_transaction(PDO $pdo, array $data): array
     }
 
     $status = (string) ($data['status'] ?? 'pending');
+    // Absolute instant via Unix epoch → FROM_UNIXTIME (safe under session +03:00).
+    $createdUnix = orange_admin_time_unix_now();
     $st = $pdo->prepare(
         'INSERT INTO payment_transactions
-            (order_id, country_id, method, provider, amount, currency, status, provider_ref, txn_uuid, raw_payload)
-         VALUES (?,?,?,?,?,?,?,?,?,?)'
+            (order_id, country_id, method, provider, amount, currency, status, provider_ref, txn_uuid, raw_payload, created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,' . orange_admin_time_sql_from_unix() . ')'
     );
     $st->execute([
         (int) ($data['order_id'] ?? 0) ?: null,
@@ -129,6 +132,7 @@ function orange_payment_record_transaction(PDO $pdo, array $data): array
         (string) ($data['provider_ref'] ?? ''),
         $txnUuid,
         isset($data['raw_payload']) ? (string) $data['raw_payload'] : null,
+        $createdUnix,
     ]);
 
     return ['created' => true, 'id' => (int) $pdo->lastInsertId()];
@@ -165,7 +169,9 @@ function orange_payment_set_order_status(
         $params[] = round($amountPaid, 4);
     }
     if ($status === 'paid' && orange_table_has_column($pdo, 'orders', 'paid_at')) {
-        $sets[] = 'paid_at = NOW()';
+        // Absolute instant: FROM_UNIXTIME(epoch) — do not write UTC wall into TIMESTAMP under +03:00.
+        $sets[] = 'paid_at = ' . orange_admin_time_sql_from_unix();
+        $params[] = orange_admin_time_unix_now();
     }
     $params[] = $orderId;
     $pdo->prepare('UPDATE orders SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);

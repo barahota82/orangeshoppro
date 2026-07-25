@@ -67,9 +67,15 @@ foreach ($writeFiles as $rel) {
     }
 }
 
-// Shared payment_core still uses NOW() for paid_at TIMESTAMP — documented blocker, must remain untouched for UTC rewrite
+// Step 1 closure: payment_core TIMESTAMP writers use FROM_UNIXTIME (no NOW())
 $payCore = file_get_contents($root . '/includes/payments/payment_core.php') ?: '';
-p2_assert(str_contains($payCore, "paid_at = NOW()"), 'blocker retained: payment_core paid_at TIMESTAMP still NOW()');
+p2_assert(!str_contains($payCore, "paid_at = NOW()"), 'closure: payment_core paid_at no longer NOW()');
+p2_assert(
+    str_contains($payCore, 'orange_admin_time_sql_from_unix') || str_contains($payCore, 'FROM_UNIXTIME'),
+    'closure: payment_core uses unix→FROM_UNIXTIME for TIMESTAMP'
+);
+$intakeSrc = file_get_contents($root . '/includes/order_intake_queue.php') ?: '';
+p2_assert(str_contains($intakeSrc, 'orange_admin_time_utc_now_mysql'), 'closure: storefront intake orders.created_at UTC');
 
 // 1–4: UTC moment + Kuwait/Cairo display + midnight crossing (fixtures, no DB)
 $utcIso = '2026-07-24T22:30:00+00:00';
@@ -136,10 +142,19 @@ p2_assert(str_contains($ordersPage, 'orange_sql_filter_country_id'), '14. orders
 p2_assert(str_contains($payReview, 'orange_sql_country_and_fragment') || str_contains($payReview, 'orange_admin_assert_entity_country'), '14. payments country isolation');
 
 // Display uses record country / helpers
-p2_assert(str_contains($ordersPage, 'orange_admin_time_display_mysql_utc_or_dash'), '7. orders list display helper');
+p2_assert(
+    str_contains($ordersPage, 'orange_admin_time_display_mysql_utc_for_record')
+    || str_contains($ordersPage, 'orange_admin_time_display_mysql_utc_or_dash'),
+    '7. orders list display helper'
+);
 $inv = file_get_contents($root . '/admin/pages/invoice.php') ?: '';
-p2_assert(str_contains($inv, 'orange_admin_time_display_mysql_utc_or_dash'), '7. invoice detail display helper');
+p2_assert(
+    str_contains($inv, 'orange_admin_time_display_mysql_utc_for_record')
+    || str_contains($inv, 'orange_admin_time_display_mysql_utc_or_dash'),
+    '7. invoice detail display helper'
+);
 p2_assert(str_contains($payReview, 'created_at_display'), '9. payment API exposes created_at_display');
+p2_assert(str_contains($payReview, 'paid_at_utc') && str_contains($payReview, 'last_txn_created_at_utc'), '9. payment API exposes TIMESTAMP as UTC ISO');
 
 // create-manual document_date uses country local today
 $cm = file_get_contents($root . '/admin/api/orders/create-manual.php') ?: '';

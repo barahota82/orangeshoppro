@@ -433,7 +433,12 @@ function orange_admin_time_filter_range_mysql_utc(
 }
 
 /**
- * Safe display helper: empty → "—"; missing country TZ → raw + no silent browser fallback.
+ * Safe display helper for country-filtered admin lists:
+ * - empty → "—"
+ * - country_id > 0 → record country IANA
+ * - country_id missing → Current Country Context (list already isolated by context)
+ * Does not use browser TZ. For single-record screens prefer
+ * orange_admin_time_display_mysql_utc_for_record() (fail-closed).
  */
 function orange_admin_time_display_mysql_utc_or_dash(
     PDO $pdo,
@@ -453,6 +458,189 @@ function orange_admin_time_display_mysql_utc_or_dash(
 
         return orange_admin_time_format_mysql_utc_for_admin_context($pdo, $raw, $lang, $pattern);
     } catch (OrangeAdminTimeConfigException $e) {
-        return $raw;
+        return '[' . $e->getMessage() . ']';
     }
+}
+
+/**
+ * Unix epoch for the current absolute instant (UTC-based; independent of PHP default TZ wall).
+ */
+function orange_admin_time_unix_now(): int
+{
+    return time();
+}
+
+/**
+ * UTC ISO-8601 (+00:00) from a Unix epoch.
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_utc_iso_from_unix(int $unix): string
+{
+    if ($unix < 0) {
+        throw new OrangeAdminTimeConfigException('admin_time_unix_invalid');
+    }
+
+    return gmdate('c', $unix);
+}
+
+/**
+ * SQL expression that binds a Unix epoch into MySQL TIMESTAMP/DATETIME without
+ * treating a UTC wall string as session-local (+03:00). Use with a bound int:
+ *   SET paid_at = FROM_UNIXTIME(?)
+ */
+function orange_admin_time_sql_from_unix(): string
+{
+    return 'FROM_UNIXTIME(?)';
+}
+
+/**
+ * Normalize a selected UNIX_TIMESTAMP(...) value (or null/empty) to int|null.
+ */
+function orange_admin_time_unix_or_null(mixed $value): ?int
+{
+    if ($value === null || $value === '') {
+        return null;
+    }
+    $unix = (int) $value;
+
+    return $unix > 0 ? $unix : null;
+}
+
+/**
+ * Convert a TIMESTAMP value returned by MySQL under the session time_zone into
+ * a Unix epoch. Uses MySQL UNIX_TIMESTAMP() so the session wall is not misread as UTC.
+ *
+ * Prefer selecting UNIX_TIMESTAMP(col) in SQL when possible.
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_mysql_timestamp_session_wall_to_unix(PDO $pdo, ?string $sessionWall): ?int
+{
+    $raw = trim((string) ($sessionWall ?? ''));
+    if ($raw === '' || $raw === '0000-00-00 00:00:00') {
+        return null;
+    }
+    if (ctype_digit($raw)) {
+        return orange_admin_time_unix_or_null($raw);
+    }
+    $st = $pdo->prepare('SELECT UNIX_TIMESTAMP(?)');
+    $st->execute([$raw]);
+    $unix = orange_admin_time_unix_or_null($st->fetchColumn());
+    if ($unix === null) {
+        throw new OrangeAdminTimeConfigException('admin_time_timestamp_parse_failed');
+    }
+
+    return $unix;
+}
+
+/**
+ * Format a Unix absolute instant for an explicit country_id IANA.
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_format_unix_for_country_id(
+    PDO $pdo,
+    int $unix,
+    int $countryId,
+    string $lang = 'ar',
+    string $pattern = 'datetime'
+): string {
+    return orange_admin_time_format_instant_for_country_id(
+        $pdo,
+        orange_admin_time_utc_iso_from_unix($unix),
+        $countryId,
+        $lang,
+        $pattern
+    );
+}
+
+/**
+ * Format Unix instant using Current Country Context (country-filtered lists only).
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_format_unix_for_admin_context(
+    PDO $pdo,
+    int $unix,
+    string $lang = 'ar',
+    string $pattern = 'datetime'
+): string {
+    return orange_admin_time_format_instant_for_admin_context(
+        $pdo,
+        orange_admin_time_utc_iso_from_unix($unix),
+        $lang,
+        $pattern
+    );
+}
+
+/**
+ * Record-scoped DATETIME (UTC wall) display — fail closed if country_id missing/invalid.
+ * No silent Current Country Context fallback.
+ */
+function orange_admin_time_display_mysql_utc_for_record(
+    PDO $pdo,
+    ?string $mysqlUtcDatetime,
+    int $countryId,
+    string $lang = 'ar',
+    string $pattern = 'datetime'
+): string {
+    $raw = trim((string) ($mysqlUtcDatetime ?? ''));
+    if ($raw === '') {
+        return '—';
+    }
+    if ($countryId <= 0) {
+        return '[admin_time_country_id_required]';
+    }
+    try {
+        return orange_admin_time_format_mysql_utc_for_country_id($pdo, $raw, $countryId, $lang, $pattern);
+    } catch (OrangeAdminTimeConfigException $e) {
+        return '[' . $e->getMessage() . ']';
+    }
+}
+
+/**
+ * Record-scoped TIMESTAMP (unix epoch) display — fail closed if country_id missing/invalid.
+ */
+function orange_admin_time_display_unix_for_record(
+    PDO $pdo,
+    ?int $unix,
+    int $countryId,
+    string $lang = 'ar',
+    string $pattern = 'datetime'
+): string {
+    if ($unix === null || $unix <= 0) {
+        return '—';
+    }
+    if ($countryId <= 0) {
+        return '[admin_time_country_id_required]';
+    }
+    try {
+        return orange_admin_time_format_unix_for_country_id($pdo, $unix, $countryId, $lang, $pattern);
+    } catch (OrangeAdminTimeConfigException $e) {
+        return '[' . $e->getMessage() . ']';
+    }
+}
+
+/**
+ * Build admin API payload fields for an absolute instant from Unix epoch.
+ *
+ * @return array{utc:string, display:string}
+ */
+function orange_admin_time_api_instant_from_unix(
+    PDO $pdo,
+    ?int $unix,
+    int $recordCountryId,
+    string $lang = 'ar',
+    string $pattern = 'datetime'
+): array {
+    if ($unix === null || $unix <= 0) {
+        return ['utc' => '', 'display' => '—'];
+    }
+    $utc = orange_admin_time_utc_iso_from_unix($unix);
+
+    return [
+        'utc' => $utc,
+        'display' => orange_admin_time_display_unix_for_record($pdo, $unix, $recordCountryId, $lang, $pattern),
+    ];
 }

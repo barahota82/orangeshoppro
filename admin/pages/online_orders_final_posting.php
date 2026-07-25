@@ -142,7 +142,9 @@ foreach ($candidates as $o) {
                         $ca = (string) ($o['completed_at'] ?? $o['updated_at'] ?? '');
                         $rowCid = (int) ($o['country_id'] ?? 0);
                         echo htmlspecialchars(
-                            orange_admin_time_display_mysql_utc_or_dash($pdo, $ca, $rowCid > 0 ? $rowCid : $adminCountryId),
+                            $rowCid > 0
+                                ? orange_admin_time_display_mysql_utc_for_record($pdo, $ca, $rowCid)
+                                : orange_admin_time_display_mysql_utc_or_dash($pdo, $ca, (int) $adminCountryId),
                             ENT_QUOTES,
                             'UTF-8'
                         );

@@ -2,8 +2,8 @@ ORANGE — سياسة الوقت المركزية للإدمن (Admin Time Polic
 ================================================================================
 المسار: docs/archive/ORANGE_ADMIN_TIME_POLICY.txt
 تاريخ القرار: 2026-07-25
-آخر تحديث: 2026-07-25 (Phase 2 — Admin Orders / Payments DATETIME paths)
-الحالة: Phase 1 foundation + Phase 2 partial migration (انظر خامساً-ب)
+آخر تحديث: 2026-07-25 (Phase 2 / Step 1 Closure — Orders & Payments time)
+الحالة: Phase 1 foundation + Phase 2 Step 1 of 4 مغلقة (انظر خامساً-ب وخامساً-ج)
 
 الغرض
 -------
@@ -40,6 +40,10 @@ ORANGE — سياسة الوقت المركزية للإدمن (Admin Time Polic
 A) Absolute Moment — لحظة عالمية واحدة → تخزين/نقل UTC → عرض عبر IANA الدولة.
 B) Date-only — قيمة Y-m-d تقويمية → بلا تحويل منطقة زمنية.
 C) Country Local Business Time — ساعة جدارية للدولة (slots/hours) → ليست Absolute Moment.
+
+قرار Owner (Step 1 Closure): **عمود واحد = دلالة زمنية واحدة**.
+لا يجوز أن يحتوي العمود نفسه على خليط من UTC (مسار إدمن) وAsia/Kuwait أو +03:00
+(مسار عميل/Storefront) وServer Local Time في مسارات كتابة مختلفة.
 
 
 --------------------------------------------------------------------
@@ -89,26 +93,67 @@ Phase 1 **لا** تستبدل دوالهما ولا تغيّر ملفاتهما.
   handover-to-agent / `includes/invoice_edit_helpers.php` (مسار تعديل فاتورة الإدمن)
 - `orders.document_date` (Date-only): اليوم المحلي لدولة الطلب عبر IANA الدولة
 - العرض: قائمة الطلبات، فاتورة الإدمن، قائمة «إنشاء قيود التسليم» —
-  عبر `orange_admin_time_display_mysql_utc_or_dash` + `country_id` للسجل
+  عبر helpers العرض + `country_id` للسجل
 - فلاتر من/إلى في `online_orders_final_posting.php`: حدود اليوم المحلي لسياق الدولة → UTC
   (`start <= completed_at < end_exclusive`)
-- API مراجعة الدفع: حقل `created_at_display` للطلب (DATETIME)؛ الحقول TIMESTAMP تبقى raw
-
-BLOCKER — لم يُرحَّل (يحتاج قرار Owner: Schema أو MySQL session UTC):
-- `orders.paid_at` TIMESTAMP + `paid_at = NOW()` في `includes/payments/payment_core.php`
-  (ملف مشترك مع Storefront؛ TIMESTAMP يعتمد على `SET time_zone = '+03:00'`)
-- `payment_transactions.created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-- `order_intake_queue.created_at` / `updated_at` TIMESTAMP
-- لا Data Migration؛ لا تغيير Schema؛ لا تغيير `date_default_timezone_set` / session TZ
 
 مجمّد كما هو: Backup Center / Restore Center.
+
+
+--------------------------------------------------------------------
+خامساً-ج: Phase 2 / Step 1 Closure (2026-07-25) — إغلاق Blockers
+--------------------------------------------------------------------
+قرار Owner: توحيد كتابة اللحظة في Shared Backend Writers (بما فيها مسار Storefront
+الداخلي و`payment_core` و`order_intake_queue`) **فقط** لأسطر الـTimestamps — بلا ترحيل
+Customer UI ولا تغيير Business Logic للطلب/الدفع/المخزون/الولاء/GL.
+
+### DATETIME (UTC wall صريح)
+- الدلالة: `Y-m-d H:i:s` = UTC wall؛ القراءة عبر `orange_admin_time_parse_mysql_utc_datetime`.
+- Writers الموحّدة لـ `orders.created_at`:
+  - Admin: `admin/api/orders/create-manual.php` → `orange_admin_time_utc_now_mysql()`
+  - Storefront backend: `includes/order_intake_queue.php` → نفس الدالة (لا `NOW()`)
+- `orders.updated_at` / `completed_at`: كتابات الإدمن + invoice_edit_helpers → UTC صريح.
+- `orders.document_date`: Date-only من اليوم المحلي لـ IANA دولة الطلب — بلا تحويل بعد التحديد.
+
+### TIMESTAMP كـ Absolute Instant (بدون Schema / بدون تغيير session TZ)
+- الكتابة الآمنة: `FROM_UNIXTIME(?)` مع Unix epoch (`orange_admin_time_unix_now`) —
+  لا تُرسل سلسلة UTC wall مباشرة إلى TIMESTAMP تحت session `+03:00`.
+- القراءة: `UNIX_TIMESTAMP(col)` → epoch → UTC ISO (`orange_admin_time_utc_iso_from_unix`)
+  ثم عرض عبر IANA دولة السجل. لا تُعامَل قيمة الجلسة الجدارية كأنها UTC.
+- أُغلق:
+  - `orders.paid_at` — `includes/payments/payment_core.php`
+  - `payment_transactions.created_at` — نفس الملف (INSERT صريح)
+  - `order_intake_queue.created_at` / `updated_at` — enqueue + process + retry APIs
+
+### دولة السجل (مرجع العرض النهائي)
+- تفاصيل طلب/دفعة: `country_id` للطلب — Fail Closed عند الغياب (`[admin_time_country_id_required]`).
+- قائمة مفلترة بالدولة: يجوز Current Country Context بعد عزل الدولة.
+- حركة الدفع تأخذ `country_id` من الطلب المرتبط (لا سياق الإدمن بدل السجل).
+
+### ما أُغلق في Step 1
+1. توحيد دلالة `orders.created_at` (Admin + Storefront writer)
+2. `orders.updated_at` / `completed_at` بدون Default/Server local
+3. `document_date` Date-only لدولة الطلب
+4. `orders.paid_at` Absolute Instant
+5. `payment_transactions.created_at` Absolute Instant + UTC ISO في Admin API
+6. `order_intake_queue` created/updated Absolute Instant + عرض إدمن
+7. Payment Review / فاتورة الإدمن / قائمة الطلبات — عرض حسب IANA الدولة
+8. فلاتر اليوم: `start_utc <= ts < next_day_start_utc`
+9. لا تغيير: Customer UI، Business Logic، PHP/MySQL global TZ، Schema، Backup/Restore
+
+لم يُغيَّر: `date_default_timezone_set`، `SET time_zone` في `db()`، Schema revision، Data migration.
 
 
 --------------------------------------------------------------------
 سادساً: تنفيذ (مسارات الكود)
 --------------------------------------------------------------------
 - العقود والدوال: `includes/admin_time.php`
-  (+ Phase 2: parse/format MySQL UTC DATETIME، day bounds للفلاتر)
+  (+ Phase 2: parse/format MySQL UTC DATETIME، day bounds للفلاتر،
+   Unix/FROM_UNIXTIME لـ TIMESTAMP، عرض Fail Closed للسجل)
+- Writers: `includes/payments/payment_core.php`، `includes/order_intake_queue.php`،
+  `admin/api/order_intake/retry.php`، `retry-bulk-failed.php`
+- Admin API/عرض: `admin/api/payments/review.php`، `admin/pages/payment_review.php`،
+  `orders.php`، `invoice.php`، `order_intake_queue.php`، `online_orders_final_posting.php`
 - إعادة استخدام: `orange_country_timezone` / `orange_admin_context_timezone` /
   `orange_countries_is_valid_iana_timezone` (نفس قواعد التحقق)
 - تنسيق العرض القديم للشاشات غير المرحّلة يبقى: `includes/date_format.php`
@@ -119,3 +164,4 @@ BLOCKER — لم يُرحَّل (يحتاج قرار Owner: Schema أو MySQL se
 --------------------------------------------------------------------
 `php scripts/self_test_admin_time_foundation.php`
 `php scripts/self_test_admin_time_phase2_orders_payments.php`
+`php scripts/self_test_admin_time_phase2_step1_closure.php`

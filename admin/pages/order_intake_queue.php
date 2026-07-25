@@ -116,7 +116,11 @@ if (orange_table_exists($pdo, 'order_intake_queue')) {
         $counts = ['pending' => 0, 'failed' => 0, 'completed' => 0, 'total' => 0];
     }
 
-    $sql = 'SELECT oiq.id, oiq.public_token, oiq.status, oiq.order_id, oiq.order_number, oiq.error_message, oiq.attempts, oiq.created_at, oiq.updated_at, oiq.payload_json
+    $sql = 'SELECT oiq.id, oiq.public_token, oiq.status, oiq.order_id, oiq.order_number, oiq.error_message, oiq.attempts,
+                   oiq.created_at, oiq.updated_at,
+                   UNIX_TIMESTAMP(oiq.created_at) AS created_at_unix,
+                   UNIX_TIMESTAMP(oiq.updated_at) AS updated_at_unix,
+                   oiq.payload_json
             FROM order_intake_queue oiq';
     $params = [];
     if ($intakeScope !== null) {
@@ -283,8 +287,23 @@ $statusLabel = [
                                 ?>
                             </td>
                             <td><?php echo (int) ($r['attempts'] ?? 0); ?></td>
-                            <td dir="ltr" style="white-space:nowrap;"><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($r['created_at'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
-                            <td dir="ltr" style="white-space:nowrap;"><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($r['updated_at'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr" style="white-space:nowrap;"><?php
+                                $intakeCid = orange_order_intake_row_country_id($pdo, $r);
+                                $cUnix = orange_admin_time_unix_or_null($r['created_at_unix'] ?? null);
+                                echo htmlspecialchars(
+                                    orange_admin_time_display_unix_for_record($pdo, $cUnix, $intakeCid),
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                );
+                            ?></td>
+                            <td dir="ltr" style="white-space:nowrap;"><?php
+                                $uUnix = orange_admin_time_unix_or_null($r['updated_at_unix'] ?? null);
+                                echo htmlspecialchars(
+                                    orange_admin_time_display_unix_for_record($pdo, $uUnix, $intakeCid),
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                );
+                            ?></td>
                             <td style="max-width:220px;">
                                 <?php if ($st === 'failed' && trim((string) ($r['error_message'] ?? '')) !== ''): ?>
                                     <?php

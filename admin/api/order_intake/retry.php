@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/order_intake_queue.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -29,10 +30,11 @@ try {
 
     $upd = $pdo->prepare(
         "UPDATE order_intake_queue SET status = 'pending', error_message = NULL, attempts = 0,
-         order_id = NULL, order_number = NULL, whatsapp_url = NULL, whatsapp_number = NULL
+         order_id = NULL, order_number = NULL, whatsapp_url = NULL, whatsapp_number = NULL,
+         updated_at = " . orange_admin_time_sql_from_unix() . "
          WHERE id = ? AND status = 'failed'"
     );
-    $upd->execute([$id]);
+    $upd->execute([orange_admin_time_unix_now(), $id]);
     if ($upd->rowCount() !== 1) {
         json_response(['success' => false, 'message' => 'الصف ليس بحالة فاشل أو غير موجود'], 422);
     }

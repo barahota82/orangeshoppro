@@ -51,13 +51,26 @@ try {
         $reference = trim((string) ($_POST['reference'] ?? ''));
         $amount = (float) ($_POST['amount'] ?? 0);
         $txnUuid = 'bank_' . $orderId . '_' . substr(md5($reference . '|' . $name), 0, 16);
+        $orderCid = 0;
+        if (orange_table_has_column($pdo, 'orders', 'country_id')) {
+            $oc = $pdo->prepare('SELECT country_id FROM orders WHERE id = ? LIMIT 1');
+            $oc->execute([$orderId]);
+            $orderCid = (int) ($oc->fetchColumn() ?: 0);
+        }
+        if ($orderCid <= 0) {
+            json_response([
+                'success' => false,
+                'code' => 'admin_time_country_id_required',
+                'message' => 'دولة الطلب مفقودة — تعذر تسجيل الدفع بدون country_id للسجل',
+            ], 422);
+        }
         orange_payment_record_transaction($pdo, [
             'order_id' => $orderId,
-            'country_id' => $cid,
+            'country_id' => $orderCid,
             'method' => 'bank',
             'provider' => 'manual',
             'amount' => $amount,
-            'currency' => orange_country_functional_currency_code($pdo, $cid),
+            'currency' => orange_country_functional_currency_code($pdo, $orderCid),
             'status' => 'pending_review',
             'provider_ref' => $reference,
             'proof_file' => $name,
@@ -86,7 +99,7 @@ try {
         $hasCreatedAt = orange_table_has_column($pdo, 'orders', 'created_at');
         $sql = 'SELECT o.id, o.order_number, o.customer_name, o.phone, o.total,'
             . ($hasPaidCol ? ' o.amount_paid,' : ' 0 AS amount_paid,')
-            . ($hasPaidAt ? ' o.paid_at,' : ' NULL AS paid_at,')
+            . ($hasPaidAt ? ' o.paid_at, UNIX_TIMESTAMP(o.paid_at) AS paid_at_unix,' : ' NULL AS paid_at, NULL AS paid_at_unix,')
             . ($hasCreatedAt ? ' o.created_at,' : ' NULL AS created_at,')
             . (orange_table_has_column($pdo, 'orders', 'country_id') ? ' o.country_id,' : ' NULL AS country_id,')
             . ' o.payment_status, o.payment_method
@@ -109,29 +122,39 @@ try {
         foreach ($rows as &$r) {
             $r['payment_status_label'] = orange_payment_status_label((string) ($r['payment_status'] ?? ''));
             $rowCid = (int) ($r['country_id'] ?? 0);
-            if ($rowCid <= 0) {
-                $rowCid = $cid;
+            // Record country is authoritative — no silent Current Country Context fallback.
+            $r['created_at_utc'] = '';
+            $createdRaw = trim((string) ($r['created_at'] ?? ''));
+            if ($createdRaw !== '') {
+                try {
+                    $r['created_at_utc'] = orange_admin_time_parse_mysql_utc_datetime($createdRaw)->format('c');
+                } catch (OrangeAdminTimeConfigException $e) {
+                    $r['created_at_utc'] = '';
+                }
             }
-            // orders.created_at is DATETIME — Phase 2 stores/displays as UTC wall → country IANA.
-            $r['created_at_display'] = orange_admin_time_display_mysql_utc_or_dash(
+            $r['created_at_display'] = orange_admin_time_display_mysql_utc_for_record(
                 $pdo,
-                (string) ($r['created_at'] ?? ''),
+                $createdRaw,
                 $rowCid
             );
-            // orders.paid_at is TIMESTAMP (session-mediated) — not yet UTC-written via Phase 1;
-            // expose raw only until Owner approves TIMESTAMP/session strategy (see ORANGE_ADMIN_TIME_POLICY).
-            $r['paid_at_raw'] = (string) ($r['paid_at'] ?? '');
-            $r['paid_at_display'] = $r['paid_at_raw'] !== '' ? $r['paid_at_raw'] : '—';
+            $paidUnix = orange_admin_time_unix_or_null($r['paid_at_unix'] ?? null);
+            $paidApi = orange_admin_time_api_instant_from_unix($pdo, $paidUnix, $rowCid);
+            $r['paid_at_utc'] = $paidApi['utc'];
+            $r['paid_at_display'] = $paidApi['display'];
+            unset($r['paid_at_unix']);
             $txn = $pdo->prepare(
-                'SELECT id, provider_ref, proof_file, amount, created_at, status
+                'SELECT id, provider_ref, proof_file, amount, created_at,
+                        UNIX_TIMESTAMP(created_at) AS created_at_unix, status
                  FROM payment_transactions WHERE order_id = ? ORDER BY id DESC LIMIT 1'
             );
             $txn->execute([(int) $r['id']]);
             $t = $txn->fetch(PDO::FETCH_ASSOC) ?: [];
             $r['last_reference'] = (string) ($t['provider_ref'] ?? '');
             $r['last_txn_status'] = (string) ($t['status'] ?? '');
-            // payment_transactions.created_at is TIMESTAMP — blocked for UTC rewrite this phase.
-            $r['last_txn_created_at_raw'] = (string) ($t['created_at'] ?? '');
+            $txnUnix = orange_admin_time_unix_or_null($t['created_at_unix'] ?? null);
+            $txnApi = orange_admin_time_api_instant_from_unix($pdo, $txnUnix, $rowCid);
+            $r['last_txn_created_at_utc'] = $txnApi['utc'];
+            $r['last_txn_created_at_display'] = $txnApi['display'];
             $pf = trim((string) ($t['proof_file'] ?? ''));
             $txnId = (int) ($t['id'] ?? 0);
             if ($pf !== '' && $txnId > 0) {
@@ -153,15 +176,28 @@ try {
         }
         orange_admin_assert_entity_country($pdo, 'orders', $orderId);
         $amount = isset($data['amount']) ? (float) $data['amount'] : null;
+        $orderCid = 0;
+        if (orange_table_has_column($pdo, 'orders', 'country_id')) {
+            $oc = $pdo->prepare('SELECT country_id FROM orders WHERE id = ? LIMIT 1');
+            $oc->execute([$orderId]);
+            $orderCid = (int) ($oc->fetchColumn() ?: 0);
+        }
+        if ($orderCid <= 0) {
+            json_response([
+                'success' => false,
+                'code' => 'admin_time_country_id_required',
+                'message' => 'دولة الطلب مفقودة — تعذر تحديث الدفع بدون country_id للسجل',
+            ], 422);
+        }
         orange_payment_set_order_status($pdo, $orderId, $status, 'bank', $amount);
         $txnUuid = 'bankset_' . $orderId . '_' . $status . '_' . substr(md5((string) ($data['reference'] ?? '') . microtime()), 0, 12);
         orange_payment_record_transaction($pdo, [
             'order_id' => $orderId,
-            'country_id' => $cid,
+            'country_id' => $orderCid,
             'method' => 'bank',
             'provider' => 'manual',
             'amount' => $amount ?? 0,
-            'currency' => orange_country_functional_currency_code($pdo, $cid),
+            'currency' => orange_country_functional_currency_code($pdo, $orderCid),
             'status' => $status,
             'provider_ref' => trim((string) ($data['reference'] ?? '')),
             'txn_uuid' => $txnUuid,
