@@ -20,24 +20,38 @@ function spm_clip(string $s): string
 }
 
 /**
- * تحويل تاريخ ISO اختياري إلى صيغة قاعدة أو null.
- * $endOfDay=true: التاريخ المجرّد (يوم النهاية) يُغلق على 23:59:59 ليكون شاملاً (لا ينتهي قبل يوم).
+ * Country-local Y-m-d → UTC DATETIME for storefront_promo_messages (nullable schedule).
+ * $endOfDay=true: last second of that local day in UTC (inclusive end, preserved semantics).
  */
-function spm_iso_or_null(?string $v, bool $endOfDay = false): ?string
+function spm_iso_or_null(?string $v, bool $endOfDay = false, ?PDO $pdo = null, int $countryId = 0): ?string
 {
     $v = trim((string) $v);
     if ($v === '') {
         return null;
     }
     $v = str_replace('T', ' ', $v);
-    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) {
-        return $v . ($endOfDay ? ' 23:59:59' : ' 00:00:00');
+    if ($pdo === null || $countryId <= 0) {
+        return null;
     }
-    if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/', $v)) {
-        return strlen($v) === 16 ? $v . ':00' : $v;
+    require_once __DIR__ . '/../../../includes/admin_time.php';
+    require_once __DIR__ . '/../../../includes/cart_promo_schedule.php';
+    $ymd = '';
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) {
+        $ymd = orange_admin_time_date_only_normalize($v);
+    } elseif (preg_match('/^(\d{4}-\d{2}-\d{2})[ T]\d{2}:\d{2}(:\d{2})?$/', $v, $m)) {
+        $ymd = orange_admin_time_date_only_normalize($m[1]);
+    }
+    if ($ymd === '') {
+        return null;
+    }
+    try {
+        $iana = orange_admin_time_timezone_for_country_id($pdo, $countryId);
+        $range = orange_cart_promo_local_ymd_range_to_utc_mysql($ymd, $ymd, $iana);
+    } catch (Throwable $e) {
+        return null;
     }
 
-    return null;
+    return $endOfDay ? $range['valid_to'] : $range['valid_from'];
 }
 
 try {
@@ -81,10 +95,18 @@ try {
         $textHi = spm_clip((string) ($data['text_hi'] ?? ''));
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $isAlwaysOn = !empty($data['is_always_on']) ? 1 : 0;
-        $validFrom = $isAlwaysOn ? null : spm_iso_or_null((string) ($data['valid_from'] ?? ''));
-        $validTo = $isAlwaysOn ? null : spm_iso_or_null((string) ($data['valid_to'] ?? ''), true);
-        if (!$isAlwaysOn && $validFrom !== null && $validTo !== null && $validTo < $validFrom) {
-            json_response(['success' => false, 'message' => 'تاريخ النهاية قبل البداية'], 422);
+        if ($ctxCid <= 0) {
+            json_response(['success' => false, 'message' => 'تعذر تحديد دولة سياق الرسالة الترويجية'], 422);
+        }
+        $validFrom = $isAlwaysOn ? null : spm_iso_or_null((string) ($data['valid_from'] ?? ''), false, $pdo, $ctxCid);
+        $validTo = $isAlwaysOn ? null : spm_iso_or_null((string) ($data['valid_to'] ?? ''), true, $pdo, $ctxCid);
+        if (!$isAlwaysOn) {
+            if ($validFrom === null || $validTo === null) {
+                json_response(['success' => false, 'message' => 'تواريخ بداية/نهاية الرسالة غير صالحة لدولة السياق'], 422);
+            }
+            if ($validTo < $validFrom) {
+                json_response(['success' => false, 'message' => 'تاريخ النهاية قبل البداية'], 422);
+            }
         }
 
         // خانة «بطاقة عرض محدّد»: تتطلّب نوع عرض ورقمه؛ غير ذلك تُصفّر.

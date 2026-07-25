@@ -637,7 +637,7 @@ function orange_admin_time_document_date_today_for_country_id(PDO $pdo, int $cou
 /**
  * Convert a country-local wall DATETIME (Y-m-d H:i:s) to UTC MySQL wall for DATETIME storage.
  * Used when a caller passes document-local wall (e.g. document_date + time) into Absolute Moment columns
- * such as inventory_cost_layers.layer_date — without changing GL $postingAt semantics (Step 4).
+ * such as inventory_cost_layers.layer_date — without changing GL $postingAt semantics (Step 5).
  *
  * @throws OrangeAdminTimeConfigException
  */
@@ -657,14 +657,59 @@ function orange_admin_time_country_local_wall_to_utc_mysql(PDO $pdo, string $loc
     if ($ymd === '') {
         throw new OrangeAdminTimeConfigException('admin_time_local_wall_invalid');
     }
+    $hhmmss = $m[2];
     $tzName = orange_admin_time_timezone_for_country_id($pdo, $countryId);
-    try {
-        $local = new DateTimeImmutable($ymd . ' ' . $m[2], new DateTimeZone($tzName));
-    } catch (Throwable $e) {
+
+    return orange_admin_time_local_wall_to_utc_mysql_in_iana($ymd . ' ' . $hhmmss, $tzName);
+}
+
+/**
+ * Local wall Y-m-d H:i:s in an IANA zone → UTC MySQL wall.
+ * Fail closed on nonexistent (DST gap) or ambiguous (DST fold) civil times — no silent pick.
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_local_wall_to_utc_mysql_in_iana(string $localWall, string $ianaTimezone): string
+{
+    $wall = trim($localWall);
+    if (!preg_match('/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})$/', $wall, $m)) {
         throw new OrangeAdminTimeConfigException('admin_time_local_wall_invalid');
     }
+    $ymd = orange_admin_time_date_only_normalize($m[1]);
+    if ($ymd === '') {
+        throw new OrangeAdminTimeConfigException('admin_time_local_wall_invalid');
+    }
+    $hhmmss = $m[2];
+    $expected = $ymd . ' ' . $hhmmss;
+    $tzName = orange_admin_time_require_iana($ianaTimezone);
+    $tz = new DateTimeZone($tzName);
+    $local = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $expected, $tz);
+    if (!$local instanceof DateTimeImmutable) {
+        throw new OrangeAdminTimeConfigException('admin_time_local_wall_invalid');
+    }
+    // Nonexistent (spring gap): PHP folds forward → wall roundtrip mismatches.
+    if ($local->format('Y-m-d H:i:s') !== $expected) {
+        throw new OrangeAdminTimeConfigException('admin_time_local_wall_nonexistent');
+    }
+    $unix = $local->getTimestamp();
+    // Ambiguous (fall fold): more than one UTC instant maps to the same local wall.
+    $matchingUnix = [];
+    foreach ([$unix - 7200, $unix - 3600, $unix, $unix + 3600, $unix + 7200] as $try) {
+        $cand = (new DateTimeImmutable('@' . $try))->setTimezone($tz);
+        if ($cand->format('Y-m-d H:i:s') === $expected) {
+            $matchingUnix[$cand->getTimestamp()] = true;
+        }
+    }
+    if (count($matchingUnix) > 1) {
+        throw new OrangeAdminTimeConfigException('admin_time_local_wall_ambiguous');
+    }
+    $utc = $local->setTimezone(new DateTimeZone('UTC'));
+    $back = $utc->setTimezone($tz);
+    if ($back->format('Y-m-d H:i:s') !== $expected) {
+        throw new OrangeAdminTimeConfigException('admin_time_local_wall_nonexistent');
+    }
 
-    return $local->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+    return $utc->format('Y-m-d H:i:s');
 }
 
 /**

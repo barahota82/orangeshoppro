@@ -909,10 +909,17 @@ function orange_delivery_promotion_resolve_for_checkout(
                 ' . $firstDeliveredSelect . ', sort_order, valid_from, valid_to, is_always_on
          FROM delivery_fee_promotions
          WHERE country_id = ? AND is_active = 1
-           AND (is_always_on = 1 OR (valid_from <= CURDATE() AND valid_to >= CURDATE()))
+           AND (is_always_on = 1 OR (valid_from <= ? AND valid_to >= ?))
          ORDER BY sort_order ASC, id ASC'
     );
-    $st->execute([$countryId]);
+    require_once __DIR__ . '/admin_time.php';
+    require_once __DIR__ . '/cart_promo_schedule.php';
+    try {
+        $countryToday = orange_admin_time_document_date_today_for_country_id($pdo, $countryId);
+    } catch (Throwable $e) {
+        return null;
+    }
+    $st->execute([$countryId, $countryToday, $countryToday]);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     if ($rows === []) {
         return null;

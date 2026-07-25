@@ -132,8 +132,8 @@ function orange_storefront_promo_message_for_slot(
            AND is_active = 1
            AND (country_id IS NULL OR country_id = ?)
            AND (is_always_on = 1 OR (
-                (valid_from IS NULL OR valid_from <= NOW())
-                AND (valid_to IS NULL OR valid_to >= NOW())
+                (valid_from IS NULL OR valid_from <= UTC_TIMESTAMP())
+                AND (valid_to IS NULL OR valid_to >= UTC_TIMESTAMP())
            ))' . $audienceSql . '
          ORDER BY sort_order ASC, id ASC
          LIMIT 1'
@@ -181,8 +181,8 @@ function orange_storefront_promo_messages_map(PDO $pdo, array $slots, ?int $coun
            AND is_active = 1
            AND (country_id IS NULL OR country_id = ?)
            AND (is_always_on = 1 OR (
-                (valid_from IS NULL OR valid_from <= NOW())
-                AND (valid_to IS NULL OR valid_to >= NOW())
+                (valid_from IS NULL OR valid_from <= UTC_TIMESTAMP())
+                AND (valid_to IS NULL OR valid_to >= UTC_TIMESTAMP())
            ))' . $audienceSql . '
          ORDER BY sort_order ASC, id ASC'
     );
@@ -232,8 +232,8 @@ function orange_storefront_promo_offer_card_map(PDO $pdo, ?int $countryId, strin
            AND is_active = 1
            AND (country_id IS NULL OR country_id = ?)
            AND (is_always_on = 1 OR (
-                (valid_from IS NULL OR valid_from <= NOW())
-                AND (valid_to IS NULL OR valid_to >= NOW())
+                (valid_from IS NULL OR valid_from <= UTC_TIMESTAMP())
+                AND (valid_to IS NULL OR valid_to >= UTC_TIMESTAMP())
            ))' . $audienceSql . '
          ORDER BY sort_order ASC, id ASC'
     );
@@ -286,10 +286,15 @@ function orange_storefront_promo_messages_admin_list(PDO $pdo, ?int $countryId):
          ORDER BY slot ASC, sort_order ASC, id ASC'
     );
     $st->execute($params);
+    require_once __DIR__ . '/cart_promo_schedule.php';
     $out = [];
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
         $audienceVal = isset($row['audience']) && (string) $row['audience'] !== '' ? (string) $row['audience'] : 'all';
-        $out[] = [
+        $rowCid = isset($row['country_id']) ? (int) $row['country_id'] : 0;
+        if ($rowCid <= 0 && $countryId !== null && $countryId > 0) {
+            $rowCid = $countryId;
+        }
+        $item = [
             'id' => (int) $row['id'],
             'country_id' => isset($row['country_id']) ? (int) $row['country_id'] : null,
             'slot' => (string) ($row['slot'] ?? ''),
@@ -306,6 +311,13 @@ function orange_storefront_promo_messages_admin_list(PDO $pdo, ?int $countryId):
             'valid_to' => (string) ($row['valid_to'] ?? ''),
             'sort_order' => (int) ($row['sort_order'] ?? 0),
         ];
+        if ((int) ($item['is_always_on'] ?? 0) === 1) {
+            $item['valid_from'] = '';
+            $item['valid_to'] = '';
+        } elseif ($rowCid > 0 && $item['valid_from'] !== '' && $item['valid_to'] !== '') {
+            $item = orange_cart_promo_admin_localize_schedule_row($pdo, $item, $rowCid);
+        }
+        $out[] = $item;
     }
 
     return $out;

@@ -520,7 +520,10 @@ try {
             trim((string) ($data['valid_from'] ?? '')),
             trim((string) ($data['valid_to'] ?? '')),
             $dateErr,
-            $isAlwaysOn === 1
+            $isAlwaysOn === 1,
+            $pdo,
+            $countryId,
+            true
         );
         if ($bounds === null) {
             json_response(['success' => false, 'message' => $dateErr ?? 'تواريخ العرض غير صالحة'], 422);

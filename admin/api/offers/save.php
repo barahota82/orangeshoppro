@@ -21,18 +21,35 @@ try {
         json_response(['success' => false, 'message' => 'بيانات العرض مطلوبة'], 422);
     }
 
+    $pid = (int) $data['product_id'];
     $isAlwaysOn = !empty($data['is_always_on']) ? 1 : 0;
+    $offerCountryId = 0;
+    if (orange_table_has_column($pdo, 'products', 'country_id')) {
+        $cst = $pdo->prepare('SELECT country_id FROM products WHERE id = ? LIMIT 1');
+        $cst->execute([$pid]);
+        $offerCountryId = (int) ($cst->fetchColumn() ?: 0);
+    }
+    if ($offerCountryId <= 0) {
+        json_response([
+            'success' => false,
+            'code' => 'offer_country_required',
+            'message' => 'دولة المنتج مطلوبة لتفسير تواريخ العرض (لا يُستخدم سياق الدولة كبديل صامت)',
+        ], 422);
+    }
+    $dateErr = null;
     $bounds = orange_cart_promo_parse_required_admin_dates(
         trim((string) ($data['valid_from'] ?? '')),
         trim((string) ($data['valid_to'] ?? '')),
         $dateErr,
-        $isAlwaysOn === 1
+        $isAlwaysOn === 1,
+        $pdo,
+        $offerCountryId,
+        false
     );
     if ($bounds === null) {
         json_response(['success' => false, 'message' => $dateErr ?? 'تواريخ العرض غير صالحة'], 422);
     }
 
-    $pid = (int) $data['product_id'];
     $discount = round((float) $data['discount'], $offersMoneyDecimals);
     if ($discount <= 0) {
         json_response(['success' => false, 'message' => 'قيمة الخصم يجب أن تكون أكبر من صفر'], 422);

@@ -25,15 +25,26 @@ $hasScheduleCols = orange_table_has_column($pdo, 'offers', 'valid_from');
 $hasSortCol = orange_table_has_column($pdo, 'offers', 'sort_order');
 
 $orderSql = $hasSortCol ? 'o.sort_order ASC, o.id DESC' : 'o.id DESC';
+$hasProductCountryCol = orange_table_has_column($pdo, 'products', 'country_id');
+$productCountrySel = $hasProductCountryCol ? ', p.country_id AS product_country_id' : '';
 $offers = $pdo->query(
     '
-    SELECT o.*, p.name AS product_name
+    SELECT o.*, p.name AS product_name' . $productCountrySel . '
     FROM offers o
     INNER JOIN products p ON p.id = o.product_id
     WHERE 1=1' . $offersProductsCountrySql . '
     ORDER BY ' . $orderSql . '
 '
 )->fetchAll();
+if ($hasScheduleCols && is_array($offers)) {
+    foreach ($offers as $ofrIdx => $ofrRow) {
+        $ofrCid = (int) ($ofrRow['product_country_id'] ?? 0);
+        if ($ofrCid <= 0) {
+            $ofrCid = $offersCountryId;
+        }
+        $offers[$ofrIdx] = orange_cart_promo_admin_localize_schedule_row($pdo, $ofrRow, $ofrCid);
+    }
+}
 $ofrNextSort = 1;
 if ($hasSortCol) {
     $ofrMaxSort = 0;

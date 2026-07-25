@@ -208,7 +208,12 @@ try {
     }
 
     if ($action === 'list') {
-        json_response(['success' => true, 'data' => orange_cart_bogo_promotions_admin_list($pdo)]);
+        $cid = orange_cart_promotion_admin_country_id($pdo);
+        $out = [];
+        foreach (orange_cart_bogo_promotions_admin_list($pdo) as $row) {
+            $out[] = orange_cart_promo_admin_localize_schedule_row($pdo, $row, $cid);
+        }
+        json_response(['success' => true, 'data' => $out]);
     }
 
     if ($action === 'always_on_history') {
@@ -255,16 +260,6 @@ try {
         $showOldPrice = !empty($data['show_old_price_to_customer']) ? 1 : 0;
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $isAlwaysOn = !empty($data['is_always_on']) ? 1 : 0;
-        $dateErr = null;
-        $bounds = orange_cart_promo_parse_required_admin_dates(
-            trim((string) ($data['valid_from'] ?? '')),
-            trim((string) ($data['valid_to'] ?? '')),
-            $dateErr,
-            $isAlwaysOn === 1
-        );
-        if ($bounds === null) {
-            json_response(['success' => false, 'message' => $dateErr ?? 'تواريخ العرض غير صالحة'], 422);
-        }
         $giftRaw = strtolower(trim((string) ($data['gift_kind'] ?? 'choice')));
         $giftKind = $giftRaw === 'fixed' ? 'fixed' : 'choice';
         // اختيار العميل لمتغيّر الهدية: ذو معنى لهدية ثابتة فقط (نوع «الاختيار» يختار العميل أصلاً).
@@ -382,6 +377,25 @@ try {
             $insertCountryId = orange_cart_promotion_prepare_admin_save($pdo, 'cart_bogo_promotions', $id);
         } catch (RuntimeException $e) {
             json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+        $scheduleCountryId = orange_cart_promo_schedule_country_id_for_save(
+            $pdo,
+            'cart_bogo_promotions',
+            $id,
+            (int) $insertCountryId
+        );
+        $dateErr = null;
+        $bounds = orange_cart_promo_parse_required_admin_dates(
+            trim((string) ($data['valid_from'] ?? '')),
+            trim((string) ($data['valid_to'] ?? '')),
+            $dateErr,
+            $isAlwaysOn === 1,
+            $pdo,
+            $scheduleCountryId,
+            false
+        );
+        if ($bounds === null) {
+            json_response(['success' => false, 'message' => $dateErr ?? 'تواريخ العرض غير صالحة'], 422);
         }
 
         $hasPoolCfg = orange_table_has_column($pdo, 'cart_bogo_promotions', 'gift_pool_config');

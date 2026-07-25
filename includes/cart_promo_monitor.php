@@ -200,15 +200,17 @@ function orange_cart_promo_log_pause_event(
         $enc = json_encode($meta, JSON_UNESCAPED_UNICODE);
         $metaJson = $enc !== false ? $enc : null;
     }
+    require_once __DIR__ . '/admin_time.php';
     $st = $pdo->prepare(
         'INSERT INTO promo_pause_log (rule_table, rule_id, reason, country_id, paused_at, meta_json)
-         VALUES (?, ?, ?, ?, NOW(), ?)'
+         VALUES (?, ?, ?, ?, ?, ?)'
     );
     $st->execute([
         $table,
         $ruleId,
         $reason,
         $countryId > 0 ? $countryId : null,
+        orange_admin_time_utc_now_mysql(),
         $metaJson,
     ]);
 }
@@ -225,14 +227,16 @@ function orange_cart_promo_upsert_stock_check(
     if (!orange_table_exists($pdo, 'promo_stock_check') || $ruleId <= 0) {
         return;
     }
+    require_once __DIR__ . '/admin_time.php';
+    $checkedAt = orange_admin_time_utc_now_mysql();
     $st = $pdo->prepare(
         'INSERT INTO promo_stock_check (rule_table, rule_id, country_id, status, stock_reason, detail_ar, checked_at)
-         VALUES (?, ?, ?, ?, ?, ?, NOW())
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            status = VALUES(status),
            stock_reason = VALUES(stock_reason),
            detail_ar = VALUES(detail_ar),
-           checked_at = NOW()'
+           checked_at = VALUES(checked_at)'
     );
     $st->execute([
         $table,
@@ -241,6 +245,7 @@ function orange_cart_promo_upsert_stock_check(
         $status,
         $stockReason !== null && $stockReason !== '' ? $stockReason : null,
         $detail,
+        $checkedAt,
     ]);
 }
 
@@ -324,9 +329,9 @@ function orange_cart_promo_sync_stock_checks(
             $inWindow = '';
             if (orange_table_has_column($pdo, $table, 'valid_from')) {
                 if (orange_table_has_column($pdo, $table, 'is_always_on')) {
-                    $inWindow = '(t.is_always_on = 1 OR (t.valid_from <= NOW() AND t.valid_to >= NOW()))';
+                    $inWindow = '(t.is_always_on = 1 OR (t.valid_from <= UTC_TIMESTAMP() AND t.valid_to >= UTC_TIMESTAMP()))';
                 } else {
-                    $inWindow = 't.valid_from <= NOW() AND t.valid_to >= NOW()';
+                    $inWindow = 't.valid_from <= UTC_TIMESTAMP() AND t.valid_to >= UTC_TIMESTAMP()';
                 }
             }
             if ($inWindow !== '' && orange_table_has_column($pdo, $table, 'auto_paused_at')) {

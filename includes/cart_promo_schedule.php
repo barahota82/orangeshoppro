@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/cart_promotion_country.php';
 require_once __DIR__ . '/promo_always_on.php';
+require_once __DIR__ . '/admin_time.php';
 
 /**
  * أهليّة عرض سلة بشرط «أول طلب مُسلَّم»: نعيد استخدام نفس منطق عروض التوصيل
@@ -152,23 +153,84 @@ function orange_cart_promo_row_is_customer_effective(array $row): bool
     );
 }
 
+/**
+ * Country authority for schedule parse on admin save (existing row country, else insert context).
+ */
+function orange_cart_promo_schedule_country_id_for_save(PDO $pdo, string $table, int $id, int $insertCountryId): int
+{
+    if ($id > 0 && orange_table_exists($pdo, $table) && orange_table_has_column($pdo, $table, 'country_id')) {
+        $st = $pdo->prepare('SELECT country_id FROM `' . str_replace('`', '``', $table) . '` WHERE id = ? LIMIT 1');
+        $st->execute([$id]);
+        $cid = (int) ($st->fetchColumn() ?: 0);
+        if ($cid > 0) {
+            return $cid;
+        }
+    }
+    if ($insertCountryId > 0) {
+        return $insertCountryId;
+    }
+
+    return orange_cart_promotion_admin_country_id($pdo);
+}
+
+/**
+ * Absolute-moment window stored as UTC DATETIME (date-only admin days → country IANA day bounds).
+ * Inclusive: now >= from AND now <= to (to = last second of the end local day in UTC).
+ */
 function orange_cart_promo_is_within_schedule(string $validFrom, string $validTo, bool $isAlwaysOn = false): bool
 {
     if ($isAlwaysOn) {
         return true;
     }
-    $from = strtotime(trim($validFrom));
-    $to = strtotime(trim($validTo));
-    if ($from === false || $to === false) {
+    $fromRaw = trim($validFrom);
+    $toRaw = trim($validTo);
+    if ($fromRaw === '' || $toRaw === '') {
         return false;
     }
-    $now = time();
+    try {
+        $from = orange_admin_time_parse_mysql_utc_datetime($fromRaw)->getTimestamp();
+        $to = orange_admin_time_parse_mysql_utc_datetime($toRaw)->getTimestamp();
+    } catch (OrangeAdminTimeConfigException $e) {
+        return false;
+    }
+    $now = orange_admin_time_unix_now();
 
     return $now >= $from && $now <= $to;
 }
 
 /**
+ * Date-only schedule (delivery_fee_promotions.valid_* DATE): compare country-local calendar today.
+ */
+function orange_cart_promo_is_within_date_only_schedule(
+    PDO $pdo,
+    int $countryId,
+    string $validFromYmd,
+    string $validToYmd,
+    bool $isAlwaysOn = false
+): bool {
+    if ($isAlwaysOn) {
+        return true;
+    }
+    if ($countryId <= 0) {
+        return false;
+    }
+    $from = orange_admin_time_date_only_normalize($validFromYmd);
+    $to = orange_admin_time_date_only_normalize($validToYmd);
+    if ($from === '' || $to === '') {
+        return false;
+    }
+    try {
+        $today = orange_admin_time_document_date_today_for_country_id($pdo, $countryId);
+    } catch (OrangeAdminTimeConfigException $e) {
+        return false;
+    }
+
+    return $today >= $from && $today <= $to;
+}
+
+/**
  * شريط SQL: نشط + ضمن المدة + غير موقوف تلقائياً.
+ * Uses UTC_TIMESTAMP() so DATETIME columns stored as UTC wall compare correctly under session +03.
  */
 function orange_cart_promo_schedule_sql(string $alias): string
 {
@@ -181,12 +243,70 @@ function orange_cart_promo_schedule_sql(string $alias): string
         . ' AND ' . $a . '.auto_paused_at IS NULL'
         . ' AND ('
         . $a . '.is_always_on = 1'
-        . ' OR (' . $a . '.valid_from <= NOW() AND ' . $a . '.valid_to >= NOW())'
+        . ' OR (' . $a . '.valid_from <= UTC_TIMESTAMP() AND ' . $a . '.valid_to >= UTC_TIMESTAMP())'
         . ')';
 }
 
 /**
- * تحقق تواريخ الأدمن (Y-m-d) — إلزامية؛ valid_to نهاية اليوم inclusive.
+ * Local Y-m-d of a stored UTC DATETIME instant in the offer country's IANA zone.
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_cart_promo_utc_mysql_to_country_ymd(PDO $pdo, string $utcMysql, int $countryId): string
+{
+    $tzName = orange_admin_time_timezone_for_country_id($pdo, $countryId);
+    $local = orange_admin_time_parse_mysql_utc_datetime($utcMysql)
+        ->setTimezone(new DateTimeZone($tzName));
+
+    return $local->format('Y-m-d');
+}
+
+/**
+ * Admin form roundtrip: expose schedule as country-local Y-m-d (Date-only input contract).
+ *
+ * @param array<string,mixed> $row
+ * @return array<string,mixed>
+ */
+function orange_cart_promo_admin_localize_schedule_row(PDO $pdo, array $row, int $countryId): array
+{
+    $cid = $countryId > 0 ? $countryId : (int) ($row['country_id'] ?? 0);
+    if (orange_promo_always_on_enabled($row)) {
+        $row['schedule_label'] = 'تفعيل دائم';
+        $row['valid_from_utc'] = (string) ($row['valid_from'] ?? '');
+        $row['valid_to_utc'] = (string) ($row['valid_to'] ?? '');
+
+        return $row;
+    }
+    $vf = trim((string) ($row['valid_from'] ?? ''));
+    $vt = trim((string) ($row['valid_to'] ?? ''));
+    $row['valid_from_utc'] = $vf;
+    $row['valid_to_utc'] = $vt;
+    if ($cid <= 0 || $vf === '' || $vt === '') {
+        return $row;
+    }
+    try {
+        // Date-only columns already Y-m-d
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $vf) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $vt)) {
+            $row['valid_from'] = $vf;
+            $row['valid_to'] = $vt;
+        } else {
+            $row['valid_from'] = orange_cart_promo_utc_mysql_to_country_ymd($pdo, $vf, $cid);
+            $row['valid_to'] = orange_cart_promo_utc_mysql_to_country_ymd($pdo, $vt, $cid);
+        }
+    } catch (OrangeAdminTimeConfigException $e) {
+        $row['valid_from'] = '';
+        $row['valid_to'] = '';
+        $row['schedule_error'] = $e->getMessage();
+    }
+
+    return $row;
+}
+
+/**
+ * Verify admin dates (Y-m-d) for an offer country.
+ * - DATETIME storage (cart/offers/messages): country-local day → UTC Absolute Moments (end inclusive).
+ * - DATE storage (delivery): keep Y-m-d (Date-only; no TZ shift of the calendar day).
+ * Permanent (is_always_on): no fake 2099 end — NOT NULL filler uses country-local today only; evaluation ignores dates.
  *
  * @return array{valid_from:string,valid_to:string}|null null + رسالة عبر $err
  */
@@ -194,55 +314,103 @@ function orange_cart_promo_parse_required_admin_dates(
     string $fromIso,
     string $toIso,
     ?string &$err = null,
-    bool $isAlwaysOn = false
-): ?array
-{
+    bool $isAlwaysOn = false,
+    ?PDO $pdo = null,
+    int $countryId = 0,
+    bool $asDateOnly = false
+): ?array {
     $err = null;
     $fromIso = trim($fromIso);
     $toIso = trim($toIso);
-    if ($isAlwaysOn) {
-        $fromTs = $fromIso !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromIso)
-            ? strtotime($fromIso . ' 00:00:00')
-            : false;
-        $toTs = $toIso !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $toIso)
-            ? strtotime($toIso . ' 23:59:59')
-            : false;
-        if ($fromTs === false || $toTs === false || $fromTs > $toTs) {
-            $fromTs = strtotime(date('Y-m-d') . ' 00:00:00');
-            $toTs = strtotime('2099-12-31 23:59:59');
-        }
 
-        return [
-            'valid_from' => date('Y-m-d H:i:s', (int) $fromTs),
-            'valid_to' => date('Y-m-d H:i:s', (int) $toTs),
-        ];
+    if ($pdo === null || $countryId <= 0) {
+        $err = 'دولة العرض مطلوبة لتفسير تواريخ الجدولة';
+
+        return null;
     }
+
+    try {
+        $iana = orange_admin_time_timezone_for_country_id($pdo, $countryId);
+        $today = orange_admin_time_document_date_today_for_country_id($pdo, $countryId);
+    } catch (OrangeAdminTimeConfigException $e) {
+        $err = 'إعداد المنطقة الزمنية لدولة العرض غير صالح';
+
+        return null;
+    }
+
+    if ($isAlwaysOn) {
+        // Permanent flag remains authority; columns may be NOT NULL — use today as technical filler (never 2099).
+        $fillerFrom = $fromIso !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromIso)
+            ? orange_admin_time_date_only_normalize($fromIso)
+            : $today;
+        $fillerTo = $toIso !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $toIso)
+            ? orange_admin_time_date_only_normalize($toIso)
+            : $today;
+        if ($fillerFrom === '' || $fillerTo === '') {
+            $fillerFrom = $today;
+            $fillerTo = $today;
+        }
+        if ($fillerFrom > $fillerTo) {
+            $fillerFrom = $today;
+            $fillerTo = $today;
+        }
+        if ($asDateOnly) {
+            return ['valid_from' => $fillerFrom, 'valid_to' => $fillerTo];
+        }
+        try {
+            return orange_cart_promo_local_ymd_range_to_utc_mysql($fillerFrom, $fillerTo, $iana);
+        } catch (OrangeAdminTimeConfigException $e) {
+            $err = 'تعذر تحويل تواريخ التفعيل الدائم';
+
+            return null;
+        }
+    }
+
     if ($fromIso === '' || $toIso === '') {
         $err = 'تاريخ بداية ونهاية العرض إلزاميان';
 
         return null;
     }
-    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromIso) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $toIso)) {
+    $fromYmd = orange_admin_time_date_only_normalize($fromIso);
+    $toYmd = orange_admin_time_date_only_normalize($toIso);
+    if ($fromYmd === '' || $toYmd === '') {
         $err = 'صيغة التاريخ غير صالحة (YYYY-MM-DD)';
 
         return null;
     }
-    $fromTs = strtotime($fromIso . ' 00:00:00');
-    $toTs = strtotime($toIso . ' 23:59:59');
-    if ($fromTs === false || $toTs === false) {
-        $err = 'تاريخ غير صالح';
-
-        return null;
-    }
-    if ($fromTs > $toTs) {
+    if ($fromYmd > $toYmd) {
         $err = 'تاريخ البداية يجب أن يسبق أو يساوي تاريخ النهاية';
 
         return null;
     }
+    if ($asDateOnly) {
+        return ['valid_from' => $fromYmd, 'valid_to' => $toYmd];
+    }
+    try {
+        return orange_cart_promo_local_ymd_range_to_utc_mysql($fromYmd, $toYmd, $iana);
+    } catch (OrangeAdminTimeConfigException $e) {
+        $err = 'تاريخ غير صالح لتوقيت دولة العرض';
+
+        return null;
+    }
+}
+
+/**
+ * Country-local inclusive date range → UTC DATETIME walls (end = last second of end day).
+ *
+ * @return array{valid_from:string,valid_to:string}
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_cart_promo_local_ymd_range_to_utc_mysql(string $fromYmd, string $toYmd, string $ianaTimezone): array
+{
+    $fromB = orange_admin_time_day_bounds_mysql_utc($fromYmd, $ianaTimezone);
+    $toB = orange_admin_time_day_bounds_mysql_utc($toYmd, $ianaTimezone);
+    $endExclusive = orange_admin_time_parse_mysql_utc_datetime($toB['end_exclusive_utc_mysql']);
+    $endInclusive = $endExclusive->modify('-1 second');
 
     return [
-        'valid_from' => date('Y-m-d H:i:s', $fromTs),
-        'valid_to' => date('Y-m-d H:i:s', $toTs),
+        'valid_from' => $fromB['start_utc_mysql'],
+        'valid_to' => $endInclusive->format('Y-m-d H:i:s'),
     ];
 }
 
@@ -347,10 +515,10 @@ function orange_cart_promo_auto_pause_with_reason(PDO $pdo, string $table, int $
         return false;
     }
     $st = $pdo->prepare(
-        "UPDATE {$table} SET auto_paused_at = NOW(), auto_paused_reason = ?
-         WHERE id = ? AND (auto_paused_at IS NULL OR auto_paused_reason IS NULL OR auto_paused_reason = '')"
+        'UPDATE ' . $table . ' SET auto_paused_at = ?, auto_paused_reason = ?
+         WHERE id = ? AND (auto_paused_at IS NULL OR auto_paused_reason IS NULL OR auto_paused_reason = \'\')'
     );
-    $st->execute([$reason, $id]);
+    $st->execute([orange_admin_time_utc_now_mysql(), $reason, $id]);
 
     return $st->rowCount() > 0;
 }

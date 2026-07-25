@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/admin_time.php';
 
 /**
  * @param mixed $value
@@ -82,12 +83,13 @@ function orange_promo_always_on_sync_history(
         $ins = $pdo->prepare(
             'INSERT INTO promotion_always_on_history
                 (promo_table, promotion_id, country_id, started_at, ended_at, started_by_admin_id, ended_by_admin_id)
-             VALUES (?, ?, ?, NOW(), NULL, ?, NULL)'
+             VALUES (?, ?, ?, ?, NULL, ?, NULL)'
         );
         $ins->execute([
             $promoTable,
             $promotionId,
             $countryId !== null && $countryId > 0 ? $countryId : null,
+            orange_admin_time_utc_now_mysql(),
             $adminId > 0 ? $adminId : null,
         ]);
 
@@ -99,10 +101,11 @@ function orange_promo_always_on_sync_history(
     }
     $up = $pdo->prepare(
         'UPDATE promotion_always_on_history
-         SET ended_at = NOW(), ended_by_admin_id = ?
+         SET ended_at = ?, ended_by_admin_id = ?
          WHERE id = ? AND ended_at IS NULL'
     );
     $up->execute([
+        orange_admin_time_utc_now_mysql(),
         $adminId > 0 ? $adminId : null,
         $openId,
     ]);

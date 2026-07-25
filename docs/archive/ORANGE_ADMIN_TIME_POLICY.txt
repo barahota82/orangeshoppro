@@ -231,7 +231,7 @@ opening/adjustment/reconciliation + inventory_cost_layers/consumptions
 
 ### مؤكّد بلا تغيير
 - Quantity / reservation / FIFO selection algorithm / unit cost / costing
-- GL / journal / pending queue timestamps (Step 4)
+- GL / journal / pending queue timestamps (Step 5 — لم تبدأ)
 - PHP global timezone / MySQL session timezone / Schema / Data Migration
 - Backup Center / Restore Center / Customer+Storefront UI
 
@@ -262,6 +262,92 @@ opening/adjustment/reconciliation + inventory_cost_layers/consumptions
 
 
 --------------------------------------------------------------------
+سادساً-ب: Phase 2 Step 4 — العروض والجدولة الزمنية حسب الدولة
+--------------------------------------------------------------------
+النطاق: Timestamp/Schedule handling فقط داخل منظومة العروض.
+بلا تغيير Discount / Gift / BOGO / Combo / Delivery fee formulas /
+Stacking / Priority / Usage / Targeting / Customer UI.
+بلا Step 5 (محاسبة/قيود). بلا Backup/Restore. بلا Schema/Data Migration.
+بلا تغيير PHP global timezone أو MySQL session timezone.
+
+### أنواع العروض المكتشفة فعلياً
+1. `cart_promotions` — خصم مجموع السلة
+2. `cart_gift_promotions` — هدية مجموع السلة
+3. `cart_bogo_promotions` — BOGO
+4. `cart_combo_promotions` — كومبو
+5. `offers` — عرض منتج (لا `country_id` على الجدول؛ السلطة عبر `products.country_id`)
+6. `delivery_fee_promotions` — خصم رسوم التوصيل (أعمدة DATE)
+7. `storefront_promo_messages` — رسائل تحفيزية بفترات اختيارية (NULL عند الدائم)
+
+لا يوجد Worker/Cron لتفعيل العروض — التقييم Query-based
+(`orange_cart_promo_schedule_sql` + evaluators PHP).
+مراقبة المخزون (`cart_promo_monitor`) تبقى كما هي مع مقارنة UTC فقط.
+
+### Country authority
+- جداول السلة/التوصيل/الرسائل: `country_id` المباشر على صف العرض
+  (عند التعديل: دولة السجل؛ عند الإنشاء: سياق الدولة الحالية المفلتر).
+- `offers`: `products.country_id` — Fail Closed إن غابت (لا Fallback لسياق الأدمن).
+- ممنوع Asia/Kuwait / Browser / Current Context كبديل صامت عند قراءة/تقييم سجل موجود.
+
+### Permanent offer semantics (`is_always_on`)
+- العلم `is_always_on = 1` هو السلطة — لا تاريخ انتهاء وهمي (لا 2099).
+- جداول NOT NULL لـ valid_*: filler تقني = يوم الدولة المحلي الحالي → UTC؛
+  التقييم يتجاهل التواريخ عند always_on.
+- `storefront_promo_messages`: always_on → `valid_from`/`valid_to` = NULL
+  (معمارية nullable محفوظة).
+
+### Scheduled offer semantics (Date-only admin contract)
+- واجهة الأدمن: تاريخ فقط (Y-m-d / DMY) عبر partials الحالية — بلا ساعة.
+- DATETIME storage (سلة/منتج/رسائل):
+  Local calendar day (IANA دولة العرض) → UTC Absolute Moment
+  (بداية اليوم 00:00 محلي → UTC؛ نهاية اليوم آخر ثانية شاملة → UTC).
+- DATE storage (`delivery_fee_promotions`): يبقى Y-m-d بلا تحويل منطقة؛
+  التقييم يقارن «اليوم المحلي للدولة» شاملاً.
+- Inclusive محفوظ: `now >= from AND now <= to` (PHP/SQL).
+- رفض: نهاية قبل البداية؛ تاريخ غير صالح؛ دولة/IANA غير صالح.
+
+### Lifecycle timestamps (Absolute Moment UTC)
+- `auto_paused_at` → `orange_admin_time_utc_now_mysql()`
+- `promo_always_on_history.started_at` / `ended_at` → UTC mysql
+- `promo_pause_log.paused_at` / `promo_stock_check.checked_at` → UTC mysql
+- `updated_at` TIMESTAMP ON UPDATE على جداول السلة: نوع TIMESTAMP يخزّن
+  Absolute Instant (تحويل جلسة MySQL→UTC داخلياً) — لم يُغيَّر Schema؛
+  لا Data Migration للصفوف القديمة (كتابات DATETIME للجدولة الجديدة = UTC wall).
+
+### Active / Upcoming / Expired
+- Server-side فقط عبر UTC instant أو Country-local DATE today.
+- SQL: `UTC_TIMESTAMP()` بدل `NOW()` لأعمدة DATETIME المخزّنة UTC.
+- لا Browser `Date.now()` كسلطة.
+- `is_active` / مخزون / أهلية تبقى كما هي (خارج تغيير الوقت).
+
+### DST
+- حدود اليوم عبر IANA (`orange_admin_time_day_bounds_*`).
+- Local wall HH:MM (مساعد مشترك): nonexistent/ambiguous يفشل
+  (`admin_time_local_wall_nonexistent` / `_ambiguous`) — لا اختيار صامت.
+- عروض الأدمن Date-only فلا تمرّ بفجوات الساعة؛ حدود اليوم DST-safe.
+
+### Shared evaluators المعدّل وقتها فقط
+- `includes/cart_promo_schedule.php`
+- `includes/storefront_promo_messages.php` (مقارنة UTC)
+- `includes/delivery_areas.php` (today للدولة)
+- `includes/cart_promo_monitor.php` (نافذة UTC + lifecycle UTC)
+- Writers: manage APIs للعروض أعلاه + `admin/api/offers/save.php`
+  + `includes/promo_always_on.php`
+
+### مؤكّد بلا تغيير
+- Discount calculation / Gift selection / BOGO / Combo formulas
+- Delivery fee math / Min-max / Usage / Stacking / Priority / Targeting
+- Orders / Payments / Purchases / Inventory / Accounting-GL (Step 5)
+- Customer/Storefront UI / Countdown / Product cards
+- Backup Center / Restore Center
+- PHP/MySQL global/session timezone / Schema revision / Data Migration
+
+### اختبار
+`php scripts/self_test_admin_time_phase2_step4_promotions.php`
+(+ يعيد تشغيل اختبارات Phase 1 و Steps 1–3)
+
+
+--------------------------------------------------------------------
 سابعاً: اختبار
 --------------------------------------------------------------------
 `php scripts/self_test_admin_time_foundation.php`
@@ -269,3 +355,4 @@ opening/adjustment/reconciliation + inventory_cost_layers/consumptions
 `php scripts/self_test_admin_time_phase2_step1_closure.php`
 `php scripts/self_test_admin_time_phase2_step2_purchases_returns.php`
 `php scripts/self_test_admin_time_phase2_step3_inventory_warehouses.php`
+`php scripts/self_test_admin_time_phase2_step4_promotions.php`
