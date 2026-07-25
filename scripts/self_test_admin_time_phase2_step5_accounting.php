@@ -185,8 +185,20 @@ s5_assert(str_contains($jvPage, 'orange_admin_time_document_date_today_for_count
 s5_assert(str_contains($jm, 'DATE(voucher_date)'), '24. operational voucher_date filters remain Date-only');
 
 // Freezes
-s5_assert(!str_contains($docsPage, 'orange_gl_posting_times_for_country'), '37. Document Archive untouched by Step 5 helpers');
-s5_assert(!str_contains($logsPage, 'orange_gl_posting_times_for_country'), '38. Activity Log untouched');
+s5_assert(!str_contains($docsPage, 'orange_gl_posting_times_for_country'), '37. Document Archive untouched (deferred outside Step 5 — placement pending)');
+s5_assert(!str_contains($logsPage, 'orange_gl_posting_times_for_country'), '38. Activity Log untouched (deferred outside Step 5 — placement pending)');
+$fpPage = file_get_contents($root . '/admin/pages/online_orders_final_posting.php') ?: '';
+s5_assert(!str_contains($fpPage, 'orange_gl_posting_times_for_country'), 'delivery list/UI page not rewritten by Step 5 helpers');
+s5_assert(
+    str_contains($of, 'orange_order_delivery_posting_times')
+    && (str_contains($fpCreate, 'orange_post_order_delivery_accounting') || str_contains($fpCreate, 'order_fulfillment')),
+    'Only Delivery Accounting Posting writers included in Step 5'
+);
+$spmSrc = file_get_contents($root . '/includes/storefront_promo_messages.php') ?: '';
+s5_assert(
+    !str_contains($spmSrc, 'orange_gl_posting_times_for_country'),
+    'Storefront Promotional Messages untouched in Step 5'
+);
 s5_assert(str_contains($bc, 'fmtTimestampDisplay'), '39. Backup Center untouched');
 s5_assert(str_contains($rc, 'fmtTimestampDisplay'), '40. Restore Center untouched');
 s5_assert(!str_contains($home, 'orange_gl_posting_times_for_country'), '41. storefront home unchanged');

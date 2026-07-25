@@ -379,10 +379,23 @@ Stacking / Priority / Usage / Targeting / Customer UI.
 Step 5 يفصل: voucher_date = يوم محلي؛ movement/document_entered = UTC instant.
 طبقات المخزون تبقى Country-local wall منفصلة (`layerWallAt` / `17:00` للتسوية).
 
-### مؤجّل Phase 3 (إلزامي — لا يُمس في Step 5)
-- `admin/pages/company_documents.php` / أرشيف المستندات
-- `admin/pages/logs.php` / `orange_admin_audit_log`
-- التقارير المالية العامة وفلاتر التقارير الواسعة
+### Deferred Outside Step 5 — Final Placement Pending Owner Decision
+(قرار مالك 2026-07-26 — OWNER SCOPE OVERRIDE؛ ممنوع تصنيفها الآن كـ Phase 3)
+- Document Archive: `admin/pages/company_documents.php` /
+  `admin/api/company_documents/*` / `orange_company_documents`
+  — untouched في Step 5 (لا created_at / doc_date / فلاتر / عرض / دولة / رفع).
+- General Activity Log: `admin/pages/logs.php` /
+  `orange_admin_audit_log` / `audit_log()` العام
+  — untouched في Step 5 (لا created_at / Writer / فلاتر / عرض / تصدير).
+
+### Create Delivery Entries — تقسيم ملزم
+- مجمّد من Step 1: قائمة `online_orders_final_posting` +
+  عرض/فلتر `orders.completed_at` — لا إعادة ترحيل في Step 5.
+- داخل Step 5 فقط: writers محاسبة التسليم
+  (`orange_post_order_delivery_accounting` ومسارات GL/Pending الناتجة).
+
+### مؤجّل لاحقاً (تقارير عامة — خارج نطاق Step 5 التشغيلي)
+- التقارير المالية العامة وفلاتر التقارير الواسعة (لا تُبدأ هنا).
 
 ### Business Logic freeze
 لا تغيير Debit/Credit / balancing / numbering / slots uniqueness /
