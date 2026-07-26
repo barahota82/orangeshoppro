@@ -14,7 +14,8 @@ $hasTable = orange_table_exists($pdo, 'storefront_promo_messages');
 $spmSlots = orange_storefront_promo_message_slots();
 $spmOfferTypes = orange_storefront_promo_message_offer_types();
 $spmAudiences = orange_storefront_promo_message_audiences();
-// المشرف المقيَّد بدولة (قفل الجلسة) لا يختار النطاق؛ المشرف العام (lock<=0) يختار «كل الدول» أو دولة بعينها.
+// SPM_IS_GLOBAL = صلاحية سوبر أدمن بلا قفل جلسة فقط — لا يلغي فلتر دولة القائمة.
+// القائمة والحفظ يتبعان Current Country Context دائماً (لا نظرة عامة لكل الدول).
 $spmLockedCid = (int) orange_admin_session_locked_country_id();
 $spmIsGlobal = $spmLockedCid <= 0;
 

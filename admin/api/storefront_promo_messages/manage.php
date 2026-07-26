@@ -72,13 +72,26 @@ try {
     $norm = orange_storefront_promo_messages_normalize_null_country_ids($pdo);
 
     if ($action === 'list') {
+        if ($ctxCid <= 0) {
+            json_response([
+                'success' => false,
+                'code' => 'country_context_required',
+                'message' => 'يلزم اختيار دولة السياق (السوق الحالي) قبل عرض الرسائل الترويجية',
+                'data' => [],
+                'slots' => orange_storefront_promo_message_slots(),
+                'offer_types' => orange_storefront_promo_message_offer_types(),
+                'audiences' => orange_storefront_promo_message_audiences(),
+                'null_country_normalize' => $norm,
+            ], 422);
+        }
         json_response([
             'success' => true,
-            'data' => orange_storefront_promo_messages_admin_list($pdo, $ctxCid > 0 ? $ctxCid : null),
+            'data' => orange_storefront_promo_messages_admin_list($pdo, $ctxCid),
             'slots' => orange_storefront_promo_message_slots(),
             'offer_types' => orange_storefront_promo_message_offer_types(),
             'audiences' => orange_storefront_promo_message_audiences(),
             'null_country_normalize' => $norm,
+            'country_id' => $ctxCid,
         ]);
     }
 
@@ -171,28 +184,55 @@ try {
                 $countryToStore = $exCid;
             }
             // الترتيب تلقائي: لا يتغيّر عند التعديل (يبقى موضع الصف كما هو).
-            $st = $pdo->prepare(
-                'UPDATE storefront_promo_messages
-                 SET country_id = ?, slot = ?, audience = ?, offer_type = ?, offer_id = ?, text_ar = ?, text_en = ?, text_fil = ?, text_hi = ?,
-                     is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?
-                 WHERE id = ?'
-            );
-            $st->execute([
-                $countryToStore,
-                $slot,
-                $audience,
-                $offerType,
-                $offerId,
-                $textAr,
-                $textEn,
-                $textFil,
-                $textHi,
-                $isActive,
-                $isAlwaysOn,
-                $validFrom,
-                $validTo,
-                $id,
-            ]);
+            // Mutation مقيّدة بدولة السجل أو صف NULL قديم يُنسَب للسياق — لا تعديل عبر دولة أخرى.
+            if ($exCid > 0) {
+                $st = $pdo->prepare(
+                    'UPDATE storefront_promo_messages
+                     SET country_id = ?, slot = ?, audience = ?, offer_type = ?, offer_id = ?, text_ar = ?, text_en = ?, text_fil = ?, text_hi = ?,
+                         is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?
+                     WHERE id = ? AND country_id = ?'
+                );
+                $st->execute([
+                    $countryToStore,
+                    $slot,
+                    $audience,
+                    $offerType,
+                    $offerId,
+                    $textAr,
+                    $textEn,
+                    $textFil,
+                    $textHi,
+                    $isActive,
+                    $isAlwaysOn,
+                    $validFrom,
+                    $validTo,
+                    $id,
+                    $exCid,
+                ]);
+            } else {
+                $st = $pdo->prepare(
+                    'UPDATE storefront_promo_messages
+                     SET country_id = ?, slot = ?, audience = ?, offer_type = ?, offer_id = ?, text_ar = ?, text_en = ?, text_fil = ?, text_hi = ?,
+                         is_active = ?, is_always_on = ?, valid_from = ?, valid_to = ?
+                     WHERE id = ? AND (country_id IS NULL OR country_id = 0)'
+                );
+                $st->execute([
+                    $countryToStore,
+                    $slot,
+                    $audience,
+                    $offerType,
+                    $offerId,
+                    $textAr,
+                    $textEn,
+                    $textFil,
+                    $textHi,
+                    $isActive,
+                    $isAlwaysOn,
+                    $validFrom,
+                    $validTo,
+                    $id,
+                ]);
+            }
         } else {
             // الترتيب تلقائي ضمن دولة السياق فقط.
             $sortStmt = $pdo->prepare(
@@ -248,12 +288,20 @@ try {
             json_response(['success' => false, 'message' => 'السجل غير موجود'], 404);
         }
         $exCid = (int) ($existing['country_id'] ?? 0);
-        if ($exCid > 0 && $exCid !== $ctxCid) {
-            json_response(['success' => false, 'message' => 'هذا السجل يخص دولة أخرى'], 403);
+        if ($exCid <= 0 || $exCid !== $ctxCid) {
+            json_response([
+                'success' => false,
+                'code' => 'country_mismatch',
+                'message' => $exCid <= 0
+                    ? 'لا يُحذف صف بلا دولة من القائمة العادية — التطبيع أو التنظيف المنفصل فقط'
+                    : 'هذا السجل يخص دولة أخرى',
+            ], 403);
         }
-        // صف NULL قديم: يُسمح بحذفه من سياق دولة صريح فقط (تنظيف setup — ليس Global).
-        $st = $pdo->prepare('DELETE FROM storefront_promo_messages WHERE id = ?');
-        $st->execute([$id]);
+        $st = $pdo->prepare('DELETE FROM storefront_promo_messages WHERE id = ? AND country_id = ?');
+        $st->execute([$id, $ctxCid]);
+        if ($st->rowCount() < 1) {
+            json_response(['success' => false, 'code' => 'country_mismatch', 'message' => 'تعذّر الحذف ضمن دولة السياق'], 403);
+        }
         json_response(['success' => true, 'message' => 'تم الحذف']);
     }
 

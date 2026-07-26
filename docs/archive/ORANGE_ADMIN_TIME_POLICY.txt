@@ -533,11 +533,15 @@ Repository Closure Sweep. لا Phase 4 · لا Writers · لا Schema · لا Ba
 ### Explicit Global / Mixed
 - Ordinary Admin activity (`admin/pages/logs.php`): يستبعد `is_global = 1`.
 - `storefront_promo_messages`: **MIGRATED_AND_COMPLIANT / COUNTRY_SCOPED**
-  (ليس Global؛ قرار مالك نهائي 2026-07-26 — Final Country-Scope Closure).
+  (ليس Global؛ قرار مالك نهائي 2026-07-26 — Final Country-Scope Closure +
+  Final Admin/Channel Country Closure).
   الدليل: عمود `country_id` صريح؛ Writer يستخدم Current Country Context فقط
   (بلا fallback دولة افتراضية)؛ التقييم التشغيلي `country_id = ?` فقط —
   **ممنوع** `country_id IS NULL OR …`؛ NULL ≠ Global ولا يظهر على أي متجر؛
-  تطبيع setup إن وُجدت دولة نشطة واحدة؛ `SPM_IS_GLOBAL` = قفل جلسة أدمن فقط.
+  قائمة الأدمن `WHERE country_id = ?` لـ Current Country Context فقط —
+  **لا نظرة عامة متعددة الدول**؛ بلا سياق → fail-closed؛
+  تطبيع setup إن وُجدت دولة نشطة واحدة؛ `SPM_IS_GLOBAL` = قفل جلسة أدمن فقط
+  (لا يلغي فلتر الدولة). Channel → `channels.country_id` → target للمتجر.
 - لا واجهة عميل Global/Mixed لخلط دول:
   NO EXPLICIT GLOBAL OR MIXED CUSTOMER/STOREFRONT USER SURFACE FOUND
 - Admin Explicit Global فقط: أحداث `orange_admin_audit_log` حيث `is_global=1`
@@ -556,6 +560,7 @@ Repository Closure Sweep. لا Phase 4 · لا Writers · لا Schema · لا Ba
 `php scripts/self_test_admin_time_phase3_step4_customer.php`
 `php scripts/self_test_admin_time_phase3_step4_closure.php`
 `php scripts/self_test_admin_time_phase3_step4_spm_country.php`
+`php scripts/self_test_admin_time_phase3_step4_admin_channel_country.php`
 
 
 --------------------------------------------------------------------
@@ -674,4 +679,5 @@ SPM country-scope: `scripts/self_test_admin_time_phase3_step4_spm_country.php`
 `php scripts/self_test_admin_time_phase3_step4_customer.php`
 `php scripts/self_test_admin_time_phase3_step4_closure.php`
 `php scripts/self_test_admin_time_phase3_step4_spm_country.php`
+`php scripts/self_test_admin_time_phase3_step4_admin_channel_country.php`
 `powershell -NoProfile -File scripts/verify-php-utf8.ps1`

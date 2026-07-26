@@ -324,7 +324,8 @@ function orange_storefront_promo_messages_normalize_null_country_ids(PDO $pdo): 
 }
 
 /**
- * قائمة الأدمن لدولة السياق فقط (أو كل الصفوف ذات country_id صريح عند نظرة عامة).
+ * قائمة الأدمن لدولة السياق فقط — لا نظرة عامة متعددة الدول.
+ * بدون Current Country Context صالح: قائمة فارغة (fail-closed).
  *
  * @return list<array<string,mixed>>
  */
@@ -333,13 +334,9 @@ function orange_storefront_promo_messages_admin_list(PDO $pdo, ?int $countryId):
     if (!orange_table_exists($pdo, 'storefront_promo_messages')) {
         return [];
     }
-    $params = [];
-    if ($countryId !== null && $countryId > 0) {
-        $countrySql = ' WHERE country_id = ?';
-        $params[] = $countryId;
-    } else {
-        // نظرة إدارية واسعة: صفوف مملوكة لدولة فقط — لا NULL-as-Global.
-        $countrySql = ' WHERE country_id IS NOT NULL AND country_id > 0';
+    $cid = ($countryId !== null && $countryId > 0) ? $countryId : 0;
+    if ($cid <= 0) {
+        return [];
     }
     $hasOfferCols = orange_table_has_column($pdo, 'storefront_promo_messages', 'offer_type')
         && orange_table_has_column($pdo, 'storefront_promo_messages', 'offer_id');
@@ -349,10 +346,11 @@ function orange_storefront_promo_messages_admin_list(PDO $pdo, ?int $countryId):
     $st = $pdo->prepare(
         'SELECT id, country_id, slot, text_ar, text_en, text_fil, text_hi,
                 is_active, is_always_on, valid_from, valid_to, sort_order' . $offerSel . $audienceSel . '
-         FROM storefront_promo_messages' . $countrySql . '
+         FROM storefront_promo_messages
+         WHERE country_id = ?
          ORDER BY slot ASC, sort_order ASC, id ASC'
     );
-    $st->execute($params);
+    $st->execute([$cid]);
     require_once __DIR__ . '/cart_promo_schedule.php';
     $out = [];
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {

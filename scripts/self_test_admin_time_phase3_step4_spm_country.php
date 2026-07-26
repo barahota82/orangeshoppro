@@ -45,12 +45,14 @@ spm_c_assert(str_contains($spmApi, '$countryToStore = $exCid'), '4/12. update pr
 spm_c_assert(str_contains($spmApi, 'WHERE country_id = ?'), '1. insert sort scoped by country_id = ?');
 spm_c_assert(!str_contains($spmApi, 'country_id IS NULL OR country_id = ?'), '10. manage.php no NULL OR sort/list filter');
 
-// Admin list
-spm_c_assert(str_contains($spmInc, 'WHERE country_id = ?') || str_contains($spmInc, ' country_id = ?'), 'admin list country filter');
-spm_c_assert(str_contains($spmInc, 'country_id IS NOT NULL AND country_id > 0'), 'unlocked overview excludes NULL rows');
+// Admin list — Current Country only (no multi-country overview)
+spm_c_assert(str_contains($spmInc, 'WHERE country_id = ?'), 'admin list country filter country_id = ?');
+spm_c_assert(!str_contains($spmInc, 'country_id IS NOT NULL AND country_id > 0'), 'no all-country admin overview query');
+spm_c_assert(str_contains($spmApi, "action === 'list'") && str_contains($spmApi, 'country_context_required'), 'list without context fails closed');
 
 // SPM_IS_GLOBAL UI only
 spm_c_assert(str_contains($spmPage, 'SPM_IS_GLOBAL'), '11. SPM_IS_GLOBAL present as UI mode');
+spm_c_assert(str_contains($spmPage, 'لا يلغي فلتر دولة'), '11. page documents SPM_IS_GLOBAL does not drop country filter');
 spm_c_assert(str_contains($spmPage, 'بلا دولة') && !str_contains($spmPage, "return 'كل الدول'"), '9/11. UI does not label NULL as all-countries');
 
 // Docs / matrix

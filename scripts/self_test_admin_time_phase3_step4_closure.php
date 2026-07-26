@@ -131,6 +131,7 @@ $spmApi = (string) file_get_contents($root . '/admin/api/storefront_promo_messag
 $spmPage = (string) file_get_contents($root . '/admin/pages/storefront_promo_messages.php');
 $policy = (string) file_get_contents($root . '/docs/archive/ORANGE_ADMIN_TIME_POLICY.txt');
 p3s4c_assert(str_contains($spmInc, 'country_id = ?') && !str_contains($spmInc, 'country_id IS NULL OR country_id = ?'), '6. SPM eval country_id = ? only (no NULL OR)');
+p3s4c_assert(!str_contains($spmInc, 'country_id IS NOT NULL AND country_id > 0'), '6. SPM admin list no multi-country overview');
 p3s4c_assert(str_contains($spmApi, 'orange_admin_context_country_id') && str_contains($spmApi, 'countryToStore'), '6. SPM save uses Current Country Context');
 p3s4c_assert(str_contains($spmApi, 'country_context_required'), '6. SPM create without context fails clearly');
 p3s4c_assert(!str_contains($spmInc, 'is_global') && !str_contains($spmApi, 'is_global'), '6. SPM has no is_global column/contract');
