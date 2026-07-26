@@ -14,6 +14,7 @@ require_once __DIR__ . '/../includes/countries.php';
 require_once __DIR__ . '/../includes/sales_doc_print.php';
 require_once __DIR__ . '/../includes/document_public_token.php';
 require_once __DIR__ . '/../includes/public_document_view.php';
+require_once __DIR__ . '/../includes/storefront_time.php';
 
 $allowedLang = ['ar', 'en', 'fil', 'hi'];
 $lang = strtolower(trim((string) ($_GET['lang'] ?? '')));
@@ -45,6 +46,7 @@ $L = [
         'amount_collected' => 'المبلغ المحصّل', 'amount_due' => 'الإجمالي المستحق', 'total_refund' => 'إجمالي المردود',
         'thanks' => 'شكراً لتعاملكم', 'signature' => 'التوقيع', 'stamp' => 'الختم',
         'not_found' => 'المستند غير موجود أو انتهت صلاحية الرابط.', 'language' => 'اللغة', 'serial' => 'رقم المستند',
+        'generated_at' => 'وقت العرض',
     ],
     'en' => [
         'inv_c' => 'Sales Invoice', 'inv_o' => 'Sales Invoice',
@@ -63,6 +65,7 @@ $L = [
         'amount_collected' => 'Amount Collected', 'amount_due' => 'Amount Due', 'total_refund' => 'Total Refund',
         'thanks' => 'Thank you for your business', 'signature' => 'Signature', 'stamp' => 'Stamp',
         'not_found' => 'Document not found or the link has expired.', 'language' => 'Language', 'serial' => 'Document No.',
+        'generated_at' => 'Viewed at',
     ],
     'fil' => [
         'inv_c' => 'Sales Invoice', 'inv_o' => 'Sales Invoice',
@@ -81,6 +84,7 @@ $L = [
         'amount_collected' => 'Halagang Nakolekta', 'amount_due' => 'Halagang Babayaran', 'total_refund' => 'Kabuuang Refund',
         'thanks' => 'Salamat sa inyong pakikipagkalakalan', 'signature' => 'Lagda', 'stamp' => 'Selyo',
         'not_found' => 'Hindi mahanap ang dokumento o nag-expire na ang link.', 'language' => 'Wika', 'serial' => 'Dokumento No.',
+        'generated_at' => 'Oras ng pagtingin',
     ],
     'hi' => [
         'inv_c' => 'बिक्री चालान', 'inv_o' => 'बिक्री चालान',
@@ -99,6 +103,7 @@ $L = [
         'amount_collected' => 'वसूली गई राशि', 'amount_due' => 'देय राशि', 'total_refund' => 'कुल वापसी',
         'thanks' => 'आपके व्यवसाय के लिए धन्यवाद', 'signature' => 'हस्ताक्षर', 'stamp' => 'मुहर',
         'not_found' => 'दस्तावेज़ नहीं मिला या लिंक की अवधि समाप्त हो गई।', 'language' => 'भाषा', 'serial' => 'दस्तावेज़ सं.',
+        'generated_at' => 'देखने का समय',
     ],
 ];
 $tt = static function (string $key) use ($L, $lang): string {
@@ -107,6 +112,7 @@ $tt = static function (string $key) use ($L, $lang): string {
 
 $doc = null;
 $currencyUnit = '';
+$generatedAtDisplay = '';
 try {
     $pdo = db();
     $found = $token !== '' ? orange_doc_public_token_lookup($pdo, $token) : null;
@@ -115,10 +121,14 @@ try {
         if ($doc !== null) {
             $cid = (int) ($doc['country_id'] ?? 0);
             $currencyUnit = orange_storefront_currency_unit($pdo, $cid > 0 ? $cid : null);
+            if ($cid > 0) {
+                $generatedAtDisplay = orange_storefront_time_now_display_for_country($pdo, $cid, $lang);
+            }
         }
     }
 } catch (Throwable $e) {
     $doc = null;
+    $generatedAtDisplay = '';
 }
 
 /* بيانات الشركة (شعار/اسم/سجل/هواتف/عنوان/ضريبة/نص قانوني) من إعدادات الشركة. */
@@ -303,6 +313,9 @@ header('X-Robots-Tag: noindex, nofollow', true);
                         <div><span class="lbl"><?php echo $esc($tt('serial')); ?>:</span> <b class="num"><?php echo $esc($doc['serial']); ?></b></div>
                         <?php if (($doc['date'] ?? '') !== ''): ?>
                             <div><span class="lbl"><?php echo $esc($tt('date')); ?>:</span> <b class="num"><?php echo $esc($doc['date']); ?></b></div>
+                        <?php endif; ?>
+                        <?php if ($generatedAtDisplay !== '' && $generatedAtDisplay !== '—'): ?>
+                            <div><span class="lbl"><?php echo $esc($tt('generated_at')); ?>:</span> <b class="num"><?php echo $esc($generatedAtDisplay); ?></b></div>
                         <?php endif; ?>
                     </div>
                 </div>

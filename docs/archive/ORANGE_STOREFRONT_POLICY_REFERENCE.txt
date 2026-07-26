@@ -183,6 +183,7 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 بوكس التسجيل لتحفيز إكمال التسجيل؛ يكمل البيانات الناقصة إن أراد.
 
 **تنفيذ (س12):** نموذج واستعلام في `pages/track.php`؛ التحقق من رقم الطلب + الهاتف عبر `api/orders/get-order.php` (**POST JSON**، انظر **س27**)؛ عرض الحالة والبنود في تدفق الواجهة (`assets/js/cart.js` — تكامل نتيجة التتبع وبوكس التسجيل).
+**تنفيذ (وقت الواجهة — Phase 3 Step 4 / 2026-07-26):** أوقات Absolute للعميل عبر `includes/storefront_time.php` (UTC ISO + عرض IANA دولة الطلب + 12 ساعة AM/PM)؛ `get-order` يرفض طلب دولة أخرى بنفس 404؛ العرض من `*_display` في `assets/js/cart.js` بلا اعتماد على timezone المتصفح. مرجع السياسة الزمنية: `docs/archive/ORANGE_ADMIN_TIME_POLICY.txt` سادساً-ه.
 
 س13. ما مستوى التفاصيل المعروضة للعميل؟
 مسجّل: في العربة 3 تابات — عربة، طلباتي، تم التسليم. غير مسجّل: تابان — عربة، طلباتي؛
@@ -193,6 +194,7 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 **تنفيذ:** المسجّل — `api/orders/list-storefront-orders.php` حسب الحساب. الضيف — `api/orders/list-guest-storefront-orders.php`
 وجلسة المتصفح `orange_sf_guest_recent_phone` (تُعبأ عند نجاح إنشاء الطلب أو اكتمال الاستعلام من الطابور أو تعديل البنود)؛
 القائمة للضيف pending و approved فقط. عند تسجيل الدخول تُمسح جلسة هاتف الضيف (`storefront_account.php`).
+**تنفيذ (وقت الواجهة — Phase 3 Step 4):** قوائم الحساب/الضيف تُفلتر بـ `country_id` (حساب أو متجر حالي)؛ Absolute Moments تخرج كـ `created_at_utc` + `created_at_display` (لا Raw DATETIME)؛ المرجع `ORANGE_ADMIN_TIME_POLICY.txt` سادساً-ه.
 **بريد بعد التتبع:** بعد نجاح التتبع يمكن للعميل طلب إرسال نسخة تفاصيل الطلب إلى بريده — `api/orders/email-track-order-summary.php`
 (تحقق من رقم الطلب + الهاتف؛ ملحق ثنائي اللغة عبر `includes/storefront_order_email.php`)؛ واجهة في `assets/js/cart.js` داخل صندوق نتيجة التتبع.
 **بريد عند التسجيل من التتبع:** `api/auth/request-email-verify.php` مع تفاصيل الطلب عند ربط الطلب بالتسجيل.

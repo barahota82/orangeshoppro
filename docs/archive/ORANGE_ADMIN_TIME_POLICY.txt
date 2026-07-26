@@ -3,7 +3,7 @@ ORANGE — سياسة الوقت المركزية للإدمن (Admin Time Polic
 المسار: docs/archive/ORANGE_ADMIN_TIME_POLICY.txt
 تاريخ القرار: 2026-07-25
 آخر تحديث: 2026-07-26 (Phase 3 / Step 2 — Admin operational time surfaces)
-الحالة: Phase 1 + Phase 2 (Steps 1–5) مغلقة؛ Phase 3 Step 1 جرد؛ Phase 3 Step 2 منفَّذ (انظر سادساً-ج)؛ Phase 3 Step 3 تقارير منفَّذ (انظر سادساً-د)
+الحالة: Phase 1 + Phase 2 (Steps 1–5) مغلقة؛ Phase 3 Steps 1–4 مغلقة (Step 4 عملاء/واجهة + Global/Mixed + Closure — انظر سادساً-ه)؛ Phase 4 QA فقط لم تبدأ
 
 الغرض
 -------
@@ -442,8 +442,8 @@ Edit-lock/partner utility defaults · utility lists ذات legacy datetime.
 - Dashboard / Channel Analytics / Activity Log:
   `start_utc <= ts < next_day_start_utc` — لا CURDATE / DATE(ts) / 23:59:59.
 
-### متبقٍ
-- Phase 3 Step 4: Customer/Storefront + Global/Mixed + Closure Sweep.
+### متبقٍ (وقت Step 2)
+- لا شيء ضمن Step 2؛ Step 4 أغلق Customer/Storefront.
 
 ### اختبار
 `php scripts/self_test_admin_time_phase3_step2_operational.php`
@@ -487,6 +487,71 @@ Print/Export timestamps — لا Business Writers · لا Backup/Restore · لا
 
 
 --------------------------------------------------------------------
+سادساً-ه: Phase 3 / Step 4 — عملاء / واجهة / Global-Mixed + إغلاق Phase 3 (2026-07-26)
+--------------------------------------------------------------------
+النطاق (فقط): Customer Account + Guest orders + Track + Public document QR +
+API Absolute UTC contract + Explicit Global/Mixed classification +
+Repository Closure Sweep. لا Phase 4 · لا Writers · لا Schema · لا Backup/Restore.
+
+### Country Authority (Customer / Storefront)
+- مرجع نهائي: order.country_id / storefront country / channel country /
+  account.country_id / parent document country — **ليس** Admin Country Context.
+- Browser timezone / IP / لغة المتصفح ليست مرجعاً.
+- Missing country_id ≠ Global.
+
+### Absolute Moment API contract
+- Helpers: `includes/storefront_time.php`
+  (`orange_storefront_time_api_instant_from_mysql_utc` /
+   `orange_storefront_time_enrich_order_row`).
+- الحقول الخارجة: `*_utc` (ISO 8601 offset) + `*_display` (IANA دولة السجل +
+  12h AM/PM) + `time_zone` عند الإنشاء.
+- ممنوع إرسال Raw MySQL DATETIME إلى JS ثم `new Date()` بلا offset.
+- مسارات: `api/orders/list-storefront-orders.php`،
+  `list-guest-storefront-orders.php`، `get-order.php`.
+- عزل: حساب → `orders.country_id = account.country_id`؛
+  ضيف/تتبع → مطابقة `orange_storefront_current_country_id` (404 موحّد عند الاختلاف).
+
+### Display (قائمة / تفاصيل / تتبع)
+- `assets/js/cart.js` يعرض `created_at_display` / `completed_at_display` /
+  `cancelled_at_display` من السيرفر فقط — بلا `toLocaleString` على أوقات الأعمال.
+- تسميات في `pages/cart.php` و`pages/track.php` (`created_label` …).
+
+### Customer documents (pages/document.php)
+- Date-only: `document_date` فقط عبر `orange_public_doc_date_only_field`
+  (d/m/Y بلا strtotime؛ ممنوع fallback إلى created_at).
+- Generated/viewed Absolute: `orange_storefront_time_now_display_for_country`
+  بدولة المستند.
+
+### Surfaces بلا وقت ظاهر للعميل (مصنّفة)
+- Bank proof upload / OTP cooldown (`Date.now` للمدة البصرية فقط) /
+  Notifications timeline / Birth date / Delivery appointment Absolute UI:
+  غير موجودة كـ User-facing time surfaces في المستودع الحالي → NOT_APPLICABLE
+  أو INTERNAL_ONLY حسب المسح.
+- Promotion eligibility: Server-side (Phase 2) — لا Countdown eligibility في JS.
+- رسائل تحفيزية: نص فقط على المتجر؛ جدولة أدمن منفصلة.
+
+### Explicit Global / Mixed
+- Ordinary Admin activity (`admin/pages/logs.php`): يستبعد `is_global = 1`.
+- `storefront_promo_messages` عند عدم قفل دولة: EXPLICIT_GLOBAL_SURFACE (إدارة).
+- لا واجهة عميل Global/Mixed لخلط دول.
+- نتيجة المسح: لا accidental mixed Customer surface بعد إصلاح guest/track country filter.
+  إن لم تُنشأ UI عالمية جديدة للعميل:
+  NO EXPLICIT GLOBAL OR MIXED USER SURFACE FOUND (Customer-facing).
+
+### Freeze
+- Phase 2 Writers مجمّدة؛ Backup/Restore / scripts/backup/* مجمّدة.
+- لا Schema 124؛ لا Data Migration؛ لا PHP/MySQL/Server TZ change.
+- لا إعادة تصميم Customer UI.
+
+### متبقٍ لـ Phase 4 (QA فقط — لم تبدأ)
+- Final Time QA / Final System Review فقط بعد موافقة المالك.
+- لا Feature جديدة في Phase 4.
+
+### اختبار
+`php scripts/self_test_admin_time_phase3_step4_customer.php`
+
+
+--------------------------------------------------------------------
 سابعاً: اختبار
 --------------------------------------------------------------------
 `php scripts/self_test_admin_time_foundation.php`
@@ -499,3 +564,4 @@ Print/Export timestamps — لا Business Writers · لا Backup/Restore · لا
 `php scripts/self_test_admin_time_phase2_step5_accounting.php`
 `php scripts/self_test_admin_time_phase3_step2_operational.php`
 `php scripts/self_test_admin_time_phase3_step3_reports.php`
+`php scripts/self_test_admin_time_phase3_step4_customer.php`

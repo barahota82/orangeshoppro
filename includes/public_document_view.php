@@ -10,6 +10,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/countries.php';
 require_once __DIR__ . '/invoice_ancillary_lines.php';
+require_once __DIR__ . '/storefront_time.php';
 
 /**
  * GAP-ACC-07-DISP — يرفق البنود الإضافية الظاهرة (show_on_print=1) ويحسب الإجمالي النهائي.
@@ -120,14 +121,20 @@ function orange_public_doc_variant_labels(PDO $pdo, array $variantIds): array
     return $out;
 }
 
+/**
+ * Date-only document calendar day (Y-m-d → d/m/Y). Never strtotime Absolute Moments.
+ */
 function orange_public_doc_fmt_date(?string $raw): string
 {
-    if ($raw === null || trim($raw) === '') {
-        return '';
-    }
-    $ts = strtotime($raw);
+    return orange_storefront_time_date_only_display($raw);
+}
 
-    return $ts !== false ? date('Y-m-d', $ts) : (string) $raw;
+/**
+ * Prefer Date-only document_date; never fall back Absolute created_at into the date field.
+ */
+function orange_public_doc_date_only_field(?string $documentDate): string
+{
+    return orange_public_doc_fmt_date($documentDate);
 }
 
 /**
@@ -192,7 +199,7 @@ function orange_public_doc_load_order(PDO $pdo, string $docKind, int $orderId): 
     $doc = [
         'doc_kind' => $docKind,
         'serial' => (string) ($o['invoice_number'] ?? ''),
-        'date' => orange_public_doc_fmt_date($o['document_date'] ?? ($o['created_at'] ?? null)),
+        'date' => orange_public_doc_date_only_field(isset($o['document_date']) ? (string) $o['document_date'] : null),
         'party_kind' => 'customer',
         'party_name' => (string) ($o['customer_name'] ?? ''),
         'party_phone' => (string) ($o['phone'] ?? ''),
@@ -266,7 +273,7 @@ function orange_public_doc_load_sales_return(PDO $pdo, int $returnId): ?array
     $doc = [
         'doc_kind' => 'sales_return',
         'serial' => (string) ($h['return_number'] ?? ''),
-        'date' => orange_public_doc_fmt_date($h['document_date'] ?? ($h['created_at'] ?? null)),
+        'date' => orange_public_doc_date_only_field(isset($h['document_date']) ? (string) $h['document_date'] : null),
         'party_kind' => 'customer',
         'party_name' => $partyName,
         'party_phone' => $partyPhone,
@@ -341,7 +348,7 @@ function orange_public_doc_load_purchase(PDO $pdo, int $purchaseId, int $country
     return [
         'doc_kind' => 'purchase',
         'serial' => $serial,
-        'date' => orange_public_doc_fmt_date($h['document_date'] ?? ($h['created_at'] ?? null)),
+        'date' => orange_public_doc_date_only_field(isset($h['document_date']) ? (string) $h['document_date'] : null),
         'party_kind' => 'supplier',
         'party_name' => $partyName,
         'party_phone' => $partyPhone,
@@ -410,7 +417,7 @@ function orange_public_doc_load_purchase_return(PDO $pdo, int $returnId): ?array
     return [
         'doc_kind' => 'purchase_return',
         'serial' => (string) ($h['return_number'] ?? ''),
-        'date' => orange_public_doc_fmt_date($h['document_date'] ?? ($h['created_at'] ?? null)),
+        'date' => orange_public_doc_date_only_field(isset($h['document_date']) ? (string) $h['document_date'] : null),
         'party_kind' => 'supplier',
         'party_name' => $partyName,
         'party_phone' => $partyPhone,

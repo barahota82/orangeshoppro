@@ -3855,6 +3855,33 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
     html += '<span class="order-status-pill order-status-pill--' + orangeEscDomText(st) + '">' + orangeEscDomText(statusText) + '</span></p>';
     html += '<p><strong>' + orangeEscDomText(lblOrder) + ':</strong> ' + orangeEscDomText(String(order.order_number || '')) + '</p>';
     html += orangeHtmlTrackShareReferenceBlock(String(order.order_number || orderNumber || ''));
+    const createdDispTrack = String(order.created_at_display || '').trim();
+    if (createdDispTrack && createdDispTrack !== '—' && UI.created_label) {
+        html +=
+            '<p><strong>' +
+            orangeEscDomText(UI.created_label) +
+            ':</strong> <span class="num" dir="ltr">' +
+            orangeEscDomText(createdDispTrack) +
+            '</span></p>';
+    }
+    const completedDispTrack = String(order.completed_at_display || '').trim();
+    if (st === 'completed' && completedDispTrack && completedDispTrack !== '—' && UI.completed_label) {
+        html +=
+            '<p><strong>' +
+            orangeEscDomText(UI.completed_label) +
+            ':</strong> <span class="num" dir="ltr">' +
+            orangeEscDomText(completedDispTrack) +
+            '</span></p>';
+    }
+    const cancelledDispTrack = String(order.cancelled_at_display || '').trim();
+    if ((st === 'cancelled' || st === 'rejected') && cancelledDispTrack && cancelledDispTrack !== '—' && UI.cancelled_label) {
+        html +=
+            '<p><strong>' +
+            orangeEscDomText(UI.cancelled_label) +
+            ':</strong> <span class="num" dir="ltr">' +
+            orangeEscDomText(cancelledDispTrack) +
+            '</span></p>';
+    }
     if (order.phone) {
         html += '<p><strong>' + orangeEscDomText(lblPhone) + ':</strong> ' + orangeEscDomText(String(order.phone)) + '</p>';
     }
@@ -4389,6 +4416,15 @@ function orangeCartRenderAccountOrderCard(row) {
     html += '<p class="cart-account-order-card__row order-status-row"><strong>' + orangeEscDomText(UI.status_label || '') + ':</strong> ';
     html += '<span class="order-status-pill order-status-pill--' + orangeEscDomText(st) + '">' + orangeEscDomText(statusText) + '</span></p>';
     html += '<p class="cart-account-order-card__row"><strong>' + orangeEscDomText(lblOrder) + ':</strong> ' + orangeEscDomText(onum) + '</p>';
+    const createdDispCard = String(row.created_at_display || '').trim();
+    if (createdDispCard && createdDispCard !== '—' && UI.created_label) {
+        html +=
+            '<p class="cart-account-order-card__row"><strong>' +
+            orangeEscDomText(UI.created_label) +
+            ':</strong> <span class="num" dir="ltr">' +
+            orangeEscDomText(createdDispCard) +
+            '</span></p>';
+    }
     if (ph) {
         html += '<p class="cart-account-order-card__row"><strong>' + orangeEscDomText(lblPhone) + ':</strong> ' + orangeEscDomText(ph) + '</p>';
     }

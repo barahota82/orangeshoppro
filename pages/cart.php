@@ -66,6 +66,24 @@ $orangeOrderStatusLabelsCart = [
 $orangeMyOrderUiCart = [
     'status_label' => t('order_status_label'),
     'order_total_label' => t('order_total_label'),
+    'created_label' => match ($lang) {
+        'ar' => 'تاريخ الطلب',
+        'fil' => 'Petsa ng order',
+        'hi' => 'ऑर्डर तिथि',
+        default => 'Order date',
+    },
+    'completed_label' => match ($lang) {
+        'ar' => 'تاريخ التسليم',
+        'fil' => 'Petsa ng paghatid',
+        'hi' => 'डिलीवरी तिथि',
+        default => 'Delivered at',
+    },
+    'cancelled_label' => match ($lang) {
+        'ar' => 'تاريخ الإلغاء',
+        'fil' => 'Petsa ng pagkansela',
+        'hi' => 'रद्द करने की तिथि',
+        default => 'Cancelled at',
+    },
     'currency' => orange_storefront_currency_unit(db()),
     'cancel' => t('customer_cancel_order'),
     'cancel_confirm' => t('customer_cancel_confirm'),
