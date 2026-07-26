@@ -532,11 +532,16 @@ Repository Closure Sweep. لا Phase 4 · لا Writers · لا Schema · لا Ba
 
 ### Explicit Global / Mixed
 - Ordinary Admin activity (`admin/pages/logs.php`): يستبعد `is_global = 1`.
-- `storefront_promo_messages` عند عدم قفل دولة: EXPLICIT_GLOBAL_SURFACE (إدارة).
-- لا واجهة عميل Global/Mixed لخلط دول.
-- نتيجة المسح: لا accidental mixed Customer surface بعد إصلاح guest/track country filter.
-  إن لم تُنشأ UI عالمية جديدة للعميل:
-  NO EXPLICIT GLOBAL OR MIXED USER SURFACE FOUND (Customer-facing).
+- `storefront_promo_messages`: **COUNTRY_SCOPED_COMPLIANT** (ليس Global).
+  الدليل: عمود `country_id`؛ الحفظ يثبت دولة السياق (`manage.php` —
+  «يُخزَّن دائماً على دولة السياق»); التقييم `(country_id = ?)` مع توافق
+  صفوف قديمة `NULL` في SQL كـ legacy match — **NULL ≠ Explicit Global**
+  و`SPM_IS_GLOBAL` = وضع شاشة سوبر أدمن بلا قفل دولة (UI admin) وليس
+  Scope Contract للبيانات. لا `is_global` على الجدول.
+- لا واجهة عميل Global/Mixed لخلط دول:
+  NO EXPLICIT GLOBAL OR MIXED CUSTOMER/STOREFRONT USER SURFACE FOUND
+- Admin Explicit Global فقط: أحداث `orange_admin_audit_log` حيث `is_global=1`
+  (Internal/Admin classification — ليست Customer UI).
 
 ### Freeze
 - Phase 2 Writers مجمّدة؛ Backup/Restore / scripts/backup/* مجمّدة.
@@ -549,6 +554,104 @@ Repository Closure Sweep. لا Phase 4 · لا Writers · لا Schema · لا Ba
 
 ### اختبار
 `php scripts/self_test_admin_time_phase3_step4_customer.php`
+`php scripts/self_test_admin_time_phase3_step4_closure.php`
+
+
+--------------------------------------------------------------------
+سادساً-و: Phase 3 Step 4 Closure — Exact Final User-facing Time Matrix (2026-07-26)
+--------------------------------------------------------------------
+الحالات المسموحة فقط: MIGRATED_AND_COMPLIANT | NOT_APPLICABLE_DATE_ONLY |
+NOT_APPLICABLE_BUSINESS_LOCAL_TIME | INTERNAL_ONLY | FROZEN_BACKUP_RESTORE |
+EXPLICIT_GLOBAL_COMPLIANT.
+صفر: NOT_MIGRATED / PARTIALLY_MIGRATED / UNKNOWN / COUNTRY_AUTHORITY_MISSING.
+
+### A. MIGRATED_AND_COMPLIANT (46)
+1. CS-Account-Order-List
+2. CS-Guest-Order-List
+3. CS-Track-Order
+4. CS-Public-Document-GeneratedAt
+5. AD-Company-Documents-Archive
+6. AD-Activity-Log-Ordinary
+7. AD-Dashboard-Time-KPIs
+8. AD-Channel-Analytics-Filters
+9. AD-Delivery-Handover-Print-Timestamp
+10. AD-Storefront-Merge-Requests
+11. AD-Customers-Last-Activity
+12. AD-Orders-Entry-List
+13. AD-Invoice-Operational
+14. AD-Payment-Review
+15. AD-Order-Intake-Queue
+16. AD-Online-Orders-Final-Posting-List
+17. AD-Purchases
+18. AD-Purchase-Returns
+19. AD-Sales-Returns
+20. AD-Opening-Stock-Balances
+21. AD-Stock-Adjustment-Voucher
+22. AD-Cart-Promotions-Schedule
+23. AD-Cart-Gift-Promotions-Schedule
+24. AD-Cart-Bogo-Promotions-Schedule
+25. AD-Cart-Combo-Promotions-Schedule
+26. AD-Delivery-Promotions-Schedule
+27. AD-Product-Offers-Schedule
+28. AD-Storefront-Promo-Messages-Admin (COUNTRY_SCOPED)
+29. AD-Journal-Voucher-Screen-Entry
+30. AD-Opening-Balances-Entry
+31. AD-Partner-Receipt-Payment-Entry
+32. RP-Sales-Reports
+33. RP-Purchase-Reports
+34. RP-Stock-Reports
+35. RP-Trial-Balance
+36. RP-Income-Statement
+37. RP-Balance-Sheet
+38. RP-Cash-Flow
+39. RP-PL-Monthly
+40. RP-PL-Compare-Years
+41. RP-GL-Account-Monthly
+42. RP-Journal-Voucher-Reports
+43. RP-Partner-Account-Statement
+44. RP-Bank-Reconciliation-Period
+45. RP-Partner-Reports
+46. RP-Analytical-Trading-Account-List
+
+### B. NOT_APPLICABLE_DATE_ONLY (6)
+47. CS-Public-Document-DocumentDate
+48. AD-Voucher-Date-Accounting
+49. AD-Purchase-Document-Date
+50. AD-Sales-Return-Document-Date
+51. RP-Financial-Period-Date-Only-Bounds
+52. AD-Fiscal-Year-Dates
+
+### C. NOT_APPLICABLE_BUSINESS_LOCAL_TIME (1)
+53. CS-No-Customer-Visible-Business-Local-Slot
+   (= NO CUSTOMER-VISIBLE BUSINESS-LOCAL TIME SURFACE FOUND)
+
+### D. INTERNAL_ONLY (7)
+54. INT-OTP-Cooldown-DateNow
+55. INT-Intake-Poll-DateNow
+56. INT-Email-Verify-Token-Expiry
+57. INT-Checkout-OTP-Expiry
+58. INT-Promo-Schedule-Server-Eval
+59. INT-Document-Token-Expires-At
+60. INT-Phone-Merge-Expires-At
+
+### E. FROZEN_BACKUP_RESTORE (2)
+61. BK-Backup-Center
+62. BK-Restore-Center
+
+### F. EXPLICIT_GLOBAL_COMPLIANT (1)
+63. AD-Audit-Log-Global-Events (is_global=1; not Customer UI)
+
+### Totals (Exact)
+- MIGRATED_AND_COMPLIANT: 46
+- NOT_APPLICABLE_DATE_ONLY: 6
+- NOT_APPLICABLE_BUSINESS_LOCAL_TIME: 1
+- INTERNAL_ONLY: 7
+- FROZEN_BACKUP_RESTORE: 2
+- EXPLICIT_GLOBAL_COMPLIANT: 1
+- Grand total: 63 (= 46+6+1+7+2+1)
+- Unresolved: 0
+
+Closure verification: `scripts/self_test_admin_time_phase3_step4_closure.php`
 
 
 --------------------------------------------------------------------
@@ -565,3 +668,4 @@ Repository Closure Sweep. لا Phase 4 · لا Writers · لا Schema · لا Ba
 `php scripts/self_test_admin_time_phase3_step2_operational.php`
 `php scripts/self_test_admin_time_phase3_step3_reports.php`
 `php scripts/self_test_admin_time_phase3_step4_customer.php`
+`php scripts/self_test_admin_time_phase3_step4_closure.php`

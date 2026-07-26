@@ -117,12 +117,18 @@ try {
     $pdo = db();
     $found = $token !== '' ? orange_doc_public_token_lookup($pdo, $token) : null;
     if ($found !== null) {
-        $doc = orange_public_document_load($pdo, $found['doc_kind'], $found['doc_id'], (int) ($found['country_id'] ?? 0));
+        $tokenCid = (int) ($found['country_id'] ?? 0);
+        $doc = orange_public_document_load($pdo, $found['doc_kind'], $found['doc_id'], $tokenCid);
         if ($doc !== null) {
             $cid = (int) ($doc['country_id'] ?? 0);
-            $currencyUnit = orange_storefront_currency_unit($pdo, $cid > 0 ? $cid : null);
-            if ($cid > 0) {
-                $generatedAtDisplay = orange_storefront_time_now_display_for_country($pdo, $cid, $lang);
+            // Token country must match record country when both are set (no cross-country leak).
+            if ($tokenCid > 0 && $cid > 0 && $tokenCid !== $cid) {
+                $doc = null;
+            } else {
+                $currencyUnit = orange_storefront_currency_unit($pdo, $cid > 0 ? $cid : null);
+                if ($cid > 0) {
+                    $generatedAtDisplay = orange_storefront_time_now_display_for_country($pdo, $cid, $lang);
+                }
             }
         }
     }

@@ -111,9 +111,11 @@ p3s4_assert(str_contains($logs, 'is_global = 0'), '55. ordinary activity exclude
 p3s4_assert(is_file($root . '/admin/pages/backup_center.php'), '75. backup_center present (untouched expected)');
 p3s4_assert(is_file($root . '/admin/pages/restore_center.php'), '75. restore_center present');
 
-// --- Explicit Global admin surface: storefront_promo_messages when unlocked ---
+// --- storefront_promo_messages: COUNTRY_SCOPED (SPM_IS_GLOBAL = admin UI unlock only) ---
 $spm = (string) file_get_contents($root . '/admin/pages/storefront_promo_messages.php');
-p3s4_assert(str_contains($spm, 'SPM_IS_GLOBAL') || str_contains($spm, 'spmIsGlobal'), '52. promo messages explicit global flag exists');
+$spmInc = (string) file_get_contents($root . '/includes/storefront_promo_messages.php');
+p3s4_assert(str_contains($spm, 'SPM_IS_GLOBAL') || str_contains($spm, 'spmIsGlobal'), '52. SPM admin unlock flag exists (UI mode, not data Global)');
+p3s4_assert(str_contains($spmInc, 'country_id') && !str_contains($spmInc, 'is_global'), '52b. SPM country-scoped; no is_global');
 
 // --- No Asia/Kuwait hardcode in storefront customer APIs ---
 p3s4_assert(!str_contains($listAcc, 'Asia/Kuwait'), '9. list account no Kuwait fallback hardcode');
