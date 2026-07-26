@@ -3,10 +3,11 @@
 declare(strict_types=1);
 
 /**
- * رسائل تحفيزية يتحكم بها المشرف العام (قرار مالك 2026-06-28).
+ * رسائل تحفيزية يتحكم بها المشرف (قرار مالك 2026-06-28؛ ملكية الدولة 2026-07-26).
  *
  * نظام مستقل تماماً عن منطق العروض/المطابقة/الطلبات: نص تحفيزي متعدّد اللغات
- * يظهر في «خانة» مُسمّاة (slot) بالواجهة، بنطاق دولة اختياري وجدولة (دائم/فترة).
+ * يظهر في «خانة» مُسمّاة (slot) بالواجهة، **بدولة واحدة صريحة** (`country_id`) وجدولة
+ * (دائم/فترة). Missing/NULL country_id ≠ Global — لا تُعرض على أي متجر.
  * الخانات أسماء ثابتة لضمان الأداء وسلامة الأماكن (لا أماكن عشوائية).
  */
 
@@ -110,7 +111,8 @@ function orange_storefront_promo_message_pick_text(array $row, string $lang): st
 }
 
 /**
- * نص الرسالة الفعّالة لخانة مُسمّاة (أو '' إن لا شيء). نطاق الدولة: NULL=كل الدول.
+ * نص الرسالة الفعّالة لخانة مُسمّاة (أو '' إن لا شيء).
+ * Country-scoped فقط: country_id = دولة المتجر — NULL لا يُعامل Global.
  */
 function orange_storefront_promo_message_for_slot(
     PDO $pdo,
@@ -124,13 +126,16 @@ function orange_storefront_promo_message_for_slot(
         return '';
     }
     $cid = ($countryId !== null && $countryId > 0) ? $countryId : 0;
+    if ($cid <= 0) {
+        return '';
+    }
     $audienceSql = orange_storefront_promo_audience_sql($pdo, $viewerRegistered);
     $st = $pdo->prepare(
         'SELECT text_ar, text_en, text_fil, text_hi
          FROM storefront_promo_messages
          WHERE slot = ?
            AND is_active = 1
-           AND (country_id IS NULL OR country_id = ?)
+           AND country_id = ?
            AND (is_always_on = 1 OR (
                 (valid_from IS NULL OR valid_from <= UTC_TIMESTAMP())
                 AND (valid_to IS NULL OR valid_to >= UTC_TIMESTAMP())
@@ -170,6 +175,9 @@ function orange_storefront_promo_messages_map(PDO $pdo, array $slots, ?int $coun
         return [];
     }
     $cid = ($countryId !== null && $countryId > 0) ? $countryId : 0;
+    if ($cid <= 0) {
+        return [];
+    }
     $placeholders = implode(', ', array_fill(0, count($valid), '?'));
     $params = $valid;
     $params[] = $cid;
@@ -179,7 +187,7 @@ function orange_storefront_promo_messages_map(PDO $pdo, array $slots, ?int $coun
          FROM storefront_promo_messages
          WHERE slot IN (' . $placeholders . ')
            AND is_active = 1
-           AND (country_id IS NULL OR country_id = ?)
+           AND country_id = ?
            AND (is_always_on = 1 OR (
                 (valid_from IS NULL OR valid_from <= UTC_TIMESTAMP())
                 AND (valid_to IS NULL OR valid_to >= UTC_TIMESTAMP())
@@ -222,6 +230,9 @@ function orange_storefront_promo_offer_card_map(PDO $pdo, ?int $countryId, strin
         return [];
     }
     $cid = ($countryId !== null && $countryId > 0) ? $countryId : 0;
+    if ($cid <= 0) {
+        return [];
+    }
     $audienceSql = orange_storefront_promo_audience_sql($pdo, $viewerRegistered);
     $st = $pdo->prepare(
         'SELECT offer_type, offer_id, text_ar, text_en, text_fil, text_hi
@@ -230,7 +241,7 @@ function orange_storefront_promo_offer_card_map(PDO $pdo, ?int $countryId, strin
            AND offer_type IS NOT NULL
            AND offer_id IS NOT NULL
            AND is_active = 1
-           AND (country_id IS NULL OR country_id = ?)
+           AND country_id = ?
            AND (is_always_on = 1 OR (
                 (valid_from IS NULL OR valid_from <= UTC_TIMESTAMP())
                 AND (valid_to IS NULL OR valid_to >= UTC_TIMESTAMP())
@@ -259,7 +270,61 @@ function orange_storefront_promo_offer_card_map(PDO $pdo, ?int $countryId, strin
 }
 
 /**
- * قائمة الأدمن (ضمن نطاق دولة المشرف الحالي: كل الدول + الدولة المختارة).
+ * تطبيع إعداد/اختبار: صفوف بلا country_id.
+ * إن وُجدت دولة نشطة واحدة فقط تُنسَب إليها (idempotent). إن تعدّدت الدول تُترَك
+ * دون تعيين صامت — ولن تظهر في المتجر (fail-closed؛ NULL ≠ Global).
+ *
+ * @return array{null_before:int,normalized:int,active_countries:int,blocked_ambiguous:bool}
+ */
+function orange_storefront_promo_messages_normalize_null_country_ids(PDO $pdo): array
+{
+    $out = [
+        'null_before' => 0,
+        'normalized' => 0,
+        'active_countries' => 0,
+        'blocked_ambiguous' => false,
+    ];
+    if (!orange_table_exists($pdo, 'storefront_promo_messages')
+        || !orange_table_exists($pdo, 'countries')) {
+        return $out;
+    }
+    $out['null_before'] = (int) $pdo->query(
+        'SELECT COUNT(*) FROM storefront_promo_messages WHERE country_id IS NULL OR country_id = 0'
+    )->fetchColumn();
+    if ($out['null_before'] <= 0) {
+        return $out;
+    }
+    $ids = $pdo->query(
+        'SELECT id FROM countries WHERE is_active = 1 ORDER BY id ASC'
+    )->fetchAll(PDO::FETCH_COLUMN);
+    $active = [];
+    foreach ($ids ?: [] as $id) {
+        $cid = (int) $id;
+        if ($cid > 0) {
+            $active[] = $cid;
+        }
+    }
+    $out['active_countries'] = count($active);
+    if ($out['active_countries'] === 1) {
+        $only = $active[0];
+        $st = $pdo->prepare(
+            'UPDATE storefront_promo_messages SET country_id = ?
+             WHERE country_id IS NULL OR country_id = 0'
+        );
+        $st->execute([$only]);
+        $out['normalized'] = (int) $st->rowCount();
+
+        return $out;
+    }
+    if ($out['active_countries'] > 1) {
+        $out['blocked_ambiguous'] = true;
+    }
+
+    return $out;
+}
+
+/**
+ * قائمة الأدمن لدولة السياق فقط (أو كل الصفوف ذات country_id صريح عند نظرة عامة).
  *
  * @return list<array<string,mixed>>
  */
@@ -269,10 +334,12 @@ function orange_storefront_promo_messages_admin_list(PDO $pdo, ?int $countryId):
         return [];
     }
     $params = [];
-    $countrySql = '';
     if ($countryId !== null && $countryId > 0) {
-        $countrySql = ' WHERE (country_id IS NULL OR country_id = ?)';
+        $countrySql = ' WHERE country_id = ?';
         $params[] = $countryId;
+    } else {
+        // نظرة إدارية واسعة: صفوف مملوكة لدولة فقط — لا NULL-as-Global.
+        $countrySql = ' WHERE country_id IS NOT NULL AND country_id > 0';
     }
     $hasOfferCols = orange_table_has_column($pdo, 'storefront_promo_messages', 'offer_type')
         && orange_table_has_column($pdo, 'storefront_promo_messages', 'offer_id');
@@ -290,13 +357,10 @@ function orange_storefront_promo_messages_admin_list(PDO $pdo, ?int $countryId):
     $out = [];
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
         $audienceVal = isset($row['audience']) && (string) $row['audience'] !== '' ? (string) $row['audience'] : 'all';
-        $rowCid = isset($row['country_id']) ? (int) $row['country_id'] : 0;
-        if ($rowCid <= 0 && $countryId !== null && $countryId > 0) {
-            $rowCid = $countryId;
-        }
+        $rowCid = (int) ($row['country_id'] ?? 0);
         $item = [
             'id' => (int) $row['id'],
-            'country_id' => isset($row['country_id']) ? (int) $row['country_id'] : null,
+            'country_id' => $rowCid > 0 ? $rowCid : null,
             'slot' => (string) ($row['slot'] ?? ''),
             'audience' => orange_storefront_promo_message_audience_valid($audienceVal) ? $audienceVal : 'all',
             'offer_type' => isset($row['offer_type']) ? (string) $row['offer_type'] : '',

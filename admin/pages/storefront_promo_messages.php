@@ -270,7 +270,8 @@ function editSpm(row) {
 }
 
 function spmCountryLabel(cid) {
-    if (cid == null || cid === '' || parseInt(cid, 10) <= 0) return 'كل الدول';
+    // NULL/missing country is never «كل الدول» / Global — row must be country-owned.
+    if (cid == null || cid === '' || parseInt(cid, 10) <= 0) return 'بلا دولة';
     var l = SPM_COUNTRY_LABELS[String(cid)];
     return l ? l : ('#' + cid);
 }

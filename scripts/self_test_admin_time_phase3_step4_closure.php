@@ -130,11 +130,12 @@ $spmInc = (string) file_get_contents($root . '/includes/storefront_promo_message
 $spmApi = (string) file_get_contents($root . '/admin/api/storefront_promo_messages/manage.php');
 $spmPage = (string) file_get_contents($root . '/admin/pages/storefront_promo_messages.php');
 $policy = (string) file_get_contents($root . '/docs/archive/ORANGE_ADMIN_TIME_POLICY.txt');
-p3s4c_assert(str_contains($spmInc, 'country_id') && str_contains($spmInc, 'country_id IS NULL OR country_id = ?'), '6. SPM customer eval uses country_id');
-p3s4c_assert(str_contains($spmApi, 'يُخزَّن دائماً على دولة السياق') || str_contains($spmApi, 'countryToStore'), '6. SPM save binds context country');
+p3s4c_assert(str_contains($spmInc, 'country_id = ?') && !str_contains($spmInc, 'country_id IS NULL OR country_id = ?'), '6. SPM eval country_id = ? only (no NULL OR)');
+p3s4c_assert(str_contains($spmApi, 'orange_admin_context_country_id') && str_contains($spmApi, 'countryToStore'), '6. SPM save uses Current Country Context');
+p3s4c_assert(str_contains($spmApi, 'country_context_required'), '6. SPM create without context fails clearly');
 p3s4c_assert(!str_contains($spmInc, 'is_global') && !str_contains($spmApi, 'is_global'), '6. SPM has no is_global column/contract');
 p3s4c_assert(str_contains($spmPage, 'spmIsGlobal') || str_contains($spmPage, 'SPM_IS_GLOBAL'), '6. SPM_IS_GLOBAL is admin UI unlock mode only');
-p3s4c_assert(str_contains($policy, 'COUNTRY_SCOPED') && !str_contains($policy, 'storefront_promo_messages` عند عدم قفل دولة: EXPLICIT_GLOBAL'), '6. policy classifies SPM as COUNTRY_SCOPED');
+p3s4c_assert(str_contains($policy, 'COUNTRY_SCOPED') && str_contains($policy, 'country_id = ?') && !str_contains($policy, 'storefront_promo_messages` عند عدم قفل دولة: EXPLICIT_GLOBAL'), '6. policy classifies SPM as COUNTRY_SCOPED');
 
 // --- Exact matrix totals in policy ---
 p3s4c_assert(str_contains($policy, 'Grand total: 63'), '13. Exact matrix grand total 63 documented');

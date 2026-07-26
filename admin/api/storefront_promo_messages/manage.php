@@ -67,8 +67,9 @@ try {
         $data = $_POST;
     }
     $action = trim((string) ($data['action'] ?? 'list'));
-    // الشاشة تتبع سياق الدولة (السوق الحالي) كبقية الشاشات — لا مفهوم «كل الدول».
-    $ctxCid = orange_cart_promotion_admin_country_id($pdo);
+    // Current Country Context فقط — بلا fallback لدولة افتراضية/ثابتة (NULL ≠ Global).
+    $ctxCid = (int) orange_admin_context_country_id($pdo);
+    $norm = orange_storefront_promo_messages_normalize_null_country_ids($pdo);
 
     if ($action === 'list') {
         json_response([
@@ -77,6 +78,7 @@ try {
             'slots' => orange_storefront_promo_message_slots(),
             'offer_types' => orange_storefront_promo_message_offer_types(),
             'audiences' => orange_storefront_promo_message_audiences(),
+            'null_country_normalize' => $norm,
         ]);
     }
 
@@ -96,7 +98,11 @@ try {
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $isAlwaysOn = !empty($data['is_always_on']) ? 1 : 0;
         if ($ctxCid <= 0) {
-            json_response(['success' => false, 'message' => 'تعذر تحديد دولة سياق الرسالة الترويجية'], 422);
+            json_response([
+                'success' => false,
+                'code' => 'country_context_required',
+                'message' => 'يلزم اختيار دولة السياق (السوق الحالي) قبل حفظ الرسالة الترويجية',
+            ], 422);
         }
         $validFrom = $isAlwaysOn ? null : spm_iso_or_null((string) ($data['valid_from'] ?? ''), false, $pdo, $ctxCid);
         $validTo = $isAlwaysOn ? null : spm_iso_or_null((string) ($data['valid_to'] ?? ''), true, $pdo, $ctxCid);
@@ -147,11 +153,10 @@ try {
             $audience = orange_storefront_promo_message_audience_valid($audienceRaw) ? $audienceRaw : 'all';
         }
 
-        // نطاق الدولة: يُخزَّن دائماً على دولة السياق الحالية (لا يُقبل country_id من الطلب).
-        $countryToStore = $ctxCid > 0 ? $ctxCid : null;
+        // إنشاء: دولة السياق. تعديل: دولة السجل إن وُجدت؛ صف NULL قديم يُنسَب للسياق.
+        $countryToStore = $ctxCid;
 
         if ($id > 0) {
-            // التأكد أن السجل ضمن دولة السياق (أو صف قديم بلا دولة يُهاجَر إليها).
             $chk = $pdo->prepare('SELECT country_id FROM storefront_promo_messages WHERE id = ? LIMIT 1');
             $chk->execute([$id]);
             $existing = $chk->fetch(PDO::FETCH_ASSOC);
@@ -159,8 +164,11 @@ try {
                 json_response(['success' => false, 'message' => 'السجل غير موجود'], 404);
             }
             $exCid = (int) ($existing['country_id'] ?? 0);
-            if ($exCid !== 0 && $ctxCid > 0 && $exCid !== $ctxCid) {
+            if ($exCid > 0 && $exCid !== $ctxCid) {
                 json_response(['success' => false, 'message' => 'هذا السجل يخص دولة أخرى'], 403);
+            }
+            if ($exCid > 0) {
+                $countryToStore = $exCid;
             }
             // الترتيب تلقائي: لا يتغيّر عند التعديل (يبقى موضع الصف كما هو).
             $st = $pdo->prepare(
@@ -186,11 +194,11 @@ try {
                 $id,
             ]);
         } else {
-            // الترتيب تلقائي: يبدأ من 1 ويزيد 1 لكل رسالة جديدة ضمن دولة السياق.
+            // الترتيب تلقائي ضمن دولة السياق فقط.
             $sortStmt = $pdo->prepare(
-                'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM storefront_promo_messages WHERE (country_id IS NULL OR country_id = ?)'
+                'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM storefront_promo_messages WHERE country_id = ?'
             );
-            $sortStmt->execute([$ctxCid > 0 ? $ctxCid : 0]);
+            $sortStmt->execute([$ctxCid]);
             $sortOrder = (int) $sortStmt->fetchColumn();
             if ($sortOrder < 1) {
                 $sortOrder = 1;
@@ -226,15 +234,24 @@ try {
         if ($id <= 0) {
             json_response(['success' => false, 'message' => 'معرّف غير صالح'], 422);
         }
+        if ($ctxCid <= 0) {
+            json_response([
+                'success' => false,
+                'code' => 'country_context_required',
+                'message' => 'يلزم اختيار دولة السياق قبل حذف الرسالة',
+            ], 422);
+        }
         $chk = $pdo->prepare('SELECT country_id FROM storefront_promo_messages WHERE id = ? LIMIT 1');
         $chk->execute([$id]);
         $existing = $chk->fetch(PDO::FETCH_ASSOC);
-        if ($existing) {
-            $exCid = (int) ($existing['country_id'] ?? 0);
-            if ($exCid !== 0 && $ctxCid > 0 && $exCid !== $ctxCid) {
-                json_response(['success' => false, 'message' => 'هذا السجل يخص دولة أخرى'], 403);
-            }
+        if (!$existing) {
+            json_response(['success' => false, 'message' => 'السجل غير موجود'], 404);
         }
+        $exCid = (int) ($existing['country_id'] ?? 0);
+        if ($exCid > 0 && $exCid !== $ctxCid) {
+            json_response(['success' => false, 'message' => 'هذا السجل يخص دولة أخرى'], 403);
+        }
+        // صف NULL قديم: يُسمح بحذفه من سياق دولة صريح فقط (تنظيف setup — ليس Global).
         $st = $pdo->prepare('DELETE FROM storefront_promo_messages WHERE id = ?');
         $st->execute([$id]);
         json_response(['success' => true, 'message' => 'تم الحذف']);

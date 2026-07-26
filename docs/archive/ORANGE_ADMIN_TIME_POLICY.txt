@@ -532,12 +532,12 @@ Repository Closure Sweep. لا Phase 4 · لا Writers · لا Schema · لا Ba
 
 ### Explicit Global / Mixed
 - Ordinary Admin activity (`admin/pages/logs.php`): يستبعد `is_global = 1`.
-- `storefront_promo_messages`: **COUNTRY_SCOPED_COMPLIANT** (ليس Global).
-  الدليل: عمود `country_id`؛ الحفظ يثبت دولة السياق (`manage.php` —
-  «يُخزَّن دائماً على دولة السياق»); التقييم `(country_id = ?)` مع توافق
-  صفوف قديمة `NULL` في SQL كـ legacy match — **NULL ≠ Explicit Global**
-  و`SPM_IS_GLOBAL` = وضع شاشة سوبر أدمن بلا قفل دولة (UI admin) وليس
-  Scope Contract للبيانات. لا `is_global` على الجدول.
+- `storefront_promo_messages`: **MIGRATED_AND_COMPLIANT / COUNTRY_SCOPED**
+  (ليس Global؛ قرار مالك نهائي 2026-07-26 — Final Country-Scope Closure).
+  الدليل: عمود `country_id` صريح؛ Writer يستخدم Current Country Context فقط
+  (بلا fallback دولة افتراضية)؛ التقييم التشغيلي `country_id = ?` فقط —
+  **ممنوع** `country_id IS NULL OR …`؛ NULL ≠ Global ولا يظهر على أي متجر؛
+  تطبيع setup إن وُجدت دولة نشطة واحدة؛ `SPM_IS_GLOBAL` = قفل جلسة أدمن فقط.
 - لا واجهة عميل Global/Mixed لخلط دول:
   NO EXPLICIT GLOBAL OR MIXED CUSTOMER/STOREFRONT USER SURFACE FOUND
 - Admin Explicit Global فقط: أحداث `orange_admin_audit_log` حيث `is_global=1`
@@ -555,6 +555,7 @@ Repository Closure Sweep. لا Phase 4 · لا Writers · لا Schema · لا Ba
 ### اختبار
 `php scripts/self_test_admin_time_phase3_step4_customer.php`
 `php scripts/self_test_admin_time_phase3_step4_closure.php`
+`php scripts/self_test_admin_time_phase3_step4_spm_country.php`
 
 
 --------------------------------------------------------------------
@@ -593,7 +594,7 @@ EXPLICIT_GLOBAL_COMPLIANT.
 25. AD-Cart-Combo-Promotions-Schedule
 26. AD-Delivery-Promotions-Schedule
 27. AD-Product-Offers-Schedule
-28. AD-Storefront-Promo-Messages-Admin (COUNTRY_SCOPED)
+28. AD-Storefront-Promo-Messages-Admin (COUNTRY_SCOPED; Final Country-Scope Closure 2026-07-26)
 29. AD-Journal-Voucher-Screen-Entry
 30. AD-Opening-Balances-Entry
 31. AD-Partner-Receipt-Payment-Entry
@@ -650,8 +651,11 @@ EXPLICIT_GLOBAL_COMPLIANT.
 - EXPLICIT_GLOBAL_COMPLIANT: 1
 - Grand total: 63 (= 46+6+1+7+2+1)
 - Unresolved: 0
+- NO EXPLICIT GLOBAL OR MIXED CUSTOMER/STOREFRONT USER SURFACE FOUND
+  (storefront_promo_messages = COUNTRY_SCOPED only; Final Country-Scope Closure 2026-07-26)
 
 Closure verification: `scripts/self_test_admin_time_phase3_step4_closure.php`
+SPM country-scope: `scripts/self_test_admin_time_phase3_step4_spm_country.php`
 
 
 --------------------------------------------------------------------
@@ -669,3 +673,5 @@ Closure verification: `scripts/self_test_admin_time_phase3_step4_closure.php`
 `php scripts/self_test_admin_time_phase3_step3_reports.php`
 `php scripts/self_test_admin_time_phase3_step4_customer.php`
 `php scripts/self_test_admin_time_phase3_step4_closure.php`
+`php scripts/self_test_admin_time_phase3_step4_spm_country.php`
+`powershell -NoProfile -File scripts/verify-php-utf8.ps1`
