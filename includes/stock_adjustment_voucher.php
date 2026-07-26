@@ -355,9 +355,12 @@ function orange_stock_adjustment_voucher_get(PDO $pdo, int $id, ?int $countryId 
     if (! $row) {
         return null;
     }
-    if ($countryId !== null && $countryId > 0 && (int) ($row['country_id'] ?? 0) > 0
-        && (int) $row['country_id'] !== $countryId) {
-        return null;
+    // Ordinary Admin: NULL ≠ Global — لا يُفتح صف بلا دولة ضمن سياق دولة.
+    if ($countryId !== null && $countryId > 0) {
+        $rowCid = (int) ($row['country_id'] ?? 0);
+        if ($rowCid <= 0 || $rowCid !== $countryId) {
+            return null;
+        }
     }
 
     $warehouseId = (int) ($row['warehouse_id'] ?? 0);
@@ -499,6 +502,8 @@ function orange_stock_adjustment_voucher_list(PDO $pdo, ?int $countryId = null):
     if (! orange_stock_adjustment_voucher_ready($pdo)) {
         return [];
     }
+    require_once __DIR__ . '/warehouses.php';
+    orange_inventory_normalize_null_country_ids($pdo, 'stock_adjustment_voucher');
     $sql = 'SELECT sv.*, w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,
             (SELECT COUNT(*) FROM stock_adjustment_voucher_line sl WHERE sl.voucher_id = sv.id) AS line_count
             FROM stock_adjustment_voucher sv
@@ -507,7 +512,7 @@ function orange_stock_adjustment_voucher_list(PDO $pdo, ?int $countryId = null):
     $params = [];
     if ($countryId !== null && $countryId > 0
         && orange_table_has_column($pdo, 'stock_adjustment_voucher', 'country_id')) {
-        $sql .= ' AND (sv.country_id IS NULL OR sv.country_id = ?)';
+        $sql .= ' AND sv.country_id = ?';
         $params[] = $countryId;
     }
     $sql .= ' ORDER BY sv.id DESC';
@@ -541,7 +546,7 @@ function orange_stock_adjustment_voucher_nav(PDO $pdo, string $where, int $curre
     $params = [];
     if ($countryId !== null && $countryId > 0
         && orange_table_has_column($pdo, 'stock_adjustment_voucher', 'country_id')) {
-        $scope = ' AND (country_id IS NULL OR country_id = ?)';
+        $scope = ' AND country_id = ?';
         $params[] = $countryId;
     }
     switch ($where) {
@@ -585,7 +590,7 @@ function orange_stock_adjustment_voucher_search(PDO $pdo, array $filters, ?int $
     $params = [];
     if ($countryId !== null && $countryId > 0
         && orange_table_has_column($pdo, 'stock_adjustment_voucher', 'country_id')) {
-        $sql .= ' AND (sv.country_id IS NULL OR sv.country_id = ?)';
+        $sql .= ' AND sv.country_id = ?';
         $params[] = $countryId;
     }
     $idFrom = (int) ($filters['id_from'] ?? 0);
@@ -1075,8 +1080,17 @@ function orange_stock_adjustment_voucher_delete_draft(PDO $pdo, int $id, ?int $c
     if ($sv === null || (string) ($sv['header']['status'] ?? '') !== 'draft') {
         return false;
     }
-    $st = $pdo->prepare('DELETE FROM stock_adjustment_voucher WHERE id = ? AND status = \'draft\'');
-    $st->execute([$id]);
+    $cid = (int) ($sv['header']['country_id'] ?? 0);
+    if ($cid <= 0) {
+        return false;
+    }
+    if ($countryId !== null && $countryId > 0 && $cid !== $countryId) {
+        return false;
+    }
+    $st = $pdo->prepare(
+        'DELETE FROM stock_adjustment_voucher WHERE id = ? AND status = \'draft\' AND country_id = ?'
+    );
+    $st->execute([$id, $cid]);
 
     return $st->rowCount() > 0;
 }

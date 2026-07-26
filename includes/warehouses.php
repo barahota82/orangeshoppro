@@ -461,3 +461,89 @@ function orange_warehouse_context_for_order(PDO $pdo, array $order): array
 
     return ['country_id' => $countryId, 'warehouse_id' => $warehouseId];
 }
+
+/**
+ * تطبيع صفوف مخزن بلا country_id (setup/test): Parent = warehouse.country_id ثم دولة Active واحدة.
+ * Idempotent؛ NULL ≠ Global ولن تظهر في القائمة بعد فلتر country_id = ?.
+ *
+ * @param 'stock_adjustment_voucher'|'opening_stock_voucher'|'inventory_reconciliation' $table
+ * @return array{null_before:int,normalized:int,from_warehouse:int,active_countries:int,blocked_ambiguous:bool}
+ */
+function orange_inventory_normalize_null_country_ids(PDO $pdo, string $table): array
+{
+    $out = [
+        'null_before' => 0,
+        'normalized' => 0,
+        'from_warehouse' => 0,
+        'active_countries' => 0,
+        'blocked_ambiguous' => false,
+    ];
+    $allowed = [
+        'stock_adjustment_voucher' => true,
+        'opening_stock_voucher' => true,
+        'inventory_reconciliation' => true,
+    ];
+    if (!isset($allowed[$table])
+        || !orange_table_exists($pdo, $table)
+        || !orange_table_has_column($pdo, $table, 'country_id')
+        || !orange_table_exists($pdo, 'warehouses')
+        || !orange_table_has_column($pdo, 'warehouses', 'country_id')) {
+        return $out;
+    }
+    $out['null_before'] = (int) $pdo->query(
+        'SELECT COUNT(*) FROM `' . $table . '` WHERE country_id IS NULL OR country_id = 0'
+    )->fetchColumn();
+    if ($out['null_before'] <= 0) {
+        return $out;
+    }
+    $stWh = $pdo->prepare(
+        'UPDATE `' . $table . '` t
+         INNER JOIN warehouses w ON w.id = t.warehouse_id
+         SET t.country_id = w.country_id
+         WHERE (t.country_id IS NULL OR t.country_id = 0)
+           AND w.country_id IS NOT NULL AND w.country_id > 0'
+    );
+    $stWh->execute();
+    $out['from_warehouse'] = (int) $stWh->rowCount();
+    $remaining = (int) $pdo->query(
+        'SELECT COUNT(*) FROM `' . $table . '` WHERE country_id IS NULL OR country_id = 0'
+    )->fetchColumn();
+    if ($remaining <= 0) {
+        $out['normalized'] = $out['from_warehouse'];
+
+        return $out;
+    }
+    if (!orange_table_exists($pdo, 'countries')) {
+        $out['blocked_ambiguous'] = true;
+        $out['normalized'] = $out['from_warehouse'];
+
+        return $out;
+    }
+    $ids = $pdo->query(
+        'SELECT id FROM countries WHERE is_active = 1 ORDER BY id ASC'
+    )->fetchAll(PDO::FETCH_COLUMN);
+    $active = [];
+    foreach ($ids ?: [] as $id) {
+        $cid = (int) $id;
+        if ($cid > 0) {
+            $active[] = $cid;
+        }
+    }
+    $out['active_countries'] = count($active);
+    if ($out['active_countries'] === 1) {
+        $only = $active[0];
+        $st = $pdo->prepare(
+            'UPDATE `' . $table . '` SET country_id = ? WHERE country_id IS NULL OR country_id = 0'
+        );
+        $st->execute([$only]);
+        $out['normalized'] = $out['from_warehouse'] + (int) $st->rowCount();
+
+        return $out;
+    }
+    if ($out['active_countries'] > 1) {
+        $out['blocked_ambiguous'] = true;
+    }
+    $out['normalized'] = $out['from_warehouse'];
+
+    return $out;
+}

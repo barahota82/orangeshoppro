@@ -30,12 +30,10 @@ function orange_cart_promotion_sql_bind(PDO $pdo, string $table, string $alias, 
 function orange_cart_promotion_admin_country_id(PDO $pdo): int
 {
     require_once __DIR__ . '/countries.php';
-    $cid = orange_admin_context_country_id($pdo);
-    if ($cid > 0) {
-        return $cid;
-    }
+    // Current Country Context فقط — ممنوع silent default_id (NULL/غياب ≠ دولة افتراضية).
+    $cid = (int) orange_admin_context_country_id($pdo);
 
-    return orange_countries_default_id($pdo);
+    return $cid > 0 ? $cid : 0;
 }
 
 /**

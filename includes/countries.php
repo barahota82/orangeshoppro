@@ -432,7 +432,10 @@ function orange_storefront_read_saved_country_code(): ?string
 }
 
 /**
- * كود الدولة الحالية للواجهة: ?country= ثم قناة الطلب (§13.7) ثم الكوكي ثم الافتراضي.
+ * كود الدولة الحالية للواجهة.
+ * الترتيب النهائي (2026-07-26): override موثوق (Geo/entry) → Channel DB country
+ * → cookie من زيارة قناة سابقة → وإلا فارغ (fail-closed).
+ * ممنوع: ?country= كسلطة؛ ممنوع fallback صامت إلى kw/default.
  */
 function orange_storefront_current_country_code(PDO $pdo): string
 {
@@ -446,15 +449,19 @@ function orange_storefront_current_country_code(PDO $pdo): string
     if ($memo !== null) {
         return $memo;
     }
-    if (isset($_GET['country']) && (string) $_GET['country'] !== '') {
-        $fromGet = orange_countries_normalize_code((string) $_GET['country']);
-        if ($fromGet !== '' && orange_country_row_by_code($pdo, $fromGet, true) !== null) {
-            $memo = $fromGet;
+    if (function_exists('orange_storefront_request_channel_country_state')) {
+        $chState = orange_storefront_request_channel_country_state($pdo);
+        if (!empty($chState['matched'])) {
+            if (!empty($chState['invalid']) || empty($chState['code'])) {
+                $memo = '';
+
+                return $memo;
+            }
+            $memo = (string) $chState['code'];
 
             return $memo;
         }
-    }
-    if (function_exists('orange_storefront_country_code_from_request_channel')) {
+    } elseif (function_exists('orange_storefront_country_code_from_request_channel')) {
         $fromChannel = orange_storefront_country_code_from_request_channel($pdo);
         if ($fromChannel !== null && $fromChannel !== ''
             && orange_country_row_by_code($pdo, $fromChannel, true) !== null) {
@@ -463,25 +470,15 @@ function orange_storefront_current_country_code(PDO $pdo): string
             return $memo;
         }
     }
+    // ?country= ليس Country Authority — التبديل يتم عبر قناة رئيسية موثوقة (storefront_country_switch_href).
     $fromCookie = orange_storefront_read_saved_country_code();
     if ($fromCookie !== null && orange_country_row_by_code($pdo, $fromCookie, true) !== null) {
         $memo = $fromCookie;
 
         return $memo;
     }
-    $def = orange_country_row_by_code($pdo, 'kw', true);
-    if ($def !== null) {
-        $memo = orange_countries_normalize_code((string) $def['code']);
-
-        return $memo;
-    }
-    $active = orange_countries_storefront_active($pdo, 'en');
-    if ($active !== []) {
-        $memo = (string) $active[0]['code'];
-
-        return $memo;
-    }
-    $memo = 'kw';
+    // لا kw / لا أول دولة Active — Missing Channel Country = fail-closed.
+    $memo = '';
 
     return $memo;
 }
@@ -535,13 +532,19 @@ function orange_storefront_current_country_id(PDO $pdo): int
         return $memo;
     }
     $code = orange_storefront_current_country_code($pdo);
+    if ($code === '') {
+        $memo = 0;
+
+        return $memo;
+    }
     $row = orange_country_row_by_code($pdo, $code, true);
     if ($row !== null) {
         $memo = (int) $row['id'];
 
         return $memo;
     }
-    $memo = orange_countries_default_id($pdo);
+    // Fail closed — لا default_id / kw.
+    $memo = 0;
 
     return $memo;
 }
@@ -635,20 +638,18 @@ function orange_admin_is_global(?array $admin): bool
 }
 
 /**
- * SQL آمن للاستعلامات بدون prepare: AND alias.country_id = N
- * للدولة الافتراضية (الكويت): يشمل country_id NULL/0 كتراث ما قبل تعدد الدول — مطابق orange_sql_filter_country_id.
+ * SQL آمن للاستعلامات بدون prepare: AND alias.country_id = N فقط.
+ * Missing country → fail-closed (AND 1=0). NULL ≠ Global.
  */
 function orange_sql_country_and_fragment(PDO $pdo, string $table, string $alias, int $countryId): string
 {
-    if ($countryId <= 0 || !orange_table_has_country_id($pdo, $table)) {
+    if (!orange_table_has_country_id($pdo, $table)) {
         return '';
     }
-    $col = trim($alias) !== '' ? trim($alias) . '.country_id' : $table . '.country_id';
-    $kwId = orange_countries_default_id($pdo);
-    if ($kwId > 0 && $countryId === $kwId) {
-        return ' AND (' . $col . ' = ' . (int) $countryId
-            . ' OR ' . $col . ' IS NULL OR ' . $col . ' = 0)';
+    if ($countryId <= 0) {
+        return ' AND 1=0';
     }
+    $col = trim($alias) !== '' ? trim($alias) . '.country_id' : $table . '.country_id';
 
     return ' AND ' . $col . ' = ' . (int) $countryId;
 }
@@ -858,36 +859,24 @@ function orange_sql_filter_storefront_row_belongs_to_country(
     string $channelSlugColumn,
     int $countryId
 ): ?array {
+    unset($channelSlugColumn);
     if ($countryId <= 0) {
-        return null;
+        return [
+            'joins' => '',
+            'where' => ' AND 1=0',
+            'params' => [],
+        ];
     }
     $alias = trim($rowAlias);
     if ($alias === '') {
         return null;
     }
     $cidCol = $alias . '.country_id';
-    $slugCol = $alias . '.' . $channelSlugColumn;
-    $kwId = orange_countries_default_id($pdo);
-    $parts = ['(' . $cidCol . ' = ?)'];
-    $params = [$countryId];
-
-    if (orange_table_exists($pdo, 'channels') && orange_table_has_column($pdo, 'channels', 'country_id')) {
-        $parts[] = '((' . $cidCol . ' IS NULL OR ' . $cidCol . ' = 0) AND EXISTS (
-            SELECT 1 FROM channels ch_sf_belongs
-            WHERE ch_sf_belongs.slug = ' . $slugCol . ' AND ch_sf_belongs.country_id = ?
-        ))';
-        $params[] = $countryId;
-    }
-
-    if ($kwId > 0 && $countryId === $kwId) {
-        $parts[] = '((' . $cidCol . ' IS NULL OR ' . $cidCol . ' = 0) AND ('
-            . $slugCol . ' IS NULL OR TRIM(' . $slugCol . ') = \'\'))';
-    }
 
     return [
         'joins' => '',
-        'where' => ' AND (' . implode(' OR ', $parts) . ')',
-        'params' => $params,
+        'where' => ' AND (' . $cidCol . ' = ?)',
+        'params' => [$countryId],
     ];
 }
 

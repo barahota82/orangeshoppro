@@ -590,7 +590,8 @@ function orange_storefront_channel_slug_from_request_path(PDO $pdo): ?string
 }
 
 /**
- * عند تعدد قنوات بنفس path_segment/slug في دول مختلفة: يفضّل كوكي الدولة ثم الافتراضي.
+ * عند تعدد قنوات بنفس path_segment/slug في دول مختلفة: يفضّل كوكي الدولة إن كانت ضمن القائمة.
+ * بلا تطابق كوكي → 0 (fail-closed؛ لا default Kuwait).
  *
  * @param list<int> $countryIds
  */
@@ -615,63 +616,98 @@ function orange_storefront_disambiguate_channel_country_ids(PDO $pdo, array $cou
         }
     }
 
-    return orange_countries_default_id($pdo);
+    return 0;
 }
 
 /**
- * §13.7 — استنتاج دولة الواجهة من رابط القناة (مسار قصير أو ?channel=) بلا فلترة country_id مسبقة.
+ * حالة استنتاج دولة القناة من الطلب.
+ *
+ * @return array{matched:bool,invalid:bool,country_id:int,code:?string}
  */
-function orange_storefront_country_code_from_request_channel(PDO $pdo): ?string
+function orange_storefront_request_channel_country_state(PDO $pdo): array
 {
     require_once __DIR__ . '/includes/countries.php';
+    $empty = ['matched' => false, 'invalid' => false, 'country_id' => 0, 'code' => null];
     if (!orange_channels_has_country_column($pdo)) {
-        return null;
+        return $empty;
     }
-    $countryId = 0;
+    $rawIds = [];
+    $channelMatched = false;
 
     if (isset($_GET['channel']) && (string) $_GET['channel'] !== '') {
         $slug = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', (string) $_GET['channel']) ?? ''));
         if ($slug !== '') {
             $st = $pdo->prepare('SELECT country_id FROM channels WHERE slug = ? AND is_active = 1');
             $st->execute([$slug]);
-            $ids = [];
-            while ($cid = $st->fetchColumn()) {
-                $ids[] = (int) $cid;
+            while (($cid = $st->fetchColumn()) !== false) {
+                $channelMatched = true;
+                $rawIds[] = (int) $cid;
             }
-            $countryId = orange_storefront_disambiguate_channel_country_ids($pdo, $ids);
         }
     }
 
-    if ($countryId <= 0) {
+    if (!$channelMatched) {
         $primary = orange_storefront_request_primary_path_segment();
         if ($primary !== null && $primary !== '') {
             $seg = strtolower($primary);
+            $reserved = false;
             foreach (orange_storefront_reserved_path_segments() as $rs) {
                 if ($seg === strtolower((string) $rs)) {
-                    return null;
+                    $reserved = true;
+                    break;
                 }
             }
-            $st = $pdo->prepare('SELECT country_id FROM channels WHERE path_segment = ? AND is_active = 1');
-            $st->execute([$seg]);
-            $ids = [];
-            while ($cid = $st->fetchColumn()) {
-                $ids[] = (int) $cid;
-            }
-            if ($ids !== []) {
-                $countryId = orange_storefront_disambiguate_channel_country_ids($pdo, $ids);
+            if (!$reserved) {
+                $st = $pdo->prepare('SELECT country_id FROM channels WHERE path_segment = ? AND is_active = 1');
+                $st->execute([$seg]);
+                while (($cid = $st->fetchColumn()) !== false) {
+                    $channelMatched = true;
+                    $rawIds[] = (int) $cid;
+                }
             }
         }
     }
 
+    if (!$channelMatched) {
+        return $empty;
+    }
+
+    $positive = array_values(array_unique(array_filter(
+        $rawIds,
+        static fn (int $id): bool => $id > 0
+    )));
+    if ($positive === []) {
+        // قناة معرّفة لكن بلا country_id صالح.
+        return ['matched' => true, 'invalid' => true, 'country_id' => 0, 'code' => null];
+    }
+    $countryId = orange_storefront_disambiguate_channel_country_ids($pdo, $positive);
     if ($countryId <= 0) {
-        return null;
+        return ['matched' => true, 'invalid' => true, 'country_id' => 0, 'code' => null];
     }
     $row = orange_country_row_by_id($pdo, $countryId, true);
     if ($row === null) {
+        return ['matched' => true, 'invalid' => true, 'country_id' => 0, 'code' => null];
+    }
+    $code = orange_countries_normalize_code((string) ($row['code'] ?? ''));
+    if ($code === '') {
+        return ['matched' => true, 'invalid' => true, 'country_id' => 0, 'code' => null];
+    }
+
+    return ['matched' => true, 'invalid' => false, 'country_id' => $countryId, 'code' => $code];
+}
+
+/**
+ * §13.7 — استنتاج دولة الواجهة من رابط القناة (مسار قصير أو ?channel=).
+ * null = لا قناة في الطلب أو قناة بلا دولة صالحة (لا يُفسَّر كـ Kuwait).
+ */
+function orange_storefront_country_code_from_request_channel(PDO $pdo): ?string
+{
+    $state = orange_storefront_request_channel_country_state($pdo);
+    if (!$state['matched'] || $state['invalid'] || $state['code'] === null || $state['code'] === '') {
         return null;
     }
 
-    return orange_countries_normalize_code((string) ($row['code'] ?? ''));
+    return (string) $state['code'];
 }
 
 function orange_channel_slug_for_path_segment(PDO $pdo, string $pathSegment, bool $requireActive = true, ?int $countryId = null): ?string
@@ -1209,27 +1245,35 @@ function storefront_toolbar_state(): array {
 }
 
 /**
- * رابط تبديل الدولة مع الحفاظ على مسار الصفحة الحالي.
+ * رابط تبديل الدولة عبر القناة الرئيسية الموثوقة للدولة (لا ?country= كسلطة).
  */
 function storefront_country_switch_href(string $countryCode, ?string $lang = null): string
 {
-    $code = function_exists('orange_countries_normalize_code')
-        ? orange_countries_normalize_code($countryCode)
-        : strtolower(trim($countryCode));
+    require_once __DIR__ . '/includes/countries.php';
+    $code = orange_countries_normalize_code($countryCode);
     if ($code === '') {
         return '';
     }
-    $params = $_GET;
-    $params['country'] = $code;
-    if ($lang !== null && $lang !== '') {
-        $params['lang'] = $lang;
+    try {
+        $pdo = db();
+    } catch (Throwable $e) {
+        return '';
     }
-    $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
-    if (!is_string($path) || $path === '') {
-        $path = '/';
+    $row = orange_country_row_by_code($pdo, $code, true);
+    if ($row === null) {
+        return '';
+    }
+    $cid = (int) ($row['id'] ?? 0);
+    $slug = orange_storefront_main_channel_slug_for_country($pdo, $cid);
+    if ($slug === null || $slug === '') {
+        return '';
+    }
+    $useLang = $lang;
+    if ($useLang === null || $useLang === '') {
+        $useLang = function_exists('current_lang') ? current_lang() : 'ar';
     }
 
-    return $path . '?' . http_build_query($params);
+    return storefront_url('home', $slug, $useLang);
 }
 
 /** wa.me link for channel WhatsApp (digits only). */

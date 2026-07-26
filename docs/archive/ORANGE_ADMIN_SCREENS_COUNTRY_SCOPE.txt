@@ -261,3 +261,8 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 [2026-05-20] GAP-09 — جولة 2: jv.country_id bind على party statement / GL monthly / PL monthly / aging / voucher_by_reference؛ تدقيق عميق + CSV.
 [2026-05-20] GAP-09 — جولة 3: LOW remainder — gl-accounts fetch fallback؛ account_tree scoped parent_id؛ catalog_schema seed per country؛ gl_pending/order_fulfillment reference LIKE scoped.
 [2026-05-22] GAP-09 — جولة 4 (تدقيق مستمر): مسح 182 موضع — 0 HIGH / 0 LOW؛ scripts/gap09_gl_country_audit.ps1؛ CSV docs/exports/GAP09_*_2026-05-22.csv.
+[2026-07-26] Targeted Country-Isolation Repair (Phase 3 Step 4): شاشات مخزن 17/41/42 —
+  stock_adjustment_voucher / inventory_reconciliation / opening_stock_balances:
+  قائمة/تنقّل/بحث `country_id = ?` فقط؛ تطبيع NULL عبر warehouse Parent ثم دولة Active واحدة؛
+  Storefront Channel DB authority؛ لا `?country=` Authority؛ لا kw silent fallback.
+  Canonical Owner screens: 97 mapped / Gaps = 0 / Unknowns = 0.

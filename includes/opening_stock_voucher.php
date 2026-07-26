@@ -172,11 +172,13 @@ function orange_opening_stock_voucher_get_singleton(PDO $pdo, ?int $countryId = 
     if (! orange_opening_stock_voucher_ready($pdo)) {
         return null;
     }
+    require_once __DIR__ . '/warehouses.php';
+    orange_inventory_normalize_null_country_ids($pdo, 'opening_stock_voucher');
     $sql = 'SELECT id FROM opening_stock_voucher WHERE 1=1';
     $params = [];
     if ($countryId !== null && $countryId > 0
         && orange_table_has_column($pdo, 'opening_stock_voucher', 'country_id')) {
-        $sql .= ' AND (country_id IS NULL OR country_id = ?)';
+        $sql .= ' AND country_id = ?';
         $params[] = $countryId;
     }
     $sql .= ' ORDER BY id DESC LIMIT 1';
@@ -235,9 +237,11 @@ function orange_opening_stock_voucher_get(PDO $pdo, int $id, ?int $countryId = n
     if (! $row) {
         return null;
     }
-    if ($countryId !== null && $countryId > 0 && (int) ($row['country_id'] ?? 0) > 0
-        && (int) $row['country_id'] !== $countryId) {
-        return null;
+    if ($countryId !== null && $countryId > 0) {
+        $rowCid = (int) ($row['country_id'] ?? 0);
+        if ($rowCid <= 0 || $rowCid !== $countryId) {
+            return null;
+        }
     }
 
     $warehouseId = (int) ($row['warehouse_id'] ?? 0);
@@ -335,6 +339,8 @@ function orange_opening_stock_voucher_list(PDO $pdo, ?int $countryId = null): ar
     if (! orange_opening_stock_voucher_ready($pdo)) {
         return [];
     }
+    require_once __DIR__ . '/warehouses.php';
+    orange_inventory_normalize_null_country_ids($pdo, 'opening_stock_voucher');
     $sql = 'SELECT sv.*,
             (SELECT COUNT(*) FROM opening_stock_voucher_line sl WHERE sl.voucher_id = sv.id) AS line_count
             FROM opening_stock_voucher sv
@@ -342,7 +348,7 @@ function orange_opening_stock_voucher_list(PDO $pdo, ?int $countryId = null): ar
     $params = [];
     if ($countryId !== null && $countryId > 0
         && orange_table_has_column($pdo, 'opening_stock_voucher', 'country_id')) {
-        $sql .= ' AND (sv.country_id IS NULL OR sv.country_id = ?)';
+        $sql .= ' AND sv.country_id = ?';
         $params[] = $countryId;
     }
     $sql .= ' ORDER BY sv.id DESC';
@@ -368,7 +374,7 @@ function orange_opening_stock_voucher_nav(PDO $pdo, string $where, int $currentI
     $params = [];
     if ($countryId !== null && $countryId > 0
         && orange_table_has_column($pdo, 'opening_stock_voucher', 'country_id')) {
-        $scope = ' AND (country_id IS NULL OR country_id = ?)';
+        $scope = ' AND country_id = ?';
         $params[] = $countryId;
     }
     switch ($where) {
@@ -412,7 +418,7 @@ function orange_opening_stock_voucher_search(PDO $pdo, array $filters, ?int $cou
     $params = [];
     if ($countryId !== null && $countryId > 0
         && orange_table_has_column($pdo, 'opening_stock_voucher', 'country_id')) {
-        $sql .= ' AND (sv.country_id IS NULL OR sv.country_id = ?)';
+        $sql .= ' AND sv.country_id = ?';
         $params[] = $countryId;
     }
     $idFrom = (int) ($filters['id_from'] ?? 0);

@@ -542,6 +542,12 @@ Repository Closure Sweep. لا Phase 4 · لا Writers · لا Schema · لا Ba
   **لا نظرة عامة متعددة الدول**؛ بلا سياق → fail-closed؛
   تطبيع setup إن وُجدت دولة نشطة واحدة؛ `SPM_IS_GLOBAL` = قفل جلسة أدمن فقط
   (لا يلغي فلتر الدولة). Channel → `channels.country_id` → target للمتجر.
+- Targeted Repair 2026-07-26 (قبل Owner Approval Phase 3):
+  Screens 17/41/42 مخزن: أُزيل `IS NULL OR`؛ تطبيع Parent=warehouse؛
+  Storefront: Channel قبل أي مصدر؛ لا `?country=` Authority؛ لا kw fallback؛
+  Canonical Owner screens: **97/97/0/0** (expected/mapped/gaps/unknowns).
+  اختبارات: `self_test_admin_time_phase3_step4_inventory_country.php`،
+  `…_channel_resolution.php`، `…_canonical97.php`.
 - لا واجهة عميل Global/Mixed لخلط دول:
   NO EXPLICIT GLOBAL OR MIXED CUSTOMER/STOREFRONT USER SURFACE FOUND
 - Admin Explicit Global فقط: أحداث `orange_admin_audit_log` حيث `is_global=1`
@@ -561,6 +567,9 @@ Repository Closure Sweep. لا Phase 4 · لا Writers · لا Schema · لا Ba
 `php scripts/self_test_admin_time_phase3_step4_closure.php`
 `php scripts/self_test_admin_time_phase3_step4_spm_country.php`
 `php scripts/self_test_admin_time_phase3_step4_admin_channel_country.php`
+`php scripts/self_test_admin_time_phase3_step4_inventory_country.php`
+`php scripts/self_test_admin_time_phase3_step4_channel_resolution.php`
+`php scripts/self_test_admin_time_phase3_step4_canonical97.php`
 
 
 --------------------------------------------------------------------
@@ -680,4 +689,7 @@ SPM country-scope: `scripts/self_test_admin_time_phase3_step4_spm_country.php`
 `php scripts/self_test_admin_time_phase3_step4_closure.php`
 `php scripts/self_test_admin_time_phase3_step4_spm_country.php`
 `php scripts/self_test_admin_time_phase3_step4_admin_channel_country.php`
+`php scripts/self_test_admin_time_phase3_step4_inventory_country.php`
+`php scripts/self_test_admin_time_phase3_step4_channel_resolution.php`
+`php scripts/self_test_admin_time_phase3_step4_canonical97.php`
 `powershell -NoProfile -File scripts/verify-php-utf8.ps1`

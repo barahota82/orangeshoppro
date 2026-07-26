@@ -269,8 +269,9 @@ function orange_inventory_reconciliation_get(PDO $pdo, int $id, ?int $countryId 
         return null;
     }
 
-    if ($countryId !== null && $countryId > 0 && isset($row['country_id']) && (int) $row['country_id'] > 0) {
-        if ((int) $row['country_id'] !== $countryId) {
+    if ($countryId !== null && $countryId > 0) {
+        $rowCid = (int) ($row['country_id'] ?? 0);
+        if ($rowCid <= 0 || $rowCid !== $countryId) {
             return null;
         }
     }
@@ -318,6 +319,8 @@ function orange_inventory_reconciliation_list(PDO $pdo, ?int $countryId = null, 
     if (! orange_inventory_reconciliation_ready($pdo)) {
         return [];
     }
+    require_once __DIR__ . '/warehouses.php';
+    orange_inventory_normalize_null_country_ids($pdo, 'inventory_reconciliation');
 
     $sql = 'SELECT ir.*, w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,
             (SELECT COUNT(*) FROM inventory_reconciliation_line irl WHERE irl.reconciliation_id = ir.id) AS line_count,
@@ -327,7 +330,7 @@ function orange_inventory_reconciliation_list(PDO $pdo, ?int $countryId = null, 
             WHERE 1=1';
     $params = [];
     if ($countryId !== null && $countryId > 0 && orange_table_has_column($pdo, 'inventory_reconciliation', 'country_id')) {
-        $sql .= ' AND (ir.country_id IS NULL OR ir.country_id = ?)';
+        $sql .= ' AND ir.country_id = ?';
         $params[] = $countryId;
     }
     $sql .= ' ORDER BY ir.id DESC LIMIT ' . max(1, min(200, $limit));
@@ -701,7 +704,7 @@ function orange_inventory_reconciliation_archive_list(
             . ' WHERE 1=1';
     $params = [];
     if ($countryId !== null && $countryId > 0 && orange_table_has_column($pdo, 'inventory_reconciliation', 'country_id')) {
-        $sql .= ' AND (ir.country_id IS NULL OR ir.country_id = ?)';
+        $sql .= ' AND ir.country_id = ?';
         $params[] = $countryId;
     }
     if ($fromDate !== null) {
@@ -762,7 +765,7 @@ function orange_inventory_reconciliation_archive_nav(PDO $pdo, string $dir, int 
     $scopeSql = '';
     $params = [];
     if ($hasCountry && $countryId !== null && $countryId > 0) {
-        $scopeSql = ' AND (country_id IS NULL OR country_id = ?)';
+        $scopeSql = ' AND country_id = ?';
         $params[] = $countryId;
     }
 
@@ -835,7 +838,7 @@ function orange_inventory_reconciliation_archive_search(PDO $pdo, array $filters
     $sql = 'SELECT ' . $cols . ' FROM inventory_reconciliation ir' . $join . ' WHERE 1=1';
     $params = [];
     if ($countryId !== null && $countryId > 0 && orange_table_has_column($pdo, 'inventory_reconciliation', 'country_id')) {
-        $sql .= ' AND (ir.country_id IS NULL OR ir.country_id = ?)';
+        $sql .= ' AND ir.country_id = ?';
         $params[] = $countryId;
     }
     if ($fromDate !== null) {
@@ -909,9 +912,11 @@ function orange_inventory_reconciliation_archive_get(PDO $pdo, int $id, ?int $co
     if (! $row) {
         return null;
     }
-    if ($countryId !== null && $countryId > 0 && isset($row['country_id']) && (int) $row['country_id'] > 0
-        && (int) $row['country_id'] !== $countryId) {
-        return null;
+    if ($countryId !== null && $countryId > 0) {
+        $rowCid = (int) ($row['country_id'] ?? 0);
+        if ($rowCid <= 0 || $rowCid !== $countryId) {
+            return null;
+        }
     }
 
     $warehouseId = (int) ($row['warehouse_id'] ?? 0);
