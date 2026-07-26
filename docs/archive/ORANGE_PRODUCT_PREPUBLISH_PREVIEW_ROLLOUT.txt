@@ -318,4 +318,19 @@ Resolved: preview model (session, not channel); TTL = 24h + lazy + optional main
 التقارير السبعة — فتُستبعد صفوف المسودّة من كل تقارير المخزن. صفّ المسودّة نفسه يُعاد استخدامه/يُحذف
 تلقائياً (تصفّح بلا منتج) أو ينتهي بعد 24 ساعة (`orange_preview_purge_expired` / `scripts/maintenance_preview_drafts.php`).
 
+== إصلاح Pre-Phase-4 (2026-07-27) — سلطة دولة/قناة المعاينة ==
+
+**قرار مالك نهائي:**
+- Preview Country لمنتج موجود = `products.country_id` ويجب أن يطابق Current Admin Country Context (وإلا Fail Closed).
+- منتج جديد: Preview Country = Current Admin Country Context (سياق صالح إلزامي).
+- دولة المعاينة **Read-only** — لا Dropdown لاختيار دولة أخرى؛ لا استخدام `orange_countries_storefront_active` لاختيار الدولة (الدولة غير النشطة للعامة تبقى قابلة للمعاينة الإدارية).
+- قنوات المعاينة = قنوات **نفس دولة المنتج فقط**؛ Selector عند تعدد القنوات؛ قناة واحدة تُختار تلقائياً؛ رئيسية (`is_country_default`) تُحدَّد تلقائياً؛ بلا رئيسية مع تعدد → اختيار صريح.
+- صفر قنوات: المعاينة السريعة داخل التاب تبقى؛ Full/Mobile → رسالة «لا توجد قناة لهذه الدولة…» بلا إنشاء قناة.
+- ممنوع: fallback لأول قناة نشطة عالمياً؛ ممنوع إنشاء قناة من المعاينة.
+- الجلسة `$_SESSION['orange_product_preview']` تحمل `admin_id` + `country_id` + `channel_id` + `draft_id` + `exp`؛ تبديل سياق الأدمن/المنتج يمسح الجلسة القديمة.
+
+**تنفيذ:** `admin/pages/products.php`؛ `admin/api/products/save-preview-draft.php`؛ `includes/product_preview.php`؛ مسح stale في `orange_admin_store_country_context`. اختبارات: `scripts/self_test_pre_phase4_product_preview_country_channel.php`.
+
+**Phase 4 Final Time QA:** مؤجّلة — لم تبدأ.
+
 نهاية الخطة.

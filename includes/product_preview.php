@@ -44,8 +44,11 @@ if (! function_exists('orange_preview_generate_token')) {
 }
 
 if (! function_exists('orange_preview_set_session')) {
-    /** يفتح جلسة معاينة (يُستدعى من API الأدمن فقط). draftId=0 يعني تصفّح بلا منتج. */
-    function orange_preview_set_session(int $adminId, int $countryId, int $draftId, int $ttlSeconds = 86400): void
+    /**
+     * يفتح جلسة معاينة (يُستدعى من API الأدمن فقط). draftId=0 يعني تصفّح بلا منتج.
+     * channelId اختياري لكن يُفضَّل تمريره لرفض الجلسات القديمة عبر الدول/القنوات.
+     */
+    function orange_preview_set_session(int $adminId, int $countryId, int $draftId, int $ttlSeconds = 86400, int $channelId = 0): void
     {
         if (session_status() !== PHP_SESSION_ACTIVE || $adminId <= 0) {
             return;
@@ -53,6 +56,7 @@ if (! function_exists('orange_preview_set_session')) {
         $_SESSION[orange_preview_session_key()] = [
             'admin_id' => $adminId,
             'country_id' => max(0, $countryId),
+            'channel_id' => max(0, $channelId),
             'draft_id' => max(0, $draftId),
             'exp' => time() + max(60, $ttlSeconds),
         ];
@@ -92,7 +96,7 @@ if (! function_exists('orange_preview_active_context')) {
      * يقرأ جلسة المعاينة ويتحقّق من صلاحيتها. يحمّل صفّ المسودّة فقط عند draft_id>0.
      * يُعيد سياق المعاينة أو null. لا يلمس القاعدة إطلاقاً إن لم تكن الجلسة فعّالة (حماية المسار الساخن).
      *
-     * @return array{admin_id:int,country_id:int,draft_id:int,product:?array<string,mixed>,source_id:int}|null
+     * @return array{admin_id:int,country_id:int,channel_id:int,draft_id:int,product:?array<string,mixed>,source_id:int}|null
      */
     function orange_preview_active_context(PDO $pdo): ?array
     {
@@ -119,6 +123,7 @@ if (! function_exists('orange_preview_active_context')) {
             return null;
         }
         $countryId = (int) ($pv['country_id'] ?? 0);
+        $channelId = (int) ($pv['channel_id'] ?? 0);
         $draftId = (int) ($pv['draft_id'] ?? 0);
         $product = null;
 
@@ -136,6 +141,12 @@ if (! function_exists('orange_preview_active_context')) {
                 $row = $st->fetch(PDO::FETCH_ASSOC);
                 if (is_array($row) && ! empty($row)) {
                     $product = $row;
+                    $draftCountry = (int) ($row['country_id'] ?? 0);
+                    if ($countryId > 0 && $draftCountry > 0 && $draftCountry !== $countryId) {
+                        unset($_SESSION[orange_preview_session_key()]);
+
+                        return null;
+                    }
                 } else {
                     $draftId = 0; // المسودّة لم تَعُد موجودة — تبقى جلسة تصفّح فقط
                 }
@@ -150,12 +161,89 @@ if (! function_exists('orange_preview_active_context')) {
         $cache = [
             'admin_id' => $adminId,
             'country_id' => $countryId,
+            'channel_id' => $channelId,
             'draft_id' => $draftId,
             'product' => $product,
             'source_id' => $product !== null ? (int) ($product['preview_source_product_id'] ?? 0) : 0,
         ];
 
         return $cache;
+    }
+}
+
+if (! function_exists('orange_preview_channels_for_country')) {
+    /**
+     * قنوات نشطة لدولة المنتج فقط (معاينة). استعلام واحد — بلا N+1.
+     *
+     * @return list<array{id:int,name:string,slug:string,path_segment:string,is_country_default:int}>
+     */
+    function orange_preview_channels_for_country(PDO $pdo, int $countryId): array
+    {
+        if ($countryId <= 0 || ! function_exists('orange_table_exists') || ! orange_table_exists($pdo, 'channels')) {
+            return [];
+        }
+        $hasCountry = function_exists('orange_channels_has_country_column') && orange_channels_has_country_column($pdo);
+        if (! $hasCountry) {
+            return [];
+        }
+        $hasDefault = function_exists('orange_channels_has_country_default_column')
+            && orange_channels_has_country_default_column($pdo);
+        $defaultSel = $hasDefault ? 'is_country_default' : '0 AS is_country_default';
+        $order = $hasDefault ? 'is_country_default DESC, id ASC' : 'id ASC';
+        try {
+            $st = $pdo->prepare(
+                'SELECT id, name, slug, path_segment, ' . $defaultSel . '
+                 FROM channels
+                 WHERE is_active = 1 AND country_id = ?
+                 ORDER BY ' . $order
+            );
+            $st->execute([$countryId]);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $id = (int) ($row['id'] ?? 0);
+            $slug = trim((string) ($row['slug'] ?? ''));
+            if ($id <= 0 || $slug === '') {
+                continue;
+            }
+            $out[] = [
+                'id' => $id,
+                'name' => trim((string) ($row['name'] ?? '')) !== '' ? trim((string) $row['name']) : $slug,
+                'slug' => $slug,
+                'path_segment' => trim((string) ($row['path_segment'] ?? $slug)),
+                'is_country_default' => (int) ($row['is_country_default'] ?? 0) === 1 ? 1 : 0,
+            ];
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('orange_preview_resolve_channel_for_country')) {
+    /**
+     * يتحقق من قناة معاينة لنفس الدولة. لا fallback عالمي.
+     *
+     * @return array{id:int,slug:string}|null
+     */
+    function orange_preview_resolve_channel_for_country(PDO $pdo, int $countryId, int $channelId): ?array
+    {
+        if ($countryId <= 0 || $channelId <= 0) {
+            return null;
+        }
+        $channels = orange_preview_channels_for_country($pdo, $countryId);
+        foreach ($channels as $ch) {
+            if ((int) $ch['id'] === $channelId) {
+                return ['id' => (int) $ch['id'], 'slug' => (string) $ch['slug']];
+            }
+        }
+
+        return null;
     }
 }
 

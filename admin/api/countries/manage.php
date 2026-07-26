@@ -35,6 +35,7 @@ function orange_country_provision_reason_labels(): array
         'no_source_country' => 'لا توجد دولة مصدر',
         'nothing_copied' => 'لا شيء جديد',
         'copy_failed' => 'فشل النسخ',
+        'manual_channel_create_only' => 'القنوات لا تُنشأ تلقائياً — أنشئها يدوياً من شاشة قنوات العملاء',
     ];
 }
 
@@ -55,6 +56,8 @@ function orange_country_provision_human_lines(array $provision): array
     $cc = $provision['channels_copy'] ?? [];
     if (is_array($cc) && (int) ($cc['channels_copied'] ?? 0) > 0) {
         $lines[] = 'قنوات منسوخة: ' . (int) $cc['channels_copied'];
+    } elseif (is_array($cc) && ($cc['reason'] ?? '') === 'manual_channel_create_only') {
+        $lines[] = $labels['manual_channel_create_only'];
     } elseif (is_array($cc) && ($cc['reason'] ?? '') !== '') {
         $lines[] = 'القنوات: ' . ($labels[(string) $cc['reason']] ?? (string) $cc['reason']);
     }

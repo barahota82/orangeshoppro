@@ -165,7 +165,7 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 5. **GL** scoped بالدولة + تقارير.
 6. **`storefront_accounts`**: `country_id` + `UNIQUE(email, country_id)`.
 7. **صلاحيات** `admin_users.country_id`.
-8. **تفعيل دول جديدة** (مصر …) بنسخ قالب: مخزن افتراضي + قنوات + (لاحقاً) كتalog.
+8. **تفعيل دول جديدة** (مصر …): تفعيل `is_active` + تهيئة تشغيلية **بدون** إنشاء قنوات تلقائياً (قرار 2026-07-27 — القنوات يدوية من شاشة قنوات العملاء؛ عدد القنوات 0/1/كثير مسموح).
 
 **تنفيذ (13 — مرحلة 1 — مخازن):** ترحيل **`orange_catalog_migrate_country_warehouses_v44`** في `includes/catalog_schema.php`؛ مساعدات **`includes/warehouses.php`**.
 
@@ -177,7 +177,9 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **تنفيذ (13 — مرحلة 7 — صلاحيات أدمن الدولة):** حقل **`admins.country_id`** في **`admin/api/admins/save.php`** و**`admin/api/admins/list.php`** و**`admin/pages/admin_users.php`** (NULL = أدمن عام؛ قيمة = فريق دولة)؛ يكمّل قفل الجلسة **`admin_country_lock`** المذكور في مرحلة 4–6.
 
-**تنفيذ (13 — مرحلة 8 — تفعيل دولة + تهيئة تشغيلية كاملة):** **`orange_country_provision_full`** في **`includes/country_provision.php`** (مخزن + نسخ قنوات الكويت + كتalog + دليل حسابات + GL + محافظة افتراضية — idempotent)؛ **`orange_country_provision_operational`** يفوّض إليها؛ **`admin/api/countries/manage.php`** — **`provision`**, **`create_team_user`**, تقرير **`provision_lines`**؛ شاشة **`admin/pages/countries.php`** — جاهزية + مستخدم فريق؛ **المشرف العام فقط** (`orange_admin_can_manage_countries`).
+**تنفيذ (13 — مرحلة 8 — تفعيل دولة + تهيئة تشغيلية كاملة):** **`orange_country_provision_full`** في **`includes/country_provision.php`** (مخزن + كتalog + دليل حسابات + GL + محافظة افتراضية — idempotent)؛ **`orange_country_provision_operational`** يفوّض إليها؛ **`admin/api/countries/manage.php`** — **`provision`**, **`create_team_user`**, تقرير **`provision_lines`**؛ شاشة **`admin/pages/countries.php`** — جاهزية + مستخدم فريق؛ **المشرف العام فقط** (`orange_admin_can_manage_countries`).
+
+**تصحيح قرار مالك (2026-07-27 — تفعيل الدولة لا ينشئ قنوات):** السبب السابق لإنشاء «ثلاث قنوات» عند تفعيل دولة: `admin/pages/countries.php` → `saveCountry` → `admin/api/countries/manage.php` `action=save` عند `is_active=1` → `orange_country_provision_runtime` → `orange_country_provision_full` → **`orange_country_copy_channels_from_source`** ينسخ كل صفوف `channels` من دولة المصدر (الكويت، غالباً 3: tiktok/online/web) إلى الدولة الجديدة؛ وإن فشل النسخ كان يُنشأ صف قناة ويب واحد. **السلوك النهائي:** النسخ/الإنشاء التلقائي للقنوات **مُعطَّل** (`reason=manual_channel_create_only`)؛ تعطيل الدولة لا يحذف قنوات؛ إنشاء القنوات يبقى يدوياً فقط عبر **`admin/api/channels/save.php`** / شاشة قنوات العملاء. اختبار: `scripts/self_test_pre_phase4_country_activation_no_channels.php`.
 
 **تنفيذ (13 — حماية API + تفرد ضمن الدولة):** **`orange_admin_assert_entity_country`** على مسارات التعديل/الحذف (**`orders/update`**, **`orders/update-status`**, **`orders/update-payment`**, **`customers/save`**, **`customers/delete`**, **`suppliers/save`**, **`products/update`**, **`products/delete`**, **`products/toggle`**, **`purchases/update`**, **`purchases/lines`**, مردودات المبيعات/المشتريات، شاشات الذمم، **`offers/save`**)؛ تفرد **`phone`/`code`/`civil_id`** (عملاء) و**`phone`/`code`/`tax_number`** (موردون) **ضمن `country_id`** في **`save`** APIs؛ فلترة موردي التقرير المالي في **`admin/pages/financial_report.php`**.
 

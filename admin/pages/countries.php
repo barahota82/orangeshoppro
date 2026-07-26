@@ -98,7 +98,7 @@ foreach ($countries as $c) {
         <strong>جاهزية شاشات الأدمن</strong>
         <ul class="ctry-provision-list" style="margin:8px 0 0;padding-right:18px;line-height:1.7;">
             <li><?php echo !empty($editProvision['warehouse']) ? '✓' : '○'; ?> مخزن</li>
-            <li><?php echo (int) ($editProvision['channels_count'] ?? 0) > 0 ? '✓' : '○'; ?> قنوات (<?php echo (int) ($editProvision['channels_count'] ?? 0); ?>)</li>
+            <li><?php echo (int) ($editProvision['channels_count'] ?? 0) > 0 ? '✓' : '○'; ?> قنوات (<?php echo (int) ($editProvision['channels_count'] ?? 0); ?> — تُنشأ يدوياً من شاشة قنوات العملاء)</li>
             <li><?php echo (int) ($editProvision['products_count'] ?? 0) > 0 ? '✓' : '○'; ?> منتجات (<?php echo (int) ($editProvision['products_count'] ?? 0); ?>)</li>
             <li><?php echo (int) ($editProvision['accounts_count'] ?? 0) > 0 ? '✓' : '○'; ?> دليل حسابات (<?php echo (int) ($editProvision['accounts_count'] ?? 0); ?>)</li>
             <li><?php echo (int) ($editProvision['gl_settings_count'] ?? 0) > 0 ? '✓' : '○'; ?> إعدادات GL (<?php echo (int) ($editProvision['gl_settings_count'] ?? 0); ?>)</li>

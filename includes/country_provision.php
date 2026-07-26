@@ -76,89 +76,23 @@ function orange_country_provision_status(PDO $pdo, int $countryId): array
 /**
  * @return array{skipped:bool, reason:string, channels_copied:int, source_country_id:int, target_country_id:int}
  */
+/**
+ * نسخ القنوات من دولة مصدر — مُعطَّل بقرار المالك (2026-07-27).
+ * القنوات تُنشأ يدوياً فقط من شاشة «قنوات العملاء». لا INSERT هنا.
+ *
+ * @return array{skipped:bool, reason:string, channels_copied:int, source_country_id:int, target_country_id:int}
+ */
 function orange_country_copy_channels_from_source(PDO $pdo, int $targetCountryId, ?int $sourceCountryId = null): array
 {
-    $out = [
+    unset($pdo, $sourceCountryId);
+
+    return [
         'skipped' => true,
-        'reason' => '',
+        'reason' => 'manual_channel_create_only',
         'channels_copied' => 0,
         'source_country_id' => 0,
         'target_country_id' => $targetCountryId,
     ];
-    if ($targetCountryId <= 0 || !orange_table_exists($pdo, 'channels') || !orange_channels_has_country_column($pdo)) {
-        $out['reason'] = 'no_channels_table';
-
-        return $out;
-    }
-    $sourceCountryId = $sourceCountryId !== null && $sourceCountryId > 0
-        ? $sourceCountryId
-        : orange_countries_default_id($pdo);
-    $out['source_country_id'] = $sourceCountryId;
-    if ($sourceCountryId <= 0 || $sourceCountryId === $targetCountryId) {
-        $out['reason'] = 'no_source_country';
-
-        return $out;
-    }
-
-    $stCnt = $pdo->prepare('SELECT COUNT(*) FROM channels WHERE country_id = ?');
-    $stCnt->execute([$targetCountryId]);
-    if ((int) $stCnt->fetchColumn() > 0) {
-        $out['reason'] = 'target_has_channels';
-
-        return $out;
-    }
-
-    $stSrc = $pdo->prepare(
-        'SELECT * FROM channels WHERE country_id = ? ORDER BY id ASC'
-    );
-    $stSrc->execute([$sourceCountryId]);
-    $rows = $stSrc->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    if ($rows === []) {
-        $out['reason'] = 'source_empty';
-
-        return $out;
-    }
-
-    $hasKind = orange_table_has_column($pdo, 'channels', 'channel_kind');
-    $hasDefault = orange_table_has_column($pdo, 'channels', 'is_country_default');
-    $defaultWhNum = 1;
-    $copyIndex = 0;
-
-    foreach ($rows as $row) {
-        if (!is_array($row)) {
-            continue;
-        }
-        unset($row['id'], $row['updated_at']);
-        $row['country_id'] = $targetCountryId;
-        $row['whatsapp_number'] = '';
-        $row['is_active'] = (int) ($row['is_active'] ?? 1);
-        if (!isset($row['warehouse_number']) || (int) $row['warehouse_number'] <= 0) {
-            $row['warehouse_number'] = $defaultWhNum;
-        }
-        if ($hasKind && !isset($row['channel_kind'])) {
-            $row['channel_kind'] = 'web';
-        }
-        if ($hasDefault) {
-            $row['is_country_default'] = $copyIndex === 0 ? 1 : 0;
-        }
-
-        $cols = array_keys($row);
-        $sql = 'INSERT INTO channels (`' . implode('`, `', $cols) . '`) VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')';
-        try {
-            $pdo->prepare($sql)->execute(array_values($row));
-            $out['channels_copied']++;
-            $copyIndex++;
-        } catch (Throwable $e) {
-            if (function_exists('error_log')) {
-                error_log('[orange] country channel copy: ' . $e->getMessage());
-            }
-        }
-    }
-
-    $out['skipped'] = $out['channels_copied'] <= 0;
-    $out['reason'] = $out['channels_copied'] > 0 ? 'copied' : 'copy_failed';
-
-    return $out;
 }
 
 /**
@@ -916,49 +850,14 @@ function orange_country_provision_full(
     $out['warehouse_id'] = $wid;
     $out['created_warehouse'] = $whBefore <= 0 && $wid > 0;
 
+    /* قرار المالك 2026-07-27: تفعيل/تهيئة الدولة لا تنشئ ولا تنسخ قنوات — إنشاء يدوي فقط. */
     $out['channels_copy'] = orange_country_copy_channels_from_source($pdo, $countryId, $sourceCountryId);
-
-    if ((int) ($out['channels_copy']['channels_copied'] ?? 0) <= 0
-        && orange_table_exists($pdo, 'channels')
-        && orange_channels_has_country_column($pdo)) {
-        $stCh = $pdo->prepare('SELECT id FROM channels WHERE country_id = ? ORDER BY id ASC LIMIT 1');
-        $stCh->execute([$countryId]);
-        $existingCh = (int) ($stCh->fetchColumn() ?: 0);
-        if ($existingCh > 0) {
-            $out['channel_id'] = $existingCh;
-        } else {
-            $row = orange_country_row_by_id($pdo, $countryId, false);
-            if ($row !== null) {
-                $code = orange_countries_normalize_code((string) ($row['code'] ?? ''));
-                $nameAr = trim((string) ($row['name_ar'] ?? ''));
-                $nameEn = trim((string) ($row['name_en'] ?? ''));
-                $chName = $nameAr !== '' ? ($nameAr . ' — ويب') : ($nameEn !== '' ? $nameEn . ' — web' : 'Web');
-                $slug = $code !== '' ? $code . '-web' : ('c' . $countryId . '-web');
-                $pathSegment = 'web';
-                $defaultWhNum = 1;
-                if (orange_table_has_column($pdo, 'channels', 'channel_kind')) {
-                    $ins = $pdo->prepare(
-                        'INSERT INTO channels (name, slug, path_segment, whatsapp_number, warehouse_number, is_active, country_id, channel_kind)
-                         VALUES (?, ?, ?, \'\', ?, 1, ?, \'web\')'
-                    );
-                    $ins->execute([$chName, $slug, $pathSegment, $defaultWhNum, $countryId]);
-                } else {
-                    $ins = $pdo->prepare(
-                        'INSERT INTO channels (name, slug, path_segment, whatsapp_number, warehouse_number, is_active, country_id)
-                         VALUES (?, ?, ?, \'\', ?, 1, ?)'
-                    );
-                    $ins->execute([$chName, $slug, $pathSegment, $defaultWhNum, $countryId]);
-                }
-                $cid = (int) $pdo->lastInsertId();
-                $out['channel_id'] = $cid;
-                $out['created_channel'] = $cid > 0;
-            }
-        }
-    } else {
+    $out['created_channel'] = false;
+    $out['channel_id'] = 0;
+    if (orange_table_exists($pdo, 'channels') && orange_channels_has_country_column($pdo)) {
         $stCh = $pdo->prepare('SELECT id FROM channels WHERE country_id = ? ORDER BY id ASC LIMIT 1');
         $stCh->execute([$countryId]);
         $out['channel_id'] = (int) ($stCh->fetchColumn() ?: 0);
-        $out['created_channel'] = (int) ($out['channels_copy']['channels_copied'] ?? 0) > 0;
     }
 
     $out['catalog_copy'] = orange_country_copy_catalog_from_source($pdo, $countryId, $sourceCountryId);

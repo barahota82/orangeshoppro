@@ -38,13 +38,95 @@ try {
         $sourceId = 0;
     }
 
-    $previewCountryId = (int) ($data['preview_country_id'] ?? 0);
-    if ($previewCountryId <= 0) {
-        $previewCountryId = orange_admin_context_country_id($pdo);
+    /*
+     * سلطة دولة المعاينة (قرار المالك 2026-07-27):
+     * - منتج موجود → products.country_id ويجب أن يطابق سياق الأدمن.
+     * - منتج جديد → Current Admin Country Context.
+     * - لا ثقة بـ preview_country_id من العميل.
+     */
+    $adminCountryId = orange_admin_context_country_id($pdo);
+    if ($adminCountryId <= 0) {
+        json_response(['success' => false, 'code' => 'admin_country_required', 'message' => 'سياق دولة الأدمن غير صالح'], 422);
     }
-    if ($previewCountryId <= 0) {
-        json_response(['success' => false, 'message' => 'اختر دولة المعاينة'], 422);
+
+    $previewCountryId = 0;
+    if ($sourceId > 0) {
+        if (!orange_table_has_column($pdo, 'products', 'country_id')) {
+            json_response(['success' => false, 'message' => 'عمود دولة المنتج غير جاهز'], 422);
+        }
+        $stSrc = $pdo->prepare(
+            'SELECT id, country_id, is_preview_draft FROM products WHERE id = ? LIMIT 1'
+        );
+        $stSrc->execute([$sourceId]);
+        $srcRow = $stSrc->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($srcRow)) {
+            json_response(['success' => false, 'message' => 'المنتج غير موجود'], 404);
+        }
+        if ((int) ($srcRow['is_preview_draft'] ?? 0) === 1) {
+            json_response(['success' => false, 'message' => 'لا يمكن معاينة صف ظل كمنتج مصدر'], 422);
+        }
+        $productCountryId = (int) ($srcRow['country_id'] ?? 0);
+        if ($productCountryId <= 0) {
+            json_response(['success' => false, 'code' => 'product_country_missing', 'message' => 'المنتج بلا دولة — لا معاينة'], 422);
+        }
+        if ($productCountryId !== $adminCountryId) {
+            json_response([
+                'success' => false,
+                'code' => 'preview_country_mismatch',
+                'message' => 'لا يمكن معاينة منتج من دولة أخرى داخل السياق الحالي',
+            ], 403);
+        }
+        $previewCountryId = $productCountryId;
+    } else {
+        $previewCountryId = $adminCountryId;
     }
+
+    /* تجاهل أي دولة مرسلة من العميل — السلطة من الخادم فقط. */
+    unset($data['preview_country_id']);
+
+    $requestedChannelId = (int) ($data['preview_channel_id'] ?? $data['channel_id'] ?? 0);
+    $countryChannels = orange_preview_channels_for_country($pdo, $previewCountryId);
+    if ($countryChannels === []) {
+        json_response([
+            'success' => false,
+            'code' => 'no_channel_for_country',
+            'message' => 'لا توجد قناة لهذه الدولة. أنشئ قناة من شاشة قنوات العملاء أولًا.',
+        ], 422);
+    }
+
+    $mainChannelId = 0;
+    foreach ($countryChannels as $chRow) {
+        if ((int) ($chRow['is_country_default'] ?? 0) === 1) {
+            $mainChannelId = (int) $chRow['id'];
+            break;
+        }
+    }
+
+    $resolvedChannelId = 0;
+    if (count($countryChannels) === 1) {
+        $resolvedChannelId = (int) $countryChannels[0]['id'];
+    } elseif ($requestedChannelId > 0) {
+        $resolvedChannelId = $requestedChannelId;
+    } elseif ($mainChannelId > 0) {
+        $resolvedChannelId = $mainChannelId;
+    } else {
+        json_response([
+            'success' => false,
+            'code' => 'preview_channel_required',
+            'message' => 'اختر قناة المعاينة صراحةً — لا توجد قناة رئيسية لهذه الدولة',
+        ], 422);
+    }
+
+    $resolvedChannel = orange_preview_resolve_channel_for_country($pdo, $previewCountryId, $resolvedChannelId);
+    if ($resolvedChannel === null) {
+        json_response([
+            'success' => false,
+            'code' => 'preview_channel_invalid',
+            'message' => 'قناة المعاينة غير صالحة أو لا تتبع دولة المنتج',
+        ], 422);
+    }
+    $channelSlug = (string) $resolvedChannel['slug'];
+    $resolvedChannelId = (int) $resolvedChannel['id'];
 
     /* نوع المنتج لم يَعُد شرطاً لفتح المعاينة — فقط لإظهار كارت المسودّة الأخضر. */
     $productTypeId = (int) ($data['product_type_id'] ?? 0);
@@ -324,24 +406,11 @@ try {
     }
 
     /* فتح جلسة المعاينة (تتصفّح الموقع كعميل؛ draft_id=0 = بلا منتج). */
-    orange_preview_set_session($adminId, $previewCountryId, $draftId, 86400);
+    orange_preview_set_session($adminId, $previewCountryId, $draftId, 86400, $resolvedChannelId);
 
-    $channelSlug = orange_storefront_main_channel_slug_for_country($pdo, $previewCountryId);
-    if ($channelSlug === null || $channelSlug === '') {
-        try {
-            $anySlug = $pdo->query('SELECT slug FROM channels WHERE is_active = 1 ORDER BY id ASC LIMIT 1')->fetchColumn();
-            $channelSlug = ($anySlug !== false && $anySlug !== null) ? (string) $anySlug : '';
-        } catch (Throwable $ce) {
-            $channelSlug = '';
-        }
-    }
-    if ($channelSlug === '') {
-        json_response(['success' => false, 'message' => 'لا توجد قناة نشطة لدولة المعاينة'], 422);
-    }
-
-    $previewUrl = storefront_url('home', (string) $channelSlug, 'ar');
+    $previewUrl = storefront_url('home', $channelSlug, 'ar');
     $productUrl = $draftId > 0
-        ? storefront_url('product', (string) $channelSlug, 'ar', ['id' => $draftId])
+        ? storefront_url('product', $channelSlug, 'ar', ['id' => $draftId])
         : null;
 
     json_response([
@@ -350,6 +419,7 @@ try {
         'draft_id' => $draftId,
         'browse_only' => $draftId === 0,
         'channel' => $channelSlug,
+        'channel_id' => $resolvedChannelId,
         'country_id' => $previewCountryId,
         'preview_url' => $previewUrl,
         'product_url' => $productUrl,

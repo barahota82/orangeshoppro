@@ -299,8 +299,34 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
 
 $orangeAdminCardPreviewCssHref = storefront_public_path('/assets/css/main.css');
 $orangeAdminCardPreviewViewLabel = t('view_product');
+$orangePreviewCountryLabel = '';
+$orangePreviewCountryRow = $adminCountryId > 0 ? orange_country_row_by_id($pdo, $adminCountryId, false) : null;
+if (is_array($orangePreviewCountryRow)) {
+    $orangePreviewCountryLabel = trim((string) (($orangePreviewCountryRow['name_ar'] ?? '') ?: ($orangePreviewCountryRow['name_en'] ?? '')));
+}
+if ($orangePreviewCountryLabel === '' && $adminCountryId > 0) {
+    $orangePreviewCountryLabel = 'دولة #' . $adminCountryId;
+}
+$orangePreviewChannelsForCountry = $adminCountryId > 0
+    ? orange_preview_channels_for_country($pdo, $adminCountryId)
+    : [];
+$orangePreviewMainChannelId = 0;
+$orangePreviewMainChannelSlug = '';
+foreach ($orangePreviewChannelsForCountry as $pvCh) {
+    if ((int) ($pvCh['is_country_default'] ?? 0) === 1) {
+        $orangePreviewMainChannelId = (int) $pvCh['id'];
+        $orangePreviewMainChannelSlug = (string) $pvCh['slug'];
+        break;
+    }
+}
+if ($orangePreviewMainChannelId <= 0 && count($orangePreviewChannelsForCountry) === 1) {
+    $orangePreviewMainChannelId = (int) $orangePreviewChannelsForCountry[0]['id'];
+    $orangePreviewMainChannelSlug = (string) $orangePreviewChannelsForCountry[0]['slug'];
+}
 $orangeAdminSfProductUrlPartsForJs = [
-    'channel' => orange_storefront_default_channel_slug($pdo),
+    'channel' => $orangePreviewMainChannelSlug,
+    'channel_id' => $orangePreviewMainChannelId,
+    'country_id' => (int) $adminCountryId,
     'lang' => 'ar',
 ];
 ?>
@@ -727,23 +753,36 @@ usort($productNavRows, static function ($a, $b) {
         <div id="productTabPanelCardPreview" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnCardPreview" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">معاينة المنتج كما يراها العميل</h4>
+        <p class="card-hint" style="margin:0 0 10px;font-size:12px;color:#64748b;">المحاكاة داخل هذا التاب معاينة سريعة تقريبية. المعاينة الكاملة / الجوال هي المرجع قبل النشر (متجر حقيقي).</p>
         <?php
-        $sfPreviewCountries = function_exists('orange_countries_storefront_active')
-            ? orange_countries_storefront_active($pdo, 'ar')
-            : [];
+        $orangePreviewChannelCount = count($orangePreviewChannelsForCountry);
+        $orangePreviewNeedsExplicitChannel = $orangePreviewChannelCount > 1 && $orangePreviewMainChannelId <= 0;
+        $orangePreviewFullDisabled = $adminCountryId <= 0 || $orangePreviewChannelCount === 0;
         ?>
         <div class="admin-product-fullpreview-row" style="margin:0 0 12px;padding:10px;border:1px solid #fed7aa;border-radius:8px;background:#fff7ed;">
             <strong style="display:block;margin-bottom:6px;font-size:13px;">معاينة كاملة — تصفّح الموقع كعميل (المحفوظ + غير المحفوظ)</strong>
             <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                <label for="orangeFullPreviewCountry" style="margin:0;font-size:13px;">دولة المعاينة</label>
-                <select id="orangeFullPreviewCountry" style="min-width:160px;">
-                    <?php foreach ($sfPreviewCountries as $sfC): ?>
-                    <option value="<?php echo (int) $sfC['id']; ?>"<?php echo ((int) $sfC['id'] === (int) $adminCountryId) ? ' selected' : ''; ?>><?php echo htmlspecialchars((string) $sfC['name'], ENT_QUOTES, 'UTF-8'); ?></option>
+                <span style="margin:0;font-size:13px;">دولة المعاينة:</span>
+                <strong id="orangeFullPreviewCountryLabel" data-country-id="<?php echo (int) $adminCountryId; ?>" style="font-size:13px;"><?php echo htmlspecialchars($orangePreviewCountryLabel !== '' ? $orangePreviewCountryLabel : '—', ENT_QUOTES, 'UTF-8'); ?></strong>
+                <input type="hidden" id="orangeFullPreviewCountry" value="<?php echo (int) $adminCountryId; ?>">
+                <label for="orangeFullPreviewChannel" style="margin:0;font-size:13px;">قناة المعاينة</label>
+                <select id="orangeFullPreviewChannel" style="min-width:180px;"<?php echo $orangePreviewFullDisabled ? ' disabled' : ''; ?>>
+                    <?php if ($orangePreviewChannelCount === 0): ?>
+                    <option value="0">لا توجد قناة لهذه الدولة</option>
+                    <?php elseif ($orangePreviewNeedsExplicitChannel): ?>
+                    <option value="0">— اختر قناة —</option>
+                    <?php foreach ($orangePreviewChannelsForCountry as $pvCh): ?>
+                    <option value="<?php echo (int) $pvCh['id']; ?>"><?php echo htmlspecialchars((string) $pvCh['name'], ENT_QUOTES, 'UTF-8'); ?></option>
                     <?php endforeach; ?>
+                    <?php else: ?>
+                    <?php foreach ($orangePreviewChannelsForCountry as $pvCh): ?>
+                    <option value="<?php echo (int) $pvCh['id']; ?>"<?php echo ((int) $pvCh['id'] === (int) $orangePreviewMainChannelId) ? ' selected' : ''; ?>><?php echo htmlspecialchars((string) $pvCh['name'], ENT_QUOTES, 'UTF-8'); ?></option>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
                 </select>
-                <button type="button" class="btn" id="orangeBtnFullPreview">فتح المعاينة الكاملة</button>
-                <button type="button" class="btn btn-secondary" id="orangeBtnMobilePreview">معاينة الجوال 📱</button>
-                <span id="orangeFullPreviewStatus" style="font-size:12px;color:#64748b;"></span>
+                <button type="button" class="btn" id="orangeBtnFullPreview"<?php echo $orangePreviewFullDisabled ? ' disabled' : ''; ?>>فتح المعاينة الكاملة</button>
+                <button type="button" class="btn btn-secondary" id="orangeBtnMobilePreview"<?php echo $orangePreviewFullDisabled ? ' disabled' : ''; ?>>معاينة الجوال 📱</button>
+                <span id="orangeFullPreviewStatus" style="font-size:12px;color:#64748b;"><?php echo $orangePreviewFullDisabled ? 'لا توجد قناة لهذه الدولة. أنشئ قناة من شاشة قنوات العملاء أولًا.' : ''; ?></span>
             </div>
         </div>
 
@@ -867,6 +906,8 @@ window.ORANGE_CATALOG_ATTR_DEFS = <?php echo json_encode($catalogAttrDefsForJs, 
 window.ORANGE_ADMIN_CARD_PREVIEW_CSS = <?php echo json_encode($orangeAdminCardPreviewCssHref, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_ADMIN_VIEW_PRODUCT_LABEL = <?php echo json_encode($orangeAdminCardPreviewViewLabel, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_ADMIN_SF_PRODUCT_URL_PARTS = <?php echo json_encode($orangeAdminSfProductUrlPartsForJs, JSON_UNESCAPED_UNICODE); ?>;
+window.ORANGE_PREVIEW_CHANNELS = <?php echo json_encode($orangePreviewChannelsForCountry, JSON_UNESCAPED_UNICODE); ?>;
+window.ORANGE_PREVIEW_ADMIN_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
 
 const PRODUCT_MSG = {
     E_REORDER: 'بيانات الترتيب غير صحيحة',
@@ -2341,18 +2382,32 @@ function orangeAdminPreviewProductPageHtml(opts) {
         '</div>';
 }
 
-/** رابط صفحة المنتج على الواجهة (بعد الحفظ فقط — يحتاج معرفاً في القاعدة). */
+/** رابط صفحة المنتج على الواجهة (بعد الحفظ فقط — يحتاج معرفاً في القاعدة + قناة نفس الدولة). */
+function orangeAdminSelectedPreviewChannelSlug() {
+    const sel = document.getElementById('orangeFullPreviewChannel');
+    const chId = sel ? (parseInt(sel.value, 10) || 0) : 0;
+    const list = Array.isArray(window.ORANGE_PREVIEW_CHANNELS) ? window.ORANGE_PREVIEW_CHANNELS : [];
+    for (let i = 0; i < list.length; i++) {
+        if (list[i] && parseInt(String(list[i].id || 0), 10) === chId) {
+            return String(list[i].slug || '').trim();
+        }
+    }
+    const parts = window.ORANGE_ADMIN_SF_PRODUCT_URL_PARTS;
+    return parts && String(parts.channel || '').trim() !== '' ? String(parts.channel).trim() : '';
+}
+
 function orangeAdminBuildStorefrontProductPageUrl(productId) {
     const id = parseInt(String(productId != null ? productId : '0'), 10) || 0;
     if (id <= 0) {
         return '';
     }
-    const parts = window.ORANGE_ADMIN_SF_PRODUCT_URL_PARTS;
-    if (!parts || String(parts.channel || '').trim() === '') {
+    const channel = orangeAdminSelectedPreviewChannelSlug();
+    if (!channel) {
         return '';
     }
+    const parts = window.ORANGE_ADMIN_SF_PRODUCT_URL_PARTS || {};
     const q = new URLSearchParams({
-        channel: String(parts.channel).trim(),
+        channel: channel,
         lang: String(parts.lang || 'ar').trim() || 'ar',
         id: String(id),
     });
@@ -2888,6 +2943,7 @@ function setProductFormEditMode(isEdit) {
 }
 
 function resetProductForm() {
+    orangeClearAdminPreviewServerSession();
     document.getElementById('product_record_id').value = '0';
     window.ORANGE_PRODUCT_FORM_DIRTY = false;
     window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = false;
@@ -3053,6 +3109,7 @@ function orangeNormalizeProductTabPanelsNoGap() {
 
 async function loadProductForEdit(id) {
     try {
+        orangeClearAdminPreviewServerSession();
         const res = await fetch(adminApiPath('api/products/get.php?id=' + encodeURIComponent(id)));
         const j = await res.json();
         if (!j.success || !j.product) {
@@ -4950,12 +5007,30 @@ function orangeClearPreviewStorefrontState() {
     } catch (e) {}
 }
 
+/** إنهاء جلسة معاينة الخادم عند تبديل المنتج/السياق حتى لا تُعاد استخدام دولة/قناة قديمة. */
+function orangeClearAdminPreviewServerSession() {
+    try {
+        fetch(adminApiPath('api/products/preview-exit.php'), { credentials: 'same-origin', redirect: 'manual' }).catch(function () {});
+    } catch (eClr) {}
+}
+
 async function orangePreparePreviewSession() {
     orangeClearPreviewStorefrontState();
     orangeEnsureVariantsForPreview();
     const payload = orangeBuildProductPreviewPayload();
-    const countryEl = document.getElementById('orangeFullPreviewCountry');
-    payload.preview_country_id = countryEl ? (parseInt(countryEl.value, 10) || 0) : 0;
+    const channelEl = document.getElementById('orangeFullPreviewChannel');
+    const channelId = channelEl ? (parseInt(channelEl.value, 10) || 0) : 0;
+    if (!channelId) {
+        const list = Array.isArray(window.ORANGE_PREVIEW_CHANNELS) ? window.ORANGE_PREVIEW_CHANNELS : [];
+        return {
+            success: false,
+            code: list.length === 0 ? 'no_channel_for_country' : 'preview_channel_required',
+            message: list.length === 0
+                ? 'لا توجد قناة لهذه الدولة. أنشئ قناة من شاشة قنوات العملاء أولًا.'
+                : 'اختر قناة المعاينة صراحةً — لا توجد قناة رئيسية لهذه الدولة'
+        };
+    }
+    payload.preview_channel_id = channelId;
     payload.preview_source_product_id = parseInt((document.getElementById('product_record_id') && document.getElementById('product_record_id').value) || '0', 10) || 0;
     return await postJSON('/admin/api/products/save-preview-draft.php', payload);
 }
@@ -5045,6 +5120,19 @@ async function orangeOpenMobilePreview() {
     if (b) { b.addEventListener('click', orangeOpenFullPreview); }
     const m = document.getElementById('orangeBtnMobilePreview');
     if (m) { m.addEventListener('click', orangeOpenMobilePreview); }
+    const chSel = document.getElementById('orangeFullPreviewChannel');
+    if (chSel) {
+        chSel.addEventListener('change', function () {
+            const slug = orangeAdminSelectedPreviewChannelSlug();
+            const chId = parseInt(chSel.value, 10) || 0;
+            if (!window.ORANGE_ADMIN_SF_PRODUCT_URL_PARTS) {
+                window.ORANGE_ADMIN_SF_PRODUCT_URL_PARTS = { lang: 'ar' };
+            }
+            window.ORANGE_ADMIN_SF_PRODUCT_URL_PARTS.channel = slug;
+            window.ORANGE_ADMIN_SF_PRODUCT_URL_PARTS.channel_id = chId;
+            try { orangeAdminRefreshStorefrontProductPageLink(); } catch (eCh) {}
+        });
+    }
 
     document.querySelectorAll('.orange-mpv-size').forEach((el) => {
         el.addEventListener('click', () => {

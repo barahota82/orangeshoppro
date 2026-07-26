@@ -683,6 +683,21 @@ function orange_admin_store_country_context(PDO $pdo, string $code, int $country
     if ($countryId <= 0) {
         return orange_countries_default_id($pdo);
     }
+    $prevCid = 0;
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $prevCid = (int) ($_SESSION['admin_country_ctx'] ?? 0);
+        if ($prevCid <= 0 && isset($GLOBALS['orange_admin_ctx_country_id'])) {
+            $prevCid = (int) $GLOBALS['orange_admin_ctx_country_id'];
+        }
+        /* منع جلسة معاينة منتج قديمة من دولة أخرى بعد تبديل سياق الأدمن. */
+        if ($prevCid > 0 && $prevCid !== $countryId
+            && function_exists('orange_preview_clear_session')) {
+            orange_preview_clear_session();
+        } elseif ($prevCid > 0 && $prevCid !== $countryId
+            && session_status() === PHP_SESSION_ACTIVE) {
+            unset($_SESSION['orange_product_preview']);
+        }
+    }
     orange_admin_send_country_cookie($code);
     $_SESSION['admin_country_ctx'] = $countryId;
     $GLOBALS['orange_admin_ctx_country_id'] = $countryId;
@@ -1031,7 +1046,8 @@ function orange_delivery_areas_has_country_column(PDO $pdo): bool
 }
 
 /**
- * بند 13.9 — تهيئة تشغيلية كاملة عند تفعيل دولة (idempotent).
+ * بند 13.9 — تهيئة تشغيلية عند تفعيل دولة (idempotent).
+ * قرار المالك 2026-07-27: لا تنشئ ولا تنسخ قنوات — القنوات يدوية من شاشة قنوات العملاء.
  *
  * @return array<string,mixed>
  */
