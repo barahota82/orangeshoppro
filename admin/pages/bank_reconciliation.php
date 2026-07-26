@@ -43,12 +43,20 @@ $editRec = ($editId > 0 && $ready) ? orange_bank_reconciliation_get($pdo, $editI
 $apiBase = storefront_public_path('/admin/api/bank-reconciliation');
 $fmtAmt = static fn (float $n): string => orange_accounting_report_format_amount($n, $reportMoney);
 
+$brTodayYmd = date('Y-m-d');
+try {
+    if ($ctxCountryId > 0) {
+        $brTodayYmd = orange_admin_time_document_date_today_for_country_id($pdo, $ctxCountryId);
+    }
+} catch (Throwable $e) {
+    $brTodayYmd = date('Y-m-d');
+}
 $initial = [
     'id' => 0,
     'account_id' => 0,
     'fiscal_year_id' => $years !== [] ? (int) ($years[0]['id'] ?? 0) : 0,
     'period_from' => '',
-    'period_to' => date('Y-m-d'),
+    'period_to' => $brTodayYmd,
     'statement_balance' => 0,
     'notes' => '',
     'lines' => [],

@@ -24,6 +24,14 @@ orange_catalog_backfill_channels_country_id($pdo);
 $sv2Caps = orange_admin_caps_for_page($admin, $pdo, 'company_sales_invoice');
 
 $adminCountryId = orange_admin_context_country_id($pdo);
+$sv2DefaultEntryDisp = '—';
+try {
+    if ($adminCountryId > 0) {
+        $sv2DefaultEntryDisp = orange_admin_time_now_display_for_admin_context($pdo);
+    }
+} catch (Throwable $e) {
+    $sv2DefaultEntryDisp = '—';
+}
 $adminDefaultPhoneDial = orange_admin_context_phone_dial($pdo);
 $adminDefaultCurrency = orange_admin_context_currency_code($pdo);
 $adminCurrencyDecimals = orange_currency_decimals_for_code($adminDefaultCurrency);
@@ -389,7 +397,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         <div>
             <label for="sv2_entry_date">تاريخ الإدخال</label>
             <input type="text" id="sv2_entry_date" class="admin-inp-readonly" readonly tabindex="-1" dir="ltr" lang="en" style="background:#f4f4f5;cursor:default;"
-                value="<?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?>"
+                value="<?php echo htmlspecialchars($sv2DefaultEntryDisp, ENT_QUOTES, 'UTF-8'); ?>"
                 title="وقت تسجيل إدخال المستند في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح">
         </div>
         <div>

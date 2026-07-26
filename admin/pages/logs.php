@@ -6,6 +6,8 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/report_export.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -14,7 +16,18 @@ $rows = [];
 $total = 0;
 $hasAuditTable = orange_table_exists($pdo, 'orange_admin_audit_log');
 $hasAdmins = orange_table_exists($pdo, 'admins');
+$hasCountryCol = $hasAuditTable && orange_table_has_column($pdo, 'orange_admin_audit_log', 'country_id');
+$hasGlobalCol = $hasAuditTable && orange_table_has_column($pdo, 'orange_admin_audit_log', 'is_global');
 $adminOptions = [];
+$ctxCountryId = orange_admin_context_country_id($pdo);
+$filterTz = '';
+try {
+    if ($ctxCountryId > 0) {
+        $filterTz = orange_admin_time_timezone_for_country_id($pdo, $ctxCountryId);
+    }
+} catch (Throwable $e) {
+    $filterTz = '';
+}
 
 $fromInput = trim((string) ($_GET['from'] ?? ''));
 $toInput = trim((string) ($_GET['to'] ?? ''));
@@ -26,14 +39,27 @@ $hasFilters = $fromInput !== '' || $toInput !== '' || $adminFilterId > 0;
 
 $where = [];
 $whereParams = [];
-if ($fromYmd !== '') {
-    $where[] = 'l.created_at >= ?';
-    $whereParams[] = $fromYmd . ' 00:00:00';
+if ($hasCountryCol) {
+    $where[] = 'l.country_id = ?';
+    $whereParams[] = $ctxCountryId;
+    if ($hasGlobalCol) {
+        $where[] = 'l.is_global = 0';
+    }
 }
-if ($toYmd !== '') {
-    $toNext = date('Y-m-d', strtotime($toYmd . ' +1 day'));
-    $where[] = 'l.created_at < ?';
-    $whereParams[] = $toNext . ' 00:00:00';
+if (($fromYmd !== '' || $toYmd !== '') && $filterTz !== '') {
+    $range = orange_admin_time_filter_range_mysql_utc($fromYmd, $toYmd, $filterTz);
+    if ($range !== null) {
+        $startUnix = orange_admin_time_parse_utc_instant(
+            orange_admin_time_parse_mysql_utc_datetime($range['start_utc_mysql'])->format('c')
+        )->getTimestamp();
+        $endUnix = orange_admin_time_parse_utc_instant(
+            orange_admin_time_parse_mysql_utc_datetime($range['end_exclusive_utc_mysql'])->format('c')
+        )->getTimestamp();
+        $where[] = 'UNIX_TIMESTAMP(l.created_at) >= ?';
+        $whereParams[] = $startUnix;
+        $where[] = 'UNIX_TIMESTAMP(l.created_at) < ?';
+        $whereParams[] = $endUnix;
+    }
 }
 if ($adminFilterId > 0) {
     $where[] = 'l.admin_id = ?';
@@ -49,13 +75,28 @@ if ($hasAdmins) {
     )->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
-if ($hasAuditTable) {
+$displayForRow = static function (PDO $pdo, array $r, int $ctxCountryId): string {
+    $unix = orange_admin_time_unix_or_null($r['created_at_unix'] ?? null);
+    $cid = (int) ($r['country_id'] ?? 0);
+    if ($cid <= 0) {
+        $cid = $ctxCountryId;
+    }
+    if ($unix === null || $cid <= 0) {
+        return '—';
+    }
+
+    return orange_admin_time_display_unix_for_record($pdo, $unix, $cid);
+};
+
+if ($hasAuditTable && $ctxCountryId > 0) {
     $countSt = $pdo->prepare('SELECT COUNT(*) FROM orange_admin_audit_log l' . $whereSql);
     $countSt->execute($whereParams);
     $total = (int) $countSt->fetchColumn();
 
     if ($hasAdmins) {
-        $sql = 'SELECT l.id, l.created_at, l.admin_id, l.action, l.message, l.entity_table, l.entity_id,
+        $sql = 'SELECT l.id, l.created_at, UNIX_TIMESTAMP(l.created_at) AS created_at_unix,
+                l.admin_id, l.action, l.message, l.entity_table, l.entity_id,
+                ' . ($hasCountryCol ? 'l.country_id,' : 'NULL AS country_id,') . '
                 a.username AS admin_username
                 FROM orange_admin_audit_log l
                 LEFT JOIN admins a ON a.id = l.admin_id
@@ -63,7 +104,9 @@ if ($hasAuditTable) {
                 ORDER BY l.id DESC
                 LIMIT 500';
     } else {
-        $sql = 'SELECT l.id, l.created_at, l.admin_id, l.action, l.message, l.entity_table, l.entity_id,
+        $sql = 'SELECT l.id, l.created_at, UNIX_TIMESTAMP(l.created_at) AS created_at_unix,
+                l.admin_id, l.action, l.message, l.entity_table, l.entity_id,
+                ' . ($hasCountryCol ? 'l.country_id,' : 'NULL AS country_id,') . '
                 NULL AS admin_username
                 FROM orange_admin_audit_log l
                 ' . $whereSql . '
@@ -75,16 +118,20 @@ if ($hasAuditTable) {
     $rows = $rowsSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
-if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $hasAuditTable) {
+if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $hasAuditTable && $ctxCountryId > 0) {
     $exportSql = $hasAdmins
-        ? 'SELECT l.id, l.created_at, l.admin_id, l.action, l.message, l.entity_table, l.entity_id,
+        ? 'SELECT l.id, l.created_at, UNIX_TIMESTAMP(l.created_at) AS created_at_unix,
+                l.admin_id, l.action, l.message, l.entity_table, l.entity_id,
+                ' . ($hasCountryCol ? 'l.country_id,' : 'NULL AS country_id,') . '
                 a.username AS admin_username
                 FROM orange_admin_audit_log l
                 LEFT JOIN admins a ON a.id = l.admin_id
                 ' . $whereSql . '
                 ORDER BY l.id DESC
                 LIMIT 8000'
-        : 'SELECT l.id, l.created_at, l.admin_id, l.action, l.message, l.entity_table, l.entity_id,
+        : 'SELECT l.id, l.created_at, UNIX_TIMESTAMP(l.created_at) AS created_at_unix,
+                l.admin_id, l.action, l.message, l.entity_table, l.entity_id,
+                ' . ($hasCountryCol ? 'l.country_id,' : 'NULL AS country_id,') . '
                 NULL AS admin_username
                 FROM orange_admin_audit_log l
                 ' . $whereSql . '
@@ -124,7 +171,7 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $hasAuditTab
         $entity = $et !== '' ? $et . ($ei !== '' ? ' #' . $ei : '') : '—';
         $xlsRows[] = [
             (int) ($r['id'] ?? 0),
-            orange_format_datetime_dmY_hi((string) ($r['created_at'] ?? '')),
+            $displayForRow($pdo, $r, $ctxCountryId),
             $u,
             (string) ($r['action'] ?? ''),
             (string) ($r['message'] ?? ''),
@@ -198,7 +245,9 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $hasAuditTab
 
 <div class="card">
     <h3 class="card-title">آخر السجلات (حتى 500)</h3>
-    <?php if ($rows === []): ?>
+    <?php if ($ctxCountryId <= 0): ?>
+        <p class="muted">اختر دولة من سياق الإدمن لعرض سجل النشاط.</p>
+    <?php elseif ($rows === []): ?>
         <?php if (!$hasAuditTable): ?>
             <p class="muted">جدول سجل النشاط غير جاهز بعد.</p>
         <?php elseif ($hasFilters): ?>
@@ -226,7 +275,7 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $hasAuditTab
                     <?php foreach ($rows as $r): ?>
                         <tr>
                             <td><?php echo (int) $r['id']; ?></td>
-                            <td dir="ltr" style="white-space:nowrap;"><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($r['created_at'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr" style="white-space:nowrap;"><?php echo htmlspecialchars($displayForRow($pdo, $r, $ctxCountryId), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td>
                                 <?php
                                 $u = trim((string) ($r['admin_username'] ?? ''));
@@ -255,29 +304,3 @@ if (isset($_GET['export']) && (string) $_GET['export'] === 'xls' && $hasAuditTab
         </div>
     <?php endif; ?>
 </div>
-
-<style>
-    .logs-filter-form {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px 14px;
-        align-items: end;
-    }
-    .logs-filter-form > div {
-        min-width: 180px;
-    }
-    .logs-filter-actions {
-        margin-inline-start: auto;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    @media (max-width: 720px) {
-        .logs-filter-form > div {
-            min-width: 100%;
-        }
-        .logs-filter-actions {
-            margin-inline-start: 0;
-        }
-    }
-</style>

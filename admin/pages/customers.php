@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/customer_attachments.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 
 $cusAttachmentMaxCount = orange_customer_attachment_max_count();
 
@@ -171,18 +172,29 @@ if (orange_table_exists($pdo, 'customers')) {
     $orderStatsByCustomerId = [];
     if (orange_table_exists($pdo, 'orders') && orange_table_has_column($pdo, 'orders', 'customer_id')) {
         try {
+            $ordersCountrySql = orange_sql_country_and_fragment($pdo, 'orders', 'orders', $adminCountryId);
             $oSt = $pdo->query(
                 'SELECT customer_id, COUNT(*) AS cnt, MAX(created_at) AS last_at
-                 FROM orders WHERE customer_id IS NOT NULL AND customer_id > 0
-                 GROUP BY customer_id'
+                 FROM orders WHERE customer_id IS NOT NULL AND customer_id > 0'
+                . $ordersCountrySql
+                . ' GROUP BY customer_id'
             );
             if ($oSt) {
                 while ($oRow = $oSt->fetch(PDO::FETCH_ASSOC)) {
                     $cid = (int) ($oRow['customer_id'] ?? 0);
                     if ($cid > 0) {
+                        $lastRaw = trim((string) ($oRow['last_at'] ?? ''));
+                        $lastDisp = '';
+                        if ($lastRaw !== '' && $adminCountryId > 0) {
+                            $lastDisp = orange_admin_time_display_mysql_utc_for_record(
+                                $pdo,
+                                $lastRaw,
+                                $adminCountryId
+                            );
+                        }
                         $orderStatsByCustomerId[$cid] = [
                             'count' => (int) ($oRow['cnt'] ?? 0),
-                            'last_at' => (string) ($oRow['last_at'] ?? ''),
+                            'last_at' => $lastDisp,
                             'cash' => 0,
                             'credit' => 0,
                             'online' => 0,
@@ -198,8 +210,9 @@ if (orange_table_exists($pdo, 'customers')) {
             if ($hasPaymentTerms) {
                 $dSt1 = $pdo->query(
                     'SELECT customer_id, payment_terms, COUNT(*) AS cnt
-                     FROM orders WHERE customer_id IS NOT NULL AND customer_id > 0
-                     GROUP BY customer_id, payment_terms'
+                     FROM orders WHERE customer_id IS NOT NULL AND customer_id > 0'
+                    . $ordersCountrySql
+                    . ' GROUP BY customer_id, payment_terms'
                 );
                 if ($dSt1) {
                     while ($dRow = $dSt1->fetch(PDO::FETCH_ASSOC)) {
@@ -227,8 +240,9 @@ if (orange_table_exists($pdo, 'customers')) {
                 $cond = $hasSource ? "source IN ('online','storefront')" : 'channel_id IS NOT NULL';
                 $dSt2 = $pdo->query(
                     "SELECT customer_id, COUNT(*) AS cnt
-                     FROM orders WHERE customer_id IS NOT NULL AND customer_id > 0 AND $cond
-                     GROUP BY customer_id"
+                     FROM orders WHERE customer_id IS NOT NULL AND customer_id > 0 AND $cond"
+                    . $ordersCountrySql
+                    . ' GROUP BY customer_id'
                 );
                 if ($dSt2) {
                     while ($dRow = $dSt2->fetch(PDO::FETCH_ASSOC)) {

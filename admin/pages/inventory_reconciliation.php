@@ -44,11 +44,19 @@ if ($defaultWarehouseId <= 0 && $warehouses !== []) {
     $defaultWarehouseId = (int) ($warehouses[0]['id'] ?? 0);
 }
 
+$invTodayYmd = date('Y-m-d');
+try {
+    if ($ctxCountryId > 0) {
+        $invTodayYmd = orange_admin_time_document_date_today_for_country_id($pdo, $ctxCountryId);
+    }
+} catch (Throwable $e) {
+    $invTodayYmd = date('Y-m-d');
+}
 $initial = [
     'id' => 0,
     'warehouse_id' => $defaultWarehouseId,
     'delivery_agent_id' => 0,
-    'counted_at' => date('Y-m-d'),
+    'counted_at' => $invTodayYmd,
     'notes' => '',
     'sort_order' => $nextDocNo,
     'attachments' => [],

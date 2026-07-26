@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/journal_types.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_settings_country.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -24,8 +25,19 @@ if ($elCountryLabel === '') {
 orange_journal_types_sync_canonical_defaults($pdo);
 /** @var list<array<string, mixed>> $elJournalTypes */
 $elJournalTypes = orange_journal_types_list($pdo, $elCountryId);
-$elDateFromDisp = orange_format_datetime_dmY_hi(date('Y-m-01 00:00:00'));
-$elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
+$elDateFromDisp = '';
+$elDateToDisp = '';
+try {
+    $elTz = orange_admin_time_timezone_for_country_id($pdo, $elCountryId);
+    $elMonthStart = orange_admin_time_month_start_ymd_in_iana($elTz);
+    $elMonthEnd = orange_admin_time_month_end_ymd_in_iana($elTz);
+    // Date-only calendar bounds; time suffix matches orange-inp-dmyhi widget (not Entry Date).
+    $elDateFromDisp = orange_format_date_dmY($elMonthStart) . ' 00:00';
+    $elDateToDisp = orange_format_date_dmY($elMonthEnd) . ' 23:59';
+} catch (Throwable $e) {
+    $elDateFromDisp = '';
+    $elDateToDisp = '';
+}
 ?>
 <div class="gl-posting-page" dir="rtl">
     <div class="page-title" style="margin:0.5rem 1rem 0.75rem;">

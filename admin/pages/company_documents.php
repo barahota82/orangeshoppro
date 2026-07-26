@@ -5,11 +5,19 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/company_documents.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 
 $typeLabels = orange_company_document_type_labels();
-$cdDefaultDocDate = orange_format_date_dmY(date('Y-m-d'));
 $entityPresets = orange_company_document_entity_presets();
 $pdo = orange_admin_page_pdo();
+$cdDefaultDocDate = '';
+try {
+    $cdDefaultDocDate = orange_format_date_dmY(
+        orange_admin_time_document_date_today_for_admin_context($pdo)
+    );
+} catch (Throwable $e) {
+    $cdDefaultDocDate = '';
+}
 ?>
 <div class="page-title">
     <h1>أرشيف المستندات والدورة المستندية</h1>

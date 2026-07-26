@@ -18,6 +18,7 @@ require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 require_once __DIR__ . '/../../includes/voucher_print_banner.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 
 $pdo = orange_admin_page_pdo();
 
@@ -52,7 +53,10 @@ $nextJournalVoucherNo = 1;
 $fyPeekId = 0;
 if (orange_journal_vouchers_ready($pdo)) {
     orange_journal_types_sync_canonical_defaults($pdo);
-    $fyPeek = orange_fiscal_find_for_date($pdo, date('Y-m-d'), $jvScreenCountryId > 0 ? $jvScreenCountryId : null);
+    $fyPeekYmd = $jvScreenCountryId > 0
+        ? orange_admin_time_document_date_today_for_country_id($pdo, $jvScreenCountryId)
+        : orange_admin_time_document_date_today_for_admin_context($pdo);
+    $fyPeek = orange_fiscal_find_for_date($pdo, $fyPeekYmd, $jvScreenCountryId > 0 ? $jvScreenCountryId : null);
     $fyPeekId = $fyPeek ? (int) $fyPeek['id'] : 0;
     $etPeek = isset($jvPageEntryType) ? (string) $jvPageEntryType : '';
     if (
@@ -70,7 +74,6 @@ if (orange_journal_vouchers_ready($pdo)) {
         $nextJournalVoucherNo = orange_gl_voucher_next_id_preview($pdo, $jvScreenCountryId);
     }
 }
-require_once __DIR__ . '/../../includes/admin_time.php';
 $jvFormDocumentEnteredDisplay = $jvScreenCountryId > 0
     ? orange_admin_time_display_mysql_utc_for_record($pdo, orange_admin_time_utc_now_mysql(), $jvScreenCountryId)
     : orange_admin_time_display_mysql_utc_or_dash($pdo, orange_admin_time_utc_now_mysql(), 0);

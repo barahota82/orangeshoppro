@@ -1,1640 +1,1641 @@
 {
     "registry_version": "1.0",
-    "schema_revision": 122,
-    "generated_at": "2026-07-25T18:20:00Z",
+    "schema_revision": 123,
+    "generated_at": "2026-07-26T01:36:32+00:00",
     "generated_by": "scripts/backup/build_table_registry.php",
     "do_not_edit": "Generated only — regenerate with build_table_registry.php",
     "table_count": 117,
     "ownership_summary": {
-                              "global": 33,
-        "country_owned": 51,
+        "global": 32,
+        "country_owned": 52,
         "dependent": 28,
-                              "excluded_ephemeral": 5
-                          },
+        "excluded_ephemeral": 5
+    },
     "tables": {
-                   "accounts": {
-                                    "ownership_type": "country_owned",
-                                    "export_order": 50,
-                                    "delete_order": 450,
-                                    "restore_order": 50,
-                                    "extraction_rule": {
-                                                            "column": "country_id",
-                                                            "type": "country_id"
-                                                        },
-                                    "parent_dependency": null,
-                                    "uploads_linked": false,
-                                    "integrity_critical": true
-                                },
-                   "admin_permissions": {
-                                             "ownership_type": "global",
-                                             "export_order": 105,
-                                             "delete_order": 905,
-                                             "restore_order": 105,
-                                             "extraction_rule": {
-                                                                     "type": "full_table"
-                                                                 },
-                                             "parent_dependency": null,
-                                             "uploads_linked": false,
-                                             "integrity_critical": false
-                                         },
-                   "admin_sessions": {
-                                          "ownership_type": "excluded_ephemeral",
-                                          "export_order": 900,
-                                          "delete_order": 9999,
-                                          "restore_order": 9999,
-                                          "extraction_rule": {
-                                                                  "type": "skip"
-                                                              },
-                                          "parent_dependency": null,
-                                          "uploads_linked": false,
-                                          "integrity_critical": false
-                                      },
-                   "admins": {
-                                  "ownership_type": "country_owned",
-                                  "export_order": 57,
-                                  "delete_order": 457,
-                                  "restore_order": 57,
-                                  "extraction_rule": {
-                                                          "column": "country_id",
-                                                          "type": "country_id"
-                                                      },
-                                  "parent_dependency": null,
-                                  "uploads_linked": false,
-                                  "integrity_critical": false
-                              },
-                   "advisory_sizing_guide_cells": {
-                                                       "ownership_type": "global",
-                                                       "export_order": 19,
-                                                       "delete_order": 819,
-                                                       "restore_order": 19,
-                                                       "extraction_rule": {
-                                                                               "type": "full_table"
-                                                                           },
-                                                       "parent_dependency": null,
-                                                       "uploads_linked": false,
-                                                       "integrity_critical": false
-                                                   },
-                   "advisory_sizing_guide_columns": {
-                                                         "ownership_type": "global",
-                                                         "export_order": 17,
-                                                         "delete_order": 817,
-                                                         "restore_order": 17,
-                                                         "extraction_rule": {
-                                                                                 "type": "full_table"
-                                                                             },
-                                                         "parent_dependency": null,
-                                                         "uploads_linked": false,
-                                                         "integrity_critical": false
-                                                     },
-                   "advisory_sizing_guide_rows": {
-                                                      "ownership_type": "global",
-                                                      "export_order": 18,
-                                                      "delete_order": 818,
-                                                      "restore_order": 18,
-                                                      "extraction_rule": {
-                                                                              "type": "full_table"
-                                                                          },
-                                                      "parent_dependency": null,
-                                                      "uploads_linked": false,
-                                                      "integrity_critical": false
-                                                  },
-                   "advisory_sizing_guides": {
-                                                  "ownership_type": "global",
-                                                  "export_order": 16,
-                                                  "delete_order": 816,
-                                                  "restore_order": 16,
-                                                  "extraction_rule": {
-                                                                          "type": "full_table"
-                                                                      },
-                                                  "parent_dependency": null,
-                                                  "uploads_linked": false,
-                                                  "integrity_critical": false
-                                              },
-                   "advisory_sizing_library_bundles": {
-                                                           "ownership_type": "global",
-                                                           "export_order": 20,
-                                                           "delete_order": 820,
-                                                           "restore_order": 20,
-                                                           "extraction_rule": {
-                                                                                   "type": "full_table"
-                                                                               },
-                                                           "parent_dependency": null,
-                                                           "uploads_linked": false,
-                                                           "integrity_critical": false
-                                                       },
-                   "analytical_dimension": {
-                                                "ownership_type": "country_owned",
-                                                "export_order": 65,
-                                                "delete_order": 465,
-                                                "restore_order": 65,
-                                                "extraction_rule": {
-                                                                        "column": "country_id",
-                                                                        "type": "country_id"
-                                                                    },
-                                                "parent_dependency": null,
-                                                "uploads_linked": false,
-                                                "integrity_critical": false
-                                            },
-                   "analytical_dimension_value": {
-                                                      "ownership_type": "dependent",
-                                                      "export_order": 174,
-                                                      "delete_order": 174,
-                                                      "restore_order": 174,
-                                                      "extraction_rule": {
-                                                                              "parent_table": "analytical_dimension",
-                                                                              "type": "parent_rows",
-                                                                              "foreign_key": "dimension_id"
-                                                                          },
-                                                      "parent_dependency": {
-                                                                                "table": "analytical_dimension",
-                                                                                "nullable": false,
-                                                                                "foreign_key": "dimension_id"
-                                                                            },
-                                                      "uploads_linked": false,
-                                                      "integrity_critical": false
-                                                  },
-                   "bank_reconciliation": {
-                                               "ownership_type": "country_owned",
-                                               "export_order": 105,
-                                               "delete_order": 505,
-                                               "restore_order": 105,
-                                               "extraction_rule": {
-                                                                       "column": "country_id",
-                                                                       "type": "country_id"
-                                                                   },
-                                               "parent_dependency": null,
-                                               "uploads_linked": false,
-                                               "integrity_critical": true
-                                           },
-                   "bank_reconciliation_line": {
-                                                    "ownership_type": "dependent",
-                                                    "export_order": 168,
-                                                    "delete_order": 168,
-                                                    "restore_order": 168,
-                                                    "extraction_rule": {
-                                                                            "parent_table": "bank_reconciliation",
-                                                                            "type": "parent_rows",
-                                                                            "foreign_key": "bank_reconciliation_id"
-                                                                        },
-                                                    "parent_dependency": {
-                                                                              "table": "bank_reconciliation",
-                                                                              "nullable": false,
-                                                                              "foreign_key": "bank_reconciliation_id"
-                                                                          },
-                                                    "uploads_linked": false,
-                                                    "integrity_critical": true
-                                                },
-                   "cart_bogo_promotions": {
-                                                "ownership_type": "country_owned",
-                                                "export_order": 74,
-                                                "delete_order": 474,
-                                                "restore_order": 74,
-                                                "extraction_rule": {
-                                                                        "column": "country_id",
-                                                                        "type": "country_id"
-                                                                    },
-                                                "parent_dependency": null,
-                                                "uploads_linked": false,
-                                                "integrity_critical": false
-                                            },
-                   "cart_combo_promotions": {
-                                                 "ownership_type": "country_owned",
-                                                 "export_order": 75,
-                                                 "delete_order": 475,
-                                                 "restore_order": 75,
-                                                 "extraction_rule": {
-                                                                         "column": "country_id",
-                                                                         "type": "country_id"
-                                                                     },
-                                                 "parent_dependency": null,
-                                                 "uploads_linked": false,
-                                                 "integrity_critical": false
-                                             },
-                   "cart_gift_promotions": {
-                                                "ownership_type": "country_owned",
-                                                "export_order": 73,
-                                                "delete_order": 473,
-                                                "restore_order": 73,
-                                                "extraction_rule": {
-                                                                        "column": "country_id",
-                                                                        "type": "country_id"
-                                                                    },
-                                                "parent_dependency": null,
-                                                "uploads_linked": false,
-                                                "integrity_critical": false
-                                            },
-                   "cart_promotions": {
-                                           "ownership_type": "country_owned",
-                                           "export_order": 72,
-                                           "delete_order": 472,
-                                           "restore_order": 72,
-                                           "extraction_rule": {
-                                                                   "column": "country_id",
-                                                                   "type": "country_id"
-                                                               },
-                                           "parent_dependency": null,
-                                           "uploads_linked": false,
-                                           "integrity_critical": false
-                                       },
-                   "catalog_attribute_options": {
-                                                     "ownership_type": "global",
-                                                     "export_order": 25,
-                                                     "delete_order": 825,
-                                                     "restore_order": 25,
-                                                     "extraction_rule": {
-                                                                             "type": "full_table"
-                                                                         },
-                                                     "parent_dependency": null,
-                                                     "uploads_linked": false,
-                                                     "integrity_critical": false
-                                                 },
-                   "catalog_attributes": {
-                                              "ownership_type": "global",
-                                              "export_order": 24,
-                                              "delete_order": 824,
-                                              "restore_order": 24,
-                                              "extraction_rule": {
-                                                                      "type": "full_table"
-                                                                  },
-                                              "parent_dependency": null,
-                                              "uploads_linked": false,
-                                              "integrity_critical": false
-                                          },
-                   "catalog_categories": {
-                                              "ownership_type": "global",
-                                              "export_order": 32,
-                                              "delete_order": 832,
-                                              "restore_order": 32,
-                                              "extraction_rule": {
-                                                                      "type": "full_table"
-                                                                  },
-                                              "parent_dependency": null,
-                                              "uploads_linked": false,
-                                              "integrity_critical": false
-                                          },
-                   "catalog_sections": {
-                                            "ownership_type": "global",
-                                            "export_order": 31,
-                                            "delete_order": 831,
-                                            "restore_order": 31,
-                                            "extraction_rule": {
-                                                                    "type": "full_table"
-                                                                },
-                                            "parent_dependency": null,
-                                            "uploads_linked": false,
-                                            "integrity_critical": false
-                                        },
-                   "catalog_subcategories": {
-                                                 "ownership_type": "global",
-                                                 "export_order": 33,
-                                                 "delete_order": 833,
-                                                 "restore_order": 33,
-                                                 "extraction_rule": {
-                                                                         "type": "full_table"
-                                                                     },
-                                                 "parent_dependency": null,
-                                                 "uploads_linked": false,
-                                                 "integrity_critical": false
-                                             },
-                   "channels": {
-                                    "ownership_type": "country_owned",
-                                    "export_order": 54,
-                                    "delete_order": 454,
-                                    "restore_order": 54,
-                                    "extraction_rule": {
-                                                            "column": "country_id",
-                                                            "type": "country_id"
-                                                        },
-                                    "parent_dependency": null,
-                                    "uploads_linked": false,
-                                    "integrity_critical": true
-                                },
-                   "color_dictionary": {
-                                            "ownership_type": "global",
-                                            "export_order": 10,
-                                            "delete_order": 810,
-                                            "restore_order": 10,
-                                            "extraction_rule": {
-                                                                    "type": "full_table"
-                                                                },
-                                            "parent_dependency": null,
-                                            "uploads_linked": false,
-                                            "integrity_critical": false
-                                        },
-                   "commercial_kind_dictionary": {
-                                                      "ownership_type": "global",
-                                                      "export_order": 22,
-                                                      "delete_order": 822,
-                                                      "restore_order": 22,
-                                                      "extraction_rule": {
-                                                                              "type": "full_table"
-                                                                          },
-                                                      "parent_dependency": null,
-                                                      "uploads_linked": false,
-                                                      "integrity_critical": false
-                                                  },
-                   "company_bank_accounts": {
-                                                 "ownership_type": "country_owned",
-                                                 "export_order": 56,
-                                                 "delete_order": 456,
-                                                 "restore_order": 56,
-                                                 "extraction_rule": {
-                                                                         "column": "country_id",
-                                                                         "type": "country_id"
-                                                                     },
-                                                 "parent_dependency": null,
-                                                 "uploads_linked": false,
-                                                 "integrity_critical": false
-                                             },
-                   "company_settings": {
-                                            "ownership_type": "country_owned",
-                                            "export_order": 55,
-                                            "delete_order": 455,
-                                            "restore_order": 55,
-                                            "extraction_rule": {
-                                                                    "column": "country_id",
-                                                                    "type": "country_id"
-                                                                },
-                                            "parent_dependency": null,
-                                            "uploads_linked": false,
-                                            "integrity_critical": true
-                                        },
-                   "countries": {
-                                     "ownership_type": "global",
-                                     "export_order": 1,
-                                     "delete_order": 801,
-                                     "restore_order": 1,
-                                     "extraction_rule": {
-                                                             "type": "full_table"
-                                                         },
-                                     "parent_dependency": null,
-                                     "uploads_linked": false,
-                                     "integrity_critical": true
-                                 },
-                   "customer_addresses": {
-                                              "ownership_type": "dependent",
-                                              "export_order": 158,
-                                              "delete_order": 158,
-                                              "restore_order": 158,
-                                              "extraction_rule": {
-                                                                      "parent_table": "customers",
-                                                                      "type": "parent_rows",
-                                                                      "foreign_key": "customer_id"
-                                                                  },
-                                              "parent_dependency": {
-                                                                        "table": "customers",
-                                                                        "nullable": false,
-                                                                        "foreign_key": "customer_id"
-                                                                    },
-                                              "uploads_linked": false,
-                                              "integrity_critical": false
-                                          },
-                   "customers": {
-                                     "ownership_type": "country_owned",
-                                     "export_order": 58,
-                                     "delete_order": 458,
-                                     "restore_order": 58,
-                                     "extraction_rule": {
-                                                             "column": "country_id",
-                                                             "type": "country_id"
-                                                         },
-                                     "parent_dependency": null,
-                                     "uploads_linked": false,
-                                     "integrity_critical": true
-                                 },
-                   "delivery_agents": {
-                                           "ownership_type": "country_owned",
-                                           "export_order": 63,
-                                           "delete_order": 463,
-                                           "restore_order": 63,
-                                           "extraction_rule": {
-                                                                   "column": "country_id",
-                                                                   "type": "country_id"
-                                                               },
-                                           "parent_dependency": null,
-                                           "uploads_linked": false,
-                                           "integrity_critical": false
-                                       },
-                   "delivery_areas": {
-                                          "ownership_type": "country_owned",
-                                          "export_order": 62,
-                                          "delete_order": 462,
-                                          "restore_order": 62,
-                                          "extraction_rule": {
-                                                                  "column": "country_id",
-                                                                  "type": "country_id"
-                                                              },
-                                          "parent_dependency": null,
-                                          "uploads_linked": false,
-                                          "integrity_critical": false
-                                      },
-                   "delivery_fee_promotion_areas": {
-                                                        "ownership_type": "dependent",
-                                                        "export_order": 176,
-                                                        "delete_order": 176,
-                                                        "restore_order": 176,
-                                                        "extraction_rule": {
-                                                                                "parent_table": "delivery_fee_promotions",
-                                                                                "type": "parent_rows",
-                                                                                "foreign_key": "promotion_id"
-                                                                            },
-                                                        "parent_dependency": {
-                                                                                  "table": "delivery_fee_promotions",
-                                                                                  "nullable": false,
-                                                                                  "foreign_key": "promotion_id"
-                                                                              },
-                                                        "uploads_linked": false,
-                                                        "integrity_critical": false
-                                                    },
-                   "delivery_fee_promotion_governorates": {
-                                                               "ownership_type": "dependent",
-                                                               "export_order": 175,
-                                                               "delete_order": 175,
-                                                               "restore_order": 175,
-                                                               "extraction_rule": {
-                                                                                       "parent_table": "delivery_fee_promotions",
-                                                                                       "type": "parent_rows",
-                                                                                       "foreign_key": "promotion_id"
-                                                                                   },
-                                                               "parent_dependency": {
-                                                                                         "table": "delivery_fee_promotions",
-                                                                                         "nullable": false,
-                                                                                         "foreign_key": "promotion_id"
-                                                                                     },
-                                                               "uploads_linked": false,
-                                                               "integrity_critical": false
-                                                           },
-                   "delivery_fee_promotions": {
-                                                   "ownership_type": "country_owned",
-                                                   "export_order": 76,
-                                                   "delete_order": 476,
-                                                   "restore_order": 76,
-                                                   "extraction_rule": {
-                                                                           "column": "country_id",
-                                                                           "type": "country_id"
-                                                                       },
-                                                   "parent_dependency": null,
-                                                   "uploads_linked": false,
-                                                   "integrity_critical": false
-                                               },
-                   "delivery_governorates": {
-                                                 "ownership_type": "country_owned",
-                                                 "export_order": 61,
-                                                 "delete_order": 461,
-                                                 "restore_order": 61,
-                                                 "extraction_rule": {
-                                                                         "column": "country_id",
-                                                                         "type": "country_id"
-                                                                     },
-                                                 "parent_dependency": null,
-                                                 "uploads_linked": false,
-                                                 "integrity_critical": false
-                                             },
-                   "department_countries": {
-                                                "ownership_type": "country_owned",
-                                                "export_order": 64,
-                                                "delete_order": 464,
-                                                "restore_order": 64,
-                                                "extraction_rule": {
-                                                                        "column": "country_id",
-                                                                        "type": "country_id"
-                                                                    },
-                                                "parent_dependency": null,
-                                                "uploads_linked": false,
-                                                "integrity_critical": false
-                                            },
-                   "departments": {
-                                       "ownership_type": "global",
-                                       "export_order": 30,
-                                       "delete_order": 830,
-                                       "restore_order": 30,
-                                       "extraction_rule": {
-                                                               "type": "full_table"
-                                                           },
-                                       "parent_dependency": null,
-                                       "uploads_linked": false,
-                                       "integrity_critical": false
-                                   },
-                   "document_public_tokens": {
-                                                  "ownership_type": "country_owned",
-                                                  "export_order": 84,
-                                                  "delete_order": 484,
-                                                  "restore_order": 84,
-                                                  "extraction_rule": {
-                                                                          "column": "country_id",
-                                                                          "type": "country_id"
-                                                                      },
-                                                  "parent_dependency": null,
-                                                  "uploads_linked": false,
-                                                  "integrity_critical": false
-                                              },
-                   "document_sequences": {
-                                              "ownership_type": "global",
-                                              "export_order": 34,
-                                              "delete_order": 834,
-                                              "restore_order": 34,
-                                              "extraction_rule": {
-                                                                      "type": "full_table"
-                                                                  },
-                                              "parent_dependency": null,
-                                              "uploads_linked": false,
-                                              "integrity_critical": false
-                                          },
-                   "expenses": {
-                                    "ownership_type": "country_owned",
-                                    "export_order": 113,
-                                    "delete_order": 513,
-                                    "restore_order": 113,
-                                    "extraction_rule": {
-                                                            "description": "Expenses scoped via expense_account_id → accounts.country_id",
-                                                            "sql": "SELECT e.id FROM expenses e INNER JOIN accounts a ON a.id = e.expense_account_id WHERE a.country_id = :country_id",
-                                                            "type": "custom_sql"
-                                                        },
-                                    "parent_dependency": null,
-                                    "uploads_linked": false,
-                                    "integrity_critical": false
-                                },
-                   "fiscal_years": {
-                                        "ownership_type": "country_owned",
-                                        "export_order": 51,
-                                        "delete_order": 451,
-                                        "restore_order": 51,
-                                        "extraction_rule": {
-                                                                "column": "country_id",
-                                                                "type": "country_id"
-                                                            },
-                                        "parent_dependency": null,
-                                        "uploads_linked": false,
-                                        "integrity_critical": true
-                                    },
-                   "inventory_cost_consumptions": {
-                                                       "ownership_type": "dependent",
-                                                       "export_order": 173,
-                                                       "delete_order": 173,
-                                                       "restore_order": 173,
-                                                       "extraction_rule": {
-                                                                               "description": "Cost consumptions scoped via inventory_cost_layers.country_id",
-                                                                               "sql": "SELECT icc.id FROM inventory_cost_consumptions icc INNER JOIN inventory_cost_layers icl ON icl.id = icc.layer_id WHERE icl.country_id = :country_id",
-                                                                               "type": "custom_sql"
-                                                                           },
-                                                       "parent_dependency": {
-                                                                                 "table": "inventory_cost_layers",
-                                                                                 "foreign_key": "layer_id"
-                                                                             },
-                                                       "uploads_linked": false,
-                                                       "integrity_critical": true
-                                                   },
-                   "inventory_cost_layers": {
-                                                 "ownership_type": "country_owned",
-                                                 "export_order": 110,
-                                                 "delete_order": 510,
-                                                 "restore_order": 110,
-                                                 "extraction_rule": {
-                                                                         "column": "country_id",
-                                                                         "type": "country_id"
-                                                                     },
-                                                 "parent_dependency": null,
-                                                 "uploads_linked": false,
-                                                 "integrity_critical": true
-                                             },
-                   "inventory_reconciliation": {
-                                                    "ownership_type": "country_owned",
-                                                    "export_order": 108,
-                                                    "delete_order": 508,
-                                                    "restore_order": 108,
-                                                    "extraction_rule": {
-                                                                            "column": "country_id",
-                                                                            "type": "country_id"
-                                                                        },
-                                                    "parent_dependency": null,
-                                                    "uploads_linked": false,
-                                                    "integrity_critical": true
-                                                },
-                   "inventory_reconciliation_line": {
-                                                         "ownership_type": "dependent",
-                                                         "export_order": 172,
-                                                         "delete_order": 172,
-                                                         "restore_order": 172,
-                                                         "extraction_rule": {
-                                                                                 "parent_table": "inventory_reconciliation",
-                                                                                 "type": "parent_rows",
-                                                                                 "foreign_key": "inventory_reconciliation_id"
-                                                                             },
-                                                         "parent_dependency": {
-                                                                                   "table": "inventory_reconciliation",
-                                                                                   "nullable": false,
-                                                                                   "foreign_key": "inventory_reconciliation_id"
-                                                                               },
-                                                         "uploads_linked": false,
-                                                         "integrity_critical": true
-                                                     },
-                   "journal_entries": {
-                                           "ownership_type": "global",
-                                           "export_order": 110,
-                                           "delete_order": 910,
-                                           "restore_order": 110,
-                                           "extraction_rule": {
-                                                                   "type": "full_table"
-                                                               },
-                                           "parent_dependency": null,
-                                           "uploads_linked": false,
-                                           "integrity_critical": false
-                                       },
-                   "journal_lines": {
-                                         "ownership_type": "dependent",
-                                         "export_order": 163,
-                                         "delete_order": 163,
-                                         "restore_order": 163,
-                                         "extraction_rule": {
-                                                                 "parent_table": "journal_vouchers",
-                                                                 "type": "parent_rows",
-                                                                 "foreign_key": "journal_voucher_id"
-                                                             },
-                                         "parent_dependency": {
-                                                                   "table": "journal_vouchers",
-                                                                   "nullable": false,
-                                                                   "foreign_key": "journal_voucher_id"
-                                                               },
-                                         "uploads_linked": false,
-                                         "integrity_critical": true
-                                     },
-                   "journal_types": {
-                                         "ownership_type": "country_owned",
-                                         "export_order": 52,
-                                         "delete_order": 452,
-                                         "restore_order": 52,
-                                         "extraction_rule": {
-                                                                 "column": "country_id",
-                                                                 "type": "country_id"
-                                                             },
-                                         "parent_dependency": null,
-                                         "uploads_linked": false,
-                                         "integrity_critical": true
-                                     },
-                   "journal_vouchers": {
-                                            "ownership_type": "country_owned",
-                                            "export_order": 104,
-                                            "delete_order": 504,
-                                            "restore_order": 104,
-                                            "extraction_rule": {
-                                                                    "column": "country_id",
-                                                                    "type": "country_id"
-                                                                },
-                                            "parent_dependency": null,
-                                            "uploads_linked": false,
-                                            "integrity_critical": true
-                                        },
-                   "logs": {
-                                "ownership_type": "excluded_ephemeral",
-                                "export_order": 902,
-                                "delete_order": 9999,
-                                "restore_order": 9999,
-                                "extraction_rule": {
-                                                        "type": "skip"
-                                                    },
-                                "parent_dependency": null,
-                                "uploads_linked": false,
-                                "integrity_critical": false
-                            },
-                   "loyalty_ledger": {
-                                          "ownership_type": "country_owned",
-                                          "export_order": 112,
-                                          "delete_order": 512,
-                                          "restore_order": 112,
-                                          "extraction_rule": {
-                                                                  "column": "country_id",
-                                                                  "type": "country_id"
-                                                              },
-                                          "parent_dependency": null,
-                                          "uploads_linked": false,
-                                          "integrity_critical": true
-                                      },
-                   "loyalty_settings": {
-                                            "ownership_type": "country_owned",
-                                            "export_order": 66,
-                                            "delete_order": 466,
-                                            "restore_order": 66,
-                                            "extraction_rule": {
-                                                                    "column": "country_id",
-                                                                    "type": "country_id"
-                                                                },
-                                            "parent_dependency": null,
-                                            "uploads_linked": false,
-                                            "integrity_critical": false
-                                        },
-                   "offers": {
-                                  "ownership_type": "dependent",
-                                  "export_order": 157,
-                                  "delete_order": 157,
-                                  "restore_order": 157,
-                                  "extraction_rule": {
-                                                          "parent_table": "products",
-                                                          "type": "parent_rows",
-                                                          "foreign_key": "product_id"
-                                                      },
-                                  "parent_dependency": {
-                                                            "table": "products",
-                                                            "nullable": false,
-                                                            "foreign_key": "product_id"
-                                                        },
-                                  "uploads_linked": false,
-                                  "integrity_critical": false
-                              },
-                   "opening_stock_voucher": {
-                                                 "ownership_type": "country_owned",
-                                                 "export_order": 106,
-                                                 "delete_order": 506,
-                                                 "restore_order": 106,
-                                                 "extraction_rule": {
-                                                                         "column": "country_id",
-                                                                         "type": "country_id"
-                                                                     },
-                                                 "parent_dependency": null,
-                                                 "uploads_linked": false,
-                                                 "integrity_critical": true
-                                             },
-                   "opening_stock_voucher_line": {
-                                                      "ownership_type": "dependent",
-                                                      "export_order": 169,
-                                                      "delete_order": 169,
-                                                      "restore_order": 169,
-                                                      "extraction_rule": {
-                                                                              "parent_table": "opening_stock_voucher",
-                                                                              "type": "parent_rows",
-                                                                              "foreign_key": "voucher_id"
-                                                                          },
-                                                      "parent_dependency": {
-                                                                                "table": "opening_stock_voucher",
-                                                                                "nullable": false,
-                                                                                "foreign_key": "voucher_id"
-                                                                            },
-                                                      "uploads_linked": false,
-                                                      "integrity_critical": true
-                                                  },
-                   "orange_admin_audit_log": {
-                                                  "ownership_type": "global",
-                                                  "export_order": 111,
-                                                  "delete_order": 911,
-                                                  "restore_order": 111,
-                                                  "extraction_rule": {
-                                                                          "type": "full_table"
-                                                                      },
-                                                  "parent_dependency": null,
-                                                  "uploads_linked": false,
-                                                  "integrity_critical": false
-                                              },
-                   "orange_admin_login_throttle": {
-                                                       "ownership_type": "excluded_ephemeral",
-                                                       "export_order": 901,
-                                                       "delete_order": 9999,
-                                                       "restore_order": 9999,
-                                                       "extraction_rule": {
-                                                                               "type": "skip"
-                                                                           },
-                                                       "parent_dependency": null,
-                                                       "uploads_linked": false,
-                                                       "integrity_critical": false
-                                                   },
-                   "orange_catalog_data_migration_log": {
-                                                             "ownership_type": "global",
-                                                             "export_order": 104,
-                                                             "delete_order": 904,
-                                                             "restore_order": 104,
-                                                             "extraction_rule": {
-                                                                                     "type": "full_table"
-                                                                                 },
-                                                             "parent_dependency": null,
-                                                             "uploads_linked": false,
-                                                             "integrity_critical": false
-                                                         },
-                   "orange_catalog_schema_checkpoint": {
-                                                            "ownership_type": "global",
-                                                            "export_order": 103,
-                                                            "delete_order": 903,
-                                                            "restore_order": 103,
-                                                            "extraction_rule": {
-                                                                                    "type": "full_table"
-                                                                                },
-                                                            "parent_dependency": null,
-                                                            "uploads_linked": false,
-                                                            "integrity_critical": false
-                                                        },
-                   "orange_company_documents": {
-                                                    "ownership_type": "country_owned",
-                                                    "export_order": 114,
-                                                    "delete_order": 514,
-                                                    "restore_order": 114,
-                                                    "extraction_rule": {
-                                                                            "description": "Company documents linked to country-scoped entities via entity_table/entity_id",
-                                                                            "sql": "SELECT ocd.id FROM orange_company_documents ocd WHERE ocd.entity_table IN (\u0027orders\u0027,\u0027purchases\u0027,\u0027customers\u0027,\u0027suppliers\u0027) AND EXISTS (SELECT 1 FROM orders o WHERE ocd.entity_table = \u0027orders\u0027 AND o.id = CAST(ocd.entity_id AS UNSIGNED) AND o.country_id = :country_id UNION SELECT 1 FROM purchases p WHERE ocd.entity_table = \u0027purchases\u0027 AND p.id = CAST(ocd.entity_id AS UNSIGNED) AND p.country_id = :country_id UNION SELECT 1 FROM customers c WHERE ocd.entity_table = \u0027customers\u0027 AND c.id = CAST(ocd.entity_id AS UNSIGNED) AND c.country_id = :country_id UNION SELECT 1 FROM suppliers s WHERE ocd.entity_table = \u0027suppliers\u0027 AND s.id = CAST(ocd.entity_id AS UNSIGNED) AND s.country_id = :country_id)",
-                                                                            "type": "custom_sql"
-                                                                        },
-                                                    "parent_dependency": null,
-                                                    "uploads_linked": true,
-                                                    "integrity_critical": false
-                                                },
-                   "orange_country_screen_copy_log": {
-                                                          "ownership_type": "country_owned",
-                                                          "export_order": 86,
-                                                          "delete_order": 486,
-                                                          "restore_order": 86,
-                                                          "extraction_rule": {
-                                                                                  "type": "country_scope_or",
-                                                                                  "columns": [
-                                                                                                  "source_country_id",
-                                                                                                  "target_country_id"
-                                                                                              ]
-                                                                              },
-                                                          "parent_dependency": null,
-                                                          "uploads_linked": false,
-                                                          "integrity_critical": false
-                                                      },
-                   "orange_edit_lock_registry": {
-                                                     "ownership_type": "country_owned",
-                                                     "export_order": 85,
-                                                     "delete_order": 485,
-                                                     "restore_order": 85,
-                                                     "extraction_rule": {
-                                                                             "column": "country_id",
-                                                                             "type": "country_id"
-                                                                         },
-                                                     "parent_dependency": null,
-                                                     "uploads_linked": false,
-                                                     "integrity_critical": false
-                                                 },
-                   "orange_gl_account_settings": {
-                                                      "ownership_type": "country_owned",
-                                                      "export_order": 79,
-                                                      "delete_order": 479,
-                                                      "restore_order": 79,
-                                                      "extraction_rule": {
-                                                                              "column": "country_id",
-                                                                              "type": "country_id"
-                                                                          },
-                                                      "parent_dependency": null,
-                                                      "uploads_linked": false,
-                                                      "integrity_critical": true
-                                                  },
-                   "orange_gl_journal_type_rules": {
-                                                        "ownership_type": "country_owned",
-                                                        "export_order": 80,
-                                                        "delete_order": 480,
-                                                        "restore_order": 80,
-                                                        "extraction_rule": {
-                                                                                "column": "country_id",
-                                                                                "type": "country_id"
-                                                                            },
-                                                        "parent_dependency": null,
-                                                        "uploads_linked": false,
-                                                        "integrity_critical": true
-                                                    },
-                   "orange_gl_pending_movements": {
-                                                       "ownership_type": "dependent",
-                                                       "export_order": 165,
-                                                       "delete_order": 165,
-                                                       "restore_order": 165,
-                                                       "extraction_rule": {
-                                                                               "description": "Pending GL movements scoped via journal_vouchers.country_id",
-                                                                               "sql": "SELECT ogpm.id FROM orange_gl_pending_movements ogpm INNER JOIN journal_vouchers jv ON jv.id = ogpm.journal_voucher_id WHERE jv.country_id = :country_id",
-                                                                               "type": "custom_sql"
-                                                                           },
-                                                       "parent_dependency": {
-                                                                                 "table": "journal_vouchers",
-                                                                                 "foreign_key": "journal_voucher_id"
-                                                                             },
-                                                       "uploads_linked": false,
-                                                       "integrity_critical": true
-                                                   },
-                   "orange_gl_setting_alloc": {
-                                                   "ownership_type": "country_owned",
-                                                   "export_order": 81,
-                                                   "delete_order": 481,
-                                                   "restore_order": 81,
-                                                   "extraction_rule": {
-                                                                           "column": "country_id",
-                                                                           "type": "country_id"
-                                                                       },
-                                                   "parent_dependency": null,
-                                                   "uploads_linked": false,
-                                                   "integrity_critical": false
-                                               },
-                   "orange_gl_voucher_slots": {
-                                                   "ownership_type": "dependent",
-                                                   "export_order": 164,
-                                                   "delete_order": 164,
-                                                   "restore_order": 164,
-                                                   "extraction_rule": {
-                                                                           "parent_table": "journal_vouchers",
-                                                                           "type": "parent_rows",
-                                                                           "foreign_key": "journal_voucher_id"
-                                                                       },
-                                                   "parent_dependency": {
-                                                                             "table": "journal_vouchers",
-                                                                             "nullable": false,
-                                                                             "foreign_key": "journal_voucher_id"
-                                                                         },
-                                                   "uploads_linked": false,
-                                                   "integrity_critical": true
-                                               },
-                   "orange_invoice_extra_lines": {
-                                                      "ownership_type": "country_owned",
-                                                      "export_order": 83,
-                                                      "delete_order": 483,
-                                                      "restore_order": 83,
-                                                      "extraction_rule": {
-                                                                              "column": "country_id",
-                                                                              "type": "country_id"
-                                                                          },
-                                                      "parent_dependency": null,
-                                                      "uploads_linked": false,
-                                                      "integrity_critical": false
-                                                  },
-                   "orange_invoice_line_presets": {
-                                                       "ownership_type": "country_owned",
-                                                       "export_order": 82,
-                                                       "delete_order": 482,
-                                                       "restore_order": 82,
-                                                       "extraction_rule": {
-                                                                               "column": "country_id",
-                                                                               "type": "country_id"
-                                                                           },
-                                                       "parent_dependency": null,
-                                                       "uploads_linked": false,
-                                                       "integrity_critical": false
-                                                   },
-                   "orange_schema_meta": {
-                                              "ownership_type": "global",
-                                              "export_order": 100,
-                                              "delete_order": 900,
-                                              "restore_order": 100,
-                                              "extraction_rule": {
-                                                                      "type": "full_table"
-                                                                  },
-                                              "parent_dependency": null,
-                                              "uploads_linked": false,
-                                              "integrity_critical": false
-                                          },
-                   "orange_schema_migration_failures": {
-                                                            "ownership_type": "global",
-                                                            "export_order": 102,
-                                                            "delete_order": 902,
-                                                            "restore_order": 102,
-                                                            "extraction_rule": {
-                                                                                    "type": "full_table"
-                                                                                },
-                                                            "parent_dependency": null,
-                                                            "uploads_linked": false,
-                                                            "integrity_critical": false
-                                                        },
-                   "orange_schema_migrations": {
-                                                    "ownership_type": "global",
-                                                    "export_order": 101,
-                                                    "delete_order": 901,
-                                                    "restore_order": 101,
-                                                    "extraction_rule": {
-                                                                            "type": "full_table"
-                                                                        },
-                                                    "parent_dependency": null,
-                                                    "uploads_linked": false,
-                                                    "integrity_critical": false
-                                                },
-                   "order_intake_queue": {
-                                              "ownership_type": "excluded_ephemeral",
-                                              "export_order": 903,
-                                              "delete_order": 9999,
-                                              "restore_order": 9999,
-                                              "extraction_rule": {
-                                                                      "type": "skip"
-                                                                  },
-                                              "parent_dependency": null,
-                                              "uploads_linked": false,
-                                              "integrity_critical": false
-                                          },
-                   "order_items": {
-                                       "ownership_type": "dependent",
-                                       "export_order": 159,
-                                       "delete_order": 159,
-                                       "restore_order": 159,
-                                       "extraction_rule": {
-                                                               "parent_table": "orders",
-                                                               "type": "parent_rows",
-                                                               "foreign_key": "order_id"
-                                                           },
-                                       "parent_dependency": {
-                                                                 "table": "orders",
-                                                                 "nullable": false,
-                                                                 "foreign_key": "order_id"
-                                                             },
-                                       "uploads_linked": false,
-                                       "integrity_critical": true
-                                   },
-                   "orders": {
-                                  "ownership_type": "country_owned",
-                                  "export_order": 100,
-                                  "delete_order": 500,
-                                  "restore_order": 100,
-                                  "extraction_rule": {
-                                                          "column": "country_id",
-                                                          "type": "country_id"
-                                                      },
-                                  "parent_dependency": null,
-                                  "uploads_linked": false,
-                                  "integrity_critical": true
-                              },
-                   "party_subledger": {
-                                           "ownership_type": "dependent",
-                                           "export_order": 166,
-                                           "delete_order": 166,
-                                           "restore_order": 166,
-                                           "extraction_rule": {
-                                                                   "description": "Party subledger scoped via journal_vouchers.country_id",
-                                                                   "sql": "SELECT ps.id FROM party_subledger ps INNER JOIN journal_vouchers jv ON jv.id = ps.voucher_id WHERE jv.country_id = :country_id",
-                                                                   "type": "custom_sql"
-                                                               },
-                                           "parent_dependency": {
-                                                                     "table": "journal_vouchers",
-                                                                     "foreign_key": "voucher_id"
-                                                                 },
-                                           "uploads_linked": false,
-                                           "integrity_critical": true
-                                       },
-                   "party_subledger_allocations": {
-                                                       "ownership_type": "dependent",
-                                                       "export_order": 167,
-                                                       "delete_order": 167,
-                                                       "restore_order": 167,
-                                                       "extraction_rule": {
-                                                                               "description": "Party subledger allocations scoped via payment journal_vouchers.country_id",
-                                                                               "sql": "SELECT psa.id FROM party_subledger_allocations psa INNER JOIN journal_vouchers jv ON jv.id = psa.payment_voucher_id WHERE jv.country_id = :country_id",
-                                                                               "type": "custom_sql"
-                                                                           },
-                                                       "parent_dependency": {
-                                                                                 "table": "journal_vouchers",
-                                                                                 "foreign_key": "payment_voucher_id"
-                                                                             },
-                                                       "uploads_linked": false,
-                                                       "integrity_critical": true
-                                                   },
-                   "pattern_dictionary": {
-                                              "ownership_type": "global",
-                                              "export_order": 11,
-                                              "delete_order": 811,
-                                              "restore_order": 11,
-                                              "extraction_rule": {
-                                                                      "type": "full_table"
-                                                                  },
-                                              "parent_dependency": null,
-                                              "uploads_linked": false,
-                                              "integrity_critical": false
-                                          },
-                   "payment_methods": {
-                                           "ownership_type": "country_owned",
-                                           "export_order": 67,
-                                           "delete_order": 467,
-                                           "restore_order": 67,
-                                           "extraction_rule": {
-                                                                   "column": "country_id",
-                                                                   "type": "country_id"
-                                                               },
-                                           "parent_dependency": null,
-                                           "uploads_linked": false,
-                                           "integrity_critical": false
-                                       },
-                   "payment_transactions": {
-                                                "ownership_type": "country_owned",
-                                                "export_order": 111,
-                                                "delete_order": 511,
-                                                "restore_order": 111,
-                                                "extraction_rule": {
-                                                                        "column": "country_id",
-                                                                        "type": "country_id"
-                                                                    },
-                                                "parent_dependency": null,
-                                                "uploads_linked": true,
-                                                "integrity_critical": true
-                                            },
-                   "product_attribute_values": {
-                                                    "ownership_type": "dependent",
-                                                    "export_order": 155,
-                                                    "delete_order": 155,
-                                                    "restore_order": 155,
-                                                    "extraction_rule": {
-                                                                            "parent_table": "products",
-                                                                            "type": "parent_rows",
-                                                                            "foreign_key": "product_id"
-                                                                        },
-                                                    "parent_dependency": {
-                                                                              "table": "products",
-                                                                              "nullable": false,
-                                                                              "foreign_key": "product_id"
-                                                                          },
-                                                    "uploads_linked": false,
-                                                    "integrity_critical": false
-                                                },
-                   "product_channels": {
-                                            "ownership_type": "dependent",
-                                            "export_order": 156,
-                                            "delete_order": 156,
-                                            "restore_order": 156,
-                                            "extraction_rule": {
-                                                                    "parent_table": "products",
-                                                                    "type": "parent_rows",
-                                                                    "foreign_key": "product_id"
-                                                                },
-                                            "parent_dependency": {
-                                                                      "table": "products",
-                                                                      "nullable": false,
-                                                                      "foreign_key": "product_id"
-                                                                  },
-                                            "uploads_linked": false,
-                                            "integrity_critical": false
-                                        },
-                   "product_colorway_images": {
-                                                   "ownership_type": "dependent",
-                                                   "export_order": 154,
-                                                   "delete_order": 154,
-                                                   "restore_order": 154,
-                                                   "extraction_rule": {
-                                                                           "parent_table": "product_colorways",
-                                                                           "type": "parent_rows",
-                                                                           "foreign_key": "product_colorway_id"
-                                                                       },
-                                                   "parent_dependency": {
-                                                                             "table": "product_colorways",
-                                                                             "nullable": false,
-                                                                             "foreign_key": "product_colorway_id"
-                                                                         },
-                                                   "uploads_linked": true,
-                                                   "integrity_critical": false
-                                               },
-                   "product_colorways": {
-                                             "ownership_type": "dependent",
-                                             "export_order": 153,
-                                             "delete_order": 153,
-                                             "restore_order": 153,
-                                             "extraction_rule": {
-                                                                     "parent_table": "products",
-                                                                     "type": "parent_rows",
-                                                                     "foreign_key": "product_id"
-                                                                 },
-                                             "parent_dependency": {
-                                                                       "table": "products",
-                                                                       "nullable": false,
-                                                                       "foreign_key": "product_id"
-                                                                   },
-                                             "uploads_linked": false,
-                                             "integrity_critical": false
-                                         },
-                   "product_images": {
-                                          "ownership_type": "dependent",
-                                          "export_order": 152,
-                                          "delete_order": 152,
-                                          "restore_order": 152,
-                                          "extraction_rule": {
-                                                                  "parent_table": "products",
-                                                                  "type": "parent_rows",
-                                                                  "foreign_key": "product_id"
-                                                              },
-                                          "parent_dependency": {
-                                                                    "table": "products",
-                                                                    "nullable": false,
-                                                                    "foreign_key": "product_id"
-                                                                },
-                                          "uploads_linked": true,
-                                          "integrity_critical": false
-                                      },
-                   "product_types": {
-                                         "ownership_type": "global",
-                                         "export_order": 26,
-                                         "delete_order": 826,
-                                         "restore_order": 26,
-                                         "extraction_rule": {
-                                                                 "type": "full_table"
-                                                             },
-                                         "parent_dependency": null,
-                                         "uploads_linked": false,
-                                         "integrity_critical": false
-                                     },
-                   "product_variants": {
-                                            "ownership_type": "dependent",
-                                            "export_order": 151,
-                                            "delete_order": 151,
-                                            "restore_order": 151,
-                                            "extraction_rule": {
-                                                                    "parent_table": "products",
-                                                                    "type": "parent_rows",
-                                                                    "foreign_key": "product_id"
-                                                                },
-                                            "parent_dependency": {
-                                                                      "table": "products",
-                                                                      "nullable": false,
-                                                                      "foreign_key": "product_id"
-                                                                  },
-                                            "uploads_linked": false,
-                                            "integrity_critical": true
-                                        },
-                   "products": {
-                                    "ownership_type": "country_owned",
-                                    "export_order": 60,
-                                    "delete_order": 460,
-                                    "restore_order": 60,
-                                    "extraction_rule": {
-                                                            "column": "country_id",
-                                                            "type": "country_id"
-                                                        },
-                                    "parent_dependency": null,
-                                    "uploads_linked": true,
-                                    "integrity_critical": true
-                                },
-                   "promo_pause_log": {
-                                           "ownership_type": "country_owned",
-                                           "export_order": 78,
-                                           "delete_order": 478,
-                                           "restore_order": 78,
-                                           "extraction_rule": {
-                                                                   "column": "country_id",
-                                                                   "type": "country_id"
-                                                               },
-                                           "parent_dependency": null,
-                                           "uploads_linked": false,
-                                           "integrity_critical": false
-                                       },
-                   "promo_stock_check": {
-                                             "ownership_type": "excluded_ephemeral",
-                                             "export_order": 904,
-                                             "delete_order": 9999,
-                                             "restore_order": 9999,
-                                             "extraction_rule": {
-                                                                     "type": "skip"
-                                                                 },
-                                             "parent_dependency": null,
-                                             "uploads_linked": false,
-                                             "integrity_critical": false
-                                         },
-                   "promotion_always_on_history": {
-                                                       "ownership_type": "country_owned",
-                                                       "export_order": 77,
-                                                       "delete_order": 477,
-                                                       "restore_order": 77,
-                                                       "extraction_rule": {
-                                                                               "column": "country_id",
-                                                                               "type": "country_id"
-                                                                           },
-                                                       "parent_dependency": null,
-                                                       "uploads_linked": false,
-                                                       "integrity_critical": false
-                                                   },
-                   "purchase_items": {
-                                          "ownership_type": "dependent",
-                                          "export_order": 160,
-                                          "delete_order": 160,
-                                          "restore_order": 160,
-                                          "extraction_rule": {
-                                                                  "parent_table": "purchases",
-                                                                  "type": "parent_rows",
-                                                                  "foreign_key": "purchase_id"
-                                                              },
-                                          "parent_dependency": {
-                                                                    "table": "purchases",
-                                                                    "nullable": false,
-                                                                    "foreign_key": "purchase_id"
-                                                                },
-                                          "uploads_linked": false,
-                                          "integrity_critical": true
-                                      },
-                   "purchase_return_items": {
-                                                 "ownership_type": "dependent",
-                                                 "export_order": 161,
-                                                 "delete_order": 161,
-                                                 "restore_order": 161,
-                                                 "extraction_rule": {
-                                                                         "parent_table": "purchase_returns",
-                                                                         "type": "parent_rows",
-                                                                         "foreign_key": "purchase_return_id"
-                                                                     },
-                                                 "parent_dependency": {
-                                                                           "table": "purchase_returns",
-                                                                           "nullable": false,
-                                                                           "foreign_key": "purchase_return_id"
-                                                                       },
-                                                 "uploads_linked": false,
-                                                 "integrity_critical": true
-                                             },
-                   "purchase_returns": {
-                                            "ownership_type": "dependent",
-                                            "export_order": 102,
-                                            "delete_order": 102,
-                                            "restore_order": 102,
-                                            "extraction_rule": {
-                                                                    "type": "custom_sql",
-                                                                    "description": "Purchase returns scoped via purchase_id → purchases.country_id or supplier_id → suppliers.country_id",
-                                                                    "sql": "SELECT pr.id FROM purchase_returns pr LEFT JOIN purchases p ON p.id = pr.purchase_id LEFT JOIN suppliers s ON s.id = pr.supplier_id WHERE (p.id IS NOT NULL AND p.country_id = :country_id) OR (p.id IS NULL AND s.country_id = :country_id)"
-                                                                },
-                                            "parent_dependency": {
-                                                                       "table": "purchases",
-                                                                       "foreign_key": "purchase_id",
-                                                                       "nullable": true
-                                                                   },
-                                            "uploads_linked": false,
-                                            "integrity_critical": true
-                                        },
-                   "purchases": {
-                                     "ownership_type": "country_owned",
-                                     "export_order": 101,
-                                     "delete_order": 501,
-                                     "restore_order": 101,
-                                     "extraction_rule": {
-                                                             "column": "country_id",
-                                                             "type": "country_id"
-                                                         },
-                                     "parent_dependency": null,
-                                     "uploads_linked": false,
-                                     "integrity_critical": true
-                                 },
-                   "report_line_master": {
-                                              "ownership_type": "global",
-                                              "export_order": 2,
-                                              "delete_order": 802,
-                                              "restore_order": 2,
-                                              "extraction_rule": {
-                                                                      "type": "full_table"
-                                                                  },
-                                              "parent_dependency": null,
-                                              "uploads_linked": false,
-                                              "integrity_critical": true
-                                          },
-                   "sales_return_items": {
-                                              "ownership_type": "dependent",
-                                              "export_order": 162,
-                                              "delete_order": 162,
-                                              "restore_order": 162,
-                                              "extraction_rule": {
-                                                                      "parent_table": "sales_returns",
-                                                                      "type": "parent_rows",
-                                                                      "foreign_key": "sales_return_id"
-                                                                  },
-                                              "parent_dependency": {
-                                                                        "table": "sales_returns",
-                                                                        "nullable": false,
-                                                                        "foreign_key": "sales_return_id"
-                                                                    },
-                                              "uploads_linked": false,
-                                              "integrity_critical": true
-                                          },
-                   "sales_returns": {
-                                         "ownership_type": "country_owned",
-                                         "export_order": 103,
-                                         "delete_order": 503,
-                                         "restore_order": 103,
-                                         "extraction_rule": {
-                                                                 "column": "country_id",
-                                                                 "type": "country_id"
-                                                             },
-                                         "parent_dependency": null,
-                                         "uploads_linked": false,
-                                         "integrity_critical": true
-                                     },
-                   "size_families": {
-                                         "ownership_type": "global",
-                                         "export_order": 12,
-                                         "delete_order": 812,
-                                         "restore_order": 12,
-                                         "extraction_rule": {
-                                                                 "type": "full_table"
-                                                             },
-                                         "parent_dependency": null,
-                                         "uploads_linked": false,
-                                         "integrity_critical": false
-                                     },
-                   "size_family_advisory_library_map": {
-                                                            "ownership_type": "global",
-                                                            "export_order": 21,
-                                                            "delete_order": 821,
-                                                            "restore_order": 21,
-                                                            "extraction_rule": {
-                                                                                    "type": "full_table"
-                                                                                },
-                                                            "parent_dependency": null,
-                                                            "uploads_linked": false,
-                                                            "integrity_critical": false
-                                                        },
-                   "size_family_sizes": {
-                                             "ownership_type": "global",
-                                             "export_order": 13,
-                                             "delete_order": 813,
-                                             "restore_order": 13,
-                                             "extraction_rule": {
-                                                                     "type": "full_table"
-                                                                 },
-                                             "parent_dependency": null,
-                                             "uploads_linked": false,
-                                             "integrity_critical": false
-                                         },
-                   "size_scheme_template_sizes": {
-                                                      "ownership_type": "global",
-                                                      "export_order": 15,
-                                                      "delete_order": 815,
-                                                      "restore_order": 15,
-                                                      "extraction_rule": {
-                                                                              "type": "full_table"
-                                                                          },
-                                                      "parent_dependency": null,
-                                                      "uploads_linked": false,
-                                                      "integrity_critical": false
-                                                  },
-                   "size_scheme_templates": {
-                                                 "ownership_type": "global",
-                                                 "export_order": 14,
-                                                 "delete_order": 814,
-                                                 "restore_order": 14,
-                                                 "extraction_rule": {
-                                                                         "type": "full_table"
-                                                                     },
-                                                 "parent_dependency": null,
-                                                 "uploads_linked": false,
-                                                 "integrity_critical": false
-                                             },
-                   "sizing_category_dictionary": {
-                                                      "ownership_type": "global",
-                                                      "export_order": 23,
-                                                      "delete_order": 823,
-                                                      "restore_order": 23,
-                                                      "extraction_rule": {
-                                                                              "type": "full_table"
-                                                                          },
-                                                      "parent_dependency": null,
-                                                      "uploads_linked": false,
-                                                      "integrity_critical": false
-                                                  },
-                   "stock_adjustment_voucher": {
-                                                    "ownership_type": "country_owned",
-                                                    "export_order": 107,
-                                                    "delete_order": 507,
-                                                    "restore_order": 107,
-                                                    "extraction_rule": {
-                                                                            "column": "country_id",
-                                                                            "type": "country_id"
-                                                                        },
-                                                    "parent_dependency": null,
-                                                    "uploads_linked": false,
-                                                    "integrity_critical": true
-                                                },
-                   "stock_adjustment_voucher_gl": {
-                                                       "ownership_type": "dependent",
-                                                       "export_order": 171,
-                                                       "delete_order": 171,
-                                                       "restore_order": 171,
-                                                       "extraction_rule": {
-                                                                               "parent_table": "stock_adjustment_voucher",
-                                                                               "type": "parent_rows",
-                                                                               "foreign_key": "voucher_id"
-                                                                           },
-                                                       "parent_dependency": {
-                                                                                 "table": "stock_adjustment_voucher",
-                                                                                 "nullable": false,
-                                                                                 "foreign_key": "voucher_id"
-                                                                             },
-                                                       "uploads_linked": false,
-                                                       "integrity_critical": true
-                                                   },
-                   "stock_adjustment_voucher_line": {
-                                                         "ownership_type": "dependent",
-                                                         "export_order": 170,
-                                                         "delete_order": 170,
-                                                         "restore_order": 170,
-                                                         "extraction_rule": {
-                                                                                 "parent_table": "stock_adjustment_voucher",
-                                                                                 "type": "parent_rows",
-                                                                                 "foreign_key": "voucher_id"
-                                                                             },
-                                                         "parent_dependency": {
-                                                                                   "table": "stock_adjustment_voucher",
-                                                                                   "nullable": false,
-                                                                                   "foreign_key": "voucher_id"
-                                                                               },
-                                                         "uploads_linked": false,
-                                                         "integrity_critical": true
-                                                     },
-                   "stock_movements": {
-                                           "ownership_type": "country_owned",
-                                           "export_order": 109,
-                                           "delete_order": 509,
-                                           "restore_order": 109,
-                                           "extraction_rule": {
-                                                                   "column": "country_id",
-                                                                   "type": "country_id"
-                                                               },
-                                           "parent_dependency": null,
-                                           "uploads_linked": false,
-                                           "integrity_critical": true
-                                       },
-                   "storefront_accounts": {
-                                               "ownership_type": "country_owned",
-                                               "export_order": 71,
-                                               "delete_order": 471,
-                                               "restore_order": 71,
-                                               "extraction_rule": {
-                                                                       "column": "country_id",
-                                                                       "type": "country_id"
-                                                                   },
-                                               "parent_dependency": null,
-                                               "uploads_linked": false,
-                                               "integrity_critical": true
-                                           },
-                   "storefront_copy_lines": {
-                                                 "ownership_type": "country_owned",
-                                                 "export_order": 68,
-                                                 "delete_order": 468,
-                                                 "restore_order": 68,
-                                                 "extraction_rule": {
-                                                                         "column": "country_id",
-                                                                         "type": "country_id"
-                                                                     },
-                                                 "parent_dependency": null,
-                                                 "uploads_linked": false,
-                                                 "integrity_critical": false
-                                             },
-                   "storefront_home_hero": {
-                                                "ownership_type": "global",
-                                                "export_order": 35,
-                                                "delete_order": 835,
-                                                "restore_order": 35,
-                                                "extraction_rule": {
-                                                                        "type": "full_table"
-                                                                    },
-                                                "parent_dependency": null,
-                                                "uploads_linked": false,
-                                                "integrity_critical": false
-                                            },
-                   "storefront_phone_merge_requests": {
-                                                           "ownership_type": "country_owned",
-                                                           "export_order": 70,
-                                                           "delete_order": 470,
-                                                           "restore_order": 70,
-                                                           "extraction_rule": {
-                                                                                   "column": "country_id",
-                                                                                   "type": "country_id"
-                                                                               },
-                                                           "parent_dependency": null,
-                                                           "uploads_linked": false,
-                                                           "integrity_critical": false
-                                                       },
-                   "storefront_promo_messages": {
-                                                     "ownership_type": "country_owned",
-                                                     "export_order": 69,
-                                                     "delete_order": 469,
-                                                     "restore_order": 69,
-                                                     "extraction_rule": {
-                                                                             "column": "country_id",
-                                                                             "type": "country_id"
-                                                                         },
-                                                     "parent_dependency": null,
-                                                     "uploads_linked": false,
-                                                     "integrity_critical": false
-                                                 },
-                   "suppliers": {
-                                     "ownership_type": "country_owned",
-                                     "export_order": 59,
-                                     "delete_order": 459,
-                                     "restore_order": 59,
-                                     "extraction_rule": {
-                                                             "column": "country_id",
-                                                             "type": "country_id"
-                                                         },
-                                     "parent_dependency": null,
-                                     "uploads_linked": false,
-                                     "integrity_critical": true
-                                 },
-                   "warehouse_variant_stock": {
-                                                   "ownership_type": "dependent",
-                                                   "export_order": 150,
-                                                   "delete_order": 150,
-                                                   "restore_order": 150,
-                                                   "extraction_rule": {
-                                                                           "parent_table": "warehouses",
-                                                                           "type": "parent_rows",
-                                                                           "foreign_key": "warehouse_id"
-                                                                       },
-                                                   "parent_dependency": {
-                                                                             "table": "warehouses",
-                                                                             "nullable": false,
-                                                                             "foreign_key": "warehouse_id"
-                                                                         },
-                                                   "uploads_linked": false,
-                                                   "integrity_critical": true
-                                               },
-                   "warehouses": {
-                                      "ownership_type": "country_owned",
-                                      "export_order": 53,
-                                      "delete_order": 453,
-                                      "restore_order": 53,
-                                      "extraction_rule": {
-                                                              "column": "country_id",
-                                                              "type": "country_id"
-                                                          },
-                                      "parent_dependency": null,
-                                      "uploads_linked": false,
-                                      "integrity_critical": true
-                                  }
-               }
+        "accounts": {
+            "ownership_type": "country_owned",
+            "export_order": 50,
+            "delete_order": 450,
+            "restore_order": 50,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "admin_permissions": {
+            "ownership_type": "global",
+            "export_order": 105,
+            "delete_order": 905,
+            "restore_order": 105,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "admin_sessions": {
+            "ownership_type": "excluded_ephemeral",
+            "export_order": 900,
+            "delete_order": 9999,
+            "restore_order": 9999,
+            "extraction_rule": {
+                "type": "skip"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "admins": {
+            "ownership_type": "country_owned",
+            "export_order": 57,
+            "delete_order": 457,
+            "restore_order": 57,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "advisory_sizing_guide_cells": {
+            "ownership_type": "global",
+            "export_order": 19,
+            "delete_order": 819,
+            "restore_order": 19,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "advisory_sizing_guide_columns": {
+            "ownership_type": "global",
+            "export_order": 17,
+            "delete_order": 817,
+            "restore_order": 17,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "advisory_sizing_guide_rows": {
+            "ownership_type": "global",
+            "export_order": 18,
+            "delete_order": 818,
+            "restore_order": 18,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "advisory_sizing_guides": {
+            "ownership_type": "global",
+            "export_order": 16,
+            "delete_order": 816,
+            "restore_order": 16,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "advisory_sizing_library_bundles": {
+            "ownership_type": "global",
+            "export_order": 20,
+            "delete_order": 820,
+            "restore_order": 20,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "analytical_dimension": {
+            "ownership_type": "country_owned",
+            "export_order": 65,
+            "delete_order": 465,
+            "restore_order": 65,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "analytical_dimension_value": {
+            "ownership_type": "dependent",
+            "export_order": 174,
+            "delete_order": 174,
+            "restore_order": 174,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "analytical_dimension",
+                "foreign_key": "dimension_id"
+            },
+            "parent_dependency": {
+                "table": "analytical_dimension",
+                "foreign_key": "dimension_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "bank_reconciliation": {
+            "ownership_type": "country_owned",
+            "export_order": 105,
+            "delete_order": 505,
+            "restore_order": 105,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "bank_reconciliation_line": {
+            "ownership_type": "dependent",
+            "export_order": 168,
+            "delete_order": 168,
+            "restore_order": 168,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "bank_reconciliation",
+                "foreign_key": "bank_reconciliation_id"
+            },
+            "parent_dependency": {
+                "table": "bank_reconciliation",
+                "foreign_key": "bank_reconciliation_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "cart_bogo_promotions": {
+            "ownership_type": "country_owned",
+            "export_order": 74,
+            "delete_order": 474,
+            "restore_order": 74,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "cart_combo_promotions": {
+            "ownership_type": "country_owned",
+            "export_order": 75,
+            "delete_order": 475,
+            "restore_order": 75,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "cart_gift_promotions": {
+            "ownership_type": "country_owned",
+            "export_order": 73,
+            "delete_order": 473,
+            "restore_order": 73,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "cart_promotions": {
+            "ownership_type": "country_owned",
+            "export_order": 72,
+            "delete_order": 472,
+            "restore_order": 72,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "catalog_attribute_options": {
+            "ownership_type": "global",
+            "export_order": 25,
+            "delete_order": 825,
+            "restore_order": 25,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "catalog_attributes": {
+            "ownership_type": "global",
+            "export_order": 24,
+            "delete_order": 824,
+            "restore_order": 24,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "catalog_categories": {
+            "ownership_type": "global",
+            "export_order": 32,
+            "delete_order": 832,
+            "restore_order": 32,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "catalog_sections": {
+            "ownership_type": "global",
+            "export_order": 31,
+            "delete_order": 831,
+            "restore_order": 31,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "catalog_subcategories": {
+            "ownership_type": "global",
+            "export_order": 33,
+            "delete_order": 833,
+            "restore_order": 33,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "channels": {
+            "ownership_type": "country_owned",
+            "export_order": 54,
+            "delete_order": 454,
+            "restore_order": 54,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "color_dictionary": {
+            "ownership_type": "global",
+            "export_order": 10,
+            "delete_order": 810,
+            "restore_order": 10,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "commercial_kind_dictionary": {
+            "ownership_type": "global",
+            "export_order": 22,
+            "delete_order": 822,
+            "restore_order": 22,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "company_bank_accounts": {
+            "ownership_type": "country_owned",
+            "export_order": 56,
+            "delete_order": 456,
+            "restore_order": 56,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "company_settings": {
+            "ownership_type": "country_owned",
+            "export_order": 55,
+            "delete_order": 455,
+            "restore_order": 55,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "countries": {
+            "ownership_type": "global",
+            "export_order": 1,
+            "delete_order": 801,
+            "restore_order": 1,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "customer_addresses": {
+            "ownership_type": "dependent",
+            "export_order": 158,
+            "delete_order": 158,
+            "restore_order": 158,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "customers",
+                "foreign_key": "customer_id"
+            },
+            "parent_dependency": {
+                "table": "customers",
+                "foreign_key": "customer_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "customers": {
+            "ownership_type": "country_owned",
+            "export_order": 58,
+            "delete_order": 458,
+            "restore_order": 58,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "delivery_agents": {
+            "ownership_type": "country_owned",
+            "export_order": 63,
+            "delete_order": 463,
+            "restore_order": 63,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "delivery_areas": {
+            "ownership_type": "country_owned",
+            "export_order": 62,
+            "delete_order": 462,
+            "restore_order": 62,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "delivery_fee_promotion_areas": {
+            "ownership_type": "dependent",
+            "export_order": 176,
+            "delete_order": 176,
+            "restore_order": 176,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "delivery_fee_promotions",
+                "foreign_key": "promotion_id"
+            },
+            "parent_dependency": {
+                "table": "delivery_fee_promotions",
+                "foreign_key": "promotion_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "delivery_fee_promotion_governorates": {
+            "ownership_type": "dependent",
+            "export_order": 175,
+            "delete_order": 175,
+            "restore_order": 175,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "delivery_fee_promotions",
+                "foreign_key": "promotion_id"
+            },
+            "parent_dependency": {
+                "table": "delivery_fee_promotions",
+                "foreign_key": "promotion_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "delivery_fee_promotions": {
+            "ownership_type": "country_owned",
+            "export_order": 76,
+            "delete_order": 476,
+            "restore_order": 76,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "delivery_governorates": {
+            "ownership_type": "country_owned",
+            "export_order": 61,
+            "delete_order": 461,
+            "restore_order": 61,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "department_countries": {
+            "ownership_type": "country_owned",
+            "export_order": 64,
+            "delete_order": 464,
+            "restore_order": 64,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "departments": {
+            "ownership_type": "global",
+            "export_order": 30,
+            "delete_order": 830,
+            "restore_order": 30,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "document_public_tokens": {
+            "ownership_type": "country_owned",
+            "export_order": 84,
+            "delete_order": 484,
+            "restore_order": 84,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "document_sequences": {
+            "ownership_type": "global",
+            "export_order": 34,
+            "delete_order": 834,
+            "restore_order": 34,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "expenses": {
+            "ownership_type": "country_owned",
+            "export_order": 113,
+            "delete_order": 513,
+            "restore_order": 113,
+            "extraction_rule": {
+                "type": "custom_sql",
+                "description": "Expenses scoped via expense_account_id → accounts.country_id",
+                "sql": "SELECT e.id FROM expenses e INNER JOIN accounts a ON a.id = e.expense_account_id WHERE a.country_id = :country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "fiscal_years": {
+            "ownership_type": "country_owned",
+            "export_order": 51,
+            "delete_order": 451,
+            "restore_order": 51,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "inventory_cost_consumptions": {
+            "ownership_type": "dependent",
+            "export_order": 173,
+            "delete_order": 173,
+            "restore_order": 173,
+            "extraction_rule": {
+                "type": "custom_sql",
+                "description": "Cost consumptions scoped via inventory_cost_layers.country_id",
+                "sql": "SELECT icc.id FROM inventory_cost_consumptions icc INNER JOIN inventory_cost_layers icl ON icl.id = icc.layer_id WHERE icl.country_id = :country_id"
+            },
+            "parent_dependency": {
+                "table": "inventory_cost_layers",
+                "foreign_key": "layer_id"
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "inventory_cost_layers": {
+            "ownership_type": "country_owned",
+            "export_order": 110,
+            "delete_order": 510,
+            "restore_order": 110,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "inventory_reconciliation": {
+            "ownership_type": "country_owned",
+            "export_order": 108,
+            "delete_order": 508,
+            "restore_order": 108,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "inventory_reconciliation_line": {
+            "ownership_type": "dependent",
+            "export_order": 172,
+            "delete_order": 172,
+            "restore_order": 172,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "inventory_reconciliation",
+                "foreign_key": "inventory_reconciliation_id"
+            },
+            "parent_dependency": {
+                "table": "inventory_reconciliation",
+                "foreign_key": "inventory_reconciliation_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "journal_entries": {
+            "ownership_type": "global",
+            "export_order": 110,
+            "delete_order": 910,
+            "restore_order": 110,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "journal_lines": {
+            "ownership_type": "dependent",
+            "export_order": 163,
+            "delete_order": 163,
+            "restore_order": 163,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "journal_vouchers",
+                "foreign_key": "journal_voucher_id"
+            },
+            "parent_dependency": {
+                "table": "journal_vouchers",
+                "foreign_key": "journal_voucher_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "journal_types": {
+            "ownership_type": "country_owned",
+            "export_order": 52,
+            "delete_order": 452,
+            "restore_order": 52,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "journal_vouchers": {
+            "ownership_type": "country_owned",
+            "export_order": 104,
+            "delete_order": 504,
+            "restore_order": 104,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "logs": {
+            "ownership_type": "excluded_ephemeral",
+            "export_order": 902,
+            "delete_order": 9999,
+            "restore_order": 9999,
+            "extraction_rule": {
+                "type": "skip"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "loyalty_ledger": {
+            "ownership_type": "country_owned",
+            "export_order": 112,
+            "delete_order": 512,
+            "restore_order": 112,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "loyalty_settings": {
+            "ownership_type": "country_owned",
+            "export_order": 66,
+            "delete_order": 466,
+            "restore_order": 66,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "offers": {
+            "ownership_type": "dependent",
+            "export_order": 157,
+            "delete_order": 157,
+            "restore_order": 157,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "products",
+                "foreign_key": "product_id"
+            },
+            "parent_dependency": {
+                "table": "products",
+                "foreign_key": "product_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "opening_stock_voucher": {
+            "ownership_type": "country_owned",
+            "export_order": 106,
+            "delete_order": 506,
+            "restore_order": 106,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "opening_stock_voucher_line": {
+            "ownership_type": "dependent",
+            "export_order": 169,
+            "delete_order": 169,
+            "restore_order": 169,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "opening_stock_voucher",
+                "foreign_key": "voucher_id"
+            },
+            "parent_dependency": {
+                "table": "opening_stock_voucher",
+                "foreign_key": "voucher_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "orange_admin_audit_log": {
+            "ownership_type": "country_owned",
+            "export_order": 111,
+            "delete_order": 511,
+            "restore_order": 111,
+            "extraction_rule": {
+                "type": "custom_sql",
+                "description": "Admin audit events for one country; excludes explicit global rows",
+                "sql": "SELECT id FROM orange_admin_audit_log WHERE country_id = :country_id AND (is_global = 0 OR is_global IS NULL)"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "orange_admin_login_throttle": {
+            "ownership_type": "excluded_ephemeral",
+            "export_order": 901,
+            "delete_order": 9999,
+            "restore_order": 9999,
+            "extraction_rule": {
+                "type": "skip"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "orange_catalog_data_migration_log": {
+            "ownership_type": "global",
+            "export_order": 104,
+            "delete_order": 904,
+            "restore_order": 104,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "orange_catalog_schema_checkpoint": {
+            "ownership_type": "global",
+            "export_order": 103,
+            "delete_order": 903,
+            "restore_order": 103,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "orange_company_documents": {
+            "ownership_type": "country_owned",
+            "export_order": 114,
+            "delete_order": 514,
+            "restore_order": 114,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": true,
+            "integrity_critical": false
+        },
+        "orange_country_screen_copy_log": {
+            "ownership_type": "country_owned",
+            "export_order": 86,
+            "delete_order": 486,
+            "restore_order": 86,
+            "extraction_rule": {
+                "type": "country_scope_or",
+                "columns": [
+                    "source_country_id",
+                    "target_country_id"
+                ]
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "orange_edit_lock_registry": {
+            "ownership_type": "country_owned",
+            "export_order": 85,
+            "delete_order": 485,
+            "restore_order": 85,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "orange_gl_account_settings": {
+            "ownership_type": "country_owned",
+            "export_order": 79,
+            "delete_order": 479,
+            "restore_order": 79,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "orange_gl_journal_type_rules": {
+            "ownership_type": "country_owned",
+            "export_order": 80,
+            "delete_order": 480,
+            "restore_order": 80,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "orange_gl_pending_movements": {
+            "ownership_type": "dependent",
+            "export_order": 165,
+            "delete_order": 165,
+            "restore_order": 165,
+            "extraction_rule": {
+                "type": "custom_sql",
+                "description": "Pending GL movements scoped via journal_vouchers.country_id",
+                "sql": "SELECT ogpm.id FROM orange_gl_pending_movements ogpm INNER JOIN journal_vouchers jv ON jv.id = ogpm.journal_voucher_id WHERE jv.country_id = :country_id"
+            },
+            "parent_dependency": {
+                "table": "journal_vouchers",
+                "foreign_key": "journal_voucher_id"
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "orange_gl_setting_alloc": {
+            "ownership_type": "country_owned",
+            "export_order": 81,
+            "delete_order": 481,
+            "restore_order": 81,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "orange_gl_voucher_slots": {
+            "ownership_type": "dependent",
+            "export_order": 164,
+            "delete_order": 164,
+            "restore_order": 164,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "journal_vouchers",
+                "foreign_key": "journal_voucher_id"
+            },
+            "parent_dependency": {
+                "table": "journal_vouchers",
+                "foreign_key": "journal_voucher_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "orange_invoice_extra_lines": {
+            "ownership_type": "country_owned",
+            "export_order": 83,
+            "delete_order": 483,
+            "restore_order": 83,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "orange_invoice_line_presets": {
+            "ownership_type": "country_owned",
+            "export_order": 82,
+            "delete_order": 482,
+            "restore_order": 82,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "orange_schema_meta": {
+            "ownership_type": "global",
+            "export_order": 100,
+            "delete_order": 900,
+            "restore_order": 100,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "orange_schema_migration_failures": {
+            "ownership_type": "global",
+            "export_order": 102,
+            "delete_order": 902,
+            "restore_order": 102,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "orange_schema_migrations": {
+            "ownership_type": "global",
+            "export_order": 101,
+            "delete_order": 901,
+            "restore_order": 101,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "order_intake_queue": {
+            "ownership_type": "excluded_ephemeral",
+            "export_order": 903,
+            "delete_order": 9999,
+            "restore_order": 9999,
+            "extraction_rule": {
+                "type": "skip"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "order_items": {
+            "ownership_type": "dependent",
+            "export_order": 159,
+            "delete_order": 159,
+            "restore_order": 159,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "orders",
+                "foreign_key": "order_id"
+            },
+            "parent_dependency": {
+                "table": "orders",
+                "foreign_key": "order_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "orders": {
+            "ownership_type": "country_owned",
+            "export_order": 100,
+            "delete_order": 500,
+            "restore_order": 100,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "party_subledger": {
+            "ownership_type": "dependent",
+            "export_order": 166,
+            "delete_order": 166,
+            "restore_order": 166,
+            "extraction_rule": {
+                "type": "custom_sql",
+                "description": "Party subledger scoped via journal_vouchers.country_id",
+                "sql": "SELECT ps.id FROM party_subledger ps INNER JOIN journal_vouchers jv ON jv.id = ps.voucher_id WHERE jv.country_id = :country_id"
+            },
+            "parent_dependency": {
+                "table": "journal_vouchers",
+                "foreign_key": "voucher_id"
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "party_subledger_allocations": {
+            "ownership_type": "dependent",
+            "export_order": 167,
+            "delete_order": 167,
+            "restore_order": 167,
+            "extraction_rule": {
+                "type": "custom_sql",
+                "description": "Party subledger allocations scoped via payment journal_vouchers.country_id",
+                "sql": "SELECT psa.id FROM party_subledger_allocations psa INNER JOIN journal_vouchers jv ON jv.id = psa.payment_voucher_id WHERE jv.country_id = :country_id"
+            },
+            "parent_dependency": {
+                "table": "journal_vouchers",
+                "foreign_key": "payment_voucher_id"
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "pattern_dictionary": {
+            "ownership_type": "global",
+            "export_order": 11,
+            "delete_order": 811,
+            "restore_order": 11,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "payment_methods": {
+            "ownership_type": "country_owned",
+            "export_order": 67,
+            "delete_order": 467,
+            "restore_order": 67,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "payment_transactions": {
+            "ownership_type": "country_owned",
+            "export_order": 111,
+            "delete_order": 511,
+            "restore_order": 111,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": true,
+            "integrity_critical": true
+        },
+        "product_attribute_values": {
+            "ownership_type": "dependent",
+            "export_order": 155,
+            "delete_order": 155,
+            "restore_order": 155,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "products",
+                "foreign_key": "product_id"
+            },
+            "parent_dependency": {
+                "table": "products",
+                "foreign_key": "product_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "product_channels": {
+            "ownership_type": "dependent",
+            "export_order": 156,
+            "delete_order": 156,
+            "restore_order": 156,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "products",
+                "foreign_key": "product_id"
+            },
+            "parent_dependency": {
+                "table": "products",
+                "foreign_key": "product_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "product_colorway_images": {
+            "ownership_type": "dependent",
+            "export_order": 154,
+            "delete_order": 154,
+            "restore_order": 154,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "product_colorways",
+                "foreign_key": "product_colorway_id"
+            },
+            "parent_dependency": {
+                "table": "product_colorways",
+                "foreign_key": "product_colorway_id",
+                "nullable": false
+            },
+            "uploads_linked": true,
+            "integrity_critical": false
+        },
+        "product_colorways": {
+            "ownership_type": "dependent",
+            "export_order": 153,
+            "delete_order": 153,
+            "restore_order": 153,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "products",
+                "foreign_key": "product_id"
+            },
+            "parent_dependency": {
+                "table": "products",
+                "foreign_key": "product_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "product_images": {
+            "ownership_type": "dependent",
+            "export_order": 152,
+            "delete_order": 152,
+            "restore_order": 152,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "products",
+                "foreign_key": "product_id"
+            },
+            "parent_dependency": {
+                "table": "products",
+                "foreign_key": "product_id",
+                "nullable": false
+            },
+            "uploads_linked": true,
+            "integrity_critical": false
+        },
+        "product_types": {
+            "ownership_type": "global",
+            "export_order": 26,
+            "delete_order": 826,
+            "restore_order": 26,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "product_variants": {
+            "ownership_type": "dependent",
+            "export_order": 151,
+            "delete_order": 151,
+            "restore_order": 151,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "products",
+                "foreign_key": "product_id"
+            },
+            "parent_dependency": {
+                "table": "products",
+                "foreign_key": "product_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "products": {
+            "ownership_type": "country_owned",
+            "export_order": 60,
+            "delete_order": 460,
+            "restore_order": 60,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": true,
+            "integrity_critical": true
+        },
+        "promo_pause_log": {
+            "ownership_type": "country_owned",
+            "export_order": 78,
+            "delete_order": 478,
+            "restore_order": 78,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "promo_stock_check": {
+            "ownership_type": "excluded_ephemeral",
+            "export_order": 904,
+            "delete_order": 9999,
+            "restore_order": 9999,
+            "extraction_rule": {
+                "type": "skip"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "promotion_always_on_history": {
+            "ownership_type": "country_owned",
+            "export_order": 77,
+            "delete_order": 477,
+            "restore_order": 77,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "purchase_items": {
+            "ownership_type": "dependent",
+            "export_order": 160,
+            "delete_order": 160,
+            "restore_order": 160,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "purchases",
+                "foreign_key": "purchase_id"
+            },
+            "parent_dependency": {
+                "table": "purchases",
+                "foreign_key": "purchase_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "purchase_return_items": {
+            "ownership_type": "dependent",
+            "export_order": 161,
+            "delete_order": 161,
+            "restore_order": 161,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "purchase_returns",
+                "foreign_key": "purchase_return_id"
+            },
+            "parent_dependency": {
+                "table": "purchase_returns",
+                "foreign_key": "purchase_return_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "purchase_returns": {
+            "ownership_type": "dependent",
+            "export_order": 102,
+            "delete_order": 102,
+            "restore_order": 102,
+            "extraction_rule": {
+                "type": "custom_sql",
+                "description": "Purchase returns scoped via purchase_id → purchases.country_id or supplier_id → suppliers.country_id",
+                "sql": "SELECT pr.id FROM purchase_returns pr LEFT JOIN purchases p ON p.id = pr.purchase_id LEFT JOIN suppliers s ON s.id = pr.supplier_id WHERE (p.id IS NOT NULL AND p.country_id = :country_id) OR (p.id IS NULL AND s.country_id = :country_id)"
+            },
+            "parent_dependency": {
+                "table": "purchases",
+                "foreign_key": "purchase_id",
+                "nullable": true
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "purchases": {
+            "ownership_type": "country_owned",
+            "export_order": 101,
+            "delete_order": 501,
+            "restore_order": 101,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "report_line_master": {
+            "ownership_type": "global",
+            "export_order": 2,
+            "delete_order": 802,
+            "restore_order": 2,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "sales_return_items": {
+            "ownership_type": "dependent",
+            "export_order": 162,
+            "delete_order": 162,
+            "restore_order": 162,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "sales_returns",
+                "foreign_key": "sales_return_id"
+            },
+            "parent_dependency": {
+                "table": "sales_returns",
+                "foreign_key": "sales_return_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "sales_returns": {
+            "ownership_type": "country_owned",
+            "export_order": 103,
+            "delete_order": 503,
+            "restore_order": 103,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "size_families": {
+            "ownership_type": "global",
+            "export_order": 12,
+            "delete_order": 812,
+            "restore_order": 12,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "size_family_advisory_library_map": {
+            "ownership_type": "global",
+            "export_order": 21,
+            "delete_order": 821,
+            "restore_order": 21,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "size_family_sizes": {
+            "ownership_type": "global",
+            "export_order": 13,
+            "delete_order": 813,
+            "restore_order": 13,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "size_scheme_template_sizes": {
+            "ownership_type": "global",
+            "export_order": 15,
+            "delete_order": 815,
+            "restore_order": 15,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "size_scheme_templates": {
+            "ownership_type": "global",
+            "export_order": 14,
+            "delete_order": 814,
+            "restore_order": 14,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "sizing_category_dictionary": {
+            "ownership_type": "global",
+            "export_order": 23,
+            "delete_order": 823,
+            "restore_order": 23,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "stock_adjustment_voucher": {
+            "ownership_type": "country_owned",
+            "export_order": 107,
+            "delete_order": 507,
+            "restore_order": 107,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "stock_adjustment_voucher_gl": {
+            "ownership_type": "dependent",
+            "export_order": 171,
+            "delete_order": 171,
+            "restore_order": 171,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "stock_adjustment_voucher",
+                "foreign_key": "voucher_id"
+            },
+            "parent_dependency": {
+                "table": "stock_adjustment_voucher",
+                "foreign_key": "voucher_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "stock_adjustment_voucher_line": {
+            "ownership_type": "dependent",
+            "export_order": 170,
+            "delete_order": 170,
+            "restore_order": 170,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "stock_adjustment_voucher",
+                "foreign_key": "voucher_id"
+            },
+            "parent_dependency": {
+                "table": "stock_adjustment_voucher",
+                "foreign_key": "voucher_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "stock_movements": {
+            "ownership_type": "country_owned",
+            "export_order": 109,
+            "delete_order": 509,
+            "restore_order": 109,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "storefront_accounts": {
+            "ownership_type": "country_owned",
+            "export_order": 71,
+            "delete_order": 471,
+            "restore_order": 71,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "storefront_copy_lines": {
+            "ownership_type": "country_owned",
+            "export_order": 68,
+            "delete_order": 468,
+            "restore_order": 68,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "storefront_home_hero": {
+            "ownership_type": "global",
+            "export_order": 35,
+            "delete_order": 835,
+            "restore_order": 35,
+            "extraction_rule": {
+                "type": "full_table"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "storefront_phone_merge_requests": {
+            "ownership_type": "country_owned",
+            "export_order": 70,
+            "delete_order": 470,
+            "restore_order": 70,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "storefront_promo_messages": {
+            "ownership_type": "country_owned",
+            "export_order": 69,
+            "delete_order": 469,
+            "restore_order": 69,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": false
+        },
+        "suppliers": {
+            "ownership_type": "country_owned",
+            "export_order": 59,
+            "delete_order": 459,
+            "restore_order": 59,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "warehouse_variant_stock": {
+            "ownership_type": "dependent",
+            "export_order": 150,
+            "delete_order": 150,
+            "restore_order": 150,
+            "extraction_rule": {
+                "type": "parent_rows",
+                "parent_table": "warehouses",
+                "foreign_key": "warehouse_id"
+            },
+            "parent_dependency": {
+                "table": "warehouses",
+                "foreign_key": "warehouse_id",
+                "nullable": false
+            },
+            "uploads_linked": false,
+            "integrity_critical": true
+        },
+        "warehouses": {
+            "ownership_type": "country_owned",
+            "export_order": 53,
+            "delete_order": 453,
+            "restore_order": 53,
+            "extraction_rule": {
+                "type": "country_id",
+                "column": "country_id"
+            },
+            "parent_dependency": null,
+            "uploads_linked": false,
+            "integrity_critical": true
+        }
+    }
 }

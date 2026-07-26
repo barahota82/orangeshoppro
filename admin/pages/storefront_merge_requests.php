@@ -7,6 +7,7 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 require_once __DIR__ . '/../../includes/admin_settings_country.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 
 $rows = [];
 $hasTable = orange_table_exists($pdo, 'storefront_phone_merge_requests');
@@ -36,7 +37,8 @@ if ($hasTable && $ctxCountryId > 0) {
     );
     if ($rScope !== null && $aScope !== null) {
         $q = $pdo->prepare(
-            "SELECT r.*, a.email AS account_email
+            "SELECT r.*, UNIX_TIMESTAMP(r.created_at) AS created_at_unix,
+                    a.email AS account_email
              FROM storefront_phone_merge_requests r
              INNER JOIN storefront_accounts a ON a.id = r.storefront_account_id
              WHERE r.consumed_at IS NULL AND r.expires_at > NOW()"
@@ -47,7 +49,8 @@ if ($hasTable && $ctxCountryId > 0) {
         $q->execute(array_merge($rScope['params'], $aScope['params']));
     } elseif ($hasCountryCol) {
         $q = $pdo->prepare(
-            "SELECT r.*, a.email AS account_email
+            "SELECT r.*, UNIX_TIMESTAMP(r.created_at) AS created_at_unix,
+                    a.email AS account_email
              FROM storefront_phone_merge_requests r
              INNER JOIN storefront_accounts a ON a.id = r.storefront_account_id
              WHERE r.country_id = ? AND r.consumed_at IS NULL AND r.expires_at > NOW()
@@ -93,6 +96,21 @@ if ($hasTable && $ctxCountryId > 0) {
                     <?php
                     $rid = (int) ($r['id'] ?? 0);
                     $waOk = !empty($r['wa_confirmed_at']);
+                    $rowCid = (int) ($r['country_id'] ?? $ctxCountryId);
+                    $createdUnix = orange_admin_time_unix_or_null($r['created_at_unix'] ?? null);
+                    if ($createdUnix === null) {
+                        try {
+                            $createdUnix = orange_admin_time_mysql_timestamp_session_wall_to_unix(
+                                $pdo,
+                                (string) ($r['created_at'] ?? '')
+                            );
+                        } catch (Throwable $e) {
+                            $createdUnix = null;
+                        }
+                    }
+                    $createdDisp = $createdUnix !== null && $rowCid > 0
+                        ? orange_admin_time_display_unix_for_record($pdo, $createdUnix, $rowCid)
+                        : '—';
                     ?>
                     <tr>
                         <td><?php echo $rid; ?></td>
@@ -100,7 +118,7 @@ if ($hasTable && $ctxCountryId > 0) {
                         <td dir="ltr"><?php echo htmlspecialchars((string) ($r['account_email'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td dir="ltr"><?php echo htmlspecialchars((string) ($r['proposed_email'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars((string) ($r['proposed_channel_slug'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars((string) ($r['created_at'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td dir="ltr"><?php echo htmlspecialchars($createdDisp, ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo $waOk ? '<span style="color:#15803d;">مؤكَّد</span>' : '—'; ?></td>
                         <td>
                             <?php if (!$waOk): ?>

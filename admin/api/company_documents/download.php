@@ -28,6 +28,15 @@ if (!$row) {
     exit;
 }
 
+try {
+    orange_company_document_assert_context_ownership($pdo, $row);
+} catch (Throwable $e) {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=UTF-8');
+    echo 'غير مصرح';
+    exit;
+}
+
 $abs = orange_company_document_absolute_path($row);
 if (!is_file($abs) || !is_readable($abs)) {
     http_response_code(410);

@@ -22,12 +22,25 @@ try {
         json_response(['success' => false, 'message' => 'المستند غير موجود'], 404);
     }
 
+    try {
+        orange_company_document_assert_context_ownership($pdo, $row);
+    } catch (Throwable $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
+    }
+
     $abs = orange_company_document_absolute_path($row);
     $pdo->prepare('DELETE FROM orange_company_documents WHERE id = ?')->execute([$id]);
     if (is_file($abs)) {
         @unlink($abs);
     }
-    audit_log('company_document_delete', 'حذف مستند أرشيف: ' . (string) ($row['title_ar'] ?? ''), 'orange_company_documents', $id);
+    $docCid = (int) ($row['country_id'] ?? 0);
+    audit_log(
+        'company_document_delete',
+        'حذف مستند أرشيف: ' . (string) ($row['title_ar'] ?? ''),
+        'orange_company_documents',
+        $id,
+        $docCid > 0 ? ['country_id' => $docCid] : []
+    );
     json_response(['success' => true, 'message' => 'تم حذف المستند']);
 } catch (Throwable $e) {
     if (function_exists('error_log')) {

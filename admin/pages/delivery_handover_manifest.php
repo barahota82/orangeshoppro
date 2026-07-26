@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/delivery_agents.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -78,7 +79,14 @@ if ($adminCountryId > 0) {
 }
 $company = orange_company_settings_row($pdo, $adminCountryId > 0 ? $adminCountryId : null);
 $companyName = trim((string) (is_array($company) ? ($company['company_name_ar'] ?? '') : ''));
-$today = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')) ?: date('Y-m-d');
+$today = '—';
+try {
+    if ($adminCountryId > 0) {
+        $today = orange_admin_time_now_display_for_admin_context($pdo);
+    }
+} catch (Throwable $e) {
+    $today = '—';
+}
 ?>
 <style>
 @media print {

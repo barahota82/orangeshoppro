@@ -322,7 +322,8 @@ function orange_company_docs_upload_root(): string
 function orange_ensure_company_docs_month_dir(): ?string
 {
     $base = orange_company_docs_upload_root();
-    $ym = date('Y') . DIRECTORY_SEPARATOR . date('m');
+    // Storage path segments use UTC calendar (not PHP Asia/Kuwait wall).
+    $ym = gmdate('Y') . DIRECTORY_SEPARATOR . gmdate('m');
     $dir = $base . DIRECTORY_SEPARATOR . $ym;
     $uploadsDir = dirname($base);
 

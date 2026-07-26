@@ -42,7 +42,7 @@ try {
     c3_assert(($matrix['boundary_policy_version'] ?? '') === 'C1.1', 'boundary_policy_version=C1.1');
     c3_assert(($matrix['dependency_graph_version'] ?? '') === 'C2', 'dependency_graph_version=C2');
     c3_assert((int) ($matrix['schema_revision'] ?? 0) === (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION, 'matrix schema_revision matches code');
-    c3_assert((int) ($matrix['mutate_table_count'] ?? 0) === 80, 'mutate_table_count=80');
+    c3_assert((int) ($matrix['mutate_table_count'] ?? 0) === 81, 'mutate_table_count=81');
 } catch (Throwable $e) {
     c3_assert(false, 'matrix load: ' . $e->getMessage());
     echo "FAIL count={$failures}\n";

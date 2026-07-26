@@ -2,8 +2,8 @@ ORANGE — سياسة الوقت المركزية للإدمن (Admin Time Polic
 ================================================================================
 المسار: docs/archive/ORANGE_ADMIN_TIME_POLICY.txt
 تاريخ القرار: 2026-07-25
-آخر تحديث: 2026-07-25 (Phase 2 / Step 3 — Inventory & Warehouses time)
-الحالة: Phase 1 + Phase 2 Step 1 و Step 2 و Step 3 مغلقة (انظر خامساً-ب/ج/د/هـ)
+آخر تحديث: 2026-07-26 (Phase 3 / Step 2 — Admin operational time surfaces)
+الحالة: Phase 1 + Phase 2 (Steps 1–5) مغلقة؛ Phase 3 Step 1 جرد؛ Phase 3 Step 2 منفَّذ (انظر سادساً-ج)
 
 الغرض
 -------
@@ -379,14 +379,9 @@ Stacking / Priority / Usage / Targeting / Customer UI.
 Step 5 يفصل: voucher_date = يوم محلي؛ movement/document_entered = UTC instant.
 طبقات المخزون تبقى Country-local wall منفصلة (`layerWallAt` / `17:00` للتسوية).
 
-### Deferred Outside Step 5 — Final Placement Pending Owner Decision
-(قرار مالك 2026-07-26 — OWNER SCOPE OVERRIDE؛ ممنوع تصنيفها الآن كـ Phase 3)
-- Document Archive: `admin/pages/company_documents.php` /
-  `admin/api/company_documents/*` / `orange_company_documents`
-  — untouched في Step 5 (لا created_at / doc_date / فلاتر / عرض / دولة / رفع).
-- General Activity Log: `admin/pages/logs.php` /
-  `orange_admin_audit_log` / `audit_log()` العام
-  — untouched في Step 5 (لا created_at / Writer / فلاتر / عرض / تصدير).
+### Deferred Outside Step 5 — ثم نُفِّذ في Phase 3 Step 2
+(قرار مالك 2026-07-26 — كانت خارج Step 5؛ التنفيذ في Phase 3 Step 2 أدناه)
+- Document Archive + General Activity Log: انظر سادساً-ج.
 
 ### Create Delivery Entries — تقسيم ملزم
 - مجمّد من Step 1: قائمة `online_orders_final_posting` +
@@ -395,17 +390,59 @@ Step 5 يفصل: voucher_date = يوم محلي؛ movement/document_entered = UT
   (`orange_post_order_delivery_accounting` ومسارات GL/Pending الناتجة).
 
 ### مؤجّل لاحقاً (تقارير عامة — خارج نطاق Step 5 التشغيلي)
-- التقارير المالية العامة وفلاتر التقارير الواسعة (لا تُبدأ هنا).
+- التقارير المالية العامة وفلاتر التقارير الواسعة → Phase 3 Step 3.
 
 ### Business Logic freeze
 لا تغيير Debit/Credit / balancing / numbering / slots uniqueness /
 fiscal rules / subledger balances / Idempotency / اختيار الطلبات.
 
 ### Backup / Restore / Promotions freeze
-لا إعادة فتح Step 4؛ لا Backup/Restore.
+لا إعادة فتح Step 4؛ لا Backup/Restore UX/time policy
+(ما عدا مزامنة Schema/Registry عند bump — انظر سادساً-ج).
 
 ### اختبار
 `php scripts/self_test_admin_time_phase2_step5_accounting.php`
+
+
+--------------------------------------------------------------------
+سادساً-ج: Phase 3 / Step 2 — شاشات الإدمن التشغيلية والأدوات (2026-07-26)
+--------------------------------------------------------------------
+النطاق (فقط): Document Archive · Activity Log · Dashboard KPIs الزمنية ·
+Channel Analytics filters · Handover print timestamp · Merge Requests admin ·
+Customers last activity · Admin Date-only defaults · Entry Date 12h AM/PM ·
+Edit-lock/partner utility defaults · utility lists ذات legacy datetime.
+
+### قرارات مالك نهائية (لا Owner Blockers)
+- كل شاشات الإدمن العادية Country-scoped؛ السوبر أدمن يختار الدولة من Context.
+- السجل الجديد يأخذ country_id من Context؛ السجل الموجود: country_id المخزّن.
+- Missing country_id = Gap يُصلح (ليس Global). Global فقط بعلامة صريحة.
+- لا بيانات إنتاج؛ Setup/Test يُنسَب مرة واحدة لدولة مستقرة.
+
+### Country ownership
+- `orange_company_documents.country_id` (NOT NULL بعد backfill).
+- `orange_admin_audit_log.country_id` + `is_global` (صريح؛ NULL≠Global).
+- Schema revision **123** (`php_admin_time_country_authority_v123`).
+- Registry/Matrix مزامَنان للـ revision 123؛ docs = country_id؛
+  audit = custom SQL يستبعد `is_global=1`.
+- Backup/Restore UX وtime policy مجمّدان؛ الحزم القديمة Non-Eligible مقبولة.
+
+### وقت / عرض
+- Absolute Moment: UTC داخلياً؛ عرض IANA دولة السجل؛ **12 ساعة AM/PM**
+  (نمط `datetime` الافتراضي في `admin_time.php` = `d/m/Y g:i A`).
+- Date-only: Y-m-d بلا تحويل TZ؛ default = اليوم المحلي للدولة.
+- «تاريخ الإدخال»: Absolute Moment فقط (created_at / document_entered_at /
+  unix TIMESTAMP) — ممنوع voucher_date/document_date أو noon filler.
+
+### فلاتر اليوم
+- Dashboard / Channel Analytics / Activity Log:
+  `start_utc <= ts < next_day_start_utc` — لا CURDATE / DATE(ts) / 23:59:59.
+
+### متبقٍ
+- Phase 3 Step 3: التقارير المالية/التجارية/المخزون الواسعة والتصدير.
+- Phase 3 Step 4: Customer/Storefront + Global/Mixed + Closure Sweep.
+
+### اختبار
+`php scripts/self_test_admin_time_phase3_step2_operational.php`
 
 
 --------------------------------------------------------------------
@@ -419,3 +456,4 @@ fiscal rules / subledger balances / Idempotency / اختيار الطلبات.
 `php scripts/self_test_admin_time_phase2_step4_promotions.php`
 `php scripts/self_test_admin_time_phase2_step4_closure.php`
 `php scripts/self_test_admin_time_phase2_step5_accounting.php`
+`php scripts/self_test_admin_time_phase3_step2_operational.php`

@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/company_documents.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -13,6 +14,11 @@ try {
     orange_catalog_ensure_schema($pdo);
     if (!orange_table_exists($pdo, 'orange_company_documents')) {
         json_response(['success' => true, 'rows' => [], 'total' => 0]);
+    }
+
+    $ctxCountryId = orange_admin_context_country_id($pdo);
+    if ($ctxCountryId <= 0) {
+        json_response(['success' => false, 'message' => 'سياق الدولة مطلوب'], 422);
     }
 
     $data = get_json_input();
@@ -40,11 +46,16 @@ try {
         $limit = 300;
     }
 
-    $sql = 'SELECT d.*, a.username AS created_by_username
+    $hasCountry = orange_table_has_column($pdo, 'orange_company_documents', 'country_id');
+    $sql = 'SELECT d.*, UNIX_TIMESTAMP(d.created_at) AS created_at_unix, a.username AS created_by_username
             FROM orange_company_documents d
             LEFT JOIN admins a ON a.id = d.created_by_admin_id
             WHERE 1=1';
     $params = [];
+    if ($hasCountry) {
+        $sql .= ' AND d.country_id = ?';
+        $params[] = $ctxCountryId;
+    }
     if ($q !== '') {
         $sql .= ' AND (d.title_ar LIKE ? OR d.reference_number LIKE ? OR d.notes LIKE ? OR d.original_filename LIKE ?)';
         $like = '%' . $q . '%';
@@ -69,6 +80,10 @@ try {
 
     $cntSql = 'SELECT COUNT(*) FROM orange_company_documents d WHERE 1=1';
     $cntParams = [];
+    if ($hasCountry) {
+        $cntSql .= ' AND d.country_id = ?';
+        $cntParams[] = $ctxCountryId;
+    }
     if ($q !== '') {
         $cntSql .= ' AND (d.title_ar LIKE ? OR d.reference_number LIKE ? OR d.notes LIKE ? OR d.original_filename LIKE ?)';
         $like = '%' . $q . '%';
@@ -108,7 +123,12 @@ try {
         $et = (string) ($r['entity_table'] ?? '');
         $r['entity_label'] = $entityPresets[$et] ?? ($et !== '' ? $et : 'عام');
         $r['doc_date_display'] = orange_format_date_dmY((string) ($r['doc_date'] ?? ''));
-        $r['created_at_display'] = orange_format_datetime_dmY_hi((string) ($r['created_at'] ?? ''));
+        $rowCid = (int) ($r['country_id'] ?? $ctxCountryId);
+        $unix = orange_admin_time_unix_or_null($r['created_at_unix'] ?? null);
+        $api = orange_admin_time_api_instant_from_unix($pdo, $unix, $rowCid);
+        $r['created_at_utc'] = $api['utc'];
+        $r['created_at_display'] = $api['display'];
+        unset($r['created_at_unix']);
     }
     unset($r);
 

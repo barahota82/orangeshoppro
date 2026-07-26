@@ -12,10 +12,19 @@ require_once __DIR__ . '/../../includes/admin_settings_country.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/voucher_print_banner.php';
 require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 
 $pdo = orange_admin_page_pdo();
 $osvPrintTuning = orange_admin_voucher_print_tuning_mode();
 $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+$osvTodayYmd = date('Y-m-d');
+try {
+    if ($ctxCountryId > 0) {
+        $osvTodayYmd = orange_admin_time_document_date_today_for_country_id($pdo, $ctxCountryId);
+    }
+} catch (Throwable $e) {
+    $osvTodayYmd = date('Y-m-d');
+}
 $ready = orange_opening_stock_voucher_ready($pdo);
 $openingStockLocked = orange_opening_stock_is_locked($pdo, $ctxCountryId);
 $nextNo = $ready ? orange_opening_stock_voucher_next_no($pdo, $ctxCountryId) : 1;
@@ -28,7 +37,7 @@ $lockApiUrl = storefront_public_path('/admin/api/stock/opening-stock-lock.php');
 
 $initial = [
     'id' => 0,
-    'document_date' => date('Y-m-d'),
+    'document_date' => $osvTodayYmd,
     'notes' => '',
     'status' => 'draft',
     'lines' => [],
@@ -39,7 +48,7 @@ if ($editSv !== null) {
     $osvId = (int) ($h['id'] ?? 0);
     $initial = [
         'id' => $osvId,
-        'document_date' => substr((string) ($h['document_date'] ?? ''), 0, 10) ?: date('Y-m-d'),
+        'document_date' => substr((string) ($h['document_date'] ?? ''), 0, 10) ?: $osvTodayYmd,
         'notes' => (string) ($h['notes'] ?? ''),
         'status' => (string) ($h['status'] ?? 'draft'),
         'lines' => $editSv['lines'],

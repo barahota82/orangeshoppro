@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/voucher_print_banner.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -44,7 +45,13 @@ $bootstrapIso = '';
 if ($obDateParam !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $obDateParam)) {
     $bootstrapIso = $obDateParam;
 } else {
-    $bootstrapIso = date('Y-m-d');
+    try {
+        $bootstrapIso = $ctxCountryId > 0
+            ? orange_admin_time_document_date_today_for_country_id($pdo, $ctxCountryId)
+            : orange_admin_time_document_date_today_for_admin_context($pdo);
+    } catch (Throwable $e) {
+        $bootstrapIso = date('Y-m-d');
+    }
 }
 
 $fyRowSel = null;
@@ -76,7 +83,11 @@ if ($years !== []) {
         $first = $years[0];
         $bootstrapIso = substr((string) ($first['start_date'] ?? ''), 0, 10);
         if (strlen($bootstrapIso) !== 10) {
-            $bootstrapIso = date('Y-m-d');
+            try {
+                $bootstrapIso = orange_admin_time_document_date_today_for_country_id($pdo, $ctxCountryId);
+            } catch (Throwable $e) {
+                $bootstrapIso = date('Y-m-d');
+            }
         }
         $fyTry2 = orange_fiscal_find_for_date($pdo, $bootstrapIso, $ctxCountryId);
         if ($isYearOpenAndListed($fyTry2)) {
@@ -87,7 +98,11 @@ if ($years !== []) {
             $fyId = (int) $fyRowSel['id'];
             $bootstrapIso = substr((string) ($fyRowSel['start_date'] ?? ''), 0, 10);
             if (strlen($bootstrapIso) !== 10) {
-                $bootstrapIso = date('Y-m-d');
+                try {
+                    $bootstrapIso = orange_admin_time_document_date_today_for_country_id($pdo, $ctxCountryId);
+                } catch (Throwable $e) {
+                    $bootstrapIso = date('Y-m-d');
+                }
             }
         }
     }
@@ -99,7 +114,14 @@ $obStatement = '';
 $obRef = $fyId > 0 ? orange_opening_balance_reference($pdo, $fyId, $ctxCountryId) : '';
 $obCountryCode = orange_opening_balance_country_code($pdo, $ctxCountryId);
 $obVoucherDateDisp = strlen($bootstrapIso) === 10 ? orange_format_date_dmY($bootstrapIso) : '';
-$obDocEnteredDisp = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$obDocEnteredDisp = '—';
+try {
+    if ($ctxCountryId > 0) {
+        $obDocEnteredDisp = orange_admin_time_now_display_for_admin_context($pdo);
+    }
+} catch (Throwable $e) {
+    $obDocEnteredDisp = '—';
+}
 $obNumberPreview = 1;
 
 if (orange_journal_vouchers_ready($pdo)) {
@@ -141,7 +163,11 @@ if ($fyId > 0 && $fyRowSel !== null && orange_journal_vouchers_ready($pdo)) {
                 $docAt = trim((string) ($vh['created_at'] ?? ''));
             }
             if ($docAt !== '') {
-                $obDocEnteredDisp = orange_format_datetime_dmY_hi($docAt);
+                $obDocEnteredDisp = orange_admin_time_display_mysql_utc_for_record(
+                    $pdo,
+                    $docAt,
+                    $ctxCountryId
+                );
             }
             $refFromDb = trim((string) ($vh['reference'] ?? ''));
             if ($refFromDb !== '') {
@@ -169,7 +195,13 @@ if ($fyId > 0 && $fyRowSel !== null && orange_journal_vouchers_ready($pdo)) {
 }
 
 if ($obVoucherDateDisp === '' && $fyId > 0) {
-    $obVoucherDateDisp = orange_format_date_dmY(date('Y-m-d'));
+    try {
+        $obVoucherDateDisp = orange_format_date_dmY(
+            orange_admin_time_document_date_today_for_country_id($pdo, $ctxCountryId)
+        );
+    } catch (Throwable $e) {
+        $obVoucherDateDisp = '';
+    }
 }
 
 $obNumberDisplay = $obVid > 0 ? $obVid : $obNumberPreview;

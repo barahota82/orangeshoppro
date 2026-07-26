@@ -86,7 +86,19 @@ function orange_backup_registry_table_definitions(): array
         'orange_catalog_data_migration_log' => $g(104),
         'admin_permissions' => $g(105),
         'journal_entries' => $g(110),
-        'orange_admin_audit_log' => $g(111),
+        // Country-scoped admin activity (explicit is_global=1 rows stay outside country packages).
+        'orange_admin_audit_log' => orange_backup_registry_row(
+            'country_owned',
+            111,
+            [
+                'type' => 'custom_sql',
+                'description' => 'Admin audit events for one country; excludes explicit global rows',
+                'sql' => 'SELECT id FROM orange_admin_audit_log WHERE country_id = :country_id AND (is_global = 0 OR is_global IS NULL)',
+            ],
+            null,
+            false,
+            false
+        ),
 
         // --- Country-owned masters ---
         'accounts' => $c(50, true),
@@ -171,18 +183,7 @@ function orange_backup_registry_table_definitions(): array
             false,
             false
         ),
-        'orange_company_documents' => orange_backup_registry_row(
-            'country_owned',
-            114,
-            [
-                'type' => 'custom_sql',
-                'description' => 'Company documents linked to country-scoped entities via entity_table/entity_id',
-                'sql' => 'SELECT ocd.id FROM orange_company_documents ocd WHERE ocd.entity_table IN (\'orders\',\'purchases\',\'customers\',\'suppliers\') AND EXISTS (SELECT 1 FROM orders o WHERE ocd.entity_table = \'orders\' AND o.id = CAST(ocd.entity_id AS UNSIGNED) AND o.country_id = :country_id UNION SELECT 1 FROM purchases p WHERE ocd.entity_table = \'purchases\' AND p.id = CAST(ocd.entity_id AS UNSIGNED) AND p.country_id = :country_id UNION SELECT 1 FROM customers c WHERE ocd.entity_table = \'customers\' AND c.id = CAST(ocd.entity_id AS UNSIGNED) AND c.country_id = :country_id UNION SELECT 1 FROM suppliers s WHERE ocd.entity_table = \'suppliers\' AND s.id = CAST(ocd.entity_id AS UNSIGNED) AND s.country_id = :country_id)',
-            ],
-            null,
-            true,
-            false
-        ),
+        'orange_company_documents' => $c(114, false, true),
 
         // --- Dependent rows (FK to country-owned parents) ---
         'warehouse_variant_stock' => $d('warehouses', 'warehouse_id', 150, true),

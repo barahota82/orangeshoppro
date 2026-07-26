@@ -76,7 +76,7 @@ function orange_country_boundary_matrix_validate(array $matrix): array
     }
     $expectedSchemaRevision = defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')
         ? (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION
-        : 122;
+        : 123;
     if ((int) ($matrix['schema_revision'] ?? 0) !== $expectedSchemaRevision) {
         $errors[] = 'schema_revision must be ' . $expectedSchemaRevision;
     }
@@ -108,8 +108,15 @@ function orange_country_boundary_matrix_validate(array $matrix): array
             $errors[] = $name . ' restore_batch missing';
         }
     }
-    if ($count !== 80) {
-        $errors[] = 'exportable mutate table count must be 80, got ' . (string) $count;
+    $expectedMutateCount = isset($matrix['mutate_table_count'])
+        ? (int) $matrix['mutate_table_count']
+        : 81;
+    if ($expectedMutateCount <= 0) {
+        $expectedMutateCount = 81;
+    }
+    if ($count !== $expectedMutateCount) {
+        $errors[] = 'exportable mutate table count must be ' . (string) $expectedMutateCount
+            . ', got ' . (string) $count;
     }
     foreach (ORANGE_CRP_NEVER_EXPORT_TABLES as $forbidden) {
         if (isset($tables[$forbidden]) && (bool) ($tables[$forbidden]['exportable'] ?? false)) {

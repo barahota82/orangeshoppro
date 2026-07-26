@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/upload_paths.php';
 require_once __DIR__ . '/../../../includes/company_documents.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -41,6 +42,14 @@ if ($titleAr === '') {
     json_response(['success' => false, 'message' => 'عنوان المستند مطلوب'], 422);
 }
 
+try {
+    $pdo = db();
+    orange_catalog_ensure_schema($pdo);
+    $countryId = orange_company_document_resolve_upload_country_id($pdo, $entityTable, $entityId);
+} catch (Throwable $e) {
+    json_response(['success' => false, 'message' => $e->getMessage()], 422);
+}
+
 $docDate = null;
 if ($docDateRaw !== '') {
     $docYmd = orange_parse_admin_date_to_ymd($docDateRaw);
@@ -48,6 +57,12 @@ if ($docDateRaw !== '') {
         json_response(['success' => false, 'message' => 'تاريخ المستند غير صالح (يوم/شهر/سنة)'], 422);
     }
     $docDate = $docYmd;
+} else {
+    try {
+        $docDate = orange_admin_time_document_date_today_for_country_id($pdo, $countryId);
+    } catch (Throwable $e) {
+        json_response(['success' => false, 'message' => 'تعذر تحديد تاريخ المستند الافتراضي للدولة'], 422);
+    }
 }
 
 if (!isset($_FILES['file']) || !is_array($_FILES['file'])) {
@@ -101,47 +116,83 @@ if ($dir === null) {
 }
 
 $ext = $allowed[$mime];
-$safe = 'd_' . date('Ymd_His') . '_' . bin2hex(random_bytes(5)) . '.' . $ext;
+$safe = 'd_' . gmdate('Ymd_His') . '_' . bin2hex(random_bytes(5)) . '.' . $ext;
 $dest = $dir . DIRECTORY_SEPARATOR . $safe;
 if (!move_uploaded_file($tmp, $dest)) {
     json_response(['success' => false, 'message' => 'تعذر حفظ الملف'], 500);
 }
 
-$rel = 'company_docs' . DIRECTORY_SEPARATOR . date('Y') . DIRECTORY_SEPARATOR . date('m') . DIRECTORY_SEPARATOR . $safe;
+$rel = 'company_docs' . DIRECTORY_SEPARATOR . gmdate('Y') . DIRECTORY_SEPARATOR . gmdate('m') . DIRECTORY_SEPARATOR . $safe;
 $rel = str_replace('\\', '/', $rel);
 
 try {
-    $pdo = db();
-    orange_catalog_ensure_schema($pdo);
     $admin = current_admin();
     $aid = ($admin && !empty($admin['id'])) ? (int) $admin['id'] : null;
     if ($aid !== null && $aid <= 0) {
         $aid = null;
     }
 
-    $st = $pdo->prepare(
-        'INSERT INTO orange_company_documents (
-            title_ar, doc_type, reference_number, doc_date, entity_table, entity_id, notes,
-            storage_path, original_filename, mime_type, file_size, created_by_admin_id
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
-    );
-    $st->execute([
-        $titleAr,
-        $docType,
-        $refNum,
-        $docDate,
-        $entityTable,
-        $entityId,
-        $notes === '' ? null : $notes,
-        $rel,
-        $origBase,
-        $mime,
-        (int) filesize($dest),
-        $aid,
-    ]);
+    $createdUnix = orange_admin_time_unix_now();
+    $hasCountry = orange_table_has_column($pdo, 'orange_company_documents', 'country_id');
+    if ($hasCountry) {
+        $st = $pdo->prepare(
+            'INSERT INTO orange_company_documents (
+                country_id, title_ar, doc_type, reference_number, doc_date, entity_table, entity_id, notes,
+                storage_path, original_filename, mime_type, file_size, created_by_admin_id, created_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,' . orange_admin_time_sql_from_unix() . ')'
+        );
+        $st->execute([
+            $countryId,
+            $titleAr,
+            $docType,
+            $refNum,
+            $docDate,
+            $entityTable,
+            $entityId,
+            $notes === '' ? null : $notes,
+            $rel,
+            $origBase,
+            $mime,
+            (int) filesize($dest),
+            $aid,
+            $createdUnix,
+        ]);
+    } else {
+        $st = $pdo->prepare(
+            'INSERT INTO orange_company_documents (
+                title_ar, doc_type, reference_number, doc_date, entity_table, entity_id, notes,
+                storage_path, original_filename, mime_type, file_size, created_by_admin_id, created_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,' . orange_admin_time_sql_from_unix() . ')'
+        );
+        $st->execute([
+            $titleAr,
+            $docType,
+            $refNum,
+            $docDate,
+            $entityTable,
+            $entityId,
+            $notes === '' ? null : $notes,
+            $rel,
+            $origBase,
+            $mime,
+            (int) filesize($dest),
+            $aid,
+            $createdUnix,
+        ]);
+    }
     $newId = (int) $pdo->lastInsertId();
-    audit_log('company_document_upload', 'رفع مستند: ' . $titleAr, 'orange_company_documents', $newId);
-    json_response(['success' => true, 'message' => 'تم حفظ المستند', 'id' => $newId]);
+    audit_log('company_document_upload', 'رفع مستند: ' . $titleAr, 'orange_company_documents', $newId, [
+        'country_id' => $countryId,
+    ]);
+    json_response([
+        'success' => true,
+        'message' => 'تم حفظ المستند',
+        'id' => $newId,
+        'country_id' => $countryId,
+        'doc_date' => $docDate,
+        'created_at_utc' => orange_admin_time_utc_iso_from_unix($createdUnix),
+        'created_at_display' => orange_admin_time_display_unix_for_record($pdo, $createdUnix, $countryId),
+    ]);
 } catch (Throwable $e) {
     @unlink($dest);
     if (function_exists('error_log')) {

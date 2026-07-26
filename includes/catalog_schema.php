@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 122);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 123);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3184,6 +3184,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_gl_voucher_slots_v120($pdo);
     orange_catalog_migrate_order_items_gl_slot_v121($pdo);
     orange_catalog_migrate_countries_timezone_v122($pdo);
+    orange_catalog_migrate_admin_time_country_authority_v123($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3537,6 +3538,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             $pdo,
             'CREATE TABLE orange_company_documents (
                 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                country_id INT UNSIGNED NOT NULL,
                 title_ar VARCHAR(255) NOT NULL DEFAULT \'\',
                 doc_type VARCHAR(48) NOT NULL DEFAULT \'other\',
                 reference_number VARCHAR(128) NOT NULL DEFAULT \'\',
@@ -3551,6 +3553,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 created_by_admin_id INT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (id),
+                KEY idx_ocd_country (country_id),
                 KEY idx_ocd_type (doc_type),
                 KEY idx_ocd_entity (entity_table, entity_id),
                 KEY idx_ocd_created (created_at),
@@ -3570,9 +3573,13 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 message TEXT NOT NULL,
                 entity_table VARCHAR(80) NOT NULL DEFAULT \'\',
                 entity_id VARCHAR(64) NOT NULL DEFAULT \'\',
+                country_id INT UNSIGNED NULL DEFAULT NULL,
+                is_global TINYINT(1) NOT NULL DEFAULT 0,
                 PRIMARY KEY (id),
                 KEY idx_orange_audit_created (created_at),
-                KEY idx_orange_audit_admin (admin_id)
+                KEY idx_orange_audit_admin (admin_id),
+                KEY idx_orange_audit_country (country_id),
+                KEY idx_orange_audit_global (is_global)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
     }
@@ -3819,6 +3826,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_gl_voucher_slots_v120($pdo);
     orange_catalog_migrate_order_items_gl_slot_v121($pdo);
     orange_catalog_migrate_countries_timezone_v122($pdo);
+    orange_catalog_migrate_admin_time_country_authority_v123($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -9508,6 +9516,166 @@ function orange_catalog_migrate_countries_timezone_v122(PDO $pdo): void
                 }
                 $upd->execute([$tz, $code]);
             }
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v123 — Phase 3 Step 2: country authority for company documents + admin audit log.
+ * Setup/Test rows are backfilled once to a stable stored country_id (no silent Global).
+ */
+function orange_catalog_migrate_admin_time_country_authority_v123(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/countries.php';
+
+    $marker = 'php_admin_time_country_authority_v123';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $fallbackCountryId = 0;
+    if (orange_table_exists($pdo, 'countries')) {
+        try {
+            $active = $pdo->query(
+                'SELECT id FROM countries WHERE is_active = 1 ORDER BY sort_order ASC, id ASC LIMIT 2'
+            )->fetchAll(PDO::FETCH_COLUMN);
+            if (is_array($active) && count($active) === 1) {
+                $fallbackCountryId = (int) $active[0];
+            } elseif (is_array($active) && count($active) > 1) {
+                $kw = $pdo->query(
+                    "SELECT id FROM countries WHERE code = 'kw' AND is_active = 1 LIMIT 1"
+                )->fetchColumn();
+                $fallbackCountryId = $kw !== false ? (int) $kw : (int) $active[0];
+            } else {
+                $any = $pdo->query('SELECT id FROM countries ORDER BY id ASC LIMIT 1')->fetchColumn();
+                $fallbackCountryId = $any !== false ? (int) $any : 0;
+            }
+        } catch (Throwable $e) {
+            $fallbackCountryId = 0;
+        }
+    }
+
+    $resolveEntityCountry = static function (PDO $pdo, string $table, string $entityId): int {
+        $table = trim($table);
+        $entityId = trim($entityId);
+        if ($table === '' || $entityId === '' || !ctype_digit($entityId)) {
+            return 0;
+        }
+        $id = (int) $entityId;
+        if ($id <= 0 || !orange_table_exists($pdo, $table) || !orange_table_has_column($pdo, $table, 'country_id')) {
+            return 0;
+        }
+        try {
+            $st = $pdo->prepare('SELECT country_id FROM `' . str_replace('`', '``', $table) . '` WHERE id = ? LIMIT 1');
+            $st->execute([$id]);
+            $cid = (int) $st->fetchColumn();
+
+            return $cid > 0 ? $cid : 0;
+        } catch (Throwable $e) {
+            return 0;
+        }
+    };
+
+    if (orange_table_exists($pdo, 'orange_company_documents')) {
+        if (!orange_table_has_column($pdo, 'orange_company_documents', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orange_company_documents ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+            );
+            orange_schema_invalidate_column_check('orange_company_documents', 'country_id');
+        }
+        if (orange_table_has_column($pdo, 'orange_company_documents', 'country_id')) {
+            $rows = $pdo->query(
+                'SELECT id, entity_table, entity_id, country_id FROM orange_company_documents
+                 WHERE country_id IS NULL OR country_id = 0'
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $upd = $pdo->prepare('UPDATE orange_company_documents SET country_id = ? WHERE id = ?');
+            foreach ($rows as $row) {
+                $cid = $resolveEntityCountry(
+                    $pdo,
+                    (string) ($row['entity_table'] ?? ''),
+                    (string) ($row['entity_id'] ?? '')
+                );
+                if ($cid <= 0) {
+                    $cid = $fallbackCountryId;
+                }
+                if ($cid > 0) {
+                    $upd->execute([$cid, (int) $row['id']]);
+                }
+            }
+            if ($fallbackCountryId > 0) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE orange_company_documents SET country_id = ' . (int) $fallbackCountryId
+                    . ' WHERE country_id IS NULL OR country_id = 0'
+                );
+            }
+            try {
+                $pdo->exec(
+                    'ALTER TABLE orange_company_documents MODIFY COLUMN country_id INT UNSIGNED NOT NULL'
+                );
+            } catch (Throwable $e) {
+                // Keep nullable if leftover rows cannot be assigned (no countries table).
+            }
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orange_company_documents ADD KEY idx_ocd_country (country_id)'
+            );
+        }
+    }
+
+    if (orange_table_exists($pdo, 'orange_admin_audit_log')) {
+        if (!orange_table_has_column($pdo, 'orange_admin_audit_log', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orange_admin_audit_log ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER entity_id'
+            );
+            orange_schema_invalidate_column_check('orange_admin_audit_log', 'country_id');
+        }
+        if (!orange_table_has_column($pdo, 'orange_admin_audit_log', 'is_global')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orange_admin_audit_log ADD COLUMN is_global TINYINT(1) NOT NULL DEFAULT 0 AFTER country_id'
+            );
+            orange_schema_invalidate_column_check('orange_admin_audit_log', 'is_global');
+        }
+        if (orange_table_has_column($pdo, 'orange_admin_audit_log', 'country_id')) {
+            $rows = $pdo->query(
+                'SELECT id, entity_table, entity_id, country_id, is_global FROM orange_admin_audit_log
+                 WHERE (country_id IS NULL OR country_id = 0) AND is_global = 0'
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $upd = $pdo->prepare('UPDATE orange_admin_audit_log SET country_id = ?, is_global = 0 WHERE id = ?');
+            foreach ($rows as $row) {
+                $cid = $resolveEntityCountry(
+                    $pdo,
+                    (string) ($row['entity_table'] ?? ''),
+                    (string) ($row['entity_id'] ?? '')
+                );
+                if ($cid <= 0) {
+                    $cid = $fallbackCountryId;
+                }
+                if ($cid > 0) {
+                    $upd->execute([$cid, (int) $row['id']]);
+                }
+            }
+            if ($fallbackCountryId > 0) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE orange_admin_audit_log SET country_id = ' . (int) $fallbackCountryId
+                    . ', is_global = 0 WHERE (country_id IS NULL OR country_id = 0) AND is_global = 0'
+                );
+            }
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orange_admin_audit_log ADD KEY idx_orange_audit_country (country_id)'
+            );
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orange_admin_audit_log ADD KEY idx_orange_audit_global (is_global)'
+            );
         }
     }
 

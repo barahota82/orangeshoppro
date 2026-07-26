@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/sales_doc_channel.php';
 require_once __DIR__ . '/../../includes/sales_return_analytics.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -28,27 +29,47 @@ $toOk = $toYmd !== '';
 $fromIn = $fromOk ? orange_format_date_dmY($fromYmd) : $fromRaw;
 $toIn = $toOk ? orange_format_date_dmY($toYmd) : $toRaw;
 
+$caRangeStartUtc = '';
+$caRangeEndExclusiveUtc = '';
+if (($fromOk || $toOk) && $caCountryId > 0) {
+    try {
+        $caTz = orange_admin_time_timezone_for_country_id($pdo, $caCountryId);
+        $caRange = orange_admin_time_filter_range_mysql_utc($fromYmd, $toYmd, $caTz);
+        if ($caRange !== null) {
+            $caRangeStartUtc = $caRange['start_utc_mysql'];
+            $caRangeEndExclusiveUtc = $caRange['end_exclusive_utc_mysql'];
+        }
+    } catch (Throwable $e) {
+        $caRangeStartUtc = '';
+        $caRangeEndExclusiveUtc = '';
+    }
+}
+
 /**
  * @return array{0: string, 1: list<mixed>}
  */
-function orange_channel_analytics_join_orders_on(bool $fromOk, string $fromYmd, bool $toOk, string $toYmd, string $ordersCountrySql = ''): array
-{
+function orange_channel_analytics_join_orders_on(
+    string $startUtcMysql,
+    string $endExclusiveUtcMysql,
+    string $ordersCountrySql = ''
+): array {
     $on = 'o.channel_id = c.id';
     $params = [];
-    if ($fromOk) {
-        $on .= ' AND o.created_at >= ?';
-        $params[] = $fromYmd . ' 00:00:00';
-    }
-    if ($toOk) {
-        $on .= ' AND o.created_at <= ?';
-        $params[] = $toYmd . ' 23:59:59';
+    if ($startUtcMysql !== '' && $endExclusiveUtcMysql !== '') {
+        $on .= ' AND o.created_at >= ? AND o.created_at < ?';
+        $params[] = $startUtcMysql;
+        $params[] = $endExclusiveUtcMysql;
     }
     $on .= $ordersCountrySql;
 
     return [$on, $params];
 }
 
-[$joinOn, $joinParams] = orange_channel_analytics_join_orders_on($fromOk, $fromYmd, $toOk, $toYmd, $caOrdersCountrySql);
+[$joinOn, $joinParams] = orange_channel_analytics_join_orders_on(
+    $caRangeStartUtc,
+    $caRangeEndExclusiveUtc,
+    $caOrdersCountrySql
+);
 
 $sqlChannels = "
     SELECT
@@ -88,13 +109,10 @@ $orphanSql = '
     WHERE (channel_id IS NULL OR channel_id = 0)' . orange_sql_country_and_fragment($pdo, 'orders', 'orders', $caCountryId) . '
 ';
 $orphanParams = [];
-if ($fromOk) {
-    $orphanSql .= ' AND created_at >= ?';
-    $orphanParams[] = $fromYmd . ' 00:00:00';
-}
-if ($toOk) {
-    $orphanSql .= ' AND created_at <= ?';
-    $orphanParams[] = $toYmd . ' 23:59:59';
+if ($caRangeStartUtc !== '' && $caRangeEndExclusiveUtc !== '') {
+    $orphanSql .= ' AND created_at >= ? AND created_at < ?';
+    $orphanParams[] = $caRangeStartUtc;
+    $orphanParams[] = $caRangeEndExclusiveUtc;
 }
 $stOr = $pdo->prepare($orphanSql);
 $stOr->execute($orphanParams);
@@ -108,13 +126,10 @@ $companyDirectSql = '
     FROM orders o
     WHERE 1=1' . orange_sales_company_direct_orders_sql($pdo, 'o') . $caOrdersCountrySql;
 $companyDirectParams = [];
-if ($fromOk) {
-    $companyDirectSql .= ' AND o.created_at >= ?';
-    $companyDirectParams[] = $fromYmd . ' 00:00:00';
-}
-if ($toOk) {
-    $companyDirectSql .= ' AND o.created_at <= ?';
-    $companyDirectParams[] = $toYmd . ' 23:59:59';
+if ($caRangeStartUtc !== '' && $caRangeEndExclusiveUtc !== '') {
+    $companyDirectSql .= ' AND o.created_at >= ? AND o.created_at < ?';
+    $companyDirectParams[] = $caRangeStartUtc;
+    $companyDirectParams[] = $caRangeEndExclusiveUtc;
 }
 $stCo = $pdo->prepare($companyDirectSql);
 $stCo->execute($companyDirectParams);
@@ -143,13 +158,10 @@ $topSql = '
     WHERE o.channel_id IS NOT NULL AND o.channel_id > 0
 ';
 $topParams = [];
-if ($fromOk) {
-    $topSql .= ' AND o.created_at >= ?';
-    $topParams[] = $fromYmd . ' 00:00:00';
-}
-if ($toOk) {
-    $topSql .= ' AND o.created_at <= ?';
-    $topParams[] = $toYmd . ' 23:59:59';
+if ($caRangeStartUtc !== '' && $caRangeEndExclusiveUtc !== '') {
+    $topSql .= ' AND o.created_at >= ? AND o.created_at < ?';
+    $topParams[] = $caRangeStartUtc;
+    $topParams[] = $caRangeEndExclusiveUtc;
 }
 $topSql .= $caOrdersCountrySql . ' GROUP BY o.channel_id, oi.product_name ORDER BY o.channel_id ASC, qty_sum DESC';
 

@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../includes/order_intake_queue.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
 require_once __DIR__ . '/../../includes/cart_promo_schedule.php';
 require_once __DIR__ . '/../../includes/product_preview.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 
 /** @var array<string, mixed> $admin — من admin/index.php */
 $pdo = db();
@@ -27,8 +28,36 @@ if (!orange_admin_is_superuser($admin) && orange_admin_permissions_matrix($pdo, 
         . '<p style="margin:0;"><strong>تنبيه:</strong> حسابك بدون صلاحيات مفصّلة بعد. يمكنك عرض هذه الصفحة فقط حتى يحدّد المشرف العام صلاحياتك من «المستخدمون والصلاحيات»، أو يُفعَّل لك عمود <code>is_superuser = 1</code> في قاعدة البيانات.</p>'
         . '</div>';
 }
-$ordersToday = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()" . $dashOrdersSql)->fetchColumn();
-$salesToday = (float)$pdo->query("SELECT COALESCE(SUM(total),0) FROM orders WHERE DATE(created_at) = CURDATE()" . $dashOrdersSql)->fetchColumn();
+$ordersToday = 0;
+$salesToday = 0.0;
+if ($dashCountryId > 0) {
+    try {
+        $dashTodayYmd = orange_admin_time_document_date_today_for_country_id($pdo, $dashCountryId);
+        $dashDayBounds = orange_admin_time_day_bounds_mysql_utc(
+            $dashTodayYmd,
+            orange_admin_time_timezone_for_country_id($pdo, $dashCountryId)
+        );
+        $stOrdToday = $pdo->prepare(
+            'SELECT COUNT(*) FROM orders WHERE created_at >= ? AND created_at < ?' . $dashOrdersSql
+        );
+        $stOrdToday->execute([
+            $dashDayBounds['start_utc_mysql'],
+            $dashDayBounds['end_exclusive_utc_mysql'],
+        ]);
+        $ordersToday = (int) $stOrdToday->fetchColumn();
+        $stSalesToday = $pdo->prepare(
+            'SELECT COALESCE(SUM(total),0) FROM orders WHERE created_at >= ? AND created_at < ?' . $dashOrdersSql
+        );
+        $stSalesToday->execute([
+            $dashDayBounds['start_utc_mysql'],
+            $dashDayBounds['end_exclusive_utc_mysql'],
+        ]);
+        $salesToday = (float) $stSalesToday->fetchColumn();
+    } catch (Throwable $e) {
+        $ordersToday = 0;
+        $salesToday = 0.0;
+    }
+}
 $pendingOrders = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending'" . $dashOrdersSql)->fetchColumn();
 $productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE 1=1" . orange_sql_country_and_fragment($pdo, 'products', 'products', $dashCountryId) . orange_preview_hide_sql($pdo, 'products'))->fetchColumn();
 
@@ -90,7 +119,14 @@ if ($intakeQueueVisible) {
         <li>
             <a href="<?php echo htmlspecialchars($href, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($alert['label'], ENT_QUOTES, 'UTF-8'); ?></a>
             <?php if ($alert['paused_at'] !== ''): ?>
-            <span class="muted" dir="ltr"> — <?php echo htmlspecialchars(substr((string) $alert['paused_at'], 0, 16), ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="muted" dir="ltr"> — <?php
+                $pausedDisp = orange_admin_time_display_mysql_utc_or_dash(
+                    $pdo,
+                    (string) $alert['paused_at'],
+                    $dashCountryId
+                );
+                echo htmlspecialchars($pausedDisp, ENT_QUOTES, 'UTF-8');
+            ?></span>
             <?php endif; ?>
         </li>
         <?php endforeach; ?>

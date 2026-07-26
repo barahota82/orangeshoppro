@@ -2,14 +2,14 @@
     "matrix_version":  "1.0",
     "boundary_policy_version":  "C1.1",
     "dependency_graph_version":  "C2",
-    "schema_revision":  122,
+    "schema_revision":  123,
     "package_type":  "country_recovery",
     "generated_for_phase":  "C3",
     "never_export":  [
                          "journal_entries",
                          "orange_country_screen_copy_log"
                      ],
-    "mutate_table_count":  80,
+    "mutate_table_count":  81,
     "tables":  {
                    "accounts":  {
                                     "classification":  "Country Scoped",
@@ -363,14 +363,23 @@
                                                       "exportable":  true
                                                   },
                    "orange_company_documents":  {
-                                                    "classification":  "Mixed",
+                                                    "classification":  "Country Scoped",
                                                     "restore_mode":  "replace",
                                                     "restore_batch":  3,
                                                     "delete_batch":  4,
-                                                    "ownership_resolver":  "polymorphic_owner_validation",
-                                                    "special_handler":  "polymorphic_company_documents",
+                                                    "ownership_resolver":  "direct_country_id",
+                                                    "special_handler":  null,
                                                     "exportable":  true
                                                 },
+                   "orange_admin_audit_log":  {
+                                                 "classification":  "Country Scoped",
+                                                 "restore_mode":  "replace",
+                                                 "restore_batch":  2,
+                                                 "delete_batch":  5,
+                                                 "ownership_resolver":  "direct_country_id",
+                                                 "special_handler":  null,
+                                                 "exportable":  true
+                                             },
                    "orange_edit_lock_registry":  {
                                                      "classification":  "Country Scoped",
                                                      "restore_mode":  "replace",

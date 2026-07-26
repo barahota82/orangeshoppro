@@ -11,10 +11,19 @@ require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/admin_voucher_print_tuning.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 
 $pdo = orange_admin_page_pdo();
 $stkPrintTuning = orange_admin_voucher_print_tuning_mode();
 $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+$stkTodayYmd = date('Y-m-d');
+try {
+    if ($ctxCountryId > 0) {
+        $stkTodayYmd = orange_admin_time_document_date_today_for_country_id($pdo, $ctxCountryId);
+    }
+} catch (Throwable $e) {
+    $stkTodayYmd = date('Y-m-d');
+}
 $stkCurrencyCode = orange_gl_functional_currency_code($pdo, $ctxCountryId > 0 ? $ctxCountryId : null);
 $stkDecimals = orange_currency_decimals_for_code($stkCurrencyCode);
 $ready = orange_stock_adjustment_voucher_ready($pdo);
@@ -43,7 +52,7 @@ $stkLossJson = json_encode($stkLossMeta, JSON_UNESCAPED_UNICODE) ?: '{}';
 
 $initial = [
     'id' => 0,
-    'document_date' => date('Y-m-d'),
+    'document_date' => $stkTodayYmd,
     'notes' => '',
     'status' => 'draft',
     'journal_voucher_id' => 0,
@@ -61,7 +70,7 @@ if ($editSv !== null) {
     }
     $initial = [
         'id' => (int) ($h['id'] ?? 0),
-        'document_date' => substr((string) ($h['document_date'] ?? ''), 0, 10) ?: date('Y-m-d'),
+        'document_date' => substr((string) ($h['document_date'] ?? ''), 0, 10) ?: $stkTodayYmd,
         'notes' => (string) ($h['notes'] ?? ''),
         'status' => (string) ($h['status'] ?? 'draft'),
         'journal_voucher_id' => (int) ($h['journal_voucher_id'] ?? 0),

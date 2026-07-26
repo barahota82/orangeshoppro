@@ -299,35 +299,36 @@ function orange_channel_analytics_returns_date_sql(
     bool $hasCreatedAt,
     bool $hasOrderJoin,
     string $fromYmd,
-    string $toYmd
+    string $toYmd,
+    string $startUtcMysql = '',
+    string $endExclusiveUtcMysql = '',
+    int $startUnix = 0,
+    int $endExclusiveUnix = 0
 ): array {
     $sql = '';
     $params = [];
     if (!$hasCreatedAt) {
         return [$sql, $params];
     }
-    if ($fromYmd !== '') {
-        if ($hasOrderJoin) {
-            $sql .= ' AND ((sr.order_id IS NOT NULL AND sr.order_id > 0 AND o.id IS NOT NULL AND o.created_at >= ?)'
-                . ' OR ((sr.order_id IS NULL OR sr.order_id = 0 OR o.id IS NULL) AND DATE(sr.created_at) >= ?))';
-            $params[] = $fromYmd . ' 00:00:00';
-            $params[] = $fromYmd;
-        } else {
-            $sql .= ' AND DATE(sr.created_at) >= ?';
-            $params[] = $fromYmd;
-        }
+    if ($startUtcMysql === '' || $endExclusiveUtcMysql === '' || $startUnix <= 0 || $endExclusiveUnix <= 0) {
+        return [$sql, $params];
     }
-    if ($toYmd !== '') {
-        if ($hasOrderJoin) {
-            $sql .= ' AND ((sr.order_id IS NOT NULL AND sr.order_id > 0 AND o.id IS NOT NULL AND o.created_at <= ?)'
-                . ' OR ((sr.order_id IS NULL OR sr.order_id = 0 OR o.id IS NULL) AND DATE(sr.created_at) <= ?))';
-            $params[] = $toYmd . ' 23:59:59';
-            $params[] = $toYmd;
-        } else {
-            $sql .= ' AND DATE(sr.created_at) <= ?';
-            $params[] = $toYmd;
-        }
+    if ($hasOrderJoin) {
+        // orders.created_at = DATETIME UTC wall; sales_returns.created_at = TIMESTAMP (unix).
+        $sql .= ' AND ((sr.order_id IS NOT NULL AND sr.order_id > 0 AND o.id IS NOT NULL'
+            . ' AND o.created_at >= ? AND o.created_at < ?)'
+            . ' OR ((sr.order_id IS NULL OR sr.order_id = 0 OR o.id IS NULL)'
+            . ' AND UNIX_TIMESTAMP(sr.created_at) >= ? AND UNIX_TIMESTAMP(sr.created_at) < ?))';
+        $params[] = $startUtcMysql;
+        $params[] = $endExclusiveUtcMysql;
+        $params[] = $startUnix;
+        $params[] = $endExclusiveUnix;
+    } else {
+        $sql .= ' AND UNIX_TIMESTAMP(sr.created_at) >= ? AND UNIX_TIMESTAMP(sr.created_at) < ?';
+        $params[] = $startUnix;
+        $params[] = $endExclusiveUnix;
     }
+    unset($fromYmd, $toYmd);
 
     return [$sql, $params];
 }
@@ -462,11 +463,41 @@ function orange_channel_analytics_aggregate_returns(
 
     $sql = 'SELECT ' . $select . ' FROM sales_returns sr' . $joinOrder . ' WHERE 1=1';
     $sql .= orange_sales_returns_country_or_order_sql($pdo, $countryId);
+    $startUtc = '';
+    $endUtc = '';
+    $startUnix = 0;
+    $endUnix = 0;
+    if (($fromYmd !== '' || $toYmd !== '') && $countryId > 0) {
+        require_once __DIR__ . '/admin_time.php';
+        try {
+            $tz = orange_admin_time_timezone_for_country_id($pdo, $countryId);
+            $range = orange_admin_time_filter_range_mysql_utc($fromYmd, $toYmd, $tz);
+            if ($range !== null) {
+                $startUtc = $range['start_utc_mysql'];
+                $endUtc = $range['end_exclusive_utc_mysql'];
+                $startUnix = orange_admin_time_parse_utc_instant(
+                    orange_admin_time_parse_mysql_utc_datetime($startUtc)->format('c')
+                )->getTimestamp();
+                $endUnix = orange_admin_time_parse_utc_instant(
+                    orange_admin_time_parse_mysql_utc_datetime($endUtc)->format('c')
+                )->getTimestamp();
+            }
+        } catch (Throwable $e) {
+            $startUtc = '';
+            $endUtc = '';
+            $startUnix = 0;
+            $endUnix = 0;
+        }
+    }
     [$dateSql, $dateParams] = orange_channel_analytics_returns_date_sql(
         $hasCreatedAt,
         $hasOrderJoin,
         $fromYmd,
-        $toYmd
+        $toYmd,
+        $startUtc,
+        $endUtc,
+        $startUnix,
+        $endUnix
     );
     $sql .= $dateSql;
     $params = $dateParams;

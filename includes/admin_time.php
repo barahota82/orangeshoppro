@@ -166,15 +166,22 @@ function orange_admin_time_format_instant_in_iana(
     if ($pattern === 'ymd') {
         return $dt->format('Y-m-d');
     }
-    // 12-hour with explicit AM/PM (matches Backup/Restore operator convention for clarity).
+    // 12-hour with explicit AM/PM (Y-m-d wall — Backup/Restore / operator tooling).
     if ($pattern === 'datetime12') {
         return $dt->format('Y-m-d g:i:s A');
     }
+    // Admin Entry Date / Absolute Moment with seconds (d/m/Y).
+    if ($pattern === 'datetime_his12') {
+        unset($lang);
 
-    // Default: d/m/Y H:i (24h) — familiar admin tables; lang reserved for future localization.
+        return $dt->format('d/m/Y g:i:s A');
+    }
+
+    // Default admin Absolute Moment / Entry Date: d/m/Y + 12-hour AM/PM (Phase 3 Step 2).
+    // Browser TZ and PHP default TZ do not affect the instant.
     unset($lang);
 
-    return $dt->format('d/m/Y H:i');
+    return $dt->format('d/m/Y g:i A');
 }
 
 /**
@@ -631,6 +638,65 @@ function orange_admin_time_document_date_today_for_country_id(PDO $pdo, int $cou
 {
     return orange_admin_time_today_ymd_in_iana(
         orange_admin_time_timezone_for_country_id($pdo, $countryId)
+    );
+}
+
+/**
+ * Date-only default for Current Country Context (admin forms).
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_document_date_today_for_admin_context(PDO $pdo): string
+{
+    return orange_admin_time_today_ymd_in_iana(
+        orange_admin_time_timezone_for_admin_context($pdo)
+    );
+}
+
+/**
+ * First calendar day of the current local month in an IANA zone (Y-m-d, Date-only).
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_month_start_ymd_in_iana(string $ianaTimezone): string
+{
+    $today = orange_admin_time_today_ymd_in_iana($ianaTimezone);
+
+    return substr($today, 0, 8) . '01';
+}
+
+/**
+ * Last calendar day of the current local month in an IANA zone (Y-m-d, Date-only).
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_month_end_ymd_in_iana(string $ianaTimezone): string
+{
+    $start = orange_admin_time_month_start_ymd_in_iana($ianaTimezone);
+    $tz = new DateTimeZone(orange_admin_time_require_iana($ianaTimezone));
+    $dt = DateTimeImmutable::createFromFormat('!Y-m-d', $start, $tz);
+    if (!$dt instanceof DateTimeImmutable) {
+        throw new OrangeAdminTimeConfigException('admin_time_month_end_invalid');
+    }
+
+    return $dt->modify('last day of this month')->format('Y-m-d');
+}
+
+/**
+ * Absolute “now” display for admin Entry Date preview (Current Country Context IANA, 12h AM/PM).
+ *
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_now_display_for_admin_context(
+    PDO $pdo,
+    string $lang = 'ar',
+    string $pattern = 'datetime'
+): string {
+    return orange_admin_time_format_instant_for_admin_context(
+        $pdo,
+        orange_admin_time_utc_now_iso(),
+        $lang,
+        $pattern
     );
 }
 

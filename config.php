@@ -2964,9 +2964,15 @@ function json_response($data, int $httpCode = 200): void {
  * تسجيل نشاط إداري في الجدول orange_admin_audit_log (يُنشأ تلقائياً مع المخطط).
  * لا يرمي استثناءً للأعلى حتى لا تتعطل عمليات الـ API.
  *
+ * Optional 5th argument (Phase 3 Step 2) — country/global scope without breaking call sites:
+ *   audit_log($action, $message, $entityTable, $entityId, ['country_id' => int])
+ *   audit_log($action, $message, $entityTable, $entityId, ['is_global' => true])
+ * Missing country_id alone is never treated as Global.
+ *
  * @param int|string|null $entityId
+ * @param array{country_id?:int,is_global?:bool}|null $scope
  */
-function audit_log(string $action, string $message, string $entityTable = '', $entityId = null): void
+function audit_log(string $action, string $message, string $entityTable = '', $entityId = null, ?array $scope = null): void
 {
     $adminId = null;
     if (function_exists('error_log') && filter_var(getenv('ORANGE_AUDIT_LOG') ?: '', FILTER_VALIDATE_BOOLEAN)) {
@@ -2978,6 +2984,8 @@ function audit_log(string $action, string $message, string $entityTable = '', $e
         }
         $pdo = db();
         require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/admin_time.php';
+        require_once __DIR__ . '/includes/countries.php';
         orange_catalog_ensure_schema($pdo);
         if (!orange_table_exists($pdo, 'orange_admin_audit_log')) {
             return;
@@ -2992,16 +3000,73 @@ function audit_log(string $action, string $message, string $entityTable = '', $e
             }
         }
         $eid = $entityId === null || $entityId === '' ? '' : (string) $entityId;
-        $st = $pdo->prepare(
-            'INSERT INTO orange_admin_audit_log (admin_id, action, message, entity_table, entity_id) VALUES (?, ?, ?, ?, ?)'
-        );
-        $st->execute([
-            $adminId,
-            $action,
-            $message,
-            $entityTable,
-            $eid,
-        ]);
+        $scope = is_array($scope) ? $scope : [];
+        $isGlobal = !empty($scope['is_global']);
+        $countryId = isset($scope['country_id']) ? (int) $scope['country_id'] : 0;
+
+        if (!$isGlobal && $countryId <= 0 && $entityTable !== '' && $eid !== '' && ctype_digit($eid)
+            && orange_table_exists($pdo, $entityTable)
+            && orange_table_has_column($pdo, $entityTable, 'country_id')) {
+            try {
+                $stEnt = $pdo->prepare(
+                    'SELECT country_id FROM `' . str_replace('`', '``', $entityTable) . '` WHERE id = ? LIMIT 1'
+                );
+                $stEnt->execute([(int) $eid]);
+                $countryId = (int) $stEnt->fetchColumn();
+            } catch (Throwable $e) {
+                $countryId = 0;
+            }
+        }
+
+        if (!$isGlobal && $countryId <= 0 && function_exists('orange_admin_context_country_id')) {
+            $countryId = (int) orange_admin_context_country_id($pdo);
+        }
+
+        if ($isGlobal) {
+            $countryId = 0;
+        } elseif ($countryId <= 0) {
+            // Fail closed: ordinary country-scoped events must not become silent Global.
+            throw new RuntimeException('audit_log_country_required');
+        } elseif (function_exists('orange_admin_context_country_id')) {
+            $ctx = (int) orange_admin_context_country_id($pdo);
+            if ($ctx > 0 && $countryId !== $ctx) {
+                throw new RuntimeException('audit_log_country_mismatch');
+            }
+        }
+
+        $createdUnix = orange_admin_time_unix_now();
+        $hasCountry = orange_table_has_column($pdo, 'orange_admin_audit_log', 'country_id');
+        $hasGlobal = orange_table_has_column($pdo, 'orange_admin_audit_log', 'is_global');
+        if ($hasCountry && $hasGlobal) {
+            $st = $pdo->prepare(
+                'INSERT INTO orange_admin_audit_log (
+                    admin_id, action, message, entity_table, entity_id, country_id, is_global, created_at
+                ) VALUES (?,?,?,?,?,?,?,' . orange_admin_time_sql_from_unix() . ')'
+            );
+            $st->execute([
+                $adminId,
+                $action,
+                $message,
+                $entityTable,
+                $eid,
+                $isGlobal ? null : $countryId,
+                $isGlobal ? 1 : 0,
+                $createdUnix,
+            ]);
+        } else {
+            $st = $pdo->prepare(
+                'INSERT INTO orange_admin_audit_log (admin_id, action, message, entity_table, entity_id, created_at)
+                 VALUES (?,?,?,?,?,' . orange_admin_time_sql_from_unix() . ')'
+            );
+            $st->execute([
+                $adminId,
+                $action,
+                $message,
+                $entityTable,
+                $eid,
+                $createdUnix,
+            ]);
+        }
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange audit_log] ' . $e->getMessage());

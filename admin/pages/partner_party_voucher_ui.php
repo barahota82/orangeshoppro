@@ -43,8 +43,19 @@ $ppvApiUrl = $ppvIsReceipt
     : '/admin/api/partners/supplier-payment.php';
 $ppvOpenItemsKind = $ppvIsReceipt ? 'customer' : 'supplier';
 
-$partnerUiTodayDmy = orange_format_date_dmY(date('Y-m-d'));
-$ppvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$partnerUiTodayDmy = '';
+$ppvFormDocumentEnteredDisplay = '—';
+try {
+    if ($ppvCountryId > 0) {
+        $partnerUiTodayDmy = orange_format_date_dmY(
+            orange_admin_time_document_date_today_for_country_id($pdo, $ppvCountryId)
+        );
+        $ppvFormDocumentEnteredDisplay = orange_admin_time_now_display_for_admin_context($pdo);
+    }
+} catch (Throwable $e) {
+    $partnerUiTodayDmy = '';
+    $ppvFormDocumentEnteredDisplay = '—';
+}
 
 $cashAccId = null;
 try {

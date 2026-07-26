@@ -27,8 +27,19 @@ $ppvCustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'cu
 $ppvTitle = 'سداد فواتير مبيعات آجلة';
 $ppvApiUrl = '/admin/api/partners/customer-receipt.php';
 
-$partnerUiTodayDmy = orange_format_date_dmY(date('Y-m-d'));
-$ppvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$partnerUiTodayDmy = '';
+$ppvFormDocumentEnteredDisplay = '—';
+try {
+    if ($ppvCountryId > 0) {
+        $partnerUiTodayDmy = orange_format_date_dmY(
+            orange_admin_time_document_date_today_for_country_id($pdo, $ppvCountryId)
+        );
+        $ppvFormDocumentEnteredDisplay = orange_admin_time_now_display_for_admin_context($pdo);
+    }
+} catch (Throwable $e) {
+    $partnerUiTodayDmy = '';
+    $ppvFormDocumentEnteredDisplay = '—';
+}
 
 $cashAccId = null;
 try {
@@ -123,7 +134,10 @@ $nextVoucherNo = 0;
 $crecRefPreview = '';
 if (orange_journal_vouchers_ready($pdo)) {
     orange_journal_types_sync_canonical_defaults($pdo, $ppvCountryId > 0 ? $ppvCountryId : null);
-    $fyPeek = orange_fiscal_find_for_date($pdo, date('Y-m-d'), $ppvCountryId > 0 ? $ppvCountryId : null);
+    $fyPeekYmd = $ppvCountryId > 0
+        ? orange_admin_time_document_date_today_for_country_id($pdo, $ppvCountryId)
+        : orange_admin_time_document_date_today_for_admin_context($pdo);
+    $fyPeek = orange_fiscal_find_for_date($pdo, $fyPeekYmd, $ppvCountryId > 0 ? $ppvCountryId : null);
     $fyPeekId = $fyPeek ? (int) $fyPeek['id'] : 0;
     if (
         $fyPeekId > 0
