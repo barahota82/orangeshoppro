@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../includes/cart_promo_products.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/inventory_cost_layers.php';
 require_once __DIR__ . '/../../includes/product_preview.php';
@@ -21,6 +22,17 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
 $srCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+$srReportIana = '';
+$srDefaultFrom = '';
+$srDefaultTo = '';
+try {
+    $srDefaults = orange_admin_time_report_default_from_to_for_admin_context($pdo);
+    $srReportIana = (string) $srDefaults['iana'];
+    $srDefaultFrom = (string) $srDefaults['from_ymd'];
+    $srDefaultTo = (string) $srDefaults['to_ymd'];
+} catch (Throwable $e) {
+    $srReportIana = '';
+}
 $companyNameAr = orange_company_settings_name_ar($pdo);
 
 $reports = [
@@ -62,8 +74,8 @@ $normalizeDate = static function (string $raw): ?string {
     $ymd = orange_parse_admin_date_to_ymd(trim($raw));
     return $ymd !== '' ? $ymd : null;
 };
-$today = date('Y-m-d');
-$monthStart = date('Y-m-01');
+$today = $srDefaultTo !== '' ? $srDefaultTo : date('Y-m-d');
+$monthStart = $srDefaultFrom !== '' ? $srDefaultFrom : date('Y-m-01');
 $mFrom = isset($_GET['m_from']) ? ($normalizeDate((string) $_GET['m_from']) ?? $monthStart) : $monthStart;
 $mTo = isset($_GET['m_to']) ? ($normalizeDate((string) $_GET['m_to']) ?? $today) : $today;
 if (strcmp($mFrom, $mTo) > 0) {
@@ -71,6 +83,83 @@ if (strcmp($mFrom, $mTo) > 0) {
 }
 $mFromDisplay = orange_format_date_dmY($mFrom);
 $mToDisplay = orange_format_date_dmY($mTo);
+$srAbsStartUtc = '';
+$srAbsEndExclusiveUtc = '';
+$srAbsFromStartUtc = '';
+if ($srReportIana !== '') {
+    try {
+        $srAbsRange = orange_admin_time_filter_range_mysql_utc($mFrom, $mTo, $srReportIana);
+        if ($srAbsRange !== null) {
+            $srAbsStartUtc = $srAbsRange['start_utc_mysql'];
+            $srAbsEndExclusiveUtc = $srAbsRange['end_exclusive_utc_mysql'];
+        }
+        $srFromBounds = orange_admin_time_day_bounds_mysql_utc($mFrom, $srReportIana);
+        $srAbsFromStartUtc = $srFromBounds['start_utc_mysql'];
+    } catch (Throwable $e) {
+        $srAbsStartUtc = '';
+        $srAbsEndExclusiveUtc = '';
+        $srAbsFromStartUtc = '';
+    }
+}
+$srAbsFilterSql = static function (string $instantSql) use ($srAbsStartUtc, $srAbsEndExclusiveUtc): array {
+    if ($instantSql === 'NULL' || $srAbsStartUtc === '' || $srAbsEndExclusiveUtc === '') {
+        return ['sql' => ' AND 1=0', 'params' => []];
+    }
+
+    return [
+        'sql' => ' AND ' . $instantSql . ' >= ? AND ' . $instantSql . ' < ?',
+        'params' => [$srAbsStartUtc, $srAbsEndExclusiveUtc],
+    ];
+};
+$srAbsSinceFilterSql = static function (string $instantSql) use ($srAbsFromStartUtc): array {
+    if ($instantSql === 'NULL' || $srAbsFromStartUtc === '') {
+        return ['sql' => ' AND 1=0', 'params' => []];
+    }
+
+    return [
+        'sql' => ' AND ' . $instantSql . ' >= ?',
+        'params' => [$srAbsFromStartUtc],
+    ];
+};
+$srAbsBeforeLocalDayEndSql = static function (string $instantSql, string $localYmd) use ($srReportIana): array {
+    if ($instantSql === 'NULL' || $localYmd === '' || $srReportIana === '') {
+        return ['sql' => ' AND 1=0', 'params' => []];
+    }
+    try {
+        $bounds = orange_admin_time_day_bounds_mysql_utc($localYmd, $srReportIana);
+
+        return [
+            'sql' => ' AND ' . $instantSql . ' < ?',
+            'params' => [$bounds['end_exclusive_utc_mysql']],
+        ];
+    } catch (Throwable $e) {
+        return ['sql' => ' AND 1=0', 'params' => []];
+    }
+};
+$srFormatInstantDisplay = static function (?string $utcMysql) use ($pdo, $srCountryId): string {
+    return orange_admin_time_display_mysql_utc_or_dash($pdo, $utcMysql, $srCountryId, 'ar', 'datetime');
+};
+$srFormatInstantDay = static function (?string $utcMysql) use ($pdo, $srCountryId, $srReportIana): string {
+    $raw = trim((string) ($utcMysql ?? ''));
+    if ($raw === '') {
+        return '';
+    }
+    try {
+        $iana = $srCountryId > 0
+            ? orange_admin_time_timezone_for_country_id($pdo, $srCountryId)
+            : $srReportIana;
+        if ($iana === '') {
+            return '';
+        }
+
+        return orange_admin_time_local_ymd_in_iana(
+            orange_admin_time_parse_mysql_utc_datetime($raw)->format('c'),
+            $iana
+        );
+    } catch (Throwable $e) {
+        return '';
+    }
+};
 $stagnantDays = isset($_GET['days']) ? max(7, min(3650, (int) $_GET['days'])) : 90;
 
 /* فلتر القسم (departments) ثم الفئة (catalog_categories) — الفئات مكرّرة الاسم بين الأقسام
@@ -395,11 +484,11 @@ try {
         $params = [];
         $prevExpr = '0';
         if ($valShowPrev) {
-            /* رصيد المتغير كما في نهاية السنة السابقة = new_stock لآخر حركة ≤ ذلك التاريخ. */
+            $prevBefore = $srAbsBeforeLocalDayEndSql('sm_v.created_at', $valPrevEnd);
             $prevExpr = 'COALESCE((SELECT sm_v.new_stock FROM stock_movements sm_v
-                          WHERE sm_v.variant_id = pv.id AND DATE(sm_v.created_at) <= ?
+                          WHERE sm_v.variant_id = pv.id' . $prevBefore['sql'] . '
                           ORDER BY sm_v.created_at DESC, sm_v.id DESC LIMIT 1), 0)';
-            $params[] = $valPrevEnd;
+            $params = array_merge($params, $prevBefore['params']);
         }
         if ($pid > 0) {
             $filterSql .= ' AND p.id = ?';
@@ -545,35 +634,38 @@ try {
 
         /* (2) صافي كل الحركات منذ «من» لكل صنف (لاستخراج رصيد أول عكسياً). */
         $msDeltaSince = [];
+        $msSinceSm = $srAbsSinceFilterSql('sm.created_at');
         $msSmSince = 'SELECT sm.product_id AS pid, COALESCE(SUM(sm.new_stock - sm.old_stock), 0) AS v
                       FROM stock_movements sm
-                      WHERE DATE(sm.created_at) >= ?' . $msMvCountrySql . $msPidSm . '
+                      WHERE 1=1' . $msSinceSm['sql'] . $msMvCountrySql . $msPidSm . '
                       GROUP BY sm.product_id';
         $st = $pdo->prepare($msSmSince);
-        $st->execute($pid > 0 ? [$mFrom, $pid] : [$mFrom]);
+        $st->execute($pid > 0 ? array_merge($msSinceSm['params'], [$pid]) : $msSinceSm['params']);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $msDeltaSince[(int) $r['pid']] = ($msDeltaSince[(int) $r['pid']] ?? 0) + (int) $r['v'];
         }
         if ($msHasPurCreatedAt) {
+            $msSincePu = $srAbsSinceFilterSql('pu.created_at');
             $msPuSince = 'SELECT pi.product_id AS pid, COALESCE(SUM(' . $msPuQtyExpr . '), 0) AS v
                           FROM purchase_items pi
                           INNER JOIN purchases pu ON pu.id = pi.purchase_id
-                          WHERE DATE(pu.created_at) >= ?' . $msPidPi . '
+                          WHERE 1=1' . $msSincePu['sql'] . $msPidPi . '
                           GROUP BY pi.product_id';
             $st = $pdo->prepare($msPuSince);
-            $st->execute($pid > 0 ? [$mFrom, $pid] : [$mFrom]);
+            $st->execute($pid > 0 ? array_merge($msSincePu['params'], [$pid]) : $msSincePu['params']);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 $msDeltaSince[(int) $r['pid']] = ($msDeltaSince[(int) $r['pid']] ?? 0) + (int) $r['v'];
             }
         }
         if ($msHasPurReturns) {
+            $msSincePr = $srAbsSinceFilterSql('pr.created_at');
             $msPrSince = 'SELECT pri.product_id AS pid, COALESCE(SUM(pri.qty), 0) AS v
                           FROM purchase_return_items pri
                           INNER JOIN purchase_returns pr ON pr.id = pri.purchase_return_id
-                          WHERE DATE(pr.created_at) >= ?' . $msPidPri . '
+                          WHERE 1=1' . $msSincePr['sql'] . $msPidPri . '
                           GROUP BY pri.product_id';
             $st = $pdo->prepare($msPrSince);
-            $st->execute($pid > 0 ? [$mFrom, $pid] : [$mFrom]);
+            $st->execute($pid > 0 ? array_merge($msSincePr['params'], [$pid]) : $msSincePr['params']);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 $msDeltaSince[(int) $r['pid']] = ($msDeltaSince[(int) $r['pid']] ?? 0) - (int) $r['v'];
             }
@@ -582,40 +674,43 @@ try {
         /* (3) وارد/صادر داخل الفترة [من,إلى] لكل صنف من كل المصادر. */
         $msIn = [];
         $msOut = [];
+        $msRangeSm = $srAbsFilterSql('sm.created_at');
         $msSmIo = 'SELECT sm.product_id AS pid,
                        SUM(CASE WHEN (sm.new_stock - sm.old_stock) > 0 THEN (sm.new_stock - sm.old_stock) ELSE 0 END) AS qin,
                        SUM(CASE WHEN (sm.new_stock - sm.old_stock) < 0 THEN (sm.old_stock - sm.new_stock) ELSE 0 END) AS qout
                    FROM stock_movements sm
-                   WHERE DATE(sm.created_at) BETWEEN ? AND ?' . $msMvCountrySql . $msPidSm . '
+                   WHERE 1=1' . $msRangeSm['sql'] . $msMvCountrySql . $msPidSm . '
                    GROUP BY sm.product_id';
         $st = $pdo->prepare($msSmIo);
-        $st->execute($pid > 0 ? [$mFrom, $mTo, $pid] : [$mFrom, $mTo]);
+        $st->execute($pid > 0 ? array_merge($msRangeSm['params'], [$pid]) : $msRangeSm['params']);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $p = (int) $r['pid'];
             $msIn[$p] = ($msIn[$p] ?? 0) + (int) $r['qin'];
             $msOut[$p] = ($msOut[$p] ?? 0) + (int) $r['qout'];
         }
         if ($msHasPurCreatedAt) {
+            $msRangePu = $srAbsFilterSql('pu.created_at');
             $msPuIo = 'SELECT pi.product_id AS pid, COALESCE(SUM(' . $msPuQtyExpr . '), 0) AS v
                        FROM purchase_items pi
                        INNER JOIN purchases pu ON pu.id = pi.purchase_id
-                       WHERE DATE(pu.created_at) BETWEEN ? AND ?' . $msPidPi . '
+                       WHERE 1=1' . $msRangePu['sql'] . $msPidPi . '
                        GROUP BY pi.product_id';
             $st = $pdo->prepare($msPuIo);
-            $st->execute($pid > 0 ? [$mFrom, $mTo, $pid] : [$mFrom, $mTo]);
+            $st->execute($pid > 0 ? array_merge($msRangePu['params'], [$pid]) : $msRangePu['params']);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 $p = (int) $r['pid'];
                 $msIn[$p] = ($msIn[$p] ?? 0) + (int) $r['v'];
             }
         }
         if ($msHasPurReturns) {
+            $msRangePr = $srAbsFilterSql('pr.created_at');
             $msPrIo = 'SELECT pri.product_id AS pid, COALESCE(SUM(pri.qty), 0) AS v
                        FROM purchase_return_items pri
                        INNER JOIN purchase_returns pr ON pr.id = pri.purchase_return_id
-                       WHERE DATE(pr.created_at) BETWEEN ? AND ?' . $msPidPri . '
+                       WHERE 1=1' . $msRangePr['sql'] . $msPidPri . '
                        GROUP BY pri.product_id';
             $st = $pdo->prepare($msPrIo);
-            $st->execute($pid > 0 ? [$mFrom, $mTo, $pid] : [$mFrom, $mTo]);
+            $st->execute($pid > 0 ? array_merge($msRangePr['params'], [$pid]) : $msRangePr['params']);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 $p = (int) $r['pid'];
                 $msOut[$p] = ($msOut[$p] ?? 0) + (int) $r['v'];
@@ -687,35 +782,38 @@ try {
 
         /* (2) صافي كل الحركات منذ «من» لكل صنف (لاستخراج رصيد أول عكسياً). */
         $mvDeltaSince = [];
+        $mvSinceSm = $srAbsSinceFilterSql('sm.created_at');
         $q = 'SELECT sm.product_id AS pid, COALESCE(SUM(sm.new_stock - sm.old_stock), 0) AS v
               FROM stock_movements sm
-              WHERE DATE(sm.created_at) >= ?' . $mvCountrySql . $mvPidSm . '
+              WHERE 1=1' . $mvSinceSm['sql'] . $mvCountrySql . $mvPidSm . '
               GROUP BY sm.product_id';
         $st = $pdo->prepare($q);
-        $st->execute($pid > 0 ? [$mFrom, $pid] : [$mFrom]);
+        $st->execute($pid > 0 ? array_merge($mvSinceSm['params'], [$pid]) : $mvSinceSm['params']);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $mvDeltaSince[(int) $r['pid']] = ($mvDeltaSince[(int) $r['pid']] ?? 0) + (int) $r['v'];
         }
         if ($mvHasPurCreatedAt) {
+            $mvSincePu = $srAbsSinceFilterSql('pu.created_at');
             $q = 'SELECT pi.product_id AS pid, COALESCE(SUM(' . $mvPuQtyExpr . '), 0) AS v
                   FROM purchase_items pi
                   INNER JOIN purchases pu ON pu.id = pi.purchase_id
-                  WHERE DATE(pu.created_at) >= ?' . $mvPidPi . '
+                  WHERE 1=1' . $mvSincePu['sql'] . $mvPidPi . '
                   GROUP BY pi.product_id';
             $st = $pdo->prepare($q);
-            $st->execute($pid > 0 ? [$mFrom, $pid] : [$mFrom]);
+            $st->execute($pid > 0 ? array_merge($mvSincePu['params'], [$pid]) : $mvSincePu['params']);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 $mvDeltaSince[(int) $r['pid']] = ($mvDeltaSince[(int) $r['pid']] ?? 0) + (int) $r['v'];
             }
         }
         if ($mvHasPurReturns) {
+            $mvSincePr = $srAbsSinceFilterSql('pr.created_at');
             $q = 'SELECT pri.product_id AS pid, COALESCE(SUM(pri.qty), 0) AS v
                   FROM purchase_return_items pri
                   INNER JOIN purchase_returns pr ON pr.id = pri.purchase_return_id
-                  WHERE DATE(pr.created_at) >= ?' . $mvPidPri . '
+                  WHERE 1=1' . $mvSincePr['sql'] . $mvPidPri . '
                   GROUP BY pri.product_id';
             $st = $pdo->prepare($q);
-            $st->execute($pid > 0 ? [$mFrom, $pid] : [$mFrom]);
+            $st->execute($pid > 0 ? array_merge($mvSincePr['params'], [$pid]) : $mvSincePr['params']);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 $mvDeltaSince[(int) $r['pid']] = ($mvDeltaSince[(int) $r['pid']] ?? 0) - (int) $r['v'];
             }
@@ -747,13 +845,14 @@ try {
 
         /* (3) أحداث الفترة [من,إلى] لكل صنف من كل المصادر. */
         $mvEvents = [];
+        $mvRangeSm = $srAbsFilterSql('sm.created_at');
         $q = 'SELECT sm.product_id AS pid, sm.created_at AS at, sm.type, sm.old_stock, sm.new_stock, sm.reference, pv.color, pv.size
               FROM stock_movements sm
               LEFT JOIN product_variants pv ON pv.id = sm.variant_id
-              WHERE DATE(sm.created_at) BETWEEN ? AND ?' . $mvCountrySql . $mvPidSm . '
+              WHERE 1=1' . $mvRangeSm['sql'] . $mvCountrySql . $mvPidSm . '
               ORDER BY sm.created_at ASC, sm.id ASC';
         $st = $pdo->prepare($q);
-        $st->execute($pid > 0 ? [$mFrom, $mTo, $pid] : [$mFrom, $mTo]);
+        $st->execute($pid > 0 ? array_merge($mvRangeSm['params'], [$pid]) : $mvRangeSm['params']);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $p = (int) $r['pid'];
             $ref = (string) ($r['reference'] ?? '');
@@ -767,14 +866,15 @@ try {
             ];
         }
         if ($mvHasPurCreatedAt) {
+            $mvRangePu = $srAbsFilterSql('pu.created_at');
             $q = 'SELECT pi.product_id AS pid, pu.id AS doc_id, pu.created_at AS at, ' . $mvPuQtyExpr . ' AS qty, pv.color, pv.size
                   FROM purchase_items pi
                   INNER JOIN purchases pu ON pu.id = pi.purchase_id
                   LEFT JOIN product_variants pv ON pv.id = pi.variant_id
-                  WHERE DATE(pu.created_at) BETWEEN ? AND ?' . $mvPidPi . '
+                  WHERE 1=1' . $mvRangePu['sql'] . $mvPidPi . '
                   ORDER BY pu.created_at ASC, pu.id ASC';
             $st = $pdo->prepare($q);
-            $st->execute($pid > 0 ? [$mFrom, $mTo, $pid] : [$mFrom, $mTo]);
+            $st->execute($pid > 0 ? array_merge($mvRangePu['params'], [$pid]) : $mvRangePu['params']);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 $p = (int) $r['pid'];
                 $mvEvents[$p][] = [
@@ -788,15 +888,16 @@ try {
             }
         }
         if ($mvHasPurReturns) {
+            $mvRangePr = $srAbsFilterSql('pr.created_at');
             $q = 'SELECT pri.product_id AS pid, pr.id AS doc_id, pr.created_at AS at, pri.qty, '
                 . ($mvHasPriVariant ? 'pv.color, pv.size' : 'NULL AS color, NULL AS size') . '
                   FROM purchase_return_items pri
                   INNER JOIN purchase_returns pr ON pr.id = pri.purchase_return_id
                   ' . ($mvHasPriVariant ? 'LEFT JOIN product_variants pv ON pv.id = pri.variant_id' : '') . '
-                  WHERE DATE(pr.created_at) BETWEEN ? AND ?' . $mvPidPri . '
+                  WHERE 1=1' . $mvRangePr['sql'] . $mvPidPri . '
                   ORDER BY pr.created_at ASC, pr.id ASC';
             $st = $pdo->prepare($q);
-            $st->execute($pid > 0 ? [$mFrom, $mTo, $pid] : [$mFrom, $mTo]);
+            $st->execute($pid > 0 ? array_merge($mvRangePr['params'], [$pid]) : $mvRangePr['params']);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 $p = (int) $r['pid'];
                 $mvEvents[$p][] = [
@@ -857,7 +958,28 @@ try {
         });
     } elseif ($reportKey === 'stagnant') {
         $wq = orange_warehouse_effective_qty_sql($pdo, $srCountryId, 'pv', 'wvs_stag');
-        $cutoff = date('Y-m-d', strtotime('-' . $stagnantDays . ' days'));
+        $cutoff = $today;
+        if ($srReportIana !== '') {
+            try {
+                $tz = new DateTimeZone($srReportIana);
+                $cutoffDt = DateTimeImmutable::createFromFormat('!Y-m-d', $today, $tz);
+                if ($cutoffDt instanceof DateTimeImmutable) {
+                    $cutoff = $cutoffDt->modify('-' . $stagnantDays . ' days')->format('Y-m-d');
+                }
+            } catch (Throwable $e) {
+                $cutoff = date('Y-m-d', strtotime('-' . $stagnantDays . ' days'));
+            }
+        } else {
+            $cutoff = date('Y-m-d', strtotime('-' . $stagnantDays . ' days'));
+        }
+        $cutoffBeforeStartUtc = '';
+        if ($srReportIana !== '') {
+            try {
+                $cutoffBeforeStartUtc = orange_admin_time_day_bounds_mysql_utc($cutoff, $srReportIana)['start_utc_mysql'];
+            } catch (Throwable $e) {
+                $cutoffBeforeStartUtc = '';
+            }
+        }
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, pv.id AS variant_id,
                        ' . $itemCodeExpr . ' AS item_code,
                        pv.color, pv.size, ' . $wq['expr'] . ' AS qty,
@@ -867,10 +989,10 @@ try {
                 INNER JOIN products p ON p.id = pv.product_id
                 ' . $wq['join'] . '
                 WHERE p.is_active = 1 AND ' . $wq['expr'] . ' > 0' . $productCountrySql . '
-                HAVING (last_move IS NULL OR DATE(last_move) < ?)
+                HAVING (last_move IS NULL OR last_move < ?)
                 ORDER BY last_move ASC, p.name ASC, pv.id ASC';
         $st = $pdo->prepare($sql);
-        $st->execute([$cutoff]);
+        $st->execute([$cutoffBeforeStartUtc !== '' ? $cutoffBeforeStartUtc : '1970-01-01 00:00:00']);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $rows[] = [
                 'product_id' => (int) $r['product_id'],
@@ -894,7 +1016,9 @@ $companyName = $company['company_name_ar'];
 $companyLogo = $company['logo_url'];
 $companyCr = $company['commercial_register'];
 $todayDmY = orange_format_date_dmY($today);
-$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$printDatetime = $srReportIana !== ''
+    ? orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime')
+    : orange_format_datetime_dmY_hi(gmdate('Y-m-d H:i:s'));
 $reportTitle = $reports[$reportKey];
 
 ?>
@@ -1241,7 +1365,7 @@ $reportTitle = $reports[$reportKey];
                             </tr>
                             <?php foreach ($g['lines'] as $ln): ?>
                             <tr<?php echo ($ln['link'] ?? '') !== '' ? ' class="sr-move-row" data-href="' . htmlspecialchars($ln['link'], ENT_QUOTES, 'UTF-8') . '" title="نقر مزدوج لفتح المستند"' : ''; ?>>
-                                <td><?php echo htmlspecialchars(orange_format_datetime_ar_day_dmY_hi($ln['at']), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars($srFormatInstantDisplay($ln['at']), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($ln['label'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td dir="ltr"><code><?php echo htmlspecialchars($ln['reference'] !== '' ? $ln['reference'] : '—', ENT_QUOTES, 'UTF-8'); ?></code></td>
                                 <td class="sr-col-variant"><?php echo htmlspecialchars($ln['variant'] !== '/' ? $ln['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
@@ -1269,7 +1393,10 @@ $reportTitle = $reports[$reportKey];
                                 <td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="sr-col-variant"><?php echo htmlspecialchars($r['variant'] !== '/' ? $r['variant'] : '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo (int) $r['qty']; ?></td>
-                                <td><?php echo $r['last_move'] !== '' ? htmlspecialchars(orange_format_date_dmY(substr($r['last_move'], 0, 10)), ENT_QUOTES, 'UTF-8') : 'بلا حركة'; ?></td>
+                                <td><?php
+                                    $lastMoveDay = $srFormatInstantDay($r['last_move']);
+                                    echo $lastMoveDay !== '' ? htmlspecialchars(orange_format_date_dmY($lastMoveDay), ENT_QUOTES, 'UTF-8') : 'بلا حركة';
+                                ?></td>
                                 <td><?php echo $r['last_move_type'] !== '' ? htmlspecialchars(orange_stock_movement_type_label_ar($r['last_move_type']), ENT_QUOTES, 'UTF-8') : '—'; ?></td>
                             </tr>
                         <?php endforeach; endif; ?>
@@ -1464,7 +1591,7 @@ if ($reportKey === 'balances') {
 } else {
     $srDocTitle = $reportTitle;
 }
-$srDocTitle .= ' - ' . date('Y-m-d');
+$srDocTitle .= ' - ' . $today;
 ?>
 <script>
 (function () {

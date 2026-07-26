@@ -12,11 +12,20 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
 $ralCountryLabel = orange_admin_page_country_label($pdo);
+$ralReportTimeIana = '';
+try {
+    $ralReportDefaults = orange_admin_time_report_default_from_to_for_admin_context($pdo);
+    $ralReportTimeIana = (string) $ralReportDefaults['iana'];
+} catch (Throwable $e) {
+    $ralReportTimeIana = '';
+}
 
 $flat = orange_accounts_flat($pdo);
 $listRows = orange_accounts_report_list_rows($pdo, $flat);
 $companyNameAr = orange_company_settings_name_ar($pdo);
-$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$printDatetime = $ralReportTimeIana !== ''
+    ? orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime')
+    : orange_format_datetime_dmY_hi(gmdate('Y-m-d H:i:s'));
 $ralCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
 $ralLogo = (string) ($ralCompany['logo_url'] ?? '');
 $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';

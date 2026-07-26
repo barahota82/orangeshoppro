@@ -18,6 +18,15 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 $pdo = orange_admin_page_pdo();
 $pcyCountryLabel = orange_admin_page_country_label($pdo);
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
+$pcyReportTimeIana = '';
+$pcyReportTodayYmd = '';
+try {
+    $pcyReportDefaults = orange_admin_time_report_default_from_to_for_admin_context($pdo);
+    $pcyReportTimeIana = (string) $pcyReportDefaults['iana'];
+    $pcyReportTodayYmd = (string) $pcyReportDefaults['to_ymd'];
+} catch (Throwable $e) {
+    $pcyReportTimeIana = '';
+}
 
 $years = orange_fiscal_years_list($pdo);
 
@@ -94,8 +103,12 @@ $companyNameAr = orange_company_settings_name_ar($pdo);
 $plcCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
 $plcLogo = (string) ($plcCompany['logo_url'] ?? '');
 
-$todayDmY = orange_format_date_dmY(date('Y-m-d'));
-$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$todayDmY = $pcyReportTodayYmd !== ''
+    ? orange_format_date_dmY($pcyReportTodayYmd)
+    : orange_format_date_dmY(gmdate('Y-m-d'));
+$printDatetime = $pcyReportTimeIana !== ''
+    ? orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime')
+    : orange_format_datetime_dmY_hi(gmdate('Y-m-d H:i:s'));
 
 ?>
 <div class="admin-fy-shell" dir="rtl">

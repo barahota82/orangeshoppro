@@ -19,6 +19,17 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 $pdo = orange_admin_page_pdo();
 $gasCountryLabel = orange_admin_page_country_label($pdo);
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
+$pasReportTimeIana = '';
+$pasReportTodayYmd = '';
+$pasReportYearStartYmd = '';
+try {
+    $pasReportDefaults = orange_admin_time_report_default_from_to_for_admin_context($pdo);
+    $pasReportTimeIana = (string) $pasReportDefaults['iana'];
+    $pasReportTodayYmd = (string) $pasReportDefaults['to_ymd'];
+    $pasReportYearStartYmd = substr($pasReportTodayYmd, 0, 4) . '-01-01';
+} catch (Throwable $e) {
+    $pasReportTimeIana = '';
+}
 
 $pasCtxCountryId = orange_admin_context_country_id($pdo);
 $pasJvCountryBind = orange_gl_voucher_country_bind($pdo, 'jv', $pasCtxCountryId);
@@ -93,8 +104,12 @@ function orange_partner_account_stmt_gl_line_text(array $ln): string
     return $d !== '' ? $d : $m;
 }
 
-$todayDmY = orange_format_date_dmY(date('Y-m-d'));
-$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$todayDmY = $pasReportTodayYmd !== ''
+    ? orange_format_date_dmY($pasReportTodayYmd)
+    : orange_format_date_dmY(gmdate('Y-m-d'));
+$printDatetime = $pasReportTimeIana !== ''
+    ? orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime')
+    : orange_format_datetime_dmY_hi(gmdate('Y-m-d H:i:s'));
 
 $leafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
 $pasAcctSql = "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere";
@@ -135,7 +150,7 @@ if (! in_array($filtPost, ['all', 'posted', 'unposted'], true)) {
 $showAging = isset($_GET['show_aging']) && (string) $_GET['show_aging'] === '1';
 
 if ($dateFromRaw === '') {
-    $dateFromRaw = orange_format_date_dmY(date('Y-01-01'));
+    $dateFromRaw = orange_format_date_dmY($pasReportYearStartYmd !== '' ? $pasReportYearStartYmd : gmdate('Y') . '-01-01');
 }
 if ($dateToRaw === '') {
     $dateToRaw = $todayDmY;
@@ -144,8 +159,8 @@ if ($dateToRaw === '') {
 $dateFromYmd = orange_parse_admin_date_to_ymd($dateFromRaw);
 $dateToYmd = orange_parse_admin_date_to_ymd($dateToRaw);
 if ($dateFromYmd === '' || $dateToYmd === '') {
-    $dateFromYmd = date('Y-01-01');
-    $dateToYmd = date('Y-m-d');
+    $dateFromYmd = $pasReportYearStartYmd !== '' ? $pasReportYearStartYmd : gmdate('Y') . '-01-01';
+    $dateToYmd = $pasReportTodayYmd !== '' ? $pasReportTodayYmd : gmdate('Y-m-d');
     $dateFromRaw = orange_format_date_dmY($dateFromYmd);
     $dateToRaw = orange_format_date_dmY($dateToYmd);
 }

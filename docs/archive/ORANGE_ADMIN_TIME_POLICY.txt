@@ -3,7 +3,7 @@ ORANGE — سياسة الوقت المركزية للإدمن (Admin Time Polic
 المسار: docs/archive/ORANGE_ADMIN_TIME_POLICY.txt
 تاريخ القرار: 2026-07-25
 آخر تحديث: 2026-07-26 (Phase 3 / Step 2 — Admin operational time surfaces)
-الحالة: Phase 1 + Phase 2 (Steps 1–5) مغلقة؛ Phase 3 Step 1 جرد؛ Phase 3 Step 2 منفَّذ (انظر سادساً-ج)
+الحالة: Phase 1 + Phase 2 (Steps 1–5) مغلقة؛ Phase 3 Step 1 جرد؛ Phase 3 Step 2 منفَّذ (انظر سادساً-ج)؛ Phase 3 Step 3 تقارير منفَّذ (انظر سادساً-د)
 
 الغرض
 -------
@@ -443,11 +443,47 @@ Edit-lock/partner utility defaults · utility lists ذات legacy datetime.
   `start_utc <= ts < next_day_start_utc` — لا CURDATE / DATE(ts) / 23:59:59.
 
 ### متبقٍ
-- Phase 3 Step 3: التقارير المالية/التجارية/المخزون الواسعة والتصدير.
 - Phase 3 Step 4: Customer/Storefront + Global/Mixed + Closure Sweep.
 
 ### اختبار
 `php scripts/self_test_admin_time_phase3_step2_operational.php`
+
+
+--------------------------------------------------------------------
+سادساً-د: Phase 3 / Step 3 — تقارير مالية/تجارية/مخزون + طباعة/تصدير (2026-07-26)
+--------------------------------------------------------------------
+النطاق (فقط): Sales / Purchase / Stock reports · Financial report_* ·
+journal_voucher_reports · partner statements · bank_reconciliation period/display ·
+Print/Export timestamps — لا Business Writers · لا Backup/Restore · لا Customer UI.
+
+### Country authority (تقارير عادية)
+- Current Country Context للتجميع؛ Record/Parent country عند Detail/Statement.
+- عزل SQL/Backend إلزامي (rows/totals/charts/export/print نفس النطاق).
+- التقارير Global/Mixed الصريحة → مؤجّلة Phase 3 Step 4.
+
+### Absolute Moment filters
+- From/To = يوم محلي لدولة التقرير → UTC: `ts >= start AND ts < end_exclusive`.
+- ممنوع: DATE(ts) / CURDATE() / 23:59:59 / BETWEEN نهاية اليوم / Fixed Offset.
+- Helpers: `orange_admin_time_filter_range_mysql_utc*`،
+  `orange_admin_time_local_month_buckets_mysql_utc` +
+  `orange_admin_time_sql_local_month_key_expr` (تجميع شهر محلي بدون CONVERT_TZ).
+
+### Date-only
+- voucher_date / document_date / fiscal / period: Y-m-d بلا تحويل TZ.
+- Defaults: `report_default_from_to_for_admin_context` / document_date_today.
+- technical noon لا يُعرض.
+
+### Display / Print / Export
+- تاريخ الإدخال = Absolute + IANA دولة السجل + 12h AM/PM.
+- print/export generated_at عبر `now_display_for_admin_context`.
+- Parity: شاشة = print = CSV/XLS (نفس Country + مدى زمني + دلالات).
+
+### Freeze
+- Phase 2 Writers مجمّدة؛ لا FIFO/balances/GL amounts change.
+- Backup Center / Restore Center / scripts/backup/* مجمّدة.
+
+### اختبار
+`php scripts/self_test_admin_time_phase3_step3_reports.php`
 
 
 --------------------------------------------------------------------
@@ -462,3 +498,4 @@ Edit-lock/partner utility defaults · utility lists ذات legacy datetime.
 `php scripts/self_test_admin_time_phase2_step4_closure.php`
 `php scripts/self_test_admin_time_phase2_step5_accounting.php`
 `php scripts/self_test_admin_time_phase3_step2_operational.php`
+`php scripts/self_test_admin_time_phase3_step3_reports.php`

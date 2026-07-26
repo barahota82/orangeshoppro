@@ -14,6 +14,13 @@ $pdo = orange_admin_page_pdo();
 $raCountryLabel = orange_admin_page_country_label($pdo);
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+$raReportTimeIana = '';
+try {
+    $raReportDefaults = orange_admin_time_report_default_from_to_for_admin_context($pdo);
+    $raReportTimeIana = (string) $raReportDefaults['iana'];
+} catch (Throwable $e) {
+    $raReportTimeIana = '';
+}
 
 $ready = orange_analytical_dimensions_ready($pdo) && orange_journal_vouchers_ready($pdo);
 $years = orange_fiscal_years_list($pdo, $ctxCountryId);
@@ -41,7 +48,9 @@ if ($ready && $submitted && $fyId > 0 && $dimensionId > 0) {
 }
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
-$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$printDatetime = $raReportTimeIana !== ''
+    ? orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime')
+    : orange_format_datetime_dmY_hi(gmdate('Y-m-d H:i:s'));
 $raCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
 $raLogo = (string) ($raCompany['logo_url'] ?? '');
 $fmt = static fn (float $n): string => orange_accounting_report_format_amount($n, $reportMoney);

@@ -523,6 +523,10 @@ Accounting Lifecycle V2 — Phase 1B (INV-C delivery slots) — 2026-07-11
   Absolute Moment UTC منفصل عن يوم `voucher_date` — انظر `ORANGE_ADMIN_TIME_POLICY.txt`
   (سادساً-ب) و`includes/gl_posting_time.php`. لا خلط قيمة واحدة بين DATE-semantics وDATETIME Absolute.
   يُتحقَّق أن يوم المستند داخل **سنة مالية مفتوحة** عبر `orange_fiscal_require_open_for_posting()` قبل الترحيل.
+- **تحديث Phase 3 / Step 3 (2026-07-26):** فلاتر/عرض/طباعة/تصدير التقارير المحاسبية والمالية
+  تستخدم `includes/admin_time.php` — `voucher_date` Date-only؛ `document_entered_at` Absolute
+  12h AM/PM؛ defaults يوم/شهر محلي لدولة السياق؛ لا تغيير Debit/Credit أو أرصدة أو منطق التقارير.
+  التفاصيل: `ORANGE_ADMIN_TIME_POLICY.txt` (سادساً-د).
 - **النطاق (يدوي، قابل للضبط):** المشتريات، فاتورة مبيعات الشركة (INV-C / جدول `orders`)،
   مردود المبيعات، مردود المشتريات.
 - **فاتورة الأونلاين (INV-O): مشتقّة** — لا حقل يدوي؛ يُرحَّل قيدها بتاريخ **«إنشاء القيود»**

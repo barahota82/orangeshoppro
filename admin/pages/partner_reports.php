@@ -12,6 +12,13 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
 $prCountryLabel = orange_admin_page_country_label($pdo);
+$prReportTimeIana = '';
+try {
+    $prReportDefaults = orange_admin_time_report_default_from_to_for_admin_context($pdo);
+    $prReportTimeIana = (string) $prReportDefaults['iana'];
+} catch (Throwable $e) {
+    $prReportTimeIana = '';
+}
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/date_format.php';
@@ -19,7 +26,9 @@ $companyNameAr = orange_company_settings_name_ar($pdo);
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 $prCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
 $prLogo = (string) ($prCompany['logo_url'] ?? '');
-$prPrintDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$prPrintDatetime = $prReportTimeIana !== ''
+    ? orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime')
+    : orange_format_datetime_dmY_hi(gmdate('Y-m-d H:i:s'));
 
 $includeAging = isset($_GET['aging']) && $_GET['aging'] === '1';
 $prHideZero = isset($_GET['hide_zero']) && $_GET['hide_zero'] === '1';

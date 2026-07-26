@@ -800,3 +800,127 @@ function orange_admin_time_api_instant_from_unix(
         'display' => orange_admin_time_display_unix_for_record($pdo, $unix, $recordCountryId, $lang, $pattern),
     ];
 }
+
+/**
+ * Report default From/To (Date-only): local month start → local today for Current Country Context.
+ *
+ * @return array{from_ymd:string,to_ymd:string,iana:string}
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_report_default_from_to_for_admin_context(PDO $pdo): array
+{
+    $iana = orange_admin_time_timezone_for_admin_context($pdo);
+
+    return [
+        'from_ymd' => orange_admin_time_month_start_ymd_in_iana($iana),
+        'to_ymd' => orange_admin_time_today_ymd_in_iana($iana),
+        'iana' => $iana,
+    ];
+}
+
+/**
+ * Local calendar months covering inclusive From/To (Date-only) with Absolute UTC MySQL bounds.
+ * DST-safe via IANA day bounds — never DATE()/MONTH() on UTC timestamps.
+ *
+ * @return list<array{ym:string,yy:int,mm:int,start_utc_mysql:string,end_exclusive_utc_mysql:string}>
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_local_month_buckets_mysql_utc(
+    string $fromYmd,
+    string $toYmd,
+    string $ianaTimezone
+): array {
+    $from = orange_admin_time_date_only_normalize($fromYmd);
+    $to = orange_admin_time_date_only_normalize($toYmd);
+    if ($from === '' || $to === '') {
+        throw new OrangeAdminTimeConfigException('admin_time_date_only_invalid');
+    }
+    if ($from > $to) {
+        [$from, $to] = [$to, $from];
+    }
+    $tzName = orange_admin_time_require_iana($ianaTimezone);
+    $tz = new DateTimeZone($tzName);
+    $cur = DateTimeImmutable::createFromFormat('!Y-m-d', substr($from, 0, 8) . '01', $tz);
+    $end = DateTimeImmutable::createFromFormat('!Y-m-d', substr($to, 0, 8) . '01', $tz);
+    if (!$cur instanceof DateTimeImmutable || !$end instanceof DateTimeImmutable) {
+        throw new OrangeAdminTimeConfigException('admin_time_month_bucket_invalid');
+    }
+    $buckets = [];
+    while ($cur <= $end) {
+        $ym = $cur->format('Y-m');
+        $monthStart = $cur->format('Y-m-d');
+        $monthEnd = $cur->modify('last day of this month')->format('Y-m-d');
+        $rangeFrom = $monthStart < $from ? $from : $monthStart;
+        $rangeTo = $monthEnd > $to ? $to : $monthEnd;
+        $bounds = orange_admin_time_filter_range_mysql_utc($rangeFrom, $rangeTo, $tzName);
+        if ($bounds === null) {
+            $cur = $cur->modify('first day of next month');
+            continue;
+        }
+        $buckets[] = [
+            'ym' => $ym,
+            'yy' => (int) $cur->format('Y'),
+            'mm' => (int) $cur->format('n'),
+            'start_utc_mysql' => $bounds['start_utc_mysql'],
+            'end_exclusive_utc_mysql' => $bounds['end_exclusive_utc_mysql'],
+        ];
+        $cur = $cur->modify('first day of next month');
+    }
+
+    return $buckets;
+}
+
+/**
+ * Build a sargable CASE expression that maps an Absolute Moment column to local YYYY-MM keys.
+ *
+ * @param list<array{ym:string,start_utc_mysql:string,end_exclusive_utc_mysql:string}> $buckets
+ * @return array{sql:string,params:list<string>}
+ */
+function orange_admin_time_sql_local_month_key_expr(string $columnSql, array $buckets): array
+{
+    $columnSql = trim($columnSql);
+    if ($columnSql === '' || $buckets === []) {
+        return ['sql' => "''", 'params' => []];
+    }
+    $parts = ['CASE'];
+    $params = [];
+    foreach ($buckets as $b) {
+        $ym = (string) ($b['ym'] ?? '');
+        $start = (string) ($b['start_utc_mysql'] ?? '');
+        $end = (string) ($b['end_exclusive_utc_mysql'] ?? '');
+        if ($ym === '' || $start === '' || $end === '') {
+            continue;
+        }
+        $parts[] = 'WHEN ' . $columnSql . ' >= ? AND ' . $columnSql . ' < ? THEN ?';
+        $params[] = $start;
+        $params[] = $end;
+        $params[] = $ym;
+    }
+    $parts[] = "ELSE '' END";
+
+    return ['sql' => implode(' ', $parts), 'params' => $params];
+}
+
+/**
+ * Absolute From/To (local Date-only inputs) → UTC MySQL inclusive/exclusive bounds for Current Country Context.
+ *
+ * @return array{start_utc_mysql:string,end_exclusive_utc_mysql:string,iana:string}|null
+ * @throws OrangeAdminTimeConfigException
+ */
+function orange_admin_time_filter_range_mysql_utc_for_admin_context(
+    PDO $pdo,
+    string $fromYmd,
+    string $toYmd
+): ?array {
+    $iana = orange_admin_time_timezone_for_admin_context($pdo);
+    $range = orange_admin_time_filter_range_mysql_utc($fromYmd, $toYmd, $iana);
+    if ($range === null) {
+        return null;
+    }
+
+    return [
+        'start_utc_mysql' => $range['start_utc_mysql'],
+        'end_exclusive_utc_mysql' => $range['end_exclusive_utc_mysql'],
+        'iana' => $iana,
+    ];
+}

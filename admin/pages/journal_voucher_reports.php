@@ -17,6 +17,17 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
 $jvrCountryLabel = orange_admin_page_country_label($pdo);
+$jvrReportTimeIana = '';
+$jvrReportTodayYmd = '';
+$jvrReportMonthStartYmd = '';
+try {
+    $jvrReportDefaults = orange_admin_time_report_default_from_to_for_admin_context($pdo);
+    $jvrReportTimeIana = (string) $jvrReportDefaults['iana'];
+    $jvrReportTodayYmd = (string) $jvrReportDefaults['to_ymd'];
+    $jvrReportMonthStartYmd = (string) $jvrReportDefaults['from_ymd'];
+} catch (Throwable $e) {
+    $jvrReportTimeIana = '';
+}
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 orange_catalog_ensure_schema($pdo);
 orange_journal_types_sync_canonical_defaults($pdo);
@@ -26,10 +37,10 @@ $dateFromRaw = trim((string) ($_GET['date_from'] ?? ''));
 $dateTo = orange_parse_admin_date_to_ymd($dateToRaw);
 $dateFrom = orange_parse_admin_date_to_ymd($dateFromRaw);
 if ($dateTo === '') {
-    $dateTo = date('Y-m-d');
+    $dateTo = $jvrReportTodayYmd !== '' ? $jvrReportTodayYmd : gmdate('Y-m-d');
 }
 if ($dateFrom === '') {
-    $dateFrom = date('Y-m-01');
+    $dateFrom = $jvrReportMonthStartYmd !== '' ? $jvrReportMonthStartYmd : gmdate('Y-m-01');
 }
 if ($dateFrom > $dateTo) {
     $tmp = $dateFrom;
@@ -185,7 +196,9 @@ if ($jvrReportDisplayed) {
 $resetUrl = htmlspecialchars(storefront_public_path('/admin/index.php?page=journal_voucher_reports'), ENT_QUOTES, 'UTF-8');
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
-$jvrPrintDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$jvrPrintDatetime = $jvrReportTimeIana !== ''
+    ? orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime')
+    : orange_format_datetime_dmY_hi(gmdate('Y-m-d H:i:s'));
 $jvrCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
 $jvrLogo = (string) ($jvrCompany['logo_url'] ?? '');
 

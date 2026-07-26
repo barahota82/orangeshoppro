@@ -7,11 +7,23 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
 $prCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+$prReportIana = '';
+$prDefaultFrom = '';
+$prDefaultTo = '';
+try {
+    $prDefaults = orange_admin_time_report_default_from_to_for_admin_context($pdo);
+    $prReportIana = (string) $prDefaults['iana'];
+    $prDefaultFrom = (string) $prDefaults['from_ymd'];
+    $prDefaultTo = (string) $prDefaults['to_ymd'];
+} catch (Throwable $e) {
+    $prReportIana = '';
+}
 $companyNameAr = orange_company_settings_name_ar($pdo);
 
 $reports = [
@@ -30,8 +42,8 @@ $normalizeDate = static function (string $raw): ?string {
     $ymd = orange_parse_admin_date_to_ymd(trim($raw));
     return $ymd !== '' ? $ymd : null;
 };
-$today = date('Y-m-d');
-$monthStart = date('Y-m-01');
+$today = $prDefaultTo !== '' ? $prDefaultTo : date('Y-m-d');
+$monthStart = $prDefaultFrom !== '' ? $prDefaultFrom : date('Y-m-01');
 $fromDate = isset($_GET['from']) ? ($normalizeDate((string) $_GET['from']) ?? $monthStart) : $monthStart;
 $toDate = isset($_GET['to']) ? ($normalizeDate((string) $_GET['to']) ?? $today) : $today;
 if (strcmp($fromDate, $toDate) > 0) {
@@ -39,6 +51,20 @@ if (strcmp($fromDate, $toDate) > 0) {
 }
 $fromDisplay = orange_format_date_dmY($fromDate);
 $toDisplay = orange_format_date_dmY($toDate);
+$prAbsStartUtc = '';
+$prAbsEndExclusiveUtc = '';
+if ($prReportIana !== '') {
+    try {
+        $prAbsRange = orange_admin_time_filter_range_mysql_utc($fromDate, $toDate, $prReportIana);
+        if ($prAbsRange !== null) {
+            $prAbsStartUtc = $prAbsRange['start_utc_mysql'];
+            $prAbsEndExclusiveUtc = $prAbsRange['end_exclusive_utc_mysql'];
+        }
+    } catch (Throwable $e) {
+        $prAbsStartUtc = '';
+        $prAbsEndExclusiveUtc = '';
+    }
+}
 
 $supplierId = isset($_GET['supplier_id']) ? max(0, (int) $_GET['supplier_id']) : 0;
 $productId = isset($_GET['product_id']) ? max(0, (int) $_GET['product_id']) : 0;
@@ -168,23 +194,134 @@ $hasPriDiscount = $hasPurchaseReturnItems && orange_table_has_column($pdo, 'purc
 $hasPartySubledger = orange_table_exists($pdo, 'party_subledger');
 $hasPartyAllocations = orange_table_exists($pdo, 'party_subledger_allocations');
 
-$purDateExpr = static function (string $alias) use ($hasPurDocumentDate, $hasPurCreatedAt): string {
-    if ($hasPurDocumentDate) {
-        return 'DATE(' . $alias . '.document_date)';
-    }
-    if ($hasPurCreatedAt) {
-        return 'DATE(' . $alias . '.created_at)';
-    }
-    return 'CURDATE()';
+$purUsesDocDate = $hasPurDocumentDate;
+$retUsesDocDate = $hasRetDocumentDate;
+$purInstantSql = static function (string $alias) use ($hasPurCreatedAt): string {
+    return $hasPurCreatedAt ? ($alias . '.created_at') : 'NULL';
 };
-$retDateExpr = static function (string $alias) use ($hasRetDocumentDate, $hasRetCreatedAt): string {
-    if ($hasRetDocumentDate) {
-        return 'DATE(' . $alias . '.document_date)';
+$retInstantSql = static function (string $alias) use ($hasRetCreatedAt): string {
+    return $hasRetCreatedAt ? ($alias . '.created_at') : 'NULL';
+};
+$purDocDateSql = static function (string $alias): string {
+    return 'DATE(' . $alias . '.document_date)';
+};
+$retDocDateSql = static function (string $alias): string {
+    return 'DATE(' . $alias . '.document_date)';
+};
+$prAbsFilterSql = static function (string $instantSql) use ($prAbsStartUtc, $prAbsEndExclusiveUtc): array {
+    if ($instantSql === 'NULL' || $prAbsStartUtc === '' || $prAbsEndExclusiveUtc === '') {
+        return ['sql' => ' AND 1=0', 'params' => []];
     }
-    if ($hasRetCreatedAt) {
-        return 'DATE(' . $alias . '.created_at)';
+
+    return [
+        'sql' => ' AND ' . $instantSql . ' >= ? AND ' . $instantSql . ' < ?',
+        'params' => [$prAbsStartUtc, $prAbsEndExclusiveUtc],
+    ];
+};
+$prDocDateFilterSql = static function (string $dateSql) use ($fromDate, $toDate): array {
+    return [
+        'sql' => ' AND ' . $dateSql . ' BETWEEN ? AND ?',
+        'params' => [$fromDate, $toDate],
+    ];
+};
+$prFormatInstantDay = static function (?string $utcMysql) use ($pdo, $prCountryId, $prReportIana): string {
+    $raw = trim((string) ($utcMysql ?? ''));
+    if ($raw === '') {
+        return '';
     }
-    return 'CURDATE()';
+    try {
+        $iana = $prCountryId > 0
+            ? orange_admin_time_timezone_for_country_id($pdo, $prCountryId)
+            : $prReportIana;
+        if ($iana === '') {
+            return '';
+        }
+
+        return orange_admin_time_local_ymd_in_iana(
+            orange_admin_time_parse_mysql_utc_datetime($raw)->format('c'),
+            $iana
+        );
+    } catch (Throwable $e) {
+        return '';
+    }
+};
+$prFormatEntry = static function (?string $utcMysql) use ($pdo, $prCountryId): string {
+    return orange_admin_time_display_mysql_utc_or_dash($pdo, $utcMysql, $prCountryId, 'ar', 'datetime');
+};
+$prRowDateYmd = static function (array $row, bool $usesDocDate) use ($prFormatInstantDay): string {
+    if ($usesDocDate) {
+        return (string) ($row['doc_date'] ?? '');
+    }
+
+    return $prFormatInstantDay((string) ($row['doc_instant'] ?? ''));
+};
+$purDateMeta = static function (string $alias) use (
+    $purUsesDocDate,
+    $hasPurCreatedAt,
+    $purDocDateSql,
+    $purInstantSql,
+    $prDocDateFilterSql,
+    $prAbsFilterSql
+): array {
+    $entrySelect = $hasPurCreatedAt
+        ? (', ' . $alias . '.created_at AS entry_instant')
+        : ', NULL AS entry_instant';
+    if ($purUsesDocDate) {
+        $dateSql = $purDocDateSql($alias);
+        $filter = $prDocDateFilterSql($dateSql);
+
+        return [
+            'date_sql' => $dateSql,
+            'select_sql' => $dateSql . ' AS doc_date' . $entrySelect,
+            'filter_sql' => $filter['sql'],
+            'filter_params' => $filter['params'],
+            'uses_doc_date' => true,
+        ];
+    }
+    $instantSql = $purInstantSql($alias);
+    $filter = $prAbsFilterSql($instantSql);
+
+    return [
+        'date_sql' => $instantSql,
+        'select_sql' => $instantSql . ' AS doc_instant' . $entrySelect,
+        'filter_sql' => $filter['sql'],
+        'filter_params' => $filter['params'],
+        'uses_doc_date' => false,
+    ];
+};
+$retDateMeta = static function (string $alias) use (
+    $retUsesDocDate,
+    $hasRetCreatedAt,
+    $retDocDateSql,
+    $retInstantSql,
+    $prDocDateFilterSql,
+    $prAbsFilterSql
+): array {
+    $entrySelect = $hasRetCreatedAt
+        ? (', ' . $alias . '.created_at AS entry_instant')
+        : ', NULL AS entry_instant';
+    if ($retUsesDocDate) {
+        $dateSql = $retDocDateSql($alias);
+        $filter = $prDocDateFilterSql($dateSql);
+
+        return [
+            'date_sql' => $dateSql,
+            'select_sql' => $dateSql . ' AS doc_date' . $entrySelect,
+            'filter_sql' => $filter['sql'],
+            'filter_params' => $filter['params'],
+            'uses_doc_date' => true,
+        ];
+    }
+    $instantSql = $retInstantSql($alias);
+    $filter = $prAbsFilterSql($instantSql);
+
+    return [
+        'date_sql' => $instantSql,
+        'select_sql' => $instantSql . ' AS doc_instant' . $entrySelect,
+        'filter_sql' => $filter['sql'],
+        'filter_params' => $filter['params'],
+        'uses_doc_date' => false,
+    ];
 };
 $purchasePaymentJoinSql = static function (string $docAlias) use ($hasPartySubledger, $hasPartyAllocations): string {
     if (!$hasPartySubledger) {
@@ -305,13 +442,14 @@ try {
         if (!$hasPurchases) {
             throw new RuntimeException('جدول فواتير المشتريات غير متاح.');
         }
-        $dateSql = $purDateExpr('p');
+        $purMeta = $purDateMeta('p');
+        $dateSql = $purMeta['date_sql'];
         $subtotalExpr = $hasPurSubtotal ? 'COALESCE(p.subtotal, p.total, 0)' : 'COALESCE(p.total, 0)';
         $discountExpr = $hasPurDiscount ? 'COALESCE(p.invoice_discount_amount, 0)' : '0';
         $supplierInvSelect = $hasPurSupplierInvoice
             ? 'COALESCE(p.supplier_invoice_number, \'\') AS supplier_invoice_number, '
             : '\'\' AS supplier_invoice_number, ';
-        $sql = 'SELECT p.id, ' . $dateSql . ' AS doc_date, ' . $supplierInvSelect . '
+        $sql = 'SELECT p.id, ' . $purMeta['select_sql'] . ', ' . $supplierInvSelect . '
                        COALESCE(s.name, \'\') AS supplier_name,
                        COALESCE(p.type, \'\') AS purchase_type,
                        ' . $subtotalExpr . ' AS subtotal_amount,
@@ -320,9 +458,9 @@ try {
                 FROM purchases p
                 LEFT JOIN suppliers s ON s.id = p.supplier_id'
                 . $purchasePaymentJoinSql('p') . '
-                WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId) . '
-                  AND ' . $dateSql . ' BETWEEN ? AND ?';
-        $params = [$fromDate, $toDate];
+                WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId)
+                . $purMeta['filter_sql'];
+        $params = $purMeta['filter_params'];
         if ($supplierId > 0) {
             $sql .= ' AND p.supplier_id = ?';
             $params[] = $supplierId;
@@ -339,7 +477,8 @@ try {
             $rows[] = [
                 'purchase_id' => (int) ($r['id'] ?? 0),
                 'reference' => 'PUR-' . (int) ($r['id'] ?? 0),
-                'date' => (string) ($r['doc_date'] ?? ''),
+                'date' => $prRowDateYmd($r, (bool) $purMeta['uses_doc_date']),
+                'entry_at' => $prFormatEntry(isset($r['entry_instant']) ? (string) $r['entry_instant'] : null),
                 'supplier' => (string) ($r['supplier_name'] ?? ''),
                 'supplier_invoice' => (string) ($r['supplier_invoice_number'] ?? ''),
                 'type' => (string) ($r['purchase_type'] ?? ''),
@@ -357,7 +496,8 @@ try {
         if (!$hasPurchaseReturns) {
             throw new RuntimeException('جدول مردودات المشتريات غير متاح.');
         }
-        $dateSql = $retDateExpr('pr');
+        $retMeta = $retDateMeta('pr');
+        $dateSql = $retMeta['date_sql'];
         $subtotalExpr = $hasRetSubtotal ? 'COALESCE(pr.subtotal, pr.total, 0)' : 'COALESCE(pr.total, 0)';
         $discountExpr = $hasRetDiscount ? 'COALESCE(pr.invoice_discount_amount, 0)' : '0';
         $returnRefExpr = $hasRetReturnNumber
@@ -369,7 +509,7 @@ try {
         $sql = 'SELECT COALESCE(pr.id, 0) AS return_id,
                        ' . ($hasRetPurchaseId ? 'COALESCE(pr.purchase_id, 0)' : '0') . ' AS purchase_id,
                        ' . $returnRefExpr . ' AS return_reference, ' . $purchaseRefExpr . ' AS purchase_reference,
-                       ' . $dateSql . ' AS doc_date,
+                       ' . $retMeta['select_sql'] . ',
                        COALESCE(s.name, \'\') AS supplier_name,
                        COALESCE(pr.type, \'\') AS return_type,
                        ' . $subtotalExpr . ' AS subtotal_amount,
@@ -377,9 +517,9 @@ try {
                        COALESCE(pr.total, 0) AS net_amount
                 FROM purchase_returns pr
                 LEFT JOIN suppliers s ON s.id = pr.supplier_id
-                WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId) . '
-                  AND ' . $dateSql . ' BETWEEN ? AND ?';
-        $params = [$fromDate, $toDate];
+                WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId)
+                . $retMeta['filter_sql'];
+        $params = $retMeta['filter_params'];
         if ($supplierId > 0) {
             $sql .= ' AND pr.supplier_id = ?';
             $params[] = $supplierId;
@@ -397,7 +537,8 @@ try {
                 'return_id' => (int) ($r['return_id'] ?? 0),
                 'reference' => (string) ($r['return_reference'] ?? ''),
                 'purchase_reference' => (string) ($r['purchase_reference'] ?? ''),
-                'date' => (string) ($r['doc_date'] ?? ''),
+                'date' => $prRowDateYmd($r, (bool) $retMeta['uses_doc_date']),
+                'entry_at' => $prFormatEntry(isset($r['entry_instant']) ? (string) $r['entry_instant'] : null),
                 'supplier' => (string) ($r['supplier_name'] ?? ''),
                 'type' => (string) ($r['return_type'] ?? ''),
                 'subtotal' => $sub,
@@ -418,14 +559,15 @@ try {
     } elseif ($reportKey === 'suppliers') {
         if ($supplierDetailed) {
             if ($hasPurchases) {
-                $dateSql = $purDateExpr('p');
+                $purMeta = $purDateMeta('p');
+                $dateSql = $purMeta['date_sql'];
                 $subtotalExpr = $hasPurSubtotal ? 'COALESCE(p.subtotal, p.total, 0)' : 'COALESCE(p.total, 0)';
                 $discountExpr = $hasPurDiscount ? 'COALESCE(p.invoice_discount_amount, 0)' : '0';
                 $supplierInvSelect = $hasPurSupplierInvoice
                     ? 'COALESCE(p.supplier_invoice_number, \'\') AS supplier_invoice_number, '
                     : '\'\' AS supplier_invoice_number, ';
                 $sql = 'SELECT p.id, COALESCE(p.supplier_id, 0) AS sid,
-                               ' . $dateSql . ' AS doc_date,
+                               ' . $purMeta['select_sql'] . ',
                                ' . $supplierInvSelect . '
                                COALESCE(s.name, \'\') AS supplier_name,
                                ' . $subtotalExpr . ' AS subtotal_amount,
@@ -434,9 +576,9 @@ try {
                         FROM purchases p
                         LEFT JOIN suppliers s ON s.id = p.supplier_id'
                         . $purchasePaymentJoinSql('p') . '
-                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId) . '
-                          AND ' . $dateSql . ' BETWEEN ? AND ?';
-                $params = [$fromDate, $toDate];
+                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId)
+                        . $purMeta['filter_sql'];
+                $params = $purMeta['filter_params'];
                 if ($supplierId > 0) {
                     $sql .= ' AND p.supplier_id = ?';
                     $params[] = $supplierId;
@@ -465,7 +607,7 @@ try {
                         'doc_type' => 'فاتورة شراء',
                         'invoice_number' => $invoiceNumber,
                         'reference' => $reference,
-                        'date' => (string) ($r['doc_date'] ?? ''),
+                        'date' => $prRowDateYmd($r, (bool) $purMeta['uses_doc_date']),
                         'subtotal' => $subtotal,
                         'discount' => $discount,
                         'net' => $net,
@@ -481,7 +623,8 @@ try {
             }
 
             if ($hasPurchaseReturns) {
-                $dateSql = $retDateExpr('pr');
+                $retMeta = $retDateMeta('pr');
+                $dateSql = $retMeta['date_sql'];
                 $returnRefExpr = $hasRetReturnNumber
                     ? "COALESCE(NULLIF(TRIM(pr.return_number), ''), CONCAT('PR-', pr.id))"
                     : "CONCAT('PR-', pr.id)";
@@ -493,7 +636,7 @@ try {
                 $sql = 'SELECT COALESCE(pr.supplier_id, 0) AS sid,
                                COALESCE(pr.id, 0) AS return_id,
                                ' . ($hasRetPurchaseId ? 'COALESCE(pr.purchase_id, 0)' : '0') . ' AS purchase_id,
-                               ' . $dateSql . ' AS doc_date,
+                               ' . $retMeta['select_sql'] . ',
                                ' . $returnRefExpr . ' AS return_reference,
                                ' . $purchaseRefExpr . ' AS purchase_reference,
                                COALESCE(s.name, \'\') AS supplier_name,
@@ -502,9 +645,9 @@ try {
                                COALESCE(pr.total, 0) AS net_amount
                         FROM purchase_returns pr
                         LEFT JOIN suppliers s ON s.id = pr.supplier_id
-                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId) . '
-                          AND ' . $dateSql . ' BETWEEN ? AND ?';
-                $params = [$fromDate, $toDate];
+                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId)
+                        . $retMeta['filter_sql'];
+                $params = $retMeta['filter_params'];
                 if ($supplierId > 0) {
                     $sql .= ' AND pr.supplier_id = ?';
                     $params[] = $supplierId;
@@ -536,7 +679,7 @@ try {
                         'doc_type' => 'مردود شراء',
                         'invoice_number' => $invoiceNumber,
                         'reference' => $reference,
-                        'date' => (string) ($r['doc_date'] ?? ''),
+                        'date' => $prRowDateYmd($r, (bool) $retMeta['uses_doc_date']),
                         'subtotal' => $subtotal,
                         'discount' => $discount,
                         'net' => $net,
@@ -576,7 +719,8 @@ try {
             $returnAgg = [];
 
             if ($hasPurchases) {
-                $purDateSql = $purDateExpr('p');
+                $purMeta = $purDateMeta('p');
+                $purDateSql = $purMeta['date_sql'];
                 $subtotalExpr = $hasPurSubtotal ? 'COALESCE(p.subtotal, p.total, 0)' : 'COALESCE(p.total, 0)';
                 $discountExpr = $hasPurDiscount ? 'COALESCE(p.invoice_discount_amount, 0)' : '0';
                 $sql = 'SELECT COALESCE(p.supplier_id, 0) AS sid,
@@ -586,9 +730,9 @@ try {
                                COALESCE(SUM(COALESCE(p.total, 0)), 0) AS net_sum
                         FROM purchases p'
                         . $purchasePaymentJoinSql('p') . '
-                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId) . '
-                          AND ' . $purDateSql . ' BETWEEN ? AND ?';
-                $params = [$fromDate, $toDate];
+                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId)
+                        . $purMeta['filter_sql'];
+                $params = $purMeta['filter_params'];
                 if ($supplierId > 0) {
                     $sql .= ' AND p.supplier_id = ?';
                     $params[] = $supplierId;
@@ -608,14 +752,15 @@ try {
             }
 
             if ($hasPurchaseReturns) {
-                $retDateSql = $retDateExpr('pr');
+                $retMeta = $retDateMeta('pr');
+                $retDateSql = $retMeta['date_sql'];
                 $sql = 'SELECT COALESCE(pr.supplier_id, 0) AS sid,
                                COUNT(*) AS doc_count,
                                COALESCE(SUM(COALESCE(pr.total, 0)), 0) AS net_sum
                         FROM purchase_returns pr
-                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId) . '
-                          AND ' . $retDateSql . ' BETWEEN ? AND ?';
-                $params = [$fromDate, $toDate];
+                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId)
+                        . $retMeta['filter_sql'];
+                $params = $retMeta['filter_params'];
                 if ($supplierId > 0) {
                     $sql .= ' AND pr.supplier_id = ?';
                     $params[] = $supplierId;
@@ -675,7 +820,7 @@ try {
         $itemsMap = [];
 
         if ($hasPurchases && $hasPurchaseItems) {
-            $purDateSql = $purDateExpr('pur');
+            $purMeta = $purDateMeta('pur');
             $variantExpr = $hasPiVariant ? 'COALESCE(pi.variant_id, 0)' : '0';
             $variantJoin = $hasPiVariant
                 ? 'LEFT JOIN product_variants pv ON pv.id = pi.variant_id'
@@ -694,9 +839,9 @@ try {
                     INNER JOIN products p ON p.id = pi.product_id
                     ' . $variantJoin
                     . $purchasePaymentJoinSql('pur') . '
-                    WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'pur', $prCountryId) . '
-                      AND ' . $purDateSql . ' BETWEEN ? AND ?';
-            $params = [$fromDate, $toDate];
+                    WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'pur', $prCountryId)
+                    . $purMeta['filter_sql'];
+            $params = $purMeta['filter_params'];
             if ($supplierId > 0) {
                 $sql .= ' AND pur.supplier_id = ?';
                 $params[] = $supplierId;
@@ -729,7 +874,7 @@ try {
         }
 
         if ($hasPurchaseReturns && $hasPurchaseReturnItems) {
-            $retDateSql = $retDateExpr('pr');
+            $retMeta = $retDateMeta('pr');
             $variantExpr = $hasPriVariant ? 'COALESCE(pri.variant_id, 0)' : '0';
             $variantJoin = $hasPriVariant
                 ? 'LEFT JOIN product_variants pv ON pv.id = pri.variant_id'
@@ -747,9 +892,9 @@ try {
                     INNER JOIN purchase_returns pr ON pr.id = pri.purchase_return_id
                     INNER JOIN products p ON p.id = pri.product_id
                     ' . $variantJoin . '
-                    WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId) . '
-                      AND ' . $retDateSql . ' BETWEEN ? AND ?';
-            $params = [$fromDate, $toDate];
+                    WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId)
+                    . $retMeta['filter_sql'];
+            $params = $retMeta['filter_params'];
             if ($supplierId > 0) {
                 $sql .= ' AND pr.supplier_id = ?';
                 $params[] = $supplierId;
@@ -820,31 +965,66 @@ try {
         });
     } elseif ($reportKey === 'monthly') {
         $monthMap = [];
+        $prMonthBuckets = [];
+        if (!$purUsesDocDate && $prReportIana !== '') {
+            try {
+                $prMonthBuckets = orange_admin_time_local_month_buckets_mysql_utc($fromDate, $toDate, $prReportIana);
+            } catch (Throwable $e) {
+                $prMonthBuckets = [];
+            }
+        }
 
         if ($hasPurchases) {
-            $purDateSql = $purDateExpr('p');
-            $sql = 'SELECT YEAR(' . $purDateSql . ') AS yy,
-                           MONTH(' . $purDateSql . ') AS mm,
-                           COUNT(*) AS doc_count,
-                           COALESCE(SUM(COALESCE(p.total, 0)), 0) AS total_sum
-                    FROM purchases p'
-                    . $purchasePaymentJoinSql('p') . '
-                    WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId) . '
-                      AND ' . $purDateSql . ' BETWEEN ? AND ?';
-            $params = [$fromDate, $toDate];
+            if ($purUsesDocDate) {
+                $purDateSql = $purDocDateSql('p');
+                $sql = 'SELECT YEAR(' . $purDateSql . ') AS yy,
+                               MONTH(' . $purDateSql . ') AS mm,
+                               COUNT(*) AS doc_count,
+                               COALESCE(SUM(COALESCE(p.total, 0)), 0) AS total_sum
+                        FROM purchases p'
+                        . $purchasePaymentJoinSql('p') . '
+                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId)
+                        . $prDocDateFilterSql($purDateSql)['sql'];
+                $params = $prDocDateFilterSql($purDateSql)['params'];
+                $sql .= ' GROUP BY YEAR(' . $purDateSql . '), MONTH(' . $purDateSql . ')';
+            } elseif ($prMonthBuckets !== []) {
+                $instantSql = $purInstantSql('p');
+                $mk = orange_admin_time_sql_local_month_key_expr($instantSql, $prMonthBuckets);
+                $sql = 'SELECT ' . $mk['sql'] . ' AS ym,
+                               COUNT(*) AS doc_count,
+                               COALESCE(SUM(COALESCE(p.total, 0)), 0) AS total_sum
+                        FROM purchases p'
+                        . $purchasePaymentJoinSql('p') . '
+                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchases', 'p', $prCountryId);
+                $absFilter = $prAbsFilterSql($instantSql);
+                $sql .= $absFilter['sql'] . ' GROUP BY ym';
+                $params = array_merge($mk['params'], $absFilter['params']);
+            } else {
+                $sql = '';
+                $params = [];
+            }
+            if ($sql !== '') {
             if ($supplierId > 0) {
                 $sql .= ' AND p.supplier_id = ?';
                 $params[] = $supplierId;
             }
             $appendPurchaseTypeFilter($sql, $params, 'p', $invoiceTypeFilter);
             $appendPurchasePaymentFilter($sql, $params, 'p', $paymentStatusFilter, $purchaseOpenAmountExpr);
-            $sql .= ' GROUP BY YEAR(' . $purDateSql . '), MONTH(' . $purDateSql . ')';
             $st = $pdo->prepare($sql);
             $st->execute($params);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                $yy = (int) ($r['yy'] ?? 0);
-                $mm = (int) ($r['mm'] ?? 0);
-                $key = sprintf('%04d-%02d', $yy, $mm);
+                if ($purUsesDocDate) {
+                    $yy = (int) ($r['yy'] ?? 0);
+                    $mm = (int) ($r['mm'] ?? 0);
+                    $key = sprintf('%04d-%02d', $yy, $mm);
+                } else {
+                    $key = trim((string) ($r['ym'] ?? ''));
+                    if ($key === '' || !preg_match('/^(\d{4})-(\d{2})$/', $key, $mmMatch)) {
+                        continue;
+                    }
+                    $yy = (int) $mmMatch[1];
+                    $mm = (int) $mmMatch[2];
+                }
                 if (!isset($monthMap[$key])) {
                     $monthMap[$key] = [
                         'yy' => $yy,
@@ -858,31 +1038,58 @@ try {
                 $monthMap[$key]['purchase_count'] += (int) ($r['doc_count'] ?? 0);
                 $monthMap[$key]['purchase_total'] += (float) ($r['total_sum'] ?? 0);
             }
+            }
         }
 
         if ($hasPurchaseReturns) {
-            $retDateSql = $retDateExpr('pr');
-            $sql = 'SELECT YEAR(' . $retDateSql . ') AS yy,
-                           MONTH(' . $retDateSql . ') AS mm,
-                           COUNT(*) AS doc_count,
-                           COALESCE(SUM(COALESCE(pr.total, 0)), 0) AS total_sum
-                    FROM purchase_returns pr
-                    WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId) . '
-                      AND ' . $retDateSql . ' BETWEEN ? AND ?';
-            $params = [$fromDate, $toDate];
+            if ($retUsesDocDate) {
+                $retDateSql = $retDocDateSql('pr');
+                $sql = 'SELECT YEAR(' . $retDateSql . ') AS yy,
+                               MONTH(' . $retDateSql . ') AS mm,
+                               COUNT(*) AS doc_count,
+                               COALESCE(SUM(COALESCE(pr.total, 0)), 0) AS total_sum
+                        FROM purchase_returns pr
+                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId)
+                        . $prDocDateFilterSql($retDateSql)['sql'];
+                $params = $prDocDateFilterSql($retDateSql)['params'];
+                $sql .= ' GROUP BY YEAR(' . $retDateSql . '), MONTH(' . $retDateSql . ')';
+            } elseif ($prMonthBuckets !== []) {
+                $instantSql = $retInstantSql('pr');
+                $mk = orange_admin_time_sql_local_month_key_expr($instantSql, $prMonthBuckets);
+                $sql = 'SELECT ' . $mk['sql'] . ' AS ym,
+                               COUNT(*) AS doc_count,
+                               COALESCE(SUM(COALESCE(pr.total, 0)), 0) AS total_sum
+                        FROM purchase_returns pr
+                        WHERE 1=1' . orange_sql_country_and_fragment($pdo, 'purchase_returns', 'pr', $prCountryId);
+                $absFilter = $prAbsFilterSql($instantSql);
+                $sql .= $absFilter['sql'] . ' GROUP BY ym';
+                $params = array_merge($mk['params'], $absFilter['params']);
+            } else {
+                $sql = '';
+                $params = [];
+            }
+            if ($sql !== '') {
             if ($supplierId > 0) {
                 $sql .= ' AND pr.supplier_id = ?';
                 $params[] = $supplierId;
             }
             $appendReturnTypeFilter($sql, $params, 'pr', $invoiceTypeFilter);
             $appendReturnPaymentFilter($sql, 'pr', $paymentStatusFilter);
-            $sql .= ' GROUP BY YEAR(' . $retDateSql . '), MONTH(' . $retDateSql . ')';
             $st = $pdo->prepare($sql);
             $st->execute($params);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                $yy = (int) ($r['yy'] ?? 0);
-                $mm = (int) ($r['mm'] ?? 0);
-                $key = sprintf('%04d-%02d', $yy, $mm);
+                if ($retUsesDocDate) {
+                    $yy = (int) ($r['yy'] ?? 0);
+                    $mm = (int) ($r['mm'] ?? 0);
+                    $key = sprintf('%04d-%02d', $yy, $mm);
+                } else {
+                    $key = trim((string) ($r['ym'] ?? ''));
+                    if ($key === '' || !preg_match('/^(\d{4})-(\d{2})$/', $key, $mmMatch)) {
+                        continue;
+                    }
+                    $yy = (int) $mmMatch[1];
+                    $mm = (int) $mmMatch[2];
+                }
                 if (!isset($monthMap[$key])) {
                     $monthMap[$key] = [
                         'yy' => $yy,
@@ -895,6 +1102,7 @@ try {
                 }
                 $monthMap[$key]['return_count'] += (int) ($r['doc_count'] ?? 0);
                 $monthMap[$key]['return_total'] += (float) ($r['total_sum'] ?? 0);
+            }
             }
         }
 
@@ -932,7 +1140,9 @@ $companyName = (string) ($company['company_name_ar'] ?? '');
 $companyLogo = (string) ($company['logo_url'] ?? '');
 $companyCr = (string) ($company['commercial_register'] ?? '');
 $todayDmY = orange_format_date_dmY($today);
-$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$printDatetime = $prReportIana !== ''
+    ? orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime')
+    : orange_format_datetime_dmY_hi(gmdate('Y-m-d H:i:s'));
 $reportTitle = $reports[$reportKey];
 $headerSupplierSummary = $supplierId > 0 && isset($supplierMap[$supplierId])
     ? (string) $supplierMap[$supplierId]
@@ -1214,6 +1424,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     <tr>
                         <th>المرجع</th>
                         <th>التاريخ</th>
+                        <th>تاريخ الإدخال</th>
                         <th>المورد</th>
                         <th>رقم فاتورة المورد</th>
                         <th>النوع</th>
@@ -1224,7 +1435,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     </thead>
                     <tbody>
                     <?php if ($rows === []): ?>
-                        <tr><td colspan="8" class="muted">لا توجد فواتير مشتريات في المدى المحدد.</td></tr>
+                        <tr><td colspan="9" class="muted">لا توجد فواتير مشتريات في المدى المحدد.</td></tr>
                     <?php else: foreach ($rows as $r): ?>
                         <tr>
                             <td dir="ltr">
@@ -1235,6 +1446,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                                 <?php endif; ?>
                             </td>
                             <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY((string) $r['date']), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr"><?php echo htmlspecialchars((string) ($r['entry_at'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) $r['supplier'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td dir="ltr"><?php echo htmlspecialchars((string) $r['supplier_invoice'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars($purchaseTypeLabel((string) $r['type']), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -1246,7 +1458,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     </tbody>
                     <tfoot>
                     <tr>
-                        <th colspan="5">الإجمالي (<?php echo (int) $invoiceSummary['count']; ?>)</th>
+                        <th colspan="6">الإجمالي (<?php echo (int) $invoiceSummary['count']; ?>)</th>
                         <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['subtotal']); ?></th>
                         <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['discount']); ?></th>
                         <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['net']); ?></th>
@@ -1257,6 +1469,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     <tr>
                         <th>مرجع المردود</th>
                         <th>التاريخ</th>
+                        <th>تاريخ الإدخال</th>
                         <th>المورد</th>
                         <th>فاتورة الشراء</th>
                         <th>النوع</th>
@@ -1267,7 +1480,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     </thead>
                     <tbody>
                     <?php if ($rows === []): ?>
-                        <tr><td colspan="8" class="muted">لا توجد مردودات مشتريات في المدى المحدد.</td></tr>
+                        <tr><td colspan="9" class="muted">لا توجد مردودات مشتريات في المدى المحدد.</td></tr>
                     <?php else: foreach ($rows as $r): ?>
                         <tr>
                             <td dir="ltr">
@@ -1278,6 +1491,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                                 <?php endif; ?>
                             </td>
                             <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY((string) $r['date']), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr"><?php echo htmlspecialchars((string) ($r['entry_at'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) $r['supplier'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td dir="ltr">
                                 <?php if ((string) ($r['purchase_doc_url'] ?? '') !== '' && (string) ($r['purchase_reference'] ?? '') !== ''): ?>
@@ -1295,7 +1509,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
                     </tbody>
                     <tfoot>
                     <tr>
-                        <th colspan="5">الإجمالي (<?php echo (int) $returnSummary['count']; ?>)</th>
+                        <th colspan="6">الإجمالي (<?php echo (int) $returnSummary['count']; ?>)</th>
                         <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $returnSummary['subtotal']); ?></th>
                         <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $returnSummary['discount']); ?></th>
                         <th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $returnSummary['net']); ?></th>
@@ -1709,7 +1923,7 @@ $filterSubtitle = implode(' — ', $subtitleParts);
 </style>
 
 <?php
-$prDocTitle = $reportTitle . ' - ' . date('Y-m-d');
+$prDocTitle = $reportTitle . ' - ' . $today;
 ?>
 <script>
 (function () {

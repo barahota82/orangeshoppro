@@ -43,13 +43,11 @@ $editRec = ($editId > 0 && $ready) ? orange_bank_reconciliation_get($pdo, $editI
 $apiBase = storefront_public_path('/admin/api/bank-reconciliation');
 $fmtAmt = static fn (float $n): string => orange_accounting_report_format_amount($n, $reportMoney);
 
-$brTodayYmd = date('Y-m-d');
+$brTodayYmd = '';
 try {
-    if ($ctxCountryId > 0) {
-        $brTodayYmd = orange_admin_time_document_date_today_for_country_id($pdo, $ctxCountryId);
-    }
+    $brTodayYmd = orange_admin_time_document_date_today_for_admin_context($pdo);
 } catch (Throwable $e) {
-    $brTodayYmd = date('Y-m-d');
+    $brTodayYmd = gmdate('Y-m-d');
 }
 $initial = [
     'id' => 0,

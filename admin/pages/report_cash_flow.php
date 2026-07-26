@@ -16,6 +16,13 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 $pdo = orange_admin_page_pdo();
 $cfCountryLabel = orange_admin_page_country_label($pdo);
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
+$cfReportTimeIana = '';
+try {
+    $cfReportDefaults = orange_admin_time_report_default_from_to_for_admin_context($pdo);
+    $cfReportTimeIana = (string) $cfReportDefaults['iana'];
+} catch (Throwable $e) {
+    $cfReportTimeIana = '';
+}
 
 $years = orange_fiscal_years_list($pdo);
 $fyId = isset($_GET['fy']) ? (int) $_GET['fy'] : 0;
@@ -44,7 +51,9 @@ if ($useVouchers && $fyId > 0 && $submitted) {
 }
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
-$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$printDatetime = $cfReportTimeIana !== ''
+    ? orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime')
+    : orange_format_datetime_dmY_hi(gmdate('Y-m-d H:i:s'));
 $cfCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));
 $cfLogo = (string) ($cfCompany['logo_url'] ?? '');
 $fmt = static function (float $amt) use ($reportMoney): string {

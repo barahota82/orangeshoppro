@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/admin_time.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/sales_return_analytics.php';
@@ -15,6 +16,17 @@ require_once __DIR__ . '/../../includes/report_export.php';
 $pdo = orange_admin_page_pdo();
 $countryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
 $companyNameAr = orange_company_settings_name_ar($pdo);
+$srReportIana = '';
+$srDefaultFrom = '';
+$srDefaultTo = '';
+try {
+    $srDefaults = orange_admin_time_report_default_from_to_for_admin_context($pdo);
+    $srReportIana = (string) $srDefaults['iana'];
+    $srDefaultFrom = (string) $srDefaults['from_ymd'];
+    $srDefaultTo = (string) $srDefaults['to_ymd'];
+} catch (Throwable $e) {
+    $srReportIana = '';
+}
 
 $tabs = [
     'invoices' => 'فواتير المبيعات',
@@ -37,8 +49,8 @@ $parseDate = static function (string $raw): ?string {
     $ymd = orange_parse_admin_date_to_ymd(trim($raw));
     return $ymd !== '' ? $ymd : null;
 };
-$today = date('Y-m-d');
-$monthStart = date('Y-m-01');
+$today = $srDefaultTo !== '' ? $srDefaultTo : date('Y-m-d');
+$monthStart = $srDefaultFrom !== '' ? $srDefaultFrom : date('Y-m-01');
 $from = isset($_GET['from']) ? ($parseDate((string) $_GET['from']) ?? $monthStart) : $monthStart;
 $to = isset($_GET['to']) ? ($parseDate((string) $_GET['to']) ?? $today) : $today;
 if (strcmp($from, $to) > 0) {
@@ -46,6 +58,55 @@ if (strcmp($from, $to) > 0) {
 }
 $fromDisplay = orange_format_date_dmY($from);
 $toDisplay = orange_format_date_dmY($to);
+$srAbsStartUtc = '';
+$srAbsEndExclusiveUtc = '';
+if ($srReportIana !== '') {
+    try {
+        $srAbsRange = orange_admin_time_filter_range_mysql_utc($from, $to, $srReportIana);
+        if ($srAbsRange !== null) {
+            $srAbsStartUtc = $srAbsRange['start_utc_mysql'];
+            $srAbsEndExclusiveUtc = $srAbsRange['end_exclusive_utc_mysql'];
+        }
+    } catch (Throwable $e) {
+        $srAbsStartUtc = '';
+        $srAbsEndExclusiveUtc = '';
+    }
+}
+$srFormatLocalDay = static function (?string $utcMysql) use ($pdo, $countryId, $srReportIana): string {
+    $raw = trim((string) ($utcMysql ?? ''));
+    if ($raw === '') {
+        return '';
+    }
+    try {
+        if ($countryId > 0) {
+            return orange_admin_time_local_ymd_in_iana(
+                orange_admin_time_parse_mysql_utc_datetime($raw)->format('c'),
+                orange_admin_time_timezone_for_country_id($pdo, $countryId)
+            );
+        }
+        if ($srReportIana !== '') {
+            return orange_admin_time_local_ymd_in_iana(
+                orange_admin_time_parse_mysql_utc_datetime($raw)->format('c'),
+                $srReportIana
+            );
+        }
+    } catch (Throwable $e) {
+        return '';
+    }
+
+    return '';
+};
+$srFormatEntry = static function (?string $utcMysql) use ($pdo, $countryId): string {
+    $raw = trim((string) ($utcMysql ?? ''));
+    if ($raw === '') {
+        return '—';
+    }
+    try {
+        return orange_admin_time_display_mysql_utc_or_dash($pdo, $raw, $countryId, 'ar', 'datetime');
+    } catch (Throwable $e) {
+        return '—';
+    }
+};
 
 $source = isset($_GET['src']) ? trim((string) $_GET['src']) : 'all';
 if (!in_array($source, ['all', 'company', 'online'], true)) {
@@ -224,20 +285,34 @@ $hasSrNotes = $hasSalesReturns && orange_table_has_column($pdo, 'sales_returns',
 $hasSriVariant = $hasSalesReturnItems && orange_table_has_column($pdo, 'sales_return_items', 'variant_id');
 $hasSriLineDiscount = $hasSalesReturnItems && orange_table_has_column($pdo, 'sales_return_items', 'line_discount');
 
-$orderDateExpr = static function (string $alias) use ($hasOrdCompletedAt, $hasOrdCreatedAt): string {
+// Absolute Moment column (UTC) — never wrap in DATE()/CURDATE() for filters or grouping.
+$orderInstantExpr = static function (string $alias) use ($hasOrdCompletedAt, $hasOrdCreatedAt): string {
     if ($hasOrdCompletedAt && $hasOrdCreatedAt) {
-        return 'DATE(COALESCE(' . $alias . '.completed_at, ' . $alias . '.created_at))';
+        return 'COALESCE(' . $alias . '.completed_at, ' . $alias . '.created_at)';
     }
     if ($hasOrdCompletedAt) {
-        return 'DATE(' . $alias . '.completed_at)';
+        return $alias . '.completed_at';
     }
     if ($hasOrdCreatedAt) {
-        return 'DATE(' . $alias . '.created_at)';
+        return $alias . '.created_at';
     }
-    return 'CURDATE()';
+
+    return 'NULL';
 };
-$returnDateExpr = static function (string $alias) use ($hasSrCreatedAt): string {
-    return $hasSrCreatedAt ? 'DATE(' . $alias . '.created_at)' : 'CURDATE()';
+$returnInstantExpr = static function (string $alias) use ($hasSrCreatedAt): string {
+    return $hasSrCreatedAt ? ($alias . '.created_at') : 'NULL';
+};
+$orderDateExpr = $orderInstantExpr;
+$returnDateExpr = $returnInstantExpr;
+$srAbsFilterSql = static function (string $instantSql) use ($srAbsStartUtc, $srAbsEndExclusiveUtc): array {
+    if ($instantSql === 'NULL' || $srAbsStartUtc === '' || $srAbsEndExclusiveUtc === '') {
+        return ['sql' => ' AND 1=0', 'params' => []];
+    }
+
+    return [
+        'sql' => ' AND ' . $instantSql . ' >= ? AND ' . $instantSql . ' < ?',
+        'params' => [$srAbsStartUtc, $srAbsEndExclusiveUtc],
+    ];
 };
 
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
@@ -451,7 +526,7 @@ try {
             : ($hasOrdOrderNumber ? "COALESCE(NULLIF(TRIM(o.order_number),''), CONCAT('ORD-', o.id))" : "CONCAT('ORD-', o.id)");
         $sql = 'SELECT o.id AS order_id,
                        ' . $referenceExpr . ' AS reference,
-                       ' . $dateSql . ' AS doc_date,
+                       ' . $dateSql . ' AS doc_instant,
                        ' . ($hasOrdCustomerId ? 'COALESCE(o.customer_id,0)' : '0') . ' AS customer_id,
                        ' . ($hasOrdCustomerName ? "COALESCE(o.customer_name,'')" : "''") . ' AS customer_name_raw,
                        ' . ($hasOrdSource ? "COALESCE(o.order_source,'website')" : "'website'") . ' AS source_kind,
@@ -462,9 +537,10 @@ try {
                 ' . $linesJoin . '
                 WHERE 1=1'
                 . orange_sql_country_and_fragment($pdo, 'orders', 'o', $countryId)
-                . " AND o.status = 'completed'
-                  AND " . $dateSql . ' BETWEEN ? AND ?';
-        $params = [$from, $to];
+                . " AND o.status = 'completed'";
+        $srAf = $srAbsFilterSql($dateSql);
+        $sql .= $srAf['sql'];
+        $params = $srAf['params'];
         $applyOrderSourceFilter($sql, $params);
         $applyOrderPayFilter($sql, $params);
         $applyOrderChannelFilter($sql, $params);
@@ -506,7 +582,8 @@ try {
             $rows[] = [
                 'order_id' => $orderIdForLink,
                 'reference' => (string) ($r['reference'] ?? ''),
-                'date' => (string) ($r['doc_date'] ?? ''),
+                'date' => $srFormatLocalDay(isset($r['doc_instant']) ? (string) $r['doc_instant'] : null),
+                'entry_at' => $srFormatEntry(isset($r['doc_instant']) ? (string) $r['doc_instant'] : null),
                 'customer' => $customerName,
                 'source' => $src,
                 'payment' => (string) ($r['pay_type'] ?? ''),
@@ -531,7 +608,7 @@ try {
         $joinChannel = ($hasChannels && $hasSrChannelId) ? ' LEFT JOIN channels ch ON ch.id = sr.channel_id' : '';
         $sql = 'SELECT sr.id AS return_id,
                        ' . $referenceExpr . ' AS reference,
-                       ' . $dateSql . ' AS doc_date,
+                       ' . $dateSql . ' AS doc_instant,
                        ' . ($hasSrCustomerId ? 'COALESCE(sr.customer_id,0)' : '0') . ' AS customer_id,
                        ' . ($hasSrInvoiceRef ? "COALESCE(sr.invoice_reference,'')" : "''") . ' AS invoice_reference,
                        ' . ($hasSrSourceKind ? "COALESCE(sr.source_kind,'')" : "''") . ' AS source_kind,
@@ -544,8 +621,10 @@ try {
                 ' . $joinChannel . '
                 WHERE 1=1'
             . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
-            . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
-        $params = [$from, $to];
+            ;
+        $srAf = $srAbsFilterSql($dateSql);
+        $sql .= $srAf['sql'];
+        $params = $srAf['params'];
         $applyReturnSourceFilter($sql, $params);
         $applyReturnPayFilter($sql, $params);
         $applyReturnChannelFilter($sql, $params);
@@ -574,7 +653,8 @@ try {
             $rows[] = [
                 'return_id' => $returnIdForLink,
                 'reference' => (string) ($r['reference'] ?? ''),
-                'date' => (string) ($r['doc_date'] ?? ''),
+                'date' => $srFormatLocalDay(isset($r['doc_instant']) ? (string) $r['doc_instant'] : null),
+                'entry_at' => $srFormatEntry(isset($r['doc_instant']) ? (string) $r['doc_instant'] : null),
                 'customer' => $customerName,
                 'invoice_reference' => (string) ($r['invoice_reference'] ?? ''),
                 'source' => $src,
@@ -619,8 +699,10 @@ try {
                         LEFT JOIN products p ON p.id = sri.product_id
                         WHERE 1=1'
                 . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
-                . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
-            $paramsProd = [$from, $to];
+                ;
+            $srAf = $srAbsFilterSql($dateSql);
+            $sqlProd .= $srAf['sql'];
+            $paramsProd = $srAf['params'];
             $applyReturnSourceFilter($sqlProd, $paramsProd);
             $applyReturnPayFilter($sqlProd, $paramsProd);
             $applyReturnChannelFilter($sqlProd, $paramsProd);
@@ -660,7 +742,7 @@ try {
                 $joinChannel = ($hasChannels && $hasOrdChannelId) ? ' LEFT JOIN channels ch ON ch.id = o.channel_id' : '';
                 $sql = 'SELECT o.id AS order_id,
                                ' . $referenceExpr . ' AS reference,
-                               ' . $dateSql . ' AS doc_date,
+                               ' . $dateSql . ' AS doc_instant,
                                ' . ($hasOrdCustomerId ? 'COALESCE(o.customer_id,0)' : '0') . ' AS customer_id,
                                ' . ($hasOrdCustomerName ? "COALESCE(o.customer_name,'')" : "''") . ' AS customer_name_raw,
                                ' . ($hasOrdSource ? "COALESCE(o.order_source,'website')" : "''") . ' AS source_kind,
@@ -672,9 +754,10 @@ try {
                         ' . $joinChannel . '
                         WHERE 1=1'
                     . orange_sql_country_and_fragment($pdo, 'orders', 'o', $countryId)
-                    . " AND o.status = 'completed'
-                      AND " . $dateSql . ' BETWEEN ? AND ?';
-                $params = [$from, $to];
+                    . " AND o.status = 'completed'";
+                $srAf = $srAbsFilterSql($dateSql);
+                $sql .= $srAf['sql'];
+                $params = $srAf['params'];
                 $applyOrderSourceFilter($sql, $params);
                 $applyOrderPayFilter($sql, $params);
                 $applyOrderChannelFilter($sql, $params);
@@ -715,7 +798,8 @@ try {
                         'customer' => $customerName,
                         'doc_type' => 'فاتورة مبيعات',
                         'reference' => (string) ($r['reference'] ?? ''),
-                        'date' => (string) ($r['doc_date'] ?? ''),
+                        'date' => $srFormatLocalDay(isset($r['doc_instant']) ? (string) $r['doc_instant'] : null),
+                'entry_at' => $srFormatEntry(isset($r['doc_instant']) ? (string) $r['doc_instant'] : null),
                         'source' => $src,
                         'payment' => (string) ($r['pay_type'] ?? 'cash'),
                         'channel' => $marketingLabel(
@@ -741,7 +825,7 @@ try {
                 $joinChannel = ($hasChannels && $hasSrChannelId) ? ' LEFT JOIN channels ch ON ch.id = sr.channel_id' : '';
                 $sql = 'SELECT sr.id AS return_id,
                                ' . $referenceExpr . ' AS reference,
-                               ' . $dateSql . ' AS doc_date,
+                               ' . $dateSql . ' AS doc_instant,
                                ' . ($hasSrCustomerId ? 'COALESCE(sr.customer_id,0)' : '0') . ' AS customer_id,
                                ' . ($hasSrInvoiceRef ? "COALESCE(sr.invoice_reference,'')" : "''") . ' AS invoice_reference,
                                ' . ($hasSrSourceKind ? "COALESCE(sr.source_kind,'')" : "''") . ' AS source_kind,
@@ -753,8 +837,10 @@ try {
                         ' . $joinChannel . '
                         WHERE 1=1'
                     . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
-                    . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
-                $params = [$from, $to];
+                    ;
+                $srAf = $srAbsFilterSql($dateSql);
+                $sql .= $srAf['sql'];
+                $params = $srAf['params'];
                 $applyReturnSourceFilter($sql, $params);
                 $applyReturnPayFilter($sql, $params);
                 $applyReturnChannelFilter($sql, $params);
@@ -782,7 +868,8 @@ try {
                         'customer' => $customerName,
                         'doc_type' => 'مردود مبيعات',
                         'reference' => (string) ($r['reference'] ?? ''),
-                        'date' => (string) ($r['doc_date'] ?? ''),
+                        'date' => $srFormatLocalDay(isset($r['doc_instant']) ? (string) $r['doc_instant'] : null),
+                'entry_at' => $srFormatEntry(isset($r['doc_instant']) ? (string) $r['doc_instant'] : null),
                         'source' => $src,
                         'payment' => (string) ($r['pay_type'] ?? 'cash'),
                         'channel' => $marketingLabel(
@@ -829,9 +916,10 @@ try {
                         FROM orders o
                         WHERE 1=1'
                     . orange_sql_country_and_fragment($pdo, 'orders', 'o', $countryId)
-                    . " AND o.status = 'completed'
-                      AND " . $dateSql . ' BETWEEN ? AND ?';
-                $params = [$from, $to];
+                    . " AND o.status = 'completed'";
+                $srAf = $srAbsFilterSql($dateSql);
+                $sql .= $srAf['sql'];
+                $params = $srAf['params'];
                 $applyOrderSourceFilter($sql, $params);
                 $applyOrderPayFilter($sql, $params);
                 $applyOrderChannelFilter($sql, $params);
@@ -860,8 +948,10 @@ try {
                         FROM sales_returns sr
                         WHERE 1=1'
                     . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
-                    . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
-                $params = [$from, $to];
+                    ;
+                $srAf = $srAbsFilterSql($dateSql);
+                $sql .= $srAf['sql'];
+                $params = $srAf['params'];
                 $applyReturnSourceFilter($sql, $params);
                 $applyReturnPayFilter($sql, $params);
                 $applyReturnChannelFilter($sql, $params);
@@ -933,9 +1023,10 @@ try {
                     ' . $variantJoin . '
                     WHERE 1=1'
                 . orange_sql_country_and_fragment($pdo, 'orders', 'o', $countryId)
-                . " AND o.status = 'completed'
-                  AND " . $dateSql . ' BETWEEN ? AND ?';
-            $params = [$from, $to];
+                . " AND o.status = 'completed'";
+            $srAf = $srAbsFilterSql($dateSql);
+            $sql .= $srAf['sql'];
+            $params = $srAf['params'];
             $applyOrderSourceFilter($sql, $params);
             $applyOrderPayFilter($sql, $params);
             $applyOrderChannelFilter($sql, $params);
@@ -985,8 +1076,10 @@ try {
                     ' . $variantJoin . '
                     WHERE 1=1'
                 . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
-                . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
-            $params = [$from, $to];
+                ;
+            $srAf = $srAbsFilterSql($dateSql);
+            $sql .= $srAf['sql'];
+            $params = $srAf['params'];
             $applyReturnSourceFilter($sql, $params);
             $applyReturnPayFilter($sql, $params);
             $applyReturnChannelFilter($sql, $params);
@@ -1054,17 +1147,27 @@ try {
         }
     } elseif ($tab === 'monthly') {
         $monthMap = [];
+        $srMonthBuckets = [];
+        if ($srReportIana !== '') {
+            try {
+                $srMonthBuckets = orange_admin_time_local_month_buckets_mysql_utc($from, $to, $srReportIana);
+            } catch (Throwable $e) {
+                $srMonthBuckets = [];
+            }
+        }
 
-        if ($hasOrders) {
+        if ($hasOrders && $srMonthBuckets !== []) {
             $dateSql = $orderDateExpr('o');
-            $sql = 'SELECT YEAR(' . $dateSql . ') AS yy, MONTH(' . $dateSql . ') AS mm,
+            $mk = orange_admin_time_sql_local_month_key_expr($dateSql, $srMonthBuckets);
+            $sql = 'SELECT ' . $mk['sql'] . ' AS ym,
                            COUNT(*) AS cnt, COALESCE(SUM(COALESCE(o.total,0)),0) AS total_sum
                     FROM orders o
                     WHERE 1=1'
                 . orange_sql_country_and_fragment($pdo, 'orders', 'o', $countryId)
-                . " AND o.status = 'completed'
-                  AND " . $dateSql . ' BETWEEN ? AND ?';
-            $params = [$from, $to];
+                . " AND o.status = 'completed'";
+            $srAf = $srAbsFilterSql($dateSql);
+            $sql .= $srAf['sql'];
+            $params = array_merge($mk['params'], $srAf['params']);
             $applyOrderSourceFilter($sql, $params);
             $applyOrderPayFilter($sql, $params);
             $applyOrderChannelFilter($sql, $params);
@@ -1076,28 +1179,33 @@ try {
                 $sql .= ' AND EXISTS (SELECT 1 FROM order_items oi2 WHERE oi2.order_id = o.id AND oi2.product_id = ?)';
                 $params[] = $productId;
             }
-            $sql .= ' GROUP BY YEAR(' . $dateSql . '), MONTH(' . $dateSql . ')';
+            $sql .= ' GROUP BY ym';
             $st = $pdo->prepare($sql);
             $st->execute($params);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                $k = sprintf('%04d-%02d', (int) ($r['yy'] ?? 0), (int) ($r['mm'] ?? 0));
+                $k = trim((string) ($r['ym'] ?? ''));
+                if ($k === '' || !preg_match('/^(\d{4})-(\d{2})$/', $k, $mm)) {
+                    continue;
+                }
                 if (!isset($monthMap[$k])) {
-                    $monthMap[$k] = ['yy' => (int) ($r['yy'] ?? 0), 'mm' => (int) ($r['mm'] ?? 0), 'sales_count' => 0, 'sales_total' => 0.0, 'return_count' => 0, 'return_total' => 0.0];
+                    $monthMap[$k] = ['yy' => (int) $mm[1], 'mm' => (int) $mm[2], 'sales_count' => 0, 'sales_total' => 0.0, 'return_count' => 0, 'return_total' => 0.0];
                 }
                 $monthMap[$k]['sales_count'] += (int) ($r['cnt'] ?? 0);
                 $monthMap[$k]['sales_total'] += (float) ($r['total_sum'] ?? 0);
             }
         }
 
-        if ($hasSalesReturns) {
+        if ($hasSalesReturns && $srMonthBuckets !== []) {
             $dateSql = $returnDateExpr('sr');
-            $sql = 'SELECT YEAR(' . $dateSql . ') AS yy, MONTH(' . $dateSql . ') AS mm,
+            $mk = orange_admin_time_sql_local_month_key_expr($dateSql, $srMonthBuckets);
+            $sql = 'SELECT ' . $mk['sql'] . ' AS ym,
                            COUNT(*) AS cnt, COALESCE(SUM(COALESCE(sr.total,0)),0) AS total_sum
                     FROM sales_returns sr
                     WHERE 1=1'
-                . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId)
-                . ' AND ' . $dateSql . ' BETWEEN ? AND ?';
-            $params = [$from, $to];
+                . orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId);
+            $srAf = $srAbsFilterSql($dateSql);
+            $sql .= $srAf['sql'];
+            $params = array_merge($mk['params'], $srAf['params']);
             $applyReturnSourceFilter($sql, $params);
             $applyReturnPayFilter($sql, $params);
             $applyReturnChannelFilter($sql, $params);
@@ -1109,13 +1217,16 @@ try {
                 $sql .= ' AND EXISTS (SELECT 1 FROM sales_return_items sri2 WHERE sri2.sales_return_id = sr.id AND sri2.product_id = ?)';
                 $params[] = $productId;
             }
-            $sql .= ' GROUP BY YEAR(' . $dateSql . '), MONTH(' . $dateSql . ')';
+            $sql .= ' GROUP BY ym';
             $st = $pdo->prepare($sql);
             $st->execute($params);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                $k = sprintf('%04d-%02d', (int) ($r['yy'] ?? 0), (int) ($r['mm'] ?? 0));
+                $k = trim((string) ($r['ym'] ?? ''));
+                if ($k === '' || !preg_match('/^(\d{4})-(\d{2})$/', $k, $mm)) {
+                    continue;
+                }
                 if (!isset($monthMap[$k])) {
-                    $monthMap[$k] = ['yy' => (int) ($r['yy'] ?? 0), 'mm' => (int) ($r['mm'] ?? 0), 'sales_count' => 0, 'sales_total' => 0.0, 'return_count' => 0, 'return_total' => 0.0];
+                    $monthMap[$k] = ['yy' => (int) $mm[1], 'mm' => (int) $mm[2], 'sales_count' => 0, 'sales_total' => 0.0, 'return_count' => 0, 'return_total' => 0.0];
                 }
                 $monthMap[$k]['return_count'] += (int) ($r['cnt'] ?? 0);
                 $monthMap[$k]['return_total'] += (float) ($r['total_sum'] ?? 0);
@@ -1152,7 +1263,9 @@ $company = orange_sales_doc_print_company($pdo, $countryId);
 $companyName = (string) ($company['company_name_ar'] ?? '');
 $companyLogo = (string) ($company['logo_url'] ?? '');
 $companyCr = (string) ($company['commercial_register'] ?? '');
-$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$printDatetime = $srReportIana !== ''
+    ? orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime')
+    : orange_format_datetime_dmY_hi(gmdate('Y-m-d H:i:s'));
 $reportTitle = $tabs[$tab];
 
 $selectedChannelFilterLabel = '';
@@ -1213,11 +1326,12 @@ if ($returnsServerExport && $reportError === '') {
         echo "\xEF\xBB\xBF";
         $out = fopen('php://output', 'w');
         if ($out !== false) {
-            fputcsv($out, ['مردود', 'تاريخ', 'مرجع فاتورة', 'مصدر', 'تحصيل', 'قناة تسويق', 'عميل', 'المبلغ', 'ملاحظات']);
+            fputcsv($out, ['مردود', 'تاريخ', 'تاريخ الإدخال', 'مرجع فاتورة', 'مصدر', 'تحصيل', 'قناة تسويق', 'عميل', 'المبلغ', 'ملاحظات']);
             foreach ($rows as $r) {
                 fputcsv($out, [
                     (string) ($r['reference'] ?? ''),
                     orange_format_date_dmY((string) ($r['date'] ?? '')),
+                    (string) ($r['entry_at'] ?? ''),
                     (string) ($r['invoice_reference'] ?? ''),
                     orange_sales_return_source_kind_label((string) ($r['source'] ?? '')),
                     orange_sales_return_payment_type_label((string) ($r['payment'] ?? '')),
@@ -1237,6 +1351,7 @@ if ($returnsServerExport && $reportError === '') {
         $xlsRows[] = [
             (string) ($r['reference'] ?? ''),
             orange_format_date_dmY((string) ($r['date'] ?? '')),
+            (string) ($r['entry_at'] ?? ''),
             (string) ($r['invoice_reference'] ?? ''),
             orange_sales_return_source_kind_label((string) ($r['source'] ?? '')),
             orange_sales_return_payment_type_label((string) ($r['payment'] ?? '')),
@@ -1251,9 +1366,9 @@ if ($returnsServerExport && $reportError === '') {
         'تفاصيل مردودات المبيعات',
         $companyNameAr,
         $filterSubtitle,
-        ['مردود', 'تاريخ', 'مرجع فاتورة', 'مصدر', 'تحصيل', 'قناة تسويق', 'عميل', 'المبلغ', 'ملاحظات'],
+        ['مردود', 'تاريخ', 'تاريخ الإدخال', 'مرجع فاتورة', 'مصدر', 'تحصيل', 'قناة تسويق', 'عميل', 'المبلغ', 'ملاحظات'],
         $xlsRows,
-        [7]
+        [8]
     );
 }
 ?>
@@ -1423,6 +1538,7 @@ if ($returnsServerExport && $reportError === '') {
                     <colgroup>
                         <col class="srr-inv-col-ref">
                         <col class="srr-inv-col-date">
+                        <col class="srr-inv-col-date">
                         <col class="srr-inv-col-customer">
                         <col class="srr-inv-col-source">
                         <col class="srr-inv-col-pay">
@@ -1430,9 +1546,9 @@ if ($returnsServerExport && $reportError === '') {
                         <col class="srr-inv-col-money">
                         <col class="srr-inv-col-money">
                     </colgroup>
-                    <thead><tr><th>المرجع</th><th>التاريخ</th><th>العميل</th><th>المصدر</th><th>التحصيل</th><th class="gl-acc-stmt-col-num">الإجمالي</th><th class="gl-acc-stmt-col-num">الخصم</th><th class="gl-acc-stmt-col-num">الصافي</th></tr></thead>
+                    <thead><tr><th>المرجع</th><th>التاريخ</th><th>تاريخ الإدخال</th><th>العميل</th><th>المصدر</th><th>التحصيل</th><th class="gl-acc-stmt-col-num">الإجمالي</th><th class="gl-acc-stmt-col-num">الخصم</th><th class="gl-acc-stmt-col-num">الصافي</th></tr></thead>
                     <tbody>
-                    <?php if ($rows === []): ?><tr><td colspan="8" class="muted">لا توجد فواتير مبيعات في المدى المحدد.</td></tr>
+                    <?php if ($rows === []): ?><tr><td colspan="9" class="muted">لا توجد فواتير مبيعات في المدى المحدد.</td></tr>
                     <?php else: foreach ($rows as $r): ?>
                         <tr>
                             <td dir="ltr">
@@ -1443,6 +1559,7 @@ if ($returnsServerExport && $reportError === '') {
                                 <?php endif; ?>
                             </td>
                             <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY((string) $r['date']), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr"><?php echo htmlspecialchars((string) ($r['entry_at'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) $r['customer'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars($sourceLabel((string) $r['source']), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars($paymentLabel((string) $r['payment']), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -1452,10 +1569,11 @@ if ($returnsServerExport && $reportError === '') {
                         </tr>
                     <?php endforeach; endif; ?>
                     </tbody>
-                    <tfoot><tr><th colspan="5">الإجمالي (<?php echo (int) $invoiceSummary['count']; ?>)</th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['subtotal']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['discount']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['net']); ?></th></tr></tfoot>
+                    <tfoot><tr><th colspan="6">الإجمالي (<?php echo (int) $invoiceSummary['count']; ?>)</th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['subtotal']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['discount']); ?></th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $invoiceSummary['net']); ?></th></tr></tfoot>
                 <?php elseif ($tab === 'returns'): ?>
                     <colgroup>
                         <col class="srr-ret-col-ref">
+                        <col class="srr-ret-col-date">
                         <col class="srr-ret-col-date">
                         <col class="srr-ret-col-customer">
                         <col class="srr-ret-col-invoice">
@@ -1464,9 +1582,9 @@ if ($returnsServerExport && $reportError === '') {
                         <col class="srr-ret-col-channel">
                         <col class="srr-ret-col-net">
                     </colgroup>
-                    <thead><tr><th>مرجع المردود</th><th>التاريخ</th><th>العميل</th><th>مرجع الفاتورة</th><th>المصدر</th><th>التحصيل</th><th>قناة التسويق</th><th class="gl-acc-stmt-col-num">الصافي</th></tr></thead>
+                    <thead><tr><th>مرجع المردود</th><th>التاريخ</th><th>تاريخ الإدخال</th><th>العميل</th><th>مرجع الفاتورة</th><th>المصدر</th><th>التحصيل</th><th>قناة التسويق</th><th class="gl-acc-stmt-col-num">الصافي</th></tr></thead>
                     <tbody>
-                    <?php if ($rows === []): ?><tr><td colspan="8" class="muted">لا توجد مردودات مبيعات في المدى المحدد.</td></tr>
+                    <?php if ($rows === []): ?><tr><td colspan="9" class="muted">لا توجد مردودات مبيعات في المدى المحدد.</td></tr>
                     <?php else: foreach ($rows as $r): ?>
                         <tr>
                             <td dir="ltr">
@@ -1477,6 +1595,7 @@ if ($returnsServerExport && $reportError === '') {
                                 <?php endif; ?>
                             </td>
                             <td dir="ltr"><?php echo htmlspecialchars(orange_format_date_dmY((string) $r['date']), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr"><?php echo htmlspecialchars((string) ($r['entry_at'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) $r['customer'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td dir="ltr"><?php echo htmlspecialchars((string) $r['invoice_reference'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars($sourceLabel((string) $r['source']), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -1486,7 +1605,7 @@ if ($returnsServerExport && $reportError === '') {
                         </tr>
                     <?php endforeach; endif; ?>
                     </tbody>
-                    <tfoot><tr><th colspan="7">الإجمالي (<?php echo (int) $returnSummary['count']; ?>)</th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $returnSummary['total']); ?></th></tr></tfoot>
+                    <tfoot><tr><th colspan="8">الإجمالي (<?php echo (int) $returnSummary['count']; ?>)</th><th class="gl-acc-stmt-col-num"><?php echo $fmtMoney((float) $returnSummary['total']); ?></th></tr></tfoot>
                 <?php elseif ($tab === 'customers'): ?>
                     <?php if ($customerDetailed): ?>
                         <colgroup>
@@ -2233,7 +2352,7 @@ if ($returnsServerExport && $reportError === '') {
 })();
 </script>
 
-<?php $docTitle = $reportTitle . ' - ' . date('Y-m-d'); ?>
+<?php $docTitle = $reportTitle . ' - ' . ($srDefaultTo !== '' ? $srDefaultTo : gmdate('Y-m-d')); ?>
 <script>
 (function () {
     var reportTitle = <?php echo json_encode($docTitle, JSON_UNESCAPED_UNICODE); ?>;

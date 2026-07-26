@@ -17,6 +17,15 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 $pdo = orange_admin_page_pdo();
 $tbCountryLabel = orange_admin_page_country_label($pdo);
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
+$tbReportTimeIana = '';
+$tbReportTodayYmd = '';
+try {
+    $tbReportDefaults = orange_admin_time_report_default_from_to_for_admin_context($pdo);
+    $tbReportTimeIana = (string) $tbReportDefaults['iana'];
+    $tbReportTodayYmd = (string) $tbReportDefaults['to_ymd'];
+} catch (Throwable $e) {
+    $tbReportTimeIana = '';
+}
 
 $normalizeYm = static function (string $raw): ?string {
     $raw = trim($raw);
@@ -53,8 +62,8 @@ $periodDateTo = '';
 $calYmMinBound = '2000-01';
 $calYmMaxBound = '2100-12';
 
-$yNow = (int) date('Y');
-$mNow = (int) date('n');
+$yNow = $tbReportTodayYmd !== '' ? (int) substr($tbReportTodayYmd, 0, 4) : (int) gmdate('Y');
+$mNow = $tbReportTodayYmd !== '' ? (int) substr($tbReportTodayYmd, 5, 2) : (int) gmdate('n');
 $defaultYmJan = sprintf('%04d-01', $yNow);
 $defaultYmToday = sprintf('%04d-%02d', $yNow, $mNow);
 
@@ -186,8 +195,12 @@ usort($rowsTb, 'orange_accounts_report_tb_rows_compare');
 
 $reportDateFromDmY = orange_format_date_dmY($periodDateFrom);
 $reportDateToDmY = orange_format_date_dmY($periodDateTo);
-$todayDmY = orange_format_date_dmY(date('Y-m-d'));
-$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$todayDmY = $tbReportTodayYmd !== ''
+    ? orange_format_date_dmY($tbReportTodayYmd)
+    : orange_format_date_dmY(gmdate('Y-m-d'));
+$printDatetime = $tbReportTimeIana !== ''
+    ? orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime')
+    : orange_format_datetime_dmY_hi(gmdate('Y-m-d H:i:s'));
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
 $tbCompany = orange_sales_doc_print_company($pdo, (int) (function_exists('orange_admin_context_country_id') ? orange_admin_context_country_id($pdo) : 0));

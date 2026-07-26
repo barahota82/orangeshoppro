@@ -19,6 +19,15 @@ $pdo = orange_admin_page_pdo();
 $bsCountryLabel = orange_admin_page_country_label($pdo);
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 $bsCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+$bsReportTimeIana = '';
+$bsReportTodayYmd = '';
+try {
+    $bsReportDefaults = orange_admin_time_report_default_from_to_for_admin_context($pdo);
+    $bsReportTimeIana = (string) $bsReportDefaults['iana'];
+    $bsReportTodayYmd = (string) $bsReportDefaults['to_ymd'];
+} catch (Throwable $e) {
+    $bsReportTimeIana = '';
+}
 
 $years = orange_fiscal_years_list($pdo);
 $fyId = isset($_GET['fy']) ? (int) $_GET['fy'] : 0;
@@ -65,7 +74,11 @@ if ($fyRow !== null) {
     }
 }
 if ($asOfYmd === '') {
-    $asOfYmd = date('Y-m-d');
+    try {
+        $asOfYmd = orange_admin_time_document_date_today_for_admin_context($pdo);
+    } catch (Throwable $e) {
+        $asOfYmd = gmdate('Y-m-d');
+    }
 }
 
 $prevAsOfYmd = $prevFyRow !== null ? trim((string) ($prevFyRow['end_date'] ?? '')) : '';
@@ -142,8 +155,12 @@ $prevAsOfDmY = $hasRealPrev ? orange_format_date_dmY($prevAsOfYmd) : 'السنة
 /* عناوين أعمدة الأرصدة = رقم السنة فقط (مثل 2026 / 2025). */
 $curYearLabel = substr($asOfYmd, 0, 4);
 $prevYearLabel = $hasRealPrev ? substr($prevAsOfYmd, 0, 4) : (string) ((int) substr($asOfYmd, 0, 4) - 1);
-$todayDmY = orange_format_date_dmY(date('Y-m-d'));
-$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$todayDmY = $bsReportTodayYmd !== ''
+    ? orange_format_date_dmY($bsReportTodayYmd)
+    : orange_format_date_dmY(gmdate('Y-m-d'));
+$printDatetime = $bsReportTimeIana !== ''
+    ? orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime')
+    : orange_format_datetime_dmY_hi(gmdate('Y-m-d H:i:s'));
 
 $company = orange_sales_doc_print_company($pdo, $bsCountryId);
 $companyNameAr = $company['company_name_ar'];
