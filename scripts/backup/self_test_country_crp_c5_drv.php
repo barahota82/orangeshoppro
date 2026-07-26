@@ -15,6 +15,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__, 2);
+require_once $projectRoot . '/includes/catalog_schema.php';
 require_once $projectRoot . '/includes/backup/backup_paths.php';
 require_once $projectRoot . '/includes/backup/backup_manifest.php';
 require_once $projectRoot . '/includes/backup/backup_table_registry_lib.php';
@@ -99,7 +100,7 @@ function c5_build_package(string $projectRoot, string $dir, array $opts = []): v
     orange_backup_write_json($dir . '/health.json', [
         'package_status' => 'healthy',
         'country_id' => $countryId,
-        'schema_revision' => 121,
+        'schema_revision' => (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION,
     ]);
 
     $manifest = [
@@ -109,7 +110,7 @@ function c5_build_package(string $projectRoot, string $dir, array $opts = []): v
         'export_time' => gmdate('c'),
         'country_id' => $countryId,
         'country_code' => 'kw',
-        'schema_revision' => (int) ($opts['schema_revision'] ?? 121),
+        'schema_revision' => (int) ($opts['schema_revision'] ?? ORANGE_CATALOG_SCHEMA_PHP_REVISION),
         'boundary_policy_version' => $opts['boundary_policy_version'] ?? ORANGE_COUNTRY_BOUNDARY_POLICY_VERSION,
         'dependency_graph_version' => $opts['dependency_graph_version'] ?? ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION,
         'drv_version' => ORANGE_COUNTRY_EXPORT_DRV_VERSION,
@@ -135,7 +136,7 @@ function c5_build_package(string $projectRoot, string $dir, array $opts = []): v
             'ok' => false,
             'codes' => ['checksum_mismatch'],
             'country_id' => $countryId,
-            'schema_revision' => 121,
+            'schema_revision' => (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION,
             'boundary_policy_version' => ORANGE_COUNTRY_BOUNDARY_POLICY_VERSION,
             'dependency_graph_version' => ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION,
             'package_fingerprint' => $manifest['package_fingerprint'],
@@ -196,7 +197,7 @@ try {
         'ok' => true,
         'codes' => [],
         'country_id' => 1,
-        'schema_revision' => 121,
+        'schema_revision' => (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION,
         'boundary_policy_version' => ORANGE_COUNTRY_BOUNDARY_POLICY_VERSION,
         'dependency_graph_version' => ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION,
         'package_fingerprint' => $mani['package_fingerprint'] ?? '',
@@ -229,7 +230,7 @@ try {
         'ok' => true,
         'codes' => [],
         'country_id' => 1,
-        'schema_revision' => 121,
+        'schema_revision' => (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION,
         'boundary_policy_version' => ORANGE_COUNTRY_BOUNDARY_POLICY_VERSION,
         'dependency_graph_version' => ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION,
         'package_fingerprint' => $mani['package_fingerprint'] ?? '',

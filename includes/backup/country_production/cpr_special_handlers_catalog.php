@@ -77,7 +77,9 @@ function orange_cpr_special_handlers_definitions(): array
             'requires_import_batches' => [3],
             'requires_handlers' => [],
             'kind' => 'polymorphic',
-            'description' => 'Company docs polymorphic owner validation',
+            // Schema 123+: Country Backup uses direct country_id; polymorphic remains cataloged
+            // for legacy CPR tooling only and is not required by Country package Verify.
+            'description' => 'Legacy polymorphic owner validation (Country packages use country_id authority)',
         ],
         'gl_voucher_slots_country' => [
             'tables' => ['orange_gl_voucher_slots'],
@@ -92,7 +94,6 @@ function orange_cpr_special_handlers_definitions(): array
             'requires_handlers' => [
                 'admins_permissions_composite',
                 'expenses_via_accounts',
-                'polymorphic_company_documents',
                 'gl_voucher_slots_country',
             ],
             'kind' => 'sequence_namespace',

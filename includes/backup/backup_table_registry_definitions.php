@@ -92,8 +92,8 @@ function orange_backup_registry_table_definitions(): array
             111,
             [
                 'type' => 'custom_sql',
-                'description' => 'Admin audit events for one country; excludes explicit global rows',
-                'sql' => 'SELECT id FROM orange_admin_audit_log WHERE country_id = :country_id AND (is_global = 0 OR is_global IS NULL)',
+                'description' => 'Admin audit events for one country; excludes explicit global rows (is_global=1). NULL country is not global.',
+                'sql' => 'SELECT id FROM orange_admin_audit_log WHERE country_id = :country_id AND is_global = 0',
             ],
             null,
             false,

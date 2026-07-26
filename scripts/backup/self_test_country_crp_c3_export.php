@@ -51,9 +51,29 @@ try {
 
 $registry = orange_backup_registry_load($projectRoot);
 $plan = orange_country_boundary_matrix_export_plan($matrix, $registry);
-c3_assert(count($plan) === 80, 'export plan has 80 tables');
+c3_assert(count($plan) === 81, 'export plan has 81 tables');
+c3_assert(in_array('orange_admin_audit_log', $planNames = array_map(static fn (array $e): string => $e['table'], $plan), true), 'audit log included in export plan');
+$docsMeta = null;
+foreach ($plan as $entry) {
+    if (($entry['table'] ?? '') === 'orange_company_documents') {
+        $docsMeta = $entry['meta'] ?? null;
+        break;
+    }
+}
+c3_assert(is_array($docsMeta), 'company documents meta present');
+c3_assert(($docsMeta['extraction_rule']['type'] ?? '') === 'country_id', 'company documents extraction=country_id');
+c3_assert(($docsMeta['special_handler'] ?? null) === null, 'company documents has no polymorphic special_handler');
+$auditMeta = null;
+foreach ($plan as $entry) {
+    if (($entry['table'] ?? '') === 'orange_admin_audit_log') {
+        $auditMeta = $entry['meta'] ?? null;
+        break;
+    }
+}
+c3_assert(is_array($auditMeta), 'audit log meta present');
+c3_assert(str_contains((string) (($auditMeta['extraction_rule']['sql'] ?? '')), 'is_global = 0'), 'audit extraction excludes is_global=1');
+c3_assert(!str_contains((string) (($auditMeta['extraction_rule']['sql'] ?? '')), 'is_global IS NULL'), 'audit extraction does not treat NULL is_global as country');
 
-$planNames = array_map(static fn (array $e): string => $e['table'], $plan);
 c3_assert(!in_array('journal_entries', $planNames, true), 'Global/Full-only: journal_entries excluded');
 c3_assert(!in_array('orange_country_screen_copy_log', $planNames, true), 'Global: country_screen_copy_log excluded');
 c3_assert(in_array('admin_permissions', $planNames, true), 'special: admin_permissions included');
@@ -210,7 +230,7 @@ orange_backup_remove_dir($tmp);
 // --- Inventory / graph builders ---
 $graph = orange_country_export_build_dependency_graph_c3($matrix, $registry, $batches);
 c3_assert(($graph['dependency_graph_version'] ?? '') === 'C2', 'dependency_graph.json version C2');
-c3_assert(count($graph['nodes'] ?? []) === 80, 'dependency graph nodes=80');
+c3_assert(count($graph['nodes'] ?? []) === 81, 'dependency graph nodes=81');
 $summary = orange_crp_export_classification_summary(['orders' => 2, 'order_items' => 5], $matrix);
 c3_assert(($summary['Country Scoped'] ?? 0) === 2, 'inventory classification Country Scoped');
 c3_assert(($summary['Mixed'] ?? 0) === 5, 'inventory classification Mixed');

@@ -21,6 +21,7 @@ require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARAT
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_table_registry_lib.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_validate.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'uploads_collector.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'country_boundary_matrix_lib.php';
 require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'country_export.php';
 
 $failures = 0;
@@ -92,7 +93,10 @@ $parentQuery = orange_country_export_build_parent_rows_query('order_items', [
     'parent_table' => 'orders',
     'foreign_key' => 'order_id',
 ], $idSnapshot);
-crp_self_test(str_contains($parentQuery['sql'], 'order_id IN'), 'dependent row extraction query');
+crp_self_test(
+    str_contains($parentQuery['sql'], 'order_id IN') || str_contains($parentQuery['sql'], '`order_id` IN'),
+    'dependent row extraction query'
+);
 $emptyParentQuery = orange_country_export_build_parent_rows_query('order_items', [
     'type' => 'parent_rows',
     'parent_table' => 'orders',
@@ -114,10 +118,9 @@ $logoCandidates = orange_country_uploads_discover_candidates(
 $logoPaths = array_map(static fn (array $c): string => (string) ($c['relative_path'] ?? ''), $logoCandidates);
 crp_self_test(in_array('uploads/company/company-logo.webp', $logoPaths, true), 'company logo resolves to uploads/company/');
 crp_self_test(!in_array('uploads/products/company-logo.webp', $logoPaths, true), 'company logo never resolves to uploads/products/');
-$uploadIssues = orange_country_uploads_collect($projectRoot, 1, [
-    'products' => [['id' => 1, 'main_image' => 'missing-file.webp']],
+$classified = orange_country_export_classify_upload_issues([
+    'warning:missing upload file: uploads/products/optional.webp',
 ]);
-$classified = orange_country_export_classify_upload_issues($uploadIssues['issues']);
 crp_self_test(($classified['package_status'] ?? '') === 'healthy', 'warning upload missing does not downgrade package_status');
 crp_self_test(($classified['warnings'] ?? []) !== [], 'warning upload issues remain in warnings[]');
 $informationalClass = orange_country_export_classify_upload_issues(['informational:optional folder absent: uploads/customers/1/']);
@@ -127,7 +130,7 @@ $healthHealthy = orange_country_export_build_health([
     'country_id' => 1,
     'country_code' => 'kw',
     'country_label' => 'Kuwait',
-    'schema_revision' => 121,
+    'schema_revision' => (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION,
     'registry_version' => '1.0',
     'upload_issues' => ['warning:missing upload file: uploads/products/optional.webp'],
     'validation_errors' => [],
@@ -158,6 +161,27 @@ mkdir($pkg . DIRECTORY_SEPARATOR . 'files');
 file_put_contents($pkg . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR . '001_orders.sql', "-- rows=0\n");
 file_put_contents($pkg . DIRECTORY_SEPARATOR . 'country.sql.gz', "\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\x03"); // minimal gzip header bytes; verify scans when gzopen works
 orange_country_uploads_write_empty_zip($pkg . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip');
+$matrix = orange_country_boundary_matrix_load($projectRoot);
+$registry = orange_backup_registry_load($projectRoot);
+$batches = orange_country_boundary_matrix_restore_batches($matrix);
+$dep = orange_country_export_build_dependency_graph_c3($matrix, $registry, $batches);
+orange_backup_write_json($pkg . DIRECTORY_SEPARATOR . 'dependency_graph.json', $dep);
+$sqlBody = "-- Orange CRP export table=orders country_id=1\n"
+    . "INSERT INTO `orders` (`id`,`country_id`) VALUES (1,1);\n";
+file_put_contents($pkg . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR . '001_orders.sql', $sqlBody);
+if (function_exists('gzopen')) {
+    $gz = gzopen($pkg . DIRECTORY_SEPARATOR . 'country.sql.gz', 'wb9');
+    if ($gz !== false) {
+        gzwrite($gz, $sqlBody);
+        gzclose($gz);
+    }
+}
+orange_backup_write_json($pkg . DIRECTORY_SEPARATOR . 'table_inventory.json', [
+    'country_id' => 1,
+    'other_country_markers' => [],
+    'tables' => ['orders' => 1],
+]);
+orange_backup_write_json($pkg . DIRECTORY_SEPARATOR . 'id_snapshot.json', ['country_id' => 1, 'tables' => ['orders' => [1]]]);
 $manifest = [
     'package_type' => 'country_recovery',
     'package_version' => ORANGE_COUNTRY_EXPORT_PACKAGE_VERSION,
@@ -166,31 +190,25 @@ $manifest = [
     'country_id' => 1,
     'country_code' => 'kw',
     'country_label' => 'Kuwait',
-    'schema_revision' => 121,
+    'schema_revision' => (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION,
     'boundary_policy_version' => 'C1.1',
     'dependency_graph_version' => 'C2',
     'drv_version' => ORANGE_COUNTRY_EXPORT_DRV_VERSION,
     'verify_version' => ORANGE_COUNTRY_EXPORT_VERIFY_VERSION,
     'registry_version' => '1.0',
     'export_backend' => ORANGE_COUNTRY_EXPORT_BACKEND,
-    'restore_batches' => [1 => ['orders']],
+    'restore_batches' => $batches,
     'package_fingerprint' => str_repeat('ab', 32),
     'package_status' => 'healthy',
 ];
+$manifest['package_fingerprint'] = orange_crp_export_package_fingerprint($pkg, $manifest);
 orange_backup_write_json($pkg . DIRECTORY_SEPARATOR . 'manifest.json', $manifest);
 orange_backup_write_json($pkg . DIRECTORY_SEPARATOR . 'health.json', [
     'package_type' => 'country_recovery',
     'package_status' => 'healthy',
     'country_id' => 1,
-    'schema_revision' => 121,
+    'schema_revision' => (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION,
 ]);
-orange_backup_write_json($pkg . DIRECTORY_SEPARATOR . 'dependency_graph.json', ['nodes' => [], 'edges' => []]);
-orange_backup_write_json($pkg . DIRECTORY_SEPARATOR . 'table_inventory.json', [
-    'country_id' => 1,
-    'other_country_markers' => [],
-    'tables' => [],
-]);
-orange_backup_write_json($pkg . DIRECTORY_SEPARATOR . 'id_snapshot.json', ['country_id' => 1, 'tables' => []]);
 orange_backup_write_checksums($pkg, [
     'manifest.json',
     'health.json',

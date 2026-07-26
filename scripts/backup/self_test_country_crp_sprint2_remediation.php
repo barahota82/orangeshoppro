@@ -9,6 +9,7 @@ declare(strict_types=1);
  */
 
 $projectRoot = dirname(__DIR__, 2);
+require_once $projectRoot . '/includes/catalog_schema.php';
 require_once $projectRoot . '/includes/backup/backup_paths.php';
 require_once $projectRoot . '/includes/backup/restore/restore_country_shadow.php';
 require_once $projectRoot . '/includes/backup/restore/restore_country_shadow_verify.php';
@@ -152,7 +153,7 @@ function s2_build_package(string $projectRoot, string $dir, int $countryId = 1):
     orange_backup_write_json($dir . '/health.json', [
         'package_status' => 'healthy',
         'country_id' => $countryId,
-        'schema_revision' => 121,
+        'schema_revision' => (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION,
     ]);
     $manifest = [
         'package_type' => 'country_recovery',
@@ -161,7 +162,7 @@ function s2_build_package(string $projectRoot, string $dir, int $countryId = 1):
         'export_time' => gmdate('c'),
         'country_id' => $countryId,
         'country_code' => 'kw',
-        'schema_revision' => 121,
+        'schema_revision' => (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION,
         'boundary_policy_version' => ORANGE_COUNTRY_BOUNDARY_POLICY_VERSION,
         'dependency_graph_version' => ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION,
         'drv_version' => ORANGE_COUNTRY_EXPORT_DRV_VERSION,

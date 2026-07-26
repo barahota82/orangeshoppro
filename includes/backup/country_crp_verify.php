@@ -115,7 +115,7 @@ function orange_crp_verify_run(string $packageRoot, array $options = []): array
     }
 
     // --- Boundary matrix ---
-    $expectedSchema = defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') ? (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION : 122;
+    $expectedSchema = defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') ? (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION : 123;
     try {
         if (defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
             $expectedSchema = (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION;
@@ -358,11 +358,11 @@ function orange_crp_verify_run(string $packageRoot, array $options = []): array
 
     // --- Special handlers present in graph ---
     if (is_array($depGraph['nodes'] ?? null)) {
+        // Schema 123+: orange_company_documents is direct country_id authority (no polymorphic special handler).
         $handlersExpected = [
             'document_sequences' => 'seq_country_namespace',
             'admin_permissions' => 'admins_permissions_composite',
             'expenses' => 'expenses_via_accounts',
-            'orange_company_documents' => 'polymorphic_company_documents',
             'orange_gl_voucher_slots' => 'gl_voucher_slots_country',
         ];
         $nodesByTable = [];
@@ -383,6 +383,37 @@ function orange_crp_verify_run(string $packageRoot, array $options = []): array
                 $add('special_' . $table, 'FAIL', 'special_handler_missing', 'Handler mismatch for ' . $table);
             } else {
                 $add('special_' . $table, 'PASS', null, $table . ' handler OK');
+            }
+        }
+        if (isset($nodesByTable['orange_company_documents'])) {
+            $docsHandler = $nodesByTable['orange_company_documents']['special_handler'] ?? null;
+            $docsType = '';
+            try {
+                require_once __DIR__ . '/backup_table_registry_lib.php';
+                $registryForDocs = orange_backup_registry_load($projectRoot);
+                $docsRule = is_array($registryForDocs['tables']['orange_company_documents']['extraction_rule'] ?? null)
+                    ? $registryForDocs['tables']['orange_company_documents']['extraction_rule']
+                    : [];
+                $docsType = (string) ($docsRule['type'] ?? '');
+            } catch (Throwable) {
+                $docsType = '';
+            }
+            if ($docsHandler !== null && $docsHandler !== '') {
+                $add(
+                    'special_orange_company_documents',
+                    'FAIL',
+                    'special_handler_missing',
+                    'orange_company_documents must use direct country_id (no special_handler) under schema 123+'
+                );
+            } elseif ($docsType !== '' && $docsType !== 'country_id') {
+                $add(
+                    'special_orange_company_documents',
+                    'FAIL',
+                    'special_handler_missing',
+                    'orange_company_documents extraction_rule must be country_id'
+                );
+            } else {
+                $add('special_orange_company_documents', 'PASS', null, 'orange_company_documents direct country_id OK');
             }
         }
     }

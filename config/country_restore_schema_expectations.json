@@ -1,6 +1,6 @@
 {
   "expectations_version": "1.0",
-  "schema_revision": 122,
+  "schema_revision": 123,
   "core_tables": [
     "orders",
     "order_items",
@@ -16,7 +16,9 @@
     "customers",
     "journal_vouchers",
     "journal_lines",
-    "document_sequences"
+    "document_sequences",
+    "orange_company_documents",
+    "orange_admin_audit_log"
   ],
   "tables": {
     "orders": {
@@ -92,6 +94,19 @@
     "document_sequences": {
       "required_columns": ["id", "scope", "next_value"],
       "required_indexes": [],
+      "required_constraints": []
+    },
+    "orange_company_documents": {
+      "required_columns": ["id", "country_id"],
+      "required_indexes": [{"name": "idx_ocd_country", "columns": ["country_id"]}],
+      "required_constraints": []
+    },
+    "orange_admin_audit_log": {
+      "required_columns": ["id", "country_id", "is_global"],
+      "required_indexes": [
+        {"name": "idx_orange_audit_country", "columns": ["country_id"]},
+        {"name": "idx_orange_audit_global", "columns": ["is_global"]}
+      ],
       "required_constraints": []
     }
   }

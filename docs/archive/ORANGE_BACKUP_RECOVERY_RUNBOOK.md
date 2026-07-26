@@ -908,6 +908,43 @@ after code revision advanced to **122** (`countries.timezone`) while backup inve
 
 ---
 
+## Schema revision 123 Country Backup compatibility repair (2026-07-26)
+
+**Context:** Phase 3 Step 2 raised live schema to **123** (`orange_company_documents.country_id`,
+`orange_admin_audit_log.country_id` + `is_global`). Registry/matrix/recovery expected revision were
+updated in commit `b6d5c75f`, but Country Backup still failed operationally.
+
+**RUNTIME_ERROR_EVIDENCE_NOT_AVAILABLE** in the agent workspace (no `export_all_countries_*.log`).
+**Code-proven failure path** after Step 2:
+
+1. Country Batch exports a package stamped schema **123** with
+   `orange_company_documents.special_handler = null` and `extraction_rule.type = country_id`.
+2. Post-export Verify (`orange_country_export_verify_package` inside
+   `includes/backup/country_batch_export.php`) still required special handler
+   `polymorphic_company_documents` → `special_handler_missing` → batch marks country **failed**.
+3. Separately, `config/country_restore_schema_expectations.json` remained at **122**, so Shadow
+   N3-02 schema drift failed with `schema_revision_mismatch` (matrix/code 123 vs expectations 122).
+
+**تنفيذ (compatibility repair — no schema 124, no new migration):**
+- Regenerate Registry from source: `includes/backup/backup_table_registry_definitions.php` →
+  `php scripts/backup/build_table_registry.php` → `config/backup_table_registry.json` (**123**).
+- Audit Country extraction: `country_id = :country_id AND is_global = 0`
+  (excludes explicit global; NULL country is never treated as global).
+- Documents: `country_owned` + `country_id` extraction; Verify accepts direct country_id
+  (no polymorphic special handler required).
+- `config/country_restore_schema_expectations.json` → **123** + required columns/indexes for
+  `orange_company_documents` / `orange_admin_audit_log`.
+- Fallback expected-schema literals in Verify/DRV/Shadow/Export → **123**.
+- Self-tests: C3 plan/nodes **81**; C4 Verify; Final Hardening N3-02.
+
+**Owner deploy (after pull):** re-run Country Batch once from Backup Center; confirm
+`Countries succeeded=1`, new package `schema_revision=123`, healthy, Verify/DRV, Restore eligibility.
+Old **122** packages remain visible and **Non-Eligible** (`schema_incompatible`) — Exact Schema Policy; no dual compatibility.
+
+**Frozen:** Backup/Restore UX, time policy, schedules, retention, wizard, production mutation.
+
+---
+
 ## Related references
 
 - Operator usage: `scripts/backup/README.md`

@@ -425,6 +425,11 @@ Edit-lock/partner utility defaults · utility lists ذات legacy datetime.
 - Registry/Matrix مزامَنان للـ revision 123؛ docs = country_id؛
   audit = custom SQL يستبعد `is_global=1`.
 - Backup/Restore UX وtime policy مجمّدان؛ الحزم القديمة Non-Eligible مقبولة.
+- **إصلاح توافق Country Backup (2026-07-26، قبل اعتماد Step 2):** بعد Step 2 فشل
+  Verify بعد التصدير لأنّه كان يشترط `polymorphic_company_documents` بينما Matrix
+  أصبح `direct_country_id`؛ و`country_restore_schema_expectations.json` بقي على 122.
+  التفاصيل والتنفيذ: `ORANGE_BACKUP_RECOVERY_RUNBOOK.md` قسم Schema revision 123
+  Country Backup compatibility repair. لا Schema 124؛ لا ترحيل بيانات جديد.
 
 ### وقت / عرض
 - Absolute Moment: UTC داخلياً؛ عرض IANA دولة السجل؛ **12 ساعة AM/PM**

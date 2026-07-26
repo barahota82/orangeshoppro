@@ -333,7 +333,7 @@ foreach ($apiFiles as $file) {
     backup_admin_self_test(!str_contains(strtolower($src), 'delete'), 'scope: API ' . $file . ' has no delete');
 }
 
-backup_admin_self_test(defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') && ORANGE_CATALOG_SCHEMA_PHP_REVISION === 121, 'schema: revision remains 121');
+backup_admin_self_test(defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') && ORANGE_CATALOG_SCHEMA_PHP_REVISION === 123, 'schema: revision remains 123');
 
 $strictResolveSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_paths.php');
 backup_admin_self_test(str_contains($strictResolveSource, 'is_writable($resolved)') || str_contains($strictResolveSource, 'is_writable($candidate)'), 'engine: strict orange_backup_resolve_root still checks writable');
