@@ -18,8 +18,8 @@ try {
     $ids = isset($data['ids']) && is_array($data['ids']) ? $data['ids'] : [];
     $unlockFiltered = !empty($data['unlock_filtered']);
     if ($unlockFiltered) {
-        [$df, $dt, $docKind, $entryTypes] = orange_edit_lock_filter_args_from_payload($pdo, $data);
-        $result = orange_edit_lock_set_filtered($pdo, $admin, false, $df, $dt, $docKind, $entryTypes);
+        [$df, $dt, $docKind, $entryTypes, $doFrom, $doTo] = orange_edit_lock_filter_args_from_payload($pdo, $data);
+        $result = orange_edit_lock_set_filtered($pdo, $admin, false, $df, $dt, $docKind, $entryTypes, $doFrom, $doTo);
         $unlocked = $result['unlocked'];
         $errors = $result['errors'];
     } else {

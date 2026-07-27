@@ -716,6 +716,13 @@ SPM country-scope: `scripts/self_test_admin_time_phase3_step4_spm_country.php`
 - Schema = 124 دون تغيير؛ Owner UI/runtime لا يزال معلّقاً.
 - Final System Review **لم تبدأ**.
 
+### Closure Verification — Edit-lock LIVE_TIME_GAP (2026-07-27)
+- المسار الحي: `admin/api/edit-lock/list.php` (+ lock/unlock المصفّى) كان يفترض
+  `date('Y-m-d 23:59:59')` ويقارن Absolute `created_at`/`saved_at` بـ `<=`.
+- الإصلاح الأدنى: `orange_edit_lock_resolve_period_bounds` → يوم مدني لدولة السياق
+  → نصف مفتوح UTC عبر `filter_range_mysql_utc`؛ Date-only لـ `voucher_date` منفصل.
+- لا Schema change.
+
 --------------------------------------------------------------------
 سابعاً: اختبار
 --------------------------------------------------------------------

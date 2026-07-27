@@ -126,6 +126,69 @@ function orange_edit_lock_format_saved_at_for_display(array $row): string
 }
 
 /**
+ * Extract Date-only Y-m-d from a posted filter value without PHP/server TZ reinterpretation.
+ * Accepts leading Y-m-d (optionally with time) or admin d/m/Y date part.
+ */
+function orange_edit_lock_extract_ymd_from_posted(string $raw): string
+{
+    require_once __DIR__ . '/admin_time.php';
+    require_once __DIR__ . '/date_format.php';
+    $raw = trim($raw);
+    if ($raw === '') {
+        return '';
+    }
+    if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $raw, $m)) {
+        return orange_admin_time_date_only_normalize($m[1]);
+    }
+    $parts = preg_split('/\s+/', $raw, 2);
+    $datePart = trim((string) ($parts[0] ?? ''));
+    $ymd = orange_parse_admin_date_to_ymd($datePart);
+
+    return $ymd !== '' ? orange_admin_time_date_only_normalize($ymd) : '';
+}
+
+/**
+ * Current Country Context civil-day period → Absolute UTC half-open + Date-only Y-m-d.
+ *
+ * @return array{
+ *   abs_from_utc_mysql:string,
+ *   abs_end_exclusive_utc_mysql:string,
+ *   date_only_from:string,
+ *   date_only_to:string,
+ *   iana:string
+ * }
+ */
+function orange_edit_lock_resolve_period_bounds(PDO $pdo, string $dateFromRaw, string $dateToRaw): array
+{
+    require_once __DIR__ . '/admin_time.php';
+    $countryId = orange_admin_context_country_id($pdo);
+    if ($countryId <= 0) {
+        throw new RuntimeException('سياق الدولة مطلوب لفترة إقفال التعديلات.');
+    }
+    $iana = orange_admin_time_timezone_for_country_id($pdo, $countryId);
+    $fromYmd = orange_edit_lock_extract_ymd_from_posted($dateFromRaw);
+    $toYmd = orange_edit_lock_extract_ymd_from_posted($dateToRaw);
+    if ($fromYmd === '') {
+        $fromYmd = orange_admin_time_month_start_ymd_in_iana($iana);
+    }
+    if ($toYmd === '') {
+        $toYmd = orange_admin_time_month_end_ymd_in_iana($iana);
+    }
+    $range = orange_admin_time_filter_range_mysql_utc($fromYmd, $toYmd, $iana);
+    if ($range === null) {
+        throw new RuntimeException('تعذر حساب حدود فترة إقفال التعديلات.');
+    }
+
+    return [
+        'abs_from_utc_mysql' => $range['start_utc_mysql'],
+        'abs_end_exclusive_utc_mysql' => $range['end_exclusive_utc_mysql'],
+        'date_only_from' => $fromYmd,
+        'date_only_to' => $toYmd,
+        'iana' => $iana,
+    ];
+}
+
+/**
  * @param array{doc_kind:string,entity_id:int,country_id?:int|null,reference?:string,label_ar?:string,amount?:float|null,saved_at?:string,journal_voucher_id?:int|null} $row
  */
 function orange_edit_lock_register(PDO $pdo, array $row): void
@@ -414,33 +477,45 @@ function orange_edit_lock_table_for_kind(string $kind): string
 /**
  * مزامنة مستندات الفترة إلى السجل (للعرض في الشاشة المركزية).
  *
+ * Absolute sync uses UTC half-open bounds (created_at).
+ * Journal voucher sync uses Date-only Y-m-d (voucher_date).
+ *
  * @param list<string>|null $entryTypes فلتر أنواع القيد (من نوع اليومية) — null = بدون فلتر
  */
-function orange_edit_lock_sync_period(PDO $pdo, ?string $dateFrom, ?string $dateTo, ?string $docKind, ?array $entryTypes = null): void
-{
+function orange_edit_lock_sync_period(
+    PDO $pdo,
+    ?string $absFromUtcMysql,
+    ?string $absEndExclusiveUtcMysql,
+    ?string $docKind,
+    ?array $entryTypes = null,
+    ?string $dateOnlyFromYmd = null,
+    ?string $dateOnlyToYmd = null
+): void {
     orange_catalog_ensure_edit_lock_schema($pdo);
-    $df = $dateFrom !== null && $dateFrom !== '' ? $dateFrom : null;
-    $dt = $dateTo !== null && $dateTo !== '' ? $dateTo : null;
+    $absFrom = $absFromUtcMysql !== null && $absFromUtcMysql !== '' ? $absFromUtcMysql : null;
+    $absEnd = $absEndExclusiveUtcMysql !== null && $absEndExclusiveUtcMysql !== '' ? $absEndExclusiveUtcMysql : null;
+    $doFrom = $dateOnlyFromYmd !== null && $dateOnlyFromYmd !== '' ? $dateOnlyFromYmd : null;
+    $doTo = $dateOnlyToYmd !== null && $dateOnlyToYmd !== '' ? $dateOnlyToYmd : null;
     $syncAll = $docKind === null || $docKind === '' || $docKind === 'all';
 
     if ($syncAll || $docKind === 'purchase') {
         if (orange_table_exists($pdo, 'purchases')) {
-            orange_edit_lock_sync_purchases($pdo, $df, $dt);
+            orange_edit_lock_sync_purchases($pdo, $absFrom, $absEnd);
         }
     }
     if ($syncAll || $docKind === 'purchase_return') {
         if (orange_table_exists($pdo, 'purchase_returns')) {
-            orange_edit_lock_sync_purchase_returns($pdo, $df, $dt);
+            orange_edit_lock_sync_purchase_returns($pdo, $absFrom, $absEnd);
         }
     }
     if ($syncAll || $docKind === 'sales_return') {
         if (orange_table_exists($pdo, 'sales_returns')) {
-            orange_edit_lock_sync_sales_returns($pdo, $df, $dt);
+            orange_edit_lock_sync_sales_returns($pdo, $absFrom, $absEnd);
         }
     }
     if ($syncAll || $docKind === 'opening_balance' || $entryTypes !== null) {
         if (orange_table_exists($pdo, 'journal_vouchers')) {
-            orange_edit_lock_sync_journal_vouchers($pdo, $df, $dt, $entryTypes);
+            orange_edit_lock_sync_journal_vouchers($pdo, $doFrom, $doTo, $entryTypes);
         }
     }
 }
@@ -515,7 +590,7 @@ function orange_edit_lock_sync_purchases(PDO $pdo, ?string $df, ?string $dt): vo
         $params[] = $df;
     }
     if ($dt !== null) {
-        $sql .= ' AND p.created_at <= ?';
+        $sql .= ' AND p.created_at < ?';
         $params[] = $dt;
     }
     $st = $params !== [] ? $pdo->prepare($sql) : $pdo->query($sql);
@@ -559,7 +634,7 @@ function orange_edit_lock_sync_purchase_returns(PDO $pdo, ?string $df, ?string $
         $params[] = $df;
     }
     if ($dt !== null) {
-        $sql .= ' AND pr.created_at <= ?';
+        $sql .= ' AND pr.created_at < ?';
         $params[] = $dt;
     }
     $st = $params !== [] ? $pdo->prepare($sql) : $pdo->query($sql);
@@ -602,7 +677,7 @@ function orange_edit_lock_sync_sales_returns(PDO $pdo, ?string $df, ?string $dt)
         $params[] = $df;
     }
     if ($dt !== null) {
-        $sql .= ' AND sr.created_at <= ?';
+        $sql .= ' AND sr.created_at < ?';
         $params[] = $dt;
     }
     $st = $params !== [] ? $pdo->prepare($sql) : $pdo->query($sql);
@@ -652,11 +727,11 @@ function orange_edit_lock_sync_journal_vouchers(PDO $pdo, ?string $df, ?string $
     // voucher_date is Accounting Date-only (DATETIME shape Y-m-d 12:00:00) — filter by calendar day.
     if ($df !== null) {
         $sql .= ' AND DATE(j.voucher_date) >= ?';
-        $params[] = substr($df, 0, 10);
+        $params[] = strlen($df) >= 10 ? substr($df, 0, 10) : $df;
     }
     if ($dt !== null) {
         $sql .= ' AND DATE(j.voucher_date) <= ?';
-        $params[] = substr($dt, 0, 10);
+        $params[] = strlen($dt) >= 10 ? substr($dt, 0, 10) : $dt;
     }
     if ($entryTypes !== null && $entryTypes !== []) {
         if ($entryTypes === ['__orange_unmapped_jt__']) {
@@ -722,26 +797,36 @@ function orange_edit_lock_sync_journal_vouchers(PDO $pdo, ?string $df, ?string $
  */
 function orange_edit_lock_list(
     PDO $pdo,
-    ?string $dateFrom,
-    ?string $dateTo,
+    ?string $absFromUtcMysql,
+    ?string $absEndExclusiveUtcMysql,
     ?string $docKind,
     ?string $lockFilter,
-    ?array $entryTypes = null
+    ?array $entryTypes = null,
+    ?string $dateOnlyFromYmd = null,
+    ?string $dateOnlyToYmd = null
 ): array {
     orange_catalog_ensure_edit_lock_schema($pdo);
-    orange_edit_lock_sync_period($pdo, $dateFrom, $dateTo, $docKind, $entryTypes);
+    orange_edit_lock_sync_period(
+        $pdo,
+        $absFromUtcMysql,
+        $absEndExclusiveUtcMysql,
+        $docKind,
+        $entryTypes,
+        $dateOnlyFromYmd,
+        $dateOnlyToYmd
+    );
     if (!orange_table_exists($pdo, 'orange_edit_lock_registry')) {
         return [];
     }
     $sql = 'SELECT * FROM orange_edit_lock_registry WHERE 1=1';
     $params = [];
-    if ($dateFrom !== null && $dateFrom !== '') {
+    if ($absFromUtcMysql !== null && $absFromUtcMysql !== '') {
         $sql .= ' AND saved_at >= ?';
-        $params[] = $dateFrom;
+        $params[] = $absFromUtcMysql;
     }
-    if ($dateTo !== null && $dateTo !== '') {
-        $sql .= ' AND saved_at <= ?';
-        $params[] = $dateTo;
+    if ($absEndExclusiveUtcMysql !== null && $absEndExclusiveUtcMysql !== '') {
+        $sql .= ' AND saved_at < ?';
+        $params[] = $absEndExclusiveUtcMysql;
     }
     if ($docKind !== null && $docKind !== '' && $docKind !== 'all') {
         $sql .= ' AND doc_kind = ?';
@@ -845,12 +930,23 @@ function orange_edit_lock_set_filtered(
     PDO $pdo,
     array $admin,
     bool $lock,
-    ?string $dateFrom,
-    ?string $dateTo,
+    ?string $absFromUtcMysql,
+    ?string $absEndExclusiveUtcMysql,
     ?string $docKind,
-    ?array $entryTypes = null
+    ?array $entryTypes = null,
+    ?string $dateOnlyFromYmd = null,
+    ?string $dateOnlyToYmd = null
 ): array {
-    $rows = orange_edit_lock_list($pdo, $dateFrom, $dateTo, $docKind, $lock ? 'open' : 'locked', $entryTypes);
+    $rows = orange_edit_lock_list(
+        $pdo,
+        $absFromUtcMysql,
+        $absEndExclusiveUtcMysql,
+        $docKind,
+        $lock ? 'open' : 'locked',
+        $entryTypes,
+        $dateOnlyFromYmd,
+        $dateOnlyToYmd
+    );
     $ids = array_map(static fn (array $r): int => (int) ($r['id'] ?? 0), $rows);
     $ids = array_values(array_filter($ids, static fn (int $id): bool => $id > 0));
     $result = orange_edit_lock_set_by_registry_ids($pdo, $admin, $ids, $lock);
@@ -887,21 +983,31 @@ function orange_edit_lock_resolve_journal_type_filter(PDO $pdo, int $journalType
 
 /**
  * @param array<string,mixed> $data
- * @return array{0:?string,1:?string,2:string,3:list<string>|null}
+ * @return array{
+ *   0:string,
+ *   1:string,
+ *   2:string,
+ *   3:list<string>|null,
+ *   4:string,
+ *   5:string
+ * }
  */
 function orange_edit_lock_filter_args_from_payload(PDO $pdo, array $data): array
 {
-    $df = trim((string) ($data['date_from'] ?? ''));
-    $dt = trim((string) ($data['date_to'] ?? ''));
+    $dfRaw = trim((string) ($data['date_from'] ?? ''));
+    $dtRaw = trim((string) ($data['date_to'] ?? ''));
+    $bounds = orange_edit_lock_resolve_period_bounds($pdo, $dfRaw, $dtRaw);
     $allMovements = !empty($data['all_movements']);
     $journalTypeId = (int) ($data['journal_type_id'] ?? 0);
     $resolved = orange_edit_lock_resolve_journal_type_filter($pdo, $journalTypeId, $allMovements);
 
     return [
-        $df !== '' ? $df : null,
-        $dt !== '' ? $dt : null,
+        $bounds['abs_from_utc_mysql'],
+        $bounds['abs_end_exclusive_utc_mysql'],
         'all',
         $resolved['entry_types'],
+        $bounds['date_only_from'],
+        $bounds['date_only_to'],
     ];
 }
 

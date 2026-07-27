@@ -264,6 +264,45 @@ p4s2_assert(!preg_match('/DATE\s*\(\s*(?:o\.)?created_at\s*\)/i', $repaired), 'S
 p4s2_assert(!str_contains($repaired, 'CURDATE('), 'Sweep. no CURDATE in repaired endpoints');
 p4s2_assert(!str_contains($repaired, 'CURRENT_DATE'), 'Sweep. no CURRENT_DATE in repaired endpoints');
 
+// --- Edit-lock Absolute period (Closure Verification LIVE_TIME_GAP fix) -------
+$elList = (string) file_get_contents($root . '/admin/api/edit-lock/list.php');
+$elLib = (string) file_get_contents($root . '/includes/edit_lock.php');
+$elListCode = p4s2_code_without_line_comments($elList);
+$elLibCode = p4s2_code_without_line_comments($elLib);
+p4s2_assert(str_contains($elList, 'orange_edit_lock_resolve_period_bounds'), 'EL. list uses period bounds helper');
+p4s2_assert(!str_contains($elListCode, '23:59:59'), 'EL. list API no 23:59:59');
+p4s2_assert(!preg_match('/\bdate\s*\(\s*[\'"]Y-m-d 23:59:59[\'"]\s*\)/', $elListCode), 'EL. list no PHP date() end-of-day default');
+p4s2_assert(str_contains($elLib, 'saved_at < ?'), 'EL. registry half-open end');
+p4s2_assert(!preg_match('/saved_at\s*<=\s*\?/', $elLibCode), 'EL. registry no inclusive 23:59 end');
+p4s2_assert(str_contains($elLib, 'created_at < ?'), 'EL. purchase Absolute half-open end');
+p4s2_assert(!preg_match('/created_at\s*<=\s*\?/', $elLibCode), 'EL. Absolute sync no <= end');
+p4s2_assert(str_contains($elLib, 'orange_admin_time_filter_range_mysql_utc'), 'EL. uses central filter_range');
+
+// --- Test-integrity: comment stripper must not hide executable SQL ------------
+$fixtureUnsafeDate = "\$sql .= ' AND DATE(o.created_at) >= ?';\n";
+$fixtureUnsafeCurdate = "\$sql .= \"WHERE DATE(created_at) = CURDATE()\";\n";
+$fixtureCommentOnly = "// DATE(o.created_at) CURDATE()\n" . "\$x = 1;\n";
+$fixtureMultiline = "// ignore CURDATE()\n\$sql .= \"AND DATE(o.created_at) >= ?\n AND status = 'x'\";\n";
+p4s2_assert(
+    (bool) preg_match('/DATE\s*\(\s*o\.created_at\s*\)/i', p4s2_code_without_line_comments($fixtureUnsafeDate)),
+    'TI. executable DATE(o.created_at) still detected'
+);
+p4s2_assert(
+    str_contains(p4s2_code_without_line_comments($fixtureUnsafeCurdate), 'CURDATE('),
+    'TI. executable CURDATE() still detected'
+);
+p4s2_assert(
+    !preg_match('/DATE\s*\(\s*o\.created_at\s*\)/i', p4s2_code_without_line_comments($fixtureCommentOnly))
+    && !str_contains(p4s2_code_without_line_comments($fixtureCommentOnly), 'CURDATE('),
+    'TI. comment-only DATE/CURDATE ignored'
+);
+$multiCode = p4s2_code_without_line_comments($fixtureMultiline);
+p4s2_assert(
+    (bool) preg_match('/DATE\s*\(\s*o\.created_at\s*\)/i', $multiCode)
+    && !str_contains($multiCode, 'CURDATE('),
+    'TI. multiline string keeps executable DATE; comment CURDATE ignored'
+);
+
 echo "\n--- Phase 4 Step 2 targeted gaps ---\n";
 echo "PASS={$passes} FAIL={$failures}\n";
 exit($failures > 0 ? 1 : 0);

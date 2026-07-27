@@ -17,15 +17,23 @@ try {
     $lockFilter = trim((string) ($_GET['lock_filter'] ?? 'all'));
     $dfRaw = trim((string) ($_GET['date_from'] ?? ''));
     $dtRaw = trim((string) ($_GET['date_to'] ?? ''));
-    $df = $dfRaw !== '' ? (orange_normalize_admin_posted_datetime($dfRaw) ?? date('Y-m-01 00:00:00')) : date('Y-m-01 00:00:00');
-    $dt = $dtRaw !== '' ? (orange_normalize_admin_posted_datetime($dtRaw) ?? date('Y-m-d 23:59:59')) : date('Y-m-d 23:59:59');
+    $bounds = orange_edit_lock_resolve_period_bounds($pdo, $dfRaw, $dtRaw);
 
     $allMovements = !empty($_GET['all_movements']) || trim((string) ($_GET['doc_kind'] ?? '')) === 'all';
     $journalTypeId = (int) ($_GET['journal_type_id'] ?? 0);
     $resolved = orange_edit_lock_resolve_journal_type_filter($pdo, $journalTypeId, $allMovements);
     $entryTypes = $resolved['entry_types'];
 
-    $rows = orange_edit_lock_list($pdo, $df, $dt, 'all', $lockFilter, $entryTypes);
+    $rows = orange_edit_lock_list(
+        $pdo,
+        $bounds['abs_from_utc_mysql'],
+        $bounds['abs_end_exclusive_utc_mysql'],
+        'all',
+        $lockFilter,
+        $entryTypes,
+        $bounds['date_only_from'],
+        $bounds['date_only_to']
+    );
 
     $journalTypes = [];
     foreach (orange_journal_types_list($pdo) as $jt) {
@@ -41,8 +49,10 @@ try {
         'journal_types' => $journalTypes,
         'filter' => array_merge($resolved['filter'], [
             'lock_filter' => $lockFilter,
-            'date_from' => $df,
-            'date_to' => $dt,
+            'date_from' => $bounds['abs_from_utc_mysql'],
+            'date_to' => $bounds['abs_end_exclusive_utc_mysql'],
+            'date_only_from' => $bounds['date_only_from'],
+            'date_only_to' => $bounds['date_only_to'],
             'all_movements' => $allMovements,
         ]),
     ]);
