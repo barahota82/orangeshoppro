@@ -197,6 +197,7 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 **تنفيذ (وقت الواجهة — Phase 3 Step 4):** قوائم الحساب/الضيف تُفلتر بـ `country_id` (حساب أو متجر حالي)؛ Absolute Moments تخرج كـ `created_at_utc` + `created_at_display` (لا Raw DATETIME)؛ المرجع `ORANGE_ADMIN_TIME_POLICY.txt` سادساً-ه.
 **بريد بعد التتبع:** بعد نجاح التتبع يمكن للعميل طلب إرسال نسخة تفاصيل الطلب إلى بريده — `api/orders/email-track-order-summary.php`
 (تحقق من رقم الطلب + الهاتف؛ ملحق ثنائي اللغة عبر `includes/storefront_order_email.php`)؛ واجهة في `assets/js/cart.js` داخل صندوق نتيجة التتبع.
+**تنفيذ (FSR-SEC-03 — 2026-07-27):** حدّ الإرسال ليس جلسة المتصفح وحدها: طبقة جلسة إضافية + حدّ خادمي مشترك (`includes/storefront_email_track_rate_limit.php`) على مفتاح HMAC لـ IP الموثوق (`REMOTE_ADDR` فقط) + بصمة الموضوع (رقم الطلب + هاتف مطبّع + بريد lowercase + `country_id` نطاق المتجر) دون تخزين PII خام؛ **8**/ساعة وتهدئة **90** ثانية (UTC/epoch)؛ عند الحظر HTTP **429** ورمز `email_track_rate_limited` ورسالة عامة بلا كشف وجود الطلب؛ الفشل في مخزن الحدّ = fail-closed دون إرسال بريد. **لا** رفع Schema (إعادة استخدام `orange_admin_login_throttle` / `et_mail`). اختبار: `scripts/self_test_final_review_email_track_rate_limit.php`.
 **بريد عند التسجيل من التتبع:** `api/auth/request-email-verify.php` مع تفاصيل الطلب عند ربط الطلب بالتسجيل.
 
 س14. هل إلغاء الطلب من العميل مسموح؟

@@ -1634,7 +1634,7 @@ function get_translations(): array {
             'track_email_summary_send' => 'Send copy to email',
             'track_email_summary_ok' => 'Sent. Check your inbox.',
             'track_email_summary_err' => 'Could not send. Try again later or contact us on WhatsApp.',
-            'track_email_summary_rate_limit' => 'Please wait before requesting another email.',
+            'track_email_summary_rate_limit' => 'Too many requests. Please wait a moment and try again.',
             'track_share_reference_title' => 'Share this order reference (text only — not a link)',
             'track_share_reference_hint' =>
                 'Tracking on this site still requires this order number and the phone used when ordering. Pasting only this text in the browser address bar will not open your order.',
@@ -1958,7 +1958,7 @@ function get_translations(): array {
             'track_email_summary_send' => 'إرسال النسخة إلى البريد',
             'track_email_summary_ok' => 'تم الإرسال. راجع صندوق الوارد.',
             'track_email_summary_err' => 'تعذّر الإرسال. حاول لاحقاً أو تواصل عبر واتساب.',
-            'track_email_summary_rate_limit' => 'يرجى الانتظار قبل طلب بريد آخر.',
+            'track_email_summary_rate_limit' => 'تم إرسال الطلب عدة مرات. يرجى الانتظار قليلاً ثم المحاولة مرة أخرى.',
             'track_share_reference_title' => 'شارك مرجع الطلب (نص فقط — ليس رابطاً)',
             'track_share_reference_hint' =>
                 'التتبع من الموقع ما زال يتطلّب رقم الطلب هذا ورقم الهاتف المستخدم عند الطلب. لصق هذا النص وحده في شريط العناوين لا يكشف حالة الطلب.',

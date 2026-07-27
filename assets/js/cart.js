@@ -614,7 +614,10 @@ function orangeCheckoutApiMessage(result) {
     if (c === 'mail_failed' && T.storefront_register_mail_failed) {
         return T.storefront_register_mail_failed;
     }
-    if ((c === 'rate_limited' || c === 'cooldown') && T.track_email_summary_rate_limit) {
+    if (
+        (c === 'rate_limited' || c === 'cooldown' || c === 'email_track_rate_limited') &&
+        T.track_email_summary_rate_limit
+    ) {
         return T.track_email_summary_rate_limit;
     }
     if (c === 'service_unavailable' && T.storefront_register_service_unavailable) {
