@@ -19,6 +19,14 @@ $pdo = orange_admin_page_pdo();
 $ov2Caps = orange_admin_caps_for_page($admin, $pdo, 'online_sales_invoice');
 
 $adminCountryId = orange_admin_context_country_id($pdo);
+$ov2PrintNowDisplay = '—';
+try {
+    if ($adminCountryId > 0) {
+        $ov2PrintNowDisplay = orange_admin_time_now_display_for_admin_context($pdo);
+    }
+} catch (Throwable $e) {
+    $ov2PrintNowDisplay = '—';
+}
 $adminDefaultPhoneDial = orange_admin_context_phone_dial($pdo);
 $adminDefaultCurrency = orange_admin_context_currency_code($pdo);
 $adminCurrencyUnit = orange_currency_display_unit($adminDefaultCurrency);
@@ -1441,6 +1449,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                 serialElId: 'ov2_doc_serial',
                 docLabel: 'فاتورة أونلاين',
                 docKind: 'inv_o',
+                printNowDisplay: <?php echo json_encode($ov2PrintNowDisplay, JSON_UNESCAPED_UNICODE); ?>,
                 docId: function () { return browseOrderId; },
                 beforePrint: function () {
                     if (!OV2_PRINT_TUNING && browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }

@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../includes/date_format.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/company_settings.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 
 require_once __DIR__ . '/../../../includes/admin_permissions.php';
 
@@ -60,16 +61,31 @@ if ($daName === '') {
     $daName = trim((string) ($row['area'] ?? ''));
 }
 
+$customerCountryId = (int) ($row['country_id'] ?? 0);
+if ($customerCountryId <= 0) {
+    $customerCountryId = orange_admin_context_country_id($pdo);
+}
+
 $ordersCount = 0;
 $ordersLastAt = '';
+$ordersLastAtDisplay = '—';
 if (orange_table_exists($pdo, 'orders') && orange_table_has_column($pdo, 'orders', 'customer_id')) {
-    $ordersCountrySql = orange_sql_country_and_fragment($pdo, 'orders', '', orange_admin_context_country_id($pdo));
+    $ordersCountrySql = orange_sql_country_and_fragment($pdo, 'orders', '', $customerCountryId);
     $oSt = $pdo->prepare('SELECT COUNT(*) AS cnt, MAX(created_at) AS last_at FROM orders WHERE customer_id = ?' . $ordersCountrySql);
     $oSt->execute([$customerId]);
     $oRow = $oSt->fetch(PDO::FETCH_ASSOC);
     if ($oRow) {
         $ordersCount = (int) ($oRow['cnt'] ?? 0);
         $ordersLastAt = (string) ($oRow['last_at'] ?? '');
+    }
+    if ($ordersLastAt !== '') {
+        $ordersLastAtDisplay = orange_admin_time_display_mysql_utc_for_record(
+            $pdo,
+            $ordersLastAt,
+            $customerCountryId,
+            'ar',
+            'datetime'
+        );
     }
 }
 
@@ -93,7 +109,22 @@ if ($statusRaw === 'inactive') {
     $statusLabel = 'نشط';
 }
 
-$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$printDatetime = '—';
+try {
+    if ($customerCountryId > 0) {
+        $printDatetime = orange_admin_time_format_instant_for_country_id(
+            $pdo,
+            orange_admin_time_utc_now_iso(),
+            $customerCountryId,
+            'ar',
+            'datetime'
+        );
+    } else {
+        $printDatetime = orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime');
+    }
+} catch (OrangeAdminTimeConfigException $e) {
+    $printDatetime = '—';
+}
 
 ?><!doctype html>
 <html lang="ar" dir="rtl">
@@ -285,7 +316,7 @@ pre {
         <div class="k">عدد الطلبات</div>
         <div class="v ltr"><?php echo (int) $ordersCount; ?></div>
         <div class="k">آخر طلب</div>
-        <div class="v ltr"><?php echo $ordersLastAt !== '' ? htmlspecialchars(orange_format_datetime_dmY_hi((string) $ordersLastAt), ENT_QUOTES, 'UTF-8') : '—'; ?></div>
+        <div class="v ltr"><?php echo htmlspecialchars($ordersLastAtDisplay, ENT_QUOTES, 'UTF-8'); ?></div>
         <?php if ($sfAcc): ?>
         <div class="k">حساب الواجهة</div>
         <div class="v ltr"><?php echo htmlspecialchars((string) ($sfAcc['email'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>

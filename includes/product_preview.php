@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/admin_time.php';
+
 /**
  * معاينة المنتج قبل النشر — مساعدات مشتركة.
  * المرجع: docs/archive/ORANGE_PRODUCT_PREPUBLISH_PREVIEW_ROLLOUT.txt
@@ -13,6 +15,7 @@ declare(strict_types=1);
  *   - الجلسة تبدأ عالمياً في config.php ⇒ فحص مفتاح المصفوفة دون أي استعلام على المسار الساخن للعميل.
  *   - صفّ الظِلّ/المسودّة في جدول products (is_preview_draft=1، is_active=0، preview_admin_id، preview_expires_at)
  *     يُحمَّل فقط عند draft_id>0 لإظهار كارت/صفحة المنتج للأدمن صاحب الجلسة وحده.
+ *   - preview_expires_at = GLOBAL_OPERATIONAL Absolute TTL (DATETIME UTC wall); مقارنات UTC↔UTC.
  */
 
 if (! function_exists('orange_preview_cookie_name')) {
@@ -131,13 +134,14 @@ if (! function_exists('orange_preview_active_context')) {
             && function_exists('orange_table_has_column')
             && orange_table_has_column($pdo, 'products', 'is_preview_draft')) {
             try {
+                $utcNow = orange_admin_time_utc_now_mysql();
                 $st = $pdo->prepare(
                     'SELECT * FROM products
                      WHERE id = ? AND is_preview_draft = 1 AND preview_admin_id = ?
-                       AND (preview_expires_at IS NULL OR preview_expires_at > NOW())
+                       AND (preview_expires_at IS NULL OR preview_expires_at > ?)
                      LIMIT 1'
                 );
-                $st->execute([$draftId, $adminId]);
+                $st->execute([$draftId, $adminId, $utcNow]);
                 $row = $st->fetch(PDO::FETCH_ASSOC);
                 if (is_array($row) && ! empty($row)) {
                     $product = $row;
@@ -317,12 +321,13 @@ if (! function_exists('orange_preview_purge_expired_for_admin')) {
             return;
         }
         try {
+            $utcNow = orange_admin_time_utc_now_mysql();
             $st = $pdo->prepare(
                 'SELECT id FROM products
                  WHERE is_preview_draft = 1 AND preview_admin_id = ?
-                   AND preview_expires_at IS NOT NULL AND preview_expires_at <= NOW()'
+                   AND preview_expires_at IS NOT NULL AND preview_expires_at <= ?'
             );
-            $st->execute([$adminId]);
+            $st->execute([$adminId, $utcNow]);
             $ids = $st->fetchAll(PDO::FETCH_COLUMN);
             if (! is_array($ids) || count($ids) === 0) {
                 return;

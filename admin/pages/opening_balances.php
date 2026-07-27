@@ -315,7 +315,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
             </tr>
         </tbody>
     </table>
-    <?php orange_voucher_print_metafoot(); ?>
+    <?php orange_voucher_print_metafoot($pdo); ?>
 </div>
 
 <div class="gl-pick-modal" id="ob_pick_modal" hidden aria-hidden="true">

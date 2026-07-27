@@ -52,20 +52,101 @@ $writeFiles = [
     'admin/api/orders/cancel-from-delivery.php',
     'admin/api/orders/handover-to-agent.php',
     'includes/invoice_edit_helpers.php',
+    // G-EX-01 / G-EX-08 — invoice update writers must share the same Absolute UTC contract
+    'admin/api/sales-invoices/update.php',
+    'includes/sales_invoice_online.php',
 ];
+
+/**
+ * Strip // line comments so comment-only NOW() does not false-positive.
+ */
+function p2_code_without_line_comments(string $src): string
+{
+    $out = [];
+    foreach (preg_split("/\r\n|\n|\r/", $src) ?: [] as $line) {
+        $trim = ltrim($line);
+        if (str_starts_with($trim, '//')) {
+            continue;
+        }
+        $out[] = $line;
+    }
+
+    return implode("\n", $out);
+}
+
+$ordersUpdatedAtWriters = [];
 foreach ($writeFiles as $rel) {
     $src = file_get_contents($root . '/' . $rel) ?: '';
+    $code = p2_code_without_line_comments($src);
     p2_assert(
         str_contains($src, 'orange_admin_time_utc_now_mysql'),
         '15/write uses utc_now_mysql: ' . $rel
     );
     // No remaining NOW() on orders timestamp assignments in these files
-    if (preg_match('/(?:created_at|updated_at|completed_at)\s*=\s*NOW\s*\(/i', $src)) {
+    if (preg_match('/(?:created_at|updated_at|completed_at)\s*=\s*NOW\s*\(/i', $code)) {
         p2_assert(false, 'no NOW() on order DATETIME in ' . $rel);
     } else {
         p2_assert(true, 'no NOW() on order DATETIME in ' . $rel);
     }
+    if (preg_match('/updated_at\s*=\s*\?/i', $code) && str_contains($code, 'orange_admin_time_utc_now_mysql')) {
+        $ordersUpdatedAtWriters[] = $rel;
+    }
 }
+
+// Inventory: every known operational orders.updated_at writer in allowlist binds UTC helper
+p2_assert(
+    in_array('admin/api/sales-invoices/update.php', $ordersUpdatedAtWriters, true)
+    && in_array('includes/sales_invoice_online.php', $ordersUpdatedAtWriters, true),
+    'G-EX-08. invoice update paths bind updated_at = ? + utc helper'
+);
+
+// Executable unsafe patterns must fail; comment-only must not
+$fixtureUnsafeNow = "\$sets[] = 'updated_at = NOW()';\n";
+$fixtureUnsafeDate = "\$sets[] = 'updated_at = ' . date('Y-m-d H:i:s');\n";
+$fixtureCommentOnly = "// updated_at = NOW()\n" . "\$x = 1;\n";
+$fixtureMultiline = "// ignore\n\$sets[] = \"updated_at = NOW()\";\n";
+p2_assert(
+    (bool) preg_match('/(?:created_at|updated_at|completed_at)\s*=\s*NOW\s*\(/i', p2_code_without_line_comments($fixtureUnsafeNow)),
+    'G-EX-08. executable updated_at = NOW() detected'
+);
+p2_assert(
+    !preg_match('/(?:created_at|updated_at|completed_at)\s*=\s*NOW\s*\(/i', p2_code_without_line_comments($fixtureCommentOnly)),
+    'G-EX-08. comment-only NOW() ignored'
+);
+p2_assert(
+    (bool) preg_match('/(?:created_at|updated_at|completed_at)\s*=\s*NOW\s*\(/i', p2_code_without_line_comments($fixtureMultiline)),
+    'G-EX-08. multiline NOW() detected'
+);
+p2_assert(
+    str_contains(p2_code_without_line_comments($fixtureUnsafeDate), "date('Y-m-d H:i:s')"),
+    'G-EX-08. date() writer pattern still visible for review'
+);
+
+// Repo-wide operational sweep: no orders.updated_at = NOW() outside products/deferred
+$scanRoots = [$root . '/admin/api', $root . '/includes'];
+$liveNowHits = [];
+foreach ($scanRoots as $scanRoot) {
+    $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($scanRoot, FilesystemIterator::SKIP_DOTS));
+    foreach ($it as $f) {
+        $p = str_replace('\\', '/', $f->getPathname());
+        if (!str_ends_with($p, '.php')) {
+            continue;
+        }
+        if (str_contains($p, '/backup/')) {
+            continue;
+        }
+        $src = (string) file_get_contents($p);
+        $code = p2_code_without_line_comments($src);
+        if (!preg_match('/updated_at\s*=\s*NOW\s*\(/i', $code)) {
+            continue;
+        }
+        // Only flag when the file clearly mutates orders
+        if (preg_match('/\bUPDATE\s+orders\b/i', $code) || preg_match('/orders\s+SET/i', $code)) {
+            $liveNowHits[] = substr($p, strlen(str_replace('\\', '/', $root)) + 1);
+        }
+    }
+}
+p2_assert($liveNowHits === [], 'G-EX-01. no operational orders.updated_at = NOW() left' . ($liveNowHits !== [] ? (' hits=' . implode('|', $liveNowHits)) : ''));
 
 // Step 1 closure: payment_core TIMESTAMP writers use FROM_UNIXTIME (no NOW())
 $payCore = file_get_contents($root . '/includes/payments/payment_core.php') ?: '';

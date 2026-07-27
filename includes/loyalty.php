@@ -6,6 +6,21 @@ require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/gl_settings.php';
 require_once __DIR__ . '/journal_voucher.php';
 require_once __DIR__ . '/gl_pending_movements.php';
+require_once __DIR__ . '/admin_time.php';
+
+/**
+ * Loyalty expires_at: pure duration from earning Absolute UTC instant.
+ * Stores DATETIME UTC wall; never PHP default TZ / MySQL session NOW().
+ */
+function orange_loyalty_expires_at_utc_mysql(int $expiryMonths): ?string
+{
+    if ($expiryMonths <= 0) {
+        return null;
+    }
+    $now = orange_admin_time_parse_mysql_utc_datetime(orange_admin_time_utc_now_mysql());
+
+    return $now->modify('+' . $expiryMonths . ' months')->format('Y-m-d H:i:s');
+}
 
 /**
  * صافي قيمة البضاعة لأساس كسب/استبدال الولاء (قرار مالك — بضاعة بعد خصومات المنتج فقط).
@@ -134,11 +149,12 @@ function orange_loyalty_balance_points(PDO $pdo, int $customerId, ?int $countryI
     if ($customerId <= 0 || !orange_table_exists($pdo, 'loyalty_ledger')) {
         return 0;
     }
+    $utcNow = orange_admin_time_utc_now_mysql();
     $sql = "SELECT COALESCE(SUM(points_remaining), 0)
          FROM loyalty_ledger
          WHERE customer_id = ? AND kind = 'earn' AND points_remaining > 0
-               AND (expires_at IS NULL OR expires_at > NOW())";
-    $params = [$customerId];
+               AND (expires_at IS NULL OR expires_at > ?)";
+    $params = [$customerId, $utcNow];
     if ($countryId !== null && $countryId > 0) {
         $sql .= ' AND country_id = ?';
         $params[] = $countryId;
@@ -265,9 +281,7 @@ function orange_loyalty_earn_for_order(PDO $pdo, array $order, int $countryId, f
 
         return;
     }
-    $expiresAt = $expiryMonths > 0
-        ? date('Y-m-d H:i:s', strtotime('+' . $expiryMonths . ' months'))
-        : null;
+    $expiresAt = orange_loyalty_expires_at_utc_mysql($expiryMonths);
 
     $ins = $pdo->prepare(
         "INSERT INTO loyalty_ledger
@@ -470,10 +484,11 @@ function orange_loyalty_redemption_compute(
         return $out;
     }
 
+    $utcNow = orange_admin_time_utc_now_mysql();
     $sql = "SELECT id, points_remaining, point_value FROM loyalty_ledger
             WHERE customer_id = ? AND kind = 'earn' AND points_remaining > 0
-                  AND (expires_at IS NULL OR expires_at > NOW())";
-    $params = [$customerId];
+                  AND (expires_at IS NULL OR expires_at > ?)";
+    $params = [$customerId, $utcNow];
     if ($countryId !== null && $countryId > 0) {
         $sql .= ' AND country_id = ?';
         $params[] = $countryId;
@@ -668,9 +683,7 @@ function orange_loyalty_restore_for_order(PDO $pdo, int $orderId): void
         $pointValue = (float) $row['point_value'];
         $s = orange_loyalty_settings($pdo, $cid > 0 ? $cid : null);
         $expiryMonths = $s !== null ? (int) $s['expiry_months'] : 0;
-        $expiresAt = $expiryMonths > 0
-            ? date('Y-m-d H:i:s', strtotime('+' . $expiryMonths . ' months'))
-            : null;
+        $expiresAt = orange_loyalty_expires_at_utc_mysql($expiryMonths);
         $ins->execute([
             $cid > 0 ? $cid : null,
             (int) $row['customer_id'],
@@ -695,11 +708,12 @@ function orange_loyalty_expire_due(PDO $pdo, ?int $countryId = null): array
     if (!orange_loyalty_tables_ready($pdo)) {
         return $out;
     }
+    $utcNow = orange_admin_time_utc_now_mysql();
     $sql = "SELECT id, country_id, customer_id, points_remaining, point_value
             FROM loyalty_ledger
             WHERE kind = 'earn' AND points_remaining > 0
-                  AND expires_at IS NOT NULL AND expires_at <= NOW()";
-    $params = [];
+                  AND expires_at IS NOT NULL AND expires_at <= ?";
+    $params = [$utcNow];
     if ($countryId !== null && $countryId > 0) {
         $sql .= ' AND country_id = ?';
         $params[] = $countryId;

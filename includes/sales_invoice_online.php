@@ -14,6 +14,7 @@ require_once __DIR__ . '/edit_lock.php';
 require_once __DIR__ . '/journal_voucher.php';
 require_once __DIR__ . '/phone_validation.php';
 require_once __DIR__ . '/invoice_ancillary_lines.php';
+require_once __DIR__ . '/admin_time.php';
 
 /**
  * @return array{sql:string,params:list<mixed>}|null
@@ -411,7 +412,8 @@ function orange_sales_invoice_online_apply_update(PDO $pdo, int $orderId, array 
         $params[] = $phoneRawIn !== '' ? $phoneRawIn : null;
     }
     if (orange_table_has_column($pdo, 'orders', 'updated_at')) {
-        $sets[] = 'updated_at = NOW()';
+        $sets[] = 'updated_at = ?';
+        $params[] = orange_admin_time_utc_now_mysql();
     }
 
     $params[] = $orderId;

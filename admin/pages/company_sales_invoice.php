@@ -2096,6 +2096,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 serialElId: 'sv2_doc_serial',
                 docLabel: 'فاتورة مبيعات',
                 docKind: 'inv_c',
+                printNowDisplay: <?php echo json_encode($sv2DefaultEntryDisp, JSON_UNESCAPED_UNICODE); ?>,
                 docId: function () { return browseOrderId; },
                 beforePrint: function () {
                     if (!SV2_PRINT_TUNING && browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }

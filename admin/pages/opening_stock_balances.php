@@ -204,7 +204,7 @@ $osvRef = $osvId > 0
             </tr>
         </tbody>
     </table>
-    <?php orange_voucher_print_metafoot(); ?>
+    <?php orange_voucher_print_metafoot($pdo); ?>
 
     <p id="osv_status_badge" class="card-hint jv-print-hide" style="margin:8px 0 0;"></p>
     <p id="osv_msg" class="card-hint jv-print-hide" style="margin-top:8px;color:#166534;display:none;"></p>

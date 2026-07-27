@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../includes/date_format.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/company_settings.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 
 require_once __DIR__ . '/../../../includes/admin_permissions.php';
 
@@ -77,7 +78,26 @@ if ($statusRaw === 'inactive') {
     $statusLabel = 'نشط';
 }
 
-$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$supplierCountryId = (int) ($row['country_id'] ?? 0);
+if ($supplierCountryId <= 0) {
+    $supplierCountryId = orange_admin_context_country_id($pdo);
+}
+$printDatetime = '—';
+try {
+    if ($supplierCountryId > 0) {
+        $printDatetime = orange_admin_time_format_instant_for_country_id(
+            $pdo,
+            orange_admin_time_utc_now_iso(),
+            $supplierCountryId,
+            'ar',
+            'datetime'
+        );
+    } else {
+        $printDatetime = orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime');
+    }
+} catch (OrangeAdminTimeConfigException $e) {
+    $printDatetime = '—';
+}
 
 ?><!doctype html>
 <html lang="ar" dir="rtl">

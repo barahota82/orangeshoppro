@@ -21,6 +21,7 @@ require_once __DIR__ . '/../../../includes/product_variants_write.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/product_colorway_images.php';
 require_once __DIR__ . '/../../../includes/product_preview.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -166,7 +167,10 @@ try {
 
     $draftId = 0;
     $token = orange_preview_generate_token();
-    $expiresAt = date('Y-m-d H:i:s', time() + 86400);
+    // GLOBAL_OPERATIONAL Absolute TTL: DATETIME UTC wall, same 24h duration.
+    $expiresAt = orange_admin_time_parse_mysql_utc_datetime(orange_admin_time_utc_now_mysql())
+        ->modify('+86400 seconds')
+        ->format('Y-m-d H:i:s');
 
     if ($canCreateDraft) {
         $nameEn = trim((string) ($data['name_en'] ?? ''));

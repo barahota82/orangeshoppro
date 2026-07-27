@@ -20,6 +20,7 @@ require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/sales_doc_channel.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -233,7 +234,8 @@ try {
         $params[] = $phoneRawIn !== '' ? $phoneRawIn : null;
     }
     if (orange_table_has_column($pdo, 'orders', 'updated_at')) {
-        $sets[] = 'updated_at = NOW()';
+        $sets[] = 'updated_at = ?';
+        $params[] = orange_admin_time_utc_now_mysql();
     }
 
     $params[] = $orderId;

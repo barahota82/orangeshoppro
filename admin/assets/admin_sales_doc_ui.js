@@ -43,13 +43,21 @@
         }
     }
 
-    function pad2(n) {
-        return (n < 10 ? '0' : '') + n;
-    }
-
-    function formatPrintDate(d) {
-        return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear()
-            + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    /**
+     * Business print timestamp is server-authored (Country IANA AM/PM).
+     * Browser Date must not define the visible stamp.
+     */
+    function resolvePrintNowDisplay(opts) {
+        opts = opts || {};
+        var fromOpts = String(opts.printNowDisplay || '').trim();
+        if (fromOpts !== '') {
+            return fromOpts;
+        }
+        var fromGlobal = String(global.ORANGE_ADMIN_PRINT_NOW_DISPLAY || '').trim();
+        if (fromGlobal !== '') {
+            return fromGlobal;
+        }
+        return '—';
     }
 
     function syncPrintBanner(opts) {
@@ -63,7 +71,7 @@
             serialEl.textContent = serial !== '' ? serial : '—';
         }
         if (dateEl) {
-            dateEl.textContent = formatPrintDate(new Date());
+            dateEl.textContent = resolvePrintNowDisplay(opts);
         }
     }
 

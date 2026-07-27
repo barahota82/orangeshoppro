@@ -6,6 +6,7 @@ require_once __DIR__ . '/company_settings.php';
 require_once __DIR__ . '/sales_doc_print.php';
 require_once __DIR__ . '/date_format.php';
 require_once __DIR__ . '/accounting_report_money.php';
+require_once __DIR__ . '/admin_time.php';
 
 /**
  * محتوى ترويسة طباعة السند (داخل header) — §9.3 V1.
@@ -94,10 +95,18 @@ function orange_voucher_print_banner(PDO $pdo, int $countryId, array $ctx): void
 
 /**
  * تذييل طباعة السند — تاريخ/وقت يمين + أرقام صفحات يسار (نمط التقارير §9.3 V5).
+ * طابع الطباعة = Absolute now معروض بـ IANA دولة سياق الإدمن (12h AM/PM).
  */
-function orange_voucher_print_metafoot(): void
+function orange_voucher_print_metafoot(?PDO $pdo = null): void
 {
-    $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+    $printDatetime = '—';
+    if ($pdo instanceof PDO) {
+        try {
+            $printDatetime = orange_admin_time_now_display_for_admin_context($pdo, 'ar', 'datetime');
+        } catch (OrangeAdminTimeConfigException $e) {
+            $printDatetime = '—';
+        }
+    }
     /*
      * §9.3 — هامش سفلي أكبر للسندات فقط (لا التقارير): @page في admin.css = 12mm عاماً؛
      * شاشات السندات/الذمم/OB تستدعي هذه الدالة فقط — تجربة تقليل انفصال سطر الحساب عن البيان.

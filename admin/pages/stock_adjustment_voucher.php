@@ -285,7 +285,7 @@ if ($editSv !== null) {
             </tr>
         </tbody>
     </table>
-    <?php orange_voucher_print_metafoot(); ?>
+    <?php orange_voucher_print_metafoot($pdo); ?>
 
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="justify-content:flex-end;">
         <div class="jv-toolbar-primary-group">

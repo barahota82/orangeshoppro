@@ -1,3 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Shared promo schedule JS helpers (included inside a <script> block).
+ * Default From/To calendar days come from Current Admin Country Context — not Browser Date.
+ */
+$ocpCountryTodayYmd = '';
+$ocpCountryPlus1yYmd = '';
+if (isset($pdo) && $pdo instanceof PDO && function_exists('orange_admin_time_document_date_today_for_admin_context')) {
+    try {
+        $ocpCountryTodayYmd = orange_admin_time_document_date_today_for_admin_context($pdo);
+        $base = DateTimeImmutable::createFromFormat('!Y-m-d', $ocpCountryTodayYmd, new DateTimeZone('UTC'));
+        if ($base instanceof DateTimeImmutable) {
+            $ocpCountryPlus1yYmd = $base->modify('+1 year')->format('Y-m-d');
+        }
+    } catch (Throwable $e) {
+        $ocpCountryTodayYmd = '';
+        $ocpCountryPlus1yYmd = '';
+    }
+}
+?>
+var OCP_COUNTRY_TODAY_YMD = <?php echo json_encode($ocpCountryTodayYmd, JSON_UNESCAPED_UNICODE); ?>;
+var OCP_COUNTRY_PLUS_1Y_YMD = <?php echo json_encode($ocpCountryPlus1yYmd, JSON_UNESCAPED_UNICODE); ?>;
 function ocpFmtIsoDate(s) {
     if (!s) return '';
     return String(s).substring(0, 10);
@@ -105,12 +130,11 @@ function ocpScheduleLabel(r) {
     return ocpFmtIsoDate(r.valid_from) + ' → ' + ocpFmtIsoDate(r.valid_to);
 }
 function ocpDefaultScheduleDates(prefix) {
-    var today = new Date();
-    var end = new Date(today.getTime());
-    end.setFullYear(end.getFullYear() + 1);
-    function pad(n) { return n < 10 ? '0' + n : String(n); }
-    var f = today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate());
-    var t = end.getFullYear() + '-' + pad(end.getMonth() + 1) + '-' + pad(end.getDate());
+    var f = String(OCP_COUNTRY_TODAY_YMD || '').substring(0, 10);
+    var t = String(OCP_COUNTRY_PLUS_1Y_YMD || '').substring(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(f) || !/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+        return;
+    }
     ocpSetDmyFromIso(prefix + '_valid_from', f);
     ocpSetDmyFromIso(prefix + '_valid_to', t);
     ocpSyncAlwaysOnUi(prefix);

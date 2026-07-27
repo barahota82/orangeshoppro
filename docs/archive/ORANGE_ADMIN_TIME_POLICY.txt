@@ -2,8 +2,8 @@ ORANGE — سياسة الوقت المركزية للإدمن (Admin Time Polic
 ================================================================================
 المسار: docs/archive/ORANGE_ADMIN_TIME_POLICY.txt
 تاريخ القرار: 2026-07-25
-آخر تحديث: 2026-07-27 (Phase 4 / Step 2 — Targeted Time Gap Repair G1/G2/G3)
-الحالة: Phase 1 + Phase 2 + Phase 3 مغلقة ومعتمدة؛ Phase 4 Step 1 QA مكتملة؛ Phase 4 Step 2 إصلاح فجوات الوقت (كود) — انظر سابعاً-ب؛ Final System Review لم تبدأ
+آخر تحديث: 2026-07-27 (Phase 4 Final Exhaustive Gap Repair G-EX-01…G-EX-08)
+الحالة: Phase 1 + Phase 2 + Phase 3 مغلقة ومعتمدة؛ Phase 4 Step 1/2 مكتملة؛ Exhaustive Gap Repair (كود) — انظر سابعاً-ج؛ Final System Review لم تبدأ
 
 الغرض
 -------
@@ -724,6 +724,50 @@ SPM country-scope: `scripts/self_test_admin_time_phase3_step4_spm_country.php`
 - لا Schema change.
 
 --------------------------------------------------------------------
+سابعاً-ج: Phase 4 Final Exhaustive Gap Repair (G-EX-01…G-EX-08) — 2026-07-27
+--------------------------------------------------------------------
+الغرض: إغلاق فجوات التدقيق الشامل النهائي فقط — بلا Schema، بلا منطق أعمال،
+بلا مسّ Backup/Restore UX، بلا Final System Review.
+
+### G-EX-01 — `orders.updated_at` دلالة واحدة (UTC wall)
+- الكتابان غير المطابقان كانا: `admin/api/sales-invoices/update.php` و
+  `includes/sales_invoice_online.php` (`updated_at = NOW()` تحت session +03).
+- الإصلاح: `updated_at = ?` + `orange_admin_time_utc_now_mysql()`.
+- العقد النهائي: كل كتّاب `orders.updated_at` التشغيليين يخزّنون UTC wall.
+
+### G-EX-08 — سلامة اختبارات الطلبات
+- توسيع `scripts/self_test_admin_time_phase2_orders_payments.php` ليشمل المسارين
+  أعلاه + كشف NOW() التنفيذي/متعدد الأسطر + استثناء التعليقات + مسح تشغيلي.
+
+### G-EX-02 — بطاقة عميل / آخر طلب
+- `admin/api/customers/print-card.php`: عرض `MAX(orders.created_at)` عبر
+  `orange_admin_time_display_mysql_utc_for_record` (IANA دولة العميل، 12h AM/PM).
+
+### G-EX-03 — طوابع طباعة مولَّدة
+- بطاقة عميل/مورد + `orange_voucher_print_metafoot($pdo)` → Country IANA AM/PM
+  (لا `orange_format_datetime_dmY_hi(date(...))` في المسار العادي).
+
+### G-EX-04 — طابع طباعة مستند المبيعات (JS)
+- `admin/assets/admin_sales_doc_ui.js`: لا `new Date()` لطابع الأعمال؛
+  القيمة من السيرفر (`printNowDisplay` / Country Context).
+
+### G-EX-05 — افتراضات جدول العروض
+- `admin/partials/cart_promo_schedule_js.inc.php`: يوم From/To الافتراضي من
+  `orange_admin_time_document_date_today_for_admin_context` (لا Browser Date).
+
+### G-EX-06 — انتهاء الولاء
+- الدلالة المثبتة: مدة خالصة من لحظة الكسب (expiry_months).
+- التخزين/المقارنة: DATETIME UTC wall + ربط UTC now (لا `date()`/`NOW()`).
+
+### G-EX-07 — TTL معاينة المنتج
+- `preview_expires_at` = GLOBAL_OPERATIONAL Absolute TTL (24h) كـ UTC wall؛
+  المقارنة UTC↔UTC (لا session `NOW()`).
+
+### تجميد
+- Schema = **124**؛ Backup/Restore مجمّد؛ Final System Review **لم تبدأ**.
+- اختبار مركّز: `scripts/self_test_admin_time_phase4_exhaustive_gap_repair.php`
+
+--------------------------------------------------------------------
 سابعاً: اختبار
 --------------------------------------------------------------------
 `php scripts/self_test_admin_time_foundation.php`
@@ -744,4 +788,5 @@ SPM country-scope: `scripts/self_test_admin_time_phase3_step4_spm_country.php`
 `php scripts/self_test_admin_time_phase3_step4_channel_resolution.php`
 `php scripts/self_test_admin_time_phase3_step4_canonical97.php`
 `php scripts/self_test_admin_time_phase4_step2_targeted_gaps.php`
+`php scripts/self_test_admin_time_phase4_exhaustive_gap_repair.php`
 `powershell -NoProfile -File scripts/verify-php-utf8.ps1`

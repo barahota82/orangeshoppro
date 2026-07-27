@@ -1601,6 +1601,7 @@ $sr2DocSerialPreview = $sr2NavReady
                 serialElId: 'sr2_doc_serial',
                 docLabel: 'مردود مبيعات',
                 docKind: 'sales_return',
+                printNowDisplay: <?php echo json_encode($sr2DefaultEntryDisp, JSON_UNESCAPED_UNICODE); ?>,
                 docId: function () { return browseReturnId; },
                 beforePrint: function () {
                     if (!SR2_PRINT_TUNING && browseReturnId <= 0) { alert('افتح مردوداً محفوظاً للطباعة.'); return false; }
