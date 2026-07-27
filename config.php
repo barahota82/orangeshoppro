@@ -440,7 +440,10 @@ function orange_storefront_legacy_slug_aliases(): array
     return ['orange' => 'tiktok', 'blue' => 'online', 'black' => 'web'];
 }
 
-/** أول قناة نشطة حسب id — افتراضي للمتجر عند غياب كوكي/قناة (ضمن الدولة الحالية إن وُجد country_id). */
+/**
+ * قناة الدولة المحددة خوارزمياً (انظر main_channel) — سلسلة فارغة عند الفشل المغلق.
+ * ممنوع إرجاع slug ملفّق (مثل tiktok) أو قناة من دولة أخرى.
+ */
 function orange_storefront_default_channel_slug(PDO $pdo, ?int $countryId = null): string
 {
     require_once __DIR__ . '/includes/countries.php';
@@ -452,11 +455,13 @@ function orange_storefront_default_channel_slug(PDO $pdo, ?int $countryId = null
         return $main;
     }
 
-    return 'tiktok';
+    return '';
 }
 
 /**
- * القناة الرئيسية للدولة (is_country_default) — null إن لا توجد قناة نشطة.
+ * اختيار قناة نشطة للدولة فقط (جذر الموقع / افتراضي المتجر):
+ * 0 نشطة → null؛ 1 نشطة → تلك القناة؛ أكثر من واحدة → بالضبط is_country_default=1 واحدة وإلا fail-closed.
+ * لا اختيار بأقل id؛ لا قناة عالمية؛ لا إنشاء قناة.
  */
 function orange_storefront_main_channel_slug_for_country(PDO $pdo, int $countryId): ?string
 {
@@ -471,30 +476,70 @@ function orange_storefront_main_channel_slug_for_country(PDO $pdo, int $countryI
     try {
         $hasDefault = orange_channels_has_country_default_column($pdo);
         $hasCountry = orange_channels_has_country_column($pdo);
-        if ($hasCountry) {
-            if ($hasDefault) {
-                $st = $pdo->prepare(
-                    'SELECT slug FROM channels
-                     WHERE is_active = 1 AND country_id = ?
-                     ORDER BY is_country_default DESC, id ASC LIMIT 1'
-                );
-            } else {
-                $st = $pdo->prepare(
-                    'SELECT slug FROM channels
-                     WHERE is_active = 1 AND country_id = ?
-                     ORDER BY id ASC LIMIT 1'
-                );
+        if (!$hasCountry) {
+            /* بلا country_id لا يمكن اعتماد اختيار آمن متعدد الدول — fail-closed إلا إن قناة نشطة واحدة عالمياً. */
+            $st = $pdo->query('SELECT slug FROM channels WHERE is_active = 1');
+            $rows = $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
+            $active = [];
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $sl = trim((string) ($row['slug'] ?? ''));
+                if ($sl !== '') {
+                    $active[] = $sl;
+                }
             }
-            $st->execute([$countryId]);
-        } else {
-            $st = $pdo->query('SELECT slug FROM channels WHERE is_active = 1 ORDER BY id ASC LIMIT 1');
+            if (count($active) === 1) {
+                $memoByCountry[$cacheKey] = $active[0];
+
+                return $memoByCountry[$cacheKey];
+            }
+            $memoByCountry[$cacheKey] = null;
+
+            return null;
         }
-        $v = $st ? $st->fetchColumn() : false;
-        if ($v !== false && $v !== null && (string) $v !== '') {
-            $memoByCountry[$cacheKey] = (string) $v;
+        $defaultSel = $hasDefault ? 'is_country_default' : '0 AS is_country_default';
+        $st = $pdo->prepare(
+            'SELECT slug, ' . $defaultSel . ' AS is_country_default
+             FROM channels
+             WHERE is_active = 1 AND country_id = ?'
+        );
+        $st->execute([$countryId]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $active = [];
+        $defaults = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $sl = trim((string) ($row['slug'] ?? ''));
+            if ($sl === '') {
+                continue;
+            }
+            $active[] = $sl;
+            if ((int) ($row['is_country_default'] ?? 0) === 1) {
+                $defaults[] = $sl;
+            }
+        }
+        $n = count($active);
+        if ($n === 0) {
+            $memoByCountry[$cacheKey] = null;
+
+            return null;
+        }
+        if ($n === 1) {
+            $memoByCountry[$cacheKey] = $active[0];
 
             return $memoByCountry[$cacheKey];
         }
+        /* n > 1: بالضبط default واحد */
+        if (count($defaults) === 1) {
+            $memoByCountry[$cacheKey] = $defaults[0];
+
+            return $memoByCountry[$cacheKey];
+        }
+        /* لا default أو أكثر من واحد → غامض / fail-closed */
     } catch (Throwable $e) {
     }
     $memoByCountry[$cacheKey] = null;
@@ -846,16 +891,15 @@ function orange_storefront_path_maps_for_js(PDO $pdo): array
         }
     } catch (Throwable $e) {
     }
-    if ($pathToSlug === []) {
-        $pathToSlug = ['tiktok' => 'tiktok', 'online' => 'online', 'web' => 'web'];
-        $slugToPath = ['tiktok' => 'tiktok', 'online' => 'online', 'web' => 'web'];
-    }
-    foreach (orange_storefront_legacy_slug_aliases() as $legacy => $_) {
-        $validSlugs[$legacy] = true;
+    /* لا خرائط slug ملفّقة عند غياب القنوات — fail-closed (قرار مالك 2026-07-27). */
+    foreach (orange_storefront_legacy_slug_aliases() as $legacy => $target) {
+        if (isset($validSlugs[$target])) {
+            $validSlugs[$legacy] = true;
+        }
     }
     $keys = array_keys($pathToSlug);
     usort($keys, static fn ($a, $b) => strlen((string) $b) <=> strlen((string) $a));
-    $alt = $keys === [] ? 'web|online|tiktok' : implode('|', array_map(static fn ($k) => preg_quote((string) $k, '/'), $keys));
+    $alt = $keys === [] ? '(?!)' : implode('|', array_map(static fn ($k) => preg_quote((string) $k, '/'), $keys));
 
     $memo = [$pathToSlug, $slugToPath, $validSlugs, $alt];
 

@@ -724,81 +724,23 @@ function orange_country_copy_company_settings_from_source(PDO $pdo, int $targetC
 }
 
 /**
+ * سابقًا: نسخ storefront_copy_lines من دولة مصدر عند تهيئة دولة جديدة.
+ * قرار مالك 2026-07-27 (Pre-Phase-4): محتوى Header/Hero مملوك للدولة ويُنشأ يدوياً فقط
+ * عبر admin/api/settings/storefront_copy_lines.php — لا نسخ تلقائي بين الدول.
+ *
  * @return array{skipped:bool, reason:string, copied:int, source_country_id:int, target_country_id:int}
  */
 function orange_country_copy_storefront_copy_lines_from_source(PDO $pdo, int $targetCountryId, ?int $sourceCountryId = null): array
 {
-    $out = [
+    unset($pdo, $sourceCountryId);
+
+    return [
         'skipped' => true,
-        'reason' => '',
+        'reason' => 'manual_copy_lines_create_only',
         'copied' => 0,
         'source_country_id' => 0,
         'target_country_id' => $targetCountryId,
     ];
-    if ($targetCountryId <= 0
-        || !orange_table_exists($pdo, 'storefront_copy_lines')
-        || !orange_table_has_column($pdo, 'storefront_copy_lines', 'country_id')) {
-        $out['reason'] = 'no_table';
-
-        return $out;
-    }
-    $sourceCountryId = $sourceCountryId !== null && $sourceCountryId > 0
-        ? $sourceCountryId
-        : orange_countries_default_id($pdo);
-    $out['source_country_id'] = $sourceCountryId;
-    if ($sourceCountryId <= 0 || $sourceCountryId === $targetCountryId) {
-        $out['reason'] = 'no_source';
-
-        return $out;
-    }
-    $stCnt = $pdo->prepare('SELECT COUNT(*) FROM storefront_copy_lines WHERE country_id = ?');
-    $stCnt->execute([$targetCountryId]);
-    if ((int) $stCnt->fetchColumn() > 0) {
-        $out['reason'] = 'target_has_rows';
-
-        return $out;
-    }
-    $stSrc = $pdo->prepare(
-        'SELECT scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi
-         FROM storefront_copy_lines WHERE country_id = ? ORDER BY scope ASC, sort_order ASC, id ASC'
-    );
-    $stSrc->execute([$sourceCountryId]);
-    $rows = $stSrc->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    if ($rows === []) {
-        $out['reason'] = 'source_empty';
-
-        return $out;
-    }
-    $ins = $pdo->prepare(
-        'INSERT INTO storefront_copy_lines (country_id, scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
-         VALUES (?,?,?,?,?,?,?,?)'
-    );
-    foreach ($rows as $row) {
-        if (!is_array($row)) {
-            continue;
-        }
-        try {
-            $ins->execute([
-                $targetCountryId,
-                (string) ($row['scope'] ?? ''),
-                (int) ($row['sort_order'] ?? 0),
-                (int) ($row['is_active'] ?? 1),
-                (string) ($row['text_ar'] ?? ''),
-                (string) ($row['text_en'] ?? ''),
-                (string) ($row['text_fil'] ?? ''),
-                (string) ($row['text_hi'] ?? ''),
-            ]);
-            $out['copied']++;
-        } catch (Throwable $e) {
-            if (function_exists('error_log')) {
-                error_log('[orange] copy storefront_copy_lines: ' . $e->getMessage());
-            }
-        }
-    }
-    $out['skipped'] = $out['copied'] <= 0;
-    $out['reason'] = $out['copied'] > 0 ? 'copied' : 'copy_failed';
-
-    return $out;
 }
 
 /**

@@ -225,11 +225,18 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
         window.ORANGE_STOREFRONT_CART_URL = <?php echo json_encode(storefront_url('cart', $channelSlug, $lang), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
         window.orangeSfCartKey = function () {
             var allowed = window.ORANGE_SF_VALID_SLUGS || {};
-            var def = String(window.ORANGE_SF_DEFAULT_CHANNEL_SLUG || 'tiktok').toLowerCase();
+            var def = String(window.ORANGE_SF_DEFAULT_CHANNEL_SLUG || '').toLowerCase();
             var ch = (typeof window.APP_CHANNEL_SLUG === 'string' && window.APP_CHANNEL_SLUG) ? window.APP_CHANNEL_SLUG : def;
             ch = String(ch).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
             if (!ch || !allowed[ch]) {
-                ch = allowed[def] ? def : (Object.keys(allowed)[0] || def);
+                ch = (def && allowed[def]) ? def : '';
+                if (!ch) {
+                    var keys = Object.keys(allowed || {});
+                    ch = keys.length === 1 ? keys[0] : '';
+                }
+            }
+            if (!ch) {
+                return 'orange_sf_cart__none';
             }
             return 'orange_sf_cart_' + ch;
         };

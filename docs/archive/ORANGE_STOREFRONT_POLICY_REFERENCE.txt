@@ -80,7 +80,7 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 واجهته؛ جمل الهيدر تحت الشعار تتناوب بكل اللغات المعبأة في الصف بالترتيب عربي ثم
 إنجليزي ثم فلبيني ثم هندي.
 
-**تنفيذ (س3 — نصوص hero والهيدر):** إدارة الأدمن `admin/pages/storefront_hero.php` وواجهة الحفظ `admin/api/settings/storefront_copy_lines.php` وجدول `storefront_copy_lines` (ترحيل في `includes/catalog_schema.php`)؛ العرض للزائر `includes/storefront_hero.php` على الصفحة الرئيسية وشريط الهيدر حسب اللغة/التناوب الموثّقين في النص أعلاه.
+**تنفيذ (س3 — نصوص hero والهيدر):** إدارة الأدمن `admin/pages/storefront_hero.php` وواجهة الحفظ `admin/api/settings/storefront_copy_lines.php` وجدول `storefront_copy_lines` (ترحيل بنية في `includes/catalog_schema.php` — **بلا** زرع محتوى تلقائي بعد 2026-07-27)؛ العرض للزائر `includes/storefront_hero.php` من `storefront_copy_lines` scoped بـ`country_id` فقط (محتوى فارغ صالح؛ لا fallback من `storefront_home_hero`).
 
 س4. هل العروض/التخفيضات تُحسب تلقائياً من السلة فقط، أم في قواعد إضافية؟
 لا يوجد حد أدنى للطلب (كحد عام إلزامي لكل الطلبات). السؤال مرتبط بس3. يوجد عروض
@@ -368,11 +368,13 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 **تنفيذ:** `assets/js/cart.js` — عند وجود أكثر من سطر في العربة وليس في وضع **تعديل طلب قائم**، يظهر لكل منتج خيار تضمينه في الطلب الحالي مع «تحديد الكل» / «إلغاء التحديد»؛ `sendOrderNow` يُرسل إلى `api/orders/create-order.php` بنود `items` المختارة فقط ويحذف **هذه البنود** من التخزين المحلي (`localStorage`) مع إبقاء الباقي. معاينة الخصم (`checkout-preview`) وملخص الطلب في تاب طلباتي يعكسان البنود المختارة فقط. وضع تعديل الطلب (`amend`) يبقى يُرسل كامل محتويات العربة كما هو اليوم.
 
 س31. فتح الموقع من جذر `/` — Geo والدول النشطة والقناة الرئيسية (قرار مالك 2026-05-20)
-- **من `/` فقط:** يُستنتج موقع الزائر (Geo)؛ إن كانت دولته **نشطة** في الموقع يُحوَّل تلقائياً إلى **القناة الرئيسية** لتلك الدولة (يحددها الأدمن: `is_country_default` على قناة واحدة لكل دولة).
+- **من `/` فقط:** يُستنتج موقع الزائر (Geo)؛ إن كانت دولته **نشطة** في الموقع يُحوَّل تلقائياً وفق عقد القنوات النشطة لتلك الدولة فقط (أدناه).
 - **دولة غير نشطة أو غير مضافة:** لا يُفتح المتجر — صفحة «الخدمة غير متاحة في منطقتك».
-- **رابط قناة مباشر** (مسار `/tiktok` … أو `?channel=`): يفتح **دائماً** — لا Geo ولا حظر على هذا المسار.
+- **رابط قناة مباشر** (مسار `/tiktok` … أو `?channel=`): يفتح **دائماً** — لا Geo ولا حظر على هذا المسار؛ صف القناة في DB هو السلطة.
 - **لا** مبدّل دولة في هيدر المتجر للزائر.
-**تنفيذ:** **`index.php`** → **`includes/storefront_entry.php`**؛ **`includes/storefront_geo.php`** (رؤوس **`CF-IPCountry`** وما يعادلها؛ **`ORANGE_STOREFRONT_GEO_OVERRIDE`** في `.env.php` للتطوير)؛ **`pages/region-unavailable.php`**؛ ترحيل v55 **`channels.is_country_default`**؛ **`admin/pages/channels.php`** + **`admin/api/channels/save.php`**؛ **`orange_storefront_main_channel_slug_for_country`** في **`config.php`**. تفاصيل **§13.7** في **`ORANGE_OWNER_MULTICOUNTRY_VISION.txt`**.
+- **عقد اختيار القناة من الجذر (قرار مالك 2026-07-27 — Pre-Phase-4 Targeted Repair):** 0 قنوات نشطة → Region-Unavailable؛ قناة نشطة واحدة → تُختار تلقائياً (حتى بلا `is_country_default`)؛ أكثر من قناة نشطة → بالضبط default واحد وإلا fail-closed (لا اختيار بأقل id؛ لا slug ملفّق مثل `tiktok`).
+- **إعادة تصميم تجربة الجذر / مختار دولة:** مؤجّل إلى ما بعد Phase 4 — لا يُنفَّذ في هذا الإصلاح.
+**تنفيذ:** **`index.php`** → **`includes/storefront_entry.php`**؛ **`includes/storefront_geo.php`** (رؤوس **`CF-IPCountry`** وما يعادلها؛ **`ORANGE_STOREFRONT_GEO_OVERRIDE`** في `.env.php` للتطوير)؛ **`pages/region-unavailable.php`**؛ ترحيل v55 **`channels.is_country_default`**؛ **`admin/pages/channels.php`** + **`admin/api/channels/save.php`**؛ **`orange_storefront_main_channel_slug_for_country`** + **`orange_storefront_default_channel_slug`** في **`config.php`**. تفاصيل **§13.7** في **`ORANGE_OWNER_MULTICOUNTRY_VISION.txt`**.
 
 
 --------------------------------------------------------------------
@@ -470,9 +472,11 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 
 **تنفيذ (2026-07-27 — إغلاق Auto-seed القنوات):** لا Runtime ينشئ قناة سوى `admin/api/channels/save.php`. بذرة `orange_catalog_seed_default_channels_if_empty` معطّلة (no-op). اختبار: `scripts/self_test_pre_phase4_no_auto_channel_seed.php`.
 
-**توضيح جداول (2026-07-27 — Pre-Phase-4 Exact Table ID):** شاشة الأدمن «بانر الصفحة الرئيسية» = `admin/index.php?page=storefront_hero` → جدول نصي `storefront_copy_lines` فقط (scopes: `header_tagline` = جمل الهيدر؛ `home_hero` = جمل الـHero). لا يوجد جدول سجلات بانر صور. الجدول القديم `storefront_home_hero` احتياطي قراءة. قنوات العملاء = `channels`.
+**توضيح جداول (2026-07-27 — Pre-Phase-4 Exact Table ID):** شاشة الأدمن «بانر الصفحة الرئيسية» = `admin/index.php?page=storefront_hero` → جدول نصي `storefront_copy_lines` فقط (scopes: `header_tagline` = جمل الهيدر؛ `home_hero` = جمل الـHero). لا يوجد جدول سجلات بانر صور. الجدول القديم `storefront_home_hero` للتوافق التاريخي فقط (لا حذف/لا تعديل صف). قنوات العملاء = `channels`. تسمية شاشة الأدمن مؤجّلة لمراجعة UX النهائية.
 
 **تفريغ Pre-launch مكتمل (Owner 2026-07-27):** نُفّذ يدوياً على قاعدة الإنتاج بنجاح — `channels=0`، `product_channels=0`، `storefront_copy_lines=0`، AUTO_INCREMENT للقنوات ولـ`storefront_copy_lines` = 1. لم تُمسّ `storefront_home_hero` / promo / products / orders / media. **لا توجد أداة Reset متبقية في المستودع**؛ ممنوع إعادة تشغيل التفريغ تلقائياً. إنشاء القنوات يدوياً فقط (`admin/api/channels/save.php`)؛ لا Auto-seed.
+
+**تنفيذ (2026-07-27 — Pre-Phase-4 Targeted Home-Copy / Bare-Domain Repair):** لا auto-seed لنصوص Header/Hero (`orange_catalog_seed_storefront_copy_defaults_if_empty` و`orange_catalog_migrate_legacy_storefront_copy_lines` = no-op بيانات؛ نسخ التهيئة بين الدول لـ`storefront_copy_lines` معطّل). الإنشاء اليدوي فقط عبر `admin/api/settings/storefront_copy_lines.php` scoped بـ`country_id`. العرض العام من `storefront_copy_lines` للدولة الحالية فقط — **بدون** fallback عام من `storefront_home_hero`. `orange_storefront_default_channel_slug` لا يُرجع `tiktok` ملفّقاً (فارغ عند الفشل المغلق). اختبار: `scripts/self_test_pre_phase4_home_copy_bare_domain_repair.php`. **Phase 4 لم تبدأ.**
 
 
 --------------------------------------------------------------------

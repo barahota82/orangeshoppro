@@ -12,7 +12,9 @@ function orange_storefront_copy_has_country_column(PDO $pdo): bool
 }
 
 /**
- * لاحقة عمود اللغة في الجدول القديم storefront_home_hero (احتياطي).
+ * لاحقة عمود اللغة في الجدول القديم storefront_home_hero.
+ * معزول: لا يُستخدَم للقراءة العامة (قرار مالك 2026-07-27 — لا fallback عالمي).
+ * الجدول/الصف يبقيان للتوافق التاريخي فقط؛ لا حذف ولا تعديل في هذا الإصلاح.
  */
 function orange_storefront_home_hero_lang_suffix(string $lang): string
 {
@@ -77,7 +79,8 @@ function orange_storefront_copy_pad_rotation(array $lines): array
 }
 
 /**
- * جمل الـ hero للصفحة الرئيسية: صفوف نشطة من storefront_copy_lines حسب لغة الزائر.
+ * جمل الـ hero للصفحة الرئيسية: صفوف نشطة من storefront_copy_lines حسب لغة الزائر ودولة المتجر فقط.
+ * لا قراءة عامة من storefront_home_hero (جدول عالمي قديم — معزول).
  *
  * @return list<string>
  */
@@ -115,22 +118,9 @@ function orange_storefront_home_hero_lines_resolved(PDO $pdo, string $lang, ?int
         $out = [];
     }
 
-    if ($out === [] && orange_table_exists($pdo, 'storefront_home_hero')) {
-        $suffix = orange_storefront_home_hero_lang_suffix($lang);
-        try {
-            $st = $pdo->query('SELECT * FROM storefront_home_hero WHERE id = 1 LIMIT 1');
-            $legacy = $st ? $st->fetch(PDO::FETCH_ASSOC) : false;
-            if (is_array($legacy)) {
-                for ($i = 1; $i <= 3; ++$i) {
-                    $t = trim((string) ($legacy['line_' . $i . '_' . $suffix] ?? ''));
-                    if ($t !== '') {
-                        $out[] = $t;
-                    }
-                }
-            }
-        } catch (Throwable $e) {
-            $out = [];
-        }
+    /* فارغ صالح: لا fallback عالمي ولا زرع صفوف. قيمتان فارغتان لتفادي أخطاء التناوب. */
+    if ($out === []) {
+        return ['', ''];
     }
 
     return orange_storefront_copy_pad_rotation($out);
@@ -206,24 +196,7 @@ function orange_storefront_header_tagline_cycle_resolved(PDO $pdo, ?int $country
         $out = [];
     }
 
-    if ($out === [] && orange_table_exists($pdo, 'storefront_home_hero')
-        && orange_table_has_column($pdo, 'storefront_home_hero', 'header_tagline_ar')) {
-        try {
-            $st = $pdo->query(
-                'SELECT header_tagline_ar, header_tagline_en, header_tagline_fil, header_tagline_hi
-                 FROM storefront_home_hero WHERE id = 1 LIMIT 1'
-            );
-            $legacy = $st ? $st->fetch(PDO::FETCH_ASSOC) : false;
-            if (is_array($legacy)) {
-                foreach (orange_storefront_header_tagline_row_lang_cycle($legacy) as $t) {
-                    $out[] = $t;
-                }
-            }
-        } catch (Throwable $e) {
-            $out = [];
-        }
-    }
-
+    /* لا قراءة عامة من storefront_home_hero — محتوى الهيدر من storefront_copy_lines للدولة فقط. */
     if ($out === []) {
         $cached[$cacheKey] = ['', ''];
 

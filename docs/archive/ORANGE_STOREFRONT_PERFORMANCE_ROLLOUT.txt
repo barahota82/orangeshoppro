@@ -99,6 +99,7 @@ ORANGE — أرشيف خطة أداء الواجهة وترحيل المخطط (
 - **`ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE` في `.env.php`:** عند true يُعرَّف **`ORANGE_SCHEMA_DEGRADED`** عند فشل البوابة بدلاً من رمي الاستثناء — **قرار مالك**؛ راجع «ثانياً» (لا تُخفَى أعطال مسارات إلزامية دون سياسة). سمة **`data-orange-schema-degraded="1"`** على `<html>` في **`includes/header.php`** (واجهة المتجر) و **`admin/partials/header.php`** (الأدمن) للتمييز في CSS/JS.
 - **س25/س26 والقنوات:** لم تُغيّر ذريعة هذا المسار.
 - **نشر مسبق:** `php scripts/run_migrations.php` يكمّل «أول زيارة» عند تشغيله صراحةً على السيرفر.
+- **Pre-Phase-4 Home-Copy / Bare-Domain (2026-07-27):** تعطيل زرع نصوص Header/Hero أثناء bootstrap/catch-up لا يضيف استعلامات مسار ساخن؛ اختيار قناة الجذر يبقى استعلاماً واحداً scoped بالدولة؛ لا طبقة كاش جديدة ولا طلب Geo خارجي.
 
 
 نهاية الأرشيف
