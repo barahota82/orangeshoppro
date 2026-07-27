@@ -246,6 +246,13 @@ function orange_admin_time_today_ymd_in_iana(string $ianaTimezone): string
  * Inclusive local-day start and exclusive next-day start as UTC ISO-8601.
  * DST-safe: uses IANA transitions (e.g. Africa/Cairo), never a fixed offset.
  *
+ * Civil-day contract (Phase 4 Step 2):
+ * - start = first valid instant belonging to the local calendar date
+ * - end_exclusive = first valid instant belonging to the next local calendar date
+ * Next date is computed as a calendar operation, then each boundary is parsed
+ * independently in the IANA zone. Do not derive end from start->modify('+1 day')
+ * when local midnight may be nonexistent (Cairo spring-forward → 23h day).
+ *
  * @return array{local_ymd:string, start_utc_iso:string, end_exclusive_utc_iso:string}
  * @throws OrangeAdminTimeConfigException
  */
@@ -257,12 +264,20 @@ function orange_admin_time_day_bounds_utc(string $localYmd, string $ianaTimezone
     }
     $tzName = orange_admin_time_require_iana($ianaTimezone);
     $tz = new DateTimeZone($tzName);
+
+    // Calendar +1 day in UTC date math only (not wall-clock from a normalized start).
+    $cal = DateTimeImmutable::createFromFormat('!Y-m-d', $ymd, new DateTimeZone('UTC'));
+    if (!$cal instanceof DateTimeImmutable) {
+        throw new OrangeAdminTimeConfigException('admin_time_day_bounds_failed');
+    }
+    $nextYmd = $cal->modify('+1 day')->format('Y-m-d');
+
     try {
         $startLocal = new DateTimeImmutable($ymd . ' 00:00:00', $tz);
+        $endLocal = new DateTimeImmutable($nextYmd . ' 00:00:00', $tz);
     } catch (Throwable $e) {
         throw new OrangeAdminTimeConfigException('admin_time_day_bounds_failed');
     }
-    $endLocal = $startLocal->modify('+1 day');
     $startUtc = $startLocal->setTimezone(new DateTimeZone('UTC'));
     $endUtc = $endLocal->setTimezone(new DateTimeZone('UTC'));
 

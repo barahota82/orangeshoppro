@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/sales_invoice_company.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
+require_once __DIR__ . '/../../../includes/admin_time.php';
 require_admin_api();
 
 try {
@@ -92,8 +93,13 @@ try {
     if ($action === 'search') {
         $idFrom = (int) ($data['id_from'] ?? 0);
         $idTo = (int) ($data['id_to'] ?? 0);
-        $dateFrom = trim((string) ($data['date_from'] ?? ''));
-        $dateTo = trim((string) ($data['date_to'] ?? ''));
+        $dateFromRaw = trim((string) ($data['date_from'] ?? ''));
+        $dateToRaw = trim((string) ($data['date_to'] ?? ''));
+        $dateFrom = $dateFromRaw !== '' ? orange_admin_time_date_only_normalize($dateFromRaw) : '';
+        $dateTo = $dateToRaw !== '' ? orange_admin_time_date_only_normalize($dateToRaw) : '';
+        if (($dateFromRaw !== '' && $dateFrom === '') || ($dateToRaw !== '' && $dateTo === '')) {
+            json_response(['success' => false, 'message' => 'تاريخ البحث غير صالح'], 422);
+        }
         $ref = trim((string) ($data['reference'] ?? ''));
         $customerName = trim((string) ($data['customer_name'] ?? ''));
         $phone = trim((string) ($data['phone'] ?? ''));
@@ -125,13 +131,22 @@ try {
             $sql .= ' AND o.id <= ?';
             $params[] = $idTo;
         }
-        if ($hasCreatedAt && $dateFrom !== '') {
-            $sql .= ' AND DATE(o.created_at) >= ?';
-            $params[] = $dateFrom;
-        }
-        if ($hasCreatedAt && $dateTo !== '') {
-            $sql .= ' AND DATE(o.created_at) <= ?';
-            $params[] = $dateTo;
+        // Absolute Moment (UTC): Country-local civil day → half-open sargable UTC range.
+        if ($hasCreatedAt && ($dateFrom !== '' || $dateTo !== '')) {
+            if ($countryId <= 0) {
+                json_response(['success' => false, 'message' => 'سياق الدولة مطلوب لتصفية التاريخ'], 422);
+            }
+            $iana = orange_admin_time_timezone_for_country_id($pdo, $countryId);
+            if ($dateFrom !== '') {
+                $fromBounds = orange_admin_time_day_bounds_mysql_utc($dateFrom, $iana);
+                $sql .= ' AND o.created_at >= ?';
+                $params[] = $fromBounds['start_utc_mysql'];
+            }
+            if ($dateTo !== '') {
+                $toBounds = orange_admin_time_day_bounds_mysql_utc($dateTo, $iana);
+                $sql .= ' AND o.created_at < ?';
+                $params[] = $toBounds['end_exclusive_utc_mysql'];
+            }
         }
         if ($ref !== '') {
             if (preg_match('/^INV-C-(\d+)$/i', $ref, $m)) {

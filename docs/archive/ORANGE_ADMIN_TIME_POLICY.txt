@@ -2,8 +2,8 @@ ORANGE — سياسة الوقت المركزية للإدمن (Admin Time Polic
 ================================================================================
 المسار: docs/archive/ORANGE_ADMIN_TIME_POLICY.txt
 تاريخ القرار: 2026-07-25
-آخر تحديث: 2026-07-26 (Phase 3 / Step 2 — Admin operational time surfaces)
-الحالة: Phase 1 + Phase 2 (Steps 1–5) مغلقة؛ Phase 3 Steps 1–4 مغلقة (Step 4 عملاء/واجهة + Global/Mixed + Closure — انظر سادساً-ه)؛ Phase 4 QA فقط لم تبدأ
+آخر تحديث: 2026-07-27 (Phase 4 / Step 2 — Targeted Time Gap Repair G1/G2/G3)
+الحالة: Phase 1 + Phase 2 + Phase 3 مغلقة ومعتمدة؛ Phase 4 Step 1 QA مكتملة؛ Phase 4 Step 2 إصلاح فجوات الوقت (كود) — انظر سابعاً-ب؛ Final System Review لم تبدأ
 
 الغرض
 -------
@@ -555,12 +555,14 @@ Repository Closure Sweep. لا Phase 4 · لا Writers · لا Schema · لا Ba
 
 ### Freeze
 - Phase 2 Writers مجمّدة؛ Backup/Restore / scripts/backup/* مجمّدة.
-- لا Schema 124؛ لا Data Migration؛ لا PHP/MySQL/Server TZ change.
+- Schema revision يبقى **124** (لا رفع Schema في Phase 4 Step 2).
+- لا Data Migration؛ لا PHP/MySQL/Server TZ change.
 - لا إعادة تصميم Customer UI.
 
-### متبقٍ لـ Phase 4 (QA فقط — لم تبدأ)
-- Final Time QA / Final System Review فقط بعد موافقة المالك.
-- لا Feature جديدة في Phase 4.
+### Phase 4
+- Step 1 (2026-07-27): Final Time QA — نتيجة B — ثلاث فجوات HIGH (G1/G2/G3).
+- Step 2 (2026-07-27): Targeted repair — انظر **سابعاً-ب**.
+- Final System Review: **لم تبدأ** (بعد موافقة المالك + فحوص UI).
 
 ### اختبار
 `php scripts/self_test_admin_time_phase3_step4_customer.php`
@@ -570,6 +572,7 @@ Repository Closure Sweep. لا Phase 4 · لا Writers · لا Schema · لا Ba
 `php scripts/self_test_admin_time_phase3_step4_inventory_country.php`
 `php scripts/self_test_admin_time_phase3_step4_channel_resolution.php`
 `php scripts/self_test_admin_time_phase3_step4_canonical97.php`
+`php scripts/self_test_admin_time_phase4_step2_targeted_gaps.php`
 
 
 --------------------------------------------------------------------
@@ -673,6 +676,47 @@ SPM country-scope: `scripts/self_test_admin_time_phase3_step4_spm_country.php`
 
 
 --------------------------------------------------------------------
+سابعاً-ب: Phase 4 Step 2 — Targeted Time Gap Repair (G1/G2/G3) — 2026-07-27
+--------------------------------------------------------------------
+الغرض: إغلاق الفجوات الثلاث المثبتة في Phase 4 Step 1 فقط — بلا Schema، بلا
+تغيير منطق أعمال، بلا مسّ Backup/Restore، بلا Final System Review.
+
+### G3 — حدود اليوم المدني (الأساس)
+- الدالة: `orange_admin_time_day_bounds_utc` في `includes/admin_time.php`.
+- السبب: عند منتصف ليل محلي غير موجود (Cairo spring-forward) كان PHP يطبيع
+  البداية إلى أول لحظة صالحة ثم `start->modify('+1 day')` فينتج نهاية عند
+  01:00 اليوم التالي (24 ساعة بدل 23).
+- العقد النهائي:
+  - start = أول لحظة صالحة لتاريخ Y-m-d المحلي (IANA).
+  - end_exclusive = أول لحظة صالحة لـ **اليوم التقويمي التالي** (يُحسب تقويمياً
+    بشكل مستقل ثم يُفسَّر في نفس IANA — لا اشتقاق من start المعيّن).
+- نتائج مثبتة: Cairo 2026-04-24 = 23س؛ Cairo 2026-10-29 = 25س؛ Kuwait = 24س.
+- التوقيع/مفاتيح الإرجاع دون كسر توافق؛ `day_bounds_mysql_utc` و
+  `filter_range_mysql_utc` و buckets الشهر ترث الإصلاح.
+
+### G1 — تصفّح فواتير المبيعات / الأونلاين
+- الملفات: `admin/api/sales-invoices/browse.php`،
+  `admin/api/online-invoices/browse.php`.
+- الاستدعاء: `company_sales_invoice.php` / `online_sales_invoice.php`.
+- سلطة الدولة: Current Admin Country Context + فلتر `country_id` الموجود
+  (ليست صفوفاً مختلطة الدول).
+- القديم: بدل `DATE(o.created_at) >=/<= ?` →
+  `o.created_at >= :from_start_utc` و `o.created_at < :to_end_exclusive_utc`
+  عبر `orange_admin_time_day_bounds_mysql_utc` (From و To اختياريان ومستقلان).
+- مجمّد: شكل الاستجابة، الترتيب `ORDER BY o.id DESC`، الكتابات، الحسابات.
+
+### G2 — `admin/api/reports/stats.php`
+- لا يستدعيه `dashboard.php` حالياً، لكنه API أدمن حي.
+- Today Absolute: نفس عقد الداشبورد — حدود يوم دولة السياق (نصف مفتوح UTC).
+- باقي المقاييس (pending / products / low stock / offers): All-time + فلتر الدولة.
+- مفاتيح JSON دون تغيير.
+
+### تنفيذ / اختبار / ما لم يُغلق
+- اختبار: `scripts/self_test_admin_time_phase4_step2_targeted_gaps.php`
+- Schema = 124 دون تغيير؛ Owner UI/runtime لا يزال معلّقاً.
+- Final System Review **لم تبدأ**.
+
+--------------------------------------------------------------------
 سابعاً: اختبار
 --------------------------------------------------------------------
 `php scripts/self_test_admin_time_foundation.php`
@@ -692,4 +736,5 @@ SPM country-scope: `scripts/self_test_admin_time_phase3_step4_spm_country.php`
 `php scripts/self_test_admin_time_phase3_step4_inventory_country.php`
 `php scripts/self_test_admin_time_phase3_step4_channel_resolution.php`
 `php scripts/self_test_admin_time_phase3_step4_canonical97.php`
+`php scripts/self_test_admin_time_phase4_step2_targeted_gaps.php`
 `powershell -NoProfile -File scripts/verify-php-utf8.ps1`
