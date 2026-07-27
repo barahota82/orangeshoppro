@@ -58,6 +58,12 @@ pa_assert(str_contains($manage, 'manual_channel_create_only'), 'manage.php label
 $chSave = (string) file_get_contents($root . '/admin/api/channels/save.php');
 pa_assert(str_contains($chSave, 'INSERT INTO channels'), 'manual channels/save.php still inserts');
 
+$bootstrap = (string) file_get_contents($root . '/includes/catalog_bootstrap_store.php');
+$seedFn = strpos($bootstrap, 'function orange_catalog_seed_default_channels_if_empty');
+$seedBody = $seedFn !== false ? substr($bootstrap, $seedFn, 400) : '';
+pa_assert($seedFn !== false, 'empty-table seed function exists');
+pa_assert(!preg_match('/INSERT\s+INTO\s+channels/i', $seedBody), 'empty-table seed is no-op (no INSERT)');
+
 echo "\n--- summary ---\n";
 echo "PASS={$passes} FAIL={$failures}\n";
 exit($failures > 0 ? 1 : 0);

@@ -333,4 +333,6 @@ Resolved: preview model (session, not channel); TTL = 24h + lazy + optional main
 
 **Phase 4 Final Time QA:** مؤجّلة — لم تبدأ.
 
+**إغلاق بذرة القنوات + Reset Setup (2026-07-27):** بعد تفريغ القنوات عبر `scripts/maintenance_setup_data_reset.php` تبقى معاينة المنتج: صفر قنوات ⇒ Full/Mobile رسالة واضحة بلا إنشاء قناة؛ لا seed عند فراغ الجدول (`orange_catalog_seed_default_channels_if_empty` = no-op).
+
 نهاية الخطة.

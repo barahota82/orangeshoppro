@@ -468,6 +468,8 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 
 **تنفيذ (2026-07-27 — Pre-Phase-4 Preview Country/Channel Authority):** دولة المعاينة ثابتة (منتج موجود → `products.country_id`؛ جديد → سياق الأدمن) مع رفض mismatch؛ قناة من قنوات نفس الدولة فقط (Selector / تلقائي / 422 بلا قناة)؛ لا fallback عالمي؛ الجلسة تحمل `channel_id`؛ Unsaved form عبر ظل؛ Quick = تقريبية؛ Full/Mobile = متجر حقيقي. التفاصيل: `ORANGE_PRODUCT_PREPUBLISH_PREVIEW_ROLLOUT.txt` قسم «إصلاح Pre-Phase-4». **Phase 4 مؤجّلة.**
 
+**تنفيذ (2026-07-27 — إغلاق Auto-seed القنوات + صيانة Setup Data):** لا Runtime ينشئ قناة سوى `admin/api/channels/save.php`. بذرة `orange_catalog_seed_default_channels_if_empty` معطّلة. جمل الهيدر (`header_tagline`) وجمل Hero (`home_hero`) في جدول مشترك `storefront_copy_lines` (شاشة `storefront_hero`). أداة لمرة واحدة: `php scripts/maintenance_setup_data_reset.php` (Dry Run) ثم Apply بتأكيد صريح على السيرفر بعد موافقة المالك — لا من Cursor.
+
 
 --------------------------------------------------------------------
 حادي عشر: تاب «العروض» الموحّد + الرسائل التحفيزية (قرار مالك 2026-06-28)

@@ -355,65 +355,16 @@ SQL
         orange_catalog_safe_exec($pdo, trim($sql));
     }
 
+    /* قرار المالك 2026-07-27: لا بذرة قنوات عند فراغ الجدول — إنشاء يدوي فقط. */
     orange_catalog_seed_default_channels_if_empty($pdo);
 }
 
 /**
- * Inserts the three default storefront channels when the table is empty (matches mysql-create seed).
+ * كان يُدرج 3 قنوات افتراضية عند فراغ الجدول (tiktok/online/web).
+ * قرار المالك 2026-07-27: Runtime no-op دائماً — القنوات تُنشأ فقط من شاشة قنوات العملاء.
+ * تبقى الدالة للتوافق مع أي استدعاء قديم؛ لا INSERT ولا قفل.
  */
 function orange_catalog_seed_default_channels_if_empty(PDO $pdo): void
 {
-    if (!function_exists('orange_table_exists') || !orange_table_exists($pdo, 'channels')) {
-        return;
-    }
-    try {
-        $n = (int) $pdo->query('SELECT COUNT(*) FROM channels')->fetchColumn();
-        if ($n > 0) {
-            return;
-        }
-    } catch (Throwable $e) {
-        if (function_exists('error_log')) {
-            error_log('[orange] channels seed count: ' . $e->getMessage());
-        }
-
-        return;
-    }
-
-    $lock = 'orange_seed_channels';
-    try {
-        $lk = $pdo->query('SELECT GET_LOCK(' . $pdo->quote($lock) . ', 10)')->fetchColumn();
-        if ((int) $lk !== 1) {
-            return;
-        }
-    } catch (Throwable $e) {
-        return;
-    }
-
-    try {
-        $n2 = (int) $pdo->query('SELECT COUNT(*) FROM channels')->fetchColumn();
-        if ($n2 > 0) {
-            return;
-        }
-        $st = $pdo->prepare(
-            'INSERT INTO channels (name, slug, path_segment, whatsapp_number, warehouse_number, is_active)
-             VALUES (?, ?, ?, ?, ?, ?)'
-        );
-        $rows = [
-            ['Orange Store', 'tiktok', 'tiktok', '96500000000', 1, 1],
-            ['Blue Store', 'online', 'online', '96500000001', 1, 1],
-            ['Black Store', 'web', 'web', '96500000002', 1, 1],
-        ];
-        foreach ($rows as $r) {
-            $st->execute($r);
-        }
-    } catch (Throwable $e) {
-        if (function_exists('error_log')) {
-            error_log('[orange] channels seed: ' . $e->getMessage());
-        }
-    } finally {
-        try {
-            $pdo->query('SELECT RELEASE_LOCK(' . $pdo->quote($lock) . ')');
-        } catch (Throwable $e) {
-        }
-    }
+    unset($pdo);
 }
