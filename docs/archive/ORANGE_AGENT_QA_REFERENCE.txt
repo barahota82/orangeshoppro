@@ -498,3 +498,13 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
 - **إنتاج النسخ/الأقفال/UX/Schema 124:** بلا تغيير؛ لا تشغيل Full/Country Backup من هذا الاختبار.
 - اختبار: `scripts/backup/self_test_backup.php`.
 - Batch A مكتمل؛ دفعات Hygiene/CSRF/أعمال أداء/Plesk/Step 4 **لم تُبدأ**.
+
+
+--------------------------------------------------------------------
+سFSR-F. ماذا حُذف في Batch F (نظافة stubs)؟ وهل تغيّر حد دخول الأدمن؟ (FSR-DEAD-01 / FSR-DOC-01)
+--------------------------------------------------------------------
+- حُذف سطحاً عاماً ميتان فقط: `api/stock/adjust-stock.php` و `api/offers/get-offers.php` (كل منهما بايت `\n` واحد؛ بلا مستدعٍ/مسار/عقد خارجي في المستودع). **لا** endpoint بديل ولا redirect.
+- مخزون/عروض حيّة تبقى: `admin/api/stock/adjust.php`، `api/cart/stock-limits.php`، `api/products/get-product*.php`، إلخ.
+- `includes/admin_login_rate_limit.php`: كان التعليق يقول «not wired» بينما `admin/login.php` يستدعي check + record_failure — صُحّح التعليق فقط؛ **بلا** تغيير عتبات/تخزين/سلوك.
+- اختبار: `scripts/self_test_final_review_hygiene_dead_stubs.php`.
+- Schema يبقى 124؛ CSRF/أداء/Plesk/Step 4 **لم تُبدأ**.

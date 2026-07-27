@@ -3,8 +3,11 @@
 declare(strict_types=1);
 
 /**
- * PR-SEC-02 — admin login rate limiting helpers (foundation only; not wired to login yet).
+ * PR-SEC-02 — admin login rate limiting helpers.
+ * Wired from admin/login.php: precheck via orange_admin_login_rate_limit_check(),
+ * then orange_admin_login_rate_limit_record_failure() on failed password verify.
  * Persistent dual-scope throttling: username + client IP (REMOTE_ADDR only).
+ * Failure-window counters (no separate success recorder in this architecture).
  */
 
 function orange_admin_login_client_ip(): string
