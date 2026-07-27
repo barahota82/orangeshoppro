@@ -468,7 +468,9 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 
 **تنفيذ (2026-07-27 — Pre-Phase-4 Preview Country/Channel Authority):** دولة المعاينة ثابتة (منتج موجود → `products.country_id`؛ جديد → سياق الأدمن) مع رفض mismatch؛ قناة من قنوات نفس الدولة فقط (Selector / تلقائي / 422 بلا قناة)؛ لا fallback عالمي؛ الجلسة تحمل `channel_id`؛ Unsaved form عبر ظل؛ Quick = تقريبية؛ Full/Mobile = متجر حقيقي. التفاصيل: `ORANGE_PRODUCT_PREPUBLISH_PREVIEW_ROLLOUT.txt` قسم «إصلاح Pre-Phase-4». **Phase 4 مؤجّلة.**
 
-**تنفيذ (2026-07-27 — إغلاق Auto-seed القنوات + صيانة Setup Data):** لا Runtime ينشئ قناة سوى `admin/api/channels/save.php`. بذرة `orange_catalog_seed_default_channels_if_empty` معطّلة. جمل الهيدر (`header_tagline`) وجمل Hero (`home_hero`) في جدول مشترك `storefront_copy_lines` (شاشة `storefront_hero`). أداة لمرة واحدة: `php scripts/maintenance_setup_data_reset.php` (Dry Run مفصل)؛ `php scripts/maintenance_setup_data_reset.php --compact` (Dry Run مختصر ASCII لـ Plesk)؛ Apply بتأكيد صريح على السيرفر بعد موافقة المالك — لا من Cursor؛ `--compact` مع `--apply` مرفوض.
+**تنفيذ (2026-07-27 — إغلاق Auto-seed القنوات):** لا Runtime ينشئ قناة سوى `admin/api/channels/save.php`. بذرة `orange_catalog_seed_default_channels_if_empty` معطّلة (no-op). اختبار: `scripts/self_test_pre_phase4_no_auto_channel_seed.php`.
+
+**توضيح جداول (2026-07-27 — Pre-Phase-4 Exact Table ID؛ بلا تفريغ):** شاشة الأدمن «بانر الصفحة الرئيسية» = `admin/index.php?page=storefront_hero` → جدول نصي `storefront_copy_lines` فقط (scopes: `header_tagline` = جمل الهيدر؛ `home_hero` = جمل الـHero). لا يوجد جدول سجلات بانر صور/وسائط للصفحة الرئيسية؛ المظهر البصري CSS gradient (`.hero-banner`). الجدول القديم `storefront_home_hero` صف واحد فارغ (احتياطي قراءة فقط؛ ليس شاشة الأدمن). الرسائل التحفيزية = `storefront_promo_messages` (منفصلة). قنوات العملاء = `channels`. **أداة صيانة Setup Data Reset حُذفت من المستودع** (كانت تستهدف channels + header_tagline + home_hero؛ لا تستهدف بانر صور منفصل — حكم: OLD_RESET_TARGET_PARTIALLY_WRONG). لا تفريغ الآن؛ لا Phase 4.
 
 
 --------------------------------------------------------------------
