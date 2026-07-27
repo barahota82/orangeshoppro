@@ -68,20 +68,14 @@ foreach ($rii as $file) {
 }
 nac_assert($otherInserts === [], 'no other runtime INSERT INTO channels: ' . implode(', ', $otherInserts));
 
-/* Obsolete PHP reset artifacts must be gone; Owner SQL file is the only reset artifact */
-nac_assert(!is_file($root . '/includes/setup_data_reset.php'), 'setup_data_reset.php removed');
-nac_assert(!is_file($root . '/scripts/maintenance_setup_data_reset.php'), 'maintenance_setup_data_reset.php removed');
-nac_assert(!is_file($root . '/scripts/self_test_pre_phase4_setup_data_reset.php'), 'old reset self_test removed');
-nac_assert(!is_file($root . '/includes/prelaunch_channels_copy_reset.php'), 'PHP prelaunch reset helper removed');
-nac_assert(!is_file($root . '/scripts/reset_prelaunch_channels_and_storefront_copy_lines.php'), 'PHP prelaunch reset CLI removed');
-nac_assert(!is_file($root . '/scripts/self_test_prelaunch_channels_copy_reset.php'), 'PHP prelaunch reset self_test removed');
-nac_assert(is_file($root . '/scripts/sql/reset_prelaunch_channels_and_storefront_copy_lines.sql'), 'Owner SQL reset file present');
-$sqlReset = (string) file_get_contents($root . '/scripts/sql/reset_prelaunch_channels_and_storefront_copy_lines.sql');
-nac_assert(str_contains($sqlReset, 'SET @ORANGE_EXECUTE_RESET = 0'), 'SQL defaults to dry-run');
-nac_assert(str_contains($sqlReset, 'RESET_PRELAUNCH_CHANNELS_AND_STOREFRONT_COPY_LINES'), 'SQL confirm token');
-nac_assert(str_contains($sqlReset, 'LEGACY_HERO_FALLBACK_BLOCKER'), 'SQL legacy blocker');
-nac_assert(!preg_match('/SET\s+FOREIGN_KEY_CHECKS\s*=\s*0/i', $sqlReset), 'SQL no FK checks disable');
-nac_assert(!preg_match('/\bTRUNCATE\b/i', $sqlReset), 'SQL no TRUNCATE');
+/* Completed pre-launch reset: no reset artifact remains in the repository */
+nac_assert(!is_file($root . '/includes/setup_data_reset.php'), 'setup_data_reset.php not present');
+nac_assert(!is_file($root . '/scripts/maintenance_setup_data_reset.php'), 'maintenance_setup_data_reset.php not present');
+nac_assert(!is_file($root . '/scripts/self_test_pre_phase4_setup_data_reset.php'), 'old reset self_test not present');
+nac_assert(!is_file($root . '/includes/prelaunch_channels_copy_reset.php'), 'PHP prelaunch reset helper not present');
+nac_assert(!is_file($root . '/scripts/reset_prelaunch_channels_and_storefront_copy_lines.php'), 'PHP prelaunch reset CLI not present');
+nac_assert(!is_file($root . '/scripts/self_test_prelaunch_channels_copy_reset.php'), 'PHP prelaunch reset self_test not present');
+nac_assert(!is_file($root . '/scripts/sql/reset_prelaunch_channels_and_storefront_copy_lines.sql'), 'SQL reset artifact removed');
 
 $heroPage = (string) file_get_contents($root . '/admin/pages/storefront_hero.php');
 nac_assert(str_contains($heroPage, "scope = 'home_hero'") && str_contains($heroPage, "scope = 'header_tagline'"), 'UI uses shared storefront_copy_lines');

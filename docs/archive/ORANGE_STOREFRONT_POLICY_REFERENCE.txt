@@ -472,7 +472,7 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 
 **توضيح جداول (2026-07-27 — Pre-Phase-4 Exact Table ID):** شاشة الأدمن «بانر الصفحة الرئيسية» = `admin/index.php?page=storefront_hero` → جدول نصي `storefront_copy_lines` فقط (scopes: `header_tagline` = جمل الهيدر؛ `home_hero` = جمل الـHero). لا يوجد جدول سجلات بانر صور. الجدول القديم `storefront_home_hero` احتياطي قراءة. قنوات العملاء = `channels`.
 
-**تفريغ Pre-launch (SQL يدوي فقط — 2026-07-27):** لا أداة PHP ولا Runtime reset. الملف: `scripts/sql/reset_prelaunch_channels_and_storefront_copy_lines.sql` — افتراضي Dry Run (`@ORANGE_EXECUTE_RESET=0`)؛ Apply فقط بعد تغيير المالك إلى `1` مع Confirmation `RESET_PRELAUNCH_CHANNELS_AND_STOREFRONT_COPY_LINES`. يفرّغ `product_channels` ثم `channels` ثم `storefront_copy_lines` ويعيد AI=1 بعد Guards. لا يعمل تلقائياً. إنشاء القنوات يبقى يدوياً فقط (`admin/api/channels/save.php`)؛ لا Auto-seed. **Phase 4 بعد التفريغ والتحقق.**
+**تفريغ Pre-launch مكتمل (Owner 2026-07-27):** نُفّذ يدوياً على قاعدة الإنتاج بنجاح — `channels=0`، `product_channels=0`، `storefront_copy_lines=0`، AUTO_INCREMENT للقنوات ولـ`storefront_copy_lines` = 1. لم تُمسّ `storefront_home_hero` / promo / products / orders / media. **لا توجد أداة Reset متبقية في المستودع**؛ ممنوع إعادة تشغيل التفريغ تلقائياً. إنشاء القنوات يدوياً فقط (`admin/api/channels/save.php`)؛ لا Auto-seed.
 
 
 --------------------------------------------------------------------
