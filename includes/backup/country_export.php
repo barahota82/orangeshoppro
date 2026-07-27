@@ -631,7 +631,7 @@ function orange_country_export_build_dependency_graph_c3(
     return [
         'boundary_policy_version' => ORANGE_COUNTRY_BOUNDARY_POLICY_VERSION,
         'dependency_graph_version' => ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION,
-        'schema_revision' => (int) ($matrix['schema_revision'] ?? (defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') ? ORANGE_CATALOG_SCHEMA_PHP_REVISION : 123)),
+        'schema_revision' => (int) ($matrix['schema_revision'] ?? (defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION') ? ORANGE_CATALOG_SCHEMA_PHP_REVISION : 124)),
         'restore_batches' => $restoreBatches,
         'nodes' => $nodes,
         'edges' => $edges,

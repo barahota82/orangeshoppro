@@ -478,6 +478,8 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 
 **تنفيذ (2026-07-27 — Pre-Phase-4 Targeted Home-Copy / Bare-Domain Repair):** لا auto-seed لنصوص Header/Hero (`orange_catalog_seed_storefront_copy_defaults_if_empty` و`orange_catalog_migrate_legacy_storefront_copy_lines` = no-op بيانات؛ نسخ التهيئة بين الدول لـ`storefront_copy_lines` معطّل). الإنشاء اليدوي فقط عبر `admin/api/settings/storefront_copy_lines.php` scoped بـ`country_id`. العرض العام من `storefront_copy_lines` للدولة الحالية فقط — **بدون** fallback عام من `storefront_home_hero`. `orange_storefront_default_channel_slug` لا يُرجع `tiktok` ملفّقاً (فارغ عند الفشل المغلق). اختبار: `scripts/self_test_pre_phase4_home_copy_bare_domain_repair.php`. **Phase 4 لم تبدأ.**
 
+**تنفيذ (2026-07-27 — Pre-Phase-4 Channel Display-Name Country Uniqueness):** حقل شاشة قنوات العملاء «اسم الواجهة» = عمود **`channels.name`** (طلب JSON `name`، إدخال `#channel_name`). فريد داخل نفس الدولة (`country_id` + `name`) بما فيها القنوات المتوقفة؛ نفس الاسم مسموح في دولة أخرى. تطبيع: `TRIM` فقط. إنشاء: دولة من سياق الأدمن؛ تحديث: `country_id` المخزّن سلطة نهائية مع مطابقة السياق. فهرس **`uq_channels_country_name`** (مخطط **124**). خطأ: `channel_display_name_duplicate_in_country` / HTTP 409. عقود slug/path/`is_country_default` بلا تغيير. اختبار: `scripts/self_test_pre_phase4_channel_display_name_country_unique.php`. **Phase 4 لم تبدأ.**
+
 
 --------------------------------------------------------------------
 حادي عشر: تاب «العروض» الموحّد + الرسائل التحفيزية (قرار مالك 2026-06-28)

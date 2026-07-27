@@ -1,7 +1,7 @@
 {
     "registry_version": "1.0",
-    "schema_revision": 123,
-    "generated_at": "2026-07-26T03:10:47+00:00",
+    "schema_revision": 124,
+    "generated_at": "2026-07-27T06:03:49+00:00",
     "generated_by": "scripts/backup/build_table_registry.php",
     "do_not_edit": "Generated only — regenerate with build_table_registry.php",
     "table_count": 117,

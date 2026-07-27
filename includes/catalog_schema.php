@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 123);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 124);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3185,6 +3185,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_order_items_gl_slot_v121($pdo);
     orange_catalog_migrate_countries_timezone_v122($pdo);
     orange_catalog_migrate_admin_time_country_authority_v123($pdo);
+    orange_catalog_migrate_channels_country_name_unique_v124($pdo);
     orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
@@ -3827,6 +3828,7 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
     orange_catalog_migrate_order_items_gl_slot_v121($pdo);
     orange_catalog_migrate_countries_timezone_v122($pdo);
     orange_catalog_migrate_admin_time_country_authority_v123($pdo);
+    orange_catalog_migrate_channels_country_name_unique_v124($pdo);
     foreach ([
         'cart_promotions',
         'cart_gift_promotions',
@@ -9538,6 +9540,75 @@ function orange_catalog_migrate_admin_time_country_authority_v123(PDO $pdo): voi
             );
         }
     }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v124 — اسم الواجهة (channels.name) فريد داخل الدولة فقط (نشط/متوقف).
+ * لا يغيّر collation ولا عقود slug/path.
+ */
+function orange_catalog_migrate_channels_country_name_unique_v124(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_channels_country_name_unique_v124';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'channels')
+        || !orange_table_has_column($pdo, 'channels', 'country_id')
+        || !orange_table_has_column($pdo, 'channels', 'name')) {
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+
+        return;
+    }
+
+    $chk = $pdo->prepare(
+        'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = \'channels\' AND INDEX_NAME = ? LIMIT 1'
+    );
+    $chk->execute(['uq_channels_country_name']);
+    if ($chk->fetchColumn()) {
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+
+        return;
+    }
+
+    try {
+        $dupRows = $pdo->query(
+            'SELECT country_id, name, GROUP_CONCAT(id ORDER BY id ASC) AS ids, COUNT(*) AS cnt
+             FROM channels
+             WHERE country_id IS NOT NULL AND country_id > 0
+             GROUP BY country_id, name
+             HAVING cnt > 1'
+        )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        $dupRows = [];
+        if (function_exists('error_log')) {
+            error_log('[orange] v124 duplicate scan: ' . $e->getMessage());
+        }
+    }
+    if ($dupRows !== []) {
+        $parts = [];
+        foreach ($dupRows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $parts[] = 'country_id=' . (string) ($row['country_id'] ?? '')
+                . ' name=' . (string) ($row['name'] ?? '')
+                . ' ids=' . (string) ($row['ids'] ?? '');
+        }
+        throw new RuntimeException(
+            'channels country+name duplicates block uq_channels_country_name: ' . implode('; ', $parts)
+        );
+    }
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE UNIQUE INDEX uq_channels_country_name ON channels (country_id, name)'
+    );
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);
 }

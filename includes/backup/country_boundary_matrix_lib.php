@@ -76,7 +76,7 @@ function orange_country_boundary_matrix_validate(array $matrix): array
     }
     $expectedSchemaRevision = defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')
         ? (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION
-        : 123;
+        : 124;
     if ((int) ($matrix['schema_revision'] ?? 0) !== $expectedSchemaRevision) {
         $errors[] = 'schema_revision must be ' . $expectedSchemaRevision;
     }

@@ -1,6 +1,6 @@
 {
   "expectations_version": "1.0",
-  "schema_revision": 123,
+  "schema_revision": 124,
   "core_tables": [
     "orders",
     "order_items",

@@ -156,6 +156,8 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **تنفيذ (13 — §13.7 — Targeted Home-Copy / Bare-Domain Repair 2026-07-27):** خوارزمية القناة الحتمية + fail-closed بلا `tiktok` ملفّق؛ تعطيل زرع/ترحيل محتوى `storefront_copy_lines` التلقائي؛ عزل `storefront_home_hero` عن العرض العام. اختبار: **`scripts/self_test_pre_phase4_home_copy_bare_domain_repair.php`**.
 
+**تنفيذ (13 — قنوات العملاء — اسم الواجهة فريد داخل الدولة 2026-07-27):** **`channels.name`** فريد لكل `country_id` (نشط/متوقف؛ TRIM؛ نفس الاسم عبر الدول مسموح). تطبيق: **`admin/api/channels/save.php`** + فهرس **`uq_channels_country_name`** (مخطط **124**). اختبار: **`scripts/self_test_pre_phase4_channel_display_name_country_unique.php`**.
+
 **13.8 الأدمن والصلاحيات**
 - **أدمن عام:** `admin_users.country_id IS NULL` — مبدّل دولة في الهيدر؛ يرى حركات الدولة المختارة فقط في كل شاشة.
 - **فريق دولة:** `admin_users.country_id` = دولته — **لا** يرى دولة أخرى.

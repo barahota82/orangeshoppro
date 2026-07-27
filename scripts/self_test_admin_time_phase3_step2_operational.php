@@ -135,12 +135,13 @@ $reg = (string) file_get_contents($root . '/config/backup_table_registry.json');
 $matrix = (string) file_get_contents($root . '/config/country_restore_boundary_matrix.json');
 $defs = (string) file_get_contents($root . '/includes/backup/backup_table_registry_definitions.php');
 p3s2_assert(
-    (bool) preg_match("/ORANGE_CATALOG_SCHEMA_PHP_REVISION',\s*123\s*\)/", $schema),
-    '72. schema revision 123'
+    (bool) preg_match("/ORANGE_CATALOG_SCHEMA_PHP_REVISION',\s*124\s*\)/", $schema),
+    '72. schema revision 124'
 );
 p3s2_assert(str_contains($schema, 'admin_time_country_authority_v123'), '72. v123 migration present');
-p3s2_assert(str_contains($reg, '"schema_revision": 123'), '72. registry schema_revision 123');
-p3s2_assert(str_contains($matrix, '"schema_revision":  123') || str_contains($matrix, '"schema_revision": 123'), '73. matrix schema_revision 123');
+p3s2_assert(str_contains($schema, 'channels_country_name_unique_v124'), '72. v124 channel name unique present');
+p3s2_assert(str_contains($reg, '"schema_revision": 124'), '72. registry schema_revision 124');
+p3s2_assert(str_contains($matrix, '"schema_revision":  124') || str_contains($matrix, '"schema_revision": 124'), '73. matrix schema_revision 124');
 p3s2_assert(str_contains($defs, "orange_company_documents' => \$c(114"), '73. docs country_id extraction');
 p3s2_assert(str_contains($defs, 'orange_admin_audit_log') && str_contains($defs, 'is_global'), '73. audit country extract excludes global');
 p3s2_assert(str_contains($matrix, 'direct_country_id') && str_contains($matrix, 'orange_company_documents'), '73. matrix docs Country Scoped');

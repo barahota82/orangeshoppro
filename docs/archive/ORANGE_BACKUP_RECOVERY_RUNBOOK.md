@@ -945,6 +945,28 @@ Old **122** packages remain visible and **Non-Eligible** (`schema_incompatible`)
 
 ---
 
+## Schema revision 124 — Channel display-name country uniqueness (2026-07-27)
+
+**Context:** Pre-Phase-4 narrow rule: `channels.name` («اسم الواجهة») unique per `country_id`
+(active + inactive). Same name allowed across countries. App validation in
+`admin/api/channels/save.php` + DB `uq_channels_country_name`.
+
+**تنفيذ (repo sync — schema compatibility only):**
+- `ORANGE_CATALOG_SCHEMA_PHP_REVISION` → **124**
+- Migration `orange_catalog_migrate_channels_country_name_unique_v124`
+- Registry regenerated via `scripts/backup/build_table_registry.php`
+- Matrix / schema expectations / `ORANGE_RECOVERY_VALIDATION_EXPECTED_SCHEMA_REVISION` → **124**
+- Fallback expected-schema literals → **124**
+
+**Owner deploy (after pull):** first request applies migration; re-run Country Batch once;
+new packages stamp **124**. Old **123** packages remain visible and **Non-Eligible**
+(`schema_incompatible`) — Exact Schema Policy; no dual compatibility.
+
+**Frozen:** Backup/Restore UX, time policy, schedules, retention, wizard, production mutation.
+Phase 4 not started.
+
+---
+
 ## Related references
 
 - Operator usage: `scripts/backup/README.md`
