@@ -3,42 +3,60 @@
 declare(strict_types=1);
 
 /**
- * صيانة لمرة واحدة — تفريغ Setup Data: القنوات + جمل الهيدر/Hero + إعادة AUTO_INCREMENT.
- * قرار المالك 2026-07-27.
+ * One-time maintenance - setup data reset: channels + header/hero copy lines + AUTO_INCREMENT.
+ * Owner decision 2026-07-27.
  *
- * الاستخدام (من جذر المشروع):
+ * Usage (from project root):
  *   php scripts/maintenance_setup_data_reset.php
- *       → DRY RUN (لا تعديل)
+ *       -> detailed DRY RUN (no writes)
+ *
+ *   php scripts/maintenance_setup_data_reset.php --compact
+ *       -> short DRY RUN KEY=VALUE (Plesk-safe, no writes)
  *
  *   php scripts/maintenance_setup_data_reset.php --apply --confirm=RESET_SETUP_CHANNELS_AND_COPY_LINES
- *       → APPLY صريح فقط
+ *       -> APPLY only with explicit confirm
  *
- * ممنوع تشغيل Apply على Production من Cursor — يشغّله المالك على السيرفر بعد مراجعة Dry Run.
+ * --compact + --apply is rejected (fail closed).
+ * Do not run APPLY on Production from Cursor.
  */
 
-require_once dirname(__DIR__) . '/config.php';
-require_once dirname(__DIR__) . '/includes/catalog_schema.php';
-require_once dirname(__DIR__) . '/includes/setup_data_reset.php';
-
 $apply = false;
+$compact = false;
 $confirm = '';
 foreach ($argv ?? [] as $arg) {
     if ($arg === '--apply') {
         $apply = true;
+    }
+    if ($arg === '--compact') {
+        $compact = true;
     }
     if (str_starts_with((string) $arg, '--confirm=')) {
         $confirm = substr((string) $arg, strlen('--confirm='));
     }
 }
 
+if ($compact && $apply) {
+    fwrite(STDERR, "ERROR: --compact cannot be combined with --apply (fail closed)\n");
+    exit(1);
+}
+
+require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/includes/catalog_schema.php';
+require_once dirname(__DIR__) . '/includes/setup_data_reset.php';
+
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 if (!$apply) {
     $inspect = orange_setup_data_reset_inspect($pdo);
+    if ($compact) {
+        fwrite(STDOUT, orange_setup_data_reset_format_compact($inspect));
+        exit(empty($inspect['can_apply']) ? 2 : 0);
+    }
     fwrite(STDOUT, orange_setup_data_reset_format_report($inspect, 'DRY_RUN'));
-    fwrite(STDOUT, "Dry Run only — zero rows modified.\n");
+    fwrite(STDOUT, "Dry Run only - zero rows modified.\n");
     fwrite(STDOUT, "To apply: php scripts/maintenance_setup_data_reset.php --apply --confirm=RESET_SETUP_CHANNELS_AND_COPY_LINES\n");
+    fwrite(STDOUT, "Compact: php scripts/maintenance_setup_data_reset.php --compact\n");
     exit(empty($inspect['can_apply']) ? 2 : 0);
 }
 

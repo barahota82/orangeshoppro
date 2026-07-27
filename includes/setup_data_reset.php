@@ -109,6 +109,7 @@ if (!function_exists('orange_setup_data_reset_inspect')) {
                 'row_count_all' => 0,
                 'header_tagline' => 0,
                 'home_hero' => 0,
+                'other' => 0,
                 'by_country' => [],
                 'auto_increment' => null,
                 'shared_table' => true,
@@ -118,7 +119,14 @@ if (!function_exists('orange_setup_data_reset_inspect')) {
                 'storefront_accounts_registered_channel_slug' => 0,
                 'merge_requests_proposed_channel_slug' => 0,
             ],
+            'business_blocker_counts' => [
+                'orders' => 0,
+                'sales_returns' => 0,
+            ],
             'business_blockers' => [],
+            'fk_blockers' => [],
+            'fk_blockers_total' => 0,
+            'media_files_to_delete' => 0,
             'deletion_order' => [
                 '1. DELETE product_channels (PURE_SETUP; FK CASCADE child)',
                 '2. NULL soft slug refs on storefront_accounts / merge requests (EPHEMERAL)',
@@ -165,6 +173,11 @@ if (!function_exists('orange_setup_data_reset_inspect')) {
                 $pdo,
                 "SELECT COUNT(*) FROM storefront_copy_lines WHERE scope = 'home_hero'"
             );
+            $out['storefront_copy_lines']['other'] = orange_setup_data_reset_count(
+                $pdo,
+                "SELECT COUNT(*) FROM storefront_copy_lines
+                 WHERE scope NOT IN ('header_tagline','home_hero')"
+            );
             $out['storefront_copy_lines']['auto_increment'] = orange_setup_data_reset_auto_increment(
                 $pdo,
                 'storefront_copy_lines'
@@ -208,7 +221,7 @@ if (!function_exists('orange_setup_data_reset_inspect')) {
             );
         }
 
-        /* Business abort guards — TRANSACTIONAL */
+        /* Business abort guards — TRANSACTIONAL (counts always set for compact report). */
         if (orange_setup_data_reset_table_exists($pdo, 'orders')
             && function_exists('orange_table_has_column')
             && orange_table_has_column($pdo, 'orders', 'channel_id')) {
@@ -216,13 +229,14 @@ if (!function_exists('orange_setup_data_reset_inspect')) {
                 $pdo,
                 'SELECT COUNT(*) FROM orders WHERE channel_id IS NOT NULL AND channel_id > 0'
             );
+            $out['business_blocker_counts']['orders'] = $n;
             if ($n > 0) {
                 $out['business_blockers'][] = [
                     'table' => 'orders',
                     'column' => 'channel_id',
                     'rows' => $n,
                     'class' => 'TRANSACTIONAL_BUSINESS_DATA',
-                    'action' => 'Owner Decision — do not delete/nullify order channel links via this reset',
+                    'action' => 'Owner Decision - do not delete/nullify order channel links via this reset',
                 ];
             }
         }
@@ -233,24 +247,20 @@ if (!function_exists('orange_setup_data_reset_inspect')) {
                 $pdo,
                 'SELECT COUNT(*) FROM sales_returns WHERE channel_id IS NOT NULL AND channel_id > 0'
             );
+            $out['business_blocker_counts']['sales_returns'] = $n;
             if ($n > 0) {
                 $out['business_blockers'][] = [
                     'table' => 'sales_returns',
                     'column' => 'channel_id',
                     'rows' => $n,
                     'class' => 'TRANSACTIONAL_BUSINESS_DATA',
-                    'action' => 'Owner Decision — do not delete/nullify sales_returns channel links via this reset',
+                    'action' => 'Owner Decision - do not delete/nullify sales_returns channel links via this reset',
                 ];
             }
         }
-        if (orange_setup_data_reset_table_exists($pdo, 'payment_transactions')) {
-            $n = orange_setup_data_reset_count($pdo, 'SELECT COUNT(*) FROM payment_transactions');
-            if ($n > 0) {
-                /* Payments exist — only block if they somehow require channel rows; soft note if channels linked via orders already blocked. */
-            }
-        }
 
-        $out['can_apply'] = $out['business_blockers'] === [];
+        $out['fk_blockers_total'] = count($out['fk_blockers']);
+        $out['can_apply'] = $out['business_blockers'] === [] && $out['fk_blockers_total'] === 0;
 
         return $out;
     }
@@ -287,6 +297,64 @@ if (!function_exists('orange_setup_data_reset_format_report')) {
             $lines[] = 'ORDER: ' . (string) $step;
         }
         $lines[] = 'UNTOUCHED: ' . implode('; ', array_keys($inspect['untouched'] ?? []));
+
+        return implode("\n", $lines) . "\n";
+    }
+}
+
+if (!function_exists('orange_setup_data_reset_format_compact')) {
+    /**
+     * Compact Dry-Run report for Plesk (ASCII KEY=VALUE only, short).
+     *
+     * @param array<string,mixed> $inspect
+     */
+    function orange_setup_data_reset_format_compact(array $inspect): string
+    {
+        $orders = (int) ($inspect['business_blocker_counts']['orders'] ?? 0);
+        $returns = (int) ($inspect['business_blocker_counts']['sales_returns'] ?? 0);
+        $bizTotal = count($inspect['business_blockers'] ?? []);
+        $fkTotal = (int) ($inspect['fk_blockers_total'] ?? 0);
+        $can = !empty($inspect['can_apply']) && $bizTotal === 0 && $fkTotal === 0;
+
+        $aiCh = $inspect['channels']['auto_increment'] ?? null;
+        $aiCopy = $inspect['storefront_copy_lines']['auto_increment'] ?? null;
+
+        $lines = [
+            'MODE=DRY_RUN',
+            'CHANNELS_ROWS=' . (int) ($inspect['channels']['row_count'] ?? 0),
+            'CHANNELS_AI=' . ($aiCh === null ? 'NA' : (string) (int) $aiCh),
+            'PRODUCT_CHANNELS_ROWS=' . (int) ($inspect['product_channels']['row_count'] ?? 0),
+            'SOFT_REF_STOREFRONT_ACCOUNTS=' . (int) ($inspect['soft_refs']['storefront_accounts_registered_channel_slug'] ?? 0),
+            'SOFT_REF_MERGE_REQUESTS=' . (int) ($inspect['soft_refs']['merge_requests_proposed_channel_slug'] ?? 0),
+            'BUSINESS_BLOCKER_ORDERS=' . $orders,
+            'BUSINESS_BLOCKER_SALES_RETURNS=' . $returns,
+            'BUSINESS_BLOCKERS_TOTAL=' . $bizTotal,
+            'COPY_LINES_ALL=' . (int) ($inspect['storefront_copy_lines']['row_count_all'] ?? 0),
+            'COPY_LINES_HEADER=' . (int) ($inspect['storefront_copy_lines']['header_tagline'] ?? 0),
+            'COPY_LINES_HERO=' . (int) ($inspect['storefront_copy_lines']['home_hero'] ?? 0),
+            'COPY_LINES_OTHER=' . (int) ($inspect['storefront_copy_lines']['other'] ?? 0),
+            'COPY_LINES_AI=' . ($aiCopy === null ? 'NA' : (string) (int) $aiCopy),
+            'FK_BLOCKERS_TOTAL=' . $fkTotal,
+            'MEDIA_FILES_TO_DELETE=' . (int) ($inspect['media_files_to_delete'] ?? 0),
+            'APPLY_ALLOWED=' . ($can ? 'YES' : 'NO'),
+        ];
+        if (!$can) {
+            $reasons = [];
+            if ($orders > 0) {
+                $reasons[] = 'orders.channel_id=' . $orders;
+            }
+            if ($returns > 0) {
+                $reasons[] = 'sales_returns.channel_id=' . $returns;
+            }
+            if ($fkTotal > 0) {
+                $reasons[] = 'fk_blockers=' . $fkTotal;
+            }
+            if ($reasons === []) {
+                $reasons[] = 'unknown_blocker';
+            }
+            $lines[] = 'BLOCK_REASON=' . implode(';', $reasons);
+        }
+        $lines[] = 'DRY_RUN_SAFE_TO_APPLY=' . ($can ? 'YES' : 'NO');
 
         return implode("\n", $lines) . "\n";
     }
