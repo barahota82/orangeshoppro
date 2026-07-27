@@ -488,3 +488,13 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
 - العقد: 90 ثانية تبريد + 8/ساعة؛ 429 `email_track_rate_limited`؛ فشل التخزين = 503 fail-closed؛ **بلا Schema**.
 - تفصيل: **ORANGE_STOREFRONT_POLICY_REFERENCE.txt** س13 / «تنفيذ FSR-SEC-03».
 - اختبار: `scripts/self_test_final_review_email_track_rate_limit.php`.
+
+
+--------------------------------------------------------------------
+سFSR-C. لماذا كان self_test_backup يفشل محلياً؟ وهل لُمس إنتاج النسخ؟ (FSR Batch C)
+--------------------------------------------------------------------
+- **عيب اختبار فقط:** `$backend` كان يُقرأ قبل التهيئة؛ المصدر الصحيح هو `selected_backend` من `orange_backup_collect_environment_report` (نفس عقد `orange_backup_select_backend`).
+- **قفل الاختبار:** جذر معزول تحت `%TEMP%\orange_bak_st_{pid}_{random}`؛ رفض التزامن عبر ملف قفل بـ PID حي (نمط `self_test_backup_admin`) وليس إعادة `acquire_lock` بينما نفس العملية تمسك `flock` (Windows Permission denied).
+- **إنتاج النسخ/الأقفال/UX/Schema 124:** بلا تغيير؛ لا تشغيل Full/Country Backup من هذا الاختبار.
+- اختبار: `scripts/backup/self_test_backup.php`.
+- Batch A مكتمل؛ دفعات Hygiene/CSRF/أعمال أداء/Plesk/Step 4 **لم تُبدأ**.
