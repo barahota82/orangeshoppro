@@ -520,3 +520,23 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
   - مساعد: `scripts/lib/final_review_d1_fixture.php`
 - تتطلب MySQL محلي؛ إن تعذّر الاتصال: ENVIRONMENT_BLOCKED (exit 2) — لا PASS وهمي.
 - بلا تغيير كود أعمال إنتاجي؛ Schema يبقى 124؛ D2–D5 وStep 4 **لم تُبدأ**.
+
+
+--------------------------------------------------------------------
+سFSR-D2. أين اختبارات السلوك للمخزون / FIFO / التكلفة / الحجز؟ (Batch D2)
+--------------------------------------------------------------------
+- أطقم معزولة على MySQL مؤقت من `scripts/orange_db.sql` (نفس بنية D1 + إثراء مخزني):
+  - `scripts/self_test_final_review_d2_fifo_costing.php`
+  - `scripts/self_test_final_review_d2_inventory_balances.php`
+  - `scripts/self_test_final_review_d2_inventory_workflows.php`
+  - `scripts/self_test_final_review_d2_inventory_concurrency.php`
+  - مساعد: `scripts/lib/final_review_d2_fixture.php`
+  - عامل تزامن: `scripts/lib/final_review_d2_concurrency_worker.php`
+- عقود مثبتة سلوكياً (لا اختراع):
+  - مصدر الكمية: `warehouse_variant_stock.quantity`؛ الحجز يخصم فوراً عبر `pending_order` بلا عمود reserved منفصل.
+  - FIFO: `ORDER BY layer_date ASC, id ASC` + `FOR UPDATE`؛ تكلفة الوحدة `round(..., 5)`.
+  - مردود مبيعات: طبقة جديدة `sale_return`؛ مردود مشتريات: `reduce_for_source` على طبقات الشراء.
+  - OSV: كميات فقط بلا طبقات FIFO؛ اعتماد الجرد: تقرير فقط بلا تطبيق مخزون (التطبيق عبر SAJ).
+  - لا retry للـ deadlock داخل مساعدات المخزون؛ المشتريات لا تكتب `stock_movements`.
+- تزامن حقيقي عبر `proc_open` + اتصالات MySQL منفصلة؛ إن تعذّر: ENVIRONMENT_BLOCKED.
+- بلا تغيير كود أعمال/FIFO/محاسبة إنتاجي؛ Schema يبقى 124؛ D3–D5 وStep 4 **لم تُبدأ**.
