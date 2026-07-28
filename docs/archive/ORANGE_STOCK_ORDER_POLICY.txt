@@ -11,6 +11,7 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
    - Primary call: `orange_storefront_execute_checkout_payload()` in `includes/order_intake_queue.php`, immediately after inserting `orders` + `order_items`, same DB transaction.
    - Customer amend: `api/orders/amend-order-items.php` — `orange_order_release_pending_stock_reservation()` → replace lines → `orange_order_apply_pending_stock_reservation()` again.
    - Completion: `orange_complete_order_fulfillment()` in `includes/order_fulfillment.php` — if a web `pending_order` reserve exists for the order number, stock is not deducted again on complete; movements may be relabeled (`pending_order_fulfilled`). Other order sources handled in the same function.
+   - **Idempotency (FSR-D2-FULFILL-01 — 2026-07-28):** `orange_order_stock_fulfillment_already_done()` treats `pending_order_fulfilled` as already-done **independently** of a live `pending_order` reservation, and `delivered_order` for the manual/non-reserved path. **تنفيذ:** `includes/order_fulfillment.php`. Sequential re-entry after rename must not decrement WVS again or insert `delivered_order`. Concurrent first-complete race without unified lock order remains ISSUE-05 (§17) — deferred.
    - Admin sales orders (today): `admin/api/orders/update.php` and `admin/api/orders/update-status.php` move the whole order to `completed`, which calls `orange_complete_order_fulfillment()`. There are no `order_items` shipped/partial columns — **line-level partial ship for outbound sales** is not implemented in UI/schema yet; **inbound** partial receipt exists for purchases (§4).
 
 3) Cancel / edit after reserve:
@@ -158,5 +159,6 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
    - **الإصلاح الم minimal المقترَح (FOR UPDATE على صف الطلب فقط):** **مرفوض كـ patch معزول** — يُ serializes إكمالاً مزدوجاً لكنه يعكس ترتيب القفل الحالي لمسارات **تعديل/إلغاء** الحجز: amend/cancel تُقفل `warehouse_variant_stock` (وتحرّر الحجز) **قبل** `UPDATE orders`، بينما الإكمال سيقفل `orders` **قبل** مخزون/FIFO — خطر **deadlock (1213)** عند تداخل amend/cancel مع complete على نفس الطلب (مثلاً `approved` + تعديل عميل + تسليم أدمن).
    - **قرار معماري:** الإصلاح **الآمن** يتطلّب **توحيد ترتيب القفل** عبر مسارات الإكمال + التعديل + الإلغاء (ويفضّل ترتيباً ثابتاً على `orders.id` في التحديث الجماعي) — **لا** `SELECT … FOR UPDATE` على `orders` في نقاط الإكمال وحدها دون ذلك.
    - **الحالة:** **مؤجَّل** حتى جلسة «lock-order harmonization» مخطَّطة؛ **لا تنفيذ** ISSUE-05 في الريبو قبلها.
+   - **ملاحظة FSR-D2-FULFILL-01 (مغلقة — ليست ISSUE-05):** عيب متسلسل بعد إعادة تسمية `pending_order` → `pending_order_fulfilled` حيث كان الحارس يشترط `$stockAlreadyReserved` — أُصلِح دون إضافة `FOR UPDATE` على `orders` (لا يُعاد فتح ISSUE-05 هنا).
 
 Agreed with project owner for Orange implementation.

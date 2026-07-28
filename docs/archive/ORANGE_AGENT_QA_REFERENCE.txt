@@ -530,6 +530,7 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
   - `scripts/self_test_final_review_d2_inventory_balances.php`
   - `scripts/self_test_final_review_d2_inventory_workflows.php`
   - `scripts/self_test_final_review_d2_inventory_concurrency.php`
+  - `scripts/self_test_final_review_d2_closure_contracts.php`
   - مساعد: `scripts/lib/final_review_d2_fixture.php`
   - عامل تزامن: `scripts/lib/final_review_d2_concurrency_worker.php`
 - عقود مثبتة سلوكياً (لا اختراع):
@@ -538,5 +539,6 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
   - مردود مبيعات: طبقة جديدة `sale_return`؛ مردود مشتريات: `reduce_for_source` على طبقات الشراء.
   - OSV: كميات فقط بلا طبقات FIFO؛ اعتماد الجرد: تقرير فقط بلا تطبيق مخزون (التطبيق عبر SAJ).
   - لا retry للـ deadlock داخل مساعدات المخزون؛ المشتريات لا تكتب `stock_movements`.
+- **FSR-D2-FULFILL-01 (مُصلَح 2026-07-28):** إعادة استدعاء `orange_complete_order_fulfillment()` بعد تحويل `pending_order` → `pending_order_fulfilled` كانت تخصم WVS وتكتب `delivered_order`. **تنفيذ:** `orange_order_stock_fulfillment_already_done()` يعترف بـ `pending_order_fulfilled` دون اشتراط حجز حي. ISSUE-05 (قفل صف الطلب) يبقى مؤجّلاً. اختبارات: workflows + concurrency `fulfill_web_dup`.
 - تزامن حقيقي عبر `proc_open` + اتصالات MySQL منفصلة؛ إن تعذّر: ENVIRONMENT_BLOCKED.
-- بلا تغيير كود أعمال/FIFO/محاسبة إنتاجي؛ Schema يبقى 124؛ D3–D5 وStep 4 **لم تُبدأ**.
+- Schema يبقى 124؛ D3–D5 وStep 4 **لم تُبدأ**.

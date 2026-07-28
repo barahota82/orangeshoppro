@@ -456,6 +456,13 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
 
 /**
  * هل اكتمل تأكيد مخزون التسليم (حجز ويب مُنجَز أو خصم delivered_order)؟
+ *
+ * FSR-D2-FULFILL-01: `pending_order_fulfilled` is authoritative on its own. After the first
+ * reserved-web fulfillment renames `pending_order` → `pending_order_fulfilled`,
+ * `$stockAlreadyReserved` becomes false; gating the fulfilled-web check on that flag
+ * incorrectly fell through to the non-reserved path (second WVS decrement + `delivered_order`).
+ *
+ * `$stockAlreadyReserved` remains in the signature for call-site compatibility only.
  */
 function orange_order_stock_fulfillment_already_done(PDO $pdo, string $orderNumber, bool $stockAlreadyReserved): bool
 {
@@ -463,7 +470,10 @@ function orange_order_stock_fulfillment_already_done(PDO $pdo, string $orderNumb
     if ($orderNumber === '') {
         return false;
     }
-    if ($stockAlreadyReserved && orange_order_has_fulfilled_web_reserve($pdo, $orderNumber)) {
+    // Retained for BC; must not gate pending_order_fulfilled recognition.
+    unset($stockAlreadyReserved);
+
+    if (orange_order_has_fulfilled_web_reserve($pdo, $orderNumber)) {
         return true;
     }
 

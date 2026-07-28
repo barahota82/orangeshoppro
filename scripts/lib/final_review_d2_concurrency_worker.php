@@ -9,7 +9,7 @@ declare(strict_types=1);
  *   php scripts/lib/final_review_d2_concurrency_worker.php <db> <scenario> <worker_id> <result_file>
  *
  * Scenarios:
- *   reserve_last | consume_last | pr_last | saj_dup | consume_split
+ *   reserve_last | consume_last | pr_last | sr_last | saj_dup | consume_split | fulfill_web_dup
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -140,6 +140,66 @@ try {
             $out['deadlock'] = str_contains(strtolower($e->getMessage()), 'deadlock');
             $out['qty'] = orange_d2_wvs_qty($pdo, $kwWh, $kwLast);
         }
+    } elseif ($scenario === 'sr_last') {
+        $meta = static function (PDO $pdo, string $k): int {
+            $st = $pdo->prepare('SELECT v FROM _d2_race_meta WHERE k = ? LIMIT 1');
+            $st->execute([$k]);
+
+            return (int) ($st->fetchColumn() ?: 0);
+        };
+        $orderId = $meta($pdo, 'sr_order_id');
+        $productId = $meta($pdo, 'sr_product_id');
+        $variantId = $meta($pdo, 'sr_variant_id');
+        $pdo->beginTransaction();
+        try {
+            orange_sales_return_lock_reference_order($pdo, $orderId);
+            orange_sales_return_assert_qty_against_order($pdo, $orderId, [[
+                'product_id' => $productId,
+                'variant_id' => $variantId,
+                'qty' => 1,
+            ]]);
+            // Document row so returned_qty_map sees the claim (same tx as stock).
+            $tmpNum = 'D2-SR-RACE-' . $workerId . '-' . getmypid();
+            $pdo->prepare(
+                'INSERT INTO sales_returns (return_number, order_id, type, total, notes)
+                 VALUES (?, ?, ?, ?, ?)'
+            )->execute([$tmpNum, $orderId, 'cash', 10.0, 'd2 race']);
+            $returnId = (int) $pdo->lastInsertId();
+            if (orange_d1_has_column($pdo, 'sales_return_items', 'variant_id')) {
+                $pdo->prepare(
+                    'INSERT INTO sales_return_items (sales_return_id, product_id, variant_id, qty, price, line_discount)
+                     VALUES (?,?,?,?,?,?)'
+                )->execute([$returnId, $productId, $variantId, 1, 10.0, 0]);
+            } else {
+                $pdo->prepare(
+                    'INSERT INTO sales_return_items (sales_return_id, product_id, qty, price)
+                     VALUES (?,?,?,?)'
+                )->execute([$returnId, $productId, 1, 10.0]);
+            }
+            orange_sales_return_add_line_stock($pdo, $productId, $variantId, 1);
+            orange_inventory_cost_layer_add(
+                $pdo,
+                $kwWh,
+                $variantId,
+                1,
+                4.0,
+                'sale_return',
+                $returnId,
+                $kwCountry,
+                null,
+                $tmpNum
+            );
+            $pdo->commit();
+            $out['ok'] = true;
+            $out['qty'] = orange_d2_wvs_qty($pdo, $kwWh, $variantId);
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $out['error'] = $e->getMessage();
+            $out['deadlock'] = str_contains(strtolower($e->getMessage()), 'deadlock');
+            $out['qty'] = orange_d2_wvs_qty($pdo, $kwWh, $variantId);
+        }
     } elseif ($scenario === 'saj_dup') {
         // Two workers try to consume same adjust source once — second should see shortfall/insufficient
         $pdo->beginTransaction();
@@ -188,6 +248,32 @@ try {
             $out['deadlock'] = str_contains(strtolower($e->getMessage()), 'deadlock');
             $out['qty'] = orange_d2_wvs_qty($pdo, $kwWh, $kwVar);
             $out['took'] = 0;
+        }
+    } elseif ($scenario === 'fulfill_web_dup') {
+        // Two processes race the real production fulfillment entry for one reserved web order.
+        // Caller transaction mirrors admin update-status (ISSUE-05: no orders FOR UPDATE here).
+        $meta = static function (PDO $pdo, string $k): int {
+            $st = $pdo->prepare('SELECT v FROM _d2_race_meta WHERE k = ? LIMIT 1');
+            $st->execute([$k]);
+
+            return (int) ($st->fetchColumn() ?: 0);
+        };
+        $orderId = $meta($pdo, 'ful_order_id');
+        $variantId = $meta($pdo, 'ful_variant_id');
+        $pdo->beginTransaction();
+        try {
+            orange_complete_order_fulfillment($pdo, $orderId);
+            $pdo->commit();
+            $out['ok'] = true;
+            $out['qty'] = orange_d2_wvs_qty($pdo, $kwWh, $variantId > 0 ? $variantId : $kwVar);
+            $out['already_done'] = true;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $out['error'] = $e->getMessage();
+            $out['deadlock'] = str_contains(strtolower($e->getMessage()), 'deadlock');
+            $out['qty'] = orange_d2_wvs_qty($pdo, $kwWh, $variantId > 0 ? $variantId : $kwVar);
         }
     } else {
         $out['error'] = 'unknown_scenario';

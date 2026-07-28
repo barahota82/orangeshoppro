@@ -10,8 +10,123 @@ declare(strict_types=1);
 require_once __DIR__ . '/final_review_d1_fixture.php';
 
 /**
- * Prevent disposable-DB schema catch-up / id-renumber from mutating the dump mid-test.
- * Uses Production gate hooks only (ok-flag + meta version) — no Production code edits.
+ * Apply committed Schema 124 inventory-relevant migrations on the disposable DB,
+ * then seal the schema gate only after signatures are verified.
+ *
+ * @return array{
+ *   dump_missing:list<string>,
+ *   applied:list<string>,
+ *   verified:list<string>,
+ *   seal:bool,
+ *   notes:list<string>
+ * }
+ */
+function orange_d2_apply_schema_124_inventory_contract(PDO $pdo, string $projectRoot, string $dbName): array
+{
+    require_once $projectRoot . '/includes/catalog_schema.php';
+    require_once $projectRoot . '/includes/schema_migrations.php';
+
+    $dumpMissing = [];
+    $applied = [];
+    $verified = [];
+    $notes = [];
+
+    if (!orange_d1_has_column($pdo, 'countries', 'timezone')) {
+        $dumpMissing[] = 'countries.timezone (absent from local orange_db.sql dump; present in Schema 124 via v122)';
+    }
+
+    // Prefer committed migration function over ad-hoc ALTER.
+    orange_catalog_migrate_countries_timezone_v122($pdo);
+    $applied[] = 'orange_catalog_migrate_countries_timezone_v122';
+
+    // Inventory tables expected by Schema 124 / catalog_schema inventory migrates.
+    $requiredTables = [
+        'warehouses',
+        'warehouse_variant_stock',
+        'stock_movements',
+        'inventory_cost_layers',
+        'inventory_cost_consumptions',
+        'opening_stock_voucher',
+        'opening_stock_voucher_line',
+        'stock_adjustment_voucher',
+        'stock_adjustment_voucher_line',
+        'inventory_reconciliation',
+        'inventory_reconciliation_line',
+        'product_variants',
+        'countries',
+    ];
+    foreach ($requiredTables as $t) {
+        if (!orange_table_exists($pdo, $t)) {
+            $dumpMissing[] = 'missing table ' . $t;
+        } else {
+            $verified[] = 'table:' . $t;
+        }
+    }
+
+    $requiredColumns = [
+        'countries.timezone',
+        'warehouse_variant_stock.warehouse_id',
+        'warehouse_variant_stock.variant_id',
+        'warehouse_variant_stock.quantity',
+        'inventory_cost_layers.layer_date',
+        'inventory_cost_layers.qty_remaining',
+        'inventory_cost_layers.unit_cost',
+        'inventory_cost_consumptions.consumed_qty',
+        'stock_movements.type',
+        'stock_movements.reference',
+        'product_variants.stock_quantity',
+        'opening_stock_voucher.status',
+        'opening_stock_voucher_line.quantity',
+        'inventory_reconciliation.status',
+    ];
+    foreach ($requiredColumns as $spec) {
+        [$table, $col] = explode('.', $spec, 2);
+        if (!orange_d1_has_column($pdo, $table, $col)) {
+            $dumpMissing[] = 'missing column ' . $spec;
+        } else {
+            $verified[] = 'column:' . $spec;
+        }
+    }
+
+    // UNIQUE (warehouse_id, variant_id) on WVS — inventory ownership key.
+    $uq = $pdo->query(
+        "SELECT INDEX_NAME FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'warehouse_variant_stock'
+           AND NON_UNIQUE = 0 AND COLUMN_NAME IN ('warehouse_id','variant_id')
+         GROUP BY INDEX_NAME HAVING COUNT(*) = 2"
+    )->fetchAll(PDO::FETCH_COLUMN);
+    if ($uq === [] || $uq === false) {
+        $dumpMissing[] = 'warehouse_variant_stock unique(warehouse_id,variant_id)';
+    } else {
+        $verified[] = 'unique:warehouse_variant_stock(warehouse_id,variant_id)';
+    }
+
+    if (!orange_d1_has_column($pdo, 'countries', 'timezone')) {
+        throw new RuntimeException('Schema 124 contract failed: countries.timezone still missing after v122');
+    }
+    $verified[] = 'countries.timezone after v122';
+
+    // Full orange_catalog_ensure_schema catch-up on a truncated dump re-runs id-renumber
+    // against tables that may lack an `id` column in this dump snapshot (observed:
+    // orange_gl_settings). That is a dump/fixture fidelity issue, not Production Schema.
+    // After applying committed inventory migrations + verifying signatures, seal the gate
+    // so D2 helpers can call ensure_schema without destructive renumber on disposable DB.
+    $notes[] = 'Full ensure_schema catch-up sealed after inventory signature verification; '
+        . 'id-renumber phase unsafe on truncated dump tables without id.';
+    orange_d2_seal_schema_gate($pdo, $dbName);
+    $applied[] = 'schema_ok_flag_after_inventory_verify';
+
+    return [
+        'dump_missing' => $dumpMissing,
+        'applied' => $applied,
+        'verified' => $verified,
+        'seal' => true,
+        'notes' => $notes,
+    ];
+}
+
+/**
+ * Seal schema gate (ok-flag + meta version) for disposable DB only.
  */
 function orange_d2_seal_schema_gate(PDO $pdo, string $dbName): void
 {
@@ -49,6 +164,8 @@ function orange_d2_seal_schema_gate(PDO $pdo, string $dbName): void
 function orange_d2_load_production_helpers(string $projectRoot): void
 {
     orange_d1_load_production_helpers($projectRoot);
+    require_once $projectRoot . '/includes/phone_validation.php';
+    require_once $projectRoot . '/includes/party_subledger.php';
     require_once $projectRoot . '/includes/warehouses.php';
     require_once $projectRoot . '/includes/inventory_cost_layers.php';
     require_once $projectRoot . '/includes/order_stock.php';
@@ -57,6 +174,8 @@ function orange_d2_load_production_helpers(string $projectRoot): void
     require_once $projectRoot . '/includes/opening_stock_lock.php';
     require_once $projectRoot . '/includes/inventory_reconciliation.php';
     require_once $projectRoot . '/includes/stock_adjustment_voucher.php';
+    require_once $projectRoot . '/includes/sales_return_helpers.php';
+    require_once $projectRoot . '/includes/purchase_return_helpers.php';
 }
 
 /**
@@ -66,6 +185,7 @@ function orange_d2_load_production_helpers(string $projectRoot): void
  *   db_name?:string,
  *   cleanup?:callable,
  *   ids?:array<string,int|string>,
+ *   schema?:array<string,mixed>,
  *   error?:string,
  *   env?:string
  * }
@@ -81,12 +201,15 @@ function orange_d2_bootstrap_isolated_db(string $projectRoot): array
     $pdo = $boot['pdo'];
     /** @var array<string,int|string> $ids */
     $ids = $boot['ids'] ?? [];
+    $dbName = (string) ($boot['db_name'] ?? '');
 
     try {
+        // Load schema helpers before applying v122 / seal.
+        require_once $projectRoot . '/includes/catalog_schema.php';
+        $schemaReport = orange_d2_apply_schema_124_inventory_contract($pdo, $projectRoot, $dbName);
         $ids = orange_d2_enrich_inventory_fixture($pdo, $ids);
-        orange_d2_seal_schema_gate($pdo, (string) ($boot['db_name'] ?? 'orange_d2'));
         $boot['ids'] = $ids;
-        // Rename disposable DB marker in return only — physical name stays orange_d1_* from bootstrap.
+        $boot['schema'] = $schemaReport;
         $boot['env'] = 'MYSQL_DISPOSABLE_D2';
 
         return $boot;
@@ -111,13 +234,7 @@ function orange_d2_enrich_inventory_fixture(PDO $pdo, array $ids): array
 {
     $now = gmdate('Y-m-d H:i:s');
 
-    // Country Configuration timezones required by FIFO layer wall→UTC conversion.
-    // Local orange_db.sql may predate countries.timezone — add on disposable DB only (not Production).
-    if (!orange_d1_has_column($pdo, 'countries', 'timezone')) {
-        $pdo->exec(
-            'ALTER TABLE countries ADD COLUMN timezone VARCHAR(64) NULL DEFAULT NULL'
-        );
-    }
+    // Timezone values (column guaranteed by v122 apply).
     $pdo->prepare('UPDATE countries SET timezone = ? WHERE id = ?')->execute(['Asia/Kuwait', (int) $ids['kw_country_id']]);
     $pdo->prepare('UPDATE countries SET timezone = ? WHERE id = ?')->execute(['Africa/Cairo', (int) $ids['eg_country_id']]);
 
@@ -160,18 +277,87 @@ function orange_d2_enrich_inventory_fixture(PDO $pdo, array $ids): array
     $kwVar = (int) $ids['kw_variant_id'];
     $egVar = (int) $ids['eg_variant_id'];
 
-    // Authoritative on-hand rows (WVS). Legacy stock_quantity is KW mirror only.
     orange_d2_upsert_wvs($pdo, $kwWh, $kwVar, 100);
     orange_d2_upsert_wvs($pdo, $kwWh, 603, 0);
     orange_d2_upsert_wvs($pdo, $kwWh, 604, 1);
     orange_d2_upsert_wvs($pdo, $kwWhB, $kwVar, 25);
     orange_d2_upsert_wvs($pdo, $egWh, $egVar, 50);
 
+    // Sync KW legacy mirror from default warehouse; leave EG mirror deliberately stale later in tests.
+    $pdo->prepare('UPDATE product_variants SET stock_quantity = ? WHERE id = ?')->execute([100, $kwVar]);
+    $pdo->prepare('UPDATE product_variants SET stock_quantity = ? WHERE id = ?')->execute([0, 603]);
+    $pdo->prepare('UPDATE product_variants SET stock_quantity = ? WHERE id = ?')->execute([1, 604]);
+    // EG WVS=50 but mirror deliberately wrong (999) to prove WVS authority.
+    $pdo->prepare('UPDATE product_variants SET stock_quantity = ? WHERE id = ?')->execute([999, $egVar]);
+
+    // Fulfillment-safe customers: phone must match orange_normalize_customer_phone E.164.
+    // customers.area / address are NOT NULL without default — INSERT path in ensure_customer needs match.
+    $kwPhone = '+96550000001';
+    $egPhone = '+201000000001';
+    if (orange_table_exists($pdo, 'customers')) {
+        $pdo->prepare(
+            'UPDATE customers SET phone = ?, area = ?, address = ?, status = ?
+             WHERE id = ?'
+        )->execute([$kwPhone, 'Kuwait City', 'D2 KW address block 1', 'active', (int) $ids['kw_customer_id']]);
+        $pdo->prepare(
+            'UPDATE customers SET phone = ?, area = ?, address = ?, status = ?
+             WHERE id = ?'
+        )->execute([$egPhone, 'Cairo', 'D2 EG address block 1', 'active', (int) $ids['eg_customer_id']]);
+    }
+
     $ids['kw_warehouse_b_id'] = $kwWhB;
     $ids['kw_variant_zero_id'] = 603;
     $ids['kw_variant_last_id'] = 604;
+    $ids['kw_customer_phone'] = $kwPhone;
+    $ids['eg_customer_phone'] = $egPhone;
 
     return $ids;
+}
+
+/**
+ * Insert an order ready for orange_complete_order_fulfillment (valid customer/area/address/phone).
+ */
+function orange_d2_insert_fulfillment_order(
+    PDO $pdo,
+    int $countryId,
+    int $channelId,
+    int $customerId,
+    string $phoneE164,
+    string $orderNumber,
+    float $total,
+    string $status = 'pending',
+    ?int $warehouseId = null
+): int {
+    $cols = ['order_number', 'customer_name', 'phone', 'area', 'address', 'channel_id', 'status', 'total'];
+    $vals = [$orderNumber, 'D2 Fulfill Customer', $phoneE164, 'Kuwait City', 'D2 fulfillment address', $channelId, $status, $total];
+    if (orange_d1_has_column($pdo, 'orders', 'country_id')) {
+        $cols[] = 'country_id';
+        $vals[] = $countryId;
+    }
+    if (orange_d1_has_column($pdo, 'orders', 'customer_id')) {
+        $cols[] = 'customer_id';
+        $vals[] = $customerId;
+    }
+    if (orange_d1_has_column($pdo, 'orders', 'warehouse_id') && $warehouseId !== null && $warehouseId > 0) {
+        $cols[] = 'warehouse_id';
+        $vals[] = $warehouseId;
+    }
+    if (orange_d1_has_column($pdo, 'orders', 'payment_terms')) {
+        $cols[] = 'payment_terms';
+        $vals[] = 'cash';
+    }
+    if (orange_d1_has_column($pdo, 'orders', 'payment_status')) {
+        $cols[] = 'payment_status';
+        $vals[] = 'unpaid';
+    }
+    if (orange_d1_has_column($pdo, 'orders', 'created_at')) {
+        $cols[] = 'created_at';
+        $vals[] = gmdate('Y-m-d H:i:s');
+    }
+    $ph = implode(',', array_fill(0, count($cols), '?'));
+    $pdo->prepare('INSERT INTO orders (' . implode(',', $cols) . ') VALUES (' . $ph . ')')->execute($vals);
+
+    return (int) $pdo->lastInsertId();
 }
 
 function orange_d2_set_admin_country(int $countryId, string $code = ''): void
@@ -213,6 +399,14 @@ function orange_d2_wvs_qty(PDO $pdo, int $warehouseId, int $variantId): int
     $q = $st->fetchColumn();
 
     return $q !== false && $q !== null ? (int) $q : 0;
+}
+
+function orange_d2_variant_mirror_qty(PDO $pdo, int $variantId): int
+{
+    $st = $pdo->prepare('SELECT stock_quantity FROM product_variants WHERE id = ? LIMIT 1');
+    $st->execute([$variantId]);
+
+    return (int) ($st->fetchColumn() ?: 0);
 }
 
 /**
@@ -266,8 +460,6 @@ function orange_d2_movement_count(PDO $pdo, string $reference, ?string $type = n
 }
 
 /**
- * Seed two distinct FIFO layers (older cheaper, newer dearer) via production helper.
- *
  * @return array{layer_old_id:int, layer_new_id:int}
  */
 function orange_d2_seed_two_fifo_layers(
@@ -311,8 +503,6 @@ function orange_d2_seed_two_fifo_layers(
 }
 
 /**
- * MySQL DSN pieces for concurrency worker processes.
- *
  * @return array{host:string,port:int,user:string,pass:string}
  */
 function orange_d2_mysql_connect_meta(): array

@@ -107,14 +107,27 @@ try {
     d2w_assert(orange_d2_layer_remaining_sum($pdo, $kwWhB, $kwVar) === 7, 'WH-B has own layers');
     d2w_assert(orange_d2_layer_remaining_sum($pdo, $kwWh, $kwVar) === 10, 'WH-A layers unchanged');
 
-    // --- Fulfillment outbound (reserved path + FIFO) ---
+    // --- Fulfillment outbound: REAL orange_complete_order_fulfillment (no helper substitute) ---
+    $egWvsAtFulStart = orange_d2_wvs_qty($pdo, $egWh, $egVar);
     orange_d2_upsert_wvs($pdo, $kwWh, $kwVar, 10);
     $orderNo = 'D2-FUL-001';
-    $orderId = orange_d1_insert_order($pdo, $kwCountry, (int) $ids['kw_channel_id'], $orderNo, 20.0, 'approved');
-    if (orange_d1_has_column($pdo, 'orders', 'warehouse_id')) {
-        $pdo->prepare('UPDATE orders SET warehouse_id = ? WHERE id = ?')->execute([$kwWh, $orderId]);
-    }
+    $orderId = orange_d2_insert_fulfillment_order(
+        $pdo,
+        $kwCountry,
+        (int) $ids['kw_channel_id'],
+        (int) $ids['kw_customer_id'],
+        (string) $ids['kw_customer_phone'],
+        $orderNo,
+        20.0,
+        'approved',
+        $kwWh
+    );
     $itemId = orange_d1_insert_order_item($pdo, $orderId, $kwProduct, $kwVar, 3, 10.0);
+    // Ensure order_items.cost set for COGS shortfall fallback path (not used when layers exist).
+    if (orange_d1_has_column($pdo, 'order_items', 'cost')) {
+        $pdo->prepare('UPDATE order_items SET cost = ? WHERE id = ?')->execute([4.0, $itemId]);
+    }
+
     $pdo->beginTransaction();
     orange_order_apply_pending_stock_reservation($pdo, $orderNo, [[
         'product' => ['id' => $kwProduct],
@@ -127,83 +140,200 @@ try {
     ]], $kwCountry, $kwWh);
     $pdo->commit();
     d2w_assert(orange_d2_wvs_qty($pdo, $kwWh, $kwVar) === 7, 'reserve before fulfill');
+    d2w_assert(orange_order_has_pending_stock_reservation($pdo, $orderNo), 'pending_order reservation active');
 
     $pdo->prepare("UPDATE orders SET status = 'completed' WHERE id = ?")->execute([$orderId]);
     $remBeforeFul = orange_d2_layer_remaining_sum($pdo, $kwWh, $kwVar);
-    $pdo->beginTransaction();
-    // Avoid full ensure_schema side-effects: call stock path via complete fulfillment when possible.
+    $wvsBeforeFul = orange_d2_wvs_qty($pdo, $kwWh, $kwVar);
+    // Do not wrap complete_order_fulfillment in an outer transaction: CLI ensure_schema may
+    // beginTransaction (MySQL implicit-commit) and break nested caller transactions.
+    $fulOk = true;
+    $fulErr = '';
     try {
         orange_complete_order_fulfillment($pdo, $orderId);
-        $fulOk = true;
-        $fulErr = '';
     } catch (Throwable $e) {
         $fulOk = false;
         $fulErr = $e->getMessage();
-        // Fallback: apply the documented stock+FIFO contract directly if customer/GL deps block.
-        if ($pdo->inTransaction()) {
-            // complete may have nested tx; ensure clean
-        }
     }
-    if ($pdo->inTransaction()) {
-        if ($fulOk) {
-            $pdo->commit();
-        } else {
-            $pdo->rollBack();
-        }
-    }
-    if (!$fulOk) {
-        echo "NOTE  complete_order_fulfillment blocked ({$fulErr}) — applying stock+FIFO contract helpers\n";
-        $pdo->beginTransaction();
-        $alreadyFifo = orange_inventory_cost_layers_consumption_cost($pdo, 'order', $itemId);
-        $needFifo = 3 - (int) $alreadyFifo['qty'];
-        if ($needFifo > 0) {
-            orange_inventory_cost_layers_consume_fifo($pdo, $kwWh, $kwVar, $needFifo, 'order', $itemId, null);
-        }
-        $pdo->prepare(
-            "UPDATE stock_movements SET type = 'pending_order_fulfilled'
-             WHERE reference = ? AND type = 'pending_order'"
-        )->execute(['ORDER-' . $orderNo]);
-        $pdo->commit();
-        $fulOk = true;
-        $skips++;
-        echo "SKIP  full orange_complete_order_fulfillment (deps) — stock/FIFO contract exercised\n";
-    }
-    d2w_assert($fulOk, 'fulfillment path completed (full or stock/FIFO contract)');
-    d2w_assert(orange_d2_wvs_qty($pdo, $kwWh, $kwVar) === 7, 'fulfill after reserve does not double-decrease on-hand');
-    d2w_assert(orange_d2_layer_remaining_sum($pdo, $kwWh, $kwVar) === $remBeforeFul - 3, 'fulfill consumes 3 from FIFO');
-    d2w_assert(orange_d2_consumption_qty($pdo, 'order', $itemId) === 3, 'consumption rows for order_item');
+    d2w_assert($fulOk, 'FULL orange_complete_order_fulfillment executed' . ($fulOk ? '' : (' ERR=' . $fulErr)));
+    d2w_assert(orange_d2_wvs_qty($pdo, $kwWh, $kwVar) === $wvsBeforeFul, 'fulfill after reserve does not decrease WVS twice');
+    d2w_assert(orange_d2_layer_remaining_sum($pdo, $kwWh, $kwVar) === $remBeforeFul - 3, 'fulfill consumes 3 from FIFO once');
+    d2w_assert(orange_d2_consumption_qty($pdo, 'order', $itemId) === 3, 'consumption rows for order_item once');
     d2w_assert(
-        orange_d2_movement_count($pdo, 'ORDER-' . $orderNo, 'pending_order_fulfilled') >= 1
-        || orange_d2_movement_count($pdo, 'ORDER-' . $orderNo, 'delivered_order') >= 1,
-        'fulfillment movement type recorded'
+        orange_d2_movement_count($pdo, 'ORDER-' . $orderNo, 'pending_order_fulfilled') >= 1,
+        'pending_order renamed to pending_order_fulfilled once'
+    );
+    d2w_assert(
+        orange_d2_movement_count($pdo, 'ORDER-' . $orderNo, 'delivered_order') === 0,
+        'reserved path does not also write delivered_order'
+    );
+    d2w_assert(
+        orange_warehouse_authority_country_id($pdo, $kwWh) === $kwCountry,
+        'fulfillment warehouse country remains KW'
     );
 
-    // Idempotent second fulfill
+    // Idempotent second call — FSR-D2-FULFILL-01 repaired contract.
     $wvsMid = orange_d2_wvs_qty($pdo, $kwWh, $kwVar);
     $remMid = orange_d2_layer_remaining_sum($pdo, $kwWh, $kwVar);
-    $pdo->beginTransaction();
-    $already = orange_inventory_cost_layers_consumption_cost($pdo, 'order', $itemId);
-    $need = 3 - (int) $already['qty'];
-    if ($need > 0) {
-        orange_inventory_cost_layers_consume_fifo($pdo, $kwWh, $kwVar, $need, 'order', $itemId, null);
+    $consMid = orange_d2_consumption_qty($pdo, 'order', $itemId);
+    $movMid = orange_d2_movement_count($pdo, 'ORDER-' . $orderNo, 'pending_order_fulfilled');
+    $reservedStill = orange_order_has_pending_stock_reservation($pdo, $orderNo);
+    d2w_assert(!$reservedStill, 'after first fulfill: pending_order reservation no longer active');
+    // Mutation-proof: old buggy gate (fulfilled only when $stockAlreadyReserved) would miss the marker.
+    $oldBuggyDone = $reservedStill && orange_order_has_fulfilled_web_reserve($pdo, $orderNo);
+    $fixedDone = orange_order_stock_fulfillment_already_done($pdo, $orderNo, $reservedStill);
+    d2w_assert(
+        !$oldBuggyDone && $fixedDone,
+        'mutation-proof FSR-D2-FULFILL-01: old reserved-gated check misses pending_order_fulfilled'
+    );
+    orange_complete_order_fulfillment($pdo, $orderId);
+    $wvsAfterRepeat = orange_d2_wvs_qty($pdo, $kwWh, $kwVar);
+    $deliveredAfterRepeat = orange_d2_movement_count($pdo, 'ORDER-' . $orderNo, 'delivered_order');
+    d2w_assert(
+        $wvsAfterRepeat === $wvsMid && $deliveredAfterRepeat === 0,
+        'repeated fulfill: WVS unchanged and no delivered_order (idempotent)'
+    );
+    d2w_assert(orange_d2_layer_remaining_sum($pdo, $kwWh, $kwVar) === $remMid, 'repeated fulfill: layers unchanged');
+    d2w_assert(orange_d2_consumption_qty($pdo, 'order', $itemId) === $consMid, 'repeated fulfill: consumption unchanged');
+    d2w_assert(
+        orange_d2_movement_count($pdo, 'ORDER-' . $orderNo, 'pending_order_fulfilled') === $movMid,
+        'repeated fulfill: pending_order_fulfilled count unchanged'
+    );
+
+    // Manual / non-reserved path: delivered_order is the idempotency marker.
+    orange_d2_upsert_wvs($pdo, $kwWh, $kwVar, 20);
+    $pdo->prepare('DELETE FROM stock_movements WHERE reference = ?')->execute(['ORDER-D2-FUL-MAN']);
+    $manNo = 'D2-FUL-MAN';
+    $manId = orange_d2_insert_fulfillment_order(
+        $pdo,
+        $kwCountry,
+        (int) $ids['kw_channel_id'],
+        (int) $ids['kw_customer_id'],
+        (string) $ids['kw_customer_phone'],
+        $manNo,
+        10.0,
+        'completed',
+        $kwWh
+    );
+    $manItemId = orange_d1_insert_order_item($pdo, $manId, $kwProduct, $kwVar, 2, 10.0);
+    if (orange_d1_has_column($pdo, 'order_items', 'cost')) {
+        $pdo->prepare('UPDATE order_items SET cost = ? WHERE id = ?')->execute([4.0, $manItemId]);
     }
+    // Ensure FIFO layers enough for manual consume
+    if (orange_d2_layer_remaining_sum($pdo, $kwWh, $kwVar) < 2) {
+        orange_inventory_cost_layer_add($pdo, $kwWh, $kwVar, 10, 4.0, 'purchase', 99401, $kwCountry, '2026-07-01 18:00:00');
+    }
+    d2w_assert(!orange_order_has_pending_stock_reservation($pdo, $manNo), 'manual path starts without pending_order');
+    $wvsManBefore = orange_d2_wvs_qty($pdo, $kwWh, $kwVar);
+    $remManBefore = orange_d2_layer_remaining_sum($pdo, $kwWh, $kwVar);
+    orange_complete_order_fulfillment($pdo, $manId);
+    d2w_assert(orange_d2_wvs_qty($pdo, $kwWh, $kwVar) === $wvsManBefore - 2, 'manual first fulfill decrements WVS');
+    d2w_assert(
+        orange_d2_movement_count($pdo, 'ORDER-' . $manNo, 'delivered_order') === 1,
+        'manual first fulfill writes delivered_order'
+    );
+    d2w_assert(orange_d2_consumption_qty($pdo, 'order', $manItemId) === 2, 'manual first fulfill consumes FIFO once');
+    // Mutation-proof: delivered_order guard alone must mark done for non-reserved path
+    d2w_assert(
+        orange_order_has_active_delivered_stock($pdo, $manNo)
+        && orange_order_stock_fulfillment_already_done($pdo, $manNo, false),
+        'mutation-proof: delivered_order satisfies already_done for manual path'
+    );
+    $wvsManMid = orange_d2_wvs_qty($pdo, $kwWh, $kwVar);
+    $remManMid = orange_d2_layer_remaining_sum($pdo, $kwWh, $kwVar);
+    $consManMid = orange_d2_consumption_qty($pdo, 'order', $manItemId);
+    orange_complete_order_fulfillment($pdo, $manId);
+    d2w_assert(orange_d2_wvs_qty($pdo, $kwWh, $kwVar) === $wvsManMid, 'manual repeated fulfill: WVS unchanged');
+    d2w_assert(orange_d2_layer_remaining_sum($pdo, $kwWh, $kwVar) === $remManMid, 'manual repeated fulfill: layers unchanged');
+    d2w_assert(orange_d2_consumption_qty($pdo, 'order', $manItemId) === $consManMid, 'manual repeated fulfill: consumption unchanged');
+    d2w_assert(
+        orange_d2_movement_count($pdo, 'ORDER-' . $manNo, 'delivered_order') === 1,
+        'manual repeated fulfill: still one delivered_order'
+    );
+
+    // Country / warehouse isolation: EG WVS untouched by KW fulfill; foreign order marker does not match.
+    d2w_assert(
+        orange_d2_wvs_qty($pdo, $egWh, $egVar) === $egWvsAtFulStart,
+        'KW fulfill does not change EG WVS'
+    );
+    d2w_assert(
+        !orange_order_stock_fulfillment_already_done($pdo, 'D2-FUL-OTHER', false),
+        'another order number cannot satisfy this order already_done'
+    );
+    d2w_assert(
+        orange_order_stock_fulfillment_already_done($pdo, $orderNo, false),
+        'this order pending_order_fulfilled still authoritative without live reservation'
+    );
+
+    // Rollback of fulfillment inventory writes (caller-owned tx around the same ops complete uses).
+    // Wrapping complete_order_fulfillment itself is unsafe under CLI schema renumber beginTransaction.
+    $rbVar = (int) $ids['kw_variant_last_id'];
+    orange_d2_upsert_wvs($pdo, $kwWh, $rbVar, 2);
+    $pdo->prepare('DELETE FROM inventory_cost_consumptions WHERE variant_id = ?')->execute([$rbVar]);
+    $pdo->prepare('DELETE FROM inventory_cost_layers WHERE warehouse_id = ? AND variant_id = ?')->execute([$kwWh, $rbVar]);
+    orange_inventory_cost_layer_add($pdo, $kwWh, $rbVar, 2, 4.0, 'purchase', 99111, $kwCountry, '2026-01-01 00:00:00');
+    $orderNoRb = 'D2-FUL-RB';
+    $rbOrderId = orange_d2_insert_fulfillment_order(
+        $pdo,
+        $kwCountry,
+        (int) $ids['kw_channel_id'],
+        (int) $ids['kw_customer_id'],
+        (string) $ids['kw_customer_phone'],
+        $orderNoRb,
+        10.0,
+        'approved',
+        $kwWh
+    );
+    $rbItemId = orange_d1_insert_order_item($pdo, $rbOrderId, $kwProduct, $rbVar, 1, 10.0);
+    $pdo->beginTransaction();
+    orange_order_apply_pending_stock_reservation($pdo, $orderNoRb, [[
+        'product' => ['id' => $kwProduct],
+        'qty' => 1,
+        'color' => '',
+        'size' => '',
+        'variant_id' => $rbVar,
+        'price' => 10.0,
+        'cost' => 4.0,
+    ]], $kwCountry, $kwWh);
     $pdo->commit();
-    d2w_assert($need === 0, 'second fulfill needFifo=0 (idempotent)');
-    d2w_assert(orange_d2_wvs_qty($pdo, $kwWh, $kwVar) === $wvsMid && orange_d2_layer_remaining_sum($pdo, $kwWh, $kwVar) === $remMid, 'idempotent fulfill no second consume');
+    $wvsRbBefore = orange_d2_wvs_qty($pdo, $kwWh, $rbVar);
+    $remRbBefore = orange_d2_layer_remaining_sum($pdo, $kwWh, $rbVar);
+    $pdo->beginTransaction();
+    orange_inventory_cost_layers_consume_fifo($pdo, $kwWh, $rbVar, 1, 'order', $rbItemId, null);
+    $pdo->prepare(
+        "UPDATE stock_movements SET type = 'pending_order_fulfilled'
+         WHERE reference = ? AND type = 'pending_order'"
+    )->execute(['ORDER-' . $orderNoRb]);
+    $pdo->rollBack();
+    d2w_assert(orange_d2_wvs_qty($pdo, $kwWh, $rbVar) === $wvsRbBefore, 'fulfillment inventory rollback restores WVS');
+    d2w_assert(orange_d2_layer_remaining_sum($pdo, $kwWh, $rbVar) === $remRbBefore, 'fulfillment inventory rollback restores layers');
+    d2w_assert(orange_d2_consumption_qty($pdo, 'order', $rbItemId) === 0, 'fulfillment inventory rollback: no consumption');
+    // Full production entry retry after clean reserve state
+    $pdo->prepare("UPDATE orders SET status = 'completed' WHERE id = ?")->execute([$rbOrderId]);
+    orange_complete_order_fulfillment($pdo, $rbOrderId);
+    d2w_assert(orange_d2_consumption_qty($pdo, 'order', $rbItemId) === 1, 'retry full complete_order_fulfillment consumes once');
 
     // Cancelled order cannot be fulfilled via complete (status guard)
     $cancelNo = 'D2-FUL-CANCEL';
-    $cancelId = orange_d1_insert_order($pdo, $kwCountry, (int) $ids['kw_channel_id'], $cancelNo, 10.0, 'cancelled');
+    $cancelId = orange_d2_insert_fulfillment_order(
+        $pdo,
+        $kwCountry,
+        (int) $ids['kw_channel_id'],
+        (int) $ids['kw_customer_id'],
+        (string) $ids['kw_customer_phone'],
+        $cancelNo,
+        10.0,
+        'cancelled',
+        $kwWh
+    );
     orange_d1_insert_order_item($pdo, $cancelId, $kwProduct, $kwVar, 1, 10.0);
     $cancelBlocked = false;
     try {
         orange_complete_order_fulfillment($pdo, $cancelId);
     } catch (Throwable $e) {
         $cancelBlocked = str_contains($e->getMessage(), 'غير مكتمل')
-            || str_contains($e->getMessage(), 'غير موجود')
-            || str_contains($e->getMessage(), 'completed');
+            || str_contains($e->getMessage(), 'غير موجود');
     }
-    // Contract: fulfillment requires orders.status = completed before stock effects.
     $stCancel = $pdo->prepare('SELECT status FROM orders WHERE id = ?');
     $stCancel->execute([$cancelId]);
     $cancelStatus = (string) $stCancel->fetchColumn();

@@ -187,14 +187,50 @@ try {
     d2c_assert($ok3 === 1, 'PR race: exactly one winner');
     d2c_assert(orange_d2_wvs_qty($pdo, $kwWh, $kwLast) === 0, 'PR race: on-hand = 0');
 
-    // --- 4) Sales return last-eligible: document-level eligibility is D1; here race on WVS restore is additive.
-    // Two workers restoring +1 each from zero is not a "last eligible" race — skip with note.
-    // Instead: two workers race to claim last consumable return capacity via reduce of a shared layer reverse:
-    // Use consume_last-style on a dedicated return layer quantity of 1 via purchase reduce already covered.
-    echo "NOTE  SR last-eligible race: document qty cap is D1; inventory restore is additive layer_add — "
-        . "race covered via PR/reserve/consume patterns\n";
-    $skips++;
-    echo "SKIP  SR dual restore race (architecture: new sale_return layers, no shared claim lock)\n";
+    // --- 4) Two Sales Returns race for the last eligible return quantity (order FOR UPDATE + qty assert) ---
+    $srOrderNo = 'D2-RACE-SR';
+    orange_d2_upsert_wvs($pdo, $kwWh, $kwLast, 5);
+    $pdo->prepare('DELETE FROM inventory_cost_layers WHERE warehouse_id = ? AND variant_id = ?')->execute([$kwWh, $kwLast]);
+    orange_inventory_cost_layer_add($pdo, $kwWh, $kwLast, 5, 4.0, 'purchase', 9700, $kwCountry, '2026-01-01 00:00:00');
+    $srOrderId = orange_d2_insert_fulfillment_order(
+        $pdo,
+        $kwCountry,
+        (int) $ids['kw_channel_id'],
+        (int) $ids['kw_customer_id'],
+        (string) $ids['kw_customer_phone'],
+        $srOrderNo,
+        10.0,
+        'completed',
+        $kwWh
+    );
+    orange_d1_insert_order_item($pdo, $srOrderId, $kwProduct, $kwLast, 1, 10.0);
+    // Persist race target for workers
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS _d2_race_meta (
+            k VARCHAR(64) PRIMARY KEY,
+            v VARCHAR(191) NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    );
+    $pdo->prepare('REPLACE INTO _d2_race_meta (k, v) VALUES (?, ?)')->execute(['sr_order_id', (string) $srOrderId]);
+    $pdo->prepare('REPLACE INTO _d2_race_meta (k, v) VALUES (?, ?)')->execute(['sr_product_id', (string) $kwProduct]);
+    $pdo->prepare('REPLACE INTO _d2_race_meta (k, v) VALUES (?, ?)')->execute(['sr_variant_id', (string) $kwLast]);
+    $wvsSrBefore = orange_d2_wvs_qty($pdo, $kwWh, $kwLast);
+    $r4 = d2c_run_workers($root, $dbName, 'sr_last', 2);
+    $ok4 = 0;
+    foreach ($r4 as $r) {
+        if (!empty($r['ok'])) {
+            $ok4++;
+        }
+        echo 'NOTE  sr_last worker=' . (int) ($r['worker_id'] ?? 0)
+            . ' ok=' . (!empty($r['ok']) ? '1' : '0')
+            . ' err=' . (string) ($r['error'] ?? '') . "\n";
+    }
+    d2c_assert($ok4 === 1, 'SR race: exactly one winner on last eligible qty');
+    d2c_assert(orange_d2_wvs_qty($pdo, $kwWh, $kwLast) === $wvsSrBefore + 1, 'SR race: WVS +1 once');
+    $restoredLayers = (int) $pdo->query(
+        "SELECT COUNT(*) FROM inventory_cost_layers WHERE source_type = 'sale_return' AND variant_id = " . (int) $kwLast
+    )->fetchColumn();
+    d2c_assert($restoredLayers === 1, 'SR race: exactly one sale_return layer');
 
     // --- 5) Duplicate adjustment consume ---
     orange_d2_upsert_wvs($pdo, $kwWh, $kwVar, 1);
@@ -235,6 +271,74 @@ try {
     d2c_assert($ok6 === 2 && $took === 5, 'split consume: both succeed totaling 5');
     d2c_assert(orange_d2_wvs_qty($pdo, $kwWh, $kwVar) === 0, 'split consume: WVS 0');
     d2c_assert(orange_d2_layer_remaining_sum($pdo, $kwWh, $kwVar) === 0, 'split consume: layers 0');
+
+    // --- 7) Concurrent orange_complete_order_fulfillment on one reserved web order ---
+    // ISSUE-05 (orders FOR UPDATE) remains deferred per ORANGE_STOCK_ORDER_POLICY §17.
+    // This race proves FSR-D2-FULFILL-01: after reserve, only one inventory finalize effect.
+    $fulNo = 'D2-RACE-FUL';
+    orange_d2_upsert_wvs($pdo, $kwWh, $kwVar, 10);
+    $pdo->prepare('DELETE FROM inventory_cost_consumptions WHERE variant_id = ?')->execute([$kwVar]);
+    $pdo->prepare('DELETE FROM inventory_cost_layers WHERE warehouse_id = ? AND variant_id = ?')->execute([$kwWh, $kwVar]);
+    $pdo->prepare('DELETE FROM stock_movements WHERE reference = ?')->execute(['ORDER-' . $fulNo]);
+    orange_inventory_cost_layer_add($pdo, $kwWh, $kwVar, 10, 3.0, 'purchase', 9800, $kwCountry, '2026-01-01 00:00:00');
+    $fulOrderId = orange_d2_insert_fulfillment_order(
+        $pdo,
+        $kwCountry,
+        (int) $ids['kw_channel_id'],
+        (int) $ids['kw_customer_id'],
+        (string) $ids['kw_customer_phone'],
+        $fulNo,
+        30.0,
+        'approved',
+        $kwWh
+    );
+    $fulItemId = orange_d1_insert_order_item($pdo, $fulOrderId, $kwProduct, $kwVar, 3, 10.0);
+    $pdo->beginTransaction();
+    orange_order_apply_pending_stock_reservation($pdo, $fulNo, [[
+        'product' => ['id' => $kwProduct],
+        'qty' => 3,
+        'color' => '',
+        'size' => '',
+        'variant_id' => $kwVar,
+        'price' => 10.0,
+        'cost' => 3.0,
+    ]], $kwCountry, $kwWh);
+    $pdo->commit();
+    $pdo->prepare("UPDATE orders SET status = 'completed' WHERE id = ?")->execute([$fulOrderId]);
+    $wvsFulBefore = orange_d2_wvs_qty($pdo, $kwWh, $kwVar);
+    d2c_assert($wvsFulBefore === 7, 'fulfill race setup: WVS after reserve = 7');
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS _d2_race_meta (
+            k VARCHAR(64) PRIMARY KEY,
+            v VARCHAR(191) NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    );
+    $pdo->prepare('REPLACE INTO _d2_race_meta (k, v) VALUES (?, ?)')->execute(['ful_order_id', (string) $fulOrderId]);
+    $pdo->prepare('REPLACE INTO _d2_race_meta (k, v) VALUES (?, ?)')->execute(['ful_variant_id', (string) $kwVar]);
+    $r7 = d2c_run_workers($root, $dbName, 'fulfill_web_dup', 2);
+    foreach ($r7 as $r) {
+        echo 'NOTE  fulfill_web_dup worker=' . (int) ($r['worker_id'] ?? 0)
+            . ' ok=' . (!empty($r['ok']) ? '1' : '0')
+            . ' err=' . (string) ($r['error'] ?? '')
+            . ' deadlock=' . (!empty($r['deadlock']) ? '1' : '0')
+            . ' qty=' . (string) ($r['qty'] ?? '') . "\n";
+    }
+    $wvsFulAfter = orange_d2_wvs_qty($pdo, $kwWh, $kwVar);
+    $fulFulfilled = orange_d2_movement_count($pdo, 'ORDER-' . $fulNo, 'pending_order_fulfilled');
+    $fulDelivered = orange_d2_movement_count($pdo, 'ORDER-' . $fulNo, 'delivered_order');
+    $fulCons = orange_d2_consumption_qty($pdo, 'order', $fulItemId);
+    d2c_assert($wvsFulAfter === $wvsFulBefore, 'fulfill race: WVS unchanged (no second decrement)');
+    d2c_assert($fulFulfilled === 1, 'fulfill race: exactly one pending_order_fulfilled');
+    d2c_assert($fulDelivered === 0, 'fulfill race: zero delivered_order on reserved path');
+    d2c_assert($fulCons === 3, 'fulfill race: FIFO consumed once (qty=3)');
+    d2c_assert(orange_d2_layer_remaining_sum($pdo, $kwWh, $kwVar) === 7, 'fulfill race: layers remaining = 7');
+    // Mutation-proof note: without independent pending_order_fulfilled recognition, a late
+    // second worker would take the non-reserved path (WVS drop + delivered_order). Proven
+    // sequentially in workflows; concurrent final state must remain one-effect.
+    d2c_assert(
+        $wvsFulAfter === 7 && $fulDelivered === 0 && $fulFulfilled === 1,
+        'mutation-proof concurrency: reserved web finalize stays single-effect'
+    );
 
     // Recon duplicate approve sequential (not parallel needed — already in workflows); quick concurrent status flip
     $pdo->prepare(

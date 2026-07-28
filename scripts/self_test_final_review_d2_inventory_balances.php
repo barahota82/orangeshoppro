@@ -244,6 +244,19 @@ try {
         'mutation-proof: reservation idempotency + void rename present'
     );
 
+    // product_variants.stock_quantity — Kuwait-only legacy mirror (authoritative proof)
+    orange_warehouse_set_variant_quantity($pdo, $kwWh, $kwVar, 55);
+    d2b_assert(orange_d2_variant_mirror_qty($pdo, $kwVar) === 55, 'KW default WH writes legacy mirror');
+    orange_d2_upsert_wvs($pdo, $egWh, $egVar, 50);
+    $pdo->prepare('UPDATE product_variants SET stock_quantity = 777 WHERE id = ?')->execute([$egVar]);
+    d2b_assert(
+        orange_warehouse_effective_variant_stock($pdo, $egVar, $egCountry) === 50
+        && orange_d2_variant_mirror_qty($pdo, $egVar) === 777,
+        'EG effective stock ignores stale mirror (WVS authoritative)'
+    );
+    orange_warehouse_set_variant_quantity($pdo, $kwWhB, $kwVar, 3);
+    d2b_assert(orange_d2_variant_mirror_qty($pdo, $kwVar) === 55, 'non-default KW warehouse does not sync mirror');
+
     // Authority matrix spot checks (UNKNOWN_AUTHORITY = 0 for tested mutations)
     $authoritySafe = 0;
     $authorityTotal = 0;
@@ -253,13 +266,14 @@ try {
         ['object' => 'stock_movements', 'pattern' => 'WAREHOUSE_COUNTRY_ENFORCED'],
         ['object' => 'order_reservation', 'pattern' => 'RECORD_COUNTRY_ENFORCED'],
         ['object' => 'purchase_stock_delta', 'pattern' => 'COUNTRY_CONTEXT_ENFORCED'],
+        ['object' => 'product_variants.stock_quantity', 'pattern' => 'LEGACY_KUWAIT_COMPATIBILITY_MIRROR_SAFE'],
     ];
     foreach ($cases as $c) {
         $authorityTotal++;
         $authoritySafe++;
         echo "AUTH  {$c['object']} => {$c['pattern']}\n";
     }
-    d2b_assert($authorityTotal === 5 && $authoritySafe === 5, 'authority matrix covered rows = 5, UNKNOWN=0');
+    d2b_assert($authorityTotal === 6 && $authoritySafe === 6, 'authority matrix covered rows = 6, UNKNOWN=0');
 
     echo "\nPASS={$passes} FAIL={$failures} SKIP={$skips}\n";
     echo "AUTHORITY_TOTAL={$authorityTotal} AUTHORITY_SAFE={$authoritySafe} AUTHORITY_UNKNOWN=0\n";
