@@ -561,4 +561,19 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
   - **PENDING-03 / YEC-01:** عقد `ownTx` في `orange_journal_types_merge_canonical_defaults` و`orange_voucher_update_multiline`.
 - **دولة الطابور:** مخزّنة في `after_post_json._country_id` (لا عمود country_id على الجدول)؛ سياق الأدمن حدّ وصول لا ملكية السند.
 - **FSR-D3-LOYALTY-01:** `orange_loyalty_post_simple_gl` فوري → خانة GL (`refType`/`refId`/`pendingSuffix`)؛ معلّق → `src:…`. تصنيف متوقع بعد الإصلاح: **IDEMPOTENT_BY_SLOT**.
-- Schema يبقى **124**؛ D4/D5 وStep 4 **لم تُبدأ**.
+- Schema يبقى **124**؛ D5 وStep 4 **لم تُبدأ** بعد D4.
+
+--------------------------------------------------------------------
+سFSR-D4. أين اختبارات العروض / الولاء (نقاط) السلوكية؟ (Batch D4)
+--------------------------------------------------------------------
+- أطقم معزولة MySQL (امتداد D3):
+  - `scripts/self_test_final_review_d4_promotion_engine.php`
+  - `scripts/self_test_final_review_d4_gift_bogo_combo.php`
+  - `scripts/self_test_final_review_d4_promotion_usage_concurrency.php`
+  - `scripts/self_test_final_review_d4_loyalty_points.php`
+  - `scripts/self_test_final_review_d4_loyalty_concurrency.php`
+  - مساعد: `scripts/lib/final_review_d4_fixture.php`
+  - عامل تزامن: `scripts/lib/final_review_d4_concurrency_worker.php`
+- **عقود مؤكَّدة من الكود:** ترتيب التطبيق في `order_intake_queue` = عرض منتج (partition) → كومبو → خصم سلة على الأساس المتبقّي → هدية/BOGO؛ جدولة UTC شاملة؛ `first_delivered` يعتمد `orders.status='completed'`؛ لا جدول usage عالمي في Schema 124.
+- ولاء: كسب عند التسليم بـ `earn_rate` على صافي البضاعة؛ استبدال FIFO طبقات مع `FOR UPDATE`؛ انتهاء idempotent؛ clawback عبر `return_clawback` فريد؛ حد GL عبر خانة D3.
+- Schema يبقى **124**؛ D5 وStep 4 **لم تُبدأ**.
