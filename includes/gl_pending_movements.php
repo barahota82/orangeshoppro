@@ -284,77 +284,147 @@ function orange_gl_pending_enqueue_multi(
     }
     $voucherDate = orange_gl_accounting_voucher_date_mysql($voucherDate);
     $jtHint = (int) ($journalTypeHintId ?? 0);
+    if ($afterPostJson !== null && $afterPostJson !== '') {
+        $afterPostJson = (string) $afterPostJson;
+        $hookDecoded = json_decode($afterPostJson, true);
+        if (!is_array($hookDecoded)) {
+            throw new InvalidArgumentException('after_post_json للحركة المعلّقة تالف.');
+        }
+    } else {
+        $afterPostJson = null;
+    }
+
+    // Summary anchors for NOT NULL + FK columns; posting uses voucher_lines_json (FSR-D3-PENDING-02).
     $sumD = 0.0;
     $sumC = 0.0;
+    $accountDebit = 0;
+    $accountCredit = 0;
+    $accountIds = [];
     foreach ($lines as $ln) {
         if (!is_array($ln)) {
             continue;
         }
-        $sumD = round($sumD + (float) ($ln['debit'] ?? 0), 4);
-        $sumC = round($sumC + (float) ($ln['credit'] ?? 0), 4);
+        $aid = (int) ($ln['account_id'] ?? 0);
+        $d = round((float) ($ln['debit'] ?? 0), 4);
+        $c = round((float) ($ln['credit'] ?? 0), 4);
+        if ($aid <= 0) {
+            throw new InvalidArgumentException('أسطر السند المعلّق بلا حساب صالح.');
+        }
+        if ($d > 0.0001 && $c > 0.0001) {
+            throw new InvalidArgumentException('سطر معلّق لا يجوز أن يجمع مديناً ودائناً معاً.');
+        }
+        if ($d < -0.0001 || $c < -0.0001) {
+            throw new InvalidArgumentException('قيم المدين/الدائن السالبة غير مسموحة في الطابور المعلّق.');
+        }
+        $sumD = round($sumD + $d, 4);
+        $sumC = round($sumC + $c, 4);
+        $accountIds[] = $aid;
+        if ($accountDebit <= 0 && $d > 0.0001) {
+            $accountDebit = $aid;
+        }
+        if ($accountCredit <= 0 && $c > 0.0001) {
+            $accountCredit = $aid;
+        }
     }
     $displayAmt = max($sumD, $sumC);
     if ($lines === [] || $displayAmt <= 0.0001) {
         throw new InvalidArgumentException('أسطر السند المعلّق غير صالحة.');
     }
+    if ($accountDebit <= 0 || $accountCredit <= 0) {
+        throw new InvalidArgumentException('أسطر السند المعلّق بلا حساب مدين/دائن صالح لأعمدة الطابور.');
+    }
+    $hookCid = orange_gl_pending_hook_country_id($afterPostJson);
+    require_once __DIR__ . '/currency.php';
+    require_once __DIR__ . '/countries.php';
+    $currencyCode = orange_gl_functional_currency_code($pdo, $hookCid > 0 ? $hookCid : null);
+    if (!orange_gl_money_is_balanced($sumD, $sumC, $currencyCode)) {
+        throw new InvalidArgumentException(
+            'السند المعلّق غير متوازن: مجموع المدين ' . $sumD . ' ≠ مجموع الدائن ' . $sumC
+        );
+    }
+    if ($hookCid > 0) {
+        orange_gl_assert_voucher_accounts_country($pdo, $accountIds, $hookCid);
+    }
     $json = json_encode($lines, JSON_UNESCAPED_UNICODE);
     if ($json === false || $json === '') {
         throw new InvalidArgumentException('تعذر ترميز أسطر السند.');
     }
-    if ($afterPostJson !== null && $afterPostJson !== '') {
-        $afterPostJson = (string) $afterPostJson;
-    } else {
-        $afterPostJson = null;
-    }
 
-    if (orange_table_has_column($pdo, 'orange_gl_pending_movements', 'journal_type_id')) {
-        $ins = $pdo->prepare(
-            'INSERT IGNORE INTO orange_gl_pending_movements (
-                reference, source_label, movement_at, voucher_date,
-                account_debit, account_credit, amount, description, entry_type, journal_type_id,
-                status, after_post_json,
-                multi_line, voucher_lines_json
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,\'pending\',?,1,?)'
-        );
-        $ins->execute([
-            $reference,
-            trim($sourceLabel),
-            $movementAt,
-            $voucherDate,
-            0,
-            0,
-            $displayAmt,
-            $description,
-            $entryType,
-            $jtHint > 0 ? $jtHint : null,
-            $afterPostJson,
-            $json,
-        ]);
-    } else {
-        $ins = $pdo->prepare(
-            'INSERT IGNORE INTO orange_gl_pending_movements (
-                reference, source_label, movement_at, voucher_date,
-                account_debit, account_credit, amount, description, entry_type, status, after_post_json,
-                multi_line, voucher_lines_json
-            ) VALUES (?,?,?,?,?,?,?,?,?,\'pending\',?,1,?)'
-        );
-        $ins->execute([
-            $reference,
-            trim($sourceLabel),
-            $movementAt,
-            $voucherDate,
-            0,
-            0,
-            $displayAmt,
-            $description,
-            $entryType,
-            $afterPostJson,
-            $json,
-        ]);
+    try {
+        if (orange_table_has_column($pdo, 'orange_gl_pending_movements', 'journal_type_id')) {
+            $ins = $pdo->prepare(
+                'INSERT INTO orange_gl_pending_movements (
+                    reference, source_label, movement_at, voucher_date,
+                    account_debit, account_credit, amount, description, entry_type, journal_type_id,
+                    status, after_post_json,
+                    multi_line, voucher_lines_json
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,\'pending\',?,1,?)'
+            );
+            $ins->execute([
+                $reference,
+                trim($sourceLabel),
+                $movementAt,
+                $voucherDate,
+                $accountDebit,
+                $accountCredit,
+                $displayAmt,
+                $description,
+                $entryType,
+                $jtHint > 0 ? $jtHint : null,
+                $afterPostJson,
+                $json,
+            ]);
+        } else {
+            $ins = $pdo->prepare(
+                'INSERT INTO orange_gl_pending_movements (
+                    reference, source_label, movement_at, voucher_date,
+                    account_debit, account_credit, amount, description, entry_type, status, after_post_json,
+                    multi_line, voucher_lines_json
+                ) VALUES (?,?,?,?,?,?,?,?,?,\'pending\',?,1,?)'
+            );
+            $ins->execute([
+                $reference,
+                trim($sourceLabel),
+                $movementAt,
+                $voucherDate,
+                $accountDebit,
+                $accountCredit,
+                $displayAmt,
+                $description,
+                $entryType,
+                $afterPostJson,
+                $json,
+            ]);
+        }
+    } catch (PDOException $e) {
+        $dup = strpos($e->getMessage(), 'Duplicate') !== false
+            || (int) ($e->errorInfo[1] ?? 0) === 1062;
+        if (!$dup) {
+            throw $e;
+        }
+        $stDup = $pdo->prepare('SELECT id FROM orange_gl_pending_movements WHERE reference = ? LIMIT 1');
+        $stDup->execute([$reference]);
+        $existingId = (int) $stDup->fetchColumn();
+
+        return $existingId > 0 ? $existingId : 0;
     }
     $newId = (int) $pdo->lastInsertId();
+    if ($newId <= 0) {
+        throw new RuntimeException('تعذر إنشاء الحركة المعلّقة (معرف فارغ).');
+    }
+    $stVerify = $pdo->prepare(
+        'SELECT id, account_debit, account_credit, multi_line FROM orange_gl_pending_movements WHERE id = ? LIMIT 1'
+    );
+    $stVerify->execute([$newId]);
+    $verify = $stVerify->fetch(PDO::FETCH_ASSOC);
+    if (!$verify
+        || (int) ($verify['account_debit'] ?? 0) <= 0
+        || (int) ($verify['account_credit'] ?? 0) <= 0
+        || (int) ($verify['multi_line'] ?? 0) !== 1) {
+        throw new RuntimeException('فشل التحقق من صف الحركة المعلّقة بعد الإدراج.');
+    }
 
-    return $newId > 0 ? $newId : 0;
+    return $newId;
 }
 
 /**
@@ -511,6 +581,16 @@ function orange_gl_pending_post_by_ids(PDO $pdo, array $ids): array
             $desc = (string) $row['description'];
             $multi = (int) ($row['multi_line'] ?? 0) === 1;
             $linesRaw = trim((string) ($row['voucher_lines_json'] ?? ''));
+            // FSR-D3-PENDING-01: assign/decode hook before Country apply or voucher_post.
+            $hookRaw = trim((string) ($row['after_post_json'] ?? ''));
+            $hook = null;
+            if ($hookRaw !== '') {
+                $hookDecoded = json_decode($hookRaw, true);
+                if (!is_array($hookDecoded)) {
+                    throw new InvalidArgumentException('after_post_json للحركة المعلّقة تالف (#' . $id . ').');
+                }
+                $hook = $hookRaw;
+            }
             if ($multi) {
                 if ($linesRaw === '') {
                     throw new InvalidArgumentException('سند معلّق متعدد الأسطر بلا أسطر (#' . $id . ').');
@@ -569,8 +649,7 @@ function orange_gl_pending_post_by_ids(PDO $pdo, array $ids): array
                     ['account_id' => (int) $row['account_credit'], 'debit' => 0.0, 'credit' => (float) $row['amount'], 'memo' => $desc],
                 ]);
             }
-            $hook = trim((string) ($row['after_post_json'] ?? ''));
-            if ($hook !== '') {
+            if ($hook !== null && $hook !== '') {
                 orange_gl_apply_voucher_after_post_hooks($pdo, $vid, $hook);
             }
             $pdo->prepare(

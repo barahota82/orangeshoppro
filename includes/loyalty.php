@@ -167,6 +167,9 @@ function orange_loyalty_balance_points(PDO $pdo, int $customerId, ?int $countryI
 
 /**
  * يرحّل قيد GL بسيط (مدين/دائن) محترماً طابور المعلّق إن كان مفعّلاً.
+ *
+ * فوري: خانة GL (doc_kind=refType, entity_id=refId, slot_key=pendingSuffix) — FSR-D3-LOYALTY-01.
+ * معلّق: مفتاح المصدر src:… (idempotent عبر reference الفريد).
  */
 function orange_loyalty_post_simple_gl(
     PDO $pdo,
@@ -213,6 +216,63 @@ function orange_loyalty_post_simple_gl(
 
         return;
     }
+
+    // Immediate path: reuse voucher-slot architecture (same identity as pending source_key).
+    require_once __DIR__ . '/gl_voucher_slot.php';
+    $docKind = strtolower(trim($refType));
+    $slotKey = trim($pendingSuffix);
+    if (orange_gl_voucher_slots_ready($pdo) && $refId > 0 && $docKind !== '' && $slotKey !== '') {
+        $slotSpec = [
+            'doc_kind' => $docKind,
+            'entity_id' => $refId,
+            'slot_key' => $slotKey,
+            'entry_type' => $entryType,
+            'country_id' => $countryId,
+        ];
+        $header = [
+            'voucher_date' => $voucherDateGl,
+            'document_entered_at' => $now,
+            'description' => $desc,
+            'entry_type' => $entryType,
+            'journal_type_id' => null,
+            'country_id' => $countryId,
+        ];
+        try {
+            orange_gl_voucher_immediate_post_simple_for_slot(
+                $pdo,
+                $slotSpec,
+                $header,
+                $debitId,
+                $creditId,
+                $amount,
+                $desc,
+                $afterJson
+            );
+        } catch (Throwable $e) {
+            // Concurrent loser: unique slot/source (or serial) — adopt existing slot voucher.
+            $msg = $e->getMessage();
+            $dup = str_contains($msg, 'Duplicate')
+                || str_contains($msg, 'خانة GL مسجّلة مسبقاً')
+                || (int) (($e instanceof PDOException) ? ($e->errorInfo[1] ?? 0) : 0) === 1062;
+            if (!$dup) {
+                throw $e;
+            }
+            $existing = orange_gl_voucher_slot_find($pdo, $docKind, $refId, $slotKey);
+            $vid = (int) ($existing['journal_voucher_id'] ?? 0);
+            if ($vid <= 0) {
+                throw $e;
+            }
+            $v = orange_voucher_by_id($pdo, $vid);
+            $vCountry = $v !== null ? (int) ($v['country_id'] ?? 0) : 0;
+            if ($vCountry > 0 && $vCountry !== $countryId) {
+                throw new RuntimeException('تعارض دولة خانة ولاء مع دولة المصدر.');
+            }
+        }
+
+        return;
+    }
+
+    // Legacy fallback when slots table absent (should not occur on Schema 124+).
     orange_voucher_post($pdo, [
         'voucher_date' => $voucherDateGl,
         'document_entered_at' => $now,

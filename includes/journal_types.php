@@ -172,7 +172,11 @@ function orange_journal_types_merge_canonical_defaults(PDO $pdo, ?int $countryId
         );
     }
 
-    $pdo->beginTransaction();
+    // Safe under caller-owned transactions (e.g. orange_gl_pending_post_by_ids). FSR-D3-PENDING-03.
+    $ownTx = !$pdo->inTransaction();
+    if ($ownTx) {
+        $pdo->beginTransaction();
+    }
     try {
         foreach ($rows as $idx => $r) {
             $ord = $idx + 1;
@@ -198,10 +202,12 @@ function orange_journal_types_merge_canonical_defaults(PDO $pdo, ?int $countryId
             }
         }
         orange_journal_types_retire_obsolete_exp_type($pdo, $scoped ? $cid : null);
-        $pdo->commit();
+        if ($ownTx) {
+            $pdo->commit();
+        }
         $completedOk[$cacheKey] = true;
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) {
+        if ($ownTx && $pdo->inTransaction()) {
             $pdo->rollBack();
         }
         throw $e;

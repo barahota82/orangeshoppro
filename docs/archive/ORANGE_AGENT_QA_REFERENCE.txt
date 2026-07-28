@@ -541,4 +541,24 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
   - لا retry للـ deadlock داخل مساعدات المخزون؛ المشتريات لا تكتب `stock_movements`.
 - **FSR-D2-FULFILL-01 (مُصلَح 2026-07-28):** إعادة استدعاء `orange_complete_order_fulfillment()` بعد تحويل `pending_order` → `pending_order_fulfilled` كانت تخصم WVS وتكتب `delivered_order`. **تنفيذ:** `orange_order_stock_fulfillment_already_done()` يعترف بـ `pending_order_fulfilled` دون اشتراط حجز حي. ISSUE-05 (قفل صف الطلب) يبقى مؤجّلاً. اختبارات: workflows + concurrency `fulfill_web_dup`.
 - تزامن حقيقي عبر `proc_open` + اتصالات MySQL منفصلة؛ إن تعذّر: ENVIRONMENT_BLOCKED.
-- Schema يبقى 124؛ D3–D5 وStep 4 **لم تُبدأ**.
+- Schema يبقى 124؛ D5 وStep 4 **لم تُبدأ** (D3 — سFSR-D3).
+
+
+--------------------------------------------------------------------
+سFSR-D3. أين اختبارات/إصلاحات المحاسبة / GL / الطابور / YEC؟ (Batch D3)
+--------------------------------------------------------------------
+- أطقم معزولة (امتداد D2):
+  - `scripts/self_test_final_review_d3_manual_vouchers.php`
+  - `scripts/self_test_final_review_d3_automatic_posting.php`
+  - `scripts/self_test_final_review_d3_fiscal_numbering.php`
+  - `scripts/self_test_final_review_d3_pending_subledger.php`
+  - `scripts/self_test_final_review_d3_accounting_concurrency.php`
+  - مساعد: `scripts/lib/final_review_d3_fixture.php`
+  - عامل تزامن: `scripts/lib/final_review_d3_concurrency_worker.php`
+- **إصلاحات إنتاج (FSR-D3):**
+  - **PENDING-01:** تعيين/فك `after_post_json` قبل `apply_country_from_hook` في `orange_gl_pending_post_by_ids`.
+  - **PENDING-02:** `enqueue_multi` يملأ `account_debit`/`account_credit` كـ summary anchors من الأسطر (لا 0)؛ INSERT صريح + معالجة Duplicate فقط (لا INSERT IGNORE صامت).
+  - **PENDING-03 / YEC-01:** عقد `ownTx` في `orange_journal_types_merge_canonical_defaults` و`orange_voucher_update_multiline`.
+- **دولة الطابور:** مخزّنة في `after_post_json._country_id` (لا عمود country_id على الجدول)؛ سياق الأدمن حدّ وصول لا ملكية السند.
+- **FSR-D3-LOYALTY-01:** `orange_loyalty_post_simple_gl` فوري → خانة GL (`refType`/`refId`/`pendingSuffix`)؛ معلّق → `src:…`. تصنيف متوقع بعد الإصلاح: **IDEMPOTENT_BY_SLOT**.
+- Schema يبقى **124**؛ D4/D5 وStep 4 **لم تُبدأ**.

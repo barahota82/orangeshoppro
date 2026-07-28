@@ -9,6 +9,29 @@ ORANGE — أرشيف منهج التصنيف المحاسبي والتقاري�
 آخر تحديث: 2026-07-09 (Accounting Lifecycle V2 — Phase 0 Approved Architecture / orange_gl_voucher_slots — القسم أدناه)
 آخر تحديث: 2026-07-10 (V2 Phase 0 — Core Engine مُنفَّذ في الكود؛ rev 120 — القسم أدناه)
 آخر تحديث: 2026-07-11 (V2 Phase 1B — INV-C delivery slots + order_items.gl_slot؛ rev 121 — القسم أدناه)
+آخر تحديث: 2026-07-28 (FSR-D3: طابور معلّق / ownTx / YEC — القسم أدناه)
+
+================================================================================
+FSR-D3 — طابور GL المعلّق ومعاملات متداخلة (2026-07-28)
+================================================================================
+**تنفيذ (إصلاحات إنتاج؛ Schema يبقى 124):**
+
+1. **عقد ownTx:** `orange_journal_types_merge_canonical_defaults` و`orange_voucher_update_multiline`
+   يشاركان معاملة المتصل إن وُجدت؛ لا `beginTransaction` متداخل؛ لا commit/rollback لمعاملة المتصل.
+2. **PENDING-01:** في `orange_gl_pending_post_by_ids` يُحمَّل `after_post_json` قبل
+   `orange_gl_pending_apply_country_from_hook` / `orange_voucher_post`.
+3. **PENDING-02:** `orange_gl_pending_enqueue_multi` يخزّن `account_debit`/`account_credit` كـ
+   **summary anchors** من أول حساب مدين/دائن صالح في الأسطر (الأعمدة NOT NULL + FK؛ الترحيل من
+   `voucher_lines_json`). لا Account ID 0. INSERT صريح؛ Duplicate على `reference` فقط يُعيد الصف الموجود.
+4. **دولة الطابور:** لا عمود `country_id` على `orange_gl_pending_movements` — السلطة في
+   `after_post_json._country_id`؛ سياق الأدمن حدّ وصول (`orange_gl_pending_assert_admin_country`).
+5. **اختبارات:** `scripts/self_test_final_review_d3_*.php` + fixture/worker تحت `scripts/lib/`.
+6. **FSR-D3-LOYALTY-01:** `orange_loyalty_post_simple_gl` في المسار الفوري يستخدم
+   `orange_gl_voucher_immediate_post_simple_for_slot` بهوية مستقرة:
+   `doc_kind=refType` + `entity_id=refId` + `slot_key=pendingSuffix` (+ `country_id` على الخانة/السند).
+   المسار المعلّق يبقى عبر `src:…` / `enqueue_multi`. لا تغيير لحساب النقاط أو اتجاه المدين/الدائن.
+7. **هوية المصدر:** كسب=`order`+`loyalty-earn`؛ انتهاء=`loyalty_layer`+`loyalty-expire`؛
+   استرداد معلّق=`sales_return`+`loyalty-return-clawback` (المسار الفوري للكسب/الاسترداد كان أصلاً عبر slot).
 
 ================================================================================
 قرار مالك نهائي (2026-07-09): Voucher Identity Preservation Policy (V2)

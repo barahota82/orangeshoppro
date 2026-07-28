@@ -1368,7 +1368,11 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
         ? 'UPDATE journal_vouchers SET voucher_date = ?, reference = ?, description = ?, fiscal_year_id = ?, updated_at = ? WHERE id = ?'
         : 'UPDATE journal_vouchers SET voucher_date = ?, reference = ?, description = ?, fiscal_year_id = ? WHERE id = ?';
 
-    $pdo->beginTransaction();
+    // Safe under caller-owned transactions (e.g. orange_year_end_close_finalize). FSR-D3-YEC-01.
+    $ownTx = !$pdo->inTransaction();
+    if ($ownTx) {
+        $pdo->beginTransaction();
+    }
     try {
         $upd = $pdo->prepare($updSql);
         if ($hasUpdatedAt) {
@@ -1385,9 +1389,11 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
             orange_journal_insert_voucher_line($pdo, $voucherId, $row);
         }
         orange_journal_voucher_stamp_currency($pdo, $voucherId, $header);
-        $pdo->commit();
+        if ($ownTx) {
+            $pdo->commit();
+        }
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) {
+        if ($ownTx && $pdo->inTransaction()) {
             $pdo->rollBack();
         }
         throw $e;
