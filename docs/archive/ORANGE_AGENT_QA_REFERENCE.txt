@@ -508,3 +508,15 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
 - `includes/admin_login_rate_limit.php`: كان التعليق يقول «not wired» بينما `admin/login.php` يستدعي check + record_failure — صُحّح التعليق فقط؛ **بلا** تغيير عتبات/تخزين/سلوك.
 - اختبار: `scripts/self_test_final_review_hygiene_dead_stubs.php`.
 - Schema يبقى 124؛ CSRF/أداء/Plesk/Step 4 **لم تُبدأ**.
+
+
+--------------------------------------------------------------------
+سFSR-D1. أين اختبارات السلوك لـ Orders/Payments/Purchases/Returns؟ (Batch D1)
+--------------------------------------------------------------------
+- أطقم معزولة على MySQL مؤقت (`orange_d1_{pid}_{random}`) من `scripts/orange_db.sql` بعد مسح بيانات الـ dump وبذر KW/EG فقط:
+  - `scripts/self_test_final_review_d1_orders.php`
+  - `scripts/self_test_final_review_d1_payments.php`
+  - `scripts/self_test_final_review_d1_purchases_returns.php`
+  - مساعد: `scripts/lib/final_review_d1_fixture.php`
+- تتطلب MySQL محلي؛ إن تعذّر الاتصال: ENVIRONMENT_BLOCKED (exit 2) — لا PASS وهمي.
+- بلا تغيير كود أعمال إنتاجي؛ Schema يبقى 124؛ D2–D5 وStep 4 **لم تُبدأ**.

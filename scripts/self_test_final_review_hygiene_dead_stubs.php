@@ -89,6 +89,9 @@ foreach ($scanRoots as $scanRoot) {
         if (str_ends_with($norm, '/self_test_final_review_hygiene_dead_stubs.php')) {
             continue;
         }
+        if (preg_match('#/self_test_final_review_d1_[^/]+\\.php$#', $norm)) {
+            continue;
+        }
         if (str_ends_with($norm, '/ORANGE_AGENT_QA_REFERENCE.txt')) {
             continue;
         }
