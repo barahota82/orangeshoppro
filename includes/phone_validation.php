@@ -21,6 +21,11 @@ function orange_storefront_parse_api_phone_country(string $raw): array
  * Normalize storefront / customer phone to +digits (8–14 digits after +, incl. country code).
  * Accepts leading 00 (converted to +). Rejects letters.
  *
+ * When a trusted Country dial is supplied:
+ * - national/local digits → canonicalize once with that dial;
+ * - already-canonical E.164 (+… / 00…) whose prefix matches the dial → return the same canonical value (idempotent);
+ * - already-canonical E.164 whose prefix conflicts with the dial → reject.
+ *
  * @param string|null $countryDialDigits e.g. "965" when the user picked Kuwait and typed the national number only
  * @param bool $internationalSingleField عند true (قائمة «دولي كامل»): لا يُطبَّق افتراض الكويت على 8 أرقام وطنية
  */
@@ -36,6 +41,10 @@ function orange_normalize_customer_phone(string $raw, ?string $countryDialDigits
     if (preg_match('/[^\d\+\s\-\(\)\.]/u', $s)) {
         return null;
     }
+    // Reject duplicate leading plus (e.g. "++965…") before digit extraction.
+    if (str_starts_with($s, '++')) {
+        return null;
+    }
 
     $cc = null;
     if ($countryDialDigits !== null && $countryDialDigits !== '') {
@@ -45,11 +54,32 @@ function orange_normalize_customer_phone(string $raw, ?string $countryDialDigits
         }
     }
 
-    if ($cc !== null) {
-        if (str_starts_with($s, '+') || str_starts_with($s, '00')) {
+    if ($cc !== null && (str_starts_with($s, '+') || str_starts_with($s, '00'))) {
+        // Downstream / Intake may re-normalize an already-canonical E.164 with the same trusted dial.
+        if (str_starts_with($s, '00')) {
+            $s = '+' . substr($s, 2);
+        }
+        if (!str_starts_with($s, '+') || substr_count($s, '+') !== 1) {
             return null;
         }
-    } elseif (str_starts_with($s, '00')) {
+        $digits = preg_replace('/\D+/', '', $s);
+        if ($digits === '' || strlen($digits) < 8 || strlen($digits) > 14) {
+            return null;
+        }
+        if ($digits[0] === '0') {
+            return null;
+        }
+        if (!str_starts_with($digits, $cc)) {
+            return null;
+        }
+        if (substr($digits, strlen($cc)) === '') {
+            return null;
+        }
+
+        return '+' . $digits;
+    }
+
+    if ($cc === null && str_starts_with($s, '00')) {
         $s = '+' . substr($s, 2);
     }
 

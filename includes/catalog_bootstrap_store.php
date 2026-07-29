@@ -22,7 +22,7 @@ function orange_catalog_bootstrap_store_tables(PDO $pdo): void
         <<<'SQL'
 CREATE TABLE IF NOT EXISTS document_sequences (
   scope VARCHAR(64) NOT NULL,
-  last_value BIGINT NOT NULL DEFAULT 0,
+  `last_value` BIGINT NOT NULL DEFAULT 0,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (scope)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci

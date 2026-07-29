@@ -21,11 +21,12 @@ function orange_sequence_next(PDO $pdo, string $scope, ?int $countryId = null): 
     if ($countryId !== null && $countryId > 0) {
         $scope .= '_c' . (int) $countryId;
     }
+    // FSR-D4-DOCUMENT-SEQUENCES-LAST-VALUE-01: quote reserved identifier on MySQL 8.4+.
     $pdo->prepare(
-        'INSERT INTO document_sequences (scope, last_value) VALUES (?, 1)
-         ON DUPLICATE KEY UPDATE last_value = last_value + 1'
+        'INSERT INTO document_sequences (scope, `last_value`) VALUES (?, 1)
+         ON DUPLICATE KEY UPDATE `last_value` = `last_value` + 1'
     )->execute([$scope]);
-    $st = $pdo->prepare('SELECT last_value FROM document_sequences WHERE scope = ? LIMIT 1');
+    $st = $pdo->prepare('SELECT `last_value` FROM document_sequences WHERE scope = ? LIMIT 1');
     $st->execute([$scope]);
 
     return (int) $st->fetchColumn();
@@ -47,7 +48,7 @@ function orange_sequence_peek_next(PDO $pdo, string $scope, ?int $countryId = nu
     if ($countryId !== null && $countryId > 0) {
         $scope .= '_c' . (int) $countryId;
     }
-    $st = $pdo->prepare('SELECT last_value FROM document_sequences WHERE scope = ? LIMIT 1');
+    $st = $pdo->prepare('SELECT `last_value` FROM document_sequences WHERE scope = ? LIMIT 1');
     $st->execute([$scope]);
     $last = (int) $st->fetchColumn();
 
@@ -256,8 +257,8 @@ function orange_orders_migrate_legacy_invoice_numbers_v1(PDO $pdo): int
             }
             try {
                 $pdo->prepare(
-                    'INSERT INTO document_sequences (scope, last_value) VALUES (?, ?)
-                     ON DUPLICATE KEY UPDATE last_value = GREATEST(last_value, VALUES(last_value))'
+                    'INSERT INTO document_sequences (scope, `last_value`) VALUES (?, ?)
+                     ON DUPLICATE KEY UPDATE `last_value` = GREATEST(`last_value`, VALUES(`last_value`))'
                 )->execute([$scope, $maxSerial]);
             } catch (Throwable $e) {
                 if (function_exists('error_log')) {

@@ -136,9 +136,10 @@ function orange_order_intake_sql_country_scope(PDO $pdo, string $alias = 'oiq', 
  * Upsert customer by phone for storefront checkout (phone = unique key for the customer row).
  * Updates name, email, phone fields from the latest order; appends order notes to customer notes.
  *
- * **المهمة 2:** لا يكتب area/address على «الحالي» للعميل عند إنشاء الطلب (كان يدهس السابق)؛
- * يبقى عنوان الطلب على صف الطلب نفسه، وتُرقّى قيمة «الحالي» + يُضاف للسجل عند إنشاء قيد التسليم
- * (orange_customer_address_promote_from_order في includes/customer_addresses.php).
+ * **المهمة 2 / FSR-D4-CUSTOMER-REQUIRED-FIELDS-01:** لا يُنسَخ عنوان التوصيل من الطلب إلى ملف العميل عند Checkout.
+ * عنوان الطلب يبقى على صف الطلب. إنشاء عميل جديد يُدرج صراحةً area='' و address='' لإرضاء Schema 124
+ * (NOT NULL بلا DEFAULT) دون الاعتماد على DEFAULT ضمني. عميل موجود: لا تُمسّ area/address.
+ * ترقية الملف عند قيد التسليم فقط (orange_customer_address_promote_from_order).
  */
 function orange_storefront_upsert_customer_from_checkout(
     PDO $pdo,
@@ -249,7 +250,18 @@ function orange_storefront_upsert_customer_from_checkout(
         $placeholders[] = '?';
         $params[] = $countryId;
     }
-    // المهمة 2: لا نكتب area/address عند إنشاء العميل من الطلب — تُرقّى عند قيد التسليم.
+    // FSR-D4-CUSTOMER-REQUIRED-FIELDS-01: explicit empty profile fields for Schema NOT NULL (no DEFAULT).
+    // Do not copy Order delivery area/address; enrichment remains deferred to delivery promote.
+    if ($hasArea) {
+        $cols[] = 'area';
+        $placeholders[] = '?';
+        $params[] = '';
+    }
+    if ($hasAddress) {
+        $cols[] = 'address';
+        $placeholders[] = '?';
+        $params[] = '';
+    }
     if ($hasEmail) {
         $cols[] = 'email';
         $placeholders[] = '?';
@@ -320,50 +332,50 @@ function orange_storefront_upsert_customer_from_checkout(
 
 /**
  * إدراج أسطر order_items من ناتج orange_storefront_validate_cart_items_core (داخل معاملة).
+ * FSR-D4-ORDER-ITEMS-GL-SLOT-01: يخصّص gl_slot عبر orange_order_item_allocate_gl_slot
+ * بنفس عقد create-manual (مرّة لكل بند، UNIQUE لكل order_id).
  *
  * @param list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $validatedItems
  */
 function orange_storefront_insert_order_items_for_order(PDO $pdo, int $orderId, array $validatedItems): void
 {
+    require_once __DIR__ . '/order_item_gl_slot.php';
+
     $hasVariantCol = orange_table_has_column($pdo, 'order_items', 'variant_id');
-    if ($hasVariantCol) {
-        $itemStmt = $pdo->prepare(
-            'INSERT INTO order_items (
-                order_id, product_id, variant_id, product_name, color, size, qty, price, cost
-            ) VALUES (?,?,?,?,?,?,?,?,?)'
-        );
-    } else {
-        $itemStmt = $pdo->prepare(
-            'INSERT INTO order_items (
-                order_id, product_id, product_name, color, size, qty, price, cost
-            ) VALUES (?,?,?,?,?,?,?,?)'
-        );
+    $hasGlSlotCol = orange_table_has_column($pdo, 'order_items', 'gl_slot');
+
+    $insertCols = ['order_id'];
+    if ($hasGlSlotCol) {
+        $insertCols[] = 'gl_slot';
     }
+    $insertCols[] = 'product_id';
+    if ($hasVariantCol) {
+        $insertCols[] = 'variant_id';
+    }
+    $insertCols = array_merge($insertCols, ['product_name', 'color', 'size', 'qty', 'price', 'cost']);
+    $placeholders = implode(',', array_fill(0, count($insertCols), '?'));
+    $itemStmt = $pdo->prepare(
+        'INSERT INTO order_items (' . implode(',', $insertCols) . ') VALUES (' . $placeholders . ')'
+    );
+
     foreach ($validatedItems as $row) {
-        if ($hasVariantCol) {
-            $itemStmt->execute([
-                $orderId,
-                (int) $row['product']['id'],
-                (int) ($row['variant_id'] ?? 0) ?: null,
-                $row['product']['name'],
-                $row['color'],
-                $row['size'],
-                $row['qty'],
-                $row['price'],
-                $row['cost'],
-            ]);
-        } else {
-            $itemStmt->execute([
-                $orderId,
-                (int) $row['product']['id'],
-                $row['product']['name'],
-                $row['color'],
-                $row['size'],
-                $row['qty'],
-                $row['price'],
-                $row['cost'],
-            ]);
+        $bind = [$orderId];
+        if ($hasGlSlotCol) {
+            $slot = orange_order_item_allocate_gl_slot($pdo, $orderId);
+            orange_order_item_assert_gl_slot($slot);
+            $bind[] = $slot;
         }
+        $bind[] = (int) $row['product']['id'];
+        if ($hasVariantCol) {
+            $bind[] = (int) ($row['variant_id'] ?? 0) ?: null;
+        }
+        $bind[] = $row['product']['name'];
+        $bind[] = $row['color'];
+        $bind[] = $row['size'];
+        $bind[] = $row['qty'];
+        $bind[] = $row['price'];
+        $bind[] = $row['cost'];
+        $itemStmt->execute($bind);
     }
 }
 
@@ -594,8 +606,9 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $ph .= ', ?';
         $params[] = $data['phone_national'] ?? null;
     }
+    // Bound values: phone, area, address, notes, channel_id, total — status is literal 'pending'.
     $cols .= ', phone, area, address, notes, channel_id, status, total';
-    $ph .= ', ?, ?, ?, ?, ?, ?, \'pending\', ?';
+    $ph .= ', ?, ?, ?, ?, ?, \'pending\', ?';
     array_push(
         $params,
         trim((string) $data['phone']),

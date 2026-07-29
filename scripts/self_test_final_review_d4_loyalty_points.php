@@ -192,6 +192,7 @@ try {
     echo "RESULT=FSR_D4_PROVEN_PROMOTION_LOYALTY_GAPS_FOUND\n";
     exit(1);
 } finally {
+    $pdo = null; // release suite connection before DROP DATABASE
     if (is_callable($cleanup)) {
         $cleanup();
     }

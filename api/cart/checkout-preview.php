@@ -166,6 +166,8 @@ try {
         }
     }
     $giftProductNetCharge = round($thresholdGiftChargePreview + $bogoGiftChargePreview, 4);
+    // Loyalty helpers (merchandise net + redemption preview) — load before first orange_loyalty_* call.
+    require_once __DIR__ . '/../../includes/loyalty.php';
     $merchandiseNet = orange_loyalty_merchandise_net_from_storefront_totals(
         $subtotal,
         $comboDiscount,
@@ -176,7 +178,6 @@ try {
     $total = max(0.0, round($merchandiseNet + $deliveryFee, 4));
 
     // نظام الولاء: عرض الرصيد القابل للاستخدام وتطبيق الاستبدال المطلوب (للحساب المسجَّل فقط).
-    require_once __DIR__ . '/../../includes/loyalty.php';
     $loyalty = ['active' => false];
     if ($buyerReg && orange_loyalty_is_active($pdo, $storefrontCountryId)) {
         $accPhone = trim((string) ($acc['customer_phone'] ?? ''));
