@@ -8,7 +8,9 @@ declare(strict_types=1);
  * Usage:
  *   php scripts/lib/final_review_d4_concurrency_worker.php <db> <scenario> <worker_id> <result_file>
  *
- * Scenarios: loyalty_earn | loyalty_redeem | loyalty_expire | cart_promo_resolve
+ * Scenarios:
+ *   loyalty_earn | loyalty_redeem | loyalty_expire | cart_promo_resolve
+ *   loyalty_clawback | loyalty_redeem_vs_expire | first_delivered_ok | gift_stock_select
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -126,6 +128,69 @@ try {
         $r = orange_cart_promotion_resolve($pdo, $sub, true, 1);
         $out['ok'] = $r !== null;
         $out['points'] = (int) ($r['id'] ?? 0);
+    } elseif ($scenario === 'loyalty_clawback') {
+        $orderId = (int) $meta($pdo, 'order_id');
+        $returnId = (int) $meta($pdo, 'return_id');
+        $rev = (float) $meta($pdo, 'returned_revenue');
+        try {
+            if (!$pdo->inTransaction()) {
+                $pdo->beginTransaction();
+            }
+            $r = orange_loyalty_clawback_for_return($pdo, $orderId, $returnId, $rev, 1);
+            if ($pdo->inTransaction()) {
+                $pdo->commit();
+            }
+            $cnt = (int) $pdo->query(
+                "SELECT COUNT(*) FROM loyalty_ledger WHERE kind='return_clawback' AND ref_type='sales_return' AND ref_id={$returnId}"
+            )->fetchColumn();
+            $out['ok'] = $cnt === 1;
+            $out['points'] = (int) ($r['available_points'] ?? 0) + (int) ($r['spent_points'] ?? 0);
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $out['error'] = $e->getMessage();
+            $out['deadlock'] = str_contains(strtolower($e->getMessage()), 'deadlock');
+            $cnt = (int) $pdo->query(
+                "SELECT COUNT(*) FROM loyalty_ledger WHERE kind='return_clawback' AND ref_type='sales_return' AND ref_id={$returnId}"
+            )->fetchColumn();
+            $out['ok'] = $cnt === 1;
+            $out['points'] = $cnt;
+        }
+    } elseif ($scenario === 'loyalty_redeem_vs_expire') {
+        // Odd workers redeem; even workers expire — race on same customer/layer pool.
+        $cust = (int) $meta($pdo, 'customer_id');
+        $role = $workerId % 2 === 1 ? 'redeem' : 'expire';
+        try {
+            if ($role === 'redeem') {
+                $pdo->beginTransaction();
+                $r = orange_loyalty_apply_redemption($pdo, $cust, 1, 100000, 50.0, 'order', 89000 + $workerId);
+                $pdo->commit();
+                $out['ok'] = true;
+                $out['points'] = (int) ($r['points'] ?? 0);
+            } else {
+                $res = orange_loyalty_expire_due($pdo, 1);
+                $out['ok'] = true;
+                $out['points'] = (int) ($res['layers'] ?? 0);
+            }
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $out['error'] = $e->getMessage();
+            $out['deadlock'] = str_contains(strtolower($e->getMessage()), 'deadlock');
+            $out['ok'] = true; // race loser may throw; final DB asserted by parent
+        }
+    } elseif ($scenario === 'first_delivered_ok') {
+        $phone = $meta($pdo, 'phone');
+        $ok = orange_cart_promo_buyer_first_delivered_ok($pdo, null, $phone, 1);
+        $out['ok'] = true;
+        $out['points'] = $ok ? 1 : 0;
+    } elseif ($scenario === 'gift_stock_select') {
+        $sub = (float) ($meta($pdo, 'subtotal') !== '' ? $meta($pdo, 'subtotal') : '30');
+        $rule = orange_cart_gift_promotion_select_rule($pdo, $sub, true, 1);
+        $out['ok'] = true;
+        $out['points'] = $rule !== null ? (int) ($rule['id'] ?? 0) : 0;
     } else {
         $out['error'] = 'unknown_scenario';
     }

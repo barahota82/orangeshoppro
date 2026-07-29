@@ -572,8 +572,10 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
   - `scripts/self_test_final_review_d4_promotion_usage_concurrency.php`
   - `scripts/self_test_final_review_d4_loyalty_points.php`
   - `scripts/self_test_final_review_d4_loyalty_concurrency.php`
+  - `scripts/self_test_final_review_d4_closure_verification.php` (إغلاق Step 3: مصفوفة first_delivered، تكديس، تكافؤ معاينة/طلب على مستوى المساعدات، سباقات clawback/redeem-vs-expire)
   - مساعد: `scripts/lib/final_review_d4_fixture.php`
   - عامل تزامن: `scripts/lib/final_review_d4_concurrency_worker.php`
 - **عقود مؤكَّدة من الكود:** ترتيب التطبيق في `order_intake_queue` = عرض منتج (partition) → كومبو → خصم سلة على الأساس المتبقّي → هدية/BOGO؛ جدولة UTC شاملة؛ `first_delivered` يعتمد `orders.status='completed'`؛ لا جدول usage عالمي في Schema 124.
+- **مستوى الإثبات للإغلاق:** `PRODUCTION_HELPER_PATH` لمسار المعاينة/الطلب (نفس دوال `checkout-preview` و`order_intake`)؛ `FULL_HTTP_API` و`FULL_ORDER_FINALIZATION_PATH` و`AMENDMENT_PROMO_RECALC` تبقى معلّقة بدون bootstrap config/session.
 - ولاء: كسب عند التسليم بـ `earn_rate` على صافي البضاعة؛ استبدال FIFO طبقات مع `FOR UPDATE`؛ انتهاء idempotent؛ clawback عبر `return_clawback` فريد؛ حد GL عبر خانة D3.
 - Schema يبقى **124**؛ D5 وStep 4 **لم تُبدأ**.
