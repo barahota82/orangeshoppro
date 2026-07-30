@@ -176,9 +176,11 @@ $c2 = orange_email_track_rate_limit_consume($pdo3, $ipA, $fp1, $seedNow + 2);
 et_assert($c1['allowed'] === true, '19a. last slot first caller');
 et_assert($c2['allowed'] === false, '19b. second cannot consume same last slot');
 
-// Parallel last-slot race on SQLite file DB.
-// Classification: TEST_HARNESS_FLAKINESS under SQLite DEFERRED beginTransaction (Production MySQL uses FOR UPDATE).
-// Retry reseeds a fresh file DB until exclusive 1 ALLOW + 1 DENY is observed (or max attempts).
+// Parallel last-slot race on SQLite file DB (test-only harness).
+// Production MySQL path uses FOR UPDATE and is unchanged.
+// Worker PDO overrides beginTransaction() → BEGIN IMMEDIATE so writers serialize
+// (SQLite default DEFERRED can lost-update without throwing).
+// Retry is ONLY for transient worker ERR / incomplete I/O — never for 2×ALLOW or 2×DENY.
 $worker = <<<'PHP'
 <?php
 declare(strict_types=1);
@@ -196,11 +198,56 @@ if (!function_exists('orange_table_exists')) {
     }
 }
 require_once $root . '/includes/storefront_email_track_rate_limit.php';
+
+final class OrangeEtSqliteImmediatePdo extends PDO
+{
+    private bool $orangeTx = false;
+
+    public function beginTransaction(): bool
+    {
+        if ($this->orangeTx) {
+            return true;
+        }
+        // Serialize writers in the test harness (SQLite DEFERRED can lost-update).
+        $this->exec('BEGIN IMMEDIATE');
+        $this->orangeTx = true;
+
+        return true;
+    }
+
+    public function commit(): bool
+    {
+        if (!$this->orangeTx) {
+            return false;
+        }
+        $this->exec('COMMIT');
+        $this->orangeTx = false;
+
+        return true;
+    }
+
+    public function rollBack(): bool
+    {
+        if (!$this->orangeTx) {
+            return false;
+        }
+        $this->exec('ROLLBACK');
+        $this->orangeTx = false;
+
+        return true;
+    }
+
+    public function inTransaction(): bool
+    {
+        return $this->orangeTx;
+    }
+}
+
 $dbFile = $argv[2];
 $ip = $argv[3];
 $fp = $argv[4];
 $now = (int) $argv[5];
-$pdo = new PDO('sqlite:' . $dbFile);
+$pdo = new OrangeEtSqliteImmediatePdo('sqlite:' . $dbFile);
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->exec('PRAGMA busy_timeout=10000');
 try {
@@ -216,11 +263,13 @@ $phpBin = PHP_BINARY;
 $nowPar = $seedNow + 501;
 $gotExclusive = false;
 $pairAttempts = 0;
-$maxPairAttempts = 20;
+$maxPairAttempts = 8;
+$transientRetries = 0;
 $lastAllows = 0;
 $lastDenies = 0;
 $lastErrs = 0;
-while (!$gotExclusive && $pairAttempts < $maxPairAttempts) {
+$semanticFail = false;
+while (!$gotExclusive && !$semanticFail && $pairAttempts < $maxPairAttempts) {
     $pairAttempts++;
     $dbFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'orange_et_rl_' . bin2hex(random_bytes(4)) . '.sqlite';
     $pdoFile = new PDO('sqlite:' . $dbFile);
@@ -268,16 +317,29 @@ while (!$gotExclusive && $pairAttempts < $maxPairAttempts) {
     $lastErrs = (str_contains($out1, 'ERR') ? 1 : 0) + (str_contains($out2, 'ERR') ? 1 : 0);
     if ($lastAllows === 1 && $lastDenies === 1) {
         $gotExclusive = true;
+        break;
     }
+    // Clean wrong outcomes are semantic failures — never masked by retry.
+    if ($lastErrs === 0 && ($lastAllows + $lastDenies) === 2) {
+        $semanticFail = true;
+        break;
+    }
+    // Transient only: ERR and/or incomplete worker output.
+    $transientRetries++;
     usleep(25000);
 }
 @unlink($workerFile);
 echo 'NOTE  batch_a_concurrency_pair_attempts=' . $pairAttempts
+    . ' transient_retries=' . $transientRetries
     . ' last_allows=' . $lastAllows
     . ' last_denies=' . $lastDenies
     . ' last_errs=' . $lastErrs
-    . " classification=SQLITE_DEFERRED_HARNESS_RETRY (Production MySQL uses FOR UPDATE)\n";
-et_assert($gotExclusive, '16/concurrency. parallel workers: one ALLOW one DENY');
+    . ' semantic_fail=' . ($semanticFail ? '1' : '0')
+    . " classification=BOUNDED_TEST_HARNESS_RETRY_SAFE (SQLite BEGIN IMMEDIATE in test worker only; Production MySQL unchanged)\n";
+et_assert(
+    $gotExclusive && !$semanticFail,
+    '16/concurrency. parallel workers: one ALLOW one DENY (no semantic 2×ALLOW/2×DENY masked by retry)'
+);
 
 $ep = (string) file_get_contents($root . '/api/orders/email-track-order-summary.php');
 et_assert(str_contains($ep, 'orange_email_track_rate_limit_consume'), 'endpoint uses shared limiter');

@@ -140,19 +140,25 @@ $passedSuites = @($rows | Where-Object { $_.fail -eq 0 -and $_.exit -eq 0 }).Cou
 $failedSuites = @($rows | Where-Object { $_.fail -gt 0 -or ($_.exit -ne 0 -and $_.pass -eq 0) }).Count
 $skippedSuites = @($rows | Where-Object { $_.pass -eq 0 -and $_.fail -eq 0 -and $_.skip -gt 0 }).Count
 $coreSkip = ($rows | Where-Object { $_.suite -match 'final_review_d4_' } | Measure-Object -Property skip -Sum).Sum
+if ($coreSkip -eq $null) { $coreSkip = 0 }
 $envSkip = $rawSkip - $coreSkip
-# Batch A runs overlap same suite file three times
-$overlap = 2 * (($rows | Where-Object { $_.suite -match 'email_track_rate_limit' } | Measure-Object).Count - 1)
-if ($overlap -lt 0) { $overlap = 0 }
-$uniquePass = $rawPass # assertion-level unique across one-shot suites; Batch A triple-counts intentionally in Raw
+# Exact Batch A overlap: 3 suite executions = 1 primary + 2 repeated; overlap assertions = 2 × PASS_per_run.
+$batchARows = @($rows | Where-Object { $_.suite -match 'email_track_rate_limit' })
+$batchAExecutions = $batchARows.Count
+$batchAPassPerRun = if ($batchAExecutions -gt 0) { [int]$batchARows[0].pass } else { 0 }
+$batchARepeatedExecutions = [Math]::Max(0, $batchAExecutions - 1)
+$overlapAssertions = $batchARepeatedExecutions * $batchAPassPerRun
+$uniquePass = $rawPass - $overlapAssertions
 Write-Host ''
 Write-Host '===== MANIFEST TOTALS ====='
 Write-Host "SUITE_COMMANDS=$suiteCount"
 Write-Host "PASSED_SUITES=$passedSuites FAILED_SUITES=$failedSuites SKIPPED_SUITES=$skippedSuites"
 Write-Host "RAW_PASS=$rawPass RAW_FAIL=$rawFail RAW_SKIP=$rawSkip"
-Write-Host "CORE_D4_SKIP=$coreSkip ENV_OR_OTHER_SKIP=$envSkip"
-Write-Host "NESTED_OVERLAP_ASSERTIONS_NOTE=Batch_A_x3_raw_includes_3x_same_suite overlap_suite_reruns=$overlap"
-Write-Host "UNIQUE_PASS_ASSERTIONS_IF_DEDUP_BATCH_A=$($rawPass - (2 * (($rows | Where-Object { $_.suite -match 'email_track_rate_limit' } | Select-Object -First 1).pass)))"
+Write-Host "CORE_D4_SKIP=$coreSkip ENVIRONMENTAL_SKIP=$envSkip"
+Write-Host "BATCH_A_EXECUTIONS=$batchAExecutions BATCH_A_PRIMARY=1 BATCH_A_REPEATED_EXECUTIONS=$batchARepeatedExecutions BATCH_A_PASS_PER_RUN=$batchAPassPerRun"
+Write-Host "OVERLAP_ASSERTIONS=$overlapAssertions"
+Write-Host "UNIQUE_PASS=$uniquePass"
+Write-Host "OVERLAP_DEFINITION=Batch_A_stability_reruns_only; no other nested suite overlap in this manifest"
 $rows | Format-Table suite,mode,exit,pass,fail,skip,result,ms -AutoSize
 if ($failedSuites -gt 0 -or $rawFail -gt 0) { exit 1 }
 if ($coreSkip -gt 0) { Write-Host 'CORE_D4_SKIP_NONZERO'; exit 1 }
