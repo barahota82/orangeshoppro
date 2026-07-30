@@ -181,8 +181,27 @@ try {
     echo 'NOTE  gift_race ok_count=' . $okCount
         . ' w1=' . substr((string) ($j1['body_snip'] ?? $j1['error'] ?? ''), 0, 120)
         . ' w2=' . substr((string) ($j2['body_snip'] ?? $j2['error'] ?? ''), 0, 120) . "\n";
-    d4f_assert($okCount <= 2, 'gift race workers completed');
     d4f_assert(is_array($j1) && is_array($j2), 'gift race worker results present');
+    // Row-level exclusive Gift proof lives in self_test_final_review_d4_promo_stock_race.php
+    // (WVS/pending/fulfillment). Here: smoke that at most one submit may keep gift_promo.
+    $giftKept = 0;
+    foreach ([$j1, $j2] as $jw) {
+        $onRace = (string) ($jw['order_number'] ?? '');
+        if ($onRace === '' || empty($jw['ok'])) {
+            continue;
+        }
+        $st->execute([$onRace]);
+        $rr = $st->fetch(PDO::FETCH_ASSOC);
+        if (is_array($rr) && (int) ($rr['cart_gift_promotion_id'] ?? 0) > 0) {
+            $giftKept++;
+        }
+    }
+    echo 'NOTE  gift_race_orders_with_gift_promo=' . $giftKept . "\n";
+    d4f_assert($giftKept <= 1, 'gift race: at most one Order retains cart_gift_promotion_id');
+    $wvsGift = (int) $pdo->query(
+        'SELECT COALESCE(quantity,0) FROM warehouse_variant_stock WHERE variant_id = 612 LIMIT 1'
+    )->fetchColumn();
+    d4f_assert($wvsGift >= 0, 'gift race: WVS non-negative after concurrent submit');
     // Restore stock
     $pdo->prepare('UPDATE warehouse_variant_stock SET quantity = 50 WHERE variant_id = 612')->execute();
     $pdo->prepare('UPDATE product_variants SET stock_quantity = 50 WHERE id = 612')->execute();
