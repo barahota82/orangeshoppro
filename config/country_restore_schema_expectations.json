@@ -42,7 +42,7 @@
       "required_constraints": []
     },
     "admin_permissions": {
-      "required_columns": ["id", "admin_id"],
+      "required_columns": ["admin_id", "resource_key"],
       "required_indexes": [],
       "required_constraints": []
     },
@@ -57,12 +57,12 @@
       "required_constraints": []
     },
     "inventory_cost_layers": {
-      "required_columns": ["id", "warehouse_id", "qty"],
+      "required_columns": ["id", "warehouse_id", "qty_in", "qty_remaining"],
       "required_indexes": [],
       "required_constraints": []
     },
     "inventory_cost_consumptions": {
-      "required_columns": ["id", "layer_id", "qty"],
+      "required_columns": ["id", "layer_id", "consumed_qty"],
       "required_indexes": [],
       "required_constraints": []
     },
@@ -92,7 +92,7 @@
       "required_constraints": []
     },
     "document_sequences": {
-      "required_columns": ["id", "scope", "next_value"],
+      "required_columns": ["scope", "last_value"],
       "required_indexes": [],
       "required_constraints": []
     },

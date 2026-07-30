@@ -183,7 +183,8 @@ if ($mysql === null) {
     foreach ([
         'orders', 'order_items', 'accounts', 'admins', 'admin_permissions',
         'warehouses', 'warehouse_variant_stock', 'inventory_cost_layers', 'inventory_cost_consumptions',
-        'journal_entries', 'products', 'customers', 'journal_vouchers', 'journal_lines', 'document_sequences',
+        'journal_entries', 'products', 'product_variants', 'customers', 'journal_vouchers', 'journal_lines',
+        'document_sequences', 'orange_company_documents', 'orange_admin_audit_log',
     ] as $t) {
         $mysql->exec("DROP TABLE IF EXISTS `{$t}`");
     }
@@ -191,28 +192,33 @@ if ($mysql === null) {
     $mysql->exec('CREATE TABLE order_items (id INT PRIMARY KEY, order_id INT NOT NULL)');
     $mysql->exec('CREATE TABLE accounts (id INT PRIMARY KEY, country_id INT NULL)');
     $mysql->exec('CREATE TABLE admins (id INT PRIMARY KEY, country_id INT NULL)');
-    $mysql->exec('CREATE TABLE admin_permissions (id INT PRIMARY KEY, admin_id INT NOT NULL)');
+    // Schema 124-aligned sparse fixture (FSR-D5-EXP-01): no legacy qty/next_value/id.
+    $mysql->exec('CREATE TABLE admin_permissions (admin_id INT NOT NULL, resource_key VARCHAR(80) NOT NULL, PRIMARY KEY (admin_id, resource_key))');
     $mysql->exec('CREATE TABLE warehouses (id INT PRIMARY KEY, country_id INT NULL)');
     $mysql->exec('CREATE TABLE warehouse_variant_stock (id INT PRIMARY KEY, warehouse_id INT NOT NULL)');
-    $mysql->exec('CREATE TABLE inventory_cost_layers (id INT PRIMARY KEY, warehouse_id INT NULL, qty DECIMAL(18,4) DEFAULT 0, country_id INT NULL)');
-    $mysql->exec('CREATE TABLE inventory_cost_consumptions (id INT PRIMARY KEY, layer_id INT NOT NULL, qty DECIMAL(18,4) DEFAULT 0)');
+    $mysql->exec('CREATE TABLE inventory_cost_layers (id INT PRIMARY KEY, warehouse_id INT NULL, qty_in INT NOT NULL DEFAULT 0, qty_remaining INT NOT NULL DEFAULT 0, country_id INT NULL)');
+    $mysql->exec('CREATE TABLE inventory_cost_consumptions (id INT PRIMARY KEY, layer_id INT NOT NULL, consumed_qty INT NOT NULL DEFAULT 0)');
     $mysql->exec('CREATE TABLE journal_entries (id INT PRIMARY KEY, note VARCHAR(64) NULL)');
     $mysql->exec('CREATE TABLE products (id INT PRIMARY KEY, country_id INT NULL)');
     $mysql->exec('CREATE TABLE customers (id INT PRIMARY KEY, country_id INT NULL)');
     $mysql->exec('CREATE TABLE journal_vouchers (id INT PRIMARY KEY, country_id INT NULL)');
     $mysql->exec('CREATE TABLE journal_lines (id INT PRIMARY KEY, voucher_id INT NULL, debit DECIMAL(18,4) DEFAULT 0, credit DECIMAL(18,4) DEFAULT 0)');
-    $mysql->exec('CREATE TABLE document_sequences (id INT PRIMARY KEY, scope VARCHAR(191) NOT NULL, next_value INT NOT NULL DEFAULT 1)');
+    $mysql->exec('CREATE TABLE document_sequences (scope VARCHAR(64) NOT NULL, `last_value` BIGINT NOT NULL DEFAULT 0, updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (scope))');
+    $mysql->exec('CREATE TABLE product_variants (id INT PRIMARY KEY, product_id INT NOT NULL)');
+    $mysql->exec('CREATE TABLE orange_company_documents (id INT PRIMARY KEY, country_id INT NOT NULL)');
+    $mysql->exec('CREATE TABLE orange_admin_audit_log (id INT PRIMARY KEY, country_id INT NULL, is_global TINYINT(1) NOT NULL DEFAULT 0)');
     $mysql->exec('SET FOREIGN_KEY_CHECKS=1');
 
     $mysql->exec('INSERT INTO orders (id, country_id) VALUES (1,1),(2,2)');
     $mysql->exec('INSERT INTO warehouses (id, country_id) VALUES (1,1),(2,2)');
     $mysql->exec('INSERT INTO warehouse_variant_stock (id, warehouse_id) VALUES (1,1),(2,2)');
-    $mysql->exec('INSERT INTO inventory_cost_layers (id, warehouse_id, qty, country_id) VALUES (1,1,5,1),(2,2,3,2)');
-    $mysql->exec('INSERT INTO inventory_cost_consumptions (id, layer_id, qty) VALUES (1,1,1)');
+    $mysql->exec('INSERT INTO inventory_cost_layers (id, warehouse_id, qty_in, qty_remaining, country_id) VALUES (1,1,5,5,1),(2,2,3,3,2)');
+    $mysql->exec('INSERT INTO inventory_cost_consumptions (id, layer_id, consumed_qty) VALUES (1,1,1)');
     $mysql->exec("INSERT INTO journal_entries (id, note) VALUES (1,'g')");
     $mysql->exec('INSERT INTO accounts (id, country_id) VALUES (1,1),(2,2)');
     $mysql->exec('INSERT INTO products (id, country_id) VALUES (1,1)');
     $mysql->exec('INSERT INTO customers (id, country_id) VALUES (1,1)');
+    $mysql->exec("INSERT INTO document_sequences (scope, `last_value`) VALUES ('inv_c1',5)");
 
     $runDir = sys_get_temp_dir() . '/orange_fh_run_' . getmypid();
     @mkdir($runDir, 0777, true);
@@ -222,7 +228,7 @@ if ($mysql === null) {
     $pkg = sys_get_temp_dir() . '/orange_fh_pkg_' . getmypid();
     @mkdir($pkg . '/files', 0777, true);
     orange_backup_write_json($pkg . '/table_inventory.json', ['tables' => ['orders' => 1], 'uploads_file_count' => 0]);
-    orange_backup_write_json($pkg . '/manifest.json', ['schema_revision' => 121, 'uploads_file_count' => 0]);
+    orange_backup_write_json($pkg . '/manifest.json', ['schema_revision' => 124, 'uploads_file_count' => 0]);
     orange_country_uploads_write_empty_zip($pkg . '/files/uploads_country.zip');
 
     $verify = orange_country_shadow_verify_target_slice(
@@ -269,7 +275,7 @@ if ($mysql === null) {
 
     // Restore survivor; inject cross-country FIFO
     $mysql->exec('INSERT INTO orders (id, country_id) VALUES (2,2)');
-    $mysql->exec('INSERT INTO inventory_cost_layers (id, warehouse_id, qty, country_id) VALUES (3,2,1,1)');
+    $mysql->exec('INSERT INTO inventory_cost_layers (id, warehouse_id, qty_in, qty_remaining, country_id) VALUES (3,2,1,1,1)');
     $stock = orange_country_shadow_verify_stock_fifo_ownership($mysql, 1);
     fh_assert($stock['ok'] === false, 'N3-03 cross-country FIFO FAIL');
     fh_assert(

@@ -492,7 +492,13 @@ try {
     c7_assert(str_contains($api, 'restore_admin_api_require_get'), 'HTTP GET-only verify status');
     c7_assert(!str_contains($api, 'orange_country_shadow_verify_run('), 'HTTP does not execute verify');
     $ui = (string) file_get_contents($projectRoot . '/admin/pages/restore_center.php');
-    c7_assert(str_contains($ui, 'Country Shadow Verification'), 'Restore Center shows C7 panel');
+    // Intended UI contract (Arabic Restore Center): C7 panel id + title, not English stub text.
+    c7_assert(
+        str_contains($ui, 'id="rc_country_shadow_section"')
+        && str_contains($ui, 'تحقق ظل الدولة')
+        && str_contains($ui, 'id="rc_country_shadow_verify"'),
+        'Restore Center shows C7 panel'
+    );
     c7_assert(
         !str_contains($ui, 'Enable Country Production Restore')
         && !str_contains($ui, 'country_production_restore_run('),

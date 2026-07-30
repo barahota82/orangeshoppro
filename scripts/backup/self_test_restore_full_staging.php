@@ -423,6 +423,33 @@ try {
 }
 restore_staging_self_test($stagingGrantOk, 'privilege fence: staging-only grant accepted');
 
+$usageNeutralOk = true;
+try {
+    orange_restore_staging_validate_grant_lines(
+        [
+            "GRANT USAGE ON *.* TO `restore_staging`@`localhost`",
+            "GRANT ALL PRIVILEGES ON `{$stagingDbName}`.* TO `restore_staging`@`localhost`",
+        ],
+        $productionDbName
+    );
+} catch (Throwable) {
+    $usageNeutralOk = false;
+}
+restore_staging_self_test($usageNeutralOk, 'privilege fence: neutral USAGE ON *.* + staging grant accepted');
+
+try {
+    orange_restore_staging_validate_grant_lines(
+        ["GRANT USAGE, SELECT ON *.* TO `restore_staging`@`localhost`"],
+        $productionDbName
+    );
+    restore_staging_self_test(false, 'privilege fence: USAGE,SELECT ON *.* rejected');
+} catch (Throwable $e) {
+    restore_staging_self_test(
+        str_contains($e->getMessage(), 'production schema'),
+        'privilege fence: USAGE,SELECT ON *.* rejected'
+    );
+}
+
 $stagingUnquotedGrantOk = true;
 try {
     orange_restore_staging_validate_grant_lines(

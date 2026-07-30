@@ -288,12 +288,39 @@ function orange_restore_country_package_anchor_checksum(string $packagePath): st
 }
 
 /**
- * @return array{kind:string,table:string,prefix:string}|null
+ * Parse a Country Recovery Package SQL chunk basename.
+ *
+ * Exporter contract (country_export.php): sprintf('%03d_%s.sql', export_order, table)
+ * — minimum width 3 digits; values ≥ 1000 naturally produce 4+ digits.
+ * Historical packages with exactly three digits remain valid (FSR-D5-CRP-CHUNK-01).
+ *
+ * @return array{kind:string,table:string,prefix:string,prefix_int:int}|null
  */
 function orange_restore_country_staging_parse_sql_chunk(string $filename): ?array
 {
-    $base = basename($filename);
-    if (!preg_match('/^(\d{3})_(.+)\.sql$/', $base, $matches)) {
+    if ($filename === '' || str_contains($filename, "\0") || preg_match('/[[:cntrl:]]/', $filename) === 1) {
+        return null;
+    }
+
+    $normalized = str_replace('\\', '/', $filename);
+    // Reject traversal path segments (e.g. ../001_table.sql) while allowing absolute package paths.
+    if (preg_match('#(?:^|/)\.\.(?:/|$)#', $normalized) === 1) {
+        return null;
+    }
+
+    // Package callers pass absolute glob paths — validate the basename only.
+    $base = basename($normalized);
+    if ($base === ''
+        || str_contains($base, '/')
+        || str_contains($base, '\\')
+        || str_contains($base, '..')
+        || str_contains($base, '://')
+    ) {
+        return null;
+    }
+    // Minimum 3 digits (historical + sprintf %03d); allow 4+ for export_order ≥ 1000.
+    // Table/token: safe MySQL-ish identifier only (rejects ../, spaces, metacharacters).
+    if (!preg_match('/^(\d{3,})_([A-Za-z_][A-Za-z0-9_]*)\.sql$/', $base, $matches)) {
         return null;
     }
 
@@ -309,6 +336,7 @@ function orange_restore_country_staging_parse_sql_chunk(string $filename): ?arra
         'kind' => $kind,
         'table' => $table,
         'prefix' => (string) $matches[1],
+        'prefix_int' => (int) $matches[1],
     ];
 }
 
@@ -378,6 +406,8 @@ function orange_restore_country_staging_build_import_plan(
     $postamble = null;
     /** @var array<string, string> $tableFiles */
     $tableFiles = [];
+    /** @var array<int, string> $prefixOwners */
+    $prefixOwners = [];
 
     foreach ($sqlFiles as $sqlFile) {
         $parsed = orange_restore_country_staging_parse_sql_chunk($sqlFile);
@@ -395,6 +425,12 @@ function orange_restore_country_staging_build_import_plan(
         }
 
         $tableName = $parsed['table'];
+        $prefixInt = (int) ($parsed['prefix_int'] ?? (int) $parsed['prefix']);
+        if (isset($prefixOwners[$prefixInt]) && $prefixOwners[$prefixInt] !== $tableName) {
+            return ['ok' => false, 'error' => 'Duplicate SQL chunk numeric prefix: ' . $prefixInt, 'import_files' => [], 'tables' => [], 'delete_order_tables' => [], 'registry_version' => $manifestRegistryVersion, 'dependency_graph_valid' => true];
+        }
+        $prefixOwners[$prefixInt] = $tableName;
+
         if (!isset($exportableTables[$tableName])) {
             return ['ok' => false, 'error' => 'SQL chunk references non-exportable or global table: ' . $tableName, 'import_files' => [], 'tables' => [], 'delete_order_tables' => [], 'registry_version' => $manifestRegistryVersion, 'dependency_graph_valid' => true];
         }

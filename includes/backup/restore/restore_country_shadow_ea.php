@@ -703,8 +703,10 @@ function orange_country_shadow_sql_integrity_checks_v2(PDO $pdo, int $countryId,
                      WHERE `scope` LIKE ? ESCAPE \'\\\\\' AND (`scope` NOT LIKE ? ESCAPE \'\\\\\')'
                 );
                 // collision: other country suffix sharing base — simplified: scopes for target must end with _c{id}
+                // Schema 124 identity/value contract: PK scope + counter last_value
+                // (never legacy next_value / surrogate id). Same root cause as FSR-D5-EXP-01.
                 $st = $pdo->prepare(
-                    'SELECT `scope`, `next_value` FROM document_sequences WHERE `scope` LIKE ? ESCAPE \'\\\\\''
+                    'SELECT `scope`, `last_value` FROM document_sequences WHERE `scope` LIKE ? ESCAPE \'\\\\\''
                 );
                 $st->execute([$like]);
                 foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
@@ -713,7 +715,7 @@ function orange_country_shadow_sql_integrity_checks_v2(PDO $pdo, int $countryId,
                         $seqCodes[] = 'sequence_namespace_collision';
                         $seqOk = false;
                     }
-                    if ((int) ($row['next_value'] ?? 0) < 0) {
+                    if ((int) ($row['last_value'] ?? 0) < 0) {
                         $seqCodes[] = 'sequence_lowered';
                         $seqOk = false;
                     }

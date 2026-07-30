@@ -253,6 +253,26 @@ function orange_restore_full_staging_run(array $options): array
 }
 
 /**
+ * Resolve Owner-approval window start (FSR-D5-APR-01).
+ *
+ * Window starts once at successful Staging finalization → awaiting_owner_approval.
+ * Empty / whitespace / null / missing are treated as unset. A valid nonempty
+ * timestamp is preserved (idempotent; no restart / no extend).
+ */
+function orange_restore_full_staging_approval_window_started_at(array $job): string
+{
+    if (!array_key_exists('owner_approval_window_started_at', $job) || $job['owner_approval_window_started_at'] === null) {
+        return gmdate('c');
+    }
+    $trimmed = trim((string) $job['owner_approval_window_started_at']);
+    if ($trimmed === '') {
+        return gmdate('c');
+    }
+
+    return $trimmed;
+}
+
+/**
  * Phase 2B.1 — finalize staging_validated → awaiting_owner_approval (shared; used by 2E resume).
  *
  * @return array<string, mixed>
@@ -262,6 +282,14 @@ function orange_restore_full_staging_finalize_approval(string $workRoot, string 
     $job = orange_restore_job_read($workRoot, $jobId);
     $status = (string) ($job['status'] ?? '');
     if ($status === ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL) {
+        // Idempotent: preserve an existing window. One-time fill only if APR-01 left it empty.
+        $existing = trim((string) ($job['owner_approval_window_started_at'] ?? ''));
+        if ($existing !== '') {
+            return $job;
+        }
+        $job['owner_approval_window_started_at'] = gmdate('c');
+        orange_restore_job_write($workRoot, $job);
+
         return $job;
     }
     if ($status !== ORANGE_RESTORE_JOB_STATUS_STAGING_VALIDATED) {
@@ -297,7 +325,7 @@ function orange_restore_full_staging_finalize_approval(string $workRoot, string 
 
     return orange_restore_job_transition($workRoot, $jobId, ORANGE_RESTORE_JOB_STATUS_AWAITING_APPROVAL, [
         'restore_report_path' => $reportPath,
-        'owner_approval_window_started_at' => (string) ($job['owner_approval_window_started_at'] ?? gmdate('c')),
+        'owner_approval_window_started_at' => orange_restore_full_staging_approval_window_started_at($job),
         'result' => 'awaiting_owner_approval',
     ]);
 }

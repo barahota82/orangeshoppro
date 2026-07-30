@@ -130,7 +130,85 @@ function orange_restore_staging_assert_safe_target(PDO $pdo, string $expectedDb)
 }
 
 /**
+ * True only for the exact neutral MySQL account line:
+ *   GRANT USAGE ON *.* TO <quoted-user>@<quoted-host>
+ *
+ * Rejects USAGE combined with any other privilege, WITH GRANT OPTION, PROXY,
+ * roles, IDENTIFIED BY, resource limits, comments, multi-statements, or
+ * unknown/unparsed suffixes. Does not accept every ON *.* line.
+ */
+function orange_restore_staging_is_neutral_usage_grant(string $grantLine): bool
+{
+    $raw = trim($grantLine);
+    if ($raw === '') {
+        return false;
+    }
+    // Fail closed on injection / multi-statement / comment shapes.
+    if (
+        str_contains($raw, ';')
+        || str_contains($raw, '--')
+        || str_contains($raw, '/*')
+        || str_contains($raw, '*/')
+        || str_contains($raw, "\0")
+        || preg_match('/[[:cntrl:]]/', $raw) === 1
+    ) {
+        return false;
+    }
+
+    $normalized = preg_replace('/\s+/u', ' ', $raw);
+    if (!is_string($normalized) || $normalized === '') {
+        return false;
+    }
+
+    // Privilege list must be exactly USAGE (not USAGE, SELECT / ALL / ...).
+    if (preg_match(
+        '/^GRANT\s+USAGE\s+ON\s+\*\.\*\s+TO\s+(.+)$/i',
+        $normalized,
+        $matches
+    ) !== 1) {
+        return false;
+    }
+
+    $grantee = trim((string) ($matches[1] ?? ''));
+    if ($grantee === '') {
+        return false;
+    }
+    if (preg_match('/\bWITH\s+GRANT\s+OPTION\b/i', $grantee) === 1) {
+        return false;
+    }
+    if (preg_match('/\bPROXY\b/i', $grantee) === 1) {
+        return false;
+    }
+    if (preg_match('/\bIDENTIFIED\b/i', $grantee) === 1) {
+        return false;
+    }
+    if (preg_match('/\bREQUIRE\b/i', $grantee) === 1) {
+        return false;
+    }
+    if (preg_match('/\bRESOURCE\b|\bMAX_|PASSWORD\s+EXPIRE|ACCOUNT\s+/i', $grantee) === 1) {
+        return false;
+    }
+    // Role / admin syntax leftovers.
+    if (preg_match('/\bADMIN\b|\bROLE\b/i', $grantee) === 1) {
+        return false;
+    }
+
+    // Exact quoted grantee only: 'u'@'h' / `u`@`h` / "u"@"h"
+    if (preg_match(
+        '/^([\'"`])([^\'"`]+)\1\s*@\s*([\'"`])([^\'"`]*)\3$/u',
+        $grantee
+    ) !== 1) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
  * Evaluate SHOW GRANTS lines for production/global privilege violations.
+ *
+ * Neutral MySQL account bootstrap `GRANT USAGE ON *.* TO ...` is permitted.
+ * Every actual global privilege on *.* remains rejected.
  *
  * @param list<string> $grantLines
  */
@@ -153,6 +231,31 @@ function orange_restore_staging_validate_grant_lines(array $grantLines, string $
         $grant = trim($grant);
         if ($grant === '') {
             continue;
+        }
+        if (preg_match('/^GRANT\b/i', $grant) !== 1) {
+            throw new RuntimeException(
+                'Staging DB user has detectable privilege on production schema ('
+                . $productionDb
+                . '). Grant staging-only access per runbook.'
+            );
+        }
+        // Exact neutral USAGE account line — required by MySQL/MariaDB for every user.
+        if (orange_restore_staging_is_neutral_usage_grant($grant)) {
+            continue;
+        }
+        if (preg_match('/\bGRANT\s+PROXY\b/i', $grant) === 1) {
+            throw new RuntimeException(
+                'Staging DB user has detectable privilege on production schema ('
+                . $productionDb
+                . '). Grant staging-only access per runbook.'
+            );
+        }
+        if (preg_match('/\bWITH\s+GRANT\s+OPTION\b/i', $grant) === 1) {
+            throw new RuntimeException(
+                'Staging DB user has detectable privilege on production schema ('
+                . $productionDb
+                . '). Grant staging-only access per runbook.'
+            );
         }
         if (
             stripos($grant, ' ON ' . $productionNeedle . '.') !== false

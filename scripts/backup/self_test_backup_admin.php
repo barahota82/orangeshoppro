@@ -310,7 +310,12 @@ $pageSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'a
 $restorePageSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php');
 $headerSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'partials' . DIRECTORY_SEPARATOR . 'header.php');
 backup_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php'), 'phase3b: restore_center page exists');
-backup_admin_self_test(str_contains($restorePageSource, 'orange_admin_render_page_title_with_country') && str_contains($restorePageSource, 'للعرض والمتابعة فقط'), 'phase3b.1: restore_center read-only dashboard');
+backup_admin_self_test(
+    str_contains($restorePageSource, 'orange_admin_render_page_title_with_country')
+    && str_contains($restorePageSource, 'rc-readonly-banner')
+    && str_contains($restorePageSource, 'إدارة الاسترداد'),
+    'phase3b.1: restore_center read-only dashboard'
+);
 backup_admin_self_test(strpos($headerSource, 'backup_center') !== false && strpos($headerSource, 'restore_center') !== false && strpos($headerSource, 'backup_center') < strpos($headerSource, 'restore_center'), 'phase3b: menu order backup_center then restore_center');
 backup_admin_self_test(!str_contains($restorePageSource, 'restore_admin.php'), 'phase3b.1: restore_center page does not load restore_admin at render');
 backup_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'self_test_restore_admin.php'), 'phase3b.1: dedicated restore admin self-test exists');

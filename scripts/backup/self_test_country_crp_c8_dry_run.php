@@ -375,7 +375,13 @@ try {
     c8_assert(str_contains($api, 'restore_admin_api_require_get'), 'HTTP GET-only');
     c8_assert(!str_contains($api, 'orange_country_dry_run_execute('), 'HTTP does not execute dry-run');
     $ui = (string) file_get_contents($projectRoot . '/admin/pages/restore_center.php');
-    c8_assert(str_contains($ui, 'Country Dry Run (C8)'), 'Restore Center shows C8 panel');
+    // Intended UI contract (Arabic Restore Center): C8 panel id + title, not English stub text.
+    c8_assert(
+        str_contains($ui, 'id="rc_country_dry_run_section"')
+        && str_contains($ui, 'محاكاة استعادة الدولة')
+        && str_contains($ui, 'id="rc_country_dry_run"'),
+        'Restore Center shows C8 panel'
+    );
 
     c8_assert(orange_country_dry_run_exit_code($safe) === 0, 'SAFE exit 0');
     c8_assert(orange_country_dry_run_exit_code(['overall_result' => 'FAIL']) === 1, 'FAIL exit 1');
