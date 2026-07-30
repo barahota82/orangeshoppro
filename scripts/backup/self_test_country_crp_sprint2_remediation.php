@@ -307,11 +307,11 @@ try {
         $je = (int) $shadowPdo->query('SELECT COUNT(*) FROM journal_entries')->fetchColumn();
         s2_assert($je === 1, 'EA-02 journal_entries not wiped');
 
-        // Re-seed target after clear for verify unit check
+        // Re-seed target after clear for verify unit check (Schema 124 admin_permissions PK).
         $shadowPdo->exec('INSERT INTO orders (id, country_id) VALUES (1,1)');
         $shadowPdo->exec('INSERT INTO order_items (id, order_id) VALUES (1,1)');
         $shadowPdo->exec('INSERT INTO admins (id, country_id) VALUES (1,1)');
-        $shadowPdo->exec('INSERT INTO admin_permissions (id, admin_id) VALUES (1,1)');
+        $shadowPdo->exec("INSERT INTO admin_permissions (admin_id, resource_key) VALUES (1,'orders')");
 
         $verify = orange_country_shadow_verify_target_slice(
             $shadowPdo,
