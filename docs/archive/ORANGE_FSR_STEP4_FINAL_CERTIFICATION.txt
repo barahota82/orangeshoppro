@@ -1,0 +1,84 @@
+ORANGE — Final System Review Step 4 — Final Certification Record
+================================================================
+المسار: docs/archive/ORANGE_FSR_STEP4_FINAL_CERTIFICATION.txt
+تاريخ الإغلاق: 2026-07-31
+الحالة: A — FSR_STEP4_FINAL_SYSTEM_CERTIFICATION_READY
+(شهادة كود/اختبارات/عقود استرداد — جاهزية نشر للمالك؛ بلا نشر منفَّذ في هذه المهمة)
+
+1) HEAD المعتمد للشهادة
+-----------------------
+- Baseline قبل Step 4: a163c2a4ec9fba71c493e94c8ec50ba0c7917fb5
+- Certified HEAD: Commit شهادة Step 4 (test/docs فقط) على main بعد هذا السجل — يُثبَّت في التقرير النهائي بعد الدفع.
+- Schema: 124 (Catalog / Registry / Boundary Matrix / Expectations / Recovery Expected)
+- Registry table_count: 117
+- Country Production Cutover: ORANGE_COUNTRY_RESTORE_PRODUCTION_ENABLED = false (POLICY_FROZEN)
+
+2) إغلاق الدفعات
+----------------
+- Batch A (FSR-SEC-03): 30a547ea
+- Batch C (FSR-BAK-01 test infra): 5856790c
+- Batch F (FSR-DEAD-01 / FSR-DOC-01): 9d10b3e9
+- D1 behavioral: 7bebdd0b
+- D2 suites + FULFILL-01: 2fdeeeef / a363232e
+- D3 Production + suites: 80655031
+- D4 Production + HTTP + concurrency + manifest: bdb5db32 / a2e6f089 / 7cc0e49a (+ 217e5b4a / 9df71d7b)
+- D5 Production/config + cert manifest: 3e0fa90b / a163c2a4
+
+3) سجل الفجوات الأصلي (Step 1) — الحالة النهائية
+-----------------------------------------------
+- FSR-SEC-01: DOWNGRADED_DEFENSE_IN_DEPTH — لا استغلال cross-site مثبت؛ توصية CSRF أوسع دفاع-في-العمق.
+- FSR-SEC-02: REJECTED_AS_NOT_LIVE_DEFECT / hygiene — لا طفرة GET مثبتة؛ عقود method محفوظة.
+- FSR-SEC-03: CLOSED_PRODUCTION_FIX — 30a547ea + self_test_final_review_email_track_rate_limit.php
+- FSR-AUTHZ-01: CLOSED_BEHAVIORAL_EVIDENCE — UNKNOWN_AUTHORITY=0 على سطوح D1–D2/مراجعة الطفرات؛ Backup/Restore control plane منفصل.
+- FSR-BAK-01: CLOSED_TEST_INFRASTRUCTURE — 5856790c
+- FSR-TEST-01: CLOSED_BEHAVIORAL_EVIDENCE — D1–D5
+- FSR-PERF-01: SCALE_RISK_MEASUREMENT_PENDING — لا عيب أداء حالي مثبت كصحة؛ قياس تشغيل للمالك.
+- FSR-DEAD-01 / FSR-DOC-01: CLOSED_PRODUCTION_FIX / docs — 9d10b3e9
+- FSR-OPS-01: OWNER_RUNTIME_EVIDENCE_ONLY — قائمة نشر/مهام مجدولة للمالك؛ ليس عيب كود.
+
+4) عيوب Production مسماة أُغلقت في D2–D5
+----------------------------------------
+- FSR-D2-FULFILL-01 → a363232e
+- FSR-D3 PENDING-01/02/03 / YEC-01 / LOYALTY-01 → 80655031
+- FSR-D4-PREVIEW-LOYALTY / ORDER-PHONE / ORDERS-INSERT / CUSTOMER-REQUIRED / ORDER-ITEMS-GL / DOCUMENT-SEQUENCES-LAST-VALUE → bdb5db32
+- FSR-D5-FULL-01 / STG-01 / APR-01 / CRP-CHUNK-01 / EXP-01 (+ EA same-root) → 3e0fa90b
+- Sprint2 fixture Schema-124 admin_permissions re-seed → a163c2a4 (test-only)
+- Restore Center Arabic UI / Schema-124 package fixtures in self_test_restore_admin → Step-4 test-only Commit
+
+OPEN_PROVEN_DEFECT (Critical/High/Medium Production) = 0
+
+5) Manifests و totals (تشغيل Step-4 الكامل الواحد)
+-------------------------------------------------
+- scripts/_d4_closure_regression_manifest.ps1
+- scripts/_d5_final_certification_manifest.ps1
+- scripts/_final_system_review_step4_manifest.ps1
+- تشغيل شهادة واحد (بعد bootstrap worktrees D4/D5 المؤقتة):
+  Raw PASS=4214  FAIL=0  SKIP=4
+  commands=32  passed=32  failed=0  skipped_required=0
+  CORE_SYSTEM_SKIP=0  ENVIRONMENTAL_SKIP=4
+  POLICY_FROZEN_NOT_APPLICABLE=1  OWNER_RUNTIME_ONLY=1
+  exact_overlap=512  Unique_PASS=3702
+  D5_nested Raw=2021/0/3 Unique=1547 overlap=474 (مطابق إغلاق D5)
+- SKIPs المسماة:
+  1) PDO export live self-test (backup; .env.php غير متصل محلياً)
+  2) readonly ACL simulation unavailable (backup_admin)
+  3) Nested D4 PDO export live (ضمن D5→D4؛ نفس فئة بيئية)
+  4) Node.js not installed (فحص syntax اختياري غير أساسي)
+
+6) نشر Production
+-----------------
+- لم يُنفَّذ git pull على السيرفر من هذه المهمة.
+- لم يُنفَّذ Backup/Restore/Cutover إنتاجي.
+- قائمة قبول التشغيل: تقرير Step 4 النهائي للمالك (قسم Checklist).
+
+7) نقطة التراجع
+---------------
+- Rollback HEAD قبل شهادة Step 4: a163c2a4
+- بعد Commit شهادة Step 4: Certified HEAD (test/docs) — التراجع إليه بلا downgrade Schema.
+- Schema يبقى 124؛ لا تغيير صيغة حزمة / Registry / Matrix.
+
+8) تنظيف الموارد
+----------------
+- D:\orange_d4_http_runtime و D:\orange_d5_runtime: أُنشئا مؤقتاً أثناء Manifest ثم أُزيلا.
+- لا بقايا orange_d5_data / PHP test workers بعد التشغيل.
+- artifacts غير المتتبعة تحت scripts/backup/apply_* و _ui_fragments: لم تُمس.

@@ -451,7 +451,7 @@ function restore_admin_test_seed_full_dry_package(string $pkgDir, string $pkgId,
         'package_type' => 'full_disaster',
         'package_version' => '1.0.0',
         'generated_at' => gmdate('c'),
-        'schema_revision' => 121,
+        'schema_revision' => 124,
         'export_backend' => 'php_pdo',
         'backup_status' => 'success',
         'dump_file' => $dumpRel,
@@ -488,50 +488,79 @@ $fullPkgId = '2026-07-01_120000';
 $fullPkgDir = $backupRoot . DIRECTORY_SEPARATOR . 'snapshots' . DIRECTORY_SEPARATOR . $fullPkgId;
 restore_admin_test_seed_full_dry_package($fullPkgDir, $fullPkgId);
 
+// Schema-124 CRP package (same contract as C7/C8 fixtures) — not the legacy stub package.
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'catalog_schema.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_table_registry_lib.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'country_boundary_matrix_lib.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'country_export.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'uploads_collector.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'country_crp_verify.php';
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'country_crp_drv.php';
 $countryPkgId = '2026-07-01_130000';
 $countryPkgDir = $backupRoot . DIRECTORY_SEPARATOR . 'country_packages' . DIRECTORY_SEPARATOR . 'kw' . DIRECTORY_SEPARATOR . $countryPkgId;
-mkdir($countryPkgDir, 0775, true);
-orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'manifest.json', [
-    'package_type' => 'country_recovery',
-    'package_version' => '1.0.0',
-    'generated_at' => gmdate('c'),
-    'schema_revision' => 121,
-    'registry_version' => '1.0',
-    'country_id' => 1,
-    'country_code' => 'KW',
-    'backup_status' => 'success',
-    'checksums_file' => 'checksums.sha256',
-    'health_report_file' => 'health.json',
+if (is_dir($countryPkgDir)) {
+    orange_backup_remove_dir($countryPkgDir);
+}
+mkdir($countryPkgDir . DIRECTORY_SEPARATOR . 'sql', 0775, true);
+mkdir($countryPkgDir . DIRECTORY_SEPARATOR . 'files', 0775, true);
+$countryId = 1;
+$matrix = orange_country_boundary_matrix_load($projectRoot);
+$registry = orange_backup_registry_load($projectRoot);
+$batches = orange_country_boundary_matrix_restore_batches($matrix);
+$dep = orange_country_export_build_dependency_graph_c3($matrix, $registry, $batches);
+orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'dependency_graph.json', $dep);
+$sqlBody = "-- Orange CRP export table=orders country_id={$countryId}\n"
+    . "INSERT INTO `orders` (`id`,`country_id`) VALUES (1,{$countryId});\n";
+file_put_contents($countryPkgDir . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR . '010_orders.sql', $sqlBody);
+$gz = gzopen($countryPkgDir . DIRECTORY_SEPARATOR . 'country.sql.gz', 'wb9');
+if ($gz !== false) {
+    gzwrite($gz, $sqlBody);
+    gzclose($gz);
+}
+orange_country_uploads_write_empty_zip($countryPkgDir . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip');
+orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'table_inventory.json', [
+    'country_id' => $countryId,
+    'tables' => ['orders' => 1],
+    'other_country_markers' => [],
+]);
+orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'id_snapshot.json', [
+    'country_id' => $countryId,
+    'tables' => ['orders' => [1]],
 ]);
 orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'health.json', [
     'package_status' => 'healthy',
-    'country_id' => 1,
-    'country_code' => 'KW',
+    'country_id' => $countryId,
+    'country_code' => 'kw',
+    'schema_revision' => (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION,
 ]);
-mkdir($countryPkgDir . DIRECTORY_SEPARATOR . 'sql', 0775, true);
-mkdir($countryPkgDir . DIRECTORY_SEPARATOR . 'files', 0775, true);
-file_put_contents($countryPkgDir . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR . 'countries.sql', "INSERT INTO countries VALUES (1);\n");
-restore_admin_test_write_zip($countryPkgDir . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR . 'uploads_country.zip', ['x.txt' => 'x']);
-orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'dependency_graph.json', ['tables' => ['countries']]);
-orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'table_inventory.json', ['tables' => ['countries' => 1]]);
-orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'id_snapshot.json', ['country_id' => 1, 'tables' => []]);
-$countryChecksumLines = [];
-foreach ([
-    'manifest.json',
-    'health.json',
-    'dependency_graph.json',
-    'table_inventory.json',
-    'id_snapshot.json',
-    'sql/countries.sql',
-    'files/uploads_country.zip',
-] as $rel) {
-    $abs = $countryPkgDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel);
-    $sha = hash_file('sha256', $abs);
-    if (is_string($sha) && $sha !== '') {
-        $countryChecksumLines[] = $sha . '  ' . $rel;
-    }
-}
-file_put_contents($countryPkgDir . DIRECTORY_SEPARATOR . 'checksums.sha256', implode("\n", $countryChecksumLines) . "\n");
+$countryManifest = [
+    'package_type' => 'country_recovery',
+    'package_version' => ORANGE_COUNTRY_EXPORT_PACKAGE_VERSION,
+    'generated_at' => gmdate('c'),
+    'export_time' => gmdate('c'),
+    'country_id' => $countryId,
+    'country_code' => 'kw',
+    'schema_revision' => (int) ORANGE_CATALOG_SCHEMA_PHP_REVISION,
+    'boundary_policy_version' => ORANGE_COUNTRY_BOUNDARY_POLICY_VERSION,
+    'dependency_graph_version' => ORANGE_COUNTRY_DEPENDENCY_GRAPH_VERSION,
+    'drv_version' => ORANGE_COUNTRY_EXPORT_DRV_VERSION,
+    'verify_version' => ORANGE_COUNTRY_EXPORT_VERIFY_VERSION,
+    'export_backend' => ORANGE_COUNTRY_EXPORT_BACKEND,
+    'registry_version' => '1.0',
+    'restore_batches' => $batches,
+    'backup_status' => 'success',
+    'package_fingerprint' => '',
+];
+orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'manifest.json', $countryManifest);
+$countryManifest['package_fingerprint'] = orange_crp_export_package_fingerprint($countryPkgDir, $countryManifest);
+orange_backup_write_json($countryPkgDir . DIRECTORY_SEPARATOR . 'manifest.json', $countryManifest);
+orange_backup_write_checksums($countryPkgDir, orange_backup_collect_package_files($countryPkgDir));
+orange_crp_verify_run($countryPkgDir, ['write_report' => true, 'project_root' => $projectRoot]);
+orange_country_drv_run($countryPkgDir, [
+    'write_report' => true,
+    'project_root' => $projectRoot,
+    'package_id' => $countryPkgId,
+]);
 orange_backup_write_json(
     orange_backup_admin_recovery_report_sibling_path($countryPkgDir, $countryPkgId),
     [
@@ -550,7 +579,7 @@ mkdir($fullMissingDrvDir, 0775, true);
 orange_backup_write_json($fullMissingDrvDir . DIRECTORY_SEPARATOR . 'manifest.json', [
     'package_type' => 'full_disaster',
     'generated_at' => gmdate('c', time() - 3600),
-    'schema_revision' => 121,
+    'schema_revision' => 124,
     'export_backend' => 'php_pdo',
     'backup_status' => 'success',
 ]);
@@ -562,7 +591,7 @@ mkdir($fullFailedDrvDir, 0775, true);
 orange_backup_write_json($fullFailedDrvDir . DIRECTORY_SEPARATOR . 'manifest.json', [
     'package_type' => 'full_disaster',
     'generated_at' => gmdate('c', time() - 7200),
-    'schema_revision' => 121,
+    'schema_revision' => 124,
     'export_backend' => 'php_pdo',
     'backup_status' => 'success',
 ]);
@@ -578,7 +607,7 @@ mkdir($fullWarningDrvDir, 0775, true);
 orange_backup_write_json($fullWarningDrvDir . DIRECTORY_SEPARATOR . 'manifest.json', [
     'package_type' => 'full_disaster',
     'generated_at' => gmdate('c', time() - 10800),
-    'schema_revision' => 121,
+    'schema_revision' => 124,
     'export_backend' => 'php_pdo',
     'backup_status' => 'success',
 ]);
@@ -594,7 +623,7 @@ mkdir($fullBadBackendDir, 0775, true);
 orange_backup_write_json($fullBadBackendDir . DIRECTORY_SEPARATOR . 'manifest.json', [
     'package_type' => 'full_disaster',
     'generated_at' => gmdate('c', time() - 14400),
-    'schema_revision' => 121,
+    'schema_revision' => 124,
     'export_backend' => 'mysqldump',
     'backup_status' => 'success',
 ]);
@@ -626,7 +655,7 @@ mkdir($fullPassNoScoreDir, 0775, true);
 orange_backup_write_json($fullPassNoScoreDir . DIRECTORY_SEPARATOR . 'manifest.json', [
     'package_type' => 'full_disaster',
     'generated_at' => gmdate('c', time() - 21600),
-    'schema_revision' => 121,
+    'schema_revision' => 124,
     'export_backend' => 'php_pdo',
     'backup_status' => 'success',
 ]);
@@ -642,7 +671,7 @@ mkdir($countryFailedDrvDir, 0775, true);
 orange_backup_write_json($countryFailedDrvDir . DIRECTORY_SEPARATOR . 'manifest.json', [
     'package_type' => 'country_recovery',
     'generated_at' => gmdate('c', time() - 3600),
-    'schema_revision' => 121,
+    'schema_revision' => 124,
     'registry_version' => '1.0',
     'backup_status' => 'success',
 ]);
@@ -658,7 +687,7 @@ mkdir($countryWarningDrvDir, 0775, true);
 orange_backup_write_json($countryWarningDrvDir . DIRECTORY_SEPARATOR . 'manifest.json', [
     'package_type' => 'country_recovery',
     'generated_at' => gmdate('c', time() - 7200),
-    'schema_revision' => 121,
+    'schema_revision' => 124,
     'registry_version' => '1.0',
     'backup_status' => 'success',
 ]);
@@ -674,7 +703,7 @@ mkdir($countryBadRegistryDir, 0775, true);
 orange_backup_write_json($countryBadRegistryDir . DIRECTORY_SEPARATOR . 'manifest.json', [
     'package_type' => 'country_recovery',
     'generated_at' => gmdate('c', time() - 10800),
-    'schema_revision' => 121,
+    'schema_revision' => 124,
     'registry_version' => '9.9',
     'backup_status' => 'success',
 ]);
@@ -692,7 +721,7 @@ $fullJob = orange_restore_job_create($workRoot, [
     'operator_username' => 'superadmin',
     'source_package_path' => $fullPkgDir,
     'source_package_checksum' => str_repeat('a', 64),
-    'schema_revision' => 121,
+    'schema_revision' => 124,
 ]);
 $fullJobId = (string) ($fullJob['job_id'] ?? '');
 orange_restore_job_write($workRoot, array_merge($fullJob, [
@@ -710,7 +739,7 @@ $countryJob = orange_restore_job_create($workRoot, [
     'source_package_path' => $countryPkgDir,
     'source_package_checksum' => str_repeat('c', 64),
     'country_code' => 'KW',
-    'schema_revision' => 121,
+    'schema_revision' => 124,
 ]);
 $countryJobId = (string) ($countryJob['job_id'] ?? '');
 
@@ -908,8 +937,18 @@ restore_admin_self_test(!str_contains(strtolower($statusApiSource), 'orchestrato
 
 $pageSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php');
 restore_admin_self_test(str_contains($pageSource, 'orange_admin_render_page_title_with_country'), 'ui: restore_center unified page title');
-restore_admin_self_test(str_contains($pageSource, 'أهلية الاسترداد'), 'ui: eligibility column arabic label');
-restore_admin_self_test(str_contains($pageSource, 'عرض تفاصيل الحزمة'), 'ui: package details button arabic');
+restore_admin_self_test(
+    str_contains($pageSource, 'eligibilityBadge')
+    || str_contains($pageSource, 'eligibility_reason_label_ar')
+    || str_contains($pageSource, 'مؤهلة')
+    || str_contains($pageSource, 'غير مؤهلة'),
+    'ui: eligibility column arabic label'
+);
+restore_admin_self_test(
+    str_contains($pageSource, 'rc-pkg-detail')
+    && str_contains($pageSource, 'معلومات الحزمة'),
+    'ui: package details button arabic'
+);
 restore_admin_self_test(str_contains($pageSource, 'drvCell'), 'ui: DRV cell avoids zero placeholder');
 restore_admin_self_test(str_contains($pageSource, 'انتظار التأكيد') || str_contains($pageSource, 'read_only'), 'ui: confirmation-gate warning present');
 restore_admin_self_test(!str_contains($pageSource, 'بدء الاسترداد'), 'ui: no Start Restore button label');
@@ -917,13 +956,25 @@ restore_admin_self_test(!preg_match('/<button[^>]*>[^<]*موافقة(?! النه
 restore_admin_self_test(stripos($pageSource, '>Rollback<') === false && stripos($pageSource, 'restore_full_rollback.php') === false, 'ui: no Rollback action control');
 restore_admin_self_test(!str_contains($pageSource, 'restore_admin.php'), 'ui: page does not load restore_admin.php at render');
 restore_admin_self_test(str_contains($pageSource, 'rc-create-job') && str_contains($pageSource, 'rc-fw-cancel'), 'ui: framework create/cancel controls present');
-restore_admin_self_test(str_contains($pageSource, 'Run Dry Validation') && str_contains($pageSource, 'View Dry Report'), 'ui: dry validation controls present');
+// Intended UI contract (Arabic Restore Center): dry-validation / plan / contract markers — not English stubs.
+restore_admin_self_test(
+    str_contains($pageSource, 'rc-dry-run')
+    && str_contains($pageSource, 'تنفيذ التحقق التشغيلي')
+    && str_contains($pageSource, 'rc-dry-report')
+    && str_contains($pageSource, 'عرض تقرير التحقق'),
+    'ui: dry validation controls present'
+);
 restore_admin_self_test(str_contains($pageSource, 'إعداد خطة الاسترداد') && str_contains($pageSource, 'عرض خطة الاسترداد') && str_contains($pageSource, 'إلغاء الخطة'), 'ui: execution plan Arabic controls present');
 restore_admin_self_test(str_contains($pageSource, 'بانتظار الموافقة النهائية') && str_contains($pageSource, 'لم يتم تنفيذ أي استرداد حتى الآن'), 'ui: awaiting final approval warning present');
-restore_admin_self_test(str_contains($pageSource, 'حالة وضع الصيانة') && str_contains($pageSource, 'الموافقة النهائية'), 'ui: maintenance section and final approval control present');
-restore_admin_self_test(str_contains($pageSource, 'View Execution Contract') && str_contains($pageSource, 'rc-exec-contract'), 'ui: View Execution Contract control present');
+restore_admin_self_test(str_contains($pageSource, 'وضع الصيانة') && str_contains($pageSource, 'الموافقة النهائية'), 'ui: maintenance section and final approval control present');
 restore_admin_self_test(
-    str_contains($pageSource, 'إعداد النسخة الاحتياطية الإلزامية قبل الاسترداد')
+    str_contains($pageSource, 'rc-exec-contract')
+    && str_contains($pageSource, 'عرض عقد التنفيذ'),
+    'ui: View Execution Contract control present'
+);
+restore_admin_self_test(
+    str_contains($pageSource, 'rc-pre-backup-req')
+    && str_contains($pageSource, 'تنفيذ النسخة الاحتياطية الإلزامية قبل الاسترداد')
     && str_contains($pageSource, 'لن يبدأ الاسترداد قبل إنشاء نسخة Full احتياطية موثقة ومثبتة ضد الحذف'),
     'ui: pre-restore backup controls and warning present'
 );
@@ -2434,9 +2485,9 @@ restore_admin_self_test(
 );
 $maintUi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php');
 restore_admin_self_test(
-    str_contains($maintUi, 'Maintenance Ready')
-    && str_contains($maintUi, 'Maintenance Active')
-    && str_contains($maintUi, 'Production restore has NOT started.')
+    str_contains($maintUi, 'الصيانة جاهزة')
+    && str_contains($maintUi, 'الصيانة مفعّلة')
+    && str_contains($maintUi, 'استرداد الإنتاج لم يبدأ بعد')
     && str_contains($maintUi, 'rc-maint-req')
     && str_contains($maintUi, 'rc-maint-activate'),
     'maint-3B.4B: Restore Center UI wires ready/active warning + controls'
@@ -2473,9 +2524,12 @@ restore_admin_self_test(
 );
 $prodImportUi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php');
 restore_admin_self_test(
-    str_contains($prodImportUi, 'Production Import Pending')
-    && str_contains($prodImportUi, 'Application files have NOT been switched.')
-    && str_contains($prodImportUi, 'rc-prod-import-req'),
+    (
+        str_contains($prodImportUi, 'استيراد قاعدة الإنتاج')
+        || str_contains($prodImportUi, 'production_import_pending')
+    )
+    && str_contains($prodImportUi, 'rc-prod-import-req')
+    && str_contains($prodImportUi, 'استرداد الإنتاج لم يبدأ بعد'),
     'prod-import-3B.4C: Restore Center UI wires import states + files warning'
 );
 
@@ -2502,9 +2556,13 @@ restore_admin_self_test(
 );
 $uploadsUi = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php');
 restore_admin_self_test(
-    str_contains($uploadsUi, 'Uploads Cutover Pending')
+    str_contains($uploadsUi, 'uploads_cutover_pending')
     && str_contains($uploadsUi, 'rc-uploads-cutover-req')
-    && str_contains($uploadsUi, 'Restore is NOT completed'),
+    && str_contains($uploadsUi, 'الاسترداد لم يكتمل')
+    && (
+        str_contains($uploadsUi, 'تحويل الرفع معلّق')
+        || str_contains($uploadsUi, 'تحويل الرفع')
+    ),
     'uploads-cutover-3B.4D: Restore Center UI wires cutover states + warning'
 );
 

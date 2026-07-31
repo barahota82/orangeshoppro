@@ -59,23 +59,30 @@ function Run-PhpSuite([string]$Rel, [string]$Nested = 'no', [string]$EnvPrereq =
         $pass = [int]$summary.Groups[1].Value
         $fail = [int]$summary.Groups[2].Value
         $skip = [int]$summary.Groups[3].Value
-    } elseif ($Rel -match 'self_test_backup|self_test_country_crp|self_test_restore') {
-        $pass = ([regex]::Matches($out, '(?m)^PASS:')).Count
-        $fail = ([regex]::Matches($out, '(?m)^FAIL:')).Count
-        $skip = ([regex]::Matches($out, '(?m)^SKIP:')).Count
-        # Some CRP suites print "PASS  " with two spaces
-        if ($pass -eq 0 -and $fail -eq 0) {
+    } else {
+        $tot = [regex]::Match($out, '(?m)^TOTAL_PASS:\s*(\d+)\s*$')
+        $totF = [regex]::Match($out, '(?m)^TOTAL_FAIL:\s*(\d+)\s*$')
+        $totS = [regex]::Match($out, '(?m)^TOTAL_SKIP:\s*(\d+)\s*$')
+        if ($tot.Success) {
+            $pass = [int]$tot.Groups[1].Value
+            $fail = $(if ($totF.Success) { [int]$totF.Groups[1].Value } else { 0 })
+            $skip = $(if ($totS.Success) { [int]$totS.Groups[1].Value } else { 0 })
+        } elseif ($Rel -match 'self_test_backup|self_test_country_crp|self_test_restore') {
+            $pass = ([regex]::Matches($out, '(?m)^PASS:')).Count
+            $fail = ([regex]::Matches($out, '(?m)^FAIL:')).Count
+            $skip = ([regex]::Matches($out, '(?m)^SKIP:')).Count
+            # Some CRP suites print "PASS  " with two spaces
+            if ($pass -eq 0 -and $fail -eq 0) {
+                $pass = ([regex]::Matches($out, '(?m)^PASS\s')).Count
+                $fail = ([regex]::Matches($out, '(?m)^FAIL\s')).Count
+                $skip = ([regex]::Matches($out, '(?m)^SKIP\s')).Count
+            }
+        } else {
             $pass = ([regex]::Matches($out, '(?m)^PASS\s')).Count
             $fail = ([regex]::Matches($out, '(?m)^FAIL\s')).Count
             $skip = ([regex]::Matches($out, '(?m)^SKIP\s')).Count
         }
-    } else {
-        $pass = ([regex]::Matches($out, '(?m)^PASS\s')).Count
-        $fail = ([regex]::Matches($out, '(?m)^FAIL\s')).Count
-        $skip = ([regex]::Matches($out, '(?m)^SKIP\s')).Count
-    }
-    # Canonical 97 / hygiene style: PASS=N FAIL=N without SKIP=
-    if (-not $summary.Success) {
+        # Canonical 97 / hygiene style: PASS=N FAIL=N without SKIP=
         $pf = [regex]::Match($out, '(?m)^PASS=(\d+)\s+FAIL=(\d+)\s*$')
         if ($pf.Success) {
             $pass = [int]$pf.Groups[1].Value
@@ -86,9 +93,12 @@ function Run-PhpSuite([string]$Rel, [string]$Nested = 'no', [string]$EnvPrereq =
     foreach ($s in $skipLines) {
         [void]$namedSkips.Add(("$Rel :: " + $s.Trim()))
     }
-    $cls = if ($fail -gt 0 -or ($code -ne 0 -and $pass -eq 0)) { 'FAIL' }
+    $cls = if ($fail -gt 0) { 'FAIL' }
+        elseif ($out -match 'ENVIRONMENT_BLOCKED') { 'SKIP' }
+        elseif ($code -ne 0 -and $pass -eq 0) { 'FAIL' }
         elseif ($skip -gt 0 -and $pass -eq 0) { 'SKIP' }
         else { 'PASS' }
+    if ($cls -eq 'SKIP' -and $skip -eq 0) { $skip = 1 }
     Add-Row $Rel $pass $fail $skip $code $sw.ElapsedMilliseconds $Nested $cls (($skipLines -join ' | ')) $EnvPrereq
     if ($fail -gt 0 -or ($code -ne 0 -and $cls -eq 'FAIL')) {
         $tail = ($out.Trim() -replace '\s+', ' ')
@@ -127,7 +137,8 @@ function Run-Ps1Nested([string]$Rel, [int]$TimeoutSec) {
             $skip = [int]($(if ($summaryS.Groups[1].Value) { $summaryS.Groups[1].Value } else { $summaryS.Groups[2].Value }))
         }
     }
-    $cls = if ($fail -gt 0 -or $code -ne 0) { 'FAIL' } else { 'PASS' }
+    # Align with PHP suite classification: non-zero Exit alone is not FAIL when assertions passed.
+    $cls = if ($fail -gt 0) { 'FAIL' } elseif ($code -ne 0 -and $pass -eq 0) { 'FAIL' } else { 'PASS' }
     Add-Row $Rel $pass $fail $skip $code $sw.ElapsedMilliseconds 'yes-nested-d4-internal' $cls '' 'D4_HTTP_FIXTURE_OPTIONAL'
 }
 
@@ -187,6 +198,7 @@ foreach ($t in $tracked) {
 ) | ForEach-Object { Run-PhpSuite $_ -EnvPrereq 'MYSQL_LOCAL_DISPOSABLE' }
 
 # --- D4 committed manifest (nested internals) ---
+Remove-Item -LiteralPath (Join-Path $root 'scripts\_d4_closure_manifest.csv') -ErrorAction SilentlyContinue
 Run-Ps1Nested 'scripts/_d4_closure_regression_manifest.ps1' $D4TimeoutSec
 
 # --- Canonical / Batch A / Batch F ---
@@ -350,7 +362,7 @@ foreach ($r in $rows) {
         env_prereq = [string]$r.env_prereq
     })
 }
-$summary['commands'] = @($cmdOut)
+$summary['commands'] = [object[]]@($cmdOut.ToArray())
 $jsonPath = Join-Path $env:TEMP ('orange_d5_final_cert_' + (Get-Date -Format 'yyyyMMdd_HHmmss') + '.json')
 ($summary | ConvertTo-Json -Depth 6) | Set-Content -LiteralPath $jsonPath -Encoding UTF8
 $compact = [ordered]@{

@@ -584,5 +584,26 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
 - **عقود مؤكَّدة من الكود:** ترتيب التطبيق في `order_intake_queue` = عرض منتج (partition) → كومبو → خصم سلة على الأساس المتبقّي → هدية/BOGO؛ جدولة UTC شاملة؛ `first_delivered` يعتمد `orders.status='completed'`؛ لا جدول usage عالمي في Schema 124.
 - **مستوى الإثبات للإغلاق (بعد HTTP runtime):** `FULL_HTTP_API` / create-order / intake / finalization عبر runtime مؤقت `D:\orange_d4_http_runtime` + `orange_db` محلي؛ `first_delivered` = `PROVEN_OWNER_APPROVED_CONCURRENT_CONTRACT`؛ ادعاء cart_promotion بعد تعطيل 1+2 صُنّف `TEST_FIXTURE_DEFECT` (بقي id=5).
 - ولاء: كسب عند التسليم بـ `earn_rate` على صافي البضاعة؛ استبدال FIFO طبقات مع `FOR UPDATE`؛ انتهاء idempotent؛ clawback عبر `return_clawback` فريد؛ حد GL عبر خانة D3.
-- Schema يبقى **124**؛ D5 وStep 4 **لم تُبدأ**.
+- Schema يبقى **124**؛ D5 أُغلق لاحقاً (سFSR-D5)؛ Step 4 — سFSR-STEP4.
 - **إغلاق تزامن المخزون (2026-07-30):** طقم `scripts/self_test_final_review_d4_promo_stock_race.php` يثبت عقد هدية/BOGO/كومبو عند الكمية=1: الحجز عند إنشاء الطلب (`linesForStock` → `pending_order` + `FOR UPDATE`)؛ التصنيف `EXCLUSIVE_AT_ORDER_FINALIZATION`؛ الخاسر لهدية/BOGO = `ORDER_ACCEPTED_WITHOUT_GIFT`؛ خاسر الكومبو = `ORDER_REJECTED_AT_FINALIZATION`؛ الإكمال يعيد تسمية الحركة دون خصم ثانٍ. Batch C المصرّح: `scripts/backup/self_test_backup.php` (tracked) — قد يُتخطّى PDO live export بيئياً عند غياب `.env.php`. Batch A (`self_test_final_review_email_track_rate_limit.php`): harness اختبار فقط — PDO فرعي بـ `BEGIN IMMEDIATE` للعمال؛ إعادة المحاولة محدودة لـ ERR عابر فقط ولا تُخفي 2×ALLOW/2×DENY؛ الإنتاج MySQL/`FOR UPDATE` بلا تغيير.
+
+
+--------------------------------------------------------------------
+سFSR-D5. أين إغلاق Backup/Restore / Expectations Schema 124؟ (Batch D5)
+--------------------------------------------------------------------
+- Production/config: `3e0fa90b` — FULL-01 / STG-01 / APR-01 / CRP-CHUNK-01 / EXP-01 + EA `last_value`.
+- شهادة الاختبار: `a163c2a4` — `scripts/_d5_final_certification_manifest.ps1` + تصحيح fixture sprint2.
+- Totals المعتمدة عند إغلاق D5: Raw 2021/0/3؛ Unique 1547؛ overlap 474؛ CORE_D5_SKIP=0.
+- Country Production Cutover يبقى `ORANGE_COUNTRY_RESTORE_PRODUCTION_ENABLED=false`.
+
+
+--------------------------------------------------------------------
+سFSR-STEP4. أين شهادة النظام النهائية وجاهزية النشر؟ (Final System Review Step 4)
+--------------------------------------------------------------------
+- سجل الشهادة: **`docs/archive/ORANGE_FSR_STEP4_FINAL_CERTIFICATION.txt`**.
+- Manifest: `scripts/_final_system_review_step4_manifest.ps1` (يعشّش D5 ثم Time/Country/Channel + restore_admin + lint/UTF-8/guard؛ ينشئ/يزيل worktrees D4/D5 مؤقتة).
+- Step 4 **لا** يصلح Production ولا ينشر ولا يشغّل Backup/Restore إنتاجي؛ يصدر قائمة قبول تشغيل للمالك.
+- OPEN_PROVEN_DEFECT Critical/High/Medium المطلوب للشهادة النظيفة: **0**.
+- تصحيحات Step 4 المسموحة: test/docs فقط (مثل تحديث `self_test_restore_admin.php` لواجهة عربية Schema 124).
+- Totals شهادة Step-4 (تشغيل كامل واحد): Raw **4214/0/4**؛ Unique **3702**؛ overlap **512**؛ CORE_SYSTEM_SKIP=0؛ D5_nested **2021/0/3** Unique **1547**.
+- Result: **A — FSR_STEP4_FINAL_SYSTEM_CERTIFICATION_READY** (جاهزية نشر للمالك؛ النشر نفسه لم يُنفَّذ).
