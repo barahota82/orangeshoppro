@@ -30,21 +30,42 @@ try {
         json_response(['success' => false, 'message' => $blockMessage], 422);
     }
 
-    $result = orange_backup_admin_run_country_batch($projectRoot);
+    $viewCtx = orange_backup_admin_context_for_view($projectRoot);
+    $backupRoot = (string) ($viewCtx['backup_root'] ?? '');
+    $executionId = null;
+    $provenanceWarning = null;
+    if ($backupRoot !== '' && is_dir($backupRoot)) {
+        $begun = orange_backup_provenance_begin_manual_admin_execution(
+            $backupRoot,
+            $admin,
+            $pdo,
+            'all_recoverable_countries'
+        );
+        $executionId = $begun['execution_id'] ?? null;
+        $provenanceWarning = $begun['warning'] ?? null;
+    }
+
+    try {
+        $result = orange_backup_admin_run_country_batch($projectRoot);
+    } finally {
+        orange_backup_provenance_clear_cli_context();
+    }
+
     $finishedAt = (string) ($result['finished_at'] ?? gmdate('c'));
     $ok = (bool) ($result['ok'] ?? false);
 
     orange_backup_admin_audit(
         'run_country_batch',
         'country_recovery',
-        'batch',
+        is_string($executionId) && $executionId !== '' ? $executionId : 'batch',
         $startedAt,
         $finishedAt,
         $ok,
-        $ok ? '' : trim((string) ($result['stderr'] ?? $result['message'] ?? ''))
+        $ok ? '' : trim((string) ($result['stderr'] ?? $result['message'] ?? '')),
+        is_string($executionId) ? $executionId : null
     );
 
-    json_response([
+    $payload = [
         'success' => $ok,
         'message' => $ok ? 'اكتمل تصدير حزم الدول.' : (string) ($result['message'] ?? 'فشل تصدير حزم الدول.'),
         'result' => orange_backup_admin_redact_secrets([
@@ -52,7 +73,19 @@ try {
             'stdout_excerpt' => orange_backup_admin_sanitize_cli_excerpt((string) ($result['stdout'] ?? ''), 4000),
             'stderr_excerpt' => orange_backup_admin_sanitize_cli_excerpt((string) ($result['stderr'] ?? ''), 2000),
         ]),
-    ], $ok ? 200 : 409);
+    ];
+    if ($executionId !== null && $executionId !== '') {
+        $payload['execution_id'] = $executionId;
+    }
+    if ($provenanceWarning !== null && $provenanceWarning !== '') {
+        $payload['provenance_warning'] = $provenanceWarning;
+    }
+    if (!empty($result['provenance_warning'])) {
+        $payload['provenance_warning'] = (string) $result['provenance_warning'];
+    }
+
+    json_response($payload, $ok ? 200 : 409);
 } catch (Throwable $e) {
+    orange_backup_provenance_clear_cli_context();
     orange_admin_api_catch($e, backup_admin_api_safe_message($e));
 }

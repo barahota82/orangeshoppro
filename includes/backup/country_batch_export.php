@@ -6,6 +6,7 @@ require_once __DIR__ . '/backup_environment.php';
 require_once __DIR__ . '/backup_runner.php';
 require_once __DIR__ . '/backup_retention.php';
 require_once __DIR__ . '/country_export.php';
+require_once __DIR__ . '/backup_provenance.php';
 
 const ORANGE_CRP_BATCH_LOCK_RELATIVE = 'locks/orange_crp_batch.lock';
 
@@ -611,6 +612,15 @@ function orange_crp_batch_export_all(PDO $pdo, string $projectRoot, array $optio
     orange_backup_runner_log($logFile, $summary, $batchOk ? 'INFO' : 'ERROR');
     orange_backup_runner_log($logFile, 'finished_at=' . $finishedAt);
 
+    $prov = orange_backup_provenance_after_country_batch($backupRoot, $succeeded, $failed, $batchOk);
+    if (empty($prov['ok'])) {
+        orange_backup_runner_log(
+            $logFile,
+            'Provenance sidecar warning: ' . (string) ($prov['warning'] ?? 'unavailable'),
+            'WARN'
+        );
+    }
+
     return [
         'ok' => $batchOk,
         'exit_code' => $exitCode,
@@ -624,6 +634,7 @@ function orange_crp_batch_export_all(PDO $pdo, string $projectRoot, array $optio
         'succeeded' => $succeeded,
         'failed' => $failed,
         'retention' => $retentionSummary,
+        'provenance_warning' => empty($prov['ok']) ? (string) ($prov['warning'] ?? 'unavailable') : null,
     ];
 }
 

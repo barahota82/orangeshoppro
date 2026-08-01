@@ -10,7 +10,10 @@ require_once __DIR__ . '/backup_retention.php';
 require_once __DIR__ . '/backup_validate.php';
 require_once __DIR__ . '/recovery_validation.php';
 require_once __DIR__ . '/country_batch_export.php';
+require_once __DIR__ . '/backup_provenance.php';
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'admin_permissions.php';
+
+const ORANGE_BACKUP_ADMIN_FULL_VERIFY_REPORT_SUFFIX = 'full_verify_report.json';
 
 const ORANGE_BACKUP_ADMIN_PACKAGE_ID_PATTERN = '/^\d{4}-\d{2}-\d{2}_\d{6}$/';
 const ORANGE_BACKUP_ADMIN_COUNTRY_CODE_PATTERN = '/^[A-Za-z]{2}$/';
@@ -863,11 +866,43 @@ function orange_backup_admin_recovery_score_from_report(?array $recovery): ?int
 /**
  * @return array<string, mixed>
  */
+function orange_backup_admin_full_verify_report_path(string $packagePath, string $packageId): string
+{
+    return dirname($packagePath) . DIRECTORY_SEPARATOR . $packageId . '.' . ORANGE_BACKUP_ADMIN_FULL_VERIFY_REPORT_SUFFIX;
+}
+
+/**
+ * @param array<string, mixed> $result
+ */
+function orange_backup_admin_persist_full_verify_report(string $packagePath, string $packageId, array $result): void
+{
+    $report = [
+        'package_type' => 'full_disaster',
+        'package_id' => $packageId,
+        'overall' => !empty($result['ok']) ? 'PASS' : 'FAIL',
+        'ok' => !empty($result['ok']),
+        'validated_at' => gmdate('c'),
+        'errors' => $result['errors'] ?? [],
+        'warnings' => $result['warnings'] ?? [],
+    ];
+    try {
+        orange_backup_write_json(
+            orange_backup_admin_full_verify_report_path($packagePath, $packageId),
+            $report
+        );
+    } catch (Throwable $e) {
+        error_log('[orange backup admin] full verify report write failed: ' . $e->getMessage());
+    }
+}
+
 function orange_backup_admin_summarize_full_package(string $packagePath, string $packageId): array
 {
     $manifest = orange_backup_admin_read_json_if_exists($packagePath . DIRECTORY_SEPARATOR . ORANGE_BACKUP_MANIFEST_FILE);
     $health = orange_backup_admin_read_json_if_exists($packagePath . DIRECTORY_SEPARATOR . ORANGE_BACKUP_HEALTH_FILE);
     $recovery = orange_backup_admin_read_recovery_validation_report($packagePath, $packageId);
+    $verifyReport = orange_backup_admin_read_json_if_exists(
+        orange_backup_admin_full_verify_report_path($packagePath, $packageId)
+    );
 
     $packageStatus = (string) ($health['package_status'] ?? $manifest['backup_status'] ?? 'unknown');
     $verification = null;
@@ -896,13 +931,75 @@ function orange_backup_admin_summarize_full_package(string $packagePath, string 
         'verification' => $verification,
         'package_path' => $packagePath,
         'healthy' => ($health['package_status'] ?? '') === 'healthy',
+        'package_fingerprint' => (string) (
+            $manifest['package_fingerprint']
+            ?? $manifest['content_fingerprint']
+            ?? orange_backup_provenance_package_identity_fingerprint($packagePath, 'full')
+        ),
     ];
     $recoveryScore = orange_backup_admin_recovery_score_from_report($recovery);
     if ($recoveryScore !== null) {
         $summary['recovery_score'] = $recoveryScore;
     }
+    $summary['verify_state'] = orange_backup_admin_derive_verify_state($verifyReport, null, true);
+    $summary['drv_state'] = orange_backup_admin_derive_drv_state($recovery, $summary['verify_state']);
+    if (is_array($verifyReport)) {
+        $summary['verify_result'] = (string) ($verifyReport['overall'] ?? '');
+        $summary['verify_validated_at'] = (string) ($verifyReport['validated_at'] ?? '');
+    }
+    $backupRoot = dirname(dirname($packagePath));
+    if (is_dir($backupRoot)) {
+        $summary = orange_backup_provenance_bind_for_list($backupRoot, $summary);
+    }
 
     return orange_backup_admin_redact_secrets($summary);
+}
+
+/**
+ * @param array<string, mixed>|null $verifyReport
+ * @param array<string, mixed>|null $countryVerifyReport
+ */
+function orange_backup_admin_derive_verify_state(
+    ?array $verifyReport,
+    ?array $countryVerifyReport,
+    bool $isFull
+): string {
+    $report = $isFull ? $verifyReport : $countryVerifyReport;
+    if (!is_array($report)) {
+        return 'not_run';
+    }
+    $overall = strtoupper((string) ($report['overall'] ?? $report['overall_result'] ?? ''));
+    if ($overall === 'PASS' || $overall === 'OK' || !empty($report['ok'])) {
+        return 'success';
+    }
+    if ($overall === 'FAIL' || $overall === 'FAILED' || (array_key_exists('ok', $report) && empty($report['ok']))) {
+        return 'failed';
+    }
+
+    return 'not_run';
+}
+
+/**
+ * @param array<string, mixed>|null $recovery
+ */
+function orange_backup_admin_derive_drv_state(?array $recovery, string $verifyState): string
+{
+    if ($verifyState !== 'success') {
+        return 'blocked';
+    }
+    if (!is_array($recovery)) {
+        return 'not_run';
+    }
+    $overall = strtolower((string) ($recovery['overall_result'] ?? ''));
+    if ($overall === 'pass' || $overall === 'ok') {
+        return 'success';
+    }
+    if ($overall === 'fail' || $overall === 'failed' || $overall === 'warning') {
+        // Country DRV treats warning as non-pass; Full may still show score — keep failed for retry UX.
+        return $overall === 'warning' ? 'failed' : 'failed';
+    }
+
+    return 'not_run';
 }
 
 /**
@@ -960,13 +1057,24 @@ function orange_backup_admin_summarize_country_package(
     if (is_array($verifyReport)) {
         $summary['verify_result'] = (string) ($verifyReport['overall'] ?? '');
         $summary['verify_engine_version'] = (string) ($verifyReport['verify_engine_version'] ?? '');
+        $summary['verify_validated_at'] = (string) ($verifyReport['validated_at'] ?? $verifyReport['generated_at'] ?? '');
     }
+    $summary['package_fingerprint'] = (string) (
+        $manifest['package_fingerprint']
+        ?? orange_backup_provenance_package_identity_fingerprint($packagePath, 'country')
+    );
+    $summary['verify_state'] = orange_backup_admin_derive_verify_state(null, $verifyReport, false);
+    $summary['drv_state'] = orange_backup_admin_derive_drv_state($recovery, $summary['verify_state']);
     if (is_array($recovery) && ($recovery['package_type'] ?? '') === 'country') {
         $summary['country_drv_result'] = (string) ($recovery['overall_result'] ?? '');
         $summary['country_drv_score'] = orange_backup_admin_recovery_score_from_report($recovery);
         $summary['boundary_isolation_valid'] = (bool) ($recovery['boundary_isolation_valid'] ?? false);
         $summary['collision_analysis_valid'] = (bool) ($recovery['collision_analysis_valid'] ?? false);
         $summary['execution_performed'] = false;
+    }
+    $backupRoot = dirname(dirname(dirname($packagePath)));
+    if (is_dir($backupRoot)) {
+        $summary = orange_backup_provenance_bind_for_list($backupRoot, $summary);
     }
 
     return orange_backup_admin_redact_secrets($summary);
@@ -1565,12 +1673,15 @@ function orange_backup_admin_verify_package(string $packageType, string $package
 {
     if ($packageType === 'full_disaster') {
         $result = orange_backup_verify_full_package($packagePath);
+        $packageId = basename(rtrim($packagePath, "\\/"));
+        orange_backup_admin_persist_full_verify_report($packagePath, $packageId, $result);
 
         return orange_backup_admin_redact_secrets([
             'ok' => (bool) ($result['ok'] ?? false),
             'package_type' => 'full_disaster',
             'errors' => $result['errors'] ?? [],
             'warnings' => $result['warnings'] ?? [],
+            'verify_state' => !empty($result['ok']) ? 'success' : 'failed',
             'manifest' => is_array($result['manifest'] ?? null) ? orange_backup_admin_redact_secrets($result['manifest']) : null,
             'health' => is_array($result['health'] ?? null) ? orange_backup_admin_redact_secrets($result['health']) : null,
         ]);
@@ -1583,6 +1694,7 @@ function orange_backup_admin_verify_package(string $packageType, string $package
             'package_type' => 'country_recovery',
             'errors' => $result['errors'] ?? [],
             'warnings' => $result['warnings'] ?? [],
+            'verify_state' => !empty($result['ok']) ? 'success' : 'failed',
             'manifest' => is_array($result['manifest'] ?? null) ? orange_backup_admin_redact_secrets($result['manifest']) : null,
             'health' => is_array($result['health'] ?? null) ? orange_backup_admin_redact_secrets($result['health']) : null,
         ]);
@@ -1642,17 +1754,20 @@ function orange_backup_admin_audit(
     string $startedAt,
     string $finishedAt,
     bool $ok,
-    string $errorSummary = ''
+    string $errorSummary = '',
+    ?string $executionId = null
 ): void {
     $errorSummary = orange_backup_admin_sanitize_cli_excerpt($errorSummary, 500);
+    $execPart = ($executionId !== null && $executionId !== '') ? (' execution_id=' . $executionId) : '';
     $message = sprintf(
-        'backup_admin %s type=%s id=%s started=%s finished=%s result=%s%s',
+        'backup_admin %s type=%s id=%s started=%s finished=%s result=%s%s%s',
         $action,
         $packageType,
         $packageIdentifier,
         $startedAt,
         $finishedAt,
         $ok ? 'pass' : 'fail',
+        $execPart,
         $errorSummary !== '' ? ' error=' . $errorSummary : ''
     );
     audit_log('backup_admin_' . $action, $message, 'backup_package', $packageIdentifier);

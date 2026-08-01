@@ -997,3 +997,27 @@ Phase 4 not started.
 | Restore owner policy archived | **Yes** — `docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt` |
 | Restore architecture archived | **Yes** — `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` |
 | Restore tested on production | **Required before go-live** — operator responsibility |
+
+---
+
+## Backup Provenance Metadata Registry (sidecar) — Owner decision 2026-08-01
+
+**Storage (authoritative for origin presentation only):**
+
+```
+{BackupRoot}/.orange_meta/provenance/v1/executions/<execution_id>.json
+{BackupRoot}/.orange_meta/provenance/v1/packages/full/<package_id>.json
+{BackupRoot}/.orange_meta/provenance/v1/packages/country/<CC>/<package_id>.json
+```
+
+**Contract:** `metadata_schema_version = 1` is a sidecar contract version only — **not** Application Schema revision 125.
+
+**Authoritative for:** manual vs scheduled/automatic; initiating Admin/System; initiating Admin Country context; parent Batch ↔ child Country packages; execution timestamps/status; per-Country outcomes; Backup Center provenance/visibility presentation.
+
+**Not authoritative for:** Health, checksums, Verify, DRV, Recoverable, Restore eligibility, Schema compatibility, Cutover, package contents.
+
+**Implementation:** `includes/backup/backup_provenance.php` (atomic JSON + flock); integrated from manual Admin APIs (`run-full.php`, `run-countries.php` via env context) and CLI runners (`orange_backup_run_full`, `orange_crp_batch_export_all`). Historical packages without sidecars remain visible with honest unavailable-origin messaging.
+
+**Forbidden by Owner for this registry:** database table; Schema migration; fields inside package `manifest.json`; package-format/checksum changes; changing Verify/DRV/Recoverable/Restore algorithms.
+
+**Focused test:** `scripts/backup/self_test_backup_provenance.php`
