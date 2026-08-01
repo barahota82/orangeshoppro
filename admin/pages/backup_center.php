@@ -106,28 +106,9 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 .bc-collapsible[open]>summary::after{content:'▴'}
 .bc-acc-title{font-weight:700;color:var(--bc-ink);min-width:7rem}
 .bc-acc-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1;min-width:0}
-.bc-acc-actions-inline{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-inline-start:auto}
+.bc-acc-actions-inline{display:flex;align-items:center;gap:8px;margin-inline-start:auto}
 .bc-acc-body,.bc-collapsible-body{padding:0 14px 12px;border-top:1px solid #f1f5f9}
 .bc-acc-body{padding-top:10px}
-.bc-primary-cluster{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.bc-qual-btn{min-width:5.5rem}
-.bc-qual-btn.is-not-run{border-color:#fecaca;color:#b91c1c!important;background:#fef2f2}
-.bc-qual-btn.is-blocked{border-color:#e5e7eb;color:#9ca3af!important;background:#f9fafb;cursor:not-allowed}
-.bc-qual-btn.is-running{border-color:#fdba74;color:#c2410c!important;background:#fff7ed}
-.bc-qual-btn.is-success{border-color:#a7f3d0;color:#047857!important;background:#ecfdf5}
-.bc-qual-btn.is-failed{border-color:#fecaca;color:#b91c1c!important;background:#fef2f2}
-.bc-report-control{display:inline-flex;align-items:center;min-height:32px;padding:0;border:0;background:none;color:var(--primary,#ea580c);font:inherit;font-size:.82rem;font-weight:650;text-decoration:underline;cursor:pointer;white-space:nowrap}
-.bc-report-control:hover{color:var(--primary-hover,#c2410c)}
-.bc-provenance-line{font-size:.78rem;color:var(--bc-muted);font-weight:500;max-width:100%}
-.bc-result-dialog-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:5600;padding:16px}
-.bc-result-dialog-backdrop.is-open{display:flex}
-.bc-result-dialog{background:#fff;border-radius:12px;max-width:560px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.22);max-height:min(80vh,640px);overflow:auto}
-.bc-result-dialog h3{margin:0 0 10px;font-size:1.05rem}
-.bc-result-dialog .bc-result-body{margin:0 0 14px;font-size:.9rem;line-height:1.55;color:var(--bc-ink);white-space:pre-wrap;word-break:break-word}
-.bc-result-dialog .bc-result-meta{margin:0 0 12px;font-size:.8rem;color:var(--bc-muted)}
-.bc-human-report{background:var(--bc-soft);border:1px solid var(--bc-border);border-radius:10px;padding:12px;margin-bottom:10px}
-.bc-human-report dt{font-size:.76rem;color:var(--bc-muted);margin:0}
-.bc-human-report dd{margin:0 0 8px;font-weight:650}
 /* Expandable panels: capped height; sticky summary (collapse always reachable); panel scrolls (Owner 2026-07-24) */
 .bc-acc-item[open],.bc-collapsible[open]{max-height:min(420px,58vh);overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .bc-acc-item[open]>summary,.bc-collapsible[open]>summary{position:sticky;top:0;z-index:3;background:var(--bc-surface);box-shadow:0 1px 0 #f1f5f9}
@@ -347,20 +328,8 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     <div class="bc-modal" role="dialog" aria-modal="true" style="max-width:760px;">
         <h3 id="bc_view_title">عرض</h3>
         <p class="bc-tz-label" id="bc_view_tz_note" style="margin:0 0 8px;"></p>
-        <div id="bc_view_human" class="bc-human-report" style="display:none;"></div>
         <pre id="bc_view_pre" class="bc-pre"></pre>
         <div class="admin-form-actions"><button type="button" class="bc-btn-secondary" id="bc_view_close">إغلاق</button></div>
-    </div>
-</div>
-
-<div id="bc_result_dialog" class="bc-result-dialog-backdrop" aria-hidden="true">
-    <div class="bc-result-dialog" role="dialog" aria-modal="true" aria-labelledby="bc_result_title">
-        <h3 id="bc_result_title">نتيجة التحقق</h3>
-        <p id="bc_result_meta" class="bc-result-meta"></p>
-        <div id="bc_result_body" class="bc-result-body"></div>
-        <div class="admin-form-actions">
-            <button type="button" class="bc-btn-primary" id="bc_result_close">إغلاق</button>
-        </div>
     </div>
 </div>
 
@@ -378,7 +347,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         full: [],
         country: [],
         busy: false,
-        runningKeys: {},
         pendingAction: null,
         archiveMode: { full: false, country: false }
     };
@@ -646,7 +614,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         });
     };
 
-    const showViewContent = (title, bodyText, localizeTimes, humanHtml) => {
+    const showViewContent = (title, bodyText, localizeTimes) => {
         el('bc_view_title').textContent = title;
         const note = el('bc_view_tz_note');
         if (note) {
@@ -658,117 +626,8 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 note.textContent = 'التواريخ في هذا العرض بالتوقيت المحلي (' + DISPLAY_TZ + ') بنظام 12 ساعة — التخزين الداخلي يبقى UTC.';
             }
         }
-        const human = el('bc_view_human');
-        if (human) {
-            if (humanHtml) {
-                human.style.display = 'block';
-                human.innerHTML = humanHtml;
-            } else {
-                human.style.display = 'none';
-                human.innerHTML = '';
-            }
-        }
         el('bc_view_pre').textContent = localizeTimes ? localizeTimestampsInText(bodyText) : String(bodyText || '');
         el('bc_view_modal').style.display = 'flex';
-    };
-
-    const showResultDialog = (title, bodyText, metaText) => {
-        el('bc_result_title').textContent = title || 'النتيجة';
-        el('bc_result_meta').textContent = metaText || '';
-        el('bc_result_body').textContent = bodyText || '';
-        const dlg = el('bc_result_dialog');
-        dlg.classList.add('is-open');
-        dlg.setAttribute('aria-hidden', 'false');
-        const closeBtn = el('bc_result_close');
-        if (closeBtn) closeBtn.focus();
-    };
-    const closeResultDialog = () => {
-        const dlg = el('bc_result_dialog');
-        dlg.classList.remove('is-open');
-        dlg.setAttribute('aria-hidden', 'true');
-    };
-
-    const packageKey = (type, id, cc) => String(type || '') + '|' + String(id || '') + '|' + String(cc || '');
-
-    const resolveVerifyState = (pkg) => {
-        if (state.runningKeys[packageKey(pkg.package_type || '', pkg.package_id, pkg.country_code || '') + '|verify']) {
-            return 'running';
-        }
-        return String(pkg.verify_state || 'not_run');
-    };
-    const resolveDrvState = (pkg) => {
-        if (state.runningKeys[packageKey(pkg.package_type || '', pkg.package_id, pkg.country_code || '') + '|drv']) {
-            return 'running';
-        }
-        const vs = resolveVerifyState(pkg);
-        if (vs !== 'success' && vs !== 'running') return 'blocked';
-        return String(pkg.drv_state || (vs === 'success' ? 'not_run' : 'blocked'));
-    };
-
-    const qualBtnHtml = (kind, pkg, type) => {
-        const id = pkg.package_id || '';
-        const cc = pkg.country_code || '';
-        const stateName = kind === 'verify' ? resolveVerifyState(pkg) : resolveDrvState(pkg);
-        let label = kind === 'verify' ? 'Verify' : 'DRV';
-        let title = '';
-        let disabled = false;
-        if (stateName === 'not_run') {
-            title = 'لم يُنفذ بعد';
-            label = kind === 'verify' ? 'Verify — لم يُنفذ بعد' : 'DRV — لم يُنفذ بعد';
-        } else if (stateName === 'blocked') {
-            title = 'بانتظار نجاح Verify';
-            label = 'DRV — بانتظار نجاح Verify';
-            disabled = true;
-        } else if (stateName === 'running') {
-            title = 'جاري التنفيذ…';
-            label = (kind === 'verify' ? 'Verify' : 'DRV') + '…';
-            disabled = true;
-        } else if (stateName === 'success') {
-            title = 'نجاح — عرض النتيجة المحفوظة';
-        } else if (stateName === 'failed') {
-            title = 'فشل — يمكن إعادة المحاولة عند السماح';
-        }
-        const cls = 'bc-btn-ghost bc-qual-btn bc-' + kind + ' is-' + stateName.replace(/_/g, '-');
-        return '<button type="button" class="' + cls + '" data-type="' + esc(type) + '" data-id="' + esc(id)
-            + '" data-cc="' + esc(cc) + '" data-qual="' + esc(kind) + '" data-state="' + esc(stateName) + '"'
-            + (disabled ? ' disabled' : '') + ' title="' + esc(title) + '">' + esc(label) + '</button>';
-    };
-
-    const provenanceSummaryHtml = (pkg) => {
-        if (!pkg || pkg.provenance_unavailable) {
-            return '<span class="bc-provenance-line">' + esc(pkg && pkg.provenance_message_ar
-                ? pkg.provenance_message_ar
-                : 'معلومات مصدر التشغيل غير متاحة لهذه الحزمة.') + '</span>';
-        }
-        const p = pkg.provenance || {};
-        const trigger = String(p.trigger_mode || '') === 'scheduled' ? 'تلقائي / مجدول' : 'يدوي';
-        const by = String(p.initiated_by_display_name_snapshot || (p.initiated_by_kind === 'system' ? 'System' : '—'));
-        const scope = String(p.backup_scope || '');
-        let scopeLabel = scope === 'all_recoverable_countries' ? 'ضمن All Recoverable Countries' : (scope === 'full' ? 'Full System Backup' : scope);
-        let ctx = '';
-        if (p.initiated_context_country_code) {
-            ctx = ' — بدأ من سياق ' + String(p.initiated_context_country_code)
-                + (p.initiated_context_country_name ? (' (' + String(p.initiated_context_country_name) + ')') : '');
-        } else if (String(p.initiated_by_kind || '') === 'system') {
-            ctx = ' — بدون سياق دولة';
-        }
-        return '<span class="bc-provenance-line">' + esc(scopeLabel + ' — ' + trigger + ' — بواسطة ' + by + ctx) + '</span>';
-    };
-
-    const formatCountryDrvHuman = (data) => {
-        if (!data || typeof data !== 'object') {
-            return '<p class="bc-muted">تعذر قراءة تقرير تحقق استرداد الدولة (مفقود أو تالف).</p>';
-        }
-        const overall = data.overall_result || data.overall || '—';
-        const score = data.recovery_score != null ? data.recovery_score : '—';
-        const validated = data.validated_at || data.generated_at || '—';
-        return '<dl>'
-            + '<div><dt>النتيجة</dt><dd>' + esc(String(overall)) + '</dd></div>'
-            + '<div><dt>الدرجة</dt><dd>' + esc(String(score)) + '</dd></div>'
-            + '<div><dt>وقت التحقق</dt><dd dir="ltr">' + esc(String(validated)) + '</dd></div>'
-            + '<div><dt>عزل الحدود</dt><dd>' + esc(String(data.boundary_isolation_valid === true ? 'صالح' : (data.boundary_isolation_valid === false ? 'غير صالح' : '—'))) + '</dd></div>'
-            + '<div><dt>تحليل التصادم</dt><dd>' + esc(String(data.collision_analysis_valid === true ? 'صالح' : (data.collision_analysis_valid === false ? 'غير صالح' : '—'))) + '</dd></div>'
-            + '</dl>';
     };
     const statusTone = (status) => {
         const s = String(status || '').toLowerCase();
@@ -857,20 +716,12 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         });
         if (el('bc_refresh_btn')) el('bc_refresh_btn').disabled = state.busy;
         document.querySelectorAll('.bc-drv').forEach((btn) => {
-            const st = btn.getAttribute('data-state') || '';
-            if (st === 'blocked' || st === 'running' || st === 'success') {
-                // State machine owns disabled/title for these; write-root gate still applies to runnable states.
-                if (st !== 'success' && recoveryCheckRequiresWrite && !manualActionsAvailable) {
-                    btn.disabled = true;
-                    btn.title = rootHealthWarning || 'DRV يتطلب كتابة على مسار النسخ الاحتياطي';
-                }
-                return;
-            }
             if (recoveryCheckRequiresWrite && !manualActionsAvailable) {
                 btn.disabled = true;
                 btn.title = rootHealthWarning || 'DRV يتطلب كتابة على مسار النسخ الاحتياطي';
-            } else if (st !== 'blocked' && st !== 'running') {
+            } else {
                 btn.disabled = false;
+                btn.removeAttribute('title');
             }
         });
     };
@@ -1074,42 +925,31 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
     }
 
     function viewFileControl(type, id, cc, file, label, asLink) {
-        // Report controls share Manifest link style (Owner report-style policy).
-        const cls = 'bc-report-control bc-view-file';
+        const cls = asLink ? 'bc-link bc-view-file' : 'bc-btn-ghost bc-view-file';
         const tag = asLink ? 'a' : 'button';
         const extra = asLink ? ' href="#"' : ' type="button"';
         return '<' + tag + extra + ' class="' + cls + '" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '" data-file="' + esc(file) + '">' + esc(label) + '</' + tag + '>';
     }
 
-    /** Reports inside accordion only — Verify/DRV live in the primary cluster. */
+    /** Expanded action row — buttons hidden until accordion opens. */
     function actionRowHtml(pkg, type) {
         const id = pkg.package_id;
         const cc = pkg.country_code || '';
         const isFull = type === 'full_disaster' || type === 'full';
-        let html = '';
+        let html = viewFileControl(type, id, cc, 'manifest.json', 'Manifest', true);
+        html += viewFileControl(type, id, cc, 'health.json', 'Health', false);
         if (isFull) {
             html += viewFileControl(type, id, cc, 'recovery_validation.json', 'DRV Report', false);
-            html += viewFileControl(type, id, cc, 'health.json', 'Health', false);
-            html += viewFileControl(type, id, cc, 'manifest.json', 'Manifest', true);
         } else {
-            html += viewFileControl(type, id, cc, 'country_recovery_validation.json', 'تقرير تحقق استرداد الدولة', false);
-            html += viewFileControl(type, id, cc, 'country_verify_report.json', 'Verify Report', false);
-            html += viewFileControl(type, id, cc, 'dependency_graph.json', 'Graph', false);
             html += viewFileControl(type, id, cc, 'table_inventory.json', 'Inventory', false);
-            html += viewFileControl(type, id, cc, 'health.json', 'Health', false);
-            html += viewFileControl(type, id, cc, 'manifest.json', 'Manifest', true);
+            html += viewFileControl(type, id, cc, 'dependency_graph.json', 'Graph', false);
+            html += viewFileControl(type, id, cc, 'country_verify_report.json', 'Verify Report', false);
+            html += viewFileControl(type, id, cc, 'country_recovery_validation.json', 'Country DRV', false);
         }
-        return html;
-    }
-
-    function primaryClusterHtml(pkg, type, idx) {
-        let html = '<span class="bc-primary-cluster">';
-        html += '<button type="button" class="bc-btn-primary bc-open-details" data-idx="' + idx + '" data-type="' + esc(type) + '">التفاصيل</button>';
         if (CAN_VERIFY) {
-            html += qualBtnHtml('verify', Object.assign({}, pkg, { package_type: type }), type);
-            html += qualBtnHtml('drv', Object.assign({}, pkg, { package_type: type }), type);
+            html += '<button type="button" class="bc-btn-ghost bc-verify" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">Verify</button>';
+            html += '<button type="button" class="bc-btn-ghost bc-drv" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">DRV</button>';
         }
-        html += '</span>';
         return html;
     }
 
@@ -1149,10 +989,9 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                         : '') +
                     badge(statusLabel) +
                     recoverabilityBadge(pkg) +
-                    provenanceSummaryHtml(pkg) +
                 '</span>' +
                 '<span class="bc-acc-actions-inline">' +
-                    primaryClusterHtml(pkg, type, idx) +
+                    '<button type="button" class="bc-btn-primary bc-open-details" data-idx="' + idx + '" data-type="' + esc(type) + '">التفاصيل</button>' +
                 '</span>' +
             '</summary>' +
             '<div class="bc-acc-body">' +
@@ -1245,8 +1084,21 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         const id = pkg.package_id;
         const cc = pkg.country_code || '';
 
-        let validationHtml = primaryClusterHtml(pkg, type, state[isFull ? 'full' : 'country'].indexOf(pkg));
-        let diagnosticsHtml = actionRowHtml(pkg, type);
+        let validationHtml = viewFileControl(type, id, cc, 'health.json', 'Health', false);
+        if (CAN_VERIFY) {
+            validationHtml += '<button type="button" class="bc-btn-ghost bc-verify" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">Verify</button>';
+            validationHtml += '<button type="button" class="bc-btn-ghost bc-drv" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">DRV</button>';
+        }
+
+        let diagnosticsHtml = viewFileControl(type, id, cc, 'manifest.json', 'Manifest', true);
+        if (isFull) {
+            diagnosticsHtml += viewFileControl(type, id, cc, 'recovery_validation.json', 'DRV Report', false);
+        } else {
+            diagnosticsHtml += viewFileControl(type, id, cc, 'dependency_graph.json', 'Graph', false);
+            diagnosticsHtml += viewFileControl(type, id, cc, 'table_inventory.json', 'Inventory', false);
+            diagnosticsHtml += viewFileControl(type, id, cc, 'country_verify_report.json', 'Verify Report', false);
+            diagnosticsHtml += viewFileControl(type, id, cc, 'country_recovery_validation.json', 'Country DRV', false);
+        }
 
         el('bc_drawer_body').innerHTML =
             '<div class="bc-drawer-group"><h4>Summary</h4><dl class="bc-drawer-meta">' +
@@ -1255,7 +1107,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 (isFull ? '' : '<div><dt>الدولة</dt><dd>' + esc((pkg.country_code || '') + (pkg.country_name ? ' — ' + pkg.country_name : '')) + '</dd></div>') +
                 '<div><dt>الحالة</dt><dd>' + badge(pkg.package_status) + '</dd></div>' +
                 '<div><dt>Recoverable</dt><dd>' + recoverabilityBadge(pkg) + '</dd></div>' +
-                '<div><dt>مصدر التشغيل</dt><dd class="bc-rtl">' + provenanceSummaryHtml(pkg) + '</dd></div>' +
                 '<div><dt>Schema</dt><dd>' + esc(String(pkg.schema_revision ?? '—')) + '</dd></div>' +
                 '<div><dt>Backend</dt><dd>' + esc(pkg.backend || '—') + '</dd></div>' +
                 '<div><dt>DRV Score</dt><dd>' + esc(String(pkg.recovery_score || 0)) + '</dd></div>' +
@@ -1270,7 +1121,14 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                 '<div><dt>Dump</dt><dd>' + esc(fmtBytes(pkg.dump_size_bytes)) + '</dd></div>' +
                 '<div><dt>Uploads</dt><dd>' + esc(fmtBytes(pkg.uploads_size_bytes)) + '</dd></div>' +
                 '<div><dt>Total</dt><dd>' + esc(sizeSummary(pkg)) + '</dd></div>' +
-            '</dl></div>';
+            '</dl></div>' +
+            '<div class="bc-drawer-group"><h4>Logs</h4>' +
+                '<p class="bc-muted" style="margin:0 0 8px;font-size:.82rem;">تقارير التحقق تظهر عبر Diagnostics. سجلات النظام من قسم «التخزين والسجلات».</p>' +
+                '<div class="bc-action-grid">' +
+                (isFull
+                    ? viewFileControl(type, id, cc, 'recovery_validation.json', 'DRV Report', false)
+                    : viewFileControl(type, id, cc, 'country_recovery_validation.json', 'Country DRV', false)) +
+                '</div></div>';
 
         el('bc_details_drawer').classList.add('is-open');
         el('bc_details_drawer').setAttribute('aria-hidden', 'false');
@@ -1355,7 +1213,6 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         if (typeof fn === 'function') await fn();
     });
     el('bc_view_close').addEventListener('click', () => { el('bc_view_modal').style.display = 'none'; });
-    el('bc_result_close').addEventListener('click', closeResultDialog);
     el('bc_drawer_close').addEventListener('click', closeDrawer);
     el('bc_drawer_backdrop').addEventListener('click', closeDrawer);
     el('bc_refresh_btn').addEventListener('click', loadAll);
@@ -1430,47 +1287,18 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         if (t.classList.contains('bc-view-file') || (t.closest && t.closest('.bc-view-file'))) {
             const btn = t.classList.contains('bc-view-file') ? t : t.closest('.bc-view-file');
             ev.preventDefault();
-            const fileName = btn.dataset.file || '';
             const q = new URLSearchParams({
                 action: 'view_file',
                 package_type: btn.dataset.type || '',
                 package_id: btn.dataset.id || '',
                 country_code: btn.dataset.cc || '',
-                file: fileName
+                file: btn.dataset.file || ''
             });
             try {
                 const res = await apiGet('status.php?' + q.toString());
-                if (!res.success && !res.data && !res.raw_text) {
-                    showViewContent(
-                        fileName === 'country_recovery_validation.json' ? 'تقرير تحقق استرداد الدولة' : fileName,
-                        'التقرير غير متاح أو تالف.',
-                        false,
-                        fileName === 'country_recovery_validation.json'
-                            ? '<p class="bc-muted">تعذر قراءة تقرير تحقق استرداد الدولة (مفقود أو تالف).</p>'
-                            : ''
-                    );
-                    return;
-                }
                 const body = res.data ? JSON.stringify(res.data, null, 2) : (res.raw_text || '');
-                const human = fileName === 'country_recovery_validation.json'
-                    ? formatCountryDrvHuman(res.data)
-                    : '';
-                const title = fileName === 'country_recovery_validation.json'
-                    ? 'تقرير تحقق استرداد الدولة'
-                    : fileName;
-                showViewContent(title, body || 'لا توجد تفاصيل تقنية إضافية.', true, human);
-            } catch (e) {
-                if (fileName === 'country_recovery_validation.json') {
-                    showViewContent(
-                        'تقرير تحقق استرداد الدولة',
-                        e.message || 'التقرير غير متاح.',
-                        false,
-                        '<p class="bc-muted">تعذر قراءة تقرير تحقق استرداد الدولة (مفقود أو تالف).</p>'
-                    );
-                } else {
-                    showAlert(e.message, false);
-                }
-            }
+                showViewContent(btn.dataset.file || 'file', body, true);
+            } catch (e) { showAlert(e.message, false); }
             return;
         }
         if (t.classList.contains('bc-log-tail')) {
@@ -1480,112 +1308,34 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             } catch (e) { showAlert(e.message, false); }
             return;
         }
-        const qualBtn = t.classList.contains('bc-verify') || t.classList.contains('bc-drv')
-            ? t
-            : (t.closest && (t.closest('.bc-verify') || t.closest('.bc-drv')));
-        if (qualBtn && CAN_VERIFY) {
-            ev.preventDefault();
-            ev.stopPropagation();
-            const kind = qualBtn.classList.contains('bc-drv') ? 'drv' : 'verify';
-            const type = qualBtn.dataset.type || '';
-            const id = qualBtn.dataset.id || '';
-            const cc = qualBtn.dataset.cc || '';
-            const st = qualBtn.dataset.state || '';
-            const list = type === 'full_disaster' ? state.full : state.country;
-            const pkg = list.find((p) => String(p.package_id) === String(id)
-                && String(p.country_code || '') === String(cc || '')) || null;
-            if (st === 'success' && pkg) {
-                if (kind === 'verify') {
-                    showResultDialog(
-                        'نتيجة Verify المحفوظة',
-                        'النتيجة: ' + (pkg.verify_result || 'PASS') + '\n'
-                            + (pkg.verify_validated_at ? ('الوقت: ' + pkg.verify_validated_at) : 'تم التحقق سابقاً بنجاح.'),
-                        id
-                    );
-                } else {
-                    const vr = pkg.verification || {};
-                    showResultDialog(
-                        'نتيجة DRV المحفوظة',
-                        'النتيجة: ' + (vr.overall_result || pkg.country_drv_result || 'PASS') + '\n'
-                            + 'الدرجة: ' + String(pkg.recovery_score || vr.recovery_score || 0) + '\n'
-                            + (vr.validated_at ? ('الوقت: ' + vr.validated_at) : ''),
-                        id
-                    );
-                }
-                return;
-            }
-            if (st === 'blocked' || st === 'running') return;
-            const runKey = packageKey(type, id, cc) + '|' + kind;
-            if (state.runningKeys[runKey]) return;
-            state.runningKeys[runKey] = true;
-            qualBtn.disabled = true;
-            qualBtn.classList.add('is-running');
-            const scrollY = window.scrollY;
-            const openIds = Array.from(document.querySelectorAll('details.bc-acc-item[open]'))
-                .map((d) => d.getAttribute('data-package-id'));
+        if (t.classList.contains('bc-verify') && CAN_VERIFY) {
+            setBusy(true, 'Verify…');
             try {
-                const endpoint = kind === 'verify' ? 'verify.php' : 'recovery-check.php';
-                const res = await apiPost(endpoint, {
-                    package_type: type,
-                    package_id: id,
-                    country_code: cc || ''
+                const res = await apiPost('verify.php', {
+                    package_type: t.dataset.type,
+                    package_id: t.dataset.id,
+                    country_code: t.dataset.cc || ''
                 });
-                const ok = !!res.success;
-                const msg = res.message || (ok ? 'تم بنجاح.' : 'فشل التنفيذ.');
-                const detail = res.result
-                    ? JSON.stringify(orangeSafeResult(res.result), null, 2)
-                    : '';
-                showResultDialog(kind === 'verify' ? 'نتيجة Verify' : 'نتيجة DRV', msg + (detail ? ('\n\n' + detail) : ''), id);
-                await refreshPackageRow(type, id, cc);
-            } catch (e) {
-                showResultDialog(kind === 'verify' ? 'نتيجة Verify' : 'نتيجة DRV', e.message || 'فشل التنفيذ.', id);
-                await refreshPackageRow(type, id, cc);
-            } finally {
-                state.runningKeys = Object.fromEntries(
-                    Object.entries(state.runningKeys).filter((pair) => pair[0] !== runKey)
-                );
-                window.scrollTo(0, scrollY);
-                openIds.forEach((pid) => {
-                    document.querySelectorAll('details.bc-acc-item[data-package-id]').forEach((d) => {
-                        if (d.getAttribute('data-package-id') === pid) d.open = true;
-                    });
+                showAlert(res.message || 'تم', true);
+                await loadAll();
+            } catch (e) { showAlert(e.message, false); }
+            finally { setBusy(false); }
+            return;
+        }
+        if (t.classList.contains('bc-drv') && CAN_VERIFY) {
+            setBusy(true, 'DRV…');
+            try {
+                const res = await apiPost('recovery-check.php', {
+                    package_type: t.dataset.type,
+                    package_id: t.dataset.id,
+                    country_code: t.dataset.cc || ''
                 });
-            }
+                showAlert(res.message || 'تم', true);
+                await loadAll();
+            } catch (e) { showAlert(e.message, false); }
+            finally { setBusy(false); }
         }
     });
-
-    function orangeSafeResult(result) {
-        if (!result || typeof result !== 'object') return result;
-        const copy = {};
-        Object.keys(result).forEach((k) => {
-            if (k === 'manifest' || k === 'health' || k === 'report') return;
-            copy[k] = result[k];
-        });
-        if (Array.isArray(copy.errors) && copy.errors.length > 12) {
-            copy.errors = copy.errors.slice(0, 12).concat(['…']);
-        }
-        return copy;
-    }
-
-    async function refreshPackageRow(type, id, cc) {
-        try {
-            const data = await apiGet('list.php');
-            renderRootHealth(data);
-            renderOverview(data);
-            const openIds = Array.from(document.querySelectorAll('details.bc-acc-item[open]'))
-                .map((d) => d.getAttribute('data-package-id'));
-            const scrollY = window.scrollY;
-            renderTables(data);
-            window.scrollTo(0, scrollY);
-            openIds.forEach((pid) => {
-                document.querySelectorAll('details.bc-acc-item[data-package-id]').forEach((d) => {
-                    if (d.getAttribute('data-package-id') === pid) d.open = true;
-                });
-            });
-        } catch (e) {
-            /* keep prior rows; dialog already shows outcome */
-        }
-    }
 
     function switchTab(name) {
         const fullBtn = el('bc_tab_full_btn');

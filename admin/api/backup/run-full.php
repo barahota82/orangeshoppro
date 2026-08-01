@@ -35,27 +35,7 @@ try {
         ], 422);
     }
 
-    $viewCtx = orange_backup_admin_context_for_view($projectRoot);
-    $backupRoot = (string) ($viewCtx['backup_root'] ?? '');
-    $executionId = null;
-    $provenanceWarning = null;
-    if ($backupRoot !== '' && is_dir($backupRoot)) {
-        $begun = orange_backup_provenance_begin_manual_admin_execution(
-            $backupRoot,
-            $admin,
-            $pdo,
-            'full'
-        );
-        $executionId = $begun['execution_id'] ?? null;
-        $provenanceWarning = $begun['warning'] ?? null;
-    }
-
-    try {
-        $result = orange_backup_admin_run_full_for_api($projectRoot);
-    } finally {
-        orange_backup_provenance_clear_cli_context();
-    }
-
+    $result = orange_backup_admin_run_full_for_api($projectRoot);
     $finishedAt = (string) ($result['finished_at'] ?? gmdate('c'));
     $ok = (bool) ($result['ok'] ?? false);
     $exitCode = (int) ($result['exit_code'] ?? ($ok ? 0 : 1));
@@ -68,8 +48,7 @@ try {
         $startedAt,
         $finishedAt,
         $ok,
-        $ok ? '' : (string) ($errorSummary ?? ''),
-        is_string($executionId) ? $executionId : null
+        $ok ? '' : (string) ($errorSummary ?? '')
     );
 
     $payload = [
@@ -80,18 +59,11 @@ try {
     if ($ok && !empty($result['snapshot'])) {
         $payload['snapshot'] = (string) $result['snapshot'];
     }
-    if ($executionId !== null && $executionId !== '') {
-        $payload['execution_id'] = $executionId;
-    }
-    if ($provenanceWarning !== null && $provenanceWarning !== '') {
-        $payload['provenance_warning'] = $provenanceWarning;
-    }
     if (!$ok && $errorSummary !== null && $errorSummary !== '') {
         $payload['error'] = $errorSummary;
     }
 
     json_response($payload, $ok ? 200 : 409);
 } catch (Throwable $e) {
-    orange_backup_provenance_clear_cli_context();
     orange_admin_api_catch($e, backup_admin_api_safe_message($e));
 }

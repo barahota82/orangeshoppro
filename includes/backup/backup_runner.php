@@ -7,7 +7,6 @@ require_once __DIR__ . '/backup_full.php';
 require_once __DIR__ . '/backup_manifest.php';
 require_once __DIR__ . '/backup_pdo_export.php';
 require_once __DIR__ . '/backup_retention.php';
-require_once __DIR__ . '/backup_provenance.php';
 
 /**
  * @var resource|null
@@ -635,14 +634,6 @@ function orange_backup_run_full(string $projectRoot, ?string $backupRootOverride
 
         if (!$result['ok']) {
             orange_backup_runner_log($logFile, $result['message'], 'ERROR');
-            $ensured = orange_backup_provenance_ensure_cli_execution($backupRoot, 'full');
-            if (!empty($ensured['execution_id'])) {
-                orange_backup_provenance_finish_execution($backupRoot, (string) $ensured['execution_id'], [
-                    'overall_status' => 'failed',
-                    'completed_at_utc' => gmdate('c'),
-                    'error_summary' => substr((string) ($result['message'] ?? 'full_backup_failed'), 0, 240),
-                ]);
-            }
 
             return [
                 'ok' => false,
@@ -657,27 +648,6 @@ function orange_backup_run_full(string $projectRoot, ?string $backupRootOverride
         orange_backup_runner_log($logFile, $result['message']);
         if ($result['snapshot'] !== null) {
             orange_backup_runner_log($logFile, 'Snapshot=' . $result['snapshot']);
-            $snapshotPath = orange_backup_path_inside_root($backupRoot, 'snapshots/' . $result['snapshot']);
-            $schemaRev = 0;
-            if (is_dir($snapshotPath)) {
-                $manifest = orange_backup_provenance_read_json_file(
-                    $snapshotPath . DIRECTORY_SEPARATOR . ORANGE_BACKUP_MANIFEST_FILE
-                );
-                $schemaRev = (int) ($manifest['schema_revision'] ?? 0);
-                $prov = orange_backup_provenance_after_full_success(
-                    $backupRoot,
-                    (string) $result['snapshot'],
-                    $snapshotPath,
-                    $schemaRev
-                );
-                if (empty($prov['ok'])) {
-                    orange_backup_runner_log(
-                        $logFile,
-                        'Provenance sidecar warning: ' . (string) ($prov['warning'] ?? 'unavailable'),
-                        'WARN'
-                    );
-                }
-            }
         }
         orange_backup_runner_log($logFile, 'Orange full backup completed successfully.');
 
