@@ -599,7 +599,13 @@ function orange_backup_admin_assert_country_package_in_context(PDO $pdo, string 
 {
     require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'countries.php';
 
-    $ctx = orange_backup_admin_normalize_country_scope_code(orange_admin_context_country_code($pdo));
+    // Prefer GLOBAL override via normalize_country_scope_code (strtolower-first).
+    // orange_countries_normalize_code strips uppercase letters if called before strtolower.
+    if (!empty($GLOBALS['orange_admin_ctx_country_code'])) {
+        $ctx = orange_backup_admin_normalize_country_scope_code((string) $GLOBALS['orange_admin_ctx_country_code']);
+    } else {
+        $ctx = orange_backup_admin_normalize_country_scope_code(orange_admin_context_country_code($pdo));
+    }
     $pkg = orange_backup_admin_normalize_country_scope_code($packageCountryCode);
     if ($ctx === '' || $pkg === '' || $ctx !== $pkg) {
         throw new RuntimeException('حزمة الدولة خارج سياق الدولة المحدد في الأدمن.');
@@ -1642,17 +1648,20 @@ function orange_backup_admin_audit(
     string $startedAt,
     string $finishedAt,
     bool $ok,
-    string $errorSummary = ''
+    string $errorSummary = '',
+    ?string $executionId = null
 ): void {
     $errorSummary = orange_backup_admin_sanitize_cli_excerpt($errorSummary, 500);
+    $execPart = ($executionId !== null && $executionId !== '') ? (' execution_id=' . $executionId) : '';
     $message = sprintf(
-        'backup_admin %s type=%s id=%s started=%s finished=%s result=%s%s',
+        'backup_admin %s type=%s id=%s started=%s finished=%s result=%s%s%s',
         $action,
         $packageType,
         $packageIdentifier,
         $startedAt,
         $finishedAt,
         $ok ? 'pass' : 'fail',
+        $execPart,
         $errorSummary !== '' ? ' error=' . $errorSummary : ''
     );
     audit_log('backup_admin_' . $action, $message, 'backup_package', $packageIdentifier);

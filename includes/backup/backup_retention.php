@@ -238,6 +238,10 @@ function orange_backup_retention_list_finalized_dirs(string $containerDir): arra
         if ($entry === '.' || $entry === '..' || orange_backup_retention_is_temp_dir_name($entry)) {
             continue;
         }
+        // Private operational metadata root must never be treated as a package.
+        if ($entry === '.orange_meta') {
+            continue;
+        }
         if (!orange_backup_retention_is_finalized_dir_name($entry)) {
             continue;
         }
@@ -461,6 +465,9 @@ function orange_backup_retention_list_country_codes(string $backupRoot): array
     $codes = [];
     foreach (scandir($countryRoot) ?: [] as $entry) {
         if ($entry === '.' || $entry === '..' || orange_backup_retention_is_temp_dir_name($entry)) {
+            continue;
+        }
+        if ($entry === '.orange_meta') {
             continue;
         }
         $full = $countryRoot . DIRECTORY_SEPARATOR . $entry;

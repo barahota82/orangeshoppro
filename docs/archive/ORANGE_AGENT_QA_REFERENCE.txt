@@ -607,3 +607,12 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
 - تصحيحات Step 4 المسموحة: test/docs فقط (مثل تحديث `self_test_restore_admin.php` لواجهة عربية Schema 124).
 - Totals شهادة Step-4 (تشغيل كامل واحد): Raw **4214/0/4**؛ Unique **3702**؛ overlap **512**؛ CORE_SYSTEM_SKIP=0؛ D5_nested **2021/0/3** Unique **1547**.
 - Result: **A — FSR_STEP4_FINAL_SYSTEM_CERTIFICATION_READY** (جاهزية نشر للمالك؛ النشر نفسه لم يُنفَّذ).
+
+--------------------------------------------------------------------
+سBC-S1. أين Backend مصدر تشغيل النسخ (Provenance sidecar) بدون واجهة Backup Center؟ (Stage 1)
+--------------------------------------------------------------------
+- نطاق Stage 1 فقط: سجل sidecar تحت `{BackupRoot}/.orange_meta/provenance/v1/` — **بلا** تغيير مرئي لـ Backup Center و**بلا** Stage 2.
+- التنفيذ: `includes/backup/backup_provenance.php` + تكامل `run-full.php` / `run-countries.php` / Full runner / Country Batch exporter؛ اكتشاف الحزم يتجاهل `.orange_meta`.
+- التفصيل: **ORANGE_BACKUP_RECOVERY_RUNBOOK.md** قسم «Backup Provenance Metadata Registry — Stage 1 Backend».
+- اختبار مركّز: `scripts/backup/self_test_backup_provenance_stage1.php`.
+- Schema يبقى **124**؛ Rejected Commit `7897eac5` يبقى معكوساً بالكامل؛ Final System Review Steps 1–4 تبقى مكتملة (**لا Step 5**).

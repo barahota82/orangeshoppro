@@ -997,3 +997,29 @@ Phase 4 not started.
 | Restore owner policy archived | **Yes** — `docs/archive/ORANGE_RESTORE_OWNER_POLICY.txt` |
 | Restore architecture archived | **Yes** — `docs/archive/ORANGE_RESTORE_ARCHITECTURE.txt` |
 | Restore tested on production | **Required before go-live** — operator responsibility |
+
+---
+
+## Backup Provenance Metadata Registry — Stage 1 Backend (Owner 2026-08-04)
+
+**Scope:** Backend sidecar only. **No Backup Center visual changes** in Stage 1.
+
+**Layout under `{BackupRoot}`:**
+
+```
+.orange_meta/provenance/v1/executions/<execution_id>.json
+.orange_meta/provenance/v1/packages/full/<package_id>.json
+.orange_meta/provenance/v1/packages/country/<CC>/<package_id>.json
+```
+
+**Contract:** `metadata_schema_version = 1` is sidecar-only (not Application Schema 125).
+
+**Authoritative for:** manual vs scheduled; Admin vs System; initiating Country context; parent Batch ↔ child Country packages; execution timestamps/status; per-Country outcomes.
+
+**Not authoritative for:** Health, Verify, DRV, Recoverable, Restore eligibility, Schema compatibility, Cutover, package contents.
+
+**Implementation:** `includes/backup/backup_provenance.php`; wired from `admin/api/backup/run-full.php`, `run-countries.php`, `orange_backup_run_full`, `orange_crp_batch_export_all`. List/UI JSON for Backup Center is intentionally unchanged in Stage 1.
+
+**Focused test:** `scripts/backup/self_test_backup_provenance_stage1.php`
+
+**Note:** Rejected Commit `7897eac5` remains fully reverted; Stage 1 is a fresh Backend-only implementation.
