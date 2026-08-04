@@ -59,6 +59,13 @@ try {
     $ok = (bool) ($result['ok'] ?? false);
     $exitCode = (int) ($result['exit_code'] ?? ($ok ? 0 : 1));
     $errorSummary = $ok ? null : (string) ($result['error'] ?? orange_backup_admin_sanitize_cli_excerpt((string) ($result['message'] ?? ''), 400));
+    if (!$ok && is_string($executionId) && $executionId !== '' && $backupRoot !== '') {
+        orange_backup_provenance_finish_execution($backupRoot, $executionId, [
+            'overall_status' => 'failed',
+            'completed_at_utc' => $finishedAt,
+            'error_summary' => $errorSummary !== null ? substr($errorSummary, 0, 240) : 'full_backup_failed',
+        ]);
+    }
 
     orange_backup_admin_audit(
         'run_full',
