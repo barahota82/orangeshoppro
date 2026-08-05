@@ -837,8 +837,8 @@ try {
     s4a_ok(!orange_backup_qualification_read_full_drv_bound($copyTarget['path'], $copyTarget['id'])['ok'], 'copied: full drv stolen report rejected');
 
     // Country report copied KW → EG
-    $kwCopy = s4a_make_country_shell($root, 'kw', '2026-08-05_kwcopy', 1);
-    $egCopy = s4a_make_country_shell($root, 'eg', '2026-08-05_egcopy', 2);
+    $kwCopy = s4a_make_country_shell($root, 'kw', '2026-08-05_606061', 1);
+    $egCopy = s4a_make_country_shell($root, 'eg', '2026-08-05_606062', 2);
     $kwVrep = [
         'report_schema_version' => 1,
         'action' => 'verify',
