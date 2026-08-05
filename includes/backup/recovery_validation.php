@@ -26,6 +26,10 @@ function orange_recovery_validation_log(string $message): void
     if (PHP_SAPI !== 'cli') {
         return;
     }
+    // Stage 4A endpoint workers need a single JSON line on STDOUT.
+    if ((string) (getenv('ORANGE_QUAL_SILENCE_DRV_LOG') ?: '') === '1') {
+        return;
+    }
     fwrite(STDOUT, $message . PHP_EOL);
     if (function_exists('fflush')) {
         fflush(STDOUT);
@@ -901,10 +905,40 @@ function orange_recovery_build_report(
     $warnings = is_array($stageResults['warnings'] ?? null) ? $stageResults['warnings'] : [];
     $score = orange_recovery_compute_score($errors, $warnings);
 
+    $packageId = $packagePath !== '' ? basename(rtrim($packagePath, "\\/")) : '';
+    $validatedAt = gmdate('c');
+    $checksumsDigest = '';
+    $fingerprint = '';
+    if ($packagePath !== '' && is_dir($packagePath)) {
+        $csFile = $packagePath . DIRECTORY_SEPARATOR . 'checksums.sha256';
+        if (is_file($csFile)) {
+            $rawCs = file_get_contents($csFile);
+            if (is_string($rawCs) && $rawCs !== '') {
+                $checksumsDigest = hash('sha256', $rawCs);
+            }
+        }
+        // Content-aware fingerprint (live payload hashes) — not checksums-file digest alone.
+        if (function_exists('orange_backup_qualification_full_payload_fingerprint')) {
+            $fingerprint = orange_backup_qualification_full_payload_fingerprint($packagePath);
+        } elseif ($checksumsDigest !== '') {
+            $fingerprint = $checksumsDigest;
+        }
+    }
+
     return [
-        'validated_at' => gmdate('c'),
+        'report_schema_version' => 1,
+        'action' => 'drv',
+        'validated_at' => $validatedAt,
+        'completed_at_utc' => $validatedAt,
         'package_type' => $packageType,
+        'package_id' => $packageId,
+        // Used by orange_recovery_write_report_file; stripped before public/API persistence.
         'package_path' => $packagePath,
+        'safe_relative_package_path' => ($packageType === ORANGE_RECOVERY_VALIDATION_PACKAGE_TYPE_FULL && $packageId !== '')
+            ? ('snapshots/' . $packageId)
+            : '',
+        'package_fingerprint' => $fingerprint,
+        'checksums_digest' => $checksumsDigest,
         'schema_revision' => (int) ($manifest['schema_revision'] ?? ($health['schema_revision'] ?? 0)),
         'package_version' => (string) ($manifest['package_version'] ?? ''),
         'validation_engine_version' => ORANGE_RECOVERY_VALIDATION_ENGINE_VERSION,

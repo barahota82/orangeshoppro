@@ -616,3 +616,15 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
 - التفصيل: **ORANGE_BACKUP_RECOVERY_RUNBOOK.md** قسم «Backup Provenance Metadata Registry — Stage 1 Backend».
 - اختبار مركّز: `scripts/backup/self_test_backup_provenance_stage1.php`.
 - Schema يبقى **124**؛ Rejected Commit `7897eac5` يبقى معكوساً بالكامل؛ Final System Review Steps 1–4 تبقى مكتملة (**لا Step 5**).
+
+--------------------------------------------------------------------
+سBC-S4A. أين Backend أدلة التأهيل / الربط / الأقفال / Idempotency لـ Verify وDRV؟ (Stage 4A)
+--------------------------------------------------------------------
+- نطاق Stage 4A فقط: Backend — **بلا** ألوان أزرار / no-refresh UI / Stage 4B.
+- Full Verify: sibling `{package_id}.full_verify_report.json` بجانب `snapshots/`.
+- أقفال: `{BackupRoot}/.orange_meta/qualification_locks/v1/{full|country/...}/{package_id}/{verify|drv}.lock`.
+- Resolver: `orange_backup_qualification_resolve()`؛ Recoverable = نفس `orange_restore_admin_package_eligibility()` دون تغيير عتبات Restore.
+- Provenance Stage 1 **خارج** سلطة التأهيل.
+- التنفيذ: `includes/backup/backup_qualification.php` + `verify.php` / `recovery-check.php`.
+- اختبار: `scripts/self_test_backup_center_stage4a_qualification_backend.php`.
+- Schema يبقى **124**؛ Final System Review Steps 1–4 تبقى مكتملة (**لا Step 5**).

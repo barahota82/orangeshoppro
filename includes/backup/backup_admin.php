@@ -1628,6 +1628,7 @@ function orange_backup_admin_recovery_validate(string $packagePath): array
 
     $report = orange_recovery_validate_package($packagePath);
     $reportPath = orange_recovery_write_report_file($report);
+    unset($report['package_path']);
 
     return orange_backup_admin_redact_secrets([
         'ok' => (string) ($report['overall_result'] ?? 'fail') === 'pass',

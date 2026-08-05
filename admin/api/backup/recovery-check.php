@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/_bootstrap.php';
+require_once __DIR__ . '/../../../includes/backup/backup_qualification.php';
 
 backup_admin_api_require_post();
 
@@ -34,40 +35,49 @@ try {
         json_response(['success' => false, 'message' => $blockMessage], 422);
     }
 
-    // DRV writes recovery_validation.json into the package directory — requires writable BackupRoot.
+    // DRV writes sibling reports — requires writable BackupRoot.
     $ctx = orange_backup_admin_context_for_mutation($projectRoot);
+    $backupRoot = (string) $ctx['backup_root'];
     if ($packageType === 'full_disaster') {
-        $packagePath = orange_backup_admin_resolve_full_package_path($ctx['backup_root'], $packageId);
+        $packagePath = orange_backup_admin_resolve_full_package_path($backupRoot, $packageId);
     } elseif ($packageType === 'country_recovery') {
         orange_backup_admin_assert_country_package_in_context($pdo, $countryCode);
-        $packagePath = orange_backup_admin_resolve_country_package_path($ctx['backup_root'], $countryCode, $packageId);
+        $packagePath = orange_backup_admin_resolve_country_package_path($backupRoot, $countryCode, $packageId);
     } else {
         json_response(['success' => false, 'message' => 'نوع الحزمة غير مدعوم'], 422);
     }
 
-    $result = orange_backup_admin_recovery_validate($packagePath);
-    $finishedAt = gmdate('c');
-    $ok = (bool) ($result['ok'] ?? false);
-
-    orange_backup_admin_audit(
-        'recovery_validation',
+    $run = orange_backup_qualification_endpoint_drv(
+        $backupRoot,
         $packageType,
-        $packageType === 'country_recovery' ? strtoupper($countryCode) . '/' . $packageId : $packageId,
-        $startedAt,
-        $finishedAt,
-        $ok,
-        $ok ? '' : implode('; ', array_slice($result['errors'] ?? [], 0, 5))
+        $packagePath,
+        $packageId,
+        $countryCode
     );
 
+    if (!empty($run['in_progress'])) {
+        json_response([
+            'success' => false,
+            'code' => 'qualification_in_progress',
+            'message' => (string) ($run['message'] ?? 'فحص قابلية الاسترداد قيد التنفيذ حالياً.'),
+            'in_progress' => true,
+        ], 409);
+    }
+
+    $ok = (bool) ($run['success'] ?? false);
+    $result = is_array($run['result'] ?? null) ? $run['result'] : [];
     json_response([
         'success' => $ok,
-        'message' => $ok ? 'اجتازت الحزمة فحص قابلية الاسترداد.' : 'فشل فحص قابلية الاسترداد.',
+        'message' => (string) ($run['message'] ?? ($ok ? 'اجتازت الحزمة فحص قابلية الاسترداد.' : 'فشل فحص قابلية الاسترداد.')),
+        'short_circuited' => (bool) ($run['short_circuited'] ?? false),
+        'heavy_executed' => (bool) ($run['heavy_executed'] ?? false),
         'result' => orange_backup_admin_redact_secrets([
             'overall_result' => $result['overall_result'] ?? 'fail',
             'recovery_score' => $result['recovery_score'] ?? 0,
             'errors' => $result['errors'] ?? [],
             'warnings' => $result['warnings'] ?? [],
             'report_path' => $result['report_path'] ?? null,
+            'from_saved_report' => (bool) ($result['from_saved_report'] ?? false),
         ]),
     ], $ok ? 200 : 422);
 } catch (Throwable $e) {

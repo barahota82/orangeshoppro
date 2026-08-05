@@ -810,9 +810,38 @@ function orange_country_drv_finalize(
     $blockers = array_values(array_unique($blockers));
 
     $scoreInfo = orange_country_drv_compute_score($flags, $blockers, $warnings);
+    $countryCode = '';
+    if (is_array($manifest) && isset($manifest['country_code'])) {
+        $countryCode = strtoupper((string) $manifest['country_code']);
+    } else {
+        $parentBase = basename(dirname($packageRoot));
+        if (preg_match('/^[A-Za-z]{2}$/', $parentBase)) {
+            $countryCode = strtoupper($parentBase);
+        }
+    }
+    $computedFp = '';
+    if (is_array($manifest) && function_exists('orange_crp_export_package_fingerprint')) {
+        require_once __DIR__ . '/country_export.php';
+        $computedFp = orange_crp_export_package_fingerprint($packageRoot, $manifest);
+    }
+    $checksumsDigest = '';
+    $checksumsFile = $packageRoot . DIRECTORY_SEPARATOR . 'checksums.sha256';
+    if (is_file($checksumsFile)) {
+        $rawCs = file_get_contents($checksumsFile);
+        if (is_string($rawCs) && $rawCs !== '') {
+            $checksumsDigest = hash('sha256', $rawCs);
+        }
+    }
+    $validatedAt = gmdate('c');
     $report = [
-        'validated_at' => gmdate('c'),
+        'report_schema_version' => 1,
+        'action' => 'drv',
+        'validated_at' => $validatedAt,
+        'completed_at_utc' => $validatedAt,
+        // Keep legacy value "country" for existing summarize/eligibility readers; binding also stores country_code.
         'package_type' => 'country',
+        'qualification_package_type' => 'country_recovery',
+        'country_code' => $countryCode,
         'country_id' => is_array($manifest) ? (int) ($manifest['country_id'] ?? 0) : 0,
         'schema_revision' => is_array($manifest) ? (int) ($manifest['schema_revision'] ?? 0) : 0,
         'package_version' => is_array($manifest) ? (string) ($manifest['package_version'] ?? '') : '',
@@ -840,6 +869,11 @@ function orange_country_drv_finalize(
         'execution_performed' => false,
         'country_restore_enabled' => ORANGE_COUNTRY_RESTORE_PRODUCTION_ENABLED,
         'package_id' => $packageId,
+        'package_fingerprint' => $computedFp,
+        'checksums_digest' => $checksumsDigest,
+        'safe_relative_package_path' => $countryCode !== ''
+            ? ('country_packages/' . strtolower($countryCode) . '/' . $packageId)
+            : '',
         'pass_score_threshold' => ORANGE_COUNTRY_DRV_PASS_SCORE_THRESHOLD,
     ];
 
