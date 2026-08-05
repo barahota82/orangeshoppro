@@ -25,7 +25,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 ?>
 <style>
 /* Orange Enterprise Backup Center V2.1 — Owner Review — page-scoped only */
-.bc-v2{--bc-border:#e2e8f0;--bc-muted:#64748b;--bc-surface:#fff;--bc-soft:#f8fafc;--bc-ink:#0f172a;--bc-ok:#047857;--bc-warn:#b45309;--bc-bad:#b91c1c;--bc-info:#1d4ed8}
+.bc-v2{--bc-border:#e2e8f0;--bc-muted:#64748b;--bc-surface:#fff;--bc-soft:#f8fafc;--bc-ink:#0f172a;--bc-ok:#047857;--bc-warn:#b45309;--bc-bad:#b91c1c;--bc-info:#1d4ed8;container-type:inline-size;container-name:bc-pack}
 .bc-v2 *{box-sizing:border-box}
 .bc-header{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;padding:14px 16px;background:var(--bc-surface);border:1px solid var(--bc-border);border-radius:12px}
 .bc-header-main{min-width:0;flex:1}
@@ -95,18 +95,21 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 .bc-acc-when{margin-inline-end:6px}
 @media (max-width:900px){.bc-ts{flex-wrap:wrap;gap:0;white-space:normal}.bc-ts-date,.bc-ts-time{display:block}}
 /* Accordion cards — same interaction family as Scheduled Operations */
-.bc-acc-list{display:flex;flex-direction:column;gap:8px}
-.bc-acc-item,.bc-collapsible{border:1px solid var(--bc-border);border-radius:12px;background:var(--bc-surface)}
-.bc-acc-item>summary,.bc-collapsible>summary{cursor:pointer;list-style:none;padding:12px 14px;font-weight:650;font-size:.9rem;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.bc-acc-list{display:flex;flex-direction:column;gap:8px;width:100%;min-width:0;max-width:100%}
+.bc-acc-item,.bc-collapsible{border:1px solid var(--bc-border);border-radius:12px;background:var(--bc-surface);width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+.bc-acc-item>summary,.bc-collapsible>summary{cursor:pointer;list-style:none;padding:12px 14px;font-weight:650;font-size:.9rem;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;width:100%;min-width:0;max-width:100%;box-sizing:border-box}
 .bc-acc-item>summary::-webkit-details-marker,.bc-collapsible>summary::-webkit-details-marker{display:none}
 .bc-acc-chevron{display:inline-flex;width:1.1em;color:var(--bc-muted);font-size:.85rem;flex:0 0 auto}
 .bc-acc-item>summary .bc-acc-chevron::before{content:'▶'}
 .bc-acc-item[open]>summary .bc-acc-chevron::before{content:'▼'}
 .bc-collapsible>summary::after{content:'▾';color:var(--bc-muted);font-size:.85rem;margin-inline-start:auto}
 .bc-collapsible[open]>summary::after{content:'▴'}
-.bc-acc-title{font-weight:700;color:var(--bc-ink);min-width:7rem}
-.bc-acc-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1;min-width:0}
-.bc-acc-actions-inline{display:flex;align-items:center;gap:8px;margin-inline-start:auto}
+.bc-acc-title{font-weight:700;color:var(--bc-ink);flex:1 1 auto;min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}
+.bc-acc-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1 1 12rem;min-width:0;max-width:100%}
+.bc-acc-actions-inline{display:flex;align-items:center;gap:8px;margin-inline-start:auto;flex:0 1 auto;min-width:0;max-width:100%}
+/* Stage 3: primary cluster keeps Details→DRV→Verify LTR so page RTL does not reverse them */
+.bc-primary-cluster{display:inline-flex;flex-wrap:wrap;align-items:center;gap:8px;direction:ltr;unicode-bidi:isolate;max-width:100%}
+.bc-primary-cluster .bc-btn-primary,.bc-primary-cluster .bc-btn-ghost{flex:0 0 auto}
 .bc-acc-body,.bc-collapsible-body{padding:0 14px 12px;border-top:1px solid #f1f5f9}
 .bc-acc-body{padding-top:10px}
 /* Expandable panels: capped height; sticky summary (collapse always reachable); panel scrolls (Owner 2026-07-24) */
@@ -131,7 +134,60 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 .bc-kpi-card h4{margin:0 0 6px;font-size:.78rem;color:var(--bc-muted);font-weight:650}
 .bc-kpi-card .bc-val{font-size:1rem;font-weight:700;word-break:break-word;direction:ltr;unicode-bidi:isolate}
 @media (max-width:1024px){.bc-storage-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media (max-width:640px){.bc-storage-kpis{grid-template-columns:1fr 1fr}.bc-primary-bar{flex-direction:column;align-items:stretch}.bc-acc-actions-inline{width:100%;margin-inline-start:0}}
+/* Stage 3 narrow: package summary grid — keyed to .bc-v2 container width (not only viewport) so admin column + mobile match */
+@media (max-width:640px){
+.bc-storage-kpis{grid-template-columns:1fr 1fr}
+.bc-primary-bar{flex-direction:column;align-items:stretch}
+}
+@container bc-pack (max-width:640px){
+.bc-acc-list,.bc-acc-item{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+details.bc-acc-item>summary{
+display:grid!important;
+grid-template-columns:1.25em minmax(0,1fr);
+grid-template-areas:"chevron title" "meta meta" "actions actions";
+align-items:start;
+column-gap:8px;
+row-gap:8px;
+width:100%;
+max-width:100%;
+min-width:0;
+box-sizing:border-box;
+}
+details.bc-acc-item>summary>.bc-acc-chevron{grid-area:chevron;margin-top:.2em;width:1.1em}
+details.bc-acc-item>summary>.bc-acc-title{grid-area:title;min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+details.bc-acc-item>summary>.bc-acc-meta{grid-area:meta;display:flex;flex-wrap:wrap;width:100%;max-width:100%;min-width:0}
+details.bc-acc-item>summary>.bc-acc-meta .bc-mono,
+details.bc-acc-item>summary>.bc-acc-meta .bc-ts,
+details.bc-acc-item>summary>.bc-acc-meta .bc-ts-date,
+details.bc-acc-item>summary>.bc-acc-meta .bc-ts-time{white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:100%}
+details.bc-acc-item>summary>.bc-acc-actions-inline{grid-area:actions;display:flex;width:100%;max-width:100%;min-width:0;margin-inline-start:0;justify-content:flex-start}
+details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justify-content:flex-start}
+}
+/* Viewport fallback when container queries unavailable */
+@media (max-width:640px){
+.bc-acc-list,.bc-acc-item{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+details.bc-acc-item>summary{
+display:grid!important;
+grid-template-columns:1.25em minmax(0,1fr);
+grid-template-areas:"chevron title" "meta meta" "actions actions";
+align-items:start;
+column-gap:8px;
+row-gap:8px;
+width:100%;
+max-width:100%;
+min-width:0;
+box-sizing:border-box;
+}
+details.bc-acc-item>summary>.bc-acc-chevron{grid-area:chevron;margin-top:.2em;width:1.1em}
+details.bc-acc-item>summary>.bc-acc-title{grid-area:title;min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+details.bc-acc-item>summary>.bc-acc-meta{grid-area:meta;display:flex;flex-wrap:wrap;width:100%;max-width:100%;min-width:0}
+details.bc-acc-item>summary>.bc-acc-meta .bc-mono,
+details.bc-acc-item>summary>.bc-acc-meta .bc-ts,
+details.bc-acc-item>summary>.bc-acc-meta .bc-ts-date,
+details.bc-acc-item>summary>.bc-acc-meta .bc-ts-time{white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:100%}
+details.bc-acc-item>summary>.bc-acc-actions-inline{grid-area:actions;display:flex;width:100%;max-width:100%;min-width:0;margin-inline-start:0;justify-content:flex-start}
+details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justify-content:flex-start}
+}
 .bc-modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:5000;padding:16px}
 .bc-modal{background:#fff;border-radius:12px;max-width:520px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
 .bc-modal h3{margin:0 0 10px}
@@ -931,7 +987,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         return '<' + tag + extra + ' class="' + cls + '" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '" data-file="' + esc(file) + '">' + esc(label) + '</' + tag + '>';
     }
 
-    /** Expanded action row — buttons hidden until accordion opens. */
+    /** Expanded action row — secondary reports only (Verify/DRV live on the primary cluster). */
     function actionRowHtml(pkg, type) {
         const id = pkg.package_id;
         const cc = pkg.country_code || '';
@@ -946,16 +1002,37 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
             html += viewFileControl(type, id, cc, 'country_verify_report.json', 'Verify Report', false);
             html += viewFileControl(type, id, cc, 'country_recovery_validation.json', 'Country DRV', false);
         }
-        if (CAN_VERIFY) {
-            html += '<button type="button" class="bc-btn-ghost bc-verify" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">Verify</button>';
-            html += '<button type="button" class="bc-btn-ghost bc-drv" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">DRV</button>';
-        }
         return html;
     }
 
-    /** Legacy flat action buttons (hidden table mounts — capability preservation). */
-    function actionButtons(pkg, type) {
-        return actionRowHtml(pkg, type);
+    /**
+     * Hidden table cell — non-interactive package metadata only.
+     * No button/anchor/form; no .bc-open-details / .bc-drv / .bc-verify (Stage 3).
+     */
+    function hiddenPkgDataCell(pkg, type) {
+        const id = pkg.package_id || '';
+        const cc = pkg.country_code || '';
+        return '<span class="bc-hidden-pkg-data"' +
+            ' data-package-id="' + esc(id) + '"' +
+            ' data-package-type="' + esc(type) + '"' +
+            ' data-cc="' + esc(cc) + '"' +
+            ' data-status="' + esc(String(pkg.package_status || '')) + '"' +
+            ' data-recovery-score="' + esc(String(pkg.recovery_score || 0)) + '"' +
+            '>' + esc(id) + '</span>';
+    }
+
+    /** Primary row cluster: Details → DRV → Verify (dir=ltr isolate; Details keeps outer-edge anchor). */
+    function primaryClusterHtml(pkg, type, idx) {
+        const id = pkg.package_id;
+        const cc = pkg.country_code || '';
+        let html = '<span class="bc-primary-cluster" dir="ltr">';
+        html += '<button type="button" class="bc-btn-primary bc-open-details" data-idx="' + idx + '" data-type="' + esc(type) + '">التفاصيل</button>';
+        if (CAN_VERIFY) {
+            html += '<button type="button" class="bc-btn-ghost bc-drv" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">DRV</button>';
+            html += '<button type="button" class="bc-btn-ghost bc-verify" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">Verify</button>';
+        }
+        html += '</span>';
+        return html;
     }
 
     function sizeSummary(pkg) {
@@ -991,7 +1068,7 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
                     recoverabilityBadge(pkg) +
                 '</span>' +
                 '<span class="bc-acc-actions-inline">' +
-                    '<button type="button" class="bc-btn-primary bc-open-details" data-idx="' + idx + '" data-type="' + esc(type) + '">التفاصيل</button>' +
+                    primaryClusterHtml(pkg, type, idx) +
                 '</span>' +
             '</summary>' +
             '<div class="bc-acc-body">' +
@@ -1084,11 +1161,8 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         const id = pkg.package_id;
         const cc = pkg.country_code || '';
 
-        let validationHtml = viewFileControl(type, id, cc, 'health.json', 'Health', false);
-        if (CAN_VERIFY) {
-            validationHtml += '<button type="button" class="bc-btn-ghost bc-verify" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">Verify</button>';
-            validationHtml += '<button type="button" class="bc-btn-ghost bc-drv" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">DRV</button>';
-        }
+        // Stage 3: Validation keeps Health only — executable Verify/DRV live on the primary row.
+        const validationHtml = viewFileControl(type, id, cc, 'health.json', 'Health', false);
 
         let diagnosticsHtml = viewFileControl(type, id, cc, 'manifest.json', 'Manifest', true);
         if (isFull) {
@@ -1146,24 +1220,22 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
         renderActiveBackupList('full');
         renderActiveBackupList('country');
 
-        // Hidden legacy tables — full data + all actions preserved
+        // Hidden legacy tables — non-interactive metadata only (no executable Details/DRV/Verify).
         el('bc_full_table').querySelector('tbody').innerHTML = state.full.length
-            ? state.full.map((p, idx) =>
+            ? state.full.map((p) =>
                 '<tr><td>' + fmtPackageWhenDisplay(p, 'full_disaster') + '</td><td>' + badge(p.package_status) + '</td><td>' +
                 esc(String(p.schema_revision ?? '')) + '</td><td>' + esc(p.backend || '') + '</td><td>' +
                 esc(fmtBytes(p.dump_size_bytes)) + '</td><td>' + esc(fmtBytes(p.uploads_size_bytes)) + '</td><td>' +
-                esc(String(p.recovery_score || 0)) + '</td><td class="bc-actions">' + actionButtons(p, 'full_disaster') +
-                ' <button type="button" class="bc-btn-primary bc-open-details" data-idx="' + idx + '" data-type="full_disaster">التفاصيل</button></td></tr>'
+                esc(String(p.recovery_score || 0)) + '</td><td class="bc-actions">' + hiddenPkgDataCell(p, 'full_disaster') + '</td></tr>'
             ).join('')
             : '<tr><td colspan="8" class="bc-muted">لا توجد لقطات.</td></tr>';
         el('bc_country_table').querySelector('tbody').innerHTML = state.country.length
-            ? state.country.map((p, idx) =>
+            ? state.country.map((p) =>
                 '<tr><td>' + esc((p.country_code || '') + (p.country_name ? ' — ' + p.country_name : '')) +
                 '</td><td>' + fmtPackageWhenDisplay(p, 'country_recovery') + '</td><td>' + esc(p.package_id || '') +
                 '</td><td>' + badge(p.package_status) + '</td><td>' + esc(String(p.schema_revision ?? '')) +
                 '</td><td>' + esc(p.registry_version || '') + '</td><td>' + esc(String(p.recovery_score || 0)) +
-                '</td><td class="bc-actions">' + actionButtons(p, 'country_recovery') +
-                ' <button type="button" class="bc-btn-primary bc-open-details" data-idx="' + idx + '" data-type="country_recovery">التفاصيل</button></td></tr>'
+                '</td><td class="bc-actions">' + hiddenPkgDataCell(p, 'country_recovery') + '</td></tr>'
             ).join('')
             : '<tr><td colspan="8" class="bc-muted">لا توجد حزم دول.</td></tr>';
 
