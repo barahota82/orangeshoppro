@@ -12,6 +12,8 @@ declare(strict_types=1);
  */
 
 $projectRoot = dirname(__DIR__);
+require_once $projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'backup_stage4b_evidence_lib.php';
+
 $pagePath = $projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'backup_center.php';
 $provenancePath = $projectRoot . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'backup_provenance.php';
 $restorePagePath = $projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'restore_center.php';
@@ -201,7 +203,7 @@ echo "ZERO_DUPLICATED_PRIMARY_CONTROLS = 1\n";
 s3_assert(true, 'markers: TOTAL_EXECUTABLE_*_PER_PACKAGE = 1 declared');
 
 /* --- Rendered DOM harness (Node/Chrome optional) --- */
-$evidenceDir = 'D:\\orange_stage3_evidence';
+$evidenceDir = s4b_ev_evidence_dir('orange_stage3_evidence');
 $harnessDir = $evidenceDir . DIRECTORY_SEPARATOR . 'runtime';
 $harnessHtml = $harnessDir . DIRECTORY_SEPARATOR . 'stage3_dom_harness.html';
 $domReport = $harnessDir . DIRECTORY_SEPARATOR . 'dom_assert_report.json';
@@ -494,7 +496,6 @@ PS;
             }
 
             // --- Mobile geometry (actual layout at 390 and 360 via Chrome CDP device metrics) ---
-            require_once $projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'backup_stage4b_evidence_lib.php';
             $mobileHtml = $harnessDir . DIRECTORY_SEPARATOR . 'stage3_mobile_geom.html';
             $mobileJs = <<<'JS'
 (function () {
