@@ -28,6 +28,8 @@ const ORANGE_BACKUP_QUAL_ACTION_VERIFY = 'verify';
 const ORANGE_BACKUP_QUAL_ACTION_DRV = 'drv';
 const ORANGE_BACKUP_QUAL_LOCK_STALE_SECONDS = 7200;
 
+require_once __DIR__ . '/backup_manual_qualification.php';
+
 /** @var array<string, resource> */
 $orangeBackupQualLockHandles = [];
 
@@ -805,11 +807,26 @@ function orange_backup_qualification_run_verify(
             ? orange_backup_qualification_read_full_verify_bound($packagePath, $packageId)
             : orange_backup_qualification_read_country_verify_bound($packagePath, $packageId, $countryCode);
         if ($boundReadonly['ok'] && ($boundReadonly['status'] ?? '') === 'success') {
+            $manualWritten = false;
+            if ($packageType === 'country_recovery') {
+                $manualWritten = orange_backup_qualification_record_country_manual_verify_ui(
+                    $backupRoot,
+                    $packagePath,
+                    $packageId,
+                    $countryCode,
+                    'success',
+                    $operator,
+                    'success',
+                    'تم تأكيد التحقق اليدوي من الحزمة بنجاح (نتيجة Backend محفوظة).'
+                );
+            }
+
             return [
                 'success' => true,
                 'in_progress' => false,
                 'short_circuited' => true,
                 'heavy_executed' => false,
+                'manual_confirmation_written' => $manualWritten,
                 'message' => 'تم التحقق من الحزمة بنجاح (نتيجة محفوظة).',
                 'result' => [
                     'ok' => true,
@@ -873,13 +890,55 @@ function orange_backup_qualification_run_verify(
             ];
         }
 
-        $bound = orange_backup_qualification_read_country_verify_bound($packagePath, $packageId, $countryCode);
-        if ($bound['ok'] && ($bound['status'] ?? '') === 'success') {
+        // Country: UI green/red requires manual Admin confirmation sidecar (not automatic export Verify alone).
+        $fp = orange_backup_qualification_current_fingerprint($packagePath, 'country_recovery');
+        $manualExisting = orange_backup_manual_qualification_read_country_verify(
+            $backupRoot,
+            $packageId,
+            $countryCode,
+            $fp
+        );
+        if (!empty($manualExisting['ok']) && ($manualExisting['state'] ?? '') === 'success') {
             return [
                 'success' => true,
                 'in_progress' => false,
                 'short_circuited' => true,
                 'heavy_executed' => false,
+                'manual_confirmation_written' => false,
+                'message' => (string) (($manualExisting['safe_summary'] ?? '') !== ''
+                    ? $manualExisting['safe_summary']
+                    : 'تم التحقق من الحزمة بنجاح (تأكيد يدوي محفوظ).'),
+                'result' => [
+                    'ok' => true,
+                    'package_type' => 'country_recovery',
+                    'from_saved_report' => true,
+                    'from_manual_confirmation' => true,
+                    'report' => $manualExisting['record'] ?? null,
+                    'errors' => [],
+                    'warnings' => [],
+                ],
+            ];
+        }
+
+        $bound = orange_backup_qualification_read_country_verify_bound($packagePath, $packageId, $countryCode);
+        if ($bound['ok'] && ($bound['status'] ?? '') === 'success') {
+            $manualWritten = orange_backup_qualification_record_country_manual_verify_ui(
+                $backupRoot,
+                $packagePath,
+                $packageId,
+                $countryCode,
+                'success',
+                $operator,
+                'success',
+                'تم تأكيد التحقق اليدوي من الحزمة بنجاح (إعادة استخدام نتيجة Backend المقيّدة).'
+            );
+
+            return [
+                'success' => true,
+                'in_progress' => false,
+                'short_circuited' => true,
+                'heavy_executed' => false,
+                'manual_confirmation_written' => $manualWritten,
                 'message' => 'تم التحقق من الحزمة بنجاح (نتيجة محفوظة).',
                 'result' => [
                     'ok' => true,
@@ -897,18 +956,64 @@ function orange_backup_qualification_run_verify(
         // Writer already strengthened in country_crp_verify finalize; re-read and enrich if needed.
         orange_backup_qualification_enrich_country_verify_report_file($packagePath, $packageId, $countryCode);
         $ok = (bool) ($heavy['ok'] ?? false);
+        $manualWritten = orange_backup_qualification_record_country_manual_verify_ui(
+            $backupRoot,
+            $packagePath,
+            $packageId,
+            $countryCode,
+            $ok ? 'success' : 'failed',
+            $operator,
+            $ok ? 'success' : 'failed',
+            $ok
+                ? 'تم تأكيد التحقق اليدوي من الحزمة بنجاح.'
+                : 'فشل التحقق اليدوي من الحزمة.'
+        );
 
         return [
             'success' => $ok,
             'in_progress' => false,
             'short_circuited' => false,
             'heavy_executed' => true,
+            'manual_confirmation_written' => $manualWritten,
             'message' => $ok ? 'تم التحقق من الحزمة بنجاح.' : 'فشل التحقق من الحزمة.',
             'result' => $heavy,
         ];
     } finally {
         orange_backup_qualification_release_lock($lockPath);
     }
+}
+
+/**
+ * Record Country Verify button authority (manual Admin click). Returns whether a new write occurred.
+ *
+ * @param array{admin_id?:int|null,kind?:string}|null $operator
+ */
+function orange_backup_qualification_record_country_manual_verify_ui(
+    string $backupRoot,
+    string $packagePath,
+    string $packageId,
+    string $countryCode,
+    string $state,
+    ?array $operator = null,
+    string $safeResultCode = '',
+    string $safeSummary = ''
+): bool {
+    $fp = orange_backup_qualification_current_fingerprint($packagePath, 'country_recovery');
+    if ($fp === '') {
+        return false;
+    }
+    $write = orange_backup_manual_qualification_write_country_verify(
+        $backupRoot,
+        $packageId,
+        $countryCode,
+        $fp,
+        $state,
+        $safeResultCode,
+        $safeSummary,
+        $operator
+    );
+
+    return !empty($write['ok']) && !empty($write['written']);
 }
 
 /**
@@ -979,6 +1084,29 @@ function orange_backup_qualification_run_drv(
                 'heavy_executed' => true,
                 'message' => $ok ? 'اجتازت الحزمة فحص قابلية الاسترداد.' : 'فشل فحص قابلية الاسترداد.',
                 'result' => $heavy,
+            ];
+        }
+
+        // Country DRV button/API requires prior manual Admin Verify confirmation (not automatic export Verify alone).
+        $fp = orange_backup_qualification_current_fingerprint($packagePath, 'country_recovery');
+        $manualVerify = orange_backup_manual_qualification_read_country_verify(
+            $backupRoot,
+            $packageId,
+            $countryCode,
+            $fp
+        );
+        if (empty($manualVerify['ok']) || ($manualVerify['state'] ?? '') !== 'success') {
+            return [
+                'success' => false,
+                'in_progress' => false,
+                'short_circuited' => false,
+                'heavy_executed' => false,
+                'code' => 'manual_verify_required',
+                'message' => 'فحص قابلية الاسترداد غير متاح قبل نجاح التحقق اليدوي من الأدمن.',
+                'result' => [
+                    'ok' => false,
+                    'errors' => ['manual_verify_required'],
+                ],
             ];
         }
 
@@ -1163,7 +1291,8 @@ function orange_backup_qualification_endpoint_verify(
         return $run;
     }
     $ok = (bool) ($run['success'] ?? false);
-    if (!empty($run['heavy_executed'])) {
+    $auditCountryManual = $packageType === 'country_recovery' && !empty($run['manual_confirmation_written']);
+    if (!empty($run['heavy_executed']) || $auditCountryManual) {
         orange_backup_admin_audit(
             'verify',
             $packageType,
@@ -1282,12 +1411,23 @@ function orange_backup_qualification_resolve(
     $schemaRevision = (int) ($manifest['schema_revision'] ?? 0);
     $fp = orange_backup_qualification_current_fingerprint($packagePath, $packageType);
 
+    // Backend integrity evidence (may originate from automatic export). Not Country Verify UI authority.
     $verifyBound = $packageType === 'full_disaster'
         ? orange_backup_qualification_read_full_verify_bound($packagePath, $packageId)
         : orange_backup_qualification_read_country_verify_bound($packagePath, $packageId, $countryCode);
     $drvBound = $packageType === 'full_disaster'
         ? orange_backup_qualification_read_full_drv_bound($packagePath, $packageId)
         : orange_backup_qualification_read_country_drv_bound($packagePath, $packageId, $countryCode);
+
+    $manualCountryVerify = null;
+    if ($packageType === 'country_recovery') {
+        $manualCountryVerify = orange_backup_manual_qualification_read_country_verify(
+            $backupRoot,
+            $packageId,
+            $countryCode,
+            $fp
+        );
+    }
 
     $verifyLock = orange_backup_qualification_lock_path(
         $backupRoot,
@@ -1309,6 +1449,16 @@ function orange_backup_qualification_resolve(
     $verifyState = 'not_run';
     if ($verifyRunning) {
         $verifyState = 'running';
+    } elseif ($packageType === 'country_recovery') {
+        // Country Verify button: only exact-bound manual Admin confirmation colors green/red.
+        if (is_array($manualCountryVerify) && !empty($manualCountryVerify['ok'])
+            && ($manualCountryVerify['state'] ?? '') === 'success') {
+            $verifyState = 'success';
+        } elseif (is_array($manualCountryVerify) && !empty($manualCountryVerify['ok'])
+            && ($manualCountryVerify['state'] ?? '') === 'failed') {
+            $verifyState = 'failed';
+        }
+        // Automatic country_verify_report.json success/failure alone => remains not_run (grey).
     } elseif ($verifyBound['ok'] && ($verifyBound['status'] ?? '') === 'success') {
         $verifyState = 'success';
     } elseif ($verifyBound['ok'] && ($verifyBound['status'] ?? '') === 'failed') {
@@ -1362,6 +1512,35 @@ function orange_backup_qualification_resolve(
 
     $verifyReport = ($verifyBound['ok'] ?? false) ? ($verifyBound['report'] ?? null) : null;
     $drvReport = ($drvBound['ok'] ?? false) ? ($drvBound['report'] ?? null) : null;
+    $manualRecord = (is_array($manualCountryVerify) && !empty($manualCountryVerify['ok']))
+        ? ($manualCountryVerify['record'] ?? null)
+        : null;
+
+    $verifyCompletedAt = '';
+    $verifyOperatorId = null;
+    $verifyStableCode = (string) ($verifyBound['reason'] ?? '');
+    $verifyReportRef = null;
+    if ($packageType === 'country_recovery') {
+        if (is_array($manualRecord)) {
+            $verifyCompletedAt = (string) ($manualRecord['completed_at_utc'] ?? '');
+            $verifyOperatorId = $manualRecord['operator_admin_id'] ?? null;
+            $verifyStableCode = (string) ($manualRecord['safe_result_code'] ?? $verifyState);
+            $verifyReportRef = ($verifyState === 'success' || $verifyState === 'failed')
+                ? 'manual_qualification/v1/country_verify'
+                : null;
+        }
+    } else {
+        $verifyReportRef = $verifyReport !== null
+            ? basename(orange_backup_qualification_full_verify_sibling_path($packagePath, $packageId))
+            : null;
+        $verifyCompletedAt = is_array($verifyReport)
+            ? (string) ($verifyReport['completed_at_utc'] ?? $verifyReport['generated_at'] ?? '')
+            : '';
+        $verifyOperatorId = is_array($verifyReport) ? ($verifyReport['operator_admin_id'] ?? null) : null;
+        $verifyStableCode = is_array($verifyReport)
+            ? (string) ($verifyReport['stable_result_code'] ?? $verifyReport['overall'] ?? '')
+            : (string) ($verifyBound['reason'] ?? '');
+    }
 
     return [
         'ok' => true,
@@ -1383,19 +1562,19 @@ function orange_backup_qualification_resolve(
         ],
         'verify' => [
             'state' => $verifyState,
-            'report_reference' => $verifyReport !== null
-                ? ($packageType === 'full_disaster'
-                    ? basename(orange_backup_qualification_full_verify_sibling_path($packagePath, $packageId))
-                    : 'country_verify_report.json')
-                : null,
-            'completed_at_utc' => is_array($verifyReport)
-                ? (string) ($verifyReport['completed_at_utc'] ?? $verifyReport['generated_at'] ?? '')
+            'report_reference' => $verifyReportRef,
+            'completed_at_utc' => $verifyCompletedAt,
+            'operator_admin_id' => $verifyOperatorId,
+            'stable_result_code' => $verifyStableCode,
+            'safe_summary' => (is_array($manualCountryVerify) && !empty($manualCountryVerify['ok']))
+                ? (string) ($manualCountryVerify['safe_summary'] ?? '')
                 : '',
-            'operator_admin_id' => is_array($verifyReport) ? ($verifyReport['operator_admin_id'] ?? null) : null,
-            'stable_result_code' => is_array($verifyReport)
-                ? (string) ($verifyReport['stable_result_code'] ?? $verifyReport['overall'] ?? '')
-                : (string) ($verifyBound['reason'] ?? ''),
-            'fingerprint_match' => (bool) ($verifyBound['ok'] ?? false),
+            // Backend bind remains available for diagnostics; Country UI color ignores it.
+            'fingerprint_match' => $packageType === 'country_recovery'
+                ? (is_array($manualCountryVerify) && !empty($manualCountryVerify['ok']))
+                : (bool) ($verifyBound['ok'] ?? false),
+            'backend_evidence_bound' => (bool) ($verifyBound['ok'] ?? false),
+            'backend_evidence_status' => (string) ($verifyBound['status'] ?? ''),
         ],
         'drv' => [
             'state' => $drvState,
@@ -1417,6 +1596,7 @@ function orange_backup_qualification_resolve(
         'authorities' => [
             'provenance_used' => false,
             'local_storage_used' => false,
+            'manual_country_verify_ui' => $packageType === 'country_recovery',
             'health_alone_not_success' => true,
             'eligibility_function' => 'orange_restore_admin_package_eligibility',
         ],
@@ -1461,16 +1641,29 @@ function orange_backup_qualification_public_status(
     $dState = (string) ($drv['state'] ?? 'blocked');
 
     $vSummary = match ($vState) {
-        'success' => 'تم التحقق من الحزمة بنجاح (نتيجة محفوظة).',
-        'failed' => 'فشل التحقق من الحزمة.',
+        'success' => $packageType === 'country_recovery'
+            ? 'تم تأكيد التحقق اليدوي من الحزمة بنجاح.'
+            : 'تم التحقق من الحزمة بنجاح (نتيجة محفوظة).',
+        'failed' => $packageType === 'country_recovery'
+            ? 'فشل التحقق اليدوي من الحزمة.'
+            : 'فشل التحقق من الحزمة.',
         'running' => 'عملية التحقق قيد التنفيذ حالياً.',
-        default => 'لم يُنفَّذ التحقق بعد.',
+        default => $packageType === 'country_recovery'
+            ? 'لم يُنفَّذ التحقق اليدوي بعد.'
+            : 'لم يُنفَّذ التحقق بعد.',
     };
+    $manualSummary = trim((string) ($verify['safe_summary'] ?? ''));
+    if ($packageType === 'country_recovery' && $manualSummary !== ''
+        && ($vState === 'success' || $vState === 'failed')) {
+        $vSummary = $manualSummary;
+    }
     $dSummary = match ($dState) {
         'success' => 'اجتازت الحزمة فحص قابلية الاسترداد (نتيجة محفوظة).',
         'failed' => 'فشل فحص قابلية الاسترداد.',
         'running' => 'فحص قابلية الاسترداد قيد التنفيذ حالياً.',
-        'blocked' => 'فحص قابلية الاسترداد غير متاح قبل نجاح التحقق.',
+        'blocked' => $packageType === 'country_recovery'
+            ? 'فحص قابلية الاسترداد غير متاح قبل نجاح التحقق اليدوي.'
+            : 'فحص قابلية الاسترداد غير متاح قبل نجاح التحقق.',
         default => 'لم يُنفَّذ فحص قابلية الاسترداد بعد.',
     };
 

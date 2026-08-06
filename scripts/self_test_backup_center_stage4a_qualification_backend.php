@@ -630,12 +630,28 @@ try {
     $badResolve = orange_backup_qualification_resolve($root, 'full_disaster', '../nope');
     s4a_ok(empty($badResolve['ok']), 'permissions: unsafe package id denied');
 
-    // Country resolver
+    // Country resolver — Backend auto evidence alone must not color Country Verify UI (Owner 2026-08-06).
     file_put_contents($kw['path'] . '/country_verify_report.json', json_encode($cvReport));
     orange_backup_qualification_write_json_atomic($cdrvPath, $cdrv);
     $rKw = orange_backup_qualification_resolve($root, 'country_recovery', $kw['id'], 'KW');
-    s4a_ok(!empty($rKw['ok']) && ($rKw['verify']['state'] ?? '') === 'success', 'resolver: country verify success');
-    s4a_ok(($rKw['drv']['state'] ?? '') === 'success', 'resolver: country drv success');
+    s4a_ok(!empty($rKw['ok']) && ($rKw['verify']['state'] ?? '') === 'not_run', 'resolver: country auto verify UI stays not_run');
+    s4a_ok(($rKw['drv']['state'] ?? '') === 'blocked', 'resolver: country DRV blocked without manual verify');
+    s4a_ok(!empty($rKw['verify']['backend_evidence_bound'])
+        && ($rKw['verify']['backend_evidence_status'] ?? '') === 'success', 'resolver: country backend evidence still bound');
+    $liveFp = (string) ($rKw['package']['current_package_fingerprint'] ?? $kw['fp']);
+    $manualWrite = orange_backup_manual_qualification_write_country_verify(
+        $root,
+        $kw['id'],
+        'KW',
+        $liveFp,
+        'success',
+        'success',
+        'manual test confirmation'
+    );
+    s4a_ok(!empty($manualWrite['ok']) && !empty($manualWrite['written']), 'resolver: manual country verify sidecar written');
+    $rKwManual = orange_backup_qualification_resolve($root, 'country_recovery', $kw['id'], 'KW');
+    s4a_ok(($rKwManual['verify']['state'] ?? '') === 'success', 'resolver: country manual verify success');
+    s4a_ok(($rKwManual['drv']['state'] ?? '') === 'success', 'resolver: country drv success after manual verify');
 
     // I. UI freeze already done; Stage 3 order markers
     s4a_ok(preg_match('/bc-open-details[\s\S]*?bc-drv[\s\S]*?bc-verify/', $bc) === 1

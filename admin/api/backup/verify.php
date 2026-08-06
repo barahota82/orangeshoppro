@@ -81,6 +81,7 @@ try {
         'message' => (string) ($run['message'] ?? ($ok ? 'تم التحقق من الحزمة بنجاح.' : 'فشل التحقق من الحزمة.')),
         'short_circuited' => (bool) ($run['short_circuited'] ?? false),
         'heavy_executed' => (bool) ($run['heavy_executed'] ?? false),
+        'manual_confirmation_written' => (bool) ($run['manual_confirmation_written'] ?? false),
         'result' => $run['result'] ?? null,
         'qualification' => !empty($qualification['ok']) ? [
             'package' => $qualification['package'],
