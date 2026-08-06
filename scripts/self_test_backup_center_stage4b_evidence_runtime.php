@@ -32,13 +32,36 @@ if ($src === '' || !preg_match('/<style>(.*?)<\/style>/s', $src, $styleM)) {
 $style = $styleM[1];
 
 $fns = [];
-foreach (['actionRowHtml', 'hiddenPkgDataCell', 'primaryClusterHtml', 'sizeSummary', 'accordionItemHtml', 'qualClearBtnState', 'qualApplyBtn', 'qualApplyToRow', 'qualFindRow'] as $fn) {
+foreach ([
+    'actionRowHtml',
+    'hiddenPkgDataCell',
+    'primaryClusterHtml',
+    'sizeSummary',
+    'accordionItemHtml',
+    'qualClearBtnState',
+    'qualApplyBtn',
+    'qualApplyToRow',
+    'qualFindRow',
+    'qualPkgKey',
+    'qualRowKey',
+    'qualResponseKey',
+    'qualSafeApplyByKey',
+    'qualPaintCachedRows',
+] as $fn) {
     $body = s4b_ev_extract_function($src, $fn);
     if ($body === '') {
         fwrite(STDERR, "FAIL: extract {$fn}\n");
         exit(1);
     }
     $fns[$fn] = $body;
+}
+if (!str_contains($src, "String(type || '') + '|' + String(cc || '').toUpperCase() + '|' + String(id || '')")) {
+    fwrite(STDERR, "FAIL: Production qualPkgKey must be type|cc|id\n");
+    exit(1);
+}
+if (!str_contains($src, 'qualPaintCachedRows') || !str_contains($src, 'qualBumpRenderGen')) {
+    fwrite(STDERR, "FAIL: Production list-rerender Verify contract helpers missing\n");
+    exit(1);
 }
 // Display helpers: match Production statusTone (unknown → muted grey, never success green).
 $arrows = [
@@ -96,7 +119,7 @@ $bootJs = "const CAN_VERIFY = true;\n"
     . "const esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\n"
     . "const fmtBytes = (n) => { n = Number(n)||0; if (n<=0) return '-'; if (n<1024) return n+' B'; if (n<1048576) return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(1)+' MB'; };\n"
     . "const qualCache = new Map();\n"
-    . "function qualPkgKey(type, id, cc) { return String(type || '') + '|' + String(id || '') + '|' + String(cc || '').toUpperCase(); }\n"
+    . "let qualRenderGen = 0;\n"
     . implode("\n", $arrows) . "\n"
     . $viewFile . "\n"
     . implode("\n\n", $fns) . "\n";
@@ -920,6 +943,19 @@ echo 'STAGE3_DOM_RUNTIME_PROOF = ' . ($eventLog['stage3_geometry']['STAGE3_DOM_R
 echo 'STAGE3_MOBILE_390_GEOMETRY = ' . ($eventLog['stage3_geometry']['STAGE3_MOBILE_390_GEOMETRY'] ?? '?') . "\n";
 echo 'STAGE3_MOBILE_360_GEOMETRY = ' . ($eventLog['stage3_geometry']['STAGE3_MOBILE_360_GEOMETRY'] ?? '?') . "\n";
 
+require_once $projectRoot . '/scripts/lib/backup_stage4b_verify_rerender_race.php';
+$race = s4b_run_verify_list_rerender_race($projectRoot, $evidenceDir, $bootJs, $shellHead, $shellMount);
+echo 'RACE_CDP=' . ($race['ok'] ? 'OK' : 'FAIL') . ' err=' . ($race['err'] ?? '') . "\n";
+foreach (($race['markers'] ?? []) as $mk => $val) {
+    if (is_scalar($val)) {
+        echo "RACE_MARKER {$mk}={$val}\n";
+    }
+}
+$eventLog['verify_list_rerender'] = $race['markers'] ?? [];
+$eventLog['verify_list_rerender_log'] = $race['log_path'] ?? null;
+file_put_contents($evidenceDir . '/stage4b_event_log.json', json_encode($eventLog, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+echo (($race['ok'] ?? false) ? 'VERIFY_LIST_RERENDER_RACE_PASS' : 'VERIFY_LIST_RERENDER_RACE_FAIL') . "\n";
+
 // Cleanup temp packages
 $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tmpRoot, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
 foreach ($it as $f) {
@@ -931,4 +967,5 @@ $geomPass = ($eventLog['stage3_geometry']['STAGE3_DOM_RUNTIME_PROOF'] ?? '') ===
     && ($eventLog['stage3_geometry']['STAGE3_MOBILE_390_GEOMETRY'] ?? '') === 'PASS'
     && ($eventLog['stage3_geometry']['STAGE3_MOBILE_360_GEOMETRY'] ?? '') === 'PASS';
 $shotsOk = count($shotMeta) >= 12 && $sheetOk;
-exit(($geomPass && $shotsOk && $multiRes['ok'] && $leakFree) ? 0 : 2);
+$racePass = !empty($race['ok']);
+exit(($geomPass && $shotsOk && $multiRes['ok'] && $leakFree && $racePass) ? 0 : 2);

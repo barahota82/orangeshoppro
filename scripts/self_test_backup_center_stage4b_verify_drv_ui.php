@@ -147,6 +147,38 @@ s4b_ok(str_contains($page, 'aria-busy'), 'a11y: aria-busy used');
 s4b_ok(preg_match('/primaryClusterHtml[\s\S]+bc-open-details[\s\S]+bc-drv[\s\S]+bc-verify/', $page) === 1
     || str_contains($page, "html += '<button type=\"button\" class=\"bc-btn-ghost bc-drv"), 'order: Details then DRV then Verify in cluster');
 
+/* --- VERIFY list-rerender race contract (BACKUP_CENTER_STAGE4B_VERIFY_LIST_RERENDER_STATE_RACE_01) --- */
+s4b_ok(
+    str_contains($page, "String(type || '') + '|' + String(cc || '').toUpperCase() + '|' + String(id || '')"),
+    'race: qualPkgKey = type|cc|id (country in key)'
+);
+s4b_ok(str_contains($page, 'function qualFindRow(type, id, cc)'), 'race: qualFindRow requires country');
+s4b_ok(str_contains($page, 'function qualSafeApplyByKey'), 'race: safe apply by exact key');
+s4b_ok(str_contains($page, 'function qualPaintCachedRows'), 'race: cache paint after rerender');
+s4b_ok(str_contains($page, 'qualBumpRenderGen'), 'race: render generation bump');
+s4b_ok(str_contains($page, 'qualDisconnectIo'), 'race: IntersectionObserver disconnect on rerender');
+s4b_ok(str_contains($page, 'row.isConnected'), 'race: refuse removed DOM targets');
+s4b_ok(str_contains($page, 'data-qual-key='), 'race: row stamped with exact qual key');
+s4b_ok(str_contains($page, 'qualPaintCachedRows()') && str_contains($page, 'function setArchiveMode'), 'race: Show All/Last 5 paints cache');
+s4b_ok(
+    preg_match('/function qualFetchStatus[\s\S]+qualSafeApplyByKey[\s\S]+qualCache\.has\(key\)/', $page) === 1
+    || (str_contains($page, 'if (!force && qualCache.has(key))') && str_contains($page, 'qualSafeApplyByKey(key, cached')),
+    'race: cache hit re-applies to replacement row'
+);
+s4b_ok(
+    str_contains($page, 'bindAndReturn') || str_contains($page, 'Replacement row subscribes'),
+    'race: in-flight Promise rebinds to replacement row'
+);
+s4b_ok(
+    preg_match('/async function qualRunMutation[\s\S]+row = qualFindRow\(type, id, cc\)/', $page) === 1,
+    'race: mutation re-finds row after await'
+);
+// DRV frozen: still blocked force + no color/order redesign markers removed
+s4b_ok(str_contains($page, "forceDisabled: (d.state === 'blocked')"), 'DRV frozen: blocked still forceDisabled');
+s4b_ok(str_contains($page, 'Country DRV'), 'DRV frozen: Country DRV label unchanged');
+echo "REGISTERED BACKUP_CENTER_STAGE4B_VERIFY_LIST_RERENDER_STATE_RACE_01\n";
+echo "REGISTERED BACKUP_CENTER_STAGE4B_VERIFY_CROSS_ROW_FALSE_SUCCESS_01\n";
+
 $root = s4b_temp_root();
 try {
     $full = s4b_mk_full($root, '2026-08-05_140001', 'a');

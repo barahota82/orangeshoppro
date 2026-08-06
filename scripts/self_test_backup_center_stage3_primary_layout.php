@@ -221,6 +221,9 @@ if (!is_dir($harnessDir) && !@mkdir($harnessDir, 0775, true) && !is_dir($harness
             "  const tag = asLink ? 'a' : 'button';\n" .
             "  const extra = asLink ? ' href=\"#\"' : ' type=\"button\"';\n" .
             "  return '<' + tag + extra + ' class=\"' + cls + '\" data-type=\"' + esc(type) + '\" data-id=\"' + esc(id) + '\" data-cc=\"' + esc(cc) + '\" data-file=\"' + esc(file) + '\">' + esc(label) + '</' + tag + '>';\n}\n";
+        // Stage 4B accordion identity helpers required by Production accordionItemHtml.
+        $bundle .= "let qualRenderGen = 0;\n"
+            . "function qualPkgKey(type, id, cc) { return String(type || '') + '|' + String(cc || '').toUpperCase() + '|' + String(id || ''); }\n";
         foreach (['actionRowHtml', 'hiddenPkgDataCell', 'primaryClusterHtml', 'sizeSummary', 'accordionItemHtml', 'openDetails'] as $fn) {
             $body = s3_extract_function($src, $fn);
             s3_assert($body !== '', 'DOM bundle extract: ' . $fn);
@@ -607,6 +610,8 @@ JS;
                 . "const recoverabilitySlotHtml = (pkg) => '<span class=\"bc-recoverable-slot\" data-bc-recoverable-slot=\"1\">' + recoverabilityBadge(pkg) + '</span>';\n"
                 . "const fmtPackageWhenDisplay = (pkg) => esc((pkg && (pkg.generated_at_display || pkg.package_id)) || '');\n"
                 . "const applyActionAvailability = () => {};\n"
+                . "let qualRenderGen = 0;\n"
+                . "function qualPkgKey(type, id, cc) { return String(type || '') + '|' + String(cc || '').toUpperCase() + '|' + String(id || ''); }\n"
                 . "function viewFileControl(type, id, cc, file, label, asLink) {\n"
                 . "  const cls = asLink ? 'bc-link bc-view-file' : 'bc-btn-ghost bc-view-file';\n"
                 . "  const tag = asLink ? 'a' : 'button';\n"

@@ -436,6 +436,9 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     let qualActiveReads = 0;
     const qualReadQueue = [];
     let qualHashCountThisPage = 0;
+    /** Bumped on every list paint / Show All / Last 5 / tab switch — stale applies must re-resolve by exact key. */
+    let qualRenderGen = 0;
+    let qualIo = null;
     /** Avoid the literal word d-e-l-e-t-e in page source (Backup Admin scope scan). */
     function qualMapDrop(map, key) {
         const fnName = ['de', 'lete'].join('');
@@ -908,8 +911,20 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         return { http: r.status, body: j };
     }
 
+    /**
+     * Exact qualification identity key: package_type + country_code_or_empty + package_id.
+     * Package ID alone is forbidden as a state key (KW/EG and Full/Country isolation).
+     */
     function qualPkgKey(type, id, cc) {
-        return String(type || '') + '|' + String(id || '') + '|' + String(cc || '').toUpperCase();
+        return String(type || '') + '|' + String(cc || '').toUpperCase() + '|' + String(id || '');
+    }
+    function qualRowKey(row) {
+        if (!row) return '';
+        return qualPkgKey(
+            row.getAttribute('data-package-type') || '',
+            row.getAttribute('data-package-id') || '',
+            row.getAttribute('data-cc') || ''
+        );
     }
     function qualClearBtnState(btn) {
         if (!btn) return;
@@ -949,18 +964,59 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         if (opts.safeSummary) btn.dataset.safeSummary = String(opts.safeSummary);
         if (opts.retryAllowed != null) btn.dataset.retryAllowed = opts.retryAllowed ? '1' : '0';
     }
-    function qualFindRow(type, id) {
+    /** Find current connected row by exact type + country + package_id (never by index). */
+    function qualFindRow(type, id, cc) {
+        const want = qualPkgKey(type, id, cc);
         const rows = document.querySelectorAll('details.bc-acc-item[data-package-id]');
         for (let i = 0; i < rows.length; i++) {
-            if (rows[i].getAttribute('data-package-id') === id
-                && rows[i].getAttribute('data-package-type') === type) {
+            if (qualRowKey(rows[i]) === want) {
                 return rows[i];
             }
         }
         return null;
     }
+    function qualResponseKey(qualification, fallbackType, fallbackId, fallbackCc) {
+        const pkg = (qualification && qualification.package) ? qualification.package : {};
+        return qualPkgKey(
+            pkg.package_type || fallbackType || '',
+            pkg.package_id || fallbackId || '',
+            (pkg.country_code != null && pkg.country_code !== '') ? pkg.country_code : (fallbackCc || '')
+        );
+    }
+    /**
+     * Apply qualification only to the current connected row for the exact request key.
+     * Never retains a removed DOM node; never applies by visual index.
+     */
+    function qualSafeApplyByKey(requestKey, qualification, opts) {
+        opts = opts || {};
+        if (!qualification || !requestKey) return false;
+        const respKey = qualResponseKey(
+            qualification,
+            opts.type || '',
+            opts.id || '',
+            opts.cc || ''
+        );
+        if (respKey !== requestKey) {
+            return false;
+        }
+        const row = qualFindRow(
+            opts.type || '',
+            opts.id || '',
+            opts.cc || ''
+        );
+        if (!row || !row.isConnected) {
+            return false;
+        }
+        if (qualRowKey(row) !== requestKey) {
+            return false;
+        }
+        // Generation is stamped on paint for observer/schedule guards only.
+        // Apply always targets the current connected exact-key row (never by index / removed node).
+        qualApplyToRow(row, qualification);
+        return true;
+    }
     function qualApplyToRow(row, qualification) {
-        if (!row || !qualification) return;
+        if (!row || !qualification || !row.isConnected) return;
         const v = qualification.verify || {};
         const d = qualification.drv || {};
         const pkg = qualification.package || {};
@@ -970,6 +1026,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             safeSummary: v.safe_summary || '',
             retryAllowed: !!v.retry_allowed
         });
+        // DRV presentation/click logic frozen — still derives blocked/enabled from authoritative state only.
         qualApplyBtn(dBtn, 'drv', d.state || 'blocked', {
             safeSummary: d.safe_summary || '',
             retryAllowed: !!d.retry_allowed,
@@ -981,8 +1038,22 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                 ? '<span class="bc-badge bc-badge--success" title="Recoverable"><span class="bc-dot" aria-hidden="true"></span>Recoverable</span>'
                 : '';
         }
-        const key = qualPkgKey(pkg.package_type || row.getAttribute('data-package-type'), pkg.package_id || row.getAttribute('data-package-id'), pkg.country_code || row.getAttribute('data-cc'));
+        const key = qualPkgKey(
+            pkg.package_type || row.getAttribute('data-package-type'),
+            pkg.package_id || row.getAttribute('data-package-id'),
+            pkg.country_code || row.getAttribute('data-cc')
+        );
         qualCache.set(key, qualification);
+    }
+    /** After list rerender: paint exact cached states onto replacement rows immediately. */
+    function qualPaintCachedRows() {
+        if (!CAN_VERIFY) return;
+        document.querySelectorAll('details.bc-acc-item[data-package-id]').forEach((row) => {
+            if (!row.isConnected) return;
+            const key = qualRowKey(row);
+            if (!key || !qualCache.has(key)) return;
+            qualApplyToRow(row, qualCache.get(key));
+        });
     }
     function qualPumpQueue() {
         while (qualActiveReads < QUAL_MAX_CONCURRENT && qualReadQueue.length) {
@@ -1002,8 +1073,27 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     }
     function qualFetchStatus(type, id, cc, force) {
         const key = qualPkgKey(type, id, cc);
-        if (!force && qualPromises.has(key)) return qualPromises.get(key);
-        if (!force && qualCache.has(key)) return Promise.resolve(qualCache.get(key));
+        const startedGen = qualRenderGen;
+        const bindAndReturn = (p) => p.then((qualification) => {
+            if (qualification) {
+                qualSafeApplyByKey(key, qualification, {
+                    type: type,
+                    id: id,
+                    cc: cc,
+                    renderGen: startedGen
+                });
+            }
+            return qualification;
+        });
+        if (!force && qualPromises.has(key)) {
+            // Replacement row subscribes to the same Promise; apply re-finds by exact key.
+            return bindAndReturn(qualPromises.get(key));
+        }
+        if (!force && qualCache.has(key)) {
+            const cached = qualCache.get(key);
+            qualSafeApplyByKey(key, cached, { type: type, id: id, cc: cc, renderGen: startedGen });
+            return Promise.resolve(cached);
+        }
         const p = new Promise((resolve) => {
             qualEnqueueRead(true, async () => {
                 try {
@@ -1015,14 +1105,21 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                     const res = await apiGet('qualification-status.php?' + q.toString());
                     const qualification = res.qualification || null;
                     if (qualification) {
-                        qualCache.set(key, qualification);
-                        const row = qualFindRow(type, id);
-                        if (row) qualApplyToRow(row, qualification);
-                        if ((qualification.verify && qualification.verify.state === 'running')
-                            || (qualification.drv && qualification.drv.state === 'running')) {
-                            qualStartPoll(type, id, cc);
-                        } else {
-                            qualStopPoll(key);
+                        const respKey = qualResponseKey(qualification, type, id, cc);
+                        if (respKey === key) {
+                            qualCache.set(key, qualification);
+                            qualSafeApplyByKey(key, qualification, {
+                                type: type,
+                                id: id,
+                                cc: cc,
+                                renderGen: startedGen
+                            });
+                            if ((qualification.verify && qualification.verify.state === 'running')
+                                || (qualification.drv && qualification.drv.state === 'running')) {
+                                qualStartPoll(type, id, cc);
+                            } else {
+                                qualStopPoll(key);
+                            }
                         }
                     }
                     resolve(qualification);
@@ -1036,7 +1133,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             });
         });
         qualPromises.set(key, p);
-        return p;
+        return bindAndReturn(p);
     }
     function qualStopPoll(key) {
         const t = qualPollTimers.get(key);
@@ -1065,14 +1162,31 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         };
         qualPollTimers.set(key, setTimeout(tick, 800));
     }
+    function qualDisconnectIo() {
+        if (qualIo && typeof qualIo.disconnect === 'function') {
+            try { qualIo.disconnect(); } catch (e) { /* ignore */ }
+        }
+        qualIo = null;
+    }
     function qualScheduleVisibleLoads() {
         const rows = Array.from(document.querySelectorAll('details.bc-acc-item[data-package-id]'));
         if (!rows.length || !CAN_VERIFY) return;
+        qualPaintCachedRows();
+        qualDisconnectIo();
+        const observedGen = qualRenderGen;
         const io = (typeof IntersectionObserver !== 'undefined')
             ? new IntersectionObserver((entries) => {
                 entries.forEach((en) => {
                     if (!en.isIntersecting) return;
                     const row = en.target;
+                    if (!row || !row.isConnected) {
+                        try { io.unobserve(row); } catch (e) { /* ignore */ }
+                        return;
+                    }
+                    if (Number(row.getAttribute('data-qual-render-gen') || -1) !== observedGen) {
+                        try { io.unobserve(row); } catch (e) { /* ignore */ }
+                        return;
+                    }
                     const type = row.getAttribute('data-package-type') || '';
                     const id = row.getAttribute('data-package-id') || '';
                     const cc = row.getAttribute('data-cc') || '';
@@ -1081,6 +1195,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                 });
             }, { root: null, rootMargin: '80px', threshold: 0.01 })
             : null;
+        qualIo = io;
         rows.forEach((row, idx) => {
             if (io) io.observe(row);
             else {
@@ -1088,17 +1203,27 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                 const id = row.getAttribute('data-package-id') || '';
                 const cc = row.getAttribute('data-cc') || '';
                 const delay = idx * 30;
-                setTimeout(() => qualFetchStatus(type, id, cc, false), delay);
+                const genAtSchedule = observedGen;
+                setTimeout(() => {
+                    if (qualRenderGen !== genAtSchedule) return;
+                    const live = qualFindRow(type, id, cc);
+                    if (!live || !live.isConnected) return;
+                    qualFetchStatus(type, id, cc, false);
+                }, delay);
             }
         });
         const idleFill = () => {
+            if (qualRenderGen !== observedGen) return;
             rows.forEach((row) => {
+                if (!row.isConnected) return;
                 const type = row.getAttribute('data-package-type') || '';
                 const id = row.getAttribute('data-package-id') || '';
                 const cc = row.getAttribute('data-cc') || '';
                 const key = qualPkgKey(type, id, cc);
                 if (!qualCache.has(key) && !qualPromises.has(key)) {
                     qualEnqueueRead(false, async () => { await qualFetchStatus(type, id, cc, false); });
+                } else if (qualCache.has(key)) {
+                    qualSafeApplyByKey(key, qualCache.get(key), { type: type, id: id, cc: cc, renderGen: observedGen });
                 }
             });
         };
@@ -1124,7 +1249,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         if (qState === 'failed' && btn.dataset.retryAllowed === '0') return;
 
         const scrollY = window.scrollY;
-        const row = qualFindRow(type, id);
+        let row = qualFindRow(type, id, cc);
         const wasOpen = !!(row && row.open);
         const activeEl = document.activeElement;
         qualInFlightMut.set(key, true);
@@ -1141,8 +1266,15 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                 country_code: cc
             });
             const body = res.body || {};
+            // Re-find by exact key after await — never mutate a removed pre-await row.
+            row = qualFindRow(type, id, cc);
             if (body.qualification) {
-                qualApplyToRow(row, body.qualification);
+                qualSafeApplyByKey(qualPkgKey(type, id, cc), body.qualification, {
+                    type: type,
+                    id: id,
+                    cc: cc,
+                    renderGen: qualRenderGen
+                });
             } else {
                 await qualFetchStatus(type, id, cc, true);
             }
@@ -1157,11 +1289,13 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         } catch (e) {
             showAlert(e.message || 'فشلت العملية', false);
             await qualFetchStatus(type, id, cc, true);
+            row = qualFindRow(type, id, cc);
         } finally {
             qualMapDrop(qualInFlightMut, key);
-            if (row) row.open = wasOpen;
+            row = qualFindRow(type, id, cc);
+            if (row && row.isConnected) row.open = wasOpen;
             if (Math.abs(window.scrollY - scrollY) > 1) window.scrollTo(0, scrollY);
-            if (activeEl && typeof activeEl.focus === 'function') {
+            if (activeEl && typeof activeEl.focus === 'function' && document.contains(activeEl)) {
                 try { activeEl.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
             }
         }
@@ -1349,8 +1483,9 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         // Identity stays package_id (unchanged). Operator clock = generated_at via central formatter.
         const identity = String(pkg.package_id || '').trim();
         const whenHtml = fmtPackageWhenDisplay(pkg, type);
+        const qKey = qualPkgKey(type, identity, pkg.country_code || '');
         return (
-            '<details class="bc-acc-item" data-bc-acc="1" data-package-id="' + esc(identity) + '" data-package-type="' + esc(type) + '" data-cc="' + esc(pkg.country_code || '') + '">' +
+            '<details class="bc-acc-item" data-bc-acc="1" data-package-id="' + esc(identity) + '" data-package-type="' + esc(type) + '" data-cc="' + esc(pkg.country_code || '') + '" data-qual-key="' + esc(qKey) + '" data-qual-render-gen="' + String(qualRenderGen) + '">' +
             '<summary>' +
                 '<span class="bc-acc-chevron" aria-hidden="true"></span>' +
                 '<span class="bc-acc-title">' + esc(title) + '</span>' +
@@ -1373,6 +1508,10 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         );
     }
 
+    function qualBumpRenderGen() {
+        qualRenderGen++;
+        qualDisconnectIo();
+    }
     function renderAccordionList(container, sourceList, type, limit) {
         if (!container) return;
         const items = typeof limit === 'number' ? sourceList.slice(0, limit) : sourceList;
@@ -1432,8 +1571,11 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
 
     function setArchiveMode(kind, on) {
         state.archiveMode[kind] = !!on;
+        qualBumpRenderGen();
         renderActiveBackupList(kind);
         document.querySelectorAll('.bc-acc-item[open]').forEach((d) => { d.open = false; });
+        // Immediate exact-key cache paint so Verify is never left stuck resolving/disabled after Show All / Last 5.
+        qualPaintCachedRows();
         qualScheduleVisibleLoads();
     }
 
@@ -1513,6 +1655,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         lastOverview = data.overview || lastOverview;
 
         // One list per type; mode controls which slice is painted into that list.
+        qualBumpRenderGen();
         renderActiveBackupList('full');
         renderActiveBackupList('country');
 
@@ -1722,6 +1865,9 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         countryPanel.hidden = isFull;
         updatePkgModePill(isFull ? 'full' : 'country');
         document.querySelectorAll('.bc-acc-item[open]').forEach((d) => { d.open = false; });
+        // Tab switch does not rebuild rows, but must re-paint/subscribe visible Verify states.
+        qualPaintCachedRows();
+        qualScheduleVisibleLoads();
     }
 
     document.querySelectorAll('[data-bc-tab]').forEach((btn) => {

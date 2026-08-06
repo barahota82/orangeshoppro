@@ -201,11 +201,17 @@ PS;
  *
  * @return array{ok:bool,err:string,report:?array,png_ok:bool}
  */
-function s4b_ev_chrome_cdp_capture(string $url, string $outPng, int $w, int $h, string $evalJs = ''): array
+function s4b_ev_chrome_cdp_capture(string $url, string $outPng, int $w, int $h, string $evalJs = '', int $waitSeconds = 12): array
 {
     $chrome = s4b_ev_chrome_path();
     if ($chrome === '') {
         return ['ok' => false, 'err' => 'chrome_missing', 'report' => null, 'png_ok' => false];
+    }
+    if ($waitSeconds < 5) {
+        $waitSeconds = 5;
+    }
+    if ($waitSeconds > 120) {
+        $waitSeconds = 120;
     }
     if ($outPng !== '' && is_file($outPng)) {
         @unlink($outPng);
@@ -217,7 +223,7 @@ function s4b_ev_chrome_cdp_capture(string $url, string $outPng, int $w, int $h, 
         @unlink($reportOut);
     }
     $ps = <<<'PS'
-param([string]$Chrome,[string]$Url,[string]$OutPng,[string]$ReportOut,[int]$W,[int]$H,[int]$Port,[string]$EvalJs)
+param([string]$Chrome,[string]$Url,[string]$OutPng,[string]$ReportOut,[int]$W,[int]$H,[int]$Port,[string]$EvalJs,[int]$WaitSeconds = 12)
 $ErrorActionPreference = 'Stop'
 $userData = Join-Path $env:TEMP ("orange_s4b_chrome_profile_" + $Port + "_" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $userData -Force | Out-Null
@@ -251,7 +257,7 @@ try {
   $wsUrl = [string]$page.webSocketDebuggerUrl
   $ws = New-Object System.Net.WebSockets.ClientWebSocket
   $cts = New-Object System.Threading.CancellationTokenSource
-  $cts.CancelAfter(60000)
+  $cts.CancelAfter([Math]::Max(60000, ($WaitSeconds + 30) * 1000))
   [void]$ws.ConnectAsync([Uri]$wsUrl, $cts.Token).GetAwaiter().GetResult()
   $msgId = 0
   function Send-Cdp([string]$method, $paramsJson) {
@@ -297,11 +303,16 @@ try {
   # Wait until evidence/geometry report marker is present (sync IIFE + layout settle).
   $b64 = ''
   $waitExpr = "(function(){ var a=document.getElementById('s4b_report_b64'); var b=document.getElementById('s3_report_b64'); var txt=(a&&a.textContent)?a.textContent:((b&&b.textContent)?b.textContent:''); return txt || ''; })()"
-  $waitUntil = (Get-Date).AddSeconds(12)
+  $waitUntil = (Get-Date).AddSeconds([Math]::Max(5, $WaitSeconds))
   while ((Get-Date) -lt $waitUntil) {
     Start-Sleep -Milliseconds 350
     $got = Eval-String $waitExpr
     if ($got -and [string]$got -ne '' -and ([string]$got).Length -gt 8) { $b64 = [string]$got; break }
+    $titleNow = [string](Eval-String 'document.title')
+    if ($titleNow -match 'S4B_RACE_(PASS|FAIL)|S4B_EVIDENCE_READY|S4B_GEOM_PASS|MOBILE_GEOM_') {
+      $got2 = Eval-String $waitExpr
+      if ($got2 -and [string]$got2 -ne '' -and ([string]$got2).Length -gt 8) { $b64 = [string]$got2; break }
+    }
   }
   $title = [string](Eval-String 'document.title')
   $cw = [string](Eval-String 'String(document.documentElement.clientWidth)')
@@ -346,7 +357,8 @@ PS;
         . ' -W ' . (int) $w
         . ' -H ' . (int) $h
         . ' -Port ' . (int) $port
-        . ' -EvalJs ' . escapeshellarg($evalJs);
+        . ' -EvalJs ' . escapeshellarg($evalJs)
+        . ' -WaitSeconds ' . (int) $waitSeconds;
     $attempts = 0;
     $exit = 1;
     $status = [];
