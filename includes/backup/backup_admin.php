@@ -613,13 +613,34 @@ function orange_backup_admin_assert_country_package_in_context(PDO $pdo, string 
 }
 
 /**
+ * Request-scoped memo storage for finalized package directory listings.
+ *
+ * @return array<string, list<array{name:string,path:string,mtime:int,age_seconds:int}>>
+ */
+function &orange_backup_admin_finalized_dirs_cache_storage(): array
+{
+    static $memo = [];
+
+    return $memo;
+}
+
+/** Clear request-scoped finalized-dir memo (tests / same-request fixture rebuilds). */
+function orange_backup_admin_reset_finalized_dirs_cache(): void
+{
+    $memo = &orange_backup_admin_finalized_dirs_cache_storage();
+    foreach (array_keys($memo) as $key) {
+        unset($memo[$key]);
+    }
+}
+
+/**
  * Request-scoped memo for finalized package directory listings.
  *
  * @return list<array{name:string,path:string,mtime:int,age_seconds:int}>
  */
 function orange_backup_admin_list_finalized_dirs_cached(string $containerDir): array
 {
-    static $memo = [];
+    $memo = &orange_backup_admin_finalized_dirs_cache_storage();
     if (!array_key_exists($containerDir, $memo)) {
         $memo[$containerDir] = orange_backup_retention_list_finalized_dirs($containerDir);
     }
@@ -979,14 +1000,21 @@ function orange_backup_admin_summarize_country_package(
 }
 
 /**
+ * List finalized Full disaster packages (newest-first directory names).
+ *
+ * @param int|null $limit null/0 = every recognized finalized Full package (Backup Center Show All).
+ *                        Positive = newest N only (restore pickers / targeted callers).
  * @return list<array<string, mixed>>
  */
-function orange_backup_admin_list_full_snapshots(string $backupRoot, int $limit = 20): array
+function orange_backup_admin_list_full_snapshots(string $backupRoot, ?int $limit = null): array
 {
     $snapshotsDir = orange_backup_path_inside_root($backupRoot, 'snapshots');
     $dirs = orange_backup_admin_list_finalized_dirs_cached($snapshotsDir);
+    if ($limit !== null && $limit > 0) {
+        $dirs = array_slice($dirs, 0, $limit);
+    }
     $out = [];
-    foreach (array_slice($dirs, 0, max(1, $limit)) as $dir) {
+    foreach ($dirs as $dir) {
         $out[] = orange_backup_admin_summarize_full_package($dir['path'], $dir['name']);
     }
 
@@ -1121,7 +1149,7 @@ function orange_backup_admin_collect_overview(
 
     $fullSnapshots = isset($preloaded['full_snapshots']) && is_array($preloaded['full_snapshots'])
         ? $preloaded['full_snapshots']
-        : orange_backup_admin_list_full_snapshots($backupRoot, 20);
+        : orange_backup_admin_list_full_snapshots($backupRoot);
     $latestFull = $fullSnapshots[0] ?? null;
     $lastSuccessfulFull = orange_backup_admin_find_last_successful_full($backupRoot, $fullSnapshots, 50);
 

@@ -117,8 +117,12 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 .bc-primary-cluster .bc-drv[aria-busy="true"],
 .bc-primary-cluster .bc-verify.bc-qstate--not-run,
 .bc-primary-cluster .bc-drv.bc-qstate--not-run,
+.bc-primary-cluster .bc-verify[data-q-state="not_run"],
+.bc-primary-cluster .bc-drv[data-q-state="not_run"],
 .bc-primary-cluster .bc-verify.bc-qstate--blocked,
-.bc-primary-cluster .bc-drv.bc-qstate--blocked{background:#f8fafc!important;color:#64748b!important;border-color:#cbd5e1!important}
+.bc-primary-cluster .bc-drv.bc-qstate--blocked,
+.bc-primary-cluster .bc-verify[data-q-state="blocked"],
+.bc-primary-cluster .bc-drv[data-q-state="blocked"]{background:#f8fafc!important;color:#64748b!important;border-color:#cbd5e1!important}
 .bc-primary-cluster .bc-verify.bc-qstate--running,
 .bc-primary-cluster .bc-drv.bc-qstate--running{background:#fff7ed!important;color:#c2410c!important;border-color:#fdba74!important}
 .bc-primary-cluster .bc-verify.bc-qstate--success,
@@ -427,15 +431,22 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     let rootHealthWarning = '';
     let lastOverview = null;
     let lastRootHealth = null;
-    /** Stage 4B — in-memory only (not authority): de-dupe + concurrency for qualification reads. */
-    const QUAL_MAX_CONCURRENT = 2;
+    /** Stage 4B — in-memory only (not authority): cohort batch transport + concurrency. */
+    const QUAL_COHORT_SIZE = 5;
+    const QUAL_MAX_CONCURRENT_BATCHES = 2;
+    /** Legacy alias kept for source markers / non-regression scans (batch concurrency). */
+    const QUAL_MAX_CONCURRENT = QUAL_MAX_CONCURRENT_BATCHES;
     const qualPromises = new Map();
     const qualCache = new Map();
     const qualInFlightMut = new Map();
     const qualPollTimers = new Map();
+    let qualActiveBatches = 0;
+    const qualBatchQueue = [];
     let qualActiveReads = 0;
     const qualReadQueue = [];
     let qualHashCountThisPage = 0;
+    let qualGroupedPaintCount = 0;
+    let qualBatchRequestCount = 0;
     /** Bumped on every list paint / Show All / Last 5 / tab switch — stale applies must re-resolve by exact key. */
     let qualRenderGen = 0;
     let qualIo = null;
@@ -1071,6 +1082,126 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         else qualReadQueue.push(fn);
         qualPumpQueue();
     }
+    function qualPumpBatchQueue() {
+        while (qualActiveBatches < QUAL_MAX_CONCURRENT_BATCHES && qualBatchQueue.length) {
+            const job = qualBatchQueue.shift();
+            if (!job) break;
+            qualActiveBatches++;
+            job().finally(() => {
+                qualActiveBatches--;
+                qualPumpBatchQueue();
+            });
+        }
+    }
+    function qualEnqueueBatch(priority, fn) {
+        if (priority) qualBatchQueue.unshift(fn);
+        else qualBatchQueue.push(fn);
+        qualPumpBatchQueue();
+    }
+    /** Apply a cohort of qualifications in one grouped DOM paint (no row-by-row cascade). */
+    function qualGroupedPaint(applies, startedGen) {
+        const run = () => {
+            if (!applies.length) return;
+            applies.forEach((a) => {
+                if (!a || !a.key || !a.qualification) return;
+                qualSafeApplyByKey(a.key, a.qualification, {
+                    type: a.type || '',
+                    id: a.id || '',
+                    cc: a.cc || '',
+                    renderGen: startedGen
+                });
+            });
+            qualGroupedPaintCount++;
+        };
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+        else run();
+    }
+    /**
+     * Read-only cohort transport (max QUAL_COHORT_SIZE). Stage 4A public_status remains authority.
+     * @param {Array<{type:string,id:string,cc:string,key:string}>} items
+     */
+    function qualFetchCohort(items, force, priority) {
+        const startedGen = qualRenderGen;
+        const need = [];
+        const cachedApplies = [];
+        (items || []).forEach((it) => {
+            if (!it || !it.key) return;
+            if (!force && qualCache.has(it.key)) {
+                cachedApplies.push({
+                    key: it.key,
+                    type: it.type,
+                    id: it.id,
+                    cc: it.cc,
+                    qualification: qualCache.get(it.key)
+                });
+                return;
+            }
+            if (!force && qualPromises.has(it.key)) return;
+            need.push(it);
+        });
+        if (cachedApplies.length) {
+            qualGroupedPaint(cachedApplies, startedGen);
+        }
+        if (!need.length) {
+            return Promise.resolve([]);
+        }
+        const p = new Promise((resolve) => {
+            qualEnqueueBatch(!!priority, async () => {
+                try {
+                    const payload = need.map((it) => ({
+                        package_type: it.type || '',
+                        package_id: it.id || '',
+                        country_code: it.cc || ''
+                    }));
+                    const q = new URLSearchParams({
+                        packages: JSON.stringify(payload)
+                    });
+                    qualBatchRequestCount++;
+                    const res = await apiGet('qualification-status-batch.php?' + q.toString());
+                    const results = Array.isArray(res.results) ? res.results : [];
+                    const applies = [];
+                    results.forEach((row) => {
+                        if (!row || !row.ok || !row.qualification) return;
+                        const qualification = row.qualification;
+                        const respKey = qualResponseKey(
+                            qualification,
+                            row.package_type || '',
+                            row.package_id || '',
+                            row.country_code || ''
+                        );
+                        const matched = need.find((it) => it.key === respKey || it.key === row.exact_key);
+                        if (!matched || respKey !== matched.key) return;
+                        qualCache.set(matched.key, qualification);
+                        applies.push({
+                            key: matched.key,
+                            type: matched.type,
+                            id: matched.id,
+                            cc: matched.cc,
+                            qualification: qualification
+                        });
+                        if ((qualification.verify && qualification.verify.state === 'running')
+                            || (qualification.drv && qualification.drv.state === 'running')) {
+                            qualStartPoll(matched.type, matched.id, matched.cc);
+                        } else {
+                            qualStopPoll(matched.key);
+                        }
+                    });
+                    qualGroupedPaint(applies, startedGen);
+                    resolve(results);
+                } catch (e) {
+                    resolve([]);
+                } finally {
+                    need.forEach((it) => {
+                        if (qualPromises.has(it.key)) qualMapDrop(qualPromises, it.key);
+                    });
+                }
+            });
+        });
+        need.forEach((it) => {
+            qualPromises.set(it.key, p.then(() => qualCache.get(it.key) || null));
+        });
+        return p;
+    }
     function qualFetchStatus(type, id, cc, force) {
         const key = qualPkgKey(type, id, cc);
         const startedGen = qualRenderGen;
@@ -1094,6 +1225,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             qualSafeApplyByKey(key, cached, { type: type, id: id, cc: cc, renderGen: startedGen });
             return Promise.resolve(cached);
         }
+        // Single-package force/poll path (mutations / running poll) — still exact-key safe.
         const p = new Promise((resolve) => {
             qualEnqueueRead(true, async () => {
                 try {
@@ -1171,64 +1303,81 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     function qualScheduleVisibleLoads() {
         const rows = Array.from(document.querySelectorAll('details.bc-acc-item[data-package-id]'));
         if (!rows.length || !CAN_VERIFY) return;
+        // Immediate exact-key cache paint so Verify is never left stuck after Show All / Last 5.
         qualPaintCachedRows();
         qualDisconnectIo();
         const observedGen = qualRenderGen;
-        const io = (typeof IntersectionObserver !== 'undefined')
-            ? new IntersectionObserver((entries) => {
+        const pending = [];
+        rows.forEach((row) => {
+            if (!row.isConnected) return;
+            if (Number(row.getAttribute('data-qual-render-gen') || -1) !== observedGen) return;
+            const type = row.getAttribute('data-package-type') || '';
+            const id = row.getAttribute('data-package-id') || '';
+            const cc = row.getAttribute('data-cc') || '';
+            const key = qualPkgKey(type, id, cc);
+            if (!key) return;
+            pending.push({ type: type, id: id, cc: cc, key: key, row: row });
+        });
+        if (!pending.length) return;
+
+        const chunk = (list) => {
+            const out = [];
+            for (let i = 0; i < list.length; i += QUAL_COHORT_SIZE) {
+                out.push(list.slice(i, i + QUAL_COHORT_SIZE));
+            }
+            return out;
+        };
+
+        const scheduleCohorts = (ordered) => {
+            if (qualRenderGen !== observedGen) return;
+            const cohorts = chunk(ordered);
+            cohorts.forEach((cohort, idx) => {
+                if (qualRenderGen !== observedGen) return;
+                // Visible / first cohort has queue priority; remaining cohorts fill bounded.
+                qualFetchCohort(cohort, false, idx === 0);
+            });
+        };
+
+        // Prefer currently visible cohort first (IntersectionObserver), then DOM order fill.
+        if (typeof IntersectionObserver !== 'undefined') {
+            const visibleKeys = [];
+            const seenVis = {};
+            const io = new IntersectionObserver((entries) => {
                 entries.forEach((en) => {
                     if (!en.isIntersecting) return;
                     const row = en.target;
-                    if (!row || !row.isConnected) {
-                        try { io.unobserve(row); } catch (e) { /* ignore */ }
-                        return;
-                    }
-                    if (Number(row.getAttribute('data-qual-render-gen') || -1) !== observedGen) {
-                        try { io.unobserve(row); } catch (e) { /* ignore */ }
-                        return;
-                    }
-                    const type = row.getAttribute('data-package-type') || '';
-                    const id = row.getAttribute('data-package-id') || '';
-                    const cc = row.getAttribute('data-cc') || '';
-                    qualFetchStatus(type, id, cc, false);
-                    io.unobserve(row);
+                    if (!row || !row.isConnected) return;
+                    if (Number(row.getAttribute('data-qual-render-gen') || -1) !== observedGen) return;
+                    const key = qualRowKey(row);
+                    if (!key || seenVis[key]) return;
+                    seenVis[key] = true;
+                    visibleKeys.push(key);
+                    try { io.unobserve(row); } catch (e) { /* ignore */ }
                 });
-            }, { root: null, rootMargin: '80px', threshold: 0.01 })
-            : null;
-        qualIo = io;
-        rows.forEach((row, idx) => {
-            if (io) io.observe(row);
-            else {
-                const type = row.getAttribute('data-package-type') || '';
-                const id = row.getAttribute('data-package-id') || '';
-                const cc = row.getAttribute('data-cc') || '';
-                const delay = idx * 30;
-                const genAtSchedule = observedGen;
-                setTimeout(() => {
-                    if (qualRenderGen !== genAtSchedule) return;
-                    const live = qualFindRow(type, id, cc);
-                    if (!live || !live.isConnected) return;
-                    qualFetchStatus(type, id, cc, false);
-                }, delay);
+            }, { root: null, rootMargin: '80px', threshold: 0.01 });
+            qualIo = io;
+            pending.forEach((it) => io.observe(it.row));
+            const kick = () => {
+                if (qualRenderGen !== observedGen) return;
+                try { io.disconnect(); } catch (e) { /* ignore */ }
+                const visSet = {};
+                visibleKeys.forEach((k) => { visSet[k] = true; });
+                const ordered = pending.slice().sort((a, b) => {
+                    const av = visSet[a.key] ? 0 : 1;
+                    const bv = visSet[b.key] ? 0 : 1;
+                    if (av !== bv) return av - bv;
+                    return 0;
+                });
+                scheduleCohorts(ordered);
+            };
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(() => { setTimeout(kick, 0); });
+            } else {
+                setTimeout(kick, 0);
             }
-        });
-        const idleFill = () => {
-            if (qualRenderGen !== observedGen) return;
-            rows.forEach((row) => {
-                if (!row.isConnected) return;
-                const type = row.getAttribute('data-package-type') || '';
-                const id = row.getAttribute('data-package-id') || '';
-                const cc = row.getAttribute('data-cc') || '';
-                const key = qualPkgKey(type, id, cc);
-                if (!qualCache.has(key) && !qualPromises.has(key)) {
-                    qualEnqueueRead(false, async () => { await qualFetchStatus(type, id, cc, false); });
-                } else if (qualCache.has(key)) {
-                    qualSafeApplyByKey(key, qualCache.get(key), { type: type, id: id, cc: cc, renderGen: observedGen });
-                }
-            });
-        };
-        if (typeof requestIdleCallback === 'function') requestIdleCallback(idleFill, { timeout: 2500 });
-        else setTimeout(idleFill, 400);
+        } else {
+            scheduleCohorts(pending);
+        }
     }
     async function qualRunMutation(action, btn) {
         const type = btn.dataset.type || '';
@@ -1456,9 +1605,10 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         let html = '<span class="bc-primary-cluster" dir="ltr">';
         html += '<button type="button" class="bc-btn-primary bc-open-details" data-idx="' + idx + '" data-type="' + esc(type) + '">التفاصيل</button>';
         if (CAN_VERIFY) {
-            // Exact class tokens preserved for Stage 3 template count; resolving via aria-busy + CSS.
-            html += '<button type="button" class="bc-btn-ghost bc-drv" disabled aria-busy="true" aria-disabled="true" title="DRV" aria-label="DRV resolving" data-q-state="resolving" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">DRV</button>';
-            html += '<button type="button" class="bc-btn-ghost bc-verify" disabled aria-busy="true" aria-disabled="true" title="Verify" aria-label="Verify resolving" data-q-state="resolving" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">Verify</button>';
+            // Exact Stage 3 class tokens preserved for template count.
+            // Before cohort result: Verify grey/actionable (not_run); DRV grey/blocked — no false green/red.
+            html += '<button type="button" class="bc-btn-ghost bc-drv" disabled aria-disabled="true" title="DRV" aria-label="DRV blocked" data-q-state="blocked" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">DRV</button>';
+            html += '<button type="button" class="bc-btn-ghost bc-verify" title="Verify" aria-label="Verify not run" data-q-state="not_run" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">Verify</button>';
         }
         html += '</span>';
         return html;

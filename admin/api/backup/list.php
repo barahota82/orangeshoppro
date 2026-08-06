@@ -21,9 +21,10 @@ try {
     $countryContextCode = orange_admin_context_country_code($pdo);
 
     // Single-pass package loads shared with overview (avoids duplicate JSON/FS inspections).
-    // Full: shared snapshots/ — never filtered by Country Context.
+    // Full: shared snapshots/ — never filtered by Country Context; every recognized finalized package
+    // (no silent row cap — Backup Center Last 5 remains a client-side slice of this payload).
     // Country: uncapped package ids for the selected context country only (no cross-country leakage).
-    $fullSnapshots = orange_backup_admin_list_full_snapshots($backupRoot, 20);
+    $fullSnapshots = orange_backup_admin_list_full_snapshots($backupRoot);
     $countryPackages = orange_backup_admin_list_country_packages($pdo, $backupRoot, null, $countryContextCode);
     $inventoryScoped = orange_backup_admin_package_inventory_counts($backupRoot, $countryContextCode);
     // Storage KPIs remain shared BackupRoot totals (global disk), not context-scoped.

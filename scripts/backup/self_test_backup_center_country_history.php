@@ -116,8 +116,9 @@ bc_country_hist_assert(
     'Backup Center list.php no longer hard-caps country packages at 5'
 );
 bc_country_hist_assert(
-    str_contains($listSource, 'list_full_snapshots($backupRoot, 20)'),
-    'Backup Center list.php keeps Full snapshots global (no country scope arg)'
+    str_contains($listSource, 'list_full_snapshots($backupRoot)')
+    && !str_contains($listSource, 'list_full_snapshots($backupRoot, 20)'),
+    'Backup Center list.php keeps Full snapshots global uncapped (no country scope arg)'
 );
 
 $pageSource = (string) file_get_contents($projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'backup_center.php');

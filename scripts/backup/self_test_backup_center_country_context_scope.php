@@ -130,7 +130,11 @@ $runFull = (string) file_get_contents(
     $projectRoot . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'run-full.php'
 );
 bc_ctx_assert(str_contains($listPhp, '$countryContextCode'), 'list.php reads Admin Country Context for Country Backup');
-bc_ctx_assert(str_contains($listPhp, 'list_full_snapshots($backupRoot, 20)'), 'list.php Full path has no country scope');
+bc_ctx_assert(
+    str_contains($listPhp, 'list_full_snapshots($backupRoot)')
+    && !str_contains($listPhp, 'list_full_snapshots($backupRoot, 20)'),
+    'list.php Full path has no country scope and no silent cap 20'
+);
 bc_ctx_assert(
     str_contains($runCountries, 'orange_backup_admin_run_country_batch')
     && !str_contains($runCountries, 'orange_admin_context_country'),

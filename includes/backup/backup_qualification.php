@@ -1511,3 +1511,175 @@ function orange_backup_qualification_public_status(
         ],
     ];
 }
+
+/** Max package identities accepted by the read-only batch status transport. */
+const ORANGE_BACKUP_QUAL_STATUS_BATCH_MAX_ITEMS = 5;
+
+/**
+ * Stage 4B — transport-only batch wrapper around orange_backup_qualification_public_status.
+ * Does not introduce a new state authority; each item is resolved independently.
+ *
+ * @param list<array{package_type?:string,package_id?:string,country_code?:string}> $items
+ * @param array{admin_id?:int|null,kind?:string}|null $admin
+ * @return array{
+ *   ok:bool,
+ *   code?:string,
+ *   message?:string,
+ *   results?:list<array<string,mixed>>
+ * }
+ */
+function orange_backup_qualification_public_status_batch(
+    string $backupRoot,
+    array $items,
+    ?array $admin = null,
+    ?PDO $pdo = null,
+    int $maxItems = ORANGE_BACKUP_QUAL_STATUS_BATCH_MAX_ITEMS
+): array {
+    if ($maxItems < 1) {
+        $maxItems = ORANGE_BACKUP_QUAL_STATUS_BATCH_MAX_ITEMS;
+    }
+    if ($items === []) {
+        return [
+            'ok' => false,
+            'code' => 'empty_batch',
+            'message' => 'دفعة الحالات فارغة.',
+        ];
+    }
+    if (count($items) > $maxItems) {
+        return [
+            'ok' => false,
+            'code' => 'batch_too_large',
+            'message' => 'تجاوزت الدفعة الحد الأقصى المسموح (' . $maxItems . ').',
+        ];
+    }
+
+    $seen = [];
+    $normalized = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            return [
+                'ok' => false,
+                'code' => 'invalid_batch_item',
+                'message' => 'عنصر دفعة غير صالح.',
+            ];
+        }
+        $packageType = trim((string) ($item['package_type'] ?? ''));
+        $packageId = trim((string) ($item['package_id'] ?? ''));
+        $countryCode = trim((string) ($item['country_code'] ?? ''));
+        if ($packageId === '' || str_contains($packageId, '/') || str_contains($packageId, '\\')
+            || str_contains($packageId, '..') || preg_match('#^[a-zA-Z]:#', $packageId)) {
+            return [
+                'ok' => false,
+                'code' => 'unsafe_package_id',
+                'message' => 'معرّف الحزمة غير صالح.',
+            ];
+        }
+        if ($countryCode !== '' && (str_contains($countryCode, '/') || str_contains($countryCode, '\\')
+            || str_contains($countryCode, '..'))) {
+            return [
+                'ok' => false,
+                'code' => 'unsafe_country_code',
+                'message' => 'رمز الدولة غير صالح.',
+            ];
+        }
+        if (isset($item['package_path']) || isset($item['path']) || isset($item['report_path'])) {
+            return [
+                'ok' => false,
+                'code' => 'path_not_allowed',
+                'message' => 'مسارات الملفات غير مقبولة في طلب الحالة.',
+            ];
+        }
+        $key = $packageType . '|' . strtoupper($countryCode) . '|' . $packageId;
+        if (isset($seen[$key])) {
+            continue; // dedupe — first wins
+        }
+        $seen[$key] = true;
+        $normalized[] = [
+            'package_type' => $packageType,
+            'package_id' => $packageId,
+            'country_code' => $countryCode,
+            'exact_key' => $key,
+        ];
+    }
+
+    if ($normalized === []) {
+        return [
+            'ok' => false,
+            'code' => 'empty_batch',
+            'message' => 'دفعة الحالات فارغة بعد إزالة التكرار.',
+        ];
+    }
+
+    $results = [];
+    foreach ($normalized as $row) {
+        $packageType = $row['package_type'];
+        $packageId = $row['package_id'];
+        $countryCode = $row['country_code'];
+
+        if ($packageType === 'country_recovery') {
+            if ($pdo instanceof PDO) {
+                try {
+                    orange_backup_admin_assert_country_package_in_context($pdo, $countryCode);
+                } catch (Throwable $e) {
+                    $results[] = [
+                        'ok' => false,
+                        'exact_key' => $row['exact_key'],
+                        'package_type' => $packageType,
+                        'package_id' => $packageId,
+                        'country_code' => strtoupper($countryCode),
+                        'code' => 'country_scope_denied',
+                        'message' => 'حزمة الدولة خارج سياق الدولة المحدد في الأدمن.',
+                    ];
+                    continue;
+                }
+            }
+        } elseif ($packageType !== 'full_disaster') {
+            $results[] = [
+                'ok' => false,
+                'exact_key' => $row['exact_key'],
+                'package_type' => $packageType,
+                'package_id' => $packageId,
+                'country_code' => $countryCode,
+                'code' => 'unsupported_package_type',
+                'message' => 'نوع الحزمة غير مدعوم.',
+            ];
+            continue;
+        }
+
+        $status = orange_backup_qualification_public_status(
+            $backupRoot,
+            $packageType,
+            $packageId,
+            $countryCode,
+            $admin,
+            $pdo
+        );
+        if (empty($status['ok'])) {
+            $results[] = [
+                'ok' => false,
+                'exact_key' => $row['exact_key'],
+                'package_type' => $packageType,
+                'package_id' => $packageId,
+                'country_code' => $packageType === 'country_recovery' ? strtoupper($countryCode) : '',
+                'code' => (string) ($status['code'] ?? 'resolve_failed'),
+                'message' => (string) ($status['message'] ?? 'تعذر قراءة حالة التأهيل.'),
+            ];
+            continue;
+        }
+
+        $results[] = [
+            'ok' => true,
+            'exact_key' => $row['exact_key'],
+            'qualification' => [
+                'package' => $status['package'],
+                'verify' => $status['verify'],
+                'drv' => $status['drv'],
+            ],
+        ];
+    }
+
+    return [
+        'ok' => true,
+        'results' => $results,
+    ];
+}

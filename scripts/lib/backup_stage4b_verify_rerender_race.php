@@ -232,10 +232,13 @@ function s4b_run_verify_list_rerender_race(string $projectRoot, string $evidence
   }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   async function waitSettled(listId) {
-    for (let i = 0; i < 60; i++) {
+    // Initial Verify template is grey/actionable not_run (not resolving) before cohort/authority paint.
+    // Settle only when every visible row matches server authority (not merely non-resolving).
+    for (let i = 0; i < 80; i++) {
       await sleep(25);
       const rows = snap(listId);
-      if (rows.length && rows.every((r) => r.verify_state && r.verify_state !== 'resolving')) return;
+      if (!rows.length) continue;
+      if (expectMatch(listId)) return;
     }
   }
   async function run() {

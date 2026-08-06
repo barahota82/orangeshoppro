@@ -121,7 +121,11 @@ $drvPhp = (string) file_get_contents($projectRoot . '/admin/api/backup/recovery-
 s4b_ok(str_contains($page, 'bc-primary-cluster'), 'S3: primary cluster present');
 s4b_ok(str_contains($page, 'bc-qstate--success') && str_contains($page, 'bc-qstate--failed'), 'S4B: qstate CSS classes');
 s4b_ok(str_contains($page, 'qualification-status.php'), 'S4B: client calls qualification-status');
-s4b_ok(str_contains($page, 'QUAL_MAX_CONCURRENT = 2'), 'perf: max concurrent = 2');
+s4b_ok(str_contains($page, 'qualification-status-batch.php'), 'S4B: client calls qualification-status-batch');
+s4b_ok(str_contains($page, 'QUAL_MAX_CONCURRENT_BATCHES = 2'), 'perf: max concurrent batches = 2');
+s4b_ok(str_contains($page, 'QUAL_COHORT_SIZE = 5'), 'perf: cohort size = 5');
+s4b_ok(str_contains($page, 'QUAL_MAX_CONCURRENT = QUAL_MAX_CONCURRENT_BATCHES')
+    || str_contains($page, 'QUAL_MAX_CONCURRENT = 2'), 'perf: max concurrent alias = 2');
 s4b_ok(str_contains($page, 'qualInFlightMut'), 'dup: client in-flight map');
 s4b_ok(str_contains($page, 'apiPostQual'), 'flow: non-throwing mutation client');
 s4b_ok(str_contains($page, 'qualRunMutation'), 'flow: no-refresh mutation helper');
