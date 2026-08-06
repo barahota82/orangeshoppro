@@ -120,9 +120,12 @@ s3_assert($openFn !== '', 'extract: openDetails body');
 if ($openFn !== '') {
     s3_assert(!str_contains($openFn, 'bc-verify'), 'drawer openDetails: no executable Verify');
     s3_assert(!str_contains($openFn, "class=\"bc-btn-ghost bc-drv\""), 'drawer openDetails: no executable DRV button');
-    s3_assert(str_contains($openFn, 'Summary') && str_contains($openFn, 'Validation') && str_contains($openFn, 'Diagnostics'), 'drawer sections unchanged');
-    s3_assert(str_contains($openFn, 'health.json') && str_contains($openFn, 'Health'), 'drawer Validation keeps Health');
-    s3_assert(str_contains($openFn, 'Country DRV'), 'drawer Country DRV report label unchanged');
+    // Owner decision: reports accordion-only — Details is metadata (no Validation/Diagnostics report controls).
+    s3_assert(str_contains($openFn, 'Summary') && str_contains($openFn, 'Storage'), 'drawer keeps Summary + Storage metadata');
+    s3_assert(!str_contains($openFn, 'viewFileControl('), 'drawer openDetails: no viewFileControl report builders');
+    s3_assert(!str_contains($openFn, 'bc-view-file'), 'drawer openDetails: no bc-view-file markup');
+    s3_assert(!str_contains($openFn, 'health.json') && !str_contains($openFn, 'manifest.json'), 'drawer openDetails: no report data-file targets');
+    s3_assert(!str_contains($openFn, 'Country DRV') && !str_contains($openFn, 'DRV Report'), 'drawer openDetails: no report labels');
     s3_assert(!str_contains($openFn, 'CRP Report'), 'no CRP Report label added');
 }
 
@@ -313,9 +316,11 @@ JS;
   const drawer = el('bc_details_drawer');
   ok(drawer.classList.contains('is-open'), 'Full drawer opens');
   ok(countExec(drawer, '.bc-drv, .bc-verify') === 0, 'Full drawer executable DRV/Verify = 0');
-  ok((el('bc_drawer_body').textContent || '').includes('Health'), 'Full drawer keeps Health');
+  ok(countExec(drawer, '.bc-view-file') === 0, 'Full drawer report controls = 0');
+  ok((el('bc_drawer_body').textContent || '').includes('Summary'), 'Full drawer keeps Summary metadata');
   openDetails(countryPkg, 'country_recovery');
   ok(countExec(drawer, '.bc-drv, .bc-verify') === 0, 'Country drawer executable DRV/Verify = 0');
+  ok(countExec(drawer, '.bc-view-file') === 0, 'Country drawer report controls = 0');
 
   const fullMount = el('bc_full_table');
   const countryMount = el('bc_country_table');

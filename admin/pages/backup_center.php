@@ -1746,22 +1746,10 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         const isFull = type === 'full_disaster';
         el('bc_drawer_title').textContent = isFull ? 'تفاصيل Full Backup' : 'تفاصيل Country Package';
         el('bc_drawer_sub').textContent = pkg.package_id || '';
-        const id = pkg.package_id;
-        const cc = pkg.country_code || '';
 
-        // Stage 3: Validation keeps Health only — executable Verify/DRV live on the primary row.
-        const validationHtml = viewFileControl(type, id, cc, 'health.json', 'Health', false);
-
-        let diagnosticsHtml = viewFileControl(type, id, cc, 'manifest.json', 'Manifest', true);
-        if (isFull) {
-            diagnosticsHtml += viewFileControl(type, id, cc, 'recovery_validation.json', 'DRV Report', false);
-        } else {
-            diagnosticsHtml += viewFileControl(type, id, cc, 'dependency_graph.json', 'Graph', false);
-            diagnosticsHtml += viewFileControl(type, id, cc, 'table_inventory.json', 'Inventory', false);
-            diagnosticsHtml += viewFileControl(type, id, cc, 'country_verify_report.json', 'Verify Report', false);
-            diagnosticsHtml += viewFileControl(type, id, cc, 'country_recovery_validation.json', 'Country DRV', false);
-        }
-
+        // Owner decision: all package reports open from the accordion only.
+        // Details drawer = metadata / status summaries — no report-opening controls.
+        // (Validation / Diagnostics / Logs report sections removed after report-control cleanup.)
         el('bc_drawer_body').innerHTML =
             '<div class="bc-drawer-group"><h4>Summary</h4><dl class="bc-drawer-meta">' +
                 '<div><dt>التاريخ</dt><dd>' + fmtPackageWhenDisplay(pkg, type) + '</dd></div>' +
@@ -1775,22 +1763,11 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                 '<div><dt>Registry</dt><dd>' + esc(pkg.registry_version || '—') + '</dd></div>' +
                 '<div><dt>Package ID</dt><dd class="bc-mono">' + esc(pkg.package_id || '—') + '</dd></div>' +
             '</dl></div>' +
-            '<div class="bc-drawer-group"><h4>Validation</h4>' +
-                '<div class="bc-action-grid">' + validationHtml + '</div></div>' +
-            '<div class="bc-drawer-group"><h4>Diagnostics</h4>' +
-                '<div class="bc-action-grid">' + diagnosticsHtml + '</div></div>' +
             '<div class="bc-drawer-group"><h4>Storage</h4><dl class="bc-drawer-meta">' +
                 '<div><dt>Dump</dt><dd>' + esc(fmtBytes(pkg.dump_size_bytes)) + '</dd></div>' +
                 '<div><dt>Uploads</dt><dd>' + esc(fmtBytes(pkg.uploads_size_bytes)) + '</dd></div>' +
                 '<div><dt>Total</dt><dd>' + esc(sizeSummary(pkg)) + '</dd></div>' +
-            '</dl></div>' +
-            '<div class="bc-drawer-group"><h4>Logs</h4>' +
-                '<p class="bc-muted" style="margin:0 0 8px;font-size:.82rem;">تقارير التحقق تظهر عبر Diagnostics. سجلات النظام من قسم «التخزين والسجلات».</p>' +
-                '<div class="bc-action-grid">' +
-                (isFull
-                    ? viewFileControl(type, id, cc, 'recovery_validation.json', 'DRV Report', false)
-                    : viewFileControl(type, id, cc, 'country_recovery_validation.json', 'Country DRV', false)) +
-                '</div></div>';
+            '</dl></div>';
 
         el('bc_details_drawer').classList.add('is-open');
         el('bc_details_drawer').setAttribute('aria-hidden', 'false');
