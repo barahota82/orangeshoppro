@@ -1690,7 +1690,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     async function loadAll() {
         const scrollY = window.scrollY;
         const openIds = Array.from(document.querySelectorAll('details.bc-acc-item[open]'))
-            .map((d) => d.getAttribute('data-package-id') + '|' + d.getAttribute('data-package-type'));
+            .map((d) => qualRowKey(d));
         setBusy(true, 'جاري تحميل البيانات…');
         try {
             const data = await apiGet('list.php');
@@ -1700,7 +1700,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             renderOverview(data);
             renderTables(data);
             document.querySelectorAll('details.bc-acc-item').forEach((d) => {
-                const k = d.getAttribute('data-package-id') + '|' + d.getAttribute('data-package-type');
+                const k = qualRowKey(d);
                 if (openIds.indexOf(k) !== -1) d.open = true;
             });
             window.scrollTo(0, scrollY);
