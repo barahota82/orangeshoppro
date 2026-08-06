@@ -46,21 +46,47 @@ try {
     );
 
     if (!empty($run['in_progress'])) {
+        $qualification = orange_backup_qualification_public_status(
+            $backupRoot,
+            $packageType,
+            $packageId,
+            $countryCode,
+            $admin,
+            $pdo
+        );
         json_response([
             'success' => false,
             'code' => 'qualification_in_progress',
             'message' => (string) ($run['message'] ?? 'عملية التحقق قيد التنفيذ حالياً.'),
             'in_progress' => true,
+            'qualification' => !empty($qualification['ok']) ? [
+                'package' => $qualification['package'],
+                'verify' => $qualification['verify'],
+                'drv' => $qualification['drv'],
+            ] : null,
         ], 409);
     }
 
     $ok = (bool) ($run['success'] ?? false);
+    $qualification = orange_backup_qualification_public_status(
+        $backupRoot,
+        $packageType,
+        $packageId,
+        $countryCode,
+        $admin,
+        $pdo
+    );
     json_response([
         'success' => $ok,
         'message' => (string) ($run['message'] ?? ($ok ? 'تم التحقق من الحزمة بنجاح.' : 'فشل التحقق من الحزمة.')),
         'short_circuited' => (bool) ($run['short_circuited'] ?? false),
         'heavy_executed' => (bool) ($run['heavy_executed'] ?? false),
         'result' => $run['result'] ?? null,
+        'qualification' => !empty($qualification['ok']) ? [
+            'package' => $qualification['package'],
+            'verify' => $qualification['verify'],
+            'drv' => $qualification['drv'],
+        ] : null,
     ], $ok ? 200 : 422);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, backup_admin_api_safe_message($e));

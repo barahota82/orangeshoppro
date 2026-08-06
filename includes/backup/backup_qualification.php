@@ -1422,3 +1422,92 @@ function orange_backup_qualification_resolve(
         ],
     ];
 }
+
+/**
+ * Stage 4B — public, safe package qualification status (no absolute paths / raw reports / fingerprints).
+ *
+ * @param array{admin_id?:int|null,kind?:string}|null $admin
+ * @return array<string, mixed>
+ */
+function orange_backup_qualification_public_status(
+    string $backupRoot,
+    string $packageType,
+    string $packageId,
+    string $countryCode = '',
+    ?array $admin = null,
+    ?PDO $pdo = null
+): array {
+    $resolved = orange_backup_qualification_resolve(
+        $backupRoot,
+        $packageType,
+        $packageId,
+        $countryCode,
+        $admin,
+        $pdo
+    );
+    if (empty($resolved['ok'])) {
+        return [
+            'ok' => false,
+            'code' => (string) ($resolved['code'] ?? 'resolve_failed'),
+            'message' => (string) ($resolved['message'] ?? 'تعذر قراءة حالة التأهيل.'),
+        ];
+    }
+
+    $pkg = is_array($resolved['package'] ?? null) ? $resolved['package'] : [];
+    $verify = is_array($resolved['verify'] ?? null) ? $resolved['verify'] : [];
+    $drv = is_array($resolved['drv'] ?? null) ? $resolved['drv'] : [];
+
+    $vState = (string) ($verify['state'] ?? 'not_run');
+    $dState = (string) ($drv['state'] ?? 'blocked');
+
+    $vSummary = match ($vState) {
+        'success' => 'تم التحقق من الحزمة بنجاح (نتيجة محفوظة).',
+        'failed' => 'فشل التحقق من الحزمة.',
+        'running' => 'عملية التحقق قيد التنفيذ حالياً.',
+        default => 'لم يُنفَّذ التحقق بعد.',
+    };
+    $dSummary = match ($dState) {
+        'success' => 'اجتازت الحزمة فحص قابلية الاسترداد (نتيجة محفوظة).',
+        'failed' => 'فشل فحص قابلية الاسترداد.',
+        'running' => 'فحص قابلية الاسترداد قيد التنفيذ حالياً.',
+        'blocked' => 'فحص قابلية الاسترداد غير متاح قبل نجاح التحقق.',
+        default => 'لم يُنفَّذ فحص قابلية الاسترداد بعد.',
+    };
+
+    $vCode = (string) ($verify['stable_result_code'] ?? '');
+    if ($vCode === '' || strlen($vCode) > 64 || preg_match('/[\\\\\\/]|\\.\\./', $vCode)) {
+        $vCode = $vState;
+    }
+    $dCode = (string) ($drv['stable_result_code'] ?? '');
+    if ($dCode === '' || strlen($dCode) > 64 || preg_match('/[\\\\\\/]|\\.\\./', $dCode)) {
+        $dCode = $dState;
+    }
+
+    return [
+        'ok' => true,
+        'package' => [
+            'package_type' => (string) ($pkg['package_type'] ?? $packageType),
+            'package_id' => (string) ($pkg['package_id'] ?? $packageId),
+            'country_code' => (string) ($pkg['country_code'] ?? ''),
+            'health' => (string) ($pkg['health'] ?? 'unknown'),
+            'recoverable' => (bool) ($pkg['recoverable'] ?? false),
+        ],
+        'verify' => [
+            'state' => $vState,
+            'completed_at' => (string) ($verify['completed_at_utc'] ?? ''),
+            'safe_result_code' => $vCode,
+            'safe_summary' => $vSummary,
+            'report_available' => ($verify['report_reference'] ?? null) !== null && $vState !== 'not_run' && $vState !== 'running',
+            'retry_allowed' => ($vState === 'failed' || $vState === 'not_run'),
+        ],
+        'drv' => [
+            'state' => $dState,
+            'completed_at' => (string) ($drv['completed_at_utc'] ?? ''),
+            'recovery_score' => isset($drv['recovery_score']) ? (int) $drv['recovery_score'] : null,
+            'safe_result_code' => $dCode,
+            'safe_summary' => $dSummary,
+            'report_available' => ($drv['report_reference'] ?? null) !== null && $dState !== 'not_run' && $dState !== 'running' && $dState !== 'blocked',
+            'retry_allowed' => ($dState === 'failed' || $dState === 'not_run'),
+        ],
+    ];
+}

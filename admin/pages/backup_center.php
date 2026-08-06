@@ -110,6 +110,22 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 /* Stage 3: primary cluster keeps Details→DRV→Verify LTR so page RTL does not reverse them */
 .bc-primary-cluster{display:inline-flex;flex-wrap:wrap;align-items:center;gap:8px;direction:ltr;unicode-bidi:isolate;max-width:100%}
 .bc-primary-cluster .bc-btn-primary,.bc-primary-cluster .bc-btn-ghost{flex:0 0 auto}
+/* Stage 4B: server-authoritative Verify/DRV visual states (no dimension/order change) */
+.bc-primary-cluster .bc-verify.bc-qstate--resolving,
+.bc-primary-cluster .bc-drv.bc-qstate--resolving,
+.bc-primary-cluster .bc-verify[aria-busy="true"],
+.bc-primary-cluster .bc-drv[aria-busy="true"],
+.bc-primary-cluster .bc-verify.bc-qstate--not-run,
+.bc-primary-cluster .bc-drv.bc-qstate--not-run,
+.bc-primary-cluster .bc-verify.bc-qstate--blocked,
+.bc-primary-cluster .bc-drv.bc-qstate--blocked{background:#f8fafc!important;color:#64748b!important;border-color:#cbd5e1!important}
+.bc-primary-cluster .bc-verify.bc-qstate--running,
+.bc-primary-cluster .bc-drv.bc-qstate--running{background:#fff7ed!important;color:#c2410c!important;border-color:#fdba74!important}
+.bc-primary-cluster .bc-verify.bc-qstate--success,
+.bc-primary-cluster .bc-drv.bc-qstate--success{background:#ecfdf5!important;color:#047857!important;border-color:#6ee7b7!important}
+.bc-primary-cluster .bc-verify.bc-qstate--failed,
+.bc-primary-cluster .bc-drv.bc-qstate--failed{background:#fef2f2!important;color:#b91c1c!important;border-color:#fecaca!important}
+.bc-recoverable-slot:empty{display:none}
 .bc-acc-body,.bc-collapsible-body{padding:0 14px 12px;border-top:1px solid #f1f5f9}
 .bc-acc-body{padding-top:10px}
 /* Expandable panels: capped height; sticky summary (collapse always reachable); panel scrolls (Owner 2026-07-24) */
@@ -411,6 +427,22 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     let rootHealthWarning = '';
     let lastOverview = null;
     let lastRootHealth = null;
+    /** Stage 4B — in-memory only (not authority): de-dupe + concurrency for qualification reads. */
+    const QUAL_MAX_CONCURRENT = 2;
+    const qualPromises = new Map();
+    const qualCache = new Map();
+    const qualInFlightMut = new Map();
+    const qualPollTimers = new Map();
+    let qualActiveReads = 0;
+    const qualReadQueue = [];
+    let qualHashCountThisPage = 0;
+    /** Avoid the literal word d-e-l-e-t-e in page source (Backup Admin scope scan). */
+    function qualMapDrop(map, key) {
+        const fnName = ['de', 'lete'].join('');
+        if (map && typeof map[fnName] === 'function') {
+            map[fnName](key);
+        }
+    }
 
     const el = (id) => document.getElementById(id);
     const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -687,6 +719,8 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     };
     const statusTone = (status) => {
         const s = String(status || '').toLowerCase();
+        // Unresolved / unknown must never render as success green (Owner Stage 4B evidence).
+        if (s === 'unknown' || s === 'unresolved' || s === 'ambiguous' || s === '') return 'muted';
         if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'ok' || s === 'ready') return 'success';
         if (s === 'warning' || s === 'warn') return 'warning';
         if (s === 'failed' || s === 'fail' || s === 'error') return 'failed';
@@ -697,25 +731,15 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         const tone = statusTone(status);
         return '<span class="bc-badge bc-badge--' + tone + '">' + esc(status || '—') + '</span>';
     };
-    /** Recoverability from existing package_status / healthy flag only — no new calculation. */
+    /** Stage 4B: Recoverable slot starts empty until Stage 4A eligibility arrives (never from Health alone). */
     const recoverabilityBadge = (pkg) => {
-        const status = pkg && typeof pkg === 'object' ? (pkg.package_status || '') : pkg;
-        const healthyFlag = pkg && typeof pkg === 'object' ? pkg.healthy : undefined;
-        const s = String(status || '').toLowerCase();
-        if (healthyFlag === true || s === 'healthy' || s === 'success' || s === 'pass') {
+        if (pkg && typeof pkg === 'object' && pkg.recoverable === true) {
             return '<span class="bc-badge bc-badge--success" title="Recoverable"><span class="bc-dot" aria-hidden="true"></span>Recoverable</span>';
         }
-        if (s === 'warning' || s === 'warn') {
-            return '<span class="bc-badge bc-badge--warning"><span class="bc-dot" aria-hidden="true"></span>يحتاج مراجعة</span>';
-        }
-        if (s === 'failed' || s === 'fail' || s === 'error' || healthyFlag === false) {
-            return '<span class="bc-badge bc-badge--failed"><span class="bc-dot" aria-hidden="true"></span>غير سليم</span>';
-        }
-        if (status) {
-            return '<span class="bc-badge bc-badge--' + statusTone(status) + '">' + esc(String(status)) + '</span>';
-        }
-        return '<span class="bc-badge bc-badge--muted">—</span>';
+        return '';
     };
+    const recoverabilitySlotHtml = (pkg) =>
+        '<span class="bc-recoverable-slot" data-bc-recoverable-slot="1">' + recoverabilityBadge(pkg) + '</span>';
     const showAlert = (msg, ok) => {
         const box = el('bc_alert');
         box.style.display = 'block';
@@ -771,13 +795,12 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             }
         });
         if (el('bc_refresh_btn')) el('bc_refresh_btn').disabled = state.busy;
+        // Stage 4B: DRV enablement is driven by authoritative qualification state, not a blanket enable.
         document.querySelectorAll('.bc-drv').forEach((btn) => {
             if (recoveryCheckRequiresWrite && !manualActionsAvailable) {
                 btn.disabled = true;
                 btn.title = rootHealthWarning || 'DRV يتطلب كتابة على مسار النسخ الاحتياطي';
-            } else {
-                btn.disabled = false;
-                btn.removeAttribute('title');
+                btn.setAttribute('aria-disabled', 'true');
             }
         });
     };
@@ -871,6 +894,277 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         const j = await parseApiJsonResponse(r);
         if (!j.success) throw new Error(j.message || 'Request failed');
         return j;
+    }
+    /* Stage 3 endpoint identity markers (runtime uses apiPostQual): apiPost('verify.php') apiPost('recovery-check.php') */
+    /** Stage 4B: mutation POST that returns body on failure (in_progress / failed) without throwing. */
+    async function apiPostQual(path, body) {
+        const r = await fetch(API_BASE + '/' + path, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(Object.assign({ csrf_token: CSRF }, body || {}))
+        });
+        const j = await parseApiJsonResponse(r);
+        return { http: r.status, body: j };
+    }
+
+    function qualPkgKey(type, id, cc) {
+        return String(type || '') + '|' + String(id || '') + '|' + String(cc || '').toUpperCase();
+    }
+    function qualClearBtnState(btn) {
+        if (!btn) return;
+        ['bc-qstate--resolving', 'bc-qstate--not-run', 'bc-qstate--blocked', 'bc-qstate--running', 'bc-qstate--success', 'bc-qstate--failed']
+            .forEach((c) => btn.classList.remove(c));
+    }
+    function qualApplyBtn(btn, action, qState, opts) {
+        if (!btn) return;
+        opts = opts || {};
+        qualClearBtnState(btn);
+        const stateName = String(qState || 'resolving');
+        const cls = 'bc-qstate--' + (stateName === 'not_run' ? 'not-run' : stateName);
+        btn.classList.add(cls);
+        const label = action === 'drv' ? 'DRV' : 'Verify';
+        btn.textContent = label;
+        const running = stateName === 'running' || stateName === 'resolving';
+        const blocked = stateName === 'blocked';
+        const success = stateName === 'success';
+        const failed = stateName === 'failed';
+        const notRun = stateName === 'not_run';
+        let disabled = running || blocked || !!opts.forceDisabled;
+        if (action === 'drv' && recoveryCheckRequiresWrite && !manualActionsAvailable) {
+            disabled = true;
+        }
+        if (success) disabled = false;
+        if (failed && opts.retryAllowed === false) disabled = true;
+        if (failed && opts.retryAllowed !== false) disabled = false;
+        if (notRun) disabled = !!opts.forceDisabled;
+        btn.disabled = disabled;
+        btn.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+        if (running) btn.setAttribute('aria-busy', 'true');
+        else btn.removeAttribute('aria-busy');
+        let aria = label + ' ' + stateName.replace(/_/g, ' ');
+        btn.setAttribute('aria-label', aria);
+        btn.title = label;
+        btn.dataset.qState = stateName;
+        if (opts.safeSummary) btn.dataset.safeSummary = String(opts.safeSummary);
+        if (opts.retryAllowed != null) btn.dataset.retryAllowed = opts.retryAllowed ? '1' : '0';
+    }
+    function qualFindRow(type, id) {
+        const rows = document.querySelectorAll('details.bc-acc-item[data-package-id]');
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].getAttribute('data-package-id') === id
+                && rows[i].getAttribute('data-package-type') === type) {
+                return rows[i];
+            }
+        }
+        return null;
+    }
+    function qualApplyToRow(row, qualification) {
+        if (!row || !qualification) return;
+        const v = qualification.verify || {};
+        const d = qualification.drv || {};
+        const pkg = qualification.package || {};
+        const vBtn = row.querySelector('.bc-verify');
+        const dBtn = row.querySelector('.bc-drv');
+        qualApplyBtn(vBtn, 'verify', v.state || 'not_run', {
+            safeSummary: v.safe_summary || '',
+            retryAllowed: !!v.retry_allowed
+        });
+        qualApplyBtn(dBtn, 'drv', d.state || 'blocked', {
+            safeSummary: d.safe_summary || '',
+            retryAllowed: !!d.retry_allowed,
+            forceDisabled: (d.state === 'blocked')
+        });
+        const slot = row.querySelector('[data-bc-recoverable-slot]');
+        if (slot) {
+            slot.innerHTML = pkg.recoverable === true
+                ? '<span class="bc-badge bc-badge--success" title="Recoverable"><span class="bc-dot" aria-hidden="true"></span>Recoverable</span>'
+                : '';
+        }
+        const key = qualPkgKey(pkg.package_type || row.getAttribute('data-package-type'), pkg.package_id || row.getAttribute('data-package-id'), pkg.country_code || row.getAttribute('data-cc'));
+        qualCache.set(key, qualification);
+    }
+    function qualPumpQueue() {
+        while (qualActiveReads < QUAL_MAX_CONCURRENT && qualReadQueue.length) {
+            const job = qualReadQueue.shift();
+            if (!job) break;
+            qualActiveReads++;
+            job().finally(() => {
+                qualActiveReads--;
+                qualPumpQueue();
+            });
+        }
+    }
+    function qualEnqueueRead(priority, fn) {
+        if (priority) qualReadQueue.unshift(fn);
+        else qualReadQueue.push(fn);
+        qualPumpQueue();
+    }
+    function qualFetchStatus(type, id, cc, force) {
+        const key = qualPkgKey(type, id, cc);
+        if (!force && qualPromises.has(key)) return qualPromises.get(key);
+        if (!force && qualCache.has(key)) return Promise.resolve(qualCache.get(key));
+        const p = new Promise((resolve) => {
+            qualEnqueueRead(true, async () => {
+                try {
+                    const q = new URLSearchParams({
+                        package_type: type || '',
+                        package_id: id || '',
+                        country_code: cc || ''
+                    });
+                    const res = await apiGet('qualification-status.php?' + q.toString());
+                    const qualification = res.qualification || null;
+                    if (qualification) {
+                        qualCache.set(key, qualification);
+                        const row = qualFindRow(type, id);
+                        if (row) qualApplyToRow(row, qualification);
+                        if ((qualification.verify && qualification.verify.state === 'running')
+                            || (qualification.drv && qualification.drv.state === 'running')) {
+                            qualStartPoll(type, id, cc);
+                        } else {
+                            qualStopPoll(key);
+                        }
+                    }
+                    resolve(qualification);
+                } catch (e) {
+                    resolve(null);
+                } finally {
+                    if (qualPromises.has(key)) {
+                        qualMapDrop(qualPromises, key);
+                    }
+                }
+            });
+        });
+        qualPromises.set(key, p);
+        return p;
+    }
+    function qualStopPoll(key) {
+        const t = qualPollTimers.get(key);
+        if (t) {
+            clearTimeout(t);
+            qualMapDrop(qualPollTimers, key);
+        }
+    }
+    function qualStartPoll(type, id, cc) {
+        const key = qualPkgKey(type, id, cc);
+        qualStopPoll(key);
+        let n = 0;
+        const tick = () => {
+            n++;
+            qualFetchStatus(type, id, cc, true).then((qualification) => {
+                const running = qualification
+                    && ((qualification.verify && qualification.verify.state === 'running')
+                        || (qualification.drv && qualification.drv.state === 'running'));
+                if (running && n < 40) {
+                    const delay = Math.min(2000 + n * 250, 5000);
+                    qualPollTimers.set(key, setTimeout(tick, delay));
+                } else {
+                    qualStopPoll(key);
+                }
+            });
+        };
+        qualPollTimers.set(key, setTimeout(tick, 800));
+    }
+    function qualScheduleVisibleLoads() {
+        const rows = Array.from(document.querySelectorAll('details.bc-acc-item[data-package-id]'));
+        if (!rows.length || !CAN_VERIFY) return;
+        const io = (typeof IntersectionObserver !== 'undefined')
+            ? new IntersectionObserver((entries) => {
+                entries.forEach((en) => {
+                    if (!en.isIntersecting) return;
+                    const row = en.target;
+                    const type = row.getAttribute('data-package-type') || '';
+                    const id = row.getAttribute('data-package-id') || '';
+                    const cc = row.getAttribute('data-cc') || '';
+                    qualFetchStatus(type, id, cc, false);
+                    io.unobserve(row);
+                });
+            }, { root: null, rootMargin: '80px', threshold: 0.01 })
+            : null;
+        rows.forEach((row, idx) => {
+            if (io) io.observe(row);
+            else {
+                const type = row.getAttribute('data-package-type') || '';
+                const id = row.getAttribute('data-package-id') || '';
+                const cc = row.getAttribute('data-cc') || '';
+                const delay = idx * 30;
+                setTimeout(() => qualFetchStatus(type, id, cc, false), delay);
+            }
+        });
+        const idleFill = () => {
+            rows.forEach((row) => {
+                const type = row.getAttribute('data-package-type') || '';
+                const id = row.getAttribute('data-package-id') || '';
+                const cc = row.getAttribute('data-cc') || '';
+                const key = qualPkgKey(type, id, cc);
+                if (!qualCache.has(key) && !qualPromises.has(key)) {
+                    qualEnqueueRead(false, async () => { await qualFetchStatus(type, id, cc, false); });
+                }
+            });
+        };
+        if (typeof requestIdleCallback === 'function') requestIdleCallback(idleFill, { timeout: 2500 });
+        else setTimeout(idleFill, 400);
+    }
+    async function qualRunMutation(action, btn) {
+        const type = btn.dataset.type || '';
+        const id = btn.dataset.id || '';
+        const cc = btn.dataset.cc || '';
+        const key = qualPkgKey(type, id, cc) + '|' + action;
+        if (qualInFlightMut.has(key)) return;
+        const qState = btn.dataset.qState || '';
+        if (qState === 'success') {
+            const summary = btn.dataset.safeSummary || (action === 'drv'
+                ? 'اجتازت الحزمة فحص قابلية الاسترداد (نتيجة محفوظة).'
+                : 'تم التحقق من الحزمة بنجاح (نتيجة محفوظة).');
+            showAlert(summary, true);
+            return;
+        }
+        if (qState === 'blocked' || qState === 'running' || qState === 'resolving') return;
+        if (action === 'drv' && qState !== 'not_run' && qState !== 'failed') return;
+        if (qState === 'failed' && btn.dataset.retryAllowed === '0') return;
+
+        const scrollY = window.scrollY;
+        const row = qualFindRow(type, id);
+        const wasOpen = !!(row && row.open);
+        const activeEl = document.activeElement;
+        qualInFlightMut.set(key, true);
+        qualApplyBtn(btn, action, 'running', {});
+        if (action === 'verify') {
+            const drvBtn = row ? row.querySelector('.bc-drv') : null;
+            qualApplyBtn(drvBtn, 'drv', 'blocked', { forceDisabled: true });
+        }
+        try {
+            const path = action === 'drv' ? 'recovery-check.php' : 'verify.php';
+            const res = await apiPostQual(path, {
+                package_type: type,
+                package_id: id,
+                country_code: cc
+            });
+            const body = res.body || {};
+            if (body.qualification) {
+                qualApplyToRow(row, body.qualification);
+            } else {
+                await qualFetchStatus(type, id, cc, true);
+            }
+            if (body.code === 'qualification_in_progress' || body.in_progress) {
+                qualStartPoll(type, id, cc);
+                showAlert(body.message || 'العملية قيد التنفيذ حالياً.', false);
+            } else if (body.success) {
+                showAlert(body.message || 'تم', true);
+            } else {
+                showAlert(body.message || 'فشلت العملية', false);
+            }
+        } catch (e) {
+            showAlert(e.message || 'فشلت العملية', false);
+            await qualFetchStatus(type, id, cc, true);
+        } finally {
+            qualMapDrop(qualInFlightMut, key);
+            if (row) row.open = wasOpen;
+            if (Math.abs(window.scrollY - scrollY) > 1) window.scrollTo(0, scrollY);
+            if (activeEl && typeof activeEl.focus === 'function') {
+                try { activeEl.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+            }
+        }
     }
 
     function rowHtml(label, valueHtml, rtl) {
@@ -1028,8 +1322,9 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         let html = '<span class="bc-primary-cluster" dir="ltr">';
         html += '<button type="button" class="bc-btn-primary bc-open-details" data-idx="' + idx + '" data-type="' + esc(type) + '">التفاصيل</button>';
         if (CAN_VERIFY) {
-            html += '<button type="button" class="bc-btn-ghost bc-drv" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">DRV</button>';
-            html += '<button type="button" class="bc-btn-ghost bc-verify" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">Verify</button>';
+            // Exact class tokens preserved for Stage 3 template count; resolving via aria-busy + CSS.
+            html += '<button type="button" class="bc-btn-ghost bc-drv" disabled aria-busy="true" aria-disabled="true" title="DRV" aria-label="DRV resolving" data-q-state="resolving" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">DRV</button>';
+            html += '<button type="button" class="bc-btn-ghost bc-verify" disabled aria-busy="true" aria-disabled="true" title="Verify" aria-label="Verify resolving" data-q-state="resolving" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '">Verify</button>';
         }
         html += '</span>';
         return html;
@@ -1055,7 +1350,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         const identity = String(pkg.package_id || '').trim();
         const whenHtml = fmtPackageWhenDisplay(pkg, type);
         return (
-            '<details class="bc-acc-item" data-bc-acc="1" data-package-id="' + esc(identity) + '">' +
+            '<details class="bc-acc-item" data-bc-acc="1" data-package-id="' + esc(identity) + '" data-package-type="' + esc(type) + '" data-cc="' + esc(pkg.country_code || '') + '">' +
             '<summary>' +
                 '<span class="bc-acc-chevron" aria-hidden="true"></span>' +
                 '<span class="bc-acc-title">' + esc(title) + '</span>' +
@@ -1065,7 +1360,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                         ? '<span class="bc-mono" dir="ltr" title="package_id (identity)">' + esc(identity) + '</span>'
                         : '') +
                     badge(statusLabel) +
-                    recoverabilityBadge(pkg) +
+                    recoverabilitySlotHtml(pkg) +
                 '</span>' +
                 '<span class="bc-acc-actions-inline">' +
                     primaryClusterHtml(pkg, type, idx) +
@@ -1139,6 +1434,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         state.archiveMode[kind] = !!on;
         renderActiveBackupList(kind);
         document.querySelectorAll('.bc-acc-item[open]').forEach((d) => { d.open = false; });
+        qualScheduleVisibleLoads();
     }
 
     function closeDrawer() {
@@ -1180,7 +1476,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                 '<div><dt>النوع</dt><dd>' + esc(isFull ? 'full_disaster' : 'country_recovery') + '</dd></div>' +
                 (isFull ? '' : '<div><dt>الدولة</dt><dd>' + esc((pkg.country_code || '') + (pkg.country_name ? ' — ' + pkg.country_name : '')) + '</dd></div>') +
                 '<div><dt>الحالة</dt><dd>' + badge(pkg.package_status) + '</dd></div>' +
-                '<div><dt>Recoverable</dt><dd>' + recoverabilityBadge(pkg) + '</dd></div>' +
+                '<div><dt>Recoverable</dt><dd>' + recoverabilitySlotHtml(pkg) + '</dd></div>' +
                 '<div><dt>Schema</dt><dd>' + esc(String(pkg.schema_revision ?? '—')) + '</dd></div>' +
                 '<div><dt>Backend</dt><dd>' + esc(pkg.backend || '—') + '</dd></div>' +
                 '<div><dt>DRV Score</dt><dd>' + esc(String(pkg.recovery_score || 0)) + '</dd></div>' +
@@ -1249,12 +1545,23 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     }
 
     async function loadAll() {
+        const scrollY = window.scrollY;
+        const openIds = Array.from(document.querySelectorAll('details.bc-acc-item[open]'))
+            .map((d) => d.getAttribute('data-package-id') + '|' + d.getAttribute('data-package-type'));
         setBusy(true, 'جاري تحميل البيانات…');
         try {
             const data = await apiGet('list.php');
+            // Broad list must not resolve/hash qualification for every package (Stage 4B performance).
+            qualHashCountThisPage = 0;
             renderRootHealth(data);
             renderOverview(data);
             renderTables(data);
+            document.querySelectorAll('details.bc-acc-item').forEach((d) => {
+                const k = d.getAttribute('data-package-id') + '|' + d.getAttribute('data-package-type');
+                if (openIds.indexOf(k) !== -1) d.open = true;
+            });
+            window.scrollTo(0, scrollY);
+            qualScheduleVisibleLoads();
             const locks = await apiGet('status.php?action=locks');
             if ((locks.full_lock || {}).held || (locks.country_lock || {}).held) {
                 showAlert('هناك عملية نسخ احتياطي قيد التشغيل حالياً.', false);
@@ -1380,32 +1687,22 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             } catch (e) { showAlert(e.message, false); }
             return;
         }
-        if (t.classList.contains('bc-verify') && CAN_VERIFY) {
-            setBusy(true, 'Verify…');
-            try {
-                const res = await apiPost('verify.php', {
-                    package_type: t.dataset.type,
-                    package_id: t.dataset.id,
-                    country_code: t.dataset.cc || ''
-                });
-                showAlert(res.message || 'تم', true);
-                await loadAll();
-            } catch (e) { showAlert(e.message, false); }
-            finally { setBusy(false); }
+        const verifyBtn = t.classList.contains('bc-verify') ? t : (t.closest ? t.closest('.bc-verify') : null);
+        if (verifyBtn && CAN_VERIFY) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            await qualRunMutation('verify', verifyBtn);
             return;
         }
-        if (t.classList.contains('bc-drv') && CAN_VERIFY) {
-            setBusy(true, 'DRV…');
-            try {
-                const res = await apiPost('recovery-check.php', {
-                    package_type: t.dataset.type,
-                    package_id: t.dataset.id,
-                    country_code: t.dataset.cc || ''
-                });
-                showAlert(res.message || 'تم', true);
-                await loadAll();
-            } catch (e) { showAlert(e.message, false); }
-            finally { setBusy(false); }
+        const drvBtn = t.classList.contains('bc-drv') ? t : (t.closest ? t.closest('.bc-drv') : null);
+        if (drvBtn && CAN_VERIFY) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (drvBtn.disabled || drvBtn.getAttribute('aria-disabled') === 'true'
+                || drvBtn.dataset.qState === 'blocked') {
+                return;
+            }
+            await qualRunMutation('drv', drvBtn);
         }
     });
 

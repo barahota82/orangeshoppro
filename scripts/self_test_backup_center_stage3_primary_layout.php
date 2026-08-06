@@ -349,15 +349,30 @@ JS;
   const pre = document.getElementById('s3_report');
   if (pre) pre.textContent = JSON.stringify(report);
   window.__STAGE3_DOM_REPORT__ = report;
+  try {
+    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(report))));
+    document.documentElement.setAttribute('data-s3-b64', b64);
+    let box = document.getElementById('s3_report_b64');
+    if (!box) {
+      box = document.createElement('pre');
+      box.id = 's3_report_b64';
+      box.style.display = 'none';
+      document.body.appendChild(box);
+    }
+    box.textContent = b64;
+  } catch (e) {}
+  document.title = 'STAGE3_DOM_' + (report.fail.length ? 'FAIL' : 'PASS');
 })();
 JS;
 
-        $harness = '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">'
+        // dir=rtl on #bc_app only (not <html>) — avoids RTL offset when capture canvas ≠ content width.
+        $harness = '<!DOCTYPE html><html lang="ar"><head><meta charset="utf-8">'
             . '<meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>Stage 3 DOM harness</title><style>' . $style
-            . 'body{margin:0;font-family:Tahoma,Arial,sans-serif;background:#f1f5f9;color:#0f172a}'
+            . 'html,body{margin:0;padding:0;width:100%;max-width:100%;overflow-x:hidden;font-family:Tahoma,Arial,sans-serif;background:#f1f5f9;color:#0f172a;box-sizing:border-box}'
+            . '*,*:before,*:after{box-sizing:border-box}'
             . '.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px}</style></head><body>'
-            . '<div class="bc-v2" id="bc_app">'
+            . '<div class="bc-v2" id="bc_app" dir="rtl" style="width:100%;max-width:100%;min-width:0;box-sizing:border-box">'
             . '<div id="bc_alert" class="card" style="display:none;margin-bottom:12px;"></div>'
             . '<div id="bc_progress" class="bc-progress" role="status"></div>'
             . '<div id="bc_root_warning" class="bc-root-warning"></div>'
@@ -378,9 +393,11 @@ JS;
             . "const el = (id) => document.getElementById(id);\n"
             . "const esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\n"
             . "const fmtBytes = (n) => { n = Number(n)||0; if (n<=0) return '-'; if (n<1024) return n+' B'; if (n<1048576) return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(1)+' MB'; };\n"
-            . "const badge = (s) => '<span class=\"bc-badge bc-badge--success\">' + esc(s||'-') + '</span>';\n"
-            . "const recoverabilityBadge = () => '<span class=\"bc-badge bc-badge--success\"><span class=\"bc-dot\"></span> Recoverable</span>';\n"
-            . "const fmtPackageWhenDisplay = (pkg) => esc(pkg.generated_at_display || pkg.package_id || '');\n"
+            . "const statusTone = (status) => { const s = String(status || '').toLowerCase(); if (s === 'unknown' || s === 'unresolved' || s === 'ambiguous' || s === '') return 'muted'; if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'ok' || s === 'ready') return 'success'; if (s === 'warning' || s === 'warn') return 'warning'; if (s === 'failed' || s === 'fail' || s === 'error') return 'failed'; if (s === 'running') return 'running'; return 'muted'; };\n"
+            . "const badge = (s) => '<span class=\"bc-badge bc-badge--' + statusTone(s) + '\">' + esc(s||'—') + '</span>';\n"
+            . "const recoverabilityBadge = (pkg) => (pkg && pkg.recoverable === true) ? '<span class=\"bc-badge bc-badge--success\" title=\"Recoverable\"><span class=\"bc-dot\" aria-hidden=\"true\"></span>Recoverable</span>' : '';\n"
+            . "const recoverabilitySlotHtml = (pkg) => '<span class=\"bc-recoverable-slot\" data-bc-recoverable-slot=\"1\">' + recoverabilityBadge(pkg) + '</span>';\n"
+            . "const fmtPackageWhenDisplay = (pkg) => esc((pkg && (pkg.generated_at_display || pkg.package_id)) || '');\n"
             . "const applyActionAvailability = () => {};\n"
             . $bundle . "\n" . $assertJs . "\n</script></body></html>";
 
@@ -399,9 +416,9 @@ JS;
 param([string]$Chrome,[string]$Url,[string]$Out,[string]$Err)
 $p = Start-Process -FilePath $Chrome -ArgumentList @(
   '--headless=new','--disable-gpu','--allow-file-access-from-files',
-  '--virtual-time-budget=2500','--dump-dom',$Url
+  '--virtual-time-budget=8000','--dump-dom',$Url
 ) -NoNewWindow -PassThru -RedirectStandardOutput $Out -RedirectStandardError $Err
-if (-not $p.WaitForExit(25000)) {
+if (-not $p.WaitForExit(45000)) {
   Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
   Write-Output 'TIMEOUT'
   exit 2
@@ -419,41 +436,85 @@ PS;
             exec($cmd, $chromeStatus, $psExit);
             echo 'CHROME_DOM: ' . implode(' ', $chromeStatus) . " psExit={$psExit}\n";
             $domHtml = is_file($dumpFile) ? (string) file_get_contents($dumpFile) : '';
-            if (preg_match('/<pre id="s3_report"[^>]*>(\{.*?\})<\/pre>/s', $domHtml, $rm)) {
-                $json = json_decode(html_entity_decode($rm[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), true);
-                if (is_array($json)) {
-                    foreach ($json['pass'] ?? [] as $p) {
-                        s3_assert(true, 'DOM: ' . $p);
-                    }
-                    foreach ($json['fail'] ?? [] as $f) {
-                        s3_assert(false, 'DOM: ' . $f);
-                    }
-                    file_put_contents($domReport, json_encode($json, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-                } else {
-                    s3_assert(false, 'DOM report JSON parse');
+            $json = null;
+            if (preg_match('/<pre id="s3_report_b64"[^>]*>\s*([A-Za-z0-9+\/=]+)\s*<\/pre>/', $domHtml, $bm)) {
+                $raw = base64_decode($bm[1], true);
+                if (is_string($raw) && $raw !== '') {
+                    $json = json_decode($raw, true);
                 }
+            } elseif (preg_match('/data-s3-b64="([^"]+)"/', $domHtml, $bm)) {
+                $raw = base64_decode(html_entity_decode($bm[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), true);
+                if (is_string($raw) && $raw !== '') {
+                    $json = json_decode($raw, true);
+                }
+            }
+            if (!is_array($json) && preg_match('/<pre id="s3_report"[^>]*>\{/', $domHtml)) {
+                // Brace-balanced extract (non-greedy regex previously truncated nested JSON).
+                $pos = strpos($domHtml, 'id="s3_report"');
+                if ($pos !== false) {
+                    $brace = strpos($domHtml, '{', $pos);
+                    if ($brace !== false) {
+                        $depth = 0;
+                        $end = -1;
+                        $len = strlen($domHtml);
+                        for ($i = $brace; $i < $len; $i++) {
+                            $ch = $domHtml[$i];
+                            if ($ch === '{') {
+                                $depth++;
+                            } elseif ($ch === '}') {
+                                $depth--;
+                                if ($depth === 0) {
+                                    $end = $i;
+                                    break;
+                                }
+                            }
+                        }
+                        if ($end > $brace) {
+                            $json = json_decode(substr($domHtml, $brace, $end - $brace + 1), true);
+                        }
+                    }
+                }
+            }
+            if (is_array($json)) {
+                foreach ($json['pass'] ?? [] as $p) {
+                    s3_assert(true, 'DOM: ' . $p);
+                }
+                foreach ($json['fail'] ?? [] as $f) {
+                    s3_assert(false, 'DOM: ' . $f);
+                }
+                file_put_contents($domReport, json_encode($json, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+                s3_assert(($json['fail'] ?? []) === [], 'STAGE3_DOM_RUNTIME_PROOF = PASS');
+                echo "STAGE3_DOM_RUNTIME_PROOF = PASS\n";
             } elseif ($domHtml !== '' && str_contains($domHtml, 'bc-primary-cluster')) {
-                s3_assert(true, 'DOM dump contains primary cluster');
-                s3_assert(substr_count($domHtml, 'bc-open-details') >= 1, 'DOM dump has Details');
-                s3_assert(!preg_match('/bc-acc-body[\s\S]{0,500}class="[^"]*bc-verify/', $domHtml), 'DOM dump: accordion body lacks Verify button');
-                s3_skip('DOM JSON report marker missing — structural fallback used');
+                s3_assert(false, 'STAGE3_DOM_RUNTIME_PROOF = FAIL (report marker missing after dump)');
+                echo "STAGE3_DOM_RUNTIME_PROOF = FAIL\n";
             } else {
-                s3_skip('Chrome DOM dump unavailable; source-level Stage 3 asserts already enforced');
+                s3_assert(false, 'STAGE3_DOM_RUNTIME_PROOF = FAIL (Chrome DOM dump unavailable)');
+                echo "STAGE3_DOM_RUNTIME_PROOF = FAIL\n";
             }
 
-            // --- Mobile geometry (actual layout at 390 and 360) ---
+            // --- Mobile geometry (actual layout at 390 and 360 via Chrome CDP device metrics) ---
+            require_once $projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'backup_stage4b_evidence_lib.php';
             $mobileHtml = $harnessDir . DIRECTORY_SEPARATOR . 'stage3_mobile_geom.html';
             $mobileJs = <<<'JS'
 (function () {
   const report = { pass: [], fail: [], geometry: {} };
-  const expectedW = window.__STAGE3_EXPECTED_W || document.documentElement.clientWidth;
+  const docEl = document.documentElement;
+  const expectedW = Number(window.__STAGE3_EXPECTED_W || docEl.clientWidth);
+  const vwL = 0;
+  const vwR = docEl.clientWidth;
   function ok(cond, msg) { (cond ? report.pass : report.fail).push(msg); }
-  function inside(el, boxLeft, boxRight, label) {
+  function boxOf(el) {
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
+  }
+  function inside(el, label) {
     if (!el) { ok(false, label + ' missing'); return null; }
     const r = el.getBoundingClientRect();
     const eps = 1;
-    ok(r.left >= boxLeft - eps, label + ' left>=appLeft (' + r.left.toFixed(2) + '>=' + boxLeft.toFixed(2) + ')');
-    ok(r.right <= boxRight + eps, label + ' right<=appRight (' + r.right.toFixed(2) + '<=' + boxRight.toFixed(2) + ')');
+    ok(r.left >= vwL - eps, label + ' left>=viewportLeft (' + r.left.toFixed(2) + '>=' + vwL + ')');
+    ok(r.right <= vwR + eps, label + ' right<=viewportRight (' + r.right.toFixed(2) + '<=' + vwR + ')');
     ok(r.width > 0 && r.height > 0, label + ' has size');
     return r;
   }
@@ -470,19 +531,18 @@ PS;
   el('bc_full_list').innerHTML = accordionItemHtml(fullPkg, 'full_disaster', 0);
   el('bc_country_list').style.display = 'block';
   el('bc_country_list').innerHTML = accordionItemHtml(countryPkg, 'country_recovery', 0);
-  const app = el('bc_app') || document.body;
-  const appBox = app.getBoundingClientRect();
   const sum = document.querySelector('#bc_full_list summary');
   const sumCs = sum ? getComputedStyle(sum) : null;
-  report.geometry.viewportWidth = expectedW;
-  report.geometry.appWidth = appBox.width;
-  report.geometry.appLeft = appBox.left;
-  report.geometry.appRight = appBox.right;
+  report.geometry.viewport_left = vwL;
+  report.geometry.viewport_right = vwR;
+  report.geometry.expectedWidth = expectedW;
+  report.geometry.documentElement_clientWidth = docEl.clientWidth;
+  report.geometry.documentElement_scrollWidth = docEl.scrollWidth;
   report.geometry.summaryDisplay = sumCs ? sumCs.display : null;
-  report.geometry.scrollWidth = app.scrollWidth;
-  ok(Math.abs(appBox.width - expectedW) <= 2, 'app width~=expected (' + appBox.width + '~=' + expectedW + ')');
-  ok(app.scrollWidth <= appBox.width + 1, 'no horizontal overflow inside app scrollWidth(' + app.scrollWidth + ')<=appWidth(' + appBox.width + ')');
-  ok(sumCs && sumCs.display === 'grid', 'summary display=grid on narrow app');
+  // Fail if CDP device metrics did not apply (guards false PASS from inner-container-only checks).
+  ok(Math.abs(docEl.clientWidth - expectedW) <= 2, 'clientWidth~=expected (' + docEl.clientWidth + '~=' + expectedW + ')');
+  ok(docEl.scrollWidth <= docEl.clientWidth + 1, 'no horizontal page scroll scrollWidth(' + docEl.scrollWidth + ')<=clientWidth(' + docEl.clientWidth + ')');
+  ok(sumCs && sumCs.display === 'grid', 'summary display=grid on narrow viewport');
 
   [['full', '#bc_full_list'], ['country', '#bc_country_list']].forEach(([kind, sel]) => {
     const item = document.querySelector(sel + ' .bc-acc-item');
@@ -491,18 +551,21 @@ PS;
     const details = item && item.querySelector('summary .bc-open-details');
     const drv = item && item.querySelector('summary .bc-drv');
     const verify = item && item.querySelector('summary .bc-verify');
-    const cr = inside(item, appBox.left, appBox.right, kind + ' card');
-    const tr = inside(title, appBox.left, appBox.right, kind + ' title');
-    inside(chevron, appBox.left, appBox.right, kind + ' chevron');
-    inside(details, appBox.left, appBox.right, kind + ' Details');
-    inside(drv, appBox.left, appBox.right, kind + ' DRV');
-    inside(verify, appBox.left, appBox.right, kind + ' Verify');
+    inside(item, kind + ' card');
+    inside(title, kind + ' title');
+    inside(chevron, kind + ' chevron');
+    inside(details, kind + ' Details');
+    inside(drv, kind + ' DRV');
+    inside(verify, kind + ' Verify');
+    report.geometry[kind] = {
+      card: boxOf(item), title: boxOf(title), chevron: boxOf(chevron),
+      Details: boxOf(details), DRV: boxOf(drv), Verify: boxOf(verify)
+    };
     if (title) {
       const cs = getComputedStyle(title);
       ok(cs.textOverflow !== 'ellipsis' || cs.overflow === 'visible', kind + ' title not ellipsis-clipped');
       const t = title.textContent || '';
       ok(t.indexOf('Full Backup') !== -1 || t.indexOf('Country Backup') !== -1, kind + ' title text complete (' + t + ')');
-      report.geometry[kind + '_title'] = { left: tr ? tr.left : null, right: tr ? tr.right : null, text: t };
     }
     if (details && drv && verify) {
       const d = details.getBoundingClientRect();
@@ -511,14 +574,23 @@ PS;
       ok(d.left <= r.left && r.left <= v.left, kind + ' order Details→DRV→Verify');
       ok(d.right <= r.left + 1 && r.right <= v.left + 1, kind + ' no primary overlap');
     }
-    if (cr) {
-      ok(Math.abs(cr.width - appBox.width) <= 2 || cr.width <= appBox.width + 1, kind + ' card width within app');
-    }
   });
 
   const pre = document.getElementById('s3_report');
   if (pre) pre.textContent = JSON.stringify(report);
-  document.title = 'MOBILE_GEOM_OK';
+  try {
+    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(report))));
+    document.documentElement.setAttribute('data-s3-b64', b64);
+    let box = document.getElementById('s3_report_b64');
+    if (!box) {
+      box = document.createElement('pre');
+      box.id = 's3_report_b64';
+      box.style.display = 'none';
+      document.body.appendChild(box);
+    }
+    box.textContent = b64;
+  } catch (e) {}
+  document.title = 'MOBILE_GEOM_' + (report.fail.length ? 'FAIL' : 'OK');
 })();
 JS;
             // Reuse harness shell with Production style/functions; inject mobile assert.
@@ -529,9 +601,11 @@ JS;
                 . "const el = (id) => document.getElementById(id);\n"
                 . "const esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\n"
                 . "const fmtBytes = (n) => { n = Number(n)||0; if (n<=0) return '-'; if (n<1024) return n+' B'; if (n<1048576) return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(1)+' MB'; };\n"
-                . "const badge = (s) => '<span class=\"bc-badge bc-badge--success\">' + esc(s||'-') + '</span>';\n"
-                . "const recoverabilityBadge = () => '<span class=\"bc-badge bc-badge--success\"><span class=\"bc-dot\"></span> Recoverable</span>';\n"
-                . "const fmtPackageWhenDisplay = (pkg) => esc(pkg.generated_at_display || pkg.package_id || '');\n"
+                . "const statusTone = (status) => { const s = String(status || '').toLowerCase(); if (s === 'unknown' || s === 'unresolved' || s === 'ambiguous' || s === '') return 'muted'; if (s === 'healthy' || s === 'success' || s === 'pass' || s === 'ok' || s === 'ready') return 'success'; if (s === 'warning' || s === 'warn') return 'warning'; if (s === 'failed' || s === 'fail' || s === 'error') return 'failed'; if (s === 'running') return 'running'; return 'muted'; };\n"
+                . "const badge = (s) => '<span class=\"bc-badge bc-badge--' + statusTone(s) + '\">' + esc(s||'—') + '</span>';\n"
+                . "const recoverabilityBadge = (pkg) => (pkg && pkg.recoverable === true) ? '<span class=\"bc-badge bc-badge--success\" title=\"Recoverable\"><span class=\"bc-dot\" aria-hidden=\"true\"></span>Recoverable</span>' : '';\n"
+                . "const recoverabilitySlotHtml = (pkg) => '<span class=\"bc-recoverable-slot\" data-bc-recoverable-slot=\"1\">' + recoverabilityBadge(pkg) + '</span>';\n"
+                . "const fmtPackageWhenDisplay = (pkg) => esc((pkg && (pkg.generated_at_display || pkg.package_id)) || '');\n"
                 . "const applyActionAvailability = () => {};\n"
                 . "function viewFileControl(type, id, cc, file, label, asLink) {\n"
                 . "  const cls = asLink ? 'bc-link bc-view-file' : 'bc-btn-ghost bc-view-file';\n"
@@ -555,68 +629,40 @@ JS;
             }
             file_put_contents($mobileHtml, $mobilePage);
 
-            $geomRunner = $harnessDir . DIRECTORY_SEPARATOR . 'run_mobile_geom.ps1';
-            $geomPs = "param([string]\$Chrome,[string]\$Url,[string]\$Out,[string]\$Err,[int]\$W,[int]\$H)\n"
-                . "\$p = Start-Process -FilePath \$Chrome -ArgumentList @(\n"
-                . "  '--headless=new','--disable-gpu','--allow-file-access-from-files','--hide-scrollbars',\n"
-                . "  \"--window-size=\$W,\$H\",'--force-device-scale-factor=1','--virtual-time-budget=3000','--dump-dom',\$Url\n"
-                . ") -NoNewWindow -PassThru -RedirectStandardOutput \$Out -RedirectStandardError \$Err\n"
-                . "if (-not \$p.WaitForExit(30000)) { Stop-Process -Id \$p.Id -Force -ErrorAction SilentlyContinue; Write-Output 'TIMEOUT'; exit 2 }\n"
-                . "Write-Output ('EXIT=' + \$p.ExitCode)\nexit 0\n";
-            file_put_contents($geomRunner, $geomPs);
-
             foreach ([[390, 844], [360, 800]] as [$w, $h]) {
-                // Force layout width in-page — Chrome dump-dom may ignore window-size alone.
+                // CDP Emulation.setDeviceMetricsOverride — do not pin a narrow body inside a wider canvas.
                 $widthForced = str_replace(
                     '<meta name="viewport" content="width=device-width, initial-scale=1">',
-                    '<meta name="viewport" content="width=' . (int) $w . ', initial-scale=1">'
-                    . '<style>html,body,#bc_app{width:' . (int) $w . 'px!important;max-width:' . (int) $w
-                    . 'px!important;margin:0!important;padding:0!important;overflow-x:hidden!important;box-sizing:border-box!important}</style>',
+                    '<meta name="viewport" content="width=' . (int) $w . ', initial-scale=1, maximum-scale=1">'
+                    . '<style>html,body,#bc_app{width:100%!important;max-width:100%!important;min-width:0!important;margin:0!important;overflow-x:hidden!important}</style>'
+                    . '<script>window.__STAGE3_EXPECTED_W=' . (int) $w . ';</script>',
                     $mobilePage
-                );
-                $widthForced = str_replace(
-                    'const expectedW = window.__STAGE3_EXPECTED_W || document.documentElement.clientWidth;',
-                    'window.__STAGE3_EXPECTED_W = ' . (int) $w . '; const expectedW = ' . (int) $w . ';',
-                    $widthForced
                 );
                 $mobileHtmlW = $harnessDir . DIRECTORY_SEPARATOR . "stage3_mobile_geom_{$w}.html";
                 file_put_contents($mobileHtmlW, $widthForced);
-                $outFile = $harnessDir . DIRECTORY_SEPARATOR . "mobile_geom_dump_{$w}.html";
-                $errG = $harnessDir . DIRECTORY_SEPARATOR . "mobile_geom_{$w}_err.txt";
                 $mUrl = 'file:///' . str_replace('\\', '/', $mobileHtmlW);
-                $status = [];
-                exec(
-                    'powershell -NoProfile -File ' . escapeshellarg($geomRunner)
-                    . ' -Chrome ' . escapeshellarg($chrome)
-                    . ' -Url ' . escapeshellarg($mUrl)
-                    . ' -Out ' . escapeshellarg($outFile)
-                    . ' -Err ' . escapeshellarg($errG)
-                    . ' -W ' . (int) $w
-                    . ' -H ' . (int) $h,
-                    $status,
-                    $gExit
-                );
-                echo "CHROME_MOBILE_{$w}: " . implode(' ', $status) . " exit={$gExit}\n";
-                $gHtml = is_file($outFile) ? (string) file_get_contents($outFile) : '';
-                if (preg_match('/<pre id="s3_report"[^>]*>(\{.*?\})<\/pre>/s', $gHtml, $gm)) {
-                    $gJson = json_decode(html_entity_decode($gm[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), true);
-                    if (is_array($gJson)) {
-                        echo 'MOBILE_GEOM_' . $w . '=' . json_encode($gJson['geometry'] ?? [], JSON_UNESCAPED_UNICODE) . "\n";
-                        foreach ($gJson['pass'] ?? [] as $p) {
-                            s3_assert(true, "mobile{$w}: " . $p);
-                        }
-                        foreach ($gJson['fail'] ?? [] as $f) {
-                            s3_assert(false, "mobile{$w}: " . $f);
-                        }
-                        file_put_contents(
-                            $harnessDir . DIRECTORY_SEPARATOR . "mobile_geom_{$w}.json",
-                            json_encode($gJson, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
-                        );
-                    } else {
-                        s3_assert(false, "mobile{$w}: geometry JSON parse");
+                $pngOut = $harnessDir . DIRECTORY_SEPARATOR . "mobile_geom_{$w}.png";
+                $cdp = s4b_ev_chrome_cdp_capture($mUrl, $pngOut, (int) $w, (int) $h, '');
+                echo "CHROME_MOBILE_{$w}_CDP: " . ($cdp['err'] ?? '') . ' png=' . (!empty($cdp['png_ok']) ? '1' : '0') . "\n";
+                $gJson = is_array($cdp['report'] ?? null) ? $cdp['report'] : null;
+                if (is_array($gJson)) {
+                    echo 'MOBILE_GEOM_' . $w . '=' . json_encode($gJson['geometry'] ?? [], JSON_UNESCAPED_UNICODE) . "\n";
+                    foreach ($gJson['pass'] ?? [] as $p) {
+                        s3_assert(true, "mobile{$w}: " . $p);
                     }
+                    foreach ($gJson['fail'] ?? [] as $f) {
+                        s3_assert(false, "mobile{$w}: " . $f);
+                    }
+                    $marker = ($gJson['fail'] ?? []) === [] ? 'PASS' : 'FAIL';
+                    echo 'STAGE3_MOBILE_' . $w . '_GEOMETRY = ' . $marker . "\n";
+                    s3_assert($marker === 'PASS', 'STAGE3_MOBILE_' . $w . '_GEOMETRY = PASS');
+                    file_put_contents(
+                        $harnessDir . DIRECTORY_SEPARATOR . "mobile_geom_{$w}.json",
+                        json_encode($gJson, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+                    );
                 } else {
-                    s3_skip("mobile{$w}: geometry report missing from dump-dom");
+                    echo 'STAGE3_MOBILE_' . $w . "_GEOMETRY = FAIL\n";
+                    s3_assert(false, 'STAGE3_MOBILE_' . $w . '_GEOMETRY = FAIL (CDP report missing)');
                 }
             }
         }

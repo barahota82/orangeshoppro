@@ -56,29 +56,56 @@ try {
     );
 
     if (!empty($run['in_progress'])) {
+        $qualification = orange_backup_qualification_public_status(
+            $backupRoot,
+            $packageType,
+            $packageId,
+            $countryCode,
+            $admin,
+            $pdo
+        );
         json_response([
             'success' => false,
             'code' => 'qualification_in_progress',
             'message' => (string) ($run['message'] ?? 'فحص قابلية الاسترداد قيد التنفيذ حالياً.'),
             'in_progress' => true,
+            'qualification' => !empty($qualification['ok']) ? [
+                'package' => $qualification['package'],
+                'verify' => $qualification['verify'],
+                'drv' => $qualification['drv'],
+            ] : null,
         ], 409);
     }
 
     $ok = (bool) ($run['success'] ?? false);
     $result = is_array($run['result'] ?? null) ? $run['result'] : [];
+    $qualification = orange_backup_qualification_public_status(
+        $backupRoot,
+        $packageType,
+        $packageId,
+        $countryCode,
+        $admin,
+        $pdo
+    );
+    $safeResult = orange_backup_admin_redact_secrets([
+        'overall_result' => $result['overall_result'] ?? 'fail',
+        'recovery_score' => $result['recovery_score'] ?? 0,
+        'errors' => $result['errors'] ?? [],
+        'warnings' => $result['warnings'] ?? [],
+        'from_saved_report' => (bool) ($result['from_saved_report'] ?? false),
+    ]);
+    unset($safeResult['report_path']);
     json_response([
         'success' => $ok,
         'message' => (string) ($run['message'] ?? ($ok ? 'اجتازت الحزمة فحص قابلية الاسترداد.' : 'فشل فحص قابلية الاسترداد.')),
         'short_circuited' => (bool) ($run['short_circuited'] ?? false),
         'heavy_executed' => (bool) ($run['heavy_executed'] ?? false),
-        'result' => orange_backup_admin_redact_secrets([
-            'overall_result' => $result['overall_result'] ?? 'fail',
-            'recovery_score' => $result['recovery_score'] ?? 0,
-            'errors' => $result['errors'] ?? [],
-            'warnings' => $result['warnings'] ?? [],
-            'report_path' => $result['report_path'] ?? null,
-            'from_saved_report' => (bool) ($result['from_saved_report'] ?? false),
-        ]),
+        'result' => $safeResult,
+        'qualification' => !empty($qualification['ok']) ? [
+            'package' => $qualification['package'],
+            'verify' => $qualification['verify'],
+            'drv' => $qualification['drv'],
+        ] : null,
     ], $ok ? 200 : 422);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, backup_admin_api_safe_message($e));
