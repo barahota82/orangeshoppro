@@ -16,8 +16,10 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $projectRoot = dirname(__DIR__);
+require_once $projectRoot . '/scripts/lib/backup_stage4b_evidence_lib.php';
+
 $pagePath = $projectRoot . '/admin/pages/backup_center.php';
-$evidenceDir = 'D:\\orange_stage4b_evidence\\report_dedup';
+$evidenceDir = s4b_ev_evidence_dir('orange_stage4b_evidence/report_dedup');
 @mkdir($evidenceDir, 0775, true);
 
 $passes = 0;
@@ -424,7 +426,9 @@ JS;
         global $coreSkip;
         echo "SKIP: Chrome/Edge not found for DOM harness\n";
         $skips++;
-        $coreSkip++;
+        if (DIRECTORY_SEPARATOR === '\\') {
+            $coreSkip++;
+        }
     } else {
         $userData = $harnessDir . DIRECTORY_SEPARATOR . 'chrome_profile';
         @mkdir($userData, 0775, true);

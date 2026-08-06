@@ -7,6 +7,24 @@ declare(strict_types=1);
  * Evidence only; no Production mutations.
  */
 
+function s4b_ev_evidence_dir(string $folderName = 'orange_stage4b_evidence'): string
+{
+    $folderName = trim($folderName, " \t\n\r\0\x0B\\/");
+    if ($folderName === '') {
+        $folderName = 'orange_stage4b_evidence';
+    }
+    if (str_contains($folderName, '..')) {
+        throw new RuntimeException('Unsafe evidence folder name');
+    }
+
+    $relative = str_replace(['\\', '/'], DIRECTORY_SEPARATOR, $folderName);
+    if (DIRECTORY_SEPARATOR === '\\') {
+        return 'D:\\' . str_replace(DIRECTORY_SEPARATOR, '\\', $relative);
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $relative;
+}
+
 function s4b_ev_extract_function(string $src, string $name): string
 {
     $needle = 'function ' . $name . '(';
