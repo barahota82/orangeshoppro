@@ -84,7 +84,9 @@ s3_assert(
 );
 s3_assert(str_contains($src, 'function primaryClusterHtml('), 'JS: primaryClusterHtml defined');
 s3_assert(str_contains($src, 'function hiddenPkgDataCell('), 'JS: hiddenPkgDataCell defined');
-s3_assert(str_contains($src, 'id="bc_alert"'), 'UI: top-page alert/result card remains');
+// Stage 5: #bc_alert remains for unrelated Backup Center alerts (Verify/DRV use result dialog).
+s3_assert(str_contains($src, 'id="bc_alert"'), 'UI: top-page alert card remains for unrelated alerts');
+s3_assert(str_contains($src, 'id="bc_result_dialog"'), 'UI: Stage 5 Verify/DRV result dialog present');
 
 $primaryFn = s3_extract_function($src, 'primaryClusterHtml');
 s3_assert($primaryFn !== '', 'extract: primaryClusterHtml body');
@@ -161,7 +163,10 @@ s3_assert(!preg_match('/\blocalStorage\b/', $src), 'no localStorage state engine
 s3_assert(!str_contains($src, 'no-refresh') && !str_contains($src, 'noRefresh'), 'no no-refresh implementation');
 s3_assert(!str_contains($src, 'CRP Report'), 'no CRP Report rename');
 s3_assert(!str_contains($src, 'bc-drawer-mock'), 'rejected drawer mock not introduced');
-s3_assert(!str_contains($src, 'state-color') && !str_contains($src, 'saved-result'), 'no state-color engine markers');
+// Stage 5 intentionally adds saved-result dialog copy (bc-result-dialog-saved / savedResult).
+// Still forbid a separate "state-color engine" marker string.
+s3_assert(!str_contains($src, 'state-color'), 'no state-color engine markers');
+s3_assert(str_contains($src, 'id="bc_result_dialog"') && str_contains($src, 'savedResult'), 'Stage 5 saved-result dialog markers present');
 s3_assert(!str_contains($src, 'enableDrvAfterVerify') && !str_contains($src, 'drvDisabledPending'), 'no Verify→DRV enablement engine');
 
 /* Single body delegated listener */

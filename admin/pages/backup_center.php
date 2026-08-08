@@ -212,6 +212,22 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
 .bc-modal{background:#fff;border-radius:12px;max-width:520px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
 .bc-modal h3{margin:0 0 10px}
 .bc-pre{max-height:360px;overflow:auto;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;font-size:.78rem;white-space:pre-wrap;word-break:break-word}
+/* Stage 5 — Verify/DRV result dialog (centered, viewport-contained; Close only) */
+.bc-result-dialog-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:5300;padding:16px;box-sizing:border-box}
+.bc-result-dialog-backdrop.is-open{display:flex}
+.bc-result-dialog{background:#fff;border-radius:12px;max-width:min(760px,100%);width:100%;max-height:min(90vh,calc(100vh - 32px));display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.2);overflow:hidden;min-height:0;box-sizing:border-box}
+.bc-result-dialog-head{padding:18px 18px 0;flex:0 0 auto}
+.bc-result-dialog-head h3{margin:0 0 10px;font-size:1.05rem;overflow-wrap:anywhere}
+.bc-result-dialog-body{padding:0 18px;overflow:auto;flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch}
+.bc-result-dialog-foot{padding:12px 18px 18px;flex:0 0 auto;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-start;gap:8px}
+.bc-result-dialog-meta{display:grid;gap:0;margin:0 0 12px}
+.bc-result-dialog-meta div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;font-size:.9rem;padding:7px 0;border-bottom:1px solid #f8fafc}
+.bc-result-dialog-meta dt{margin:0;color:var(--bc-muted)}
+.bc-result-dialog-meta dd{margin:0;font-weight:600;text-align:left;direction:ltr;unicode-bidi:isolate;word-break:break-word;max-width:100%}
+.bc-result-dialog-summary{white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;font-size:.92rem;line-height:1.55;margin:0 0 4px}
+.bc-result-dialog--ok .bc-result-dialog-summary{color:#166534}
+.bc-result-dialog--fail .bc-result-dialog-summary{color:#991b1b}
+.bc-result-dialog-saved{margin:0 0 10px;font-size:.82rem;color:var(--bc-muted)}
 .bc-drawer-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.4);display:none;z-index:5100}
 .bc-drawer{position:fixed;top:0;bottom:0;left:0;width:min(440px,94vw);background:#fff;box-shadow:8px 0 32px rgba(15,23,42,.18);z-index:5200;display:none;flex-direction:column;overflow:hidden}
 .bc-drawer.is-open{display:flex}
@@ -406,6 +422,19 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         <p class="bc-tz-label" id="bc_view_tz_note" style="margin:0 0 8px;"></p>
         <pre id="bc_view_pre" class="bc-pre"></pre>
         <div class="admin-form-actions"><button type="button" class="bc-btn-secondary" id="bc_view_close">إغلاق</button></div>
+    </div>
+</div>
+
+<?php /* Stage 5: Verify/DRV result dialog — Close only; no X / backdrop / Escape dismiss */ ?>
+<div id="bc_result_dialog_backdrop" class="bc-result-dialog-backdrop" aria-hidden="true" data-bc-result-dialog="1">
+    <div id="bc_result_dialog" class="bc-result-dialog" role="dialog" aria-modal="true" aria-labelledby="bc_result_dialog_title" tabindex="-1">
+        <div class="bc-result-dialog-head">
+            <h3 id="bc_result_dialog_title">نتيجة العملية</h3>
+        </div>
+        <div class="bc-result-dialog-body" id="bc_result_dialog_body"></div>
+        <div class="bc-result-dialog-foot">
+            <button type="button" class="bc-btn-secondary" id="bc_result_dialog_close">إغلاق</button>
+        </div>
     </div>
 </div>
 
@@ -759,6 +788,158 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         box.style.display = 'block';
         box.innerHTML = '<div class="' + (ok ? 'alert-success' : 'alert-error') + '">' + msg + '</div>';
     };
+    /** Stage 5: Verify/DRV results only — never route these through #bc_alert. */
+    let bcResultDialogReturnFocus = null;
+    let bcResultDialogKeyHandler = null;
+    function closeQualResultDialog() {
+        const backdrop = el('bc_result_dialog_backdrop');
+        const dlg = el('bc_result_dialog');
+        if (!backdrop || !dlg) return;
+        backdrop.classList.remove('is-open');
+        backdrop.setAttribute('aria-hidden', 'true');
+        if (bcResultDialogKeyHandler) {
+            document.removeEventListener('keydown', bcResultDialogKeyHandler, true);
+            bcResultDialogKeyHandler = null;
+        }
+        const ret = bcResultDialogReturnFocus;
+        bcResultDialogReturnFocus = null;
+        if (ret && typeof ret.focus === 'function' && document.contains(ret)) {
+            try { ret.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+        }
+    }
+    function showQualResultDialog(opts) {
+        opts = opts || {};
+        const backdrop = el('bc_result_dialog_backdrop');
+        const dlg = el('bc_result_dialog');
+        const body = el('bc_result_dialog_body');
+        const titleEl = el('bc_result_dialog_title');
+        const closeBtn = el('bc_result_dialog_close');
+        if (!backdrop || !dlg || !body || !titleEl || !closeBtn) return;
+
+        const op = opts.operation === 'drv' ? 'DRV' : 'Verify';
+        const isFull = (opts.packageType === 'full_disaster');
+        const pkgLabel = isFull ? 'Full' : 'Country';
+        const ok = !!opts.success;
+        const saved = !!opts.savedResult;
+        titleEl.textContent = saved
+            ? ('نتيجة محفوظة — ' + op)
+            : ('نتيجة ' + op);
+
+        const metaRows = [];
+        metaRows.push('<div><dt>العملية</dt><dd>' + esc(op) + '</dd></div>');
+        metaRows.push('<div><dt>نوع الحزمة</dt><dd>' + esc(pkgLabel) + '</dd></div>');
+        if (opts.packageId) {
+            metaRows.push('<div><dt>معرّف الحزمة</dt><dd class="bc-mono">' + esc(String(opts.packageId)) + '</dd></div>');
+        }
+        if (!isFull && (opts.countryCode || opts.countryName)) {
+            const ccLabel = String(opts.countryCode || '')
+                + (opts.countryName ? (' — ' + String(opts.countryName)) : '');
+            metaRows.push('<div><dt>الدولة</dt><dd>' + esc(ccLabel) + '</dd></div>');
+        }
+        metaRows.push('<div><dt>النتيجة</dt><dd>' + esc(ok ? 'success' : 'failure') + '</dd></div>');
+        if (opts.code) {
+            metaRows.push('<div><dt>الرمز</dt><dd class="bc-mono">' + esc(String(opts.code)) + '</dd></div>');
+        }
+        if (opts.completedAt) {
+            metaRows.push('<div><dt>وقت الإكمال</dt><dd dir="ltr">' + esc(String(opts.completedAt)) + '</dd></div>');
+        }
+
+        let html = '';
+        if (saved) {
+            html += '<p class="bc-result-dialog-saved">اكتملت هذه الخطوة سابقاً — تُعرض النتيجة المحفوظة دون إعادة تشغيل.</p>';
+        }
+        html += '<dl class="bc-result-dialog-meta">' + metaRows.join('') + '</dl>';
+        html += '<p class="bc-result-dialog-summary">' + esc(String(opts.summary || '')) + '</p>';
+        body.innerHTML = html;
+
+        dlg.classList.toggle('bc-result-dialog--ok', ok);
+        dlg.classList.toggle('bc-result-dialog--fail', !ok);
+
+        bcResultDialogReturnFocus = opts.sourceBtn && opts.sourceBtn.isConnected
+            ? opts.sourceBtn
+            : (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+
+        backdrop.classList.add('is-open');
+        backdrop.setAttribute('aria-hidden', 'false');
+
+        if (bcResultDialogKeyHandler) {
+            document.removeEventListener('keydown', bcResultDialogKeyHandler, true);
+        }
+        bcResultDialogKeyHandler = (ev) => {
+            if (!backdrop.classList.contains('is-open')) return;
+            if (ev.key === 'Escape') {
+                ev.preventDefault();
+                ev.stopPropagation();
+                return;
+            }
+            if (ev.key !== 'Tab') return;
+            const focusables = [closeBtn];
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            if (ev.shiftKey) {
+                if (document.activeElement === first || !dlg.contains(document.activeElement)) {
+                    ev.preventDefault();
+                    last.focus();
+                }
+            } else if (document.activeElement === last || !dlg.contains(document.activeElement)) {
+                ev.preventDefault();
+                first.focus();
+            }
+        };
+        document.addEventListener('keydown', bcResultDialogKeyHandler, true);
+
+        try { closeBtn.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+    }
+    function openQualResultFromButton(action, btn, extras) {
+        extras = extras || {};
+        const type = (btn && btn.dataset.type) || extras.packageType || '';
+        const id = (btn && btn.dataset.id) || extras.packageId || '';
+        const cc = (btn && btn.dataset.cc) || extras.countryCode || '';
+        const row = qualFindRow(type, id, cc);
+        let countryName = '';
+        if (row && type !== 'full_disaster') {
+            const detailsBtn = row.querySelector('.bc-open-details');
+            const idx = detailsBtn ? Number(detailsBtn.dataset.idx || -1) : -1;
+            if (idx >= 0 && state.country[idx] && state.country[idx].country_name) {
+                countryName = String(state.country[idx].country_name);
+            }
+        }
+        const key = qualPkgKey(type, id, cc);
+        const cached = key && qualCache.has(key) ? qualCache.get(key) : null;
+        const arm = cached
+            ? (action === 'drv' ? (cached.drv || {}) : (cached.verify || {}))
+            : {};
+        const success = extras.success != null
+            ? !!extras.success
+            : ((btn && btn.dataset.qState === 'success') || arm.state === 'success');
+        const summary = extras.summary
+            || (btn && btn.dataset.safeSummary)
+            || arm.safe_summary
+            || (action === 'drv'
+                ? (success ? 'اجتازت الحزمة فحص قابلية الاسترداد.' : 'فشل فحص قابلية الاسترداد.')
+                : (success ? 'تم التحقق من الحزمة بنجاح.' : 'فشل التحقق من الحزمة.'));
+        const code = extras.code
+            || (btn && btn.dataset.safeResultCode)
+            || arm.safe_result_code
+            || '';
+        const completedAt = extras.completedAt
+            || (btn && btn.dataset.completedAt)
+            || arm.completed_at
+            || '';
+        showQualResultDialog({
+            operation: action,
+            packageType: type,
+            packageId: id,
+            countryCode: cc,
+            countryName: countryName,
+            success: success,
+            summary: summary,
+            code: code,
+            completedAt: completedAt,
+            savedResult: !!extras.savedResult,
+            sourceBtn: btn
+        });
+    }
     const healthBadge = (ok, yesLabel, noLabel) => {
         const label = ok ? yesLabel : noLabel;
         const cls = ok ? 'bc-badge--success' : 'bc-badge--warning';
@@ -973,6 +1154,8 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         btn.title = label;
         btn.dataset.qState = stateName;
         if (opts.safeSummary) btn.dataset.safeSummary = String(opts.safeSummary);
+        if (opts.completedAt != null) btn.dataset.completedAt = String(opts.completedAt || '');
+        if (opts.safeResultCode != null) btn.dataset.safeResultCode = String(opts.safeResultCode || '');
         if (opts.retryAllowed != null) btn.dataset.retryAllowed = opts.retryAllowed ? '1' : '0';
     }
     /** Find current connected row by exact type + country + package_id (never by index). */
@@ -1035,11 +1218,15 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         const dBtn = row.querySelector('.bc-drv');
         qualApplyBtn(vBtn, 'verify', v.state || 'not_run', {
             safeSummary: v.safe_summary || '',
+            completedAt: v.completed_at || '',
+            safeResultCode: v.safe_result_code || '',
             retryAllowed: !!v.retry_allowed
         });
         // DRV presentation/click logic frozen — still derives blocked/enabled from authoritative state only.
         qualApplyBtn(dBtn, 'drv', d.state || 'blocked', {
             safeSummary: d.safe_summary || '',
+            completedAt: d.completed_at || '',
+            safeResultCode: d.safe_result_code || '',
             retryAllowed: !!d.retry_allowed,
             forceDisabled: (d.state === 'blocked')
         });
@@ -1387,10 +1574,8 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         if (qualInFlightMut.has(key)) return;
         const qState = btn.dataset.qState || '';
         if (qState === 'success') {
-            const summary = btn.dataset.safeSummary || (action === 'drv'
-                ? 'اجتازت الحزمة فحص قابلية الاسترداد (نتيجة محفوظة).'
-                : 'تم التحقق من الحزمة بنجاح (نتيجة محفوظة).');
-            showAlert(summary, true);
+            // Stage 5: green saved-result → centered dialog only (no heavy POST / no top alert).
+            openQualResultFromButton(action, btn, { savedResult: true, success: true });
             return;
         }
         if (qState === 'blocked' || qState === 'running' || qState === 'resolving') return;
@@ -1427,16 +1612,45 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             } else {
                 await qualFetchStatus(type, id, cc, true);
             }
+            // Re-resolve button after state paint (Verify success enables DRV before dialog).
+            btn = (row && row.isConnected)
+                ? (action === 'drv' ? row.querySelector('.bc-drv') : row.querySelector('.bc-verify')) || btn
+                : btn;
+            const arm = body.qualification
+                ? (action === 'drv' ? (body.qualification.drv || {}) : (body.qualification.verify || {}))
+                : {};
             if (body.code === 'qualification_in_progress' || body.in_progress) {
                 qualStartPoll(type, id, cc);
-                showAlert(body.message || 'العملية قيد التنفيذ حالياً.', false);
+                openQualResultFromButton(action, btn, {
+                    success: false,
+                    summary: body.message || 'العملية قيد التنفيذ حالياً.',
+                    code: body.code || 'qualification_in_progress',
+                    completedAt: arm.completed_at || '',
+                    savedResult: false
+                });
             } else if (body.success) {
-                showAlert(body.message || 'تم', true);
+                openQualResultFromButton(action, btn, {
+                    success: true,
+                    summary: body.message || arm.safe_summary || 'تم',
+                    code: arm.safe_result_code || body.code || '',
+                    completedAt: arm.completed_at || '',
+                    savedResult: !!body.short_circuited
+                });
             } else {
-                showAlert(body.message || 'فشلت العملية', false);
+                openQualResultFromButton(action, btn, {
+                    success: false,
+                    summary: body.message || arm.safe_summary || 'فشلت العملية',
+                    code: arm.safe_result_code || body.code || '',
+                    completedAt: arm.completed_at || '',
+                    savedResult: false
+                });
             }
         } catch (e) {
-            showAlert(e.message || 'فشلت العملية', false);
+            openQualResultFromButton(action, btn, {
+                success: false,
+                summary: e.message || 'فشلت العملية',
+                savedResult: false
+            });
             await qualFetchStatus(type, id, cc, true);
             row = qualFindRow(type, id, cc);
         } finally {
@@ -1444,7 +1658,9 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             row = qualFindRow(type, id, cc);
             if (row && row.isConnected) row.open = wasOpen;
             if (Math.abs(window.scrollY - scrollY) > 1) window.scrollTo(0, scrollY);
-            if (activeEl && typeof activeEl.focus === 'function' && document.contains(activeEl)) {
+            // Focus returns via dialog Close → originating button; keep scroll/accordion here.
+            if (activeEl && typeof activeEl.focus === 'function' && document.contains(activeEl)
+                && !(el('bc_result_dialog_backdrop') && el('bc_result_dialog_backdrop').classList.contains('is-open'))) {
                 try { activeEl.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
             }
         }
@@ -1864,6 +2080,18 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     el('bc_view_close').addEventListener('click', () => { el('bc_view_modal').style.display = 'none'; });
     el('bc_drawer_close').addEventListener('click', closeDrawer);
     el('bc_drawer_backdrop').addEventListener('click', closeDrawer);
+    // Stage 5: Close is the only dismiss path (no backdrop / Escape / X).
+    el('bc_result_dialog_close').addEventListener('click', (ev) => {
+        ev.preventDefault();
+        closeQualResultDialog();
+    });
+    el('bc_result_dialog_backdrop').addEventListener('click', (ev) => {
+        // Intentionally ignore backdrop clicks — result dialog stays open.
+        if (ev.target === el('bc_result_dialog_backdrop')) {
+            ev.preventDefault();
+            ev.stopPropagation();
+        }
+    });
     el('bc_refresh_btn').addEventListener('click', loadAll);
 
     el('bc_view_full_history_btn').addEventListener('click', () => setArchiveMode('full', true));

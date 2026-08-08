@@ -700,9 +700,9 @@ $mutJs = <<<'JS'
   });
   log.verify_post_count_per_click = verifyPosts;
   log.rapid_double_click_post_count = verifyPosts;
-  // Green Verify: Production showAlert path — zero heavy delta
+  // Green Verify: Production Stage 5 saved-result dialog path — zero heavy delta
   const beforeG = verifyPosts;
-  if (mutationGuard('verify', vBtn) === 'green') { /* alert only */ }
+  if (mutationGuard('verify', vBtn) === 'green') { /* dialog only; no POST */ }
   log.green_verify_heavy_delta = verifyPosts - beforeG;
   // DRV one POST
   const beforeDrv = drvPosts;

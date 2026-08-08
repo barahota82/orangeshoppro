@@ -130,7 +130,10 @@ s4b_ok(str_contains($page, 'qualInFlightMut'), 'dup: client in-flight map');
 s4b_ok(str_contains($page, 'apiPostQual'), 'flow: non-throwing mutation client');
 s4b_ok(str_contains($page, 'qualRunMutation'), 'flow: no-refresh mutation helper');
 s4b_ok(!str_contains($page, 'localStorage') && !str_contains($page, 'sessionStorage'), 'auth: no localStorage/sessionStorage');
-s4b_ok(str_contains($page, 'id="bc_alert"') || str_contains($page, "el('bc_alert')"), 'S5 absence: bc_alert remains');
+// Stage 5 supersedes "no dialog" absence: Verify/DRV results use centered dialog;
+// #bc_alert remains for unrelated Backup Center alerts only.
+s4b_ok(str_contains($page, 'id="bc_alert"') || str_contains($page, "el('bc_alert')"), 'S5: bc_alert remains for unrelated alerts');
+s4b_ok(str_contains($page, 'id="bc_result_dialog"') && str_contains($page, 'showQualResultDialog'), 'S5: centered Verify/DRV result dialog present');
 s4b_ok(!str_contains($page, 'CRP Report'), 'S6 absence: no CRP Report');
 s4b_ok(str_contains($page, 'Country DRV'), 'S6 absence: Country DRV label unchanged');
 s4b_ok(substr_count($page, 'class="bc-btn-ghost bc-verify') >= 1, 'S3: Verify button template');
@@ -267,7 +270,13 @@ try {
     echo "FULL_PAGE_RELOAD_COUNT = 0\n";
     s4b_ok(str_contains($page, 'qualRunMutation') && !preg_match('/location\.reload|window\.location\s*=/', $page), 'no reload in page JS');
     echo "HEAVY_VERIFY_CALL_DELTA_ON_GREEN_CLICK = 0\n";
-    s4b_ok(str_contains($page, "qState === 'success'") && str_contains($page, 'showAlert(summary'), 'green click shows alert not POST');
+    // Stage 5: green saved-result opens centered dialog (not top alert / not heavy POST).
+    s4b_ok(
+        str_contains($page, "qState === 'success'")
+        && str_contains($page, 'openQualResultFromButton(action, btn, { savedResult: true')
+        && !preg_match('/qState === \'success\'[\s\S]{0,220}showAlert\(/', $page),
+        'green click shows saved-result dialog not POST/alert'
+    );
     echo "BUTTON_COLOR_CANNOT_FORCE_RECOVERABLE = 1\n";
     s4b_ok(true, 'marker: BUTTON_COLOR_CANNOT_FORCE_RECOVERABLE = 1');
     echo "PROVENANCE_CANNOT_FORCE_RECOVERABLE = 1\n";
@@ -362,13 +371,13 @@ $scenarioDefs = [
     35 => ['D DRV', 'Recoverable from server only', 'pkg.recoverable === true + HEALTHY_TRUE…=0', 'HTTP', 'HEALTHY_TRUE_ELIGIBILITY_FALSE_RECOVERABLE_BADGE = 0'],
     36 => ['D DRV', 'no reload', 'shared with 26', 'source', 'no reload in page JS'],
     37 => ['D DRV', 'row unchanged', 'shared with 27', 'browser runtime', 'flow: no-refresh mutation helper'],
-    38 => ['E GREEN', 'green Verify heavy delta = 0', 'event green_verify_heavy_delta', 'browser runtime', 'green click shows alert not POST'],
-    39 => ['E GREEN', 'green DRV heavy delta = 0', 'event green_drv_heavy_delta', 'browser runtime', 'green click shows alert not POST'],
-    40 => ['E GREEN', 'worker delta = 0', 'event green_worker_delta', 'browser runtime', 'green click shows alert not POST'],
-    41 => ['E GREEN', 'report-write delta = 0', 'event green_report_write_delta', 'browser runtime', 'green click shows alert not POST'],
-    42 => ['E GREEN', 'Audit delta = 0', 'event green_audit_delta', 'browser runtime', 'green click shows alert not POST'],
-    43 => ['E GREEN', 'saved summary displayed through current alert', 'showAlert(summary) on success state', 'source', 'green click shows alert not POST'],
-    44 => ['E GREEN', 'no dialog created', 'S5 absence bc_alert / no centered dialog', 'source', 'S5 absence: bc_alert remains'],
+    38 => ['E GREEN', 'green Verify heavy delta = 0', 'event green_verify_heavy_delta', 'browser runtime', 'green click shows saved-result dialog not POST/alert'],
+    39 => ['E GREEN', 'green DRV heavy delta = 0', 'event green_drv_heavy_delta', 'browser runtime', 'green click shows saved-result dialog not POST/alert'],
+    40 => ['E GREEN', 'worker delta = 0', 'event green_worker_delta', 'browser runtime', 'green click shows saved-result dialog not POST/alert'],
+    41 => ['E GREEN', 'report-write delta = 0', 'event green_report_write_delta', 'browser runtime', 'green click shows saved-result dialog not POST/alert'],
+    42 => ['E GREEN', 'Audit delta = 0', 'event green_audit_delta', 'browser runtime', 'green click shows saved-result dialog not POST/alert'],
+    43 => ['E GREEN', 'saved summary displayed through Stage 5 dialog', 'openQualResultFromButton savedResult on success state', 'source', 'green click shows saved-result dialog not POST/alert'],
+    44 => ['E GREEN', 'centered result dialog (Stage 5)', 'bc_result_dialog + showQualResultDialog', 'source', 'S5: centered Verify/DRV result dialog present'],
     45 => ['F DUP', 'rapid double click = one POST', 'event rapid_double_click_post_count=1', 'browser runtime', 'dup: client in-flight map'],
     46 => ['F DUP', 'keyboard double activation = one POST', 'same inFlight map key', 'source', 'dup: client in-flight map'],
     47 => ['F DUP', 'same package/action in two tabs = one heavy execution', 'Stage 4A lock + client inFlight', 'source', 'dup: client in-flight map'],
@@ -403,9 +412,9 @@ $scenarioDefs = [
     76 => ['J S3', '360 geometry', 'STAGE3_MOBILE_360_GEOMETRY', 'browser runtime', 'S3: primary cluster present'],
     77 => ['J S3', 'no overflow', 'geometry asserts', 'browser runtime', 'S3: primary cluster present'],
     78 => ['J S3', 'drawer unchanged', 'openDetails not hosting Verify/DRV', 'source', 'S3: primary cluster present'],
-    79 => ['K S5/6', '#bc_alert remains', 'S5 absence: bc_alert remains', 'source', 'S5 absence: bc_alert remains'],
-    80 => ['K S5/6', 'no centered result dialog', 'S5 absence', 'source', 'S5 absence: bc_alert remains'],
-    81 => ['K S5/6', 'no top-card removal', 'page structure retained', 'source', 'S5 absence: bc_alert remains'],
+    79 => ['K S5/6', '#bc_alert remains for unrelated alerts', 'S5: bc_alert remains for unrelated alerts', 'source', 'S5: bc_alert remains for unrelated alerts'],
+    80 => ['K S5/6', 'centered Verify/DRV result dialog (Stage 5)', 'bc_result_dialog present', 'source', 'S5: centered Verify/DRV result dialog present'],
+    81 => ['K S5/6', 'unrelated top-card retained', 'page structure retained', 'source', 'S5: bc_alert remains for unrelated alerts'],
     82 => ['K S5/6', 'Country DRV unchanged', 'Country DRV label', 'source', 'S6 absence: Country DRV label unchanged'],
     83 => ['K S5/6', 'no CRP Report', 'no CRP Report string', 'source', 'S6 absence: no CRP Report'],
     84 => ['K S5/6', 'report styles unchanged', 'no report redesign markers', 'source', 'S6 absence: Country DRV label unchanged'],

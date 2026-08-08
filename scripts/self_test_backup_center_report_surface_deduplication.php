@@ -177,7 +177,14 @@ rd_ok(!preg_match('/bc_country_table[\s\S]{0,900}bc-view-file/', $renderFn), 'hi
 
 // Absences / freezes
 rd_ok(!str_contains($src, 'CRP Report'), 'no CRP Report');
-rd_ok(str_contains($src, 'id="bc_alert"'), 'top result card remains');
+// Stage 5: #bc_alert remains for unrelated alerts; Verify/DRV results use centered dialog.
+rd_ok(str_contains($src, 'id="bc_alert"'), 'top alert card remains for unrelated alerts');
+rd_ok(str_contains($src, 'id="bc_result_dialog"'), 'Stage 5: Verify/DRV centered result dialog present');
+rd_ok(
+    str_contains($src, 'function openQualResultFromButton')
+    && preg_match('/async function qualRunMutation[\s\S]{0,3500}openQualResultFromButton/', $src) === 1,
+    'Stage 5: qualRunMutation routes results to dialog'
+);
 rd_ok(!str_contains($src, 'Internal Stage 5') && !str_contains($src, 'internal_stage_5'), 'Internal Stage 5 absent');
 rd_ok(is_file($projectRoot . '/admin/pages/restore_center.php'), 'Restore Center page file untouched presence');
 
