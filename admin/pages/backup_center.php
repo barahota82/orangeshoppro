@@ -104,7 +104,8 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 .bc-badge--muted{background:#f3f4f6;color:#4b5563;border-color:#e5e7eb}
 .bc-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 auto}
 .bc-root-warning{display:none;margin-bottom:12px;padding:12px 14px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e}
-.bc-progress{display:none;margin:0 0 12px;padding:10px 14px;border-radius:10px;background:#eff6ff;color:#1e3a8a;font-weight:600}
+.bc-progress{display:none;margin:10px 0 0;padding:10px 14px;border-radius:10px;background:#eff6ff;color:#1e3a8a;font-weight:600}
+.bc-primary-bar .bc-progress{max-width:100%}
 .bc-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .bc-table{width:100%;border-collapse:collapse;font-size:.88rem}
 .bc-table th,.bc-table td{padding:9px 11px;border-bottom:1px solid #f1f5f9;text-align:right;vertical-align:middle}
@@ -276,7 +277,6 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
 </style>
 
 <div class="bc-v2" id="bc_app">
-    <div id="bc_progress" class="bc-progress" role="status" aria-live="polite">جاري التنفيذ…</div>
     <?php /* Top-page #bc_alert removed (Owner post-Stage7): terminal messages use centered dialogs only. */ ?>
     <?php /* Embedded for UI self-test + progressive disclosure fallback; JS overwrites from API when shown. */ ?>
     <div id="bc_root_warning" class="bc-root-warning" role="status" aria-live="polite">مسار النسخ الاحتياطي قابل للقراءة لكنه غير قابل للكتابة بواسطة PHP الخاص بالموقع. يمكن عرض النسخ الحالية، لكن التشغيل اليدوي متوقف حتى يتم ضبط صلاحيات المجلد.</div>
@@ -326,6 +326,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             <?php endif; ?>
             <button type="button" class="bc-btn-secondary" id="bc_refresh_btn">تحديث البيانات</button>
         </div>
+        <div id="bc_progress" class="bc-progress" role="status" aria-live="polite">جاري التنفيذ…</div>
     </section>
 
     <nav class="bc-sec-nav" aria-label="أقسام ثانوية">
@@ -2449,7 +2450,8 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         applyActionAvailability();
     }
 
-    async function loadAll() {
+    async function loadAll(opts) {
+        opts = opts || {};
         const scrollY = window.scrollY;
         const openIds = Array.from(document.querySelectorAll('details.bc-acc-item[open]'))
             .map((d) => d.getAttribute('data-package-id') + '|' + d.getAttribute('data-package-type'));
@@ -2468,7 +2470,9 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             window.scrollTo(0, scrollY);
             qualScheduleVisibleLoads();
             const locks = await apiGet('status.php?action=locks');
-            if ((locks.full_lock || {}).held || (locks.country_lock || {}).held) {
+            // After a run-result dialog, do not replace the terminal result with a lock notice.
+            if (!opts.preserveOpenDialog
+                && ((locks.full_lock || {}).held || (locks.country_lock || {}).held)) {
                 showSystemDialog({
                     title: 'رسالة النظام',
                     message: 'هناك عملية نسخ احتياطي قيد التشغيل حالياً.',
@@ -2477,11 +2481,13 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             }
         } catch (e) {
             el('bc_root_warning').style.display = 'none';
-            showSystemDialog({
-                title: 'رسالة النظام',
-                message: e.message || 'تعذر التحميل',
-                success: false
-            });
+            if (!opts.preserveOpenDialog) {
+                showSystemDialog({
+                    title: 'رسالة النظام',
+                    message: e.message || 'تعذر التحميل',
+                    success: false
+                });
+            }
         } finally {
             setBusy(false);
         }
@@ -2536,55 +2542,86 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     el('bc_view_country_history_btn').addEventListener('click', () => setArchiveMode('country', true));
     el('bc_back_recent_country_btn').addEventListener('click', () => setArchiveMode('country', false));
 
+    /**
+     * Run-result contract (Owner post-Stage7):
+     * run-full / run-countries wait for CLI subprocess — HTTP response is terminal completion, not a queue ack.
+     * Do not invent Country success/fail/skip counts (API does not return them).
+     */
+    const RUN_FULL_OK_MSG = 'اكتمل إنشاء النسخة الاحتياطية الكاملة بنجاح.';
+    const RUN_FULL_FAIL_MSG = 'تعذر إكمال إنشاء النسخة الاحتياطية الكاملة.\nيرجى مراجعة حالة النظام والمحاولة مرة أخرى.';
+    const RUN_COUNTRIES_OK_MSG = 'اكتمل إنشاء النسخ الاحتياطية للدول القابلة للاسترداد بنجاح.';
+    const RUN_COUNTRIES_FAIL_MSG = 'تعذر إكمال إنشاء النسخ الاحتياطية للدول القابلة للاسترداد.\nيرجى مراجعة حالة النظام والمحاولة مرة أخرى.';
+    let bcRunRequestInFlight = false;
+    async function executeBackupRun(kind) {
+        if (bcRunRequestInFlight || state.busy) {
+            return;
+        }
+        const isFull = kind === 'full';
+        const btn = el(isFull ? 'bc_run_full_btn' : 'bc_run_countries_btn');
+        const scrollY = window.scrollY || 0;
+        const archiveSnap = {
+            full: !!(state.archiveMode && state.archiveMode.full),
+            country: !!(state.archiveMode && state.archiveMode.country)
+        };
+        const openIds = Array.from(document.querySelectorAll('details.bc-acc-item[open]'))
+            .map((d) => d.getAttribute('data-package-id') + '|' + d.getAttribute('data-package-type'));
+        bcRunRequestInFlight = true;
+        setBusy(
+            true,
+            isFull
+                ? 'جاري إنشاء النسخة الاحتياطية الكاملة…'
+                : 'جاري إنشاء النسخ الاحتياطية للدول القابلة للاسترداد…'
+        );
+        try {
+            // No terminal dialog until the request returns (RUNNING_TERMINAL_DIALOG_COUNT = 0).
+            await apiPost(isFull ? 'run-full.php' : 'run-countries.php', {});
+            showSystemDialog({
+                title: 'نتيجة العملية',
+                message: isFull ? RUN_FULL_OK_MSG : RUN_COUNTRIES_OK_MSG,
+                success: true,
+                sourceBtn: btn
+            });
+            // Preserve Last 5 / Show All across the post-run list refresh (loadAll reads state.archiveMode).
+            state.archiveMode.full = archiveSnap.full;
+            state.archiveMode.country = archiveSnap.country;
+            await loadAll({ preserveOpenDialog: true });
+            document.querySelectorAll('details.bc-acc-item').forEach((d) => {
+                const k = d.getAttribute('data-package-id') + '|' + d.getAttribute('data-package-type');
+                if (openIds.indexOf(k) !== -1) d.open = true;
+            });
+            updatePkgModePill('full');
+            updatePkgModePill('country');
+        } catch (e) {
+            // Never surface raw API/PHP/English exception text for run failures.
+            showSystemDialog({
+                title: 'تعذر إتمام العملية',
+                message: isFull ? RUN_FULL_FAIL_MSG : RUN_COUNTRIES_FAIL_MSG,
+                success: false,
+                sourceBtn: btn
+            });
+        } finally {
+            setBusy(false);
+            bcRunRequestInFlight = false;
+            try { window.scrollTo(0, scrollY); } catch (err) { /* ignore */ }
+        }
+    }
     if (CAN_RUN) {
-        el('bc_run_full_btn').addEventListener('click', () => confirmAction(
-            'تشغيل Full Disaster Backup',
-            'سيتم تشغيل النسخ الاحتياطي الكامل عبر محرك Orange المعتمد. هل تريد المتابعة؟',
-            async () => {
-                setBusy(true, 'تشغيل Full Backup…');
-                try {
-                    const res = await apiPost('run-full.php', {});
-                    showSystemDialog({
-                        title: 'نتيجة العملية',
-                        message: res.message || 'تم تشغيل Full Backup.',
-                        success: true,
-                        sourceBtn: el('bc_run_full_btn')
-                    });
-                    await loadAll();
-                } catch (e) {
-                    showSystemDialog({
-                        title: 'رسالة النظام',
-                        message: e.message || 'فشل التشغيل',
-                        success: false,
-                        sourceBtn: el('bc_run_full_btn')
-                    });
-                } finally { setBusy(false); }
-            }
-        ));
-        el('bc_run_countries_btn').addEventListener('click', () => confirmAction(
-            'تشغيل Country Batch',
-            'سيتم تصدير جميع الدول القابلة للاسترداد. قد يستغرق وقتاً. هل تريد المتابعة؟',
-            async () => {
-                setBusy(true, 'تشغيل Country Batch…');
-                try {
-                    const res = await apiPost('run-countries.php', {});
-                    showSystemDialog({
-                        title: 'نتيجة العملية',
-                        message: res.message || 'تم تشغيل Country Batch.',
-                        success: true,
-                        sourceBtn: el('bc_run_countries_btn')
-                    });
-                    await loadAll();
-                } catch (e) {
-                    showSystemDialog({
-                        title: 'رسالة النظام',
-                        message: e.message || 'فشل التشغيل',
-                        success: false,
-                        sourceBtn: el('bc_run_countries_btn')
-                    });
-                } finally { setBusy(false); }
-            }
-        ));
+        el('bc_run_full_btn').addEventListener('click', () => {
+            if (bcRunRequestInFlight || state.busy) return;
+            confirmAction(
+                'تشغيل Full Disaster Backup',
+                'سيتم تشغيل النسخ الاحتياطي الكامل عبر محرك Orange المعتمد. هل تريد المتابعة؟',
+                () => executeBackupRun('full')
+            );
+        });
+        el('bc_run_countries_btn').addEventListener('click', () => {
+            if (bcRunRequestInFlight || state.busy) return;
+            confirmAction(
+                'تشغيل Country Batch',
+                'سيتم تصدير جميع الدول القابلة للاسترداد. قد يستغرق وقتاً. هل تريد المتابعة؟',
+                () => executeBackupRun('countries')
+            );
+        });
     }
 
     // BC-02: only one backup accordion open at a time
