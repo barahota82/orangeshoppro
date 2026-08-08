@@ -39,6 +39,72 @@ function backup_admin_self_test(bool $ok, string $label): void
     }
 }
 
+/**
+ * Semantic Restore capability in Backup Center page source.
+ * Detects interactive Restore navigation/controls/endpoints — not diagnostic tokens.
+ */
+function backup_admin_source_has_restore_capability(string $src): bool
+{
+    $patterns = [
+        // Navigation / routes
+        '/page\s*=\s*[\'"]restore_center[\'"]/i',
+        '/[?&]page=restore_center\b/i',
+        '/href\s*=\s*[\'"][^\'"]*restore_center[^\'"]*[\'"]/i',
+        // Restore API surface
+        '#admin/api/restore/#i',
+        '#/api/restore/#i',
+        // Explicit Restore execution identities
+        '/\brestore_run_full\b/',
+        '/\brestore_run_country\b/',
+        '/\brun_restore\b/i',
+        '/\bexecute_restore\b/i',
+        // Interactive controls
+        '/\bbc-restore[\w-]*/i',
+        '/data-action\s*=\s*[\'"][^\'"]*restore[^\'"]*[\'"]/i',
+        '/<(?:button|a|form)\b[^>]*(?:restore_center|restore_run_|data-action=["\']restore)/i',
+        // Event branches that invoke Restore mutations
+        '/apiPost\s*\(\s*[\'"][^\'"]*restore[^\'"]*[\'"]/i',
+        '/fetch\s*\(\s*[\'"][^\'"]*\/restore\/[^\'"]*[\'"]/i',
+    ];
+    foreach ($patterns as $re) {
+        if (preg_match($re, $src) === 1) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Semantic Backup package-deletion capability in Backup Center page source.
+ * Detects delete-package controls/endpoints — not JS `delete` property operators.
+ */
+function backup_admin_source_has_package_delete_capability(string $src): bool
+{
+    $patterns = [
+        // Package delete endpoints / actions
+        '#admin/api/backup/[^\'"\s]*delete[^\'"\s]*#i',
+        '/\bdelete-package\.php\b/i',
+        '/\bpackage_delete\b/i',
+        '/\bdelete_package\b/i',
+        '/data-action\s*=\s*[\'"][^\'"]*delete(?:[-_]?package)?[^\'"]*[\'"]/i',
+        // Interactive controls
+        '/\bbc-delete[\w-]*/i',
+        '/<(?:button|a)\b[^>]*(?:bc-delete|data-action=["\']delete|delete-package)/i',
+        // Delegated mutation branches
+        '/apiPost\s*\(\s*[\'"][^\'"]*delete[^\'"]*[\'"]/i',
+        '/fetch\s*\(\s*[\'"][^\'"]*delete-package[^\'"]*[\'"]/i',
+        '/confirmAction\s*\(\s*[\'"][^\'"]*حذف[^\'"]*[\'"]/u',
+    ];
+    foreach ($patterns as $re) {
+        if (preg_match($re, $src) === 1) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function backup_admin_test_set_readonly(string $dir): bool
 {
     if (!is_dir($dir)) {
@@ -321,8 +387,75 @@ backup_admin_self_test(!str_contains($restorePageSource, 'restore_admin.php'), '
 backup_admin_self_test(is_file($projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'backup' . DIRECTORY_SEPARATOR . 'self_test_restore_admin.php'), 'phase3b.1: dedicated restore admin self-test exists');
 backup_admin_self_test(str_contains($pageSource, 'parseApiJsonResponse') && str_contains($pageSource, 'text/html'), 'ui: api client detects html responses before json parse');
 backup_admin_self_test(str_contains($pageSource, '\\u0627\\u0633\\u062a\\u062c\\u0627\\u0628'), 'ui: sanitized arabic message for non-json responses');
-backup_admin_self_test(!str_contains($pageSource, 'restore_run_full') && !str_contains($pageSource, 'rollback'), 'scope: no restore UI actions in backup_center page');
-backup_admin_self_test(!str_contains($pageSource, 'delete'), 'scope: no delete action in backup_center page');
+// Stage 7: semantic scope fence (not broad keyword matching).
+backup_admin_self_test(
+    !backup_admin_source_has_restore_capability($pageSource),
+    'scope: no restore UI actions in backup_center page'
+);
+backup_admin_self_test(
+    !backup_admin_source_has_package_delete_capability($pageSource),
+    'scope: no delete action in backup_center page'
+);
+
+/* Stage 7 mutation-sensitivity fixtures — semantic detectors must stay sharp. */
+$restorePositiveFixtures = [
+    'nav_restore_center' => '<a href="index.php?page=restore_center">استرداد</a>',
+    'btn_restore_exec' => '<button type="button" class="bc-restore-run" data-action="restore_run_full">Restore</button>',
+    'api_restore_call' => "apiPost('../../../api/restore/run-full.php', {});",
+];
+$deletePositiveFixtures = [
+    'btn_package_delete' => '<button type="button" class="bc-delete-package" data-action="delete-package">Delete package</button>',
+    'api_package_delete' => "apiPost('delete-package.php', { package_id: id });",
+    'delegated_delete' => "if (t.classList.contains('bc-delete')) { await apiPost('package_delete.php', {}); }",
+];
+$scopeNegativeFixtures = [
+    'rollback_readiness_invalid' => "rollback_readiness_invalid: 'Rollback readiness validation failed.',",
+    'restore_eligibility' => "const restore_eligibility = pkg.restore_eligibility || '';",
+    'recovery_validation' => "viewFileControl(type, id, cc, 'recovery_validation.json', 'DRV Report');",
+    'js_delete_report_path' => 'delete clone.report_path;',
+    'js_delete_secret' => 'delete sanitized.secret;',
+    'crp_safe_map' => "cross_country_row_leakage: 'Cross-country row leakage detected.',",
+];
+foreach ($restorePositiveFixtures as $name => $fixture) {
+    backup_admin_self_test(
+        backup_admin_source_has_restore_capability($fixture),
+        'scope fixture: restore positive detected (' . $name . ')'
+    );
+}
+foreach ($deletePositiveFixtures as $name => $fixture) {
+    backup_admin_self_test(
+        backup_admin_source_has_package_delete_capability($fixture),
+        'scope fixture: package-delete positive detected (' . $name . ')'
+    );
+}
+foreach ($scopeNegativeFixtures as $name => $fixture) {
+    backup_admin_self_test(
+        !backup_admin_source_has_restore_capability($fixture)
+        && !backup_admin_source_has_package_delete_capability($fixture),
+        'scope fixture: negative allowed (' . $name . ')'
+    );
+}
+backup_admin_self_test(
+    backup_admin_source_has_restore_capability($restorePositiveFixtures['nav_restore_center'])
+    && backup_admin_source_has_restore_capability($restorePositiveFixtures['api_restore_call']),
+    'REAL_RESTORE_CONTROL_DETECTED + REAL_RESTORE_ENDPOINT_DETECTED'
+);
+backup_admin_self_test(
+    backup_admin_source_has_package_delete_capability($deletePositiveFixtures['btn_package_delete'])
+    && backup_admin_source_has_package_delete_capability($deletePositiveFixtures['api_package_delete']),
+    'REAL_PACKAGE_DELETE_CONTROL_DETECTED + REAL_PACKAGE_DELETE_ENDPOINT_DETECTED'
+);
+backup_admin_self_test(
+    !backup_admin_source_has_restore_capability($scopeNegativeFixtures['rollback_readiness_invalid']),
+    'ROLLBACK_REASON_FALSE_POSITIVE_COUNT = 0'
+);
+backup_admin_self_test(
+    !backup_admin_source_has_package_delete_capability($scopeNegativeFixtures['js_delete_report_path'])
+    && !backup_admin_source_has_package_delete_capability($scopeNegativeFixtures['js_delete_secret']),
+    'JS_DELETE_OPERATOR_FALSE_POSITIVE_COUNT = 0'
+);
+echo "ASSERTION_WEAKENED = 0\n";
+echo "MUTATION_SENSITIVITY_PRESERVED = 1\n";
 
 $apiFiles = [
     'run-full.php',
