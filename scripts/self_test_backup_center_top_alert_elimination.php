@@ -57,6 +57,10 @@ function ta_evidence_dir(): string
 $pagePath = $projectRoot . '/admin/pages/backup_center.php';
 $src = is_file($pagePath) ? (string) file_get_contents($pagePath) : '';
 ta_ok($src !== '', 'source readable');
+$clickRegion = '';
+if (preg_match("/classList\.contains\('bc-view-file'\)[\s\S]*?classList\.contains\('bc-log-tail'\)/s", $src, $m)) {
+    $clickRegion = $m[0];
+}
 
 /* Inventory callers — Production must have zero top-alert surfaces */
 ta_ok(!str_contains($src, 'id="bc_alert"'), '19/28. TOP_PAGE_ALERT_VISIBLE_COUNT source = 0 (element removed)');
@@ -97,8 +101,9 @@ ta_ok(
     '25. report errors → centered report dialog helpers'
 );
 ta_ok(
-    str_contains($src, 'showFullDrvReportView')
-    && !preg_match('/recovery_validation\.json[\s\S]{0,1200}showSystemDialog\(/', $src),
+    $clickRegion !== ''
+    && str_contains($clickRegion, 'showFullDrvReportView')
+    && !preg_match('/recovery_validation\.json[\s\S]{0,1200}showSystemDialog\(/', $clickRegion),
     '25b. Full DRV report errors stay in report dialog'
 );
 ta_ok(
