@@ -258,7 +258,7 @@ try {
     s4a_ok(!str_contains($bc, 'backup_qualification'), 'UI freeze: backup_center.php does not reference qualification helper');
     s4a_ok(str_contains($bc, 'bc-primary-cluster'), 'UI freeze: Stage 3 primary cluster still present');
     s4a_ok(!str_contains($bc, 'state-color') && !str_contains($bc, 'localStorage'), 'UI freeze: no state-color/localStorage');
-    s4a_ok(!str_contains($bc, 'CRP Report'), 'UI freeze: no CRP Report');
+    s4a_ok(str_contains($bc, 'CRP Report') && !str_contains($bc, "'Country DRV'"), 'UI: CRP Report label (Stage 6); no Country DRV');
     s4a_ok(is_file($projectRoot . '/includes/backup/backup_provenance.php'), 'Stage 1 provenance file untouched presence');
 
     // Path security

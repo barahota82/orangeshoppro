@@ -25,8 +25,8 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 ?>
 <style>
 /* Orange Enterprise Backup Center V2.1 — Owner Review — page-scoped only */
-.bc-v2{--bc-border:#e2e8f0;--bc-muted:#64748b;--bc-surface:#fff;--bc-soft:#f8fafc;--bc-ink:#0f172a;--bc-ok:#047857;--bc-warn:#b45309;--bc-bad:#b91c1c;--bc-info:#1d4ed8;container-type:inline-size;container-name:bc-pack}
-.bc-v2 *{box-sizing:border-box}
+.bc-v2{--bc-border:#e2e8f0;--bc-muted:#64748b;--bc-surface:#fff;--bc-soft:#f8fafc;--bc-ink:#0f172a;--bc-ok:#047857;--bc-warn:#b45309;--bc-bad:#b91c1c;container-type:inline-size;container-name:bc-pack;box-sizing:border-box;width:100%;max-width:100%;min-width:0}
+.bc-v2,.bc-v2 *{box-sizing:border-box}
 .bc-header{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;padding:14px 16px;background:var(--bc-surface);border:1px solid var(--bc-border);border-radius:12px}
 .bc-header-main{min-width:0;flex:1}
 .bc-header-kicker{margin:0 0 4px;font-size:.78rem;font-weight:600;color:var(--bc-muted)}
@@ -59,6 +59,28 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 .bc-btn-danger-soft:hover{background:#fef2f2}
 .bc-link{background:none;border:0;padding:0;margin:0;color:var(--primary,#ea580c);font:inherit;font-size:.82rem;font-weight:650;text-decoration:underline;cursor:pointer;white-space:nowrap}
 .bc-link:hover{color:var(--primary-hover,#c2410c)}
+/* Stage 6: one coherent accordion report-control family (neutral info; never Verify/DRV state colors) */
+.bc-btn-report{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:5px 11px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155!important;font-weight:600;cursor:pointer;font:inherit;font-size:.82rem;white-space:nowrap;text-decoration:none;box-sizing:border-box}
+.bc-btn-report:hover{background:#f1f5f9;border-color:#94a3b8;color:#1e293b!important}
+.bc-btn-report:focus-visible{outline:2px solid #94a3b8;outline-offset:2px}
+.bc-report-dialog-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:5000;padding:16px;box-sizing:border-box}
+.bc-report-dialog-backdrop.is-open{display:flex}
+.bc-report-dialog{background:#fff;border-radius:12px;max-width:min(760px,100%);width:100%;max-height:min(90vh,calc(100vh - 32px));display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.2);overflow:hidden;min-height:0;box-sizing:border-box;padding:0}
+.bc-report-dialog-head{padding:18px 18px 0;flex:0 0 auto}
+.bc-report-dialog-head h3{margin:0 0 8px;font-size:1.05rem;overflow-wrap:anywhere}
+.bc-report-dialog-body{padding:0 18px;overflow:auto;flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch}
+.bc-report-dialog-foot{padding:12px 18px 18px;flex:0 0 auto;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-start}
+.bc-report-summary{margin:0 0 12px}
+.bc-report-summary-meta{display:grid;gap:0;margin:0 0 10px}
+.bc-report-summary-meta div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;font-size:.9rem;padding:7px 0;border-bottom:1px solid #f8fafc}
+.bc-report-summary-meta dt{margin:0;color:var(--bc-muted)}
+.bc-report-summary-meta dd{margin:0;font-weight:600;text-align:left;direction:ltr;unicode-bidi:isolate;word-break:break-word;max-width:100%}
+.bc-report-status{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:.78rem;font-weight:700;border:1px solid #cbd5e1;background:#f8fafc;color:#475569}
+.bc-report-status--pass{background:#ecfdf5;border-color:#6ee7b7;color:#047857}
+.bc-report-status--fail{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
+.bc-report-status--warning,.bc-report-status--incomplete{background:#fff7ed;border-color:#fdba74;color:#c2410c}
+.bc-report-raw-label{margin:12px 0 6px;font-size:.78rem;font-weight:700;color:var(--bc-muted)}
+.bc-report-dialog .bc-pre{max-height:none;margin:0 0 8px}
 .bc-section{margin-bottom:14px}
 .bc-panel{background:var(--bc-surface);border:1px solid var(--bc-border);border-radius:12px;padding:12px 14px}
 .bc-panel-title{margin:0 0 10px;font-size:.95rem;font-weight:700}
@@ -130,13 +152,13 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 .bc-primary-cluster .bc-verify.bc-qstate--failed,
 .bc-primary-cluster .bc-drv.bc-qstate--failed{background:#fef2f2!important;color:#b91c1c!important;border-color:#fecaca!important}
 .bc-recoverable-slot:empty{display:none}
-.bc-acc-body,.bc-collapsible-body{padding:0 14px 12px;border-top:1px solid #f1f5f9}
-.bc-acc-body{padding-top:10px}
+.bc-acc-body,.bc-collapsible-body{padding:0 14px 12px;border-top:1px solid #f1f5f9;min-width:0;max-width:100%;box-sizing:border-box}
+.bc-acc-body{padding-top:10px;overflow-x:hidden}
 /* Expandable panels: capped height; sticky summary (collapse always reachable); panel scrolls (Owner 2026-07-24) */
 .bc-acc-item[open],.bc-collapsible[open]{max-height:min(420px,58vh);overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .bc-acc-item[open]>summary,.bc-collapsible[open]>summary{position:sticky;top:0;z-index:3;background:var(--bc-surface);box-shadow:0 1px 0 #f1f5f9}
-.bc-action-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
-.bc-action-row .bc-btn-ghost,.bc-action-row .bc-link{flex:0 0 auto}
+.bc-action-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+.bc-action-row .bc-btn-ghost,.bc-action-row .bc-link,.bc-action-row .bc-btn-report{flex:0 1 auto;max-width:100%}
 .bc-collapsible{margin-bottom:14px}
 .bc-collapsible>summary{justify-content:space-between}
 .bc-collapsible .card-hint{margin:10px 0 0}
@@ -158,6 +180,9 @@ orange_admin_render_page_title_with_country('إدارة النسخ الاحتي�
 @media (max-width:640px){
 .bc-storage-kpis{grid-template-columns:1fr 1fr}
 .bc-primary-bar{flex-direction:column;align-items:stretch}
+.bc-v2,#bc_app{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
+.bc-action-row{gap:8px}
+.bc-action-row .bc-btn-report{flex:0 1 auto;max-width:100%}
 }
 @container bc-pack (max-width:640px){
 .bc-acc-list,.bc-acc-item{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
@@ -212,6 +237,8 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
 .bc-modal{background:#fff;border-radius:12px;max-width:520px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
 .bc-modal h3{margin:0 0 10px}
 .bc-pre{max-height:360px;overflow:auto;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;font-size:.78rem;white-space:pre-wrap;word-break:break-word}
+/* Stage 6: technical JSON LTR isolate (wins over page RTL + generic .bc-pre wrap). */
+.bc-pre.bc-pre--json,.bc-report-dialog #bc_view_pre{direction:ltr!important;unicode-bidi:isolate;text-align:left;white-space:pre;overflow:auto;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;word-break:normal;overflow-wrap:normal}
 /* Stage 5 — Verify/DRV result dialog (centered, viewport-contained; Close only) */
 .bc-result-dialog-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:5300;padding:16px;box-sizing:border-box}
 .bc-result-dialog-backdrop.is-open{display:flex}
@@ -416,12 +443,21 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     </div>
 </div>
 
-<div id="bc_view_modal" class="bc-modal-backdrop" aria-hidden="true">
-    <div class="bc-modal" role="dialog" aria-modal="true" style="max-width:760px;">
-        <h3 id="bc_view_title">عرض</h3>
-        <p class="bc-tz-label" id="bc_view_tz_note" style="margin:0 0 8px;"></p>
-        <pre id="bc_view_pre" class="bc-pre"></pre>
-        <div class="admin-form-actions"><button type="button" class="bc-btn-secondary" id="bc_view_close">إغلاق</button></div>
+<?php /* Stage 6: unified report viewer — Close only; no X / backdrop / Escape dismiss */ ?>
+<div id="bc_view_modal" class="bc-report-dialog-backdrop" aria-hidden="true" data-bc-report-dialog="1">
+    <div class="bc-report-dialog" role="dialog" aria-modal="true" aria-labelledby="bc_view_title" tabindex="-1">
+        <div class="bc-report-dialog-head">
+            <h3 id="bc_view_title">عرض</h3>
+            <p class="bc-tz-label" id="bc_view_tz_note" style="margin:0 0 8px;"></p>
+        </div>
+        <div class="bc-report-dialog-body" id="bc_view_body">
+            <div id="bc_view_summary" class="bc-report-summary" style="display:none" aria-live="polite"></div>
+            <p id="bc_view_raw_label" class="bc-report-raw-label" style="display:none">Raw JSON (technical)</p>
+            <pre id="bc_view_pre" class="bc-pre bc-pre--json" dir="ltr"></pre>
+        </div>
+        <div class="bc-report-dialog-foot">
+            <button type="button" class="bc-btn-secondary" id="bc_view_close">إغلاق</button>
+        </div>
     </div>
 </div>
 
@@ -745,7 +781,27 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         });
     };
 
-    const showViewContent = (title, bodyText, localizeTimes) => {
+    let bcReportDialogReturnFocus = null;
+    let bcReportDialogKeyHandler = null;
+    function closeReportDialog() {
+        const backdrop = el('bc_view_modal');
+        if (!backdrop) return;
+        backdrop.classList.remove('is-open');
+        backdrop.style.display = 'none';
+        backdrop.setAttribute('aria-hidden', 'true');
+        if (bcReportDialogKeyHandler) {
+            document.removeEventListener('keydown', bcReportDialogKeyHandler, true);
+            bcReportDialogKeyHandler = null;
+        }
+        const ret = bcReportDialogReturnFocus;
+        bcReportDialogReturnFocus = null;
+        if (ret && typeof ret.focus === 'function' && document.contains(ret)) {
+            try { ret.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+        }
+    }
+    function openReportDialogShell(title, localizeTimes, sourceBtn) {
+        const backdrop = el('bc_view_modal');
+        const closeBtn = el('bc_view_close');
         el('bc_view_title').textContent = title;
         const note = el('bc_view_tz_note');
         if (note) {
@@ -757,9 +813,238 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                 note.textContent = 'التواريخ في هذا العرض بالتوقيت المحلي (' + DISPLAY_TZ + ') بنظام 12 ساعة — التخزين الداخلي يبقى UTC.';
             }
         }
+        bcReportDialogReturnFocus = sourceBtn && sourceBtn.isConnected
+            ? sourceBtn
+            : (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+        backdrop.classList.add('is-open');
+        backdrop.style.display = 'flex';
+        backdrop.setAttribute('aria-hidden', 'false');
+        if (bcReportDialogKeyHandler) {
+            document.removeEventListener('keydown', bcReportDialogKeyHandler, true);
+        }
+        bcReportDialogKeyHandler = (ev) => {
+            if (!backdrop.classList.contains('is-open')) return;
+            if (ev.key === 'Escape') {
+                ev.preventDefault();
+                ev.stopPropagation();
+                return;
+            }
+            if (ev.key !== 'Tab' || !closeBtn) return;
+            if (ev.shiftKey) {
+                if (document.activeElement !== closeBtn) {
+                    ev.preventDefault();
+                    closeBtn.focus();
+                }
+            } else if (document.activeElement !== closeBtn) {
+                ev.preventDefault();
+                closeBtn.focus();
+            }
+        };
+        document.addEventListener('keydown', bcReportDialogKeyHandler, true);
+        try { closeBtn.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+    }
+    const showViewContent = (title, bodyText, localizeTimes, sourceBtn) => {
+        const summary = el('bc_view_summary');
+        const rawLabel = el('bc_view_raw_label');
+        if (summary) {
+            summary.style.display = 'none';
+            summary.innerHTML = '';
+        }
+        if (rawLabel) rawLabel.style.display = 'none';
         el('bc_view_pre').textContent = localizeTimes ? localizeTimestampsInText(bodyText) : String(bodyText || '');
-        el('bc_view_modal').style.display = 'flex';
+        el('bc_view_pre').style.display = 'block';
+        openReportDialogShell(title, localizeTimes, sourceBtn || null);
     };
+    function crpNormalizeStatus(raw) {
+        const s = String(raw || '').toLowerCase();
+        if (s === 'pass' || s === 'success' || s === 'ok') return 'PASS';
+        if (s === 'warning' || s === 'warn') return 'WARNING';
+        if (s === 'incomplete' || s === 'missing' || s === 'partial') return 'INCOMPLETE';
+        if (s === 'fail' || s === 'failed' || s === 'error') return 'FAIL';
+        return '';
+    }
+    function crpBoolLabel(v) {
+        if (v === true) return 'PASS';
+        if (v === false) return 'FAIL';
+        return '—';
+    }
+    /** Stage 6: map known safe CRP codes to human text; never invent PASS. */
+    function crpHumanizeFailureReason(raw) {
+        const token = String(raw || '').trim();
+        if (!token) return '';
+        const map = {
+            cross_country_row_leakage: 'Cross-country row leakage detected.',
+            dependency_incomplete: 'Dependency validation is incomplete.',
+            dependency_completeness_invalid: 'Dependency completeness check failed.',
+            composite_graph_invalid: 'Dependency graph validation failed.',
+            boundary_isolation_invalid: 'Cross-country isolation check failed.',
+            package_identity_mismatch: 'Package identity does not match this package.',
+            report_identity_mismatch: 'CRP report identity does not match this package.',
+            stable_validation_issue: 'Validation failed. See technical details.',
+            uploads_soft_warning: 'Uploads validation reported a warning.',
+            collision_analysis_invalid: 'Collision analysis validation failed.',
+            accounting_boundary_invalid: 'Accounting boundary validation failed.',
+            stock_fifo_invalid: 'Stock FIFO validation failed.',
+            uploads_invalid: 'Uploads validation failed.',
+            sequences_invalid: 'Sequence validation failed.',
+            rollback_readiness_invalid: 'Rollback readiness validation failed.',
+            environment_incompatible: 'Environment compatibility check failed.'
+        };
+        if (map[token]) return map[token];
+        // Human sentences / stable UI messages pass through; snake_case machine tokens do not.
+        if (/^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/.test(token)) {
+            return 'Validation failed. See technical details.';
+        }
+        if (/package_path|fingerprint|\\\\|[A-Za-z]:\\\\|\/var\/|inetpub/i.test(token)) {
+            return 'Validation failed. See technical details.';
+        }
+        return token;
+    }
+    function buildCrpReadableSummary(data, pkgMeta, stableMessage, forceStatus) {
+        let status = crpNormalizeStatus(forceStatus)
+            || crpNormalizeStatus(data && data.overall_result);
+        if (!status) {
+            status = 'INCOMPLETE';
+        }
+        // Never fabricate PASS when the payload is absent or only a stable error message is available.
+        if ((!data || typeof data !== 'object') && status === 'PASS') {
+            status = 'INCOMPLETE';
+        }
+        if (stableMessage && status === 'PASS' && forceStatus) {
+            status = crpNormalizeStatus(forceStatus) || 'INCOMPLETE';
+        }
+        const tone = status === 'PASS' ? 'pass'
+            : (status === 'FAIL' ? 'fail'
+                : (status === 'WARNING' ? 'warning' : 'incomplete'));
+        const cc = String((data && data.country_code) || pkgMeta.countryCode || '').toUpperCase();
+        const countryName = String(pkgMeta.countryName || '');
+        const countryLabel = countryName
+            ? (countryName + (cc ? (' (' + cc + ')') : ''))
+            : (cc || '—');
+        const pkgId = String((data && data.package_id) || pkgMeta.packageId || '—');
+        const schema = (data && data.schema_revision != null && data.schema_revision !== '')
+            ? String(data.schema_revision)
+            : '—';
+        const when = String((data && (data.completed_at_utc || data.validated_at || data.generated_at)) || '—');
+        const score = (data && data.recovery_score != null && data.recovery_score !== '')
+            ? String(data.recovery_score)
+            : '—';
+        const isolation = data ? crpBoolLabel(data.boundary_isolation_valid) : '—';
+        const bindingOk = !!(data
+            && data.package_id
+            && String(data.package_id) === String(pkgMeta.packageId)
+            && (!data.country_code
+                || String(data.country_code).toUpperCase() === String(pkgMeta.countryCode || '').toUpperCase()));
+        const binding = data ? (bindingOk ? 'PASS' : 'FAIL') : '—';
+        const inventory = data && data.dependency_completeness_valid != null
+            ? crpBoolLabel(data.dependency_completeness_valid)
+            : '—';
+        const graph = data && data.composite_graph_valid != null
+            ? crpBoolLabel(data.composite_graph_valid)
+            : '—';
+        let reason = '';
+        if (stableMessage) {
+            reason = crpHumanizeFailureReason(stableMessage);
+        } else if (data && Array.isArray(data.blocking_reason_codes) && data.blocking_reason_codes.length) {
+            reason = data.blocking_reason_codes.slice(0, 3).map((x) => crpHumanizeFailureReason(x)).filter(Boolean).join(' ');
+        } else if (data && Array.isArray(data.errors) && data.errors.length) {
+            reason = data.errors.slice(0, 3).map((x) => crpHumanizeFailureReason(x)).filter(Boolean).join(' ');
+        } else if (data && Array.isArray(data.warnings) && data.warnings.length && status !== 'PASS') {
+            reason = data.warnings.slice(0, 3).map((x) => crpHumanizeFailureReason(x)).filter(Boolean).join(' ');
+        }
+        if (!reason && status !== 'PASS') {
+            reason = 'Validation failed. See technical details.';
+        }
+        // Collapse duplicate generic sentences.
+        if (reason) {
+            const parts = reason.split(/\s+(?=Validation failed\.|Cross-country|Dependency|Package|Uploads|Collision|Accounting|Stock|Sequence|Rollback|Environment)/);
+            reason = Array.from(new Set(parts.map((p) => p.trim()).filter(Boolean))).join(' ');
+        }
+        let html = '<dl class="bc-report-summary-meta">';
+        html += '<div><dt>Validation status</dt><dd><span class="bc-report-status bc-report-status--'
+            + tone + '">' + esc(status) + '</span></dd></div>';
+        html += '<div><dt>Country</dt><dd>' + esc(countryLabel) + '</dd></div>';
+        html += '<div><dt>Package ID</dt><dd class="bc-mono">' + esc(pkgId) + '</dd></div>';
+        html += '<div><dt>Package type</dt><dd>Country</dd></div>';
+        html += '<div><dt>Schema revision</dt><dd>' + esc(schema) + '</dd></div>';
+        html += '<div><dt>Generated / completed</dt><dd dir="ltr">' + esc(when) + '</dd></div>';
+        html += '<div><dt>Recovery / validation score</dt><dd>' + esc(score) + '</dd></div>';
+        html += '<div><dt>Cross-Country isolation</dt><dd>' + esc(isolation) + '</dd></div>';
+        html += '<div><dt>Package identity / binding</dt><dd>' + esc(binding) + '</dd></div>';
+        html += '<div><dt>Table / inventory validation</dt><dd>' + esc(inventory) + '</dd></div>';
+        html += '<div><dt>Dependency / graph validation</dt><dd>' + esc(graph) + '</dd></div>';
+        if (reason) {
+            html += '<div><dt>Safe failure reason</dt><dd>' + esc(reason) + '</dd></div>';
+        }
+        html += '</dl>';
+        return { html: html, status: status };
+    }
+    function showCrpReportView(opts) {
+        opts = opts || {};
+        const summary = el('bc_view_summary');
+        const rawLabel = el('bc_view_raw_label');
+        const pre = el('bc_view_pre');
+        const built = buildCrpReadableSummary(opts.data || null, {
+            packageId: opts.packageId || '',
+            countryCode: opts.countryCode || '',
+            countryName: opts.countryName || ''
+        }, opts.stableMessage || '', opts.forceStatus || '');
+        if (summary) {
+            summary.style.display = 'block';
+            summary.innerHTML = built.html;
+        }
+        const raw = opts.rawText != null ? String(opts.rawText) : '';
+        if (raw && !opts.hideRaw) {
+            if (rawLabel) rawLabel.style.display = 'block';
+            pre.style.display = 'block';
+            pre.setAttribute('dir', 'ltr');
+            pre.classList.add('bc-pre--json');
+            pre.textContent = localizeTimestampsInText(raw);
+        } else {
+            if (rawLabel) rawLabel.style.display = 'none';
+            pre.textContent = '';
+            pre.style.display = 'none';
+        }
+        openReportDialogShell(opts.title || 'CRP Report', true, opts.sourceBtn || null);
+        return built.status;
+    }
+    function sanitizeCrpDisplayData(data) {
+        if (!data || typeof data !== 'object') return null;
+        let clone;
+        try { clone = JSON.parse(JSON.stringify(data)); } catch (err) { return null; }
+        delete clone.package_fingerprint;
+        delete clone.checksums_digest;
+        delete clone.safe_relative_package_path;
+        delete clone.package_path;
+        delete clone.project_root;
+        delete clone.absolute_path;
+        delete clone.fingerprint;
+        return clone;
+    }
+    function resolveCountryNameForPkg(type, id, cc) {
+        if (type === 'full_disaster') return '';
+        const row = qualFindRow(type, id, cc);
+        if (row) {
+            const detailsBtn = row.querySelector('.bc-open-details');
+            const idx = detailsBtn ? Number(detailsBtn.dataset.idx || -1) : -1;
+            if (idx >= 0 && state.country[idx] && state.country[idx].country_name) {
+                return String(state.country[idx].country_name);
+            }
+        }
+        const hit = (state.country || []).find((p) =>
+            String(p.package_id || '') === String(id || '')
+            && String(p.country_code || '').toUpperCase() === String(cc || '').toUpperCase()
+        );
+        return hit && hit.country_name ? String(hit.country_name) : '';
+    }
+    function crpReportTitle(countryName, cc) {
+        const code = String(cc || '').toUpperCase();
+        const name = String(countryName || '').trim();
+        if (name && code) return 'CRP Report — ' + name + ' (' + code + ')';
+        if (name) return 'CRP Report — ' + name;
+        if (code) return 'CRP Report — (' + code + ')';
+        return 'CRP Report';
+    }
     const statusTone = (status) => {
         const s = String(status || '').toLowerCase();
         // Unresolved / unknown must never render as success green (Owner Stage 4B evidence).
@@ -1773,11 +2058,10 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         ).join('');
     }
 
-    function viewFileControl(type, id, cc, file, label, asLink) {
-        const cls = asLink ? 'bc-link bc-view-file' : 'bc-btn-ghost bc-view-file';
-        const tag = asLink ? 'a' : 'button';
-        const extra = asLink ? ' href="#"' : ' type="button"';
-        return '<' + tag + extra + ' class="' + cls + '" data-type="' + esc(type) + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '" data-file="' + esc(file) + '">' + esc(label) + '</' + tag + '>';
+    function viewFileControl(type, id, cc, file, label) {
+        return '<button type="button" class="bc-btn-report bc-view-file" data-type="' + esc(type)
+            + '" data-id="' + esc(id) + '" data-cc="' + esc(cc) + '" data-file="' + esc(file) + '">'
+            + esc(label) + '</button>';
     }
 
     /** Expanded action row — secondary reports only (Verify/DRV live on the primary cluster). */
@@ -1785,15 +2069,15 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         const id = pkg.package_id;
         const cc = pkg.country_code || '';
         const isFull = type === 'full_disaster' || type === 'full';
-        let html = viewFileControl(type, id, cc, 'manifest.json', 'Manifest', true);
-        html += viewFileControl(type, id, cc, 'health.json', 'Health', false);
+        let html = viewFileControl(type, id, cc, 'manifest.json', 'Manifest');
+        html += viewFileControl(type, id, cc, 'health.json', 'Health');
         if (isFull) {
-            html += viewFileControl(type, id, cc, 'recovery_validation.json', 'DRV Report', false);
+            html += viewFileControl(type, id, cc, 'recovery_validation.json', 'DRV Report');
         } else {
-            html += viewFileControl(type, id, cc, 'table_inventory.json', 'Inventory', false);
-            html += viewFileControl(type, id, cc, 'dependency_graph.json', 'Graph', false);
-            html += viewFileControl(type, id, cc, 'country_verify_report.json', 'Verify Report', false);
-            html += viewFileControl(type, id, cc, 'country_recovery_validation.json', 'Country DRV', false);
+            html += viewFileControl(type, id, cc, 'table_inventory.json', 'Inventory');
+            html += viewFileControl(type, id, cc, 'dependency_graph.json', 'Graph');
+            html += viewFileControl(type, id, cc, 'country_verify_report.json', 'Verify Report');
+            html += viewFileControl(type, id, cc, 'country_recovery_validation.json', 'CRP Report');
         }
         return html;
     }
@@ -2077,7 +2361,17 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         closeConfirm();
         if (typeof fn === 'function') await fn();
     });
-    el('bc_view_close').addEventListener('click', () => { el('bc_view_modal').style.display = 'none'; });
+    el('bc_view_close').addEventListener('click', (ev) => {
+        ev.preventDefault();
+        closeReportDialog();
+    });
+    el('bc_view_modal').addEventListener('click', (ev) => {
+        // Intentionally ignore backdrop clicks — report dialog stays open.
+        if (ev.target === el('bc_view_modal')) {
+            ev.preventDefault();
+            ev.stopPropagation();
+        }
+    });
     el('bc_drawer_close').addEventListener('click', closeDrawer);
     el('bc_drawer_backdrop').addEventListener('click', closeDrawer);
     // Stage 5: Close is the only dismiss path (no backdrop / Escape / X).
@@ -2164,24 +2458,129 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         if (t.classList.contains('bc-view-file') || (t.closest && t.closest('.bc-view-file'))) {
             const btn = t.classList.contains('bc-view-file') ? t : t.closest('.bc-view-file');
             ev.preventDefault();
+            ev.stopPropagation();
+            const type = btn.dataset.type || '';
+            const id = btn.dataset.id || '';
+            const cc = btn.dataset.cc || '';
+            const file = btn.dataset.file || '';
+            const scrollY = window.scrollY || 0;
+            const row = qualFindRow(type, id, cc);
+            const wasOpen = row ? !!row.open : null;
             const q = new URLSearchParams({
                 action: 'view_file',
-                package_type: btn.dataset.type || '',
-                package_id: btn.dataset.id || '',
-                country_code: btn.dataset.cc || '',
-                file: btn.dataset.file || ''
+                package_type: type,
+                package_id: id,
+                country_code: cc,
+                file: file
             });
             try {
                 const res = await apiGet('status.php?' + q.toString());
-                const body = res.data ? JSON.stringify(res.data, null, 2) : (res.raw_text || '');
-                showViewContent(btn.dataset.file || 'file', body, true);
-            } catch (e) { showAlert(e.message, false); }
+                if (file === 'country_recovery_validation.json') {
+                    const countryName = resolveCountryNameForPkg(type, id, cc);
+                    const title = crpReportTitle(countryName, cc);
+                    const errors = Array.isArray(res.errors) ? res.errors : [];
+                    const errText = errors.map((x) => String(x)).join('; ');
+                    if (!res.success || res.data == null) {
+                        const malformed = /invalid\s*json/i.test(errText);
+                        const msg = malformed
+                            ? 'CRP report is unreadable or malformed.'
+                            : (errText && !/not found/i.test(errText)
+                                ? 'CRP report could not be read.'
+                                : 'CRP report is missing for this package.');
+                        showCrpReportView({
+                            title: title,
+                            data: null,
+                            packageId: id,
+                            countryCode: cc,
+                            countryName: countryName,
+                            stableMessage: msg,
+                            forceStatus: 'INCOMPLETE',
+                            hideRaw: true,
+                            sourceBtn: btn
+                        });
+                    } else if (typeof res.data !== 'object' || Array.isArray(res.data)
+                        || (Object.keys(res.data).length === 0)) {
+                        showCrpReportView({
+                            title: title,
+                            data: null,
+                            packageId: id,
+                            countryCode: cc,
+                            countryName: countryName,
+                            stableMessage: 'CRP report is empty.',
+                            forceStatus: 'INCOMPLETE',
+                            hideRaw: true,
+                            sourceBtn: btn
+                        });
+                    } else {
+                        const dataCc = String(res.data.country_code || '').toUpperCase();
+                        const dataId = String(res.data.package_id || '');
+                        const mismatch = (dataId && dataId !== String(id))
+                            || (dataCc && cc && dataCc !== String(cc).toUpperCase());
+                        if (mismatch) {
+                            showCrpReportView({
+                                title: title,
+                                data: null,
+                                packageId: id,
+                                countryCode: cc,
+                                countryName: countryName,
+                                stableMessage: 'CRP report identity does not match this package.',
+                                forceStatus: 'FAIL',
+                                hideRaw: true,
+                                sourceBtn: btn
+                            });
+                        } else {
+                            const safe = sanitizeCrpDisplayData(res.data);
+                            const raw = safe ? JSON.stringify(safe, null, 2) : '';
+                            showCrpReportView({
+                                title: title,
+                                data: res.data,
+                                packageId: id,
+                                countryCode: cc,
+                                countryName: countryName,
+                                rawText: raw,
+                                hideRaw: !raw,
+                                sourceBtn: btn
+                            });
+                        }
+                    }
+                } else {
+                    const body = res.data ? JSON.stringify(res.data, null, 2) : (res.raw_text || '');
+                    const label = (btn.textContent || '').trim() || file || 'file';
+                    if (!res.success && !body) {
+                        const errMsg = Array.isArray(res.errors) && res.errors.length
+                            ? res.errors.map((x) => String(x)).join('; ')
+                            : (res.message || 'تعذّر فتح التقرير');
+                        showAlert(errMsg, false);
+                    } else {
+                        showViewContent(label, body || (Array.isArray(res.errors) ? res.errors.join('\n') : ''), true, btn);
+                    }
+                }
+            } catch (e) {
+                if (file === 'country_recovery_validation.json') {
+                    const countryName = resolveCountryNameForPkg(type, id, cc);
+                    showCrpReportView({
+                        title: crpReportTitle(countryName, cc),
+                        data: null,
+                        packageId: id,
+                        countryCode: cc,
+                        countryName: countryName,
+                        stableMessage: 'CRP report could not be read.',
+                        forceStatus: 'INCOMPLETE',
+                        hideRaw: true,
+                        sourceBtn: btn
+                    });
+                } else {
+                    showAlert(e.message, false);
+                }
+            }
+            if (row && wasOpen !== null) row.open = wasOpen;
+            try { window.scrollTo(0, scrollY); } catch (err) { /* ignore */ }
             return;
         }
         if (t.classList.contains('bc-log-tail')) {
             try {
                 const res = await apiGet('status.php?action=log_tail&log=' + encodeURIComponent(t.dataset.log || ''));
-                showViewContent('Log: ' + (t.dataset.log || ''), res.tail || '', true);
+                showViewContent('Log: ' + (t.dataset.log || ''), res.tail || '', true, t);
             } catch (e) { showAlert(e.message, false); }
             return;
         }

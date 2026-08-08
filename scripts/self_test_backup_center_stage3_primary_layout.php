@@ -113,7 +113,7 @@ if ($actionFn !== '') {
     s3_assert(!str_contains($actionFn, 'bc-drv'), 'accordion actionRowHtml: no executable DRV');
     s3_assert(str_contains($actionFn, 'Manifest') && str_contains($actionFn, 'Health'), 'reports: Manifest + Health remain');
     s3_assert(str_contains($actionFn, 'DRV Report'), 'Full reports: DRV Report label unchanged');
-    s3_assert(str_contains($actionFn, 'Country DRV'), 'Country reports: Country DRV label unchanged (no CRP rename)');
+    s3_assert(str_contains($actionFn, 'CRP Report') && !str_contains($actionFn, 'Country DRV'), 'Country reports: CRP Report label (Stage 6)');
     s3_assert(str_contains($actionFn, 'Inventory') && str_contains($actionFn, 'Graph') && str_contains($actionFn, 'Verify Report'), 'Country report set unchanged');
 }
 
@@ -128,7 +128,7 @@ if ($openFn !== '') {
     s3_assert(!str_contains($openFn, 'bc-view-file'), 'drawer openDetails: no bc-view-file markup');
     s3_assert(!str_contains($openFn, 'health.json') && !str_contains($openFn, 'manifest.json'), 'drawer openDetails: no report data-file targets');
     s3_assert(!str_contains($openFn, 'Country DRV') && !str_contains($openFn, 'DRV Report'), 'drawer openDetails: no report labels');
-    s3_assert(!str_contains($openFn, 'CRP Report'), 'no CRP Report label added');
+    s3_assert(!str_contains($openFn, 'CRP Report'), 'drawer openDetails: no CRP Report (accordion-only)');
 }
 
 $accFn = s3_extract_function($src, 'accordionItemHtml');
@@ -161,7 +161,7 @@ if ($hiddenFn !== '') {
 /* Stage 4 non-goals must not appear */
 s3_assert(!preg_match('/\blocalStorage\b/', $src), 'no localStorage state engine');
 s3_assert(!str_contains($src, 'no-refresh') && !str_contains($src, 'noRefresh'), 'no no-refresh implementation');
-s3_assert(!str_contains($src, 'CRP Report'), 'no CRP Report rename');
+s3_assert(str_contains($src, 'CRP Report') && str_contains($src, 'country_recovery_validation.json'), 'Stage 6: CRP Report rename present');
 s3_assert(!str_contains($src, 'bc-drawer-mock'), 'rejected drawer mock not introduced');
 // Stage 5 intentionally adds saved-result dialog copy (bc-result-dialog-saved / savedResult).
 // Still forbid a separate "state-color engine" marker string.
@@ -224,11 +224,9 @@ if (!is_dir($harnessDir) && !@mkdir($harnessDir, 0775, true) && !is_dir($harness
         $style = $styleM[1];
         // Pull exact function bodies from Production page for faithful DOM.
         $bundle = "/* Auto-extracted from admin/pages/backup_center.php for Stage 3 DOM asserts */\n";
-        $bundle .= "function viewFileControl(type, id, cc, file, label, asLink) {\n" .
-            "  const cls = asLink ? 'bc-link bc-view-file' : 'bc-btn-ghost bc-view-file';\n" .
-            "  const tag = asLink ? 'a' : 'button';\n" .
-            "  const extra = asLink ? ' href=\"#\"' : ' type=\"button\"';\n" .
-            "  return '<' + tag + extra + ' class=\"' + cls + '\" data-type=\"' + esc(type) + '\" data-id=\"' + esc(id) + '\" data-cc=\"' + esc(cc) + '\" data-file=\"' + esc(file) + '\">' + esc(label) + '</' + tag + '>';\n}\n";
+        $bundle .= "function viewFileControl(type, id, cc, file, label) {\n" .
+            "  return '<button type=\"button\" class=\"bc-btn-report bc-view-file\" data-type=\"' + esc(type)" .
+            " + '\" data-id=\"' + esc(id) + '\" data-cc=\"' + esc(cc) + '\" data-file=\"' + esc(file) + '\">' + esc(label) + '</button>';\n}\n";
         // Stage 4B accordion identity helpers required by Production accordionItemHtml.
         $bundle .= "let qualRenderGen = 0;\n"
             . "function qualPkgKey(type, id, cc) { return String(type || '') + '|' + String(cc || '').toUpperCase() + '|' + String(id || ''); }\n";
@@ -315,7 +313,7 @@ JS;
   ok(!!fullItem.querySelector('.bc-acc-body .bc-view-file'), 'Full reports remain in accordion');
   ok(!!countryItem.querySelector('.bc-acc-body .bc-view-file'), 'Country reports remain in accordion');
   const countryBodyText = countryItem.querySelector('.bc-acc-body').textContent || '';
-  ok(countryBodyText.includes('Country DRV') && !countryBodyText.includes('CRP Report'), 'Country DRV label unchanged');
+  ok(countryBodyText.includes('CRP Report') && !countryBodyText.includes('Country DRV'), 'Country CRP Report label (Stage 6)');
 
   openDetails(fullPkg, 'full_disaster');
   const drawer = el('bc_details_drawer');
@@ -622,11 +620,9 @@ JS;
                 . "const applyActionAvailability = () => {};\n"
                 . "let qualRenderGen = 0;\n"
                 . "function qualPkgKey(type, id, cc) { return String(type || '') + '|' + String(cc || '').toUpperCase() + '|' + String(id || ''); }\n"
-                . "function viewFileControl(type, id, cc, file, label, asLink) {\n"
-                . "  const cls = asLink ? 'bc-link bc-view-file' : 'bc-btn-ghost bc-view-file';\n"
-                . "  const tag = asLink ? 'a' : 'button';\n"
-                . "  const extra = asLink ? ' href=\"#\"' : ' type=\"button\"';\n"
-                . "  return '<' + tag + extra + ' class=\"' + cls + '\" data-type=\"' + esc(type) + '\" data-id=\"' + esc(id) + '\" data-cc=\"' + esc(cc) + '\" data-file=\"' + esc(file) + '\">' + esc(label) + '</' + tag + '>';\n}\n"
+                . "function viewFileControl(type, id, cc, file, label) {\n"
+                . "  return '<button type=\"button\" class=\"bc-btn-report bc-view-file\" data-type=\"' + esc(type)"
+                . " + '\" data-id=\"' + esc(id) + '\" data-cc=\"' + esc(cc) + '\" data-file=\"' + esc(file) + '\">' + esc(label) + '</button>';\n}\n"
                 . s3_extract_function($src, 'actionRowHtml') . "\n"
                 . s3_extract_function($src, 'hiddenPkgDataCell') . "\n"
                 . s3_extract_function($src, 'primaryClusterHtml') . "\n"

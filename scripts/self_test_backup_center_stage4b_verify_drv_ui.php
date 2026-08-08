@@ -134,8 +134,8 @@ s4b_ok(!str_contains($page, 'localStorage') && !str_contains($page, 'sessionStor
 // #bc_alert remains for unrelated Backup Center alerts only.
 s4b_ok(str_contains($page, 'id="bc_alert"') || str_contains($page, "el('bc_alert')"), 'S5: bc_alert remains for unrelated alerts');
 s4b_ok(str_contains($page, 'id="bc_result_dialog"') && str_contains($page, 'showQualResultDialog'), 'S5: centered Verify/DRV result dialog present');
-s4b_ok(!str_contains($page, 'CRP Report'), 'S6 absence: no CRP Report');
-s4b_ok(str_contains($page, 'Country DRV'), 'S6 absence: Country DRV label unchanged');
+s4b_ok(str_contains($page, 'CRP Report') && str_contains($page, 'country_recovery_validation.json'), 'S6: CRP Report present');
+s4b_ok(!str_contains($page, "'Country DRV'") && !str_contains($page, '>Country DRV<'), 'S6: Country DRV visible label removed');
 s4b_ok(substr_count($page, 'class="bc-btn-ghost bc-verify') >= 1, 'S3: Verify button template');
 s4b_ok(substr_count($page, 'class="bc-btn-ghost bc-drv') >= 1, 'S3: DRV button template');
 s4b_ok(str_contains($page, 'recoverabilitySlotHtml') || str_contains($page, 'data-bc-recoverable-slot'), 'Recoverable slot present');
@@ -182,7 +182,7 @@ s4b_ok(
 );
 // DRV frozen: still blocked force + no color/order redesign markers removed
 s4b_ok(str_contains($page, "forceDisabled: (d.state === 'blocked')"), 'DRV frozen: blocked still forceDisabled');
-s4b_ok(str_contains($page, 'Country DRV'), 'DRV frozen: Country DRV label unchanged');
+s4b_ok(str_contains($page, 'CRP Report') && !str_contains($page, "'Country DRV'"), 'DRV frozen: CRP Report label (Stage 6); primary DRV unchanged');
 echo "REGISTERED BACKUP_CENTER_STAGE4B_VERIFY_LIST_RERENDER_STATE_RACE_01\n";
 echo "REGISTERED BACKUP_CENTER_STAGE4B_VERIFY_CROSS_ROW_FALSE_SUCCESS_01\n";
 
@@ -415,9 +415,9 @@ $scenarioDefs = [
     79 => ['K S5/6', '#bc_alert remains for unrelated alerts', 'S5: bc_alert remains for unrelated alerts', 'source', 'S5: bc_alert remains for unrelated alerts'],
     80 => ['K S5/6', 'centered Verify/DRV result dialog (Stage 5)', 'bc_result_dialog present', 'source', 'S5: centered Verify/DRV result dialog present'],
     81 => ['K S5/6', 'unrelated top-card retained', 'page structure retained', 'source', 'S5: bc_alert remains for unrelated alerts'],
-    82 => ['K S5/6', 'Country DRV unchanged', 'Country DRV label', 'source', 'S6 absence: Country DRV label unchanged'],
-    83 => ['K S5/6', 'no CRP Report', 'no CRP Report string', 'source', 'S6 absence: no CRP Report'],
-    84 => ['K S5/6', 'report styles unchanged', 'no report redesign markers', 'source', 'S6 absence: Country DRV label unchanged'],
+    82 => ['K S5/6', 'CRP Report present', 'CRP Report label', 'source', 'S6: CRP Report present'],
+    83 => ['K S5/6', 'Country DRV removed', 'no Country DRV visible label', 'source', 'S6: Country DRV visible label removed'],
+    84 => ['K S5/6', 'report family Stage 6', 'unified report controls', 'source', 'S6: CRP Report present'],
 ];
 
 $sharedWith = [

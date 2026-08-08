@@ -74,7 +74,7 @@ function rd_parse_view_file_calls(string $fnBody, string $surface, string $packa
         return $out;
     }
     if (!preg_match_all(
-        "/viewFileControl\(\s*type\s*,\s*id\s*,\s*cc\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*(true|false)\s*\)/",
+        "/viewFileControl\(\s*type\s*,\s*id\s*,\s*cc\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*(true|false))?\s*\)/",
         $fnBody,
         $m,
         PREG_SET_ORDER
@@ -84,7 +84,7 @@ function rd_parse_view_file_calls(string $fnBody, string $surface, string $packa
     foreach ($m as $row) {
         $file = $row[1];
         $label = $row[2];
-        $asLink = $row[3] === 'true';
+        $asLink = isset($row[3]) && $row[3] === 'true';
         $isFull = $packageFamily === 'full';
         $isCountry = $packageFamily === 'country';
         // Filter by surrounding if/else when possible — actionRowHtml has if (isFull).
@@ -94,7 +94,7 @@ function rd_parse_view_file_calls(string $fnBody, string $surface, string $packa
             'label' => $label,
             'data_file' => $file,
             'as_link' => $asLink,
-            'selector' => $asLink ? 'a.bc-link.bc-view-file' : 'button.bc-btn-ghost.bc-view-file',
+            'selector' => 'button.bc-btn-report.bc-view-file',
             'endpoint' => 'status.php?action=view_file',
             'destination_fingerprint' => ($isFull ? 'full_disaster' : 'country_recovery') . '|view_file|' . $file,
             'interactive' => true,
@@ -132,7 +132,7 @@ $countryAccReports = [
     ['Inventory', 'table_inventory.json'],
     ['Graph', 'dependency_graph.json'],
     ['Verify Report', 'country_verify_report.json'],
-    ['Country DRV', 'country_recovery_validation.json'],
+    ['CRP Report', 'country_recovery_validation.json'],
 ];
 foreach ($fullAccReports as [$label, $file]) {
     rd_ok(str_contains($actionFn, "'" . $file . "', '" . $label . "'")
@@ -176,7 +176,8 @@ rd_ok($renderFn !== '' && str_contains($renderFn, 'hiddenPkgDataCell(') && !preg
 rd_ok(!preg_match('/bc_country_table[\s\S]{0,900}bc-view-file/', $renderFn), 'hidden Country table: no bc-view-file');
 
 // Absences / freezes
-rd_ok(!str_contains($src, 'CRP Report'), 'no CRP Report');
+rd_ok(str_contains($src, 'CRP Report') && !str_contains($src, "'Country DRV'"), 'Stage 6: CRP Report label; Country DRV removed');
+rd_ok(str_contains($src, 'bc-btn-report') && str_contains($src, 'function viewFileControl'), 'Stage 6: unified report-control family');
 // Stage 5: #bc_alert remains for unrelated alerts; Verify/DRV results use centered dialog.
 rd_ok(str_contains($src, 'id="bc_alert"'), 'top alert card remains for unrelated alerts');
 rd_ok(str_contains($src, 'id="bc_result_dialog"'), 'Stage 5: Verify/DRV centered result dialog present');
@@ -232,7 +233,7 @@ $matrix['duplicate_groups'] = [
         'final' => 'accordion only',
     ],
     [
-        'label' => 'Country DRV',
+        'label' => 'CRP Report',
         'destination' => 'country_recovery|view_file|country_recovery_validation.json',
         'was' => ['accordion', 'Details/Diagnostics', 'Details/Logs'],
         'final' => 'accordion only',
@@ -270,11 +271,9 @@ if (!preg_match('/<style>(.*?)<\/style>/s', $src, $styleM)) {
     rd_ok(false, 'extract Production style');
 } else {
     $style = $styleM[1];
-    $bundle = "function viewFileControl(type, id, cc, file, label, asLink) {\n"
-        . "  const cls = asLink ? 'bc-link bc-view-file' : 'bc-btn-ghost bc-view-file';\n"
-        . "  const tag = asLink ? 'a' : 'button';\n"
-        . "  const extra = asLink ? ' href=\"#\"' : ' type=\"button\"';\n"
-        . "  return '<' + tag + extra + ' class=\"' + cls + '\" data-type=\"' + esc(type) + '\" data-id=\"' + esc(id) + '\" data-cc=\"' + esc(cc) + '\" data-file=\"' + esc(file) + '\">' + esc(label) + '</' + tag + '>';\n}\n";
+    $bundle = "function viewFileControl(type, id, cc, file, label) {\n"
+        . "  return '<button type=\"button\" class=\"bc-btn-report bc-view-file\" data-type=\"' + esc(type)"
+        . " + '\" data-id=\"' + esc(id) + '\" data-cc=\"' + esc(cc) + '\" data-file=\"' + esc(file) + '\">' + esc(label) + '</button>';\n}\n";
     $bundle .= "let qualRenderGen = 0;\n"
         . "function qualPkgKey(type, id, cc) { return String(type || '') + '|' + String(cc || '').toUpperCase() + '|' + String(id || ''); }\n"
         . "const CAN_VERIFY = true;\n"
@@ -343,8 +342,9 @@ JS;
     && countryFiles.includes('dependency_graph.json') && countryFiles.includes('country_verify_report.json')
     && countryFiles.includes('country_recovery_validation.json'), 'DOM Country accordion unique destinations');
   ok(new Set(countryFiles).size === countryFiles.length, 'DOM Country accordion no duplicate destinations');
-  ok(fullLabels.includes('DRV Report') && countryLabels.includes('Country DRV') && countryLabels.includes('Verify Report'), 'DOM report labels preserved');
-  ok(!fullLabels.includes('CRP Report') && !countryLabels.includes('CRP Report'), 'DOM no CRP Report');
+  ok(fullLabels.includes('DRV Report') && countryLabels.includes('CRP Report') && countryLabels.includes('Verify Report'), 'DOM report labels preserved (Stage 6 CRP)');
+  ok(!fullLabels.includes('CRP Report') && !countryLabels.includes('Country DRV'), 'DOM: CRP Country-only; Country DRV absent');
+  ok(countryItem.querySelectorAll('.bc-acc-body .bc-btn-report.bc-view-file').length === countryLabels.length, 'DOM: unified bc-btn-report family');
 
   ok(count(fullItem, 'summary .bc-open-details') === 1, 'Full Details count=1');
   ok(count(fullItem, 'summary .bc-drv') === 1, 'Full DRV count=1');
@@ -463,7 +463,7 @@ JS;
 // Contract freezes (source)
 rd_ok(str_contains($src, "String(type || '') + '|' + String(cc || '').toUpperCase() + '|' + String(id || '')"), 'rerender exact-key preserved');
 rd_ok(str_contains($src, 'QUAL_COHORT_SIZE = 5') || str_contains($src, 'QUAL_COHORT_SIZE=5'), 'grouped cohort size preserved');
-rd_ok(str_contains($actionFn, 'Country DRV') && str_contains($actionFn, 'DRV Report'), 'report labels not renamed');
+rd_ok(str_contains($actionFn, 'CRP Report') && str_contains($actionFn, 'DRV Report') && !str_contains($actionFn, 'Country DRV'), 'report labels Stage 6: CRP Report + DRV Report');
 
 echo "DETAILS_REPORT_CONTROL_COUNT = 0\n";
 echo "INTERNAL_DETAILS_DUPLICATE_REPORT_COUNT = 0\n";

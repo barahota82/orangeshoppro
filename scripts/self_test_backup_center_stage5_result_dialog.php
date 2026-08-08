@@ -139,16 +139,17 @@ s5_ok(
     '27. unrelated alerts still work (showAlert retained)'
 );
 s5_ok(
-    str_contains($src, 'actionRowHtml') && str_contains($src, 'Country DRV')
+    str_contains($src, 'actionRowHtml') && str_contains($src, 'CRP Report')
+    && !str_contains($src, "'Country DRV'")
     && !str_contains(s5_extract_function($src, 'openDetails'), 'bc-view-file'),
-    '28-29. reports accordion-only; Details metadata-only'
+    '28-29. reports accordion-only; Details metadata-only; CRP Report label'
 );
 $primary = s5_extract_function($src, 'primaryClusterHtml');
 $dPos = strpos($primary, 'bc-open-details');
 $drvPos = strpos($primary, 'bc-drv');
 $vPos = strpos($primary, 'bc-verify');
 s5_ok($dPos !== false && $drvPos !== false && $vPos !== false && $dPos < $drvPos && $drvPos < $vPos, '30. primary order unchanged');
-s5_ok(!str_contains($src, 'CRP Report'), '39. no CRP Report');
+s5_ok(str_contains($src, 'CRP Report') && str_contains($src, 'country_recovery_validation.json'), '39. CRP Report present (Stage 6)');
 s5_ok(is_file($projectRoot . '/admin/pages/restore_center.php'), '40. Restore Center page presence unchanged');
 s5_ok(
     !str_contains($src, 'Internal Stage 5') && !str_contains($src, 'internal_stage_5')
@@ -230,11 +231,9 @@ $shotsDir = $evidenceDir . DIRECTORY_SEPARATOR . 'shots';
 @mkdir($runtimeDir, 0775, true);
 @mkdir($shotsDir, 0775, true);
 
-$viewFile = "function viewFileControl(type, id, cc, file, label, asLink) {\n"
-    . "  const cls = asLink ? 'bc-link bc-view-file' : 'bc-btn-ghost bc-view-file';\n"
-    . "  const tag = asLink ? 'a' : 'button';\n"
-    . "  const extra = asLink ? ' href=\"#\"' : ' type=\"button\"';\n"
-    . "  return '<' + tag + extra + ' class=\"' + cls + '\" data-type=\"' + esc(type) + '\" data-id=\"' + esc(id) + '\" data-cc=\"' + esc(cc) + '\" data-file=\"' + esc(file) + '\">' + esc(label) + '</' + tag + '>';\n}\n";
+$viewFile = "function viewFileControl(type, id, cc, file, label) {\n"
+    . "  return '<button type=\"button\" class=\"bc-btn-report bc-view-file\" data-type=\"' + esc(type)"
+    . " + '\" data-id=\"' + esc(id) + '\" data-cc=\"' + esc(cc) + '\" data-file=\"' + esc(file) + '\">' + esc(label) + '</button>';\n}\n";
 
 $boot = <<<'JS'
 const CAN_VERIFY = true;

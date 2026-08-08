@@ -144,7 +144,7 @@ try {
     cmv_ok(str_contains($manualHelper, 'manual_admin_verify'), 'storage: trigger = manual_admin_verify');
     cmv_ok(str_contains($qualPhp, 'manual_country_verify_ui'), 'resolve: manual UI authority flag');
     cmv_ok(str_contains($qualPhp, 'backend_evidence_bound'), 'resolve: backend evidence separate field');
-    cmv_ok(!str_contains($bc, 'CRP Report'), 'freeze: no CRP Report');
+    cmv_ok(str_contains($bc, 'CRP Report') && !str_contains($bc, "'Country DRV'"), 'Stage 6: CRP Report label; Country DRV removed');
     cmv_ok(preg_match('/bc-open-details[\s\S]*?bc-drv[\s\S]*?bc-verify/', $bc) === 1
         || str_contains($bc, 'primaryClusterHtml'), 'freeze: Stage 3 Details→DRV→Verify');
 
