@@ -7,7 +7,7 @@ declare(strict_types=1);
  *
  * Usage: php scripts/self_test_backup_center_top_alert_elimination.php
  *
- * Evidence (outside Git): D:\orange_top_alert_elimination_evidence\
+ * Evidence: D:\orange_top_alert_elimination_evidence\ on Windows; system temp on Linux/macOS.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -43,6 +43,15 @@ function ta_extract(string $src, string $name): string
     }
 
     return $body;
+}
+
+function ta_evidence_dir(): string
+{
+    if (DIRECTORY_SEPARATOR === '\\') {
+        return 'D:\\orange_top_alert_elimination_evidence';
+    }
+
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'orange_top_alert_elimination_evidence';
 }
 
 $pagePath = $projectRoot . '/admin/pages/backup_center.php';
@@ -122,7 +131,7 @@ $inventory = [
     ],
 ];
 
-$evidenceDir = 'D:\\orange_top_alert_elimination_evidence';
+$evidenceDir = ta_evidence_dir();
 @mkdir($evidenceDir, 0775, true);
 @mkdir($evidenceDir . DIRECTORY_SEPARATOR . 'shots', 0775, true);
 @mkdir($evidenceDir . DIRECTORY_SEPARATOR . 'runtime', 0775, true);

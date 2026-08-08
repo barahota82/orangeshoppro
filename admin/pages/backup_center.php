@@ -913,9 +913,6 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         if (stableMessage && status === 'PASS' && forceStatus) {
             status = crpNormalizeStatus(forceStatus) || 'INCOMPLETE';
         }
-        const tone = status === 'PASS' ? 'pass'
-            : (status === 'FAIL' ? 'fail'
-                : (status === 'WARNING' ? 'warning' : 'incomplete'));
         const cc = String((data && data.country_code) || pkgMeta.countryCode || '').toUpperCase();
         const countryName = String(pkgMeta.countryName || '');
         const countryLabel = countryName
@@ -936,6 +933,12 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             && (!data.country_code
                 || String(data.country_code).toUpperCase() === String(pkgMeta.countryCode || '').toUpperCase()));
         const binding = data ? (bindingOk ? 'PASS' : 'FAIL') : '—';
+        if (data && !bindingOk) {
+            status = 'FAIL';
+        }
+        const tone = status === 'PASS' ? 'pass'
+            : (status === 'FAIL' ? 'fail'
+                : (status === 'WARNING' ? 'warning' : 'incomplete'));
         const inventory = data && data.dependency_completeness_valid != null
             ? crpBoolLabel(data.dependency_completeness_valid)
             : '—';
@@ -951,6 +954,9 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             reason = data.errors.slice(0, 3).map((x) => crpHumanizeFailureReason(x)).filter(Boolean).join(' ');
         } else if (data && Array.isArray(data.warnings) && data.warnings.length && status !== 'PASS') {
             reason = data.warnings.slice(0, 3).map((x) => crpHumanizeFailureReason(x)).filter(Boolean).join(' ');
+        }
+        if (!reason && data && !bindingOk) {
+            reason = 'Package identity does not match this package.';
         }
         if (!reason && status !== 'PASS') {
             reason = 'Validation failed. See technical details.';
@@ -1033,9 +1039,6 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         if (stableMessage && status === 'PASS' && forceStatus) {
             status = crpNormalizeStatus(forceStatus) || 'INCOMPLETE';
         }
-        const tone = status === 'PASS' ? 'pass'
-            : (status === 'FAIL' ? 'fail'
-                : (status === 'WARNING' ? 'warning' : 'incomplete'));
         const pkgId = String((data && data.package_id) || pkgMeta.packageId || '—');
         const schema = (data && data.schema_revision != null && data.schema_revision !== '')
             ? String(data.schema_revision)
@@ -1048,6 +1051,12 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             && data.package_id
             && String(data.package_id) === String(pkgMeta.packageId));
         const binding = data ? (bindingOk ? 'PASS' : 'FAIL') : '—';
+        if (data && !bindingOk) {
+            status = 'FAIL';
+        }
+        const tone = status === 'PASS' ? 'pass'
+            : (status === 'FAIL' ? 'fail'
+                : (status === 'WARNING' ? 'warning' : 'incomplete'));
         const checksumSummary = data && data.checksums_valid != null
             ? crpBoolLabel(data.checksums_valid)
             : '—';
@@ -1067,6 +1076,9 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             reason = data.errors.slice(0, 3).map((x) => crpHumanizeFailureReason(x)).filter(Boolean).join(' ');
         } else if (data && Array.isArray(data.warnings) && data.warnings.length && status !== 'PASS') {
             reason = data.warnings.slice(0, 3).map((x) => crpHumanizeFailureReason(x)).filter(Boolean).join(' ');
+        }
+        if (!reason && data && !bindingOk) {
+            reason = 'Package identity does not match this package.';
         }
         if (!reason && status !== 'PASS' && status !== 'INCOMPLETE') {
             reason = 'Validation failed. See technical details.';
