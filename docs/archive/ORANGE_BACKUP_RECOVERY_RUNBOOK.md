@@ -833,6 +833,11 @@ On Windows/Plesk, **Scheduled Task PHP** (CLI under Task Scheduler) and **Websit
 - `verify.php` remains **read-only** (view context); it does not require write access.
 - Backup Center UI shows **حالة مسار النسخ الاحتياطي** (exists / readable / writable / manual available) and an Arabic banner when readable+non-writable; Run buttons and DRV are disabled; no generic alert for this expected condition.
 
+**Owner decision — Backup Center message surfaces + Full DRV Report parity (2026-08-08, post-Stage7):**
+- **No top-page alert card:** `#bc_alert` / `showAlert()` are removed. Terminal user-facing messages use centered dialogs only (system / Verify·DRV result / report). Temporary loading stays inline (`#bc_progress` / control state). This supersedes the earlier Stage 5 exception that allowed unrelated messages in `#bc_alert`.
+- **Full `DRV Report`:** remains visible in the accordion before DRV success; opens a readable centered report view matching the CRP Report model (INCOMPLETE + stable Arabic not-ready/unavailable messages; no raw `File not found`; optional Raw JSON only for a valid parsed report; opening never runs DRV/Verify/Backup).
+- **تنفيذ:** `admin/pages/backup_center.php` UI only — no Backend/API/Schema change. Tests: `scripts/self_test_backup_center_full_drv_report_parity.php`, `scripts/self_test_backup_center_top_alert_elimination.php`.
+
 **Manual Full Backup execution model (Admin API — Phase 3A):**
 
 - **Manual Run Full Backup** from Admin **never** calls `orange_backup_run_full()` inside the IIS FastCGI HTTP request. The approved boundary is: `admin/api/backup/run-full.php` → **`orange_backup_admin_run_full_for_api()`** → subprocess **`scripts/backup/run_full_backup.php`** → **`orange_backup_run_full()`** (same engine entry as Plesk Scheduled Tasks).

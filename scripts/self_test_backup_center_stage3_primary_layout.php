@@ -84,9 +84,9 @@ s3_assert(
 );
 s3_assert(str_contains($src, 'function primaryClusterHtml('), 'JS: primaryClusterHtml defined');
 s3_assert(str_contains($src, 'function hiddenPkgDataCell('), 'JS: hiddenPkgDataCell defined');
-// Stage 5: #bc_alert remains for unrelated Backup Center alerts (Verify/DRV use result dialog).
-s3_assert(str_contains($src, 'id="bc_alert"'), 'UI: top-page alert card remains for unrelated alerts');
-s3_assert(str_contains($src, 'id="bc_result_dialog"'), 'UI: Stage 5 Verify/DRV result dialog present');
+// Post-Stage7: top-page #bc_alert removed; terminal messages use centered system/result dialogs.
+s3_assert(!str_contains($src, 'id="bc_alert"'), 'UI: top-page alert card removed');
+s3_assert(str_contains($src, 'function showSystemDialog') && str_contains($src, 'id="bc_result_dialog"'), 'UI: centered system/result dialog present');
 
 $primaryFn = s3_extract_function($src, 'primaryClusterHtml');
 s3_assert($primaryFn !== '', 'extract: primaryClusterHtml body');
@@ -172,7 +172,7 @@ s3_assert(!str_contains($src, 'enableDrvAfterVerify') && !str_contains($src, 'dr
 /* Single body delegated listener */
 s3_assert(substr_count($src, "document.body.addEventListener('click'") === 1, 'exactly one document.body click listener');
 s3_assert(str_contains($src, "apiPost('verify.php'") && str_contains($src, "apiPost('recovery-check.php'"), 'Verify/DRV endpoints unchanged');
-s3_assert(str_contains($src, 'showAlert(') && str_contains($src, 'loadAll()'), 'page-refresh + top alert success path remains');
+s3_assert(str_contains($src, 'showSystemDialog(') && str_contains($src, 'loadAll()'), 'page-refresh + centered system dialog path remains');
 
 /* Permission / unauthorized path: Verify/DRV only under CAN_VERIFY in primaryClusterHtml */
 s3_assert(

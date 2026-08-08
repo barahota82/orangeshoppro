@@ -135,8 +135,10 @@ s5_ok(
     '26. Verify/DRV result does not populate top alert'
 );
 s5_ok(
-    str_contains($src, 'id="bc_alert"') && str_contains($src, 'const showAlert'),
-    '27. unrelated alerts still work (showAlert retained)'
+    !str_contains($src, 'id="bc_alert"')
+    && !preg_match('/\bfunction showAlert\b|\bconst showAlert\b/', $src)
+    && str_contains($src, 'function showSystemDialog'),
+    '27. top alert removed; unrelated messages use showSystemDialog'
 );
 s5_ok(
     str_contains($src, 'actionRowHtml') && str_contains($src, 'CRP Report')
@@ -188,6 +190,8 @@ foreach ([
     'actionRowHtml',
     'hiddenPkgDataCell',
     'accordionItemHtml',
+    'openCenteredResultShell',
+    'showSystemDialog',
     'showQualResultDialog',
     'openQualResultFromButton',
     'closeQualResultDialog',
@@ -495,8 +499,13 @@ async function s5Scenario(name) {
     window.__S5_MUT_MODE = 'verify_fail_long';
     await clickBtn('#bc_full_list .bc-verify');
   } else if (name === 'unrelated_alert') {
-    showAlert('هناك عملية نسخ احتياطي قيد التشغيل حالياً.', false);
-    log.unrelated_alert_visible = (alertBox && alertBox.style.display !== 'none') ? 1 : 0;
+    showSystemDialog({
+      title: 'رسالة النظام',
+      message: 'هناك عملية نسخ احتياطي قيد التشغيل حالياً.',
+      success: false
+    });
+    log.unrelated_alert_visible = (alertBox && alertBox.style.display !== 'none' && alertBox.innerHTML) ? 1 : 0;
+    log.system_dialog_open = (el('bc_result_dialog_backdrop') && el('bc_result_dialog_backdrop').classList.contains('is-open')) ? 1 : 0;
   }
 
   // Backdrop / Escape must not close while open
@@ -540,14 +549,28 @@ async function s5Scenario(name) {
   log.archive_mode_full = !!state.archiveMode.full;
   log.active_tab = el('bc_country_list').innerHTML && !el('bc_full_list').innerHTML ? 'country' : 'full';
 
-  // Prove unrelated alert still works (top card) without becoming the Verify/DRV result surface.
-  if (name !== 'unrelated_alert') {
-    const alertBefore = alertBox ? alertBox.innerHTML : '';
-    showAlert('تعذر التحميل', false);
-    log.unrelated_alert_still_works = (alertBox && alertBox.style.display !== 'none') ? 1 : 0;
-    // Clear so Verify/DRV top-alert counters stay clean for this scenario surface.
-    if (alertBox) { alertBox.style.display = 'none'; alertBox.innerHTML = alertBefore; }
+  // Prove system dialog can carry unrelated terminal messages (never Verify/DRV top-card).
+  if (name !== 'unrelated_alert' && typeof showSystemDialog === 'function') {
+    const bdSys = el('bc_result_dialog_backdrop');
+    const wasOpen = !!(bdSys && bdSys.classList.contains('is-open'));
+    if (!wasOpen) {
+      showSystemDialog({ title: 'رسالة النظام', message: 'تعذر التحميل', success: false });
+      log.system_dialog_still_works = (bdSys && bdSys.classList.contains('is-open')) ? 1 : 0;
+      closeQualResultDialog();
+      // Restore Verify/DRV dialog snapshot for evidence if it was open earlier in this scenario.
+      if (bodyHtmlSnapshot) {
+        el('bc_result_dialog_title').textContent = titleSnapshot;
+        el('bc_result_dialog_body').innerHTML = bodyHtmlSnapshot;
+        el('bc_result_dialog').classList.toggle('bc-result-dialog--ok', wasOk);
+        el('bc_result_dialog').classList.toggle('bc-result-dialog--fail', !wasOk);
+        bdSys.classList.add('is-open');
+        bdSys.setAttribute('aria-hidden', 'false');
+      }
+    } else {
+      log.system_dialog_still_works = 1;
+    }
   }
+  log.top_page_alert_visible = (alertBox && alertBox.style.display !== 'none' && (alertBox.innerHTML || '').trim() !== '') ? 1 : 0;
 
   const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(log))));
   document.documentElement.setAttribute('data-s5-b64', b64);

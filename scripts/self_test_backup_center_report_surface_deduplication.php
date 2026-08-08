@@ -178,8 +178,8 @@ rd_ok(!preg_match('/bc_country_table[\s\S]{0,900}bc-view-file/', $renderFn), 'hi
 // Absences / freezes
 rd_ok(str_contains($src, 'CRP Report') && !str_contains($src, "'Country DRV'"), 'Stage 6: CRP Report label; Country DRV removed');
 rd_ok(str_contains($src, 'bc-btn-report') && str_contains($src, 'function viewFileControl'), 'Stage 6: unified report-control family');
-// Stage 5: #bc_alert remains for unrelated alerts; Verify/DRV results use centered dialog.
-rd_ok(str_contains($src, 'id="bc_alert"'), 'top alert card remains for unrelated alerts');
+// Post-Stage7: top-page #bc_alert removed; Verify/DRV/system messages use centered dialogs.
+rd_ok(!str_contains($src, 'id="bc_alert"') && str_contains($src, 'function showSystemDialog'), 'top alert card removed; system dialog present');
 rd_ok(str_contains($src, 'id="bc_result_dialog"'), 'Stage 5: Verify/DRV centered result dialog present');
 rd_ok(
     str_contains($src, 'function openQualResultFromButton')

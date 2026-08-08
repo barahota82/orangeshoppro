@@ -277,7 +277,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
 
 <div class="bc-v2" id="bc_app">
     <div id="bc_progress" class="bc-progress" role="status" aria-live="polite">جاري التنفيذ…</div>
-    <div id="bc_alert" class="card" style="display:none;margin-bottom:12px;"></div>
+    <?php /* Top-page #bc_alert removed (Owner post-Stage7): terminal messages use centered dialogs only. */ ?>
     <?php /* Embedded for UI self-test + progressive disclosure fallback; JS overwrites from API when shown. */ ?>
     <div id="bc_root_warning" class="bc-root-warning" role="status" aria-live="polite">مسار النسخ الاحتياطي قابل للقراءة لكنه غير قابل للكتابة بواسطة PHP الخاص بالموقع. يمكن عرض النسخ الحالية، لكن التشغيل اليدوي متوقف حتى يتم ضبط صلاحيات المجلد.</div>
 
@@ -1021,6 +1021,129 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         delete clone.fingerprint;
         return clone;
     }
+    const FULL_DRV_MSG_NOT_READY = 'تقرير DRV لم يتم إنشاؤه لهذه النسخة بعد.';
+    const FULL_DRV_MSG_UNAVAILABLE = 'تقرير DRV غير متاح لهذه النسخة.';
+    function buildFullDrvReadableSummary(data, pkgMeta, stableMessage, forceStatus) {
+        let status = crpNormalizeStatus(forceStatus)
+            || crpNormalizeStatus(data && data.overall_result);
+        if (!status) status = 'INCOMPLETE';
+        if ((!data || typeof data !== 'object') && status === 'PASS') {
+            status = 'INCOMPLETE';
+        }
+        if (stableMessage && status === 'PASS' && forceStatus) {
+            status = crpNormalizeStatus(forceStatus) || 'INCOMPLETE';
+        }
+        const tone = status === 'PASS' ? 'pass'
+            : (status === 'FAIL' ? 'fail'
+                : (status === 'WARNING' ? 'warning' : 'incomplete'));
+        const pkgId = String((data && data.package_id) || pkgMeta.packageId || '—');
+        const schema = (data && data.schema_revision != null && data.schema_revision !== '')
+            ? String(data.schema_revision)
+            : '—';
+        const when = String((data && (data.completed_at_utc || data.validated_at || data.generated_at)) || '—');
+        const score = (data && data.recovery_score != null && data.recovery_score !== '')
+            ? String(data.recovery_score)
+            : '—';
+        const bindingOk = !!(data
+            && data.package_id
+            && String(data.package_id) === String(pkgMeta.packageId));
+        const binding = data ? (bindingOk ? 'PASS' : 'FAIL') : '—';
+        const checksumSummary = data && data.checksums_valid != null
+            ? crpBoolLabel(data.checksums_valid)
+            : '—';
+        const integrityParts = [];
+        if (data && data.manifest_valid != null) integrityParts.push('Manifest ' + crpBoolLabel(data.manifest_valid));
+        if (data && data.health_valid != null) integrityParts.push('Health ' + crpBoolLabel(data.health_valid));
+        if (data && data.sql_valid != null) integrityParts.push('SQL ' + crpBoolLabel(data.sql_valid));
+        if (data && data.uploads_valid != null) integrityParts.push('Uploads ' + crpBoolLabel(data.uploads_valid));
+        const integrity = integrityParts.length ? integrityParts.join(' · ') : '—';
+        let eligibility = '—';
+        if (pkgMeta && pkgMeta.recoverable === true) eligibility = 'Eligible';
+        else if (pkgMeta && pkgMeta.recoverable === false) eligibility = 'Not eligible';
+        let reason = '';
+        if (stableMessage) {
+            reason = String(stableMessage);
+        } else if (data && Array.isArray(data.errors) && data.errors.length) {
+            reason = data.errors.slice(0, 3).map((x) => crpHumanizeFailureReason(x)).filter(Boolean).join(' ');
+        } else if (data && Array.isArray(data.warnings) && data.warnings.length && status !== 'PASS') {
+            reason = data.warnings.slice(0, 3).map((x) => crpHumanizeFailureReason(x)).filter(Boolean).join(' ');
+        }
+        if (!reason && status !== 'PASS' && status !== 'INCOMPLETE') {
+            reason = 'Validation failed. See technical details.';
+        }
+        let html = '<dl class="bc-report-summary-meta">';
+        html += '<div><dt>Validation status</dt><dd><span class="bc-report-status bc-report-status--'
+            + tone + '">' + esc(status) + '</span></dd></div>';
+        html += '<div><dt>Package ID</dt><dd class="bc-mono">' + esc(pkgId) + '</dd></div>';
+        html += '<div><dt>Package type</dt><dd>Full</dd></div>';
+        html += '<div><dt>Schema revision</dt><dd>' + esc(schema) + '</dd></div>';
+        html += '<div><dt>Generated / completed</dt><dd dir="ltr">' + esc(when) + '</dd></div>';
+        html += '<div><dt>Recovery / validation score</dt><dd>' + esc(score) + '</dd></div>';
+        html += '<div><dt>Package identity / binding</dt><dd>' + esc(binding) + '</dd></div>';
+        html += '<div><dt>Checksum / integrity summary</dt><dd>' + esc(checksumSummary)
+            + (integrity !== '—' ? (' · ' + esc(integrity)) : '') + '</dd></div>';
+        html += '<div><dt>Recoverability / eligibility</dt><dd>' + esc(eligibility) + '</dd></div>';
+        if (reason) {
+            html += '<div><dt>Safe failure reason</dt><dd>' + esc(reason) + '</dd></div>';
+        }
+        html += '</dl>';
+        return { html: html, status: status };
+    }
+    function showFullDrvReportView(opts) {
+        opts = opts || {};
+        const summary = el('bc_view_summary');
+        const rawLabel = el('bc_view_raw_label');
+        const pre = el('bc_view_pre');
+        const built = buildFullDrvReadableSummary(opts.data || null, {
+            packageId: opts.packageId || '',
+            recoverable: opts.recoverable
+        }, opts.stableMessage || '', opts.forceStatus || '');
+        if (summary) {
+            summary.style.display = 'block';
+            summary.innerHTML = built.html;
+        }
+        const raw = opts.rawText != null ? String(opts.rawText) : '';
+        if (raw && !opts.hideRaw) {
+            if (rawLabel) rawLabel.style.display = 'block';
+            pre.style.display = 'block';
+            pre.setAttribute('dir', 'ltr');
+            pre.classList.add('bc-pre--json');
+            pre.textContent = localizeTimestampsInText(raw);
+        } else {
+            if (rawLabel) rawLabel.style.display = 'none';
+            pre.textContent = '';
+            pre.style.display = 'none';
+        }
+        openReportDialogShell(opts.title || 'DRV Report — Full Backup', true, opts.sourceBtn || null);
+        return built.status;
+    }
+    function resolveFullPkgRecoverable(id) {
+        const hit = (state.full || []).find((p) => String(p.package_id || '') === String(id || ''));
+        if (!hit || hit.recoverable == null) return null;
+        return !!hit.recoverable;
+    }
+    function safeGenericReportMessage(errText) {
+        const t = String(errText || '');
+        if (/not\s*found/i.test(t)) return 'التقرير غير متاح لهذه النسخة.';
+        if (/invalid\s*json/i.test(t)) return 'تعذّر قراءة التقرير.';
+        if (/403|unauthorized|forbidden|صلاح|غير مصرح/i.test(t)) return 'ليست لديك صلاحية لعرض هذا التقرير.';
+        return 'تعذّر فتح التقرير.';
+    }
+    function showSafeReportMessage(title, message, sourceBtn) {
+        const summary = el('bc_view_summary');
+        const rawLabel = el('bc_view_raw_label');
+        const pre = el('bc_view_pre');
+        if (summary) {
+            summary.style.display = 'block';
+            summary.innerHTML = '<p class="bc-result-dialog-summary">' + esc(String(message || 'تعذّر فتح التقرير.')) + '</p>';
+        }
+        if (rawLabel) rawLabel.style.display = 'none';
+        if (pre) {
+            pre.textContent = '';
+            pre.style.display = 'none';
+        }
+        openReportDialogShell(title || 'تقرير', false, sourceBtn || null);
+    }
     function resolveCountryNameForPkg(type, id, cc) {
         if (type === 'full_disaster') return '';
         const row = qualFindRow(type, id, cc);
@@ -1068,12 +1191,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
     };
     const recoverabilitySlotHtml = (pkg) =>
         '<span class="bc-recoverable-slot" data-bc-recoverable-slot="1">' + recoverabilityBadge(pkg) + '</span>';
-    const showAlert = (msg, ok) => {
-        const box = el('bc_alert');
-        box.style.display = 'block';
-        box.innerHTML = '<div class="' + (ok ? 'alert-success' : 'alert-error') + '">' + msg + '</div>';
-    };
-    /** Stage 5: Verify/DRV results only — never route these through #bc_alert. */
+    /** Post-Stage7: no top-page alert card. Terminal messages use centered dialogs only. */
     let bcResultDialogReturnFocus = null;
     let bcResultDialogKeyHandler = null;
     function closeQualResultDialog() {
@@ -1092,7 +1210,7 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             try { ret.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
         }
     }
-    function showQualResultDialog(opts) {
+    function openCenteredResultShell(opts) {
         opts = opts || {};
         const backdrop = el('bc_result_dialog_backdrop');
         const dlg = el('bc_result_dialog');
@@ -1100,13 +1218,62 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         const titleEl = el('bc_result_dialog_title');
         const closeBtn = el('bc_result_dialog_close');
         if (!backdrop || !dlg || !body || !titleEl || !closeBtn) return;
-
+        titleEl.textContent = String(opts.title || 'رسالة النظام');
+        body.innerHTML = String(opts.bodyHtml || '');
+        const ok = !!opts.success;
+        const fail = opts.failure === true || (opts.failure == null && opts.success === false);
+        dlg.classList.toggle('bc-result-dialog--ok', ok);
+        dlg.classList.toggle('bc-result-dialog--fail', fail && !ok);
+        bcResultDialogReturnFocus = opts.sourceBtn && opts.sourceBtn.isConnected
+            ? opts.sourceBtn
+            : (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+        backdrop.classList.add('is-open');
+        backdrop.setAttribute('aria-hidden', 'false');
+        if (bcResultDialogKeyHandler) {
+            document.removeEventListener('keydown', bcResultDialogKeyHandler, true);
+        }
+        bcResultDialogKeyHandler = (ev) => {
+            if (!backdrop.classList.contains('is-open')) return;
+            if (ev.key === 'Escape') {
+                ev.preventDefault();
+                ev.stopPropagation();
+                return;
+            }
+            if (ev.key !== 'Tab') return;
+            if (ev.shiftKey) {
+                if (document.activeElement !== closeBtn) {
+                    ev.preventDefault();
+                    closeBtn.focus();
+                }
+            } else if (document.activeElement !== closeBtn) {
+                ev.preventDefault();
+                closeBtn.focus();
+            }
+        };
+        document.addEventListener('keydown', bcResultDialogKeyHandler, true);
+        try { closeBtn.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+    }
+    /** CENTERED_SYSTEM_DIALOG — general terminal messages (never #bc_alert). */
+    function showSystemDialog(opts) {
+        opts = opts || {};
+        const ok = !!opts.success;
+        const msg = String(opts.message || 'حدث خطأ غير متوقع');
+        openCenteredResultShell({
+            title: opts.title || (ok ? 'نتيجة العملية' : 'رسالة النظام'),
+            bodyHtml: '<p class="bc-result-dialog-summary">' + esc(msg) + '</p>',
+            success: ok,
+            failure: !ok,
+            sourceBtn: opts.sourceBtn || null
+        });
+    }
+    function showQualResultDialog(opts) {
+        opts = opts || {};
         const op = opts.operation === 'drv' ? 'DRV' : 'Verify';
         const isFull = (opts.packageType === 'full_disaster');
         const pkgLabel = isFull ? 'Full' : 'Country';
         const ok = !!opts.success;
         const saved = !!opts.savedResult;
-        titleEl.textContent = saved
+        const title = saved
             ? ('نتيجة محفوظة — ' + op)
             : ('نتيجة ' + op);
 
@@ -1135,45 +1302,13 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
         }
         html += '<dl class="bc-result-dialog-meta">' + metaRows.join('') + '</dl>';
         html += '<p class="bc-result-dialog-summary">' + esc(String(opts.summary || '')) + '</p>';
-        body.innerHTML = html;
-
-        dlg.classList.toggle('bc-result-dialog--ok', ok);
-        dlg.classList.toggle('bc-result-dialog--fail', !ok);
-
-        bcResultDialogReturnFocus = opts.sourceBtn && opts.sourceBtn.isConnected
-            ? opts.sourceBtn
-            : (document.activeElement instanceof HTMLElement ? document.activeElement : null);
-
-        backdrop.classList.add('is-open');
-        backdrop.setAttribute('aria-hidden', 'false');
-
-        if (bcResultDialogKeyHandler) {
-            document.removeEventListener('keydown', bcResultDialogKeyHandler, true);
-        }
-        bcResultDialogKeyHandler = (ev) => {
-            if (!backdrop.classList.contains('is-open')) return;
-            if (ev.key === 'Escape') {
-                ev.preventDefault();
-                ev.stopPropagation();
-                return;
-            }
-            if (ev.key !== 'Tab') return;
-            const focusables = [closeBtn];
-            const first = focusables[0];
-            const last = focusables[focusables.length - 1];
-            if (ev.shiftKey) {
-                if (document.activeElement === first || !dlg.contains(document.activeElement)) {
-                    ev.preventDefault();
-                    last.focus();
-                }
-            } else if (document.activeElement === last || !dlg.contains(document.activeElement)) {
-                ev.preventDefault();
-                first.focus();
-            }
-        };
-        document.addEventListener('keydown', bcResultDialogKeyHandler, true);
-
-        try { closeBtn.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+        openCenteredResultShell({
+            title: title,
+            bodyHtml: html,
+            success: ok,
+            failure: !ok,
+            sourceBtn: opts.sourceBtn || null
+        });
     }
     function openQualResultFromButton(action, btn, extras) {
         extras = extras || {};
@@ -2334,11 +2469,19 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             qualScheduleVisibleLoads();
             const locks = await apiGet('status.php?action=locks');
             if ((locks.full_lock || {}).held || (locks.country_lock || {}).held) {
-                showAlert('هناك عملية نسخ احتياطي قيد التشغيل حالياً.', false);
+                showSystemDialog({
+                    title: 'رسالة النظام',
+                    message: 'هناك عملية نسخ احتياطي قيد التشغيل حالياً.',
+                    success: false
+                });
             }
         } catch (e) {
             el('bc_root_warning').style.display = 'none';
-            showAlert(e.message || 'تعذر التحميل', false);
+            showSystemDialog({
+                title: 'رسالة النظام',
+                message: e.message || 'تعذر التحميل',
+                success: false
+            });
         } finally {
             setBusy(false);
         }
@@ -2401,10 +2544,20 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                 setBusy(true, 'تشغيل Full Backup…');
                 try {
                     const res = await apiPost('run-full.php', {});
-                    showAlert(res.message || 'تم', true);
+                    showSystemDialog({
+                        title: 'نتيجة العملية',
+                        message: res.message || 'تم تشغيل Full Backup.',
+                        success: true,
+                        sourceBtn: el('bc_run_full_btn')
+                    });
                     await loadAll();
                 } catch (e) {
-                    showAlert(e.message || 'فشل التشغيل', false);
+                    showSystemDialog({
+                        title: 'رسالة النظام',
+                        message: e.message || 'فشل التشغيل',
+                        success: false,
+                        sourceBtn: el('bc_run_full_btn')
+                    });
                 } finally { setBusy(false); }
             }
         ));
@@ -2415,10 +2568,20 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                 setBusy(true, 'تشغيل Country Batch…');
                 try {
                     const res = await apiPost('run-countries.php', {});
-                    showAlert(res.message || 'تم', true);
+                    showSystemDialog({
+                        title: 'نتيجة العملية',
+                        message: res.message || 'تم تشغيل Country Batch.',
+                        success: true,
+                        sourceBtn: el('bc_run_countries_btn')
+                    });
                     await loadAll();
                 } catch (e) {
-                    showAlert(e.message || 'فشل التشغيل', false);
+                    showSystemDialog({
+                        title: 'رسالة النظام',
+                        message: e.message || 'فشل التشغيل',
+                        success: false,
+                        sourceBtn: el('bc_run_countries_btn')
+                    });
                 } finally { setBusy(false); }
             }
         ));
@@ -2543,14 +2706,83 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                             });
                         }
                     }
+                } else if (file === 'recovery_validation.json') {
+                    // Full DRV Report — CRP-parity readable presentation (read-only; no autorun).
+                    const title = 'DRV Report — Full Backup';
+                    const recoverable = resolveFullPkgRecoverable(id);
+                    const drvBtn = row ? row.querySelector('.bc-drv') : null;
+                    const qState = drvBtn ? String(drvBtn.dataset.qState || '') : '';
+                    const errors = Array.isArray(res.errors) ? res.errors : [];
+                    const errText = errors.map((x) => String(x)).join('; ');
+                    if (!res.success || res.data == null) {
+                        const malformed = /invalid\s*json/i.test(errText);
+                        const notFound = !errText || /not\s*found/i.test(errText);
+                        let msg = FULL_DRV_MSG_UNAVAILABLE;
+                        if (malformed) {
+                            msg = FULL_DRV_MSG_UNAVAILABLE;
+                        } else if (notFound) {
+                            msg = (qState === 'success' || qState === 'failure')
+                                ? FULL_DRV_MSG_UNAVAILABLE
+                                : FULL_DRV_MSG_NOT_READY;
+                        }
+                        showFullDrvReportView({
+                            title: title,
+                            data: null,
+                            packageId: id,
+                            recoverable: recoverable,
+                            stableMessage: msg,
+                            forceStatus: 'INCOMPLETE',
+                            hideRaw: true,
+                            sourceBtn: btn
+                        });
+                    } else if (typeof res.data !== 'object' || Array.isArray(res.data)
+                        || (Object.keys(res.data).length === 0)) {
+                        showFullDrvReportView({
+                            title: title,
+                            data: null,
+                            packageId: id,
+                            recoverable: recoverable,
+                            stableMessage: FULL_DRV_MSG_UNAVAILABLE,
+                            forceStatus: 'INCOMPLETE',
+                            hideRaw: true,
+                            sourceBtn: btn
+                        });
+                    } else {
+                        const dataId = String(res.data.package_id || '');
+                        const mismatch = dataId && dataId !== String(id);
+                        if (mismatch) {
+                            showFullDrvReportView({
+                                title: title,
+                                data: null,
+                                packageId: id,
+                                recoverable: recoverable,
+                                stableMessage: FULL_DRV_MSG_UNAVAILABLE,
+                                forceStatus: 'INCOMPLETE',
+                                hideRaw: true,
+                                sourceBtn: btn
+                            });
+                        } else {
+                            const safe = sanitizeCrpDisplayData(res.data);
+                            const raw = safe ? JSON.stringify(safe, null, 2) : '';
+                            showFullDrvReportView({
+                                title: title,
+                                data: res.data,
+                                packageId: id,
+                                recoverable: recoverable,
+                                rawText: raw,
+                                hideRaw: !raw,
+                                sourceBtn: btn
+                            });
+                        }
+                    }
                 } else {
                     const body = res.data ? JSON.stringify(res.data, null, 2) : (res.raw_text || '');
                     const label = (btn.textContent || '').trim() || file || 'file';
                     if (!res.success && !body) {
-                        const errMsg = Array.isArray(res.errors) && res.errors.length
+                        const errText = Array.isArray(res.errors) && res.errors.length
                             ? res.errors.map((x) => String(x)).join('; ')
-                            : (res.message || 'تعذّر فتح التقرير');
-                        showAlert(errMsg, false);
+                            : (res.message || '');
+                        showSafeReportMessage(label, safeGenericReportMessage(errText), btn);
                     } else {
                         showViewContent(label, body || (Array.isArray(res.errors) ? res.errors.join('\n') : ''), true, btn);
                     }
@@ -2569,8 +2801,20 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
                         hideRaw: true,
                         sourceBtn: btn
                     });
+                } else if (file === 'recovery_validation.json') {
+                    showFullDrvReportView({
+                        title: 'DRV Report — Full Backup',
+                        data: null,
+                        packageId: id,
+                        recoverable: resolveFullPkgRecoverable(id),
+                        stableMessage: FULL_DRV_MSG_UNAVAILABLE,
+                        forceStatus: 'INCOMPLETE',
+                        hideRaw: true,
+                        sourceBtn: btn
+                    });
                 } else {
-                    showAlert(e.message, false);
+                    const label = (btn.textContent || '').trim() || file || 'file';
+                    showSafeReportMessage(label, safeGenericReportMessage(e.message), btn);
                 }
             }
             if (row && wasOpen !== null) row.open = wasOpen;
@@ -2581,7 +2825,14 @@ details.bc-acc-item>summary .bc-primary-cluster{width:100%;max-width:100%;justif
             try {
                 const res = await apiGet('status.php?action=log_tail&log=' + encodeURIComponent(t.dataset.log || ''));
                 showViewContent('Log: ' + (t.dataset.log || ''), res.tail || '', true, t);
-            } catch (e) { showAlert(e.message, false); }
+            } catch (e) {
+                showSystemDialog({
+                    title: 'رسالة النظام',
+                    message: e.message || 'تعذّر فتح السجل',
+                    success: false,
+                    sourceBtn: t
+                });
+            }
             return;
         }
         const verifyBtn = t.classList.contains('bc-verify') ? t : (t.closest ? t.closest('.bc-verify') : null);

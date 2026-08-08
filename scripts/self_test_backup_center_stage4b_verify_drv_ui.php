@@ -131,8 +131,12 @@ s4b_ok(str_contains($page, 'apiPostQual'), 'flow: non-throwing mutation client')
 s4b_ok(str_contains($page, 'qualRunMutation'), 'flow: no-refresh mutation helper');
 s4b_ok(!str_contains($page, 'localStorage') && !str_contains($page, 'sessionStorage'), 'auth: no localStorage/sessionStorage');
 // Stage 5 supersedes "no dialog" absence: Verify/DRV results use centered dialog;
-// #bc_alert remains for unrelated Backup Center alerts only.
-s4b_ok(str_contains($page, 'id="bc_alert"') || str_contains($page, "el('bc_alert')"), 'S5: bc_alert remains for unrelated alerts');
+// Post-Stage7: top-page #bc_alert removed; unrelated messages use centered system dialog.
+s4b_ok(
+    !str_contains($page, 'id="bc_alert"')
+    && str_contains($page, 'function showSystemDialog'),
+    'S5/post7: top alert removed; showSystemDialog present'
+);
 s4b_ok(str_contains($page, 'id="bc_result_dialog"') && str_contains($page, 'showQualResultDialog'), 'S5: centered Verify/DRV result dialog present');
 s4b_ok(str_contains($page, 'CRP Report') && str_contains($page, 'country_recovery_validation.json'), 'S6: CRP Report present');
 s4b_ok(!str_contains($page, "'Country DRV'") && !str_contains($page, '>Country DRV<'), 'S6: Country DRV visible label removed');
@@ -412,9 +416,9 @@ $scenarioDefs = [
     76 => ['J S3', '360 geometry', 'STAGE3_MOBILE_360_GEOMETRY', 'browser runtime', 'S3: primary cluster present'],
     77 => ['J S3', 'no overflow', 'geometry asserts', 'browser runtime', 'S3: primary cluster present'],
     78 => ['J S3', 'drawer unchanged', 'openDetails not hosting Verify/DRV', 'source', 'S3: primary cluster present'],
-    79 => ['K S5/6', '#bc_alert remains for unrelated alerts', 'S5: bc_alert remains for unrelated alerts', 'source', 'S5: bc_alert remains for unrelated alerts'],
+    79 => ['K S5/6', 'top alert removed; system dialog present', 'S5/post7: top alert removed; showSystemDialog present', 'source', 'S5/post7: top alert removed; showSystemDialog present'],
     80 => ['K S5/6', 'centered Verify/DRV result dialog (Stage 5)', 'bc_result_dialog present', 'source', 'S5: centered Verify/DRV result dialog present'],
-    81 => ['K S5/6', 'unrelated top-card retained', 'page structure retained', 'source', 'S5: bc_alert remains for unrelated alerts'],
+    81 => ['K S5/6', 'unrelated messages centered', 'page structure retained', 'source', 'S5/post7: top alert removed; showSystemDialog present'],
     82 => ['K S5/6', 'CRP Report present', 'CRP Report label', 'source', 'S6: CRP Report present'],
     83 => ['K S5/6', 'Country DRV removed', 'no Country DRV visible label', 'source', 'S6: Country DRV visible label removed'],
     84 => ['K S5/6', 'report family Stage 6', 'unified report controls', 'source', 'S6: CRP Report present'],
